@@ -20,7 +20,8 @@ struct Frame {
     data: String,
 }
 
-/// Zerlegt einen SSE-Ausschnitt in Frames mit `event:`; reine Kommentar-Frames fallen weg.
+/// Zerlegt einen SSE-Ausschnitt in Frames mit `event:`; reine Kommentar-Frames und die Position
+/// des Einsatz-Stroms (Kontroll-Ereignis `position`, LFH-922) fallen weg.
 fn frames(roh: &str) -> Vec<Frame> {
     roh.split("\n\n")
         .filter_map(|block| {
@@ -36,7 +37,9 @@ fn frames(roh: &str) -> Vec<Frame> {
                     data.push_str(v);
                 }
             }
-            event.map(|event| Frame { id, event, data })
+            event
+                .filter(|e| e != "position")
+                .map(|event| Frame { id, event, data })
         })
         .collect()
 }
@@ -63,6 +66,23 @@ async fn oeffnen(
         .oneshot(req.body(Body::empty()).unwrap())
         .await
         .unwrap()
+}
+
+/// Liest einen offenen SSE-Body weiter, bis `stille_ms` lang nichts kommt.
+async fn weiterlesen(body: &mut Body, stille_ms: u64) -> String {
+    use http_body_util::BodyExt;
+    let mut gelesen = String::new();
+    while let Ok(Some(Ok(frame))) = tokio::time::timeout(
+        std::time::Duration::from_millis(stille_ms),
+        std::pin::Pin::new(&mut *body).frame(),
+    )
+    .await
+    {
+        if let Some(daten) = frame.data_ref() {
+            gelesen.push_str(&String::from_utf8_lossy(daten));
+        }
+    }
+    gelesen
 }
 
 async fn org_von(pool: &sqlx::SqlitePool, benutzername: &str) -> i64 {
@@ -175,11 +195,17 @@ async fn org_ereignis_laesst_den_einsatz_replay_unberuehrt() {
     let eid = einsatz_anlegen(&app, &admin).await;
     let pfad = format!("/api/einsaetze/{eid}/live");
 
-    let erst = oeffnen(&app, &pfad, Some(&admin), None).await;
+    // Einsatz- und Org-Teil laufen zusammengeführt; gleichzeitig bereitliegende Frames beider
+    // Teile kommen in beliebiger Reihenfolge. Deshalb wird nach jedem Ereignis gelesen.
+    let mut erst = oeffnen(&app, &pfad, Some(&admin), None).await.into_body();
+    let mut roh = weiterlesen(&mut erst, 300).await;
     live.publiziere_event(eid, LiveEvent::Etb, r#"{"n":1}"#.into());
+    roh.push_str(&weiterlesen(&mut erst, 300).await);
     live.publiziere_stammdaten(org);
+    roh.push_str(&weiterlesen(&mut erst, 300).await);
     live.publiziere_event(eid, LiveEvent::Etb, r#"{"n":2}"#.into());
-    let fs = frames(&sse_anfang_lesen(erst.into_body(), 300).await);
+    roh.push_str(&weiterlesen(&mut erst, 300).await);
+    let fs = frames(&roh);
     assert_eq!(events(&fs), vec!["etb", "stammdaten", "etb"], "{fs:?}");
     let erste_id = fs[0].id.clone().expect("Einsatz-Ereignis trägt eine Id");
 

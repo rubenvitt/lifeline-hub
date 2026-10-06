@@ -7,26 +7,35 @@
 //! bei Upstream-Ausfall den Stale-Cache weiter und evictet per LRU unter einem Größen-Cap.
 //! Cache-Fehler sind NIE fatal: Lesen → Miss, Schreiben → ignoriert.
 //!
+//! Die Größe führt eine Zählerzeile, die Trigger bei jedem Insert, Update und Delete
+//! fortschreiben; Cap-Prüfung und die Auswahl der Verdrängung lesen keine BLOB-Seiten (LFH-932).
+//!
 //! Jeder Upstream-Abruf belegt einen Platz der Proxy-Grenze (`proxy::abruf_platz`); gleichzeitige
 //! Misses auf dieselbe URL teilen sich einen Abruf (LFH-930).
 
 use crate::karte::proxy::{self, AssetAntwort, ProxyFehler, Revalidiert};
 use futures::future::{BoxFuture, FutureExt, Shared};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::Semaphore;
 
 /// Cache-Obergrenze in Bytes (feste Vorgabe, keine CLI-Option).
 pub const TILE_CACHE_CAP_BYTES: i64 = 256 * 1024 * 1024;
 
-/// Eviction nur jede N-te Schreiboperation (die SUM ist O(n)); Überschuss ≤ N × Tile.
-const EVICT_INTERVALL: u64 = 16;
-static EVICT_ZAEHLER: AtomicU64 = AtomicU64::new(0);
+/// Höchstzahl Einträge, die eine Verdrängungs-Transaktion löscht; ein Lauf wiederholt, bis die
+/// Summe unter dem Cap liegt. Kurze Transaktionen halten den Schreib-Lock des Caches kurz.
+const VERDRAENG_BATCH: i64 = 64;
+
+/// Schema-Stand der Cache-Datei in `PRAGMA user_version`. Die Datei ist verwerfbar: weicht der
+/// Stand ab, wird die Tabelle verworfen und neu angelegt, denn `CREATE TABLE IF NOT EXISTS`
+/// übernähme kein geändertes Schema. Stand 2 (LFH-932): `bytes` als letzte Spalte, damit
+/// Zeilen ohne den BLOB-Überlauf lesbar sind, Covering-Index für die LRU-Reihenfolge und
+/// Zählerzeile `tile_cache_groesse`. Stand 0 ist die Datei vor LFH-932.
+const SCHEMA_VERSION: i64 = 2;
 
 /// `letzter_zugriff` wird bei einem Hit nur fortgeschrieben, wenn er älter als diese Schwelle
 /// ist — sonst würde jeder Lesezugriff zum Write.
@@ -96,36 +105,92 @@ pub fn unix_now() -> i64 {
 
 // ===== Pool (per Pfad memoisiert, kein AppState-Feld) =====
 
-static POOLS: OnceLock<Mutex<HashMap<PathBuf, SqlitePool>>> = OnceLock::new();
+/// Ein geöffneter Kachel-Cache: Pool, Cap und die Sperre, die überlappende Verdrängungen
+/// verhindert. `Deref` auf den Pool, damit die Speicher-Operationen ihn direkt nehmen.
+#[derive(Clone)]
+pub struct TileCache {
+    pool: SqlitePool,
+    cap: i64,
+    verdraengung: Arc<tokio::sync::Mutex<()>>,
+}
 
-fn pools() -> &'static Mutex<HashMap<PathBuf, SqlitePool>> {
+impl TileCache {
+    fn neu(pool: SqlitePool, cap: i64) -> Self {
+        Self {
+            pool,
+            cap,
+            verdraengung: Arc::new(tokio::sync::Mutex::new(())),
+        }
+    }
+}
+
+impl std::ops::Deref for TileCache {
+    type Target = SqlitePool;
+    fn deref(&self) -> &SqlitePool {
+        &self.pool
+    }
+}
+
+static POOLS: OnceLock<Mutex<HashMap<PathBuf, TileCache>>> = OnceLock::new();
+
+fn pools() -> &'static Mutex<HashMap<PathBuf, TileCache>> {
     POOLS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Legt das Schema an oder baut es neu, wenn `user_version` nicht [`SCHEMA_VERSION`] ist. Prüfen
+/// und Umbauen in EINER `BEGIN IMMEDIATE`-Transaktion, damit zwei gleichzeitig öffnende Pools
+/// nicht beide umbauen.
 async fn schema_anlegen(pool: &SqlitePool) -> sqlx::Result<()> {
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS tile_cache (\
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let stand: i64 = sqlx::query_scalar("PRAGMA user_version")
+        .fetch_one(&mut *tx)
+        .await?;
+    if stand == SCHEMA_VERSION {
+        return Ok(()); // Drop von `tx` → Rollback, nichts geschrieben.
+    }
+    for sql in [
+        "DROP TABLE IF EXISTS tile_cache",
+        "DROP TABLE IF EXISTS tile_cache_groesse",
+        "CREATE TABLE tile_cache (\
              schluessel       TEXT    PRIMARY KEY, \
-             bytes            BLOB    NOT NULL, \
              content_type     TEXT    NOT NULL, \
              content_encoding TEXT, \
              etag             TEXT, \
              expires_at       INTEGER NOT NULL, \
              groesse          INTEGER NOT NULL, \
-             letzter_zugriff  INTEGER NOT NULL)",
-    )
-    .execute(pool)
+             letzter_zugriff  INTEGER NOT NULL, \
+             bytes            BLOB    NOT NULL)",
+        // Covering für die Verdrängung: Reihenfolge, Größe und Schlüssel ohne Tabellenzeile.
+        "CREATE INDEX idx_tile_cache_lru ON tile_cache (letzter_zugriff, groesse, schluessel)",
+        "CREATE TABLE tile_cache_groesse (\
+             id    INTEGER PRIMARY KEY CHECK (id = 1), \
+             summe INTEGER NOT NULL)",
+        "INSERT INTO tile_cache_groesse (id, summe) VALUES (1, 0)",
+        "CREATE TRIGGER tile_cache_groesse_ins AFTER INSERT ON tile_cache BEGIN \
+             UPDATE tile_cache_groesse SET summe = summe + NEW.groesse WHERE id = 1; END",
+        "CREATE TRIGGER tile_cache_groesse_upd AFTER UPDATE OF groesse ON tile_cache BEGIN \
+             UPDATE tile_cache_groesse SET summe = summe + NEW.groesse - OLD.groesse \
+             WHERE id = 1; END",
+        "CREATE TRIGGER tile_cache_groesse_del AFTER DELETE ON tile_cache BEGIN \
+             UPDATE tile_cache_groesse SET summe = summe - OLD.groesse WHERE id = 1; END",
+    ] {
+        sqlx::query(sql).execute(&mut *tx).await?;
+    }
+    // Konstante, kein Eingabewert.
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "PRAGMA user_version = {SCHEMA_VERSION}"
+    )))
+    .execute(&mut *tx)
     .await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tile_cache_lru ON tile_cache (letzter_zugriff)")
-        .execute(pool)
-        .await?;
+    tx.commit().await?;
+    tracing::info!("Tile-Cache: Schema auf Stand {SCHEMA_VERSION} angelegt (vorher {stand})");
     Ok(())
 }
 
-/// Memoisierter Cache-Pool für ein `karten_dir`; legt DB-Datei und Schema beim ersten Aufruf
-/// an. Per Pfad, damit Tests mit eigenem Temp-Verzeichnis isoliert sind. Der std-Mutex wird nie
-/// über ein `await` gehalten (`!Send`), daher der Doppel-Check.
-pub async fn cache_pool(karten_dir: &Path) -> sqlx::Result<SqlitePool> {
+/// Memoisierter Cache für ein `karten_dir`; legt DB-Datei und Schema beim ersten Aufruf an. Per
+/// Pfad, damit Tests mit eigenem Temp-Verzeichnis isoliert sind. Der std-Mutex wird nie über
+/// ein `await` gehalten (`!Send`), daher der Doppel-Check.
+pub async fn cache_oeffnen(karten_dir: &Path) -> sqlx::Result<TileCache> {
     let pfad = karten_dir.join("tile-cache.db");
     {
         let map = pools().lock().unwrap();
@@ -139,12 +204,18 @@ pub async fn cache_pool(karten_dir: &Path) -> sqlx::Result<SqlitePool> {
             SqliteConnectOptions::new()
                 .filename(&pfad)
                 .create_if_missing(true)
-                .journal_mode(SqliteJournalMode::Wal),
+                .journal_mode(SqliteJournalMode::Wal)
+                // Verwerfbarer Cache: ein Absturz darf die letzten Kacheln kosten, aber nicht je
+                // Kachel einen fsync (sqlx-Vorgabe FULL). Die operative DB bleibt unberührt.
+                .synchronous(SqliteSynchronous::Normal),
         )
         .await?;
     schema_anlegen(&pool).await?;
     let mut map = pools().lock().unwrap();
-    Ok(map.entry(pfad).or_insert(pool).clone())
+    Ok(map
+        .entry(pfad)
+        .or_insert_with(|| TileCache::neu(pool, TILE_CACHE_CAP_BYTES))
+        .clone())
 }
 
 // ===== Speicher-Operationen (Fehler nie fatal) =====
@@ -190,19 +261,25 @@ async fn speichere(
     expires_at: i64,
     now: i64,
 ) -> sqlx::Result<()> {
+    // Upsert statt `INSERT OR REPLACE`: REPLACE löscht die alte Zeile ohne Delete-Trigger (ohne
+    // `recursive_triggers`), die Zählerzeile liefe davon.
     sqlx::query(
-        "INSERT OR REPLACE INTO tile_cache \
-         (schluessel, bytes, content_type, content_encoding, etag, expires_at, groesse, letzter_zugriff) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO tile_cache \
+         (schluessel, content_type, content_encoding, etag, expires_at, groesse, letzter_zugriff, bytes) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) \
+         ON CONFLICT (schluessel) DO UPDATE SET \
+         content_type = excluded.content_type, content_encoding = excluded.content_encoding, \
+         etag = excluded.etag, expires_at = excluded.expires_at, groesse = excluded.groesse, \
+         letzter_zugriff = excluded.letzter_zugriff, bytes = excluded.bytes",
     )
     .bind(schluessel)
-    .bind(a.bytes.as_slice())
     .bind(&a.content_type)
     .bind(a.content_encoding.as_deref())
     .bind(a.etag.as_deref())
     .bind(expires_at)
     .bind(a.bytes.len() as i64)
     .bind(now)
+    .bind(a.bytes.as_slice())
     .execute(pool)
     .await?;
     Ok(())
@@ -237,42 +314,79 @@ async fn aktualisiere_frische(
     Ok(())
 }
 
-/// Evictet den ältesten (per `letzter_zugriff`) Eintrag, bis `SUM(groesse) <= cap`.
-async fn evict_falls_noetig(pool: &SqlitePool, cap: i64) -> sqlx::Result<()> {
-    let total: i64 = sqlx::query_scalar("SELECT COALESCE(SUM(groesse), 0) FROM tile_cache")
-        .fetch_one(pool)
-        .await?;
-    if total <= cap {
-        return Ok(());
-    }
-    let rows: Vec<(String, i64)> =
-        sqlx::query_as("SELECT schluessel, groesse FROM tile_cache ORDER BY letzter_zugriff ASC")
-            .fetch_all(pool)
-            .await?;
-    let mut rest = total;
-    for (schluessel, groesse) in rows {
-        if rest <= cap {
-            break;
-        }
-        sqlx::query("DELETE FROM tile_cache WHERE schluessel = ?")
-            .bind(&schluessel)
-            .execute(pool)
-            .await?;
-        rest -= groesse;
-    }
-    Ok(())
+/// Gesamtgröße aus der Zählerzeile: ein Zugriff über den Primärschlüssel, kein Tabellenscan.
+const GESAMTGROESSE_SQL: &str = "SELECT summe FROM tile_cache_groesse WHERE id = 1";
+
+/// Löscht die ältesten Einträge (per `letzter_zugriff`), bis die Summe höchstens `cap` ist: je
+/// Transaktion bis zu [`VERDRAENG_BATCH`] Zeilen, genau so viele, wie der Überhang verlangt.
+/// Die Auswahl läuft über den Covering-Index und liest keine BLOB-Seiten; erst das Löschen
+/// selbst geht durch die Seiten der gelöschten Zeilen.
+const VERDRAENG_SQL: &str = "DELETE FROM tile_cache WHERE schluessel IN (\
+     SELECT schluessel FROM (\
+         SELECT schluessel, \
+                SUM(groesse) OVER (ORDER BY letzter_zugriff, groesse, schluessel \
+                                   ROWS UNBOUNDED PRECEDING) - groesse AS davor \
+         FROM tile_cache ORDER BY letzter_zugriff, groesse, schluessel LIMIT ?) \
+     WHERE davor < ?)";
+
+/// Setzt die Zählerzeile auf die Summe der Einträge (über den Covering-Index).
+const ZAEHLER_NEU_SQL: &str = "UPDATE tile_cache_groesse \
+     SET summe = (SELECT COALESCE(SUM(groesse), 0) FROM tile_cache) WHERE id = 1";
+
+async fn gesamtgroesse(pool: &SqlitePool) -> sqlx::Result<i64> {
+    sqlx::query_scalar(GESAMTGROESSE_SQL).fetch_one(pool).await
 }
 
-/// Gedrosselte Eviction: nur jede `EVICT_INTERVALL`-te Schreiboperation prüft den Cap.
-async fn evict_throttled(pool: &SqlitePool, cap: i64) {
-    if EVICT_ZAEHLER
-        .fetch_add(1, Ordering::Relaxed)
-        .is_multiple_of(EVICT_INTERVALL)
-    {
-        if let Err(e) = evict_falls_noetig(pool, cap).await {
-            tracing::warn!("Tile-Cache: Eviction-Fehler: {e}");
+/// Verdrängt bis unter `cap`. Die Aufrufer halten die Sperre des [`TileCache`].
+async fn verdraenge(pool: &SqlitePool, cap: i64) -> sqlx::Result<()> {
+    loop {
+        let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+        let summe: i64 = sqlx::query_scalar(GESAMTGROESSE_SQL)
+            .fetch_one(&mut *tx)
+            .await?;
+        if summe <= cap {
+            return Ok(());
+        }
+        let geloescht = sqlx::query(VERDRAENG_SQL)
+            .bind(VERDRAENG_BATCH)
+            .bind(summe - cap)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+        if geloescht == 0 {
+            // Zähler über der Summe der Zeilen (sollte es mit den Triggern nie geben): neu
+            // zählen statt endlos laufen oder bei jedem Schreiben erneut anzuspringen.
+            sqlx::query(ZAEHLER_NEU_SQL).execute(&mut *tx).await?;
+            tx.commit().await?;
+            tracing::warn!("Tile-Cache: Zählerzeile ({summe}) passte nicht, neu gezählt");
+            return Ok(());
+        }
+        tx.commit().await?;
+    }
+}
+
+/// Prüft nach einem Schreiben den Cap (ein Zeilenzugriff) und startet bei Überschreitung eine
+/// Verdrängung im Hintergrund. Läuft schon eine, wird übersprungen statt gestaut: die laufende
+/// räumt ohnehin bis unter den Cap. Der auslösende Request wartet nicht.
+async fn verdraenge_falls_noetig(cache: &TileCache) {
+    match gesamtgroesse(cache).await {
+        Ok(summe) if summe > cache.cap => {}
+        Ok(_) => return,
+        Err(e) => {
+            tracing::warn!("Tile-Cache: Größe nicht lesbar: {e}");
+            return;
         }
     }
+    let Ok(sperre) = cache.verdraengung.clone().try_lock_owned() else {
+        return;
+    };
+    let cache = cache.clone();
+    tokio::spawn(async move {
+        let _sperre = sperre;
+        if let Err(e) = verdraenge(&cache, cache.cap).await {
+            tracing::warn!("Tile-Cache: Eviction-Fehler: {e}");
+        }
+    });
 }
 
 /// Auslieferungs-Antwort aus einem Cache-Eintrag: `Cache-Control: public, max-age=<Rest>` und
@@ -288,10 +402,13 @@ fn aus_cache(row: CacheRow, now: i64) -> AssetAntwort {
     }
 }
 
-async fn speichere_falls_cachebar(pool: &SqlitePool, schluessel: &str, a: &AssetAntwort, now: i64) {
+async fn speichere_falls_cachebar(cache: &TileCache, schluessel: &str, a: &AssetAntwort, now: i64) {
     if let CachePlan::Cachen { ttl } = cache_plan(a.cache_control.as_deref()) {
-        if speichere(pool, schluessel, a, now + ttl, now).await.is_ok() {
-            evict_throttled(pool, TILE_CACHE_CAP_BYTES).await;
+        if speichere(cache, schluessel, a, now + ttl, now)
+            .await
+            .is_ok()
+        {
+            verdraenge_falls_noetig(cache).await;
         } else {
             tracing::warn!("Tile-Cache: Schreibfehler (ignoriert)");
         }
@@ -333,7 +450,7 @@ fn laeuft_gebuendelt(schluessel: &str) -> bool {
 /// weiter, wenn der auslösende Client abbricht (begrenzt durch das Gesamt-Timeout des
 /// `proxy_client`), speichert die Kachel und trägt sich danach aus.
 async fn hole_gebuendelt(
-    cache_pool: &SqlitePool,
+    cache_pool: &TileCache,
     client: &reqwest::Client,
     grenze: &Arc<Semaphore>,
     url: reqwest::Url,
@@ -401,7 +518,7 @@ async fn mit_platz<T>(
 /// [`ProxyFehler::Ueberlast`] und ein veralteter Eintrag wird weiter serviert. Hits brauchen
 /// keinen Platz.
 pub async fn hole_asset_cached(
-    cache_pool: &SqlitePool,
+    cache_pool: &TileCache,
     client: &reqwest::Client,
     grenze: &Arc<Semaphore>,
     url: reqwest::Url,
@@ -459,8 +576,8 @@ pub async fn hole_asset_via_cache_oder_direkt(
     byte_cap: usize,
     now: i64,
 ) -> Result<AssetAntwort, ProxyFehler> {
-    match cache_pool(karten_dir).await {
-        Ok(pool) => hole_asset_cached(&pool, client, grenze, url, byte_cap, now).await,
+    match cache_oeffnen(karten_dir).await {
+        Ok(cache) => hole_asset_cached(&cache, client, grenze, url, byte_cap, now).await,
         Err(e) => {
             tracing::warn!("Tile-Cache: Pool nicht verfügbar ({e}), Direkt-Fetch ohne Cache");
             mit_platz(grenze, proxy::hole_asset(client, url, byte_cap)).await
@@ -471,10 +588,14 @@ pub async fn hole_asset_via_cache_oder_direkt(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicU64;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
-    async fn test_cache_pool() -> SqlitePool {
+    async fn test_cache_pool() -> TileCache {
+        test_cache_mit_cap(TILE_CACHE_CAP_BYTES).await
+    }
+
+    async fn test_cache_mit_cap(cap: i64) -> TileCache {
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(
@@ -485,7 +606,7 @@ mod tests {
             .await
             .unwrap();
         schema_anlegen(&pool).await.unwrap();
-        pool
+        TileCache::neu(pool, cap)
     }
 
     /// Loopback-Upstream mit Hit-Zähler und `If-None-Match`→304; belegt, dass ein Cache-Hit den
@@ -946,22 +1067,264 @@ mod tests {
         speichere(&pool, "b", &mk(2), 9999, 2).await.unwrap();
         speichere(&pool, "c", &mk(3), 9999, 3).await.unwrap();
 
-        evict_falls_noetig(&pool, 250).await.unwrap(); // muss auf ≤250 → ältesten (a) löschen
-        let rest: Vec<String> =
-            sqlx::query_scalar("SELECT schluessel FROM tile_cache ORDER BY schluessel")
-                .fetch_all(&pool)
-                .await
-                .unwrap();
+        verdraenge(&pool, 250).await.unwrap(); // muss auf ≤250 → ältesten (a) löschen
         assert_eq!(
-            rest,
+            schluessel(&pool).await,
             vec!["b", "c"],
             "ältester (a, niedrigster letzter_zugriff) evictet"
         );
     }
 
+    fn kachel(n: usize) -> AssetAntwort {
+        AssetAntwort {
+            bytes: vec![7; n],
+            content_type: "x".into(),
+            content_encoding: None,
+            cache_control: Some("public, max-age=300".into()),
+            etag: None,
+        }
+    }
+
+    async fn schluessel(pool: &SqlitePool) -> Vec<String> {
+        sqlx::query_scalar("SELECT schluessel FROM tile_cache ORDER BY schluessel")
+            .fetch_all(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn summe_der_zeilen(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar("SELECT COALESCE(SUM(groesse), 0) FROM tile_cache")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn verdraengung_loescht_in_batches_genau_den_ueberhang() {
+        let pool = test_cache_pool().await;
+        // 200 × 10 Bytes, letzter_zugriff 0..199.
+        for i in 0..200 {
+            speichere(&pool, &format!("k{i:03}"), &kachel(10), 9999, i)
+                .await
+                .unwrap();
+        }
+        verdraenge(&pool, 505).await.unwrap(); // mehrere Batches à 64
+        let rest = schluessel(&pool).await;
+        assert_eq!(
+            rest.len(),
+            50,
+            "genau bis unter den Cap, nicht ein Batch zu viel"
+        );
+        assert_eq!(
+            rest.first().map(String::as_str),
+            Some("k150"),
+            "die ältesten gingen"
+        );
+        assert_eq!(gesamtgroesse(&pool).await.unwrap(), 500);
+    }
+
+    #[tokio::test]
+    async fn verdraengung_loescht_bei_ueberhang_auf_einer_grenze_nicht_eine_zeile_mehr() {
+        let pool = test_cache_pool().await;
+        for (i, k) in ["a", "b", "c"].into_iter().enumerate() {
+            speichere(&pool, k, &kachel(100), 9999, i as i64)
+                .await
+                .unwrap();
+        }
+        // Überhang 100 = genau die Größe von a: a reicht, b bleibt.
+        verdraenge(&pool, 200).await.unwrap();
+        assert_eq!(schluessel(&pool).await, vec!["b", "c"]);
+        assert_eq!(gesamtgroesse(&pool).await.unwrap(), 200);
+    }
+
+    #[tokio::test]
+    async fn verdraengung_zaehlt_einen_abweichenden_zaehler_neu() {
+        let pool = test_cache_pool().await;
+        speichere(&pool, "a", &kachel(10), 9999, 1).await.unwrap();
+        sqlx::query("DELETE FROM tile_cache")
+            .execute(&*pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE tile_cache_groesse SET summe = 1000 WHERE id = 1")
+            .execute(&*pool)
+            .await
+            .unwrap();
+        verdraenge(&pool, 100).await.unwrap();
+        assert_eq!(gesamtgroesse(&pool).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn groessenzaehler_folgt_insert_replace_und_delete() {
+        let pool = test_cache_pool().await;
+        let pruefe = |schritt: &'static str| {
+            let pool = pool.clone();
+            async move {
+                assert_eq!(
+                    gesamtgroesse(&pool).await.unwrap(),
+                    summe_der_zeilen(&pool).await,
+                    "{schritt}"
+                );
+            }
+        };
+        speichere(&pool, "a", &kachel(100), 9999, 1).await.unwrap();
+        speichere(&pool, "b", &kachel(200), 9999, 2).await.unwrap();
+        pruefe("Insert").await;
+        assert_eq!(gesamtgroesse(&pool).await.unwrap(), 300);
+        speichere(&pool, "a", &kachel(50), 9999, 3).await.unwrap();
+        pruefe("Replace").await;
+        assert_eq!(gesamtgroesse(&pool).await.unwrap(), 250);
+        sqlx::query("DELETE FROM tile_cache WHERE schluessel = 'b'")
+            .execute(&*pool)
+            .await
+            .unwrap();
+        pruefe("Delete").await;
+        assert_eq!(gesamtgroesse(&pool).await.unwrap(), 50);
+        verdraenge(&pool, 0).await.unwrap();
+        pruefe("Verdrängung").await;
+        assert_eq!(gesamtgroesse(&pool).await.unwrap(), 0);
+    }
+
+    /// Cap-Prüfung und Verdrängung lesen keine Tabellenzeile (und damit keine BLOB-Seite): die
+    /// Größe kommt über den Primärschlüssel der Zählerzeile, die Auswahl über den Covering-Index.
+    #[tokio::test]
+    async fn cap_pruefung_und_verdraengung_lesen_keine_blob_seiten() {
+        let pool = test_cache_pool().await;
+        async fn plan(pool: &SqlitePool, sql: &str) -> Vec<String> {
+            let zeilen: Vec<(i64, i64, i64, String)> =
+                sqlx::query_as(sqlx::AssertSqlSafe(format!("EXPLAIN QUERY PLAN {sql}")))
+                    .bind(1i64)
+                    .bind(1i64)
+                    .fetch_all(pool)
+                    .await
+                    .unwrap();
+            zeilen.into_iter().map(|z| z.3).collect()
+        }
+        let groesse = plan(&pool, GESAMTGROESSE_SQL).await;
+        assert!(
+            groesse
+                .iter()
+                .any(|z| z.contains("tile_cache_groesse USING INTEGER PRIMARY KEY")),
+            "{groesse:?}"
+        );
+        let verdraengung = plan(&pool, VERDRAENG_SQL).await;
+        assert!(
+            verdraengung
+                .iter()
+                .any(|z| z.contains("SCAN tile_cache USING COVERING INDEX idx_tile_cache_lru")),
+            "{verdraengung:?}"
+        );
+        assert!(
+            !verdraengung
+                .iter()
+                .any(|z| z.contains("SCAN tile_cache") && !z.contains("COVERING INDEX")),
+            "kein Scan über die Tabellenzeilen: {verdraengung:?}"
+        );
+        assert!(
+            !verdraengung.iter().any(|z| z.contains("TEMP B-TREE")),
+            "keine Sortierung außerhalb des Index: {verdraengung:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn bytes_ist_die_letzte_spalte() {
+        let pool = test_cache_pool().await;
+        let spalten: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM pragma_table_info('tile_cache') ORDER BY cid")
+                .fetch_all(&*pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            spalten.last().map(String::as_str),
+            Some("bytes"),
+            "{spalten:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn altes_schema_wird_beim_oeffnen_verworfen() {
+        let tmp = tempfile::tempdir().unwrap();
+        let pfad = tmp.path().join("tile-cache.db");
+        {
+            // Stand vor LFH-932: bytes an zweiter Stelle, user_version 0, ein Eintrag.
+            let alt = SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect_with(
+                    SqliteConnectOptions::new()
+                        .filename(&pfad)
+                        .create_if_missing(true),
+                )
+                .await
+                .unwrap();
+            for sql in [
+                "CREATE TABLE tile_cache (schluessel TEXT PRIMARY KEY, bytes BLOB NOT NULL, \
+                 content_type TEXT NOT NULL, content_encoding TEXT, etag TEXT, \
+                 expires_at INTEGER NOT NULL, groesse INTEGER NOT NULL, \
+                 letzter_zugriff INTEGER NOT NULL)",
+                "CREATE INDEX idx_tile_cache_lru ON tile_cache (letzter_zugriff)",
+                "INSERT INTO tile_cache VALUES ('alt', x'00', 'x', NULL, NULL, 9999, 1, 1)",
+            ] {
+                sqlx::query(sql).execute(&alt).await.unwrap();
+            }
+            alt.close().await;
+        }
+
+        let cache = cache_oeffnen(tmp.path()).await.unwrap();
+        let stand: i64 = sqlx::query_scalar("PRAGMA user_version")
+            .fetch_one(&*cache)
+            .await
+            .unwrap();
+        assert_eq!(stand, SCHEMA_VERSION);
+        assert!(
+            schluessel(&cache).await.is_empty(),
+            "alter Inhalt verworfen"
+        );
+        assert_eq!(gesamtgroesse(&cache).await.unwrap(), 0);
+        speichere(&cache, "neu", &kachel(10), 9999, 1)
+            .await
+            .unwrap();
+        assert_eq!(gesamtgroesse(&cache).await.unwrap(), 10);
+
+        // Ein zweites Öffnen (neuer Prozess) baut nicht erneut um.
+        pools().lock().unwrap().remove(&pfad);
+        let wieder = cache_oeffnen(tmp.path()).await.unwrap();
+        assert_eq!(schluessel(&wieder).await, vec!["neu"]);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn laufende_verdraengung_wird_nicht_verdoppelt_und_raeumt_im_hintergrund() {
+        let cache = test_cache_mit_cap(150).await;
+        let sperre = cache.verdraengung.clone().lock_owned().await; // „läuft schon“
+        for (i, k) in ["a", "b", "c"].into_iter().enumerate() {
+            speichere_falls_cachebar(&cache, k, &kachel(100), i as i64).await;
+        }
+        assert_eq!(
+            gesamtgroesse(&cache).await.unwrap(),
+            300,
+            "bei gehaltener Sperre übersprungen statt gestaut"
+        );
+
+        drop(sperre);
+        // Übersprungen heißt: es wartet keine Verdrängung auf die Sperre.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(
+            gesamtgroesse(&cache).await.unwrap(),
+            300,
+            "nach dem Freigeben räumt niemand nach"
+        );
+        speichere_falls_cachebar(&cache, "d", &kachel(100), 3).await;
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            while gesamtgroesse(&cache).await.unwrap() > 150 {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("Verdrängung im Hintergrund");
+        assert_eq!(schluessel(&cache).await, vec!["d"]);
+    }
+
     #[tokio::test]
     async fn pool_fehler_degradiert_auf_direkt_fetch() {
-        // `karten_dir` unter einer regulären Datei → `cache_pool()` scheitert (ENOTDIR). Erwartet
+        // `karten_dir` unter einer regulären Datei → `cache_oeffnen()` scheitert (ENOTDIR). Erwartet
         // wird kein Fehler, sondern ein Direkt-Fetch.
         let client = reqwest::Client::new();
         let (u, hits) = spawn_zaehlend("public, max-age=300", None, b"DIRECT".to_vec()).await;

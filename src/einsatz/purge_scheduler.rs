@@ -417,70 +417,7 @@ mod tests {
         );
     }
 
-    thread_local! {
-        /// Ziel der Log-Ausgabe dieses Test-Threads, solange ein [`LogPuffer`] einfängt.
-        static LOG_ZIEL: std::cell::RefCell<Option<LogPuffer>> = const { std::cell::RefCell::new(None) };
-    }
-
-    /// Fängt die Log-Ausgabe eines Tests ein.
-    ///
-    /// Über EINEN globalen Subscriber, dessen Writer nur in den Puffer des eigenen Threads schreibt
-    /// (ein `#[tokio::test]` läuft auf genau einem). Ein thread-lokaler (`set_default`) fing unter
-    /// parallelen Tests mal alles, mal nichts: `tracing` speichert je Meldestelle zwischen, ob sie
-    /// jemand hören will, und das über alle Threads hinweg.
-    #[derive(Clone, Default)]
-    struct LogPuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
-
-    /// Hebt das Einfangen beim Verlassen des Tests auf.
-    struct LogWaechter;
-
-    impl Drop for LogWaechter {
-        fn drop(&mut self) {
-            LOG_ZIEL.with(|z| z.borrow_mut().take());
-        }
-    }
-
-    impl LogPuffer {
-        fn einfangen() -> (Self, LogWaechter) {
-            static GLOBAL: std::sync::Once = std::sync::Once::new();
-            GLOBAL.call_once(|| {
-                let _ = tracing::subscriber::set_global_default(
-                    tracing_subscriber::fmt()
-                        .with_writer(|| ThreadLog)
-                        .with_ansi(false)
-                        .with_max_level(tracing::Level::INFO)
-                        .finish(),
-                );
-            });
-            // Eine Meldestelle, die ein anderer Thread gerade während des Setzens registriert
-            // hat, kann sonst als „hört niemand“ stehen bleiben.
-            tracing::callsite::rebuild_interest_cache();
-            let puffer = Self::default();
-            LOG_ZIEL.with(|z| *z.borrow_mut() = Some(puffer.clone()));
-            (puffer, LogWaechter)
-        }
-
-        fn text(&self) -> String {
-            String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
-        }
-    }
-
-    /// Writer des globalen Test-Subscribers: schreibt in den Puffer des Threads oder verwirft.
-    struct ThreadLog;
-
-    impl std::io::Write for ThreadLog {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            LOG_ZIEL.with(|z| {
-                if let Some(puffer) = z.borrow().as_ref() {
-                    puffer.0.lock().unwrap().extend_from_slice(buf);
-                }
-            });
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
+    use crate::test_log::LogPuffer;
 
     /// Jeder Audit-Eintrag scheitert — Soft-Delete und Schwärzung brechen fail-closed ab.
     async fn audit_scheitern_lassen(pool: &SqlitePool) {
@@ -759,6 +696,15 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(bilder, 0, "Bild der Lagekarte nach der Schwärzung entfernt");
+        // Die Bytes liegen getrennt (LFH-936) und fallen per CASCADE mit.
+        let bytes: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM karte_hintergrundbild_daten WHERE bild_id = ?",
+        )
+        .bind(bild.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bytes, 0, "Bilddaten nach der Schwärzung entfernt");
         assert!(matches!(
             crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id).await,
             Err(crate::error::AppError::NotFound)
@@ -2270,18 +2216,25 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap();
-        sqlx::query(
-            "INSERT INTO karte_hintergrundbild (einsatz_id, name, daten, mime, groesse, sha256, \
+        // Metadaten und Bytes getrennt (LFH-936, Migration 0154).
+        let bild: i64 = sqlx::query_scalar(
+            "INSERT INTO karte_hintergrundbild (einsatz_id, name, mime, groesse, sha256, \
                 ecken_json, hochgeladen_von) \
-             VALUES (?, 'Luftbild.png', ?, 'image/png', ?, 'x', '[[0,0],[1,0],[1,1],[0,1]]', ?)",
+             VALUES (?, 'Luftbild.png', 'image/png', ?, 'x', '[[0,0],[1,0],[1,1],[0,1]]', ?) \
+             RETURNING id",
         )
         .bind(einsatz)
-        .bind(daten)
         .bind(daten.len() as i64)
         .bind(b)
-        .execute(pool)
+        .fetch_one(pool)
         .await
         .unwrap();
+        sqlx::query("INSERT INTO karte_hintergrundbild_daten (bild_id, daten) VALUES (?, ?)")
+            .bind(bild)
+            .bind(daten)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 
     async fn bilder_von(pool: &SqlitePool, einsatz: i64) -> i64 {

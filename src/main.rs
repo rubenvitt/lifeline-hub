@@ -10,10 +10,20 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Nicht blockierend (LFH-925): ein eigener Thread schreibt auf stdout, die Tokio-Worker legen
+    // Zeilen nur in einen Puffer. Ist er voll (journald staut), fallen Zeilen weg, statt dass ein
+    // Worker im `write` hängt und mit ihm der Server samt Alarmierung. Der Puffer fasst 16 Ki Zeilen
+    // (Vorgabe 128 Ki, auf dem Pi zu viel Speicher). Der Wächter leert ihn beim Ende von `main` und
+    // muss bis dahin leben.
+    let (ausgabe, _log_waechter) = tracing_appender::non_blocking::NonBlockingBuilder::default()
+        .buffered_lines_limit(16 * 1024)
+        .lossy(true)
+        .finish(std::io::stdout());
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
+        .with_writer(ausgabe)
         .init();
 
     let config = Config::parse();
@@ -307,6 +317,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         state,
         RouterOptionen {
             demo_daten: config.demo_daten,
+            zulassungs_budget: None,
         },
     );
 

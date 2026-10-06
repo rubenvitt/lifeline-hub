@@ -8,7 +8,11 @@
 //!   [`HEADER_READ_TIMEOUT`] vollständig sendet, wird abgeräumt.
 //! * **Verbindungs-Obergrenze** — höchstens [`MAX_VERBINDUNGEN`] Verbindungen werden
 //!   gleichzeitig bedient ([`SemaphorAkzeptor`]).
+//! * **TCP-Keepalive** — jede angenommene Verbindung prüft nach [`TCP_KEEPALIVE_ZEIT`] Stille,
+//!   ob die Gegenstelle noch da ist (LFH-938). Ein Feld-Tablet, das mitten im Upload in den
+//!   Standby geht, sendet kein FIN; ohne Keepalive hielte die Verbindung ihren Platz unbegrenzt.
 //! * **Streams je HTTP/2-Verbindung** — höchstens [`HTTP2_MAX_STREAMS`] zugleich (LFH-920).
+//! * **Kopfgröße** — HTTP/1-Köpfe über [`HTTP1_MAX_KOPF`] weist hyper mit 431 ab (LFH-925).
 //!
 //! ## Die Timer-Falle
 //!
@@ -53,6 +57,31 @@ pub const HTTP2_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(20);
 /// Wie lange auf die PING-Antwort gewartet wird. Muss deutlich unter dem Intervall liegen.
 pub const HTTP2_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Stille, nach der das Betriebssystem die erste Keepalive-Probe sendet.
+pub const TCP_KEEPALIVE_ZEIT: Duration = Duration::from_secs(60);
+
+/// Abstand der folgenden Keepalive-Proben (wo das System ihn einstellen lässt).
+pub const TCP_KEEPALIVE_INTERVALL: Duration = Duration::from_secs(10);
+
+/// Schaltet TCP-Keepalive an einer angenommenen Verbindung ein. Eigener Trait, weil der
+/// Akzeptor generisch über den Verbindungstyp ist; beide Serve-Pfade nehmen
+/// `tokio::net::TcpStream` an (TLS setzt erst danach auf).
+pub trait KeepaliveSetzen {
+    fn keepalive_setzen(&self);
+}
+
+impl KeepaliveSetzen for tokio::net::TcpStream {
+    fn keepalive_setzen(&self) {
+        let params = socket2::TcpKeepalive::new().with_time(TCP_KEEPALIVE_ZEIT);
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+        let params = params.with_interval(TCP_KEEPALIVE_INTERVALL);
+        // Kein Abbruch: ohne Keepalive bleibt die Verbindung so geschützt wie vorher.
+        if let Err(fehler) = socket2::SockRef::from(self).set_tcp_keepalive(&params) {
+            tracing::debug!(%fehler, "TCP-Keepalive ließ sich nicht setzen");
+        }
+    }
+}
+
 /// Gleichzeitige Streams je HTTP/2-Verbindung (LFH-920), dem Client per SETTINGS mitgeteilt; ein
 /// Browser stellt weitere Anfragen zurück, bis ein Stream frei wird. Ohne diese Grenze gälten
 /// hypers 200 Streams mit je bis zu 400 KiB Sendepuffer, und ein Client hielte auf einer einzigen
@@ -67,6 +96,12 @@ const _: () = assert!(
     HTTP2_MAX_STREAMS <= 64,
     "LFH-920: höchstens 64 Streams je Verbindung"
 );
+
+/// Lesepuffer für HTTP/1-Köpfe (LFH-925). Ein längerer Kopf endet mit 431, bevor ein Handler
+/// läuft. Ohne Grenze nähme hyper bis etwa 408 KiB an, und jeder Kopfwert, der in eine Logzeile
+/// gerät (Request-ID, Pfad), flutete das Journal. 32 KiB lassen Cookies und lange Abfragen weit
+/// hinter sich. HTTP/2 braucht nichts Eigenes: hypers Kopflistengrenze steht dort schon auf 16 KiB.
+pub const HTTP1_MAX_KOPF: usize = 32 * 1024;
 
 /// Akzeptor, der jede Verbindung an ein Semaphore-Permit bindet. Das Permit lebt in
 /// [`PermitStream`] und fällt zurück, sobald die Verbindung geschlossen wird.
@@ -96,7 +131,7 @@ impl Default for SemaphorAkzeptor {
 
 impl<I, S> Accept<I, S> for SemaphorAkzeptor
 where
-    I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    I: AsyncRead + AsyncWrite + KeepaliveSetzen + Unpin + Send + 'static,
     S: Send + 'static,
 {
     type Stream = PermitStream<I>;
@@ -104,6 +139,7 @@ where
     type Future = Pin<Box<dyn Future<Output = io::Result<(Self::Stream, Self::Service)>> + Send>>;
 
     fn accept(&self, stream: I, service: S) -> Self::Future {
+        stream.keepalive_setzen();
         let plaetze = self.plaetze.clone();
         Box::pin(async move {
             // Hier wird GEWARTET statt abgewiesen: auf Verbindungsebene gibt es noch keinen
@@ -144,7 +180,8 @@ pub fn zeitschranken_setzen<A: axum_server::Address, Acc>(
     builder
         .http1()
         .timer(hyper_util::rt::TokioTimer::new())
-        .header_read_timeout(Some(fristen.header_read));
+        .header_read_timeout(Some(fristen.header_read))
+        .max_buf_size(HTTP1_MAX_KOPF);
     builder
         .http2()
         .timer(hyper_util::rt::TokioTimer::new())
@@ -236,6 +273,22 @@ mod tests {
         // Dem Listener einen Moment geben, bevor der erste Client verbindet.
         tokio::time::sleep(Duration::from_millis(120)).await;
         (addr, akzeptor)
+    }
+
+    /// LFH-938: Keepalive ist an der Verbindung wirklich gesetzt, mit der Frist von oben.
+    #[tokio::test]
+    async fn keepalive_wird_an_der_verbindung_gesetzt() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let (server, _) = listener.accept().await.unwrap();
+
+        let sock = socket2::SockRef::from(&server);
+        assert!(!sock.keepalive().unwrap(), "Vorgabe: aus");
+        server.keepalive_setzen();
+        assert!(sock.keepalive().unwrap());
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        assert_eq!(sock.tcp_keepalive_time().unwrap(), TCP_KEEPALIVE_ZEIT);
     }
 
     /// Regressionstest gegen die Timer-Falle: ohne `.timer()` paniked hyper in der
@@ -356,6 +409,52 @@ mod tests {
             ergebnis.is_ok(),
             "Server hat die stille h2-Verbindung nicht abgeräumt — Keep-Alive-Prüfung wirkungslos"
         );
+    }
+
+    /// LFH-925: ein HTTP/1-Kopf über 32 KiB wird auf Verbindungsebene abgewiesen. Mutationsprobe:
+    /// ohne `max_buf_size` antwortet der Server mit 200.
+    #[tokio::test]
+    async fn uebergrosser_kopf_wird_abgewiesen() {
+        let (addr, _) = server_starten(Fristen::default(), 8).await;
+
+        let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        let anfrage = format!(
+            "GET /ping HTTP/1.1\r\nHost: localhost\r\nx-request-id: {}\r\nConnection: close\r\n\r\n",
+            "a".repeat(HTTP1_MAX_KOPF + 1024)
+        );
+        // Der Server kann die Verbindung schließen, bevor alles gesendet ist.
+        let _ = sock.write_all(anfrage.as_bytes()).await;
+
+        let mut antwort = Vec::new();
+        let _ = tokio::time::timeout(Duration::from_secs(5), sock.read_to_end(&mut antwort))
+            .await
+            .expect("Antwort oder Abbruch binnen 5 s");
+        let text = String::from_utf8_lossy(&antwort);
+        assert!(
+            text.is_empty() || text.starts_with("HTTP/1.1 431"),
+            "erwartet 431 oder Abbruch, Antwort war: {}",
+            &text[..text.len().min(200)]
+        );
+    }
+
+    /// Gegenprobe: ein Kopf knapp unter der Grenze wird bedient.
+    #[tokio::test]
+    async fn kopf_unter_der_grenze_wird_bedient() {
+        let (addr, _) = server_starten(Fristen::default(), 8).await;
+
+        let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        let anfrage = format!(
+            "GET /ping HTTP/1.1\r\nHost: localhost\r\nx-gross: {}\r\nConnection: close\r\n\r\n",
+            "a".repeat(HTTP1_MAX_KOPF / 2)
+        );
+        sock.write_all(anfrage.as_bytes()).await.expect("senden");
+        let mut antwort = Vec::new();
+        tokio::time::timeout(Duration::from_secs(5), sock.read_to_end(&mut antwort))
+            .await
+            .expect("Antwort binnen 5 s")
+            .expect("lesen");
+        let text = String::from_utf8_lossy(&antwort);
+        assert!(text.starts_with("HTTP/1.1 200"), "Antwort war: {text}");
     }
 
     /// Slow Loris im Kleinen: Header nie abschließen; der Server muss die Verbindung nach der Frist

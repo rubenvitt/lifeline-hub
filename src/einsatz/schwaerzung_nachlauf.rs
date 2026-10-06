@@ -15,6 +15,18 @@ use sqlx::SqlitePool;
 /// Jede trägt `id` und `einsatz_id`.
 pub const EINZELN_GELOESCHT: &[&str] = &["anhang", "karte_hintergrundbild"];
 
+/// Kind-Tabellen einer Tabelle aus [`EINZELN_GELOESCHT`] als `(kind, elternteil)`: sie fallen
+/// per `ON DELETE CASCADE` mit deren Zeile, in derselben Transaktion des Nachlaufs (LFH-936, die
+/// Bytes der Lagekarten-Bilder). Der atomare Vorgang übergeht sie wie den Elternteil; erreichbar
+/// sind sie nur über ihn. Guard: `schwaerzung_registry::tests::mit_geloeschte_kinder_fallen_per_cascade`.
+pub const MIT_GELOESCHT: &[(&str, &str)] =
+    &[("karte_hintergrundbild_daten", "karte_hintergrundbild")];
+
+/// Ob `tabelle` ein Kind aus [`MIT_GELOESCHT`] ist.
+pub(crate) fn ist_mit_geloescht(tabelle: &str) -> bool {
+    MIT_GELOESCHT.iter().any(|(kind, _)| *kind == tabelle)
+}
+
 /// SQL-Bedingung „die Zeile `{alias}` ist zur Entfernung vorgesehen“: ihr abgeschlossener
 /// Einsatz ist geschwärzt, oder dessen Kategorie `anhaenge` ist es. Die atomare Schwärzung lässt
 /// solche Zeilen stehen; [`entferne_vorgesehene`] löscht sie danach einzeln, und bis dahin

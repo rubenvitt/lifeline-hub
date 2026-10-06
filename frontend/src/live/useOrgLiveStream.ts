@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
 import { beobachteEinsatzStrom, einsatzStromOffen } from './einsatzStromStore';
+import { erzeugeLiveSammler } from './liveInvalidierung';
 import { oeffneLiveVerbindung } from './liveVerbindung';
 import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
 
@@ -24,12 +25,19 @@ export function useOrgLiveStream(angemeldet: boolean): void {
     // Einsatzes laufen die Effekte des Einsatz-Rahmens (Kind) vor diesem (Eltern), der Zähler
     // steht dann schon, `aktiv` aber noch auf dem alten Stand.
     if (!aktiv || einsatzStromOffen()) return;
-    const abgleich = () => invalidiereOrgLiveKeys(qc);
-    return oeffneLiveVerbindung({
+    // Org-Ereignisse haben weder Nummer noch Replay: jeder Wiederaufbau gleicht die Org-Keys ab,
+    // auch einer des Browsers (`beiNachlieferung` = Vorgabe).
+    const sammler = erzeugeLiveSammler(qc);
+    const abgleich = () => invalidiereOrgLiveKeys(sammler);
+    const schliessen = oeffneLiveVerbindung({
       url: '/api/live',
-      listeners: [...orgListener(qc), ['lagged', abgleich]],
+      listeners: [...orgListener(sammler), ['lagged', abgleich]],
       beiWiederaufbau: abgleich,
       beimErstenOpen: abgleich,
     });
+    return () => {
+      schliessen();
+      sammler.raeumen();
+    };
   }, [aktiv, qc]);
 }

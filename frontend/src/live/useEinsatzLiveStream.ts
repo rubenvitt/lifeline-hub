@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS, einsatzKeys } from '../api/queryKeys';
 import { meldeEinsatzStrom } from './einsatzStromStore';
+import { erzeugeLiveSammler } from './liveInvalidierung';
 import { oeffneLiveVerbindung } from './liveVerbindung';
 import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
 
@@ -20,6 +21,8 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
  * Listener, Invalidierung und lagged-Vollabgleich werden aus `EINSATZ_STREAM_EVENTS`
  * (`api/queryKeys.ts`) abgeleitet; ein neues Live-Modul ist ein Map-Eintrag. Nur Ereignisse
  * mit Seiteneffekt (`sofortmeldung`, Erinnerung, Ablösung) und `lagged` stehen explizit hier.
+ * Invalidiert wird gebündelt über den Sammler der Verbindung (LFH-922, `liveInvalidierung.ts`);
+ * Ton und Toast laufen sofort.
  *
  * Der Strom trägt auch die Org-Ereignisse `einsatzliste` und `stammdaten` (LFH-734): im Einsatz
  * bleibt es bei dieser einen Verbindung, der Org-Strom `/api/live` ruht so lange
@@ -29,7 +32,8 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
 export function useEinsatzLiveStream(einsatzId: number): void {
   const qc = useQueryClient();
   useEffect(() => {
-    const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
+    const sammler = erzeugeLiveSammler(qc);
+    const inval = (key: string) => sammler.vormerken([key, einsatzId]);
     const invalAlle = (keys: readonly string[]) => keys.forEach(inval);
 
     const listeners: [string, EventListener][] = Object.entries(EINSATZ_STREAM_EVENTS).map(
@@ -41,11 +45,11 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     const alleKeys = [...new Set(Object.values(EINSATZ_STREAM_EVENTS).flat())];
     const vollabgleich = () => {
       invalAlle(alleKeys);
-      invalidiereOrgLiveKeys(qc);
+      invalidiereOrgLiveKeys(sammler);
     };
     listeners.push(['lagged', vollabgleich]);
     // Org-Ereignisse auf derselben Verbindung (LFH-734).
-    listeners.push(...orgListener(qc));
+    listeners.push(...orgListener(sammler));
 
     // Sofortmeldung: Listen aktualisieren UND alarmieren (Ton + Toast). Der Toast läuft über ein
     // window-CustomEvent (AlarmZentrale im Layout). NICHT im lagged-Fan-out.
@@ -153,29 +157,37 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       });
     };
 
-    // Reconnect-Resync: jeder Folge-Open gleicht ab wie `lagged`. Der Erst-Open lädt nur die
-    // Org-Keys nach (die Einsatz-Abfragen laden beim Mount ohnehin): ein Org-Ereignis kann beim
-    // Wechsel aus dem Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734).
+    // Reconnect-Resync (LFH-922, design.md D3): eine neue Verbindung hat keine `Last-Event-ID`
+    // und gleicht ab wie `lagged`. Verbindet der Browser dieselbe Quelle neu, nachdem sie ihre
+    // Position (`position`, D4) erhalten hat, liefert der Server das Verpasste per
+    // `Last-Event-ID` nach oder meldet `lagged`; dann laden nur die Org-Keys nach, die keinen
+    // Nachlieferweg haben. Der Erst-Open lädt nur die Org-Keys nach (die
+    // Einsatz-Abfragen laden beim Mount ohnehin): ein Org-Ereignis kann beim Wechsel aus dem
+    // Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734).
+    const orgAbgleich = () => invalidiereOrgLiveKeys(sammler);
     const verbinde = (beimErstenOpen: () => void) => {
       schliessen = oeffneLiveVerbindung({
         url: `/api/einsaetze/${einsatzId}/live`,
         listeners,
         beiWiederaufbau: vollabgleich,
+        beiNachlieferung: orgAbgleich,
+        positionsEreignis: 'position',
         beimErstenOpen,
         istEndzustand: einsatzUnerreichbar,
         beiEndzustand: () => {
           aufWiedergewaehrenWarten();
           // Den Weg in die Sackgasse öffnet der neu geholte Einsatzkopf, dessen 403/404
-          // `EinsatzLayout` dorthin führt.
-          inval(EINSATZ_KEYS.einsatz);
+          // `EinsatzLayout` dorthin führt. Kein Live-Ereignis, deshalb ohne Sammler.
+          void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
         },
       });
     };
-    verbinde(() => invalidiereOrgLiveKeys(qc));
+    verbinde(orgAbgleich);
     const abmelden = meldeEinsatzStrom();
     return () => {
       wartenBeenden?.();
       schliessen();
+      sammler.raeumen();
       abmelden();
     };
   }, [einsatzId, qc]);

@@ -22,13 +22,27 @@
 //! ## Warum die Ausnahmen auch vom Cap befreit sind
 //!
 //! SSE-Streams, Uploads und BLOB-Downloads halten ihren Slot über die ganze Dauer; ein
-//! routerweiter Cap würde von ihnen aufgezehrt (s. `src/app.rs`). Die Anhang- und
-//! Dokument-Downloads haben stattdessen eine eigene, engere Grenze (`ConcurrencyLimitLayer(16)`,
-//! wartet auf einen Platz), der Sicherungs-Download eine Sperre für genau einen Lauf
-//! (`backup::DownloadSperre`, ein zweiter bekommt sofort 503, LFH-926), die Live-Ströme eine
-//! Grenze je Benutzer und insgesamt samt Lebensdauer (`live::strom`, 429 bzw. 503, LFH-920).
+//! routerweiter Cap würde von ihnen aufgezehrt (s. `src/app.rs`). Sie stehen deshalb nicht
+//! ungeschützt da, sondern unter eigenen Grenzen (LFH-938, [`crate::transfer`]):
+//!
+//! * Uploads teilen EINE Upload-Grenze (`transfer::MAX_GLEICHZEITIGE_UPLOADS` Plätze, ein
+//!   überzähliger bekommt sofort 503) und enden, wenn der Body [`transfer::LEERLAUF_FRIST`]
+//!   lang keine Daten liefert.
+//! * Voll-BLOB-Downloads haben je Route eine Download-Grenze
+//!   (`transfer::MAX_GLEICHZEITIGE_DOWNLOADS`, wartet auf einen Platz). Der Platz reist im
+//!   Response-Body und wird erst frei, wenn der Body gesendet oder verworfen ist; ein Client, der
+//!   die Leerlauf-Frist lang nichts abnimmt, gibt Puffer und Platz frei.
+//! * Der Sicherungs-Download hat eine Sperre für genau einen Lauf (`backup::DownloadSperre`, ein
+//!   zweiter bekommt sofort 503, LFH-926) und eine eigene Leerlauf-Frist.
+//! * Die Live-Ströme haben eine Grenze je Benutzer und insgesamt samt Lebensdauer
+//!   (`live::strom`, 429 bzw. 503, LFH-920).
+//! * Die CSV-Exporte sind die einzigen Ausnahmen ohne eigene Grenze;
+//!   `tests/zulassung_guard.rs` führt sie namentlich.
+//!
+//! [`transfer::LEERLAUF_FRIST`]: crate::transfer::LEERLAUF_FRIST
 
 use crate::error::AppError;
+use crate::log_drossel::Sammelzeile;
 use axum::{
     extract::{MatchedPath, Request, State},
     http::Method,
@@ -59,7 +73,9 @@ pub const MAX_GLEICHZEITIGE_REQUESTS: usize = 256;
 ///
 /// Kriterium ist ausschließlich die **Transferdauer**: die Route hält den Request legitim lange
 /// offen (Streaming, große Blobs, unbeschränkte Serialisierung). Eine Route, die nur langsam
-/// sein könnte, gehört nicht hierher. Gegen tote Einträge wacht `tests/zulassung_guard.rs`.
+/// sein könnte, gehört nicht hierher. `tests/zulassung_guard.rs` wacht gegen tote Einträge, gegen
+/// fehlende (jede Route mit Body-Grenze über 4 MiB und jede Download-Grenze steht hier) und gegen
+/// Ausnahmen ohne eigene Grenze.
 pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // SSE-Dauerverbindung: jede Zeitschranke kappte sie, und jede offene Verbindung bände einen
     // Cap-Slot. Eigene Grenze je Benutzer und insgesamt, Lebensdauer statt Zeitbudget:
@@ -72,7 +88,9 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // DB-Größe und Leitung des Clients. Eigene Sperre für einen Lauf und Leerlauf-Frist je Chunk
     // in `routes::backup` (LFH-926).
     ("GET", "/api/backup"),
-    // Multipart-Upload bis 26 MiB, plus clamd-INSTREAM-Scan im Request (Default 30 s).
+    // Multipart-Upload bis 26 MiB, plus clamd-INSTREAM-Scan im Request (Default 30 s). Alle
+    // Uploads hier tragen die gemeinsame Upload-Grenze, alle Downloads eine Download-Grenze
+    // (`transfer`).
     ("POST", "/api/einsaetze/{id}/anhaenge"),
     // Voll-BLOB-Read bis 25 MiB. NUR GET — das DELETE im selben MethodRouter ist ein reiner
     // DB-Delete und bleibt geregelt.
@@ -92,6 +110,29 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Nur PUT bzw. GET — PATCH, DELETE und die Übernahme (ein Kopieren in der DB) bleiben geregelt.
     ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/bild"),
+    // ETB-Anhänge (LFH-117) und Erfassungs-Anhänge (Schaden LFH-21, Person LFH-757, Tier und UHS
+    // LFH-758): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Download. Über LTE dauert ein
+    // 15-MiB-Gutachten länger als das Budget (LFH-938). Nur POST bzw. GET — Liste, DELETE und die
+    // Zugriffsliste bleiben geregelt.
+    ("POST", "/api/einsaetze/{id}/etb/anhaenge"),
+    ("GET", "/api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid}"),
+    ("POST", "/api/einsaetze/{id}/schaeden/{sid}/anhaenge"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
+    ),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/anhaenge"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei",
+    ),
+    ("POST", "/api/einsaetze/{id}/tiere/{tid}/anhaenge"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei",
+    ),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei"),
     // CSV-Vollexporte: laden ohne Limit und bauen im Speicher — Dauer wächst linear mit der
     // Betroffenen-/Tierzahl der Lage.
     ("GET", "/api/einsaetze/{id}/personen/export"),
@@ -144,10 +185,17 @@ pub async fn zulassung(State(cfg): State<Zulassung>, req: Request, next: Next) -
     // Lastabwurf: `try_acquire_owned` wartet nicht. Ein stauender Limiter hielte die Verbindungen
     // genau dann fest, wenn ohnehin zu viele offen sind.
     let Ok(_platz) = cfg.plaetze.clone().try_acquire_owned() else {
-        tracing::warn!(
-            "Zulassungsgrenze erreicht ({} gleichzeitige Requests), Anfrage abgewiesen (503)",
-            MAX_GLEICHZEITIGE_REQUESTS
-        );
+        // Gedrosselt (LFH-925): den Lastabwurf kann ein Fremder je Anfrage auslösen.
+        static LASTABWURF: Sammelzeile = Sammelzeile::neu();
+        if let Some(f) = LASTABWURF.zaehlen() {
+            tracing::warn!(
+                abgewiesen = f.anzahl,
+                seit_s = f.seit_s,
+                "Zulassungsgrenze erreicht ({} gleichzeitige Requests), Anfragen abgewiesen (503); \
+                 Sammelzeile, höchstens eine je Minute",
+                MAX_GLEICHZEITIGE_REQUESTS
+            );
+        }
         return AppError::ServiceUnavailable(UEBERLASTET.to_string()).into_response();
     };
 

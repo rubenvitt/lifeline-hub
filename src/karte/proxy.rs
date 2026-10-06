@@ -700,17 +700,32 @@ type Rewriter = fn(
     usize,
 ) -> Result<(), RewriteFehler>;
 
-/// Holt ein JSON-Dokument, schreibt es mit `rewriter` um (Slots via `repo::slot_upsert`) und liefert
-/// den key-freien String. Zweiphasig, damit der Walker rein/synchron bleibt: (1) auf einem Klon die
-/// `(url, art)`-Paare sammeln, (2) alle Slots async upserten, (3) auf dem Original anwenden.
+/// Karenz, bevor ein Slot, den sein Dokument nicht mehr nennt, gelöscht wird (LFH-932): offene
+/// Karten (Lagemonitore halten ihren Style tagelang) laufen mit dem alten Dokument weiter.
+pub const WAISEN_KARENZ_SEK: i64 = 7 * 24 * 3600;
+
+/// Holt ein JSON-Dokument, schreibt es mit `rewriter` um und liefert den key-freien String.
+/// Zweiphasig, damit der Walker rein/synchron bleibt: (1) auf einem Klon die `(url, art)`-Paare
+/// sammeln, (2) die genannten Slots sichern, (3) auf dem Original anwenden.
+///
+/// Der Abgleich (LFH-932) liest zuerst den Bestand der Quelle und schreibt nur, wenn etwas fehlt,
+/// umzuhängen oder wiedergefunden ist; ein unverändertes Dokument schreibt nicht in die
+/// operative DB. `herkunft` ist `None` für das Style-Dokument, sonst die Slot-id des
+/// TileJSON-Dokuments. Slots derselben Herkunft, die das Dokument nicht mehr nennt, werden erst
+/// nach dem Secret-Check und nur bei einem Dokument, das überhaupt etwas nennt, als verwaist
+/// markiert und nach [`WAISEN_KARENZ_SEK`] gelöscht: ein leeres oder fehlerhaftes Upstream-Dokument
+/// räumt nichts ab.
+///
 /// **fail-closed:** taucht nach dem Rewrite noch ein Query-Key der Upstream-URL im Ergebnis auf →
 /// `Secret` (nicht ausliefern).
 async fn hole_und_rewrite(
     client: &reqwest::Client,
     pool: &sqlx::SqlitePool,
     quelle_id: i64,
+    herkunft: Option<i64>,
     url: Url,
     rewriter: Rewriter,
+    jetzt: i64,
 ) -> Result<String, ProxyFehler> {
     let asset = hole_asset(client, url.clone(), ASSET_BYTE_CAP).await?;
     let text = String::from_utf8(asset.bytes)
@@ -729,25 +744,28 @@ async fn hole_und_rewrite(
         };
         rewriter(&mut klon, &basis, &mut sammeln, MAX_SLOTS)
             .map_err(|e| ProxyFehler::Http(e.to_string()))?;
-    }
-
-    // (2) Slots async upserten → Map (url, art) → Proxy-URL.
-    let mut map: std::collections::HashMap<(String, SlotArt), String> =
-        std::collections::HashMap::new();
-    for (u, a) in &paare {
-        let key = (u.clone(), *a);
-        if let std::collections::hash_map::Entry::Vacant(e) = map.entry(key) {
-            let slot = repo::slot_upsert(pool, quelle_id, u, a.as_str())
-                .await
-                .map_err(|e| ProxyFehler::Http(e.to_string()))?;
-            e.insert(proxy_url(quelle_id, *a, slot));
+        // Ein Dokument, das den Key außerhalb der umgeschriebenen URLs trägt, wird nie
+        // ausgeliefert: dann auch keinen Slot anlegen, übernehmen oder entmarkieren.
+        let ohne_urls =
+            serde_json::to_string(&klon).map_err(|e| ProxyFehler::Http(e.to_string()))?;
+        if contains_secret(&ohne_urls, &url) {
+            return Err(ProxyFehler::Secret);
         }
     }
 
+    // (2) Genannte Slots sichern → Map (url, art) → Proxy-URL, dazu die Waisen der Herkunft.
+    let plan = slots_planen(pool, quelle_id, herkunft, paare, jetzt)
+        .await
+        .map_err(proxy_fehler_aus_db)?;
+
     // (3) Anwenden auf dem Original.
     {
-        let mut anwenden =
-            |u: &str, a: SlotArt| map.get(&(u.to_string(), a)).cloned().unwrap_or_default();
+        let mut anwenden = |u: &str, a: SlotArt| {
+            plan.map
+                .get(&(u.to_string(), a))
+                .cloned()
+                .unwrap_or_default()
+        };
         rewriter(&mut v, &basis, &mut anwenden, MAX_SLOTS)
             .map_err(|e| ProxyFehler::Http(e.to_string()))?;
     }
@@ -756,7 +774,133 @@ async fn hole_und_rewrite(
     if contains_secret(&s, &url) {
         return Err(ProxyFehler::Secret);
     }
+    // (4) Waisen pflegen: erst jetzt, da das Dokument gültig ist, und nur, wenn es etwas nennt.
+    if !plan.map.is_empty() && !(plan.verwaisen.is_empty() && plan.loeschen.is_empty()) {
+        repo::waisen_pflegen(
+            pool,
+            quelle_id,
+            herkunft,
+            &plan.verwaisen,
+            &plan.loeschen,
+            jetzt,
+            jetzt - WAISEN_KARENZ_SEK,
+        )
+        .await
+        .map_err(proxy_fehler_aus_db)?;
+    }
     Ok(s)
+}
+
+/// Ein Fehler der Slot-Map: Schreibdruck (`write_retry!` gibt bei `busy` auf, der Pool läuft
+/// in den Timeout) bleibt ein 503 wie überall (`AppError::status`), alles andere wird ein
+/// Upstream-/Proxyfehler.
+fn proxy_fehler_aus_db(e: crate::error::AppError) -> ProxyFehler {
+    if e.status() == axum::http::StatusCode::SERVICE_UNAVAILABLE {
+        ProxyFehler::Ueberlast
+    } else {
+        ProxyFehler::Http(e.to_string())
+    }
+}
+
+type SlotMap = std::collections::HashMap<(String, SlotArt), String>;
+
+/// Ergebnis von Phase (2): die Proxy-URLs der genannten Slots und die Waisen der Herkunft.
+struct SlotPlan {
+    map: SlotMap,
+    /// Nicht mehr genannt, noch nicht markiert.
+    verwaisen: Vec<i64>,
+    /// Nicht mehr genannt und seit mindestens der Karenz markiert.
+    loeschen: Vec<i64>,
+}
+
+/// Phase (2) von [`hole_und_rewrite`]: liest den Bestand, sichert die genannten Slots (schreibt
+/// nur bei Bedarf) und plant die Waisen, ohne sie anzufassen.
+async fn slots_planen(
+    pool: &sqlx::SqlitePool,
+    quelle_id: i64,
+    herkunft: Option<i64>,
+    paare: Vec<(String, SlotArt)>,
+    jetzt: i64,
+) -> Result<SlotPlan, crate::error::AppError> {
+    use std::collections::{HashMap, HashSet};
+    let bestand = repo::slots_der_quelle(pool, quelle_id).await?;
+    let nach_paar: HashMap<(&str, &str), &repo::SlotZeile> = bestand
+        .iter()
+        .map(|z| ((z.upstream_url.as_str(), z.art.as_str()), z))
+        .collect();
+
+    let mut map = SlotMap::new();
+    let mut genannt: HashSet<i64> = HashSet::new();
+    let mut neu: Vec<(String, SlotArt)> = Vec::new();
+    let mut umhaengen: Vec<i64> = Vec::new();
+    let mut wiedergefunden: Vec<repo::Wiedergefunden> = Vec::new();
+    let mut wieder_paare: Vec<(String, SlotArt)> = Vec::new();
+    let mut gesehen: HashSet<(String, SlotArt)> = HashSet::new();
+    for (u, a) in paare {
+        if !gesehen.insert((u.clone(), a)) {
+            continue;
+        }
+        let treffer = nach_paar.get(&(u.as_str(), a.as_str())).copied();
+        match treffer {
+            Some(z) => {
+                genannt.insert(z.id);
+                if z.verwaist_seit.is_some() {
+                    // Verwaist, aber wieder genannt (auch von einem anderen Dokument derselben
+                    // Quelle): Markierung weg, das nennende Dokument übernimmt ihn.
+                    wiedergefunden.push((z.id, u.clone(), a.as_str().to_string()));
+                    wieder_paare.push((u.clone(), a));
+                } else if herkunft.is_some() && z.herkunft_id.is_none() {
+                    // Bestandszeile ohne Herkunft (vor LFH-932 oder aus dem Style): ein TileJSON,
+                    // das sie nennt, übernimmt sie einmalig.
+                    umhaengen.push(z.id);
+                }
+                map.insert((u, a), proxy_url(quelle_id, a, z.id));
+            }
+            None => neu.push((u, a)),
+        }
+    }
+
+    if !(neu.is_empty() && umhaengen.is_empty() && wiedergefunden.is_empty()) {
+        let neu_db: Vec<(String, String)> = neu
+            .iter()
+            .map(|(u, a)| (u.clone(), a.as_str().to_string()))
+            .collect();
+        let (ids, wieder_ids) = repo::slots_sichern(
+            pool,
+            quelle_id,
+            herkunft,
+            &neu_db,
+            &umhaengen,
+            &wiedergefunden,
+        )
+        .await?;
+        for ((u, a), id) in neu
+            .into_iter()
+            .chain(wieder_paare)
+            .zip(ids.into_iter().chain(wieder_ids))
+        {
+            map.insert((u, a), proxy_url(quelle_id, a, id));
+        }
+    }
+
+    let grenze = jetzt - WAISEN_KARENZ_SEK;
+    let mut verwaisen = Vec::new();
+    let mut loeschen = Vec::new();
+    for z in bestand
+        .iter()
+        .filter(|z| z.herkunft_id == herkunft && !genannt.contains(&z.id))
+    {
+        match z.verwaist_seit {
+            None => verwaisen.push(z.id),
+            Some(seit) if seit <= grenze => loeschen.push(z.id),
+            Some(_) => {}
+        }
+    }
+    Ok(SlotPlan {
+        map,
+        verwaisen,
+        loeschen,
+    })
 }
 
 /// Holt + rewrited einen Vektor-Style (`style.json`). Siehe `hole_und_rewrite`.
@@ -765,18 +909,31 @@ pub async fn hole_style(
     pool: &sqlx::SqlitePool,
     quelle_id: i64,
     url: Url,
+    jetzt: i64,
 ) -> Result<String, ProxyFehler> {
-    hole_und_rewrite(client, pool, quelle_id, url, rewrite_style).await
+    hole_und_rewrite(client, pool, quelle_id, None, url, rewrite_style, jetzt).await
 }
 
-/// Holt + rewrited ein TileJSON-Dokument (`source.url`-Indirektion). Siehe `hole_und_rewrite`.
+/// Holt + rewrited ein TileJSON-Dokument (`source.url`-Indirektion) aus dem Slot `slot`, der
+/// Herkunft seiner Kachel-Slots. Siehe `hole_und_rewrite`.
 pub async fn hole_tilejson(
     client: &reqwest::Client,
     pool: &sqlx::SqlitePool,
     quelle_id: i64,
+    slot: i64,
     url: Url,
+    jetzt: i64,
 ) -> Result<String, ProxyFehler> {
-    hole_und_rewrite(client, pool, quelle_id, url, rewrite_tilejson).await
+    hole_und_rewrite(
+        client,
+        pool,
+        quelle_id,
+        Some(slot),
+        url,
+        rewrite_tilejson,
+        jetzt,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -1399,7 +1556,7 @@ mod service_tests {
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
 
-        let s = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap())
+        let s = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap(), T0)
             .await
             .unwrap();
         assert!(!s.contains("GEHEIMTOKEN12345"), "kein Key im Ergebnis: {s}");
@@ -1442,12 +1599,569 @@ mod service_tests {
         .await;
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
-        let err = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap())
+        let err = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap(), T0)
             .await
             .unwrap_err();
         assert!(
             matches!(err, ProxyFehler::Secret),
             "fail-closed bei Rest-Key"
+        );
+    }
+
+    async fn tilejson_slot(pool: &sqlx::SqlitePool, qid: i64, url: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) \
+             VALUES (?, ?, 'tilejson') RETURNING id",
+        )
+        .bind(qid)
+        .bind(url)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Loopback-Upstream, dessen Dokumente der Test zwischen zwei Abrufen tauscht (Pfad → Body).
+    async fn spawn_dokumente() -> (
+        u16,
+        Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
+    ) {
+        use axum::{http::Uri, response::IntoResponse, Router};
+        let docs = Arc::new(std::sync::Mutex::new(std::collections::HashMap::<
+            String,
+            String,
+        >::new()));
+        let d = docs.clone();
+        let app = Router::new().fallback(move |uri: Uri| {
+            let body = d
+                .lock()
+                .unwrap()
+                .get(uri.path())
+                .cloned()
+                .unwrap_or_default();
+            async move { ([("content-type", "application/json")], body).into_response() }
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        (port, docs)
+    }
+
+    async fn total_changes(pool: &sqlx::SqlitePool) -> i64 {
+        // Der Test-Pool hat genau eine Verbindung: total_changes() zählt alles, was er schrieb.
+        sqlx::query_scalar("SELECT total_changes()")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// Testuhr: ein fester Zeitpunkt, damit die Karenz deterministisch ist.
+    const T0: i64 = 1_800_000_000;
+
+    /// `(upstream_url, art, herkunft_id, verwaist_seit)`, sortiert.
+    type Slot = (String, String, Option<i64>, Option<i64>);
+
+    async fn slots(pool: &sqlx::SqlitePool, qid: i64) -> Vec<Slot> {
+        let mut z: Vec<Slot> = sqlx::query_as(
+            "SELECT upstream_url, art, herkunft_id, verwaist_seit \
+             FROM karte_proxy_asset WHERE quelle_id = ?",
+        )
+        .bind(qid)
+        .fetch_all(pool)
+        .await
+        .unwrap();
+        z.sort();
+        z
+    }
+
+    async fn slot_von(pool: &sqlx::SqlitePool, qid: i64, url: &str) -> Slot {
+        slots(pool, qid)
+            .await
+            .into_iter()
+            .find(|z| z.0 == url)
+            .unwrap_or_else(|| panic!("kein Slot für {url}"))
+    }
+
+    /// Die Slot-id am Ende einer Proxy-URL.
+    fn slot_id(proxy_url: &str) -> i64 {
+        proxy_url.rsplit('/').next().unwrap().parse().unwrap()
+    }
+
+    async fn style(pool: &sqlx::SqlitePool, qid: i64, url: &str, jetzt: i64) -> String {
+        hole_style(&plain(), pool, qid, Url::parse(url).unwrap(), jetzt)
+            .await
+            .unwrap()
+    }
+
+    async fn tilejson(pool: &sqlx::SqlitePool, qid: i64, slot: i64, url: &str, jetzt: i64) {
+        hole_tilejson(&plain(), pool, qid, slot, Url::parse(url).unwrap(), jetzt)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn unveraendertes_dokument_schreibt_nicht() {
+        let (url, _port) = spawn_json(
+            "/style.json",
+            |p| {
+                format!(
+                    r#"{{"version":8,"sources":{{"v":{{"type":"vector","url":"http://127.0.0.1:{p}/tiles.json?key=GEHEIMTOKEN12345"}}}},
+                    "sprite":"http://127.0.0.1:{p}/sprite?key=GEHEIMTOKEN12345"}}"#
+                )
+            },
+            "key=GEHEIMTOKEN12345",
+        )
+        .await;
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        let erster = style(&pool, qid, &url, T0).await;
+        let vorher = total_changes(&pool).await;
+        let zweiter = style(&pool, qid, &url, T0 + 1).await;
+        assert_eq!(erster, zweiter, "dieselben Slots");
+        assert_eq!(
+            total_changes(&pool).await,
+            vorher,
+            "zweiter Abruf mit identischem Dokument schreibt nicht"
+        );
+    }
+
+    /// Style, dessen Sprite-URL `v` trägt.
+    fn sprite_style(port: u16, v: u32) -> String {
+        format!(
+            r#"{{"version":8,"sources":{{}},"sprite":"http://127.0.0.1:{port}/sprite?v={v}&key=GEHEIMTOKEN12345"}}"#
+        )
+    }
+
+    #[tokio::test]
+    async fn gewechselte_asset_url_verwaist_den_alten_slot_bis_zur_karenz() {
+        let (port, docs) = spawn_dokumente().await;
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 1));
+        let url = format!("http://127.0.0.1:{port}/style.json?key=GEHEIMTOKEN12345");
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+
+        let s1 = style(&pool, qid, &url, T0).await;
+        let alt = slot_id(
+            serde_json::from_str::<Value>(&s1).unwrap()["sprite"]
+                .as_str()
+                .unwrap(),
+        );
+        let v1 = format!("http://127.0.0.1:{port}/sprite?v=1&key=GEHEIMTOKEN12345");
+
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 2));
+        let t1 = T0 + 10;
+        style(&pool, qid, &url, t1).await;
+        assert_eq!(slots(&pool, qid).await.len(), 2);
+        assert_eq!(
+            slot_von(&pool, qid, &v1).await.3,
+            Some(t1),
+            "alter Slot verwaist"
+        );
+        assert_eq!(
+            repo::slot_aufloesen(&pool, qid, alt, "sprite")
+                .await
+                .unwrap(),
+            Some(v1.clone()),
+            "offene Karten mit dem alten Style laufen weiter"
+        );
+
+        // Kurz vor Ablauf der Karenz: nichts zu tun, kein Schreibvorgang.
+        let vorher = total_changes(&pool).await;
+        style(&pool, qid, &url, t1 + WAISEN_KARENZ_SEK - 1).await;
+        assert_eq!(total_changes(&pool).await, vorher);
+        assert_eq!(slots(&pool, qid).await.len(), 2);
+
+        style(&pool, qid, &url, t1 + WAISEN_KARENZ_SEK).await;
+        let bestand = slots(&pool, qid).await;
+        assert_eq!(bestand.len(), 1, "{bestand:?}");
+        assert!(bestand[0].0.contains("v=2"), "{bestand:?}");
+        assert_eq!(
+            repo::slot_aufloesen(&pool, qid, alt, "sprite")
+                .await
+                .unwrap(),
+            None,
+            "nach der Karenz nicht mehr auflösbar"
+        );
+    }
+
+    #[tokio::test]
+    async fn wieder_genannter_slot_verliert_die_markierung() {
+        let (port, docs) = spawn_dokumente().await;
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 1));
+        let url = format!("http://127.0.0.1:{port}/style.json?key=GEHEIMTOKEN12345");
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        let s1 = style(&pool, qid, &url, T0).await;
+
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 2));
+        style(&pool, qid, &url, T0 + 10).await;
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 1));
+        let s3 = style(&pool, qid, &url, T0 + 20).await;
+        assert_eq!(s1, s3, "derselbe Slot wie beim ersten Abruf");
+
+        let v1 = format!("http://127.0.0.1:{port}/sprite?v=1&key=GEHEIMTOKEN12345");
+        let v2 = format!("http://127.0.0.1:{port}/sprite?v=2&key=GEHEIMTOKEN12345");
+        assert_eq!(slot_von(&pool, qid, &v1).await.3, None);
+        assert_eq!(slot_von(&pool, qid, &v2).await.3, Some(T0 + 20));
+        // Die alte Markierung zählt nicht weiter: v1 überlebt jede Karenz ab T0 + 10.
+        style(&pool, qid, &url, T0 + 10 + 2 * WAISEN_KARENZ_SEK).await;
+        assert_eq!(slots(&pool, qid).await.len(), 1);
+        assert_eq!(slot_von(&pool, qid, &v1).await.3, None);
+    }
+
+    #[tokio::test]
+    async fn wiedergefundener_slot_nach_parallelem_loeschen_zeigt_auf_den_neuen_slot() {
+        let (port, docs) = spawn_dokumente().await;
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 1));
+        let url = format!("http://127.0.0.1:{port}/style.json?key=GEHEIMTOKEN12345");
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        let sprite = |s: &str| {
+            slot_id(
+                serde_json::from_str::<Value>(s).unwrap()["sprite"]
+                    .as_str()
+                    .unwrap(),
+            )
+        };
+        let alt = sprite(&style(&pool, qid, &url, T0).await);
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 2));
+        style(&pool, qid, &url, T0 + 10).await;
+
+        // Ein paralleler Abruf löscht den verwaisten Slot zwischen Lesen und Entmarkieren.
+        sqlx::query(
+            "CREATE TEMP TRIGGER parallel_geloescht BEFORE UPDATE OF verwaist_seit \
+             ON karte_proxy_asset WHEN NEW.verwaist_seit IS NULL \
+             BEGIN DELETE FROM karte_proxy_asset WHERE id = OLD.id; SELECT RAISE(IGNORE); END",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 1));
+        let neu = sprite(&style(&pool, qid, &url, T0 + 20).await);
+
+        assert_ne!(neu, alt);
+        assert_eq!(
+            repo::slot_aufloesen(&pool, qid, neu, "sprite")
+                .await
+                .unwrap(),
+            Some(format!(
+                "http://127.0.0.1:{port}/sprite?v=1&key=GEHEIMTOKEN12345"
+            )),
+            "das ausgelieferte Dokument zeigt auf den lebenden Slot"
+        );
+    }
+
+    #[tokio::test]
+    async fn leeres_fehlerhaftes_oder_geheimes_dokument_raeumt_nichts_ab() {
+        let (port, docs) = spawn_dokumente().await;
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 1));
+        let url = format!("http://127.0.0.1:{port}/style.json?key=GEHEIMTOKEN12345");
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        style(&pool, qid, &url, T0).await;
+        let v1 = format!("http://127.0.0.1:{port}/sprite?v=1&key=GEHEIMTOKEN12345");
+        let spaet = T0 + 2 * WAISEN_KARENZ_SEK;
+
+        // Fehlerseite des Anbieters als gültiges JSON: nennt nichts.
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), r#"{"message":"invalid key"}"#.into());
+        hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap(), spaet)
+            .await
+            .unwrap();
+        // Kein JSON.
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), "<html>Wartung</html>".into());
+        assert!(
+            hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap(), spaet)
+                .await
+                .is_err()
+        );
+        // Nennt eine neue URL, trägt aber den Key im Klartext: wird nicht ausgeliefert.
+        docs.lock().unwrap().insert(
+            "/style.json".into(),
+            format!(
+                r#"{{"version":8,"sources":{{}},"name":"GEHEIMTOKEN12345","sprite":"http://127.0.0.1:{port}/sprite?v=2&key=GEHEIMTOKEN12345"}}"#
+            ),
+        );
+        assert!(matches!(
+            hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap(), spaet).await,
+            Err(ProxyFehler::Secret)
+        ));
+
+        assert_eq!(
+            slot_von(&pool, qid, &v1).await.3,
+            None,
+            "der Slot des letzten gültigen Dokuments bleibt unmarkiert"
+        );
+        assert_eq!(
+            slots(&pool, qid).await.len(),
+            1,
+            "das abgelehnte Dokument legt keinen Slot an"
+        );
+    }
+
+    #[tokio::test]
+    async fn tilejson_slots_haengen_an_ihrem_dokument() {
+        let (port, docs) = spawn_dokumente().await;
+        let tj_url = format!("http://127.0.0.1:{port}/tiles.json?key=GEHEIMTOKEN12345");
+        let tj = |v: u32| {
+            format!(
+                r#"{{"tiles":["http://127.0.0.1:{port}/{{z}}/{{x}}/{{y}}.pbf?v={v}&key=GEHEIMTOKEN12345"]}}"#
+            )
+        };
+        let kachel = |v: u32| {
+            format!("http://127.0.0.1:{port}/{{z}}/{{x}}/{{y}}.pbf?v={v}&key=GEHEIMTOKEN12345")
+        };
+        docs.lock().unwrap().insert(
+            "/style.json".into(),
+            format!(
+                r#"{{"version":8,"sources":{{"v":{{"type":"vector","url":"{tj_url}"}}}},"sprite":"http://127.0.0.1:{port}/sprite?key=GEHEIMTOKEN12345"}}"#
+            ),
+        );
+        docs.lock().unwrap().insert("/tiles.json".into(), tj(1));
+        let url = format!("http://127.0.0.1:{port}/style.json?key=GEHEIMTOKEN12345");
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+
+        // Bestand aus der Zeit vor der Herkunft: TileJSON- und Kachel-Slot ohne herkunft_id.
+        let tj_slot = tilejson_slot(&pool, qid, &tj_url).await;
+        sqlx::query(
+            "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (?, ?, 'template')",
+        )
+        .bind(qid)
+        .bind(kachel(1))
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Das TileJSON übernimmt die Bestandszeile, die es nennt.
+        tilejson(&pool, qid, tj_slot, &tj_url, T0).await;
+        assert_eq!(slot_von(&pool, qid, &kachel(1)).await.2, Some(tj_slot));
+
+        // Der Style nennt die Kachel nicht, verwaist sie aber auch nicht: sie gehört dem TileJSON.
+        let s = style(&pool, qid, &url, T0).await;
+        let v: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(slot_id(v["sources"]["v"]["url"].as_str().unwrap()), tj_slot);
+        let vorher = slots(&pool, qid).await;
+        assert!(vorher.iter().all(|z| z.3.is_none()), "{vorher:?}");
+        let geschrieben = total_changes(&pool).await;
+        style(&pool, qid, &url, T0 + 1).await;
+        assert_eq!(total_changes(&pool).await, geschrieben);
+
+        // TileJSON wechselt die Kachel-URL → die alte verwaist und geht nach der Karenz.
+        docs.lock().unwrap().insert("/tiles.json".into(), tj(2));
+        tilejson(&pool, qid, tj_slot, &tj_url, T0 + 2).await;
+        assert_eq!(slot_von(&pool, qid, &kachel(1)).await.3, Some(T0 + 2));
+        tilejson(&pool, qid, tj_slot, &tj_url, T0 + 2 + WAISEN_KARENZ_SEK).await;
+        let kacheln: Vec<_> = slots(&pool, qid)
+            .await
+            .into_iter()
+            .filter(|z| z.1 == "template")
+            .collect();
+        assert_eq!(kacheln.len(), 1, "{kacheln:?}");
+        assert_eq!(kacheln[0].0, kachel(2));
+
+        // Der Style nennt das TileJSON nicht mehr → nach der Karenz geht es; seine Kacheln gehen
+        // verwaist an den Style und nach einer weiteren Karenz.
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), sprite_style(port, 1));
+        let t = T0 + 10 * WAISEN_KARENZ_SEK;
+        style(&pool, qid, &url, t).await;
+        assert_eq!(slot_von(&pool, qid, &tj_url).await.3, Some(t));
+        assert_eq!(
+            slot_von(&pool, qid, &kachel(2)).await.3,
+            None,
+            "nicht markiert"
+        );
+        let t2 = t + WAISEN_KARENZ_SEK;
+        style(&pool, qid, &url, t2).await;
+        assert!(!slots(&pool, qid).await.iter().any(|z| z.0 == tj_url));
+        assert_eq!(
+            slot_von(&pool, qid, &kachel(2)).await,
+            (kachel(2), "template".into(), None, Some(t2)),
+            "Kachel-Slot freigegeben statt mitgelöscht"
+        );
+        style(&pool, qid, &url, t2 + WAISEN_KARENZ_SEK).await;
+        let rest = slots(&pool, qid).await;
+        assert!(
+            rest.iter().all(|z| z.1 == "sprite"),
+            "nur Sprites: {rest:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn vom_style_verwaiste_bestandszeile_holt_das_tilejson_zurueck() {
+        let (port, docs) = spawn_dokumente().await;
+        let tj_url = format!("http://127.0.0.1:{port}/tiles.json?key=GEHEIMTOKEN12345");
+        let kachel = format!("http://127.0.0.1:{port}/{{z}}/{{x}}/{{y}}.pbf?key=GEHEIMTOKEN12345");
+        docs.lock().unwrap().insert(
+            "/style.json".into(),
+            format!(r#"{{"version":8,"sources":{{"v":{{"type":"vector","url":"{tj_url}"}}}}}}"#),
+        );
+        docs.lock()
+            .unwrap()
+            .insert("/tiles.json".into(), format!(r#"{{"tiles":["{kachel}"]}}"#));
+        let url = format!("http://127.0.0.1:{port}/style.json?key=GEHEIMTOKEN12345");
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        let tj_slot = tilejson_slot(&pool, qid, &tj_url).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) \
+             VALUES (?, ?, 'template') RETURNING id",
+        )
+        .bind(qid)
+        .bind(&kachel)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Erster Abruf nach dem Update: der Style hält die Bestandszeile für seine Waise.
+        style(&pool, qid, &url, T0).await;
+        assert_eq!(slot_von(&pool, qid, &kachel).await.3, Some(T0));
+
+        // Das TileJSON nennt sie: Markierung weg, gleiche id, jetzt seine.
+        tilejson(&pool, qid, tj_slot, &tj_url, T0 + 1).await;
+        assert_eq!(
+            slot_von(&pool, qid, &kachel).await,
+            (kachel.clone(), "template".into(), Some(tj_slot), None)
+        );
+        assert_eq!(
+            repo::slot_aufloesen(&pool, qid, alt, "template")
+                .await
+                .unwrap(),
+            Some(kachel.clone()),
+            "offene Karten behalten ihre Kachel-URL"
+        );
+        style(&pool, qid, &url, T0 + 2 * WAISEN_KARENZ_SEK).await;
+        assert_eq!(slot_von(&pool, qid, &kachel).await.3, None);
+    }
+
+    #[tokio::test]
+    async fn neue_tilejson_url_uebernimmt_die_kacheln_der_alten_ohne_luecke() {
+        let (port, docs) = spawn_dokumente().await;
+        let tj = |v: u32| format!("http://127.0.0.1:{port}/tiles.json?v={v}&key=GEHEIMTOKEN12345");
+        let kachel = format!("http://127.0.0.1:{port}/{{z}}/{{x}}/{{y}}.pbf?key=GEHEIMTOKEN12345");
+        let style_mit = |u: &str| {
+            format!(r#"{{"version":8,"sources":{{"v":{{"type":"vector","url":"{u}"}}}}}}"#)
+        };
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), style_mit(&tj(1)));
+        docs.lock()
+            .unwrap()
+            .insert("/tiles.json".into(), format!(r#"{{"tiles":["{kachel}"]}}"#));
+        let url = format!("http://127.0.0.1:{port}/style.json?key=GEHEIMTOKEN12345");
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        let tj_slot = |s: &str| {
+            slot_id(
+                serde_json::from_str::<Value>(s).unwrap()["sources"]["v"]["url"]
+                    .as_str()
+                    .unwrap(),
+            )
+        };
+
+        let j1 = tj_slot(&style(&pool, qid, &url, T0).await);
+        tilejson(&pool, qid, j1, &tj(1), T0).await;
+        let k = slot_von_id(&pool, qid, &kachel).await;
+
+        // Der Anbieter versioniert die TileJSON-URL, die Kachel-URL bleibt.
+        docs.lock()
+            .unwrap()
+            .insert("/style.json".into(), style_mit(&tj(2)));
+        let j2 = tj_slot(&style(&pool, qid, &url, T0 + 1).await);
+        tilejson(&pool, qid, j2, &tj(2), T0 + 1).await;
+
+        // Nach der Karenz geht das alte TileJSON; die Kachel bleibt, gleiche id.
+        let t = T0 + 1 + WAISEN_KARENZ_SEK;
+        style(&pool, qid, &url, t).await;
+        assert!(!slots(&pool, qid).await.iter().any(|z| z.0 == tj(1)));
+        assert_eq!(slot_von_id(&pool, qid, &kachel).await, k);
+        tilejson(&pool, qid, j2, &tj(2), t + 1).await;
+        assert_eq!(
+            slot_von(&pool, qid, &kachel).await,
+            (kachel.clone(), "template".into(), Some(j2), None),
+            "das neue TileJSON übernimmt die Kachel"
+        );
+        style(&pool, qid, &url, t + 2 * WAISEN_KARENZ_SEK).await;
+        assert_eq!(slot_von_id(&pool, qid, &kachel).await, k);
+    }
+
+    async fn slot_von_id(pool: &sqlx::SqlitePool, qid: i64, url: &str) -> i64 {
+        sqlx::query_scalar(
+            "SELECT id FROM karte_proxy_asset WHERE quelle_id = ? AND upstream_url = ?",
+        )
+        .bind(qid)
+        .bind(url)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[test]
+    fn schreibdruck_auf_der_slot_map_bleibt_503() {
+        use crate::error::AppError;
+        assert!(matches!(
+            proxy_fehler_aus_db(AppError::Database(sqlx::Error::PoolTimedOut)),
+            ProxyFehler::Ueberlast
+        ));
+        assert!(matches!(
+            proxy_fehler_aus_db(AppError::Database(sqlx::Error::RowNotFound)),
+            ProxyFehler::Http(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn geteilte_kachel_url_gehoert_dem_dokument_das_sie_noch_nennt() {
+        let (port, docs) = spawn_dokumente().await;
+        let tj1 = format!("http://127.0.0.1:{port}/a.json?key=GEHEIMTOKEN12345");
+        let tj2 = format!("http://127.0.0.1:{port}/b.json?key=GEHEIMTOKEN12345");
+        let geteilt = format!("http://127.0.0.1:{port}/{{z}}/{{x}}/{{y}}.pbf?key=GEHEIMTOKEN12345");
+        let andere = format!("http://127.0.0.1:{port}/{{z}}/{{x}}/{{y}}.mvt?key=GEHEIMTOKEN12345");
+        let doc = |u: &str| format!(r#"{{"tiles":["{u}"]}}"#);
+        docs.lock().unwrap().insert("/a.json".into(), doc(&geteilt));
+        docs.lock().unwrap().insert("/b.json".into(), doc(&geteilt));
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &tj1).await;
+        let s1 = tilejson_slot(&pool, qid, &tj1).await;
+        let s2 = tilejson_slot(&pool, qid, &tj2).await;
+
+        tilejson(&pool, qid, s1, &tj1, T0).await;
+        tilejson(&pool, qid, s2, &tj2, T0).await;
+        assert_eq!(slot_von(&pool, qid, &geteilt).await.2, Some(s1));
+
+        // A nennt die Kachel nicht mehr und verwaist sie; B nennt sie und übernimmt sie.
+        docs.lock().unwrap().insert("/a.json".into(), doc(&andere));
+        tilejson(&pool, qid, s1, &tj1, T0 + 1).await;
+        tilejson(&pool, qid, s2, &tj2, T0 + 2).await;
+        assert_eq!(slot_von(&pool, qid, &geteilt).await.2, Some(s2));
+        // A räumt nach der Karenz nur noch, was ihm gehört.
+        tilejson(&pool, qid, s1, &tj1, T0 + 1 + 2 * WAISEN_KARENZ_SEK).await;
+        assert_eq!(
+            slot_von(&pool, qid, &geteilt).await,
+            (geteilt.clone(), "template".into(), Some(s2), None)
         );
     }
 
@@ -1465,7 +2179,8 @@ mod service_tests {
         .await;
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
-        let s = hole_tilejson(&plain(), &pool, qid, Url::parse(&url).unwrap())
+        let tj = tilejson_slot(&pool, qid, &url).await;
+        let s = hole_tilejson(&plain(), &pool, qid, tj, Url::parse(&url).unwrap(), T0)
             .await
             .unwrap();
         assert!(!s.contains("GEHEIMTOKEN12345"), "key-frei: {s}");

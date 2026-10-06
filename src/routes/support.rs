@@ -553,18 +553,30 @@ pub fn last_event_id(headers: &HeaderMap) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// Wire-Name des Kontroll-Ereignisses, das die Position eines Einsatz-Stroms trägt (LFH-922).
+/// Kein [`LiveEvent`]: es gehört keinem Modul, läuft an jedem Filter vorbei und löst keinen
+/// Abgleich aus; der Client hört es nur in `frontend/src/live/liveVerbindung.ts`.
+pub const POSITION_EREIGNIS: &str = "position";
+
 /// Baut den SSE-Ausgabe-Stream mit vorangestelltem Replay (F14/LFH-263): verpasste
 /// Nachrichten (`Replay::Events`) werden VOR dem Live-Kanal ausgeliefert; eine `Luecke`
 /// (Ring-Overflow / Neustart) sendet genau ein `lagged`/`resync`-Signal (Client resynct per
 /// GET); ohne Replay (`Keine`) nur der Live-Kanal.
 /// Der Modul-Filter `erlaubt` greift auf BEIDEN Wegen — Replay-Prefix und Live-Tail.
 /// Sonst wäre ein Reconnect mit `Last-Event-ID` ein Bypass des Gates (F01/LFH-227).
+///
+/// Nach dem Replay folgt die `position` des Abonnements als Kontroll-Ereignis
+/// [`POSITION_EREIGNIS`] mit `id:` und Daten (LFH-922, design.md D4): erst ein Frame mit Daten
+/// setzt die `Last-Event-ID` in jeder Engine (WebKit übernimmt die `id` eines Frames ohne Daten
+/// nicht), und der Client erfährt so, dass der Server ab hier nachliefern kann. Die Position deckt
+/// auch Nachrichten ab, die der Filter verschluckt hat.
 pub fn sse_stream_mit_replay(
     replay: Replay,
     rx: Receiver<LiveNachricht>,
+    position: String,
     erlaubt: impl Fn(LiveEvent) -> bool,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
-    let prefix: Vec<Result<Event, Infallible>> = match replay {
+    let mut prefix: Vec<Result<Event, Infallible>> = match replay {
         Replay::Keine => Vec::new(),
         Replay::Events(nachrichten) => nachrichten
             .into_iter()
@@ -580,6 +592,10 @@ pub fn sse_stream_mit_replay(
             .event(LiveEvent::Lagged.as_str())
             .data("resync"))],
     };
+    prefix.push(Ok(Event::default()
+        .id(position)
+        .event(POSITION_EREIGNIS)
+        .data("{}")));
     tokio_stream::iter(prefix).chain(sse_event_stream(rx, erlaubt))
 }
 
@@ -751,21 +767,34 @@ mod tests {
     async fn sse_stream_mit_replay_praefixt_nach_replay_art() {
         let n = |id: &str| nachricht(id, LiveEvent::Etb);
 
-        let keine: Vec<_> = sse_stream_mit_replay(Replay::Keine, leerer_rx(), alles)
+        let p = || "1-2".to_string();
+        let keine: Vec<_> = sse_stream_mit_replay(Replay::Keine, leerer_rx(), p(), alles)
             .collect()
             .await;
-        assert_eq!(keine.len(), 0, "Keine → kein Prefix");
+        assert_eq!(keine.len(), 1, "Keine → nur die Position");
 
-        let events: Vec<_> =
-            sse_stream_mit_replay(Replay::Events(vec![n("1-1"), n("1-2")]), leerer_rx(), alles)
-                .collect()
-                .await;
-        assert_eq!(events.len(), 2, "Events → je verpasste Nachricht ein Event");
+        let events: Vec<_> = sse_stream_mit_replay(
+            Replay::Events(vec![n("1-1"), n("1-2")]),
+            leerer_rx(),
+            p(),
+            alles,
+        )
+        .collect()
+        .await;
+        assert_eq!(
+            events.len(),
+            3,
+            "Events → je verpasste Nachricht ein Event, dann die Position"
+        );
 
-        let luecke: Vec<_> = sse_stream_mit_replay(Replay::Luecke, leerer_rx(), alles)
+        let luecke: Vec<_> = sse_stream_mit_replay(Replay::Luecke, leerer_rx(), p(), alles)
             .collect()
             .await;
-        assert_eq!(luecke.len(), 1, "Luecke → genau ein lagged/resync-Event");
+        assert_eq!(
+            luecke.len(),
+            2,
+            "Luecke → genau ein lagged/resync-Event, dann die Position"
+        );
     }
 
     /// F01/LFH-227: der Modul-Filter muss den **Replay-Prefix** genauso greifen wie den
@@ -777,15 +806,16 @@ mod tests {
             nachricht("1-2", LiveEvent::Chat),
             nachricht("1-3", LiveEvent::Etb),
         ];
-        let nur_etb: Vec<_> = sse_stream_mit_replay(Replay::Events(verpasst), leerer_rx(), |ev| {
-            ev == LiveEvent::Etb
-        })
-        .collect()
-        .await;
+        let nur_etb: Vec<_> =
+            sse_stream_mit_replay(Replay::Events(verpasst), leerer_rx(), "1-3".into(), |ev| {
+                ev == LiveEvent::Etb
+            })
+            .collect()
+            .await;
         assert_eq!(
             nur_etb.len(),
-            2,
-            "nur die etb-Nachrichten dürfen im Replay ankommen"
+            3,
+            "nur die etb-Nachrichten dürfen im Replay ankommen (plus die Position)"
         );
     }
 
@@ -793,10 +823,15 @@ mod tests {
     /// der jedes Fach-Modul verbietet — sonst hinge der Client im Stale-Zustand.
     #[tokio::test]
     async fn lagged_kontroll_event_passiert_jeden_filter() {
-        let luecke: Vec<_> = sse_stream_mit_replay(Replay::Luecke, leerer_rx(), |_| false)
-            .collect()
-            .await;
-        assert_eq!(luecke.len(), 1, "lagged/resync muss immer durchgehen");
+        let luecke: Vec<_> =
+            sse_stream_mit_replay(Replay::Luecke, leerer_rx(), "1-1".into(), |_| false)
+                .collect()
+                .await;
+        assert_eq!(
+            luecke.len(),
+            2,
+            "lagged/resync und die Position müssen immer durchgehen"
+        );
     }
 
     /// Der Live-Tail filtert ebenfalls — hier über den echten Broadcast-Kanal.

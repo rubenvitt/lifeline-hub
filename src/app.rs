@@ -1,6 +1,7 @@
 use crate::karte::FachebenenState;
 use crate::live::LiveHub;
 use crate::routes;
+use crate::transfer::UPLOAD_BODY_MAX;
 use axum::{
     extract::DefaultBodyLimit,
     response::IntoResponse,
@@ -9,12 +10,7 @@ use axum::{
 };
 use sqlx::SqlitePool;
 use std::path::PathBuf;
-use tower::limit::ConcurrencyLimitLayer;
-
-/// Begrenzt die gleichzeitig laufenden Voll-BLOB-Reads der Asset-Downloads (bis 25 MiB je
-/// Anhang → RAM-Druck). Nur auf den Download-Routen, nicht routerweit — ein globaler Limiter
-/// hungerte die langlebigen SSE-Streams aus.
-const MAX_GLEICHZEITIGE_ASSET_DOWNLOADS: usize = 16;
+use std::time::Duration;
 
 /// Geteilter Anwendungszustand, der an alle Handler übergeben wird.
 #[derive(Clone)]
@@ -51,6 +47,10 @@ pub struct RouterOptionen {
     /// Registriert die Routen unter `/api/demo-daten` (`--demo-daten`). Ohne den Schalter
     /// antworten sie wie jeder unbekannte `/api/`-Pfad mit 404, auch angemeldet.
     pub demo_daten: bool,
+    /// Zeitbudget der Zulassungssteuerung; `None` = [`crate::zulassung::REQUEST_BUDGET`]. Nur
+    /// Tests setzen es, um ohne Minuten Wartezeit zu belegen, welche Routen dem Budget entzogen
+    /// sind (LFH-938).
+    pub zulassungs_budget: Option<Duration>,
 }
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand, mit Vorgabe-Optionen (ohne
@@ -72,6 +72,22 @@ const AUTH_FINISH_BODY_MAX: usize = 16 * 1024;
 
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
 pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
+    // Grenzen der großen Transfers (LFH-938, `src/transfer.rs`): EINE Upload-Grenze für alle
+    // Upload-Routen, je Download-Route eine eigene Grenze, deren Platz im Response-Body reist.
+    // Beide Routenarten stehen in `zulassung::OHNE_ZULASSUNGSGRENZE`; `tests/zulassung_guard.rs`
+    // verlangt das eine mit dem anderen. Als `route_layer`: die 405-Antwort des Fallbacks belegt
+    // keinen Platz.
+    let upload_grenze = axum::middleware::from_fn_with_state(
+        crate::transfer::UploadGrenze::default(),
+        crate::transfer::upload_grenze,
+    );
+    let download_grenze = || {
+        axum::middleware::from_fn_with_state(
+            crate::transfer::DownloadGrenze::default(),
+            crate::transfer::download_grenze,
+        )
+    };
+
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
@@ -246,17 +262,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/etb/{eintrag_id}/auftrag",
             post(routes::etb::auftrag_erteilen),
         )
-        // ETB-Anhänge: Upload mit Body-Limit (die Vorgabe von 2 MiB kappte still), Download mit dem
-        // Asset-Concurrency-Cap.
+        // ETB-Anhänge: Upload mit Body-Limit (die Vorgabe von 2 MiB kappte still) und Upload-Grenze,
+        // Download mit Download-Grenze.
         .route(
             "/api/einsaetze/{id}/etb/anhaenge",
-            post(routes::etb::anhang_hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            post(routes::etb::anhang_hochladen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid}",
-            get(routes::etb::anhang_herunterladen).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::etb::anhang_herunterladen).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/chat/kanaele",
@@ -306,22 +322,28 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Multipart-Overhead.
         .route(
             "/api/einsaetze/{id}/anhaenge",
-            post(routes::anhang::hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            post(routes::anhang::hochladen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/anhaenge/{aid}",
-            get(routes::anhang::herunterladen)
-                .delete(routes::anhang::loeschen)
-                .layer(ConcurrencyLimitLayer::new(
-                    MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-                )),
+            get(routes::anhang::herunterladen).route_layer(download_grenze()),
+        )
+        .route(
+            "/api/einsaetze/{id}/anhaenge/{aid}",
+            delete(routes::anhang::loeschen),
         )
         // Dokumentenablage: eigener Präfix mit Modul-Gate; Upload/Download wie Anhänge.
         .route(
             "/api/einsaetze/{id}/dokumente",
-            get(routes::dokument::liste)
-                .post(routes::dokument::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::dokument::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/dokumente",
+            post(routes::dokument::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}",
@@ -329,9 +351,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}/datei",
-            get(routes::dokument::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::dokument::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/erinnerungen",
@@ -829,9 +849,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // der Download schreibt je Abruf eine Zeile ins Zugriffsprotokoll der Person.
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge",
-            get(routes::person_anhang::liste)
-                .post(routes::person_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::person_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/anhaenge",
+            post(routes::person_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}",
@@ -839,9 +863,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei",
-            get(routes::person_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::person_anhang::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/tiere",
@@ -874,9 +896,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Tier-Anhänge (LFH-758): Modul-Gate `tiere`; Upload/Download wie die Schaden-Anhänge.
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
-            get(routes::tier_anhang::liste)
-                .post(routes::tier_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::tier_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
+            post(routes::tier_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}",
@@ -884,9 +910,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei",
-            get(routes::tier_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::tier_anhang::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/schaeden",
@@ -919,9 +943,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Schaden-Anhänge: Modul-Gate `schaeden`; Upload/Download wie die Dokumentenablage.
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
-            get(routes::schaden_anhang::liste)
-                .post(routes::schaden_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::schaden_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
+            post(routes::schaden_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}",
@@ -929,9 +957,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
-            get(routes::schaden_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::schaden_anhang::datei).route_layer(download_grenze()),
         )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
         .route(
@@ -974,9 +1000,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // UHS-Anhänge (LFH-758): Modul-Gate `unfallhilfsstellen`; jeder Download im Lese-Audit.
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
-            get(routes::uhs_anhang::liste)
-                .post(routes::uhs_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::uhs_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
+            post(routes::uhs_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge/zugriffe",
@@ -988,15 +1018,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei",
-            get(routes::uhs_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::uhs_anhang::datei).route_layer(download_grenze()),
         )
         // UHS-Plan (LFH-999): eigene Bytes, kein Anhang; die Anzeige schreibt kein Lese-Audit.
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plan",
             put(routes::uhs_plan::hinterlegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024))
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone())
                 .patch(routes::uhs_plan::aendern)
                 .delete(routes::uhs_plan::entfernen),
         )
@@ -1006,9 +1035,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plan/bild",
-            get(routes::uhs_plan::bild).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::uhs_plan::bild).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plaetze",
@@ -1183,13 +1210,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder",
             post(routes::karte_hintergrundbild::hochladen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
-            get(routes::karte_hintergrundbild::herunterladen).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::karte_hintergrundbild::herunterladen).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",
@@ -1645,7 +1671,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // des `CatchPanicLayer` liegen, damit sie dessen 500-Antwort bekommt statt eines Unwinds.
         // `MatchedPath` ist beim Routing gesetzt, die Ausnahmeliste greift also trotzdem.
         .layer(axum::middleware::from_fn_with_state(
-            crate::zulassung::Zulassung::default(),
+            opt.zulassungs_budget
+                .map_or_else(crate::zulassung::Zulassung::default, |budget| {
+                    crate::zulassung::Zulassung::neu(
+                        budget,
+                        crate::zulassung::MAX_GLEICHZEITIGE_REQUESTS,
+                    )
+                }),
             crate::zulassung::zulassung,
         ))
         // Request-Instrumentierung. `.layer()` hängt nach außen, der Trace-Layer liegt also
@@ -1653,14 +1685,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // von CatchPanic UND Zulassung und sieht Panik-500er wie Lastabwürfe. Jeder Handler läuft
         // in
         // diesem Span, deshalb tragen die `tracing::error!`-Zeilen Methode, Pfad und Request-ID.
-        .layer(tower_http::trace::TraceLayer::new_for_http().make_span_with(MakeSpanMitRequestId))
+        //
+        // `on_failure` eigen (LFH-925): ein 503 ist Überlast, die ein Fremder je Anfrage auslösen
+        // kann; er geht gedrosselt als WARN-Sammelzeile ins Log. Jeder andere Fehler bleibt ERROR.
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http()
+                .make_span_with(MakeSpanMitRequestId)
+                .on_failure(OnFailureOhneUeberlastFlut),
+        )
         // Request-ID ganz außen setzen, damit sie im Span schon steht, und in die Antwort spiegeln
-        // — so
-        // kann ein Nutzer sie aus dem Fehlerfall melden.
+        // — so kann ein Nutzer sie aus dem Fehlerfall melden.
         .layer(tower_http::request_id::PropagateRequestIdLayer::x_request_id())
         .layer(tower_http::request_id::SetRequestIdLayer::x_request_id(
             tower_http::request_id::MakeRequestUuid,
         ))
+        // Davor die ID des Clients prüfen (LFH-925): `SetRequestIdLayer` lässt eine mitgeschickte
+        // stehen, sie stünde ungeprüft in jeder Logzeile und in der Antwort. Eine unzulässige
+        // fällt hier weg und wird oben durch eine UUID ersetzt.
+        .layer(axum::middleware::map_request(fremde_request_id_pruefen))
         // Schutzköpfe an JEDER Antwort (LFH-797, `src/AGENTS.md`, „Schutzköpfe“). Ganz außen,
         // damit auch Panik-500, Lastabwurf, 405 und der Frontend-Fallback ihn tragen.
         // `if_not_present`: eine Route, die den Kopf selbst setzt (Anhang, Logo, Karten-Assets),
@@ -1674,8 +1716,53 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .with_state(state)
 }
 
+/// Höchstlänge einer vom Client mitgeschickten Request-ID (LFH-925).
+pub const REQUEST_ID_MAX: usize = 64;
+
+/// Höchstlänge des Pfads im Span, in Zeichen samt Auslassungsmarke (LFH-925).
+pub const PFAD_MAX_ZEICHEN: usize = 256;
+
+/// Eine Request-ID vom Client gilt nur mit 1 bis [`REQUEST_ID_MAX`] Zeichen aus `[A-Za-z0-9-]`
+/// (eine UUID passt). Alles andere könnte das Log mit langen oder Steuerzeichen fluten.
+fn request_id_zulaessig(wert: &[u8]) -> bool {
+    !wert.is_empty()
+        && wert.len() <= REQUEST_ID_MAX
+        && wert.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'-')
+}
+
+/// Entfernt eine unzulässige `x-request-id` des Clients, auch mehrfach gesendete; der
+/// nachfolgende `SetRequestIdLayer` setzt dann eine UUID.
+async fn fremde_request_id_pruefen(mut request: axum::extract::Request) -> axum::extract::Request {
+    let kopf = axum::http::HeaderName::from_static("x-request-id");
+    let werte = request.headers().get_all(&kopf);
+    let mut werte = werte.iter();
+    let zulaessig = match (werte.next(), werte.next()) {
+        (None, _) => return request,
+        (Some(wert), None) => request_id_zulaessig(wert.as_bytes()),
+        (Some(_), Some(_)) => false,
+    };
+    if !zulaessig {
+        request.headers_mut().remove(&kopf);
+    }
+    request
+}
+
+/// Kürzt den Pfad für das Log auf höchstens [`PFAD_MAX_ZEICHEN`] Zeichen, an einer Zeichengrenze
+/// und mit `…` am Ende.
+fn pfad_fuer_protokoll(pfad: &str) -> std::borrow::Cow<'_, str> {
+    if pfad.chars().nth(PFAD_MAX_ZEICHEN).is_none() {
+        return std::borrow::Cow::Borrowed(pfad);
+    }
+    let ende = pfad
+        .char_indices()
+        .nth(PFAD_MAX_ZEICHEN - 1)
+        .map_or(pfad.len(), |(i, _)| i);
+    std::borrow::Cow::Owned(format!("{}…", &pfad[..ende]))
+}
+
 /// Baut den `tracing`-Span jedes HTTP-Requests. Eigene Implementierung, weil `DefaultMakeSpan`
-/// die Request-ID nicht kennt.
+/// die Request-ID nicht kennt. Pfad gekürzt, Request-ID nur in zulässiger Form (LFH-925): beide
+/// hängen an jeder Logzeile des Requests.
 #[derive(Clone, Copy)]
 struct MakeSpanMitRequestId;
 
@@ -1684,14 +1771,50 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpanMitRequestId {
         let request_id = request
             .headers()
             .get("x-request-id")
+            .filter(|wert| request_id_zulaessig(wert.as_bytes()))
             .and_then(|wert| wert.to_str().ok())
             .unwrap_or("-");
         tracing::info_span!(
             "http",
             methode = %request.method(),
-            pfad = %request.uri().path(),
+            pfad = %pfad_fuer_protokoll(request.uri().path()),
             request_id = %request_id,
         )
+    }
+}
+
+/// `on_failure` des `TraceLayer` (LFH-925). Der Standard schreibt jeden 5xx als ERROR; ein 503
+/// ist aber Überlast (Lastabwurf, Pool, Sperren), die ein Fremder je Anfrage auslösen kann. Er geht
+/// deshalb als WARN-[`Sammelzeile`](crate::log_drossel::Sammelzeile) ins Log. Jeder andere
+/// Fehler bleibt eine ERROR-Zeile wie bisher.
+#[derive(Clone, Copy)]
+struct OnFailureOhneUeberlastFlut;
+
+impl tower_http::trace::OnFailure<tower_http::classify::ServerErrorsFailureClass>
+    for OnFailureOhneUeberlastFlut
+{
+    fn on_failure(
+        &mut self,
+        klasse: tower_http::classify::ServerErrorsFailureClass,
+        latenz: std::time::Duration,
+        _span: &tracing::Span,
+    ) {
+        use tower_http::classify::ServerErrorsFailureClass;
+        static UEBERLAST: crate::log_drossel::Sammelzeile = crate::log_drossel::Sammelzeile::neu();
+        let latenz_ms = latenz.as_millis() as u64;
+        match klasse {
+            ServerErrorsFailureClass::StatusCode(axum::http::StatusCode::SERVICE_UNAVAILABLE) => {
+                if let Some(f) = UEBERLAST.zaehlen() {
+                    tracing::warn!(
+                        anzahl = f.anzahl,
+                        seit_s = f.seit_s,
+                        latenz_ms,
+                        "Antworten mit 503 (Überlast), Sammelzeile"
+                    );
+                }
+            }
+            andere => tracing::error!(klasse = %andere, latenz_ms, "response failed"),
+        }
     }
 }
 
@@ -1720,6 +1843,63 @@ fn on_panic(_err: Box<dyn std::any::Any + Send + 'static>) -> axum::response::Re
 mod tests {
     use super::*;
     use axum::body::to_bytes;
+
+    /// LFH-925: nur 1 bis 64 Zeichen aus `[A-Za-z0-9-]` gelten als Request-ID des Clients.
+    #[test]
+    fn request_id_des_clients_wird_geprueft() {
+        assert!(request_id_zulaessig(
+            b"0f8e1c2a-7b3d-4e5f-9a6b-1c2d3e4f5a6b"
+        ));
+        assert!(request_id_zulaessig(&[b'a'; REQUEST_ID_MAX]));
+        assert!(!request_id_zulaessig(&[b'a'; REQUEST_ID_MAX + 1]));
+        assert!(!request_id_zulaessig(b""));
+        assert!(!request_id_zulaessig(b"mit leerzeichen"));
+        assert!(!request_id_zulaessig(b"zeile\r\nfalsch"));
+        assert!(!request_id_zulaessig("ümlaut".as_bytes()));
+    }
+
+    /// LFH-925: der Span-Pfad hat höchstens 256 Zeichen, auch bei Mehrbyte-Zeichen.
+    #[test]
+    fn pfad_wird_fuer_das_log_gekuerzt() {
+        assert_eq!(pfad_fuer_protokoll("/api/health"), "/api/health");
+        let genau = format!("/{}", "a".repeat(PFAD_MAX_ZEICHEN - 1));
+        assert_eq!(pfad_fuer_protokoll(&genau), genau.as_str());
+
+        for zeichen in ["a", "ä", "€"] {
+            let lang = format!("/{}", zeichen.repeat(10 * 1024));
+            let gekuerzt = pfad_fuer_protokoll(&lang);
+            assert_eq!(gekuerzt.chars().count(), PFAD_MAX_ZEICHEN, "{zeichen}");
+            assert!(gekuerzt.ends_with('…'));
+            assert!(lang.starts_with(gekuerzt.trim_end_matches('…')));
+        }
+    }
+
+    /// LFH-925: ein 503 schreibt keine ERROR-Zeile aus dem `TraceLayer` mehr, ein 500 weiter.
+    #[test]
+    fn trace_layer_schreibt_503_nicht_als_error() {
+        use tower_http::classify::ServerErrorsFailureClass;
+        use tower_http::trace::OnFailure;
+        let (puffer, _log) = crate::test_log::LogPuffer::einfangen();
+        let span = tracing::Span::none();
+        for _ in 0..100 {
+            OnFailureOhneUeberlastFlut.on_failure(
+                ServerErrorsFailureClass::StatusCode(axum::http::StatusCode::SERVICE_UNAVAILABLE),
+                std::time::Duration::from_millis(1),
+                &span,
+            );
+        }
+        let log = puffer.text();
+        assert!(!log.contains("ERROR"), "{log}");
+        assert!(log.matches("Antworten mit 503").count() <= 1, "{log}");
+
+        OnFailureOhneUeberlastFlut.on_failure(
+            ServerErrorsFailureClass::StatusCode(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
+            std::time::Duration::from_millis(1),
+            &span,
+        );
+        let log = puffer.text();
+        assert_eq!(log.matches("ERROR").count(), 1, "{log}");
+    }
 
     #[tokio::test]
     async fn on_panic_liefert_500_mit_error_envelope() {

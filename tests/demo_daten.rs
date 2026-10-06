@@ -96,7 +96,11 @@ async fn ohne_freischaltung_antworten_alle_demo_pfade_wie_ein_unbekannter_pfad()
 /// Mit Freischaltung: anonym 401 auf jedem Endpunkt.
 #[tokio::test]
 async fn mit_freischaltung_anonym_401() {
-    let (app, _pool) = common::setup_mit_optionen(RouterOptionen { demo_daten: true }).await;
+    let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
+        demo_daten: true,
+        zulassungs_budget: None,
+    })
+    .await;
     for (methode, pfad) in ENDPUNKTE {
         let (status, _ct, _body) = roh(&app, methode, pfad, None).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{methode} {pfad}");
@@ -107,7 +111,11 @@ async fn mit_freischaltung_anonym_401() {
 /// bekommt auf jedem Endpunkt 403.
 #[tokio::test]
 async fn mit_freischaltung_fuehrungskraft_403() {
-    let (app, _pool) = common::setup_mit_optionen(RouterOptionen { demo_daten: true }).await;
+    let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
+        demo_daten: true,
+        zulassungs_budget: None,
+    })
+    .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
     common::benutzer_anlegen(&app, &admin, "fuehrung", "fuehrungskraft").await;
     let fk = common::login_cookie(&app, "fuehrung", "fuehrungpw1").await;
@@ -122,7 +130,11 @@ async fn mit_freischaltung_fuehrungskraft_403() {
 /// Bericht. Die Felder sind abwesend, nicht `null` (LFH-265).
 #[tokio::test]
 async fn mit_freischaltung_admin_status_nicht_importiert() {
-    let (app, _pool) = common::setup_mit_optionen(RouterOptionen { demo_daten: true }).await;
+    let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
+        demo_daten: true,
+        zulassungs_budget: None,
+    })
+    .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
 
     let (status, v) = common::anfrage(&app, "GET", "/api/demo-daten", &admin, None).await;
@@ -138,7 +150,11 @@ async fn mit_freischaltung_admin_status_nicht_importiert() {
 /// Envelope-freien DTO, beim Fehler der `{error}`-Envelope.
 #[tokio::test]
 async fn mit_freischaltung_schreibende_endpunkte_tragen_die_codes_aus_d3() {
-    let (app, _pool) = common::setup_mit_optionen(RouterOptionen { demo_daten: true }).await;
+    let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
+        demo_daten: true,
+        zulassungs_budget: None,
+    })
+    .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
 
     let (status, v) = common::anfrage(&app, "DELETE", "/api/demo-daten", &admin, None).await;
@@ -350,7 +366,10 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 // Routen, Neu-Import, Live
 // ---------------------------------------------------------------------------------------------
 
-const AN: RouterOptionen = RouterOptionen { demo_daten: true };
+const AN: RouterOptionen = RouterOptionen {
+    demo_daten: true,
+    zulassungs_budget: None,
+};
 
 /// Einen Demo-Endpunkt aufrufen; liefert `(Status, Body)`.
 async fn demo(app: &axum::Router, cookie: &str, methode: &str, pfad: &str) -> (StatusCode, Value) {

@@ -221,9 +221,10 @@ async fn strom_endet_nach_der_lebensdauer_und_der_reconnect_holt_nach() {
     let wieder = oeffnen(&app, &feed, &admin, Some(&letzte_id)).await;
     assert_eq!(wieder.status(), StatusCode::OK);
     let nachgeholt = bis_zum_ende(wieder, Duration::from_secs(5)).await;
-    let ids: Vec<&str> = nachgeholt
-        .lines()
-        .filter_map(|z| z.strip_prefix("id: "))
+    let ids: Vec<String> = sse_frames(&nachgeholt)
+        .into_iter()
+        .filter(|f| f.event.is_some() && !ist_position(f))
+        .filter_map(|f| f.id)
         .collect();
     assert_eq!(
         ids.len(),
@@ -284,4 +285,128 @@ async fn stroeme_senden_eine_gestreute_wartezeit() {
             .expect("retry in Millisekunden");
         assert!((1000..=5000).contains(&retry), "{pfad}: retry {retry}");
     }
+}
+
+/// Ein SSE-Frame mit seinen Feldern; Kommentarzeilen bleiben außen vor.
+#[derive(Debug, Default)]
+struct SseFrame {
+    kommentar: bool,
+    id: Option<String>,
+    event: Option<String>,
+    data: Option<String>,
+    retry: Option<String>,
+}
+
+/// Zerlegt einen SSE-Ausschnitt in seine Frames, in der Reihenfolge des Drahts.
+fn sse_frames(roh: &str) -> Vec<SseFrame> {
+    roh.split("\n\n")
+        .filter(|block| !block.trim().is_empty())
+        .map(|block| {
+            let mut f = SseFrame::default();
+            for zeile in block.lines() {
+                if zeile.starts_with(':') {
+                    f.kommentar = true;
+                } else if let Some(v) = zeile.strip_prefix("id: ") {
+                    f.id = Some(v.to_string());
+                } else if let Some(v) = zeile.strip_prefix("event: ") {
+                    f.event = Some(v.to_string());
+                } else if let Some(v) = zeile.strip_prefix("data: ") {
+                    f.data = Some(v.to_string());
+                } else if let Some(v) = zeile.strip_prefix("retry:") {
+                    f.retry = Some(v.trim().to_string());
+                }
+            }
+            f
+        })
+        .collect()
+}
+
+/// Ist das Frame die Position: das Kontroll-Ereignis `position` mit `id:` und Daten? Erst Daten
+/// lassen jede Engine die `id` übernehmen (WebKit nicht ohne).
+fn ist_position(f: &SseFrame) -> bool {
+    f.event.as_deref() == Some("position") && f.id.is_some() && f.data.is_some()
+}
+
+/// Öffnet den Einsatz-Strom, liest seinen Anfang und liefert die Position (LFH-922).
+async fn position_lesen(app: &axum::Router, feed: &str, cookie: &str) -> String {
+    let resp = oeffnen(app, feed, cookie, None).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let anfang = common::sse_anfang_lesen(resp.into_body(), 300).await;
+    sse_frames(&anfang)
+        .into_iter()
+        .find(ist_position)
+        .and_then(|f| f.id)
+        .unwrap_or_else(|| panic!("keine Position im Anfang: {anfang:?}"))
+}
+
+/// Der Einsatz-Strom nennt beim Aufbau seine Position (LFH-922, design.md D4): nach dem
+/// Kommentar `verbunden` und dem `retry:` das Kontroll-Ereignis `position` mit `id:`. Der Browser
+/// übernimmt es als `Last-Event-ID`. Das erste Frame bleibt reiner Kommentar.
+#[tokio::test]
+async fn einsatz_strom_nennt_beim_aufbau_seine_position() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+
+    let resp = oeffnen(&app, &format!("/api/einsaetze/{eid}/live"), &admin, None).await;
+    let anfang = common::sse_anfang_lesen(resp.into_body(), 300).await;
+    let fs = sse_frames(&anfang);
+    assert!(fs.len() >= 3, "{anfang:?}");
+    assert!(
+        fs[0].kommentar && fs[0].id.is_none() && fs[0].event.is_none(),
+        "zuerst der Kommentar: {anfang:?}"
+    );
+    assert!(fs[1].retry.is_some(), "dann retry: {anfang:?}");
+    assert!(ist_position(&fs[2]), "dann die Position: {anfang:?}");
+    let id = fs[2].id.as_deref().unwrap();
+    let (epoch, n) = id.split_once('-').expect("Format epoch-n");
+    assert!(
+        epoch.parse::<u64>().is_ok() && n.parse::<u64>().is_ok(),
+        "{id}"
+    );
+    assert_eq!(
+        fs.iter().filter(|f| ist_position(f)).count(),
+        1,
+        "{anfang:?}"
+    );
+}
+
+/// Wer mit seiner Position neu verbindet, bekommt ohne zwischenzeitliches Ereignis nichts
+/// und kein `lagged`; mit einem Ereignis genau dieses (LFH-922). Das Ereignis vor dem Aufbau
+/// zeigt, dass die Position die zuletzt vergebene Nummer ist und nicht der Kanalbeginn.
+#[tokio::test]
+async fn neuverbinden_mit_der_position_holt_genau_das_verpasste() {
+    let (app, _pool, live) = setup_mit_grenzen(StromGrenzen::default()).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let feed = format!("/api/einsaetze/{eid}/live");
+    // Ein offener Strom hält den Kanal, damit das erste Ereignis eine Nummer im Ring bekommt.
+    let _halter = oeffnen(&app, &feed, &admin, None).await;
+    live.publiziere_einsatz(eid, LiveEvent::Einsatz);
+
+    let position = position_lesen(&app, &feed, &admin).await;
+
+    let still = oeffnen(&app, &feed, &admin, Some(&position)).await;
+    assert_eq!(still.status(), StatusCode::OK);
+    let anfang = common::sse_anfang_lesen(still.into_body(), 300).await;
+    let ereignisse: Vec<_> = sse_frames(&anfang)
+        .into_iter()
+        .filter(|f| !ist_position(f))
+        .filter_map(|f| f.event)
+        .collect();
+    assert!(ereignisse.is_empty(), "nichts nachzuliefern: {anfang:?}");
+
+    live.publiziere_einsatz(eid, LiveEvent::Etb);
+    let wieder = oeffnen(&app, &feed, &admin, Some(&position)).await;
+    let anfang = common::sse_anfang_lesen(wieder.into_body(), 300).await;
+    let ereignisse: Vec<_> = sse_frames(&anfang)
+        .into_iter()
+        .filter(|f| !ist_position(f))
+        .filter_map(|f| f.event)
+        .collect();
+    assert_eq!(
+        ereignisse,
+        ["etb"],
+        "genau das verpasste Ereignis: {anfang:?}"
+    );
 }

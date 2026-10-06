@@ -8,13 +8,52 @@
 //!    ein Upload/Stream bricht ab 60 s ab. Nichts im Build meldet das.
 //! 2. **Methode driftet** — die Route wird von `POST` auf `PUT` umgestellt, der Eintrag nicht.
 //!    Gleicher Effekt, noch unauffälliger.
+//! 3. **Fehlende Ausnahme** (LFH-938) — eine neue Upload-Route mit großem Body-Limit oder eine
+//!    neue Download-Route kommt ohne Eintrag dazu. Genau so liefen ETB- und Schaden-Upload ab
+//!    60 s in 503.
+//! 4. **Ausnahme ohne Ersatz** (LFH-938) — eine befreite Route trägt keine eigene Grenze und
+//!    läuft damit ganz ungeschützt.
 //!
 //! Der Guard liest deshalb `src/app.rs` als Quelltext und verlangt für jeden Eintrag eine
-//! real registrierte Route mit passender Methode. Quelltext-Parsing per Klammer-Tiefenzähler,
+//! real registrierte Route mit passender Methode und umgekehrt. Quelltext-Parsing per Klammer-Tiefenzähler,
 //! bewusst ohne `regex`-Dependency — dasselbe Vorgehen wie `tests/json_extractor_guard.rs`.
 
 use lifeline_hub::zulassung::OHNE_ZULASSUNGSGRENZE;
 use std::fs;
+
+/// Ab dieser Body-Grenze ist eine Route ein Upload, der über das Zeitbudget hinaus dauern kann
+/// und unter die Upload-Grenze gehört.
+const GROSSER_BODY: usize = 4 * 1024 * 1024;
+
+/// Befreite Routen ohne Upload- oder Download-Grenze, jede mit ihrem Ersatz. Ein neuer Eintrag
+/// hier braucht eine eigene Begründung.
+const OHNE_EIGENE_GRENZE: &[(&str, &str, &str)] = &[
+    (
+        "GET",
+        "/api/einsaetze/{id}/live",
+        "SSE-Dauerverbindung, Grenze je Benutzer und insgesamt mit Lebensdauer in `live::strom` (LFH-920)",
+    ),
+    (
+        "GET",
+        "/api/live",
+        "SSE-Dauerverbindung, Grenze je Benutzer und insgesamt mit Lebensdauer in `live::strom` (LFH-920)",
+    ),
+    (
+        "GET",
+        "/api/backup",
+        "eigene Sperre für einen Lauf und Leerlauf-Frist (LFH-926)",
+    ),
+    (
+        "GET",
+        "/api/einsaetze/{id}/personen/export",
+        "CSV-Vollexport ohne BLOB: unbeschränkt ist die Dauer, nicht der Speicher",
+    ),
+    (
+        "GET",
+        "/api/einsaetze/{id}/tiere/export",
+        "CSV-Vollexport ohne BLOB: unbeschränkt ist die Dauer, nicht der Speicher",
+    ),
+];
 
 /// Liefert zu jedem `.route(…)`-Aufruf für `pfad` den Argument-Text, per Klammer-Tiefe
 /// abgegrenzt.
@@ -27,6 +66,15 @@ use std::fs;
 /// Ein Pfad kann mehrfach registriert sein (getrennte `MethodRouter` auf demselben Pfad,
 /// z. B. Liste vs. Upload der Hintergrundbilder) — deshalb eine Liste, nicht ein Treffer.
 fn route_bloecke(quelle: &str, pfad: &str) -> Vec<String> {
+    alle_route_bloecke(quelle)
+        .into_iter()
+        .filter(|(p, _)| p == pfad)
+        .map(|(_, block)| block)
+        .collect()
+}
+
+/// Jeder `.route(…)`-Aufruf als `(Pfad, Argument-Text)`.
+fn alle_route_bloecke(quelle: &str) -> Vec<(String, String)> {
     let bytes = quelle.as_bytes();
     let mut bloecke = Vec::new();
     let mut suche_ab = 0usize;
@@ -47,8 +95,8 @@ fn route_bloecke(quelle: &str, pfad: &str) -> Vec<String> {
                     tiefe -= 1;
                     if tiefe == 0 {
                         let block = &quelle[open..=open + offset];
-                        if erstes_literal(block).as_deref() == Some(pfad) {
-                            bloecke.push(block.to_string());
+                        if let Some(pfad) = erstes_literal(block) {
+                            bloecke.push((pfad, block.to_string()));
                         }
                         break;
                     }
@@ -158,4 +206,185 @@ fn die_schutzschichten_sind_im_produktionscode_montiert() {
         "Schutzschichten nicht vollständig montiert:\n{}",
         fehlt.join("\n")
     );
+}
+
+/// Wertet den Ausdruck einer Body-Grenze aus: Summen von Produkten aus Zahlen und Konstanten
+/// (`26 * 1024 * 1024`, `1024 * 1024 + 64 * 1024`, `UPLOAD_BODY_MAX`). Konstanten werden in den
+/// mitgegebenen Quellen als `const NAME: usize = …;` gesucht. `None`, wenn etwas fehlt.
+fn auswerten(ausdruck: &str, quellen: &[&str]) -> Option<usize> {
+    ausdruck
+        .split('+')
+        .map(|summand| {
+            summand
+                .split('*')
+                .map(|faktor| {
+                    let faktor = faktor.trim();
+                    let name = faktor.rsplit("::").next()?;
+                    if let Ok(zahl) = name.replace('_', "").parse::<usize>() {
+                        return Some(zahl);
+                    }
+                    let kopf = format!("const {name}: usize =");
+                    let quelle = quellen.iter().find(|q| q.contains(&kopf))?;
+                    let rest = &quelle[quelle.find(&kopf)? + kopf.len()..];
+                    auswerten(&rest[..rest.find(';')?], quellen)
+                })
+                .product::<Option<usize>>()
+        })
+        .sum()
+}
+
+/// Alle Body-Grenzen eines Routen-Blocks, ausgewertet.
+fn body_grenzen(block: &str, quellen: &[&str]) -> Vec<Result<usize, String>> {
+    let nadel = "DefaultBodyLimit::max(";
+    let mut grenzen = Vec::new();
+    let mut rest = block;
+    while let Some(start) = rest.find(nadel) {
+        rest = &rest[start + nadel.len()..];
+        let ende = rest.find(')').unwrap_or(rest.len());
+        let ausdruck = &rest[..ende];
+        grenzen.push(auswerten(ausdruck, quellen).ok_or_else(|| ausdruck.to_string()));
+    }
+    grenzen
+}
+
+fn ist_ausgenommen(methode: &str, pfad: &str) -> bool {
+    OHNE_ZULASSUNGSGRENZE
+        .iter()
+        .any(|(m, p)| *m == methode && *p == pfad)
+}
+
+/// LFH-938, L24: ETB- und Schaden-Upload hatten 26 MiB Body-Grenze, standen aber nicht in der
+/// Liste und brachen nach 60 s ab. Jede Route mit großem Body ist ein Upload: ihre
+/// Body-Methode steht in der Liste, und sie trägt die gemeinsame Upload-Grenze.
+#[test]
+fn jede_grosse_body_grenze_ist_ausgenommen_und_traegt_die_upload_grenze() {
+    let app = fs::read_to_string("src/app.rs").expect("src/app.rs lesbar");
+    let transfer = fs::read_to_string("src/transfer.rs").expect("src/transfer.rs lesbar");
+    let quellen = [app.as_str(), transfer.as_str()];
+    let mut verstoesse = Vec::new();
+    let mut gefunden = 0;
+
+    for (pfad, block) in alle_route_bloecke(&app) {
+        for grenze in body_grenzen(&block, &quellen) {
+            let grenze = match grenze {
+                Ok(g) => g,
+                Err(ausdruck) => {
+                    verstoesse.push(format!(
+                        "{pfad}: Body-Grenze `{ausdruck}` nicht auswertbar — Zahl oder \
+                         `const …: usize` in src/app.rs bzw. src/transfer.rs verwenden"
+                    ));
+                    continue;
+                }
+            };
+            if grenze <= GROSSER_BODY {
+                continue;
+            }
+            gefunden += 1;
+            let befreit = ["POST", "PUT", "PATCH"].iter().any(|m| {
+                block.contains(&format!("{}(", m.to_lowercase())) && ist_ausgenommen(m, &pfad)
+            });
+            if !befreit {
+                verstoesse.push(format!(
+                    "{pfad}: Body-Grenze {grenze} B, aber keine Body-Methode in \
+                     OHNE_ZULASSUNGSGRENZE — ein langsamer Upload endet nach dem Zeitbudget in 503"
+                ));
+            }
+            if !block.contains("upload_grenze") {
+                verstoesse.push(format!(
+                    "{pfad}: Body-Grenze {grenze} B ohne `.layer(upload_grenze.clone())` — der \
+                     Upload läuft ohne Parallelitätsgrenze"
+                ));
+            }
+        }
+    }
+
+    assert!(
+        gefunden >= 9,
+        "nur {gefunden} Upload-Routen gefunden — Parser kaputt?"
+    );
+    assert!(
+        verstoesse.is_empty(),
+        "Upload-Routen nicht vollständig geschützt:\n{}",
+        verstoesse.join("\n")
+    );
+}
+
+/// Jede Route mit Download-Grenze ist ein Voll-BLOB-Download und steht mit GET in der Liste.
+#[test]
+fn jede_download_grenze_ist_ausgenommen() {
+    let app = fs::read_to_string("src/app.rs").expect("src/app.rs lesbar");
+    let mut verstoesse = Vec::new();
+    let mut gefunden = 0;
+    for (pfad, block) in alle_route_bloecke(&app) {
+        if !block.contains("download_grenze()") {
+            continue;
+        }
+        gefunden += 1;
+        if !block.contains("get(") || !ist_ausgenommen("GET", &pfad) {
+            verstoesse.push(format!(
+                "GET {pfad}: Download-Grenze, aber kein Eintrag in OHNE_ZULASSUNGSGRENZE"
+            ));
+        }
+    }
+    assert!(
+        gefunden >= 9,
+        "nur {gefunden} Download-Routen gefunden — Parser kaputt?"
+    );
+    assert!(verstoesse.is_empty(), "{}", verstoesse.join("\n"));
+}
+
+/// Jede Ausnahme hat einen Ersatz: Upload-Grenze, Download-Grenze oder einen namentlichen
+/// Eintrag in [`OHNE_EIGENE_GRENZE`].
+#[test]
+fn jede_ausnahme_hat_eine_eigene_grenze() {
+    let app = fs::read_to_string("src/app.rs").expect("src/app.rs lesbar");
+    let mut verstoesse = Vec::new();
+    for (methode, pfad) in OHNE_ZULASSUNGSGRENZE {
+        if OHNE_EIGENE_GRENZE
+            .iter()
+            .any(|(m, p, _)| m == methode && p == pfad)
+        {
+            continue;
+        }
+        let aufruf = format!("{}(", methode.to_lowercase());
+        let geschuetzt = route_bloecke(&app, pfad).iter().any(|b| {
+            b.contains(&aufruf) && (b.contains("upload_grenze") || b.contains("download_grenze()"))
+        });
+        if !geschuetzt {
+            verstoesse.push(format!(
+                "{methode} {pfad}: ausgenommen, aber ohne Upload- oder Download-Grenze"
+            ));
+        }
+    }
+    for (methode, pfad, _) in OHNE_EIGENE_GRENZE {
+        if !ist_ausgenommen(methode, pfad) {
+            verstoesse.push(format!(
+                "{methode} {pfad}: steht in OHNE_EIGENE_GRENZE, aber nicht in der Ausnahmeliste"
+            ));
+        }
+    }
+    assert!(verstoesse.is_empty(), "{}", verstoesse.join("\n"));
+}
+
+/// `ConcurrencyLimitLayer` gibt den Platz frei, sobald der Handler antwortet, nicht wenn der
+/// Body gesendet ist (L23). Download-Routen nehmen deshalb `download_grenze()`.
+#[test]
+fn kein_concurrency_limit_layer_mehr_im_router() {
+    let app = fs::read_to_string("src/app.rs").expect("src/app.rs lesbar");
+    assert!(
+        !app.contains("ConcurrencyLimitLayer"),
+        "src/app.rs nutzt wieder ConcurrencyLimitLayer — der Platz fiele vor dem Body zurück"
+    );
+}
+
+#[test]
+fn ausdruck_der_body_grenze_wird_ausgewertet() {
+    let quelle = "const X: usize = 2 * 1024;";
+    assert_eq!(auswerten("26 * 1024 * 1024", &[]), Some(26 * 1024 * 1024));
+    assert_eq!(
+        auswerten("1024 * 1024 + 64 * 1024", &[]),
+        Some(1024 * 1024 + 64 * 1024)
+    );
+    assert_eq!(auswerten("crate::a::X + 1", &[quelle]), Some(2049));
+    assert_eq!(auswerten("UNBEKANNT", &[quelle]), None);
 }
