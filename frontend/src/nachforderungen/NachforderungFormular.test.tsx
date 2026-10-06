@@ -34,3 +34,15 @@ describe('NachforderungFormular — Serienerfassung', () => {
     expect(screen.getByLabelText('Art')).toHaveValue('RTW');
   });
 });
+
+describe('NachforderungFormular — Eingabegrenzen (LFH-937)', () => {
+  it('begrenzt Bezeichnung, Adressat und Begründung auf die Grenzen des Servers', () => {
+    renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
+    expect(screen.getByLabelText('Bezeichnung')).toHaveAttribute('maxlength', '200');
+    expect(screen.getByPlaceholderText('z. B. Leitstelle Nord')).toHaveAttribute(
+      'maxlength',
+      '500',
+    );
+    expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveAttribute('maxlength', '500');
+  });
+});

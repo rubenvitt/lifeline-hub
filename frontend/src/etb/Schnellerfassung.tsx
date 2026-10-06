@@ -1,4 +1,4 @@
-import { IconAuge, IconBueroklammer, IconKreuz, IconPlus } from '../icons';
+import { IconAuge, IconBueroklammer, IconKreuz, IconPlus, IconWarndreieck } from '../icons';
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 import {
@@ -27,6 +27,8 @@ import { ERFASSBARE_TYPEN } from './typFarben';
 import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
+import { Zeichenzaehler } from '../components/zeichenGrenze';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { weiter } from '../components/useUploadFortschritt';
 import { Schnellerfassungszeile, useRollen } from '../components/instrument';
@@ -53,6 +55,7 @@ import {
   type MetadatenWerte,
   type MetaFeld,
   type SlashEintrag,
+  laengenVerstoss,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { neueClientId } from '../offline/clientId';
@@ -312,6 +315,8 @@ export default function Schnellerfassung({
   const [rufnameAendern, setRufnameAendern] = useState(false);
   /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
   const [pflichtHinweis, setPflichtHinweis] = useState<string | null>(null);
+  /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
+  const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
   // Einzeilige Chip-Zeile unter `md`: den gerade bearbeiteten Chip waagerecht ins Bild holen
   // (die Eingabe fokussiert sich selbst). Ohne Chip in Bearbeitung steht die Zeile am Anfang.
@@ -605,6 +610,13 @@ export default function Schnellerfassung({
       return;
     }
     setPflichtHinweis(null);
+    // Zeichengrenzen des Servers (LFH-937, design.md D8): ebenfalls VOR Upload und Warteschlange.
+    // Das Feld endet an der Grenze, ein Baustein oder Slash-Befehl setzt den Text aber von außen;
+    // ein zu langer Eintrag läge sonst bis zum Abgleich in der Offline-Queue und käme abgelehnt
+    // zurück. Der Text bleibt im Feld.
+    const zuLang = laengenVerstoss(inhalt, wirksam);
+    setLaengenHinweis(zuLang);
+    if (zuLang) return;
     // Nur der UPLOAD braucht Netz. Mit Dateien in der Liste wird ohne Verbindung abgewiesen, ohne
     // etwas zu leeren — ein Eintrag ohne die gewählten Dateien wäre eine stille Auslassung.
     // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte mit 400, und die
@@ -751,13 +763,38 @@ export default function Schnellerfassung({
     : istSchmal
       ? ENTER_HINWEIS_KURZ
       : ENTER_HINWEIS;
+  // Zeichengrenze (LFH-937, D8): Zähler und Hinweis stehen in der Hinweiszeile, nicht unter dem
+  // Feld — eine weitere Zeile risse das Höhenbudget der angepinnten Leiste. Der Zähler erscheint
+  // erst ab 80 % der Grenze; der Hinweis trägt neben der Farbe ein Zeichen und Worte (WCAG 1.4.1).
+  const grenzTeil = (
+    <>
+      {laengenHinweis && (
+        <span
+          role="alert"
+          data-lfh="etb-laengen-hinweis"
+          style={{
+            color: rollen.alarmText,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: token.marginXXS,
+          }}
+        >
+          <IconWarndreieck />
+          <span>{laengenHinweis}</span>
+        </span>
+      )}
+      <Zeichenzaehler wert={inhalt} max={ETB_INHALT_MAX} />
+    </>
+  );
   const hinweiszeile = istSchmal ? (
     <>
+      {grenzTeil}
       <span>{enterHinweis}</span>
       {schalter && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
     </>
   ) : (
     <>
+      {grenzTeil}
       {!berichtigungZu && (
         <span style={{ color: rollen.gedaempft }}>{TYP_BEFEHLE.map((t) => `/${t}`).join(' ')}</span>
       )}
@@ -912,6 +949,8 @@ export default function Schnellerfassung({
             // Die Bildschirmtastatur zeigt „Return“, nicht „Senden“: Return bricht dort um (D1).
             enterKeyHint="enter"
             readOnly={sendet}
+            maxLength={ETB_INHALT_MAX}
+            zaehlerAussen
           />
         </Schnellerfassungszeile>
         <SlashMenu

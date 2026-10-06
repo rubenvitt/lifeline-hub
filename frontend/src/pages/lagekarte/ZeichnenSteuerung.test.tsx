@@ -231,3 +231,27 @@ describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', ()
     ).toBeInTheDocument();
   });
 });
+
+describe('ZeichnenSteuerung — Stützpunkte (LFH-937)', () => {
+  it('bis 5 000 Punkte kein Hinweis, Abschließen frei', () => {
+    setup({ punkte: 5_000 });
+    expect(screen.queryByText(/zu viele Punkte/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeEnabled();
+  });
+
+  it('über 5 000 Punkten: Hinweis neben dem Zähler mit Zeichen, Abschließen gesperrt', () => {
+    setup({ punkte: 5_001 });
+    const hinweis = screen.getByText('zu viele Punkte (höchstens 5.000)');
+    const zeile = screen.getByText('5.001 Punkte').parentElement!;
+    expect(zeile.contains(hinweis)).toBe(true);
+    // Zweiter Kanal neben der Farbe: ein Zeichen vor dem Wort.
+    expect(hinweis.closest('[data-lfh="zeichnen-zu-viele"]')?.querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeDisabled();
+  });
+
+  it('in der Bestätigung sperrt eine zu große Figur das Speichern', () => {
+    setup({ phase: 'bestaetigen', punkte: 5_001 });
+    expect(screen.getByText('zu viele Punkte (höchstens 5.000)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+});

@@ -111,3 +111,10 @@ describe('NachrichtEingabe', () => {
     expect(name).not.toHaveAttribute('tabindex');
   });
 });
+
+describe('NachrichtEingabe — Eingabegrenze (LFH-937)', () => {
+  it('nimmt höchstens 20 000 Zeichen an', () => {
+    renderMitProviders(<NachrichtEingabe onSenden={vi.fn()} senden={false} />);
+    expect(screen.getByPlaceholderText('Nachricht…')).toHaveAttribute('maxlength', '20000');
+  });
+});

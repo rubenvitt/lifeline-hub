@@ -18,7 +18,7 @@ import {
   parseZeichnenAuftrag,
   parseRouteId,
 } from '../routing/deeplinks';
-import { parsePolygon, polygonZentroid } from './lagekarte/geo';
+import { parsePolygon, polygonZentroid, stuetzpunkte } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
@@ -454,6 +454,7 @@ export default function LagekartePage() {
     aktiveAnsichtId,
     fehler,
     erfolg,
+    warnung: (text) => message.warning(text),
   });
 
   // Unter `lg` liegt die Leiste unter der Karte, ab `lg` rechts daneben. Auf jeder Breite lässt sie
@@ -1123,7 +1124,12 @@ export default function LagekartePage() {
           phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
           speichernLaeuft={zoneSpeichern}
           abschliessenMoeglich={zeichenStand.bereit}
-          punkte={zeichenStand.punkte}
+          // In der Bestätigung zählen die Stützpunkte des Entwurfs (Grenze des Servers, LFH-937).
+          punkte={
+            zoneBestaetigung != null
+              ? stuetzpunkte(zoneBestaetigung.geometrie)
+              : zeichenStand.punkte
+          }
           punktZurueckMoeglich={zeichenStand.kannZurueck}
           onPunktZurueck={() => {
             kartenRef.current?.punktZurueck();

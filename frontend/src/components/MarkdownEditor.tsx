@@ -3,6 +3,7 @@ import { Button, Input, Tabs, Typography } from 'antd';
 import type { GetRef } from 'antd';
 import { forwardRef, useState, type KeyboardEvent, type TextareaHTMLAttributes } from 'react';
 import Markdown, { type UnterEbene } from './Markdown';
+import { zeichenGrenze } from './zeichenGrenze';
 import './MarkdownEditor.css';
 
 /** Ref-Typ des inneren antd Input.TextArea (hat `resizableTextArea.textArea`). */
@@ -57,6 +58,17 @@ interface Props {
   umschalterAussen?: boolean;
   /** Nur mit {@link umschalterAussen}: ob die Vorschau offen ist. */
   vorschauOffen?: boolean;
+  /**
+   * Grenze des Servers in Zeichen (LFH-937, `api/eingabegrenzen.ts`): das Textfeld nimmt darüber
+   * nichts an und zeigt ab 80 % „n / max“ (`components/zeichenGrenze.tsx`). Ein von außen gesetzter
+   * längerer Wert (Baustein) bleibt stehen; den hält der Aufrufer vor dem Senden zurück.
+   */
+  maxLength?: number;
+  /**
+   * Nur mit {@link maxLength}: der Aufrufer zeigt den Zähler selbst (ETB-Hinweiszeile), das Feld
+   * zählt nicht unter sich — die angepinnte Erfassungsleiste hat ein Höhenbudget.
+   */
+  zaehlerAussen?: boolean;
 }
 
 /**
@@ -83,6 +95,8 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     druckfassung = false,
     umschalterAussen = false,
     vorschauOffen: vorschauOffenAussen = false,
+    maxLength,
+    zaehlerAussen = false,
   },
   ref,
 ) {
@@ -101,6 +115,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
       onKeyDown={onKeyDown}
       enterKeyHint={enterKeyHint}
       readOnly={readOnly}
+      count={maxLength != null ? zeichenGrenze(maxLength, { zaehler: !zaehlerAussen }) : undefined}
     />
   );
 

@@ -113,4 +113,15 @@ describe('HeraufstufenModal', () => {
       [101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
     );
   });
+
+  it('LFH-937: ein Text über 20 000 Zeichen wird nicht still gekürzt und nicht heraufgestuft', async () => {
+    const lang = { ...nachricht(), inhalt: 'x'.repeat(20_001) };
+    const onHeraufstufen = oeffne(lang);
+    expect(screen.getByText('20.001 / 20.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
+    expect(
+      await screen.findByText('Text darf höchstens 20.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onHeraufstufen).not.toHaveBeenCalled();
+  });
 });

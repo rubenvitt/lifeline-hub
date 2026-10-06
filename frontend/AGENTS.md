@@ -581,6 +581,13 @@ Spec `bedien-arbeitsplatz`).
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
   bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
   `einheit:<id>`).
+- **Freitext nie länger als der Server erlaubt** (LFH-937, Spec `eingabegrenzen`): Grenzen nur aus
+  `api/eingabegrenzen.ts` (Spiegeltest `tests/eingabegrenzen_spiegel.rs`), lange Felder über
+  `zeichenGrenze(max)` aus `components/zeichenGrenze.tsx`, kurze mit nativem `maxLength`. Der
+  Zähler erscheint erst ab 80 % (Höhenbudget der ETB-Leiste), Überlänge in `alarmText` und als
+  Wort. Ein vorbelegter Wert über der Grenze sperrt über `zeichenRegel`, statt still zu kürzen.
+  Die Schnellerfassung prüft die Länge **vor** Upload und Queue (`laengenVerstoss`): ein zu
+  langer Baustein wird nie eingereiht.
 - Dichte kommt vom `ConfigProvider`. `test/utils.tsx` rendert ein **nacktes** `ConfigProvider`
   ohne Theme — Höhen-/Trefferflächen-Aussagen im Vitest belegen nichts.
 

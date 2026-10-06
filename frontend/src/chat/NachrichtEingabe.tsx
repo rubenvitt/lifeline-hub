@@ -1,5 +1,6 @@
 import { IconBueroklammer } from '../icons';
 import { Button, Input, Space, Upload } from 'antd';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import type { UploadFile } from 'antd';
 import { useRef, useState } from 'react';
 
@@ -52,6 +53,8 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Nachricht…"
+          // Grenze des Servers (LFH-937): eine Nachricht kann zum ETB-Eintrag heraufgestuft werden.
+          maxLength={ETB_INHALT_MAX}
           autoSize={{ minRows: 1, maxRows: 4 }}
           onPressEnter={(e) => {
             if (!e.shiftKey) {

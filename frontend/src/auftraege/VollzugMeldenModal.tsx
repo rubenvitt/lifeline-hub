@@ -1,4 +1,5 @@
 import { App, Input, Modal } from 'antd';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { useState } from 'react';
 
 export default function VollzugMeldenModal({
@@ -35,6 +36,8 @@ export default function VollzugMeldenModal({
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Rückmeldung zur Erledigung"
+        // Die Vollzugsmeldung wird ETB-Eintrag: Grenze des ETB-Inhalts (LFH-937).
+        maxLength={ETB_INHALT_MAX}
       />
     </Modal>
   );

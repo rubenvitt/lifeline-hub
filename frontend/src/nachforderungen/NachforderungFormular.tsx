@@ -1,4 +1,5 @@
 import { Col, Form, Input, InputNumber, Row } from 'antd';
+import { ETB_PARTEI_MAX, NACHFORDERUNG_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import { useEffect } from 'react';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -126,7 +127,7 @@ export default function NachforderungFormular({
         label="Bezeichnung / Bedarf"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung ist erforderlich' }]}
       >
-        <Input aria-label="Bezeichnung" />
+        <Input aria-label="Bezeichnung" maxLength={NACHFORDERUNG_BEZEICHNUNG_MAX} />
       </Form.Item>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
@@ -136,7 +137,7 @@ export default function NachforderungFormular({
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="adressatBezeichnung" label="Adressat-Bezeichnung">
-            <Input placeholder="z. B. Leitstelle Nord" />
+            <Input placeholder="z. B. Leitstelle Nord" maxLength={ETB_PARTEI_MAX} />
           </Form.Item>
         </Col>
       </Row>
@@ -155,7 +156,7 @@ export default function NachforderungFormular({
         <Col xs={24} sm={12}>
           <Form.Item name="begruendung" label="Begründung / Lagebezug">
             {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung ist mehrzeilig. */}
-            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
+            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} maxLength={ETB_PARTEI_MAX} />
           </Form.Item>
         </Col>
       </Row>

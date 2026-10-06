@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { einsatzKeys } from '../../api/queryKeys';
+import { SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
+import { grenzeText, zeichenZahl } from '../../components/zeichenGrenze';
 
 /** Strukturierter Wert der Geschädigt-Combobox. Genau eine Variante (oder null = unbekannt/öffentlich). */
 export type GeschaedigtWert =
@@ -18,6 +20,8 @@ export type GeschaedigtWert =
 interface GeschaedigtOption {
   value: string;
   label: string;
+  /** Nur der Hinweis „Kontakt zu lang“ ist nicht wählbar. */
+  disabled?: boolean;
   typ?: 'person' | 'personal' | 'organisation' | 'extern';
   refId?: number;
   kontakt?: string;
@@ -115,7 +119,16 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
     const exaktVorhanden = [...personOptions, ...personalOptions, ...orgOptions].some(
       (o) => o.label.toLowerCase() === lower,
     );
-    if (term && !exaktVorhanden) {
+    // Über der Grenze des Servers (`geschaedigt_kontakt`, LFH-937) kein Angebot, das beim Speichern
+    // scheiterte: an seiner Stelle ein nicht wählbarer Hinweis mit der Grenze.
+    const termZeichen = zeichenZahl(term);
+    if (term && !exaktVorhanden && termZeichen > SCHADEN_ORT_MAX) {
+      gruppen.push({
+        value: 'extern-zu-lang',
+        label: `Kontakt zu lang: höchstens ${grenzeText(SCHADEN_ORT_MAX)} Zeichen (jetzt ${grenzeText(termZeichen)})`,
+        disabled: true,
+      });
+    } else if (term && !exaktVorhanden) {
       gruppen.push({
         value: 'extern',
         label: `Als externen Kontakt: „${term}“`,

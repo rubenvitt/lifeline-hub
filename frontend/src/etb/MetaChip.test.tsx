@@ -406,4 +406,33 @@ describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
     const ms = (onCommit.mock.calls[0][1] as dayjs.Dayjs).valueOf();
     expect(Math.abs(ms - SERVER)).toBeLessThanOrEqual(1_000);
   });
+
+  it('LFH-937: Von/An nehmen höchstens 500 Zeichen an — als Freitext und mit Vorschlägen', () => {
+    const { unmount } = renderMitProviders(
+      <MetaChip
+        feld="veranlassung"
+        editing
+        wert={undefined}
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Veranlassung')).toHaveAttribute('maxlength', '500');
+    unmount();
+    renderMitProviders(
+      <MetaChip
+        feld="von"
+        editing
+        wert={undefined}
+        optionen={['Florian 1']}
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Von')).toHaveAttribute('maxlength', '500');
+  });
 });

@@ -113,4 +113,14 @@ describe('RufnameAbfrage', () => {
     await userEvent.type(screen.getByRole('combobox', { name: 'Rufname für Von' }), '{Escape}');
     await waitFor(() => expect(onAbbrechen).toHaveBeenCalled());
   });
+
+  it('LFH-937: der Rufname nimmt höchstens 500 Zeichen an', () => {
+    renderMitProviders(
+      <RufnameAbfrage optionen={[]} standard={null} onUebernehmen={uebernehmen()} />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Rufname für Von und An' })).toHaveAttribute(
+      'maxlength',
+      '500',
+    );
+  });
 });

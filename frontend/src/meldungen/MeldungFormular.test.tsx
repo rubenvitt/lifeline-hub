@@ -294,3 +294,12 @@ describe('MeldungFormular — Ereigniszeit eines vorgehenden Geräts (LFH-895)',
     expect(gesendeteEreigniszeit(onAnlegen)).toBe('2026-10-04 09:30:00');
   });
 });
+
+describe('MeldungFormular — Eingabegrenzen (LFH-937)', () => {
+  it('begrenzt Absender, Empfänger und Wortlaut auf die Grenzen des Servers', () => {
+    renderFormular();
+    expect(screen.getByLabelText('Absender')).toHaveAttribute('maxlength', '500');
+    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveAttribute('maxlength', '500');
+    expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveAttribute('maxlength', '20000');
+  });
+});

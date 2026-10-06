@@ -1,4 +1,6 @@
 import { Button, Checkbox, Collapse, Flex, Form, Input } from 'antd';
+import { INFOTELEFON_KURZ_MAX, INFOTELEFON_NOTIZ_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { RefSelectProps } from 'antd';
 import type { Dayjs } from 'dayjs';
@@ -83,7 +85,7 @@ export default function AnrufErfassung({
       ]}
       style={{ marginBottom: 0 }}
     >
-      <Input placeholder="Telefon" />
+      <Input placeholder="Telefon" maxLength={INFOTELEFON_KURZ_MAX} />
     </Form.Item>
   );
 
@@ -110,7 +112,12 @@ export default function AnrufErfassung({
               />
             </Form.Item>
             <Form.Item name="notiz" style={{ marginBottom: 0, flex: '1 1 240px', minWidth: 0 }}>
-              <Input aria-label="Notiz" placeholder="Notiz zum Anruf" />
+              <Input
+                aria-label="Notiz"
+                placeholder="Notiz zum Anruf"
+                // Zähler ab 80 % im Feld selbst (Suffix), keine weitere Zeile (LFH-937).
+                count={zeichenGrenze(INFOTELEFON_NOTIZ_MAX)}
+              />
             </Form.Item>
             <Form.Item
               name="rueckruf_noetig"
@@ -139,7 +146,7 @@ export default function AnrufErfassung({
                     name="anrufer_name"
                     style={{ marginBottom: 0, flex: '1 1 200px' }}
                   >
-                    <Input />
+                    <Input maxLength={INFOTELEFON_KURZ_MAX} />
                   </Form.Item>
                   {!rueckrufNoetig && <div style={{ flex: '1 1 200px' }}>{rueckrufFeld}</div>}
                   <Form.Item

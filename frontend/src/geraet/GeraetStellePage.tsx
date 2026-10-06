@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Alert, App, Button, Form, Input, Space, Spin } from 'antd';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { IconKachelraster } from '../icons';
@@ -204,7 +205,7 @@ function MeldungenBereich({
               label="Inhalt"
               rules={[{ required: true, whitespace: true, message: 'Bitte den Inhalt eingeben' }]}
             >
-              <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} />
+              <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} maxLength={ETB_INHALT_MAX} />
             </Form.Item>
             <Form.Item<MeldungWerte> name="prioritaet" label="Priorität">
               <PrioritaetFeld />

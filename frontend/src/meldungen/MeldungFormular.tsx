@@ -1,5 +1,6 @@
 import { IconBlitz, IconPapierflieger } from '../icons';
 import { Button, Col, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
@@ -203,12 +204,12 @@ export default function MeldungFormular({
             label="Absender (Funkrufname/Stelle)"
             rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
           >
-            <Input aria-label="Absender" />
+            <Input aria-label="Absender" maxLength={ETB_PARTEI_MAX} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={vonOptionen.length > 0 ? 8 : 12}>
           <Form.Item name="empfaenger" label="Empfänger / Adressat">
-            <Input placeholder="z. B. ELW 1, S3" />
+            <Input placeholder="z. B. ELW 1, S3" maxLength={ETB_PARTEI_MAX} />
           </Form.Item>
         </Col>
       </Row>
@@ -295,7 +296,7 @@ export default function MeldungFormular({
         label="Inhalt / Wortlaut"
         rules={[{ required: true, whitespace: true, message: 'Inhalt ist erforderlich' }]}
       >
-        <TextArea aria-label="Inhalt / Wortlaut" rows={3} />
+        <TextArea aria-label="Inhalt / Wortlaut" rows={3} maxLength={ETB_INHALT_MAX} />
       </Form.Item>
     </ErfassungsFormular>
   );

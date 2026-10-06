@@ -107,3 +107,18 @@ describe('BearbeitenModal — Erfassungshülle (LFH-796)', () => {
     expect(screen.getByDisplayValue('Deich gehalten')).toBeInTheDocument();
   });
 });
+
+describe('BearbeitenModal — Eingabegrenze (LFH-937)', () => {
+  it('nimmt höchstens 20 000 Zeichen an', () => {
+    renderMitProviders(
+      <BearbeitenModal
+        offen
+        nachricht={nachricht}
+        senden={false}
+        onAbbrechen={vi.fn()}
+        onBestaetigen={vi.fn()}
+      />,
+    );
+    expect(screen.getByDisplayValue('Deich instabil')).toHaveAttribute('maxlength', '20000');
+  });
+});

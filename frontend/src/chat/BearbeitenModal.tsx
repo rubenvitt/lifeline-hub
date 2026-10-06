@@ -1,4 +1,5 @@
 import { Form, Input } from 'antd';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { useEffect } from 'react';
 import { ErfassungsModal } from '../components/Erfassung';
 import type { ChatNachricht } from '../api/types';
@@ -49,7 +50,7 @@ export default function BearbeitenModal({
         name="inhalt"
         rules={[{ required: true, whitespace: true, message: 'Text erforderlich' }]}
       >
-        <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} />
+        <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} maxLength={ETB_INHALT_MAX} />
       </Form.Item>
     </ErfassungsModal>
   );

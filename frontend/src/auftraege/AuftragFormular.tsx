@@ -19,6 +19,14 @@ import {
   type FunktionsVorschlaege,
 } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
+import {
+  AUFTRAG_BEFEHLSFELD_MAX,
+  AUFTRAG_EMPFAENGER_MAX,
+  AUFTRAG_EXTERN_BEZEICHNUNG_MAX,
+  AUFTRAG_TEXT_MAX,
+  FUNKTION_TEXT_MAX,
+} from '../api/eingabegrenzen';
+import { grenzeText, istZuLang, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 
 const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
   { value: 'leitstelle', label: 'Leitstelle' },
@@ -90,6 +98,26 @@ function baueEmpfaenger(
     }
     return angabe.text ? [{ empfaenger_typ: 'funktion', funktion_text: angabe.text }] : [];
   });
+}
+
+/**
+ * Freie Empfänger-Texte über der Grenze des Servers (`funktion_text`, LFH-937): der Tag-Modus hat
+ * keinen Zähler, deshalb eine Regel statt eines stillen Kürzens.
+ */
+function empfaengerRegel(katalog: FunktionsVorschlaege['katalog']) {
+  return {
+    validator: (_: unknown, werte: unknown) =>
+      Array.isArray(werte) &&
+      baueEmpfaenger(werte as string[], katalog).some((e) =>
+        istZuLang(e.funktion_text, FUNKTION_TEXT_MAX),
+      )
+        ? Promise.reject(
+            new Error(
+              `Ein Empfänger darf höchstens ${grenzeText(FUNKTION_TEXT_MAX)} Zeichen lang sein`,
+            ),
+          )
+        : Promise.resolve(),
+  };
 }
 
 /**
@@ -237,7 +265,11 @@ export default function AuftragFormular({
           </Col>
           <Col xs={24} sm={12}>
             <Form.Item name="externBezeichnung" label="Bezeichnung der Stelle">
-              <Input aria-label="Externe Bezeichnung" placeholder="z. B. Leitstelle Nord" />
+              <Input
+                aria-label="Externe Bezeichnung"
+                placeholder="z. B. Leitstelle Nord"
+                maxLength={AUFTRAG_EXTERN_BEZEICHNUNG_MAX}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -245,19 +277,19 @@ export default function AuftragFormular({
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="absicht" label="Absicht / Ziel">
-            <TextArea aria-label="Absicht / Ziel" rows={1} />
+            <TextArea aria-label="Absicht / Ziel" rows={1} maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="lage" label="Lage">
-            <TextArea aria-label="Lage" rows={1} />
+            <TextArea aria-label="Lage" rows={1} maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={8}>
           <Form.Item name="ort" label="Ort / Wo">
-            <Input aria-label="Ort / Wo" />
+            <Input aria-label="Ort / Wo" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
@@ -265,24 +297,25 @@ export default function AuftragFormular({
             <Input
               aria-label="Zeit / Wann"
               placeholder="z. B. sofort, bis 14:00, nach Eintreffen"
+              maxLength={AUFTRAG_BEFEHLSFELD_MAX}
             />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
           <Form.Item name="mittel" label="Mittel / Womit">
-            <Input aria-label="Mittel / Womit" />
+            <Input aria-label="Mittel / Womit" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="verbindung" label="Verbindung / Meldewege">
-            <Input aria-label="Verbindung / Meldewege" />
+            <Input aria-label="Verbindung / Meldewege" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="sicherheit" label="Sicherheit / Besonderes">
-            <Input aria-label="Sicherheit / Besonderes" />
+            <Input aria-label="Sicherheit / Besonderes" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
           </Form.Item>
         </Col>
       </Row>
@@ -323,18 +356,29 @@ export default function AuftragFormular({
       <Form.Item
         name="text"
         label="Auftrag / Was"
-        rules={[{ required: true, message: 'Auftragstext ist erforderlich' }]}
+        rules={[
+          { required: true, message: 'Auftragstext ist erforderlich' },
+          // Ein vorbelegter Text aus Meldung, Chat oder ETB über der Grenze wird nicht still
+          // gekürzt: der Zähler zeigt die Überlänge, Senden scheitert hier (LFH-937, D8).
+          zeichenRegel(AUFTRAG_TEXT_MAX, 'Auftragstext'),
+        ]}
       >
-        <TextArea aria-label="Auftrag / Was" rows={2} />
+        <TextArea aria-label="Auftrag / Was" rows={2} count={zeichenGrenze(AUFTRAG_TEXT_MAX)} />
       </Form.Item>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           {/* EIN Feld für beide Empfängersorten (Begründung an `FormWerte.empfaenger`). Das Komma bleibt
              Trennzeichen, damit „S3, Fachberater" zwei Empfänger ergibt. */}
-          <Form.Item name="empfaenger" label="Empfänger">
+          <Form.Item
+            name="empfaenger"
+            label="Empfänger"
+            rules={[empfaengerRegel(funktionen.katalog)]}
+          >
             <Select
               mode="tags"
               aria-label="Empfänger"
+              // Grenze des Servers vor dem Entdoppeln (LFH-937); kappt auch eine eingefügte Liste.
+              maxCount={AUFTRAG_EMPFAENGER_MAX}
               options={zielOptionen}
               placeholder="Abschnitt, Einheit oder Funktion (z. B. S3)"
               allowClear

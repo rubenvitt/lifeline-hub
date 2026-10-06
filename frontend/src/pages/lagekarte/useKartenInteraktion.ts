@@ -20,7 +20,12 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { EinsatzAnzeige, ZoneTyp, FreiesZeichenUpdate } from '../../api/types';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
-import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
+import {
+  ZU_VIELE_STUETZPUNKTE,
+  zuVieleStuetzpunkte,
+  type GeoJsonGeometry,
+  type GeoJsonPolygon,
+} from './geo';
 import type { ZeichenModus } from './zeichnen';
 import type { MessForm } from './messung';
 import type { PlatzierenPunktTyp } from './Sidebar';
@@ -140,6 +145,11 @@ interface KartenInteraktionArgs {
   fehler: (e: unknown) => void;
   /** Sichtbare fachliche Quittung nach serverseitig erfolgreicher Aktion. */
   erfolg: (text: string) => void;
+  /**
+   * Hinweis, wenn eine fertige Figur nicht gespeichert wird (LFH-937: über der Stützpunkt-Grenze
+   * des Servers). Wie der Mindestpunkte-Fall der Seite (`message.warning`).
+   */
+  warnung?: (text: string) => void;
 }
 
 /**
@@ -155,6 +165,7 @@ export function useKartenInteraktion({
   aktiveAnsichtId,
   fehler,
   erfolg,
+  warnung,
 }: KartenInteraktionArgs) {
   const qc = useQueryClient();
 
@@ -502,6 +513,11 @@ export function useKartenInteraktion({
   const bestaetigungSpeichern = () => {
     if (!zoneBestaetigung) return;
     const zu = zoneBestaetigung;
+    // Die Steuerung sperrt „Speichern“ schon; dies ist der Riegel für jeden anderen Weg (LFH-937).
+    if (zuVieleStuetzpunkte(zu.geometrie)) {
+      warnung?.(ZU_VIELE_STUETZPUNKTE);
+      return;
+    }
     dispatch({ t: 'zoneSpeichernStart' });
     legeZoneAn(einsatzId, {
       typ: zu.typ,
@@ -642,6 +658,13 @@ export function useKartenInteraktion({
 
   // Abschnittsfläche fertig → persistieren, quittieren, dann Zeichenmodus beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
+    // Die Abschnittsfläche hat keine Bestätigung: über der Grenze des Servers wird sie hier
+    // zurückgehalten, gemeldet und der Zeichenmodus beendet (LFH-937, design.md D8).
+    if (zuVieleStuetzpunkte(poly)) {
+      warnung?.(ZU_VIELE_STUETZPUNKTE);
+      dispatch({ t: 'beenden', arten: ['abschnitt'] });
+      return;
+    }
     setAbschnittSpeichern(true);
     zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
       .then(() => {
