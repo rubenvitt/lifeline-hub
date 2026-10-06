@@ -359,6 +359,12 @@ describe('3.4 Bilanz', () => {
         status: 'betroffen',
         aktuelle_verbleib_art: 'vor_ort',
       }),
+      // Jede übrige Verbleib-Art, Sichtung und jeder Status einmal: eine spätere Kollision fällt auf.
+      person({ id: 5, aktuelle_sichtung: 'sk1', aktuelle_verbleib_art: 'transport' }),
+      person({ id: 6, aktuelle_sichtung: 'sk3', aktuelle_verbleib_art: 'notunterkunft' }),
+      person({ id: 7, aktuelle_sichtung: 'sk4', aktuelle_verbleib_art: 'entlassung' }),
+      person({ id: 8, aktuelle_uhs_id: 3 }),
+      person({ id: 9, status: 'abgemeldet' }),
     ];
     const b = verdichteEinsatzbericht(rohBericht({ personen: daten(personen) }), konv);
     const a = abschnitt(b, 'bilanz', 'Personen');

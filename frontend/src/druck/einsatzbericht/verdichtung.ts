@@ -431,7 +431,7 @@ function personenBilanz(personen: Person[]): Inhalt[] {
       'Nach Verbleib',
     ),
     vermerk(
-      '„Tot“ ist die Sichtungskategorie, „Verstorben“ der Personenstatus. Beide werden getrennt geführt und müssen nicht übereinstimmen.',
+      '„Tot“ ist die Sichtungskategorie, „Verstorben“ der Personenstatus und „Verstorben (Verbleib)“ der dokumentierte Verbleib; die Achsen werden getrennt geführt und müssen nicht übereinstimmen. „Transportiert“ zählt ohne Voranmeldung, der Verbleib nur angetroffene Personen (nicht vermisst, nicht abgemeldet).',
     ),
   ];
 }

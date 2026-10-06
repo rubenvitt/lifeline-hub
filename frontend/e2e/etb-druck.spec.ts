@@ -206,6 +206,11 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
     expect(auszug[m - 1].text, 'letzter Eintrag auf der letzten Seite').toContain(
       'Berichtigung: Deich Süd, nicht Nord',
     );
+    // Auf dem echten Blatt (Seitenbreite statt Fenster) gelten die Regeln für den schmalen Schirm
+    // nicht: sechs Spalten, keine Metazeile (LFH-956).
+    expect(auszug[0].text).toContain('Von/An');
+    expect(auszug[0].text).toContain('Erfasser');
+    expect(auszug[0].text).not.toContain('Erfasser: ');
     test.info().annotations.push({ type: 'messwert', description: `ETB-Druck: PDF ${m} Seiten` });
   } else {
     test.info().annotations.push({
@@ -240,8 +245,16 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
       async (p) => {
         const erste = zeile(p, saat.grund.lfd_nr);
         // Vorbedingung: die Metazeile trägt Typ und Von/An, der Erfasser den langen Namen.
-        await expect(erste).toContainText('Meldung · von Florian 1 · an ELW');
-        await expect(erste).toContainText('Erfasser: Administrator');
+        // `useInnerText`: nur sichtbarer Text zählt — eine versteckte Metazeile ließe Typ, Von/An und
+        // Erfasser am Handy verschwinden.
+        await expect(erste).toContainText('Meldung · von Florian 1 · an ELW', {
+          useInnerText: true,
+        });
+        await expect(erste).toContainText('Erfasser: Administrator', { useInnerText: true });
+        await expect(erste.locator('td.druckansicht-nicht-schmal')).toHaveCount(3);
+        for (const zelle of await erste.locator('td.druckansicht-nicht-schmal').all()) {
+          await expect(zelle).toBeHidden();
+        }
         return p.evaluate(() => {
           const tabelle = document.querySelector('[data-lfh="etb-druck-tabelle"]')!;
           const inhalt = Array.from(tabelle.querySelectorAll('thead th')).find(

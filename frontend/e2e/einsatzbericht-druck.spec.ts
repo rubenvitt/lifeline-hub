@@ -366,8 +366,10 @@ test('Einsatzbericht am Handy: Layout-Viewport bleibt 390 px, „Freigegeben von
         // Vorbedingung: das Verzeichnis trägt den langen, untrennbaren Namen.
         await expect(lage.locator('td', { hasText: /^Administrator$/ })).toHaveCount(1);
         // Die Personenbilanz steht gegliedert (die Zahlen selbst prüft `verdichtung.test.ts`).
-        const bilanz = p.locator('[data-lfh="einsatzbericht-block-bilanz"]');
-        await expect(bilanz.getByRole('heading', { level: 5 })).toHaveText([
+        const personen = p
+          .locator('[data-lfh="einsatzbericht-block-bilanz"] section')
+          .filter({ has: p.getByRole('heading', { level: 4, name: 'Personen', exact: true }) });
+        await expect(personen.getByRole('heading', { level: 5 })).toHaveText([
           'Nach Sichtung',
           'Nach Personenstatus',
           'Nach Verbleib',
