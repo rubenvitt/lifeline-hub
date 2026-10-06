@@ -242,7 +242,7 @@ pub async fn login(
         // Anlauf `login` → `totp/finish` den Zähler zurück, und der Code ließe sich ungebremst
         // raten. Geräumt wird in `totp_finish`.
         let key = session::neuer_token();
-        crate::auth::totp::state::speichere(key.clone(), benutzer.id);
+        crate::auth::totp::state::speichere(key.clone(), benutzer.id).map_err(anmeldungen_voll)?;
         let jar = jar.add(mfa_pending_cookie(key, secure));
         return Ok((
             jar,
@@ -601,10 +601,15 @@ pub struct OidcStartQuery {
 /// (Open-Redirect-Schutz). Abgelehnt werden neben `//…` auch Backslashes und Control-Zeichen:
 /// Browser entfernen Tab/Newline und machen aus `/\` ein protokoll-relatives `//` (WHATWG-URL),
 /// beides sonst ein Bypass. Pfade dieser App enthalten beides nie.
+///
+/// Länger als [`ZIEL_PFAD_MAX`] fällt ebenfalls auf die Vorgabe zurück (LFH-919): der Pfad liegt
+/// bis zum Callback im State-Speicher, und ohne Grenze trüge jeder Start bis zum URI-Maximum von
+/// rund 64 KiB hinein. Gekürzt wird nicht, ein abgeschnittener Pfad führte irgendwohin.
 fn ziel_pfad_aus_query(von: Option<String>) -> String {
     match von {
         Some(pfad)
-            if pfad.starts_with('/')
+            if pfad.len() <= ZIEL_PFAD_MAX
+                && pfad.starts_with('/')
                 && !pfad.starts_with("//")
                 && !pfad.contains('\\')
                 && !pfad.chars().any(|c| c.is_control()) =>
@@ -612,6 +617,32 @@ fn ziel_pfad_aus_query(von: Option<String>) -> String {
             pfad
         }
         _ => "/einsaetze".to_string(),
+    }
+}
+
+/// Höchstlänge des Ziel-Pfads nach dem OIDC-Login in Bytes; Pfade dieser App sind ASCII und weit
+/// kürzer (der längste trägt die `challenge` der Mac-App, rund 70).
+const ZIEL_PFAD_MAX: usize = 512;
+
+/// Der Zeremonie-Speicher ist voll (LFH-919): kein neuer Anmeldeablauf, bis Einträge ablaufen.
+fn anmeldungen_voll(_: crate::auth::ablauf_speicher::Voll) -> AppError {
+    tracing::warn!("Anmeldeablauf abgewiesen: Zeremonie-Speicher voll");
+    AppError::ServiceUnavailable(
+        "Gerade laufen zu viele Anmeldungen. Bitte kurz warten.".to_string(),
+    )
+}
+
+/// Drossel der öffentlichen Anmelde-Starts je Quelle (LFH-919, `auth/start_drossel.rs`). Ohne
+/// bekannte Adresse (Router-Tests ohne `ConnectInfo`) wird nicht gedrosselt.
+fn start_drosseln(peer_ip: Option<std::net::IpAddr>) -> Result<(), AppError> {
+    match peer_ip {
+        Some(ip) if !crate::auth::start_drossel::start_erlaubt(ip) => {
+            tracing::warn!(peer_ip = %ip, "Anmelde-Start abgewiesen: zu viele Starts aus dieser Quelle");
+            Err(AppError::TooManyRequests(
+                "Zu viele Anmeldeversuche. Bitte kurz warten.".to_string(),
+            ))
+        }
+        _ => Ok(()),
     }
 }
 
@@ -654,6 +685,7 @@ fn oidc_state_binding_ok(cookie_state: Option<&str>, state_query: &str) -> bool 
 /// Redirect auf die Login-Seite mit generischem Hinweis. Setzt das `oidc_state`-Binding-Cookie.
 pub async fn oidc_start(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     Query(query): Query<OidcStartQuery>,
@@ -665,6 +697,7 @@ pub async fn oidc_start(
     if !oidc_aktiv {
         return Err(AppError::NotFound);
     }
+    start_drosseln(peer_ip)?;
 
     let client = match crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await {
         Ok(client) => client,
@@ -694,7 +727,8 @@ pub async fn oidc_start(
             pkce_verifier: pkce_verifier.secret().clone(),
             ziel_pfad,
         },
-    );
+    )
+    .map_err(anmeldungen_voll)?;
 
     // Binding-Cookie, s. `baue_oidc_state_cookie`.
     let jar = jar.add(baue_oidc_state_cookie(csrf.secret().clone(), secure));
@@ -941,7 +975,8 @@ pub async fn webauthn_register_start(
     crate::auth::webauthn::state::speichere(
         key.clone(),
         crate::auth::webauthn::state::CeremonyZustand::Registrierung(reg),
-    );
+    )
+    .map_err(anmeldungen_voll)?;
 
     let jar = jar.add(webauthn_reg_cookie(key, secure));
     Ok((jar, Json(ccr)))
@@ -1023,6 +1058,7 @@ pub struct WebauthnAuthStartRequest {
 /// discoverable Login hat diesen Tradeoff nicht.
 pub async fn webauthn_auth_start(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<WebauthnAuthStartRequest>,
@@ -1031,6 +1067,7 @@ pub async fn webauthn_auth_start(
         return Err(AppError::NotFound);
     }
     let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+    start_drosseln(peer_ip)?;
     // Wie beim Passwort-Login (LFH-921, LFH-981): getrimmt, Höchstlänge, ohne Schreibweise.
     let benutzername = crate::auth::benutzername::normalisiere(&req.benutzername)?;
 
@@ -1061,7 +1098,8 @@ pub async fn webauthn_auth_start(
     crate::auth::webauthn::state::speichere(
         key.clone(),
         crate::auth::webauthn::state::CeremonyZustand::Authentifizierung(auth_state),
-    );
+    )
+    .map_err(anmeldungen_voll)?;
 
     let jar = jar.add(webauthn_auth_cookie(key, secure));
     Ok((jar, Json(rcr)))
@@ -1220,6 +1258,7 @@ fn webauthn_disc_cookie(key: String, secure: bool) -> Cookie<'static> {
 /// sichert ein künftiges Frontend ab, das den ganzen Wrapper übergäbe.
 pub async fn webauthn_discoverable_start(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
 ) -> Result<(CookieJar, Json<RequestChallengeResponse>), AppError> {
@@ -1227,6 +1266,7 @@ pub async fn webauthn_discoverable_start(
         return Err(AppError::NotFound);
     }
     let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+    start_drosseln(peer_ip)?;
 
     // Ohne Nutzerbezug ist ein Fehler hier ein echter Serverfehler (500).
     let (mut rcr, disc_state) = webauthn.start_discoverable_authentication().map_err(|e| {
@@ -1238,7 +1278,8 @@ pub async fn webauthn_discoverable_start(
     crate::auth::webauthn::state::speichere(
         key.clone(),
         crate::auth::webauthn::state::CeremonyZustand::AuthentifizierungDiscoverable(disc_state),
-    );
+    )
+    .map_err(anmeldungen_voll)?;
 
     let jar = jar.add(webauthn_disc_cookie(key, secure));
     Ok((jar, Json(rcr)))
@@ -1703,6 +1744,9 @@ pub struct AppCodeEinloesen {
 /// gebunden an die `challenge` der macOS-Hülle (LFH-818). Die Webanwendung ruft das erst nach
 /// der ausdrücklichen Bestätigung auf `/app-anmeldung` auf. Ohne Sitzung 401, `challenge` in
 /// falscher Form 400.
+///
+/// Ein neuer Code macht den offenen Code derselben Person ungültig; sind schon
+/// `huelle::state::OBERGRENZE` Codes anderer Personen offen, 429 (LFH-919).
 pub async fn app_code_ausstellen(
     CurrentUser(benutzer): CurrentUser,
     JsonBody(req): JsonBody<AppCodeAnfrage>,
@@ -1719,7 +1763,11 @@ pub async fn app_code_ausstellen(
             benutzer_id: benutzer.id,
             challenge: req.challenge,
         },
-    );
+    )
+    .map_err(|_| {
+        tracing::warn!("Einmalcode abgewiesen: zu viele offene Codes");
+        AppError::TooManyRequests("Zu viele offene Anmeldungen. Bitte kurz warten.".to_string())
+    })?;
     Ok(Json(AppCode { code }))
 }
 
@@ -1855,6 +1903,18 @@ mod tests {
     fn ziel_pfad_aus_query_behaelt_die_query() {
         let ziel = "/app-anmeldung?challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
         assert_eq!(ziel_pfad_aus_query(Some(ziel.to_string())), ziel);
+    }
+
+    /// Der Pfad liegt bis zum Callback im State-Speicher; ohne Grenze trüge jeder Start bis zu
+    /// rund 64 KiB hinein (LFH-919).
+    #[test]
+    fn ziel_pfad_aus_query_faellt_bei_ueberlaenge_auf_die_vorgabe_zurueck() {
+        let grenzfall = format!("/{}", "a".repeat(ZIEL_PFAD_MAX - 1));
+        assert_eq!(ziel_pfad_aus_query(Some(grenzfall.clone())), grenzfall);
+        let zu_lang = format!("/{}", "a".repeat(ZIEL_PFAD_MAX));
+        assert_eq!(ziel_pfad_aus_query(Some(zu_lang)), "/einsaetze");
+        let riesig = format!("/{}", "a".repeat(60 * 1024));
+        assert_eq!(ziel_pfad_aus_query(Some(riesig)), "/einsaetze");
     }
 
     #[test]

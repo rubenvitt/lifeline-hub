@@ -121,6 +121,27 @@ impl Default for FachebenenState {
     }
 }
 
+/// Vermerkt den Ausgang eines Abrufs im Fehlschlag-Merker (Pegel, Wetter): Erfolg räumt den
+/// Schlüssel, Fehlschlag startet seine Abkühlung. Dabei fällt jeder Eintrag weg, dessen
+/// Abkühlung vorbei ist (LFH-919): sonst blieben Schlüssel, die nie wieder gelingen (eine
+/// unbekannte Pegel-UUID bekommt dauerhaft 404), bis zum Neustart stehen. Der Merker hält so nur
+/// die Fehlschläge der letzten `abkuehlung`; je Schlüssel gibt es darin höchstens einen Abruf.
+pub(crate) fn ausgang_vermerken(
+    merker: &Mutex<HashMap<String, Instant>>,
+    schluessel: String,
+    erfolg: bool,
+    abkuehlung: Duration,
+) {
+    let jetzt = Instant::now();
+    let mut merker = merker.lock().unwrap_or_else(|e| e.into_inner());
+    merker.retain(|_, t| jetzt.saturating_duration_since(*t) < abkuehlung);
+    if erfolg {
+        merker.remove(&schluessel);
+    } else {
+        merker.insert(schluessel, jetzt);
+    }
+}
+
 /// Loopback-Quelle, die immer gzip-kodiert antwortet und den `Accept-Encoding`-Kopf der Anfrage
 /// mitschreibt (LFH-599). Geteilt von den Tests des Fachebenen-, Proxy- und Download-Clients.
 #[cfg(test)]
@@ -208,6 +229,33 @@ mod tests {
             &*fe.pegel_basis_url, PEGELONLINE_BASIS_URL,
             "die Pegel-Basis bleibt unberührt"
         );
+    }
+
+    #[test]
+    fn ein_vermerk_raeumt_abgelaufene_fehlschlaege() {
+        let merker = Mutex::new(HashMap::new());
+        let abkuehlung = Duration::from_millis(50);
+        ausgang_vermerken(&merker, "alt".into(), false, abkuehlung);
+        std::thread::sleep(abkuehlung);
+        ausgang_vermerken(&merker, "frisch".into(), false, abkuehlung);
+        let merker = merker.into_inner().unwrap();
+        assert!(
+            !merker.contains_key("alt"),
+            "die Abkühlung von `alt` ist vorbei"
+        );
+        assert!(merker.contains_key("frisch"));
+    }
+
+    #[test]
+    fn ein_erfolg_raeumt_seinen_schluessel_und_abgelaufene() {
+        let merker = Mutex::new(HashMap::new());
+        let abkuehlung = Duration::from_millis(50);
+        ausgang_vermerken(&merker, "alt".into(), false, abkuehlung);
+        ausgang_vermerken(&merker, "x".into(), false, abkuehlung);
+        std::thread::sleep(abkuehlung);
+        ausgang_vermerken(&merker, "y".into(), false, Duration::from_secs(60));
+        ausgang_vermerken(&merker, "y".into(), true, abkuehlung);
+        assert!(merker.into_inner().unwrap().is_empty());
     }
 
     #[test]

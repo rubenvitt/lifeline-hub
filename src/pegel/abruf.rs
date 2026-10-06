@@ -148,13 +148,7 @@ fn abruf(
     );
     async move {
         let ergebnis = fut.await;
-        let mut merker = fehlschlag.lock().unwrap_or_else(|e| e.into_inner());
-        if ergebnis.is_some() {
-            merker.remove(&uuid);
-        } else {
-            merker.insert(uuid, std::time::Instant::now());
-        }
-        drop(merker);
+        crate::karte::ausgang_vermerken(&fehlschlag, uuid, ergebnis.is_some(), ABKUEHLUNG);
         drop(freigabe);
         ergebnis
     }
@@ -427,6 +421,23 @@ mod tests {
             .insert(UUID.into(), std::time::Instant::now() - ABKUEHLUNG);
         messungen(&fe, &pool, &[UUID], Modus::Warten).await;
         assert_eq!(anzahl(&zaehler), 2);
+    }
+
+    /// Eine unbekannte UUID scheitert dauerhaft; ihr Eintrag darf nicht bis zum Neustart stehen
+    /// bleiben (LFH-919).
+    #[tokio::test]
+    async fn ein_fehlschlag_raeumt_abgelaufene_merker() {
+        let pool = crate::db::test_pool().await;
+        let (basis, _) = quelle_404().await;
+        let fe = FachebenenState::neu().mit_pegel_basis_url(&basis);
+        fe.pegel_fehlschlag.lock().unwrap().insert(
+            "eine-laengst-vergessene-station".into(),
+            std::time::Instant::now() - ABKUEHLUNG,
+        );
+        messungen(&fe, &pool, &[UUID], Modus::Warten).await;
+        let merker = fe.pegel_fehlschlag.lock().unwrap();
+        assert!(!merker.contains_key("eine-laengst-vergessene-station"));
+        assert!(merker.contains_key(UUID), "der neue Fehlschlag kühlt ab");
     }
 
     #[tokio::test]
