@@ -89,8 +89,8 @@ describe('AuftragVorschau (LFH-664)', () => {
     // Der offene Empfänger bleibt mit Namen stehen — nur der Knopf dazu fehlt.
     expect(screen.getByText('Quittung offen:')).toBeInTheDocument();
     expect(screen.getByText('EA Nord')).toBeInTheDocument();
-    // Das Befehlsschema steht wie auf der Seite hinter „Befehlsdetails".
-    expect(screen.getByText('Befehlsdetails')).toBeInTheDocument();
+    // Das Befehlsschema steht wie auf der Seite hinter „Auftragsdetails (Schema)".
+    expect(screen.getByText('Auftragsdetails (Schema)')).toBeInTheDocument();
   });
 
   it('führt den Rückverweis auf den Quell-ETB-Eintrag als Link', async () => {

@@ -1,7 +1,8 @@
 import { IconPlus } from '../icons';
 import { Button, Form, Input } from 'antd';
 import { Select } from '../components/Select';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
 import { einsatzKeys } from '../api/queryKeys';
@@ -103,12 +104,19 @@ export default function BefehlListe({
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   const fehler = useFehlerMeldung();
 
+  const navigate = useNavigate();
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeuerBefehl) => legeBefehlAn(einsatzId, daten),
     // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`).
     onSuccess: invalidate,
     onError: fehler,
   });
+  /*
+   * Angelegt ist nur ein ENTWURF; bearbeitet und freigegeben wird er auf der Detailseite (LFH-972).
+   * Die Kennung wartet hier bis `onFertig`: erst dann hat die Hülle Abbruchprüfung und Reset
+   * hinter sich, ein Sprung schon in `onSuccess` liefe einem Abbruch während der Mutation davon.
+   */
+  const neuerEntwurf = useRef<number | null>(null);
 
   const befehle = befehleQuery.data ?? [];
   const entwuerfe = befehle.filter((b) => b.status === 'entwurf').length;
@@ -126,14 +134,15 @@ export default function BefehlListe({
         aktion={
           darfSchreiben && (
             // `aria-label` ist PFLICHT: antds Icon schiebt `aria-label="plus"` in den berechneten Namen,
-            // sonst hieße der Knopf „plus Befehl erteilen".
+            // sonst hieße der Knopf „plus Befehl entwerfen". „Entwerfen", nicht „erteilen": der
+            // Knopf legt einen Entwurf an, erteilt ist der Befehl erst mit der Freigabe (LFH-972).
             <Button
               type="primary"
               icon={<IconPlus />}
-              aria-label="Befehl erteilen"
+              aria-label="Befehl entwerfen"
               onClick={() => setAnlegenOffen(true)}
             >
-              Befehl erteilen
+              Befehl entwerfen
             </Button>
           )
         }
@@ -169,13 +178,20 @@ export default function BefehlListe({
           Befehls im Formularspeicher stehen, der nächste Befehl wurde damit angelegt (LFH-796). */}
       <ErfassungsModal<NeuerBefehl>
         offen={anlegenOffen}
-        titel="Neuen Befehl anlegen"
+        titel="Neuer Befehlsentwurf"
         form={form}
-        erfassenText="Anlegen"
+        erfassenText="Entwurf anlegen"
         laeuft={anlegenMutation.isPending}
         initialValues={{ vorlage: 'befehl_lad' }}
-        onErfassen={(w) => anlegenMutation.mutateAsync(w)}
-        onFertig={() => setAnlegenOffen(false)}
+        onErfassen={async (w) => {
+          neuerEntwurf.current = (await anlegenMutation.mutateAsync(w)).id;
+        }}
+        onFertig={() => {
+          setAnlegenOffen(false);
+          const id = neuerEntwurf.current;
+          neuerEntwurf.current = null;
+          if (id != null) navigate(befehlDetailPfad(einsatzId, id));
+        }}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
         <Form.Item label="Schema" name="vorlage" rules={[{ required: true }]}>

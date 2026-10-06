@@ -56,6 +56,7 @@ import {
   nachforderungenPfad,
   parseNachforderungVorbelegung,
   auftraegePfad,
+  parseAuftraegeReiter,
   gefahrenPfad,
   lagekartePfad,
   einsatzdatenPfad,
@@ -484,6 +485,18 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('auftraegePfad ohne Optionen', () => {
     expect(auftraegePfad(E)).toBe('/einsaetze/5/auftraege');
+  });
+  it('auftraegePfad mit ?reiter=befehle (LFH-972); „Aufträge" ist die Vorgabe ohne Parameter', () => {
+    expect(auftraegePfad(E, { reiter: 'befehle' })).toBe('/einsaetze/5/auftraege?reiter=befehle');
+    expect(auftraegePfad(E, { reiter: 'auftraege' })).toBe('/einsaetze/5/auftraege');
+  });
+  it('parseAuftraegeReiter: Round-Trip, unbekannter und fehlender Wert ergeben die Vorgabe', () => {
+    const rund = (pfad: string) => parseAuftraegeReiter(new URL(pfad, 'http://x').searchParams);
+    expect(rund(auftraegePfad(E, { reiter: 'befehle' }))).toBe('befehle');
+    expect(rund(auftraegePfad(E))).toBe('auftraege');
+    expect(parseAuftraegeReiter(new URLSearchParams('reiter=chat'))).toBe('auftraege');
+    // Ein geerbter Objektschlüssel ist kein erlaubter Wert (hasOwnProperty, nicht `in`).
+    expect(parseAuftraegeReiter(new URLSearchParams('reiter=toString'))).toBe('auftraege');
   });
   it('gefahrenPfad ohne Optionen', () => {
     expect(gefahrenPfad(E)).toBe('/einsaetze/5/gefahren');

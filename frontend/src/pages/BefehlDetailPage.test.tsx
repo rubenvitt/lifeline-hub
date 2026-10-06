@@ -171,9 +171,29 @@ describe('BefehlDetailPage', () => {
     expect(await screen.findByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
   });
 
-  it('leitet bei ungültiger Befehl-ID auf die Auftrags-Liste um (LFH-25)', async () => {
-    renderAt('abc');
+  it('leitet bei ungültiger Befehl-ID auf den Reiter Befehle um (LFH-25, LFH-972)', async () => {
+    const { router } = renderAt('abc');
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+    expect(router.state.location.search).toBe('?reiter=befehle');
+  });
+
+  it('die Brotkrume führt auf den Reiter Befehle, nicht auf die Vorgabe (LFH-972)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    expect(await screen.findByRole('link', { name: 'Aufträge/Befehle' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege?reiter=befehle',
+    );
+  });
+
+  it('ein unbekannter Befehl bietet den Rückweg zu den Befehlen an (LFH-972)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockRejectedValue(new Error('Nicht gefunden'));
+    renderAt(99);
+    expect(await screen.findByText(/Befehl nicht gefunden/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Zu den Befehlen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege?reiter=befehle',
+    );
   });
 
   it('verlinkt vom freigegebenen Befehl per ?eintrag= auf den ETB-Eintrag (LFH-25)', async () => {
