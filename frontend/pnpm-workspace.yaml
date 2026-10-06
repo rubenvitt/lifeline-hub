@@ -52,6 +52,32 @@ minimumReleaseAgeExclude:
 # Ab pnpm 10 werden Overrides hier gelesen, NICHT mehr aus package.json ("pnpm"-Feld
 # wird ignoriert — pnpm warnt darüber nur, es bricht nicht).
 overrides:
+  # GHSA-p6vx-979v-rg4c (critical): fromJSON() assimiliert Promise-Thenables und ruft dabei
+  # von Plugins erzeugte Funktionen auf (betrifft <= 1.6.0), sowie GHSA-jp82-f5mq-hwhp (high):
+  # Speichererschöpfung über eine ungeprüfte TypedArray-Länge beim JSON-Deserialisieren
+  # (betrifft <= 1.6.2). Fund 2026-10-06, alpha ohne eigenes Zutun rot (LFH-1070).
+  # Kette: @tanstack/react-query-devtools → @tanstack/query-devtools → @kobalte/core bzw.
+  # @solid-primitives/* → solid-js → seroval (und seroval-plugins → seroval). Nur die
+  # Devtools ziehen Solid herein; ReactQueryDevtools rendert im Produktionsbau nichts, und
+  # Solid braucht seroval nur für Server-Rendering, das hier nicht läuft.
+  # KEIN UPGRADE-PFAD ÜBER DIE KETTE: solid-js 1.9.15 ist die neueste Version und fordert
+  # `seroval ~1.5.4`; einen 1.5.x-Backport gibt es nicht. Der Override hebt deshalb bewusst
+  # über die Range von solid-js hinaus auf die 1.6-Linie (Minor, kein Major). seroval-plugins
+  # wird im Gleichschritt mitgehoben: beide Pakete erscheinen gemeinsam, und seroval-plugins
+  # 1.6.x fordert selbst `seroval ^1.6.3` als Peer. Verifiziert durch den
+  # Frontend-Produktionsbuild, Vitest und check-all.sh. Entfällt, sobald solid-js selbst
+  # `seroval >=1.6.3` fordert.
+  seroval@<1.6.3: ^1.6.3
+  seroval-plugins@<1.6.3: ^1.6.3
+
+  # GHSA-68fv-2mgg-jv7q (high): Event-Loop-DoS über Abschnitts-Offsets in indizierten
+  # Source-Maps (betrifft >= 1.0.0 < 1.2.2). Kette: vitest → jsdom → css-tree →
+  # source-map-js (reine Test-Zeit; postcss hielt bereits 1.2.2). Kein Laufzeit-Code im
+  # Bündel. css-tree 3.2.1 ist die neueste Version und fordert `source-map-js ^1.0.1`; das
+  # Lockfile löste dort 1.2.1, und kein Direktabhängiger hebt es. ^1.2.2 bleibt ein
+  # Same-Major-Patch.
+  source-map-js@>=1.0.0 <1.2.2: ^1.2.2
+
   # GHSA-5p4m-2wfm-xmqj (high): quadratische CPU bei !!omap-Auflösung.
   # @redocly/openapi-core pinnt js-yaml exakt auf 4.2.0, openapi-typescript ist bereits
   # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.1 war

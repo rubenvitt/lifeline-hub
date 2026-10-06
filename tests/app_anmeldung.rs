@@ -11,6 +11,7 @@ use lifeline_hub::auth::huelle::state::{speichere_mit_ablauf, CodeEintrag};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use std::time::Instant;
+use tokio::sync::{Mutex, MutexGuard};
 use tower::ServiceExt;
 
 mod common;
@@ -20,6 +21,17 @@ use common::{anfrage, benutzer_anlegen, login_cookie, setup_mit_pool};
 const VERIFIER: &str = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 const CHALLENGE: &str = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
 const FREMDER_VERIFIER: &str = "eBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+
+/// Der Code-Speicher ist prozessweit, und seit LFH-919 hat jede Person nur einen offenen Code.
+/// Die Tests laufen gegen je eigene Datenbanken, in denen `admin` dieselbe id hat: parallel
+/// machte ein Test den Code des anderen ungültig. Deshalb nacheinander.
+static NACHEINANDER: Mutex<()> = Mutex::const_new(());
+
+async fn aufbau() -> (MutexGuard<'static, ()>, axum::Router, sqlx::SqlitePool) {
+    let reihe = NACHEINANDER.lock().await;
+    let (app, pool) = setup_mit_pool().await;
+    (reihe, app, pool)
+}
 
 struct Antwort {
     status: StatusCode,
@@ -97,7 +109,7 @@ async fn audit(pool: &sqlx::SqlitePool) -> Vec<(String, Option<i64>, String)> {
 
 #[tokio::test]
 async fn ausstellen_ohne_sitzung_ist_401() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let a = post(
         &app,
         "/api/auth/app-code",
@@ -111,7 +123,7 @@ async fn ausstellen_ohne_sitzung_ist_401() {
 
 #[tokio::test]
 async fn challenge_in_falscher_form_ist_400() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     for falsch in [
         "",
@@ -133,7 +145,7 @@ async fn challenge_in_falscher_form_ist_400() {
 
 #[tokio::test]
 async fn passender_verifier_ergibt_eigene_sitzung_und_browsersitzung_bleibt() {
-    let (app, pool) = setup_mit_pool().await;
+    let (_reihe, app, pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     let code = code_ausstellen(&app, &browser, CHALLENGE).await;
     assert_eq!(code.len(), 64);
@@ -166,7 +178,7 @@ async fn passender_verifier_ergibt_eigene_sitzung_und_browsersitzung_bleibt() {
 
 #[tokio::test]
 async fn code_gilt_nur_einmal() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     let code = code_ausstellen(&app, &browser, CHALLENGE).await;
 
@@ -181,7 +193,7 @@ async fn code_gilt_nur_einmal() {
 
 #[tokio::test]
 async fn fremder_verifier_verbraucht_den_code() {
-    let (app, pool) = setup_mit_pool().await;
+    let (_reihe, app, pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     let code = code_ausstellen(&app, &browser, CHALLENGE).await;
 
@@ -202,7 +214,7 @@ async fn fremder_verifier_verbraucht_den_code() {
 
 #[tokio::test]
 async fn abgelaufener_code_ist_401() {
-    let (app, pool) = setup_mit_pool().await;
+    let (_reihe, app, pool) = aufbau().await;
     let admin_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
         .fetch_one(&pool)
         .await
@@ -224,7 +236,7 @@ async fn abgelaufener_code_ist_401() {
 
 #[tokio::test]
 async fn deaktiviertes_konto_ist_401() {
-    let (app, pool) = setup_mit_pool().await;
+    let (_reihe, app, pool) = aufbau().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "gerda", "keine").await;
     let gerda = login_cookie(&app, "gerda", "gerdapw1").await;
@@ -241,7 +253,7 @@ async fn deaktiviertes_konto_ist_401() {
 
 #[tokio::test]
 async fn unbekannt_und_falsch_gebunden_sind_nicht_unterscheidbar() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     let code = code_ausstellen(&app, &browser, CHALLENGE).await;
 
@@ -254,7 +266,7 @@ async fn unbekannt_und_falsch_gebunden_sind_nicht_unterscheidbar() {
 
 #[tokio::test]
 async fn einloesen_in_falscher_form_ist_400() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let code = "c".repeat(64);
     for body in [
         json!({ "code": code, "verifier": "" }),
@@ -271,7 +283,7 @@ async fn einloesen_in_falscher_form_ist_400() {
 
 #[tokio::test]
 async fn formfehler_verbraucht_den_code_nicht() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     let code = code_ausstellen(&app, &browser, CHALLENGE).await;
 
@@ -285,7 +297,7 @@ async fn formfehler_verbraucht_den_code_nicht() {
 
 #[tokio::test]
 async fn alte_sitzung_im_einloesenden_speicher_wird_geloescht() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     // Eine übrig gebliebene Sitzung im Webview der Hülle.
     let alt = login_cookie(&app, "admin", "startpw12").await;
@@ -306,7 +318,7 @@ async fn alte_sitzung_im_einloesenden_speicher_wird_geloescht() {
 
 #[tokio::test]
 async fn gesperrte_adresse_bekommt_429_nach_fehlversuchen() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     // Eigene Adresse, damit parallele Tests die globale Sperre nicht teilen.
     let peer: SocketAddr = "203.0.113.81:40000".parse().unwrap();
     for i in 0..10 {
@@ -333,7 +345,7 @@ async fn gesperrte_adresse_bekommt_429_nach_fehlversuchen() {
 
 #[tokio::test]
 async fn gesperrte_adresse_verbraucht_den_code_nicht() {
-    let (app, _pool) = setup_mit_pool().await;
+    let (_reihe, app, _pool) = aufbau().await;
     let browser = login_cookie(&app, "admin", "startpw12").await;
     let code = code_ausstellen(&app, &browser, CHALLENGE).await;
     let gesperrt: SocketAddr = "203.0.113.82:40000".parse().unwrap();
@@ -367,4 +379,59 @@ async fn gesperrte_adresse_verbraucht_den_code_nicht() {
     )
     .await;
     assert_eq!(b.status, StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn ein_neuer_code_macht_den_vorigen_derselben_person_ungueltig() {
+    let (_reihe, app, _pool) = aufbau().await;
+    let browser = login_cookie(&app, "admin", "startpw12").await;
+    let erster = code_ausstellen(&app, &browser, CHALLENGE).await;
+    let zweiter = code_ausstellen(&app, &browser, CHALLENGE).await;
+
+    assert_eq!(
+        einloesen(&app, &erster, VERIFIER).await.status,
+        StatusCode::UNAUTHORIZED,
+        "der erste Code ist mit dem zweiten ungültig geworden"
+    );
+    assert_eq!(
+        einloesen(&app, &zweiter, VERIFIER).await.status,
+        StatusCode::NO_CONTENT
+    );
+}
+
+/// Sind so viele Codes offen, wie die Obergrenze erlaubt, bekommt eine weitere Person 429; wer
+/// schon einen offenen Code hat, ersetzt ihn und belegt keinen neuen Platz.
+#[tokio::test]
+async fn ueber_der_obergrenze_ist_429_ausser_fuer_den_ersatz() {
+    let (_reihe, app, _pool) = aufbau().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "gerda", "keine").await;
+    let gerda = login_cookie(&app, "gerda", "gerdapw1").await;
+    code_ausstellen(&app, &admin, CHALLENGE).await;
+
+    lifeline_hub::auth::huelle::state::platz_fuer_tests(Some(0));
+    let anfordern = |cookie: String| {
+        let app = app.clone();
+        async move {
+            post(
+                &app,
+                "/api/auth/app-code",
+                Some(&cookie),
+                &json!({ "challenge": CHALLENGE }),
+                None,
+            )
+            .await
+        }
+    };
+    let voll = anfordern(gerda).await;
+    let ersatz = anfordern(admin).await;
+    lifeline_hub::auth::huelle::state::platz_fuer_tests(None);
+
+    assert_eq!(
+        voll.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "{:?}",
+        voll.body
+    );
+    assert_eq!(ersatz.status, StatusCode::OK, "{:?}", ersatz.body);
 }
