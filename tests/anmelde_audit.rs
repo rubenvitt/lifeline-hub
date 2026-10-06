@@ -848,7 +848,8 @@ async fn oidc_callback(app: &axum::Router, state_key: &str, code: &str) -> Antwo
             pkce_verifier: "v".repeat(43),
             ziel_pfad: "/einsaetze".to_string(),
         },
-    );
+    )
+    .unwrap();
     sende(
         app,
         "GET",
@@ -906,7 +907,8 @@ async fn oidc_abbruch_beim_idp_hinterlaesst_genau_einen_fehlschlag() {
             pkce_verifier: "v".repeat(43),
             ziel_pfad: "/einsaetze".to_string(),
         },
-    );
+    )
+    .unwrap();
 
     let antwort = sende(
         &app,
