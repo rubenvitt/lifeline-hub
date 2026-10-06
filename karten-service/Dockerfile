@@ -31,7 +31,7 @@ FROM debian:13-slim
 ARG TARGETARCH
 
 RUN apt-get update \
- && apt-get install --no-install-recommends -y make sqlite3 ca-certificates tzdata \
+ && apt-get install --no-install-recommends -y make sqlite3 ca-certificates tzdata tini \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
@@ -48,5 +48,7 @@ ENV KS_KARTEN_BUILD_DIR=/opt/karten-build \
 EXPOSE 8088
 # Bewusst root: der Zugriff auf den gemounteten Docker-Socket ist ohnehin root-äquivalent,
 # ein anderer Nutzer würde nur die GID-Zuordnung des Hosts ins Abbild ziehen.
-ENTRYPOINT ["/usr/local/bin/karten-service"]
+# tini als PID 1 (LFH-927): Nach einer Zeitüberschreitung beendet der Service `make`; die dabei
+# verwaiste `docker run`-CLI hängt sich an PID 1 und würde ohne init als Zombie liegen bleiben.
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/karten-service"]
 CMD ["serve"]

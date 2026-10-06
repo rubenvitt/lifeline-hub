@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 pub struct Region {
     pub slug: &'static str,
     pub geofabrik_area: &'static str,
@@ -5,6 +7,33 @@ pub struct Region {
     pub region: &'static str,
     pub gruppe: &'static str,
     pub lizenz: &'static str,
+    pub bau: BauKlasse,
+}
+
+/// Wie schwer ein Bau ist (LFH-927, LFH-929). Daraus folgen die Frist des Baus und ob der
+/// Quartals-Cron die Region von selbst einreiht.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BauKlasse {
+    /// Länder und Bundesländer: wenige GB, in Stunden gebaut, läuft im Cron mit.
+    Region,
+    /// Ganze Welt (~70–80 GB Download, ~300 GB Build-Platte): nur auf ausdrücklichen Auftrag
+    /// (`POST /builds`, `build --slug planet`), nie im Cron und nie in `build --all`.
+    Welt,
+}
+
+impl Region {
+    /// Frist für Bau und Upload. Ein hängender make-/docker-Lauf darf den einzigen Bauplatz nicht
+    /// dauerhaft belegen (LFH-927); germany braucht auf schwacher Hardware wenige Stunden.
+    pub fn max_dauer(&self) -> Duration {
+        match self.bau {
+            BauKlasse::Region => Duration::from_secs(6 * 3600),
+            BauKlasse::Welt => Duration::from_secs(72 * 3600),
+        }
+    }
+    /// Reiht der Quartals-Cron (und `build --all`) diese Region ein? (LFH-929)
+    pub fn im_cron(&self) -> bool {
+        self.bau == BauKlasse::Region
+    }
 }
 const ODBL: &str = "© OpenStreetMap contributors (ODbL)";
 // Jede Region = EIN einzelner Geofabrik-Bare-Name (gegen den Geofabrik-Index gematcht, wie
@@ -19,6 +48,7 @@ static REGIONS: &[Region] = &[
         region: "DE",
         gruppe: "Deutschland",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     // Alle 16 Bundesländer (ISO 3166-2:DE) — Falschregion-Schutz via generischem DE-*-Fallback.
     Region {
@@ -28,6 +58,7 @@ static REGIONS: &[Region] = &[
         region: "DE-BW",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "bayern",
@@ -36,6 +67,7 @@ static REGIONS: &[Region] = &[
         region: "DE-BY",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "berlin",
@@ -44,6 +76,7 @@ static REGIONS: &[Region] = &[
         region: "DE-BE",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "brandenburg",
@@ -52,6 +85,7 @@ static REGIONS: &[Region] = &[
         region: "DE-BB",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "bremen",
@@ -60,6 +94,7 @@ static REGIONS: &[Region] = &[
         region: "DE-HB",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "hamburg",
@@ -68,6 +103,7 @@ static REGIONS: &[Region] = &[
         region: "DE-HH",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "hessen",
@@ -76,6 +112,7 @@ static REGIONS: &[Region] = &[
         region: "DE-HE",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "mecklenburg-vorpommern",
@@ -84,6 +121,7 @@ static REGIONS: &[Region] = &[
         region: "DE-MV",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "niedersachsen",
@@ -92,6 +130,7 @@ static REGIONS: &[Region] = &[
         region: "DE-NI",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "nordrhein-westfalen",
@@ -100,6 +139,7 @@ static REGIONS: &[Region] = &[
         region: "DE-NW",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "rheinland-pfalz",
@@ -108,6 +148,7 @@ static REGIONS: &[Region] = &[
         region: "DE-RP",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "saarland",
@@ -116,6 +157,7 @@ static REGIONS: &[Region] = &[
         region: "DE-SL",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "sachsen",
@@ -124,6 +166,7 @@ static REGIONS: &[Region] = &[
         region: "DE-SN",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "sachsen-anhalt",
@@ -132,6 +175,7 @@ static REGIONS: &[Region] = &[
         region: "DE-ST",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "schleswig-holstein",
@@ -140,6 +184,7 @@ static REGIONS: &[Region] = &[
         region: "DE-SH",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "thueringen",
@@ -148,6 +193,7 @@ static REGIONS: &[Region] = &[
         region: "DE-TH",
         gruppe: "Bundesländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     // Alle 9 Nachbarländer Deutschlands — je eine erwartete_box in validate.rs (FR/NL/DK weit
     // wegen Übersee-/Karibik-/Färöer-Gebieten im Geofabrik-Extrakt).
@@ -158,6 +204,7 @@ static REGIONS: &[Region] = &[
         region: "AT",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "belgium",
@@ -166,6 +213,7 @@ static REGIONS: &[Region] = &[
         region: "BE",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "czech-republic",
@@ -174,6 +222,7 @@ static REGIONS: &[Region] = &[
         region: "CZ",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "denmark",
@@ -182,6 +231,7 @@ static REGIONS: &[Region] = &[
         region: "DK",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "france",
@@ -190,6 +240,7 @@ static REGIONS: &[Region] = &[
         region: "FR",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "luxembourg",
@@ -198,6 +249,7 @@ static REGIONS: &[Region] = &[
         region: "LU",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "netherlands",
@@ -206,6 +258,7 @@ static REGIONS: &[Region] = &[
         region: "NL",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "poland",
@@ -214,6 +267,7 @@ static REGIONS: &[Region] = &[
         region: "PL",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     Region {
         slug: "switzerland",
@@ -222,6 +276,7 @@ static REGIONS: &[Region] = &[
         region: "CH",
         gruppe: "Nachbarländer",
         lizenz: ODBL,
+        bau: BauKlasse::Region,
     },
     // Ganze Welt, VOLL-Detail (z2–14) — bewusst wählbare Option, sehr groß (~70–80 GB Download,
     // ~300 GB Build-Platte). `--area planet` ist ein Sonderfall des versatiles-planetiler-Images
@@ -233,13 +288,30 @@ static REGIONS: &[Region] = &[
         region: "WORLD",
         gruppe: "Welt",
         lizenz: ODBL,
+        bau: BauKlasse::Welt,
     },
 ];
 pub fn alle() -> &'static [Region] {
     REGIONS
 }
+/// Regionen, die der Quartals-Cron und `build --all` bauen — ohne die Welt (LFH-929).
+pub fn fuer_cron() -> impl Iterator<Item = &'static Region> {
+    REGIONS.iter().filter(|r| r.im_cron())
+}
 pub fn finde(slug: &str) -> Option<&'static Region> {
     REGIONS.iter().find(|r| r.slug == slug)
+}
+/// Slugs für `build --slug <x>` / `--all`. `--all` baut dieselben Regionen wie der Cron, also
+/// ohne die Welt; planet geht nur über `--slug planet` (LFH-929).
+pub fn fuer_build(slug: Option<&str>, alle: bool) -> anyhow::Result<Vec<&'static str>> {
+    match (slug, alle) {
+        (Some(s), _) => {
+            let reg = finde(s).ok_or_else(|| anyhow::anyhow!("unbekannter slug {s}"))?;
+            Ok(vec![reg.slug])
+        }
+        (None, true) => Ok(fuer_cron().map(|r| r.slug).collect()),
+        (None, false) => anyhow::bail!("build braucht --slug <x> oder --all"),
+    }
 }
 
 // LFH-323: `RegionDto` lebt jetzt im geteilten Crate `karten-katalog` — auf owned `String`-Felder
@@ -280,6 +352,30 @@ mod tests {
             alle().iter().all(|r| !r.slug.contains('.')),
             "Slug ohne Punkt (URL-Parsing)"
         );
+    }
+
+    #[test]
+    fn welt_ist_baubar_aber_nicht_im_cron() {
+        assert!(finde("planet").is_some(), "planet bleibt von Hand baubar");
+        assert!(
+            alle().iter().any(|r| r.slug == "planet"),
+            "GET /regions listet planet"
+        );
+        assert!(fuer_cron().all(|r| r.slug != "planet"));
+        assert_eq!(
+            fuer_cron().count(),
+            alle().len() - 1,
+            "nur planet fällt heraus"
+        );
+    }
+
+    #[test]
+    fn welt_bekommt_die_laengere_frist() {
+        let welt = finde("planet").unwrap().max_dauer();
+        assert!(alle()
+            .iter()
+            .filter(|r| r.slug != "planet")
+            .all(|r| r.max_dauer() < welt));
     }
 
     #[test]

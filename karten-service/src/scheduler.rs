@@ -1,5 +1,29 @@
+use crate::{jobs::Registry, regions};
 use std::sync::{Arc, Mutex};
 use tokio_cron_scheduler::{Job, JobScheduler};
+
+/// Platz in der Warteschlange über einen vollen Cron-Lauf hinaus, für Aufträge aus der
+/// Admin-Ansicht und für planet (LFH-929).
+pub const MANUELLE_RESERVE: usize = 5;
+
+/// Grenze der offenen Aufträge: ein ganzer Cron-Lauf plus [`MANUELLE_RESERVE`].
+pub fn offene_cap() -> usize {
+    regions::fuer_cron().count() + MANUELLE_RESERVE
+}
+
+/// Ein Cron-Lauf: reiht alle Regionen außer der Welt ein (LFH-929). Ein volles Enqueue geht nicht
+/// still verloren, sondern landet als `warn` im Log (LFH-927). Gibt die Zahl der verworfenen
+/// Regionen zurück.
+pub fn cron_lauf(registry: &Registry) -> usize {
+    let mut verworfen = 0;
+    for r in regions::fuer_cron() {
+        if let Err(e) = registry.enqueue(r.slug) {
+            tracing::warn!(slug = r.slug, fehler = ?e, "Cron-Lauf: Region nicht eingereiht");
+            verworfen += 1;
+        }
+    }
+    verworfen
+}
 
 /// Startet einen Cron-Scheduler, der `enqueue_all` nach dem `cron`-Ausdruck (6 Felder inkl.
 /// Sekunden) auslöst. Abweichung von der Skizze im Brief: die reale 0.15-API verlangt für
@@ -34,6 +58,28 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::jobs::Registry;
+
+    #[test]
+    fn cron_lauf_reiht_alles_ausser_der_welt_ein() {
+        let r = Registry::neu(super::offene_cap());
+        assert_eq!(super::cron_lauf(&r), 0);
+        let jobs = r.alle();
+        assert!(jobs.iter().all(|j| j.slug != "planet"));
+        assert_eq!(jobs.len(), crate::regions::fuer_cron().count());
+        // Nach einem vollen Cron-Lauf passt noch ein Auftrag von Hand hinein.
+        assert!(r.enqueue("planet").is_ok());
+    }
+
+    #[test]
+    fn cron_lauf_zaehlt_verworfene_regionen() {
+        let r = Registry::neu(2);
+        assert_eq!(
+            super::cron_lauf(&r),
+            crate::regions::fuer_cron().count() - 2
+        );
+    }
+
     /// LFH-993: Die Job-ID bleibt erhalten, damit `GET /zeitplan` den nächsten Lauf nennen kann.
     #[tokio::test]
     async fn naechster_tick_liegt_in_der_zukunft() {

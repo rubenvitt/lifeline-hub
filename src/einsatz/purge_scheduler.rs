@@ -3,7 +3,7 @@
 //! `tick_einmal`; die Logik selbst ist mit injiziertem `jetzt` deterministisch
 //! testbar. Idempotent über WHERE-Guards in den Repo-Queries.
 //!
-//! Vier Phasen:
+//! Phasen in dieser Reihenfolge:
 //! - **Phase A** (reversibel): Einsätze mit abgelaufener Aufbewahrungsfrist werden
 //!   soft-gelöscht (`geloescht_at` = Karenz-Start: Fristablauf bzw. Setzen einer Frist in die
 //!   Vergangenheit, höchstens jetzt; LFH-906). Ab da am Datenzugriff
@@ -19,14 +19,19 @@
 //!   Kategorien löscht jede Schwärzung nach ihrem Commit einzeln, je Zeile eine Transaktion
 //!   (`schwaerzung_nachlauf::entferne_vorgesehene`); der Tick holt Reste nach.
 //! - **Phase C**: abgelaufene Einträge des Auth-Audits (eigene Frist, an keinem Einsatz).
+//! - **Phase C2** (LFH-928): abgelaufene Sitzungen (`auth::session::purge_abgelaufene`), aus
+//!   demselben Grund wie Phase C.
 //! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
 //!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
 //!   einzige Spur ist das Löschprotokoll der Org. Ohne Org-Frist bleibt das Skelett.
+//! - **Phase E** (LFH-250, LFH-928): verwaiste Anhänge jenseits ihrer Karenz, einzeln je
+//!   Transaktion (`anhang::repo::sweep_verwaiste`). Hängt an keiner Aufbewahrungsfrist.
 //!
 //! DATENVERLUST-kritisch: jede Mutation wird zuvor mit `tracing` protokolliert. Phase A und B
 //! begleitet ein ETB-System-Audit; Phase D schreibt ihren Audit in derselben Transaktion ins
-//! `aufbewahrung_loeschprotokoll` (das ETB geht mit); Phase C betrifft keinen Einsatz. Aktive
-//! Einsätze sind durch `status='abgeschlossen'` in jeder Einsatz-Purge-Query hart ausgeschlossen.
+//! `aufbewahrung_loeschprotokoll` (das ETB geht mit); Phasen C und C2 betreffen keinen Einsatz,
+//! Phase E nur Uploads, die nie an etwas gebunden wurden. Aktive Einsätze sind durch
+//! `status='abgeschlossen'` in jeder Einsatz-Purge-Query hart ausgeschlossen.
 
 use super::aufbewahrung_kategorie as kategorie;
 use super::repo;
@@ -41,9 +46,9 @@ use std::time::Duration;
 /// kein Sekunden-Druck wie bei Erinnerungen).
 const TICK_SEKUNDEN: u64 = 600;
 
-/// Ein Purge-Durchlauf für den Zeitpunkt `jetzt`. Führt Phase A (Soft-Delete), Phase B
-/// (PII-Schwärzung), Phase C (Auth-Audit) und Phase D (endgültige Löschung) aus und liefert
-/// die Gesamtzahl der Mutationen.
+/// Ein Purge-Durchlauf für den Zeitpunkt `jetzt`. Führt die Phasen aus dem Modulkopf aus, von
+/// Phase A (Soft-Delete) bis Phase E (verwaiste Anhänge), und liefert die Gesamtzahl der
+/// Mutationen.
 /// Async + injiziertes `jetzt` = deterministisch testbar. Idempotent: ein zweiter
 /// Tick ohne neue Fälligkeiten liefert 0.
 ///
@@ -57,8 +62,8 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
     tick_mit_rueckschrieb(pool, live, jetzt, &mut false).await
 }
 
-/// Wie [`tick_einmal`], schreibt nach einer Schwärzung oder endgültigen Löschung (LFH-750) aber
-/// den WAL zurück (LFH-725, Spec
+/// Wie [`tick_einmal`], schreibt nach einer Schwärzung, einer endgültigen Löschung (LFH-750)
+/// oder einem Sweep mit Löschungen (LFH-928) aber den WAL zurück (LFH-725, Spec
 /// `aufbewahrung`, „Physische Entfernung geschwärzter Werte“): erst damit sind die genullten
 /// Seiten in der Hauptdatei und der Vorzustand aus dem WAL getilgt. Blockiert eine andere
 /// Verbindung den Rückschrieb, bleibt `rueckschrieb_ausstehend` gesetzt, und jeder folgende Tick
@@ -238,6 +243,18 @@ pub async fn tick_mit_rueckschrieb(
         Err(e) => tracing::warn!("Purge Phase C: Auth-Audit-Purge fehlgeschlagen: {e}"),
     }
 
+    // --- Phase C2: abgelaufene Sitzungen (LFH-928) ---
+    // Geräte im Feld melden sich nie ab; jede Anmeldung bliebe sonst als Zeile mit Benutzer und
+    // Zeitpunkt stehen — dieselbe unbegrenzte Sammlung von Anmeldedaten wie in Phase C.
+    match crate::auth::session::purge_abgelaufene(pool).await {
+        Ok(0) => {}
+        Ok(n) => {
+            tracing::info!(anzahl = n, "Purge Phase C2: abgelaufene Sitzungen gelöscht");
+            anzahl += n as usize;
+        }
+        Err(e) => tracing::warn!("Purge Phase C2: Sitzungs-Purge fehlgeschlagen: {e}"),
+    }
+
     // --- Phase D: endgültige Löschung geschwärzter Skelette (UNUMKEHRBAR, LFH-750) ---
     // Läuft nach Phase B: fallen Karenz-Ende und Skelett-Frist in denselben Lauf, löscht er
     // direkt nach der Schwärzung. Wie Phase B meldet sie nichts live — der Einsatz ist seit der
@@ -263,9 +280,33 @@ pub async fn tick_mit_rueckschrieb(
         Err(e) => tracing::warn!("Purge Phase D: Abfrage fehlgeschlagen: {e}"),
     }
 
-    // --- Rückschrieb nach Schwärzung oder Löschung (LFH-725, LFH-750) ---
-    // Nicht in jedem Tick: TRUNCATE hält beim Warten auf Lesende die Schreibsperre.
-    if geschwaerzt > 0 || geloescht > 0 || nachgelaufen > 0 || *rueckschrieb_ausstehend {
+    // --- Phase E: verwaiste Anhänge (LFH-250), einzeln je Transaktion (LFH-928) ---
+    // Hochgeladen, aber nie gebunden; gegen monotones BLOB-Wachstum. Im Tick statt im Ticker,
+    // damit er mit injiziertem `jetzt` testbar ist und seine Löschungen zurückgeschrieben werden.
+    let mut verwaist = 0;
+    match crate::anhang::repo::sweep_verwaiste(pool, jetzt).await {
+        Ok(0) => {}
+        Ok(n) => {
+            tracing::info!(anzahl = n, "Purge Phase E: verwaiste Anhänge gelöscht");
+            anzahl += n as usize;
+            verwaist = n;
+        }
+        Err(e) => {
+            // Bis zum Fehler kann er schon gelöscht haben: dann trotzdem zurückschreiben.
+            tracing::warn!("Purge Phase E: Verwaisten-Sweep fehlgeschlagen: {e}");
+            *rueckschrieb_ausstehend = true;
+        }
+    }
+
+    // --- Rückschrieb nach Schwärzung, Löschung oder Sweep (LFH-725, LFH-750, LFH-928) ---
+    // Nicht in jedem Tick: TRUNCATE hält beim Warten auf Lesende die Schreibsperre. Nach dem
+    // Sweep kürzt er den WAL, den die genullten Seiten der BLOBs aufgebläht haben.
+    if geschwaerzt > 0
+        || geloescht > 0
+        || nachgelaufen > 0
+        || verwaist > 0
+        || *rueckschrieb_ausstehend
+    {
         match crate::db::wal_zurueckschreiben(pool).await {
             Ok(true) => {
                 if *rueckschrieb_ausstehend {
@@ -303,15 +344,6 @@ pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
         loop {
             ticker.tick().await;
             tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;
-            // Verwaiste Anhänge (hochgeladen-nicht-gesendet) jenseits der Karenz entfernen
-            // (LFH-250) — gegen monotones BLOB-Wachstum. Fehler nur loggen, nie den Tick killen.
-            match crate::anhang::repo::sweep_verwaiste(&pool, Utc::now()).await {
-                Ok(n) if n > 0 => {
-                    tracing::info!(anzahl = n, "Orphan-Sweep: verwaiste Anhänge gelöscht")
-                }
-                Ok(_) => {}
-                Err(e) => tracing::warn!("Orphan-Sweep fehlgeschlagen: {e}"),
-            }
         }
     });
 }
@@ -3312,6 +3344,144 @@ mod tests {
         assert_eq!(
             repo::laden(&pool, e).await.unwrap().teilschwaerzungen,
             Some(1)
+        );
+    }
+
+    // ---------- LFH-928: Sitzungsablauf (Phase C2) und Verwaisten-Sweep (Phase E) ----------
+
+    /// Org, Benutzer `l` und ein aktiver Einsatz; liefert (Benutzer, Einsatz).
+    async fn aktiver_einsatz(pool: &SqlitePool) -> (i64, i64) {
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'L','l','h') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1, 'Lage', 'aktiv') \
+             RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (b, e)
+    }
+
+    /// Nach einem Tick steht keine abgelaufene Sitzung mehr in `session`, die gültige
+    /// authentifiziert weiter. Mutationsprobe: ohne Phase C2 bleibt die abgelaufene stehen.
+    #[tokio::test]
+    async fn purge_loescht_abgelaufene_sitzungen() {
+        let pool = crate::db::test_pool().await;
+        let (b, _) = aktiver_einsatz(&pool).await;
+        let gueltig = crate::auth::session::anlegen(&pool, b).await.unwrap();
+        sqlx::query(
+            "INSERT INTO session (token_hash, benutzer_id, expires_at) \
+             VALUES ('abgelaufen', ?, datetime('now', '-1 minute'))",
+        )
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), Utc::now()).await,
+            1,
+            "genau die abgelaufene Sitzung zählt als Mutation"
+        );
+
+        let abgelaufene: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM session WHERE expires_at <= datetime('now')")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(abgelaufene, 0);
+        let gesamt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM session")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(gesamt, 1, "die gültige Sitzung bleibt");
+        let benutzer = crate::auth::session::benutzer_aus_token(&pool, &gueltig)
+            .await
+            .unwrap();
+        assert_eq!(benutzer.id, b);
+    }
+
+    /// Verwaister Anhang mit `erstellt_at = jetzt` (Datenbankzeit) und den Bytes `daten`.
+    async fn verwaister_anhang(pool: &SqlitePool, einsatz: i64, von: i64, daten: &[u8]) {
+        sqlx::query(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'foto.jpg', 'image/jpeg', ?, 'x', ?, ?)",
+        )
+        .bind(einsatz)
+        .bind(daten.len() as i64)
+        .bind(daten)
+        .bind(von)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Der Sweep läuft im Tick (Phase E) und schreibt danach den WAL zurück: die Bytes des
+    /// gelöschten Anhangs stehen weder in der Hauptdatei noch im WAL, und der WAL ist gekürzt.
+    /// Mutationsprobe: ohne Phase E bleibt der Anhang; ohne `verwaist` im Rückschrieb-Wächter
+    /// bleibt der WAL voll.
+    #[tokio::test]
+    async fn tick_raeumt_verwaiste_anhaenge_und_schreibt_zurueck() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let (b, e) = aktiver_einsatz(&pool).await;
+        let mut daten = vec![7u8; 300_000];
+        daten[..ANHANG_KLARTEXT.len()].copy_from_slice(ANHANG_KLARTEXT);
+        verwaister_anhang(&pool, e, b, &daten).await;
+        let jung = Utc::now();
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), jung).await,
+            0,
+            "innerhalb der Karenz bleibt er"
+        );
+        assert_eq!(anhaenge_von(&pool, e).await, 1);
+
+        let spaeter = Utc::now() + chrono::Duration::days(2);
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), spaeter).await, 1);
+        assert_eq!(anhaenge_von(&pool, e).await, 0);
+        assert_eq!(wal_bytes(&pfad), 0, "WAL nach dem Sweep gekürzt");
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
+            "Anhang-Bytes stehen noch in DB-Datei oder WAL"
+        );
+    }
+
+    /// Je Transaktion höchstens ein Anhang: der WAL wächst während des Sweeps nie über zwei
+    /// Datei-Inhalte, auch wenn sich viele verwaiste Fotos angestaut haben (Neustart nach langem
+    /// Stillstand). Gemessen wie beim Nachlauf in Bytes, nicht in Zeit. Mutationsprobe: alle in
+    /// einem `DELETE` (oder eine Portion über alle) lässt den WAL auf ihre Summe wachsen.
+    #[tokio::test]
+    async fn sweep_haelt_jede_transaktion_auf_einen_anhang() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let (b, e) = aktiver_einsatz(&pool).await;
+        for i in 0..6u8 {
+            verwaister_anhang(&pool, e, b, &vec![i + 1; NACHLAUF_ANHANG_BYTES]).await;
+        }
+        assert!(crate::db::wal_zurueckschreiben(&pool).await.unwrap());
+        assert_eq!(wal_bytes(&pfad), 0, "Vorbedingung: WAL leer");
+
+        let spaeter = Utc::now() + chrono::Duration::days(2);
+        assert_eq!(
+            crate::anhang::repo::sweep_verwaiste(&pool, spaeter)
+                .await
+                .unwrap(),
+            6
+        );
+        assert_eq!(anhaenge_von(&pool, e).await, 0);
+        assert!(
+            wal_bytes(&pfad) < 2 * NACHLAUF_ANHANG_BYTES as u64,
+            "WAL wuchs über zwei Anhänge (eine Transaktion für mehrere?): {} Bytes",
+            wal_bytes(&pfad)
         );
     }
 }

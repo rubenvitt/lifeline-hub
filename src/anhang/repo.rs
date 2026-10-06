@@ -387,23 +387,61 @@ pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerSta
 /// Schwärzung haben sie keinen Linker mehr und sähen verwaist aus. Löschte der Sweep sie in
 /// seinem einen `DELETE`, hielte er die Schreibsperre so lange wie vor dem Nachlauf; sie gehören
 /// allein [`crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene`].
+///
+/// **In Einzelschritten** (LFH-928): je Anhang eine Transaktion, mit [`SWEEP_PAUSE`]
+/// dazwischen, wie der Nachlauf der Schwärzung (LFH-905). Mit `secure_delete = ON` schreibt
+/// jedes gelöschte MB ein MB genullter Seiten ins WAL (LFH-725); in einem `DELETE` hielte ein
+/// Stau verwaister Fotos nach langem Stillstand die Schreibsperre so lange, dass
+/// `write_retry!`-Schreibende aller Einsätze mit 503 aufgeben. Die Kandidaten werden einmal
+/// außerhalb der Schreibsperre gesucht (ohne Index auf `erstellt_at` ein Scan über die ganze
+/// Tabelle); das `DELETE` je Anhang trifft nur den Primärschlüssel und wiederholt die Bedingung,
+/// damit ein inzwischen gebundener Anhang bleibt.
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
+    sweep_verwaiste_mit_pause(pool, jetzt, SWEEP_PAUSE).await
+}
+
+/// Pause zwischen zwei Transaktionen des Sweeps. Ohne sie nähme die Schleife die Sperre gleich
+/// wieder, bevor ein wartender Schreibender (Busy-Handler) zum Zug kommt.
+const SWEEP_PAUSE: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// [`sweep_verwaiste`] mit wählbarer Pause (Tests: null).
+async fn sweep_verwaiste_mit_pause(
+    pool: &SqlitePool,
+    jetzt: DateTime<Utc>,
+    pause: std::time::Duration,
+) -> Result<u64, AppError> {
     let grenze = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN));
-    let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
-        "DELETE FROM anhang \
-         WHERE erstellt_at < ? \
-           AND NOT EXISTS \
-               (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id) \
-           AND NOT {} \
-           AND NOT {}",
+    let verwaist = format!(
+        "anhang.erstellt_at < ? \
+         AND NOT EXISTS \
+             (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id) \
+         AND NOT {} \
+         AND NOT {}",
         modul_gebunden_sql("anhang"),
         zur_entfernung_vorgesehen_sql("anhang")
+    );
+    let ids: Vec<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT id FROM anhang WHERE {verwaist} ORDER BY id"
     )))
-    .bind(grenze)
-    .execute(pool)
-    .await?
-    .rows_affected();
-    Ok(betroffen)
+    .bind(&grenze)
+    .fetch_all(pool)
+    .await?;
+    let sql = format!("DELETE FROM anhang WHERE id = ? AND {verwaist}");
+    let mut geloescht = 0;
+    for (i, id) in ids.into_iter().enumerate() {
+        if i > 0 {
+            tokio::time::sleep(pause).await;
+        }
+        geloescht += crate::write_retry!(pool, |conn| {
+            Ok(sqlx::query(sqlx::AssertSqlSafe(sql.clone()))
+                .bind(id)
+                .bind(&grenze)
+                .execute(&mut *conn)
+                .await?
+                .rows_affected())
+        })?;
+    }
+    Ok(geloescht)
 }
 
 #[cfg(test)]
@@ -550,6 +588,38 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(zweiter, 0, "idempotent: kein erneutes Löschen");
+    }
+
+    /// LFH-928: der Sweep räumt in einem Lauf alle fälligen Anhänge ab, einzeln je Transaktion
+    /// (die Grenze je Transaktion misst `sweep_haelt_jede_transaktion_auf_einen_anhang` im
+    /// Purge-Lauf).
+    #[tokio::test]
+    async fn sweep_verwaiste_loescht_einzeln_alle_faelligen() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        for i in 0..5 {
+            anhang_mit_zeit(
+                &pool,
+                einsatz,
+                von,
+                &format!("{i}.pdf"),
+                "2026-01-01 00:00:00",
+            )
+            .await;
+        }
+        let jung = anhang_mit_zeit(&pool, einsatz, von, "jung.pdf", "2026-06-15 12:00:00").await;
+
+        let geloescht =
+            sweep_verwaiste_mit_pause(&pool, t("2026-06-16 00:00:00"), std::time::Duration::ZERO)
+                .await
+                .unwrap();
+        assert_eq!(geloescht, 5, "alle fälligen in einem Lauf");
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 1, "nur der junge bleibt");
+        assert!(anzeige_laden(&pool, jung).await.is_ok());
     }
 
     /// Hängt einen Anhang als Dokument an (direkter INSERT, inkl. ETB-Pflicht-FK).

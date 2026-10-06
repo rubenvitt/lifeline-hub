@@ -44,6 +44,11 @@ use tokio::sync::Semaphore;
 /// tragen deutlich kürzere eigene Client-Timeouts (Karten-Proxy 30 s, karten-service 10 s, OIDC
 /// 15 s, Fachebenen 8 s, Geocoding 1,5 s) und feuern immer zuerst. Diese Schranke ist das
 /// Sicherheitsnetz gegen den hängenden Handler.
+///
+/// Die anmeldefreien Karten-Proxy-Routen bleiben geregelt (ihr Transfer ist kurz), begrenzen ihre
+/// Upstream-Abrufe aber zusätzlich selbst auf `karte::proxy::MAX_GLEICHZEITIGE_PROXY_ABRUFE` und
+/// weisen darüber sofort mit 503 ab (LFH-930): ein hängender Kartenanbieter bindet so höchstens
+/// diese Zahl globaler Plätze bis zu seinem 30-s-Timeout.
 pub const REQUEST_BUDGET: Duration = Duration::from_secs(60);
 
 /// Obergrenze gleichzeitig laufender geregelter Requests. Im Normalbetrieb greift sie nie; sie
