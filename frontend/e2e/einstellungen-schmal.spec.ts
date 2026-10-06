@@ -250,12 +250,12 @@ for (const [name, fenster] of [
 
 /** Die Rechtehinweise der Sektionen, je über ein Fragment, das nur EINEN Hinweis trifft —
  *  auf der Aufbewahrung stehen zwei (Einstellungen und Frist). */
-const HINWEIS_EINSTELLUNGEN = 'darf die Einstellungen dieses Einsatzes';
-const HINWEIS_FRIST = 'darf die Aufbewahrungsfrist';
+const HINWEIS_EINSTELLUNGEN = 'nur Einsatzleitung, Führung oder Admin';
+const HINWEIS_FRIST = 'nur Einsatzleitung oder Admin';
 const HINWEIS_MODULE = 'darf die Modul-Sichtbarkeit';
 
 function rechteHinweis(p: Page, fragment: string) {
-  return p.getByRole('alert').filter({ hasText: fragment });
+  return p.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: fragment });
 }
 
 /** Der Speichern-Knopf der Formular-Sektion (die Frist trägt „Frist ändern", nicht „Speichern"). */

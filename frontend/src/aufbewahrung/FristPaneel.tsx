@@ -19,6 +19,7 @@ import {
   istFristverkuerzung,
   liegtInDerVergangenheit,
 } from './fristModell';
+import { NUR_LEITUNG_ADMIN } from '../components/nurAnsicht';
 
 /**
  * Aufbewahrungsfrist am Einsatz anzeigen und ändern.
@@ -53,8 +54,7 @@ interface Rueckfrage {
 }
 
 /** Text des Rechte-Hinweises — eine Stelle für Paneel und Akte. */
-const FRIST_RECHTE_TEXT =
-  'Nur die Einsatzleitung oder ein System-Admin der Organisation des Einsatzes darf die Aufbewahrungsfrist ändern — die Frist steht hier zum Nachlesen.';
+const FRIST_RECHTE_TEXT = NUR_LEITUNG_ADMIN;
 
 interface FristAenderung {
   /** Öffnet den Dialog „Frist ändern". */

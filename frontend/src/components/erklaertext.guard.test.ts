@@ -79,7 +79,7 @@ const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
  */
 const OFFEN: Record<string, number> = {
   'abloesung/AbloesungDialoge.tsx': 5,
-  'aufbewahrung/FristPaneel.tsx': 2,
+  'aufbewahrung/FristPaneel.tsx': 1,
   'aufbewahrung/SchwaerzungsantragDialog.tsx': 2,
   'betreuung/BetreuungDialoge.tsx': 3,
   'command-palette/VorschauZustand.tsx': 1,
@@ -98,8 +98,6 @@ const OFFEN: Record<string, number> = {
   'pages/AbloesungPage.tsx': 2,
   'pages/BefehlDetailPage.tsx': 1,
   'pages/BetreuungPage.tsx': 2,
-  'pages/DokumentePage.tsx': 2,
-  'pages/EinsatzEinstellungenPage.tsx': 1,
   'pages/EtbPage.tsx': 1,
   'pages/LageberichtDetailPage.tsx': 1,
   'pages/LageberichtePage.tsx': 1,
@@ -122,7 +120,6 @@ const OFFEN: Record<string, number> = {
   'pages/lagekarte/ZeichnenSteuerung.tsx': 2,
   'stab/LagebesprechungModal.tsx': 1,
   'stab/skizze/Eigenschaftspaneel.tsx': 1,
-  'stammdaten/rechteText.ts': 1,
   'verpflegung/VerpflegungDialoge.tsx': 1,
 };
 
@@ -151,7 +148,8 @@ function erklaerTreffer(quelle: string, dateiname = 'x.tsx'): string[] {
   for (const { text, zeile } of texteAus(quelle, dateiname)) {
     // JSX-Text bricht Zeilen um; ein Muster soll über den Umbruch hinweg treffen.
     const flach = text.replace(/\s+/g, ' ');
-    for (const { name, muster } of MUSTER) if (muster.test(flach)) treffer.push(`${zeile}: ${name}`);
+    for (const { name, muster } of MUSTER)
+      if (muster.test(flach)) treffer.push(`${zeile}: ${name}`);
   }
   return treffer;
 }
@@ -221,7 +219,9 @@ describe('Erklärtext-Guard (LFH-1078)', () => {
       .map(([datei, n]) => `${datei}: ${n} statt höchstens ${OFFEN[datei] ?? 0}`);
     const zuGross = Object.entries(OFFEN)
       .filter(([datei, n]) => n > (ist[datei] ?? 0))
-      .map(([datei, n]) => `${datei}: Schuld ${n}, gefunden ${ist[datei] ?? 0} — Eintrag verkleinern`);
+      .map(
+        ([datei, n]) => `${datei}: Schuld ${n}, gefunden ${ist[datei] ?? 0} — Eintrag verkleinern`,
+      );
     expect(
       { neu, zuGross },
       `Fundorte:\n${fundorte.filter((f) => neu.some((n) => n.startsWith(f.split(':')[0] + ':'))).join('\n')}`,

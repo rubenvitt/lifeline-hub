@@ -211,7 +211,7 @@ test('Katalogtabelle bei 390 px: scrollt auch ohne Aktionsspalte in sich, Kopfze
 
   // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
   await expect(
-    page.getByRole('alert').filter({ hasText: 'dürfen die Stammdaten ändern' }),
+    page.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: 'nur System-Admin' }),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
   await expect(

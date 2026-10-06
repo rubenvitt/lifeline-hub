@@ -557,15 +557,15 @@ type Gate1Route = {
   umleitungOhneAdmin?: boolean;
 };
 
-/** Der Rechtehinweis des Nur-Lese-Zweigs (`RechteHinweis`, antd `Alert`). */
+/** Der Rechtehinweis des Nur-Lese-Zweigs (`RechteHinweis`: „Nur Ansicht · Grund“, LFH-1078). */
 function rechteHinweis(p: Page, text: RegExp) {
   return expect(
-    p.getByRole('alert').filter({ hasText: text }),
+    p.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: text }),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
 }
 
-const NUR_SCHREIBENDE = /^Nur Einsatzleitung und Führungspersonal/;
+const NUR_SCHREIBENDE = /nur Einsatzleitung und Führung$/;
 
 function gate1Routen(einsatzId: string): Gate1Route[] {
   // Eine Route je Layoutfamilie (Ebene-1-Shell, Lagebild, Einsatz-Workspace, Admin-Layout)
@@ -881,7 +881,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
 }
 
 /** Nur Systemrolle „Admin" ändert Stammdaten und Org-Defaults — der Rest liest nach. */
-const NUR_SYSTEM_ADMIN = /^Nur Benutzer mit der Systemrolle „Admin“ dürfen/;
+const NUR_SYSTEM_ADMIN = /nur System-Admin|Systemrolle „Admin“ dürfen/;
 
 const FAHRZEUG_STOFF = 'Florian Musterstadt-Nordwest 46/11-1 Wechsellader Abrollbehälter';
 

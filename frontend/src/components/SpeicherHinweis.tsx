@@ -1,5 +1,6 @@
-import { Alert, Flex, theme } from 'antd';
+import { Alert, Flex, theme, Typography } from 'antd';
 import { ApiError } from '../api/client';
+import { StatusChip } from './instrument/Status';
 
 /**
  * Persistenter Speicher-Fehler und erklärender Rechte-Hinweis (LFH-345 · C10).
@@ -41,20 +42,29 @@ export function SpeicherFehler({ fehler, titel, fallback }: SpeicherFehlerProps)
 }
 
 interface RechteHinweisProps {
-  /** Was fehlt und warum — ein ganzer Satz, keine Abkürzung. */
+  /** Grund in wenigen Wörtern („Einsatz abgeschlossen“), aus `components/nurAnsicht.ts`. */
   text: string;
   /** Nur bei FEHLENDER Berechtigung sichtbar. */
   sichtbar: boolean;
 }
 
 /**
- * Erklärt eine fehlende Berechtigung, statt sie stumm auszugrauen. „Ausgegraut" allein ist eine
- * Ein-Kanal-Aussage (WCAG 1.4.1) und nennt keinen Grund. Hier steht der Grund über einem ganzen
- * Block, nicht je Zeile.
+ * Nennt eine fehlende Berechtigung, statt sie stumm auszugrauen (M16). „Ausgegraut“ allein ist
+ * eine Ein-Kanal-Aussage (WCAG 1.4.1) und nennt keinen Grund. Hier steht der Grund über einem
+ * ganzen Block, nicht je Zeile.
+ *
+ * Eine Zeile „Nur Ansicht · Grund“, kein Kasten mit Satz (LFH-1078, Spec `bedien-erklaertexte`):
+ * dass Werte nur zu lesen sind, zeigen die gesperrten Knöpfe; der Grund bleibt ohne Hover lesbar.
  */
 export function RechteHinweis({ text, sichtbar }: RechteHinweisProps) {
+  const { token } = theme.useToken();
   if (!sichtbar) return null;
-  return <Alert type="info" showIcon title={text} />;
+  return (
+    <Flex role="status" align="center" wrap gap={token.marginXS} data-lfh="rechte-hinweis">
+      <StatusChip ton="neutral" wort="Nur Ansicht" />
+      <Typography.Text type="secondary">{text}</Typography.Text>
+    </Flex>
+  );
 }
 
 interface SeitenHinweiseProps {

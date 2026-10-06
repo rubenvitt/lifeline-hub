@@ -1517,7 +1517,7 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
     expect(meldung.closest('.ant-message')).toBeNull();
     expect(meldung.closest('.ant-alert')).not.toBeNull();
     expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
-    expect(screen.getByText('Einsatz ist abgeschlossen — nur Ansicht.')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz abgeschlossen')).toBeInTheDocument();
     expect(speichern).not.toHaveBeenCalled();
   });
 });

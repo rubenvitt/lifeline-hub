@@ -38,9 +38,14 @@ describe('SpeicherFehler', () => {
 });
 
 describe('RechteHinweis', () => {
-  it('erklaert die fehlende Berechtigung', () => {
-    render(<RechteHinweis sichtbar text="Nur die Einsatzleitung darf das ändern" />);
-    expect(screen.getByText('Nur die Einsatzleitung darf das ändern')).toBeInTheDocument();
+  // LFH-1078 (Spec bedien-erklaertexte): eine Zeile „Nur Ansicht · Grund“, kein Kasten mit Satz.
+  it('zeigt „Nur Ansicht“ und den Grund in einer Statuszeile, ohne Alert', () => {
+    render(<RechteHinweis sichtbar text="Einsatz abgeschlossen" />);
+    const zeile = screen.getByRole('status');
+    expect(zeile).toHaveTextContent('Nur Ansicht');
+    expect(zeile).toHaveTextContent('Einsatz abgeschlossen');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.querySelector('.ant-alert')).toBeNull();
   });
 
   it('schweigt bei vorhandener Berechtigung', () => {

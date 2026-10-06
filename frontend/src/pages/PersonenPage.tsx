@@ -64,6 +64,7 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
@@ -656,7 +657,7 @@ export default function PersonenPage() {
       hinweis={
         (nurAnsicht || csvExport.fehler != null) && (
           <SeitenHinweise
-            rechteText="Einsatz ist abgeschlossen — nur Ansicht."
+            rechteText={EINSATZ_ABGESCHLOSSEN}
             rechteFehlt={nurAnsicht}
             fehler={csvExport.fehler}
             fehlerTitel="Export fehlgeschlagen"

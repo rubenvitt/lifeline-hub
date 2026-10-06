@@ -50,6 +50,7 @@ import { abloesungsMarken } from '../../abloesung/einstufung';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
+import { einsatzRechteGrund } from '../../components/nurAnsicht';
 
 dayjs.extend(utc);
 
@@ -610,12 +611,7 @@ export function naechsteMarken(
   return { marken, weitere: Math.max(0, sortiert.length - MARKEN_MAX) };
 }
 
-/**
- * Grund der fehlenden Schreibberechtigung als ganzer Satz; nennt die zwei Schreibwege des
- * Überblicks.
- */
+/** Grund der fehlenden Schreibberechtigung für ETB-Erfassung und Abschnitte des Überblicks. */
 export function ueberblickRechteText(einsatzStatus: EinsatzStatus): string {
-  return einsatzStatus !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — Einsatztagebuch und Abschnitte sind nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können Einträge erfassen und Abschnitte anlegen.';
+  return einsatzRechteGrund(einsatzStatus);
 }
