@@ -10,6 +10,7 @@
  */
 import type { WetterWarnstufe } from '../api/types';
 import type { UnwetterGedaechtnis } from './unwetter';
+import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 
 export const GEDAECHTNIS_PRAEFIX = 'lifeline-unwetter-gemeldet';
 
@@ -45,12 +46,7 @@ export function ladeGedaechtnis(benutzerId: number, einsatzId: number): Unwetter
   // gemeldete Paare vergäße und alle 5 min erneut alarmierte.
   const juenger = rueckfall.get(s);
   if (juenger) return juenger;
-  let roh: string | null;
-  try {
-    roh = localStorage.getItem(s);
-  } catch {
-    return {};
-  }
+  const roh = sicherLesen(s);
   if (roh == null) return {};
   try {
     return bereinige(JSON.parse(roh));
@@ -65,12 +61,8 @@ export function speichereGedaechtnis(
   gedaechtnis: UnwetterGedaechtnis,
 ): void {
   const s = schluessel(benutzerId, einsatzId);
-  try {
-    localStorage.setItem(s, JSON.stringify(gedaechtnis));
-    rueckfall.delete(s);
-  } catch {
-    rueckfall.set(s, gedaechtnis);
-  }
+  if (sicherSchreiben(s, JSON.stringify(gedaechtnis))) rueckfall.delete(s);
+  else rueckfall.set(s, gedaechtnis);
 }
 
 /** Nur für Tests: leert den Rückfall des Tabs. */

@@ -665,6 +665,17 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur begründet,
 `-next-line` an der gemeldeten Zeile mit Kommentar; keine Block-Disables, keine toten Direktiven.
 
+## Frontend — Browserspeicher (LFH-942)
+
+- **`localStorage` nur über `lib/sichererSpeicher`** (`sicherLesen`, `sicherSchreiben`,
+  `sicherEntfernen`, `sicherSchluessel`); `lib/sichererSpeicher.guard.test.ts` macht jeden anderen
+  Zugriff rot. Auf gehärteten Rechnern ist `localStorage` `null` oder wirft, ein Wurf im Render
+  lässt die Seite weiß.
+- **Eine Einstellung wirkt auch ohne Speicher:** erst den State setzen, dann schreiben; ohne
+  gespeicherten Wert gilt die Vorgabe (Farbschema: Nachtbetrieb).
+- Jeder Speicherort steht in `GERAETESPEICHER`: `frontend/src/offline/AGENTS.md`.
+- Herleitung: `openspec/changes/archive/2026-10-06-lfh-942-browserspeicher-abgesichert/design.md`.
+
 ## Sitzung über mehrere Tabs (LFH-387)
 
 Geschrieben wird nur über `apiSend`/`apiUpload` (tragen `X-Erwarteter-Benutzer-Id`, Server

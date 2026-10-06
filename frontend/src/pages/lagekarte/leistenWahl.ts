@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /**
  * Ein-/Ausblenden der rechten Kartenleiste. Per Vorgabe offen, auf jeder Breite ausblendbar (am
@@ -43,12 +44,8 @@ export function leisteSichtbar(args: {
 }
 
 function lesen(klasse: LeistenKlasse): boolean | null {
-  try {
-    const wert = localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL[klasse]);
-    return wert === '1' ? true : wert === '0' ? false : null;
-  } catch {
-    return null;
-  }
+  const wert = sicherLesen(LEISTE_SPEICHER_SCHLUESSEL[klasse]);
+  return wert === '1' ? true : wert === '0' ? false : null;
 }
 
 /**
@@ -86,11 +83,8 @@ export function useLeistenWahl(breit: boolean, modusAktiv = false) {
     (offen: boolean) => {
       setVorlaeufig((alt) => (alt[klasse] === null ? alt : { ...alt, [klasse]: null }));
       setPlaetze((alt) => (alt[klasse] === offen ? alt : { ...alt, [klasse]: offen }));
-      try {
-        localStorage.setItem(LEISTE_SPEICHER_SCHLUESSEL[klasse], offen ? '1' : '0');
-      } catch {
-        // Kein Speicher (privates Fenster): die Wahl gilt dann nur bis zum Neuladen.
-      }
+      // Kein Speicher (privates Fenster): die Wahl gilt dann nur bis zum Neuladen.
+      sicherSchreiben(LEISTE_SPEICHER_SCHLUESSEL[klasse], offen ? '1' : '0');
     },
     [klasse],
   );
