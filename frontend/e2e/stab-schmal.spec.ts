@@ -126,15 +126,18 @@ async function zeilenJeTeil(wert: Locator) {
       ).size;
     };
     const inhalt = text.data;
-    const trenner = '\u00a0· ';
+    // Trenner mit beliebigem Leerzeichen vor dem Punkt: so zeigt auch ein Rückfall auf normale
+    // Leerzeichen, WELCHER Teil reißt.
     const teile: { teil: string; zeilen: number }[] = [];
     let pos = 0;
-    const stuecke = inhalt.split(trenner);
-    for (const [i, teil] of stuecke.entries()) {
+    for (const t of [...inhalt.matchAll(/[ \u00a0]· /g), null]) {
+      const teilEnde = t ? t.index : inhalt.length;
       // Gemessen mit dem folgenden „ ·": auch der Punkt steht nie am Anfang einer Zeile.
-      const ende = pos + teil.length + (i < stuecke.length - 1 ? 2 : 0);
-      teile.push({ teil, zeilen: zeilen(pos, ende) });
-      pos += teil.length + trenner.length;
+      teile.push({
+        teil: inhalt.slice(pos, teilEnde),
+        zeilen: zeilen(pos, t ? teilEnde + 2 : teilEnde),
+      });
+      pos = teilEnde + 3;
     }
     return { gesamt: zeilen(0, inhalt.length), teile };
   });
