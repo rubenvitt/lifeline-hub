@@ -30,7 +30,9 @@ async fn zone(app: &axum::Router, cookie: &str, e: i64, geometrie: &str) -> (Sta
         "POST",
         &format!("/api/einsaetze/{e}/zonen"),
         cookie,
-        Some(&json!({ "typ": "gefahrengebiet", "geometrie_typ": "Polygon", "geometrie": geometrie })),
+        Some(
+            &json!({ "typ": "gefahrengebiet", "geometrie_typ": "Polygon", "geometrie": geometrie }),
+        ),
     )
     .await
 }
@@ -61,7 +63,14 @@ async fn zone_mit_5001_punkten_ist_400_und_kaputtes_json_bleibt_422() {
     let (s, _) = zone(&app, &admin, e, r#"{"type":"LineString","coordinates":[]}"#).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
-    let (_, liste) = anfrage_json(&app, "GET", &format!("/api/einsaetze/{e}/zonen"), &admin, None).await;
+    let (_, liste) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(liste.as_array().unwrap().len(), 2);
 }
 
@@ -89,10 +98,16 @@ async fn abschnittsflaeche_gueltig_400_und_422() {
     let ausserhalb = r#"{"type":"Polygon","coordinates":[[[9,91],[9,51],[10,51],[9,91]]]}"#;
     for (geo, erwartet) in [
         (polygon(5_001), StatusCode::BAD_REQUEST),
-        (r#"{"type":"Polygon","coordinates":[[["a",52],[9,51],[9,52],["a",52]]]}"#.to_string(), StatusCode::BAD_REQUEST),
+        (
+            r#"{"type":"Polygon","coordinates":[[["a",52],[9,51],[9,52],["a",52]]]}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
         (ausserhalb.to_string(), StatusCode::BAD_REQUEST),
         ("{".to_string(), StatusCode::UNPROCESSABLE_ENTITY),
-        (r#"{"type":"LineString","coordinates":[[9,51],[9,52]]}"#.to_string(), StatusCode::UNPROCESSABLE_ENTITY),
+        (
+            r#"{"type":"LineString","coordinates":[[9,51],[9,52]]}"#.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
     ] {
         let (s, j) = anfrage_json(&app, "PATCH", &uri, &admin, Some(&setze(geo))).await;
         assert_eq!(s, erwartet, "{j:?}");

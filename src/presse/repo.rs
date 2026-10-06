@@ -257,7 +257,11 @@ pub async fn status_tx(
 ) -> Result<(), AppError> {
     // Grenzen vor jedem Zusammenhang (400 vor 422; LFH-937, design.md D6).
     let antwort = text_max(w.antwort.as_deref(), "antwort", super::ANTWORT_MAX)?;
-    let freigabe_durch = text_max(w.freigabe_durch.as_deref(), "freigabe_durch", super::KURZ_MAX)?;
+    let freigabe_durch = text_max(
+        w.freigabe_durch.as_deref(),
+        "freigabe_durch",
+        super::KURZ_MAX,
+    )?;
     let alt = laden(&mut *conn, einsatz_id, id).await?;
     if alt.status == w.ziel {
         return Err(AppError::UnprocessableEntity(format!(

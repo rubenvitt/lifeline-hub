@@ -101,7 +101,13 @@ async fn dubletten_werden_an_jedem_ziel_zu_einer_zuordnung() {
     .await;
     assert_eq!(s, StatusCode::OK, "{j:?}");
     assert_eq!(
-        zeilen(&pool, "einsatz_fuehrungsstelle_sprechgruppe", "einsatz_id", e).await,
+        zeilen(
+            &pool,
+            "einsatz_fuehrungsstelle_sprechgruppe",
+            "einsatz_id",
+            e
+        )
+        .await,
         erwartet
     );
 }
@@ -191,7 +197,14 @@ async fn zu_lange_liste_verhindert_auch_den_lagewechsel() {
     let e = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppen(&app, &admin, e, 33).await;
     let aid = abschnitt(&app, &admin, e).await;
-    let (_, etb_vorher) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/etb"), &admin, None).await;
+    let (_, etb_vorher) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/etb"),
+        &admin,
+        None,
+    )
+    .await;
 
     let (s, _) = patch(
         &app,
@@ -208,8 +221,18 @@ async fn zu_lange_liste_verhindert_auch_den_lagewechsel() {
             .await
             .unwrap();
     assert_eq!(lage, None);
-    let (_, etb) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/etb"), &admin, None).await;
-    assert_eq!(etb.as_array().unwrap().len(), etb_vorher.as_array().unwrap().len());
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        etb.as_array().unwrap().len(),
+        etb_vorher.as_array().unwrap().len()
+    );
 }
 
 #[tokio::test]
@@ -241,9 +264,11 @@ async fn fremde_sprechgruppe_bleibt_422_mit_der_id() {
         j["error"],
         format!("Sprechgruppe {fremd} ist für diese Organisation/diesen Einsatz nicht zuordenbar")
     );
-    assert!(zeilen(&pool, "einsatzabschnitt_sprechgruppe", "abschnitt_id", aid)
-        .await
-        .is_empty());
+    assert!(
+        zeilen(&pool, "einsatzabschnitt_sprechgruppe", "abschnitt_id", aid)
+            .await
+            .is_empty()
+    );
 }
 
 async fn qualifikationen(app: &axum::Router, admin: &str, n: usize) -> Vec<i64> {

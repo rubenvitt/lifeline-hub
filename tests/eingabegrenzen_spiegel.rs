@@ -4,7 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use lifeline_hub::{auftrag, etb, fuehrung, infotelefon, lage_zone, nachforderung, presse, schaden};
+use lifeline_hub::{
+    auftrag, etb, fuehrung, infotelefon, lage_zone, nachforderung, presse, schaden,
+};
 
 fn backend() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
@@ -13,9 +15,15 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("AUFTRAG_TEXT_MAX", auftrag::AUFTRAG_TEXT_MAX),
         ("AUFTRAG_BEFEHLSFELD_MAX", auftrag::BEFEHLSFELD_MAX),
         ("AUFTRAG_EMPFAENGER_MAX", auftrag::EMPFAENGER_MAX),
-        ("AUFTRAG_EXTERN_BEZEICHNUNG_MAX", auftrag::EXTERN_BEZEICHNUNG_MAX),
+        (
+            "AUFTRAG_EXTERN_BEZEICHNUNG_MAX",
+            auftrag::EXTERN_BEZEICHNUNG_MAX,
+        ),
         ("FUNKTION_TEXT_MAX", fuehrung::TEXT_MAX),
-        ("NACHFORDERUNG_BEZEICHNUNG_MAX", nachforderung::BEZEICHNUNG_MAX),
+        (
+            "NACHFORDERUNG_BEZEICHNUNG_MAX",
+            nachforderung::BEZEICHNUNG_MAX,
+        ),
         ("INFOTELEFON_NOTIZ_MAX", infotelefon::NOTIZ_MAX),
         ("INFOTELEFON_KURZ_MAX", infotelefon::KURZ_MAX),
         ("PRESSE_KURZ_MAX", presse::KURZ_MAX),
@@ -29,7 +37,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
 
 /// `export const NAME = 20_000;` je Zeile; andere Zeilen (Kommentare) zählen nicht.
 fn frontend() -> BTreeMap<String, usize> {
-    let pfad = concat!(env!("CARGO_MANIFEST_DIR"), "/frontend/src/api/eingabegrenzen.ts");
+    let pfad = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/frontend/src/api/eingabegrenzen.ts"
+    );
     let text = std::fs::read_to_string(pfad).expect("Spiegeldatei lesbar");
     text.lines()
         .filter_map(|z| z.trim().strip_prefix("export const "))

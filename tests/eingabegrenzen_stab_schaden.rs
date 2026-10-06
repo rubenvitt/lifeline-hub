@@ -72,10 +72,19 @@ async fn presse_anlegen_aendern_und_status() {
     assert_eq!(s, StatusCode::CREATED, "{k:?}");
     let kid = k["id"].as_i64().unwrap();
     for (body, feld) in [
-        (kontakt(x(201), "T".into(), "N".into(), "E".into()), "medium"),
+        (
+            kontakt(x(201), "T".into(), "N".into(), "E".into()),
+            "medium",
+        ),
         (kontakt("M".into(), x(501), "N".into(), "E".into()), "thema"),
-        (kontakt("M".into(), "T".into(), x(201), "E".into()), "kontakt_name"),
-        (kontakt("M".into(), "T".into(), "N".into(), x(501)), "kontakt_erreichbarkeit"),
+        (
+            kontakt("M".into(), "T".into(), x(201), "E".into()),
+            "kontakt_name",
+        ),
+        (
+            kontakt("M".into(), "T".into(), "N".into(), x(501)),
+            "kontakt_erreichbarkeit",
+        ),
     ] {
         let (s, j) = post(&app, &admin, &uri, body).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}");
@@ -87,7 +96,10 @@ async fn presse_anlegen_aendern_und_status() {
         (json!({ "thema": x(501) }), "thema"),
         (json!({ "medium": x(201) }), "medium"),
         (json!({ "kontakt_name": x(201) }), "kontakt_name"),
-        (json!({ "kontakt_erreichbarkeit": x(501) }), "kontakt_erreichbarkeit"),
+        (
+            json!({ "kontakt_erreichbarkeit": x(501) }),
+            "kontakt_erreichbarkeit",
+        ),
     ] {
         let (s, j) = patch(&app, &admin, &kid_uri, body).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}");
@@ -113,7 +125,13 @@ async fn presse_anlegen_aendern_und_status() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
     // Beantwortet ohne Antwort bleibt 422, mit Antwort an der Grenze geht es.
-    let (s, _) = post(&app, &admin, &status_uri, json!({ "status": "beantwortet" })).await;
+    let (s, _) = post(
+        &app,
+        &admin,
+        &status_uri,
+        json!({ "status": "beantwortet" }),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
     let (s, j) = post(
         &app,
@@ -131,9 +149,7 @@ async fn schaden_ort_beschreibung_kontakt() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let uri = format!("/api/einsaetze/{e}/schaeden");
-    let schaden = |ort: String, beschreibung: String| {
-        json!({ "typ": "sachschaden", "ausmass": "gering", "ort": ort, "beschreibung": beschreibung })
-    };
+    let schaden = |ort: String, beschreibung: String| json!({ "typ": "sachschaden", "ausmass": "gering", "ort": ort, "beschreibung": beschreibung });
 
     let (s, j) = post(&app, &admin, &uri, schaden(x(500), x(8_000))).await;
     assert_eq!(s, StatusCode::CREATED, "{j:?}");
@@ -158,7 +174,10 @@ async fn schaden_ort_beschreibung_kontakt() {
     for (body, feld) in [
         (json!({ "ort": x(501) }), "Ort"),
         (json!({ "beschreibung": x(8_001) }), "Beschreibung"),
-        (json!({ "geschaedigt_kontakt": x(501) }), "Geschädigt-Kontakt"),
+        (
+            json!({ "geschaedigt_kontakt": x(501) }),
+            "Geschädigt-Kontakt",
+        ),
     ] {
         let (s, j) = patch(&app, &admin, &sid_uri, body).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}");

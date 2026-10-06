@@ -177,7 +177,10 @@ pub fn pruefe_geometrie_struktur(
             }
             coords
                 .iter()
-                .map(|r| r.as_array().ok_or_else(|| fehler("ein Ring ist keine Liste")))
+                .map(|r| {
+                    r.as_array()
+                        .ok_or_else(|| fehler("ein Ring ist keine Liste"))
+                })
                 .collect::<Result<_, _>>()?
         }
         Some("LineString") => vec![coords],
@@ -233,7 +236,10 @@ mod tests {
     }
 
     fn polygon(ringe: &[String]) -> String {
-        format!(r#"{{"type":"Polygon","coordinates":[{}]}}"#, ringe.join(","))
+        format!(
+            r#"{{"type":"Polygon","coordinates":[{}]}}"#,
+            ringe.join(",")
+        )
     }
 
     fn status(geo: &str, g: &str) -> Option<u16> {
@@ -247,14 +253,24 @@ mod tests {
     fn geometrie_grenzen_und_struktur() {
         assert_eq!(status(&polygon(&[ring(5_000)]), "Polygon"), None);
         assert_eq!(status(&polygon(&[ring(5_001)]), "Polygon"), Some(400));
-        assert_eq!(status(&polygon(&[ring(4_000), ring(1_001)]), "Polygon"), Some(400));
+        assert_eq!(
+            status(&polygon(&[ring(4_000), ring(1_001)]), "Polygon"),
+            Some(400)
+        );
         let zehn: Vec<String> = (0..10).map(|_| ring(4)).collect();
         assert_eq!(status(&polygon(&zehn), "Polygon"), None);
         let elf: Vec<String> = (0..11).map(|_| ring(4)).collect();
         assert_eq!(status(&polygon(&elf), "Polygon"), Some(400));
-        assert_eq!(status(r#"{"type":"Polygon","coordinates":[]}"#, "Polygon"), Some(400));
+        assert_eq!(
+            status(r#"{"type":"Polygon","coordinates":[]}"#, "Polygon"),
+            Some(400)
+        );
         let linie = r#"{"type":"LineString","coordinates":[[9,51],[9.1,51.1,12.5]]}"#;
-        assert_eq!(status(linie, "LineString"), None, "Höhe als dritte Zahl ist erlaubt");
+        assert_eq!(
+            status(linie, "LineString"),
+            None,
+            "Höhe als dritte Zahl ist erlaubt"
+        );
         for kaputt in [
             r#"{"type":"LineString","coordinates":[["a",51],[9,51]]}"#,
             r#"{"type":"LineString","coordinates":[["NaN",51],[9,51]]}"#,
@@ -266,7 +282,11 @@ mod tests {
             r#"{"type":"LineString"}"#,
             r#"{"type":"Polygon","coordinates":[[9,51]]}"#,
         ] {
-            let g = if kaputt.contains("Polygon") { "Polygon" } else { "LineString" };
+            let g = if kaputt.contains("Polygon") {
+                "Polygon"
+            } else {
+                "LineString"
+            };
             assert_eq!(status(kaputt, g), Some(400), "{kaputt}");
         }
     }
@@ -276,7 +296,11 @@ mod tests {
         // Kein gültiges JSON, aber zu groß: die Größe entscheidet zuerst (400, nicht 422).
         let gross = "x".repeat(GEOMETRIE_BYTES_MAX + 1);
         assert_eq!(status(&gross, "Polygon"), Some(400));
-        assert_eq!(status(&"x".repeat(10), "Polygon"), Some(422), "kaputtes JSON bleibt 422");
+        assert_eq!(
+            status(&"x".repeat(10), "Polygon"),
+            Some(422),
+            "kaputtes JSON bleibt 422"
+        );
     }
 
     /// Die reine Prüfung aus dem Handler, Wortlaut und Code je Fall (LFH-690).
