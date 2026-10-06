@@ -19,7 +19,7 @@
 -- Die ids bleiben erhalten; die Sequenz beginnt über der höchsten. karte_proxy_asset ist Leaf
 -- (keine andere Tabelle verweist darauf, grep über migrations/) → kein
 -- PRAGMA-foreign_keys-Toggle, das DROP löst keine Kaskade aus (Muster 0112/0141).
--- Schema = 0077 1:1 plus die zwei Spalten. Abgesichert von db::tests::migration_0153_*.
+-- Schema = 0077 1:1 plus die zwei Spalten. Abgesichert von db::tests::migration_0154_*.
 
 CREATE TABLE karte_proxy_asset_neu (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
