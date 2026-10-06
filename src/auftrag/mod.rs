@@ -38,6 +38,11 @@ pub fn kappe_an(namen: &[String]) -> String {
             format!(" … und {n} weitere")
         }
     };
+    let voll = namen.join(", ");
+    if zeichen(&voll) <= max {
+        return voll;
+    }
+    // Ab hier braucht es einen Hinweis; jeder Kandidat lässt Platz für den Rest.
     let mut an = String::new();
     for (i, name) in namen.iter().enumerate() {
         let kandidat = if i == 0 {
@@ -54,7 +59,7 @@ pub fn kappe_an(namen: &[String]) -> String {
             // Der vorige Durchlauf hat genau für diesen Hinweis Platz gelassen.
             return format!("{an}{}", hinweis(fehlend));
         }
-        // Schon der erste Name ist allein zu lang.
+        // Schon der erste Name passt nicht neben den Hinweis.
         let rest = hinweis(fehlend - 1);
         let platz = max - zeichen(&rest) - 1;
         return format!("{}…{rest}", name.chars().take(platz).collect::<String>());
