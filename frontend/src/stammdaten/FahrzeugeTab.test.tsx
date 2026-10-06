@@ -190,7 +190,7 @@ describe('FahrzeugeTab', () => {
      * kein Suchfeld, und der Griff fällt schon am `null`.
      *
      * Gesucht wird über den Typ: das belegt, dass die Suche mehr als die Leitspalte liest, und
-     * damit den Platzhalter „Funkrufname, Typ oder Kennzeichen". „RTW" kommt in keiner
+     * damit den Platzhalter „Funkrufname, Typ, Träger oder Kennzeichen". „RTW" kommt in keiner
      * datenbezogenen Spalte des ersten Fahrzeugs vor.
      *
      * Kein `waitFor` um die Zählung: `userEvent.type` wickelt den Zustandslauf in `act` ein. Die
@@ -206,7 +206,7 @@ describe('FahrzeugeTab', () => {
 
     const feld = container.querySelector<HTMLInputElement>('input[type="search"]');
     expect(feld, 'die Fahrzeugtabelle muss ein Suchfeld tragen').not.toBeNull();
-    expect(feld!.placeholder).toBe('Funkrufname, Typ oder Kennzeichen');
+    expect(feld!.placeholder).toBe('Funkrufname, Typ, Träger oder Kennzeichen');
 
     await userEvent.type(feld!, 'RTW');
     expect(zeilen()).toHaveLength(1);

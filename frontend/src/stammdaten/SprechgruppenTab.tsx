@@ -1,8 +1,13 @@
-import { Button, Popconfirm, Space, type TableColumnsType } from 'antd';
+import { Button, Modal, Space } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import KatalogTabelle from '../components/KatalogTabelle';
+import KatalogTabelle, {
+  KENNUNG_SCHMAL_BREITE,
+  type KatalogSpalte,
+} from '../components/KatalogTabelle';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { useViewport } from '../components/useViewport';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -19,6 +24,10 @@ export default function SprechgruppenTab() {
   const qc = useQueryClient();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Sprechgruppe | null>(null);
+  // Die Rückfrage steht als EIN Modal außerhalb der Zeilen (LFH-980): im Aktionsmenü unter `md`
+  // kann keine Blase am Knopf hängen, und beide Formen fragen gleich.
+  const [zuDeaktivieren, setZuDeaktivieren] = useState<Sprechgruppe | null>(null);
+  const { istSchmal } = useViewport();
 
   const sprechgruppenQuery = useQuery({
     queryKey: globalKeys.sprechgruppenAlle(),
@@ -30,9 +39,18 @@ export default function SprechgruppenTab() {
   const deaktivierenMutation = useMutation({
     mutationFn: (id: number) => deaktiviereSprechgruppe(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() }),
+    // Auch bei Ablehnung schließt die Rückfrage: der Fehler steht im Seitenhinweis.
+    onSettled: () => setZuDeaktivieren(null),
   });
 
-  const spalten: TableColumnsType<Sprechgruppe> = [
+  const bearbeiten = (sg: Sprechgruppe) => {
+    setBearbeite(sg);
+    setModalOffen(true);
+  };
+
+  // Der Hinweis ist nachrangig und fällt unter `lg` weg; Status und Aktionen stehen rechts fixiert
+  // und sind nicht abwählbar (LFH-980).
+  const spalten: KatalogSpalte<Sprechgruppe>[] = [
     {
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
@@ -43,6 +61,9 @@ export default function SprechgruppenTab() {
       // fachliche Reihenfolge des Backends (`sprechgruppe/repo.rs`:
       // ORDER BY betriebsart, sortier, bezeichnung), die TMO und DMO gruppiert hält.
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
+      // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
+      width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
+      render: (b: string) => <span style={{ overflowWrap: 'anywhere' }}>{b}</span>,
     },
     {
       title: 'Betriebsart',
@@ -64,6 +85,7 @@ export default function SprechgruppenTab() {
       title: 'Hinweis',
       dataIndex: 'hinweis',
       key: 'hinweis',
+      abBreite: 'lg',
       /**
        * Die einzige Freitextspalte — ungekürzt trieb sie die Zeilenhöhe. `showTitle` hält den vollen
        * Wert erreichbar, und der Hinweis steht namentlich im Suchplatzhalter. Gekappt wird an der
@@ -78,6 +100,8 @@ export default function SprechgruppenTab() {
     {
       title: 'Aktiv',
       key: 'aktiv',
+      immerSichtbar: true,
+      fixed: 'right',
       // Zweite Filterachse: der Tab lädt bewusst auch die deaktivierten (`listeSprechgruppen(false)`);
       // wer nur den Bestand im Funkbetrieb sehen will, blendet sie hier weg.
       //
@@ -98,33 +122,45 @@ export default function SprechgruppenTab() {
         ),
     },
     ...(istAdmin
-      ? ([
+      ? [
           {
             title: 'Aktionen',
             key: 'aktionen',
-            render: (_, sg: Sprechgruppe) => (
-              <Space size="middle">
-                <Button
-                  onClick={() => {
-                    setBearbeite(sg);
-                    setModalOffen(true);
-                  }}
-                >
-                  Bearbeiten
-                </Button>
-                {sg.aktiv && (
-                  <Popconfirm
-                    title="Sprechgruppe deaktivieren?"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => deaktivierenMutation.mutate(sg.id)}
-                  >
-                    <Button danger>Deaktivieren</Button>
-                  </Popconfirm>
-                )}
-              </Space>
-            ),
+            immerSichtbar: true,
+            fixed: 'right' as const,
+            render: (_: unknown, sg: Sprechgruppe) =>
+              istSchmal ? (
+                // Unter `md` passen zwei Knöpfe neben Kennung und Status nicht in 390 px.
+                <MenueAusloeser
+                  eintraege={[
+                    { key: 'bearbeiten' as const, label: 'Bearbeiten' },
+                    ...(sg.aktiv
+                      ? [
+                          {
+                            key: 'deaktivieren' as const,
+                            label: 'Deaktivieren',
+                            gefahr: true as const,
+                          },
+                        ]
+                      : []),
+                  ]}
+                  zugaenglicherName={`Aktionen zu Sprechgruppe ${sg.bezeichnung}`}
+                  onWahl={(aktion) =>
+                    aktion === 'bearbeiten' ? bearbeiten(sg) : setZuDeaktivieren(sg)
+                  }
+                />
+              ) : (
+                <Space size="middle">
+                  <Button onClick={() => bearbeiten(sg)}>Bearbeiten</Button>
+                  {sg.aktiv && (
+                    <Button danger onClick={() => setZuDeaktivieren(sg)}>
+                      Deaktivieren
+                    </Button>
+                  )}
+                </Space>
+              ),
           },
-        ] as TableColumnsType<Sprechgruppe>)
+        ]
       : []),
   ];
 
@@ -174,8 +210,24 @@ export default function SprechgruppenTab() {
           columns={spalten}
           locale={{ emptyText: 'Noch keine Sprechgruppen' }}
           suche={{ platzhalter: 'Bezeichnung, Betriebsart oder Hinweis' }}
+          spaltenSchalter={{ bezeichnung: 'Sprechgruppen' }}
         />
       )}
+      <Modal
+        open={zuDeaktivieren != null}
+        title={
+          zuDeaktivieren
+            ? `Sprechgruppe ${zuDeaktivieren.bezeichnung} deaktivieren?`
+            : 'Sprechgruppe deaktivieren?'
+        }
+        // Der Knopf nennt die Handlung, nie nur „Ja“ oder „OK“.
+        okText="Sprechgruppe deaktivieren"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: deaktivierenMutation.isPending }}
+        onOk={() => zuDeaktivieren && deaktivierenMutation.mutate(zuDeaktivieren.id)}
+        onCancel={() => setZuDeaktivieren(null)}
+        destroyOnHidden
+      />
       <SprechgruppeFormModal
         offen={modalOffen}
         sprechgruppe={bearbeite}
