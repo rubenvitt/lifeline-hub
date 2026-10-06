@@ -1,3 +1,65 @@
+## [1.0.0-alpha.83](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.82...v1.0.0-alpha.83) (2026-10-06)
+
+### Wichtige Änderungen
+
+- Die Datenbank wird automatisch migriert und enthält neue Indizes für Ablösungen, eine getrennte Tabelle für Kartenhintergründe sowie Erweiterungen für den Kachel-Proxy
+- Offline-Kartendateien werden nach einem Neustart aufgeräumt; unvollständige Downloads (`.mbtiles.part`) werden automatisch gelöscht
+- Der Karten-Service benötigt nun `tini` als PID 1 im Container-Image
+
+### Lagekarte
+
+- Kartenhintergründe werden schneller geladen: Die Bilddaten liegen in einer separaten Tabelle, sodass Listen und Metadaten ohne Übertragung großer Dateien abgerufen werden können
+- Der Kachel-Proxy prüft jetzt die Koordinaten und lehnt ungültige Anfragen ab, bevor Ressourcen belastet werden
+- Mehrere gleichzeitige Anfragen für dieselbe Kachel werden gebündelt und rufen die Quelle nur einmal ab
+- Die Anzahl gleichzeitiger Kachel-Abrufe ist auf 32 begrenzt; darüber wird sofort mit „Service nicht verfügbar" geantwortet
+- Der Kachel-Cache verdrängt alte Einträge effizienter im Hintergrund, ohne alle Daten zu lesen
+- Proxy-Konfigurationen werden nur noch bei tatsächlichen Änderungen geschrieben, nicht bei jedem Abruf
+- Offline-Regionen werden je Karte im Arbeitsspeicher gecacht, parallele Zugriffe öffnen die Datei nicht mehrfach
+- Das Löschen einer Offline-Region wirkt sich nicht mehr auf andere Regionen aus
+- Während eines laufenden Downloads kann die Region nicht gelöscht werden
+- Der Kartenbau wird nach einer Frist abgebrochen (6 Stunden je Region, 72 Stunden für Weltkarten), damit der Bauplatz nicht dauerhaft blockiert bleibt
+- Der Weltbau läuft nicht mehr im regelmäßigen Cron, kann aber weiterhin manuell gestartet werden
+- Bauplätze werden vor jedem Bau und nach jedem Upload aufgeräumt; alte Dateien verbleiben bis zum erfolgreichen Abschluss
+- Die Prüfsumme der Kartendateien wird direkt aus dem Bau-Werkzeug übernommen
+
+### Kommunikation
+
+- Meldungen und Aufträge werden über performante Aggregat-Zählungen ausgewertet, statt alle Listeneinträge zu laden
+- Die Auftragsliste filtert jetzt im Datenbankzugriff nach Status, Richtung und Empfänger, was die Abfrage deutlich beschleunigt
+- Empfänger werden gebündelt abgerufen, statt für jeden Auftrag einzeln nachzuschlagen
+
+### Führung
+
+- Die Einsatzliste prüft Tombstones, Aufbewahrungsfristen und Organisationsgrenzen direkt beim Datenbankzugriff, was die Abfrage beschleunigt
+- Ablösungen werden über einen Index schneller ermittelt, ohne die gesamte Historie zu durchsuchen
+- Organisationslabels werden nur noch für sichtbare Einsätze geladen
+
+### Verwaltung
+
+- Abgelaufene Sitzungen werden automatisch gelöscht, nicht nur bei der Authentifizierung übersprungen
+- Verwaiste Anhänge werden einzeln in eigenen Transaktionen gelöscht, mit kurzen Pausen dazwischen, um die Datenbank nicht zu blockieren
+- Die Write-Ahead-Log-Datei wird nach großen Löschvorgängen zurückgeschrieben, damit sie nicht dauerhaft groß bleibt
+
+### Betrieb und Installation
+
+- Live-Aktualisierungen werden gebündelt in 300-Millisekunden-Fenstern versendet, statt bei jeder Änderung einzeln
+- Jeder Benutzer kann maximal 16 gleichzeitige Live-Verbindungen halten, insgesamt sind 512 erlaubt
+- Live-Verbindungen enden automatisch nach 30 bis 45 Minuten; der Browser verbindet sich neu und prüft dabei Sitzung und Berechtigungen
+- Kurze Verbindungsabbrüche werden ausgeblendet, ein Wiederaufbau-Hinweis erscheint erst nach 8 Sekunden
+- HTTP/2-Verbindungen erlauben maximal 64 gleichzeitige Streams
+- Uploads und Downloads sind auf 4 bzw. 8 gleichzeitige Vorgänge begrenzt; darüber wird mit „Service nicht verfügbar" und Wiederholungs-Zeitpunkt geantwortet
+- Uploads für Einsatztagebuch-Anhänge und Schadenserfassungen haben keine Zeitbegrenzung mehr, andere Uploads werden nach 60 Sekunden ohne Datenfluss abgebrochen
+- Downloads belegen ihren Platz bis zum Ende der Übertragung, nicht nur bis zum Start
+- TCP-Keepalive ist an allen Verbindungen aktiv
+- Die Anmeldung über OIDC, Passkey und Einmalcodes ist auf eine feste Anzahl offener Vorgänge begrenzt; bei vollem Speicher antwortet das System mit „Service nicht verfügbar"
+- Öffentliche Anmeldungen werden je IP-Adresse gedrosselt (60 pro Minute)
+- Eine ungültige Anfrage-ID wird durch eine Server-ID ersetzt, statt das Protokoll zu stören
+- Pfade werden auf 256 Zeichen gekürzt, HTTP/1-Anfragen mit sehr großen Headern abgelehnt
+- Gesperrte Quellen erzeugen maximal eine Warnmeldung pro Minute, statt bei jedem Versuch
+- Lastabwurf, Schreibkonflikte und Überlastungen werden als Sammelzeilen protokolliert, nicht mehr einzeln
+- Das Protokoll wird verlustbehaftet ohne Blockierung geschrieben
+- Sicherheitslücken in Abhängigkeiten wurden durch Versionsübersteuerung behoben (seroval, source-map-js)
+
 ## [1.0.0-alpha.82](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.81...v1.0.0-alpha.82) (2026-10-05)
 
 ### Aufbewahrung und Datenschutz
