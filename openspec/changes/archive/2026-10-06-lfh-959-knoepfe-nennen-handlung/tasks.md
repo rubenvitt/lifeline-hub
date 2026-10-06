@@ -25,5 +25,5 @@
 ## 6. Regel und Abschluss
 
 - [x] 6.1 `frontend/AGENTS.md`, Bedien-Leitlinie „Aktionen“: die Regel aus `specs/bedien-wortlaut` mit Verweis auf den Guard.
-- [ ] 6.2 Lint, Typecheck, Vitest der berührten Dateien, Mutationsproben.
-- [ ] 6.3 `./scripts/check-all.sh` (Bündel `schnell`, Vitest; e2e der berührten Specs).
+- [x] 6.2 Lint, Typecheck, Vitest der berührten Dateien, Mutationsproben.
+- [x] 6.3 `./scripts/check-all.sh` (Bündel `schnell`, Vitest; e2e der berührten Specs).
