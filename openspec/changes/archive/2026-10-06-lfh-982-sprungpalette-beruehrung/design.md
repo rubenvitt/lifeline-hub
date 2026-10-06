@@ -33,7 +33,7 @@ nichts zu erhalten.
 
 **Goals:**
 - Bei grobem Zeiger: echter Schließknopf ≥ 48 × 48 px, keine Tastenhinweise, Präfixe als Chips,
-  „Öffnen“ in der Vorschau. Die Fußzeile ist bei 390 px niedriger als die heutigen rund 95 px.
+  „Öffnen“ in der Vorschau. Die Fußzeile steht bei 390 px in einer Reihe (≤ 70 px).
 - Bei feinem Zeiger: kein Unterschied zu heute, alle bestehenden Palette-Tests bleiben grün.
 
 **Non-Goals:**
@@ -100,6 +100,12 @@ Messung einmal als Beobachter über `e2e/rollen-kern.ts` (`wechsleZuRolle`), wei
 Palette-Inhalt von der Rolle abhängt.
 
 ## Risks / Trade-offs
+
+- [Fußzeile nicht flacher] Das Ticket verlangte eine niedrigere Fußzeile als „rund 95 px“. Das
+  war der Stand vor der Überholung der Palette; heute misst die Tasten-Fußzeile bei 390 px 51 px
+  (zwei Zeilen Marken). Die Touch-Fußzeile misst in komfortabel 59 px, weil echte Tippziele den
+  Boden 48 tragen. Bewusst: 8 px mehr für Ziele, die etwas tun, statt Marken, die nichts tun.
+  Ziele unter 48 px wären der Rückschritt, den die Bedien-Leitlinie verbietet.
 
 - [Chips bei 390 px in Handschuh] Drei Knöpfe mit 72 px Boden und „Personen & Kräfte“ passen
   womöglich nicht in 340 px. → Die Zeile scrollt dann waagerecht, statt umzubrechen. Gemessen wird

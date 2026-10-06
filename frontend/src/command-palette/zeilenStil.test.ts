@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { palettenZeilenStil, vorschauZielStil } from './zeilenStil';
+import { palettenZeilenStil, schliessKnopfMass, vorschauZielStil } from './zeilenStil';
 import { dichten } from '../theme/tokens';
 
 /**
@@ -105,5 +105,17 @@ describe('vorschauZielStil', () => {
 
   it('trennt sich sichtbar von der Zeile', () => {
     expect(vorschauZielStil(tokenFuer('kompakt')).borderInlineStart).toBe('1px solid #123456');
+  });
+});
+
+/**
+ * Der Schließknopf der Palette bei grobem Zeiger (LFH-982): 48 ist Boden, nie Deckel, wie im
+ * Navigationsrahmen. Böden als Literale.
+ */
+describe('schliessKnopfMass', () => {
+  it('hält 48 px in kompakt und komfortabel und wächst in Handschuh auf 72', () => {
+    expect(schliessKnopfMass({ controlHeight: dichten.kompakt.zeilenhoehe })).toBe(48);
+    expect(schliessKnopfMass({ controlHeight: dichten.komfortabel.zeilenhoehe })).toBe(48);
+    expect(schliessKnopfMass({ controlHeight: dichten.handschuh.zeilenhoehe })).toBe(72);
   });
 });

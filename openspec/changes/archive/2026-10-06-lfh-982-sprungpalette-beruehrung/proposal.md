@@ -5,9 +5,10 @@
 Auf Handy und Führungs-Tablet ist die Sprungpalette der schnelle Weg zu Modulen, ETB-Einträgen
 und Personen. Dort zeigt sie aber nur Tastaturwege: Im Kopf steht eine umrandete „Esc“-Marke, die
 wie ein Knopf aussieht und sich nicht antippen lässt, und die Fußzeile („↵ öffnen“, „Strg ↵ neuer
-Tab“, „→ Vorschau“) bricht bei 390 px auf drei Zeilen um (rund 95 px). Die einzige Hilfe, die auch
-ohne Tastatur wirkt, die Präfixe `> # @`, geht dazwischen unter und lässt sich nur tippen, nicht
-antippen.
+Tab“, „→ Vorschau“) steht dort, obwohl keine Taste da ist (bei 390 px zwei Zeilen, 51 px; das
+Ticket maß vor der letzten Überholung noch drei Zeilen und rund 95 px). Die einzige Hilfe, die
+auch ohne Tastatur wirkt, die Präfixe `> # @`, geht dazwischen unter und lässt sich nur tippen,
+nicht antippen.
 
 ## What Changes
 

@@ -106,9 +106,9 @@ Dichtestufe tragen. Die Chips MUST in einer Zeile stehen.
 - **WHEN** im Suchfeld „#42“ steht und der gedrückte Chip „#“ angetippt wird
 - **THEN** steht im Suchfeld „42“ und kein Chip ist gedrückt
 
-#### Scenario: Fußzeile wird flacher
+#### Scenario: Eine Reihe Chips
 - **WHEN** die Palette auf dem Handy bei 390 px in der Stufe komfortabel geöffnet wird
-- **THEN** stehen die drei Chips in einer Zeile und die Fußzeile ist niedriger als die bisherige dreizeilige Legende
+- **THEN** stehen die drei Chips ohne Scrollen in einer Zeile, jeder mindestens 48 px hoch, und die Fußzeile ist höchstens 70 px hoch
 
 ### Requirement: Bei grobem Zeiger öffnet ein Knopf den Datensatz aus der Vorschau
 Bei grobem Zeiger SHALL die Fußzeile der Vorschau statt der Tastenhinweise einen Knopf „Öffnen“
