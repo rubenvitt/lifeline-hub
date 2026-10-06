@@ -117,4 +117,40 @@ describe('Schnellerfassungszeile', () => {
     const regel = css.match(/([^{}]*)\{\s*flex: 1 1 auto;\s*min-width: 0;\s*\}/);
     expect(regel?.[1]).toContain('.lfh-schnellerfassung__feld--fuellt > *');
   });
+  /**
+   * LFH-978 (U70): die rahmenlose Feldregel gilt dem EINEN Feld (ETB). Im Informationstelefon
+   * stehen Anliegen, Notiz, Haken und Knopf nebeneinander; das Select behielt seinen Rahmen, die
+   * Notiz verlor ihn und las sich am Handy wie eine Beschriftung.
+   */
+  it('felderUmrandet: nur dann trägt die Feldzelle die Klasse, die den Rahmen lässt', () => {
+    const { unmount } = renderMitProviders(
+      <Schnellerfassungszeile felderUmrandet>
+        <Input aria-label="Feld" />
+      </Schnellerfassungszeile>,
+    );
+    const zelle = () => screen.getByLabelText('Feld').closest('.lfh-schnellerfassung__feld');
+    expect(zelle()).toHaveClass('lfh-schnellerfassung__feld--umrandet');
+    unmount();
+    renderMitProviders(
+      <Schnellerfassungszeile>
+        <Input aria-label="Feld" />
+      </Schnellerfassungszeile>,
+    );
+    expect(zelle()).not.toHaveClass('lfh-schnellerfassung__feld--umrandet');
+  });
+
+  it('felderUmrandet: die rahmenlose Regel in sprache.css nimmt die Klasse aus', () => {
+    const css = readFileSync(join(process.cwd(), 'src/theme/sprache.css'), 'utf8');
+    const regel = css.match(/([^{}]*)\{\s*border-color: transparent;\s*background: transparent;/);
+    const selektoren = regel![1]
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split(',')
+      .map((t) => t.trim());
+    expect(selektoren.length).toBeGreaterThan(0);
+    for (const sel of selektoren) {
+      expect(sel).toContain(
+        '.lfh-schnellerfassung__feld:not(.lfh-schnellerfassung__feld--umrandet)',
+      );
+    }
+  });
 });

@@ -83,13 +83,32 @@ export function ausKennzahl(
   return { wert: k.einheit ? `${k.wert} ${k.einheit}` : k.wert, notiz: k.notiz || null };
 }
 
-/** Die Sichtung im Wortlaut der Vorbereitung (auch Lagevortrag, LFH-869). */
+/** Geschütztes Leerzeichen: hält einen Teil der Sichtung auf einer Zeile. */
+const GESCHUETZT = '\u00a0';
+/** Trenner der Teile; geschützt VOR dem Punkt, damit keine Zeile mit „·“ beginnt. */
+export const SICHTUNG_TRENNER = `${GESCHUETZT}· `;
+
+/** Ein Teil der Sichtung, „SK III 6": jedes Leerzeichen darin geschützt. */
+function sichtungTeil(wort: string, zahl: number): string {
+  return `${wort} ${zahl}`.split(' ').join(GESCHUETZT);
+}
+
+/**
+ * Die Sichtung im Wortlaut der Vorbereitung (auch Lagevortrag, LFH-869).
+ *
+ * Umbrechen darf die Zeile nur hinter dem Trenner „ · “ (LFH-978): innerhalb eines Teils und vor
+ * dem Punkt stehen geschützte Leerzeichen, sonst riss die Wertspalte bei 390 und 820 px mitten in
+ * „SK III 6“ oder „ohne Sichtung 1“. Der Lagebericht übernimmt denselben Text und bricht im Druck
+ * ebenso.
+ */
 export function sichtungText(sk: Lagebild['sk']): string {
-  const teile = (['sk1', 'sk2', 'sk3', 'sk4'] as const).map((k) => `${SK_META[k].label} ${sk[k]}`);
-  if (sk.tot > 0) teile.push(`${SK_META.tot.label} ${sk.tot}`);
-  if (sk.unverletzt > 0) teile.push(`${SK_META.unverletzt.label} ${sk.unverletzt}`);
-  teile.push(`${SK_WORT.ohne} ${sk.ohne}`);
-  return teile.join(' · ');
+  const teile = (['sk1', 'sk2', 'sk3', 'sk4'] as const).map((k) =>
+    sichtungTeil(SK_META[k].label, sk[k]),
+  );
+  if (sk.tot > 0) teile.push(sichtungTeil(SK_META.tot.label, sk.tot));
+  if (sk.unverletzt > 0) teile.push(sichtungTeil(SK_META.unverletzt.label, sk.unverletzt));
+  teile.push(sichtungTeil(SK_WORT.ohne, sk.ohne));
+  return teile.join(SICHTUNG_TRENNER);
 }
 
 /** Höchste Warnstufe mit der Zahl der Gebiete (auch Lagevortrag, LFH-869). */
