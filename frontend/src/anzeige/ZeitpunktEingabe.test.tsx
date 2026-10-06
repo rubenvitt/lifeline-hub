@@ -4,12 +4,15 @@ import userEvent from '@testing-library/user-event';
 import { Form } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ReactNode } from 'react';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from './AnzeigeKonventionenContext';
-import { ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from './ZeitpunktEingabe';
+import { ZEIT_BLATT, ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from './ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from './zeitEingabe';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
+import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 
 dayjs.extend(utc);
 
@@ -281,5 +284,65 @@ describe('ZeitpunktEingabe/ZeitraumEingabe — stabil über Re-Render', () => {
     const [von, bis] = onChange.mock.lastCall![0]!;
     expect(alsBackendZeit(von!)).toBe('2026-07-15 10:00:00');
     expect(alsBackendZeit(bis!)).toBe('2026-07-16 11:30:00');
+  });
+});
+
+describe('ZeitpunktEingabe/ZeitraumEingabe — Blatt unter md (LFH-953)', () => {
+  /** Das offene Panel; antd hängt es an `document.body`. */
+  const panel = () =>
+    waitFor(() => {
+      const p = document.querySelector<HTMLElement>('.ant-picker-dropdown');
+      expect(p).not.toBeNull();
+      return p!;
+    });
+
+  it('öffnet den Zeitpunkt unter md als Blatt', async () => {
+    setzeViewportBreite(390);
+    render(mitZone(null, <ZeitpunktEingabe aria-label="von" open />));
+    expect(await panel()).toHaveClass(ZEIT_BLATT);
+  });
+
+  it('öffnet den Zeitraum unter md als Blatt', async () => {
+    setzeViewportBreite(390);
+    render(mitZone(null, <ZeitraumEingabe placeholder={['Beginn', 'Ende']} open />));
+    expect(await panel()).toHaveClass(ZEIT_BLATT);
+  });
+
+  it('lässt das Panel ab md am Feld (antds Ausrichtung)', async () => {
+    render(mitZone(null, <ZeitpunktEingabe aria-label="von" open />));
+    expect(await panel()).not.toHaveClass(ZEIT_BLATT);
+  });
+
+  it('sperrt das Tippen nur auf dem Handschirm mit Fingerbedienung (keine Bildschirmtastatur)', () => {
+    setzeViewportBreite(390);
+    setzeZeigerGrob(true);
+    const { unmount } = render(
+      mitZone(
+        null,
+        <>
+          <ZeitpunktEingabe aria-label="von" />
+          <ZeitraumEingabe placeholder={['Beginn', 'Ende']} />
+        </>,
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'von' })).toHaveAttribute('readonly');
+    expect(screen.getByPlaceholderText('Beginn')).toHaveAttribute('readonly');
+    unmount();
+
+    // Gegenprobe: Handschirm mit Maus — getippt werden darf.
+    setzeZeigerGrob(false);
+    render(mitZone(null, <ZeitpunktEingabe aria-label="von" />));
+    expect(screen.getByRole('textbox', { name: 'von' })).not.toHaveAttribute('readonly');
+  });
+
+  it('die Regeln des Blatts stehen fest am unteren Rand, Kalender und Uhrzeit untereinander', () => {
+    // jsdom rechnet kein Layout; den Vertrag belegt `e2e/dialoge-handy.spec.ts` im Browser.
+    const css = readFileSync(join(process.cwd(), 'src/anzeige/ZeitpunktEingabe.css'), 'utf8');
+    expect(css).toMatch(
+      new RegExp(`\\.${ZEIT_BLATT}\\.ant-picker-dropdown \\{[^}]*position: fixed !important;`),
+    );
+    expect(css).toMatch(
+      new RegExp(`\\.${ZEIT_BLATT} \\.ant-picker-datetime-panel \\{[^}]*flex-direction: column;`),
+    );
   });
 });
