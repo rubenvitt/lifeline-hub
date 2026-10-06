@@ -10,7 +10,13 @@ import {
   setzeAppAktualisierer,
   verwerfeAppAktualisierung,
 } from '../pwa/appAktualisierung';
-import { queueAblehnen, queueEinreihen, queueLaden, queueLeerenFuerTests } from '../offline/queue';
+import {
+  queueAblehnen,
+  queueEinreihen,
+  queueLaden,
+  queueLeerenFuerTests,
+  queueLegacyEinreihenFuerTests,
+} from '../offline/queue';
 
 function melde(status: string) {
   act(() => {
@@ -91,7 +97,7 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
   it('zeigt Offline-Writes als Badge in derselben Betriebszeile', async () => {
     await queueEinreihen(11, 7, { typ: 'meldung', inhalt: 'Offline', client_id: 'etb-1' });
     renderBanner('/einsaetze/7/etb');
-    expect(await screen.findByLabelText('1 ausstehende Offline-Aktionen')).toBeInTheDocument();
+    expect(await screen.findByLabelText('1 ausstehende Offline-Aktion')).toBeInTheDocument();
     expect(screen.getByText('ausstehend')).toBeInTheDocument();
   });
 
@@ -105,10 +111,28 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
     await queueAblehnen(11, pending, 'Unter Einsatz B weiterhin sichtbar');
 
     renderBanner('/einsaetze/8/etb');
-    await userEvent.click(await screen.findByLabelText('1 abgelehnte Offline-Aktionen'));
+    await userEvent.click(await screen.findByLabelText('1 abgelehnte Offline-Aktion'));
 
     expect(await screen.findByText('Unter Einsatz B weiterhin sichtbar')).toBeInTheDocument();
     expect(screen.getByText('#7')).toBeInTheDocument();
+  });
+
+  it('nennt beim Knopf für alte Offline-Daten die Wirkung (ansehen), nicht das Verwerfen (LFH-944)', async () => {
+    await queueLegacyEinreihenFuerTests(73, {
+      typ: 'meldung',
+      inhalt: 'Aus früherer Sitzung',
+      client_id: 'legacy-banner-1',
+    });
+    renderBanner('/einsaetze/7/etb');
+
+    const knopf = await screen.findByRole('button', {
+      name: 'Alte Offline-Daten ansehen (1 Aktion ohne Zuordnung)',
+    });
+    expect(knopf).toHaveTextContent('Alte Offline-Daten ansehen');
+    expect(screen.queryByText(/verwerfen/)).not.toBeInTheDocument();
+    // Der Knopf öffnet nur den Drawer; verworfen wird dort erst nach Bestätigung.
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Offline-Aktionen wiederherstellen')).toBeInTheDocument();
   });
 
   it('öffnet vom globalen Badge die Recovery mit Inhalt, Grund und Wiederholen', async () => {
@@ -121,7 +145,7 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
     await queueAblehnen(11, pending, 'Keine Berechtigung');
     renderBanner('/einsaetze/7/etb');
 
-    await userEvent.click(await screen.findByLabelText('1 abgelehnte Offline-Aktionen'));
+    await userEvent.click(await screen.findByLabelText('1 abgelehnte Offline-Aktion'));
     expect(await screen.findByText('Offline-Aktionen wiederherstellen')).toBeInTheDocument();
     expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
     expect(screen.getByText(/Vollständiger Offline-Wortlaut/)).toBeInTheDocument();

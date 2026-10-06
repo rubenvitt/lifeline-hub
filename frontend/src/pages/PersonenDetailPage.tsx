@@ -455,7 +455,7 @@ export default function PersonenDetailPage() {
         <Space wrap>
           {istPatient(person) && <Tag color="geekblue">Patient</Tag>}
           {person.aktuelle_sichtung ? (
-            <SichtungsTag kategorie={person.aktuelle_sichtung} praefix="SK: " />
+            <SichtungsTag kategorie={person.aktuelle_sichtung} />
           ) : (
             <Tag>ungesichtet</Tag>
           )}
@@ -468,7 +468,7 @@ export default function PersonenDetailPage() {
           <Alert
             type="warning"
             showIcon
-            title="Sichtung = tot. Admin-Status wurde NICHT automatisch geändert."
+            title={`Sichtung „tot“ – Personenstatus ist noch „${STATUS_META[person.status].label}“. Bitte auf „verstorben“ setzen.`}
             action={
               <Button
                 loading={
@@ -490,7 +490,7 @@ export default function PersonenDetailPage() {
                   })
                 }
               >
-                Status → verstorben
+                Auf „verstorben“ setzen
               </Button>
             }
           />
@@ -498,7 +498,7 @@ export default function PersonenDetailPage() {
         {darfSchreiben && !person.storniert_at && (
           <Form form={notizForm} layout="vertical" onFinish={notizMutation.mutate}>
             <Form.Item
-              label="Befund/Verlaufsnotiz (append-only, kein ETB)"
+              label="Verlaufsnotiz (nicht änderbar, erscheint nicht im ETB)"
               name="text"
               rules={[{ required: true, message: 'Bitte Text eingeben' }]}
             >
@@ -980,7 +980,8 @@ export default function PersonenDetailPage() {
     const statuswechsel: Kopfaktion[] = (statusFrei ? naechsteStatus(p.status) : []).map((s) => ({
       art: 'status',
       key: `status:${s}`,
-      label: `→ ${STATUS_META[s].label}`,
+      // Mit Verb (LFH-944): ein Pfeil allein sagt nicht, dass der Eintrag den Status setzt.
+      label: `Auf „${STATUS_META[s].label}“ setzen`,
       status: s,
     }));
     const stornieren: Kopfaktion = {

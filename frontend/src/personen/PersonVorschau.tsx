@@ -44,7 +44,7 @@ export default function PersonVorschau({
             <StatusTag darstellung={STATUS_META[p.status]} />
             {istPatient(p) && <Tag color="geekblue">Patient</Tag>}
             {p.aktuelle_sichtung ? (
-              <SichtungsTag kategorie={p.aktuelle_sichtung} praefix="SK: " />
+              <SichtungsTag kategorie={p.aktuelle_sichtung} />
             ) : (
               <Tag>ungesichtet</Tag>
             )}

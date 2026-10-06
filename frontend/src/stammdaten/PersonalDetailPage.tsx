@@ -144,7 +144,7 @@ export default function PersonalDetailPage() {
             {person.ist_demo && <DemoMarke />}
           </Space>
         }
-        beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die eine Person nicht auffindbar ist."
+        beschreibung="Alle Stammdaten der Person. In der Liste erfasst du nur die vier Pflichtfelder, hier ergänzt du den Rest."
         hinweis={
           <SeitenHinweise
             fehler={speichern.error}

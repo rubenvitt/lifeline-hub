@@ -875,9 +875,11 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       await screen.findByLabelText('Code aus deiner Authenticator-App');
-      await userEvent.click(screen.getByRole('button', { name: 'Recovery-Code verwenden' }));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Wiederherstellungscode verwenden' }),
+      );
 
-      const recoveryFeld = await screen.findByLabelText('Recovery-Code');
+      const recoveryFeld = await screen.findByLabelText('Wiederherstellungscode');
       expect(screen.queryByLabelText('Code aus deiner Authenticator-App')).not.toBeInTheDocument();
 
       await userEvent.type(recoveryFeld, 'a1b2-c3d4-e5f6-0718-293a');
@@ -903,15 +905,17 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       await screen.findByLabelText('Code aus deiner Authenticator-App');
-      await userEvent.click(screen.getByRole('button', { name: 'Recovery-Code verwenden' }));
-      await screen.findByLabelText('Recovery-Code');
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Wiederherstellungscode verwenden' }),
+      );
+      await screen.findByLabelText('Wiederherstellungscode');
 
       await userEvent.click(
         screen.getByRole('button', { name: 'Code aus der Authenticator-App verwenden' }),
       );
 
       expect(await screen.findByLabelText('Code aus deiner Authenticator-App')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Recovery-Code')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Wiederherstellungscode')).not.toBeInTheDocument();
     });
 
     it('meldet einen normalen (Nicht-MFA) Login unverändert direkt an — keine Code-Eingabe', async () => {

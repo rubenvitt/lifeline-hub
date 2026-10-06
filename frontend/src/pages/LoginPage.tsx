@@ -298,9 +298,9 @@ export default function LoginPage() {
           >
             {recoveryModus ? (
               <Form.Item
-                label="Recovery-Code"
+                label="Wiederherstellungscode"
                 name="code"
-                rules={[{ required: true, message: 'Bitte Recovery-Code eingeben' }]}
+                rules={[{ required: true, message: 'Bitte Wiederherstellungscode eingeben' }]}
               >
                 <Input
                   size="large"
@@ -334,7 +334,7 @@ export default function LoginPage() {
             <Button type="link" block onClick={wechsleRecoveryModus}>
               {recoveryModus
                 ? 'Code aus der Authenticator-App verwenden'
-                : 'Recovery-Code verwenden'}
+                : 'Wiederherstellungscode verwenden'}
             </Button>
             <Button type="link" block onClick={zurueckZumPasswort}>
               Zurück

@@ -572,7 +572,7 @@ function einstellungenFlaechen(einsatzId: string): Flaeche[] {
       ziele: [
         {
           sorte: 'Profil Aktionen',
-          ziele: knopf(/^(Passwort ändern|2FA einrichten)$/),
+          ziele: knopf(/^(Passwort ändern|Zweiten Faktor einrichten)$/),
           mindestens: 2,
         },
       ],

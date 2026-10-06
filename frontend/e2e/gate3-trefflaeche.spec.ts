@@ -292,10 +292,10 @@ test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px',
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// Profil → „2FA einrichten“ (LFH-763): die Kopieraktion neben dem TOTP-Geheimnis. antds
+// Profil → „Zweiten Faktor einrichten“ (LFH-763): die Kopieraktion neben dem Schlüssel. antds
 // `Typography copyable` maß hier 15 × 13 px in jeder Stufe; `KopierbarerText` trägt einen echten
 // Knopf. Eigenes Konto, damit das unbestätigte Geheimnis nicht am Admin hängt.
-test('Profil: die Kopieraktion des TOTP-Geheimnisses hält 30 / 48 / 72 px in beiden Achsen', async ({
+test('Profil: die Kopieraktion des Schlüssels zum zweiten Faktor hält 30 / 48 / 72 px in beiden Achsen', async ({
   page,
 }) => {
   await page.setViewportSize(FUEKW);
@@ -305,13 +305,13 @@ test('Profil: die Kopieraktion des TOTP-Geheimnisses hält 30 / 48 / 72 px in be
   for (const { dichte, soll } of STAFFEL) {
     await page.goto('/profil');
     await stelleDichte(page, dichte);
-    await page.getByRole('button', { name: '2FA einrichten' }).click();
-    const knopf = page.getByRole('button', { name: 'TOTP-Geheimnis kopieren', exact: true });
-    const hoehe = await haeltStufe(knopf, soll, `TOTP-Geheimnis kopieren (${dichte})`);
+    await page.getByRole('button', { name: 'Zweiten Faktor einrichten' }).click();
+    const knopf = page.getByRole('button', { name: 'Schlüssel kopieren', exact: true });
+    const hoehe = await haeltStufe(knopf, soll, `Schlüssel kopieren (${dichte})`);
     const breite = (await knopf.boundingBox())!.width;
     expect(
       breite,
-      `TOTP-Geheimnis kopieren (${dichte}, ${breite}px breit, Soll ≥ ${soll})`,
+      `Schlüssel kopieren (${dichte}, ${breite}px breit, Soll ≥ ${soll})`,
     ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
     gemessen.push(`${dichte} (Soll ≥ ${soll}): ${breite} × ${hoehe}px`);
   }
