@@ -14,7 +14,7 @@ import { materialStatus } from '../../theme/statusFarben';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 import { useAuthOptional } from '../../auth/AuthContext';
 import { KennungsLink } from '../../components/kennungsLink';
-import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
+import { sprungGesperrtText } from '../../components/Sprung';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { materialPfad } from '../../routing/deeplinks';
 
@@ -165,7 +165,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
             <Typography.Text type="secondary" id={sperrgrundId} data-testid="material-sperrgrund">
               Kein freies Material im Einsatz –{' '}
               {materialGesperrt ? (
-                `im Modul Material erfassen (${KEINE_BERECHTIGUNG})`
+                sprungGesperrtText('im Modul Material erfassen')
               ) : (
                 <KennungsLink to={materialPfad(einsatzId)}>
                   im Modul Material erfassen <span aria-hidden="true">↗</span>
