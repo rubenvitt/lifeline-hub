@@ -23,7 +23,11 @@ function wort(k: SichtungsbildSchluessel): string {
   return k === 'ohne' ? 'ohne Sichtung' : sichtung[k].label;
 }
 
-export default function Sichtungszeile({ alle }: { alle: readonly Pick<Person, 'aktuelle_sichtung'>[] }) {
+export default function Sichtungszeile({
+  alle,
+}: {
+  alle: readonly Pick<Person, 'aktuelle_sichtung'>[];
+}) {
   const { token, rollen } = useRollen();
   const bild = sichtungsbild(alle);
   const kategorien = SICHTUNGSBILD_REIHE.filter((k) => IMMER.includes(k) || bild.je[k] > 0);
@@ -68,7 +72,7 @@ export default function Sichtungszeile({ alle }: { alle: readonly Pick<Person, '
                 border: `1px solid ${k === 'ohne' ? token.colorTextTertiary : token.colorText}`,
               }}
             />
-            <span style={{ ...monoStil(14, 500), color: rollen.text }}>{bild.je[k]}</span>
+            <span style={{ ...monoStil(14, 500), color: rollen.text }}>{bild.je[k]}</span>{' '}
             <span>{wort(k)}</span>
           </li>
         );

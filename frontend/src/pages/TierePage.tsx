@@ -504,7 +504,7 @@ export default function TierePage() {
         </Form.Item>
         {/* FELDBUDGET (LFH-963, `frontend/AGENTS.md`, Feldbudget): drei sichtbare Felder in
             beiden Modi, der Rest eingeklappt. `forceRender` ist TRAGEND: ohne ihn fehlten die
-            eingeklappten Werte in `onFinish`, und „Werte behalten" erreichte sie nicht. */}
+            eingeklappten Werte in `onFinish`, und die Feldzählung des Budgets wäre nicht prüfbar. */}
         <Collapse
           ghost
           style={{ marginInline: -8 }}

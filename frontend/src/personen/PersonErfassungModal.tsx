@@ -14,7 +14,7 @@ import AufnahmeFelder, {
   type AufnahmeWerte,
 } from './AufnahmeFelder';
 
-/** Erfassungs-Modi der Personen-Schnellerfassung. `null` = Modal geschlossen. */
+/** Erfassungs-Modi der Personenmaske („Betroffene erfassen“, „Vermisst melden“). `null` = Modal geschlossen. */
 export type ErfassungsModus = AufnahmeModus;
 
 /** Ein Titel je Modus — eine allgemeine Maske, dazu „Vermisst melden“ (LFH-963). */

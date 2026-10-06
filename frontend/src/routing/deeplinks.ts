@@ -139,7 +139,7 @@ export function kraefteuebersichtPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'kraefteuebersicht');
 }
 
-/** Tier-Liste; `?neu=1` öffnet die Schnellerfassung (`TierePage`). */
+/** Tier-Liste; `?neu=1` öffnet „Tier erfassen“ (`TierePage`). */
 export function tierePfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'tiere'), { neu: opts.neu ? 1 : undefined });
 }

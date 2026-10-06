@@ -166,9 +166,14 @@ function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
   if (istSchmal) {
     return (
       <MenueAusloeser
-        eintraege={eintraege.map((e) => ({ key: e.key, label: e.label }))}
+        // Ein laufender Nebenweg sperrt nur seinen Eintrag, nicht den Auslöser: ein Knopf im
+        // Ladezustand schluckt Klicks, und Drucken wäre bis zum Ende des Exports unerreichbar.
+        eintraege={eintraege.map((e) =>
+          e.laeuft
+            ? { key: e.key, label: `${e.label} (läuft …)`, gesperrt: true as const }
+            : { key: e.key, label: e.label },
+        )}
         zugaenglicherName={name}
-        laeuft={eintraege.some((e) => e.laeuft)}
         onWahl={(key) => eintraege.find((e) => e.key === key)?.onWahl()}
       />
     );
@@ -183,7 +188,12 @@ function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
           onClick={(ereignis) => {
             if (e.ziel != null) {
               // Strg/⌘/Umschalt oder mittlere Taste: der Browser öffnet den Link selbst.
-              if (ereignis.metaKey || ereignis.ctrlKey || ereignis.shiftKey || ereignis.button !== 0)
+              if (
+                ereignis.metaKey ||
+                ereignis.ctrlKey ||
+                ereignis.shiftKey ||
+                ereignis.button !== 0
+              )
                 return;
               ereignis.preventDefault();
             }

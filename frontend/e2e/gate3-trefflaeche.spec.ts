@@ -2725,7 +2725,7 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
   page,
 }) => {
   // LFH-435: der Nur-Lese-Zweig der Betroffenen NIMMT WEG — Zustand steht als Text statt als
-  // `BemerkungZelle`, Erfassungsband und die drei Kopfknöpfe fehlen. Einen Rechtehinweis gibt es
+  // `BemerkungZelle`, Erfassungsband und die zwei Kopfknöpfe fehlen. Einen Rechtehinweis gibt es
   // im aktiven Einsatz nicht (nur „abgeschlossen — nur Ansicht"). Dem Beobachter bleibt im Kopf
   // die Ansichtsleiste; sie wird gemessen.
   test.setTimeout(120_000);

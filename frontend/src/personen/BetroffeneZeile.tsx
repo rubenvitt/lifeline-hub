@@ -10,6 +10,17 @@ import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instr
 import { formatKoordinate } from './koordinate';
 import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './personBefehl';
 
+/** Aus dem Bild, nicht aus dem Baum: der Vorleser liest die Kürzel weiter als Feldbeschreibung. */
+const NUR_VORLESER = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  clipPath: 'inset(50%)',
+  whiteSpace: 'nowrap',
+} as const;
+
 /**
  * Die Betroffenen-Schnellerfassungszeile: EINE Eingabe, die per Kürzel parst
  * (`personen/personBefehl.ts`), etwa „Kowalski, Anna w 34 sk3 @Weserstadion #52.2691/9.1342".
@@ -94,6 +105,7 @@ export default function BetroffeneZeile({
   const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
   const hinweisId = useId();
+  const kuerzelId = useId();
   const eigenesFeld = useRef<InputRef>(null);
   const sendetRef = useRef(false);
   const [text, setText] = useState('');
@@ -134,6 +146,7 @@ export default function BetroffeneZeile({
   }
 
   const leer = befehl.leer;
+  const kuerzelEingeklappt = istSchmal && !kuerzelOffen;
   // Kürzel-Hinweis und „erkannt: …" liegen GESTAPELT in derselben Rasterzelle: der Hinweis bleibt
   // im Baum und wird nur unsichtbar, die Zeile behält also ihre Höhe (sonst sprang bei 390 px
   // der Inhalt darunter beim ersten Zeichen). `visibility: hidden` nimmt ihn zugleich aus
@@ -155,38 +168,31 @@ export default function BetroffeneZeile({
           }}
         >
           {/* Unter `md` eingeklappt (LFH-963, design.md D6): drei Zeilen Kürzel kosteten am Handy
-              den Platz der ersten Person. Ein Knopf klappt sie auf. */}
-          {istSchmal && !kuerzelOffen ? (
-            <Button
-              type="link"
-              aria-expanded={false}
-              onClick={() => setKuerzelOffen(true)}
-              style={{ paddingInline: 0 }}
-            >
-              Kürzel anzeigen
-            </Button>
-          ) : (
-            <>
-              <span>
-                Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
-              </span>
-              <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
-              <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
-              {/* Das Format zeigt der Platzhalter nicht, also hier. */}
-              <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
-              <span style={{ color: rollen.gedaempft }}>@UHS</span>
-              {istSchmal && (
-                <Button
-                  type="link"
-                  aria-expanded
-                  onClick={() => setKuerzelOffen(false)}
-                  style={{ paddingInline: 0 }}
-                >
-                  Kürzel ausblenden
-                </Button>
-              )}
-            </>
-          )}
+              den Platz der ersten Person. Eingeklappt bleiben sie für Vorleser im Baum (die
+              Beschreibung des Felds), nur unsichtbar; der Knopf steht neben dieser Zelle. */}
+          <span
+            id={kuerzelId}
+            style={
+              kuerzelEingeklappt
+                ? NUR_VORLESER
+                : {
+                    display: 'inline-flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    columnGap: token.padding,
+                    rowGap: token.marginXXS,
+                  }
+            }
+          >
+            <span>
+              Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
+            </span>
+            <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
+            <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+            {/* Das Format zeigt der Platzhalter nicht, also hier. */}
+            <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
+            <span style={{ color: rollen.gedaempft }}>@UHS</span>
+          </span>
         </span>
         {!leer && (
           <span
@@ -207,6 +213,19 @@ export default function BetroffeneZeile({
           </span>
         )}
       </span>
+      {/* EIN Knopf für beide Richtungen: er bleibt beim Umschalten derselbe Knoten, der Fokus
+          bleibt also auf ihm. Beim Tippen unsichtbar wie der Hinweis, mit gehaltener Breite. */}
+      {istSchmal && (
+        <Button
+          type="link"
+          aria-expanded={kuerzelOffen}
+          aria-controls={kuerzelId}
+          onClick={() => setKuerzelOffen((offen) => !offen)}
+          style={{ paddingInline: 0, visibility: leer ? 'visible' : 'hidden' }}
+        >
+          {kuerzelOffen ? 'Kürzel ausblenden' : 'Kürzel anzeigen'}
+        </Button>
+      )}
       {zuletzt != null && (
         <span data-lfh="zuletzt" style={{ marginInlineStart: 'auto', color: rollen.gedaempft }}>
           {zuletzt}

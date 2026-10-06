@@ -85,10 +85,24 @@ describe('EinsatzSeite — Nebenwege unter md', () => {
     expect(druck).not.toHaveBeenCalled();
   });
 
-  it('zeigt einen laufenden Nebenweg am Auslöser', () => {
+  it('sperrt bei einem laufenden Nebenweg nur dessen Eintrag, nicht den Auslöser', async () => {
     setzeViewportBreite(390);
-    zeige([{ key: 'csv', label: 'CSV exportieren', onWahl: vi.fn(), laeuft: true }]);
-    expect(screen.getByRole('button', { name: NAME })).toHaveClass('ant-btn-loading');
+    const druck = vi.fn();
+    zeige([
+      { key: 'druck', label: 'Drucken / als PDF', onWahl: druck },
+      { key: 'csv', label: 'CSV exportieren', onWahl: vi.fn(), laeuft: true },
+    ]);
+    const ausloeser = screen.getByRole('button', { name: NAME });
+    expect(ausloeser).not.toHaveClass('ant-btn-loading');
+    await userEvent.click(ausloeser);
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    expect(
+      within(offenesMenue()).getByRole('menuitem', { name: 'CSV exportieren (läuft …)' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(
+      within(offenesMenue()).getByRole('menuitem', { name: 'Drucken / als PDF' }),
+    );
+    expect(druck).toHaveBeenCalledTimes(1);
   });
 });
 

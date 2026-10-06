@@ -69,7 +69,7 @@ Tiere „Tier erfassen“, „Vermisst melden“; Schäden „Schnellerfassung�
 öffnen `'erfassen'`; der Folgestatus ist dort immer `erfasst` (der Server hebt mit Sichtung auf
 `betroffen`). Titel und Knopf „Betroffene erfassen“, der Knopf ist die eine Primäraktion des
 Kopfes (vorher drei sekundäre). `AufnahmeFelder` zeigt im Modus `'erfassen'` über den Feldern
-eine Zeile „Wird als ‚erfasst‘ angelegt · mit Sichtung → betroffen“ — beide Mounts (Modal und
+eine Zeile „Status: erfasst · mit Sichtung → betroffen“ — beide Mounts (Modal und
 `/personen/aufnahme`) sagen damit dasselbe. Die Zeile ist Text, kein Feld; das Budget von vier
 sichtbaren Feldern bleibt.
 

@@ -326,10 +326,17 @@ describe('PersonenPage', () => {
     render(einsatzAktiv, [{ ...person, aktuelle_sichtung: 'sk1' as const }, unbekannt]);
     const zeile = await screen.findByRole('list', { name: 'Sichtungszahlen' });
     expect(zeile).toHaveTextContent('2 gesamt');
-    expect(zeile).toHaveTextContent('1SK I');
+    expect(zeile).toHaveTextContent('1 SK I');
     const filter = screen.getByRole('tablist', { name: 'Personen nach Status filtern' });
     // Über dem Filter, also vor ihm im Dokument.
     expect(zeile.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('ab xl steht die Sichtungszeile nicht: die Seitenleiste trägt die Zahlen daneben', async () => {
+    setzeViewportBreite(1366);
+    render(einsatzAktiv, [{ ...person, aktuelle_sichtung: 'sk1' as const }, unbekannt]);
+    expect(await screen.findByRole('region', { name: 'Sichtungsbild' })).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Sichtungszahlen' })).not.toBeInTheDocument();
   });
 
   it('bestätigt die Registriernummer, macht die neue Person sichtbar und hebt sie hervor', async () => {
@@ -1399,7 +1406,9 @@ describe('PersonenPage', () => {
       const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
       expect(zeile).toHaveAccessibleDescription(/#Koordinate \(52\.2691\/9\.1342\)/);
       await userEvent.type(zeile, 'Kowalski sk2');
-      const hinweis = screen.getByText('#Koordinate (52.2691/9.1342)').parentElement!;
+      // Die Ebene des Stapels: über der Kürzel-Gruppe (die unter `md` einklappt, LFH-963).
+      const hinweis = screen.getByText('#Koordinate (52.2691/9.1342)').parentElement!
+        .parentElement!;
       expect(hinweis).toHaveStyle({ visibility: 'hidden' });
       expect(hinweis).toHaveAttribute('aria-hidden', 'true');
       expect(zeile).toHaveAccessibleDescription(/^erkannt:/);

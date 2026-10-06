@@ -25,17 +25,27 @@ describe('BetroffeneZeile — Kürzel-Hinweis', () => {
     expect(screen.queryByRole('button', { name: 'Kürzel anzeigen' })).not.toBeInTheDocument();
   });
 
-  it('klappt unter md ein und auf Wunsch wieder auf', async () => {
+  it('klappt unter md ein und auf Wunsch wieder auf — derselbe Knopf, der Fokus bleibt', async () => {
     setzeViewportBreite(390);
     zeige();
-    expect(screen.queryByText('m/w/d + Alter')).not.toBeInTheDocument();
-    const auf = screen.getByRole('button', { name: 'Kürzel anzeigen' });
-    expect(auf).toHaveAttribute('aria-expanded', 'false');
-    await userEvent.click(auf);
-    expect(screen.getByText('m/w/d + Alter')).toBeInTheDocument();
-    const zu = screen.getByRole('button', { name: 'Kürzel ausblenden' });
-    expect(zu).toHaveAttribute('aria-expanded', 'true');
-    await userEvent.click(zu);
-    expect(screen.queryByText('m/w/d + Alter')).not.toBeInTheDocument();
+    const kuerzel = () => screen.getByText('m/w/d + Alter').parentElement!;
+    // Eingeklappt: aus dem Bild (Vorleser-Stil), aber weiter die Beschreibung des Felds.
+    expect(kuerzel()).toHaveStyle({ position: 'absolute' });
+    expect(screen.getByRole('textbox', { name: 'Kurzeingabe Person' })).toHaveAccessibleDescription(
+      expect.stringContaining('m/w/d + Alter'),
+    );
+    const knopf = screen.getByRole('button', { name: 'Kürzel anzeigen' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(knopf);
+    expect(kuerzel()).not.toHaveStyle({ position: 'absolute' });
+    expect(knopf).toHaveAccessibleName('Kürzel ausblenden');
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(knopf).toHaveFocus();
+    // Der Knopf selbst gehört nicht zur Feldbeschreibung.
+    expect(
+      screen.getByRole('textbox', { name: 'Kurzeingabe Person' }),
+    ).not.toHaveAccessibleDescription(expect.stringContaining('Kürzel ausblenden'));
+    await userEvent.click(knopf);
+    expect(kuerzel()).toHaveStyle({ position: 'absolute' });
   });
 });

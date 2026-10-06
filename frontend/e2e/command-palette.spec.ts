@@ -162,7 +162,7 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
 });
 
-test('Schnellaktion „Person erfassen" navigiert und öffnet die Schnellerfassung (Schnellaktionen)', async ({
+test('Schnellaktion „Person erfassen" navigiert und öffnet „Betroffene erfassen“ (Schnellaktionen)', async ({
   page,
 }) => {
   await anmelden(page);

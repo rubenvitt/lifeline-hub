@@ -23,17 +23,17 @@ describe('Sichtungszeile', () => {
     renderMitProviders(<Sichtungszeile alle={[p('sk1'), p('sk1'), p('sk3'), p(null)]} />);
     expect(eintraege()).toEqual([
       '4 gesamt',
-      '2SK I',
-      '0SK II',
-      '1SK III',
-      '0SK IV',
-      '0tot',
-      '1ohne Sichtung',
+      '2 SK I',
+      '0 SK II',
+      '1 SK III',
+      '0 SK IV',
+      '0 tot',
+      '1 ohne Sichtung',
     ]);
   });
 
   it('lässt „unverletzt“ und „ohne Sichtung“ ohne Bestand weg, SK I–IV und tot nie', () => {
     renderMitProviders(<Sichtungszeile alle={[]} />);
-    expect(eintraege()).toEqual(['0 gesamt', '0SK I', '0SK II', '0SK III', '0SK IV', '0tot']);
+    expect(eintraege()).toEqual(['0 gesamt', '0 SK I', '0 SK II', '0 SK III', '0 SK IV', '0 tot']);
   });
 });
