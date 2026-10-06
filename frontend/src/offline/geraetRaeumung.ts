@@ -122,7 +122,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'localStorage lfh:nav:eingeklappt',
     datei: 'einsatz/navPersistenz.ts',
     entscheidung: 'bleibt',
-    grund: 'Geräte-Einstellung (Navigation eingeklappt), ohne Personenbezug.',
+    grund: 'Geräte-Einstellung (Modulmenü zu oder offen gewählt), ohne Personenbezug.',
   },
   {
     ort: 'localStorage lifeline-hub.theme, lifeline-hub.dichte, lifeline-hub.helligkeit',

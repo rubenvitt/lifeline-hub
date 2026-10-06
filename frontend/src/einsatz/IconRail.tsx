@@ -88,7 +88,8 @@ const ETIKETT_STIL: CSSProperties = {
  *
  * Das Etikett steht SICHTBAR, nicht im Tooltip: auf dem Führungs-Tablet gibt es kein Hover. Es
  * ist das Kurzetikett (`Kategorie.kurz`); der volle Name bleibt `aria-label` und `title`.
- * „Einstellungen" (`fuss`) steht abgesetzt unten. Es bleiben SECHS Ziele in EINER Landmarke.
+ * „Einstellungen" (`fuss`) steht abgesetzt unten. Es bleiben SECHS Kategorie-Ziele in EINER
+ * Landmarke; steht ein Modulpanel daneben, kommt im Fuß der Griff „Menü“ dazu (LFH-952).
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
   const { token } = theme.useToken();
@@ -142,59 +143,70 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         boxSizing: 'border-box',
       }}
     >
-      {/* Die Kategorien bleiben beim Rollen unter dem klebenden Kopf stehen (LFH-952,
-         `frontend/AGENTS.md`, Rahmen); der Grund ist nötig, weil der Rest der Rail darunter
-         vorbeirollt. */}
+      {/* EINE klebende Spalte unter dem Kopf (LFH-952, `frontend/AGENTS.md`, Rahmen): Kategorien oben,
+         Fuß unten, zusammen höchstens so hoch wie das Fenster unter dem Rahmen. Zwei getrennt
+         klebende Teile (Kategorien oben, Fuß unten) überlappten bei geringer Höhe in `handschuh`,
+         und keiner rollte die verdeckte Kategorie frei. Reicht die Höhe nicht, rollt die Spalte in
+         sich; der Fuß klebt an ihrem Ende, `fussFokusabstand` hält Fokusziele über ihm frei.
+         Steht über dem Kopf eine Zeile im Fluss (Betriebszeile ab `md`), liegt der Fuß um ihre
+         Höhe unter dem Fensterrand, bis die Seite so weit gerollt ist. */}
       <div
-        data-lfh="rail-haupt"
+        data-lfh="rail-spalte"
         style={{
           position: 'sticky',
           top: 'var(--lfh-rahmen-oben, 0px)',
+          height: 'calc(100dvh - var(--lfh-rahmen-oben, 0px))',
           display: 'flex',
           flexDirection: 'column',
-          background: rahmenFarben.grund,
+          overflowY: 'auto',
         }}
       >
-        {haupt.map(ziel)}
-      </div>
-      {fuss.length > 0 && (
-        // `sticky; bottom: 0`: die Seite scrollt im Dokument, sonst stünde der Fuß auf einer langen
-        // Seite am Seitenende. Auf kurzen Seiten schiebt ihn `marginTop: auto` ans Spaltenende. Der
-        // Grund ist nötig, weil darunter Ziele vorbeiscrollen.
-        <div
-          ref={fussRef}
-          data-lfh="rail-fuss"
-          style={{
-            marginTop: 'auto',
-            position: 'sticky',
-            bottom: 0,
-            background: rahmenFarben.grund,
-            borderTop: `1px solid ${rahmenFarben.linie}`,
-          }}
-        >
-          {panel && (
-            // Griff des Modulmenüs (LFH-952, D5): sichtbar, weil das Panel am Tablet quer ohne
-            // Wahl zu ist und der Selbstklick auf die Kategorie kein erkennbarer Weg zurück wäre.
-            <button
-              type="button"
-              aria-label={panel.offen ? 'Menü einklappen' : 'Menü ausklappen'}
-              aria-expanded={panel.offen}
-              aria-controls={panel.offen ? MODUL_PANEL_ID : undefined}
-              data-lfh="rail-griff"
-              onClick={panel.onUmschalten}
-              style={{ ...railZielStil(token, { aktiv: false }), ...fussFokusabstandStil }}
-            >
-              <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
-                {panel.offen ? <IconSeitenleisteZu size={20} /> : <IconSeitenleisteAuf size={20} />}
-              </span>
-              <span aria-hidden="true" data-lfh="rail-etikett" style={ETIKETT_STIL}>
-                Menü
-              </span>
-            </button>
-          )}
-          {fuss.map(ziel)}
+        <div data-lfh="rail-haupt" style={{ display: 'flex', flexDirection: 'column' }}>
+          {haupt.map(ziel)}
         </div>
-      )}
+        {fuss.length > 0 && (
+          // `sticky; bottom: 0` am Ende der Spalte; auf hohen Fenstern schiebt ihn `marginTop: auto`
+          // dorthin. Der Grund ist nötig, weil in einer rollenden Spalte Ziele darunter vorbeiziehen.
+          <div
+            ref={fussRef}
+            data-lfh="rail-fuss"
+            style={{
+              marginTop: 'auto',
+              position: 'sticky',
+              bottom: 0,
+              background: rahmenFarben.grund,
+              borderTop: `1px solid ${rahmenFarben.linie}`,
+            }}
+          >
+            {panel && (
+              // Griff des Modulmenüs (LFH-952, D5): sichtbar, weil das Panel am Tablet quer ohne
+              // Wahl zu ist und der Selbstklick auf die Kategorie kein erkennbarer Weg zurück wäre.
+              // Eigenes Etikett-Merkmal: `rail-etikett` zählt die Kategorien.
+              <button
+                type="button"
+                aria-label={panel.offen ? 'Menü einklappen' : 'Menü ausklappen'}
+                aria-expanded={panel.offen}
+                aria-controls={panel.offen ? MODUL_PANEL_ID : undefined}
+                data-lfh="rail-griff"
+                onClick={panel.onUmschalten}
+                style={{ ...railZielStil(token, { aktiv: false }), ...fussFokusabstandStil }}
+              >
+                <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                  {panel.offen ? (
+                    <IconSeitenleisteZu size={20} />
+                  ) : (
+                    <IconSeitenleisteAuf size={20} />
+                  )}
+                </span>
+                <span aria-hidden="true" data-lfh="rail-griff-etikett" style={ETIKETT_STIL}>
+                  Menü
+                </span>
+              </button>
+            )}
+            {fuss.map(ziel)}
+          </div>
+        )}
+      </div>
     </nav>
   );
 }

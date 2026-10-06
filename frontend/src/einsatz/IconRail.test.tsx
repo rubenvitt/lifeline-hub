@@ -109,15 +109,20 @@ describe('IconRail', () => {
     expect(fuss.querySelector('button')).toHaveAttribute('aria-label', 'Einstellungen');
   });
 
-  it('die Kategorien kleben unter dem Rahmen, der Fuß bleibt unten (LFH-952)', () => {
+  it('Kategorien und Fuß kleben als eine Spalte unter dem Rahmen (LFH-952)', () => {
     renderMitProviders(
       <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
     );
     const nav = screen.getByRole('navigation', { name: 'Kategorien' });
-    const haupt = nav.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
-    expect(haupt).not.toBeNull();
-    expect(haupt.style.position).toBe('sticky');
-    expect(haupt.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
+    // EINE klebende Spalte, nicht zwei klebende Teile: die überlappten bei geringer Höhe.
+    const spalte = nav.querySelector<HTMLElement>('[data-lfh="rail-spalte"]')!;
+    expect(spalte.style.position).toBe('sticky');
+    expect(spalte.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
+    expect(spalte.style.height).toBe('calc(100dvh - var(--lfh-rahmen-oben, 0px))');
+    expect(spalte.style.overflowY).toBe('auto');
+    const haupt = spalte.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
+    expect(haupt.style.position).toBe('');
+    expect(spalte.querySelector('[data-lfh="rail-fuss"]')).not.toBeNull();
     // Fünf Kategorien in der Gruppe, „Einstellungen“ nicht: es steht im Fuß.
     expect(haupt.querySelectorAll('button')).toHaveLength(5);
     expect(haupt.querySelector('[aria-label="Einstellungen"]')).toBeNull();

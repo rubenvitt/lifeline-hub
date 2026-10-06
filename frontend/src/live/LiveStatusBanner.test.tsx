@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { App as AntApp } from 'antd';
 import LiveStatusBanner from './LiveStatusBanner';
 import { setzeViewportBreite } from '../test/viewport';
+import { leseRahmenOben } from '../components/rahmenOben';
 import {
   meldeAppAktualisierungVerfuegbar,
   setzeAppAktualisierer,
@@ -168,6 +169,17 @@ describe('LiveStatusBanner — klebt bei Störung am Handy (LFH-952)', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     renderBanner('/einsaetze', true);
     expect(zeile()!.style.position).toBe('');
+  });
+
+  it('meldet ihre Höhe als Rahmen, solange sie klebt, und nimmt sie mit der Störung wieder weg', () => {
+    setzeViewportBreite(390);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(40);
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderBanner('/einsaetze', true);
+    expect(leseRahmenOben()).toBe(40);
+    online.mockReturnValue(true);
+    act(() => window.dispatchEvent(new Event('online')));
+    expect(leseRahmenOben()).toBe(0);
   });
 
   it('ohne `klebend` (Gerätehülle mit eigenem Scrollbereich) klebt sie nie', () => {

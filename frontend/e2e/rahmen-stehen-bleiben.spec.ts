@@ -67,6 +67,8 @@ for (const rolle of ['admin', 'beobachter'] as const) {
       if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
       await page.setViewportSize({ width: b.width, height: b.height });
       await etbGerollt(page, einsatzId);
+      // Vorbedingung des Rollenzweigs (`e2e/AGENTS.md`): ohne Schreibrecht fehlt die Erfassung.
+      await expect(page.getByPlaceholder('Inhalt …')).toHaveCount(rolle === 'beobachter' ? 0 : 1);
 
       const kopf = page.locator('[data-lfh="rahmen-kopf"]');
       if (!b.kopfKlebt) {
@@ -91,10 +93,52 @@ for (const rolle of ['admin', 'beobachter'] as const) {
         expect(r.y, 'Kategorien hängen unter dem Kopf').toBeGreaterThanOrEqual(
           kopfUnten.y + kopfUnten.height - 1,
         );
+        // Bedienbar: der Sprung aus der gerollten Seite führt in die Kategorie.
+        const lage = page
+          .getByRole('navigation', { name: 'Kategorien' })
+          .getByRole('button', { name: 'Lage', exact: true });
+        await lage.click();
+        await expect(lage).toHaveAttribute('aria-current', 'true');
+        await expect(page).not.toHaveURL(/\/etb$/);
       }
     });
   }
 }
+
+/**
+ * Geringe Höhe in `handschuh` (1366 × 520): Kategorien und Fuß (Griff „Menü“ und Einstellungen)
+ * passen nicht zusammen unter den Kopf. Als zwei getrennt klebende Teile überdeckte der Fuß die
+ * letzte Kategorie, und nichts rollte sie frei (Review 06.10.2026). Als eine Spalte rollt sie in
+ * sich, und die letzte Kategorie ist erreichbar.
+ */
+test('1366 × 520, handschuh, gerollt: auch die letzte Kategorie ist erreichbar', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen niedrig ${Date.now()}`);
+  await etbFuellen(page, einsatzId);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  await etbGerollt(page, einsatzId);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+
+  const spalte = page.locator('[data-lfh="rail-spalte"]');
+  // Vorbedingung: die Spalte reicht wirklich nicht, sonst wäre die Aussage leer.
+  const ueberhang = await spalte.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(ueberhang, 'Kategorien und Fuß sind höher als der Platz unter dem Kopf').toBeGreaterThan(
+    0,
+  );
+
+  const rail = page.getByRole('navigation', { name: 'Kategorien' });
+  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
+  const name = (await letzte.getAttribute('aria-label'))!;
+  await letzte.click();
+  await expect(rail.getByRole('button', { name, exact: true })).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+  await expect(page).not.toHaveURL(/\/etb$/);
+});
 
 for (const b of BREITEN) {
   test(`${b.width} px offline: der Zustand bleibt nach dem Rollen sichtbar`, async ({

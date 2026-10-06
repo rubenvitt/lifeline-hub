@@ -248,7 +248,7 @@ export default function InfotelefonPage() {
             style={{ position: 'relative' }}
           >
             {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. Es klebt unter dem
-              Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen). */}
+                Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen). */}
             <div
               style={{
                 position: 'sticky',

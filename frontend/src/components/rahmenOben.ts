@@ -1,4 +1,4 @@
-import { useLayoutEffect, useSyncExternalStore, type RefObject } from 'react';
+import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 
 /**
  * Die Höhe dessen, was am oberen Fensterrand klebt (LFH-952, `frontend/AGENTS.md`, Rahmen):
@@ -27,6 +27,9 @@ export const RAHMEN_EBENE = 100;
  * `var(--lfh-rahmen-oben)` darunter.
  */
 export const RAHMEN_KLEBT = { position: 'sticky', top: 0, zIndex: RAHMEN_EBENE } as const;
+
+/** antds Hüllen mit eigenem Scrollbereich, in denen der Dokument-Rahmen nicht gilt. */
+const EIGENER_SCROLLBEREICH = '.ant-drawer-body, .ant-modal-wrap';
 
 const anteile = new Map<symbol, number>();
 const hoerer = new Set<() => void>();
@@ -57,13 +60,18 @@ export function useRahmenOben(): number {
 }
 
 /**
- * Meldet das Element hinter `ref` als klebende Quelle, solange `aktiv` gilt. Die erste Messung
- * läuft in `useLayoutEffect`, also vor dem ersten Bild: sonst säße ein stehender Tabellenkopf ein
- * Bild lang unter dem Kopf. Danach hält ein `ResizeObserver` den Wert (Umbruch, Dichtewechsel).
+ * Meldet ein Element als klebende Quelle, solange `aktiv` gilt; das Ergebnis ist der Callback-Ref
+ * dafür. Callback-Ref statt `useRef`: tauscht React das Element (der Rahmen hängt nach einem
+ * Fehlerausstieg neu ein), beobachtet der Effekt das neue — mit einem `RefObject` in den
+ * Abhängigkeiten bliebe er am alten hängen (dieselbe Falle wie `einsatz/fussFokusabstand.ts`).
+ *
+ * Die erste Messung läuft in `useLayoutEffect`, also vor dem ersten Bild: sonst säße ein stehender
+ * Tabellenkopf ein Bild lang unter dem Kopf. Danach hält ein `ResizeObserver` den Wert (Umbruch,
+ * Dichtewechsel).
  */
-export function useRahmenObenQuelle(ref: RefObject<HTMLElement | null>, aktiv: boolean): void {
+export function useRahmenObenQuelle<T extends HTMLElement>(aktiv: boolean): (el: T | null) => void {
+  const [el, setEl] = useState<T | null>(null);
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!aktiv || !el) return;
     const schluessel = Symbol('rahmen-oben');
     const messen = () => {
@@ -78,5 +86,21 @@ export function useRahmenObenQuelle(ref: RefObject<HTMLElement | null>, aktiv: b
       anteile.delete(schluessel);
       neuRechnen();
     };
-  }, [ref, aktiv]);
+  }, [el, aktiv]);
+  return setEl;
+}
+
+/**
+ * Wie {@link useRahmenOben}, aber 0, wenn das Element in einem eigenen Scrollbereich steht (Drawer,
+ * Modal): dort rollt nicht das Dokument, und kein Rahmen klebt über der Tabelle. `element` muss
+ * stabil sein (`useCallback`); geprüft wird beim Einhängen im Layout-Effekt, also vor dem ersten
+ * Bild. Eine Tabelle wandert nicht zwischen Dokument und Drawer.
+ */
+export function useRahmenObenFuer(element: () => HTMLElement | null | undefined): number {
+  const rahmenOben = useRahmenOben();
+  const [eigenerBereich, setEigenerBereich] = useState(false);
+  useLayoutEffect(() => {
+    setEigenerBereich(element()?.closest(EIGENER_SCROLLBEREICH) != null);
+  }, [element]);
+  return eigenerBereich ? 0 : rahmenOben;
 }

@@ -1,5 +1,5 @@
 import { Alert, Badge, Button, Space, theme } from 'antd';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { abonniereLiveStatus, leseLiveStatus } from './liveStatusStore';
 import {
   abonniereAppAktualisierung,
@@ -83,8 +83,7 @@ export default function LiveStatusBanner({
 
   const stoerung = !istOnline || status === 'lost';
   const klebt = klebend && !mittel && stoerung;
-  const zeileRef = useRef<HTMLDivElement>(null);
-  useRahmenObenQuelle(zeileRef, klebt);
+  const zeileRef = useRahmenObenQuelle<HTMLDivElement>(klebt);
 
   const bannerSichtbar =
     hinweise.length > 0 ||

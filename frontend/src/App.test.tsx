@@ -11,6 +11,7 @@ import { http, HttpResponse } from 'msw';
 import { meHandler, server } from './test/server';
 import { SITZUNG_ABGELAUFEN } from './auth/sitzungsEvent';
 import { adminFixture } from './test/fixtures';
+import { setzeViewportBreite } from './test/viewport';
 
 /**
  * Synthetisches WIP-Modul ohne `MODUL_ELEMENTE`-Eintrag: `App.tsx` wählt den Stub über die
@@ -143,6 +144,8 @@ describe('App-Routing', () => {
   });
 
   it('Default-Route /einsaetze/:id landet im Führungsüberblick (Neuentwurf)', async () => {
+    // Ab `xl` steht das Modulpanel ohne gemerkte Wahl offen (LFH-952); 1024 läge darunter.
+    setzeViewportBreite(1440);
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),

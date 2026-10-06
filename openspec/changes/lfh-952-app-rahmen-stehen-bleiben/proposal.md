@@ -56,11 +56,11 @@ Keine.
 ## Impact
 
 - Frontend: `einsatz/EinsatzLayout.tsx`, `einsatz/IconRail.tsx`, `einsatz/ModulPanel.tsx`,
-  `einsatz/navPersistenz.ts`, `components/AppLayout.tsx`, `components/Kopfleiste.tsx`,
+  `einsatz/navPersistenz.ts`, `components/AppLayout.tsx`, `components/rahmenOben.ts`,
   `components/BenutzerMenu.tsx`, `live/LiveStatusBanner.tsx`, `components/KatalogTabelle.tsx`,
   `pages/gefahren/`, `pages/EtbPage.tsx`, `etb/EtbZeitachse.tsx`, `pages/InfotelefonPage.tsx`,
   `components/erfassungsAnhaenge/ErfassungsAnhaenge.tsx`, `pages/fuehrung/UeberblickPage.tsx`,
-  `index.css`, `theme/sprache.css`.
+  `pages/fuehrung/ueberblick.css`, `index.css`, `App.tsx`.
 - e2e: neue Spec `e2e/rahmen-stehen-bleiben.spec.ts`, Erweiterung `e2e/fokus-verdeckung.spec.ts`.
 - Kein Backend, keine Migration, keine API.
 - Nicht in diesem Change: Ortspfad, Seitentitel und Rückweg (eigener Task „Orientierung“),

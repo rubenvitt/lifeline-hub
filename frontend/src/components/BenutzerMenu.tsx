@@ -45,8 +45,8 @@ function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Ico
 
 /**
  * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit Rollen-Übersicht und
- * Funktion, darunter sofort Profil und Abmelden, danach die Umschaltgruppen (LFH-952). Holt sich Benutzer und Logout selbst, damit es in beiden Layout-Ebenen
- * gleich nutzbar ist.
+ * Funktion, darunter sofort Profil und Abmelden, danach die Umschaltgruppen (LFH-952). Holt sich
+ * Benutzer und Logout selbst, damit es in beiden Layout-Ebenen gleich nutzbar ist.
  *
  * DIE INITIALEN STEHEN NEUTRAL: eine 24-px-Kachel auf `flaeche3`. Rot ist im Rahmen genau
  * zweimal vergeben (Quadrat der Bildmarke, aktive Rail-Marke). Neben der Kachel steht ab `xl` die

@@ -117,6 +117,24 @@ async function drawerIstNichtImBaum(page: Page) {
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 
+/**
+ * Am Tablet quer ist das Modulmenü ohne Wahl zu (LFH-952); der Griff „Menü“ öffnet es. Er ist
+ * selbst ein Rail-Ziel und hält die Stufe wie die Kategorien.
+ */
+async function modulmenueOeffnen(page: Page, soll: number, wer: string) {
+  const griff = page.getByRole('button', { name: 'Menü ausklappen' });
+  await expect(griff, 'Vorbedingung: das Menü ist ohne Wahl zu').toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await haeltTreffflaeche(griff, soll, `Griff „Menü"${wer}`);
+  await griff.click();
+  await expect(page.getByRole('button', { name: 'Menü einklappen' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+}
+
 for (const { dichte, soll } of STAFFEL) {
   test(`Führungs-Tablet, Stufe ${dichte}: Modulzeilen und Bestätigungsknöpfe halten ${soll} px`, async ({
     page,
@@ -153,6 +171,7 @@ for (const { dichte, soll } of STAFFEL) {
     await drawerIstNichtImBaum(page);
 
     // ── (a) Modulzeilen im INLINE-Rahmen ──────────────────────────────────────────────
+    await modulmenueOeffnen(page, soll, '');
     const panel = page.locator('[data-lfh="modul-panel"]');
     await expect(panel, 'der inline-Rahmen steht bei 1024 px').toHaveCount(1);
     for (const modul of ['Einheiten', 'Personal', 'Fahrzeuge', 'Material']) {
@@ -393,6 +412,7 @@ for (const { dichte, soll } of STAFFEL) {
     await expect(page.locator('.ant-popconfirm'), 'keine Bestätigungsblase im Baum').toHaveCount(0);
 
     // ── Was bleibt, hält die Stufe: Modulzeilen und Kategorie-Ziele.
+    await modulmenueOeffnen(page, soll, ' (Beobachter)');
     const panel = page.locator('[data-lfh="modul-panel"]');
     await expect(panel, 'der inline-Rahmen steht bei 1024 px').toHaveCount(1);
     for (const modul of ['Einheiten', 'Personal', 'Fahrzeuge', 'Material']) {

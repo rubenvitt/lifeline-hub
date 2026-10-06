@@ -8,9 +8,8 @@ statisch, nur Rail-Fuß und Panel-Fuß kleben unten. Die Betriebszeile steht in 
 (`top: token.margin`) und drei Sammelbanner-Überlagerungen mit `top: 0` (ETB-Zeitachse,
 Erfassungsanhänge, Infotelefon). Sobald der Kopf klebt, lägen sie alle unter ihm.
 
-Entscheidung 6 der Klärungsrunde (06.10.2026, Option A,
-`/mnt/project-files/lfh-917/klaerungsrunde-welle4.md`) legt das Verhalten fest; dieser Entwurf
-legt fest, wie.
+Entscheidung 6 der Klärungsrunde (06.10.2026, Option A: gestuft kleben) legt das Verhalten fest;
+dieser Entwurf legt fest, wie.
 
 ## Goals / Non-Goals
 
@@ -28,8 +27,10 @@ und jeden `window.scrollTo`-Nachweis).
 
 - **Ab `md`:** `Header` in `EinsatzLayout` und `AppLayout` mit `position: sticky; top: 0` und
   `zIndex: RAHMEN_EBENE` (über Inhalt und ETB-Leiste, unter antds Overlays ab 1000). Die
-  Hauptgruppe der Rail (Kategorien, ab `lg`) klebt mit `top: var(--lfh-rahmen-oben)`; der Fuß
-  klebt weiter unten. Das Modulpanel klebt nicht, seine Liste rollt mit der Seite.
+  Rail (ab `lg`) klebt als EINE Spalte mit `top: var(--lfh-rahmen-oben)` und der Fensterhöhe
+  darunter: Kategorien oben, Fuß (Griff, Einstellungen) unten; reicht die Höhe nicht, rollt die
+  Spalte in sich. Zwei getrennt klebende Teile überlappten in `handschuh` bei 520 px Höhe
+  (Review). Das Modulpanel klebt nicht, seine Liste rollt mit der Seite.
 - **Unter `md`:** der Kopf rollt (~140 von 844 px wären zu teuer). Die Betriebszeile klebt mit
   `top: 0`, solange sie eine Verbindungsstörung meldet: `navigator.onLine === false` oder
   Live-Status `lost`. Andere Hinweise (Queue, neue Version, Verbindungsaufbau) rollen weiter.
@@ -51,8 +52,10 @@ Gemessen statt gerechnet, weil der Kopf umbricht (LFH-460) und mit der Staffel w
 Jedes oben klebende Element liest diese Höhe:
 
 - rc-table braucht eine Zahl: `KatalogTabelle` und Gefahrenmatrix setzen
-  `sticky={{ offsetHeader: useRahmenOben() }}`; der Fokusfreiraum der Tabelle
-  (`--lfh-tabellenkopf-hoehe`) addiert sie in `theme/sprache.css` bzw. `gefahrenMatrix.css`.
+  `sticky={{ offsetHeader: useRahmenOben() }}`. Der Fokusfreiraum der Tabelle
+  (`--lfh-tabellenkopf-hoehe`, `scroll-margin` am Ziel) bleibt unverändert: der Browser addiert
+  ihn zum `scroll-padding` des Dokuments (D3), das die Rahmenhöhe schon trägt. In einem eigenen
+  Scrollbereich (Drawer, Modal) ist der Versatz 0, dort klebt kein Rahmen darüber.
 - ETB-Bilanz `top: calc(var(--lfh-rahmen-oben, 0px) + margin)`, die drei
   Sammelbanner-Überlagerungen `top: var(--lfh-rahmen-oben, 0px)`, die Rail-Gruppe ebenso.
 - Ein Guard (`components/rahmenOben.guard.test.ts`) verbietet `top: 0` an einem klebenden

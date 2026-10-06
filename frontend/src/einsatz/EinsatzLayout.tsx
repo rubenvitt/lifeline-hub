@@ -1,5 +1,5 @@
 import { IconMenue } from '../icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -176,19 +176,17 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const zellToken = mittel ? token : { padding: token.paddingXS };
   // Ab `md` bleibt der Kopf beim Rollen stehen (LFH-952, `frontend/AGENTS.md`, Rahmen); seine
   // gemessene Höhe ist `--lfh-rahmen-oben`, unter der alles hängt, was selbst oben klebt.
-  const kopfRef = useRef<HTMLElement>(null);
-  useRahmenObenQuelle(kopfRef, mittel);
+  const kopfRef = useRahmenObenQuelle<HTMLElement>(mittel);
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
    * ZWEITER Zustand neben `offeneKategorie`: jene sagt WELCHE Kategorie offen ist, dieser OB das
    * Panel steht. Der Effekt darunter gleicht nur die erste an die Route an — sonst klappte ein
    * zugeklapptes Panel beim ersten Modulwechsel wieder auf.
-   */
-  /**
-   * Die Wahl der Person (LFH-952, `navPersistenz`): `null` heißt keine Wahl, dann ist das Panel am
-   * Tablet quer (`lg` bis `xl`) zu und ab `xl` offen. Ein Rail-Sprung öffnet es nur für diese
-   * Sitzung ({@link sprungOffen}), gemerkt werden Griff und Selbstklick.
+   *
+   * Ob es steht, ist die Wahl der Person (LFH-952, `navPersistenz`): `null` heißt keine Wahl, dann
+   * ist das Panel am Tablet quer (`lg` bis `xl`) zu und ab `xl` offen. Ein Rail-Sprung öffnet es nur
+   * für diese Sitzung (`sprungOffen`), gemerkt werden Griff und Selbstklick.
    */
   const [navWahl, setNavWahl] = useState<NavWahl | null>(leseNavWahl);
   const [sprungOffen, setSprungOffen] = useState(false);

@@ -928,11 +928,6 @@ describe('UeberblickPage', () => {
   });
 
   /**
-   * Der Überblick ist die Startseite, und jedes Ziel darauf ist eine bewusste Modulwahl: sie füllt
-   * die Palettengruppe „Zuletzt besucht" (LFH-436). Jeder Test prüft zuerst, dass das Laden allein
-   * nichts gemerkt hat — sonst bliebe er auch mit einem Routen-Effekt grün.
-   */
-  /**
    * LFH-952 (D6): die Abschnittszeile ist ein Raster mit Containerabfrage am Paneel
    * (`ueberblick.css`). jsdom rechnet weder Raster noch Abfrage; hier stehen die Klassen und die
    * DOM-Reihenfolge (der Linkname hängt an ihr), die Lage misst `e2e/rahmen-stehen-bleiben.spec.ts`.
@@ -955,6 +950,11 @@ describe('UeberblickPage', () => {
     ]);
   });
 
+  /**
+   * Der Überblick ist die Startseite, und jedes Ziel darauf ist eine bewusste Modulwahl: sie füllt
+   * die Palettengruppe „Zuletzt besucht" (LFH-436). Jeder Test prüft zuerst, dass das Laden allein
+   * nichts gemerkt hat — sonst bliebe er auch mit einem Routen-Effekt grün.
+   */
   describe('„Zuletzt"-Speicher (LFH-436)', () => {
     const ICH = benutzerFixture({ id: 9, org_rolle: 'fuehrungskraft' });
     const gemerkt = () => leseZuletztModule(ICH.id, 1, JETZT.getTime());

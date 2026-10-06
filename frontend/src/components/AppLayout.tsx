@@ -1,6 +1,6 @@
 import { IconSchloss } from '../icons';
 import { Layout, Tag, Typography, theme } from 'antd';
-import { useRef, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
@@ -128,8 +128,7 @@ export default function AppLayout() {
   // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
   const zellToken = mittel ? token : { padding: token.paddingXS };
   // Ab `md` bleibt der Kopf stehen wie im Einsatz-Workspace (LFH-952, `frontend/AGENTS.md`, Rahmen).
-  const kopfRef = useRef<HTMLElement>(null);
-  useRahmenObenQuelle(kopfRef, mittel);
+  const kopfRef = useRahmenObenQuelle<HTMLElement>(mittel);
   // Der Verwaltungs-Link ist ein handgebautes Bedienziel: ZWEI Angaben (LFH-365). Farbe aus der
   // Nachtrolle, weil die Leiste in beiden Modi dunkel ist.
   const linkStil: CSSProperties = {

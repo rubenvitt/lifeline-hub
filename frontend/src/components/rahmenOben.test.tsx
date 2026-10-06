@@ -4,22 +4,37 @@
  * `e2e/rahmen-stehen-bleiben.spec.ts`.
  */
 import { act, render, screen } from '@testing-library/react';
-import { useRef } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { RAHMEN_OBEN_VAR, leseRahmenOben, useRahmenOben, useRahmenObenQuelle } from './rahmenOben';
+import { useCallback, useRef } from 'react';
+import {
+  RAHMEN_OBEN_VAR,
+  leseRahmenOben,
+  useRahmenOben,
+  useRahmenObenFuer,
+  useRahmenObenQuelle,
+} from './rahmenOben';
 
 function Quelle({ hoehe, aktiv, name }: { hoehe: number; aktiv: boolean; name: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useRahmenObenQuelle(ref, aktiv);
+  const ref = useRahmenObenQuelle<HTMLDivElement>(aktiv);
   return (
     <div
       data-testid={name}
       ref={(el) => {
         if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: hoehe });
-        ref.current = el;
+        ref(el);
       }}
     />
   );
+}
+
+/** Dieselbe Quelle (ein Hook), aber React tauscht das Element: so hängt der Rahmen nach einer Sackgasse neu ein. */
+function Tausch({ variante }: { variante: 'alt' | 'neu' }) {
+  const ref = useRahmenObenQuelle<HTMLElement>(true);
+  const mit = (hoehe: number) => (el: HTMLElement | null) => {
+    if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: hoehe });
+    ref(el);
+  };
+  return variante === 'alt' ? <div key="alt" ref={mit(52)} /> : <header key="neu" ref={mit(73)} />;
 }
 
 function Anzeige() {
@@ -73,6 +88,13 @@ describe('rahmenOben', () => {
     expect(variable()).toBe('0px');
   });
 
+  it('ein getauschtes Element unter derselben Quelle wird neu gemessen (Fehlerausstieg)', () => {
+    const { rerender } = render(<Tausch variante="alt" />);
+    expect(leseRahmenOben()).toBe(52);
+    rerender(<Tausch variante="neu" />);
+    expect(leseRahmenOben()).toBe(73);
+  });
+
   it('wird eine Quelle inaktiv, fällt ihr Anteil weg, und die Anzeige folgt', () => {
     const { rerender } = render(
       <>
@@ -89,5 +111,32 @@ describe('rahmenOben', () => {
       );
     });
     expect(screen.getByTestId('anzeige').textContent).toBe('0');
+  });
+
+  it('in Drawer und Modal ist der Versatz 0, im Dokument die Rahmenhöhe', () => {
+    function Abnehmer({ name }: { name: string }) {
+      const ref = useRef<HTMLSpanElement>(null);
+      const versatz = useRahmenObenFuer(useCallback(() => ref.current, []));
+      return (
+        <span ref={ref} data-testid={name}>
+          {versatz}
+        </span>
+      );
+    }
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Abnehmer name="dokument" />
+        <div className="ant-drawer-body">
+          <Abnehmer name="drawer" />
+        </div>
+        <div className="ant-modal-wrap">
+          <Abnehmer name="modal" />
+        </div>
+      </>,
+    );
+    expect(screen.getByTestId('dokument').textContent).toBe('52');
+    expect(screen.getByTestId('drawer').textContent).toBe('0');
+    expect(screen.getByTestId('modal').textContent).toBe('0');
   });
 });
