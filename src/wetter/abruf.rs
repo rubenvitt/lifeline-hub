@@ -282,13 +282,7 @@ fn abruf<T: Serialize + Send + Sync + 'static>(
     );
     async move {
         let ergebnis = fut.await;
-        let mut merker = fehlschlag.lock().unwrap_or_else(|e| e.into_inner());
-        if ergebnis.is_some() {
-            merker.remove(&key);
-        } else {
-            merker.insert(key, std::time::Instant::now());
-        }
-        drop(merker);
+        crate::karte::ausgang_vermerken(&fehlschlag, key, ergebnis.is_some(), ABKUEHLUNG);
         drop(freigabe);
         ergebnis
     }
@@ -787,6 +781,27 @@ mod tests {
         );
         warnlage(&fe, &pool, &ort(), Utc::now()).await;
         assert_eq!(anzahl(&zaehler), 2);
+    }
+
+    /// Ein Ort, der nur während eines Ausfalls abgefragt wurde, darf nicht bis zum Neustart im
+    /// Merker stehen bleiben (LFH-919).
+    #[tokio::test]
+    async fn ein_fehlschlag_raeumt_abgelaufene_merker() {
+        let pool = crate::db::test_pool().await;
+        let (basis, _) = quelle_404().await;
+        let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
+        // `checked_sub`: `Instant::now() - …` panickt auf Hosts, die kürzer als die Abkühlung laufen.
+        let Some(abgelaufen) = std::time::Instant::now().checked_sub(ABKUEHLUNG) else {
+            return;
+        };
+        fe.wetter_fehlschlag
+            .lock()
+            .unwrap()
+            .insert("ein-ort-von-vorgestern".into(), abgelaufen);
+        warnlage(&fe, &pool, &ort(), Utc::now()).await;
+        let merker = fe.wetter_fehlschlag.lock().unwrap();
+        assert!(!merker.contains_key("ein-ort-von-vorgestern"));
+        assert!(merker.contains_key(&schluessel_warnungen(&ort())));
     }
 
     #[tokio::test]

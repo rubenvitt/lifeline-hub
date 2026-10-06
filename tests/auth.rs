@@ -880,7 +880,8 @@ async fn oidc_callback_mit_falschem_state_cookie_redirect_ohne_session() {
             pkce_verifier: "v".to_string(),
             ziel_pfad: "/einsaetze".to_string(),
         },
-    );
+    )
+    .unwrap();
 
     let resp = app
         .oneshot(

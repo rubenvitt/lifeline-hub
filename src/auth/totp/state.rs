@@ -6,50 +6,57 @@
 //! **Pending-State → Session:** `/auth/totp/finish` leitet die `benutzer_id` AUS diesem Store
 //! ab — nie aus client-gelieferten Anmeldedaten.
 //!
+//! **Begrenzt** (LFH-919, [`BegrenzterAblaufSpeicher`]): höchstens [`OBERGRENZE`] offene
+//! Anmeldungen; darüber antwortet der Login mit 503. Bewusst **kein** Ersatz je Person wie beim
+//! Einmalcode der Hülle: ein Funktionskonto meldet sich oft auf zwei Geräten zugleich an, und
+//! der zweite Login machte den ersten zwischen Passwort und Code still ungültig, während die
+//! Person noch ihren Code abtippt. Wachsen kann der Speicher hier nur mit richtigem Passwort,
+//! gebremst durch die KDF; ein Innentäter mit eigenem TOTP-Konto könnte ihn mit vielen Logins
+//! dennoch füllen und TOTP-Anmeldungen bis zum Ablauf (5 min) mit 503 abweisen lassen.
+//!
 //! **!Send-Disziplin:** `entnehme` gibt den std-`MutexGuard` frei, bevor der Aufrufer
 //! `session::anlegen().await` ausführt; dieses Modul enthält kein `.await`.
 
-use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
+
+use crate::auth::ablauf_speicher::{BegrenzterAblaufSpeicher, Voll};
 
 /// Lebensdauer eines Pending-Eintrags. Abgelaufene Einträge liefert `entnehme` nicht mehr.
 const TTL: Duration = Duration::from_secs(5 * 60);
 
+/// Höchstzahl offener Anmeldungen zwischen Passwort und Zweitfaktor.
+pub const OBERGRENZE: usize = 10_000;
+
 /// Prozessweiter State-Store; kurzlebig, ohne Persistenzbedarf.
-static STORE: LazyLock<Mutex<HashMap<String, (i64, Instant)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static STORE: LazyLock<Mutex<BegrenzterAblaufSpeicher<i64>>> =
+    LazyLock::new(|| Mutex::new(neuer_speicher()));
+
+fn neuer_speicher() -> BegrenzterAblaufSpeicher<i64> {
+    BegrenzterAblaufSpeicher::neu(TTL, OBERGRENZE)
+}
+
+fn store() -> MutexGuard<'static, BegrenzterAblaufSpeicher<i64>> {
+    STORE.lock().unwrap_or_else(|poison| poison.into_inner())
+}
 
 /// Speichert `benutzer_id` unter `key` mit Ablauf `TTL`; ein vorhandener Eintrag wird
-/// überschrieben. Räumt vorher abgelaufene Einträge weg, damit abgebrochene oder gespammte
-/// Logins die Map nicht unbegrenzt wachsen lassen.
-pub fn speichere(key: String, benutzer_id: i64) {
-    let jetzt = Instant::now();
-    let ablauf = jetzt + TTL;
-    let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
-    store.retain(|_, (_, entry_ablauf)| *entry_ablauf > jetzt);
-    store.insert(key, (benutzer_id, ablauf));
+/// überschrieben. Bei [`OBERGRENZE`] offenen Anmeldungen wird nicht eingefügt ([`Voll`]).
+pub fn speichere(key: String, benutzer_id: i64) -> Result<(), Voll> {
+    store().einfuegen(key, benutzer_id, Instant::now())
 }
 
 /// Entnimmt die `benutzer_id` zu `key` **einmalig**; ein zweiter Aufruf liefert `None`, ebenso
 /// ein unbekannter oder abgelaufener Key. Der Guard ist bei der Rückkehr freigegeben.
 pub fn entnehme(key: &str) -> Option<i64> {
-    let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
-    let (benutzer_id, ablauf) = store.remove(key)?;
-    drop(store);
-
-    if Instant::now() >= ablauf {
-        return None;
-    }
-    Some(benutzer_id)
+    store().entnehmen(key, Instant::now())
 }
 
 /// Test-only: Eintrag mit vorgegebener Ablaufzeit, um einen abgelaufenen Eintrag ohne Warten zu
 /// erzeugen.
 #[cfg(test)]
 fn speichere_mit_ablauf(key: String, benutzer_id: i64, ablauf: Instant) {
-    let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
-    store.insert(key, (benutzer_id, ablauf));
+    store().einfuegen_mit_ablauf(key, benutzer_id, ablauf);
 }
 
 #[cfg(test)]
@@ -60,7 +67,7 @@ mod tests {
     fn speichere_dann_entnehme_liefert_dieselbe_benutzer_id() {
         let key = "mfa-roundtrip".to_string();
 
-        speichere(key.clone(), 42);
+        speichere(key.clone(), 42).unwrap();
         let entnommen = entnehme(&key);
 
         assert_eq!(entnommen, Some(42));
@@ -69,7 +76,7 @@ mod tests {
     #[test]
     fn zweites_entnehme_desselben_keys_liefert_none() {
         let key = "mfa-einmalig".to_string();
-        speichere(key.clone(), 7);
+        speichere(key.clone(), 7).unwrap();
 
         let erstes = entnehme(&key);
         let zweites = entnehme(&key);
@@ -98,19 +105,14 @@ mod tests {
         assert_eq!(entnommen, None);
     }
 
+    /// Am eigenen Speicher statt am prozessweiten: der ist mit den übrigen Tests geteilt.
     #[test]
-    fn speichere_raeumt_abgelaufene_eintraege_auf() {
-        let alt_key = "mfa-alt-abgelaufen".to_string();
-        speichere_mit_ablauf(alt_key.clone(), 1, Instant::now());
-
-        let neu_key = "mfa-neu".to_string();
-        speichere(neu_key.clone(), 2);
-
-        let store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
-        assert!(
-            !store.contains_key(&alt_key),
-            "abgelaufener Eintrag sollte beim naechsten speichere() aufgeraeumt werden"
-        );
-        assert!(store.contains_key(&neu_key));
+    fn die_anmeldung_ueber_der_obergrenze_wird_abgewiesen() {
+        let mut s = neuer_speicher();
+        let jetzt = Instant::now();
+        for n in 0..OBERGRENZE {
+            s.einfuegen(format!("k{n}"), 1, jetzt).unwrap();
+        }
+        assert_eq!(s.einfuegen("zuviel".into(), 1, jetzt), Err(Voll));
     }
 }
