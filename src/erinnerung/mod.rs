@@ -91,6 +91,14 @@ pub async fn anreichern_alle(
     Ok(())
 }
 
+/// Zahlen der Erinnerungsseite (LFH-940): die Abgeschlossenen kommen nur noch seitenweise.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ErinnerungKennzahlen {
+    pub offen: i64,
+    /// Erledigt oder quittiert.
+    pub abgeschlossen: i64,
+}
+
 pub const STATUS_OFFEN: &str = ErinnerungStatus::Offen.as_str();
 pub const STATUS_ERLEDIGT: &str = ErinnerungStatus::Erledigt.as_str();
 pub const STATUS_QUITTIERT: &str = ErinnerungStatus::Quittiert.as_str();

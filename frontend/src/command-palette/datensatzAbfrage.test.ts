@@ -8,7 +8,7 @@ import { datensatzAbfrage, etbNummerAbfrage, FRISCH_MS } from './datensatzAbfrag
 describe('datensatzAbfrage (LFH-664)', () => {
   it('liefert je Quelle genau das Bestandsfach der Palette', () => {
     const erwartet: Record<keyof typeof datensatzAbfrage, readonly unknown[]> = {
-      personen: ['einsatz-personen', 5],
+      personen: ['einsatz-personen-auswahl', 5],
       schaeden: ['einsatz-schaeden', 5],
       uhs: ['einsatz-uhs', 5],
       meldungen: ['einsatz-meldungen', 5],

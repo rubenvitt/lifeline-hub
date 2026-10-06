@@ -2,7 +2,7 @@ import { IconUhr } from '../icons';
 import { Button, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
-import { useState, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
 import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge } from '../kommunikation';
@@ -68,8 +68,15 @@ function bestaetigungsAchse(m: Meldung, formatZeit: (wire?: string | null) => st
   );
 }
 
-/** Meldungs-Karte. Die Bestätigungs-Achse bleibt orthogonal zum Triage-Status. */
-export default function MeldungKarte({
+/**
+ * Meldungs-Karte. Die Bestätigungs-Achse bleibt orthogonal zum Triage-Status.
+ *
+ * Per `memo` (LFH-940): bei unverändertem Bestand rendert keine Karte neu. Das trägt nur, wenn
+ * die Seite stabile Rückrufe übergibt (`useCallback` in `MeldungenPage`).
+ */
+export default memo(MeldungKarte);
+
+function MeldungKarte({
   meldung: m,
   ansicht = 'offen',
   einsatzId,

@@ -48,7 +48,7 @@ beforeEach(() => {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/:id/modul-freigaben', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/:id/personen', () => HttpResponse.json([PERSON])),
+    http.get('/api/einsaetze/:id/personen/auswahl', () => HttpResponse.json([PERSON])),
     http.get('/api/einsaetze/:id/schaeden', () => HttpResponse.json([SCHADEN])),
     http.get('/api/einsaetze/:id/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/:id/meldungen', () => HttpResponse.json([])),

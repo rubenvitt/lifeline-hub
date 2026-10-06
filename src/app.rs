@@ -362,6 +362,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::erinnerung::anlegen),
         )
         .route(
+            "/api/einsaetze/{id}/erinnerungen/kennzahlen",
+            get(routes::erinnerung::kennzahlen),
+        )
+        .route(
             "/api/einsaetze/{id}/erinnerungen/{eid}/erledigen",
             post(routes::erinnerung::erledigen),
         )
@@ -652,6 +656,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::meldung::rueckmeldungen),
         )
         .route(
+            "/api/einsaetze/{id}/meldungen/kennzahlen",
+            get(routes::meldung::kennzahlen),
+        )
+        .route(
+            "/api/einsaetze/{id}/meldungen/{mid}",
+            get(routes::meldung::detail),
+        )
+        .route(
             "/api/einsaetze/{id}/meldungen",
             post(routes::meldung::anlegen),
         )
@@ -792,6 +804,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen",
             post(routes::einsatz_person::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/auswahl",
+            get(routes::einsatz_person::auswahl),
         )
         .route(
             "/api/einsaetze/{id}/personen/export",
@@ -1660,6 +1676,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // greift
         // nur, wenn der Pfad existiert, die Methode aber nicht.
         .method_not_allowed_fallback(methode_nicht_erlaubt)
+        // Antwortkompression nur für JSON (LFH-940, Spec `antwortkompression`): Listen gehen über
+        // LTE. SSE darf nicht puffern, Anhänge und Kacheln sind schon gepackt oder tragen ETags,
+        // die eingebetteten Frontend-Dateien bleiben unberührt. Innen, damit Zulassung und Trace
+        // die ungepackte Antwort sehen.
+        .layer(
+            tower_http::compression::CompressionLayer::new()
+                .no_deflate()
+                .no_zstd()
+                .compress_when(nur_json_ab(ANTWORT_KOMPRESSION_AB)),
+        )
         // Fängt eine Handler-Panik und antwortet mit 500 + `{error}`, statt die Verbindung
         // abzureißen
         // (das hielte das Frontend für „kein Netz“).
@@ -1718,6 +1744,25 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             ),
         )
         .with_state(state)
+}
+
+/// Ab dieser Größe (Bytes) wird eine JSON-Antwort komprimiert (LFH-940); darunter kostet das
+/// Packen mehr, als es spart.
+pub const ANTWORT_KOMPRESSION_AB: u64 = 1024;
+
+/// Prädikat der Antwortkompression: `application/json` und mindestens `ab` Bytes.
+fn nur_json_ab(ab: u64) -> impl tower_http::compression::Predicate {
+    use tower_http::compression::predicate::{Predicate, SizeAbove};
+    SizeAbove::new(ab).and(
+        |_: axum::http::StatusCode,
+         _: axum::http::Version,
+         kopf: &axum::http::HeaderMap,
+         _: &axum::http::Extensions| {
+            kopf.get(axum::http::header::CONTENT_TYPE)
+                .and_then(|t| t.to_str().ok())
+                .is_some_and(|t| t.starts_with("application/json"))
+        },
+    )
 }
 
 /// Höchstlänge einer vom Client mitgeschickten Request-ID (LFH-925).

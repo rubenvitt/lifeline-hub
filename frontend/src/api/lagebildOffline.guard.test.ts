@@ -32,6 +32,8 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-kraefte-zeitachse',
   'einsatz-befehle',
   'einsatz-personen',
+  // Auswahl ohne Freitexte (LFH-940, D8): Personensuche der Palette ohne Netz.
+  'einsatz-personen-auswahl',
   'einsatz-uhs',
   'einsatz-zonen',
   'einsatz-freie-zeichen',

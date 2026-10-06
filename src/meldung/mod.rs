@@ -89,6 +89,20 @@ pub fn richtung_gueltig(r: &str) -> bool {
     Richtung::parse(r).is_some()
 }
 
+/// Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie
+/// das Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct MeldungKennzahlen {
+    /// Offen und noch von niemandem angefasst (Status `neu`).
+    pub unbearbeitet: i64,
+    /// Offen und bereits angefasst.
+    pub in_arbeit: i64,
+    /// Pflichtig, unbestätigt, Frist abgelaufen oder eskaliert — quer zur Phase.
+    pub alarmiert: i64,
+    /// Abgeschlossen.
+    pub erledigt: i64,
+}
+
 /// Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,
 /// `lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
