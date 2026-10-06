@@ -1,9 +1,9 @@
 ## 1. Server: Position beim Aufbau des Einsatz-Stroms (D4)
 
-- [ ] 1.1 Test zuerst (`tests/live_feed.rs`): Ein frisch geöffneter Einsatz-Strom sendet nach `verbunden` und `retry:` ein Frame nur mit `id:` (kein `event:`, kein `data:`); das erste Frame bleibt reiner Kommentar.
-- [ ] 1.2 Test: Ein Neuverbinden mit dieser Position ohne zwischenzeitliches Ereignis liefert nichts nach und kein `lagged`; mit einem zwischenzeitlichen Ereignis genau dieses.
-- [ ] 1.3 Test: Ein Kanal ohne bisherige Nachricht liefert eine Position, die beim Neuverbinden „nichts verpasst“ ergibt (Unit-Test in `src/live/mod.rs`).
-- [ ] 1.4 `LiveHub::abonniere_mit_replay` liefert die Position unter derselben Sperre; `sse_stream_mit_replay` sendet sie nach dem Replay-Vorspann; `routes/live.rs` reicht sie durch. Mutationsprobe: Position weglassen → 1.1 und 1.2 rot.
+- [x] 1.1 Test zuerst (`tests/live_feed.rs`): Ein frisch geöffneter Einsatz-Strom sendet nach `verbunden` und `retry:` ein Frame nur mit `id:` (kein `event:`, kein `data:`); das erste Frame bleibt reiner Kommentar.
+- [x] 1.2 Test: Ein Neuverbinden mit dieser Position ohne zwischenzeitliches Ereignis liefert nichts nach und kein `lagged`; mit einem zwischenzeitlichen Ereignis genau dieses.
+- [x] 1.3 Test: Ein Kanal ohne bisherige Nachricht liefert eine Position, die beim Neuverbinden „nichts verpasst“ ergibt (Unit-Test in `src/live/mod.rs`).
+- [x] 1.4 `LiveHub::abonniere_mit_position` liefert die Position unter derselben Sperre; `sse_stream_mit_replay` sendet sie nach dem Replay-Vorspann; `routes/live.rs` reicht sie durch. Mutationsprobe: Position weglassen → 1.1 und 1.2 rot.
 
 ## 2. Frontend: Sammler (D1, D2)
 

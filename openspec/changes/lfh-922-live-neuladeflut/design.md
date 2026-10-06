@@ -86,9 +86,9 @@ ohne Daten erreicht keinen Listener. Die Art des Opens ist das verlässlichere M
 
 ### D4 Position beim Aufbau des Einsatz-Stroms
 
-`LiveHub::abonniere_mit_replay` liefert zusätzlich die Kennung der zuletzt vergebenen Nummer des
-Kanals (`"{epoch}-{naechste_id - 1}"`), ermittelt unter derselben Sperre wie Replay und
-`subscribe()`. `sse_stream_mit_replay` sendet sie nach dem Replay-Vorspann als Ereignis nur mit
+`LiveHub::abonniere_mit_position` liefert neben Replay und Empfänger die Kennung der zuletzt
+vergebenen Nummer des Kanals (`"{epoch}-{naechste_id - 1}"`), ermittelt unter derselben Sperre wie
+Replay und `subscribe()`; `abonniere_mit_replay` bleibt als dünner Wrapper ohne Position. `sse_stream_mit_replay` sendet sie nach dem Replay-Vorspann als Ereignis nur mit
 `id:` (kein `event:`, kein `data:`). Der Browser übernimmt sie als `Last-Event-ID`, ein Listener
 feuert nicht.
 
