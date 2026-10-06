@@ -22,11 +22,11 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 2. ETB-Allowlist (D4)
 
-- [ ] 2.1 `api/queryKeys.ts`: feste ETB-Ansicht als Positivliste (`typ`, `limit`), in
+- [x] 2.1 `api/queryKeys.ts`: feste ETB-Ansicht als Positivliste (`typ`, `limit`), in
   `istLagebildOfflineKey`; Kommentar an `LAGEBILD_OFFLINE` richtigstellen. Prüfen:
   `lagebildOffline.guard.test.ts` umgedreht — `etbListe(7, { q: 'x' })` ist `false`,
   `etbListe(7, {})`, `etbListe(7, { typ: 'meldung' })`, Zähler `{}` und Lesemarke sind `true`.
-- [ ] 2.2 `api/queryClient.ts`: freie ETB-Keys ohne eigenes `gcTime` bekommen 5 min. Prüfen:
+- [x] 2.2 `api/queryClient.ts`: freie ETB-Keys ohne eigenes `gcTime` bekommen 5 min. Prüfen:
   Produktionsclient — freie Variante 5 min, feste 24 h, Palette behält 30 s.
 
 ## 3. Queue-Zähler (D5)

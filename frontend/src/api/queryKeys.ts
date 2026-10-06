@@ -872,8 +872,9 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.modulFreigaben,
     EINSATZ_KEYS.einstellungen,
     EINSATZ_KEYS.modulZaehler,
-    // ETB — samt der Nummern-Abfragen der Palette unter demselben Prefix: dieselbe
-    // Datenklasse, dieselben Rechte, und ihr kurzes `gcTime` räumt sie ohnehin schnell.
+    // ETB — nur in seinen festen Ansichten ({@link istFesteEtbAnsicht}, LFH-939 D4). Ergebnisse
+    // freier Eingaben (Volltext, Zeitraum, Einheit, Nummernsprung der Palette, Bezugssuche)
+    // filtert `istLagebildOfflineKey` heraus; ihr kurzes `gcTime` setzt `api/queryClient.ts`.
     EINSATZ_KEYS.etb,
     // Meldebild
     EINSATZ_KEYS.einheiten,
@@ -927,11 +928,35 @@ export const LAGEBILD_OFFLINE = {
 const LAGEBILD_EINSATZ: ReadonlySet<unknown> = new Set<unknown>(LAGEBILD_OFFLINE.einsatz);
 const LAGEBILD_GLOBAL: ReadonlySet<unknown> = new Set<unknown>(LAGEBILD_OFFLINE.global);
 
+/**
+ * Filterfelder, die eine FESTE ETB-Ansicht ergeben (LFH-939, design.md D4): Gesamtliste, je ein
+ * Reiter je Typ, feste Ausschnitte (Überblick, Lage-Dashboard, Bezugswahl ohne Suche). Ihre Menge
+ * ist begrenzt. Eine Positivliste statt einer Negativliste: ein neues Filterfeld landet nicht
+ * still auf der Platte, es muss hier aufgenommen werden.
+ */
+const ETB_FESTE_FILTERFELDER: ReadonlySet<string> = new Set(['typ', 'limit']);
+
+/**
+ * Ist dieser ETB-Key eine feste Ansicht? Liste (`['etb', id, filter]`), Zähler
+ * (`['etb', id, 'zaehler', filter]`) und Lesemarke. Alles mit einer freien Eingabe (Volltext,
+ * Zeitraum, Einheit, Nummernsprung, Bezugssuche, Lageentwicklung) ist es nicht.
+ */
+export function istFesteEtbAnsicht(key: readonly unknown[]): boolean {
+  if (key[0] !== EINSATZ_KEYS.etb || typeof key[1] !== 'number') return false;
+  if (key.length === 2 || key[2] === 'lesemarke') return true;
+  const filter = key[2] === 'zaehler' ? key[3] : key[2];
+  if (filter === null || typeof filter !== 'object' || Array.isArray(filter)) return false;
+  return Object.entries(filter).every(
+    ([feld, wert]) => wert === undefined || ETB_FESTE_FILTERFELDER.has(feld),
+  );
+}
+
 /** Gehört der Key zur Allowlist {@link LAGEBILD_OFFLINE}? Einsatz-Keys verlangen an Stelle 1
  *  eine Einsatz-ID, wie jeder Accessor von {@link einsatzKeys} sie setzt. */
 export function istLagebildOfflineKey(key: readonly unknown[]): boolean {
   if (LAGEBILD_GLOBAL.has(key[0])) return true;
   if (typeof key[1] !== 'number') return false;
+  if (key[0] === EINSATZ_KEYS.etb) return istFesteEtbAnsicht(key);
   if (LAGEBILD_EINSATZ.has(key[0])) return true;
   return LAGEBILD_OFFLINE.einsatzUnterKeys.some(
     ([prefix, unter]) => key[0] === prefix && key[2] === unter,
