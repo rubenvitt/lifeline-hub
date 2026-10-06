@@ -20,6 +20,9 @@ export const EINSATZ_KEYS = {
   // Fotos und Dateien an einem Schaden: eigener Prefix neben der Schadensliste, live über das
   // `schaden`-Ereignis.
   schadenAnhaenge: 'einsatz-schaden-anhaenge',
+  // Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931): schlanke Projektion ohne
+  // Freitexte, eigener Prefix neben der Schadenliste, live über `schaden`.
+  schadenMarker: 'einsatz-schaden-marker',
   // LFH-758: dasselbe an Tieren und UHS, live über `tier` bzw. `uhs`.
   tierAnhaenge: 'einsatz-tier-anhaenge',
   uhsAnhaenge: 'einsatz-uhs-anhaenge',
@@ -150,8 +153,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.lagemonitor,
   ],
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Anhangliste der Detailseite hängt
-  // deshalb mit daran.
-  schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenAnhaenge],
+  // deshalb mit daran. Gezielt (Zeile, Anhangliste) ordnet {@link EINSATZ_STREAM_ZIELE} zu.
+  schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenMarker, EINSATZ_KEYS.schadenAnhaenge],
   // Der Status einer Einheit ist aus ihren Fahrzeugen abgeleitet.
   // Ein markierter Fahrzeugstatus schreibt die Zeitachse seiner Einheit (LFH-552).
   fahrzeug: [
@@ -270,6 +273,67 @@ export const EINSATZ_STREAM_EVENTS = {
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
+
+/** Listen, die ein Live-Ereignis zeilenweise abgleicht (`live/zeilenAbgleich.ts`, LFH-931). */
+export type ZeilenZiel = 'medienkontakte' | 'schaeden';
+
+/** Ein gezielter Abgleich: einen Key (samt Prefix-Match) oder eine Zeile einer Liste. */
+export type LiveAbgleich =
+  | { readonly art: 'key'; readonly key: readonly unknown[] }
+  | { readonly art: 'zeile'; readonly ziel: ZeilenZiel; readonly id: number };
+
+type LivePayload = Readonly<Record<string, unknown>>;
+
+const kennung = (p: LivePayload, feld: string): number | null =>
+  typeof p[feld] === 'number' ? p[feld] : null;
+
+const key = (k: readonly unknown[]): LiveAbgleich => ({ art: 'key', key: k });
+
+/** Dokument mit Kopfliste (LFH-931, design.md D2): `nur_inhalt` heißt, der PATCH hat nur
+ *  Abschnitte geändert; dann bleibt die Kopfliste, und nur das Detail dieser Kennung gleicht ab. */
+const dokument =
+  (feld: string, liste: readonly unknown[], detail: (id: number) => readonly unknown[]) =>
+  (p: LivePayload): readonly LiveAbgleich[] | null => {
+    const id = kennung(p, feld);
+    if (id === null) return null;
+    return p.nur_inhalt === true ? [key(detail(id))] : [key(liste), key(detail(id))];
+  };
+
+/**
+ * Gezielte Zuordnung nach Payload (LFH-931, Spec `live-abgleich`, design.md D4): Wire-Event →
+ * Funktion von Payload und Einsatz auf die Abgleiche, die dieses Objekt betrifft. `null` (Kennung
+ * fehlt, etwa beim Purge) fällt auf die Prefixe aus {@link EINSATZ_STREAM_EVENTS} zurück, die
+ * auch `lagged` und jeder Wiederaufbau ohne Nachlieferung abgleichen.
+ */
+export const EINSATZ_STREAM_ZIELE: Partial<
+  Record<EinsatzStreamEvent, (p: LivePayload, einsatzId: number) => readonly LiveAbgleich[] | null>
+> = {
+  lagebericht: (p, e) =>
+    dokument('lagebericht_id', einsatzKeys.lageberichte(e), (id) => einsatzKeys.lagebericht(e, id))(
+      p,
+    ),
+  befehl: (p, e) =>
+    dokument('befehl_id', einsatzKeys.befehle(e), (id) => einsatzKeys.befehl(e, id))(p),
+  // Ein Ereignis teilt sich der Name mit den Pressemitteilungen: Medienkontakte gleichen
+  // zeilenweise ab, Mitteilungen wie ein Dokument. Keines von beiden trifft das andere.
+  presse: (p, e) => {
+    const kid = kennung(p, 'medienkontakt_id');
+    if (kid !== null) return [{ art: 'zeile', ziel: 'medienkontakte', id: kid }];
+    return dokument('pressemitteilung_id', einsatzKeys.pressemitteilungen(e), (id) =>
+      einsatzKeys.pressemitteilung(e, id),
+    )(p);
+  },
+  // `anhang`: eine Datei am Schaden; Liste und Marker tragen davon nichts.
+  schaden: (p, e) => {
+    const sid = kennung(p, 'schaden_id');
+    if (sid === null) return null;
+    if (p.anhang === true) return [key(einsatzKeys.schadenAnhaenge(e, sid))];
+    return [
+      { art: 'zeile', ziel: 'schaeden', id: sid },
+      key(einsatzKeys.schaedenGeschaedigtAlle(e)),
+    ];
+  },
+};
 
 /**
  * Managed einsatz-scoped Keys, die BEWUSST nicht über den SSE-Live-Feed invalidiert werden.
@@ -431,6 +495,10 @@ export const einsatzKeys = {
   schaeden: (einsatzId: number) => [EINSATZ_KEYS.schaeden, einsatzId] as const,
   schaedenGeschaedigt: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.schaeden, einsatzId, 'geschaedigt', personId] as const,
+  /** Prefix aller {@link einsatzKeys.schaedenGeschaedigt}-Listen eines Einsatzes. */
+  schaedenGeschaedigtAlle: (einsatzId: number) =>
+    [EINSATZ_KEYS.schaeden, einsatzId, 'geschaedigt'] as const,
+  schadenMarker: (einsatzId: number) => [EINSATZ_KEYS.schadenMarker, einsatzId] as const,
   schaden: (einsatzId: number, schadenId: number) =>
     [EINSATZ_KEYS.schaden, einsatzId, schadenId] as const,
   schadenAnhaenge: (einsatzId: number, schadenId: number) =>
@@ -895,6 +963,7 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.freieZeichen,
     EINSATZ_KEYS.gefahrengebiete,
     EINSATZ_KEYS.schaeden,
+    EINSATZ_KEYS.schadenMarker,
     EINSATZ_KEYS.lagemeldungen,
     EINSATZ_KEYS.fuehrungskraefte,
     EINSATZ_KEYS.betreuung,

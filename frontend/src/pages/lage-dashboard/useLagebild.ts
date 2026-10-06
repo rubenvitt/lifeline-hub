@@ -7,7 +7,7 @@ import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
-import { listeSchaeden } from '../../api/einsatzSchaden';
+import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeEinheiten } from '../../api/einheiten';
 import { ladeGefahrengebiete } from '../../api/gefahren';
@@ -50,7 +50,7 @@ function quelle<T>(
 export const LAGEBILD_QUELLEN = {
   personen: quelle('personen', einsatzKeys.personen, (id) => listePersonen(id)),
   uhs: quelle('unfallhilfsstellen', einsatzKeys.uhs, listeUhs),
-  schaeden: quelle('schaeden', einsatzKeys.schaeden, listeSchaeden),
+  schaeden: quelle('schaeden', einsatzKeys.schadenMarker, listeSchadenMarker),
   gefahren: quelle('gefahrenzonen', einsatzKeys.gefahrengebiete, ladeGefahrengebiete),
   lageberichte: quelle('lageberichte', einsatzKeys.lageberichte, listeLageberichte),
   einheiten: quelle('einheiten', einsatzKeys.einheiten, listeEinheiten),

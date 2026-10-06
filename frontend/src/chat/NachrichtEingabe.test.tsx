@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import NachrichtEingabe from './NachrichtEingabe';
@@ -109,5 +109,22 @@ describe('NachrichtEingabe', () => {
     const name = await within(liste).findByTitle('lage.pdf');
     expect(name).not.toHaveAttribute('role');
     expect(name).not.toHaveAttribute('tabindex');
+  });
+});
+
+describe('NachrichtEingabe — Eingabegrenze (LFH-937)', () => {
+  it('zählt ab 80 %; über 20 000 Zeichen bleibt der Text stehen und geht nicht hinaus', async () => {
+    const onSenden = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    expect(feld).not.toHaveAttribute('maxlength');
+    fireEvent.change(feld, { target: { value: 'n'.repeat(16_000) } });
+    expect(screen.getByText('16.000 / 20.000')).toBeInTheDocument();
+    fireEvent.change(feld, { target: { value: 'n'.repeat(20_001) } });
+    expect(screen.getByText('20.001 / 20.000 · zu lang')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
+    fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    expect(onSenden).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('n'.repeat(20_001));
   });
 });

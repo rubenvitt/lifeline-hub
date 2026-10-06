@@ -1,10 +1,18 @@
 import { hashKey, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
-import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS, einsatzKeys } from '../api/queryKeys';
+import {
+  EINSATZ_KEYS,
+  EINSATZ_STREAM_EVENTS,
+  EINSATZ_STREAM_ZIELE,
+  einsatzKeys,
+  type EinsatzStreamEvent,
+  type LiveAbgleich,
+} from '../api/queryKeys';
 import { meldeEinsatzStrom } from './einsatzStromStore';
 import { erzeugeLiveSammler, ZAEHLER_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { oeffneLiveVerbindung } from './liveVerbindung';
+import { erzeugeZeilenSammler } from './zeilenAbgleich';
 import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
 
 /**
@@ -23,6 +31,8 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
  * mit Seiteneffekt (`sofortmeldung`, Erinnerung, Ablösung) und `lagged` stehen explizit hier.
  * Invalidiert wird gebündelt über den Sammler der Verbindung (LFH-922, `liveInvalidierung.ts`),
  * die Modulzähler über einen zweiten mit längerem Fenster (LFH-935); Ton und Toast laufen sofort.
+ * Trägt die Payload eine Objekt-Kennung, ordnet `EINSATZ_STREAM_ZIELE` gezielt zu (nur Detail,
+ * nur Anhangliste, eine Zeile über `zeilenAbgleich.ts`, LFH-931); fehlt sie, gelten die Prefixe.
  *
  * Der Strom trägt auch die Org-Ereignisse `einsatzliste` und `stammdaten` (LFH-734): im Einsatz
  * bleibt es bei dieser einen Verbindung, der Org-Strom `/api/live` ruht so lange
@@ -36,13 +46,35 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // Die Modulzähler bekommen ein eigenes, längeres Fenster (LFH-935): ein Burst kostet je Tab
     // einen Zählerabruf, die Listen bleiben beim kurzen Fenster.
     const zaehlerSammler = erzeugeLiveSammler(qc, ZAEHLER_SAMMELFENSTER_MS);
-    const inval = (key: string) =>
-      (key === EINSATZ_KEYS.modulZaehler ? zaehlerSammler : sammler).vormerken([key, einsatzId]);
+    const vormerken = (key: readonly unknown[]) =>
+      (key[0] === EINSATZ_KEYS.modulZaehler ? zaehlerSammler : sammler).vormerken(key);
+    const zeilen = erzeugeZeilenSammler(qc, sammler, einsatzId);
+    const inval = (key: string) => vormerken([key, einsatzId]);
     const invalAlle = (keys: readonly string[]) => keys.forEach(inval);
 
-    const listeners: [string, EventListener][] = Object.entries(EINSATZ_STREAM_EVENTS).map(
-      ([event, keys]) => [event, () => invalAlle(keys)],
-    );
+    // Gezielt, wenn die Payload es erlaubt (LFH-931); sonst die Prefixe des Ereignisses.
+    const abgleichen = (event: EinsatzStreamEvent, ev: MessageEvent) => {
+      const zuordnung = EINSATZ_STREAM_ZIELE[event];
+      let ziele: readonly LiveAbgleich[] | null = null;
+      if (zuordnung) {
+        try {
+          const payload: unknown = JSON.parse(ev.data);
+          if (payload !== null && typeof payload === 'object') {
+            ziele = zuordnung(payload as Record<string, unknown>, einsatzId);
+          }
+        } catch {
+          /* unlesbare Payload → Prefixe */
+        }
+      }
+      if (ziele === null) return invalAlle(EINSATZ_STREAM_EVENTS[event]);
+      for (const z of ziele) {
+        if (z.art === 'key') vormerken(z.key);
+        else zeilen.vormerken(z.ziel, z.id);
+      }
+    };
+    const listeners: [string, EventListener][] = (
+      Object.keys(EINSATZ_STREAM_EVENTS) as EinsatzStreamEvent[]
+    ).map((event) => [event, ((ev: MessageEvent) => abgleichen(event, ev)) as EventListener]);
 
     // lagged (Reconnect/Overflow) → alle Registry-Keys refetchen. Bewusst OHNE Ton, sonst
     // Fehlalarm ohne neue Sofortmeldung.
@@ -191,6 +223,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     return () => {
       wartenBeenden?.();
       schliessen();
+      zeilen.raeumen();
       sammler.raeumen();
       zaehlerSammler.raeumen();
       abmelden();

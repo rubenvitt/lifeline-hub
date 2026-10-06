@@ -9,7 +9,7 @@ import type {
   FreiesZeichen,
   FuehrungskraftKarte,
   LageMeldung,
-  Schaden,
+  SchadenMarker,
   Sichtungskategorie,
   Uhs,
 } from '../../api/types';
@@ -117,7 +117,7 @@ const UHS_ROLLE = 'bedien' as const;
 export function baueMarker(
   einsatz: EinsatzAnzeige | undefined,
   uhsListe: Uhs[],
-  schaeden: Schaden[],
+  schaeden: readonly SchadenMarker[],
   token: GlobalToken,
 ): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
   const verortet: KarteMarker[] = [];

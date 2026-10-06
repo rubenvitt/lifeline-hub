@@ -540,6 +540,63 @@ describe('Schnellerfassung', () => {
     );
   });
 
+  it('LFH-937: ein zu langer Baustein-Text wird nicht gesendet, die Grenze steht da, der Text bleibt', async () => {
+    const langerText = 'x'.repeat(20_001);
+    const baustein: EtbBaustein = {
+      id: 1,
+      label: 'Lagebericht lang',
+      typ: 'meldung',
+      inhalt: langerText,
+      meldeweg: null,
+      veranlassung: null,
+      sortier: 0,
+    };
+    const p = props({ bausteine: [baustein] });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/lagebericht');
+    await userEvent.click(await screen.findByText('Lagebericht lang'));
+    await waitFor(() => expect(feld).toHaveValue(langerText));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    const hinweis = await screen.findByText(/Inhalt ist zu lang/);
+    expect(hinweis.closest('[data-lfh="etb-laengen-hinweis"]')).not.toBeNull();
+    expect(hinweis).toHaveTextContent('höchstens 20.000 Zeichen');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue(langerText);
+    // Der Zähler steht in der Hinweiszeile, nicht unter dem Feld (Höhenbudget der Leiste).
+    expect(screen.getByText('20.001 / 20.000 · zu lang')).toBeInTheDocument();
+    expect(document.querySelector('.ant-input-data-count')).toBeNull();
+  });
+
+  it('LFH-937: ein zu langes Von hält das Senden ebenso zurück', async () => {
+    const p = props({
+      initialWerte: { inhalt: 'Lage ruhig', typ: 'meldung', metadaten: { von: 'v'.repeat(501) } },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText(/Von ist zu lang/)).toHaveTextContent('höchstens 500 Zeichen');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('LFH-937: Zähler erst ab 80 %; eingefügter Text über der Grenze bleibt ganz stehen und geht nicht hinaus', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    fireEvent.change(feld, { target: { value: 'a'.repeat(15_999) } });
+    expect(screen.queryByText(/\/ 20\.000/)).toBeNull();
+    fireEvent.change(feld, { target: { value: 'a'.repeat(16_000) } });
+    expect(screen.getByText('16.000 / 20.000')).toBeInTheDocument();
+    fireEvent.change(feld, { target: { value: 'a'.repeat(20_005) } });
+    expect(feld).toHaveValue('a'.repeat(20_005));
+    expect(screen.getByText('20.005 / 20.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText(/Inhalt ist zu lang/)).toBeInTheDocument();
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('a'.repeat(20_005));
+  });
+
   it('zeigt bei Typ „Lage" den Sprung in den strukturierten Lagebericht', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);

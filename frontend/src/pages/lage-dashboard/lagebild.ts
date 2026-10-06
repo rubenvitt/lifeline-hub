@@ -15,11 +15,11 @@ import type {
   Einsatzabschnitt,
   Gefahrengebiet,
   Lagekennzahl,
-  LageberichtAnzeige,
+  LageberichtKopf,
   LageberichtStatus,
   PegelAnzeige,
   Person,
-  Schaden,
+  SchadenMarker,
   Uhs,
   Warnstufe,
 } from '../../api/types';
@@ -323,9 +323,9 @@ export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
   uhs: Uhs[];
-  schaeden: Schaden[];
+  schaeden: SchadenMarker[];
   gefahren: Gefahrengebiet[];
-  lageberichte: LageberichtAnzeige[];
+  lageberichte: LageberichtKopf[];
   einheiten: Einheit[];
   personal: EinsatzPersonal[];
   fahrzeuge: EinsatzFahrzeug[];

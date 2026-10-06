@@ -19,6 +19,9 @@ ohne den Standard-Rufnamen hielte die Von/An-Pflicht jede Erfassung nach einem K
 Prefix landet also nicht still auf der Platte, er muss aufgenommen oder ausdrücklich
 draußen gelassen werden.
 
+- **Die Lagekarte liest Schäden als Marker** (`schadenMarker`, LFH-931, ohne Freitexte). Beide
+  Prefixe stehen in `LAGEBILD_OFFLINE`: die Marker für Karte und Dashboard, die Volltextliste für
+  die Schadenseite.
 - **Das ETB nur in festen Ansichten** (LFH-939, D4, Entscheidung Ruben 06.10.2026): Ein
   ETB-Key geht nur auf die Platte, wenn sein Filter allein `typ` und `limit` trägt
   (`istFesteEtbAnsicht`, Positivliste), dazu Zähler und Lesemarke. Ergebnisse freier Eingaben
@@ -32,9 +35,10 @@ draußen gelassen werden.
   wartender Erzeuger, keine `.then`-Kette. Der Vorrat schrumpft bei jeder Speicherung auf das,
   was zulässig und nicht live überdeckt ist (D3).
 - **Kopf und Stand liegen getrennt** (D2): `kopf` (Identität, `bestaetigtAt`, `buster`) und
-  `client`, im v1-Store; den Altdatensatz `aktuell` nehmen Anlegen und Löschen mit. Bestätigung und Identitätsprüfung lesen nur den Kopf,
-  in derselben Transaktion wie das Schreiben (Mehrtab-Schutz). Herleitung: `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
-
+  `client`, im v1-Store; den Altdatensatz `aktuell` nehmen Anlegen und Löschen mit.
+  Bestätigung und Identitätsprüfung lesen nur den Kopf, in derselben Transaktion wie das
+  Schreiben (Mehrtab-Schutz). Herleitung:
+  `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
 - **Offline-Identität nur bei einem Leitungsfehler.** Scheitert `/api/auth/me` an einem
   Netzfehler oder an einer Gateway-Antwort 502/503/504, gilt der zuletzt bestätigte Benutzer
   aus dem Datensatz. Jede Antwort des Servers selbst, auch eine 500, löscht. Die Frist beträgt

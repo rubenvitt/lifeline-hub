@@ -1,4 +1,4 @@
-import { App, Col, Collapse, Form, Input, Row } from 'antd';
+import { App, Col, Collapse, Form, Input, Row, type FormInstance } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
@@ -19,6 +19,14 @@ import {
   type FunktionsVorschlaege,
 } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
+import {
+  AUFTRAG_BEFEHLSFELD_MAX,
+  AUFTRAG_EMPFAENGER_MAX,
+  AUFTRAG_EXTERN_BEZEICHNUNG_MAX,
+  AUFTRAG_TEXT_MAX,
+  FUNKTION_TEXT_MAX,
+} from '../api/eingabegrenzen';
+import { grenzeText, istZuLang, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 
 const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
   { value: 'leitstelle', label: 'Leitstelle' },
@@ -91,6 +99,51 @@ function baueEmpfaenger(
     return angabe.text ? [{ empfaenger_typ: 'funktion', funktion_text: angabe.text }] : [];
   });
 }
+
+/**
+ * Freie Empfänger-Texte über der Grenze des Servers (`funktion_text`, LFH-937): der Tag-Modus hat
+ * keinen Zähler, deshalb eine Regel statt eines stillen Kürzens.
+ */
+function empfaengerRegel(katalog: FunktionsVorschlaege['katalog']) {
+  return {
+    validator: (_: unknown, werte: unknown) =>
+      Array.isArray(werte) &&
+      baueEmpfaenger(werte as string[], katalog).some((e) =>
+        istZuLang(e.funktion_text, FUNKTION_TEXT_MAX),
+      )
+        ? Promise.reject(
+            new Error(
+              `Ein Empfänger darf höchstens ${grenzeText(FUNKTION_TEXT_MAX)} Zeichen lang sein`,
+            ),
+          )
+        : Promise.resolve(),
+  };
+}
+
+/**
+ * Gesamtzahl der Empfänger (LFH-937): `maxCount` am Select begrenzt nur die Tags; bei Richtung
+ * „extern“ mit Bezeichnung kommt der externe Adressat dazu, 50 Tags ergäben 51 Empfänger und 400.
+ */
+function empfaengerAnzahlRegel({ getFieldValue }: Pick<FormInstance<FormWerte>, 'getFieldValue'>) {
+  return {
+    validator: (_: unknown, werte: unknown) => {
+      const tags = Array.isArray(werte) ? werte.length : 0;
+      const extern =
+        getFieldValue('richtung') === 'extern' &&
+        String(getFieldValue('externBezeichnung') ?? '').trim() !== '';
+      return tags + (extern ? 1 : 0) > AUFTRAG_EMPFAENGER_MAX
+        ? Promise.reject(new Error(`Höchstens ${AUFTRAG_EMPFAENGER_MAX} Empfänger je Auftrag`))
+        : Promise.resolve();
+    },
+  };
+}
+
+/**
+ * Befehlsschema: Zähler ab 80 % und Sperre über der Grenze statt nativem `maxLength` (D8: natives
+ * `maxLength` nur, wo antd nicht zählt); ein vorbelegter längerer Wert bleibt stehen (LFH-937).
+ */
+const BEFEHLSFELD_ZAEHLER = zeichenGrenze(AUFTRAG_BEFEHLSFELD_MAX);
+const befehlsfeldRegel = (feld: string) => zeichenRegel(AUFTRAG_BEFEHLSFELD_MAX, feld);
 
 /**
  * Wiederholfelder einer Auftrags-Serie: gleiche Stelle, Dringlichkeit und Richtung; der
@@ -237,52 +290,65 @@ export default function AuftragFormular({
           </Col>
           <Col xs={24} sm={12}>
             <Form.Item name="externBezeichnung" label="Bezeichnung der Stelle">
-              <Input aria-label="Externe Bezeichnung" placeholder="z. B. Leitstelle Nord" />
+              <Input
+                aria-label="Externe Bezeichnung"
+                placeholder="z. B. Leitstelle Nord"
+                maxLength={AUFTRAG_EXTERN_BEZEICHNUNG_MAX}
+              />
             </Form.Item>
           </Col>
         </Row>
       )}
       <Row gutter={16}>
         <Col xs={24} sm={12}>
-          <Form.Item name="absicht" label="Absicht / Ziel">
-            <TextArea aria-label="Absicht / Ziel" rows={1} />
+          <Form.Item name="absicht" rules={[befehlsfeldRegel('Absicht')]} label="Absicht / Ziel">
+            <TextArea aria-label="Absicht / Ziel" rows={1} count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="lage" label="Lage">
-            <TextArea aria-label="Lage" rows={1} />
+          <Form.Item name="lage" rules={[befehlsfeldRegel('Lage')]} label="Lage">
+            <TextArea aria-label="Lage" rows={1} count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={8}>
-          <Form.Item name="ort" label="Ort / Wo">
-            <Input aria-label="Ort / Wo" />
+          <Form.Item name="ort" rules={[befehlsfeldRegel('Ort')]} label="Ort / Wo">
+            <Input aria-label="Ort / Wo" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
-          <Form.Item name="zeit" label="Zeit / Wann">
+          <Form.Item name="zeit" rules={[befehlsfeldRegel('Zeit')]} label="Zeit / Wann">
             <Input
               aria-label="Zeit / Wann"
               placeholder="z. B. sofort, bis 14:00, nach Eintreffen"
+              count={BEFEHLSFELD_ZAEHLER}
             />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
-          <Form.Item name="mittel" label="Mittel / Womit">
-            <Input aria-label="Mittel / Womit" />
+          <Form.Item name="mittel" rules={[befehlsfeldRegel('Mittel')]} label="Mittel / Womit">
+            <Input aria-label="Mittel / Womit" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
-          <Form.Item name="verbindung" label="Verbindung / Meldewege">
-            <Input aria-label="Verbindung / Meldewege" />
+          <Form.Item
+            name="verbindung"
+            rules={[befehlsfeldRegel('Verbindung')]}
+            label="Verbindung / Meldewege"
+          >
+            <Input aria-label="Verbindung / Meldewege" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="sicherheit" label="Sicherheit / Besonderes">
-            <Input aria-label="Sicherheit / Besonderes" />
+          <Form.Item
+            name="sicherheit"
+            rules={[befehlsfeldRegel('Sicherheit')]}
+            label="Sicherheit / Besonderes"
+          >
+            <Input aria-label="Sicherheit / Besonderes" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
       </Row>
@@ -323,18 +389,30 @@ export default function AuftragFormular({
       <Form.Item
         name="text"
         label="Auftrag / Was"
-        rules={[{ required: true, message: 'Auftragstext ist erforderlich' }]}
+        rules={[
+          { required: true, message: 'Auftragstext ist erforderlich' },
+          // Ein vorbelegter Text aus Meldung, Chat oder ETB über der Grenze wird nicht still
+          // gekürzt: der Zähler zeigt die Überlänge, Senden scheitert hier (LFH-937, D8).
+          zeichenRegel(AUFTRAG_TEXT_MAX, 'Auftragstext'),
+        ]}
       >
-        <TextArea aria-label="Auftrag / Was" rows={2} />
+        <TextArea aria-label="Auftrag / Was" rows={2} count={zeichenGrenze(AUFTRAG_TEXT_MAX)} />
       </Form.Item>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           {/* EIN Feld für beide Empfängersorten (Begründung an `FormWerte.empfaenger`). Das Komma bleibt
              Trennzeichen, damit „S3, Fachberater" zwei Empfänger ergibt. */}
-          <Form.Item name="empfaenger" label="Empfänger">
+          <Form.Item
+            name="empfaenger"
+            label="Empfänger"
+            rules={[empfaengerRegel(funktionen.katalog), empfaengerAnzahlRegel]}
+            dependencies={['richtung', 'externBezeichnung']}
+          >
             <Select
               mode="tags"
               aria-label="Empfänger"
+              // Grenze des Servers vor dem Entdoppeln (LFH-937); kappt auch eine eingefügte Liste.
+              maxCount={AUFTRAG_EMPFAENGER_MAX}
               options={zielOptionen}
               placeholder="Abschnitt, Einheit oder Funktion (z. B. S3)"
               allowClear

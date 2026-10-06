@@ -14,6 +14,59 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+/// Höchstzahl der Empfänger eines Auftrags im Request (LFH-937, design.md D3); gezählt vor
+/// dem Entdoppeln, damit die Arbeit vor der ersten Abfrage begrenzt ist. Darüber → 400.
+pub const EMPFAENGER_MAX: usize = 50;
+/// Höchstlänge des Auftragstexts (LFH-937); er wird der Inhalt der ETB-Anordnung.
+pub const AUFTRAG_TEXT_MAX: usize = 10_000;
+/// Höchstlänge je Feld des Befehlsschemas (Absicht, Lage, Ort, Zeit, Mittel, Verbindung,
+/// Sicherheit; LFH-937).
+pub const BEFEHLSFELD_MAX: usize = 2_000;
+/// Höchstlänge der Bezeichnung eines externen Empfängers (LFH-937), wie `fuehrung::TEXT_MAX`.
+pub const EXTERN_BEZEICHNUNG_MAX: usize = 200;
+
+/// ETB-`an` einer Anordnung aus den Anzeigenamen der Empfänger (LFH-937, design.md D4):
+/// kommagetrennt, höchstens `etb::PARTEI_MAX` Zeichen. Passen nicht alle Namen hinein, endet es
+/// mit „… und N weitere“; ein Name, der allein zu lang ist, wird mit „…“ gekürzt.
+pub fn kappe_an(namen: &[String]) -> String {
+    let max = crate::etb::PARTEI_MAX;
+    let zeichen = |s: &str| s.chars().count();
+    let hinweis = |n: usize| {
+        if n == 0 {
+            String::new()
+        } else {
+            format!(" … und {n} weitere")
+        }
+    };
+    let voll = namen.join(", ");
+    if zeichen(&voll) <= max {
+        return voll;
+    }
+    // Ab hier braucht es einen Hinweis; jeder Kandidat lässt Platz für den Rest.
+    let mut an = String::new();
+    for (i, name) in namen.iter().enumerate() {
+        let kandidat = if i == 0 {
+            name.clone()
+        } else {
+            format!("{an}, {name}")
+        };
+        if zeichen(&kandidat) + zeichen(&hinweis(namen.len() - i - 1)) <= max {
+            an = kandidat;
+            continue;
+        }
+        let fehlend = namen.len() - i;
+        if i > 0 {
+            // Der vorige Durchlauf hat genau für diesen Hinweis Platz gelassen.
+            return format!("{an}{}", hinweis(fehlend));
+        }
+        // Schon der erste Name passt nicht neben den Hinweis.
+        let rest = hinweis(fehlend - 1);
+        let platz = max - zeichen(&rest) - 1;
+        return format!("{}…{rest}", name.chars().take(platz).collect::<String>());
+    }
+    an
+}
+
 /// Priorität eines Auftrags (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
 pub const PRIO_DRINGEND: &str = Prioritaet::Dringend.as_str();
@@ -236,4 +289,46 @@ pub async fn anreichern_alle(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod kappe_an_tests {
+    use super::kappe_an;
+    use crate::etb::PARTEI_MAX;
+
+    fn namen(n: usize, laenge: usize) -> Vec<String> {
+        (0..n).map(|i| format!("{i:0>laenge$}")).collect()
+    }
+
+    #[test]
+    fn passt_alles_bleibt_die_volle_liste() {
+        assert_eq!(kappe_an(&namen(3, 2)), "00, 01, 02");
+        assert_eq!(kappe_an(&[]), "");
+    }
+
+    #[test]
+    fn zu_viele_namen_enden_mit_rest_hinweis() {
+        let an = kappe_an(&namen(50, 200));
+        assert!(an.chars().count() <= PARTEI_MAX, "{}", an.chars().count());
+        // Zwei Namen à 200 Zeichen passen samt Hinweis, der dritte nicht.
+        assert!(an.ends_with(" … und 48 weitere"), "{an}");
+        assert!(an.starts_with(&format!("{:0>200}, ", 0)));
+    }
+
+    #[test]
+    fn genau_auf_die_grenze_passt_ohne_hinweis() {
+        let n = vec!["x".repeat(PARTEI_MAX - 2 - 10), "y".repeat(10)];
+        assert_eq!(kappe_an(&n).chars().count(), PARTEI_MAX);
+        assert!(!kappe_an(&n).contains('…'));
+    }
+
+    #[test]
+    fn einzelner_ueberlanger_name_wird_gekuerzt() {
+        let an = kappe_an(&["ä".repeat(PARTEI_MAX + 5)]);
+        assert_eq!(an.chars().count(), PARTEI_MAX);
+        assert!(an.ends_with('…'));
+        let an = kappe_an(&["ä".repeat(PARTEI_MAX + 5), "b".into()]);
+        assert!(an.chars().count() <= PARTEI_MAX);
+        assert!(an.ends_with("… … und 1 weitere"), "{an}");
+    }
 }

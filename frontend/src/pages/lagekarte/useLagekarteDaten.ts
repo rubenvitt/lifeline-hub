@@ -11,7 +11,7 @@ import { personenMarker } from '../../personen/personenKarte';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { listeUhs } from '../../api/einsatzUhs';
-import { listeSchaeden } from '../../api/einsatzSchaden';
+import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { ladeKarteConfig } from '../../api/karte';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -131,8 +131,9 @@ export function useLagekarteDaten({
     enabled: uhsFrei,
   });
   const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId),
+    // Marker-Projektion statt Volltextliste (LFH-931, Spec `listen-projektion`).
+    queryKey: einsatzKeys.schadenMarker(einsatzId),
+    queryFn: () => listeSchadenMarker(einsatzId),
     enabled: schaedenFrei,
   });
   const einheitenQuery = useQuery({

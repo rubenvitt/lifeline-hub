@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Collapse, Form, Input } from 'antd';
+import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fehlerText } from '../../api/client';
@@ -149,10 +151,14 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
         />
       </Form.Item>
       <Form.Item label="Ort" name="ort" rules={[{ required: true, message: 'Ort ist Pflicht' }]}>
-        <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />
+        <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" maxLength={SCHADEN_ORT_MAX} />
       </Form.Item>
-      <Form.Item label="Beschreibung" name="beschreibung">
-        <Input.TextArea rows={2} />
+      <Form.Item
+        label="Beschreibung"
+        name="beschreibung"
+        rules={[zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')]}
+      >
+        <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />
       </Form.Item>
       <WeitereAngaben>
         <Form.Item label="Geschädigt">

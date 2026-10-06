@@ -11,6 +11,14 @@ Ersatz. Discovery gegen den Issuer läuft **lazy** (erst beim ersten tatsächlic
 OIDC-Login-Versuch, dann prozessweit gecacht), nicht beim Serverstart — ein
 nicht erreichbarer IdP blockiert den Start also nicht.
 
+**IdP-Ausfall im Betrieb (LFH-923):** Scheitert die Discovery, antwortet der
+Server 30 s lang ohne neuen Netzversuch mit dem Fehler-Redirect auf die
+Login-Seite; danach versucht es genau eine Anmeldung erneut. Gleichzeitige
+Klicks teilen sich einen Abruf, und keine Anmeldung wartet länger als 2 s
+darauf; bei einer langsamen Leitung kann deshalb der erste Klick nach dem
+Serverstart auf der Login-Seite landen, der nächste gelingt. Ein schon geladenes, aber abgelaufenes Discovery-Dokument (TTL 1 h)
+bleibt in Gebrauch, solange die Erneuerung scheitert.
+
 ## PocketID-Client anlegen
 
 In PocketID einen neuen OIDC-Client anlegen mit:
@@ -24,7 +32,7 @@ In PocketID einen neuen OIDC-Client anlegen mit:
 
 | Variable | Bedeutung |
 |---|---|
-| `LIFELINE_OIDC_ISSUER` | Basis-URL des PocketID-Servers (Issuer, dient der Discovery). |
+| `LIFELINE_OIDC_ISSUER` | Basis-URL des PocketID-Servers (Issuer, dient der Discovery). Muss `https://` sein; `http://` nur auf Loopback (`localhost`, `127.0.0.1`, `::1`) für Entwicklung und Tests. Auch alle Endpunkte aus dem Discovery-Dokument (JWKS, Token) müssen dann `https://` sein. |
 | `LIFELINE_OIDC_CLIENT_ID` | Client-ID aus dem PocketID-Client. |
 | `LIFELINE_OIDC_CLIENT_SECRET` | Client-Secret aus dem PocketID-Client. |
 | `LIFELINE_OIDC_REDIRECT_URL` | Muss exakt der beim PocketID-Client hinterlegten Redirect-URL entsprechen (`https://<host>/api/auth/oidc/callback`). |

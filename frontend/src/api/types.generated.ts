@@ -556,6 +556,34 @@ export interface components {
             zeitstand: string;
         };
         /**
+         * @description Listenzeile eines Befehls: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie in der Anzeige
+         *     als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.
+         */
+        BefehlKopf: {
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            ersteller_id: number;
+            ersteller_name: string;
+            erstellt_at: string;
+            /** Format: int64 */
+            etb_eintrag_id?: number | null;
+            freigegeben_at?: string | null;
+            /** Format: int64 */
+            freigegeben_von_id?: number | null;
+            freigegeben_von_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            status: components["schemas"]["BefehlStatus"];
+            titel: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            vorgaenger_id?: number | null;
+            vorlage: components["schemas"]["BefehlVorlage"];
+            zeitstand: string;
+        };
+        /**
          * @description Befehls-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
          * @enum {string}
          */
@@ -2527,6 +2555,34 @@ export interface components {
             zeitstand: string;
         };
         /**
+         * @description Listenzeile eines Lageberichts: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie in der Anzeige
+         *     als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.
+         */
+        LageberichtKopf: {
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            ersteller_id: number;
+            ersteller_name: string;
+            erstellt_at: string;
+            /** Format: int64 */
+            etb_eintrag_id?: number | null;
+            freigegeben_at?: string | null;
+            /** Format: int64 */
+            freigegeben_von_id?: number | null;
+            freigegeben_von_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            status: components["schemas"]["LageberichtStatus"];
+            titel: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            vorgaenger_id?: number | null;
+            vorlage: components["schemas"]["LageberichtVorlage"];
+            zeitstand: string;
+        };
+        /**
          * @description Lagebericht-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
          * @enum {string}
          */
@@ -3599,6 +3655,34 @@ export interface components {
             zeitstand: string;
         };
         /**
+         * @description Listenzeile einer Pressemitteilung: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie
+         *     in der Anzeige als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.
+         */
+        PressemitteilungKopf: {
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            ersteller_id: number;
+            ersteller_name: string;
+            erstellt_at: string;
+            /** Format: int64 */
+            etb_eintrag_id?: number | null;
+            freigegeben_at?: string | null;
+            /** Format: int64 */
+            freigegeben_von_id?: number | null;
+            freigegeben_von_name?: string | null;
+            /** Format: int64 */
+            id: number;
+            status: components["schemas"]["PressemitteilungStatus"];
+            titel: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: int64 */
+            vorgaenger_id?: number | null;
+            vorlage: components["schemas"]["PressemitteilungVorlage"];
+            zeitstand: string;
+        };
+        /**
          * @description Status einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `status`.
          * @enum {string}
          */
@@ -3746,6 +3830,25 @@ export interface components {
             typ: components["schemas"]["SchadenTyp"];
             uebergeben_an?: string | null;
             uebergeben_at?: string | null;
+        };
+        /**
+         * @description Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931, `listen-projektion`): nur, was
+         *     Marker, Inspector und Kennzahl brauchen. Ort, Beschreibung und Geschädigte fehlen bewusst.
+         *     Optionale Felder wie in [`SchadenAnzeige`] als `null`: der Client leitet einen Marker auch
+         *     aus einer nachgeladenen vollen Zeile ab.
+         */
+        SchadenMarker: {
+            ausmass: components["schemas"]["Ausmass"];
+            /** Format: int64 */
+            id: number;
+            /** Format: double */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
+            /** Format: int64 */
+            registrier_nr: number;
+            status: components["schemas"]["SchadenStatus"];
+            typ: components["schemas"]["SchadenTyp"];
         };
         /** @enum {string} */
         SchadenStatus: "offen" | "uebergeben" | "abgeschlossen";

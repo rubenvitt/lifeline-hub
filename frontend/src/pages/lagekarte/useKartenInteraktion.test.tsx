@@ -1121,6 +1121,55 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     await waitFor(() => expect(result.current.zeichneAbschnittId).toBeNull());
   });
 
+  it('LFH-937: eine Abschnittsfläche über 5 000 Stützpunkten wird nicht gespeichert, sondern gemeldet', async () => {
+    einsatzabschnitteApi.zeichneAbschnitt.mockClear();
+    const warnung = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          einsatz: undefined,
+          darfSchreiben: true,
+          waehlbar: [],
+          fehler: vi.fn(),
+          erfolg: vi.fn(),
+          warnung,
+        }),
+      { wrapper: wrapper() },
+    );
+    act(() => result.current.onAbschnittZeichnenStart(8));
+    const ring = Array.from({ length: 5_001 }, (_, i) => [i / 10_000, 0] as [number, number]);
+    act(() => result.current.onFlaecheGezeichnet({ type: 'Polygon', coordinates: [ring] }));
+    expect(warnung).toHaveBeenCalledWith(expect.stringContaining('höchstens 5.000'));
+    expect(einsatzabschnitteApi.zeichneAbschnitt).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.zeichneAbschnittId).toBeNull());
+  });
+
+  it('LFH-937: eine Zone über 5 000 Stützpunkten wird in der Bestätigung nicht gespeichert', () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const warnung = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          einsatz: undefined,
+          darfSchreiben: true,
+          waehlbar: [],
+          fehler: vi.fn(),
+          erfolg: vi.fn(),
+          warnung,
+        }),
+      { wrapper: wrapper() },
+    );
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'linie' }));
+    const linie = Array.from({ length: 5_001 }, (_, i) => [i / 10_000, 0] as [number, number]);
+    act(() => result.current.onZoneGezeichnet({ type: 'LineString', coordinates: linie }));
+    act(() => result.current.bestaetigungSpeichern());
+    expect(warnung).toHaveBeenCalledWith(expect.stringContaining('höchstens 5.000'));
+    expect(lagezonenApi.legeZoneAn).not.toHaveBeenCalled();
+    expect(result.current.zoneBestaetigung).not.toBeNull();
+  });
+
   it('zoneLoeschen: Fehlschlag → keine Quittung', async () => {
     lagezonenApi.loescheZone.mockRejectedValueOnce(new Error('abgelehnt'));
     const fehler = vi.fn();

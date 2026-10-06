@@ -49,7 +49,12 @@ pub async fn aendern(
     JsonBody(body): JsonBody<FuehrungsstellePatchBody>,
 ) -> Result<Json<FuehrungsstelleAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let ids: Option<Vec<i64>> = body.sprechgruppe_ids.map(Option::unwrap_or_default);
+    // Liste vor jedem Schreiben begrenzen (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    let ids: Option<Vec<i64>> = body
+        .sprechgruppe_ids
+        .map(Option::unwrap_or_default)
+        .map(crate::sprechgruppe::normalisiere_ids)
+        .transpose()?;
     let rufname = trimme_tri(body.rufname);
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;

@@ -584,3 +584,68 @@ async fn live_ereignis_presse_nur_mit_kennungen() {
         n.data
     );
 }
+
+/// Spec `stab-presse-log`, „Einzelabruf“ und „Fremder Einsatz“ (LFH-931).
+#[tokio::test]
+async fn medienkontakt_einzeln_abrufen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let kid = kontakt(&app, &admin, e, ANFRAGE).await;
+    let (s, j) = anfrage(&app, "GET", &format!("{}/{kid}", kontakte(e)), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["id"], kid);
+    assert_eq!(j["art"], "anfrage");
+    assert_eq!(j["medium"], "NDR 1");
+    assert_eq!(j["status"], "offen");
+    let (_, liste) = anfrage(&app, "GET", &kontakte(e), &admin, None).await;
+    assert_eq!(liste[0], j, "gleiche Angaben wie in der Liste");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/{kid}", kontakte(anderer)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Der Einzelabruf steht hinter derselben Stab-Sperre wie die Liste.
+#[tokio::test]
+async fn medienkontakt_einzeln_hinter_der_stab_sperre() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungspersonal(&app, &admin, e).await;
+    let kid = kontakt(&app, &admin, e, ANFRAGE).await;
+    let uri = format!("{}/{kid}", kontakte(e));
+    let (s, _) = anfrage(&app, "GET", &uri, &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: sichtbar liest sie");
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/stab"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let (s, _) = anfrage(&app, "GET", &uri, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// Spec `listen-projektion`: die Liste der Pressemitteilungen trägt Köpfe ohne Abschnitte.
+#[tokio::test]
+async fn pressemitteilungen_liste_ohne_abschnitte() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let pm = mitteilung(&app, &admin, e).await;
+    let (_, liste) = anfrage(&app, "GET", &mitteilungen(e), &admin, None).await;
+    let zeile = liste[0].as_object().unwrap();
+    assert_eq!(zeile["id"], pm["id"]);
+    assert_eq!(zeile["titel"], "Hochwasser Musterstadt");
+    assert!(!zeile.contains_key("abschnitte"), "{zeile:?}");
+}

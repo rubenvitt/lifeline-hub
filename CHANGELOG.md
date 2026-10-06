@@ -1,3 +1,80 @@
+## [1.0.0-alpha.85](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.84...v1.0.0-alpha.85) (2026-10-06)
+
+### Betrieb und Installation
+
+- **Verbesserte Stabilität bei externen Dienstausfällen**: Die Anwendung begrenzt nun die Größe eingehender Antworten von externen Diensten (Geocodierung, Fachebenen, Authentifizierung) auf ein sicheres Maximum. Dies verhindert übermäßigen Speicherverbrauch bei fehlerhaften oder manipulierten Antworten.
+
+- **Robustere Authentifizierung bei Netzproblemen**: Wenn der Authentifizierungsdienst (Identity Provider) nicht erreichbar ist, werden bereits abgerufene Konfigurationsdaten zwischengespeichert und weiterverwendet. Die Anwendung bleibt dadurch bei temporären Netzausfällen oder Problemen des Authentifizierungsdienstes einsatzfähig. Parallele Authentifizierungsanfragen werden gebündelt, um die Belastung externer Dienste zu reduzieren.
+
+- **Optimierte Netzwerk-Kommunikation**: Die Verbindungen zu externen Diensten wurden überarbeitet, um Ressourcen effizienter zu nutzen und Fehler durch wiederverwendete Verbindungen zu vermeiden.
+
+## [1.0.0-alpha.84](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.83...v1.0.0-alpha.84) (2026-10-06)
+
+### Wichtige Änderungen
+
+Alle Schreibendpunkte prüfen jetzt Eingabegrenzen und lehnen zu lange Texte, zu viele Empfänger oder zu komplexe Geometrien mit einer Fehlermeldung ab. Bestehende Daten bleiben unverändert, neue Eingaben müssen die Grenzen einhalten.
+
+### Einsatztagebuch
+
+- Eingabefelder zeigen ab 80 % der maximal zulässigen Länge einen Zeichenzähler an und verhindern das Absenden zu langer Einträge
+- Die maximal zulässige Länge liegt bei 5.000 Zeichen pro Eintrag
+
+### Lagekarte
+
+- Schäden werden auf der Karte deutlich schneller geladen, da nur noch die für die Darstellung notwendigen Daten übertragen werden
+- Beim Zeichnen von Flächen und Zonen wird die Anzahl der Stützpunkte begrenzt, um zu komplexe Geometrien zu verhindern
+- Der Zähler beim Flächenzeichnen berücksichtigt jetzt auch den Schlusspunkt korrekt
+
+### Aufträge und Befehle
+
+- Pro Auftrag können maximal 50 Empfänger ausgewählt werden
+- Die Liste der Empfänger wird automatisch von Duplikaten bereinigt
+- Bei Aufträgen mit zu vielen Empfängern erscheint ein entsprechender Hinweis im ETB-An-Feld nur dann, wenn tatsächlich Empfänger abgeschnitten wurden
+- Das Textfeld im Auftragsformular zeigt einen Zeichenzähler an, wenn die Eingabe lang wird
+- Befehle werden schneller geladen, da zunächst nur Überschriften ohne die ausführlichen Abschnitte übertragen werden. Die Details werden erst beim Öffnen nachgeladen
+
+### Lageberichte
+
+- Lageberichte werden deutlich schneller geladen: Die Liste zeigt nur noch Überschriften, die Details werden erst beim Öffnen eines Berichts nachgeladen
+- Beim Bearbeiten eines Entwurfs laden andere Sitzungen nur noch die geänderten Inhalte nach, nicht mehr den gesamten Bestand
+
+### Betroffenen- und Schadenserfassung
+
+- Schäden werden auf dem Dashboard schneller angezeigt, da nur noch die notwendigen Daten für die Übersicht geladen werden
+- Die Schnellerfassung prüft bereits vor dem Hochladen, ob die eingegebenen Texte die zulässige Länge überschreiten
+- Änderungen an Schäden werden gezielt nachgeladen: Andere Sitzungen holen nur noch die tatsächlich geänderten Einträge ab, nicht mehr die gesamte Liste
+- Anhang-Änderungen werden effizienter übertragen und lösen nur noch das Nachladen der Anhangliste aus
+
+### Meldungen und Nachforderungen
+
+- Eingabefelder für Meldungen und Nachforderungen zeigen einen Zeichenzähler an und lassen maximal die vom Server erlaubte Länge zu
+- Die Art einer Nachforderung ist auf 200 Zeichen begrenzt
+
+### Kommunikation
+
+- Chat-Eingabefeld zeigt den Zeichenzähler unterhalb der Eingabezeile an, die Treffgröße für Touchbedienung bleibt bei 72 Pixel
+- Eingaben werden auf maximal 2.000 Zeichen begrenzt
+
+### Presse
+
+- Pressemitteilungen werden schneller geladen: Die Liste zeigt zunächst nur Überschriften, die vollständigen Texte werden erst beim Öffnen nachgeladen
+- Das Presse-Log lädt Änderungen gezielt nach, anstatt bei jeder Aktualisierung alle Einträge neu zu übertragen
+- Eingabefelder für Pressemitteilungen zeigen einen Zeichenzähler an und begrenzen die Eingabelänge
+
+### Infotelefon
+
+- Eingabefelder im Infotelefon begrenzen die Textlänge und zeigen bei längeren Eingaben einen Zeichenzähler an
+
+### Kräfte und Mittel
+
+- Sprechgruppen und Qualifikationen werden automatisch von Duplikaten bereinigt
+- Die Anzahl der eingetragenen Sprechgruppen und Qualifikationen ist begrenzt
+
+### Betrieb
+
+- Listen werden nicht mehr mit veralteten Daten befüllt, wenn ein gezieltes Nachladen einzelner Einträge läuft
+- Die Lagebericht-Vorschau in der Sprungpalette zeigt an, wenn ein Bericht nicht mehr vorhanden ist
+
 ## [1.0.0-alpha.83](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.82...v1.0.0-alpha.83) (2026-10-06)
 
 ### Wichtige Änderungen

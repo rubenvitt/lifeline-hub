@@ -1,6 +1,8 @@
 import StatusTag from '../components/StatusTag';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { Alert, App, Breadcrumb, Button, Form, Input, Popconfirm, Space, Spin, Tag } from 'antd';
+import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -207,10 +209,21 @@ export default function SchaedenDetailPage() {
                 'ausmass',
                 <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
               ),
-              ort: feld('ort', <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />, [
-                { required: true, message: 'Ort ist Pflicht' },
-              ]),
-              beschreibung: feld('beschreibung', <Input.TextArea rows={2} />),
+              ort: feld(
+                'ort',
+                <Input
+                  placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5"
+                  maxLength={SCHADEN_ORT_MAX}
+                />,
+                [{ required: true, message: 'Ort ist Pflicht' }],
+              ),
+              // Eine ältere, längere Beschreibung bleibt stehen: der Zähler nennt die Überlänge,
+              // Speichern scheitert an der Regel, bis gekürzt ist (LFH-937, design.md Risiken).
+              beschreibung: feld(
+                'beschreibung',
+                <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />,
+                [zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')],
+              ),
               geschaedigt: feld(
                 'geschaedigt',
                 <GeschaedigtPicker

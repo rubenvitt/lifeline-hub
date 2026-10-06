@@ -1,7 +1,7 @@
 import type {
   Auftrag,
   BezugTyp,
-  LageberichtAnzeige,
+  LageberichtKopf,
   Meldung,
   Person,
   Schaden,
@@ -63,7 +63,7 @@ export function personLabel(p: Person): string {
   return name ? `${nr} · ${name}` : nr;
 }
 
-export function lageberichtLabel(l: LageberichtAnzeige): string {
+export function lageberichtLabel(l: LageberichtKopf): string {
   return l.titel;
 }
 
@@ -89,7 +89,7 @@ export function personInfo(p: Person): BezugKurzinfo {
   const name = [p.vorname, p.name].filter(Boolean).join(' ');
   return { titel: personLabel(p), zeilen: name ? [`Name: ${name}`] : ['Name nicht erfasst'] };
 }
-export function lageberichtInfo(l: LageberichtAnzeige): BezugKurzinfo {
+export function lageberichtInfo(l: LageberichtKopf): BezugKurzinfo {
   return { titel: lageberichtLabel(l), zeilen: [`Ersteller: ${l.ersteller_name}`] };
 }
 export function meldungInfo(m: Meldung): BezugKurzinfo {

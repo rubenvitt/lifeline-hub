@@ -1,3 +1,6 @@
+import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
+import { grenzeText } from '../../components/zeichenGrenze';
+
 export interface GeoJsonPolygon {
   type: 'Polygon';
   coordinates: number[][][];
@@ -123,6 +126,24 @@ export function polygonUmfangM(poly: GeoJsonPolygon): number {
   const ring = poly.coordinates?.[0];
   return ring && ring.length >= 2 ? zugLaengeM(ring) : 0;
 }
+
+/**
+ * Stützpunkte einer Geometrie, wie der Server sie zählt (LFH-937, D7): beim Polygon die Positionen
+ * aller Ringe samt Schlusspunkt, beim Linienzug seine Positionen.
+ */
+export function stuetzpunkte(g: GeoJsonGeometry): number {
+  return g.type === 'Polygon'
+    ? g.coordinates.reduce((summe, ring) => summe + ring.length, 0)
+    : g.coordinates.length;
+}
+
+/** Mehr Stützpunkte, als der Server annimmt (`GEOMETRIE_STUETZPUNKTE_MAX`). */
+export function zuVieleStuetzpunkte(g: GeoJsonGeometry): boolean {
+  return stuetzpunkte(g) > GEOMETRIE_STUETZPUNKTE_MAX;
+}
+
+/** Meldung, wenn eine fertige Figur über der Grenze liegt und nicht gespeichert wird. */
+export const ZU_VIELE_STUETZPUNKTE = `Zu viele Punkte: höchstens ${grenzeText(GEOMETRIE_STUETZPUNKTE_MAX)} je Figur. Nicht gespeichert.`;
 
 /** Länge eines Linienzugs in Metern (Haversine); 0 bei <2 Punkten. */
 export function lineLaengeM(line: GeoJsonLineString): number {
