@@ -629,6 +629,13 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   (Modulzähler, ETB-Zeitachse, Meldungen) übernehmen ihn, statt eigene Timer zu bauen. Ein
   Neuaufbau des Browsers nach dem Kontroll-Ereignis `position` gleicht im Einsatz-Strom nur die
   Org-Keys ab (der Server liefert per `Last-Event-ID` nach), sonst und bei neuer Verbindung voll.
+- **Gezielter Abgleich nach Payload** (LFH-931, Spec `live-abgleich`): trägt ein Ereignis seine
+  Objekt-Kennung, ordnet `EINSATZ_STREAM_ZIELE` zu — nur das Detail bei `nur_inhalt`, nur die
+  Anhangliste bei `anhang`, eine Zeile über `live/zeilenAbgleich.ts` (bis 10 Kennungen je
+  Fenster, sonst und bei verdecktem Tab, Fehler oder fehlender Liste der Sammler). Ohne Kennung
+  gelten die Prefixe aus `EINSATZ_STREAM_EVENTS`, `lagged` gleicht weiter alles ab. Jeder gezielte
+  Key liegt unter den Prefixen seines Ereignisses (`queryKeys.test.ts`); eine zeilenweise
+  abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher).
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

@@ -19,6 +19,9 @@ ohne den Standard-Rufnamen hielte die Von/An-Pflicht jede Erfassung nach einem K
 Prefix landet also nicht still auf der Platte, er muss aufgenommen oder ausdrücklich
 draußen gelassen werden.
 
+- **Die Lagekarte liest Schäden als Marker** (`schadenMarker`, LFH-931, ohne Freitexte). Beide
+  Prefixe stehen in `LAGEBILD_OFFLINE`: die Marker für Karte und Dashboard, die Volltextliste für
+  die Schadenseite.
 - **Offline-Identität nur bei einem Leitungsfehler.** Scheitert `/api/auth/me` an einem
   Netzfehler oder an einer Gateway-Antwort 502/503/504, gilt der zuletzt bestätigte Benutzer
   aus dem Datensatz. Jede Antwort des Servers selbst, auch eine 500, löscht. Die Frist beträgt

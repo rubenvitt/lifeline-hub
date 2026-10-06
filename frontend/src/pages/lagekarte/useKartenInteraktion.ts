@@ -277,6 +277,7 @@ export function useKartenInteraktion({
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.schadenMarker(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) });
@@ -417,7 +418,7 @@ export function useKartenInteraktion({
       case 'schaden':
         return {
           aufruf: aktualisiereSchaden(einsatzId, marker.id, { lat: null, lon: null }),
-          faecher: [einsatzKeys.schaeden(einsatzId)],
+          faecher: [einsatzKeys.schaeden(einsatzId), einsatzKeys.schadenMarker(einsatzId)],
         };
       case 'einheit':
         return {

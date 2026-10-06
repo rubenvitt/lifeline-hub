@@ -211,6 +211,21 @@ pub struct SchadenAnzeige {
     pub geschaedigt_organisation_name: Option<String>, // organisation.name
 }
 
+/// Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931, `listen-projektion`): nur, was
+/// Marker, Inspector und Kennzahl brauchen. Ort, Beschreibung und Geschädigte fehlen bewusst.
+/// Optionale Felder wie in [`SchadenAnzeige`] als `null`: der Client leitet einen Marker auch
+/// aus einer nachgeladenen vollen Zeile ab.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct SchadenMarker {
+    pub id: i64,
+    pub registrier_nr: i64,
+    pub status: SchadenStatus,
+    pub typ: SchadenTyp,
+    pub ausmass: Ausmass,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

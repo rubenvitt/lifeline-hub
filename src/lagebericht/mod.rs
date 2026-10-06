@@ -122,6 +122,7 @@ pub struct Lagebericht;
 impl Dokumentart for Lagebericht {
     type Abschnitt = Abschnitt;
     type Anzeige = repo::LageberichtAnzeige;
+    type Kopf = repo::LageberichtKopf;
     const TABELLE: &'static str = "lagebericht";
     const ETB_TYP: &'static str = crate::etb::TYP_LAGE;
     const ETB_VERWEIS: &'static str = "lagebericht_id";

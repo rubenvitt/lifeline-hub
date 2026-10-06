@@ -5,6 +5,7 @@ import type {
   MedienkontaktStatus,
   Pressemitteilung,
   PressemitteilungAbschnitt,
+  PressemitteilungKopf,
   PressemitteilungVorlageKey,
 } from './types';
 
@@ -17,9 +18,25 @@ const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/stab`;
 
 // ── Presse-Log ──────────────────────────────────────────────────────────────────────────────
 
-/** Offene zuerst, dann jüngster Eingang zuerst (Ordnung vom Server). */
+/** Offene zuerst, dann jüngster Eingang zuerst (Ordnung vom Server, {@link vergleicheMedienkontakte}). */
 export function ladeMedienkontakte(einsatzId: number): Promise<Medienkontakt[]> {
   return apiGet<Medienkontakt[]>(`${basis(einsatzId)}/medienkontakte`);
+}
+
+/** Ein Medienkontakt (LFH-931): auf ein `presse`-Ereignis lädt der Tab nur diese Zeile nach. */
+export function ladeMedienkontakt(einsatzId: number, kontaktId: number): Promise<Medienkontakt> {
+  return apiGet<Medienkontakt>(`${basis(einsatzId)}/medienkontakte/${kontaktId}`);
+}
+
+/**
+ * Ordnung der Liste wie im SQL von `presse::repo::liste`: offene zuerst, dann `eingang_at`
+ * absteigend, dann `id` absteigend. Zeiten als Text verglichen wie in SQLite.
+ */
+export function vergleicheMedienkontakte(a: Medienkontakt, b: Medienkontakt): number {
+  const offen = Number(b.status === 'offen') - Number(a.status === 'offen');
+  if (offen !== 0) return offen;
+  if (a.eingang_at !== b.eingang_at) return a.eingang_at < b.eingang_at ? 1 : -1;
+  return b.id - a.id;
 }
 
 /** Kein Backend-Schema: Eingabe-Body von `POST …/stab/medienkontakte`. */
@@ -79,8 +96,9 @@ export function setzeMedienkontaktStatus(
 
 // ── Pressemitteilungen ──────────────────────────────────────────────────────────────────────
 
-export function ladePressemitteilungen(einsatzId: number): Promise<Pressemitteilung[]> {
-  return apiGet<Pressemitteilung[]>(`${basis(einsatzId)}/pressemitteilungen`);
+/** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
+export function ladePressemitteilungen(einsatzId: number): Promise<PressemitteilungKopf[]> {
+  return apiGet<PressemitteilungKopf[]>(`${basis(einsatzId)}/pressemitteilungen`);
 }
 
 export function ladePressemitteilung(einsatzId: number, id: number): Promise<Pressemitteilung> {

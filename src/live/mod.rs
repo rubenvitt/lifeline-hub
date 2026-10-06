@@ -511,9 +511,26 @@ impl LiveHub {
 
     /// Modul-Ereignis mit der üblichen ID-only-Payload `{"einsatz_id": …, <schluessel>: id}`.
     pub fn publiziere_objekt(&self, einsatz_id: i64, event: LiveEvent, schluessel: &str, id: i64) {
+        self.publiziere_objekt_mit(einsatz_id, event, schluessel, id, &[]);
+    }
+
+    /// Wie [`Self::publiziere_objekt`], dazu Kennzeichen, die dem Client einen gezielten
+    /// Abgleich erlauben (LFH-931): `nur_inhalt` (Entwurfs-PATCH ohne Kopfänderung),
+    /// `anhang` (Datei an einem Schaden). Nur Wahrheitswerte, nie Inhalte.
+    pub fn publiziere_objekt_mit(
+        &self,
+        einsatz_id: i64,
+        event: LiveEvent,
+        schluessel: &str,
+        id: i64,
+        kennzeichen: &[&str],
+    ) {
         let mut data = serde_json::Map::new();
         data.insert("einsatz_id".into(), einsatz_id.into());
         data.insert(schluessel.into(), id.into());
+        for k in kennzeichen {
+            data.insert((*k).into(), true.into());
+        }
         self.publiziere_event(
             einsatz_id,
             event,

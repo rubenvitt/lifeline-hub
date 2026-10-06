@@ -15,6 +15,7 @@ import {
   daten,
   etbEintrag,
   lagebericht,
+  lageberichtQuelle,
   periode,
   person,
   rohBericht,
@@ -225,29 +226,31 @@ describe('3.3 Lage', () => {
   it('Verzeichnis der freigegebenen Berichte nach Zeitstand, ohne Entwurf; letzter im Volltext', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({
-        lageberichte: daten([
-          lagebericht({
-            id: 3,
-            titel: 'Lage 3',
-            zeitstand: '2026-03-29T01:40:00',
-            freigegeben_at: '2026-03-29T01:45:00',
-            abschnitte: [{ schluessel: 'lage', text: 'Feuer aus.' }],
-          }),
-          lagebericht({ id: 1, titel: 'Erstlage' }),
-          lagebericht({
-            id: 2,
-            titel: 'Lage 2',
-            zeitstand: '2026-03-29T01:00:00',
-            freigegeben_at: '2026-03-29T01:05:00',
-          }),
-          lagebericht({
-            id: 4,
-            titel: 'Entwurf',
-            status: 'entwurf',
-            freigegeben_at: null,
-            zeitstand: '2026-03-29T01:50:00',
-          }),
-        ]),
+        lageberichte: daten(
+          lageberichtQuelle([
+            lagebericht({
+              id: 3,
+              titel: 'Lage 3',
+              zeitstand: '2026-03-29T01:40:00',
+              freigegeben_at: '2026-03-29T01:45:00',
+              abschnitte: [{ schluessel: 'lage', text: 'Feuer aus.' }],
+            }),
+            lagebericht({ id: 1, titel: 'Erstlage' }),
+            lagebericht({
+              id: 2,
+              titel: 'Lage 2',
+              zeitstand: '2026-03-29T01:00:00',
+              freigegeben_at: '2026-03-29T01:05:00',
+            }),
+            lagebericht({
+              id: 4,
+              titel: 'Entwurf',
+              status: 'entwurf',
+              freigegeben_at: null,
+              zeitstand: '2026-03-29T01:50:00',
+            }),
+          ]),
+        ),
       }),
       konv,
     );
@@ -264,16 +267,18 @@ describe('3.3 Lage', () => {
   it('eine Kette mit freigegebener v1 und Entwurf v2 erscheint mit v1', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({
-        lageberichte: daten([
-          lagebericht({ id: 1, version: 1 }),
-          lagebericht({
-            id: 2,
-            version: 2,
-            vorgaenger_id: 1,
-            status: 'entwurf',
-            freigegeben_at: null,
-          }),
-        ]),
+        lageberichte: daten(
+          lageberichtQuelle([
+            lagebericht({ id: 1, version: 1 }),
+            lagebericht({
+              id: 2,
+              version: 2,
+              vorgaenger_id: 1,
+              status: 'entwurf',
+              freigegeben_at: null,
+            }),
+          ]),
+        ),
       }),
       konv,
     );
@@ -285,15 +290,17 @@ describe('3.3 Lage', () => {
   it('fortgeschriebene und freigegebene v2 steht einmal mit v2', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({
-        lageberichte: daten([
-          lagebericht({ id: 1, version: 1 }),
-          lagebericht({
-            id: 2,
-            version: 2,
-            vorgaenger_id: 1,
-            freigegeben_at: '2026-03-29T01:20:00',
-          }),
-        ]),
+        lageberichte: daten(
+          lageberichtQuelle([
+            lagebericht({ id: 1, version: 1 }),
+            lagebericht({
+              id: 2,
+              version: 2,
+              vorgaenger_id: 1,
+              freigegeben_at: '2026-03-29T01:20:00',
+            }),
+          ]),
+        ),
       }),
       konv,
     );
@@ -304,7 +311,9 @@ describe('3.3 Lage', () => {
   it('ohne freigegebenen Bericht „keine Einträge“', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({
-        lageberichte: daten([lagebericht({ status: 'entwurf', freigegeben_at: null })]),
+        lageberichte: daten(
+          lageberichtQuelle([lagebericht({ status: 'entwurf', freigegeben_at: null })]),
+        ),
       }),
       konv,
     );

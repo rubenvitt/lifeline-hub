@@ -128,6 +128,7 @@ pub struct Befehl;
 impl Dokumentart for Befehl {
     type Abschnitt = Abschnitt;
     type Anzeige = repo::BefehlAnzeige;
+    type Kopf = repo::BefehlKopf;
     const TABELLE: &'static str = "befehl";
     const ETB_TYP: &'static str = crate::etb::TYP_ANORDNUNG;
     const ETB_VERWEIS: &'static str = "befehl_id";

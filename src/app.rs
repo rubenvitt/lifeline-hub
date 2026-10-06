@@ -529,7 +529,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/stab/medienkontakte/{kid}",
-            patch(routes::presse::medienkontakt_aendern),
+            get(routes::presse::medienkontakt_detail).patch(routes::presse::medienkontakt_aendern),
         )
         .route(
             "/api/einsaetze/{id}/stab/medienkontakte/{kid}/status",
@@ -919,6 +919,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/schaeden",
             post(routes::einsatz_schaden::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/marker",
+            get(routes::einsatz_schaden::marker),
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}",

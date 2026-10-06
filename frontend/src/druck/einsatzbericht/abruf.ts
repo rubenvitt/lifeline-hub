@@ -8,11 +8,12 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeSchaeden } from '../../api/einsatzSchaden';
 import { ladeEtbZaehler } from '../../api/etb';
 import { listeEinheitenPerioden, listePersonalPerioden } from '../../api/kraefteZeitachse';
-import { listeLageberichte } from '../../api/lageberichte';
+import { ladeLagebericht, listeLageberichte } from '../../api/lageberichte';
 import { ladeLagebesprechungen, ladeStab } from '../../api/stab';
 import { ladeVerpflegung } from '../../api/verpflegung';
 import { ladeEtbVollstaendig } from '../../etb/druckAbruf';
 import { QUELLEN, modulLabel, type QuellenFreigabe, type QuellenSchluessel } from './quellen';
+import { letzterFreigegebenerLagebericht, type LageberichtQuelle } from './verdichtung';
 
 /**
  * Abruf des Einsatzberichts (LFH-726, design.md D4): alle freigegebenen Quellen parallel, EIN
@@ -22,6 +23,16 @@ import { QUELLEN, modulLabel, type QuellenFreigabe, type QuellenSchluessel } fro
  * Eine Quelle auf `gesperrt`, `nicht-genutzt` oder `nicht-gewaehlt` geht nicht ans Netz: ein Abruf ergäbe nur ein
  * 403 und am Server einen Fehlversuch ohne Erkenntnis.
  */
+
+/**
+ * Die Liste trägt nur Köpfe (LFH-931); den Text des zuletzt freigegebenen Lageberichts holt ein
+ * zweiter Abruf aus dem Detail. Ohne freigegebenen Bericht bleibt es bei der Liste.
+ */
+async function ladeLageberichtQuelle(einsatzId: number): Promise<LageberichtQuelle> {
+  const liste = await listeLageberichte(einsatzId);
+  const kopf = letzterFreigegebenerLagebericht(liste);
+  return { liste, letzter: kopf ? await ladeLagebericht(einsatzId, kopf.id) : null };
+}
 
 /** Die Abruffunktionen je Quelle. Die Entscheidungen kommen vollständig, nicht gedeckelt. */
 const ABRUF = {
@@ -34,7 +45,7 @@ const ABRUF = {
   personal: listeEinsatzPersonal,
   personalPerioden: listePersonalPerioden,
   fahrzeuge: listeEinsatzFahrzeuge,
-  lageberichte: listeLageberichte,
+  lageberichte: ladeLageberichtQuelle,
   personen: (id: number) => listePersonen(id),
   schaeden: (id: number) => listeSchaeden(id),
   betreuung: ladeBetreuung,

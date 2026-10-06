@@ -725,6 +725,14 @@ async fn live_schaden_und_etb_ohne_dateinamen_schaden_nur_mit_modulrecht() {
     let bei_frieda = sse_anfang_lesen(feed_frieda.into_body(), 400).await;
     assert!(bei_gustav.contains("event: schaden"), "{bei_gustav:?}");
     assert!(bei_gustav.contains("event: etb"), "{bei_gustav:?}");
+    // LFH-931: das Ereignis gibt sich als Anhang-Änderung zu erkennen, damit andere Sitzungen
+    // nur die Anhangliste nachladen und nicht Schadenliste und Marker.
+    assert!(
+        bei_gustav.contains(&format!(
+            r#"{{"anhang":true,"einsatz_id":{einsatz},"schaden_id":{schaden}}}"#
+        )),
+        "Anhang-Kennzeichen im schaden-Ereignis: {bei_gustav:?}"
+    );
     assert!(
         bei_frieda.contains("event: etb"),
         "Friedas Feed läuft (sonst bewiese das Fehlen nichts): {bei_frieda:?}"

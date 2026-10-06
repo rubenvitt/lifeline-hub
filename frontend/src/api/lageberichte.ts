@@ -1,8 +1,14 @@
 import { apiGet, apiSend } from './client';
-import type { LageberichtAbschnitt, LageberichtAnzeige, LageberichtVorlageKey } from './types';
+import type {
+  LageberichtAbschnitt,
+  LageberichtAnzeige,
+  LageberichtKopf,
+  LageberichtVorlageKey,
+} from './types';
 
-export function listeLageberichte(einsatzId: number): Promise<LageberichtAnzeige[]> {
-  return apiGet<LageberichtAnzeige[]>(`/api/einsaetze/${einsatzId}/lageberichte`);
+/** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
+export function listeLageberichte(einsatzId: number): Promise<LageberichtKopf[]> {
+  return apiGet<LageberichtKopf[]>(`/api/einsaetze/${einsatzId}/lageberichte`);
 }
 
 export function ladeLagebericht(einsatzId: number, id: number): Promise<LageberichtAnzeige> {

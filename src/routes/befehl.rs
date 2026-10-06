@@ -3,7 +3,7 @@
 
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::befehl::repo::BefehlAnzeige;
+use crate::befehl::repo::{BefehlAnzeige, BefehlKopf};
 use crate::befehl::{Abschnitt, Befehl};
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -31,7 +31,7 @@ pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
-) -> Result<Json<Vec<BefehlAnzeige>>, AppError> {
+) -> Result<Json<Vec<BefehlKopf>>, AppError> {
     kern::liste::<Befehl>(&state, &benutzer, einsatz_id).await
 }
 

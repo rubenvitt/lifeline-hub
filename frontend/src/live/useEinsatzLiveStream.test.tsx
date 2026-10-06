@@ -271,6 +271,60 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
+  // LFH-931: ein Entwurfs-PATCH nur an Abschnitten lädt das Detail, nicht die Kopfliste.
+  it('gleicht bei einem Entwurfs-PATCH nur das Detail ab, nie die Liste (LFH-931)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit(
+      'lagebericht',
+      JSON.stringify({ einsatz_id: 3, lagebericht_id: 8, nur_inhalt: true }),
+    );
+    await waitFor(() => expect(keysVon(spy)).toEqual([['einsatz-lagebericht', 3, 8]]));
+    expect(keysVon(spy)).not.toContainEqual(['einsatz-lageberichte', 3]);
+  });
+
+  // LFH-931: ein Schaden-Ereignis mit Kennung lädt nur diese Zeile und sortiert sie ein.
+  it('lädt bei einem Schaden-Ereignis nur die Zeile, nicht die Liste (LFH-931)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const abrufe: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/3/schaeden/:sid', ({ params }) => {
+        abrufe.push(String(params.sid));
+        return HttpResponse.json({
+          id: 9,
+          registrier_nr: 2,
+          status: 'offen',
+          typ: 'sachschaden',
+          ausmass: 'gering',
+          storniert_at: null,
+        });
+      }),
+    );
+    // Ohne gcTime 0: die Liste liegt ohne Beobachter im Cache wie hinter einer offenen Seite.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['einsatz-schaeden', 3], [{ id: 1, registrier_nr: 1, storniert_at: null }]);
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('schaden', JSON.stringify({ einsatz_id: 3, schaden_id: 9 }));
+    await waitFor(() =>
+      expect(
+        client.getQueryData<{ id: number }[]>(['einsatz-schaeden', 3])?.map((s) => s.id),
+      ).toEqual([9, 1]),
+    );
+    expect(abrufe).toEqual(['9']);
+    expect(keysVon(spy)).not.toContainEqual(['einsatz-schaeden', 3]);
+  });
+
   // Der lagged-Vollabgleich invalidiert breit (Union aller Event-Keys), löst aber BEWUSST keinen
   // Sofort-Alarm aus — sonst Fehlalarm ohne neue Sofortmeldung.
   it('invalidiert breit und feuert KEINEN window-Alarm bei lagged-Event (LFH-122)', async () => {
