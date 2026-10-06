@@ -7,6 +7,7 @@ import { baueLagebild, type Rohdaten } from '../pages/lage-dashboard/lagebild';
 import {
   quellenLaden,
   vorbereitungMarkdown,
+  sichtungText,
   vorbereitungsZeilen,
   type VorbereitungsQuellen,
 } from './vorbereitung';
@@ -101,7 +102,7 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
     expect(zeile(zeilen, 'betroffene').wert).toBe('3');
     expect(zeile(zeilen, 'kraefte').wert).toBe('2');
     expect(zeile(zeilen, 'sichtung').wert).toBe(
-      'SK I 1 · SK II 0 · SK III 1 · SK IV 0 · ohne Sichtung 1',
+      'SK\u00a0I\u00a01 · SK\u00a0II\u00a00 · SK\u00a0III\u00a01 · SK\u00a0IV\u00a00 · ohne\u00a0Sichtung\u00a01',
     );
     expect(zeile(zeilen, 'warnstufe')).toMatchObject({
       wert: 'hoch',
@@ -252,5 +253,31 @@ describe('vorbereitungMarkdown', () => {
     expect((container.textContent ?? '').replace(/\u2060/g, '')).toContain(
       'www.thw-nord.de (Lage <https://x.de> · ops@thw-nord.de · http://a.de)',
     );
+  });
+});
+
+/**
+ * LFH-978 (U69): die Wertspalte bricht bei 390 und 820 px um. Mit normalen Leerzeichen riss sie
+ * mitten in „SK III 6" und „ohne Sichtung 1". Umbrechen darf sie nur am Trenner.
+ */
+describe('sichtungText (LFH-978)', () => {
+  const sk = { sk1: 1, sk2: 3, sk3: 6, sk4: 1, tot: 2, unverletzt: 4, ohne: 1 };
+
+  it('verbindet die Teile mit „ · “, der einzigen Umbruchstelle', () => {
+    const teile = sichtungText(sk).split(' · ');
+    expect(teile).toHaveLength(7);
+    for (const teil of teile) expect(teil, teil).not.toMatch(/[ \t\n]/);
+  });
+
+  it('hält Kennung und Zahl jedes Teils mit geschütztem Leerzeichen zusammen', () => {
+    expect(sichtungText(sk).split(' · ')).toEqual([
+      'SK\u00a0I\u00a01',
+      'SK\u00a0II\u00a03',
+      'SK\u00a0III\u00a06',
+      'SK\u00a0IV\u00a01',
+      'tot\u00a02',
+      'unverletzt\u00a04',
+      'ohne\u00a0Sichtung\u00a01',
+    ]);
   });
 });

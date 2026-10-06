@@ -232,6 +232,13 @@ interface ListenEintragBasisProps {
    * „aktuell" an (LFH-621).
    */
   'aria-current'?: AriaAttributes['aria-current'];
+  /**
+   * Aktionen auf eigener Zeile UNTER dem Inhalt, linksbündig (LFH-978). Opt-in: der Aufrufer
+   * entscheidet anhand seiner Breite (`useViewport().istSchmal`), die Zeile kennt keinen
+   * Breakpoint. Auf 390 px belegte „Besetzung ändern“ rechts rund 150 px, die Beschreibung der
+   * Stab-Zeile brach in den übrigen ~190 px auf fünf bis sechs Zeilen um.
+   */
+  gestapelt?: boolean;
 }
 
 interface ListenEintragAuswahlProps extends ListenEintragBasisProps {
@@ -252,6 +259,7 @@ export function ListenEintrag({
   children,
   actions,
   onClick,
+  gestapelt = false,
   style,
   className,
   'aria-current': ariaCurrent,
@@ -270,6 +278,7 @@ export function ListenEintrag({
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: token.padding,
+      ...(gestapelt ? { flexWrap: 'wrap' as const, rowGap: token.paddingXS } : {}),
       paddingBlock,
       paddingInline,
       // Die Spread-Position ist TRAGEND (LFH-366): ein Aufrufer mit Trefflächenboden übergibt die
@@ -288,7 +297,9 @@ export function ListenEintrag({
           style={{
             display: 'flex',
             alignItems: 'center',
-            flex: '0 0 auto',
+            ...(gestapelt
+              ? { flex: '1 1 100%', flexBasis: '100%', justifyContent: 'flex-start' }
+              : { flex: '0 0 auto' }),
             margin: 0,
             padding: 0,
             listStyle: 'none',

@@ -14,6 +14,7 @@ import { Paneel } from '../components/instrument';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
+import { useViewport } from '../components/useViewport';
 import { modulZielRoute } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzModulPfad } from '../routing/deeplinks';
@@ -61,6 +62,7 @@ export default function StabPage() {
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const { token } = theme.useToken();
+  const { istSchmal } = useViewport();
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -240,6 +242,10 @@ export default function StabPage() {
                 const unterseiten = unterseitenFuer(s.sachgebiet);
                 return (
                   <ListenEintrag
+                    // Unter `md` steht „Besetzung ändern“ unter dem Inhalt (LFH-978): rechts
+                    // daneben blieben der Beschreibung auf 390 px rund 190 px, die Seite wurde
+                    // über 5 000 px lang.
+                    gestapelt={istSchmal}
                     actions={
                       // Erst mit Daten: vor dem Laden belegte die Maske „nicht vergeben" vor. Die
                       // Tastatur erreicht den Knopf auch unter dem Ladeindikator.

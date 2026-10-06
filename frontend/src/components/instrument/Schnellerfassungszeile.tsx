@@ -16,7 +16,8 @@ import '../../theme/sprache.css';
  *
  * Das Feld im Kind verliert Rahmen und Grund über `.lfh-schnellerfassung__feld` in
  * `theme/sprache.css` — die Zeile trägt den Rahmen. Seine HÖHE bleibt `controlHeight`, die Hülle
- * wächst mit (30 / 48 / 72).
+ * wächst mit (30 / 48 / 72). Das gilt dem EINEN Feld; wer mehrere Felder nebeneinander in die
+ * Zelle legt, lässt ihnen per `felderUmrandet` den Steuerrahmen (LFH-978).
  */
 export function schnellerfassungStil(
   rollen: Pick<Farbrollen, 'bedien' | 'flaeche2' | 'text'>,
@@ -96,6 +97,13 @@ interface SchnellerfassungszeileProps {
    * Breite (die Wurzel des `MarkdownEditor` im ETB) blieb sonst auf seiner Inhaltsbreite.
    */
   feldFuellt?: boolean;
+  /**
+   * Die Felder der Zelle behalten ihren Steuerrahmen (LFH-978). Opt-in für eine Zelle mit
+   * mehreren Feldern (Informationstelefon: Anliegen, Notiz, Haken, Knopf): rahmenlos stand das
+   * Textfeld neben einem umrandeten Select und las sich am Handy wie eine Beschriftung. Das
+   * eine Feld des ETB bleibt rahmenlos, dort trägt die Zeile den Rahmen.
+   */
+  felderUmrandet?: boolean;
   style?: CSSProperties;
 }
 
@@ -106,6 +114,7 @@ export default function Schnellerfassungszeile({
   hinweiszeile,
   gestapelt = false,
   feldFuellt = false,
+  felderUmrandet = false,
   style,
 }: SchnellerfassungszeileProps) {
   const { token, rollen } = useRollen();
@@ -116,6 +125,7 @@ export default function Schnellerfassungszeile({
         'lfh-schnellerfassung__feld',
         gestapelt && 'lfh-schnellerfassung__feld--gestapelt',
         feldFuellt && 'lfh-schnellerfassung__feld--fuellt',
+        felderUmrandet && 'lfh-schnellerfassung__feld--umrandet',
       ]
         .filter(Boolean)
         .join(' ')}
