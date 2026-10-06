@@ -20,19 +20,50 @@ pub struct ErinnerungDaten<'a> {
     pub bezug_id: Option<i64>,
 }
 
+/// Fällig: der Fälligkeitszeitpunkt ist erreicht. Trägt EIN `?` für `jetzt`. EINMAL definiert
+/// für [`ANZEIGE_SELECT`] und den Modulzähler [`faellige_offene`] (LFH-935).
+macro_rules! ist_faellig_sql {
+    () => {
+        "(e.faellig_at <= ?)"
+    };
+}
+
 /// SELECT-Projektion inkl. abgeleitetem `ist_faellig`. `jetzt` wird als erster positionaler
 /// `?` gebunden (steht vor der WHERE-Klausel), danach die WHERE-Parameter.
-const ANZEIGE_SELECT: &str =
+const ANZEIGE_SELECT: &str = concat!(
     "SELECT e.id, e.einsatz_id, e.titel, e.beschreibung, e.faellig_at, e.intervall_minuten, \
             e.empfaenger_funktion, e.empfaenger_funktion_code, e.bezug_typ, e.bezug_id, e.quelle, e.status, e.erledigt_at, \
-            e.erstellt_von_id, e.erstellt_at, \
-            (e.faellig_at <= ?) AS ist_faellig, \
+            e.erstellt_von_id, e.erstellt_at, ",
+    ist_faellig_sql!(),
+    " AS ist_faellig, \
             ks.quittiert_at AS quittiert_at, ks.quittiert_von_id AS quittiert_von_id, \
             COALESCE(ks.vollzug_status, 'offen') AS vollzug_status, \
             ks.vollzogen_at AS vollzogen_at, ks.vollzogen_von_id AS vollzogen_von_id \
      FROM erinnerung e \
      LEFT JOIN kommunikation_status ks \
-            ON ks.objekt_typ = 'erinnerung' AND ks.objekt_id = e.id";
+            ON ks.objekt_typ = 'erinnerung' AND ks.objekt_id = e.id"
+);
+
+/// Modulzähler der Erinnerungen (LFH-935): offen und fällig, per `COUNT(*)` über
+/// `idx_erinnerung_einsatz_status`. Dasselbe Fälligkeits-Fragment wie [`ANZEIGE_SELECT`].
+/// Bind-Reihenfolge: `einsatz_id`, Status, dann `jetzt`.
+pub async fn faellige_offene(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<i64, AppError> {
+    const SQL: &str = concat!(
+        "SELECT COUNT(*) FROM erinnerung e WHERE e.einsatz_id = ? AND e.status = ? AND ",
+        ist_faellig_sql!()
+    );
+    sqlx::query_scalar(SQL)
+        .bind(einsatz_id)
+        .bind(STATUS_OFFEN)
+        .bind(jetzt)
+        .fetch_one(pool)
+        .await
+        .map_err(Into::into)
+}
 
 /// Lädt eine Erinnerung als Anzeige; `NotFound`, wenn sie nicht existiert. Bind-Reihenfolge:
 /// `jetzt`, dann `id`. Executor-generisch, damit [`anlegen_tx`] auf seiner Verbindung lädt.

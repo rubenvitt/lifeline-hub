@@ -7,6 +7,13 @@ import { hashKey, type QueryClient, type QueryKey } from '@tanstack/react-query'
  */
 export const LIVE_SAMMELFENSTER_MS = 300;
 
+/**
+ * Eigenes Sammelfenster der Modulzähler (LFH-935, Spec `modul-zaehler`): der Zähler hängt an
+ * zwölf Live-Ereignissen und wird in jedem Einsatz-Tab gehalten. Ein Burst kostet so je Tab
+ * einen Zählerabruf; die Zahl folgt der Liste höchstens 1 s später.
+ */
+export const ZAEHLER_SAMMELFENSTER_MS = 1000;
+
 export interface LiveSammler {
   /** Merkt einen Query-Key für den Abgleich am Ende des laufenden Fensters vor. */
   vormerken(queryKey: QueryKey): void;
@@ -18,7 +25,9 @@ export interface LiveSammler {
 }
 
 /**
- * Gebündelte Invalidierung für EINE Live-Verbindung (LFH-922). Live-Ereignisse invalidieren nur
+ * Gebündelte Invalidierung für EINE Live-Verbindung (LFH-922), Fenster `fensterMs` (Vorgabe
+ * `LIVE_SAMMELFENSTER_MS`; die Modulzähler laufen über einen zweiten Sammler mit
+ * `ZAEHLER_SAMMELFENSTER_MS`, LFH-935). Live-Ereignisse invalidieren nur
  * hierüber (`frontend/AGENTS.md`, „Query-Key-Registry“); Seiteneffekte wie Ton und Toast laufen
  * daneben sofort.
  *
@@ -31,7 +40,10 @@ export interface LiveSammler {
  * - Ein verdeckter Tab markiert nur (`refetchType: 'none'`); beim Zurückwechseln holt der
  *   `focusManager` jede veraltete aktive Abfrage einmal nach. Gelesen wird am Ende des Fensters.
  */
-export function erzeugeLiveSammler(qc: QueryClient): LiveSammler {
+export function erzeugeLiveSammler(
+  qc: QueryClient,
+  fensterMs: number = LIVE_SAMMELFENSTER_MS,
+): LiveSammler {
   const vorgemerkt = new Map<string, QueryKey>();
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -47,13 +59,13 @@ export function erzeugeLiveSammler(qc: QueryClient): LiveSammler {
       if (qc.isFetching({ queryKey }) > 0) vorgemerkt.set(hash, queryKey);
       else markieren(queryKey, refetchType);
     }
-    if (vorgemerkt.size > 0) timer = setTimeout(abgleichen, LIVE_SAMMELFENSTER_MS);
+    if (vorgemerkt.size > 0) timer = setTimeout(abgleichen, fensterMs);
   };
 
   return {
     vormerken(queryKey) {
       vorgemerkt.set(hashKey(queryKey), queryKey);
-      timer ??= setTimeout(abgleichen, LIVE_SAMMELFENSTER_MS);
+      timer ??= setTimeout(abgleichen, fensterMs);
     },
     raeumen() {
       if (timer) clearTimeout(timer);

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useEinsatzLiveStream } from './useEinsatzLiveStream';
-import { LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
+import { LIVE_SAMMELFENSTER_MS, ZAEHLER_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { WIEDERAUFBAU_SCHONFRIST_MS } from './liveVerbindung';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 
@@ -681,6 +681,67 @@ describe('useEinsatzLiveStream', () => {
     expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 3]));
     expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-personal', 3]));
     expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-fahrzeuge', 3]));
+  });
+
+  it('ruft die Modulzähler je Burst einmal ab, die Listen im eigenen Fenster (LFH-935)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    const zaehler = (k: unknown[]) =>
+      JSON.stringify(k) === JSON.stringify(['einsatz-modul-zaehler', 3]);
+    // Zehn Ereignisse in 500 ms.
+    for (let i = 0; i < 10; i += 1) {
+      quelle.emit('meldung');
+      vi.advanceTimersByTime(50);
+    }
+    // Die Liste kam schon im 300-ms-Fenster, der Zähler noch nicht.
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-meldungen', 3]));
+    expect(keysVon(spy).filter(zaehler)).toHaveLength(0);
+    vi.advanceTimersByTime(ZAEHLER_SAMMELFENSTER_MS);
+    expect(keysVon(spy).filter(zaehler)).toHaveLength(1);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-modul-zaehler', 3]));
+  });
+
+  it('merkt die Modulzähler auch bei lagged im eigenen Fenster vor (LFH-935)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte!.emit('lagged');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 3]));
+    expect(spy).not.toHaveBeenCalledWith(...abgleich(['einsatz-modul-zaehler', 3]));
+    vi.advanceTimersByTime(ZAEHLER_SAMMELFENSTER_MS - LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-modul-zaehler', 3]));
+  });
+
+  it('markiert vorgemerkte Modulzähler beim Verlassen nur (LFH-935)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const { unmount } = render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte!.emit('etb');
+    unmount();
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-modul-zaehler', 3], 'none'));
+    vi.advanceTimersByTime(ZAEHLER_SAMMELFENSTER_MS);
+    expect(spy).not.toHaveBeenCalledWith(...abgleich(['einsatz-modul-zaehler', 3]));
   });
 
   it('ruft in einem verdeckten Tab nicht ab, sondern markiert nur (LFH-922)', () => {

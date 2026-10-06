@@ -43,7 +43,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
 - **Modulzähler** (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
   Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat als
-  Handlungsmenge. Ablösung (Uhr), Betreuung und Wetter/Pegel (LFH-663) zählt der Browser
+  Handlungsmenge. Der Server zählt sie per Aggregat ohne Listen zu laden, über dieselben
+  SQL-Fragmente wie die Listen (LFH-935, `tests/modul_zaehler_abfragen.rs`). Ablösung (Uhr), Betreuung und Wetter/Pegel (LFH-663) zählt der Browser
   (`ClientZaehlerQuelle`). Ohne Recht **fehlt** das Modul (`berechtigung::erlaubte_module`). Wer
   eine gezählte Liste invalidiert, invalidiert `modulZaehler` mit (`ZAEHLER_LISTEN_KEYS`,
   `queryKeys.test.ts`).
