@@ -227,7 +227,7 @@ describe('AuftraegePage', () => {
     renderPage();
     await screen.findByText('Deich sichern');
     // Aktion in einem Popconfirm → Trigger + Bestätigen.
-    await userEvent.click(screen.getByText('quittieren'));
+    await userEvent.click(screen.getByText('Quittieren'));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
   });
@@ -248,7 +248,7 @@ describe('AuftraegePage', () => {
       auftrag({ id: 2, auftrag_text: 'Unabhängiger Auftrag' }),
     ]);
 
-    await userEvent.click(screen.getByText('quittieren'));
+    await userEvent.click(screen.getByText('Quittieren'));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
 
     expect(await screen.findByText('1 Empfänger · 1/1 quittiert')).toBeInTheDocument();
@@ -305,7 +305,7 @@ describe('AuftraegePage', () => {
     // behauptet.
     expect(screen.queryByRole('button', { name: /EA West/ })).not.toBeInTheDocument();
 
-    // Beide Knöpfe heißen sichtbar „quittieren"; auseinanderhalten muss sie der zugängliche Name.
+    // Beide Knöpfe heißen sichtbar „Quittieren"; auseinanderhalten muss sie der zugängliche Name.
     expect(screen.getAllByRole('button', { name: /quittieren$/ })).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Süd quittieren' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
@@ -456,12 +456,12 @@ describe('AuftraegePage', () => {
    * Der erste Klick schaltet ohne Rückfrage — der Rückweg steht im Rückgängig-Toast (`POST
    * …/vollzug` mit `status: 'offen'`).
    */
-  it('setzt einen offenen Auftrag mit EINEM Klick auf „In Bearbeitung"', async () => {
+  it('setzt einen offenen Auftrag mit EINEM Klick über „Bearbeitung beginnen" in Bearbeitung', async () => {
     listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'offen' })]);
     setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
     renderPage();
     await screen.findByText('Deich sichern');
-    await userEvent.click(screen.getByRole('button', { name: 'In Bearbeitung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung beginnen' }));
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'in_arbeit', undefined));
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
@@ -471,7 +471,7 @@ describe('AuftraegePage', () => {
     setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
     renderPage();
     await screen.findByText('Deich sichern');
-    await userEvent.click(screen.getByRole('button', { name: 'In Bearbeitung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung beginnen' }));
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(1));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
@@ -501,7 +501,7 @@ describe('AuftraegePage', () => {
     renderPage();
     expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
-    expect(screen.queryByText('quittieren')).not.toBeInTheDocument();
+    expect(screen.queryByText('Quittieren')).not.toBeInTheDocument();
   });
 
   it('?auftrag=<id> hebt den Ziel-Auftrag hervor und räumt den Param (LFH-153)', async () => {

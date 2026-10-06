@@ -56,7 +56,7 @@ async function anmelden(page: Page) {
 
 /**
  * Fahrzeug über die API anlegen. Der `dienststatus` wird mitgelesen: nur an `in_dienst` steht
- * die destruktive Nachbarin „Außer Dienst" — sonst vergliche die Abstandsmessung zwei harmlose
+ * die destruktive Nachbarin „Außer Dienst nehmen" — sonst vergliche die Abstandsmessung zwei harmlose
  * Knöpfe und bliebe fälschlich grün.
  */
 async function fahrzeugAnlegen(page: Page, funkrufname: string) {
@@ -105,20 +105,20 @@ for (const { dichte, zeilenhoehe, abstandSm, abstandMd } of STAFFEL) {
     const zeile = page.locator('tr.ant-table-row').filter({ hasText: fahrzeug.funkrufname });
     await expect(zeile).toHaveCount(1);
     const bearbeiten = zeile.getByRole('button', { name: 'Bearbeiten' });
-    const ausserDienst = zeile.getByRole('button', { name: 'Außer Dienst' });
+    const ausserDienst = zeile.getByRole('button', { name: 'Außer Dienst nehmen' });
     await expect(bearbeiten).toBeVisible();
     await expect(ausserDienst).toBeVisible();
 
     const links = (await bearbeiten.boundingBox())!;
     const rechts = (await ausserDienst.boundingBox())!;
     expect(links, 'Bearbeiten nicht messbar').not.toBeNull();
-    expect(rechts, 'Außer Dienst nicht messbar').not.toBeNull();
+    expect(rechts, 'Außer Dienst nehmen nicht messbar').not.toBeNull();
 
     // (a) Höhe = die Steuerhöhe der Stufe. GLEICHHEIT: nach unten fängt sie eine punktuelle
     //     Klein-Angabe, nach oben eine durchgreifende falsche Stufe.
     for (const [name, box] of [
       ['Bearbeiten', links],
-      ['Außer Dienst', rechts],
+      ['Außer Dienst nehmen', rechts],
     ] as const) {
       expect(
         Math.abs(box.height - zeilenhoehe),

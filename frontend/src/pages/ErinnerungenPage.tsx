@@ -31,7 +31,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
-/** Schluessel-Zeitstempel der Abgeschlossen-Ansicht: erledigt ODER quittiert ODER Anlage. */
+/** Schluessel-Zeitstempel der Abgeschlossen-Ansicht: erledigt ODER erübrigt ODER Anlage. */
 function abschlussZeit(e: Erinnerung): string {
   return e.erledigt_at ?? e.quittiert_at ?? e.erstellt_at;
 }
@@ -74,7 +74,7 @@ export default function ErinnerungenPage() {
     onError: fehler,
   });
   /**
-   * Der Rückweg beider Abschluss-Aktionen: „Erledigt" und „Quittieren" schalten mit einem Klick
+   * Der Rückweg beider Abschluss-Aktionen: „Erledigt" und „Erübrigt" schalten mit einem Klick
    * statt mit Rückfrage; `POST …/erinnerungen/{eid}/oeffnen` räumt dafür alle drei Achsen (Status,
    * Vollzug, Quittung).
    */
@@ -95,7 +95,7 @@ export default function ErinnerungenPage() {
     mutationFn: (eid: number) => quittiereErinnerung(einsatzId, eid),
     onSuccess: (_daten, eid) => {
       invalidiere();
-      zeigeRueckgaengig(message, 'Erinnerung quittiert', () => oeffnenMutation.mutate(eid));
+      zeigeRueckgaengig(message, 'Erinnerung erübrigt', () => oeffnenMutation.mutate(eid));
     },
     onError: fehler,
   });

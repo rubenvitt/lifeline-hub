@@ -223,7 +223,7 @@ test('Katalogtabelle bei 390 px: scrollt auch ohne Aktionsspalte in sich, Kopfze
     page.getByRole('columnheader', { name: 'Aktionen' }),
     'Vorbedingung: ohne Admin-Recht entfällt die Aktionsspalte',
   ).toHaveCount(0);
-  for (const aktion of ['Bearbeiten', 'Außer Dienst', 'Wieder in Dienst']) {
+  for (const aktion of ['Bearbeiten', 'Außer Dienst nehmen', 'Wieder in Dienst nehmen']) {
     await expect(
       page.locator('tr.ant-table-row').getByRole('button', { name: aktion }),
       `Vorbedingung: keine Zeilenaktion „${aktion}"`,

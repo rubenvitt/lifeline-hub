@@ -1,7 +1,12 @@
 import { Button, Flex, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
-import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
+import {
+  NACHFORDERUNG_HANDLUNG,
+  NACHFORDERUNG_STATUS,
+  PrioBadge,
+  StatusBadge,
+} from '../kommunikation';
 import KommKarte from '../kommunikation/KommKarte';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -54,10 +59,11 @@ export default function NachforderungKarte({
     darfSchreiben && n.ist_offen
       ? [
           // Fortschaltung mit EINEM Klick; der Rückweg steht im Rückgängig-Toast, und
-          // `uebergang_erlaubt` nimmt die Rücknahme um genau eine Stufe an.
+          // `uebergang_erlaubt` nimmt die Rücknahme um genau eine Stufe an. Der Knopf nennt die
+          // Handlung („Zusage erfassen"), nicht den Zielstatus (LFH-959).
           next && onStatus ? (
             <Button key="next" onClick={() => onStatus(n.id, next)}>
-              → {NACHFORDERUNG_STATUS[next].label}
+              {NACHFORDERUNG_HANDLUNG[next]}
             </Button>
           ) : null,
           // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → keine Rückfrage.

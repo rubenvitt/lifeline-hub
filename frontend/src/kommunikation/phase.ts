@@ -67,11 +67,43 @@ export const NACHFORDERUNG_STATUS: StatusDeskriptor = {
   abgelehnt: { label: 'Abgelehnt', phase: 'ausnahme' },
 };
 
-/** ERINNERUNG (status 'offen' | 'erledigt' | 'quittiert'). */
+/** ERINNERUNG (status 'offen' | 'erledigt' | 'quittiert'; `quittiert` heißt „Erübrigt“). */
 export const ERINNERUNG_STATUS: StatusDeskriptor = {
   offen: { label: 'Offen', phase: 'offen' },
   erledigt: { label: 'Erledigt', phase: 'abgeschlossen' },
-  quittiert: { label: 'Quittiert', phase: 'abgeschlossen' },
+  // Drahtwert `quittiert`, Wortlaut „Erübrigt“: Quittieren heißt Empfang bestätigt (LFH-959).
+  quittiert: { label: 'Erübrigt', phase: 'abgeschlossen' },
+};
+
+/**
+ * Handlungstexte je ZIELSTATUS (LFH-959): ein Knopf nennt, was er tut, das Statuswort bleibt dem
+ * Etikett (`frontend/AGENTS.md`, Bedien-Leitlinie „Aktionen“). Knopf, ⋮-Menü und Rückfrage lesen
+ * dieselbe Karte; `wortlaut.guard.test.ts` hält sie von den Statuswörtern fern.
+ */
+export const MELDUNG_HANDLUNG: Record<string, string> = {
+  gesichtet: 'Sichten',
+  in_bearbeitung: 'Bearbeitung beginnen',
+  erledigt: 'Als erledigt melden',
+};
+
+export const AUFTRAG_HANDLUNG: Record<string, string> = {
+  in_arbeit: 'Bearbeitung beginnen',
+};
+
+export const NACHFORDERUNG_HANDLUNG: Record<string, string> = {
+  zugesagt: 'Zusage erfassen',
+  unterwegs: 'Abfahrt melden',
+  eingetroffen: 'Eintreffen melden',
+};
+
+/**
+ * Die zwei Abschlusswege einer Erinnerung, Wortlaut aus Entscheidung 10: die Klammer trägt die
+ * Abgrenzung sichtbar, ohne Tooltip. Bewusst nicht im Gleichheits-Guard („Erledigt
+ * (durchgeführt)“ ist entschieden, design.md D2).
+ */
+export const ERINNERUNG_HANDLUNG: Record<string, string> = {
+  quittiert: 'Erübrigt (zur Kenntnis)',
+  erledigt: 'Erledigt (durchgeführt)',
 };
 
 /**

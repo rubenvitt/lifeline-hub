@@ -5,7 +5,13 @@ import { Select } from '../components/Select';
 import { useState, type ReactNode } from 'react';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
-import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge } from '../kommunikation';
+import {
+  MELDUNG_HANDLUNG,
+  MELDUNG_STATUS,
+  PrioBadge,
+  QuittungIndikator,
+  StatusBadge,
+} from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
@@ -48,7 +54,9 @@ interface MeldungKarteProps {
 
 /**
  * Bestätigungs-Achse der Sofortmeldung, ORTHOGONAL zum Triage-Status. Bestätigt →
- * QuittungIndikator; unbestätigt mit Frist/Eskalation → eigener Chip mit Frist.
+ * QuittungIndikator; unbestätigt mit Frist/Eskalation → eigener Chip mit Frist. Die Uhr steht im
+ * Chip „Bestätigung überfällig“, nicht als eigenes „Alarm“ daneben (LFH-959): ein Wort, wie
+ * Kennzahlenband, Modulzähler und Lage-Dashboard.
  */
 function bestaetigungsAchse(m: Meldung, formatZeit: (wire?: string | null) => string): ReactNode {
   if (!m.bestaetigung_pflicht) return null;
@@ -57,7 +65,15 @@ function bestaetigungsAchse(m: Meldung, formatZeit: (wire?: string | null) => st
   }
   if (m.ist_ueberfaellig || m.eskaliert) {
     return (
-      <StatusChip ton="alarm" wort={`Bestätigung überfällig${m.eskaliert ? ' (eskaliert)' : ''}`} />
+      <StatusChip
+        ton="alarm"
+        code={
+          <span aria-hidden="true">
+            <IconUhr />
+          </span>
+        }
+        wort={`Bestätigung überfällig${m.eskaliert ? ' (eskaliert)' : ''}`}
+      />
     );
   }
   return (
@@ -100,8 +116,8 @@ export default function MeldungKarte({
   // alles Weitere hängt am ⋮-Menü.
   //
   // Rückfragen nach Umkehrbarkeit:
-  //  • „Sichten"/„In Bearbeitung" ohne — `setze_status` nimmt jeden Status zurück.
-  //  • „Erledigt" mit — die Abgeschlossen-Ansicht trägt keine Aktion zurück. Als `<Modal>` mit
+  //  • „Sichten"/„Bearbeitung beginnen" ohne — `setze_status` nimmt jeden Status zurück.
+  //  • „Als erledigt melden" mit — die Abgeschlossen-Ansicht trägt keine Aktion zurück. Als `<Modal>` mit
   //    eigenem State, kein `Popconfirm`, und derselbe Pfad, ob sichtbar oder im Menü.
   //  • „Bestätigen" behält seinen `Popconfirm` (sichtbarer Knopf, einmalig).
   const [erledigtOffen, setErledigtOffen] = useState(false);
@@ -112,33 +128,40 @@ export default function MeldungKarte({
     !m.ist_bestaetigt &&
     onBestaetigen
   );
-  // Je Status genau eine Vorwärtsbewegung; `erledigt` hat keine. Der `darfSchreiben`-Riegel steht
+  // Je Status genau eine Vorwärtsbewegung; `erledigt` hat keine. Der Knopf nennt die Handlung aus
+  // `MELDUNG_HANDLUNG`, nicht das Statuswort (LFH-959). Der `darfSchreiben`-Riegel steht
   // HIER: `MeldungenPage` übergibt `onStatus` auch Beobachtern, der Callback ist kein Rechtebeleg.
   const naechster: { ziel: MeldungStatus; label: string } | null = !(darfSchreiben && onStatus)
     ? null
     : m.status === 'neu'
-      ? { ziel: 'gesichtet', label: 'Sichten' }
+      ? { ziel: 'gesichtet', label: MELDUNG_HANDLUNG.gesichtet }
       : m.status === 'gesichtet'
-        ? { ziel: 'in_bearbeitung', label: 'In Bearbeitung' }
+        ? { ziel: 'in_bearbeitung', label: MELDUNG_HANDLUNG.in_bearbeitung }
         : m.status === 'in_bearbeitung'
-          ? { ziel: 'erledigt', label: 'Erledigt' }
+          ? { ziel: 'erledigt', label: MELDUNG_HANDLUNG.erledigt }
           : null;
 
   const weitere: { key: string; label: string; onClick: () => void }[] = darfSchreiben
     ? [
         // Was der Primär-Knopf gerade nicht zeigt, bleibt über das Menü erreichbar (z. B. der
-        // Direktsprung auf „Erledigt" bei einer neuen Meldung).
+        // Direktsprung auf „Als erledigt melden" bei einer neuen Meldung).
         ...(m.status === 'neu' && onStatus
           ? [
               {
                 key: 'ib',
-                label: 'In Bearbeitung',
+                label: MELDUNG_HANDLUNG.in_bearbeitung,
                 onClick: () => onStatus(m.id, 'in_bearbeitung'),
               },
             ]
           : []),
         ...(m.status !== 'erledigt' && m.status !== 'in_bearbeitung' && onStatus
-          ? [{ key: 'er', label: 'Erledigt', onClick: () => setErledigtOffen(true) }]
+          ? [
+              {
+                key: 'er',
+                label: MELDUNG_HANDLUNG.erledigt,
+                onClick: () => setErledigtOffen(true),
+              },
+            ]
           : []),
         // Lage-Übergabe und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung selbst.
         ...(!m.lagerelevant && onLagerelevant
@@ -183,14 +206,6 @@ export default function MeldungKarte({
           )}
         </Space>
         <Space size={10} wrap>
-          {alarmiert && (
-            <Text type="danger" strong style={{ fontSize: 12 }}>
-              <span aria-hidden="true">
-                <IconUhr />
-              </span>{' '}
-              Alarm
-            </Text>
-          )}
           {bestaetigungsAchse(m, formatZeit)}
         </Space>
       </Flex>
@@ -290,7 +305,7 @@ export default function MeldungKarte({
       <Modal
         open={erledigtOffen}
         title="Meldung auf „Erledigt“ setzen?"
-        okText="Bestätigen"
+        okText={MELDUNG_HANDLUNG.erledigt}
         cancelText="Abbrechen"
         onOk={() => {
           setErledigtOffen(false);

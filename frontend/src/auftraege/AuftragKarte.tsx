@@ -2,7 +2,7 @@ import { IconUhr } from '../icons';
 import { Button, Collapse, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Auftrag } from '../api/types';
-import { AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
+import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
@@ -101,9 +101,10 @@ export default function AuftragKarte({
     ? [
         // EIN Klick; der Rückweg steht im Rückgängig-Toast (`POST …/vollzug` mit `status: 'offen'`, nur
         // aus `in_arbeit`). „Abnehmen" behält seine Rückfrage: die Abnahme hat keinen Rückweg.
+        // Der Knopf nennt die Handlung, das Etikett daneben sagt „Offen" (LFH-959).
         a.bearbeitungsstatus === 'offen' && onInArbeit ? (
           <Button key="ia" onClick={() => onInArbeit(a.id)}>
-            In Bearbeitung
+            {AUFTRAG_HANDLUNG.in_arbeit}
           </Button>
         ) : null,
         // „Vollzug melden" öffnet ein Modal (eigene Bestätigung).
@@ -228,7 +229,7 @@ export default function AuftragKarte({
                     loading={istQuittierungZiel(e.id)}
                     disabled={quittierungLaeuft}
                   >
-                    quittieren
+                    Quittieren
                   </Button>
                 </Popconfirm>
               )}

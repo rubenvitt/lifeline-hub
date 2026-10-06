@@ -82,7 +82,7 @@ const TABELLEN: Tabelle[] = [
     },
     status: 'in Dienst',
     menue: (k) => `Aktionen zu Fahrzeug ${k}`,
-    zweiteAktion: 'Außer Dienst',
+    zweiteAktion: 'Außer Dienst nehmen',
   },
   {
     name: 'Personal',
@@ -99,7 +99,7 @@ const TABELLEN: Tabelle[] = [
     },
     status: 'in Dienst',
     menue: (k) => `Aktionen zu Person ${k}`,
-    zweiteAktion: 'Außer Dienst',
+    zweiteAktion: 'Außer Dienst nehmen',
   },
   {
     name: 'Sprechgruppen',

@@ -333,10 +333,10 @@ export default function MeldungenPage() {
           zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
         />
         <Kennzahl
-          titel="Alarmiert"
+          titel="Bestätigung überfällig"
           groesse="klein"
-          wert={kennzahlen.alarmiert}
-          ton={kennzahlen.alarmiert > 0 ? 'alarm' : 'neutral'}
+          wert={kennzahlen.bestaetigungUeberfaellig}
+          ton={kennzahlen.bestaetigungUeberfaellig > 0 ? 'alarm' : 'neutral'}
           notiz="Bestätigungsfrist verstrichen"
           zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
         />

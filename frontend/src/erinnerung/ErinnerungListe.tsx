@@ -4,7 +4,7 @@ import ErinnerungKarte from './ErinnerungKarte';
 
 interface ErinnerungListeProps {
   erinnerungen: Erinnerung[];
-  /** Steuert die Abschluss-Spalten (Erledigt/Quittiert-Zeitpunkt) in der Abgeschlossen-Ansicht. */
+  /** Steuert die Abschluss-Spalten (Erledigt/Erübrigt-Zeitpunkt) in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';
   darfSchreiben: boolean;
   onErledigen: (id: number) => void;
