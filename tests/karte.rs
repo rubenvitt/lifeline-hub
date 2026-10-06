@@ -2428,3 +2428,227 @@ async fn baubare_regionen_und_bau_status_forwarden_service_antwort_roh() {
         "verschachtelter Build-Status unverändert durchgereicht: {status:?}"
     );
 }
+
+// ===== Offline-Regionen: Reader je Pfad, Teildateien, Löschen bei laufendem Download (LFH-934) =====
+
+/// Legt eine heruntergeladene Karte an (Zeile `bereit`, Pfad `karte-{id}.mbtiles`) und schreibt
+/// ihre MBTiles mit einer Kachel `daten` nach `karten_dir`. Liefert die id.
+async fn heruntergeladene_karte(
+    pool: &sqlx::SqlitePool,
+    karten_dir: &std::path::Path,
+    daten: &[u8],
+) -> i64 {
+    use lifeline_hub::karte::registry::repo;
+    let k = repo::neue_download_karte(
+        pool,
+        &repo::OfflineDownloadEingabe {
+            name: "Region".into(),
+            quell_url: "https://example.test/region.mbtiles".into(),
+            lizenz: "© Test".into(),
+            kachel_schema: "shortbread".into(),
+            format: "pbf".into(),
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap();
+    let dateiname = format!("karte-{}.mbtiles", k.id);
+    schreibe_fixture_mbtiles(&karten_dir.join(&dateiname), daten).await;
+    repo::markiere_bereit(pool, k.id, &dateiname, 1, "abc")
+        .await
+        .unwrap();
+    k.id
+}
+
+async fn kachel(app: &axum::Router, uri: &str) -> (StatusCode, Vec<u8>) {
+    let res = anfrage(app, "GET", uri, None, None).await;
+    let status = res.status();
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    (status, bytes.to_vec())
+}
+
+// Zwei bereite Regionen, verschränkt abgefragt wie MapLibre mit zwei Vector-Sources: jede liefert
+// ihre eigene Kachel. (Dass jede Datei dabei nur einmal geöffnet wird, belegt der Unit-Test
+// `abwechselnder_abruf_oeffnet_jede_datei_einmal` in `src/karte/mbtiles.rs`.)
+#[tokio::test]
+async fn zwei_regionen_verschraenkt_liefern_je_ihre_kachel() {
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let a = heruntergeladene_karte(&pool, dir.path(), &[0xAA]).await;
+    let b = heruntergeladene_karte(&pool, dir.path(), &[0xBB]).await;
+    let app = app_mit(pool, dir.path().to_path_buf());
+    for _ in 0..3 {
+        let (s, d) = kachel(&app, &format!("/api/karte/offline/{a}/tiles/1/0/0")).await;
+        assert_eq!((s, d), (StatusCode::OK, vec![0xAA]));
+        let (s, d) = kachel(&app, &format!("/api/karte/offline/{b}/tiles/1/0/0")).await;
+        assert_eq!((s, d), (StatusCode::OK, vec![0xBB]));
+    }
+}
+
+// Containment gegen Symlinks bleibt: eine registrierte Datei, die auf eine MBTiles außerhalb des
+// karten_dir zeigt, wird nicht ausgeliefert — auch nicht beim zweiten Abruf.
+#[cfg(unix)]
+#[tokio::test]
+async fn symlink_aus_dem_karten_dir_heraus_liefert_nichts() {
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let fremd = tempfile::tempdir().unwrap();
+    let ziel = fremd.path().join("fremd.mbtiles");
+    schreibe_fixture_mbtiles(&ziel, &[0xEE]).await;
+    std::os::unix::fs::symlink(&ziel, dir.path().join("link.mbtiles")).unwrap();
+    registriere_und_aktiviere(&pool, "link.mbtiles", "pbf").await;
+    let app = app_mit(pool, dir.path().to_path_buf());
+    for _ in 0..2 {
+        let (s, d) = kachel(&app, "/api/karte/offline/tiles/1/0/0").await;
+        assert_eq!(s, StatusCode::NO_CONTENT);
+        assert!(d.is_empty());
+    }
+}
+
+// Ein In-Place-Reload lässt die Zeile `bereit`; bricht der Server mitten im Download ab, bleibt
+// die `.part` liegen. Die Crash-Recovery räumt sie, die Karte bleibt bereit und auslieferbar.
+#[tokio::test]
+async fn neustart_raeumt_teildatei_einer_bereiten_karte() {
+    use lifeline_hub::karte::registry::repo;
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let id = heruntergeladene_karte(&pool, dir.path(), &[0xAA]).await;
+    let part = dir.path().join(format!("karte-{id}.mbtiles.part"));
+    std::fs::write(&part, b"halber Reload").unwrap();
+    let fremd = dir.path().join("notizen.txt");
+    std::fs::write(&fremd, b"bleibt").unwrap();
+
+    lifeline_hub::karte::download::raeume_nach_neustart(&pool, dir.path()).await;
+
+    assert!(!part.exists(), "Teildatei des Reloads ist weg");
+    assert!(fremd.exists(), "fremde Datei bleibt");
+    let k = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
+    assert_eq!(k.status, "bereit");
+    let app = app_mit(pool, dir.path().to_path_buf());
+    let (s, d) = kachel(&app, &format!("/api/karte/offline/{id}/tiles/1/0/0")).await;
+    assert_eq!((s, d), (StatusCode::OK, vec![0xAA]));
+}
+
+// Löschen bei laufendem Download: 422 und keine Datei angefasst. Nach dem Abbruch (der Task
+// räumt seinen Fortschritt-Eintrag) löscht DELETE wie bisher.
+#[tokio::test]
+async fn loeschen_bei_laufendem_download_ist_422() {
+    use lifeline_hub::karte::download::{neue_fortschritt_map, Fortschritt};
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let fortschritt = neue_fortschritt_map();
+    let (app, pool) = {
+        let (karten_dir, fortschritt) = (karten_dir.clone(), fortschritt.clone());
+        common::setup_mit_state(move |s| {
+            s.karten_dir = karten_dir;
+            s.download_fortschritt = fortschritt;
+        })
+        .await
+    };
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let id = heruntergeladene_karte(&pool, &karten_dir, &[0xAA]).await;
+    let datei = karten_dir.join(format!("karte-{id}.mbtiles"));
+    let part = karten_dir.join(format!("karte-{id}.mbtiles.part"));
+    std::fs::write(&part, b"laeuft").unwrap();
+    let f = Arc::new(Fortschritt::default());
+    fortschritt.write().unwrap().insert(id, f.clone());
+
+    let uri = format!("/api/karte/offline-karten/{id}");
+    let res = anfrage(&app, "DELETE", &uri, Some(&cookie), None).await;
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(json(res).await["error"]
+        .as_str()
+        .unwrap()
+        .contains("abbrechen"));
+    assert!(datei.exists() && part.exists(), "keine Datei entlinkt");
+    let k = lifeline_hub::karte::registry::repo::finde_offline_karte(&pool, id)
+        .await
+        .unwrap();
+    assert!(k.is_some(), "Zeile bleibt");
+
+    let res = anfrage(
+        &app,
+        "POST",
+        &format!("/api/karte/offline-karten/{id}/abbrechen"),
+        Some(&cookie),
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert!(f.abbruch.load(Ordering::Relaxed));
+    // Der Download-Task endet und gibt seinen Slot frei.
+    fortschritt.write().unwrap().remove(&id);
+
+    let res = anfrage(&app, "DELETE", &uri, Some(&cookie), None).await;
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert!(!datei.exists() && !part.exists(), "Dateien gelöscht");
+    assert!(
+        fortschritt.read().unwrap().is_empty(),
+        "Löschen gibt seinen Slot wieder frei"
+    );
+}
+
+// Containment je Anfrage, auch nach einem Cache-Treffer: wird die ausgelieferte Datei durch einen
+// Symlink nach außen ersetzt, antwortet die Auslieferung 204 statt die fremde Datei zu lesen.
+#[cfg(unix)]
+#[tokio::test]
+async fn symlink_nach_cache_treffer_liefert_nichts() {
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let fremd = tempfile::tempdir().unwrap();
+    let ziel = fremd.path().join("fremd.mbtiles");
+    schreibe_fixture_mbtiles(&ziel, &[0xEE]).await;
+    let id = heruntergeladene_karte(&pool, dir.path(), &[0xAA]).await;
+    let app = app_mit(pool, dir.path().to_path_buf());
+    let uri = format!("/api/karte/offline/{id}/tiles/1/0/0");
+    assert_eq!(kachel(&app, &uri).await, (StatusCode::OK, vec![0xAA]));
+
+    let datei = dir.path().join(format!("karte-{id}.mbtiles"));
+    std::fs::remove_file(&datei).unwrap();
+    std::os::unix::fs::symlink(&ziel, &datei).unwrap();
+
+    let (s, d) = kachel(&app, &uri).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert!(d.is_empty());
+}
+
+// Löschen gibt den Pool genau dieser Karte frei: ein Neu-Download unter derselben id (gleicher
+// Pfad, neue Inode) liefert den neuen Inhalt, die andere Region bleibt unberührt.
+#[tokio::test]
+async fn loeschen_verwirft_den_reader_der_karte() {
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let (app, pool) = {
+        let karten_dir = karten_dir.clone();
+        common::setup_mit_state(move |s| s.karten_dir = karten_dir).await
+    };
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    // b zuerst: a trägt die höchste rowid und wird nach dem Löschen neu vergeben.
+    let b = heruntergeladene_karte(&pool, &karten_dir, &[0xBB]).await;
+    let a = heruntergeladene_karte(&pool, &karten_dir, &[0xAA]).await;
+    let (s, d) = kachel(&app, &format!("/api/karte/offline/{a}/tiles/1/0/0")).await;
+    assert_eq!((s, d), (StatusCode::OK, vec![0xAA]));
+    let (s, _) = kachel(&app, &format!("/api/karte/offline/{b}/tiles/1/0/0")).await;
+    assert_eq!(s, StatusCode::OK);
+
+    let res = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/karte/offline-karten/{a}"),
+        Some(&cookie),
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+    // Neu-Download vergibt die freie rowid erneut → derselbe Pfad mit neuem Inhalt.
+    let neu = heruntergeladene_karte(&pool, &karten_dir, &[0xCC]).await;
+    assert_eq!(
+        neu, a,
+        "ohne AUTOINCREMENT vergibt SQLite max(rowid) + 1 neu"
+    );
+    let (s, d) = kachel(&app, &format!("/api/karte/offline/{a}/tiles/1/0/0")).await;
+    assert_eq!((s, d), (StatusCode::OK, vec![0xCC]));
+    let (s, d) = kachel(&app, &format!("/api/karte/offline/{b}/tiles/1/0/0")).await;
+    assert_eq!((s, d), (StatusCode::OK, vec![0xBB]));
+}
