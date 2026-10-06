@@ -18,6 +18,7 @@ import type {
 } from '../../api/types';
 import { einsatzFixture } from '../../test/fixtures';
 import type { BerichtQuellen, EinsatzberichtRoh, QuellenErgebnis } from './abruf';
+import { letzterFreigegebenerLagebericht, type LageberichtQuelle } from './verdichtung';
 
 /**
  * Testdaten des Einsatzberichts (LFH-726), geteilt von Verdichtungs- und Seitentest. Die Namen
@@ -81,6 +82,13 @@ export function lagebericht(teil: Partial<LageberichtAnzeige> = {}): Lagebericht
     abschnitte: [{ schluessel: 'lage', text: 'Brand in Halle 3.' }],
     ...teil,
   } as LageberichtAnzeige;
+}
+
+/** Die Quelle `lageberichte` wie `ladeLageberichtQuelle`: Kopfliste plus Detail des letzten
+ *  freigegebenen Berichts. */
+export function lageberichtQuelle(berichte: LageberichtAnzeige[]): LageberichtQuelle {
+  const kopf = letzterFreigegebenerLagebericht(berichte);
+  return { liste: berichte, letzter: berichte.find((b) => b.id === kopf?.id) ?? null };
 }
 
 export function etbEintrag(teil: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
@@ -176,7 +184,7 @@ export function rohBericht(
       { personal_id: 12, perioden: [periode('2026-03-29T01:00:00', null)] },
     ] as PersonPerioden[]),
     fahrzeuge: daten([{ id: 21 }, { id: 22 }] as EinsatzFahrzeug[]),
-    lageberichte: daten([lagebericht()]),
+    lageberichte: daten(lageberichtQuelle([lagebericht()])),
     personen: daten([person()]),
     schaeden: daten([
       {

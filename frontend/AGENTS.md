@@ -581,6 +581,16 @@ Spec `bedien-arbeitsplatz`).
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
   bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
   `einheit:<id>`).
+- **Freitext nie länger als der Server erlaubt** (LFH-937, Spec `eingabegrenzen`): Grenzen nur aus
+  `api/eingabegrenzen.ts` (Spiegeltest `tests/eingabegrenzen_spiegel.rs`). Mehrzeilige Felder
+  (TextArea, Markdown) tragen den Zähler `count={zeichenGrenze(max)}` aus
+  `components/zeichenGrenze.tsx`; natives `maxLength` nur bei kurzen einzeiligen Feldern ohne
+  antd-Zähler. Der Zähler erscheint erst ab 80 % (Höhenbudget der ETB-Leiste), Überlänge in
+  `alarmText` und als Wort („zu lang“). **Es wird nie gekürzt**, auch kein vorbelegter oder
+  eingefügter Text: Überlänge bleibt stehen und sperrt das Senden — im Formular über
+  `zeichenRegel` (Pflicht an jedem Feld mit `zeichenGrenze`), außerhalb eines Formulars über
+  `istZuLang` am Sende-Knopf. Die Schnellerfassung prüft die Länge **vor** Upload und Queue
+  (`laengenVerstoss`): ein zu langer Baustein wird nie eingereiht.
 - Dichte kommt vom `ConfigProvider`. `test/utils.tsx` rendert ein **nacktes** `ConfigProvider`
   ohne Theme — Höhen-/Trefferflächen-Aussagen im Vitest belegen nichts.
 
@@ -630,6 +640,13 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   (Modulzähler, ETB-Zeitachse, Meldungen) übernehmen ihn, statt eigene Timer zu bauen. Ein
   Neuaufbau des Browsers nach dem Kontroll-Ereignis `position` gleicht im Einsatz-Strom nur die
   Org-Keys ab (der Server liefert per `Last-Event-ID` nach), sonst und bei neuer Verbindung voll.
+- **Gezielter Abgleich nach Payload** (LFH-931, Spec `live-abgleich`): trägt ein Ereignis seine
+  Objekt-Kennung, ordnet `EINSATZ_STREAM_ZIELE` zu — nur das Detail bei `nur_inhalt`, nur die
+  Anhangliste bei `anhang`, eine Zeile über `live/zeilenAbgleich.ts` (bis 10 Kennungen je
+  Fenster, sonst und bei verdecktem Tab, Fehler oder fehlender Liste der Sammler). Ohne Kennung
+  gelten die Prefixe aus `EINSATZ_STREAM_EVENTS`, `lagged` gleicht weiter alles ab. Jeder gezielte
+  Key liegt unter den Prefixen seines Ereignisses (`queryKeys.test.ts`); eine zeilenweise
+  abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher).
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

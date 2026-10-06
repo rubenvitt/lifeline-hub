@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
@@ -192,5 +192,135 @@ describe('AuftragFormular — Frist und Erteilung in der Anzeigezone (LFH-692)',
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('AuftragFormular — Eingabegrenzen (LFH-937)', () => {
+  it('zeigt den Zähler am Auftragstext erst ab 80 % und kürzt eingefügten Text nie', () => {
+    rendern();
+    const text = screen.getByLabelText('Auftrag / Was');
+    fireEvent.change(text, { target: { value: 'a'.repeat(7_999) } });
+    expect(screen.queryByText(/\/ 10\.000/)).toBeNull();
+    fireEvent.change(text, { target: { value: 'a'.repeat(8_000) } });
+    expect(screen.getByText('8.000 / 10.000')).toBeInTheDocument();
+    fireEvent.change(text, { target: { value: 'a'.repeat(10_003) } });
+    expect(text).toHaveValue('a'.repeat(10_003));
+    expect(screen.getByText('10.003 / 10.000 · zu lang')).toBeInTheDocument();
+  });
+
+  it('ein zu langer initialText bleibt beim Löschen eines Zeichens vollständig', () => {
+    const start = `${'m'.repeat(10_000)}ENDE`;
+    rendern({ initialText: start });
+    const text = screen.getByLabelText('Auftrag / Was');
+    fireEvent.change(text, { target: { value: start.slice(1) } });
+    expect(text).toHaveValue(start.slice(1));
+  });
+
+  it('kürzt einen zu langen initialText nicht still: Senden scheitert, bis gekürzt ist', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen, initialText: 'm'.repeat(10_001) });
+    const text = screen.getByLabelText('Auftrag / Was');
+    expect(text).toHaveValue('m'.repeat(10_001));
+    expect(screen.getByText('10.001 / 10.000 · zu lang')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    expect(
+      await screen.findByText('Auftragstext darf höchstens 10.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+
+    fireEvent.change(text, { target: { value: 'Erkunden' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+  });
+
+  it('lehnt einen freien Empfänger über 200 Zeichen ab', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    fireEvent.change(screen.getByLabelText('Empfänger'), {
+      target: { value: `${'f'.repeat(201)},` },
+    });
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    expect(
+      await screen.findByText('Ein Empfänger darf höchstens 200 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+  });
+
+  it('nimmt höchstens 50 Empfänger an, auch beim Einfügen einer langen Liste', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    const liste = Array.from({ length: 51 }, (_, i) => `Stelle ${i + 1}`).join(',');
+    fireEvent.change(screen.getByLabelText('Empfänger'), { target: { value: `${liste},` } });
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0].empfaenger).toHaveLength(50);
+  });
+
+  it('begrenzt die Extern-Bezeichnung nativ auf 200 Zeichen', async () => {
+    rendern();
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    await userEvent.click(screen.getByLabelText('Richtung'));
+    await userEvent.click(await screen.findByTitle('Extern'));
+    expect(screen.getByLabelText('Externe Bezeichnung')).toHaveAttribute('maxlength', '200');
+  });
+
+  it('zählt die sieben Befehlsfelder ab 80 %; über 2 000 Zeichen bleiben sie stehen und sperren', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    fireEvent.change(screen.getByLabelText('Lage'), { target: { value: 'l'.repeat(1_600) } });
+    expect(screen.getByText('1.600 / 2.000')).toBeInTheDocument();
+    for (const feld of SKK) {
+      const el = screen.getByLabelText(feld);
+      expect(el).not.toHaveAttribute('maxlength');
+      fireEvent.change(el, { target: { value: 's'.repeat(2_001) } });
+      expect(el).toHaveValue('s'.repeat(2_001));
+    }
+    expect(screen.getAllByText('2.001 / 2.000 · zu lang')).toHaveLength(7);
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    expect(
+      await screen.findByText('Absicht darf höchstens 2.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Sicherheit darf höchstens 2.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+  });
+
+  async function externMitBezeichnung() {
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    await userEvent.click(screen.getByLabelText('Richtung'));
+    await userEvent.click(await screen.findByTitle('Extern'));
+    await userEvent.type(screen.getByLabelText('Externe Bezeichnung'), 'Leitstelle Nord');
+  }
+
+  it('extern: 50 Tags plus externer Adressat sind 51 Empfänger und werden abgelehnt', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    const liste = Array.from({ length: 50 }, (_, i) => `Stelle ${i + 1}`).join(',');
+    fireEvent.change(screen.getByLabelText('Empfänger'), { target: { value: `${liste},` } });
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await externMitBezeichnung();
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    expect(await screen.findByText('Höchstens 50 Empfänger je Auftrag')).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+  });
+
+  it('extern: 49 Tags plus externer Adressat gehen als 50 Empfänger hinaus', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    const liste = Array.from({ length: 49 }, (_, i) => `Stelle ${i + 1}`).join(',');
+    fireEvent.change(screen.getByLabelText('Empfänger'), { target: { value: `${liste},` } });
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await externMitBezeichnung();
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0].empfaenger).toHaveLength(50);
   });
 });

@@ -392,7 +392,7 @@ function basisHandler(
     ...extra,
     http.get('/api/einsaetze/1', () => HttpResponse.json(EINSATZ)),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([UHS_NICHT_VERORTET])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([SCHADEN_VERORTET])),
+    http.get('/api/einsaetze/1/schaeden/marker', () => HttpResponse.json([SCHADEN_VERORTET])),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
@@ -517,7 +517,7 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
       [
         '/api/einsaetze/1',
         '/api/einsaetze/1/uhs',
-        '/api/einsaetze/1/schaeden',
+        '/api/einsaetze/1/schaeden/marker',
         '/api/einsaetze/1/einheiten',
         '/api/einsaetze/1/fahrzeuge',
         '/api/einsaetze/1/abschnitte',

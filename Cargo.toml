@@ -120,6 +120,9 @@ webauthn-rs-core = "=0.5.5"
 # SSE-Body eines OFFENEN Streams frameweise lesen: `to_bytes` wartet auf ein Stream-Ende, das
 # bei einem Live-Feed nie kommt.
 http-body-util = "0.1"
+# gzip-Bomben für die Deckel-Tests ausgehender Abrufe (LFH-923, `src/http_begrenzt.rs`); liegt
+# über `osmpbf` ohnehin im Lockfile.
+flate2 = "1"
 # `all` nur für Tests: liest die Keepalive-Frist zurück (`verbindung::tests`).
 socket2 = { version = "0.6", features = ["all"] }
 # `test-util` für `#[tokio::test(start_paused = true)]`: die Fristen in `transfer::tests` laufen
@@ -141,7 +144,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.83"
+version = "1.0.0-alpha.84"
 
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]

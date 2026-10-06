@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import HeraufstufenModal from './HeraufstufenModal';
@@ -112,5 +112,24 @@ describe('HeraufstufenModal', () => {
       'Deich instabil',
       [101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
     );
+  });
+
+  it('LFH-937: ein Text über 20 000 Zeichen wird nicht still gekürzt und nicht heraufgestuft', async () => {
+    const lang = { ...nachricht(), inhalt: 'x'.repeat(20_001) };
+    const onHeraufstufen = oeffne(lang);
+    expect(screen.getByText('20.001 / 20.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
+    expect(
+      await screen.findByText('Text darf höchstens 20.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onHeraufstufen).not.toHaveBeenCalled();
+  });
+
+  it('LFH-937: ein zu langer Text bleibt beim Löschen eines Zeichens vollständig', () => {
+    const start = `${'x'.repeat(20_000)}ENDE`;
+    oeffne({ ...nachricht(), inhalt: start });
+    const feld = screen.getByDisplayValue(start);
+    fireEvent.change(feld, { target: { value: start.slice(1) } });
+    expect(feld).toHaveValue(start.slice(1));
   });
 });

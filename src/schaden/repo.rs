@@ -1,4 +1,4 @@
-use super::SchadenAnzeige;
+use super::{SchadenAnzeige, SchadenMarker};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -85,6 +85,18 @@ pub async fn liste(
             .fetch_all(pool)
             .await?,
     )
+}
+
+/// Marker aller nicht stornierten Schäden eines Einsatzes, neueste Registriernummer zuerst
+/// (LFH-931). Ohne Joins und Freitexte.
+pub async fn marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<SchadenMarker>, AppError> {
+    Ok(sqlx::query_as::<_, SchadenMarker>(
+        "SELECT id, registrier_nr, status, typ, ausmass, lat, lon FROM einsatz_schaden \
+         WHERE einsatz_id = ? AND storniert_at IS NULL ORDER BY registrier_nr DESC",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
 }
 
 pub async fn laden(

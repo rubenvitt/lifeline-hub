@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  stuetzpunkte,
+  zuVieleStuetzpunkte,
   polygonZentroid,
   parseGeometry,
   polygonFlaecheM2,
@@ -423,5 +425,22 @@ describe('geometrieZumKlickFeature (LFH-282)', () => {
       props: {},
       geometrie: null,
     });
+  });
+});
+
+describe('stuetzpunkte (LFH-937)', () => {
+  it('zählt beim Polygon die Positionen aller Ringe, beim Linienzug seine Positionen', () => {
+    const ring = (n: number) => Array.from({ length: n }, (_, i) => [i, i] as [number, number]);
+    expect(stuetzpunkte({ type: 'Polygon', coordinates: [ring(5), ring(4)] })).toBe(9);
+    expect(stuetzpunkte({ type: 'LineString', coordinates: ring(7) })).toBe(7);
+  });
+
+  it('erlaubt genau 5 000 Stützpunkte, nicht einen mehr', () => {
+    const linie = (n: number) => ({
+      type: 'LineString' as const,
+      coordinates: Array.from({ length: n }, (_, i) => [i, 0] as [number, number]),
+    });
+    expect(zuVieleStuetzpunkte(linie(5_000))).toBe(false);
+    expect(zuVieleStuetzpunkte(linie(5_001))).toBe(true);
   });
 });

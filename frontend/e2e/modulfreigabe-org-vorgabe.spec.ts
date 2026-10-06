@@ -56,7 +56,9 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await karteBereit(page);
 
     // Vorbedingung: freie Kartenquellen liefen — sonst wäre „kein Abruf" trivial.
-    await expect.poll(() => abrufe.includes(`/api/einsaetze/${einsatzId}/schaeden`)).toBe(true);
+    await expect
+      .poll(() => abrufe.includes(`/api/einsaetze/${einsatzId}/schaeden/marker`))
+      .toBe(true);
     expect(abrufe).toContain(`/api/einsaetze/${einsatzId}/modul-freigaben`);
 
     // Navigation: das Modul steht da, gesperrt, mit Grund.

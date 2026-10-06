@@ -1,11 +1,9 @@
-import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Space } from 'antd';
 import { Datenfeld, Datenraster } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
-import type { LageberichtAnzeige } from '../api/types';
-import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
+import { lageberichtAbfrage } from '../command-palette/datensatzAbfrage';
 import { VORSCHAU_UNTER_EBENE, VorschauZustand } from '../command-palette/VorschauZustand';
 import LageberichtText from './LageberichtText';
 import { vorlage } from './vorlagen';
@@ -13,14 +11,13 @@ import { vorlage } from './vorlagen';
 /**
  * Lese-Vorschau eines Lageberichts in der Sprungpalette.
  *
- * Quelle ist die Lageberichtsliste (das Fach der Palette); sie trägt die Abschnittstexte, ein
- * Einzel-GET wäre ein zweites Fach für dieselben Bytes. Der Titel steht schon im Kopf der
- * Palette. Darunter Status, Vorlage, Fassung, Zeitstand, Ersteller, ggf. Freigabe und der
+ * Quelle ist das Detail des Lageberichts: die Liste trägt seit LFH-931 nur Kopfdaten, den Text
+ * liefert nur der Einzelabruf (Spec `listen-projektion`). Der Detail-Key ist live. Der Titel
+ * steht schon im Kopf der Palette. Darunter Status, Vorlage, Fassung, Zeitstand, Ersteller, ggf. Freigabe und der
  * Berichtstext aus demselben Bauteil wie der Lesezweig der Seite.
  */
 export default function LageberichtVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
-  const select = useCallback((liste: LageberichtAnzeige[]) => liste.find((b) => b.id === id), [id]);
-  const abfrage = useQuery({ ...datensatzAbfrage.lageberichte(einsatzId), select });
+  const abfrage = useQuery(lageberichtAbfrage(einsatzId, id));
 
   return (
     <VorschauZustand abfrage={abfrage} sorte="Der Lagebericht">

@@ -5,7 +5,7 @@ import type {
   EinsatzFahrzeug,
   FuehrungskraftKarte,
   Rueckmeldungen,
-  Schaden,
+  SchadenMarker,
   Uhs,
 } from '../../api/types';
 import type { OnlineStyle } from '../../api/karte';
@@ -186,7 +186,7 @@ export interface AuswahlRoh {
   fahrzeuge: readonly EinsatzFahrzeug[];
   fuehrungskraefte: readonly FuehrungskraftKarte[];
   uhs: readonly Uhs[];
-  schaeden: readonly Schaden[];
+  schaeden: readonly SchadenMarker[];
   abschnitte: readonly Einsatzabschnitt[];
   /** Betreuungsstellen — leer ohne Modulrecht. */
   betreuungsstellen: readonly Betreuungsstelle[];

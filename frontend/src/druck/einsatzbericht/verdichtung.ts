@@ -10,6 +10,7 @@ import type {
   EtbEintragAnzeige,
   EtbZaehler,
   LageberichtAnzeige,
+  LageberichtKopf,
   Lagebesprechung,
   MitgliedAnzeige,
   Person,
@@ -315,18 +316,37 @@ function lageberichtText(b: LageberichtAnzeige): { titel: string; text: string }
   return [...bekannt, ...fremd];
 }
 
-function lage(berichte: LageberichtAnzeige[] | null, konv: AnzeigeKonventionen): Abschnitt[] {
-  if (berichte == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
-  // Erst filtern, dann Köpfe bilden: ein Entwurf v2 über einer freigegebenen v1 ließe sonst
-  // die Kette mit dem Entwurf als Kopf aus dem Verzeichnis fallen (design.md D7).
-  const freigegeben = berichte.filter((b) => b.status === 'freigegeben');
-  const koepfe = kettenKoepfe(freigegeben)
+/** Quelle `lageberichte`: die Kopfliste und der Volltext des zuletzt freigegebenen (LFH-931). */
+export interface LageberichtQuelle {
+  liste: LageberichtKopf[];
+  letzter: LageberichtAnzeige | null;
+}
+
+/**
+ * Köpfe der freigegebenen Ketten, nach Zeitstand. Erst filtern, dann Köpfe bilden: ein Entwurf v2
+ * über einer freigegebenen v1 ließe sonst die Kette mit dem Entwurf als Kopf aus dem Verzeichnis
+ * fallen (design.md D7).
+ */
+function freigegebeneKoepfe(berichte: readonly LageberichtKopf[]): LageberichtKopf[] {
+  return kettenKoepfe(berichte.filter((b) => b.status === 'freigegeben'))
     .map((k) => k.kopf)
     .sort((a, b) => a.zeitstand.localeCompare(b.zeitstand));
-  if (koepfe.length === 0) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
-  const letzter = koepfe.reduce((a, b) =>
-    (b.freigegeben_at ?? '') > (a.freigegeben_at ?? '') ? b : a,
-  );
+}
+
+/** Der zuletzt freigegebene Kettenkopf; seinen Text lädt der Abruf aus dem Detail. */
+export function letzterFreigegebenerLagebericht(
+  berichte: readonly LageberichtKopf[],
+): LageberichtKopf | null {
+  const koepfe = freigegebeneKoepfe(berichte);
+  if (koepfe.length === 0) return null;
+  return koepfe.reduce((a, b) => ((b.freigegeben_at ?? '') > (a.freigegeben_at ?? '') ? b : a));
+}
+
+function lage(quelle: LageberichtQuelle | null, konv: AnzeigeKonventionen): Abschnitt[] {
+  if (quelle == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
+  const koepfe = freigegebeneKoepfe(quelle.liste);
+  const letzter = quelle.letzter;
+  if (koepfe.length === 0 || letzter == null) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
   return [
     {
       titel: 'Verzeichnis der Lageberichte',

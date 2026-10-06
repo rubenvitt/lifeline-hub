@@ -83,7 +83,8 @@ async fn pruefe_benutzer_link(
 }
 
 /// Setzt die Qualifikations-Zuordnung als Vollersatz. Nur ids der eigenen Org werden eingefügt;
-/// fremde werden still ignoriert (die UI bietet nur eigene an).
+/// fremde werden still ignoriert (die UI bietet nur eigene an). Zwei Anweisungen, unabhängig
+/// von der Länge der Liste (LFH-937, design.md D5).
 async fn setze_qualifikationen(
     tx: &mut sqlx::SqliteConnection,
     org_id: i64,
@@ -94,17 +95,18 @@ async fn setze_qualifikationen(
         .bind(personal_id)
         .execute(&mut *tx)
         .await?;
-    for &qid in qualifikation_ids {
-        sqlx::query(
-            "INSERT OR IGNORE INTO personal_qualifikation (personal_id, qualifikation_id) \
-             SELECT ?, id FROM qualifikation WHERE id = ? AND org_id = ?",
-        )
-        .bind(personal_id)
-        .bind(qid)
-        .bind(org_id)
-        .execute(&mut *tx)
-        .await?;
-    }
+    let ids = serde_json::to_string(qualifikation_ids)
+        .map_err(|e| AppError::Internal(format!("Qualifikations-ids serialisieren: {e}")))?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO personal_qualifikation (personal_id, qualifikation_id) \
+         SELECT ?, id FROM qualifikation \
+         WHERE org_id = ? AND id IN (SELECT value FROM json_each(?))",
+    )
+    .bind(personal_id)
+    .bind(org_id)
+    .bind(ids)
+    .execute(&mut *tx)
+    .await?;
     Ok(())
 }
 
@@ -323,9 +325,10 @@ pub async fn patche(
         // Vor der Transaktion; die geliehene Verbindung geht zurück, bevor `begin` eine nimmt.
         pruefe_benutzer_link(&mut *pool.acquire().await?, org_id, bid, Some(id)).await?;
     }
-    let mut tx = pool.begin().await?;
-    let ergebnis = sqlx::query(
-        "UPDATE personal SET \
+    // BEGIN IMMEDIATE mit Wiederholung bei belegter Sperre (LFH-240; LFH-937, design.md D5).
+    crate::write_retry!(pool, |conn| {
+        let ergebnis = sqlx::query(
+            "UPDATE personal SET \
             benutzer_id = CASE WHEN ?1 IS NULL THEN benutzer_id ELSE ?2 END, \
             name = CASE WHEN ?3 IS NULL THEN name ELSE ?4 END, \
             personalnummer = CASE WHEN ?5 IS NULL THEN personalnummer ELSE ?6 END, \
@@ -334,34 +337,35 @@ pub async fn patche(
             staerke_position = CASE WHEN ?11 IS NULL THEN staerke_position ELSE ?12 END, \
             bemerkung = CASE WHEN ?13 IS NULL THEN bemerkung ELSE ?14 END \
          WHERE id = ?15 AND org_id = ?16",
-    )
-    .bind(patch.benutzer_id.map(|_| 1_i64))
-    .bind(patch.benutzer_id.and_then(|v| v))
-    .bind(patch.name.map(|_| 1_i64))
-    .bind(patch.name)
-    .bind(patch.personalnummer.map(|_| 1_i64))
-    .bind(patch.personalnummer.and_then(|v| v))
-    .bind(patch.traegerorganisation.map(|_| 1_i64))
-    .bind(patch.traegerorganisation.and_then(|v| v))
-    .bind(patch.telefon.map(|_| 1_i64))
-    .bind(patch.telefon.and_then(|v| v))
-    .bind(patch.staerke_position.map(|_| 1_i64))
-    .bind(patch.staerke_position.and_then(|v| v))
-    .bind(patch.bemerkung.map(|_| 1_i64))
-    .bind(patch.bemerkung.and_then(|v| v))
-    .bind(id)
-    .bind(org_id)
-    .execute(&mut *tx)
-    .await;
+        )
+        .bind(patch.benutzer_id.map(|_| 1_i64))
+        .bind(patch.benutzer_id.and_then(|v| v))
+        .bind(patch.name.map(|_| 1_i64))
+        .bind(patch.name)
+        .bind(patch.personalnummer.map(|_| 1_i64))
+        .bind(patch.personalnummer.and_then(|v| v))
+        .bind(patch.traegerorganisation.map(|_| 1_i64))
+        .bind(patch.traegerorganisation.and_then(|v| v))
+        .bind(patch.telefon.map(|_| 1_i64))
+        .bind(patch.telefon.and_then(|v| v))
+        .bind(patch.staerke_position.map(|_| 1_i64))
+        .bind(patch.staerke_position.and_then(|v| v))
+        .bind(patch.bemerkung.map(|_| 1_i64))
+        .bind(patch.bemerkung.and_then(|v| v))
+        .bind(id)
+        .bind(org_id)
+        .execute(&mut *conn)
+        .await;
 
-    if let Err(e) = ergebnis {
-        return unique_conflict(e);
-    }
-    // Nur wenn das Feld gesendet wurde — sonst löschte ein PATCH alle Qualifikationen.
-    if let Some(ids) = qualifikation_ids {
-        setze_qualifikationen(&mut tx, org_id, id, ids).await?;
-    }
-    tx.commit().await?;
+        if let Err(e) = ergebnis {
+            return unique_conflict(e);
+        }
+        // Nur wenn das Feld gesendet wurde — sonst löschte ein PATCH alle Qualifikationen.
+        if let Some(ids) = qualifikation_ids {
+            setze_qualifikationen(&mut *conn, org_id, id, ids).await?;
+        }
+        Ok(())
+    })?;
     laden(pool, org_id, id).await
 }
 

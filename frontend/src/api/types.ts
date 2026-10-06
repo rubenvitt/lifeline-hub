@@ -288,6 +288,8 @@ export type SchadenTyp = S['SchadenTyp'];
 export type Ausmass = S['Ausmass'];
 export type SchadenAbschlussGrund = S['SchadenAbschlussGrund'];
 export type Schaden = S['SchadenAnzeige'];
+/** LFH-931: Schadenmarker für Lagekarte und Lage-Dashboard, ohne Freitexte. */
+export type SchadenMarker = S['SchadenMarker'];
 /** LFH-21: Foto/Datei an einem Schaden; `id` ist die Linker-id, nicht `anhang.id`. */
 export type SchadenAnhang = S['SchadenAnhangAnzeige'];
 export type TierAnhang = S['TierAnhangAnzeige'];
@@ -384,11 +386,15 @@ export type LageberichtVorlageKey = S['LageberichtVorlage'];
 export type LageberichtStatus = S['LageberichtStatus'];
 export type LageberichtAbschnitt = S['LageberichtAbschnitt'];
 export type LageberichtAnzeige = S['LageberichtAnzeige'];
+/** LFH-931: Listenzeile ohne Abschnitte; den Text liefert nur das Detail. */
+export type LageberichtKopf = S['LageberichtKopf'];
 
 // ============================== LFH-64 Befehlsgebung ==============================
 export type BefehlVorlageKey = S['BefehlVorlage'];
 export type BefehlAbschnitt = S['BefehlAbschnitt'];
 export type BefehlAnzeige = S['BefehlAnzeige'];
+/** LFH-931: Listenzeile ohne Abschnitte. */
+export type BefehlKopf = S['BefehlKopf'];
 
 // ============================== LFH-606 Pegel-Kennzahl ==============================
 export type PegelAnzeige = S['PegelAnzeige'];
@@ -901,6 +907,8 @@ export type PressemitteilungVorlageKey = S['PressemitteilungVorlage'];
 export type PressemitteilungStatus = S['PressemitteilungStatus'];
 export type PressemitteilungAbschnitt = S['PressemitteilungAbschnitt'];
 export type Pressemitteilung = S['PressemitteilungAnzeige'];
+/** LFH-931: Listenzeile ohne Abschnitte. */
+export type PressemitteilungKopf = S['PressemitteilungKopf'];
 export type InfotelefonAnliegen = S['InfotelefonAnliegen'];
 export type InfotelefonStatus = S['InfotelefonStatus'];
 export type InfotelefonAnruf = S['InfotelefonAnrufAnzeige'];

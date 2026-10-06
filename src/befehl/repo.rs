@@ -3,7 +3,7 @@
 
 use super::{Abschnitt, Befehl};
 use crate::error::AppError;
-use crate::vorlagendokument::repo::{self as kern, Dokument};
+use crate::vorlagendokument::repo::{self as kern, Dokument, DokumentKopf};
 use serde::Serialize;
 use sqlx::SqliteConnection;
 use utoipa::ToSchema;
@@ -52,6 +52,51 @@ impl From<Dokument<Abschnitt>> for BefehlAnzeige {
             freigegeben_von_name: d.freigegeben_von_name,
             freigegeben_at: d.freigegeben_at,
             etb_eintrag_id: d.etb_eintrag_id,
+        }
+    }
+}
+
+/// Listenzeile eines Befehls: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie in der Anzeige
+/// als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BefehlKopf {
+    pub id: i64,
+    pub einsatz_id: i64,
+    #[schema(value_type = crate::befehl::BefehlVorlage)]
+    pub vorlage: String,
+    pub titel: String,
+    pub zeitstand: String,
+    #[schema(value_type = crate::befehl::BefehlStatus)]
+    pub status: String,
+    pub version: i64,
+    pub vorgaenger_id: Option<i64>,
+    pub ersteller_id: i64,
+    pub ersteller_name: String,
+    pub erstellt_at: String,
+    pub freigegeben_von_id: Option<i64>,
+    pub freigegeben_von_name: Option<String>,
+    pub freigegeben_at: Option<String>,
+    pub etb_eintrag_id: Option<i64>,
+}
+
+impl From<DokumentKopf> for BefehlKopf {
+    fn from(k: DokumentKopf) -> Self {
+        Self {
+            id: k.id,
+            einsatz_id: k.einsatz_id,
+            vorlage: k.vorlage,
+            titel: k.titel,
+            zeitstand: k.zeitstand,
+            status: k.status,
+            version: k.version,
+            vorgaenger_id: k.vorgaenger_id,
+            ersteller_id: k.ersteller_id,
+            ersteller_name: k.ersteller_name,
+            erstellt_at: k.erstellt_at,
+            freigegeben_von_id: k.freigegeben_von_id,
+            freigegeben_von_name: k.freigegeben_von_name,
+            freigegeben_at: k.freigegeben_at,
+            etb_eintrag_id: k.etb_eintrag_id,
         }
     }
 }

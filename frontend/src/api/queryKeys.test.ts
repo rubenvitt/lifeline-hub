@@ -4,6 +4,7 @@ import { ZAEHLER_LISTEN_KEYS } from '../einsatz/useModulZaehler';
 import {
   EINSATZ_KEYS,
   EINSATZ_STREAM_EVENTS,
+  EINSATZ_STREAM_ZIELE,
   NICHT_LIVE_KEYS,
   ORG_STREAM_EVENTS,
   einsatzKeys,
@@ -126,9 +127,13 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.infotelefon).toEqual(['einsatz-infotelefon']);
   });
 
-  // Ablegen und Entfernen einer Datei verteilen `schaden`.
-  it('schaden invalidiert Schadensliste und Anhanglisten', () => {
-    expect(EINSATZ_STREAM_EVENTS.schaden).toEqual(['einsatz-schaeden', 'einsatz-schaden-anhaenge']);
+  // Ablegen und Entfernen einer Datei verteilen `schaden`; die Marker der Karte hängen am Schaden.
+  it('schaden invalidiert Schadensliste, Marker und Anhanglisten', () => {
+    expect(EINSATZ_STREAM_EVENTS.schaden).toEqual([
+      'einsatz-schaeden',
+      'einsatz-schaden-marker',
+      'einsatz-schaden-anhaenge',
+    ]);
   });
 
   // LFH-758: dasselbe an Tieren und UHS; das UHS-Zugriffsprotokoll bleibt draußen.
@@ -630,5 +635,72 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
     }
     expect(qc.getQueryState(['personal', 'alle'])?.isInvalidated).toBe(true);
     expect(qc.getQueryState(['sprechgruppen', 'alle'])?.isInvalidated).toBe(true);
+  });
+});
+
+describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
+  const ziele = (event: keyof typeof EINSATZ_STREAM_ZIELE, p: Record<string, unknown>) =>
+    EINSATZ_STREAM_ZIELE[event]?.(p, 7);
+
+  it('ein Entwurfs-PATCH nur an Abschnitten trifft nur das Detail', () => {
+    expect(ziele('lagebericht', { einsatz_id: 7, lagebericht_id: 3, nur_inhalt: true })).toEqual([
+      { art: 'key', key: einsatzKeys.lagebericht(7, 3) },
+    ]);
+    expect(ziele('befehl', { einsatz_id: 7, befehl_id: 4, nur_inhalt: true })).toEqual([
+      { art: 'key', key: einsatzKeys.befehl(7, 4) },
+    ]);
+  });
+
+  it('ein Titelwechsel oder Statuswechsel trifft auch die Kopfliste', () => {
+    expect(ziele('lagebericht', { einsatz_id: 7, lagebericht_id: 3 })).toEqual([
+      { art: 'key', key: einsatzKeys.lageberichte(7) },
+      { art: 'key', key: einsatzKeys.lagebericht(7, 3) },
+    ]);
+  });
+
+  it('ohne Kennung fällt die Zuordnung auf die Prefixe zurück', () => {
+    expect(ziele('lagebericht', { einsatz_id: 7 })).toBeNull();
+    expect(ziele('schaden', { einsatz_id: 7 })).toBeNull();
+    expect(ziele('presse', { einsatz_id: 7 })).toBeNull();
+  });
+
+  it('ein Medienkontakt gleicht seine Zeile ab, eine Pressemitteilung nie das Presse-Log', () => {
+    expect(ziele('presse', { einsatz_id: 7, medienkontakt_id: 12 })).toEqual([
+      { art: 'zeile', ziel: 'medienkontakte', id: 12 },
+    ]);
+    const mitteilung = ziele('presse', { einsatz_id: 7, pressemitteilung_id: 5 });
+    expect(mitteilung).toEqual([
+      { art: 'key', key: einsatzKeys.pressemitteilungen(7) },
+      { art: 'key', key: einsatzKeys.pressemitteilung(7, 5) },
+    ]);
+    expect(JSON.stringify(mitteilung)).not.toContain('medienkontakte');
+  });
+
+  it('ein Anhang trifft nur die Anhangliste, sonst Zeile und Geschädigten-Listen', () => {
+    expect(ziele('schaden', { einsatz_id: 7, schaden_id: 9, anhang: true })).toEqual([
+      { art: 'key', key: einsatzKeys.schadenAnhaenge(7, 9) },
+    ]);
+    expect(ziele('schaden', { einsatz_id: 7, schaden_id: 9 })).toEqual([
+      { art: 'zeile', ziel: 'schaeden', id: 9 },
+      { art: 'key', key: einsatzKeys.schaedenGeschaedigtAlle(7) },
+    ]);
+  });
+
+  it('jede gezielte Zuordnung trifft nur Keys ihres Ereignisses aus EINSATZ_STREAM_EVENTS', () => {
+    const proben: Record<string, Record<string, unknown>[]> = {
+      lagebericht: [{ lagebericht_id: 1 }, { lagebericht_id: 1, nur_inhalt: true }],
+      befehl: [{ befehl_id: 1 }],
+      presse: [{ medienkontakt_id: 1 }, { pressemitteilung_id: 1 }],
+      schaden: [{ schaden_id: 1 }, { schaden_id: 1, anhang: true }],
+    };
+    for (const [event, payloads] of Object.entries(proben)) {
+      const erlaubt: readonly string[] =
+        EINSATZ_STREAM_EVENTS[event as keyof typeof EINSATZ_STREAM_EVENTS];
+      for (const p of payloads) {
+        for (const z of ziele(event as keyof typeof EINSATZ_STREAM_ZIELE, p) ?? []) {
+          if (z.art === 'key') expect(erlaubt).toContain(z.key[0]);
+        }
+      }
+    }
   });
 });

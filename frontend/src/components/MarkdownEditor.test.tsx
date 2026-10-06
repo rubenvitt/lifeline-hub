@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -245,5 +245,40 @@ describe('MarkdownEditor – toggle-Variante', () => {
     );
     await userEvent.type(screen.getByPlaceholderText('Inhalt …'), '/');
     expect(onKeyDown).toHaveBeenCalled();
+  });
+});
+
+describe('MarkdownEditor — Zeichengrenze (LFH-937)', () => {
+  function Gesteuert({ zaehlerAussen = false }: { zaehlerAussen?: boolean }) {
+    const [wert, setWert] = useState('');
+    return (
+      <MarkdownEditor
+        unterEbene={3}
+        layout="toggle"
+        value={wert}
+        onChange={setWert}
+        maxLength={10}
+        zaehlerAussen={zaehlerAussen}
+      />
+    );
+  }
+
+  it('reicht die Grenze an das Textfeld: Zähler ab 80 %, Überlänge ohne Kürzen', () => {
+    render(<Gesteuert />);
+    const feld = screen.getByRole('textbox');
+    fireEvent.change(feld, { target: { value: 'a'.repeat(8) } });
+    expect(screen.getByText('8 / 10')).toBeInTheDocument();
+    fireEvent.change(feld, { target: { value: 'a'.repeat(12) } });
+    expect(feld).toHaveValue('a'.repeat(12));
+    expect(screen.getByText('12 / 10 · zu lang')).toBeInTheDocument();
+  });
+
+  it('mit zaehlerAussen zählt das Feld nicht selbst, markiert die Überlänge aber', () => {
+    const { container } = render(<Gesteuert zaehlerAussen />);
+    const feld = screen.getByRole('textbox');
+    fireEvent.change(feld, { target: { value: 'a'.repeat(12) } });
+    expect(feld).toHaveValue('a'.repeat(12));
+    expect(screen.queryByText(/\/ 10/)).toBeNull();
+    expect(container.querySelector('.ant-input-out-of-range')).not.toBeNull();
   });
 });

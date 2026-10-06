@@ -1,4 +1,6 @@
 import { App, Breadcrumb, Button, Collapse, Flex, Form, Input, Space } from 'antd';
+import { PRESSE_ANTWORT_MAX, PRESSE_KURZ_MAX, PRESSE_THEMA_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { IconPlus } from '../icons';
 import type { Dayjs } from 'dayjs';
@@ -24,7 +26,6 @@ import type {
   Medienkontakt,
   MedienkontaktArt,
   MedienkontaktStatus,
-  Pressemitteilung,
   PressemitteilungVorlageKey,
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
@@ -466,14 +467,17 @@ export default function PressePage() {
           name="medium"
           rules={[{ required: true, whitespace: true, message: 'Medium erforderlich' }]}
         >
-          <Input placeholder="z. B. NDR 1, dpa, Polizei-Pressestelle" />
+          <Input placeholder="z. B. NDR 1, dpa, Polizei-Pressestelle" maxLength={PRESSE_KURZ_MAX} />
         </Form.Item>
         <Form.Item
           label="Thema"
           name="thema"
-          rules={[{ required: true, whitespace: true, message: 'Thema erforderlich' }]}
+          rules={[
+            { required: true, whitespace: true, message: 'Thema erforderlich' },
+            zeichenRegel(PRESSE_THEMA_MAX, 'Thema'),
+          ]}
         >
-          <Input placeholder="z. B. Zahl der Evakuierten" />
+          <Input placeholder="z. B. Zahl der Evakuierten" count={zeichenGrenze(PRESSE_THEMA_MAX)} />
         </Form.Item>
         <Collapse
           ghost
@@ -484,10 +488,10 @@ export default function PressePage() {
               children: (
                 <>
                   <Form.Item label="Ansprechperson" name="kontakt_name">
-                    <Input />
+                    <Input maxLength={PRESSE_KURZ_MAX} />
                   </Form.Item>
                   <Form.Item label="Erreichbarkeit" name="kontakt_erreichbarkeit">
-                    <Input placeholder="Telefon oder E-Mail" />
+                    <Input placeholder="Telefon oder E-Mail" maxLength={PRESSE_THEMA_MAX} />
                   </Form.Item>
                   <Form.Item label="Eingang" name="eingang" extra="Leer gelassen: jetzt">
                     <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
@@ -530,18 +534,21 @@ export default function PressePage() {
         <Form.Item
           label="Gegebene Antwort"
           name="antwort"
-          rules={[{ required: true, whitespace: true, message: 'Antwort erforderlich' }]}
+          rules={[
+            { required: true, whitespace: true, message: 'Antwort erforderlich' },
+            zeichenRegel(PRESSE_ANTWORT_MAX, 'Antwort'),
+          ]}
         >
-          <Input.TextArea autoSize={{ minRows: 2 }} />
+          <Input.TextArea autoSize={{ minRows: 2 }} count={zeichenGrenze(PRESSE_ANTWORT_MAX)} />
         </Form.Item>
         <Form.Item label="Freigegeben durch" name="freigabe_durch">
-          <Input placeholder="z. B. EL mündlich 14:20" />
+          <Input placeholder="z. B. EL mündlich 14:20" maxLength={PRESSE_KURZ_MAX} />
         </Form.Item>
         <Form.Item label="Verweis auf Pressemitteilung" name="pressemitteilung_id">
           <Select
             allowClear
             placeholder="optional"
-            options={freigegeben.map((m: Pressemitteilung) => ({
+            options={freigegeben.map((m) => ({
               value: m.id,
               label: `${m.titel} (v${m.version})`,
             }))}

@@ -37,6 +37,7 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-freie-zeichen',
   'gefahrengebiete',
   'einsatz-schaeden',
+  'einsatz-schaden-marker',
   'einsatz-lagemeldungen',
   'einsatz-fuehrungskraefte',
   'einsatz-betreuung',
