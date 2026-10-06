@@ -861,6 +861,20 @@ describe('UeberblickPage', () => {
     expect(screen.queryByText(/Folgeaufträge werden nicht gezählt/)).toBeNull();
   });
 
+  it('Abschnitte: fehlen die Aufträge, sagt es der Fuß, die Legende bleibt oben (LFH-962)', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/auftraege', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(
+      await within(p).findByText('Aufträge nicht abrufbar, Auftragstexte fehlen'),
+    ).toBeInTheDocument();
+    expect(within(p).getByText(/Einheiten nach Status: bereit/)).toBeInTheDocument();
+  });
+
   it('Ladezustand: Kennzahlen und Paneele zeigen „wird abgerufen", keine Null', async () => {
     const haengt = async () => {
       await delay('infinite');

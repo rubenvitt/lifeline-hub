@@ -86,6 +86,10 @@ describe('AbschnittKnoten', () => {
   it('zeigt den Lagezustand mit demselben Wort wie der Überblick', () => {
     renderKnoten({ ...nord, lagezustand: 'angespannt' } as Einsatzabschnitt);
     expect(screen.getByText('angespannt')).toBeInTheDocument();
+    // Dieselbe Form wie im Überblick: Rollenrand am `StatusTag`, nicht Fläche oder Chip.
+    const tag = screen.getByText('angespannt').closest('[data-rolle]');
+    expect(tag).toHaveAttribute('data-rolle', 'achtung');
+    expect(tag).toHaveAttribute('data-darstellung', 'rand');
   });
 
   it('lässt einen nicht beurteilten Lagezustand leer', () => {

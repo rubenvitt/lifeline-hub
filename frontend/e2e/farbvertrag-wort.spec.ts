@@ -8,6 +8,10 @@ import { wechsleZuRolle } from './rollen-kern';
  * Besatzung wie Unterbesetzung. Hier steht, was jsdom nicht belegt: das Wort ist auf Handy und
  * Desktop wirklich sichtbar, und es schiebt die Seite nicht über den Rand.
  *
+ * Der Überhang ist der der Seite (`documentElement`); ein Überlauf innerhalb des eigenen
+ * Bildlaufs der Tabelle ist erlaubt und wird hier nicht gemessen (`frontend/AGENTS.md`,
+ * Fließende Spalte).
+ *
  * Gemessen als Admin UND als Beobachter (`frontend/e2e/AGENTS.md`, Layout-Gate
  * nicht-privilegiert): ohne Schreibrecht fehlen Anlegen und Frei-Pool, das Wort bleibt.
  *

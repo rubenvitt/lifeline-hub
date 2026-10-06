@@ -266,7 +266,7 @@ export const brStatus: Record<BrStatus, StatusDarstellung> = {
 /**
  * Urteil über die Besatzung eines disponierten Fahrzeugs (Ist aus den zugeordneten Kräften gegen
  * das Soll des Fahrzeugs). Kein Domänen-Enum: das Urteil fällt im Client
- * (`pages/FahrzeugePage.tsx:besatzungsUrteil`).
+ * (`pages/FahrzeugePage.tsx:besatzungsUrteilVon`).
  */
 export type BesatzungsUrteil = 'nicht_erfasst' | 'kein_soll' | 'erfuellt' | 'unterbesetzt';
 
