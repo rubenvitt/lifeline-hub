@@ -335,6 +335,12 @@ anwendbar), „nicht geprüft" ist keins.
 - **Ein Anker in der Zeile bedient den Klick allein** (Riegel `closest('a')` in `Datensicht`);
   mit `titel.ziel` erzeugt das `render` keinen Anker.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET**; Speichern gehört ins `<form>`.
+- **Nebenwege im Kopf gehen über `weitere` der `EinsatzSeite`** (LFH-963, Spec
+  `einsatztauglichkeit-layout`, Entscheidung 8): Drucken, CSV, Listenzugriffe und ähnliche
+  Öffnen-Wege stehen ab `md` als sekundäre Knöpfe, unter `md` hinter EINEM Auslöser „Weitere“
+  (`MenueAusloeser`, Name nennt die Seite). In `aktionen` bleibt nur, was am Handy sichtbar sein
+  muss: Segmentleiste und genau eine Erfassung, auf Betroffenen- und Tiere-Liste dazu „Vermisst
+  melden“. Nachgezogen sind Betroffene, Tiere, Schäden; die übrigen Seiten folgen im Folgeticket.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt
   (`/admin/stammdaten/{fahrzeuge,personal}/:id`), sonst Einzel-GET; Admin-Pfade in

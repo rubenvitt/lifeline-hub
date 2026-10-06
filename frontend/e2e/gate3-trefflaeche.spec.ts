@@ -2755,7 +2755,7 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
       'Vorbedingung: ohne Schreibrecht kein Erfassungsband',
     ).toHaveCount(0);
     const kopfAktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
-    for (const name of ['Schnellerfassung', 'Vermisst melden', 'Betroffene/n erfassen']) {
+    for (const name of ['Betroffene erfassen', 'Vermisst melden']) {
       await expect(
         kopfAktionen.getByRole('button', { name, exact: true }),
         `Vorbedingung: ohne Schreibrecht kein Kopfknopf „${name}"`,
@@ -2846,9 +2846,9 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
       `Route Koordinate (${dichte})`,
     );
 
-    // Modal „Schnellerfassung": dieselben zwei Felder im zweiten Mount von `AufnahmeFelder`.
+    // Modal „Betroffene erfassen": dieselben zwei Felder im zweiten Mount von `AufnahmeFelder`.
     await page.goto(`/einsaetze/${einsatzId}/personen`);
-    await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+    await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
     const schnell = page.getByRole('dialog');
     await schnell.getByRole('button', { name: /Weitere Angaben/ }).click();
     await modalRuht(page);

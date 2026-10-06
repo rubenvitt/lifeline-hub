@@ -39,7 +39,7 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   const einsatzId = page.url().match(/\/einsaetze\/(\d+)\//)![1];
 
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const personName = `MovePat${Date.now()}`;
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
@@ -143,7 +143,7 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
   const einsatzId = page.url().match(/\/einsaetze\/(\d+)\//)![1];
 
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const personName = `UniPat${Date.now()}`;
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
@@ -242,7 +242,7 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
 
   // Person per Schnellerfassung anlegen (landet in „Noch nicht aufgenommen").
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const personName = `PatScroll${Date.now()}`;
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
@@ -302,7 +302,7 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
 
   // Person mit absichtlich LANGEM Namen (stresst die Ellipsis-Begrenzung des Labels).
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const personName = `Maximiliane-Charlotte von Lindenberg-Hohenfels ${Date.now()}`;
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
@@ -372,7 +372,7 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   const einsatzId = page.url().match(/\/einsaetze\/(\d+)\//)![1];
 
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const personName = `PatDrop${Date.now()}`;
   // „Name" liegt unter „Weitere Angaben" eingeklappt.
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
