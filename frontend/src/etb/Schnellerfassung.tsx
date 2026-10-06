@@ -611,7 +611,7 @@ export default function Schnellerfassung({
     }
     setPflichtHinweis(null);
     // Zeichengrenzen des Servers (LFH-937, design.md D8): ebenfalls VOR Upload und Warteschlange.
-    // Das Feld endet an der Grenze, ein Baustein oder Slash-Befehl setzt den Text aber von außen;
+    // Das Feld kürzt nie (Zähler „zu lang“), und ein Baustein oder Slash-Befehl setzt Text von außen;
     // ein zu langer Eintrag läge sonst bis zum Abgleich in der Offline-Queue und käme abgelehnt
     // zurück. Der Text bleibt im Feld.
     const zuLang = laengenVerstoss(inhalt, wirksam);
