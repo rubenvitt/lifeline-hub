@@ -3464,11 +3464,11 @@ mod tests {
         pool
     }
 
-    // --- Migration 0154: karte_proxy_asset mit Herkunft, Verwaisung und AUTOINCREMENT (LFH-932) ---
+    // --- Migration 0155: karte_proxy_asset mit Herkunft, Verwaisung und AUTOINCREMENT (LFH-932) ---
     //
-    // Alt-DB im 0077-Stand (FK-Zwang an), befüllt, dann die echte 0154.
+    // Alt-DB im 0077-Stand (FK-Zwang an), befüllt, dann die echte 0155.
     #[tokio::test]
-    async fn migration_0154_karte_proxy_asset_rebuild_erhaelt_zeilen_und_vergibt_keine_id_neu() {
+    async fn migration_0155_karte_proxy_asset_rebuild_erhaelt_zeilen_und_vergibt_keine_id_neu() {
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(
@@ -3497,7 +3497,7 @@ mod tests {
         .await
         .unwrap();
 
-        let migration = include_str!("../migrations/0154_karte_proxy_asset_herkunft.sql");
+        let migration = include_str!("../migrations/0155_karte_proxy_asset_herkunft.sql");
         assert!(
             migration.starts_with("-- no-transaction"),
             "sqlx erkennt die Direktive nur am Dateianfang"
@@ -3505,7 +3505,7 @@ mod tests {
         sqlx::raw_sql(migration)
             .execute(&pool)
             .await
-            .expect("0154 muss auf einer befüllten DB durchlaufen");
+            .expect("0155 muss auf einer befüllten DB durchlaufen");
 
         type Zeile = (i64, i64, String, String, String, Option<i64>, Option<i64>);
         let zeilen: Vec<Zeile> = sqlx::query_as(
