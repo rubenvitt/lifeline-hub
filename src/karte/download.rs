@@ -277,6 +277,49 @@ pub async fn entferne_download_dateien(karten_dir: &Path, id: i64) {
     let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles.part"))).await;
 }
 
+/// Crash-Recovery beim Start: hängende Downloads (`laedt`) auf `fehler` setzen, danach jede
+/// Teildatei löschen ([`raeume_teildateien`]). Vor dem Start der Download-Tasks aufrufen.
+pub async fn raeume_nach_neustart(pool: &sqlx::SqlitePool, karten_dir: &Path) {
+    if let Err(e) = crate::karte::registry::repo::reset_haengende_downloads(pool).await {
+        tracing::warn!("Crash-Recovery der Offline-Downloads fehlgeschlagen: {e}");
+    }
+    let teildateien = raeume_teildateien(karten_dir);
+    if teildateien > 0 {
+        tracing::info!("Crash-Recovery: {teildateien} Teildatei(en) der Offline-Karten gelöscht");
+    }
+}
+
+/// Start-Sweep (LFH-934): löscht jede `karte-<id>.mbtiles.part` in `karten_dir`. Downloads
+/// überleben keinen Neustart, eine `.part` ist nach dem Start immer ein Rest — auch die eines
+/// In-Place-Reloads, dessen Zeile `bereit` bleibt und den `reset_haengende_downloads` deshalb
+/// nicht findet. Andere Dateien bleiben stehen. Liefert die Zahl der gelöschten Dateien. Nur vor
+/// dem Start der Downloads aufrufen (synchron, beim Hochfahren).
+pub fn raeume_teildateien(karten_dir: &Path) -> usize {
+    let Ok(eintraege) = std::fs::read_dir(karten_dir) else {
+        return 0;
+    };
+    let mut geloescht = 0;
+    for eintrag in eintraege.flatten() {
+        let name = eintrag.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if !ist_download_teildatei(name) || !eintrag.file_type().is_ok_and(|t| t.is_file()) {
+            continue;
+        }
+        match std::fs::remove_file(eintrag.path()) {
+            Ok(()) => geloescht += 1,
+            Err(e) => tracing::warn!("Teildatei {name} nicht löschbar: {e}"),
+        }
+    }
+    geloescht
+}
+
+/// `karte-<ziffern>.mbtiles.part`, der Name, unter dem der Download-Manager lädt.
+fn ist_download_teildatei(name: &str) -> bool {
+    name.strip_prefix("karte-")
+        .and_then(|r| r.strip_suffix(".mbtiles.part"))
+        .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+}
+
 fn hex(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(bytes.len() * 2);
     for b in bytes {
@@ -392,6 +435,54 @@ pub async fn lade_datei(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // LFH-934: Der Start-Sweep nimmt jede Download-Teildatei, unabhängig vom Zeilenstatus, und
+    // lässt fertige Karten und fremde Dateien stehen.
+    #[test]
+    fn raeume_teildateien_loescht_nur_download_teildateien() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path();
+        for name in [
+            "karte-1.mbtiles.part",
+            "karte-27.mbtiles.part",
+            "karte-1.mbtiles",
+            "welt-uebersicht.mbtiles",
+            "eigene.mbtiles.part",
+            "karte-x.mbtiles.part",
+            "karte-.mbtiles.part",
+            "tile-cache.db",
+        ] {
+            std::fs::write(p.join(name), b"x").unwrap();
+        }
+        // Ein Verzeichnis mit passendem Namen ist keine Teildatei.
+        std::fs::create_dir(p.join("karte-5.mbtiles.part")).unwrap();
+
+        assert_eq!(raeume_teildateien(p), 2);
+
+        let mut rest: Vec<String> = std::fs::read_dir(p)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        rest.sort();
+        assert_eq!(
+            rest,
+            [
+                "eigene.mbtiles.part",
+                "karte-.mbtiles.part",
+                "karte-1.mbtiles",
+                "karte-5.mbtiles.part",
+                "karte-x.mbtiles.part",
+                "tile-cache.db",
+                "welt-uebersicht.mbtiles",
+            ]
+        );
+    }
+
+    #[test]
+    fn raeume_teildateien_ohne_verzeichnis_ist_noop() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(raeume_teildateien(&dir.path().join("fehlt")), 0);
+    }
 
     #[test]
     fn validiere_url_lehnt_unsichere_ziele_ab() {

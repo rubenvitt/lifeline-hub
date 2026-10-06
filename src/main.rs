@@ -108,15 +108,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // ein No-op.
     lifeline_hub::karte::assets::extrahiere_welt_uebersicht(&karten_dir);
 
-    // Crash-Recovery: hängende Downloads auf 'fehler' setzen und `.part`-Dateien löschen.
-    match lifeline_hub::karte::registry::repo::reset_haengende_downloads(&pool).await {
-        Ok(ids) => {
-            for id in ids {
-                let _ = std::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles.part")));
-            }
-        }
-        Err(e) => tracing::warn!("Crash-Recovery der Offline-Downloads fehlgeschlagen: {e}"),
-    }
+    // Crash-Recovery: hängende Downloads auf 'fehler' setzen, danach jede `.part` löschen — auch
+    // die eines abgebrochenen In-Place-Reloads, dessen Zeile `bereit` blieb (LFH-934).
+    lifeline_hub::karte::download::raeume_nach_neustart(&pool, &karten_dir).await;
     // Crash-Recovery der Sicherungen (LFH-926): Teildateien eines abgebrochenen Laufs und
     // Download-Kopien neben der DB wegräumen.
     if let Some(verzeichnis) = &config.backup_verzeichnis {

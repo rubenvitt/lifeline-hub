@@ -224,7 +224,7 @@ pub async fn offline_welt_tiles(
 /// Liest eine Kachel aus einer relativen MBTiles-Datei unter `karten_dir` und baut die Antwort.
 /// Geteilt von `offline_tiles` (aktive/erste Region) und `offline_tiles_region` (per id). Vektor
 /// (`pbf`) → gzip-MVT, Raster (`png`/`jpg`/`webp`) → Bild ohne Content-Encoding (LFH-185). Öffnet
-/// die Datei read-only (gecacht per Pfad in `mbtiles::reader_fuer`), Y-Flip in mbtiles.rs.
+/// die Datei read-only (gecacht je Pfad in `mbtiles::reader()`), Y-Flip in mbtiles.rs.
 async fn serve_offline_tile(
     state: &AppState,
     pfad_rel: &str,
@@ -247,20 +247,42 @@ async fn serve_offline_tile(
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
     let voll = state.karten_dir.join(p);
+    // Gecacht je registriertem Pfad (LFH-934); Containment und Öffnen laufen nur beim Fehltreffer.
     // Containment via canonicalize fängt zusätzlich Symlinks: der reale Zielpfad MUSS unter dem
     // realen karten_dir liegen, sonst keine Auslieferung (Parität zum `tiles`-Handler,
     // Defense-in-Depth gegen einen Symlink auf eine fremde SQLite-Datei → kein Blob-Leak).
-    let basis = state
-        .karten_dir
-        .canonicalize()
-        .map_err(|e| AppError::Internal(format!("karten_dir nicht auflösbar: {e}")))?;
-    let real = match voll.canonicalize() {
-        Ok(r) if r.starts_with(&basis) => r,
-        _ => return Ok(StatusCode::NO_CONTENT.into_response()),
+    // `canonicalize` blockiert (Dateisystem), deshalb im Blocking-Pool.
+    enum Oeffnen {
+        Ausserhalb,
+        Fehler(String),
+    }
+    let geoeffnet = mbtiles::reader()
+        .reader_fuer(&voll, || {
+            let basis_dir = state.karten_dir.clone();
+            let ziel = voll.clone();
+            async move {
+                let (basis, real) = tokio::task::spawn_blocking(move || {
+                    (basis_dir.canonicalize(), ziel.canonicalize())
+                })
+                .await
+                .map_err(|e| Oeffnen::Fehler(format!("Pfad auflösen: {e}")))?;
+                let basis = basis
+                    .map_err(|e| Oeffnen::Fehler(format!("karten_dir nicht auflösbar: {e}")))?;
+                let real = match real {
+                    Ok(r) if r.starts_with(&basis) => r,
+                    _ => return Err(Oeffnen::Ausserhalb),
+                };
+                mbtiles::oeffne_readonly(&real)
+                    .await
+                    .map_err(|e| Oeffnen::Fehler(format!("MBTiles öffnen: {e}")))
+            }
+        })
+        .await;
+    let pool = match geoeffnet {
+        Ok(pool) => pool,
+        Err(Oeffnen::Ausserhalb) => return Ok(StatusCode::NO_CONTENT.into_response()),
+        Err(Oeffnen::Fehler(text)) => return Err(AppError::Internal(text)),
     };
-    let pool = mbtiles::reader_fuer(&real)
-        .await
-        .map_err(|e| AppError::Internal(format!("MBTiles öffnen: {e}")))?;
     match mbtiles::lies_tile(&pool, z, x, y).await {
         Ok(Some(daten)) => {
             let (content_type, encoding) = format_mime_encoding(format);
@@ -1205,6 +1227,13 @@ pub async fn offline_loeschen(
     _admin: AdminUser,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
+    // LFH-934: Ein laufender Download schriebe über sein offenes Handle weiter in die entlinkte
+    // `.part` und belegte Bandbreite und Platte bis zum Ende. Erst abbrechen, dann löschen.
+    if download::lies_fortschritt(&state.download_fortschritt).contains_key(&id) {
+        return Err(AppError::UnprocessableEntity(
+            "Für diese Karte läuft ein Download; zuerst abbrechen, dann löschen".into(),
+        ));
+    }
     // Zeile vor dem DB-Delete lesen, um gemanagte Downloads von extern Registrierten zu trennen.
     let karte = repo::finde_offline_karte(&state.pool, id).await?;
     if !repo::loesche_offline_karte(&state.pool, id).await? {
@@ -1219,12 +1248,15 @@ pub async fn offline_loeschen(
             k.download_at.is_some() || k.pfad.is_empty() || k.pfad == format!("karte-{id}.mbtiles");
         if ist_gemanagt {
             download::entferne_download_dateien(&state.karten_dir, id).await;
-            // Reader-Cache ist NUR nach Pfad gekeyt: ein Neu-Download kann denselben Pfad
-            // (`karte-{id}.mbtiles`, rowid-Wiederverwendung ohne AUTOINCREMENT) bei neuer Inode
-            // erhalten — ohne Invalidierung würde der alte, gecachte Reader (Datei-Handle auf die
-            // entlinkte Datei) weiterservieren.
-            crate::karte::mbtiles::invalidate_reader().await;
         }
+        // Reader-Cache ist NUR nach Pfad gekeyt: ein Neu-Download kann denselben Pfad
+        // (`karte-{id}.mbtiles`, rowid-Wiederverwendung ohne AUTOINCREMENT) bei neuer Inode
+        // erhalten — ohne Invalidierung würde der alte, gecachte Reader (Datei-Handle auf die
+        // entlinkte Datei) weiterservieren. Auch extern registrierte Karten geben ihren Pool frei.
+        crate::karte::mbtiles::invalidate_reader_fuer(&state.karten_dir.join(&k.pfad));
+        crate::karte::mbtiles::invalidate_reader_fuer(
+            &state.karten_dir.join(format!("karte-{id}.mbtiles")),
+        );
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1356,13 +1388,14 @@ async fn finalisiere_in_place_download(
     let part = karten_dir.join(format!("{dateiname}.part"));
     let ziel = karten_dir.join(&dateiname);
     // Atomarer Swap: POSIX-rename ersetzt die Zieldatei in-place; die alte Inode bleibt für bereits
-    // geöffnete Reader gültig, bis invalidate_reader() den gecachten Pool verwirft.
+    // geöffnete Reader gültig, bis der gecachte Pool dieses Pfads verworfen wird.
     tokio::fs::rename(&part, &ziel)
         .await
         .map_err(|e| format!("Rename: {e}"))?;
     // Reader-Cache VOR dem DB-Update verwerfen: die Datei hat eine neue Inode, der gecachte Pool
-    // (per Pfad gekeyt) hält sonst das alte Handle → würde die alte Datei weiterservieren.
-    crate::karte::mbtiles::invalidate_reader().await;
+    // (per Pfad gekeyt) hält sonst das alte Handle → würde die alte Datei weiterservieren. Nur
+    // dieser Pfad; die übrigen Regionen behalten ihren Pool (LFH-934).
+    crate::karte::mbtiles::invalidate_reader_fuer(&ziel);
     repo::markiere_bereit(pool, id, &dateiname, groesse, sha256)
         .await
         .map_err(|e| format!("markiere_bereit: {e}"))?;
@@ -2430,6 +2463,69 @@ mod finalisierung_tests {
             zeile.quell_url.as_deref(),
             Some("https://example.test/de_neu_20260401.mbtiles"),
             "quell_url auf neue Katalog-URL aktualisiert"
+        );
+    }
+
+    /// Schreibt eine MBTiles mit genau einer Kachel XYZ (1/0/0) = `daten`.
+    async fn schreibe_mbtiles(pfad: &FsPath, daten: &[u8]) {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                sqlx::sqlite::SqliteConnectOptions::new()
+                    .filename(pfad)
+                    .create_if_missing(true),
+            )
+            .await
+            .unwrap();
+        sqlx::query(
+            "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO tiles VALUES (1, 0, 1, ?1)")
+            .bind(daten)
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+    }
+
+    // LFH-934: Der Tausch verwirft den gecachten Pool des getauschten Pfads; danach liefert die
+    // Auslieferung die neue Datei statt der alten Inode.
+    #[tokio::test]
+    async fn in_place_swap_verwirft_den_reader_des_pfads() {
+        use crate::karte::mbtiles;
+        let pool = crate::db::test_pool().await;
+        let tmp = tempfile::tempdir().unwrap();
+        let id = bereite_karte(&pool, "DE").await;
+        let ziel = tmp.path().join(format!("karte-{id}.mbtiles"));
+        schreibe_mbtiles(&ziel, &[0xAA]).await;
+        schreibe_mbtiles(
+            &tmp.path().join(format!("karte-{id}.mbtiles.part")),
+            &[0xBB],
+        )
+        .await;
+        let alt = mbtiles::reader()
+            .reader_fuer(&ziel, || mbtiles::oeffne_readonly(&ziel))
+            .await
+            .unwrap();
+        assert_eq!(
+            mbtiles::lies_tile(&alt, 1, 0, 0).await.unwrap(),
+            Some(vec![0xAA])
+        );
+
+        finalisiere_in_place_download(&pool, tmp.path(), id, 1, "neu", "https://example.test/n")
+            .await
+            .expect("Swap ok");
+
+        let neu = mbtiles::reader()
+            .reader_fuer(&ziel, || mbtiles::oeffne_readonly(&ziel))
+            .await
+            .unwrap();
+        assert_eq!(
+            mbtiles::lies_tile(&neu, 1, 0, 0).await.unwrap(),
+            Some(vec![0xBB])
         );
     }
 
