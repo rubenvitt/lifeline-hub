@@ -6,7 +6,7 @@ import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
-import { modulRegistry } from '../../einsatz/modulRegistry';
+import { modulRegistry, modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
 import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import { Formularpaneel } from '../../components/instrument';
 import {
@@ -14,13 +14,15 @@ import {
   KOORDINATEN_OPTIONEN,
   ZEITFORMAT_OPTIONEN,
   ZEITZONEN_OPTIONEN,
-  ZEITZONE_HILFE,
+  ZEITZONE_HILFE_EINSATZ,
 } from './optionen';
 import {
   initialAllgemein,
   normalisiereAllgemein,
   orgHinweisSelect,
   orgHinweisWert,
+  platzhalterVorgabe,
+  platzhalterVorgabeSelect,
   zuUpdate,
   type FormWerteAllgemein,
 } from './einsatzEinstellungenForm';
@@ -78,6 +80,8 @@ export default function EinsatzAllgemein() {
 
   const orgDefaults = daten.einstellungen.org_defaults;
   // Nur fertige Module sind als Default-Modul wählbar.
+  // Leer öffnet der Einsatz das Modul aus `redirectZiel` (LFH-944: der Platzhalter nennt es).
+  const einstiegVorgabe = modulZuRoute(redirectZiel())?.label ?? 'ETB';
   const standardModulOptionen = modulRegistry
     .filter((m) => m.status === 'fertig')
     .map((m) => ({ value: m.key, label: m.label }));
@@ -107,11 +111,11 @@ export default function EinsatzAllgemein() {
           <Form.Item
             label="Einstiegsmodul"
             name="standard_modul"
-            tooltip="Modul, das beim Öffnen des Einsatzes erscheint. Leer = Lage-Dashboard bzw. ETB."
+            tooltip={`Modul, das beim Öffnen des Einsatzes erscheint. Leer = ${einstiegVorgabe}.`}
           >
             <Select
               allowClear
-              placeholder={mitVorgabe('Lage-Dashboard bzw. ETB')}
+              placeholder={mitVorgabe(einstiegVorgabe)}
               options={standardModulOptionen}
             />
           </Form.Item>
@@ -124,13 +128,13 @@ export default function EinsatzAllgemein() {
           <Form.Item
             label="Zeitzone"
             name="zeitzone"
-            tooltip={ZEITZONE_HILFE}
+            tooltip={ZEITZONE_HILFE_EINSATZ}
             extra={orgHinweisWert(orgDefaults?.zeitzone)}
           >
             <AutoComplete
               allowClear
               options={ZEITZONEN_OPTIONEN}
-              placeholder={mitVorgabe('Gerätezeit')}
+              placeholder={platzhalterVorgabe(orgDefaults?.zeitzone, 'Gerätezeit')}
               showSearch={teilwortSuche}
             />
           </Form.Item>
@@ -141,7 +145,11 @@ export default function EinsatzAllgemein() {
           >
             <Select
               allowClear
-              placeholder={mitVorgabe('24 Stunden')}
+              placeholder={platzhalterVorgabeSelect(
+                orgDefaults?.zeitformat,
+                ZEITFORMAT_OPTIONEN,
+                '24 Stunden',
+              )}
               options={ZEITFORMAT_OPTIONEN}
             />
           </Form.Item>
@@ -150,7 +158,15 @@ export default function EinsatzAllgemein() {
             name="einheiten"
             extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
           >
-            <Select allowClear placeholder={mitVorgabe('Metrisch')} options={EINHEITEN_OPTIONEN} />
+            <Select
+              allowClear
+              placeholder={platzhalterVorgabeSelect(
+                orgDefaults?.einheiten,
+                EINHEITEN_OPTIONEN,
+                'Metrisch',
+              )}
+              options={EINHEITEN_OPTIONEN}
+            />
           </Form.Item>
           <Form.Item
             label="Koordinatenformat"
@@ -159,7 +175,11 @@ export default function EinsatzAllgemein() {
           >
             <Select
               allowClear
-              placeholder={mitVorgabe('WGS84 dezimal')}
+              placeholder={platzhalterVorgabeSelect(
+                orgDefaults?.koordinatenformat,
+                KOORDINATEN_OPTIONEN,
+                'WGS84 dezimal',
+              )}
               options={KOORDINATEN_OPTIONEN}
             />
           </Form.Item>

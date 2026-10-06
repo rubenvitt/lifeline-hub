@@ -13,6 +13,8 @@
 - [x] 2.4 Anmeldeverfahren „Anmeldewege“; Online-Kartenquellen „Kartengrundlage“ statt „Basemap“; Meldungsfrist; Führungsfunktionen „(Vorgabe: …)“; Organisation „Taktische Zeichen“
 - [x] 2.5 Guard grün; Mutationsprobe: ein Altwortlaut zurück macht Guard und Seitentest rot
 
+- [x] 2.6 Review: Einsatz-Platzhalter nennen den wirksamen Wert (Org ?? System), Einstiegsmodul aus `redirectZiel`, Meldungsformular „Frist (Vorgabe)“, Modul-Override „Vorgabe der Organisation: …“, Servermeldung der Fristprüfung
+
 ## 3. Regel, e2e, Abschluss
 
 - [x] 3.1 Regelzeile in `frontend/AGENTS.md` (Bedien-Leitlinie) mit Verweis auf Spec `bedien-begriffe`, `components/vorgabeText.ts` und den Guard

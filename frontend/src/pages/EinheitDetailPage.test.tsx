@@ -119,7 +119,7 @@ async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
 }
 
 describe('EinheitDetailPage · die Route selbst', () => {
-  it('nennt die Stärke-Position in Klartext und erklärt Führer ohne Einheitsführer-Merkmal', async () => {
+  it('nennt die Stärke-Position in Klartext', async () => {
     const mitPersonal = [
       {
         ...einheiten[0],
@@ -138,7 +138,23 @@ describe('EinheitDetailPage · die Route selbst', () => {
     expect(screen.getByText(/Uwe Unter \(Unterführer\)/)).toBeInTheDocument();
     expect(screen.getByText(/Nora Platzhalter \(Mannschaft\)/)).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/\((fuehrer|unterfuehrer|mannschaft)\)/);
-    // Der Hinweis steht nur beim Führer, dem das Merkmal fehlt — genau einmal.
+    // Die Einheit hat schon Einheitsführer: der Hinweis entfällt, sonst läse er sich als Auftrag.
+    expect(screen.queryByText(/noch nicht als Einheitsführer gesetzt/)).not.toBeInTheDocument();
+  });
+
+  it('erklärt den Führer ohne Merkmal, solange die Einheit keinen Einheitsführer hat', async () => {
+    const ohneEinheitsfuehrer = [
+      {
+        ...einheiten[0],
+        personal_mitglieder: [
+          { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
+          { ep_id: 2, name: 'Uwe Unter', staerke_position: 'unterfuehrer', ist_fuehrer: false },
+        ],
+      },
+    ];
+    zeige(http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(ohneEinheitsfuehrer)));
+    await screen.findByText(/Max Mustermann \(Führer\)/);
+    // Genau einmal, beim Führer — nicht beim Unterführer.
     expect(
       screen.getAllByText(/als Führer gezählt, noch nicht als Einheitsführer gesetzt/),
     ).toHaveLength(1);

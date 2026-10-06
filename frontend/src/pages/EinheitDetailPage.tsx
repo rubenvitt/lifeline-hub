@@ -177,6 +177,7 @@ export default function EinheitDetailPage() {
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const aktuell = einheiten.find((e) => e.id === einheitId) ?? null;
+  const hatEinheitsfuehrer = aktuell?.personal_mitglieder.some((m) => m.ist_fuehrer) ?? false;
 
   const speichern = useMutation({
     mutationFn: (werte: KopfWerte) => {
@@ -572,8 +573,9 @@ export default function EinheitDetailPage() {
                 {m.name}
                 {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
                 {/* Die Stärke-Position „Führer“ zählt in F/UF/M, das Merkmal Einheitsführer ist
-                    ein eigenes (LFH-946). Ohne den Satz hielte man es für schon gesetzt. */}
-                {m.staerke_position === 'fuehrer' && !m.ist_fuehrer && (
+                    ein eigenes (LFH-946). Ohne den Satz hielte man es für schon gesetzt. Hat die
+                    Einheit schon einen Einheitsführer, läse er sich wie ein Auftrag. */}
+                {m.staerke_position === 'fuehrer' && !m.ist_fuehrer && !hatEinheitsfuehrer && (
                   <span style={{ color: rollen.gedaempft }}>
                     {' '}
                     · als Führer gezählt, noch nicht als Einheitsführer gesetzt

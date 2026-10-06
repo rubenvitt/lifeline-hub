@@ -8,10 +8,14 @@ import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/t
  */
 
 /**
- * Tooltip der Zeitzone an beiden Ebenen. Leer gilt die Gerätezeit (`anzeige/format.ts`, `inZone`),
+ * Tooltip der Zeitzone in der Verwaltung. Leer gilt die Gerätezeit (`anzeige/format.ts`, `inZone`),
  * deshalb nennt auch der Platzhalter „Gerätezeit“ und nicht Europe/Berlin (LFH-944).
  */
 export const ZEITZONE_HILFE = 'Zeitzone wie Europe/Berlin. Leer = Gerätezeit.';
+
+/** Dasselbe im Einsatz: leer greift zuerst die Vorgabe der Organisation. */
+export const ZEITZONE_HILFE_EINSATZ =
+  'Zeitzone wie Europe/Berlin. Leer = Vorgabe der Organisation, ohne sie Gerätezeit.';
 
 /** Benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
 export const ROLLEN_OPTIONEN: { value: string; label: string }[] = [

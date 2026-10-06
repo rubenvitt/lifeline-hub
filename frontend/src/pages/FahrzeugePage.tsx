@@ -22,6 +22,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
+import { POSITION_LABELS } from '../api/personal';
 import {
   aktualisiereDisposition,
   disponiereAdhoc,
@@ -173,7 +174,7 @@ function BesatzungsBlock({
             <Space size={abstand.sm}>
               <span>
                 {m.name}
-                {m.staerke_position ? ` (${m.staerke_position})` : ''}
+                {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
               </span>
               {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
                 <Tag color="orange" style={{ margin: 0 }}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KEINE_VORGABE, LEER_SYSTEM_VORGABE, mitVorgabe, orgVorgabe } from './vorgabeText';
+import { LEER_SYSTEM_VORGABE, mitVorgabe, orgVorgabe } from './vorgabeText';
 
 describe('vorgabeText — ein Wortlaut für voreingestellte Werte (LFH-944)', () => {
   it('setzt „(Vorgabe)“ hinter den System-Wert im Platzhalter', () => {
@@ -10,8 +10,7 @@ describe('vorgabeText — ein Wortlaut für voreingestellte Werte (LFH-944)', ()
     expect(orgVorgabe('24 Stunden')).toBe('Vorgabe der Organisation: 24 Stunden');
   });
 
-  it('erklärt das leere Org-Feld und das Fehlen einer Vorgabe', () => {
+  it('erklärt das leere Org-Feld', () => {
     expect(LEER_SYSTEM_VORGABE).toBe('Leer = Vorgabe des Systems.');
-    expect(KEINE_VORGABE).toBe('keine Vorgabe');
   });
 });

@@ -10,6 +10,8 @@ import {
   orgHinweisAutoEtb,
   orgHinweisSelect,
   orgHinweisWert,
+  platzhalterVorgabe,
+  platzhalterVorgabeSelect,
   zuUpdate,
 } from './einsatzEinstellungenForm';
 import type { EinsatzEinstellungen } from '../../api/types';
@@ -263,5 +265,25 @@ describe('orgHinweisWert / orgHinweisSelect / orgHinweisAutoEtb', () => {
     );
     expect(orgHinweisAutoEtb(0)).toBe('Vorgabe der Organisation: Aus');
     expect(orgHinweisAutoEtb(1)).toBe('Vorgabe der Organisation: An');
+  });
+});
+
+describe('platzhalterVorgabe — der Platzhalter nennt den Wert, der leer gilt (LFH-944)', () => {
+  it('nimmt die Vorgabe der Organisation, sonst die des Systems', () => {
+    expect(platzhalterVorgabe(30, '5')).toBe('30 (Vorgabe)');
+    expect(platzhalterVorgabe(null, '5')).toBe('5 (Vorgabe)');
+    expect(platzhalterVorgabe('Europe/Vienna', 'Gerätezeit')).toBe('Europe/Vienna (Vorgabe)');
+    expect(platzhalterVorgabe(undefined, 'Gerätezeit')).toBe('Gerätezeit (Vorgabe)');
+  });
+
+  it('zeigt bei Auswahlfeldern das sichtbare Label der Org-Vorgabe', () => {
+    const optionen = [
+      { value: '24h', label: '24 Stunden' },
+      { value: '12h', label: '12 Stunden (AM/PM)' },
+    ];
+    expect(platzhalterVorgabeSelect('12h', optionen, '24 Stunden')).toBe(
+      '12 Stunden (AM/PM) (Vorgabe)',
+    );
+    expect(platzhalterVorgabeSelect(null, optionen, '24 Stunden')).toBe('24 Stunden (Vorgabe)');
   });
 });

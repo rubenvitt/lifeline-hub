@@ -14,6 +14,7 @@ import {
   normalisiereVerhalten,
   orgHinweisAutoEtb,
   orgHinweisWert,
+  platzhalterVorgabe,
   zuUpdate,
   type FormWerteVerhalten,
 } from './einsatzEinstellungenForm';
@@ -21,7 +22,6 @@ import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
-import { KEINE_VORGABE, mitVorgabe } from '../../components/vorgabeText';
 
 /** Tristate-Optionen für automatische ETB-Einträge (leer = erbt Org, true = An, false = Aus).
  *  Bleibt bewusst hier: diese Liste gibt es nur auf der Einsatz-Ebene. */
@@ -171,7 +171,7 @@ export default function EinsatzVerhalten() {
                 min={1}
                 max={10080}
                 style={{ width: '100%', maxWidth: 200 }}
-                placeholder={mitVorgabe('5')}
+                placeholder={platzhalterVorgabe(orgDefaults?.meldung_bestaetigung_frist_min, '5')}
               />
             </Form.Item>
             <Form.Item
@@ -184,7 +184,10 @@ export default function EinsatzVerhalten() {
                 min={1}
                 max={10080}
                 style={{ width: '100%', maxWidth: 200 }}
-                placeholder={KEINE_VORGABE}
+                placeholder={platzhalterVorgabe(
+                  orgDefaults?.auftrag_quittierung_frist_min,
+                  'keine Frist',
+                )}
               />
             </Form.Item>
             <Form.Item
@@ -197,18 +200,25 @@ export default function EinsatzVerhalten() {
                 min={1}
                 max={10080}
                 style={{ width: '100%', maxWidth: 200 }}
-                placeholder={mitVorgabe('60')}
+                placeholder={platzhalterVorgabe(orgDefaults?.rueckmeldung_frist_min, '60')}
               />
             </Form.Item>
             <Form.Item
               label="Automatische ETB-Einträge"
               name="auto_etb_eintraege"
-              tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Leer = Vorgabe der Organisation."
+              tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Leer = Vorgabe der Organisation, ohne sie An."
               extra={orgHinweisAutoEtb(orgDefaults?.auto_etb_eintraege)}
             >
               <Select
                 allowClear
-                placeholder="Vorgabe der Organisation"
+                placeholder={platzhalterVorgabe(
+                  orgDefaults?.auto_etb_eintraege == null
+                    ? null
+                    : orgDefaults.auto_etb_eintraege === 0
+                      ? 'Aus'
+                      : 'An',
+                  'An',
+                )}
                 options={AUTO_ETB_OPTIONEN}
                 style={{ width: '100%', maxWidth: 200 }}
               />

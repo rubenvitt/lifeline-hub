@@ -27,7 +27,7 @@ import {
 import type { OrgEinstellungenUpdate } from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
-import { KEINE_VORGABE, LEER_SYSTEM_VORGABE, mitVorgabe } from '../../components/vorgabeText';
+import { LEER_SYSTEM_VORGABE, mitVorgabe } from '../../components/vorgabeText';
 
 /** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Modulzeile. */
 const RECHTE_TEXT =
@@ -232,7 +232,7 @@ export default function EinsatzDefaults() {
               min={1}
               max={10080}
               style={{ width: '100%', maxWidth: 200 }}
-              placeholder={KEINE_VORGABE}
+              placeholder={mitVorgabe('keine Frist')}
             />
           </Form.Item>
           <Form.Item

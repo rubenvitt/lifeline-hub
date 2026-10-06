@@ -158,11 +158,12 @@ describe('EinsatzVerhalten', () => {
     expect(screen.getByText('Vorgabe der Organisation: 60 Min.')).toBeInTheDocument();
     expect(screen.getByText('Vorgabe der Organisation: 90 Min.')).toBeInTheDocument();
     expect(screen.getByText('Vorgabe der Organisation: An')).toBeInTheDocument();
-    // Leere Felder nennen den Wert, der ohne Organisation gilt (LFH-944).
+    // Leere Felder nennen den Wert, der gilt: hier die Vorgabe der Organisation (LFH-944).
     expect(screen.getByLabelText('Bestätigungsfrist Meldungen (Minuten)')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('30 (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('keine Vorgabe')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('90 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('An (Vorgabe)')).toBeInTheDocument();
     const platzhalter = [...document.querySelectorAll('[placeholder]')].map((e) =>
       e.getAttribute('placeholder'),
     );
@@ -182,6 +183,16 @@ describe('EinsatzVerhalten', () => {
         }),
       ),
     );
+  });
+
+  it('ohne Org-Vorgabe nennen die Platzhalter die Werte des Systems (LFH-944)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({ ...BASIS } as never);
+    rendern();
+
+    expect(await screen.findByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('keine Frist (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('An (Vorgabe)')).toBeInTheDocument();
   });
 
   it('laesst die fremden Sektionen als Bestandswert mitfahren (Vollersatz-PUT)', async () => {

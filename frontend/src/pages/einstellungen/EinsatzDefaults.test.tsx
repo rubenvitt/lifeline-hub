@@ -322,7 +322,7 @@ describe('EinsatzDefaults', () => {
     ).toBeInTheDocument();
     // Leere Meldungsfrist heißt 5 Minuten (System), leere Auftragsfrist heißt keine Frist.
     expect(screen.getByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('keine Vorgabe')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('keine Frist (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByText(/Leer = Vorgabe des Systems\./)).toBeInTheDocument();
     const platzhalter = [...container.querySelectorAll('[placeholder]')].map((e) =>

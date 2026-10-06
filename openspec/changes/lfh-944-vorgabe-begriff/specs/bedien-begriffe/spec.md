@@ -33,8 +33,8 @@ Einsatz-Einstellungen, für das die Organisation einen Wert gesetzt hat, MUST di
 „Vorgabe der Organisation: <Wert>“ zeigen.
 
 #### Scenario: Org-Vorgabe im Einsatz
-- **WHEN** die Organisation das Zeitformat „24 Stunden“ vorgibt und der Einsatz keines gesetzt hat
-- **THEN** steht unter dem Feld „Vorgabe der Organisation: 24 Stunden“, und der Einsatz speichert weiter `null`
+- **WHEN** die Organisation das Zeitformat „12 Stunden (AM/PM)“ vorgibt und der Einsatz keines gesetzt hat
+- **THEN** steht unter dem Feld „Vorgabe der Organisation: 12 Stunden (AM/PM)“, der Platzhalter lautet „12 Stunden (AM/PM) (Vorgabe)“, und der Einsatz speichert weiter `null`
 
 #### Scenario: Keine Org-Vorgabe
 - **WHEN** die Organisation für ein Feld keinen Wert gesetzt hat
@@ -45,5 +45,9 @@ Platzhalter und Tooltip eines Feldes mit Vorgabe SHALL denselben Wert nennen, un
 MUST dem Verhalten bei leerem Feld entsprechen.
 
 #### Scenario: Zeitzone leer
-- **WHEN** das Feld „Zeitzone“ in den Anzeige-Konventionen oder im Einsatz leer ist
-- **THEN** lautet der Platzhalter „Gerätezeit (Vorgabe)“, der Tooltip sagt „Leer = Gerätezeit“, und Zeiten erscheinen in der Zeitzone des Geräts
+- **WHEN** das Feld „Zeitzone“ in den Anzeige-Konventionen leer ist, oder im Einsatz leer ist und die Organisation keine Zeitzone vorgibt
+- **THEN** lautet der Platzhalter „Gerätezeit (Vorgabe)“, der Tooltip nennt die Gerätezeit als Wert bei leerem Feld, und Zeiten erscheinen in der Zeitzone des Geräts
+
+#### Scenario: Frist im Einsatz mit Org-Vorgabe
+- **WHEN** die Organisation eine Bestätigungsfrist von 30 Minuten vorgibt und das Einsatz-Feld leer ist
+- **THEN** lautet der Platzhalter „30 (Vorgabe)“ und nicht der System-Wert „5 (Vorgabe)“

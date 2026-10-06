@@ -20,6 +20,3 @@ export const LEER_SYSTEM_VORGABE = 'Leer = Vorgabe des Systems.';
 export function orgVorgabe(wert: string): string {
   return `Vorgabe der Organisation: ${wert}`;
 }
-
-/** Auswahl-Eintrag für „nichts vorgeben“. */
-export const KEINE_VORGABE = 'keine Vorgabe';

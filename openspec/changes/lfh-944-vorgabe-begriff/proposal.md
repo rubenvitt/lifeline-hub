@@ -59,4 +59,6 @@ im selben Branch außerhalb dieser Change.
   `components/vorgabe.guard.test.ts`.
 - Tests: Vitest der genannten Seiten; e2e-Anker auf „Einsatz-Defaults“ und „Benötigte Rolle
   (Default)“ (`gate1-ueberlauf`, `fokus-verdeckung`, `verwaltung-vereinheitlicht`).
-- Kein Backend, keine Migration, keine API-Änderung. Routen bleiben (`/admin/einstellungen/einsatz`).
+- Backend nur im Text einer Prüfmeldung („Frist muss zwischen 1 und 10080 Minuten liegen“
+  statt „Default-Frist …“); keine Migration, keine API-Änderung. Routen bleiben
+  (`/admin/einstellungen/einsatz`).

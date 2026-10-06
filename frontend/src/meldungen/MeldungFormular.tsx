@@ -10,7 +10,6 @@ import { ErfassungsFormular } from '../components/Erfassung';
 import { useEffect } from 'react';
 import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
-import { mitVorgabe } from '../components/vorgabeText';
 import type {
   Einheit,
   Einsatzabschnitt,
@@ -286,7 +285,7 @@ export default function MeldungFormular({
               <InputNumber
                 min={1}
                 suffix="Min"
-                placeholder={`Frist ${mitVorgabe('5')}`}
+                placeholder="Frist (Vorgabe)"
                 aria-label="Bestätigungsfrist in Minuten"
               />
             </Form.Item>

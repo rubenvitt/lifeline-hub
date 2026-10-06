@@ -144,7 +144,7 @@ export default function PersonalDetailPage() {
             {person.ist_demo && <DemoMarke />}
           </Space>
         }
-        beschreibung="Alle Stammdaten der Person. In der Liste erfasst du nur die vier Pflichtfelder, hier ergänzt du den Rest."
+        beschreibung="Alle Stammdaten der Person. In der Liste erfasst du nur vier Grundfelder, hier ergänzt du den Rest."
         hinweis={
           <SeitenHinweise
             fehler={speichern.error}

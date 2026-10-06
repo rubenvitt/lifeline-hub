@@ -11,6 +11,7 @@ import {
   Typography,
 } from 'antd';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { anzahl } from '../anzeige/anzahl';
 import {
   OFFLINE_QUEUE_EVENT,
   abgelehntEntfernen,
@@ -170,7 +171,7 @@ export default function OfflineRecoveryDrawer({
   useEffect(() => {
     if (!open) return;
     const neuLaden = () =>
-      void laden().catch(() => message.error('Recovery-Daten konnten nicht geladen werden'));
+      void laden().catch(() => message.error('Offline-Daten konnten nicht geladen werden'));
     neuLaden();
     window.addEventListener(OFFLINE_QUEUE_EVENT, neuLaden);
     return () => window.removeEventListener(OFFLINE_QUEUE_EVENT, neuLaden);
@@ -269,30 +270,35 @@ export default function OfflineRecoveryDrawer({
           <Alert
             type="warning"
             showIcon
-            title="Nicht attribuierbare Alt-Daten"
+            title="Alte Offline-Daten ohne Zuordnung"
             description={
               <Space orientation="vertical" size="small">
                 <Typography.Text>
-                  {sichtbareNichtZugeordnet} lokale Offline-Aktion(en) aus einer früheren
-                  App-Version sind keinem Benutzer sicher zuordenbar. Inhalt, Einsatz und weitere
-                  Metadaten werden nicht angezeigt und können nicht übernommen werden.
+                  {anzahl(
+                    sichtbareNichtZugeordnet,
+                    'lokale Offline-Aktion',
+                    'lokale Offline-Aktionen',
+                  )}{' '}
+                  aus einer früheren App-Version {sichtbareNichtZugeordnet === 1 ? 'ist' : 'sind'}{' '}
+                  keinem Benutzer sicher zuordenbar. Inhalt, Einsatz und weitere Metadaten werden
+                  nicht angezeigt und können nicht übernommen werden.
                 </Typography.Text>
                 <Popconfirm
-                  title="Alle nicht attribuierbaren Alt-Daten endgültig verwerfen?"
+                  title="Alle alten Offline-Daten ohne Zuordnung endgültig verwerfen?"
                   description="Die lokal gespeicherten Inhalte werden unwiderruflich gelöscht. Daten mit bekannter Benutzerzuordnung bleiben erhalten."
-                  okText="Alle Alt-Daten endgültig verwerfen"
+                  okText="Alle alten Offline-Daten endgültig verwerfen"
                   cancelText="Abbrechen"
                   okButtonProps={{ danger: true }}
                   onConfirm={() =>
                     ausfuehren(
                       'legacy:discard-all',
                       async () => (await queueNichtZugeordnetAlleVerwerfen()) > 0,
-                      'Nicht attribuierbare Alt-Daten verworfen',
+                      'Alte Offline-Daten ohne Zuordnung verworfen',
                     )
                   }
                 >
                   <Button danger loading={aktionLaeuft === 'legacy:discard-all'}>
-                    Alle Alt-Daten verwerfen
+                    Alle alten Offline-Daten verwerfen
                   </Button>
                 </Popconfirm>
               </Space>

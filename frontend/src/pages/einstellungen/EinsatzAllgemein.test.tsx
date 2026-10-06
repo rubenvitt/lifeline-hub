@@ -145,13 +145,13 @@ describe('EinsatzAllgemein', () => {
     );
   });
 
-  it('zeigt Org-Standard-Hinweise bei leeren Einsatz-Feldern und sendet trotzdem null', async () => {
+  it('zeigt die Org-Vorgaben bei leeren Einsatz-Feldern und sendet trotzdem null', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       ...BASIS,
       org_defaults: {
         org_id: 1,
         zeitzone: 'Europe/Berlin',
-        zeitformat: '24h',
+        zeitformat: '12h',
         einheiten: 'metrisch',
         koordinatenformat: 'wgs84',
       },
@@ -160,13 +160,13 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(await screen.findByText('Vorgabe der Organisation: Europe/Berlin')).toBeInTheDocument();
-    expect(screen.getByText('Vorgabe der Organisation: 24 Stunden')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: 12 Stunden (AM/PM)')).toBeInTheDocument();
     expect(screen.getByText('Vorgabe der Organisation: Metrisch (m, km)')).toBeInTheDocument();
     expect(screen.getByText('Vorgabe der Organisation: WGS84 dezimal')).toBeInTheDocument();
-    // Platzhalter nennen den System-Wert, die leere Zeitzone die Gerätezeit (LFH-944).
-    expect(screen.getByText('Gerätezeit (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByText('24 Stunden (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByText('Lage-Dashboard bzw. ETB (Vorgabe)')).toBeInTheDocument();
+    // Der Platzhalter nennt den Wert, der leer gilt: hier die Vorgabe der Organisation (LFH-944).
+    expect(screen.getByText('Europe/Berlin (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('12 Stunden (AM/PM) (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('Überblick (Vorgabe)')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Standard|Default|Fallback/);
 
     // Der Org-Default darf NICHT in den Payload fließen — leer bleibt null (das Backend löst auf).
@@ -189,6 +189,17 @@ describe('EinsatzAllgemein', () => {
    * `Select`/`AutoComplete`, und rc-select ruft bei jedem Enter `preventDefault()`. Prüfbar ist die
    * Struktur — der Absende-Knopf liegt im `<form>`.
    */
+  it('ohne Org-Vorgabe nennt der Platzhalter den System-Wert, die Zeitzone die Gerätezeit (LFH-944)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({ ...BASIS } as never);
+    rendern();
+
+    expect(await screen.findByText('Gerätezeit (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('24 Stunden (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('Metrisch (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('WGS84 dezimal (Vorgabe)')).toBeInTheDocument();
+    expect(screen.queryByText(/Vorgabe der Organisation:/)).not.toBeInTheDocument();
+  });
+
   it('haelt den Speichern-Knopf IM Formular (Erfassungs-Norm B4/LFH-332)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(BASIS as never);
 

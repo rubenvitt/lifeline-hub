@@ -165,7 +165,7 @@ export default function FahrzeugDetailPage() {
             {fahrzeug.ist_demo && <DemoMarke />}
           </Space>
         }
-        beschreibung="Alle Stammdaten des Fahrzeugs. In der Liste erfasst du nur die vier Pflichtfelder, hier ergänzt du den Rest."
+        beschreibung="Alle Stammdaten des Fahrzeugs. In der Liste erfasst du nur vier Grundfelder, hier ergänzt du den Rest."
         hinweis={
           <SeitenHinweise
             fehler={speichern.error}

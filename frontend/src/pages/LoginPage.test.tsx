@@ -855,7 +855,7 @@ describe('LoginPage', () => {
       expect(codeFeld).toHaveAttribute('maxlength', '6');
     });
 
-    it('schaltet per „Recovery-Code verwenden" auf die Recovery-Eingabe um und schickt den Code an totp/finish', async () => {
+    it('schaltet per „Wiederherstellungscode verwenden" auf dessen Eingabe um und schickt den Code an totp/finish', async () => {
       let totpBody: unknown = null;
       server.use(http.get('/api/auth/me', () => HttpResponse.json(adminBody)));
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));

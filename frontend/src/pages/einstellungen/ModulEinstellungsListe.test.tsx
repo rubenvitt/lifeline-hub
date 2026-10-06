@@ -86,11 +86,13 @@ describe('ModulEinstellungsListe', () => {
     renderMitProviders(
       <ModulEinstellungsListe
         {...einsatzProps()}
-        hinweisVon={(key) => (key === 'etb' ? 'Org: Führungskraft' : undefined)}
+        hinweisVon={(key) =>
+          key === 'etb' ? 'Vorgabe der Organisation: Führungskraft' : undefined
+        }
       />,
     );
 
-    expect(screen.getByText('Org: Führungskraft')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: Führungskraft')).toBeInTheDocument();
   });
 
   it('zeigt den aktuellen Wert je Modul an (Rolle und Sichtbarkeit kommen von außen)', () => {

@@ -381,7 +381,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     expect(await screen.findByText('Code ungültig')).toBeInTheDocument();
   });
 
-  it('behält die Recovery-Codes sichtbar, wenn der Status-Refresh nach enrollFinish auf „2FA aktiv" dreht (Regressionsschutz)', async () => {
+  it('behält die Wiederherstellungscodes sichtbar, wenn der Status-Refresh nach enrollFinish auf „Zweiter Faktor aktiv" dreht (Regressionsschutz)', async () => {
     setup(false);
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
