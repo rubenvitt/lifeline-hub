@@ -2101,6 +2101,52 @@ async fn proxy_raster_nicht_numerisches_z_ist_400() {
     );
 }
 
+/// LFH-930: Kachelkoordinaten außerhalb von `z 0..=24`, `x, y 0..2^z` sind 204, bevor Quelle,
+/// Template oder Upstream angefasst werden. Die Quellen zeigen auf eine interne Adresse: erreichte
+/// eine Anfrage den Abruf, endete sie am SSRF-Gate mit 500 (bei z ≥ 64 schon vorher als Panik).
+#[tokio::test]
+async fn proxy_kachel_ausserhalb_des_rasters_ist_204_ohne_abruf() {
+    let pool = pool().await;
+    insert_proxy_quelle(
+        &pool,
+        "R",
+        "https://127.0.0.1/{z}/{x}/{-y}.png?key=K",
+        "raster",
+        1,
+        1,
+        0,
+    )
+    .await; // id 1
+    insert_proxy_quelle(&pool, "V", "https://x/s.json?key=K", "vektor", 1, 1, 1).await; // id 2
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (2, 'https://127.0.0.1/{z}/{x}/{-y}.pbf', 'template')")
+        .execute(&pool).await.unwrap(); // slot 1
+    let app = app_mit_pool(pool);
+
+    for pfad in [
+        "/api/karte/proxy/1/raster/64/0/0",
+        "/api/karte/proxy/1/raster/-1/0/0",
+        "/api/karte/proxy/1/raster/25/0/0",
+        "/api/karte/proxy/1/raster/3/8/0",
+        "/api/karte/proxy/1/raster/3/0/8",
+        "/api/karte/proxy/1/raster/3/-1/0",
+        "/api/karte/proxy/2/tile/1/-1/0/0",
+        "/api/karte/proxy/2/tile/1/64/0/0",
+        "/api/karte/proxy/2/tile/1/2/4/0",
+        "/api/karte/proxy/2/tile/1/2/0/-1",
+        // Auch vor der Quellenprüfung: eine unbekannte Quelle liefert hier kein 404.
+        "/api/karte/proxy/999/raster/64/0/0",
+    ] {
+        let res = anfrage(&app, "GET", pfad, None, None).await;
+        assert_eq!(res.status(), StatusCode::NO_CONTENT, "{pfad}");
+    }
+
+    // Gegenprobe: eine gültige Kachel erreicht den Abruf und endet am SSRF-Gate.
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/raster/3/7/7", None, None).await;
+    assert!(res.status().is_server_error(), "{}", res.status());
+    let res = anfrage(&app, "GET", "/api/karte/proxy/2/tile/1/3/7/7", None, None).await;
+    assert!(res.status().is_server_error(), "{}", res.status());
+}
+
 #[tokio::test]
 async fn proxy_glyphs_ungueltiger_range_ist_400() {
     let pool = pool().await;

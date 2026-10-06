@@ -238,7 +238,8 @@ async fn serve_offline_tile(
     // shiftet `1i64 << z` für den TMS-Y-Flip — ein absurdes z (negativ oder > 24) würde im
     // Debug-Build panicken bzw. im Release-Build maskiert überlaufen. Kein valider XYZ-Zoom liegt
     // außerhalb von 0..=24.
-    if !(0..=24).contains(&z) || x < 0 || y < 0 {
+    // Geteilter Guard mit dem Kachel-Proxy (LFH-930), samt oberer Grenze `x, y < 2^z`.
+    if !proxy::kachel_koordinate_gueltig(z, x, y) {
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
     // Pfad-Guard analog zum bisherigen tiles-Handler (relativ, kein Traversal).
@@ -2175,6 +2176,26 @@ fn ssrf_geprueft(upstream: &str) -> Result<reqwest::Url, AppError> {
     Ok(u)
 }
 
+/// Fehler der Proxy-Service-Schicht als Antwort: eine erschöpfte Proxy-Grenze ist Lastabwurf
+/// (503, LFH-930), alles andere bleibt 500.
+fn proxy_fehler(e: proxy::ProxyFehler) -> AppError {
+    match e {
+        proxy::ProxyFehler::Ueberlast => AppError::ServiceUnavailable(
+            "Kartenproxy vorübergehend ausgelastet — bitte erneut versuchen.".into(),
+        ),
+        andere => AppError::Internal(andere.to_string()),
+    }
+}
+
+/// Kachelkoordinaten außerhalb von `z 0..=24`, `x, y 0..2^z` beantworten die Proxy-Routen mit
+/// 204 wie `serve_offline_tile`, BEVOR Quelle, Template oder Upstream angefasst werden (LFH-930).
+/// Bewusst nicht 400 (`src/AGENTS.md`, Statuscode-Konvention): das Feld ist für sich gültig (ein
+/// nicht numerisches `z` bleibt 400 über `PfadParam`), es gibt die Kachel nur nicht; MapLibre
+/// zeigt 204 als leere Kachel, statt je Kachel einen Fehler zu melden.
+fn keine_kachel(z: i64, x: i64, y: i64) -> Option<Response> {
+    (!proxy::kachel_koordinate_gueltig(z, x, y)).then(|| StatusCode::NO_CONTENT.into_response())
+}
+
 /// JSON-Proxy-Antwort (style.json / tilejson): key-frei, nicht cachen.
 fn json_proxy_antwort(json: String) -> Response {
     Response::builder()
@@ -2224,12 +2245,13 @@ async fn proxy_asset(state: &AppState, u: reqwest::Url) -> Result<Response, AppE
     let asset = tile_cache::hole_asset_via_cache_oder_direkt(
         &state.karten_dir,
         proxy::proxy_client(),
+        proxy::proxy_abruf_grenze(),
         u,
         proxy::ASSET_BYTE_CAP,
         tile_cache::unix_now(),
     )
     .await
-    .map_err(|e| AppError::Internal(e.to_string()))?;
+    .map_err(proxy_fehler)?;
     Ok(asset_antwort(asset))
 }
 
@@ -2240,9 +2262,10 @@ pub async fn proxy_style(
 ) -> Result<Response, AppError> {
     let q = aktive_proxy_quelle(&state, id).await?;
     let u = ssrf_geprueft(&q.url)?;
+    let _platz = proxy::abruf_platz(proxy::proxy_abruf_grenze()).map_err(proxy_fehler)?;
     let json = proxy::hole_style(proxy::proxy_client(), &state.pool, id, u)
         .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+        .map_err(proxy_fehler)?;
     Ok(json_proxy_antwort(json))
 }
 
@@ -2251,6 +2274,9 @@ pub async fn proxy_raster(
     State(state): State<AppState>,
     PfadParam((id, z, x, y)): PfadParam<(i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
+    if let Some(leer) = keine_kachel(z, x, y) {
+        return Ok(leer);
+    }
     let q = aktive_proxy_quelle(&state, id).await?;
     let u = ssrf_geprueft(&proxy::subst_template(&q.url, z, x, y))?;
     proxy_asset(&state, u).await
@@ -2261,6 +2287,9 @@ pub async fn proxy_tile(
     State(state): State<AppState>,
     PfadParam((id, slot, z, x, y)): PfadParam<(i64, i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
+    if let Some(leer) = keine_kachel(z, x, y) {
+        return Ok(leer);
+    }
     aktive_proxy_quelle(&state, id).await?;
     let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Template).await?;
     let u = ssrf_geprueft(&proxy::subst_template(&template, z, x, y))?;
@@ -2275,9 +2304,10 @@ pub async fn proxy_tilejson(
     aktive_proxy_quelle(&state, id).await?;
     let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Tilejson).await?;
     let u = ssrf_geprueft(&upstream)?;
+    let _platz = proxy::abruf_platz(proxy::proxy_abruf_grenze()).map_err(proxy_fehler)?;
     let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
         .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+        .map_err(proxy_fehler)?;
     Ok(json_proxy_antwort(json))
 }
 
@@ -2341,6 +2371,18 @@ mod proxy_antwort_tests {
             "application/json"
         );
         assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
+    }
+
+    #[test]
+    fn proxy_ueberlast_ist_503_sonst_500() {
+        assert_eq!(
+            proxy_fehler(proxy::ProxyFehler::Ueberlast).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            proxy_fehler(proxy::ProxyFehler::Status(502)).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }
 
