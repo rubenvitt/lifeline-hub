@@ -3968,4 +3968,299 @@ mod tests {
         .unwrap();
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
+
+    // --- Migration 0154: Bytes der Karten-Hintergrundbilder auslagern (LFH-936) ---
+
+    /// Pool mit genau einer Verbindung auf `ort`, ohne Migrationen.
+    async fn verbinden(ort: SqliteConnectOptions) -> SqlitePool {
+        SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(ort.foreign_keys(true))
+            .await
+            .unwrap()
+    }
+
+    /// Wie [`verbinden`], mit Migrationen bis `bis`.
+    async fn pool_bis(ort: SqliteConnectOptions, bis: i64) -> SqlitePool {
+        let pool = verbinden(ort).await;
+        migriere_bis(&pool, bis).await;
+        pool
+    }
+
+    async fn migriere_bis(pool: &SqlitePool, bis: i64) {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        Migrator {
+            migrations: Cow::Owned(alle.into_iter().filter(|m| m.version <= bis).collect()),
+            ..Migrator::DEFAULT
+        }
+        .run(pool)
+        .await
+        .unwrap_or_else(|e| panic!("Migrationen bis {bis}: {e}"));
+    }
+
+    /// Org, Benutzer, Einsatz auf einer Alt-DB; liefert (einsatz, benutzer).
+    async fn bild_grundlage(pool: &SqlitePool) -> (i64, i64) {
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (e, b)
+    }
+
+    fn sha256_hex(daten: &[u8]) -> String {
+        use sha2::{Digest, Sha256};
+        Sha256::digest(daten)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    }
+
+    /// Ein Bild im Alt-Schema (Bytes in `karte_hintergrundbild.daten`).
+    async fn altes_bild(
+        pool: &SqlitePool,
+        einsatz: i64,
+        benutzer: i64,
+        daten: &[u8],
+        ansicht: Option<i64>,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO karte_hintergrundbild (einsatz_id, name, daten, mime, groesse, sha256, \
+                ecken_json, opazitaet, sichtbar, reihenfolge, ansicht_id, hochgeladen_von) \
+             VALUES (?, 'Lageplan.png', ?, 'image/png', ?, ?, '[[0,0],[1,0],[1,1],[0,1]]', 60, 0, \
+                (SELECT COUNT(*) FROM karte_hintergrundbild), ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(daten)
+        .bind(daten.len() as i64)
+        .bind(sha256_hex(daten))
+        .bind(ansicht)
+        .bind(benutzer)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Bestandsbilder überstehen den Umbau verlustfrei (Bytes und sha256 gleich, Metadaten samt
+    /// `ansicht_id`), die Tabelle trägt keine BLOB-Spalte mehr, Index und Fremdschlüssel stehen,
+    /// und das Löschen eines Bilds nimmt seine Bytes per CASCADE mit.
+    #[tokio::test]
+    async fn migration_0154_lagert_bytes_verlustfrei_aus() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 153).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let ansicht: i64 = sqlx::query_scalar(
+            "INSERT INTO karten_ansicht (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let eins: Vec<u8> = (0..70_000u32).map(|i| (i % 251) as u8).collect();
+        let zwei: Vec<u8> = (0..5_000u32).map(|i| (i % 13) as u8).collect();
+        let bild_eins = altes_bild(&pool, e, b, &eins, Some(ansicht)).await;
+        let bild_zwei = altes_bild(&pool, e, b, &zwei, None).await;
+        type Meta = (i64, String, i64, String, i64, i64, i64, Option<i64>);
+        let meta = || async {
+            sqlx::query_as::<_, Meta>(
+                "SELECT id, name, groesse, sha256, opazitaet, sichtbar, reihenfolge, ansicht_id \
+                 FROM karte_hintergrundbild ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = meta().await;
+
+        migriere_bis(&pool, 154).await;
+
+        assert_eq!(meta().await, vorher, "Metadaten unverändert");
+        let spalten: Vec<(String, String)> =
+            sqlx::query_as("SELECT name, type FROM pragma_table_info('karte_hintergrundbild')")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(
+            spalten
+                .iter()
+                .all(|(name, typ)| name != "daten" && typ != "BLOB"),
+            "keine BLOB-Spalte mehr: {spalten:?}"
+        );
+        for (id, erwartet) in [(bild_eins, &eins), (bild_zwei, &zwei)] {
+            let (daten, sha): (Vec<u8>, String) = sqlx::query_as(
+                "SELECT d.daten, b.sha256 FROM karte_hintergrundbild_daten d \
+                 JOIN karte_hintergrundbild b ON b.id = d.bild_id WHERE d.bild_id = ?",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(&daten, erwartet, "Bytes von Bild {id}");
+            assert_eq!(sha256_hex(&daten), sha, "sha256 von Bild {id}");
+        }
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'index' \
+             AND name = 'idx_karte_hintergrundbild_einsatz' AND tbl_name = 'karte_hintergrundbild'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        assert!(index.is_some(), "Index auf einsatz_id erhalten");
+        // Das RENAME hat den Verweis der Bytes auf den endgültigen Namen umgeschrieben.
+        let ziel: Vec<(String, String)> = sqlx::query_as(
+            "SELECT \"table\", on_delete FROM pragma_foreign_key_list('karte_hintergrundbild_daten')",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            ziel,
+            vec![("karte_hintergrundbild".to_string(), "CASCADE".to_string())]
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE instr(sql, 'karte_hintergrundbild_neu') > 0",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "kein Verweis auf die Zwischentabelle");
+        let verletzungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(verletzungen, 0);
+
+        // ON DELETE SET NULL der Ansicht und CASCADE der Bytes gelten weiter.
+        sqlx::query("DELETE FROM karten_ansicht WHERE id = ?")
+            .bind(ansicht)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let ansicht_id: Option<i64> =
+            sqlx::query_scalar("SELECT ansicht_id FROM karte_hintergrundbild WHERE id = ?")
+                .bind(bild_eins)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ansicht_id, None);
+        sqlx::query("DELETE FROM karte_hintergrundbild WHERE id = ?")
+            .bind(bild_eins)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: Vec<i64> = sqlx::query_scalar("SELECT bild_id FROM karte_hintergrundbild_daten")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, vec![bild_zwei], "CASCADE nimmt die Bytes mit");
+    }
+
+    /// Seiten, die die Verbindung von `pool` seit dem letzten Aufruf aus der Datei lesen musste
+    /// (`SQLITE_DBSTATUS_CACHE_MISS`, setzt den Zähler zurück).
+    async fn gelesene_seiten(pool: &SqlitePool) -> i64 {
+        let mut conn = pool.acquire().await.unwrap();
+        let mut handle = conn.lock_handle().await.unwrap();
+        let (mut aktuell, mut hoechst) = (0i32, 0i32);
+        // SAFETY: `handle` hält die Verbindung gesperrt und den Zeiger gültig; die Funktion liest
+        // nur Zähler der Verbindung und schreibt in die zwei lokalen Variablen.
+        let rc = unsafe {
+            libsqlite3_sys::sqlite3_db_status(
+                handle.as_raw_handle().as_ptr(),
+                libsqlite3_sys::SQLITE_DBSTATUS_CACHE_MISS,
+                &mut aktuell,
+                &mut hoechst,
+                1,
+            )
+        };
+        assert_eq!(rc, libsqlite3_sys::SQLITE_OK);
+        i64::from(aktuell)
+    }
+
+    /// Akzeptanz LFH-936: Liste und Download-Metadaten von 5 Bildern à 5 MB lesen nach dem Umbau
+    /// weniger als 1 % der Bildseiten. Dieselbe Messung vor dem Umbau ist die Gegenprobe: dort
+    /// liest die Liste die Überlaufketten aller Bilder, die Messung wird also rot, wenn die
+    /// Bytes wieder vor den Metadaten liegen. Gemessen auf einer Datei-DB mit frischer
+    /// Verbindung je Messung (leerer Seiten-Cache).
+    #[tokio::test]
+    async fn migration_0154_liste_und_meta_lesen_keine_bilddaten() {
+        const BILDER: usize = 5;
+        const GROESSE: usize = 5 * 1024 * 1024;
+        let dir = tempfile::tempdir().unwrap();
+        let datei = dir.path().join("bilder.db");
+        let ort = || {
+            SqliteConnectOptions::new()
+                .filename(&datei)
+                .create_if_missing(true)
+        };
+        let pool = pool_bis(ort(), 153).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let mut ids = Vec::new();
+        for n in 0..BILDER {
+            ids.push(altes_bild(&pool, e, b, &vec![n as u8 + 1; GROESSE], None).await);
+        }
+        let seite: i64 = sqlx::query_scalar("PRAGMA page_size")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let bildseiten = (BILDER * GROESSE) as i64 / seite;
+        pool.close().await;
+
+        let messen = |ids: Vec<i64>| async move {
+            let pool = verbinden(ort()).await;
+            // Schema laden, bevor gezählt wird.
+            sqlx::query("SELECT 1 FROM karte_hintergrundbild LIMIT 0")
+                .execute(&pool)
+                .await
+                .unwrap();
+            gelesene_seiten(&pool).await;
+            let liste = crate::karte_hintergrundbild::repo::liste(&pool, e, None)
+                .await
+                .unwrap();
+            assert_eq!(liste.len(), BILDER);
+            for id in ids {
+                crate::karte_hintergrundbild::repo::meta_fuer_download(&pool, e, id)
+                    .await
+                    .unwrap();
+            }
+            let gelesen = gelesene_seiten(&pool).await;
+            pool.close().await;
+            gelesen
+        };
+
+        let vorher = messen(ids.clone()).await;
+        assert!(
+            vorher > bildseiten / 2,
+            "Gegenprobe: im Alt-Schema liest die Liste die Bilddaten ({vorher} von {bildseiten} \
+             Seiten) — sonst misst der Test nichts"
+        );
+
+        let pool = pool_bis(ort(), 154).await;
+        pool.close().await;
+        let nachher = messen(ids.clone()).await;
+        assert!(
+            nachher * 100 < bildseiten,
+            "Liste und Metadaten lesen {nachher} Seiten, erlaubt < 1 % von {bildseiten}"
+        );
+
+        // Die Bytes selbst kommen unverändert.
+        let pool = pool_bis(ort(), 154).await;
+        let (_, _, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, ids[2])
+            .await
+            .unwrap();
+        assert_eq!(daten, vec![3u8; GROESSE]);
+    }
 }

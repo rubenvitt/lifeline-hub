@@ -106,7 +106,7 @@ pub async fn ablegen(
 ) -> Result<(StatusCode, Json<DokumentAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     let (mut datei, mut titel, mut kategorie, mut bezug_typ, mut bezug_id) =
-        (None::<(String, Vec<u8>)>, None, None, None, None);
+        (None::<(String, axum::body::Bytes)>, None, None, None, None);
     while let Some(feld) = multipart
         .next_field()
         .await
@@ -123,7 +123,8 @@ pub async fn ablegen(
                 let b = feld.bytes().await.map_err(|e| {
                     AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}"))
                 })?;
-                datei = Some((dateiname, b.to_vec()));
+                // Ohne Kopie: die Bytes gehen als Slice bis zum Binden (LFH-938).
+                datei = Some((dateiname, b));
             }
             Some("titel") => titel = Some(feld.text().await.map_err(text)?),
             Some("kategorie") => kategorie = Some(feld.text().await.map_err(text)?),

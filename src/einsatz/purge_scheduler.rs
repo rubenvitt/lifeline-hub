@@ -759,6 +759,15 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(bilder, 0, "Bild der Lagekarte nach der Schwärzung entfernt");
+        // Die Bytes liegen getrennt (LFH-936) und fallen per CASCADE mit.
+        let bytes: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM karte_hintergrundbild_daten WHERE bild_id = ?",
+        )
+        .bind(bild.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(bytes, 0, "Bilddaten nach der Schwärzung entfernt");
         assert!(matches!(
             crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id).await,
             Err(crate::error::AppError::NotFound)
@@ -2270,18 +2279,25 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap();
-        sqlx::query(
-            "INSERT INTO karte_hintergrundbild (einsatz_id, name, daten, mime, groesse, sha256, \
+        // Metadaten und Bytes getrennt (LFH-936, Migration 0154).
+        let bild: i64 = sqlx::query_scalar(
+            "INSERT INTO karte_hintergrundbild (einsatz_id, name, mime, groesse, sha256, \
                 ecken_json, hochgeladen_von) \
-             VALUES (?, 'Luftbild.png', ?, 'image/png', ?, 'x', '[[0,0],[1,0],[1,1],[0,1]]', ?)",
+             VALUES (?, 'Luftbild.png', 'image/png', ?, 'x', '[[0,0],[1,0],[1,1],[0,1]]', ?) \
+             RETURNING id",
         )
         .bind(einsatz)
-        .bind(daten)
         .bind(daten.len() as i64)
         .bind(b)
-        .execute(pool)
+        .fetch_one(pool)
         .await
         .unwrap();
+        sqlx::query("INSERT INTO karte_hintergrundbild_daten (bild_id, daten) VALUES (?, ?)")
+            .bind(bild)
+            .bind(daten)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 
     async fn bilder_von(pool: &SqlitePool, einsatz: i64) -> i64 {

@@ -60,6 +60,7 @@ pub mod stichwort;
 pub mod storno;
 pub mod tier;
 pub mod tls;
+pub mod transfer;
 pub mod tx;
 pub mod uhs;
 pub mod verbindung;

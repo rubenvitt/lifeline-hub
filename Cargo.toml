@@ -75,6 +75,12 @@ rcgen = "0.14"
 # Nur für `TokioTimer`: hyper braucht einen Timer, bevor `header_read_timeout` gesetzt werden
 # darf (sonst Panik beim Verbindungsaufbau).
 hyper-util = { version = "0.1", features = ["tokio"] }
+# Body-Hüllen der Transfer-Grenzen (LFH-938, `src/transfer.rs`): Leerlauf-Frist am Upload,
+# Download-Platz im Response-Body.
+http-body = "1"
+# TCP-Keepalive an angenommenen Verbindungen (LFH-938, `src/verbindung.rs`): ein Upload, dessen
+# Gegenstelle ohne FIN verschwindet, hielte die Verbindung sonst unbegrenzt.
+socket2 = "0.6"
 # OIDC/SSO. default-features aus: sie zögen oauth2s eigenen reqwest-0.12-Stack (`ring`) neben
 # unseren reqwest 0.13 (`aws-lc-rs`) auf dasselbe rustls-0.23, und rustls könnte den
 # Default-CryptoProvider nicht mehr bestimmen (bricht tls::tests::rcgen_pem_ist_per_rustls_ladbar).
@@ -112,6 +118,11 @@ webauthn-rs-core = "=0.5.5"
 # SSE-Body eines OFFENEN Streams frameweise lesen: `to_bytes` wartet auf ein Stream-Ende, das
 # bei einem Live-Feed nie kommt.
 http-body-util = "0.1"
+# `all` nur für Tests: liest die Keepalive-Frist zurück (`verbindung::tests`).
+socket2 = { version = "0.6", features = ["all"] }
+# `test-util` für `#[tokio::test(start_paused = true)]`: die Fristen in `transfer::tests` laufen
+# auf einer angehaltenen Uhr und hängen nicht an der Last der Maschine.
+tokio = { version = "1", features = ["full", "test-util"] }
 
 [features]
 # clamav ist Default-AN (reines Rust). Der echte Scan braucht einen erreichbaren clamd; ohne

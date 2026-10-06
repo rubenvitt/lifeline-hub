@@ -1,6 +1,7 @@
 use crate::karte::FachebenenState;
 use crate::live::LiveHub;
 use crate::routes;
+use crate::transfer::UPLOAD_BODY_MAX;
 use axum::{
     extract::DefaultBodyLimit,
     response::IntoResponse,
@@ -9,12 +10,7 @@ use axum::{
 };
 use sqlx::SqlitePool;
 use std::path::PathBuf;
-use tower::limit::ConcurrencyLimitLayer;
-
-/// Begrenzt die gleichzeitig laufenden Voll-BLOB-Reads der Asset-Downloads (bis 25 MiB je
-/// Anhang → RAM-Druck). Nur auf den Download-Routen, nicht routerweit — ein globaler Limiter
-/// hungerte die langlebigen SSE-Streams aus.
-const MAX_GLEICHZEITIGE_ASSET_DOWNLOADS: usize = 16;
+use std::time::Duration;
 
 /// Geteilter Anwendungszustand, der an alle Handler übergeben wird.
 #[derive(Clone)]
@@ -51,6 +47,10 @@ pub struct RouterOptionen {
     /// Registriert die Routen unter `/api/demo-daten` (`--demo-daten`). Ohne den Schalter
     /// antworten sie wie jeder unbekannte `/api/`-Pfad mit 404, auch angemeldet.
     pub demo_daten: bool,
+    /// Zeitbudget der Zulassungssteuerung; `None` = [`crate::zulassung::REQUEST_BUDGET`]. Nur
+    /// Tests setzen es, um ohne Minuten Wartezeit zu belegen, welche Routen dem Budget entzogen
+    /// sind (LFH-938).
+    pub zulassungs_budget: Option<Duration>,
 }
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand, mit Vorgabe-Optionen (ohne
@@ -72,6 +72,22 @@ const AUTH_FINISH_BODY_MAX: usize = 16 * 1024;
 
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
 pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
+    // Grenzen der großen Transfers (LFH-938, `src/transfer.rs`): EINE Upload-Grenze für alle
+    // Upload-Routen, je Download-Route eine eigene Grenze, deren Platz im Response-Body reist.
+    // Beide Routenarten stehen in `zulassung::OHNE_ZULASSUNGSGRENZE`; `tests/zulassung_guard.rs`
+    // verlangt das eine mit dem anderen. Als `route_layer`: die 405-Antwort des Fallbacks belegt
+    // keinen Platz.
+    let upload_grenze = axum::middleware::from_fn_with_state(
+        crate::transfer::UploadGrenze::default(),
+        crate::transfer::upload_grenze,
+    );
+    let download_grenze = || {
+        axum::middleware::from_fn_with_state(
+            crate::transfer::DownloadGrenze::default(),
+            crate::transfer::download_grenze,
+        )
+    };
+
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
@@ -246,17 +262,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/etb/{eintrag_id}/auftrag",
             post(routes::etb::auftrag_erteilen),
         )
-        // ETB-Anhänge: Upload mit Body-Limit (die Vorgabe von 2 MiB kappte still), Download mit dem
-        // Asset-Concurrency-Cap.
+        // ETB-Anhänge: Upload mit Body-Limit (die Vorgabe von 2 MiB kappte still) und Upload-Grenze,
+        // Download mit Download-Grenze.
         .route(
             "/api/einsaetze/{id}/etb/anhaenge",
-            post(routes::etb::anhang_hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            post(routes::etb::anhang_hochladen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid}",
-            get(routes::etb::anhang_herunterladen).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::etb::anhang_herunterladen).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/chat/kanaele",
@@ -306,22 +322,28 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Multipart-Overhead.
         .route(
             "/api/einsaetze/{id}/anhaenge",
-            post(routes::anhang::hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            post(routes::anhang::hochladen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/anhaenge/{aid}",
-            get(routes::anhang::herunterladen)
-                .delete(routes::anhang::loeschen)
-                .layer(ConcurrencyLimitLayer::new(
-                    MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-                )),
+            get(routes::anhang::herunterladen).route_layer(download_grenze()),
+        )
+        .route(
+            "/api/einsaetze/{id}/anhaenge/{aid}",
+            delete(routes::anhang::loeschen),
         )
         // Dokumentenablage: eigener Präfix mit Modul-Gate; Upload/Download wie Anhänge.
         .route(
             "/api/einsaetze/{id}/dokumente",
-            get(routes::dokument::liste)
-                .post(routes::dokument::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::dokument::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/dokumente",
+            post(routes::dokument::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}",
@@ -329,9 +351,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}/datei",
-            get(routes::dokument::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::dokument::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/erinnerungen",
@@ -829,9 +849,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // der Download schreibt je Abruf eine Zeile ins Zugriffsprotokoll der Person.
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge",
-            get(routes::person_anhang::liste)
-                .post(routes::person_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::person_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/anhaenge",
+            post(routes::person_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}",
@@ -839,9 +863,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei",
-            get(routes::person_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::person_anhang::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/tiere",
@@ -874,9 +896,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Tier-Anhänge (LFH-758): Modul-Gate `tiere`; Upload/Download wie die Schaden-Anhänge.
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
-            get(routes::tier_anhang::liste)
-                .post(routes::tier_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::tier_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
+            post(routes::tier_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}",
@@ -884,9 +910,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei",
-            get(routes::tier_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::tier_anhang::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/schaeden",
@@ -919,9 +943,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Schaden-Anhänge: Modul-Gate `schaeden`; Upload/Download wie die Dokumentenablage.
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
-            get(routes::schaden_anhang::liste)
-                .post(routes::schaden_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::schaden_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
+            post(routes::schaden_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}",
@@ -929,9 +957,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
-            get(routes::schaden_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::schaden_anhang::datei).route_layer(download_grenze()),
         )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
         .route(
@@ -974,9 +1000,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // UHS-Anhänge (LFH-758): Modul-Gate `unfallhilfsstellen`; jeder Download im Lese-Audit.
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
-            get(routes::uhs_anhang::liste)
-                .post(routes::uhs_anhang::ablegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::uhs_anhang::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
+            post(routes::uhs_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge/zugriffe",
@@ -988,15 +1018,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei",
-            get(routes::uhs_anhang::datei).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::uhs_anhang::datei).route_layer(download_grenze()),
         )
         // UHS-Plan (LFH-999): eigene Bytes, kein Anhang; die Anzeige schreibt kein Lese-Audit.
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plan",
             put(routes::uhs_plan::hinterlegen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024))
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone())
                 .patch(routes::uhs_plan::aendern)
                 .delete(routes::uhs_plan::entfernen),
         )
@@ -1006,9 +1035,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plan/bild",
-            get(routes::uhs_plan::bild).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::uhs_plan::bild).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plaetze",
@@ -1183,13 +1210,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder",
             post(routes::karte_hintergrundbild::hochladen)
-                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
-            get(routes::karte_hintergrundbild::herunterladen).layer(ConcurrencyLimitLayer::new(
-                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
-            )),
+            get(routes::karte_hintergrundbild::herunterladen).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",
@@ -1645,7 +1671,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // des `CatchPanicLayer` liegen, damit sie dessen 500-Antwort bekommt statt eines Unwinds.
         // `MatchedPath` ist beim Routing gesetzt, die Ausnahmeliste greift also trotzdem.
         .layer(axum::middleware::from_fn_with_state(
-            crate::zulassung::Zulassung::default(),
+            opt.zulassungs_budget
+                .map_or_else(crate::zulassung::Zulassung::default, |budget| {
+                    crate::zulassung::Zulassung::neu(
+                        budget,
+                        crate::zulassung::MAX_GLEICHZEITIGE_REQUESTS,
+                    )
+                }),
             crate::zulassung::zulassung,
         ))
         // Request-Instrumentierung. `.layer()` hängt nach außen, der Trace-Layer liegt also
