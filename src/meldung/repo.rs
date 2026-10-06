@@ -25,31 +25,121 @@ pub struct MeldungDaten<'a> {
     pub abschnitt_id: Option<i64>,
 }
 
+/// Offen: Status ungleich „erledigt" (Posteingang = offene Meldungen). Liste und Modulzähler
+/// beziehen das Prädikat von hier (LFH-935), es gibt kein zweites.
+macro_rules! ist_offen_sql {
+    () => {
+        "(m.status != 'erledigt')"
+    };
+}
+
+/// Bestätigt: die Quittungs-Achse (`kommunikation_status`, Alias `ks`) trägt einen Zeitpunkt.
+macro_rules! ist_bestaetigt_sql {
+    () => {
+        "(ks.quittiert_at IS NOT NULL)"
+    };
+}
+
+/// Bestätigung überfällig: pflichtig, unbestätigt, Frist abgelaufen. Trägt EIN `?` für `jetzt`.
+macro_rules! ist_ueberfaellig_sql {
+    () => {
+        "(m.bestaetigung_pflicht = 1 AND ks.quittiert_at IS NULL \
+          AND m.bestaetigung_frist_at IS NOT NULL AND m.bestaetigung_frist_at <= ?)"
+    };
+}
+
+/// Die Bestätigungs-Achse einer Meldung (Alias `ks`), geteilt von Liste und Zählung.
+macro_rules! quittung_join_sql {
+    () => {
+        " LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'meldung' AND ks.objekt_id = m.id"
+    };
+}
+
 /// SELECT-Projektion inkl. Bearbeitername (LEFT JOIN benutzer), Herkunfts-Rückverweis
 /// (Subquery lage_meldung), Bestätigungs-Achse (LEFT JOIN kommunikation_status, objekt_typ
 /// ='meldung') und abgeleiteten Feldern. Reihenfolge der Spalten = Struct (FromRow positional).
 ///
 /// `ist_ueberfaellig` ist eine computed column mit `jetzt`-Vergleich → ihr `?` steht textuell
 /// VOR der WHERE-Klausel; alle Aufrufer binden `jetzt` als ERSTEN Parameter (Muster erinnerung).
-const ANZEIGE_SELECT: &str =
+const ANZEIGE_SELECT: &str = concat!(
     "SELECT m.id, m.einsatz_id, m.lfd_nr, m.absender, m.empfaenger, m.meldeweg, m.inhalt, \
             m.meldungsart, m.prioritaet, m.richtung, m.status, m.bearbeiter_id, b.anzeigename AS bearbeiter_name, \
             m.lagerelevant, m.ereigniszeit, m.eingang_at, m.etb_meldung_id, m.auftrag_id, \
             m.erfasst_von_id, m.erstellt_at, \
-            (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, \
-            (m.status != 'erledigt') AS ist_offen, \
+            (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, ",
+    ist_offen_sql!(),
+    " AS ist_offen, \
             m.erledigt_at, \
             m.bestaetigung_pflicht, m.bestaetigung_frist_at, m.eskaliert, \
             ks.quittiert_at AS bestaetigt_at, ks.quittiert_von_id AS bestaetigt_von_id, \
-            qb.anzeigename AS bestaetigt_von_name, \
-            (ks.quittiert_at IS NOT NULL) AS ist_bestaetigt, \
-            (m.bestaetigung_pflicht = 1 AND ks.quittiert_at IS NULL \
-             AND m.bestaetigung_frist_at IS NOT NULL AND m.bestaetigung_frist_at <= ?) AS ist_ueberfaellig, \
+            qb.anzeigename AS bestaetigt_von_name, ",
+    ist_bestaetigt_sql!(),
+    " AS ist_bestaetigt, ",
+    ist_ueberfaellig_sql!(),
+    " AS ist_ueberfaellig, \
             m.einheit_id, m.abschnitt_id \
      FROM meldung m \
-     LEFT JOIN benutzer b ON b.id = m.bearbeiter_id \
-     LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'meldung' AND ks.objekt_id = m.id \
-     LEFT JOIN benutzer qb ON qb.id = ks.quittiert_von_id";
+     LEFT JOIN benutzer b ON b.id = m.bearbeiter_id",
+    quittung_join_sql!(),
+    " LEFT JOIN benutzer qb ON qb.id = ks.quittiert_von_id"
+);
+
+/// Eine Gruppe gleicher Zählmerkmale mit ihrer Anzahl ([`zaehlen`]).
+#[derive(sqlx::FromRow)]
+struct MerkmalGruppe {
+    #[sqlx(try_from = "String")]
+    status: super::MeldungStatus,
+    ist_offen: bool,
+    bestaetigung_pflicht: bool,
+    ist_bestaetigt: bool,
+    ist_ueberfaellig: bool,
+    eskaliert: bool,
+    anzahl: i64,
+}
+
+/// Modulzähler der Meldungen (LFH-935): EINE Abfrage, gruppiert nach den Merkmalen, die die
+/// Zählregel braucht ([`crate::einsatz::zaehler::zaehle_meldungen_gewichtet`]). Die Prädikate
+/// sind dieselben Fragmente wie in [`ANZEIGE_SELECT`]; ohne `inhalt`, ohne Benutzer-Joins,
+/// ohne `lage_meldung`. Die Ergebnismenge hängt an den Merkmalskombinationen, nicht am Bestand.
+/// Bind-Reihenfolge: `jetzt` (Fragment im SELECT), dann `einsatz_id`.
+pub async fn zaehlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<crate::einsatz::zaehler::MeldungsZaehler, AppError> {
+    const SQL: &str = concat!(
+        "SELECT m.status, ",
+        ist_offen_sql!(),
+        " AS ist_offen, m.bestaetigung_pflicht, ",
+        ist_bestaetigt_sql!(),
+        " AS ist_bestaetigt, ",
+        ist_ueberfaellig_sql!(),
+        " AS ist_ueberfaellig, m.eskaliert, COUNT(*) AS anzahl \
+         FROM meldung m",
+        quittung_join_sql!(),
+        " WHERE m.einsatz_id = ? GROUP BY 1, 2, 3, 4, 5, 6"
+    );
+    let gruppen = sqlx::query_as::<_, MerkmalGruppe>(SQL)
+        .bind(jetzt)
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?;
+    Ok(crate::einsatz::zaehler::zaehle_meldungen_gewichtet(
+        gruppen.into_iter().map(|g| {
+            (
+                crate::einsatz::zaehler::MeldungsMerkmale {
+                    status: g.status,
+                    ist_offen: g.ist_offen,
+                    bestaetigung_pflicht: g.bestaetigung_pflicht,
+                    ist_bestaetigt: g.ist_bestaetigt,
+                    ist_ueberfaellig: g.ist_ueberfaellig,
+                    eskaliert: g.eskaliert,
+                },
+                g.anzahl,
+            )
+        }),
+    ))
+}
 
 /// Lädt eine Meldung als Anzeige. `NotFound`, wenn unbekannt.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed `ist_ueberfaellig`), dann `id` (WHERE).

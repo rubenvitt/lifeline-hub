@@ -65,6 +65,23 @@ macro_rules! bearbeitungsstatus_sql {
     };
 }
 
+/// Überfällig: Frist abgelaufen und mindestens ein Empfänger hat nicht quittiert. Trägt EIN `?`
+/// für `jetzt`. EINMAL definiert für [`ANZEIGE_SELECT`] und den Modulzähler [`zaehlen`]
+/// (LFH-935).
+macro_rules! ist_ueberfaellig_sql {
+    () => {
+        "(a.frist_at IS NOT NULL AND a.frist_at <= ? \
+          AND EXISTS (SELECT 1 FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NULL))"
+    };
+}
+
+/// Die Vollzugs-Achse eines Auftrags (Alias `ks`), geteilt von Liste und Zählung.
+macro_rules! vollzug_join_sql {
+    () => {
+        " LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'auftrag' AND ks.objekt_id = a.id"
+    };
+}
+
 /// SELECT-Projektion inkl. Vollzugs-Achse (LEFT JOIN kommunikation_status),
 /// Quittungs-Aggregat (Subquery auf auftrag_empfaenger) und abgeleiteten Feldern.
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
@@ -77,14 +94,60 @@ const ANZEIGE_SELECT: &str = concat!(
             COALESCE(ks.vollzug_status, 'offen') AS vollzug_status, \
             ks.vollzogen_at AS vollzogen_at, ks.vollzogen_von_id AS vollzogen_von_id, \
             (SELECT COUNT(*) FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id) AS empfaenger_anzahl, \
-            (SELECT COUNT(*) FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NOT NULL) AS quittiert_anzahl, \
-            (a.frist_at IS NOT NULL AND a.frist_at <= ? \
-             AND EXISTS (SELECT 1 FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NULL)) AS ist_ueberfaellig, ",
+            (SELECT COUNT(*) FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NOT NULL) AS quittiert_anzahl, ",
+    ist_ueberfaellig_sql!(),
+    " AS ist_ueberfaellig, ",
     bearbeitungsstatus_sql!(),
     " AS bearbeitungsstatus \
-     FROM auftrag a \
-     LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'auftrag' AND ks.objekt_id = a.id"
+     FROM auftrag a",
+    vollzug_join_sql!()
 );
+
+/// Eine Gruppe gleicher Zählmerkmale mit ihrer Anzahl ([`zaehlen`]).
+#[derive(sqlx::FromRow)]
+struct MerkmalGruppe {
+    #[sqlx(try_from = "String")]
+    bearbeitungsstatus: super::AuftragBearbeitungsstatus,
+    ist_ueberfaellig: bool,
+    anzahl: i64,
+}
+
+/// Modulzähler der Aufträge (LFH-935): EINE Abfrage, gruppiert nach Bearbeitungsstatus und
+/// Überfälligkeit, gezählt mit [`crate::einsatz::zaehler::zaehle_auftraege_gewichtet`]. Dieselben
+/// Fragmente wie [`ANZEIGE_SELECT`]; Empfängerzeilen werden nicht geladen, nur die
+/// `EXISTS`-Prüfung der Überfälligkeit läuft je Auftrag. Bind-Reihenfolge: `jetzt`, dann
+/// `einsatz_id`.
+pub async fn zaehlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<crate::einsatz::zaehler::AuftragsZaehler, AppError> {
+    const SQL: &str = concat!(
+        "SELECT ",
+        bearbeitungsstatus_sql!(),
+        " AS bearbeitungsstatus, ",
+        ist_ueberfaellig_sql!(),
+        " AS ist_ueberfaellig, COUNT(*) AS anzahl FROM auftrag a",
+        vollzug_join_sql!(),
+        " WHERE a.einsatz_id = ? GROUP BY 1, 2"
+    );
+    let gruppen = sqlx::query_as::<_, MerkmalGruppe>(SQL)
+        .bind(jetzt)
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?;
+    Ok(crate::einsatz::zaehler::zaehle_auftraege_gewichtet(
+        gruppen.into_iter().map(|g| {
+            (
+                crate::einsatz::zaehler::AuftragsMerkmale {
+                    bearbeitungsstatus: g.bearbeitungsstatus,
+                    ist_ueberfaellig: g.ist_ueberfaellig,
+                },
+                g.anzahl,
+            )
+        }),
+    ))
+}
 
 /// Lädt einen Auftrag samt Empfängern. `NotFound`, wenn unbekannt.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).

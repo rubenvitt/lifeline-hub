@@ -1,6 +1,10 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { erzeugeLiveSammler, LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
+import {
+  erzeugeLiveSammler,
+  LIVE_SAMMELFENSTER_MS,
+  ZAEHLER_SAMMELFENSTER_MS,
+} from './liveInvalidierung';
 
 /** Setzt `document.visibilityState`, wie der Browser es beim Verdecken des Tabs tut. */
 function sichtbarkeit(wert: DocumentVisibilityState) {
@@ -138,5 +142,26 @@ describe('erzeugeLiveSammler (LFH-922)', () => {
     expect(qc.getQueryState(['etb', 1])?.isInvalidated).toBe(false);
     vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     expect(qc.getQueryState(['etb', 1])?.isInvalidated).toBe(true);
+  });
+});
+
+describe('eigenes Fenster je Sammler (LFH-935)', () => {
+  it('das Fenster der Modulzähler liegt im Ticketrahmen von 1 bis 2 s', () => {
+    expect(ZAEHLER_SAMMELFENSTER_MS).toBe(1000);
+  });
+
+  it('gleicht mit eigenem Fenster erst nach dessen Ablauf ab', () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, 'invalidateQueries').mockResolvedValue(undefined);
+    const sammler = erzeugeLiveSammler(qc, ZAEHLER_SAMMELFENSTER_MS);
+    for (let i = 0; i < 10; i += 1) sammler.vormerken(['einsatz-modul-zaehler', 1]);
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(ZAEHLER_SAMMELFENSTER_MS - LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: ['einsatz-modul-zaehler', 1], refetchType: 'active' },
+      { cancelRefetch: false },
+    );
   });
 });

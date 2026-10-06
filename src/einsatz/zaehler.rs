@@ -8,9 +8,13 @@
 //! ([`crate::einsatz::berechtigung::erlaubte_module`]); eine 0 wäre eine Auskunft über ein
 //! Modul, dessen Liste er mit 403 abgewiesen bekäme.
 //!
-//! **Die Kommunikationszähler zählen über die Listenfunktionen**, nicht über ein eigenes
-//! `COUNT`: `ist_offen`, `ist_ueberfaellig`, `ist_faellig` und `ungelesen_anzahl` rechnet der
-//! Server dort je Zeile, und ein zweites Prädikat wiche bei der nächsten Änderung still ab.
+//! **Die Kommunikationszähler zählen mit denselben Prädikaten wie die Listen** (LFH-935):
+//! `ist_offen`, `ist_bestaetigt`, `ist_ueberfaellig`, `ist_faellig` und „ungelesen" stehen je
+//! einmal als SQL-Fragment im Repo ihres Moduls; Listen-SELECT und Zählabfrage setzen sich
+//! daraus zusammen, ein zweites Prädikat gibt es nicht. Gezählt wird je Modul mit EINER Abfrage
+//! ohne Listen zu laden (`meldung::repo::zaehlen`, `auftrag::repo::zaehlen`,
+//! `erinnerung::repo::faellige_offene`, `chat::repo::ungelesen_gesamt`): Meldungen und Aufträge
+//! gruppiert nach ihren Merkmalen, gezählt mit den reinen Regeln unten.
 //!
 //! **Eine Heimat je Zahl (LFH-550):** Lage-Dashboard und Führungsüberblick zeigen Aufträge und
 //! Meldungen aus diesem Zähler, nicht aus eigener Zählung. Die Zählregeln über den Zeilen stehen
@@ -20,7 +24,6 @@
 
 use crate::auftrag::AuftragBearbeitungsstatus;
 use crate::auth::Benutzer;
-use crate::erinnerung::STATUS_OFFEN as ERINNERUNG_OFFEN;
 use crate::error::AppError;
 use crate::meldung::MeldungStatus;
 use serde::Serialize;
@@ -56,16 +59,16 @@ pub struct AuftragsZaehler {
     pub ueberfaellig: i64,
 }
 
-/// Was an einem Auftrag gezählt wird. Die Flags rechnet die Liste je Zeile
-/// (`auftrag::repo::ANZEIGE_SELECT`); gezählt wird darüber in [`zaehle_auftraege`].
+/// Was an einem Auftrag gezählt wird. Die Flags kommen aus denselben SQL-Fragmenten wie in der
+/// Liste (`auftrag::repo`); gezählt wird darüber in [`zaehle_auftraege`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AuftragsMerkmale {
     pub bearbeitungsstatus: AuftragBearbeitungsstatus,
     pub ist_ueberfaellig: bool,
 }
 
-/// Was an einer Meldung gezählt wird. Die Flags rechnet die Liste je Zeile
-/// (`meldung::repo`); gezählt wird darüber in [`zaehle_meldungen`].
+/// Was an einer Meldung gezählt wird. Die Flags kommen aus denselben SQL-Fragmenten wie in der
+/// Liste (`meldung::repo`); gezählt wird darüber in [`zaehle_meldungen`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MeldungsMerkmale {
     pub status: MeldungStatus,
@@ -76,26 +79,34 @@ pub struct MeldungsMerkmale {
     pub eskaliert: bool,
 }
 
-fn anzahl(n: usize) -> i64 {
-    i64::try_from(n).unwrap_or(i64::MAX)
-}
-
 /// Zählregel der Aufträge: offen = `ist_offen()` der Phase; davon in Arbeit; davon überfällig.
 pub fn zaehle_auftraege(auftraege: &[AuftragsMerkmale]) -> AuftragsZaehler {
-    let offen: Vec<_> = auftraege
-        .iter()
-        .filter(|a| a.bearbeitungsstatus.ist_offen())
-        .collect();
-    AuftragsZaehler {
-        offen: anzahl(offen.len()),
-        in_arbeit: anzahl(
-            offen
-                .iter()
-                .filter(|a| a.bearbeitungsstatus == AuftragBearbeitungsstatus::InArbeit)
-                .count(),
-        ),
-        ueberfaellig: anzahl(offen.iter().filter(|a| a.ist_ueberfaellig).count()),
+    zaehle_auftraege_gewichtet(auftraege.iter().map(|a| (*a, 1)))
+}
+
+/// [`zaehle_auftraege`] über Gruppen gleicher Merkmale mit ihrer Anzahl (LFH-935): der Server
+/// zählt per `GROUP BY` über die Merkmale (`auftrag::repo::zaehlen`), die Regel bleibt diese.
+pub fn zaehle_auftraege_gewichtet(
+    gruppen: impl IntoIterator<Item = (AuftragsMerkmale, i64)>,
+) -> AuftragsZaehler {
+    let mut z = AuftragsZaehler {
+        offen: 0,
+        in_arbeit: 0,
+        ueberfaellig: 0,
+    };
+    for (a, n) in gruppen {
+        if !a.bearbeitungsstatus.ist_offen() {
+            continue;
+        }
+        z.offen += n;
+        if a.bearbeitungsstatus == AuftragBearbeitungsstatus::InArbeit {
+            z.in_arbeit += n;
+        }
+        if a.ist_ueberfaellig {
+            z.ueberfaellig += n;
+        }
     }
+    z
 }
 
 /// Zählregel der Meldungen: offen, davon ungesehen (Status „neu"), und die überfällige
@@ -103,26 +114,31 @@ pub fn zaehle_auftraege(auftraege: &[AuftragsMerkmale]) -> AuftragsZaehler {
 /// (`istAlarmiert` in `frontend/src/meldungen/meldungKennzahlen.ts`); das gemeinsame Fixture
 /// hält beide gleich.
 pub fn zaehle_meldungen(meldungen: &[MeldungsMerkmale]) -> MeldungsZaehler {
-    let offen: Vec<_> = meldungen.iter().filter(|m| m.ist_offen).collect();
-    MeldungsZaehler {
-        offen: anzahl(offen.len()),
-        ungesehen: anzahl(
-            offen
-                .iter()
-                .filter(|m| m.status == MeldungStatus::Neu)
-                .count(),
-        ),
-        bestaetigung_ueberfaellig: anzahl(
-            meldungen
-                .iter()
-                .filter(|m| {
-                    m.bestaetigung_pflicht
-                        && !m.ist_bestaetigt
-                        && (m.ist_ueberfaellig || m.eskaliert)
-                })
-                .count(),
-        ),
+    zaehle_meldungen_gewichtet(meldungen.iter().map(|m| (*m, 1)))
+}
+
+/// [`zaehle_meldungen`] über Gruppen gleicher Merkmale mit ihrer Anzahl (LFH-935): der Server
+/// zählt per `GROUP BY` über die Merkmale (`meldung::repo::zaehlen`), die Regel bleibt diese.
+pub fn zaehle_meldungen_gewichtet(
+    gruppen: impl IntoIterator<Item = (MeldungsMerkmale, i64)>,
+) -> MeldungsZaehler {
+    let mut z = MeldungsZaehler {
+        offen: 0,
+        ungesehen: 0,
+        bestaetigung_ueberfaellig: 0,
+    };
+    for (m, n) in gruppen {
+        if m.ist_offen {
+            z.offen += n;
+            if m.status == MeldungStatus::Neu {
+                z.ungesehen += n;
+            }
+        }
+        if m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert) {
+            z.bestaetigung_ueberfaellig += n;
+        }
     }
+    z
 }
 
 /// Erinnerungen: fällig und noch offen.
@@ -226,46 +242,21 @@ pub async fn berechne(
         );
     }
     if erlaubt.contains("meldungen") {
-        let liste = crate::meldung::repo::liste(pool, einsatz_id, None, None, jetzt).await?;
-        let merkmale: Vec<_> = liste
-            .iter()
-            .map(|m| MeldungsMerkmale {
-                status: m.status,
-                ist_offen: m.ist_offen,
-                bestaetigung_pflicht: m.bestaetigung_pflicht,
-                ist_bestaetigt: m.ist_bestaetigt,
-                ist_ueberfaellig: m.ist_ueberfaellig,
-                eskaliert: m.eskaliert,
-            })
-            .collect();
-        z.meldungen = Some(zaehle_meldungen(&merkmale));
+        z.meldungen = Some(crate::meldung::repo::zaehlen(pool, einsatz_id, jetzt).await?);
     }
     if erlaubt.contains("auftraege") {
-        let liste = crate::auftrag::repo::liste(pool, einsatz_id, None, None, None, jetzt).await?;
-        let merkmale: Vec<_> = liste
-            .iter()
-            .map(|d| AuftragsMerkmale {
-                bearbeitungsstatus: d.auftrag.bearbeitungsstatus,
-                ist_ueberfaellig: d.auftrag.ist_ueberfaellig,
-            })
-            .collect();
-        z.auftraege = Some(zaehle_auftraege(&merkmale));
+        z.auftraege = Some(crate::auftrag::repo::zaehlen(pool, einsatz_id, jetzt).await?);
     }
     if erlaubt.contains("erinnerungen") {
-        let liste = crate::erinnerung::repo::liste(pool, einsatz_id, false, jetzt).await?;
         z.erinnerungen = Some(ErinnerungsZaehler {
-            faellig: liste
-                .iter()
-                .filter(|e| e.ist_faellig && e.status == ERINNERUNG_OFFEN)
-                .count() as i64,
+            faellig: crate::erinnerung::repo::faellige_offene(pool, einsatz_id, jetzt).await?,
         });
     }
     if erlaubt.contains("chat") {
         // Rein lesend, ohne das Anlegen des Standardkanals: dieser Abruf läuft bei jedem gezählten
         // Live-Ereignis und darf keine Schreibsperre nehmen.
-        let kanaele = crate::chat::repo::kanaele_lesen(pool, einsatz_id, benutzer.id).await?;
         z.chat = Some(ChatZaehler {
-            ungelesen: kanaele.iter().map(|k| k.ungelesen_anzahl).sum(),
+            ungelesen: crate::chat::repo::ungelesen_gesamt(pool, einsatz_id, benutzer.id).await?,
         });
     }
     if erlaubt.contains("dokumente") {
@@ -325,6 +316,65 @@ mod tests {
     fn nicht_erlaubtes_modul_fehlt_statt_null() {
         let v = serde_json::to_value(ModulZaehlerAnzeige::default()).unwrap();
         assert!(v.as_object().unwrap().is_empty(), "{v:?}");
+    }
+
+    /// Der Server zählt über Gruppen gleicher Merkmale (LFH-935): Gewicht n zählt wie n gleiche
+    /// Zeilen, quer über alle Merkmalskombinationen beider Regeln.
+    #[test]
+    fn gewicht_zaehlt_wie_gleiche_zeilen() {
+        use AuftragBearbeitungsstatus as A;
+        let mut auftraege = vec![];
+        for bs in [A::Offen, A::InArbeit, A::Vollzogen, A::Abgenommen] {
+            for ist_ueberfaellig in [false, true] {
+                auftraege.push(AuftragsMerkmale {
+                    bearbeitungsstatus: bs,
+                    ist_ueberfaellig,
+                });
+            }
+        }
+        let mut meldungen = vec![];
+        for status in [
+            MeldungStatus::Neu,
+            MeldungStatus::Gesichtet,
+            MeldungStatus::InBearbeitung,
+            MeldungStatus::Erledigt,
+        ] {
+            for bits in 0u8..16 {
+                meldungen.push(MeldungsMerkmale {
+                    status,
+                    ist_offen: status != MeldungStatus::Erledigt,
+                    bestaetigung_pflicht: bits & 1 != 0,
+                    ist_bestaetigt: bits & 2 != 0,
+                    ist_ueberfaellig: bits & 4 != 0,
+                    eskaliert: bits & 8 != 0,
+                });
+            }
+        }
+        // Gewicht je Kombination unterschiedlich, damit eine vertauschte Zuordnung auffällt.
+        let gewicht = |i: usize| i64::try_from(i % 5 + 1).unwrap();
+        let ausgeschrieben = |n: i64| usize::try_from(n).unwrap();
+
+        let a_zeilen: Vec<_> = auftraege
+            .iter()
+            .enumerate()
+            .flat_map(|(i, a)| std::iter::repeat_n(*a, ausgeschrieben(gewicht(i))))
+            .collect();
+        let a_gruppen = auftraege.iter().enumerate().map(|(i, a)| (*a, gewicht(i)));
+        assert_eq!(
+            zaehle_auftraege_gewichtet(a_gruppen),
+            zaehle_auftraege(&a_zeilen)
+        );
+
+        let m_zeilen: Vec<_> = meldungen
+            .iter()
+            .enumerate()
+            .flat_map(|(i, m)| std::iter::repeat_n(*m, ausgeschrieben(gewicht(i))))
+            .collect();
+        let m_gruppen = meldungen.iter().enumerate().map(|(i, m)| (*m, gewicht(i)));
+        assert_eq!(
+            zaehle_meldungen_gewichtet(m_gruppen),
+            zaehle_meldungen(&m_zeilen)
+        );
     }
 
     #[test]
