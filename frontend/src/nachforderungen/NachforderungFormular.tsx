@@ -1,5 +1,10 @@
 import { Col, Form, Input, InputNumber, Row } from 'antd';
-import { ETB_PARTEI_MAX, NACHFORDERUNG_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
+import {
+  ETB_PARTEI_MAX,
+  NACHFORDERUNG_ART_MAX,
+  NACHFORDERUNG_BEZEICHNUNG_MAX,
+} from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { useEffect } from 'react';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -113,7 +118,11 @@ export default function NachforderungFormular({
             label="Art (Kräfte/Mittel)"
             rules={[{ required: true, whitespace: true, message: 'Art ist erforderlich' }]}
           >
-            <Input aria-label="Art" placeholder="z. B. RTW, SEG, Sandsäcke" />
+            <Input
+              aria-label="Art"
+              placeholder="z. B. RTW, SEG, Sandsäcke"
+              maxLength={NACHFORDERUNG_ART_MAX}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
@@ -154,9 +163,14 @@ export default function NachforderungFormular({
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="begruendung" label="Begründung / Lagebezug">
+          <Form.Item
+            name="begruendung"
+            label="Begründung / Lagebezug"
+            // Eine Vorbelegung aus der Verpflegung kann länger sein: sie bleibt stehen und sperrt.
+            rules={[zeichenRegel(ETB_PARTEI_MAX, 'Begründung')]}
+          >
             {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung ist mehrzeilig. */}
-            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} maxLength={ETB_PARTEI_MAX} />
+            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} count={zeichenGrenze(ETB_PARTEI_MAX)} />
           </Form.Item>
         </Col>
       </Row>

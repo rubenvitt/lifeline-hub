@@ -1,6 +1,7 @@
 import { IconBueroklammer } from '../icons';
 import { Button, Input, Space, Upload } from 'antd';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
+import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
 import type { UploadFile } from 'antd';
 import { useRef, useState } from 'react';
 
@@ -21,8 +22,12 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
   // Feld, und `loading` am Knopf sperrt nur Klicks.
   const sendetRef = useRef(false);
 
+  // Kein antd-Formular: über der Grenze sperrt das Senden, der Zähler nennt die Überlänge, der Text
+  // bleibt stehen (LFH-937, `components/zeichenGrenze.tsx`).
+  const zuLang = istZuLang(text, ETB_INHALT_MAX);
+
   const absenden = async () => {
-    if (sendetRef.current) return;
+    if (sendetRef.current || zuLang) return;
     const getrimmt = text.trim();
     // Die rohen File-Objekte stecken in originFileObj (beforeUpload=false → kein Auto-Upload).
     const rohdateien = dateien
@@ -54,7 +59,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
           onChange={(e) => setText(e.target.value)}
           placeholder="Nachricht…"
           // Grenze des Servers (LFH-937): eine Nachricht kann zum ETB-Eintrag heraufgestuft werden.
-          maxLength={ETB_INHALT_MAX}
+          count={zeichenGrenze(ETB_INHALT_MAX)}
           autoSize={{ minRows: 1, maxRows: 4 }}
           onPressEnter={(e) => {
             if (!e.shiftKey) {
@@ -63,7 +68,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
             }
           }}
         />
-        <Button type="primary" loading={senden} onClick={() => void absenden()}>
+        <Button type="primary" loading={senden} disabled={zuLang} onClick={() => void absenden()}>
           Senden
         </Button>
       </Space.Compact>

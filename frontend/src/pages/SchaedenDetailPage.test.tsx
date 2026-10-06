@@ -471,6 +471,15 @@ describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
     expect(gepatcht).toBe(false);
   });
 
+  it('eine ältere, zu lange Beschreibung bleibt beim Löschen eines Zeichens vollständig', async () => {
+    const start = `${'b'.repeat(8_000)}ENDE`;
+    render(einsatzAktiv, basisSchaden({ beschreibung: start }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByDisplayValue(start);
+    fireEvent.change(feld, { target: { value: start.slice(1) } });
+    expect(feld).toHaveValue(start.slice(1));
+  });
+
   it('Geschädigt: ein Suchbegriff über 500 Zeichen wird nicht als externer Kontakt angeboten', async () => {
     render(einsatzAktiv, basisSchaden());
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));

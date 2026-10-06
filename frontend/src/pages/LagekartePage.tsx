@@ -1130,6 +1130,7 @@ export default function LagekartePage() {
               ? stuetzpunkte(zoneBestaetigung.geometrie)
               : zeichenStand.punkte
           }
+          figur={zeichneAbschnittId == null && zoneEntwurf?.modus === 'linie' ? 'linie' : 'flaeche'}
           punktZurueckMoeglich={zeichenStand.kannZurueck}
           onPunktZurueck={() => {
             kartenRef.current?.punktZurueck();

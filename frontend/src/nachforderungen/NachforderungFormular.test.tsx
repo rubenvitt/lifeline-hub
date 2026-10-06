@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import NachforderungFormular from './NachforderungFormular';
@@ -36,13 +36,31 @@ describe('NachforderungFormular — Serienerfassung', () => {
 });
 
 describe('NachforderungFormular — Eingabegrenzen (LFH-937)', () => {
-  it('begrenzt Bezeichnung, Adressat und Begründung auf die Grenzen des Servers', () => {
+  it('begrenzt Art, Bezeichnung und Adressat nativ', () => {
     renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
     expect(screen.getByLabelText('Bezeichnung')).toHaveAttribute('maxlength', '200');
     expect(screen.getByPlaceholderText('z. B. Leitstelle Nord')).toHaveAttribute(
       'maxlength',
       '500',
     );
-    expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveAttribute('maxlength', '500');
+    expect(screen.getByLabelText('Art')).toHaveAttribute('maxlength', '200');
+  });
+
+  it('zählt die Begründung ab 80 %; über 500 Zeichen bleibt sie ganz stehen und sperrt', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
+    const begruendung = screen.getByLabelText('Begründung / Lagebezug');
+    expect(begruendung).not.toHaveAttribute('maxlength');
+    fireEvent.change(begruendung, { target: { value: 'g'.repeat(400) } });
+    expect(screen.getByText('400 / 500')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Art'), 'RTW');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Zwei RTW');
+    fireEvent.change(begruendung, { target: { value: 'g'.repeat(501) } });
+    expect(begruendung).toHaveValue('g'.repeat(501));
+    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    expect(
+      await screen.findByText('Begründung darf höchstens 500 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Button, Collapse, Flex, Form, Input, Space } from 'antd';
 import { PRESSE_ANTWORT_MAX, PRESSE_KURZ_MAX, PRESSE_THEMA_MAX } from '../api/eingabegrenzen';
-import { zeichenGrenze } from '../components/zeichenGrenze';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { IconPlus } from '../icons';
 import type { Dayjs } from 'dayjs';
@@ -473,7 +473,10 @@ export default function PressePage() {
         <Form.Item
           label="Thema"
           name="thema"
-          rules={[{ required: true, whitespace: true, message: 'Thema erforderlich' }]}
+          rules={[
+            { required: true, whitespace: true, message: 'Thema erforderlich' },
+            zeichenRegel(PRESSE_THEMA_MAX, 'Thema'),
+          ]}
         >
           <Input placeholder="z. B. Zahl der Evakuierten" count={zeichenGrenze(PRESSE_THEMA_MAX)} />
         </Form.Item>
@@ -532,7 +535,10 @@ export default function PressePage() {
         <Form.Item
           label="Gegebene Antwort"
           name="antwort"
-          rules={[{ required: true, whitespace: true, message: 'Antwort erforderlich' }]}
+          rules={[
+            { required: true, whitespace: true, message: 'Antwort erforderlich' },
+            zeichenRegel(PRESSE_ANTWORT_MAX, 'Antwort'),
+          ]}
         >
           <Input.TextArea autoSize={{ minRows: 2 }} count={zeichenGrenze(PRESSE_ANTWORT_MAX)} />
         </Form.Item>

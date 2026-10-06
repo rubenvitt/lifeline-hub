@@ -24,6 +24,8 @@ export const AUFTRAG_EXTERN_BEZEICHNUNG_MAX = 200;
 export const FUNKTION_TEXT_MAX = 200;
 /** Bezeichnung einer Nachforderung. */
 export const NACHFORDERUNG_BEZEICHNUNG_MAX = 200;
+/** Art einer Nachforderung (Freitext, landet im ETB-Inhalt). */
+export const NACHFORDERUNG_ART_MAX = 200;
 /** Notiz eines Anrufs am Infotelefon. */
 export const INFOTELEFON_NOTIZ_MAX = 2_000;
 /** Kurzfelder des Infotelefons (anrufer_name, rueckruf). */

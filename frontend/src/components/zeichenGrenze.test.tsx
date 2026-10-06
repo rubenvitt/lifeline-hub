@@ -68,19 +68,30 @@ describe('zeichenGrenze an einem antd-Feld', () => {
     expect((marke as HTMLElement).style.fontVariantNumeric).toBe('tabular-nums');
   });
 
-  it('schneidet eine Eingabe an der Grenze ab', () => {
-    render(<Feld max={10} />);
-    const feld = screen.getByLabelText('Text');
-    fireEvent.change(feld, { target: { value: 'a'.repeat(12) } });
-    expect(feld).toHaveValue('a'.repeat(10));
-  });
-
-  it('schneidet nach Zeichen, nicht nach UTF-16-Einheiten (Emoji zählt einfach)', () => {
+  it('kürzt eingefügten Text über der Grenze nie, sondern zeigt die Überlänge', () => {
     const { container } = render(<Feld max={10} />);
     const feld = screen.getByLabelText('Text');
-    fireEvent.change(feld, { target: { value: '😀'.repeat(12) } });
+    fireEvent.change(feld, { target: { value: 'a'.repeat(12) } });
+    expect(feld).toHaveValue('a'.repeat(12));
+    expect(zaehler(container)).toBe('12 / 10 · zu lang');
+  });
+
+  it('zählt Zeichen, nicht UTF-16-Einheiten (Emoji zählt einfach)', () => {
+    const { container } = render(<Feld max={10} />);
+    const feld = screen.getByLabelText('Text');
+    fireEvent.change(feld, { target: { value: '😀'.repeat(10) } });
     expect(feld).toHaveValue('😀'.repeat(10));
     expect(zaehler(container)).toBe('10 / 10');
+  });
+
+  it('ein vorbelegter Wert über der Grenze bleibt beim Löschen eines Zeichens vollständig', () => {
+    const start = `${'a'.repeat(10)}ENDE`;
+    const { container } = render(<Feld max={10} start={start} />);
+    const feld = screen.getByLabelText('Text');
+    // Ein Zeichen vorn gelöscht: antd ruft dabei `exceedFormatter`, wenn es einen gibt.
+    fireEvent.change(feld, { target: { value: start.slice(1) } });
+    expect(feld).toHaveValue(start.slice(1));
+    expect(zaehler(container)).toBe('13 / 10 · zu lang');
   });
 
   it('kürzt einen vorbelegten Wert über der Grenze nicht still, sondern zeigt die Überlänge', () => {

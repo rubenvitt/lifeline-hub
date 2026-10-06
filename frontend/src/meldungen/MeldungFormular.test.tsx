@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
@@ -296,10 +296,25 @@ describe('MeldungFormular — Ereigniszeit eines vorgehenden Geräts (LFH-895)',
 });
 
 describe('MeldungFormular — Eingabegrenzen (LFH-937)', () => {
-  it('begrenzt Absender, Empfänger und Wortlaut auf die Grenzen des Servers', () => {
+  it('begrenzt Absender und Empfänger nativ auf 500 Zeichen', () => {
     renderFormular();
     expect(screen.getByLabelText('Absender')).toHaveAttribute('maxlength', '500');
     expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveAttribute('maxlength', '500');
-    expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveAttribute('maxlength', '20000');
+  });
+
+  it('zählt den Wortlaut ab 80 %; über 20 000 Zeichen bleibt er ganz stehen und sperrt', async () => {
+    const onAnlegen = renderFormular();
+    const inhalt = screen.getByLabelText('Inhalt / Wortlaut');
+    expect(inhalt).not.toHaveAttribute('maxlength');
+    fireEvent.change(inhalt, { target: { value: 'w'.repeat(16_000) } });
+    expect(screen.getByText('16.000 / 20.000')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
+    fireEvent.change(inhalt, { target: { value: 'w'.repeat(20_001) } });
+    expect(inhalt).toHaveValue('w'.repeat(20_001));
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    expect(
+      await screen.findByText('Inhalt darf höchstens 20.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
   });
 });

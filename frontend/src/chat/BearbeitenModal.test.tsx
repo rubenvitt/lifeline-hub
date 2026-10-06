@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import BearbeitenModal from './BearbeitenModal';
@@ -109,16 +109,25 @@ describe('BearbeitenModal — Erfassungshülle (LFH-796)', () => {
 });
 
 describe('BearbeitenModal — Eingabegrenze (LFH-937)', () => {
-  it('nimmt höchstens 20 000 Zeichen an', () => {
+  it('zeigt die Überlänge über 20 000 Zeichen und speichert nicht', async () => {
+    const onBestaetigen = vi.fn();
     renderMitProviders(
       <BearbeitenModal
         offen
         nachricht={nachricht}
         senden={false}
         onAbbrechen={vi.fn()}
-        onBestaetigen={vi.fn()}
+        onBestaetigen={onBestaetigen}
       />,
     );
-    expect(screen.getByDisplayValue('Deich instabil')).toHaveAttribute('maxlength', '20000');
+    const feld = screen.getByDisplayValue('Deich instabil');
+    expect(feld).not.toHaveAttribute('maxlength');
+    fireEvent.change(feld, { target: { value: 'd'.repeat(20_001) } });
+    expect(screen.getByText('20.001 / 20.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByText('Text darf höchstens 20.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onBestaetigen).not.toHaveBeenCalled();
   });
 });

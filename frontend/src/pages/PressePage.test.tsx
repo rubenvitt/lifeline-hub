@@ -269,7 +269,7 @@ describe('PressePage — Eingang in der Anzeigezone (LFH-692)', () => {
 });
 
 describe('PressePage — Eingabegrenzen (LFH-937)', () => {
-  it('Medienkontakt: Thema zählt ab 80 %, die Kurzfelder enden an der Grenze', async () => {
+  it('Medienkontakt: Thema zählt ab 80 %, Überlänge sperrt, die Kurzfelder enden an der Grenze', async () => {
     setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Medienkontakt erfassen' }));
     const dialog = await screen.findByRole('dialog');
@@ -279,8 +279,14 @@ describe('PressePage — Eingabegrenzen (LFH-937)', () => {
     expect(within(dialog).queryByText(/\/ 500/)).toBeNull();
     fireEvent.change(thema, { target: { value: 't'.repeat(400) } });
     expect(within(dialog).getByText('400 / 500')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Medium'), 'dpa');
     fireEvent.change(thema, { target: { value: 't'.repeat(501) } });
-    expect(thema).toHaveValue('t'.repeat(500));
+    expect(thema).toHaveValue('t'.repeat(501));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    expect(
+      await within(dialog).findByText('Thema darf höchstens 500 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(legeMedienkontaktAn).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByText('Ansprechperson und Uhrzeit'));
     expect(await within(dialog).findByLabelText('Ansprechperson')).toHaveAttribute(
       'maxlength',
@@ -289,7 +295,7 @@ describe('PressePage — Eingabegrenzen (LFH-937)', () => {
     expect(within(dialog).getByLabelText('Erreichbarkeit')).toHaveAttribute('maxlength', '500');
   });
 
-  it('Antwort: Zähler ab 6.400 von 8.000, die Freigabeangabe endet bei 200', async () => {
+  it('Antwort: Zähler ab 6.400 von 8.000, Überlänge sperrt, die Freigabeangabe endet bei 200', async () => {
     setup();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Anfrage von NDR 1 beantworten' }),
@@ -300,6 +306,13 @@ describe('PressePage — Eingabegrenzen (LFH-937)', () => {
     fireEvent.change(antwort, { target: { value: 'a'.repeat(6_400) } });
     expect(within(dialog).getByText('6.400 / 8.000')).toBeInTheDocument();
     fireEvent.change(antwort, { target: { value: 'a'.repeat(8_001) } });
-    expect(antwort).toHaveValue('a'.repeat(8_000));
+    expect(antwort).toHaveValue('a'.repeat(8_001));
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Als beantwortet speichern' }),
+    );
+    expect(
+      await within(dialog).findByText('Antwort darf höchstens 8.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(setzeMedienkontaktStatus).not.toHaveBeenCalled();
   });
 });

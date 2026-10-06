@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import HeraufstufenModal from './HeraufstufenModal';
@@ -123,5 +123,13 @@ describe('HeraufstufenModal', () => {
       await screen.findByText('Text darf höchstens 20.000 Zeichen lang sein'),
     ).toBeInTheDocument();
     expect(onHeraufstufen).not.toHaveBeenCalled();
+  });
+
+  it('LFH-937: ein zu langer Text bleibt beim Löschen eines Zeichens vollständig', () => {
+    const start = `${'x'.repeat(20_000)}ENDE`;
+    oeffne({ ...nachricht(), inhalt: start });
+    const feld = screen.getByDisplayValue(start);
+    fireEvent.change(feld, { target: { value: start.slice(1) } });
+    expect(feld).toHaveValue(start.slice(1));
   });
 });

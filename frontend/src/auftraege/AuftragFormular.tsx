@@ -1,4 +1,4 @@
-import { App, Col, Collapse, Form, Input, Row } from 'antd';
+import { App, Col, Collapse, Form, Input, Row, type FormInstance } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
@@ -119,6 +119,31 @@ function empfaengerRegel(katalog: FunktionsVorschlaege['katalog']) {
         : Promise.resolve(),
   };
 }
+
+/**
+ * Gesamtzahl der Empfänger (LFH-937): `maxCount` am Select begrenzt nur die Tags; bei Richtung
+ * „extern“ mit Bezeichnung kommt der externe Adressat dazu, 50 Tags ergäben 51 Empfänger und 400.
+ */
+function empfaengerAnzahlRegel({ getFieldValue }: Pick<FormInstance<FormWerte>, 'getFieldValue'>) {
+  return {
+    validator: (_: unknown, werte: unknown) => {
+      const tags = Array.isArray(werte) ? werte.length : 0;
+      const extern =
+        getFieldValue('richtung') === 'extern' &&
+        String(getFieldValue('externBezeichnung') ?? '').trim() !== '';
+      return tags + (extern ? 1 : 0) > AUFTRAG_EMPFAENGER_MAX
+        ? Promise.reject(new Error(`Höchstens ${AUFTRAG_EMPFAENGER_MAX} Empfänger je Auftrag`))
+        : Promise.resolve();
+    },
+  };
+}
+
+/**
+ * Befehlsschema: Zähler ab 80 % und Sperre über der Grenze statt nativem `maxLength` (D8: natives
+ * `maxLength` nur, wo antd nicht zählt); ein vorbelegter längerer Wert bleibt stehen (LFH-937).
+ */
+const BEFEHLSFELD_ZAEHLER = zeichenGrenze(AUFTRAG_BEFEHLSFELD_MAX);
+const befehlsfeldRegel = (feld: string) => zeichenRegel(AUFTRAG_BEFEHLSFELD_MAX, feld);
 
 /**
  * Wiederholfelder einer Auftrags-Serie: gleiche Stelle, Dringlichkeit und Richtung; der
@@ -276,46 +301,54 @@ export default function AuftragFormular({
       )}
       <Row gutter={16}>
         <Col xs={24} sm={12}>
-          <Form.Item name="absicht" label="Absicht / Ziel">
-            <TextArea aria-label="Absicht / Ziel" rows={1} maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
+          <Form.Item name="absicht" rules={[befehlsfeldRegel('Absicht')]} label="Absicht / Ziel">
+            <TextArea aria-label="Absicht / Ziel" rows={1} count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="lage" label="Lage">
-            <TextArea aria-label="Lage" rows={1} maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
+          <Form.Item name="lage" rules={[befehlsfeldRegel('Lage')]} label="Lage">
+            <TextArea aria-label="Lage" rows={1} count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={8}>
-          <Form.Item name="ort" label="Ort / Wo">
-            <Input aria-label="Ort / Wo" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
+          <Form.Item name="ort" rules={[befehlsfeldRegel('Ort')]} label="Ort / Wo">
+            <Input aria-label="Ort / Wo" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
-          <Form.Item name="zeit" label="Zeit / Wann">
+          <Form.Item name="zeit" rules={[befehlsfeldRegel('Zeit')]} label="Zeit / Wann">
             <Input
               aria-label="Zeit / Wann"
               placeholder="z. B. sofort, bis 14:00, nach Eintreffen"
-              maxLength={AUFTRAG_BEFEHLSFELD_MAX}
+              count={BEFEHLSFELD_ZAEHLER}
             />
           </Form.Item>
         </Col>
         <Col xs={24} sm={8}>
-          <Form.Item name="mittel" label="Mittel / Womit">
-            <Input aria-label="Mittel / Womit" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
+          <Form.Item name="mittel" rules={[befehlsfeldRegel('Mittel')]} label="Mittel / Womit">
+            <Input aria-label="Mittel / Womit" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
       </Row>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
-          <Form.Item name="verbindung" label="Verbindung / Meldewege">
-            <Input aria-label="Verbindung / Meldewege" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
+          <Form.Item
+            name="verbindung"
+            rules={[befehlsfeldRegel('Verbindung')]}
+            label="Verbindung / Meldewege"
+          >
+            <Input aria-label="Verbindung / Meldewege" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="sicherheit" label="Sicherheit / Besonderes">
-            <Input aria-label="Sicherheit / Besonderes" maxLength={AUFTRAG_BEFEHLSFELD_MAX} />
+          <Form.Item
+            name="sicherheit"
+            rules={[befehlsfeldRegel('Sicherheit')]}
+            label="Sicherheit / Besonderes"
+          >
+            <Input aria-label="Sicherheit / Besonderes" count={BEFEHLSFELD_ZAEHLER} />
           </Form.Item>
         </Col>
       </Row>
@@ -372,7 +405,8 @@ export default function AuftragFormular({
           <Form.Item
             name="empfaenger"
             label="Empfänger"
-            rules={[empfaengerRegel(funktionen.katalog)]}
+            rules={[empfaengerRegel(funktionen.katalog), empfaengerAnzahlRegel]}
+            dependencies={['richtung', 'externBezeichnung']}
           >
             <Select
               mode="tags"

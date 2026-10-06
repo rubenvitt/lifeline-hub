@@ -580,7 +580,7 @@ describe('Schnellerfassung', () => {
     expect(p.erfassen).not.toHaveBeenCalled();
   });
 
-  it('LFH-937: das Textfeld nimmt über der Grenze nichts an, der Zähler erscheint erst ab 80 %', async () => {
+  it('LFH-937: Zähler erst ab 80 %; eingefügter Text über der Grenze bleibt ganz stehen und geht nicht hinaus', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
@@ -589,7 +589,12 @@ describe('Schnellerfassung', () => {
     fireEvent.change(feld, { target: { value: 'a'.repeat(16_000) } });
     expect(screen.getByText('16.000 / 20.000')).toBeInTheDocument();
     fireEvent.change(feld, { target: { value: 'a'.repeat(20_005) } });
-    expect(feld).toHaveValue('a'.repeat(20_000));
+    expect(feld).toHaveValue('a'.repeat(20_005));
+    expect(screen.getByText('20.005 / 20.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText(/Inhalt ist zu lang/)).toBeInTheDocument();
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('a'.repeat(20_005));
   });
 
   it('zeigt bei Typ „Lage" den Sprung in den strukturierten Lagebericht', async () => {

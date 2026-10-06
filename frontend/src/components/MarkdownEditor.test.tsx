@@ -263,20 +263,22 @@ describe('MarkdownEditor — Zeichengrenze (LFH-937)', () => {
     );
   }
 
-  it('reicht die Grenze an das Textfeld: Zähler ab 80 %, Abschneiden an der Grenze', () => {
+  it('reicht die Grenze an das Textfeld: Zähler ab 80 %, Überlänge ohne Kürzen', () => {
     render(<Gesteuert />);
     const feld = screen.getByRole('textbox');
     fireEvent.change(feld, { target: { value: 'a'.repeat(8) } });
     expect(screen.getByText('8 / 10')).toBeInTheDocument();
     fireEvent.change(feld, { target: { value: 'a'.repeat(12) } });
-    expect(feld).toHaveValue('a'.repeat(10));
+    expect(feld).toHaveValue('a'.repeat(12));
+    expect(screen.getByText('12 / 10 · zu lang')).toBeInTheDocument();
   });
 
-  it('mit zaehlerAussen zählt das Feld nicht selbst, schneidet aber ab', () => {
-    render(<Gesteuert zaehlerAussen />);
+  it('mit zaehlerAussen zählt das Feld nicht selbst, markiert die Überlänge aber', () => {
+    const { container } = render(<Gesteuert zaehlerAussen />);
     const feld = screen.getByRole('textbox');
     fireEvent.change(feld, { target: { value: 'a'.repeat(12) } });
-    expect(feld).toHaveValue('a'.repeat(10));
-    expect(screen.queryByText('10 / 10')).toBeNull();
+    expect(feld).toHaveValue('a'.repeat(12));
+    expect(screen.queryByText(/\/ 10/)).toBeNull();
+    expect(container.querySelector('.ant-input-out-of-range')).not.toBeNull();
   });
 });

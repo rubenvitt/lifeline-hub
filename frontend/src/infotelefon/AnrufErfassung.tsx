@@ -1,6 +1,6 @@
 import { Button, Checkbox, Collapse, Flex, Form, Input } from 'antd';
 import { INFOTELEFON_KURZ_MAX, INFOTELEFON_NOTIZ_MAX } from '../api/eingabegrenzen';
-import { zeichenGrenze } from '../components/zeichenGrenze';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { RefSelectProps } from 'antd';
 import type { Dayjs } from 'dayjs';
@@ -111,7 +111,11 @@ export default function AnrufErfassung({
                 options={ANLIEGEN_REIHENFOLGE.map((a) => ({ value: a, label: ANLIEGEN_LABEL[a] }))}
               />
             </Form.Item>
-            <Form.Item name="notiz" style={{ marginBottom: 0, flex: '1 1 240px', minWidth: 0 }}>
+            <Form.Item
+              name="notiz"
+              rules={[zeichenRegel(INFOTELEFON_NOTIZ_MAX, 'Notiz')]}
+              style={{ marginBottom: 0, flex: '1 1 240px', minWidth: 0 }}
+            >
               <Input
                 aria-label="Notiz"
                 placeholder="Notiz zum Anruf"

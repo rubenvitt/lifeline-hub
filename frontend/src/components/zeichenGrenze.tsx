@@ -4,11 +4,16 @@
  *
  * Der Server zählt Unicode-Skalarwerte nach dem Trimmen; `[...s].length` zählt dasselbe (ein
  * Emoji ist ein Zeichen, `s.length` zählte zwei). `zeichenGrenze(max)` liefert die
- * `count`-Props für antds `Input`/`Input.TextArea`: die Eingabe endet an der Grenze, und erst ab
- * 80 % erscheint „n / max“ in Mono mit `tabular-nums` — darunter bleibt die Maske unverändert
- * (die ETB-Erfassungsleiste hat ein Höhenbudget). Ein vorbelegter Wert über der Grenze wird nicht
- * gekürzt (antd schneidet nur beim Tippen ab); der Zähler nennt die Überlänge dann auch in
- * Worten („zu lang“), nicht nur in antds Fehlerfarbe. Grenzwerte: `api/eingabegrenzen.ts`.
+ * `count`-Props für antds `Input`/`Input.TextArea`: erst ab 80 % erscheint „n / max“ in Mono mit
+ * `tabular-nums` — darunter bleibt die Maske unverändert (die ETB-Erfassungsleiste hat ein
+ * Höhenbudget).
+ *
+ * **Es wird nie gekürzt**, auch nicht beim Tippen oder Einfügen: `@rc-component/input` ruft einen
+ * `exceedFormatter` bei JEDEM `onChange` über der Grenze (`hooks/useCountExceed.js`), ein
+ * vorbelegter Text verlöre so beim ersten gelöschten Zeichen sein Ende. Über der Grenze nennt der
+ * Zähler die Überlänge in `alarmText` und als Wort („zu lang“), und das Senden sperrt: im Formular
+ * über {@link zeichenRegel} (Pflicht an jedem Feld mit `zeichenGrenze`), außerhalb über
+ * {@link istZuLang} beim Aufrufer. Grenzwerte: `api/eingabegrenzen.ts`.
  */
 import type { FormRule, InputProps } from 'antd';
 import { schriftStil, useRollen } from './instrument/rollenwerte';
@@ -62,20 +67,15 @@ export function Zeichenzaehler({ wert, max }: { wert: string; max: number }) {
   );
 }
 
-/** Schneidet auf `max` Zeichen (nach Skalarwerten, nie mitten in einem Emoji). */
-function abschneiden(wert: string, { max }: { max: number }): string {
-  return [...wert].slice(0, max).join('');
-}
-
 const zaehlen = (s: string) => zeichenZahl(s);
 
 /** Je Grenze und Form genau eine Konfiguration: antd merkt sie sich per Identität (`useMemo`). */
 const konfigurationen = new Map<string, ZaehlerKonfig>();
 
 /**
- * `count`-Props für antds `Input`/`Input.TextArea`. Mit `zaehler: false` endet die Eingabe an der
- * Grenze, ohne dass das Feld selbst zählt — der Aufrufer zeigt {@link Zeichenzaehler} an
- * anderer Stelle (ETB-Hinweiszeile).
+ * `count`-Props für antds `Input`/`Input.TextArea`. Mit `zaehler: false` zählt das Feld nicht
+ * selbst — der Aufrufer zeigt {@link Zeichenzaehler} an anderer Stelle (ETB-Hinweiszeile); die
+ * Fehlerfarbe der Überlänge (`ant-input-out-of-range`) bleibt.
  */
 export function zeichenGrenze(
   max: number,
@@ -87,7 +87,6 @@ export function zeichenGrenze(
   const konfig: ZaehlerKonfig = {
     max,
     strategy: zaehlen,
-    exceedFormatter: abschneiden,
   };
   if (zaehler) {
     konfig.show = ({ value }) => <Zeichenzaehler wert={value} max={max} />;

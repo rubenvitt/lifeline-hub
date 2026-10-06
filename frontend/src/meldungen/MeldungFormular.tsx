@@ -1,6 +1,7 @@
 import { IconBlitz, IconPapierflieger } from '../icons';
 import { Button, Col, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
 import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
@@ -294,9 +295,12 @@ export default function MeldungFormular({
       <Form.Item
         name="inhalt"
         label="Inhalt / Wortlaut"
-        rules={[{ required: true, whitespace: true, message: 'Inhalt ist erforderlich' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Inhalt ist erforderlich' },
+          zeichenRegel(ETB_INHALT_MAX, 'Inhalt'),
+        ]}
       >
-        <TextArea aria-label="Inhalt / Wortlaut" rows={3} maxLength={ETB_INHALT_MAX} />
+        <TextArea aria-label="Inhalt / Wortlaut" rows={3} count={zeichenGrenze(ETB_INHALT_MAX)} />
       </Form.Item>
     </ErfassungsFormular>
   );

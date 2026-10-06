@@ -1,5 +1,6 @@
 import { Form, Input } from 'antd';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { useEffect } from 'react';
 import { ErfassungsModal } from '../components/Erfassung';
 import type { ChatNachricht } from '../api/types';
@@ -48,9 +49,15 @@ export default function BearbeitenModal({
       <Form.Item
         label="Text"
         name="inhalt"
-        rules={[{ required: true, whitespace: true, message: 'Text erforderlich' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Text erforderlich' },
+          zeichenRegel(ETB_INHALT_MAX, 'Text'),
+        ]}
       >
-        <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} maxLength={ETB_INHALT_MAX} />
+        <Input.TextArea
+          autoSize={{ minRows: 2, maxRows: 6 }}
+          count={zeichenGrenze(ETB_INHALT_MAX)}
+        />
       </Form.Item>
     </ErfassungsModal>
   );

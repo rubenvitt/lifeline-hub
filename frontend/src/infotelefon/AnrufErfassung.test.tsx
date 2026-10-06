@@ -92,15 +92,23 @@ describe('AnrufErfassung — Uhrzeit in der Anzeigezone (LFH-692)', () => {
 });
 
 describe('AnrufErfassung — Eingabegrenzen (LFH-937)', () => {
-  it('zählt die Notiz erst ab 80 % und nimmt über 2 000 Zeichen nichts an', () => {
-    renderMitProviders(<AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />);
+  it('zählt die Notiz erst ab 80 %; über 2 000 Zeichen bleibt sie ganz stehen und sperrt', async () => {
+    const erfassen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<AnrufErfassung onErfassen={erfassen} laeuft={false} fehler={null} />);
     const notiz = screen.getByLabelText('Notiz');
     fireEvent.change(notiz, { target: { value: 'n'.repeat(1_599) } });
     expect(screen.queryByText(/\/ 2\.000/)).toBeNull();
     fireEvent.change(notiz, { target: { value: 'n'.repeat(1_600) } });
     expect(screen.getByText('1.600 / 2.000')).toBeInTheDocument();
     fireEvent.change(notiz, { target: { value: 'n'.repeat(2_001) } });
-    expect(notiz).toHaveValue('n'.repeat(2_000));
+    expect(notiz).toHaveValue('n'.repeat(2_001));
+    expect(screen.getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    await waehleAnliegen('Auskunft zur Lage');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(
+      await screen.findByText('Notiz darf höchstens 2.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(erfassen).not.toHaveBeenCalled();
   });
 
   it('begrenzt Name und Rückrufnummer auf 200 Zeichen', () => {

@@ -24,6 +24,12 @@ interface ZeichnenSteuerungProps {
    * (LFH-937, `GEOMETRIE_STUETZPUNKTE_MAX`).
    */
   punkte?: number;
+  /**
+   * Art der laufenden Figur, Vorgabe 'flaeche'. In der Zeichenphase zählt `punkte` Ecken; der Server
+   * zählt beim Polygon den Schlusspunkt mit, also sperrt eine Fläche schon ab
+   * `GEOMETRIE_STUETZPUNKTE_MAX` Ecken. Die Bestätigung zählt die Geometrie selbst (`stuetzpunkte`).
+   */
+  figur?: 'flaeche' | 'linie';
   /** Es gibt einen Punkt zum Zurücknehmen; bis dahin ist „Letzten Punkt zurück" gesperrt. */
   punktZurueckMoeglich?: boolean;
   /** „Letzten Punkt zurück". Nicht gesetzt → kein Knopf. */
@@ -57,7 +63,8 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // Über der Grenze des Servers (LFH-937, design.md D8): Hinweis neben dem Zähler, in derselben
   // Zeile — ein eigenes Band höbe den Fuß bei 390 px über die Karte. Zeichen und Wort tragen ihn
   // neben der Farbe (WCAG 1.4.1); Abschließen und Speichern sind gesperrt.
-  const zuViele = props.punkte != null && props.punkte > GEOMETRIE_STUETZPUNKTE_MAX;
+  const schlusspunkt = !bestaetigen && props.figur !== 'linie' ? 1 : 0;
+  const zuViele = props.punkte != null && props.punkte + schlusspunkt > GEOMETRIE_STUETZPUNKTE_MAX;
   const zuVieleHinweis = zuViele && (
     <Typography.Text
       data-lfh="zeichnen-zu-viele"
