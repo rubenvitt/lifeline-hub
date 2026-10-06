@@ -418,16 +418,16 @@ fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, Ap
         params.typ.as_deref(),
         "Ungültiger Eintragstyp im Filter",
     )?;
+    let von_zeit = params.von.as_deref().map(normalisiere_zeit).transpose()?;
+    let bis_zeit = params.bis.as_deref().map(normalisiere_zeit).transpose()?;
+    // Erst nach den Feldprüfungen (400): jedes Feld ist für sich gültig, erst die Kombination
+    // nicht (`src/AGENTS.md`, Statuscode-Konvention).
     let ohne_system = params.ohne_system.unwrap_or(false);
     if ohne_system && params.typ.as_deref() == Some("system") {
-        // Jedes Feld ist für sich gültig, erst die Kombination nicht (`src/AGENTS.md`,
-        // Statuscode-Konvention).
         return Err(AppError::UnprocessableEntity(
             "typ=system und ohne_system schließen sich aus".into(),
         ));
     }
-    let von_zeit = params.von.as_deref().map(normalisiere_zeit).transpose()?;
-    let bis_zeit = params.bis.as_deref().map(normalisiere_zeit).transpose()?;
     // q nur als Filter nutzen, wenn nach Trim nicht leer.
     let q = params
         .q

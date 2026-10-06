@@ -129,6 +129,11 @@ export default function Zeitachseneintrag({
     farben ?? (typ ? etbTypFarbe(typ, token) : { kante: rollen.schwach, wort: rollen.gedaempft });
   const spalte = { paddingBlock: token.paddingSM } as const;
   const einzeilig = zeitachsenAufbau(token) === 'zeile';
+  // Verfasser und Weg wandern nur als Text in die Kopfzeile. Ein bedienbarer Verfasser (ein
+  // Verweis mit eigener Trefffläche, Infotelefon) bliebe dort ein 30-px-Ziel, das die Kopfzeile
+  // hochzöge; er bleibt mit dem Weg in der Spalte.
+  const metaImKopf = einzeilig && (verfasser == null || typeof verfasser === 'string');
+  const menueImKopf = einzeilig && menue != null;
   const trenner = (
     <span aria-hidden="true" style={{ ...monoStil(10), color: rollen.schwach }}>
       ·
@@ -199,7 +204,7 @@ export default function Zeitachseneintrag({
             {typwort}
           </span>
           {meta != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{meta}</span>}
-          {einzeilig && verfasser != null && (
+          {metaImKopf && verfasser != null && (
             <>
               {trenner}
               {/* Einzeilig statt des 15ch-Deckels (LFH-615), der in die Höhe umbrach; der volle
@@ -220,13 +225,13 @@ export default function Zeitachseneintrag({
               </span>
             </>
           )}
-          {einzeilig && weg != null && (
+          {metaImKopf && weg != null && (
             <>
               {trenner}
               <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>
             </>
           )}
-          {einzeilig && menue != null && (
+          {menueImKopf && (
             // Die negative Blockkante lässt den 30-px-Knopf in die Polsterung ragen, statt die
             // Kopfzeile auf seine Höhe zu ziehen; die Trefffläche bleibt ganz.
             <span style={{ marginInlineStart: 'auto', marginBlock: -token.paddingSM }}>
@@ -240,6 +245,9 @@ export default function Zeitachseneintrag({
             lineHeight: 1.5,
             color: rollen.text2,
             overflowWrap: 'anywhere',
+            // Der Menüknopf ragt aus der Kopfzeile in die erste Textzeile; der Text hält ihm
+            // die Breite frei, sonst läge der Knopf über den letzten Zeichen.
+            paddingInlineEnd: menueImKopf ? token.controlHeight : undefined,
           }}
         >
           {children}
@@ -250,9 +258,9 @@ export default function Zeitachseneintrag({
           </div>
         )}
       </div>
-      {(einzeilig
-        ? aktionen != null
-        : verfasser != null || weg != null || aktionen != null || menue != null) && (
+      {((!metaImKopf && (verfasser != null || weg != null)) ||
+        aktionen != null ||
+        (!menueImKopf && menue != null)) && (
         <div
           data-lfh="metaspalte"
           style={{
@@ -267,7 +275,7 @@ export default function Zeitachseneintrag({
             textAlign: 'end',
           }}
         >
-          {!einzeilig && verfasser != null && (
+          {!metaImKopf && verfasser != null && (
             // Gedeckelt (LFH-615): mit Funktion („Administrator ·\u00A0EL") drückte die Spalte den
             // Meldungstext bei 1200 px unter die halbe Sicht. `ch` misst in der Mono-Schrift DIESES
             // Elements; ein längerer Verfasser bricht um.
@@ -283,11 +291,11 @@ export default function Zeitachseneintrag({
               {verfasser}
             </span>
           )}
-          {!einzeilig && weg != null && (
+          {!metaImKopf && weg != null && (
             <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>
           )}
           {aktionen}
-          {!einzeilig && menue}
+          {!menueImKopf && menue}
         </div>
       )}
     </Element>

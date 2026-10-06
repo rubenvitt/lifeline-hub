@@ -1770,6 +1770,26 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     expect(screen.getByRole('switch', { name: /Systemeinträge zeigen/ })).toBeChecked();
   });
 
+  it('unter einem Typfilter blendet ein vergeblicher Sprung nichts ein', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb?typ=meldung&ohne_system=true&eintrag=2', server958());
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?typ=meldung&ohne_system=true$/),
+    );
+    expect(
+      screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
+    ).toBeNull();
+  });
+
+  it('der Schalter heißt fest, die Zahl beschreibt ihn', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb', server958());
+    await screen.findByText('Person erfasst');
+    const schalter = screen.getByRole('switch', { name: 'Systemeinträge zeigen' });
+    await waitFor(() => expect(schalter).toHaveAccessibleDescription('98'));
+  });
+
   it('ein Sprung auf einen sichtbaren Eintrag behält den Ausschluss', async () => {
     setzeViewportBreite(1366);
     const { container } = setup('/einsaetze/7/etb?ohne_system=true&eintrag=1', server958());

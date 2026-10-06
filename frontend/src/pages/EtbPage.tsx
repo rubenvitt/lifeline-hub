@@ -27,7 +27,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
 import EtbLesemarkeBanner from '../etb/EtbLesemarkeBanner';
@@ -260,6 +260,7 @@ export default function EtbPage() {
     queryFn: () => ladeEtbZaehler(einsatzId, filterMitSystem),
     enabled: filter.ohne_system === true,
   });
+  const systemZahlId = useId();
   const systemAnzahl = (filter.ohne_system ? systemZaehlerQuery.data : zaehlerQuery.data)?.je_typ
     .system;
 
@@ -434,9 +435,10 @@ export default function EtbPage() {
       etbQuery.fetchPreviousPage();
       return;
     }
-    if (richtung !== 'da' && !gescheitert && filter.ohne_system) {
+    if (richtung !== 'da' && !gescheitert && filter.ohne_system && filter.typ == null) {
       // Das Ziel kann ein ausgeblendeter Systemeintrag sein (LFH-958, design.md D5): einblenden
-      // und erneut suchen. Der zweite Durchlauf findet ihn oder räumt den Param wie sonst.
+      // und erneut suchen. Der zweite Durchlauf findet ihn oder räumt den Param wie sonst. Unter
+      // einem Typfilter verbirgt der Ausschluss nichts, was der Filter zeigen würde.
       navigate(etbPfad(einsatzId, { ...filterMitSystem, eintrag: zielEintragId }), {
         replace: true,
       });
@@ -809,13 +811,20 @@ export default function EtbPage() {
                         whiteSpace: 'nowrap',
                       }}
                     >
+                      {/* Der Name bleibt fest, die Zahl ist Beschreibung: sonst sagte ein
+                          Bildschirmleser bei jeder neuen Zählung den Schalter neu an. */}
                       <Switch
+                        aria-label="Systemeinträge zeigen"
+                        aria-describedby={systemAnzahl != null ? systemZahlId : undefined}
                         checked={!filter.ohne_system}
                         onChange={(an) => filterAendern({ ohne_system: an ? undefined : true })}
                       />
                       Systemeinträge zeigen
                       {systemAnzahl != null && (
-                        <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
+                        <span
+                          id={systemZahlId}
+                          style={{ ...monoStil(11), color: rollen.gedaempft }}
+                        >
                           {filter.ohne_system ? `${systemAnzahl} ausgeblendet` : systemAnzahl}
                         </span>
                       )}

@@ -493,5 +493,13 @@ async fn ohne_system_schliesst_systemeintraege_aus_wie_die_liste() {
         )
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{pfad}: {v:?}");
-    }
+    } // Ein für sich ungültiges Feld bleibt 400, auch neben der unzulässigen Kombination.
+    let (status, _) = zaehler(
+        &app,
+        &admin,
+        einsatz,
+        "?typ=system&ohne_system=true&von=gestern",
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }

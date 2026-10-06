@@ -193,6 +193,36 @@ describe('Zeitachseneintrag: Aufbau je Dichte (LFH-958)', () => {
     expect(spalte).not.toContainElement(screen.getByText(VERFASSER));
   });
 
+  it('kompakt: ein bedienbarer Verfasser bleibt mit dem Weg in der Spalte', () => {
+    const { container } = renderMitProviders(
+      <ConfigProvider theme={{ token: { controlHeight: 30 } }}>
+        <Zeitachseneintrag
+          zeit="14:06"
+          typwort="Meldung"
+          verfasser={<a href="#anrufer">Anrufer 3</a>}
+          weg="Telefon"
+          menue={<button type="button">Aktionen zu Eintrag 1</button>}
+        >
+          x
+        </Zeitachseneintrag>
+      </ConfigProvider>,
+    );
+    const spalte = container.querySelector('[data-lfh="metaspalte"]')!;
+    expect(spalte).toContainElement(screen.getByRole('link', { name: 'Anrufer 3' }));
+    expect(spalte).toContainElement(screen.getByText('Telefon'));
+    // Das Menü steht trotzdem in der Kopfzeile.
+    expect(kopfzeile()).toContainElement(
+      screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }),
+    );
+  });
+
+  it('kompakt: der Text hält dem Menüknopf die Breite frei', () => {
+    renderMitProviders(
+      <ConfigProvider theme={{ token: { controlHeight: 30 } }}>{zeile()}</ConfigProvider>,
+    );
+    expect(screen.getByText('Pegel steigt.')).toHaveStyle({ paddingInlineEnd: '30px' });
+  });
+
   it.each([48, 72])(
     'controlHeight %i: Verfasser, Weg und Menü in der Spalte rechts, wie bisher',
     (hoehe) => {
