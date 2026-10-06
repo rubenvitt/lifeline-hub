@@ -97,12 +97,12 @@ for (const rolle of ['admin', 'beobachter'] as const) {
         page.getByRole('navigation').first(),
         'Vorbedingung: die Modulnavigation steht neben dem Grundriss',
       ).toBeVisible();
-      if (rolle === 'beobachter') {
-        await expect(
-          page.getByRole('button', { name: /^Verbleib \/ Entlassung erfassen/ }),
-          'Vorbedingung: ohne Schreibrecht fehlt der Verbleib-Knopf',
-        ).toHaveCount(0);
-      }
+      // Vorbedingung: der Rollenzweig steht VOR der Messung (`e2e/AGENTS.md`). Die Platzaktionen
+      // liegen auf der Fläche, die in beiden Formen montiert ist; beim Admin sind sie die Gegenprobe.
+      await expect(
+        page.getByRole('button', { name: /^Platzaktionen zu / }),
+        `Vorbedingung: Platzaktionen ${rolle === 'admin' ? 'stehen' : 'fehlen ohne Schreibrecht'}`,
+      ).toHaveCount(rolle === 'admin' ? PLAETZE : 0);
 
       const rahmen = page.getByTestId('grundriss-rahmen');
       if (form === 'reiter') {
@@ -121,6 +121,30 @@ for (const rolle of ['admin', 'beobachter'] as const) {
     });
   }
 }
+
+/**
+ * Die Weiche misst nach: wird das Fenster nach dem Laden schmaler (Fenster geteilt, Tablet gedreht),
+ * kippt die Form ohne Neuladen. Ohne den ResizeObserver bliebe die erste Messung stehen.
+ */
+test('Fensterwechsel nach dem Laden: 1920 → 1180 → 1920 px schaltet die Form ohne Neuladen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await anmelden(page);
+  const { pfad } = await aufbauen(page);
+  await seiteSteht(page, pfad);
+  const rahmen = page.getByTestId('grundriss-rahmen');
+  await expect(rahmen).toHaveCSS('flex-direction', 'row');
+
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await expect(page.getByRole('tab', { name: 'Fläche' })).toBeVisible();
+  await expect(rahmen).toHaveCSS('flex-direction', 'column');
+  expect(await angeschnitteneKarten(page), 'angeschnittene Platzkarten').toEqual([]);
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect(page.getByRole('tab', { name: 'Fläche' })).toHaveCount(0);
+  await expect(rahmen).toHaveCSS('flex-direction', 'row');
+});
 
 test('Handschirm (390 px): die Fläche läuft seitlich über, „weitere Plätze →" sagt es ohne Bedienung', async ({
   page,
@@ -168,19 +192,22 @@ for (const rolle of ['admin', 'beobachter'] as const) {
       const huellen = page
         .locator('[role="button"]')
         .filter({ has: page.locator('[data-lfh="personenkarte"]') });
-      gemessen.set(
-        dichte,
-        await alleHaltenStufe(huellen, soll, `Personenmarke (${dichte}, ${rolle})`, 2),
-      );
+      // Vorbedingung VOR der Messung: der Rollenzweig steht, die Liste ist da.
+      await expect(huellen).toHaveCount(2);
       const verbleib = page.getByRole('button', { name: /^Verbleib \/ Entlassung erfassen/ });
       if (rolle === 'admin') {
         await expect(verbleib).toHaveCount(2);
         await expect(verbleib.first(), 'das Wort steht sichtbar am Knopf').toHaveText('Verbleib');
-        await alleHaltenStufe(verbleib, soll, `Verbleib (${dichte})`, 2);
-        // Ein Klick auf die Marke öffnet die Person, nicht den Verbleib-Dialog daneben.
       } else {
         await expect(verbleib).toHaveCount(0);
       }
+
+      gemessen.set(
+        dichte,
+        await alleHaltenStufe(huellen, soll, `Personenmarke (${dichte}, ${rolle})`, 2),
+      );
+      if (rolle === 'admin') await alleHaltenStufe(verbleib, soll, `Verbleib (${dichte})`, 2);
+      // Ein Klick auf die Marke öffnet die Person, nicht den Verbleib-Dialog daneben.
       await huellen.first().click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await expect(page.getByRole('dialog')).not.toContainText('Verbleib erfassen');

@@ -303,6 +303,31 @@ describe('MaterialTab · Sperrgrund „Material zuordnen" (LFH-970)', () => {
     expect(screen.queryByTestId('material-sperrgrund')).not.toBeInTheDocument();
   });
 
+  it('meldet keinen Fehler, wenn nur ein Abgleich im Hintergrund scheitert', async () => {
+    const { client } = render([frei, verortet]);
+    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+
+    server.use(
+      http.get('/api/einsaetze/1/material', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    await client.refetchQueries();
+    await waitFor(() =>
+      expect(
+        client
+          .getQueryCache()
+          .findAll()
+          .some((q) => q.state.status === 'error'),
+      ).toBe(true),
+    );
+
+    // Die alten Daten gelten: der Knopf bleibt bedienbar, daneben steht kein Fehlertext.
+    expect(knopf).toBeEnabled();
+    expect(screen.queryByTestId('material-sperrgrund')).not.toBeInTheDocument();
+  });
+
   it('lässt den Sprung ohne Zugriff auf das Modul Material weg und sagt warum', async () => {
     server.use(
       http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>

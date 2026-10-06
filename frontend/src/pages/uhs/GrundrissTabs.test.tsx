@@ -181,7 +181,7 @@ function setzeRahmen(fenster: number, rahmen: number) {
   setzeMasse('grundriss-mass', { clientWidth: rahmen });
 }
 
-/** Breit genug für die Mindestfläche von 700 px neben beiden Seitenspalten (Sockel 506 px). */
+/** Breit genug für die Mindestfläche von 700 px neben beiden Seitenspalten (Sockel 523 px). */
 const RAHMEN_BREIT = 1300;
 /** Unter dem Umschaltpunkt: Reiterform. */
 const RAHMEN_SCHMAL = 800;
@@ -451,7 +451,7 @@ describe('Grundriss — Umschaltpunkt nach Inhaltsbreite und Überlauf (LFH-970)
   it('richtet den Umschaltpunkt nach der Fläche: ein Platz weit rechts verlangt mehr Rahmen', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    // Fläche = maxX + 160 = 900 px; der Sockel davor 506 px. 1300 px reichen nicht mehr.
+    // Fläche = maxX + 160 = 900 px; der Sockel davor 523 px. 1300 px reichen nicht mehr.
     const weit = uhsDetail({
       plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', pos_x: 740 })],
       belegungen: [transportBelegung],
@@ -460,6 +460,34 @@ describe('Grundriss — Umschaltpunkt nach Inhaltsbreite und Überlauf (LFH-970)
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={weit} schreibgeschuetzt={false} />));
 
     expect(await screen.findByRole('tablist')).toBeInTheDocument();
+  });
+
+  /**
+   * Ein Live-Update kann die Fläche über den Umschaltpunkt schieben (ein Platz in einer neuen
+   * Rasterspalte) und zurück. Der gewählte Reiter darf dabei nicht auf „Fläche“ zurückspringen.
+   */
+  it('behält den gewählten Reiter über einen Formwechsel hin und zurück', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    const weit = uhsDetail({
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', pos_x: 740 })],
+      belegungen: [transportBelegung],
+    });
+    setzeRahmen(1600, RAHMEN_BREIT);
+    const { rerender } = renderMitProviders(
+      kompakt(<Grundriss einsatzId={1} uhs={weit} schreibgeschuetzt={false} />),
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
+
+    rerender(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
+    expect(await screen.findByText('Noch nicht aufgenommen')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+
+    rerender(kompakt(<Grundriss einsatzId={1} uhs={weit} schreibgeschuetzt={false} />));
+    expect(await screen.findByRole('tab', { name: 'Wartebereich' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 
   it('zeigt „weitere Plätze →“, solange die Fläche rechts weitergeht, und nimmt ihn am Ende zurück', async () => {

@@ -50,12 +50,17 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   const freiVerortbar = material.filter((em) => em.uhs_id == null);
   // Sperrgrund statt stummer Sperre (LFH-970, U78; `frontend/AGENTS.md`, M16): ohne freies
   // Material nennt eine Zeile neben dem Knopf den Grund und springt ins Modul Material, ein
-  // gescheiterter Abruf meldet sich als Fehler. Solange die Liste lädt, steht nichts daneben.
-  const sperrgrund: 'fehler' | 'leer' | null = materialQuery.isError
-    ? 'fehler'
-    : materialQuery.isSuccess && freiVerortbar.length === 0
-      ? 'leer'
-      : null;
+  // gescheiterter Abruf ohne Daten meldet sich als Fehler. Solange die Liste lädt, steht nichts
+  // daneben. Scheitert nur ein Abgleich im Hintergrund, bleiben die alten Daten maßgeblich: ein
+  // Fehlertext neben einem bedienbaren Knopf widerspräche ihm.
+  const sperrgrund: 'fehler' | 'leer' | null =
+    materialQuery.data === undefined
+      ? materialQuery.isError
+        ? 'fehler'
+        : null
+      : freiVerortbar.length === 0
+        ? 'leer'
+        : null;
   const sperrgrundId = useId();
   // Ein Sprung in ein gesperrtes Modul entfällt, die Beschriftung bleibt (Spec `modul-freigabe`).
   const materialGesperrt = useSprungSperre(einsatzId)('material');

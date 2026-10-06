@@ -1109,7 +1109,12 @@ export default function Grundriss({
   const plan = uhs.plan ?? null;
   const flaecheBreite = Math.max(700, maxX + 160, plan ? plan.x + plan.breite : 0);
   const flaecheHoehe = Math.max(420, maxY + 140, plan ? plan.y + planHoehe(plan) : 0);
-  const breit = dreiSpaltenPassen(rahmenBreite, flaecheBreite);
+  // Während eines Zugs steht die Form: ein Live-Update, das die Fläche verbreitert (ein Platz in
+  // einer neuen Rasterspalte), montierte sonst Quelle und Ziel des laufenden Zugs neu.
+  const [formImZug, setFormImZug] = useState<boolean | null>(null);
+  const breit = formImZug ?? dreiSpaltenPassen(rahmenBreite, flaecheBreite);
+  // Der gewählte Reiter überdauert einen Formwechsel hin und zurück.
+  const [reiter, setReiter] = useState('flaeche');
 
   function invalidate() {
     // Promise zurückgeben: React Query hält die Mutation so bis zum Ende aller Refetches `pending`,
@@ -1288,6 +1293,7 @@ export default function Grundriss({
   });
 
   function onDragStart(event: DragStartEvent) {
+    setFormImZug(breit);
     const data = event.active.data.current as { kind: string; personId?: number } | undefined;
     if (data?.kind === 'person' && data.personId != null) setAktivePersonId(data.personId);
   }
@@ -1296,10 +1302,12 @@ export default function Grundriss({
   // am Ende ließe einen Geister-Overlay stehen.
   function onDragCancel() {
     setAktivePersonId(null);
+    setFormImZug(null);
   }
 
   function onDragEnd(event: DragEndEvent) {
     setAktivePersonId(null);
+    setFormImZug(null);
     const { active, over, delta } = event;
     const data = active.data.current as
       { kind: string; personId?: number; platzId?: number } | undefined;
@@ -1578,7 +1586,8 @@ export default function Grundriss({
             }}
           >
             <Tabs
-              defaultActiveKey="flaeche"
+              activeKey={reiter}
+              onChange={setReiter}
               destroyOnHidden
               style={{ height: '100%' }}
               // Body und Pane reichen die Resthöhe weiter, sonst wächst die Fläche über den

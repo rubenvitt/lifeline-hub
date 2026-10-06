@@ -14,20 +14,20 @@ function token(dichte: Dichte) {
 }
 
 describe('dreiSpaltenPassen — Umschaltpunkt nach Inhaltsbreite (LFH-970)', () => {
-  it('rechnet zwei 240-px-Seitenspalten, zwei 12-px-Lücken und den Rand der Fläche', () => {
-    // 2 × 240 + 2 × 12 + 2 × 1 px gestrichelter Rand.
-    expect(DREI_SPALTEN_SOCKEL).toBe(506);
+  it('rechnet zwei 240-px-Seitenspalten, zwei 12-px-Lücken, den Rand und die Bildlaufleiste', () => {
+    // 2 × 240 + 2 × 12 + 2 × 1 px gestrichelter Rand + 17 px klassische Bildlaufleiste.
+    expect(DREI_SPALTEN_SOCKEL).toBe(523);
   });
 
-  it('stellt die Mindestfläche von 700 px erst ab 1206 px Rahmenbreite nebeneinander', () => {
-    expect(dreiSpaltenPassen(1205, 700)).toBe(false);
-    expect(dreiSpaltenPassen(1206, 700)).toBe(true);
+  it('stellt die Mindestfläche von 700 px erst ab 1223 px Rahmenbreite nebeneinander', () => {
+    expect(dreiSpaltenPassen(1222, 700)).toBe(false);
+    expect(dreiSpaltenPassen(1223, 700)).toBe(true);
   });
 
   it('wächst mit der Fläche: ein Platz weiter rechts verlangt mehr Rahmen', () => {
     // Die Fläche aus `Grundriss` ist `max(700, maxX + 160, Planrand)`.
     expect(dreiSpaltenPassen(1300, 900)).toBe(false);
-    expect(dreiSpaltenPassen(1406, 900)).toBe(true);
+    expect(dreiSpaltenPassen(1423, 900)).toBe(true);
   });
 
   /**

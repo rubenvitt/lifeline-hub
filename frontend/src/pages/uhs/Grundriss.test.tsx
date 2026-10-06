@@ -25,7 +25,7 @@ import { setzeMasse } from '../../test/elementMasse';
 
 // Diese Datei prüft den Grundriss in der Drei-Spalten-Form, alle Bereiche zugleich im Baum. Seit
 // LFH-970 entscheidet die gemessene Rahmenbreite, nicht die Fensterbreite; jsdom misst 0 (Reiter).
-// 1300 px liegen über dem Sockel für die Mindestfläche (1206 px, `grundrissLayout.ts`). Die
+// 1300 px liegen über dem Sockel für die Mindestfläche (1223 px, `grundrissLayout.ts`). Die
 // Weiche selbst prüft `GrundrissTabs.test.tsx`.
 beforeEach(() => setzeMasse('grundriss-mass', { clientWidth: 1300 }));
 
