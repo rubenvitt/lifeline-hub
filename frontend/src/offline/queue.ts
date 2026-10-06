@@ -45,12 +45,16 @@ export type PersonErfassungsSicht = Extract<Person['status'], 'erfasst' | 'vermi
 
 /** Dauerhafte Erfolgsquittung einer offline vorgemerkten Person. Sie wird erst
  * nach erfolgreichem Server-Replay zusammen mit dem Entfernen der Pending-Zeile
- * geschrieben und bleibt bis zur Darstellung auf der Personen-Seite erhalten. */
-interface PersonErfassungsQuittung {
+ * geschrieben und bleibt bis zur Darstellung auf der Personen-Seite erhalten.
+ *
+ * Nur Kennungen (LFH-941, design.md D6): Die Person liegt nach dem Replay auf dem Server, die
+ * Anzeige braucht nur Kennung und R-Nr. Name, Sichtung und Status bleiben vom Gerät fern. */
+export interface PersonErfassungsQuittung {
   benutzer_id: number;
   einsatz_id: number;
   client_id: string;
-  person: Person;
+  person_id: number;
+  registrier_nr: number;
   sicht: PersonErfassungsSicht;
   erstellt_at: string;
 }
@@ -136,7 +140,11 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
     // erscheinen in keinem Index und werden nie automatisch unter einer späteren Sitzung versendet.
     // v5: Personen-Erfolgsquittungen. Jeder Store wird versionsgeguardet angelegt, sonst würfe
     // `createObjectStore` auf einer Bestands-DB.
-    dbPromise = openDB<OfflineDB>('lifeline-offline', 5, {
+    //
+    // Die Kürzung der Quittungen (LFH-941, design.md D6) läuft bewusst OHNE Versionssprung nach
+    // dem Öffnen: ein Tab mit altem Bundle hielte v5 offen, ein Upgrade hinge und mit ihm Queue,
+    // Abgleich und Anmeldung.
+    const offen: Promise<IDBPDatabase<OfflineDB>> = openDB<OfflineDB>('lifeline-offline', 5, {
       upgrade(d, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           const store = d.createObjectStore('ausstehend', { keyPath: 'id', autoIncrement: true });
@@ -188,9 +196,51 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
           quittungen.createIndex('by-benutzer-einsatz', ['benutzer_id', 'einsatz_id']);
         }
       },
+      // Will ein neueres Bundle die DB hochstufen, gibt dieser Tab sie frei, statt es zu blockieren.
+      blocking() {
+        void offen.then((d) => d.close());
+        if (dbPromise === offen) dbPromise = null;
+      },
+    }).then(async (d) => {
+      await quittungenKuerzen(d).catch((fehler: unknown) =>
+        console.warn('Offline-Queue: Kürzen der Quittungen fehlgeschlagen', fehler),
+      );
+      return d;
     });
+    dbPromise = offen;
   }
   return dbPromise;
+}
+
+type Bestandsquittung = Omit<PersonErfassungsQuittung, 'person_id' | 'registrier_nr'> & {
+  person: Person;
+};
+
+/** Eine Quittung der Vorversion (oder aus einem Tab mit altem Bundle) auf ihre Kennungen kürzen. */
+function nurKennungen(
+  q: PersonErfassungsQuittung | Bestandsquittung,
+): PersonErfassungsQuittung | null {
+  if (!('person' in q)) return null;
+  const { person, ...rest } = q;
+  return { ...rest, person_id: person.id, registrier_nr: person.registrier_nr };
+}
+
+/** LFH-941, design.md D6: jede Bestandsquittung mit voller Person auf ihre Kennungen kürzen. */
+async function quittungenKuerzen(d: IDBPDatabase<OfflineDB>): Promise<void> {
+  const tx = d.transaction('personErfassungsQuittungen', 'readwrite');
+  let cursor = await tx.store.openCursor();
+  while (cursor) {
+    const gekuerzt = nurKennungen(cursor.value as PersonErfassungsQuittung | Bestandsquittung);
+    if (gekuerzt) await cursor.update(gekuerzt);
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+}
+
+/** Nur für Tests: vergisst die offene Verbindung, damit ein Test ein Upgrade nachstellen kann. */
+export function queueDbZuruecksetzenFuerTests(): void {
+  void dbPromise?.then((d) => d.close()).catch(() => {});
+  dbPromise = null;
 }
 
 /**
@@ -475,7 +525,8 @@ export async function schreibaktionPersonAbschliessen(
     benutzer_id: benutzerId,
     einsatz_id: aktuell.einsatz_id,
     client_id: clientId,
-    person,
+    person_id: person.id,
+    registrier_nr: person.registrier_nr,
     sicht: aktuell.aktion.daten.status ?? 'erfasst',
     erstellt_at: new Date().toISOString(),
   };
@@ -498,9 +549,13 @@ export async function personErfassungsQuittungenLaden(
     'by-benutzer-einsatz',
     benutzerEinsatz(benutzerId, einsatzId),
   );
-  return alle.sort(
-    (a, b) => a.erstellt_at.localeCompare(b.erstellt_at) || a.client_id.localeCompare(b.client_id),
-  );
+  // Ein Tab mit altem Bundle kann bis zu seinem Neuladen noch volle Quittungen schreiben.
+  return alle
+    .map((q) => nurKennungen(q as PersonErfassungsQuittung | Bestandsquittung) ?? q)
+    .sort(
+      (a, b) =>
+        a.erstellt_at.localeCompare(b.erstellt_at) || a.client_id.localeCompare(b.client_id),
+    );
 }
 
 /** Quittiert eine bereits in der Personen-UI dargestellte Erfolgsquittung.
@@ -648,18 +703,27 @@ const OFFLINE_STORE_NAMEN = [
 
 /** Liefert ausschließlich eine globale Anzahl der v1-v3-Zeilen ohne sichere
  * Benutzerbindung. Weder Payload, Einsatz, Art noch Zeitstempel verlassen die
- * Queue-Schicht; eine spätere Sitzung darf daraus keine fremden Rohdaten lernen. */
+ * Queue-Schicht; eine spätere Sitzung darf daraus keine fremden Rohdaten lernen.
+ *
+ * Gezählt, nicht gelesen (LFH-939, design.md D5): Der Index `by-benutzer` enthält genau die
+ * Zeilen mit `benutzer_id` (ein fehlendes oder `null`-Feld ist kein gültiger Schlüssel), der
+ * Rest des Stores ist Altbestand. Der Zähler läuft bei jeder Queue-Änderung; ein `getAll`
+ * deserialisierte dabei jede Payload aller Benutzer. */
 export async function queueNichtZugeordnetZaehlen(): Promise<number> {
   const d = await db();
-  const [etbOffen, etbAbgelehnt, aktionenOffen, aktionenAbgelehnt] = await Promise.all([
-    d.getAll('ausstehend'),
-    d.getAll('abgelehnt'),
-    d.getAll('schreibaktionen'),
-    d.getAll('schreibaktionenAbgelehnt'),
-  ]);
-  return [...etbOffen, ...etbAbgelehnt, ...aktionenOffen, ...aktionenAbgelehnt].filter(
-    ohneBenutzerbindung,
-  ).length;
+  const tx = d.transaction(OFFLINE_STORE_NAMEN, 'readonly');
+  const je = await Promise.all(
+    OFFLINE_STORE_NAMEN.map(async (name) => {
+      const store = tx.objectStore(name);
+      const [alle, gebunden] = await Promise.all([
+        store.count(),
+        store.index('by-benutzer').count(),
+      ]);
+      return alle - gebunden;
+    }),
+  );
+  await tx.done;
+  return je.reduce((summe, n) => summe + n, 0);
 }
 
 /** Verwirft alle nicht attribuierbaren Alt-Daten in einer Transaktion. Eine
