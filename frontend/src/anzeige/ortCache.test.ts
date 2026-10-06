@@ -1,6 +1,15 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { openDB } from 'idb';
 import { rohLesen } from '../test/rohIdb';
-import { ortKeyVon, holeOrt, setzeOrt, ortCacheRaeumen } from './ortCache';
+import {
+  ortKeyVon,
+  holeOrt,
+  setzeOrt,
+  ortCacheRaeumen,
+  ortCacheZuruecksetzenFuerTests,
+  ORTCACHE_FRIST_MS,
+  ORTCACHE_OBERGRENZE,
+} from './ortCache';
 
 describe('ortCache', () => {
   afterEach(() => ortCacheRaeumen());
@@ -31,5 +40,61 @@ describe('ortCache', () => {
     await ortCacheRaeumen();
 
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
+  });
+
+  /** Einträge direkt auf die Platte legen und die Verbindung vergessen: das nächste Öffnen
+   *  dünnt aus wie beim Start der App. */
+  async function rohSchreiben(eintraege: [string, { name: string; at: number }][]) {
+    await holeOrt('vorher-oeffnen');
+    ortCacheZuruecksetzenFuerTests();
+    const d = await openDB('lifeline-ortcache');
+    const tx = d.transaction('ortsnamen', 'readwrite');
+    for (const [key, wert] of eintraege) void tx.store.put(wert, key);
+    await tx.done;
+    d.close();
+  }
+
+  it('löscht beim Öffnen Einträge, die älter als 30 Tage sind (LFH-941)', async () => {
+    const jetzt = Date.now();
+    await rohSchreiben([
+      ['alt', { name: 'Alter Ort', at: jetzt - ORTCACHE_FRIST_MS - 60_000 }],
+      ['frisch', { name: 'Frischer Ort', at: jetzt - ORTCACHE_FRIST_MS + 60_000 }],
+    ]);
+    expect(await holeOrt('alt')).toBeNull();
+    expect(await holeOrt('frisch')).toBe('Frischer Ort');
+    expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toHaveLength(1);
+  });
+
+  it('hält beim Öffnen höchstens 5 000 Einträge, die ältesten fallen heraus (LFH-941)', async () => {
+    const jetzt = Date.now();
+    const eintraege: [string, { name: string; at: number }][] = [];
+    for (let i = 0; i < ORTCACHE_OBERGRENZE + 10; i++) {
+      eintraege.push([`k${i}`, { name: `Ort ${i}`, at: jetzt - 1_000_000 + i }]);
+    }
+    await rohSchreiben(eintraege);
+    expect(await holeOrt('k9')).toBeNull();
+    expect(await holeOrt('k10')).toBe('Ort 10');
+    expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toHaveLength(ORTCACHE_OBERGRENZE);
+  });
+
+  it('verwirft den Bestand der Vorversion ohne Zeitstempel (LFH-941)', async () => {
+    ortCacheZuruecksetzenFuerTests();
+    await new Promise<void>((fertig, fehler) => {
+      const loeschen = indexedDB.deleteDatabase('lifeline-ortcache');
+      loeschen.onsuccess = () => fertig();
+      loeschen.onerror = () => fehler(loeschen.error);
+    });
+    const alt = await openDB('lifeline-ortcache', 1, {
+      upgrade(d) {
+        d.createObjectStore('ortsnamen');
+      },
+    });
+    await alt.put('ortsnamen', 'Alter Ort', ortKeyVon(1, 1));
+    alt.close();
+    expect(await holeOrt(ortKeyVon(1, 1))).toBeNull();
+    await setzeOrt(ortKeyVon(2, 2), 'Neuer Ort');
+    expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([
+      { name: 'Neuer Ort', at: expect.any(Number) },
+    ]);
   });
 });

@@ -47,7 +47,7 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 5. Ortscache (D7)
 
-- [ ] 5.1 `anzeige/ortCache.ts`: v2 mit `{ name, at }`, Frist 30 Tage, Obergrenze 5 000.
+- [x] 5.1 `anzeige/ortCache.ts`: v2 mit `{ name, at }`, Frist 30 Tage, Obergrenze 5 000.
   Prüfen: abgelaufener Eintrag nach dem Öffnen weg; bei 5 010 Einträgen bleiben die 5 000
   jüngsten; `holeOrt` liefert den Namen.
 
