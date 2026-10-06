@@ -1,6 +1,6 @@
 /**
  * Der einzige Zugang zum Browserspeicher (`localStorage`), LFH-942,
- * `openspec/changes/lfh-942-browserspeicher-abgesichert/design.md` D1.
+ * `openspec/changes/archive/2026-10-06-lfh-942-browserspeicher-abgesichert/design.md` D1.
  *
  * Auf einem gehärteten Rechner (Firefox mit `dom.storage.enabled=false`) ist `localStorage`
  * `null`, in einer Einbettung wirft schon der Zugriff einen SecurityError, und ein volles

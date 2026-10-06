@@ -674,7 +674,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 - **Eine Einstellung wirkt auch ohne Speicher:** erst den State setzen, dann schreiben; ohne
   gespeicherten Wert gilt die Vorgabe (Farbschema: Nachtbetrieb).
 - Jeder Speicherort steht in `GERAETESPEICHER`: `frontend/src/offline/AGENTS.md`.
-- Herleitung: `openspec/changes/lfh-942-browserspeicher-abgesichert/design.md`.
+- Herleitung: `openspec/changes/archive/2026-10-06-lfh-942-browserspeicher-abgesichert/design.md`.
 
 ## Sitzung über mehrere Tabs (LFH-387)
 

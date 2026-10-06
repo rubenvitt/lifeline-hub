@@ -27,6 +27,6 @@
 ## 6. Regel und Abschluss
 
 - [x] 6.1 Regel „Browserspeicher nur über `lib/sichererSpeicher`“ in `frontend/AGENTS.md`.
-- [ ] 6.2 Lint, Typecheck, Vitest der berührten Dateien.
-- [ ] 6.3 `./scripts/check-all.sh` (Bündel `schnell` und Vitest; e2e der Einstellungs- und Offline-Specs).
+- [x] 6.2 Lint, Typecheck, Vitest der berührten Dateien.
+- [x] 6.3 `./scripts/check-all.sh` (Bündel `schnell` und Vitest; e2e der Einstellungs- und Offline-Specs). Bündel `schnell` grün; Vitest voll 737/739 Dateien grün, die zwei Zeitüberschreitungen (`VerpflegungDialoge`, `LageberichtePage`) liefen unter paralleler e2e-Last und sind einzeln grün; e2e Chromium: neue Spec und acht verwandte Specs grün.
 - [x] 6.4 e2e `browserspeicher-gesperrt.spec.ts`: Anmeldung mit `localStorage` `null` und mit werfendem Zugriff, Nachtbetrieb, kein unbehandelter Fehler der App. Mutationsprobe: Farbschema roh lesen → beide rot.
