@@ -27,6 +27,9 @@ vi.mock('../wetter/UnwetterHinweis', () => ({ default: () => null }));
  */
 const EINGEKLAPPT = 'lfh:nav:eingeklappt';
 
+/** Ab `xl` ist das Modulpanel ohne Wahl offen (LFH-952); die Testbreite 1024 liegt darunter. */
+const XL = 1440;
+
 const admin = adminFixture({ anzeigename: 'Chef' });
 const einsatz = {
   id: 7,
@@ -225,6 +228,7 @@ describe('EinsatzLayout', () => {
    * Ein Deep-Link von außen füllt ihn deshalb nicht.
    */
   it('merkt ein per Klick gewähltes Modul im Zuletzt-Speicher (LFH-337 · H12)', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     localStorage.clear();
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
@@ -244,6 +248,7 @@ describe('EinsatzLayout', () => {
    * noch, wäre „Lagekarte" hier ein Knopf. Die Vorbedingung macht die Abwesenheit zur Aussage.
    */
   it('zeigt gemerkte Module nicht als „Zuletzt"-Gruppe im Panel', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     localStorage.clear();
     merkeModulBesuch(admin.id, 7, 'lagekarte');
     setup();
@@ -254,6 +259,7 @@ describe('EinsatzLayout', () => {
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     // 'personen' ausblenden; das Erfassung-Panel ist via /etb offen.
     setup(freigabenFixture({ personen: { sichtbar: false, zugriff: false } }));
     // Erst der Panel-Anker, dann die Abwesenheit ABWARTEN: bis die Freigaben ankommen, steht
@@ -265,6 +271,7 @@ describe('EinsatzLayout', () => {
   });
 
   it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     // Letztes Segment ist „liste"; das aktive Modul wird am Segment nach der Einsatz-ID erkannt —
     // sonst klappt das Panel beim UHS-Redirect zu.
     setupRoute('/einsaetze/7/unfallhilfsstellen/liste', 'unfallhilfsstellen/liste');
@@ -349,6 +356,7 @@ describe('EinsatzLayout', () => {
   // Gegenprobe zum Schmal-Block: sonst wäre der Schmal-Test auch grün, wenn der Hamburger bei
   // JEDER Breite erschiene.
   it('ab lg steht der Rahmen inline und es gibt keinen Hamburger', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
@@ -479,6 +487,7 @@ describe('EinsatzLayout', () => {
    * Angleich-Effekt fasst das Flag nicht an.
    */
   it('merkt das eingeklappte Panel über einen Neu-Mount (lfh:nav:eingeklappt)', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     setup();
     await waitFor(() => expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument());
 
@@ -502,7 +511,7 @@ describe('EinsatzLayout', () => {
     expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
   });
 
-  it('klappt beim Wechsel auf eine andere Kategorie wieder auf', async () => {
+  it('klappt beim Wechsel auf eine andere Kategorie wieder auf, ohne die Wahl zu überschreiben', async () => {
     localStorage.setItem(EINGEKLAPPT, '1');
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
@@ -510,7 +519,70 @@ describe('EinsatzLayout', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
 
     expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
-    expect(localStorage.getItem(EINGEKLAPPT)).toBeNull();
+    // Der Sprung ist keine Wahl (LFH-952, D5): gemerkt bleibt „zu“.
+    expect(localStorage.getItem(EINGEKLAPPT)).toBe('1');
+  });
+
+  /**
+   * LFH-952 (D5): ohne Wahl ist das Panel am Tablet quer (`lg` bis `xl`, hier die Testbreite 1024)
+   * zu und ab `xl` offen. Der Griff „Menü“ im Rail-Fuß schreibt die Wahl, und sie gilt dann auf
+   * jeder Breite.
+   */
+  describe('Modulmenü: Vorgabe je Breite und Griff (LFH-952)', () => {
+    it('1024 ohne Wahl: Panel zu, Griff „Menü ausklappen“ mit aria-expanded false', async () => {
+      setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Menü ausklappen' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      expect(screen.getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    });
+
+    it('1440 ohne Wahl: Panel offen (Gegenprobe zur Vorgabe)', async () => {
+      setzeViewportBreite(XL);
+      setup();
+      expect(await screen.findByRole('button', { name: 'ETB' })).toBeInTheDocument();
+      const griff = screen.getByRole('button', { name: 'Menü einklappen' });
+      expect(griff).toHaveAttribute('aria-expanded', 'true');
+      expect(document.getElementById(griff.getAttribute('aria-controls')!)).toHaveAttribute(
+        'data-lfh',
+        'modul-panel',
+      );
+    });
+
+    it('der Griff öffnet, merkt „offen“, und die Wahl übersteht einen Neu-Mount', async () => {
+      const { unmount } = setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      await userEvent.click(screen.getByRole('button', { name: 'Menü ausklappen' }));
+      expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument();
+      expect(localStorage.getItem(EINGEKLAPPT)).toBe('0');
+      unmount();
+
+      setup();
+      expect(await screen.findByRole('button', { name: 'ETB' })).toBeInTheDocument();
+    });
+
+    it('eine Wahl „zu“ gilt auch ab xl', async () => {
+      localStorage.setItem(EINGEKLAPPT, '1');
+      setzeViewportBreite(XL);
+      setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+    });
+
+    it('der Rail-Sprung öffnet am Tablet, schreibt aber keine Wahl', async () => {
+      setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      await freigabenAngekommen();
+      await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+      expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
+      expect(localStorage.getItem(EINGEKLAPPT)).toBeNull();
+    });
   });
 
   /**
@@ -633,6 +705,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
    * Modul, in dem man dann steht, und „Vermisste" wird nicht als Modulbesuch gemerkt.
    */
   it('springt über eine Sprungmarke ins Zielmodul, ohne sie als Besuch zu merken', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     localStorage.clear();
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
@@ -684,6 +757,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
   });
 
   it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     // Der Selbstklick ist der Zuklapp-Umschalter mit Persistenz; ohne diese Gegenaussage färbte
     // auch ein bedingungslos navigierender Klick den Test darüber grün. Startpunkt 'personen',
     // nicht 'etb' (das erste Modul der Kategorie) — sonst änderte ein falscher Sprung den Pfad nicht.
@@ -705,6 +779,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
    * Rail-Sprung der Kategorie überspringt es — er landet im nächsten freien Modul.
    */
   it('überspringt beim Rail-Sprung ein gesperrtes Modul (LFH-669)', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     setup(
       freigabenFixture({
         'lage-dashboard': { zugriff: false },

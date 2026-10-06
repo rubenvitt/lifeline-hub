@@ -24,7 +24,7 @@ import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
 import ModulAkkordeon from './ModulAkkordeon';
-import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
+import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
@@ -185,7 +185,14 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
    * Panel steht. Der Effekt darunter gleicht nur die erste an die Route an — sonst klappte ein
    * zugeklapptes Panel beim ersten Modulwechsel wieder auf.
    */
-  const [panelEingeklappt, setPanelEingeklappt] = useState(leseNavEingeklappt);
+  /**
+   * Die Wahl der Person (LFH-952, `navPersistenz`): `null` heißt keine Wahl, dann ist das Panel am
+   * Tablet quer (`lg` bis `xl`) zu und ab `xl` offen. Ein Rail-Sprung öffnet es nur für diese
+   * Sitzung ({@link sprungOffen}), gemerkt werden Griff und Selbstklick.
+   */
+  const [navWahl, setNavWahl] = useState<NavWahl | null>(leseNavWahl);
+  const [sprungOffen, setSprungOffen] = useState(false);
+  const panelEingeklappt = sprungOffen ? false : panelZu(navWahl, weit);
   const [navOffen, setNavOffen] = useState(false);
 
   // Panel an die aktuelle Modul-Kategorie angleichen (auch nach dem Default-Redirect).
@@ -241,7 +248,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   }
 
   /**
-   * Rail-Klick im inline-Rahmen: SELBSTKLICK = ZUKLAPPEN, FREMDKLICK = SPRUNG in das erste
+   * Rail-Klick im inline-Rahmen: SELBSTKLICK = UMKLAPPEN, FREMDKLICK = SPRUNG in das erste
    * freigegebene Modul der Kategorie.
    * Nicht immer navigieren: der Angleich-Effekt höbe sonst das persistierte Zuklappen in
    * derselben Runde auf. Die Rail behält ihre Hervorhebung über
@@ -251,16 +258,23 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
    */
   function onKategorieKlick(key: KategorieKey) {
     if (offeneKategorie === key) {
-      const zu = !panelEingeklappt;
-      setPanelEingeklappt(zu);
-      schreibeNavEingeklappt(zu);
+      panelUmschalten();
       return;
     }
     setOffeneKategorie(key);
-    setPanelEingeklappt(false);
-    schreibeNavEingeklappt(false);
+    // Öffnet das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem ersten Sprung am
+    // Tablet die Vorgabe „zu“ für immer weg.
+    setSprungOffen(true);
     const ziel = erstesFreigegebenesModul(key, modulFreigaben);
     if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
+  }
+
+  /** Griff „Menü“ und Selbstklick: die einzigen Wege, die eine Wahl schreiben (LFH-952). */
+  function panelUmschalten() {
+    const wahl: NavWahl = panelEingeklappt ? 'offen' : 'zu';
+    setNavWahl(wahl);
+    setSprungOffen(false);
+    schreibeNavWahl(wahl);
   }
 
   /**
@@ -442,6 +456,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             kategorien={kategorien}
             aktiveKategorie={offeneKategorie ?? aktiveKategorie}
             onKategorieKlick={onKategorieKlick}
+            panel={
+              offeneKategorie
+                ? { offen: !panelEingeklappt, onUmschalten: panelUmschalten }
+                : undefined
+            }
           />
         )}
         {breit && offeneKategorie && !panelEingeklappt && (

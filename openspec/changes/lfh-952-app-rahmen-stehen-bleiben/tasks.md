@@ -24,17 +24,17 @@
 
 ## 5. Modulpanel (D5)
 
-- [ ] 5.1 `einsatz/navPersistenz.test.ts`: dreiwertig (zu, offen, keine Wahl). Prüfen: rot vor 5.2
-- [ ] 5.2 `navPersistenz.ts`, `EinsatzLayout`: Vorgabe je Breite, Wahl nur über Griff und Selbstklick; Tests
-- [ ] 5.3 `IconRail`: Griff „Menü“ im Fuß mit `aria-expanded`/`aria-controls`, `aria-expanded` an der offenen Kategorie; `ModulPanel` mit `id`; Tests
+- [x] 5.1 `einsatz/navPersistenz.test.ts`: dreiwertig (zu, offen, keine Wahl). Prüfen: rot vor 5.2
+- [x] 5.2 `navPersistenz.ts`, `EinsatzLayout`: Vorgabe je Breite, Wahl nur über Griff und Selbstklick; Tests
+- [x] 5.3 `IconRail`: Griff „Menü“ im Fuß mit `aria-expanded`/`aria-controls`, `aria-expanded` an der offenen Kategorie; `ModulPanel` mit `id`; Tests
 
 ## 6. Überblick (D6)
 
-- [ ] 6.1 `pages/fuehrung/ueberblick.css` und `AbschnittEintrag`: Raster mit Containerabfrage; Test der Klassen
+- [x] 6.1 `pages/fuehrung/ueberblick.css` und `AbschnittEintrag`: Raster mit Containerabfrage; Test der Klassen
 
 ## 7. Regel und Nachweis
 
-- [ ] 7.1 `frontend/AGENTS.md`, Abschnitt „Rahmen“: Stehenbleiben gestuft, `--lfh-rahmen-oben`, Panel-Vorgabe
+- [x] 7.1 `frontend/AGENTS.md`, Abschnitt „Rahmen“: Stehenbleiben gestuft, `--lfh-rahmen-oben`, Panel-Vorgabe
 - [ ] 7.2 `e2e/rahmen-stehen-bleiben.spec.ts` (vier Breiten, offline, Abmelden in `handschuh`, Stärke bei 1180, Tabellenkopf), Admin und nicht-privilegiert; Mutationsprobe ohne sticky dokumentieren
 - [ ] 7.3 Mitlaufen: `kopfzeile-schmal`, `fokus-verdeckung`, `rail-etikett`, `nav-schmal`, `gate1-ueberlauf`, `gate3-trefflaeche`, `leisten-flaeche`
 - [ ] 7.4 Vitest, Lint, Typen, `check-all.sh --nur schnell`

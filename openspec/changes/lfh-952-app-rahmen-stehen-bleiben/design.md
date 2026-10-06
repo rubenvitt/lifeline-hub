@@ -93,7 +93,7 @@ Neutralem.
 - Ohne Wahl: zwischen `lg` und `xl` zu, ab `xl` offen. Mit Wahl gilt sie auf jeder Breite.
 - Griff in der Rail, im klebenden Fuß über „Einstellungen“: Icon `IconSeitenleisteZu`/`Auf`
   und sichtbares Etikett „Menü“, `aria-expanded`, `aria-controls` auf das Panel
-  (`id="modul-panel"`), Name „Modulmenü einklappen“ bzw. „Modulmenü ausklappen“. Er schreibt die
+  (`id="modul-panel"`, solange es steht), Name „Menü einklappen“ bzw. „Menü ausklappen“ (beginnt mit dem sichtbaren Etikett, WCAG 2.5.3). Er schreibt die
   Wahl. Der Selbstklick auf die offene Kategorie bleibt als zweiter Weg und trägt ebenfalls
   `aria-expanded`.
 - Ein Kategorie-Sprung öffnet das Panel wie heute, schreibt aber keine Wahl mehr: sonst wäre
@@ -102,7 +102,7 @@ Neutralem.
 ### D6 Abschnittszeile im Überblick
 
 Die Zeile wird ein Raster über eine Containerabfrage am Paneel (`ueberblick.css`):
-breit `Kante | Name | Auftrag | Stärke`, unter 520 px Paneelbreite `Kante | Name | Stärke`, darunter
+breit `Kante | Name | Auftrag | Stärke`, unter 560 px Listenbreite `Kante | Name | Stärke`, darunter
 `Auftrag` über Name und Stärke. Die Reihenfolge im DOM bleibt (Linkname unverändert).
 
 ## Risks / Trade-offs

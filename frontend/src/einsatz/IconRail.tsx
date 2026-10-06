@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { theme } from 'antd';
+import { IconSeitenleisteAuf, IconSeitenleisteZu } from '../icons';
 import { railBreite } from '../components/Kopfleiste';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
@@ -9,7 +10,15 @@ interface Props {
   kategorien: Kategorie[];
   aktiveKategorie: KategorieKey | null;
   onKategorieKlick: (key: KategorieKey) => void;
+  /**
+   * Das Modulpanel neben der Rail (LFH-952, D5): trägt den Griff „Menü“ im Fuß und
+   * `aria-expanded` an der offenen Kategorie. Ohne (Drawer-Zweig) kein Griff.
+   */
+  panel?: { offen: boolean; onUmschalten: () => void };
 }
+
+/** `id` des Modulpanels, auf das Griff und offene Kategorie zeigen. */
+export const MODUL_PANEL_ID = 'modul-panel';
 
 /**
  * Zeilenhöhe einer Kategorie laut Entwurf (62 px) — zugleich Boden unter der Dichte-Staffel: in
@@ -81,7 +90,7 @@ const ETIKETT_STIL: CSSProperties = {
  * ist das Kurzetikett (`Kategorie.kurz`); der volle Name bleibt `aria-label` und `title`.
  * „Einstellungen" (`fuss`) steht abgesetzt unten. Es bleiben SECHS Ziele in EINER Landmarke.
  */
-export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick }: Props) {
+export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
   const { token } = theme.useToken();
   const { wurzelRef, fussRef } = useFussFokusabstand();
 
@@ -95,6 +104,9 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         aria-label={k.label}
         title={k.label === k.kurz ? undefined : k.label}
         aria-current={aktiv ? 'true' : undefined}
+        // Der Selbstklick klappt das Panel um (LFH-952): die offene Kategorie sagt, ob es steht.
+        aria-expanded={aktiv && panel ? panel.offen : undefined}
+        aria-controls={aktiv && panel?.offen ? MODUL_PANEL_ID : undefined}
         onClick={() => onKategorieKlick(k.key)}
         // Fokusabstand zum klebenden Fuß (WCAG 2.4.11) — neben, nicht in `railZielStil`.
         style={{ ...railZielStil(token, { aktiv }), ...fussFokusabstandStil }}
@@ -160,6 +172,26 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
             borderTop: `1px solid ${rahmenFarben.linie}`,
           }}
         >
+          {panel && (
+            // Griff des Modulmenüs (LFH-952, D5): sichtbar, weil das Panel am Tablet quer ohne
+            // Wahl zu ist und der Selbstklick auf die Kategorie kein erkennbarer Weg zurück wäre.
+            <button
+              type="button"
+              aria-label={panel.offen ? 'Menü einklappen' : 'Menü ausklappen'}
+              aria-expanded={panel.offen}
+              aria-controls={panel.offen ? MODUL_PANEL_ID : undefined}
+              data-lfh="rail-griff"
+              onClick={panel.onUmschalten}
+              style={{ ...railZielStil(token, { aktiv: false }), ...fussFokusabstandStil }}
+            >
+              <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                {panel.offen ? <IconSeitenleisteZu size={20} /> : <IconSeitenleisteAuf size={20} />}
+              </span>
+              <span aria-hidden="true" data-lfh="rail-etikett" style={ETIKETT_STIL}>
+                Menü
+              </span>
+            </button>
+          )}
           {fuss.map(ziel)}
         </div>
       )}

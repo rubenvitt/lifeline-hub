@@ -89,6 +89,7 @@ import {
   type Marke,
 } from './ueberblickDaten';
 import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
+import './ueberblick.css';
 
 /**
  * Führung · Überblick — die Startseite eines Einsatzes. Die Bedeutung jeder Zahl steht in
@@ -750,7 +751,10 @@ export default function UeberblickPage() {
                     nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
                   }
                 >
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  <ul
+                    className="ueberblick-abschnitte"
+                    style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                  >
                     {zeilen.map((z) => (
                       <li key={z.key}>
                         <AbschnittEintrag
@@ -1060,7 +1064,10 @@ function AbschnittEintrag({
     <Link
       to={ziel}
       data-lfh="ueberblick-abschnitt"
-      style={{ ...zeilenzielStil(rollen, token), flexWrap: 'wrap', paddingBlock: token.padding }}
+      // Raster mit Containerabfrage (LFH-952, `ueberblick.css`): ab schmaler Liste stehen Name und
+      // Stärke oben, der Auftrag darunter. `display` inline, weil `zeilenzielStil` Flex setzt.
+      className="ueberblick-abschnitt"
+      style={{ ...zeilenzielStil(rollen, token), display: 'grid', paddingBlock: token.padding }}
     >
       {/* Lagekante: Farbe nur als Rand, das Wort steht im StatusTag daneben. Ohne Beurteilung
           durchsichtig — eine graue Kante sähe aus wie eine Stufe „neutral". */}
@@ -1068,14 +1075,14 @@ function AbschnittEintrag({
         aria-hidden
         data-lfh="abschnitt-lagekante"
         data-rolle={lage?.rolle}
+        className="ueberblick-abschnitt__kante"
         style={{
-          flex: '0 0 3px',
-          alignSelf: 'stretch',
           background: lage ? rollenFarbe(lage.rolle, token) : 'transparent',
         }}
       />
       <span
-        style={{ flex: '0 0 158px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
+        className="ueberblick-abschnitt__name"
+        style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
       >
         <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
@@ -1104,8 +1111,8 @@ function AbschnittEintrag({
         )}
       </span>
       <span
+        className="ueberblick-abschnitt__auftrag"
         style={{
-          flex: '1 1 160px',
           minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -1183,8 +1190,8 @@ function AbschnittEintrag({
         )}
       </span>
       <span
+        className="ueberblick-abschnitt__staerke"
         style={{
-          flex: '0 0 132px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',

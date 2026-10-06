@@ -15,6 +15,7 @@ import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
 import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
+import { MODUL_PANEL_ID } from './IconRail';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -293,6 +294,8 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
       // Navigationsträger keine Landmark — eine zweite machte `getByRole('navigation')` ohne Namen
       // mehrdeutig —, deshalb ein Datenmerkmal.
       data-lfh="modul-panel"
+      // Ziel von `aria-controls` an Griff und offener Kategorie der Rail (LFH-952).
+      id={MODUL_PANEL_ID}
       style={{
         width: PANEL_BREITE,
         flex: `0 0 ${PANEL_BREITE}px`,
