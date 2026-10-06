@@ -830,7 +830,7 @@ describe('LagekartePage', () => {
     expect(screen.queryByRole('button', { name: /Verortung löschen/ })).not.toBeInTheDocument();
   });
 
-  it('Basemap-Umschalter: von Online auf Blind wechseln, Marker bleiben sichtbar', async () => {
+  it('Basemap-Umschalter: von Online auf „Ohne Karte“ wechseln, Marker bleiben sichtbar', async () => {
     basisHandler([], {
       online_styles: [
         { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
@@ -852,7 +852,7 @@ describe('LagekartePage', () => {
     await user.click(within(grundlage).getByRole('radio', { name: 'Ohne Karte' }));
     expect(within(grundlage).getByRole('radio', { name: 'Ohne Karte' })).toBeChecked();
     expect(within(grundlage).getByRole('radio', { name: 'Online' })).not.toBeChecked();
-    // Marker bleiben im Blind-Modus sichtbar (Spec-Garantie):
+    // Marker bleiben ohne Karte sichtbar (Spec-Garantie):
     expect(screen.getByText('marker-schaden-9')).toBeInTheDocument();
   });
 
@@ -905,7 +905,18 @@ describe('LagekartePage', () => {
     ).toBeInTheDocument();
   });
 
-  it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
+  it('Basemap-Umschalter: am Handschirm steht der Hinweis „Ohne Karte“ auf der Karte (LFH-971)', async () => {
+    setzeViewportBreite(390);
+    basisHandler();
+    renderSeite();
+    // Die Leiste mit der Grundlage-Wahl ist dort zu; der Hinweis steht trotzdem genau einmal.
+    expect(
+      await screen.findByText(/Keine Kartengrundlage konfiguriert \(Verwaltung › Karten\)/),
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-lfh="grundlage-hinweis"]')).toHaveLength(1);
+  });
+
+  it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Hinweis „Ohne Karte“', async () => {
     basisHandler([], {
       online_styles: [
         { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },

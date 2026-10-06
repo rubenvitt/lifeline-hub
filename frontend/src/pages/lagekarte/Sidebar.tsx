@@ -1380,12 +1380,13 @@ export default function Sidebar(props: SidebarProps) {
               Gewählt wird die Grundlage oben links auf der Karte.
             </Typography.Text>
           )}
-          {!props.onlineVerfuegbar && (
+          {/* Mit der Leiste im Paneel (Handschirm) nennt deren Sperrgrund das schon. */}
+          {!props.grundlageWahl && !props.onlineVerfuegbar && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Online-Karte: nicht konfiguriert
             </Typography.Text>
           )}
-          {!props.offlineVerfuegbar && (
+          {!props.grundlageWahl && !props.offlineVerfuegbar && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Offline-Karte: nicht konfiguriert
             </Typography.Text>

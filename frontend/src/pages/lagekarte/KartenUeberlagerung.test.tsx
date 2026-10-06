@@ -256,9 +256,12 @@ describe('KartenUeberlagerung — Zeigerkoordinate', () => {
     // Die Klasse blendet sie über `@media not (any-pointer: fine)` aus (`lagekarte.css`, LFH-712);
     // jsdom wertet die Media-Query nicht aus, der Browser-Nachweis steht in
     // `e2e/lagekarte-touch.spec.ts`.
-    expect(document.querySelector('[data-lfh="zeiger-koordinate"]')).toHaveClass(
-      'lfh-nur-feiner-zeiger',
-    );
+    const huelle = document
+      .querySelector('[data-lfh="zeiger-koordinate"]')!
+      .closest('.lfh-nur-feiner-zeiger') as HTMLElement | null;
+    expect(huelle).not.toBeNull();
+    // Ein Inline-`display` an der Hülle schlüge die Regel, die Koordinate bliebe stehen.
+    expect(huelle!.style.display).toBe('');
   });
 });
 
@@ -298,6 +301,35 @@ describe('GrundlageLeiste', () => {
     // Eine freie Wahl räumt den Grund wieder ab.
     fireEvent.click(screen.getByRole('radio', { name: 'Ohne Karte' }));
     expect(onWechsel).toHaveBeenCalledWith('blind');
+    expect(hinweis()).toBeNull();
+  });
+
+  it('LFH-971: ein zweiter Tipp oder ein Wechsel von außen räumt den Grund ab', () => {
+    const optionen = grundlageOptionen(STILE, false);
+    const { rerender } = renderMitProviders(
+      <GrundlageLeiste optionen={optionen} wert="online:Liberty" onWechsel={() => {}} />,
+    );
+    const offline = () => screen.getByRole('radio', { name: 'Offline' });
+    fireEvent.click(offline());
+    expect(hinweis()).toHaveTextContent(OFFLINE_GRUND);
+    fireEvent.click(offline());
+    expect(hinweis()).toBeNull();
+    fireEvent.click(offline());
+    expect(hinweis()).toHaveTextContent(OFFLINE_GRUND);
+    // Eine geladene Ansicht setzt die Grundlage von außen: der Grund gehörte zur alten.
+    rerender(<GrundlageLeiste optionen={optionen} wert="blind" onWechsel={() => {}} />);
+    expect(hinweis()).not.toHaveTextContent(OFFLINE_GRUND);
+  });
+
+  it('LFH-971: ohne `blindHinweisZeigen` steht der Hinweis zu „Ohne Karte“ nicht an der Leiste', () => {
+    renderMitProviders(
+      <GrundlageLeiste
+        optionen={grundlageOptionen([], false)}
+        wert="blind"
+        onWechsel={() => {}}
+        blindHinweisZeigen={false}
+      />,
+    );
     expect(hinweis()).toBeNull();
   });
 

@@ -226,7 +226,7 @@
   background: var(--lfh-flaeche-3);
   color: var(--lfh-text);
 }
-/* Gesperrt: sichtbar, fokussierbar (der Grund steht im Tooltip), aber ohne Hover-Aufhellung.
+/* Gesperrt: sichtbar, fokussierbar (den Grund nennt die Leiste), aber ohne Hover-Aufhellung.
    Die Farbe ist nicht der einzige Kanal — `Segmentleiste` nennt den Grund. */
 .lfh-segment[aria-disabled='true'],
 .lfh-segment[aria-disabled='true']:hover {

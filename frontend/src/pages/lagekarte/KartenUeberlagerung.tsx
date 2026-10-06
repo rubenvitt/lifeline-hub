@@ -116,6 +116,7 @@ export function GrundlageLeiste({
   wert,
   onWechsel,
   einzeilig = false,
+  blindHinweisZeigen = true,
 }: {
   optionen: readonly GrundlageOption[];
   wert: GrundlageWert;
@@ -126,24 +127,37 @@ export function GrundlageLeiste({
    * Segment in den sichtbaren Bereich.
    */
   einzeilig?: boolean;
+  /**
+   * `false`: der Hinweis zu „Ohne Karte" steht anderswo. Auf dem Handschirm liegt die Leiste im
+   * zugeklappten Paneel, dort zeigt ihn die Karte selbst ({@link GrundlageHinweis}).
+   */
+  blindHinweisZeigen?: boolean;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const grundId = useId();
   const knoepfe = useRef<(HTMLButtonElement | null)[]>([]);
-  // Der zuletzt angetippte gesperrte Wert; eine freie Wahl räumt ihn ab.
-  const [angetippt, setAngetippt] = useState<GrundlageWert | null>(null);
+  // Der zuletzt angetippte gesperrte Wert, gemerkt zur Grundlage, bei der er angetippt wurde:
+  // wechselt die Grundlage (Wahl, geladene Ansicht), räumt sich der Grund ab, ein zweiter Tipp
+  // auf dasselbe Segment ebenso.
+  const [angetippt, setAngetippt] = useState<{ wert: GrundlageWert; bei: GrundlageWert } | null>(
+    null,
+  );
   const aktivIndex = optionen.findIndex((o) => o.wert === wert);
   const gesperrt = optionen.map((o) => o.gesperrt != null);
   // Roving tabindex: das gewählte Segment, ohne Wahl das erste freie.
   const tabZiel = aktivIndex >= 0 ? aktivIndex : gesperrt.findIndex((g) => !g);
-  const grund = optionen.find((o) => o.wert === angetippt)?.gesperrt;
-  const hinweise = [grund, wert === 'blind' ? blindHinweis(optionen) : undefined].filter(
-    (h): h is string => h != null,
-  );
+  const grund =
+    angetippt?.bei === wert ? optionen.find((o) => o.wert === angetippt.wert)?.gesperrt : undefined;
+  const hinweise = [
+    grund,
+    blindHinweisZeigen && wert === 'blind' ? blindHinweis(optionen) : undefined,
+  ].filter((h): h is string => h != null);
 
   const waehle = (o: GrundlageOption) => {
     if (o.gesperrt != null) {
-      setAngetippt(o.wert);
+      setAngetippt((vorher) =>
+        vorher?.wert === o.wert && vorher.bei === wert ? null : { wert: o.wert, bei: wert },
+      );
       return;
     }
     setAngetippt(null);
@@ -214,37 +228,48 @@ export function GrundlageLeiste({
                 style={{ ...segmentStil(token), whiteSpace: 'nowrap' }}
               >
                 {o.label}
+                {aus && (
+                  // Versteckt wie in `Segmentleiste`: `aria-describedby` liest ihn trotzdem, in den
+                  // Namen geht er nicht ein. Sichtbar trägt ihn nach dem Tipp die Hinweiszeile.
+                  <span id={beschreibungId} hidden>
+                    {o.gesperrt}
+                  </span>
+                )}
               </button>
-              {/* Neben dem Knopf, nicht darin: sonst ginge der Grund in den Namen ein. */}
-              {aus && (
-                <span id={beschreibungId} style={NUR_VORLESEN}>
-                  {o.gesperrt}
-                </span>
-              )}
             </span>
           );
         })}
       </div>
       {/* Höflich angesagt: der Grund erscheint als Antwort auf den eigenen Tipp. */}
       <div aria-live="polite">
-        {hinweise.length > 0 && (
-          <div
-            data-lfh="grundlage-hinweis"
-            style={{
-              padding: `${token.paddingXXS}px ${token.paddingSM}px`,
-              background: rollen.kopf,
-              border: `1px solid ${rollen.linieStark}`,
-              color: rollen.text2,
-              fontSize: token.fontSizeSM,
-              lineHeight: token.lineHeightSM,
-            }}
-          >
-            {hinweise.map((h) => (
-              <div key={h}>{h}</div>
-            ))}
-          </div>
-        )}
+        <GrundlageHinweis zeilen={hinweise} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Hinweiszeile der Kartengrundlage (Sperrgrund, „Ohne Karte") — unter der Leiste und, auf dem
+ * Handschirm, allein über der Karte. Ohne Zeilen nichts.
+ */
+export function GrundlageHinweis({ zeilen }: { zeilen: readonly string[] }) {
+  const { token, rollen } = useRollen();
+  if (zeilen.length === 0) return null;
+  return (
+    <div
+      data-lfh="grundlage-hinweis"
+      style={{
+        padding: `${token.paddingXXS}px ${token.paddingSM}px`,
+        background: rollen.kopf,
+        border: `1px solid ${rollen.linieStark}`,
+        color: rollen.text2,
+        fontSize: token.fontSizeSM,
+        lineHeight: token.lineHeightSM,
+      }}
+    >
+      {zeilen.map((h) => (
+        <div key={h}>{h}</div>
+      ))}
     </div>
   );
 }
@@ -256,28 +281,29 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
   const lage = useZeigerLage(quelle);
   return (
     // Nur mit feinem Zeiger (`.lfh-nur-feiner-zeiger`, LFH-712/LFH-971): gespeist wird sie über
-    // `mousemove`, auf reinem Touch bliebe sie ein „—“-Kästchen, das wie ein Fehler aussieht.
-    <div
-      data-lfh="zeiger-koordinate"
-      className="lfh-nur-feiner-zeiger"
-      title="Position des Zeigers"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: token.marginXS,
-        alignSelf: 'flex-start',
-        minHeight: 28,
-        padding: `0 ${token.paddingSM}px`,
-        background: rollen.kopf,
-        border: `1px solid ${rollen.linieStark}`,
-        color: rollen.gedaempft,
-        ...monoStil(11),
-      }}
-    >
-      <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
-        <IconFadenkreuz size={14} />
-      </span>
-      {lage ? formatKoordinate(lage.lat, lage.lon) : '—'}
+    // `mousemove`, auf reinem Touch bliebe sie ein „—“-Kästchen, das wie ein Fehler aussieht. Die
+    // Klasse sitzt an einer Hülle ohne Inline-`display` — der schlüge die Regel.
+    <div className="lfh-nur-feiner-zeiger" style={{ alignSelf: 'flex-start' }}>
+      <div
+        data-lfh="zeiger-koordinate"
+        title="Position des Zeigers"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: token.marginXS,
+          minHeight: 28,
+          padding: `0 ${token.paddingSM}px`,
+          background: rollen.kopf,
+          border: `1px solid ${rollen.linieStark}`,
+          color: rollen.gedaempft,
+          ...monoStil(11),
+        }}
+      >
+        <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
+          <IconFadenkreuz size={14} />
+        </span>
+        {lage ? formatKoordinate(lage.lat, lage.lon) : '—'}
+      </div>
     </div>
   );
 }

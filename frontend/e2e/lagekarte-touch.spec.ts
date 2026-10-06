@@ -1904,10 +1904,20 @@ for (const viewport of [
         const offline = grundlage.getByRole('radio', { name: 'Offline' });
         await expect(offline).toHaveAttribute('aria-disabled', 'true');
         const gewaehlt = await grundlage.getByRole('radio', { checked: true }).textContent();
-        const hinweis = page.locator('[data-lfh="grundlage-hinweis"]');
-        await expect(hinweis).not.toContainText('Offline-Karte nicht konfiguriert');
+        // Die Zeile unter der Leiste; am Handschirm steht der Hinweis „Ohne Karte“ zusätzlich
+        // allein über der Karte.
+        const hinweis = page.locator('[data-lfh="grundlage"] [data-lfh="grundlage-hinweis"]');
+        await expect(hinweis.filter({ hasText: 'Offline-Karte nicht konfiguriert' })).toHaveCount(
+          0,
+        );
 
-        await offline.tap();
+        // Ein echter Fingertipp auf die Mitte des Segments: Playwrights `tap()` verweigert sich
+        // einem `aria-disabled`-Element („not enabled“), der Browser nimmt den Tipp aber an — genau
+        // das ist hier die Zusage.
+        await offline.scrollIntoViewIfNeeded();
+        const box = await offline.boundingBox();
+        expect(box, 'Offline-Segment hat keine Box').not.toBeNull();
+        await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
         await expect(hinweis).toBeVisible();
         await expect(hinweis).toContainText(
           'Offline-Karte nicht konfiguriert (Verwaltung › Karten)',
@@ -1933,6 +1943,8 @@ test.describe('Zeigerkoordinate mit feinem Zeiger (LFH-971)', () => {
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
     await ruhe(page);
     expect(await page.evaluate(() => window.matchMedia('(any-pointer: fine)').matches)).toBe(true);
+    // Die Maus steht noch über dem Anmeldeknopf, also über der Karte: erst wegführen.
+    await page.mouse.move(0, 0);
     const koordinate = page.locator('[data-lfh="zeiger-koordinate"]');
     await expect(koordinate).toBeVisible();
     await expect(koordinate).toHaveText('—');
