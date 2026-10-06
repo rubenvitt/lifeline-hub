@@ -142,6 +142,11 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
   //      BREITE bleibt 390 px (die Frage dieses Specs), die HÖHE wird verkürzt.
   await page.setViewportSize({ width: BREITE, height: 400 });
   await expect(zeile).toBeVisible();
+  // Vom Seitenanfang aus messen: Spaltenschalter und Fokusrückgabe können die Seite schon
+  // gescrollt haben. Dann stünde die Kopfzeile vorab bei y = 0, das Ziel unten läge ÜBER ihrem
+  // Startpunkt, und der Bildlauf nach oben gäbe sie frei — rot, ohne dass die Fixierung fehlt.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 
   // Von oben messen: ein Klick in den Spaltenschalter kann die Seite mitrollen, sobald sie lang
   // genug ist (in der Suite säen andere Specs Benutzer vor). Dann klebt die Kopfzeile schon vor
