@@ -37,6 +37,13 @@ export interface LiveVerbindungOptionen {
    */
   beiNachlieferung?: () => void;
   /**
+   * Ereignis, mit dem der Server die Position des Stroms meldet (Einsatz-Strom: `position`,
+   * LFH-922). Ist es gesetzt, gilt {@link beiNachlieferung} nur, wenn die Quelle ihre Position
+   * erhalten hat: sonst kennt der Browser keine `Last-Event-ID` (Abriss vor der Position), und
+   * der Neuaufbau gleicht ab wie eine neue Verbindung.
+   */
+  positionsEreignis?: string;
+  /**
    * Läuft nur beim ersten `open`. Beim Wechsel zwischen Einsatz- und Org-Strom (LFH-734) kann
    * ein Org-Ereignis zwischen beiden Verbindungen verloren gehen; der neue Strom gleicht deshalb
    * gleich zu Beginn die Org-Keys ab (`openspec/changes/archive/2026-10-01-lfh-734-org-live-ereignis/design.md`, D4).
@@ -123,6 +130,11 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     // Hat DIESE Quelle schon einmal geöffnet? Dann ist der nächste `open` ein Neuaufbau des
     // Browsers mit `Last-Event-ID`, kein neuer Strom.
     let quelleWarOffen = false;
+    let positionBekannt = false;
+    const positionErhalten = () => {
+      positionBekannt = true;
+    };
+    if (opt.positionsEreignis) quelle.addEventListener(opt.positionsEreignis, positionErhalten);
     opt.listeners.forEach(([event, handler]) => quelle.addEventListener(event, handler));
     quelle.onopen = () => {
       schonfristBeenden();
@@ -131,7 +143,7 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
       if (ersterOpen) {
         ersterOpen = false;
         opt.beimErstenOpen?.();
-      } else if (quelleWarOffen) {
+      } else if (quelleWarOffen && (!opt.positionsEreignis || positionBekannt)) {
         (opt.beiNachlieferung ?? opt.beiWiederaufbau)();
       } else {
         opt.beiWiederaufbau();

@@ -10,7 +10,10 @@ export const LIVE_SAMMELFENSTER_MS = 300;
 export interface LiveSammler {
   /** Merkt einen Query-Key für den Abgleich am Ende des laufenden Fensters vor. */
   vormerken(queryKey: QueryKey): void;
-  /** Verwirft Vorgemerktes und Timer, ohne zu invalidieren (Effekt-Cleanup). */
+  /**
+   * Effekt-Cleanup: beendet das Fenster und markiert Vorgemerktes nur als veraltet, ohne
+   * abzurufen. Wer binnen `staleTime` zurückkehrt, sieht so keinen alten Stand als frisch.
+   */
   raeumen(): void;
 }
 
@@ -22,6 +25,9 @@ export interface LiveSammler {
  * - Je Key genau ein `invalidateQueries` je Fenster, gleiche Keys über `hashKey` erkannt.
  * - `cancelRefetch: false`: ein laufender Abruf bleibt stehen, statt abgebrochen und neu
  *   gestartet zu werden (der abgebrochene GET liefe sonst auf Leitung und Server zu Ende).
+ * - Läuft für einen Key am Ende des Fensters schon ein Abruf, wandert er ins nächste Fenster:
+ *   der laufende Abruf kann vor der gemeldeten Änderung gelesen haben, und sein Erfolg nähme die
+ *   Markierung wieder weg. So folgt ihm genau ein Abruf, abgebrochen wird nichts.
  * - Ein verdeckter Tab markiert nur (`refetchType: 'none'`); beim Zurückwechseln holt der
  *   `focusManager` jede veraltete aktive Abfrage einmal nach. Gelesen wird am Ende des Fensters.
  */
@@ -29,14 +35,19 @@ export function erzeugeLiveSammler(qc: QueryClient): LiveSammler {
   const vorgemerkt = new Map<string, QueryKey>();
   let timer: ReturnType<typeof setTimeout> | null = null;
 
+  const markieren = (queryKey: QueryKey, refetchType: 'active' | 'none') =>
+    void qc.invalidateQueries({ queryKey, refetchType }, { cancelRefetch: false });
+
   const abgleichen = () => {
     timer = null;
     const refetchType = document.visibilityState === 'hidden' ? 'none' : 'active';
-    const keys = [...vorgemerkt.values()];
+    const faellig = [...vorgemerkt];
     vorgemerkt.clear();
-    keys.forEach(
-      (queryKey) => void qc.invalidateQueries({ queryKey, refetchType }, { cancelRefetch: false }),
-    );
+    for (const [hash, queryKey] of faellig) {
+      if (qc.isFetching({ queryKey }) > 0) vorgemerkt.set(hash, queryKey);
+      else markieren(queryKey, refetchType);
+    }
+    if (vorgemerkt.size > 0) timer = setTimeout(abgleichen, LIVE_SAMMELFENSTER_MS);
   };
 
   return {
@@ -47,7 +58,9 @@ export function erzeugeLiveSammler(qc: QueryClient): LiveSammler {
     raeumen() {
       if (timer) clearTimeout(timer);
       timer = null;
+      const offen = [...vorgemerkt.values()];
       vorgemerkt.clear();
+      offen.forEach((queryKey) => markieren(queryKey, 'none'));
     },
   };
 }

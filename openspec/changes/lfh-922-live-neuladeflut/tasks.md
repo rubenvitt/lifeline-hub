@@ -1,6 +1,6 @@
 ## 1. Server: Position beim Aufbau des Einsatz-Stroms (D4)
 
-- [x] 1.1 Test zuerst (`tests/live_feed.rs`): Ein frisch geöffneter Einsatz-Strom sendet nach `verbunden` und `retry:` ein Frame nur mit `id:` (kein `event:`, kein `data:`); das erste Frame bleibt reiner Kommentar.
+- [x] 1.1 Test zuerst (`tests/live_feed.rs`): Ein frisch geöffneter Einsatz-Strom sendet nach `verbunden` und `retry:` das Kontroll-Ereignis `position` mit `id:` und Daten (WebKit übernimmt eine `id` ohne Daten nicht); das erste Frame bleibt reiner Kommentar.
 - [x] 1.2 Test: Ein Neuverbinden mit dieser Position ohne zwischenzeitliches Ereignis liefert nichts nach und kein `lagged`; mit einem zwischenzeitlichen Ereignis genau dieses.
 - [x] 1.3 Test: Ein Kanal ohne bisherige Nachricht liefert eine Position, die beim Neuverbinden „nichts verpasst“ ergibt (Unit-Test in `src/live/mod.rs`).
 - [x] 1.4 `LiveHub::abonniere_mit_position` liefert die Position unter derselben Sperre; `sse_stream_mit_replay` sendet sie nach dem Replay-Vorspann; `routes/live.rs` reicht sie durch. Mutationsprobe: Position weglassen → 1.1 und 1.2 rot.
@@ -29,3 +29,9 @@
 - [x] 5.1 `frontend/AGENTS.md`, „Query-Key-Registry“: Regel aus D7.
 - [ ] 5.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests von `live_feed`, `org_live`, `modul_override` und `live::`.
 - [ ] 5.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der Live-Specs).
+
+## 6. Nachzug aus dem Review
+
+- [x] 6.1 Position als Kontroll-Ereignis `position` mit Daten; Browser-Neuaufbau gilt nur nach erhaltener Position als Nachlieferung (Test „ohne erhaltene Position voll ab“, Mutationsprobe rot).
+- [x] 6.2 Sammler legt Keys mit laufendem Abruf ins nächste Fenster (Test, Mutationsprobe rot).
+- [x] 6.3 `raeumen()` markiert Vorgemerktes mit `refetchType: 'none'` statt es zu verwerfen.

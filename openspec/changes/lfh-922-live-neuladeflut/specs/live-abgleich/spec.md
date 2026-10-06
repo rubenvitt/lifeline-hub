@@ -10,16 +10,30 @@ Neuabrufen reagiert, damit das Lagebild aktuell bleibt, ohne Leitung und Server 
 
 Das Frontend SHALL die Abfragen, die ein Live-Ereignis betrifft, in einem Sammelfenster von
 höchstens 500 ms zusammenfassen und jede betroffene Abfrage am Ende des Fensters genau einmal als
-veraltet markieren. Ein Abruf, der zu dieser Zeit schon läuft, MUST NOT abgebrochen und neu
-gestartet werden. Das gilt für Einsatz- und Org-Ereignisse in beiden Live-Strömen.
+veraltet markieren. Das gilt für Einsatz- und Org-Ereignisse in beiden Live-Strömen.
 
 #### Scenario: Nachlieferung nach einem Funkloch
 - **WHEN** ein Tab nach einem Funkloch 50 ETB-Ereignisse innerhalb von 200 ms erhält
 - **THEN** ruft er jede betroffene Abfrage höchstens einmal neu ab
 
+### Requirement: Laufende Abrufe bleiben stehen und verdecken nichts
+
+Läuft am Ende eines Sammelfensters für eine betroffene Abfrage schon ein Abruf, MUST NOT das
+Frontend ihn abbrechen und neu starten. Es SHALL die Abfrage stattdessen im nächsten Fenster
+markieren, damit der laufende Abruf eine später gemeldete Änderung nicht verdeckt.
+
 #### Scenario: Langsame Leitung
 - **WHEN** während eines laufenden Abrufs der ETB-Liste ein weiteres `etb`-Ereignis eintrifft
-- **THEN** läuft der begonnene Abruf zu Ende, und es wird kein zweiter parallel gestartet
+- **THEN** läuft der begonnene Abruf zu Ende, es wird kein zweiter parallel gestartet, und danach ruft der Tab die Liste genau einmal neu ab
+
+### Requirement: Ein Verbindungsende markiert Vorgemerktes als veraltet
+
+Endet eine Live-Verbindung, bevor ihr Sammelfenster abläuft, SHALL das Frontend die vorgemerkten
+Abfragen als veraltet markieren und MUST NOT sie dafür abrufen.
+
+#### Scenario: Einsatz kurz verlassen
+- **WHEN** ein `etb`-Ereignis eintrifft, der Disponent den Einsatz binnen 300 ms verlässt und gleich wieder öffnet
+- **THEN** gilt die ETB-Liste als veraltet und wird beim Öffnen neu abgerufen
 
 ### Requirement: Alarme und Status wirken sofort
 
@@ -47,8 +61,9 @@ sichtbar, MUST er jede veraltete Abfrage, die er gerade anzeigt, genau einmal ne
 ### Requirement: Der Einsatz-Strom nennt beim Aufbau seine Position
 
 Der Live-Strom eines Einsatzes SHALL dem Browser beim Aufbau die aktuelle Position des
-Einsatz-Kanals mitteilen, ohne ein Ereignis auszulösen. Ein Neuaufbau durch den Browser MUST damit
-auch dann eine `Last-Event-ID` mitschicken, wenn der Tab seit dem Aufbau kein Ereignis erhalten hat.
+Einsatz-Kanals als eigenes Kontroll-Ereignis `position` mitteilen, das keinen Abgleich auslöst. Ein
+Neuaufbau durch den Browser MUST damit auch dann eine `Last-Event-ID` mitschicken, wenn der Tab seit
+dem Aufbau kein Fach-Ereignis erhalten hat, in jeder Browser-Engine.
 
 #### Scenario: Neuverbinden ohne zwischenzeitliches Ereignis
 - **WHEN** ein Tab den Strom öffnet, kein Ereignis erhält und der Browser mit der mitgeteilten Position neu verbindet
@@ -56,8 +71,9 @@ auch dann eine `Last-Event-ID` mitschicken, wenn der Tab seit dem Aufbau kein Er
 
 ### Requirement: Wiederaufbau gleicht nur ab, was der Server nicht nachliefert
 
-Verbindet der Browser die Verbindung von sich aus neu, SHALL das Frontend die Einsatz-Abfragen nicht
-voll abgleichen, sondern sich auf die Nachlieferung des Servers oder dessen `lagged` verlassen. Baut
+Verbindet der Browser die Verbindung von sich aus neu, nachdem sie ihre Position erhalten hat, SHALL
+das Frontend die Einsatz-Abfragen nicht voll abgleichen, sondern sich auf die Nachlieferung des
+Servers oder dessen `lagged` verlassen. Hat die Verbindung ihre Position noch nicht erhalten oder baut
 das Frontend die Verbindung selbst neu auf, MUST es voll abgleichen. Die live geführten globalen
 Abfragen MUST nach jedem Wiederaufbau abgeglichen werden.
 
@@ -72,6 +88,10 @@ Abfragen MUST nach jedem Wiederaufbau abgeglichen werden.
 #### Scenario: Server-Neustart
 - **WHEN** der Server neu startet und der Browser neu verbindet
 - **THEN** meldet der Server `lagged`, und der Tab gleicht alle Abfragen genau einmal ab
+
+#### Scenario: Abriss vor der Position
+- **WHEN** die Verbindung abreißt, bevor der Server ihre Position gemeldet hat, und der Browser neu verbindet
+- **THEN** gleicht der Tab alle Abfragen ab
 
 #### Scenario: Neue Verbindung nach Fehler
 - **WHEN** der Browser aufgibt und das Frontend eine neue Verbindung aufbaut

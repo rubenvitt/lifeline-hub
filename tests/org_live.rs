@@ -20,7 +20,8 @@ struct Frame {
     data: String,
 }
 
-/// Zerlegt einen SSE-Ausschnitt in Frames mit `event:`; reine Kommentar-Frames fallen weg.
+/// Zerlegt einen SSE-Ausschnitt in Frames mit `event:`; reine Kommentar-Frames und die Position
+/// des Einsatz-Stroms (Kontroll-Ereignis `position`, LFH-922) fallen weg.
 fn frames(roh: &str) -> Vec<Frame> {
     roh.split("\n\n")
         .filter_map(|block| {
@@ -36,7 +37,9 @@ fn frames(roh: &str) -> Vec<Frame> {
                     data.push_str(v);
                 }
             }
-            event.map(|event| Frame { id, event, data })
+            event
+                .filter(|e| e != "position")
+                .map(|event| Frame { id, event, data })
         })
         .collect()
 }

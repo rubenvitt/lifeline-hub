@@ -158,9 +158,10 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
 
     // Reconnect-Resync (LFH-922, design.md D3): eine neue Verbindung hat keine `Last-Event-ID`
-    // und gleicht ab wie `lagged`. Verbindet der Browser dieselbe Quelle neu, liefert der Server
-    // das Verpasste per `Last-Event-ID` nach oder meldet `lagged`; dann laden nur die Org-Keys
-    // nach, die keinen Nachlieferweg haben. Der Erst-Open lädt nur die Org-Keys nach (die
+    // und gleicht ab wie `lagged`. Verbindet der Browser dieselbe Quelle neu, nachdem sie ihre
+    // Position (`position`, D4) erhalten hat, liefert der Server das Verpasste per
+    // `Last-Event-ID` nach oder meldet `lagged`; dann laden nur die Org-Keys nach, die keinen
+    // Nachlieferweg haben. Der Erst-Open lädt nur die Org-Keys nach (die
     // Einsatz-Abfragen laden beim Mount ohnehin): ein Org-Ereignis kann beim Wechsel aus dem
     // Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734).
     const orgAbgleich = () => invalidiereOrgLiveKeys(sammler);
@@ -170,6 +171,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         listeners,
         beiWiederaufbau: vollabgleich,
         beiNachlieferung: orgAbgleich,
+        positionsEreignis: 'position',
         beimErstenOpen,
         istEndzustand: einsatzUnerreichbar,
         beiEndzustand: () => {

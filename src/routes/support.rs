@@ -553,6 +553,11 @@ pub fn last_event_id(headers: &HeaderMap) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// Wire-Name des Kontroll-Ereignisses, das die Position eines Einsatz-Stroms trägt (LFH-922).
+/// Kein [`LiveEvent`]: es gehört keinem Modul, läuft an jedem Filter vorbei und löst keinen
+/// Abgleich aus; der Client hört es nur in `frontend/src/live/liveVerbindung.ts`.
+pub const POSITION_EREIGNIS: &str = "position";
+
 /// Baut den SSE-Ausgabe-Stream mit vorangestelltem Replay (F14/LFH-263): verpasste
 /// Nachrichten (`Replay::Events`) werden VOR dem Live-Kanal ausgeliefert; eine `Luecke`
 /// (Ring-Overflow / Neustart) sendet genau ein `lagged`/`resync`-Signal (Client resynct per
@@ -560,9 +565,11 @@ pub fn last_event_id(headers: &HeaderMap) -> Option<String> {
 /// Der Modul-Filter `erlaubt` greift auf BEIDEN Wegen — Replay-Prefix und Live-Tail.
 /// Sonst wäre ein Reconnect mit `Last-Event-ID` ein Bypass des Gates (F01/LFH-227).
 ///
-/// Nach dem Replay folgt die `position` des Abonnements als Frame nur mit `id:` (LFH-922,
-/// design.md D4): der Browser übernimmt sie als `Last-Event-ID`, ein Listener feuert nicht.
-/// Sie deckt auch Nachrichten ab, die der Filter verschluckt hat.
+/// Nach dem Replay folgt die `position` des Abonnements als Kontroll-Ereignis
+/// [`POSITION_EREIGNIS`] mit `id:` und Daten (LFH-922, design.md D4): erst ein Frame mit Daten
+/// setzt die `Last-Event-ID` in jeder Engine (WebKit übernimmt die `id` eines Frames ohne Daten
+/// nicht), und der Client erfährt so, dass der Server ab hier nachliefern kann. Die Position deckt
+/// auch Nachrichten ab, die der Filter verschluckt hat.
 pub fn sse_stream_mit_replay(
     replay: Replay,
     rx: Receiver<LiveNachricht>,
@@ -585,7 +592,10 @@ pub fn sse_stream_mit_replay(
             .event(LiveEvent::Lagged.as_str())
             .data("resync"))],
     };
-    prefix.push(Ok(Event::default().id(position)));
+    prefix.push(Ok(Event::default()
+        .id(position)
+        .event(POSITION_EREIGNIS)
+        .data("{}")));
     tokio_stream::iter(prefix).chain(sse_event_stream(rx, erlaubt))
 }
 

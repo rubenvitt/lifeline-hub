@@ -91,13 +91,43 @@ describe('erzeugeLiveSammler (LFH-922)', () => {
     );
   });
 
-  it('räumen vor dem Ablauf verwirft das Vorgemerkte', () => {
+  it('räumen vor dem Ablauf markiert das Vorgemerkte nur und beendet das Fenster', () => {
     const { spy, sammler } = aufbau();
     sammler.vormerken(['etb', 1]);
+    sammler.vormerken(['etb', 1]);
     sammler.raeumen();
-    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS * 2);
-    expect(spy).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(
+      { queryKey: ['etb', 1], refetchType: 'none' },
+      { cancelRefetch: false },
+    );
     expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS * 2);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('räumen ohne Vorgemerktes ruft nichts auf', () => {
+    const { spy, sammler } = aufbau();
+    sammler.raeumen();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('legt einen Key mit laufendem Abruf ins nächste Fenster, statt sich anzuhängen', () => {
+    const { qc, spy, sammler } = aufbau();
+    const laeuft = vi.spyOn(qc, 'isFetching').mockReturnValueOnce(1).mockReturnValue(0);
+    sammler.vormerken(['etb', 1]);
+    sammler.vormerken(['einsaetze']);
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(laeuft).toHaveBeenCalledWith({ queryKey: ['etb', 1] });
+    expect(spy.mock.calls.map((c) => c[0]?.queryKey)).toEqual([['einsaetze']]);
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy.mock.calls.map((c) => c[0]?.queryKey)).toEqual([['einsaetze'], ['etb', 1]]);
+    expect(spy).toHaveBeenLastCalledWith(
+      { queryKey: ['etb', 1], refetchType: 'active' },
+      { cancelRefetch: false },
+    );
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS * 3);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it('markiert die Abfrage tatsächlich als veraltet', () => {

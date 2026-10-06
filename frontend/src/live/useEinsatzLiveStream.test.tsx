@@ -539,6 +539,7 @@ describe('useEinsatzLiveStream', () => {
     );
     const quelle = FakeEventSource.letzte!;
     quelle.emit('open'); // erstes open
+    quelle.emit('position', '{}'); // der Server hat seine Position genannt
     vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     spy.mockClear();
     quelle.emitError(FakeEventSource.CONNECTING);
@@ -549,6 +550,30 @@ describe('useEinsatzLiveStream', () => {
     expect(keys).toContainEqual(['einsaetze']);
     expect(keys).toContainEqual(['fahrzeuge']);
     expect(FakeEventSource.instanzen).toHaveLength(1);
+  });
+
+  // Riss die Leitung vor der Position, kennt der Browser keine `Last-Event-ID`: der Server
+  // liefert dann nichts nach, also gleicht der Tab ab wie bei einer neuen Verbindung.
+  it('gleicht beim Neuaufbau ohne erhaltene Position voll ab (LFH-922)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    spy.mockClear();
+    quelle.emitError(FakeEventSource.CONNECTING);
+    quelle.emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 3]));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-uhs', 3]));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
   });
 
   it('gleicht nach einem Neuaufbau mit neuer Verbindung alle Registry-Keys ab (F14)', async () => {
@@ -1132,7 +1157,7 @@ describe('useEinsatzLiveStream', () => {
     expect(spy).toHaveBeenCalledWith(...abgleich(['organisation']));
   });
 
-  it('verwirft beim Unmount Vorgemerktes, statt nach dem Abbau abzurufen (LFH-922)', () => {
+  it('markiert beim Unmount Vorgemerktes nur, statt nach dem Abbau abzurufen (LFH-922)', () => {
     vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
@@ -1144,7 +1169,8 @@ describe('useEinsatzLiveStream', () => {
     );
     FakeEventSource.letzte!.emit('etb');
     unmount();
+    expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 7], 'none'));
     vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
-    expect(spy).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalledWith(...abgleich(['etb', 7]));
   });
 });

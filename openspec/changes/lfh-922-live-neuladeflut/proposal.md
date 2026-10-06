@@ -26,7 +26,7 @@ wird wiederhergestellt“.
   Fehler) gleicht weiter voll ab. Die Org-Abfragen gleichen bei jedem Wiederaufbau weiter ab, sie
   haben keinen Nachlieferweg.
 - **Jede Einsatz-Verbindung hat eine Position:** Der Einsatz-Strom teilt dem Browser beim Aufbau
-  die aktuelle Ereignis-Nummer des Kanals mit (ein `id:`-Feld ohne Daten). So schickt auch ein Tab,
+  die aktuelle Ereignis-Nummer des Kanals mit (Kontroll-Ereignis `position` mit `id:`). So schickt auch ein Tab,
   der noch kein Ereignis empfangen hat, beim Neuverbinden eine `Last-Event-ID`.
 - **Kurzer Abriss ohne Hinweis:** Der Hinweis „wird wiederhergestellt“ erscheint erst, wenn die
   Verbindung nach einer Schonfrist von 8 s nicht wieder steht. Ein planmäßiges Ende der
@@ -56,4 +56,5 @@ abzurufen, gilt unverändert.
   Tests; Regel in `frontend/AGENTS.md`, „Query-Key-Registry“.
 - Backend: `src/live/mod.rs` (Position beim Abonnieren), `src/routes/support.rs`
   (`sse_stream_mit_replay`), `src/routes/live.rs`; Tests in `tests/live_feed.rs`.
-- Keine Migration, keine API-Änderung außer dem zusätzlichen `id:`-Feld im Einsatz-Strom.
+- Keine Migration, keine API-Änderung außer dem zusätzlichen Kontroll-Ereignis `position` im
+  Einsatz-Strom.

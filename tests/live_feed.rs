@@ -223,7 +223,7 @@ async fn strom_endet_nach_der_lebensdauer_und_der_reconnect_holt_nach() {
     let nachgeholt = bis_zum_ende(wieder, Duration::from_secs(5)).await;
     let ids: Vec<String> = sse_frames(&nachgeholt)
         .into_iter()
-        .filter(|f| f.event.is_some())
+        .filter(|f| f.event.is_some() && !ist_position(f))
         .filter_map(|f| f.id)
         .collect();
     assert_eq!(
@@ -321,9 +321,10 @@ fn sse_frames(roh: &str) -> Vec<SseFrame> {
         .collect()
 }
 
-/// Ist das Frame eine reine Position: nur `id:`, kein Ereignis und keine Daten?
+/// Ist das Frame die Position: das Kontroll-Ereignis `position` mit `id:` und Daten? Erst Daten
+/// lassen jede Engine die `id` übernehmen (WebKit nicht ohne).
 fn ist_position(f: &SseFrame) -> bool {
-    f.id.is_some() && f.event.is_none() && f.data.is_none() && f.retry.is_none() && !f.kommentar
+    f.event.as_deref() == Some("position") && f.id.is_some() && f.data.is_some()
 }
 
 /// Öffnet den Einsatz-Strom, liest seinen Anfang und liefert die Position (LFH-922).
@@ -339,8 +340,8 @@ async fn position_lesen(app: &axum::Router, feed: &str, cookie: &str) -> String 
 }
 
 /// Der Einsatz-Strom nennt beim Aufbau seine Position (LFH-922, design.md D4): nach dem
-/// Kommentar `verbunden` und dem `retry:` ein Frame nur mit `id:`. Der Browser übernimmt es
-/// als `Last-Event-ID`, ohne dass ein Listener feuert. Das erste Frame bleibt reiner Kommentar.
+/// Kommentar `verbunden` und dem `retry:` das Kontroll-Ereignis `position` mit `id:`. Der Browser
+/// übernimmt es als `Last-Event-ID`. Das erste Frame bleibt reiner Kommentar.
 #[tokio::test]
 async fn einsatz_strom_nennt_beim_aufbau_seine_position() {
     let app = setup().await;
@@ -390,6 +391,7 @@ async fn neuverbinden_mit_der_position_holt_genau_das_verpasste() {
     let anfang = common::sse_anfang_lesen(still.into_body(), 300).await;
     let ereignisse: Vec<_> = sse_frames(&anfang)
         .into_iter()
+        .filter(|f| !ist_position(f))
         .filter_map(|f| f.event)
         .collect();
     assert!(ereignisse.is_empty(), "nichts nachzuliefern: {anfang:?}");
@@ -399,6 +401,7 @@ async fn neuverbinden_mit_der_position_holt_genau_das_verpasste() {
     let anfang = common::sse_anfang_lesen(wieder.into_body(), 300).await;
     let ereignisse: Vec<_> = sse_frames(&anfang)
         .into_iter()
+        .filter(|f| !ist_position(f))
         .filter_map(|f| f.event)
         .collect();
     assert_eq!(

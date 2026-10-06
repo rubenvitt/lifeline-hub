@@ -41,8 +41,12 @@ Server antwortet dann mit `Replay::Keine`, und verpasste Ereignisse sind weg.
 Neuer Baustein `frontend/src/live/liveInvalidierung.ts`: `erzeugeLiveSammler(qc)` liefert
 `vormerken(queryKey)` und `raeumen()`. Vorgemerkte Keys liegen in einer `Map` über `hashKey`; das
 erste Vormerken startet einen Timer von 300 ms, weitere Keys schließen sich an. Beim Ablauf
-invalidiert der Sammler jeden Key einmal und leert die Map. `raeumen()` (Effekt-Cleanup) löscht
-Timer und Map, ohne zu invalidieren: Die Verbindung ist dann ohnehin weg.
+invalidiert der Sammler jeden Key einmal und leert die Map. Läuft für einen Key gerade ein Abruf
+(`qc.isFetching`), wandert er ins nächste Fenster: mit `cancelRefetch: false` hinge sich die
+Invalidierung sonst an einen Abruf, der vor der gemeldeten Änderung gelesen haben kann, und dessen
+Erfolg nähme die Markierung wieder weg (Review). `raeumen()` (Effekt-Cleanup) löscht den Timer und
+markiert Vorgemerktes nur (`refetchType: 'none'`): wer binnen `staleTime` zurückkehrt, sieht keinen
+alten Stand als frisch.
 
 - **Festes Fenster statt nachlaufender Entprellung:** Eine Entprellung, die jedes Ereignis neu
   aufzieht, hielte bei einem Dauerstrom (Sammelerfassung) die Anzeige beliebig lange an. Das feste
@@ -73,8 +77,9 @@ Fenster verdeckt, ruft er nicht mehr ab.
 
 `liveVerbindung.ts` unterscheidet zwei Arten von Folge-Opens:
 
-- **Browser-Neuaufbau:** dieselbe `EventSource` öffnet erneut. Der Browser schickt die zuletzt
-  bekannte `Last-Event-ID`; der Server liefert nach oder sendet `lagged`. Neue Option
+- **Browser-Neuaufbau:** dieselbe `EventSource` öffnet erneut, nachdem sie ihre Position (D4)
+  erhalten hat. Der Browser schickt die zuletzt bekannte `Last-Event-ID`; der Server liefert nach
+  oder sendet `lagged`. Ohne erhaltene Position gilt der Neuaufbau als Frontend-Neuaufbau. Neue Option
   `beiNachlieferung` (Vorgabe: `beiWiederaufbau`). Der Einsatz-Strom gleicht darin nur die
   Org-Keys ab, der Org-Strom wie bisher seine Org-Keys.
 - **Frontend-Neuaufbau:** eine neue `EventSource` nach `probeUndReconnect` oder nach einem
@@ -88,9 +93,12 @@ ohne Daten erreicht keinen Listener. Die Art des Opens ist das verlässlichere M
 
 `LiveHub::abonniere_mit_position` liefert neben Replay und Empfänger die Kennung der zuletzt
 vergebenen Nummer des Kanals (`"{epoch}-{naechste_id - 1}"`), ermittelt unter derselben Sperre wie
-Replay und `subscribe()`; `abonniere_mit_replay` bleibt als dünner Wrapper ohne Position. `sse_stream_mit_replay` sendet sie nach dem Replay-Vorspann als Ereignis nur mit
-`id:` (kein `event:`, kein `data:`). Der Browser übernimmt sie als `Last-Event-ID`, ein Listener
-feuert nicht.
+Replay und `subscribe()`; `abonniere_mit_replay` bleibt als dünner Wrapper ohne Position. `sse_stream_mit_replay` sendet sie nach dem Replay-Vorspann als Kontroll-Ereignis `position` mit
+`id:` und `data: {}`. Ein Frame nur mit `id:` reichte nach der Spezifikation, aber WebKit (Safari,
+Tauri auf macOS und Linux) übernimmt die `id` erst mit einem ausgelösten Ereignis (Review). Das
+Frontend merkt sich je Quelle, ob die Position kam: nur dann ist ein Browser-Neuaufbau eine
+Nachlieferung (D3). Riss die Leitung davor, gleicht es voll ab. `position` ist kein `LiveEvent`:
+es gehört keinem Modul und läuft an jedem Filter vorbei.
 
 - Das erste Frame bleibt der Kommentar `verbunden` (LFH-624), danach `retry:` (LFH-920), dann der
   Replay, dann die Position, dann der Live-Teil.

@@ -627,8 +627,8 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   Spec `live-abgleich`): je Key ein Abgleich je 300-ms-Fenster, `cancelRefetch: false`, verdeckte
   Tabs markieren nur. Seiteneffekte (Ton, Toast, Status) bleiben sofort. Spätere Live-Abnehmer
   (Modulzähler, ETB-Zeitachse, Meldungen) übernehmen ihn, statt eigene Timer zu bauen. Ein
-  Neuaufbau des Browsers gleicht im Einsatz-Strom nur die Org-Keys ab (der Server liefert per
-  `Last-Event-ID` nach), eine neue Verbindung voll.
+  Neuaufbau des Browsers nach dem Kontroll-Ereignis `position` gleicht im Einsatz-Strom nur die
+  Org-Keys ab (der Server liefert per `Last-Event-ID` nach), sonst und bei neuer Verbindung voll.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der
