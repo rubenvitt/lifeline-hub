@@ -1,9 +1,5 @@
 import { Button, Popconfirm, Space, Typography } from 'antd';
-import {
-  istPfadGesperrt,
-  istSprungGesperrt,
-  KEINE_BERECHTIGUNG,
-} from '../../einsatz/modulRegistry';
+import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { useId, useMemo } from 'react';
 import { renderSvg } from '@einsatzzeichen/core';
@@ -14,6 +10,7 @@ import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import { Link } from 'react-router';
+import { GesperrterSprung } from '../../components/Sprung';
 import { etbPfad } from '../../routing/deeplinks';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
@@ -297,17 +294,12 @@ export default function Inspector({
         >
           {/* `display: block` am inline-Anker, sonst bliebe die Zeile auf Textbreite. Das ↗
               steht `aria-hidden`. */}
+          {/* Gesperrt nennt der Sprung seinen Grund im sichtbaren Text (`GesperrterSprung`); das
+              Raster lässt ihn die Breite füllen wie den freien Knopf. */}
           {fachmodulGesperrt ? (
-            <Button
-              type="primary"
-              block
-              disabled
-              title={KEINE_BERECHTIGUNG}
-              style={{ flex: '1 1 auto', width: 'auto' }}
-            >
-              {fachmodulText}
-              <span aria-hidden="true">↗</span>
-            </Button>
+            <div style={{ display: 'grid', flex: '1 1 auto' }}>
+              <GesperrterSprung>{fachmodulText}</GesperrterSprung>
+            </div>
           ) : (
             <Link to={modulLink} style={{ display: 'block', flex: '1 1 auto' }}>
               <Button type="primary" block>
@@ -317,15 +309,9 @@ export default function Inspector({
             </Link>
           )}
           {marker.typ === 'einheit' && etbGesperrt && (
-            <Button
-              block
-              disabled
-              title={KEINE_BERECHTIGUNG}
-              aria-label={`Einsatztagebuch zu ${marker.label}`}
-              style={{ flex: '1 1 auto', width: 'auto' }}
-            >
-              ETB<span aria-hidden="true">↗</span>
-            </Button>
+            <div style={{ display: 'grid', flex: '1 1 auto' }}>
+              <GesperrterSprung>ETB</GesperrterSprung>
+            </div>
           )}
           {marker.typ === 'einheit' && !etbGesperrt && (
             // Der zugängliche Name trägt die Einheit: „ETB" allein sagte nicht, wessen.
