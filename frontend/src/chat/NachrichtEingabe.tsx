@@ -1,7 +1,7 @@
 import { IconBueroklammer } from '../icons';
 import { Button, Input, Space, Upload } from 'antd';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
-import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
+import { istZuLang, zeichenGrenze, Zeichenzaehler } from '../components/zeichenGrenze';
 import type { UploadFile } from 'antd';
 import { useRef, useState } from 'react';
 
@@ -59,7 +59,9 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
           onChange={(e) => setText(e.target.value)}
           placeholder="Nachricht…"
           // Grenze des Servers (LFH-937): eine Nachricht kann zum ETB-Eintrag heraufgestuft werden.
-          count={zeichenGrenze(ETB_INHALT_MAX)}
+          // Ohne eingebauten Zähler: der legte das Feld in einen Rahmen, und das Textfeld verlöre
+          // die 72-px-Trefffläche im Handschuh-Betrieb; der Zähler steht unter der Zeile.
+          count={zeichenGrenze(ETB_INHALT_MAX, { zaehler: false })}
           autoSize={{ minRows: 1, maxRows: 4 }}
           onPressEnter={(e) => {
             if (!e.shiftKey) {
@@ -72,6 +74,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
           Senden
         </Button>
       </Space.Compact>
+      <Zeichenzaehler wert={text} max={ETB_INHALT_MAX} />
       <Upload
         multiple
         beforeUpload={() => false}
