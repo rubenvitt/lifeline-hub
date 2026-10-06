@@ -1,6 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { EtbEntwurf } from './entwurfModell';
+import { istLeer, zuWerte, type EtbEntwurf } from './entwurfModell';
 import { neueClientId } from '../../offline/clientId';
+import {
+  sicherEntfernen,
+  sicherLesen,
+  sicherSchluessel,
+  sicherSchreiben,
+} from '../../lib/sichererSpeicher';
 
 interface EntwurfDB extends DBSchema {
   entwuerfe: {
@@ -19,6 +25,24 @@ const AKTIV_PRAEFIX = 'etb-entwurf-aktiv-';
 
 export function aktivSchluessel(benutzerId: number, einsatzId: number): string {
   return `${AKTIV_PRAEFIX}${benutzerId}-${einsatzId}`;
+}
+
+/**
+ * Entfernt jeden Aktiv-Merker der Person, deren Einsatz keinen Entwurf mehr hat (LFH-941,
+ * design.md D8). Ein Merker zeigt sonst je besuchtem Einsatz auf einen längst verschwundenen
+ * Entwurf. Merker anderer Personen bleiben, sie gehen mit deren Abmelden.
+ */
+export function aktivMerkerAufraeumen(
+  benutzerId: number,
+  einsaetzeMitEntwurf: ReadonlySet<number>,
+): void {
+  const praefix = `${AKTIV_PRAEFIX}${benutzerId}-`;
+  // Gesperrter Speicher: `sicherSchluessel` ist leer, dann liegt dort auch kein Merker.
+  for (const k of sicherSchluessel()) {
+    if (!k.startsWith(praefix)) continue;
+    const einsatzId = Number(k.slice(praefix.length));
+    if (!einsaetzeMitEntwurf.has(einsatzId)) sicherEntfernen(k);
+  }
 }
 
 /**
@@ -43,8 +67,8 @@ interface Vorlaufeintrag {
 }
 
 function vorlaufLesen(id: string): Vorlaufeintrag | null {
+  const roh = sicherLesen(VORLAUF_PRAEFIX + id);
   try {
-    const roh = localStorage.getItem(VORLAUF_PRAEFIX + id);
     const wert: unknown = roh ? JSON.parse(roh) : null;
     return wert && typeof wert === 'object' ? (wert as Vorlaufeintrag) : null;
   } catch {
@@ -54,33 +78,22 @@ function vorlaufLesen(id: string): Vorlaufeintrag | null {
 
 /** Alle Entwurfs-ids mit offenem Vorlauf, gleich aus welchem Tab. */
 function vorlaufIds(): string[] {
-  try {
-    return Object.keys(localStorage)
-      .filter((k) => k.startsWith(VORLAUF_PRAEFIX))
-      .map((k) => k.slice(VORLAUF_PRAEFIX.length));
-  } catch {
-    return [];
-  }
+  return sicherSchluessel()
+    .filter((k) => k.startsWith(VORLAUF_PRAEFIX))
+    .map((k) => k.slice(VORLAUF_PRAEFIX.length));
 }
 
 /** Synchron — muss vor dem ersten `await` des Schreibauftrags stehen. */
 function vormerken(id: string, entwurf: EtbEntwurf | null): string {
   const stand = neueClientId();
-  try {
-    localStorage.setItem(VORLAUF_PRAEFIX + id, JSON.stringify({ stand, entwurf }));
-  } catch {
-    // Speicher voll oder gesperrt: dann trägt allein die IndexedDB, wie vor LFH-521.
-  }
+  // Speicher voll oder gesperrt: dann trägt allein die IndexedDB, wie vor LFH-521.
+  sicherSchreiben(VORLAUF_PRAEFIX + id, JSON.stringify({ stand, entwurf }));
   return stand;
 }
 
 function quittieren(id: string, stand: string): void {
   if (vorlaufLesen(id)?.stand !== stand) return;
-  try {
-    localStorage.removeItem(VORLAUF_PRAEFIX + id);
-  } catch {
-    // s. vormerken
-  }
+  sicherEntfernen(VORLAUF_PRAEFIX + id);
 }
 
 let dbPromise: Promise<IDBPDatabase<EntwurfDB>> | null = null;
@@ -143,8 +156,49 @@ async function vorlaufNachtragen(d: IDBPDatabase<EntwurfDB>): Promise<void> {
   for (const { id, stand } of offen) quittieren(id, stand);
 }
 
+/** Ab wann ein leerer Entwurf als liegen geblieben gilt (LFH-941, design.md D8). */
+const LEER_LIEGEZEIT_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Räumt die leeren Entwürfe der Person, die länger als {@link LEER_LIEGEZEIT_MS} unverändert
+ * sind, über alle Einsätze, und danach die verwaisten Aktiv-Merker (LFH-941, design.md D8).
+ * Seit LFH-894 sichert die Erfassung keinen leeren Entwurf mehr; liegen bleiben Altentwürfe von
+ * davor und solche, die gewählte Dateien festhielten (die Dateien selbst liegen nie hier).
+ * Entwürfe mit Inhalt bleiben unabhängig vom Alter (LFH-767 D4). Gelöscht wird mit derselben
+ * Vorlauf-Disziplin wie {@link entwurfEntfernen} (LFH-521).
+ */
+async function leereAufraeumen(
+  d: IDBPDatabase<EntwurfDB>,
+  benutzerId: number,
+  jetzt: number,
+): Promise<void> {
+  const grenze = jetzt - LEER_LIEGEZEIT_MS;
+  const bereich = IDBKeyRange.bound([benutzerId, -Infinity], [benutzerId, Infinity]);
+  const gemerkt: { id: string; stand: string }[] = [];
+  const mitEntwurf = new Set<number>();
+  const tx = d.transaction('entwuerfe', 'readwrite');
+  let cursor = await tx.store.index('by-benutzer-einsatz').openCursor(bereich);
+  while (cursor) {
+    const e = cursor.value;
+    const zuletzt = Date.parse(e.geaendert_at ?? e.erstellt_at);
+    // Ein offener Vorlauf heißt: ein anderer Tab schreibt gerade an diesem Entwurf. Er gewinnt,
+    // `vormerken(id, null)` überschriebe sonst seinen Auftrag (LFH-521).
+    if (istLeer(zuWerte(e)) && zuletzt < grenze && !vorlaufLesen(e.id)) {
+      gemerkt.push({ id: e.id, stand: vormerken(e.id, null) });
+      await cursor.delete();
+    } else {
+      mitEntwurf.add(e.einsatz_id);
+    }
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+  for (const { id, stand } of gemerkt) quittieren(id, stand);
+  aktivMerkerAufraeumen(benutzerId, mitEntwurf);
+}
+
 /** Entwürfe einer Person in einem Einsatz, aufsteigend nach erstellt_at (älteste zuerst →
- *  stabile Tab-Reihenfolge). Fremde Entwürfe liefert der Index nie (LFH-767). */
+ *  stabile Tab-Reihenfolge). Fremde Entwürfe liefert der Index nie (LFH-767). Vorher räumt es
+ *  liegen gebliebene leere Entwürfe und verwaiste Merker der Person (LFH-941). */
 export async function entwuerfeLaden(benutzerId: number, einsatzId: number): Promise<EtbEntwurf[]> {
   const d = await db();
   try {
@@ -152,6 +206,12 @@ export async function entwuerfeLaden(benutzerId: number, einsatzId: number): Pro
   } catch (fehler) {
     // Ein unlesbarer Vorlauf darf die Erfassung nicht sperren; er bleibt für den nächsten Versuch.
     console.warn('ETB-Entwürfe: Vorlauf ließ sich nicht nachtragen', fehler);
+  }
+  try {
+    await leereAufraeumen(d, benutzerId, Date.now());
+  } catch (fehler) {
+    // Räumen ist Pflege, kein Teil des Ladens: ein Fehler darf die Erfassung nicht sperren.
+    console.warn('ETB-Entwürfe: leere Entwürfe ließen sich nicht räumen', fehler);
   }
   const alle = await d.getAllFromIndex('entwuerfe', 'by-benutzer-einsatz', [benutzerId, einsatzId]);
   return alle.sort((a, b) => a.erstellt_at.localeCompare(b.erstellt_at));
@@ -174,13 +234,10 @@ export async function entwurfEntfernen(id: string): Promise<void> {
 /** Abmelden (LFH-767, design.md D2): alle Entwürfe samt Vorlauf und Aktiv-Merkern. Wirft bei
  *  einem Plattenfehler — `geraetRaeumen` protokolliert ihn und räumt die übrigen Orte. */
 export async function entwuerfeRaeumen(): Promise<void> {
-  for (const id of vorlaufIds()) localStorage.removeItem(VORLAUF_PRAEFIX + id);
-  try {
-    for (const k of Object.keys(localStorage)) {
-      if (k.startsWith(AKTIV_PRAEFIX)) localStorage.removeItem(k);
-    }
-  } catch {
-    // localStorage gesperrt: dann liegt dort auch kein Merker.
+  // Gesperrter Speicher liefert keine Schlüssel: dann liegt dort auch kein Merker.
+  for (const id of vorlaufIds()) sicherEntfernen(VORLAUF_PRAEFIX + id);
+  for (const k of sicherSchluessel()) {
+    if (k.startsWith(AKTIV_PRAEFIX)) sicherEntfernen(k);
   }
   const d = await db();
   await d.clear('entwuerfe');
@@ -222,7 +279,7 @@ export async function entwuerfeAufraeumen(benutzerId: number | null, jetzt: numb
 
 /** Nur für Tests: leert den Store (fake-indexeddb persistiert sonst zwischen Tests). */
 export async function entwuerfeLeerenFuerTests(): Promise<void> {
-  for (const id of vorlaufIds()) localStorage.removeItem(VORLAUF_PRAEFIX + id);
+  for (const id of vorlaufIds()) sicherEntfernen(VORLAUF_PRAEFIX + id);
   const d = await db();
   await d.clear('entwuerfe');
 }
