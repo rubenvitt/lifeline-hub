@@ -13,14 +13,14 @@
 
 ## 3. Kopf und Betriebszeile kleben (D1)
 
-- [ ] 3.1 `EinsatzLayout`, `AppLayout`: Kopf ab `md` sticky mit `RAHMEN_EBENE`, Beobachter am Kopf; Tests
-- [ ] 3.2 `LiveStatusBanner`: unter `md` sticky bei Störung, Beobachter an der Zeile; Test
-- [ ] 3.3 `IconRail`: Hauptgruppe sticky unter `--lfh-rahmen-oben`; Test
+- [x] 3.1 `EinsatzLayout`, `AppLayout`: Kopf ab `md` sticky mit `RAHMEN_EBENE`, Beobachter am Kopf; Tests
+- [x] 3.2 `LiveStatusBanner`: unter `md` sticky bei Störung, Beobachter an der Zeile; Test
+- [x] 3.3 `IconRail`: Hauptgruppe sticky unter `--lfh-rahmen-oben`; Test
 
 ## 4. Fokusabstand (D3)
 
-- [ ] 4.1 `index.css`: `scroll-padding-block-start` am Dokument mit `:has`-Ausnahme für Fokus im Rahmen (D3)
-- [ ] 4.2 `e2e/fokus-verdeckung.spec.ts`: „Kopf verdeckt keinen Fokus“ (Shift+Tab bei 1366 × 520, Vorbedingung Stopps am Kopf) und „Tab durch den Kopf rollt nicht“; Mutationsprobe ohne Abstand dokumentieren
+- [x] 4.1 `index.css`: `scroll-padding-block-start` am Dokument mit `:has`-Ausnahme für Fokus im Rahmen (D3)
+- [x] 4.2 `e2e/fokus-verdeckung.spec.ts`: „Kopf verdeckt keinen Fokus“ (Shift+Tab bei 1366 × 520, Vorbedingung Stopps am Kopf) und „Tab durch den Kopf rollt nicht“; Mutationsprobe ohne Abstand dokumentieren
 
 ## 5. Modulpanel (D5)
 

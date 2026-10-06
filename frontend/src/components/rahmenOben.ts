@@ -21,6 +21,13 @@ export const RAHMEN_OBEN_VAR = '--lfh-rahmen-oben';
  */
 export const RAHMEN_EBENE = 100;
 
+/**
+ * Stil des klebenden Rahmens selbst: an der Fensterkante, auf {@link RAHMEN_EBENE}. Nur der Rahmen
+ * (Kopf ab `md`, Betriebszeile unter `md` im Störungsfall) trägt ihn; alles andere hängt sich mit
+ * `var(--lfh-rahmen-oben)` darunter.
+ */
+export const RAHMEN_KLEBT = { position: 'sticky', top: 0, zIndex: RAHMEN_EBENE } as const;
+
 const anteile = new Map<symbol, number>();
 const hoerer = new Set<() => void>();
 let summe = 0;

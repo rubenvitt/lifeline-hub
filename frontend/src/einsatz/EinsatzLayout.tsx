@@ -1,5 +1,5 @@
 import { IconMenue } from '../icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -28,6 +28,7 @@ import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
+import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
@@ -173,6 +174,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Unter `md` rücken die Zellen zusammen, sonst bräche die rechte Gruppe auf 390 px in eine
   // dritte Zeile.
   const zellToken = mittel ? token : { padding: token.paddingXS };
+  // Ab `md` bleibt der Kopf beim Rollen stehen (LFH-952, `frontend/AGENTS.md`, Rahmen); seine
+  // gemessene Höhe ist `--lfh-rahmen-oben`, unter der alles hängt, was selbst oben klebt.
+  const kopfRef = useRef<HTMLElement>(null);
+  useRahmenObenQuelle(kopfRef, mittel);
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
@@ -291,7 +296,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={KOPF_STIL}>
+      <Header
+        ref={kopfRef}
+        data-lfh="rahmen-kopf"
+        style={mittel ? { ...KOPF_STIL, ...RAHMEN_KLEBT } : KOPF_STIL}
+      >
         {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Bei Platzmangel
            bricht die rechte Gruppe um; die linke wächst stärker als die Suche, damit der Name erst
            spät kürzt. */}

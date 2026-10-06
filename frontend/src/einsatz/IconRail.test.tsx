@@ -109,6 +109,20 @@ describe('IconRail', () => {
     expect(fuss.querySelector('button')).toHaveAttribute('aria-label', 'Einstellungen');
   });
 
+  it('die Kategorien kleben unter dem Rahmen, der Fuß bleibt unten (LFH-952)', () => {
+    renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Kategorien' });
+    const haupt = nav.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
+    expect(haupt).not.toBeNull();
+    expect(haupt.style.position).toBe('sticky');
+    expect(haupt.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
+    // Fünf Kategorien in der Gruppe, „Einstellungen“ nicht: es steht im Fuß.
+    expect(haupt.querySelectorAll('button')).toHaveLength(5);
+    expect(haupt.querySelector('[aria-label="Einstellungen"]')).toBeNull();
+  });
+
   it('meldet Klick mit dem Kategorie-Key', async () => {
     const onKlick = vi.fn();
     renderMitProviders(

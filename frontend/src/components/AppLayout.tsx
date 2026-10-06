@@ -1,11 +1,12 @@
 import { IconSchloss } from '../icons';
 import { Layout, Tag, Typography, theme } from 'antd';
-import type { CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import BenutzerMenu from './BenutzerMenu';
+import { RAHMEN_KLEBT, useRahmenObenQuelle } from './rahmenOben';
 import CommandPaletteTrigger from './CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
@@ -126,6 +127,9 @@ export default function AppLayout() {
   // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite
   // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
   const zellToken = mittel ? token : { padding: token.paddingXS };
+  // Ab `md` bleibt der Kopf stehen wie im Einsatz-Workspace (LFH-952, `frontend/AGENTS.md`, Rahmen).
+  const kopfRef = useRef<HTMLElement>(null);
+  useRahmenObenQuelle(kopfRef, mittel);
   // Der Verwaltungs-Link ist ein handgebautes Bedienziel: ZWEI Angaben (LFH-365). Farbe aus der
   // Nachtrolle, weil die Leiste in beiden Modi dunkel ist.
   const linkStil: CSSProperties = {
@@ -143,7 +147,11 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={KOPF_STIL}>
+      <Header
+        ref={kopfRef}
+        data-lfh="rahmen-kopf"
+        style={mittel ? { ...KOPF_STIL, ...RAHMEN_KLEBT } : KOPF_STIL}
+      >
         {/* LINKE GRUPPE: Marke, Wortmarke (Link zur Einsatzliste), Verwaltung. */}
         <div style={{ display: 'flex', alignItems: 'stretch', flex: '1 1 auto', minWidth: 0 }}>
           <Markenzelle />

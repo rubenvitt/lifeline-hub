@@ -197,6 +197,30 @@ describe('EinsatzLayout', () => {
   });
 
   /**
+   * LFH-952 (D1): ab `md` klebt der Kopf über dem Inhalt, unter `md` rollt er mit (am Handy wären
+   * ~140 px Kopf zu teuer). Die gemessene Höhe prüft `components/rahmenOben.test.tsx`, das Kleben
+   * im Browser `e2e/rahmen-stehen-bleiben.spec.ts`.
+   */
+  it('ab md klebt der Kopf auf der Rahmenebene (LFH-952)', async () => {
+    setup();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument(),
+    );
+    const kopf = screen.getByRole('banner');
+    expect(kopf).toHaveAttribute('data-lfh', 'rahmen-kopf');
+    expect(kopf).toHaveStyle({ position: 'sticky', top: '0px', zIndex: '100' });
+  });
+
+  it('unter md rollt der Kopf mit (Gegenprobe, LFH-952)', async () => {
+    setzeViewportBreite(390);
+    setup();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('banner').style.position).toBe('');
+  });
+
+  /**
    * Aufzeichnung am KLICK, nicht am Routenwechsel: der Speicher trägt Wahlen, keine Ankünfte.
    * Ein Deep-Link von außen füllt ihn deshalb nicht.
    */

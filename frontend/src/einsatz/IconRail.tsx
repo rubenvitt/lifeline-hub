@@ -130,7 +130,21 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         boxSizing: 'border-box',
       }}
     >
-      {haupt.map(ziel)}
+      {/* Die Kategorien bleiben beim Rollen unter dem klebenden Kopf stehen (LFH-952,
+         `frontend/AGENTS.md`, Rahmen); der Grund ist nötig, weil der Rest der Rail darunter
+         vorbeirollt. */}
+      <div
+        data-lfh="rail-haupt"
+        style={{
+          position: 'sticky',
+          top: 'var(--lfh-rahmen-oben, 0px)',
+          display: 'flex',
+          flexDirection: 'column',
+          background: rahmenFarben.grund,
+        }}
+      >
+        {haupt.map(ziel)}
+      </div>
       {fuss.length > 0 && (
         // `sticky; bottom: 0`: die Seite scrollt im Dokument, sonst stünde der Fuß auf einer langen
         // Seite am Seitenende. Auf kurzen Seiten schiebt ihn `marginTop: auto` ans Spaltenende. Der
