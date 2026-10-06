@@ -3464,6 +3464,144 @@ mod tests {
         pool
     }
 
+    // --- Migration 0154: karte_proxy_asset mit Herkunft, Verwaisung und AUTOINCREMENT (LFH-932) ---
+    //
+    // Alt-DB im 0077-Stand (FK-Zwang an), befüllt, dann die echte 0154.
+    #[tokio::test]
+    async fn migration_0154_karte_proxy_asset_rebuild_erhaelt_zeilen_und_vergibt_keine_id_neu() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .expect("In-Memory-Pool");
+        sqlx::raw_sql(
+            "CREATE TABLE karte_online_quelle (id INTEGER PRIMARY KEY); \
+             INSERT INTO karte_online_quelle (id) VALUES (1), (2); \
+             CREATE TABLE karte_proxy_asset ( \
+                 id           INTEGER PRIMARY KEY, \
+                 quelle_id    INTEGER NOT NULL REFERENCES karte_online_quelle(id) ON DELETE CASCADE, \
+                 upstream_url TEXT    NOT NULL, \
+                 art          TEXT    NOT NULL CHECK (art IN ('static', 'template', 'tilejson', 'sprite', 'glyphs')), \
+                 erstellt_at  TEXT    NOT NULL DEFAULT (datetime('now')), \
+                 UNIQUE (quelle_id, upstream_url, art)); \
+             INSERT INTO karte_proxy_asset (id, quelle_id, upstream_url, art, erstellt_at) VALUES \
+                 (1, 1, 'https://h/tj', 'tilejson', '2026-07-01 10:00:00'), \
+                 (2, 1, 'https://h/{z}', 'template', '2026-07-01 10:00:01'), \
+                 (7, 2, 'https://h/s', 'sprite', '2026-07-01 10:00:02');",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let migration = include_str!("../migrations/0154_karte_proxy_asset_herkunft.sql");
+        assert!(
+            migration.starts_with("-- no-transaction"),
+            "sqlx erkennt die Direktive nur am Dateianfang"
+        );
+        sqlx::raw_sql(migration)
+            .execute(&pool)
+            .await
+            .expect("0154 muss auf einer befüllten DB durchlaufen");
+
+        type Zeile = (i64, i64, String, String, String, Option<i64>, Option<i64>);
+        let zeilen: Vec<Zeile> = sqlx::query_as(
+            "SELECT id, quelle_id, upstream_url, art, erstellt_at, herkunft_id, verwaist_seit \
+             FROM karte_proxy_asset ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeilen,
+            vec![
+                (
+                    1,
+                    1,
+                    "https://h/tj".into(),
+                    "tilejson".into(),
+                    "2026-07-01 10:00:00".into(),
+                    None,
+                    None
+                ),
+                (
+                    2,
+                    1,
+                    "https://h/{z}".into(),
+                    "template".into(),
+                    "2026-07-01 10:00:01".into(),
+                    None,
+                    None
+                ),
+                (
+                    7,
+                    2,
+                    "https://h/s".into(),
+                    "sprite".into(),
+                    "2026-07-01 10:00:02".into(),
+                    None,
+                    None
+                ),
+            ],
+            "ids und Werte bleiben, damit ausgelieferte Proxy-URLs gültig bleiben"
+        );
+        let schema = schema_von(&pool, "karte_proxy_asset").await;
+        for erwartet in [
+            "fk:karte_proxy_asset|herkunft_id|id|SET NULL",
+            "fk:karte_online_quelle|quelle_id|id|CASCADE",
+            "index:idx_karte_proxy_asset_herkunft|0|c|herkunft_id",
+            "index:sqlite_autoindex_karte_proxy_asset_1|1|u|quelle_id,upstream_url,art",
+        ] {
+            assert!(
+                schema.contains(&erwartet.to_string()),
+                "{erwartet} fehlt: {schema:?}"
+            );
+        }
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'karte_proxy_asset_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'karte_proxy_asset_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+
+        // Die höchste id wird nach dem Löschen nicht neu vergeben.
+        sqlx::query("DELETE FROM karte_proxy_asset WHERE id = 7")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art, herkunft_id) \
+             VALUES (1, 'https://h/{z}?v=2', 'template', 1) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(neue_id, 8, "AUTOINCREMENT");
+
+        // Herkunft löst sich beim Löschen des TileJSON-Slots, die Zeile bleibt.
+        sqlx::query("DELETE FROM karte_proxy_asset WHERE id = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let herkunft: Option<i64> =
+            sqlx::query_scalar("SELECT herkunft_id FROM karte_proxy_asset WHERE id = 8")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(herkunft, None);
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+    }
+
     // --- Migration 0141: Leaf-Rebuild von person_zugriff_audit mit Art 'anhang' (LFH-757) ---
     //
     // Befüllt mit allen drei Bestandsarten, höchste Zeile gelöscht, dann die echte 0141.
