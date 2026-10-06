@@ -128,8 +128,20 @@ pub async fn andere_loeschen(
     Ok(ergebnis.rows_affected())
 }
 
+/// Löscht alle abgelaufenen Sitzungen (Purge-Lauf, Phase C2, LFH-928). Die Bedingung ist das
+/// Gegenstück zum Filter in [`sitzung_aus_token`]: was dort nicht mehr authentifiziert, fällt
+/// hier. Ohne diesen Lauf bliebe jede Anmeldung eines Geräts, das sich nie abmeldet, als Zeile
+/// mit Benutzer und Zeitpunkt für immer stehen. Liefert die Zahl gelöschter Sitzungen.
+pub async fn purge_abgelaufene(pool: &SqlitePool) -> Result<u64, sqlx::Error> {
+    let ergebnis = sqlx::query("DELETE FROM session WHERE expires_at <= datetime('now')")
+        .execute(pool)
+        .await?;
+    Ok(ergebnis.rows_affected())
+}
+
 /// Benutzer-ID hinter einem Session-Token, ohne Gültigkeitsprüfung. Für die Audit-Spur beim
-/// Logout, die den Benutzer VOR dem Löschen der Session bestimmen muss.
+/// Logout, die den Benutzer VOR dem Löschen der Session bestimmen muss. Eine abgelaufene Sitzung
+/// steht nur bis zum nächsten Purge-Lauf (Phase C2); danach bleibt der Logout ohne Benutzer.
 pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64> {
     sqlx::query_scalar("SELECT benutzer_id FROM session WHERE token_hash = ?")
         .bind(hash_token(token))
