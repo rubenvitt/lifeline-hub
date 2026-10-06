@@ -16,7 +16,9 @@
  *      bestätigt, eine Erinnerung erübrigt sich (Entscheidung 10).
  *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
- *   • Knopftexte aus Variablen oder Ausdrücken außer `…_STATUS[…].label`;
+ *   • Knopftexte aus Variablen oder Ausdrücken außer einem `.label` an einem Empfänger mit
+ *     „status“ im Namen ({@link STATUSLABEL}); ein Statuswort, das in eine anders benannte
+ *     Variable umgefüllt wird, bleibt unsichtbar;
  *   • JSX-Text mit `=`, `;`, `{` oder `<` darin (der Schnitt endet dort);
  *   • Dateien außerhalb von {@link KARTEN} und {@link ERINNERUNG_DATEIEN}.
  */
@@ -38,7 +40,19 @@ import { DIENSTSTATUS_HANDLUNG } from '../stammdaten/dienststatus';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const lies = (relativ: string) => readFileSync(join(SRC, relativ), 'utf-8');
 
-const norm = (s: string) => s.trim().toLocaleLowerCase('de');
+/** Getrimmt, klein, ohne Zeichen vor dem ersten und nach dem letzten Buchstaben („→ Zugesagt“). */
+const norm = (s: string) =>
+  s
+    .trim()
+    .replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '')
+    .toLocaleLowerCase('de');
+
+/**
+ * Ein Statuslabel als Ausdruck: jedes `.label` an einem Empfänger, der „status“ im Namen trägt —
+ * `NACHFORDERUNG_STATUS[next].label`, `AUFTRAG_STATUS.in_arbeit.label`, `status.label`,
+ * `dienststatus[t.dienststatus]!.label`.
+ */
+const STATUSLABEL = /\b\w*status\w*(?:\[[^\]]*\]|\.\w+)?[!?]?\.label\b/i;
 
 /** Statuswörter eines Moduls, normalisiert. */
 function woerter(status: Record<string, { label: string }>): Set<string> {
@@ -91,13 +105,12 @@ function knopfInhalte(quelle: string): string[] {
 function kartenVerstoesse(quelle: string, statuswoerter: Set<string>): string[] {
   const funde: string[] = [];
   for (const inhalt of knopfInhalte(quelle)) {
-    if (/\w+_STATUS\[[^\]]+\]\??\.label/.test(inhalt))
-      funde.push(`Statuslabel im Knopf: ${inhalt.trim()}`);
+    if (STATUSLABEL.test(inhalt)) funde.push(`Statuslabel im Knopf: ${inhalt.trim()}`);
     const text = inhalt.replace(/\{[\s\S]*?\}/g, ' ').trim();
     if (text && statuswoerter.has(norm(text))) funde.push(`Statuswort im Knopf: ${text}`);
   }
-  for (const m of quelle.matchAll(/label:\s*'([^']+)'/g)) {
-    if (statuswoerter.has(norm(m[1]))) funde.push(`Statuswort im Menü: ${m[1]}`);
+  for (const m of quelle.matchAll(/label:\s*(['"`])([^'"`]+)\1/g)) {
+    if (statuswoerter.has(norm(m[2]))) funde.push(`Statuswort im Menü: ${m[2]}`);
   }
   return funde;
 }
@@ -165,6 +178,16 @@ describe('Knöpfe nennen ihre Handlung (LFH-959)', () => {
         ),
         'Pfeil und Klammern im Kopf',
       ).toHaveLength(1);
+      expect(kartenVerstoesse('<Button>→ Zugesagt</Button>', w), 'Pfeil davor').toHaveLength(1);
+      expect(kartenVerstoesse('<Button>{status.label}</Button>', w)).toHaveLength(1);
+      expect(kartenVerstoesse('<Button>{AUFTRAG_STATUS.in_arbeit.label}</Button>', w)).toHaveLength(
+        1,
+      );
+      expect(
+        kartenVerstoesse('<Button>{dienststatus[t.dienststatus]!.label}</Button>', w),
+      ).toHaveLength(1);
+      expect(kartenVerstoesse('{ key: "z", label: "Unterwegs" }', w)).toHaveLength(1);
+      expect(kartenVerstoesse('<Button>{naechster.label}</Button>', w)).toEqual([]);
       expect(kartenVerstoesse('<Button>Zusage erfassen</Button>', w)).toEqual([]);
     });
   });

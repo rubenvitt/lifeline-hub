@@ -12,8 +12,18 @@ import { wechsleZuRolle } from './rollen-kern';
  * Gemessen als Admin UND als Beobachter (`frontend/e2e/AGENTS.md`, Layout-Gate
  * nicht-privilegiert): ohne Schreibrecht fehlen die Knöpfe, die Karte bleibt.
  *
- * Mutationsprobe: in `kommunikation/phase.ts` `ERINNERUNG_HANDLUNG.quittiert` auf „Quittieren"
- * zurückstellen → die Sichtbarkeit „Erübrigt (zur Kenntnis)" wird rot.
+ * Jeder Knopf wird zusätzlich probehalber angeklickt (`trial`): das prüft, dass nichts über ihm
+ * liegt — `toBeVisible` allein belegt das nicht.
+ *
+ * Die Erinnerung ist bewusst NICHT fällig (2030): eine fällige meldet die AlarmZentrale als
+ * stehenden Toast oben rechts, der über den Knöpfen läge (Falle wie in
+ * `abloesung-zufluss.spec.ts`). Die Knöpfe sind an offener und fälliger Erinnerung dieselben.
+ *
+ * Mutationsproben (beide gefahren):
+ *   • `ERINNERUNG_HANDLUNG.quittiert` in `kommunikation/phase.ts` zurück auf „Quittieren" → nur
+ *     der Admin-Test wird rot („Erübrigt (zur Kenntnis)" fehlt);
+ *   • in `erinnerung/ErinnerungKarte.tsx` den Riegel `darfSchreiben &&` vor den Aktionen
+ *     entfernen → nur der Beobachter-Test wird rot (Knöpfe ohne Schreibrecht).
  */
 
 const BREITEN = [
@@ -57,7 +67,7 @@ async function seede(page: Page): Promise<string> {
   await post(page, einsatzId, `meldungen/${meldungId}/status`, { status: 'gesichtet' });
   await post(page, einsatzId, 'erinnerungen', {
     titel: 'Lagemeldung an die Leitstelle',
-    faellig_at: '2026-01-01 10:00',
+    faellig_at: '2030-01-01 10:00',
   });
   await post(page, einsatzId, 'nachforderungen', {
     art: 'Fahrzeug',
@@ -97,6 +107,7 @@ async function pruefe(page: Page, einsatzId: string, rolle: 'admin' | 'beobachte
           continue;
         }
         await expect(knopf.first(), `${wo}: „${name}" als Wort`).toBeVisible();
+        await knopf.first().click({ trial: true, timeout: 5_000 });
         await innerhalbDerKarte(knopf.first(), `${wo} „${name}"`);
       }
       expect(await ueberhang(page), `${wo}: ohne Überhang`).toBeLessThanOrEqual(1);

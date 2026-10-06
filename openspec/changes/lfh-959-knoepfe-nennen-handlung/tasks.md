@@ -20,7 +20,7 @@
 
 ## 5. e2e
 
-- [ ] 5.1 Layout-Gate (`e2e/knopf-wortlaut.spec.ts`): Erinnerungen, Meldungen, Aufträge, Nachforderungen bei 390, 820, 1180 und 1440 ohne waagerechten Überhang der Aktionszeilen; Erinnerungsknöpfe als Wort sichtbar; als Beobachter über `e2e/rollen-kern.ts` mit der Vorbedingung, dass die Knöpfe fehlen.
+- [x] 5.1 Layout-Gate (`e2e/knopf-wortlaut.spec.ts`): Erinnerungen, Meldungen, Aufträge, Nachforderungen bei 390, 820, 1180 und 1440 ohne waagerechten Überhang der Aktionszeilen; Erinnerungsknöpfe als Wort sichtbar; als Beobachter über `e2e/rollen-kern.ts` mit der Vorbedingung, dass die Knöpfe fehlen.
 
 ## 6. Regel und Abschluss
 
