@@ -67,10 +67,6 @@ export default function OfflineVorhandeneModal({
       onCancel={onClose}
       destroyOnHidden
     >
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-        Übernimmt eine bereits im Karten-Verzeichnis liegende MBTiles-Datei (z. B. selbst mit
-        karten-build erzeugt) als Offline-Karte — ohne Download/Hosting. Danach aktivierbar.
-      </Typography.Paragraph>
       {vorhandeneQuery.isLoading ? (
         <div style={{ textAlign: 'center', padding: 24 }}>
           <Spin />

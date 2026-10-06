@@ -1,4 +1,4 @@
-import { App, Button, Modal, Spin, Tag, Tooltip, Typography } from 'antd';
+import { App, Button, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -58,7 +58,7 @@ function istRasterKarte(k: OfflineKarte): boolean {
 /**
  * Regions-Picker: EIN Weg, eine Region aufs Gerät zu bringen. Je Region ein adaptiver Button —
  * „Bauen & laden" (Bau, danach automatisch Download), „Laden", „Lädt…", „Baut…", „Auf dem
- * Gerät" oder „Nicht verfügbar".
+ * Gerät" oder „Kein Karten-Dienst".
  */
 export default function OfflineRegionPicker({
   offen,
@@ -135,7 +135,7 @@ export default function OfflineRegionPicker({
     onSuccess: (_res, { slug, name }) => {
       setVerkettung((prev) => new Map(prev).set(slug, name));
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('bau-status') });
-      message.success('Bau gestartet — die Region wird danach automatisch geladen');
+      message.success('Bau gestartet');
     },
     onError: (e) => message.error(fehlerText(e, 'Bau konnte nicht gestartet werden')),
   });
@@ -269,13 +269,11 @@ export default function OfflineRegionPicker({
         </Button>
       );
     }
-    // 5) Nicht gebaut und kein Bau möglich.
+    // 5) Nicht gebaut und kein Bau möglich: der Grund steht sichtbar da, kein Tooltip (Touch).
     return (
-      <Tooltip title="Diese Region ist noch nicht gebaut; der zentrale Karten-Dienst ist nicht konfiguriert.">
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          Nicht verfügbar
-        </Typography.Text>
-      </Tooltip>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        Kein Karten-Dienst
+      </Typography.Text>
     );
   };
 
@@ -288,12 +286,6 @@ export default function OfflineRegionPicker({
       destroyOnHidden
       width={560}
     >
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-        Wähle eine Region — sie wird (falls nötig) zuerst gebaut und danach automatisch aufs Gerät
-        geladen; danach ist sie ganz ohne Netz nutzbar. Mehrere Regionen erscheinen gemeinsam auf
-        der Lagekarte. Quelle: Eigenbau (Planetiler-Shortbread), Pflicht-Attribution offline
-        sichtbar.
-      </Typography.Paragraph>
       {ladend ? (
         <div style={{ textAlign: 'center', padding: 24 }}>
           <Spin />

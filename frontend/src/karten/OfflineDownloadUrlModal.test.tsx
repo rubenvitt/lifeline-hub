@@ -61,7 +61,7 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     renderMitProviders(<Harness onClose={geschlossen} />);
 
     await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
-    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/de.mbtiles');
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), 'https://example.test/de.mbtiles');
     await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
     await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
 
@@ -89,7 +89,10 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     await waitFor(() => expect(document.activeElement).toBe(name));
     await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
     await nutzer.type(name, 'Deutschland');
-    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/de.mbtiles{Enter}');
+    await nutzer.type(
+      screen.getByLabelText('URL (.mbtiles)'),
+      'https://example.test/de.mbtiles{Enter}',
+    );
 
     await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
     expect(gesendet.mock.calls[0][0]).toMatchObject({
@@ -113,7 +116,7 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     const name = await screen.findByLabelText('Name');
     await waitFor(() => expect(document.activeElement).toBe(name));
     await nutzer.type(name, 'Deutschland');
-    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/de.mbtiles');
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), 'https://example.test/de.mbtiles');
     await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM{Enter}ODbL');
     expect(screen.getByLabelText('Attribution / Lizenz')).toHaveValue('© OSM\nODbL');
     await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
@@ -146,12 +149,57 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     renderMitProviders(<Harness onClose={geschlossen} />);
 
     await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
-    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/de.mbtiles');
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), 'https://example.test/de.mbtiles');
     await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
     await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
 
     await screen.findByText('URL nicht erreichbar');
     expect(screen.getByLabelText('Name')).toHaveValue('Deutschland');
     expect(geschlossen).not.toHaveBeenCalled();
+  });
+  /** LFH-1078: die Maske erklärt nichts — Format und Pflicht zeigen Feldname und Prüfung. */
+  it('trägt keinen Erklärkasten und keine Technikwörter', async () => {
+    handler();
+    renderMitProviders(<Harness />);
+    await screen.findByLabelText('URL (.mbtiles)');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Shortbread|Prep-Phase|offline ausgeliefert/),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['http://example.test/de.mbtiles', 'Nur https-Adressen'],
+    ['https://example.test/de.pmtiles', 'Keine .mbtiles-Datei'],
+  ])('prüft die URL statt sie zu erklären: %s', async (url, meldung) => {
+    const gesendet = vi.fn();
+    handler(gesendet);
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), url);
+    await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
+    await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
+
+    expect(await screen.findByText(meldung)).toBeInTheDocument();
+    expect(gesendet).not.toHaveBeenCalled();
+  });
+
+  it('nimmt eine .mbtiles-Adresse mit Abfrageteil an', async () => {
+    const gesendet = vi.fn();
+    handler(gesendet);
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
+    await nutzer.type(
+      screen.getByLabelText('URL (.mbtiles)'),
+      'https://example.test/de.mbtiles?v=2',
+    );
+    await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
+    await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
+
+    await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
   });
 });
