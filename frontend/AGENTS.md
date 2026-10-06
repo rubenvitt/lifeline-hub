@@ -341,6 +341,7 @@ anwendbar), „nicht geprüft" ist keins.
   (`MenueAusloeser`, Name nennt die Seite). In `aktionen` bleibt nur, was am Handy sichtbar sein
   muss: Segmentleiste und genau eine Erfassung, auf Betroffenen- und Tiere-Liste dazu „Vermisst
   melden“. Nachgezogen sind Betroffene, Tiere, Schäden; die übrigen Seiten folgen im Folgeticket.
+  Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt
   (`/admin/stammdaten/{fahrzeuge,personal}/:id`), sonst Einzel-GET; Admin-Pfade in
