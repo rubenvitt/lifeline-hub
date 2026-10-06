@@ -1,6 +1,8 @@
-import { Button, Space, type TableColumnsType } from 'antd';
+import { Button, Space } from 'antd';
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import StatusTag from '../components/StatusTag';
+import type { KatalogSpalte } from '../components/KatalogTabelle';
+import { MenueAusloeser } from '../components/MenueAusloeser';
 import type { Dienststatus } from '../api/types';
 import { dienststatus } from '../theme/statusFarben';
 
@@ -45,19 +47,31 @@ const DIENSTSTATUS_FILTER = (Object.keys(dienststatus) as Dienststatus[]).map((s
  * Status- und (nur für Admins) Aktionsspalte der Stammdaten-Tabellen Fahrzeuge, Personal
  * und Material. Die Farbrolle des Dienststatus steht im Vertrag (`theme/statusFarben.ts`,
  * `dienststatus`, LFH-476) — kein Katalog-Tab setzt sie selbst.
+ *
+ * Beide Spalten stehen rechts fixiert und sind nicht abwählbar (LFH-980): wer ein Fahrzeug außer
+ * Dienst stellt, findet Status und Knopf auf jedem Schirm ohne waagerechtes Wischen. Unter `md`
+ * (`schmal`) passen zwei Knöpfe neben der fixierten Kennung und dem Status nicht mehr in 390 px;
+ * dort stehen sie im Aktionsmenü, benannt mit der Zeilenkennung (`kennung`).
  */
 export function dienststatusSpalten<T extends { id: number; dienststatus: Dienststatus }>({
   mutation,
   istAdmin,
   onBearbeiten,
+  schmal,
+  kennung,
 }: {
   mutation: DienststatusMutation;
   istAdmin: boolean;
   onBearbeiten: (eintrag: T) => void;
-}): TableColumnsType<T> {
-  const status: TableColumnsType<T>[number] = {
+  schmal: boolean;
+  /** Menschenlesbare Kennung der Zeile für den zugänglichen Namen des Aktionsmenüs. */
+  kennung: (eintrag: T) => string;
+}): KatalogSpalte<T>[] {
+  const status: KatalogSpalte<T> = {
     title: 'Status',
     key: 'dienststatus',
+    immerSichtbar: true,
+    fixed: 'right',
     // Bewusst OHNE `dataIndex`: `onFilter` liest den Datensatz selbst, ein Bezug zöge den
     // Drahtwert `in_dienst` in die Freitextsuche, die Rohwerte liest. `String(wert)`, weil
     // antd das Filterargument als `React.Key | boolean` typisiert.
@@ -71,6 +85,8 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
     {
       title: 'Aktionen',
       key: 'aktionen',
+      immerSichtbar: true,
+      fixed: 'right',
       render: (_, t) => {
         /**
          * Eine laufende Mutation sperrt GENAU EINE Zeile, nicht die ganze Tabelle. Der
@@ -79,6 +95,27 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
          * (idempotent), nicht umschaltet.
          */
         const laeuft = mutation.isPending && mutation.variables?.id === t.id;
+        const inDienst = t.dienststatus === 'in_dienst';
+        if (schmal) {
+          // Dieselben zwei Handlungen wie in der Knopfreihe darunter; „Außer Dienst" bleibt rot.
+          return (
+            <MenueAusloeser
+              eintraege={[
+                { key: 'bearbeiten', label: 'Bearbeiten' },
+                inDienst
+                  ? { key: 'dienst', label: 'Außer Dienst', gefahr: true }
+                  : { key: 'dienst', label: 'Wieder in Dienst' },
+              ]}
+              zugaenglicherName={`Aktionen zu ${kennung(t)}`}
+              gesperrt={laeuft}
+              laeuft={laeuft}
+              onWahl={(aktion) => {
+                if (aktion === 'bearbeiten') onBearbeiten(t);
+                else if (!laeuft) mutation.mutate({ id: t.id, inDienst: !inDienst });
+              }}
+            />
+          );
+        }
         return (
           <Space size="middle">
             <Button disabled={laeuft} onClick={() => onBearbeiten(t)}>
@@ -94,7 +131,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
                 eigene, spätere Anlage — nie durch einen Fehlklick hier. Deshalb `danger` und
                 Abstand (`size="middle"`), aber keine Reibung. Gilt für Fahrzeuge, Personal und
                 Material zugleich: alle drei Tabs rendern diese eine Spalte. */}
-            {t.dienststatus === 'in_dienst' ? (
+            {inDienst ? (
               <Button
                 danger
                 loading={laeuft}

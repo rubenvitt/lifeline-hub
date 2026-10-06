@@ -238,7 +238,8 @@ describe('BenutzerPage', () => {
     const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
     const maxZeile = (await screen.findByText('Max')).closest('tr') as HTMLElement;
     await userEvent.click(within(evaZeile).getByRole('button', { name: 'Deaktivieren' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
+    // Die Rückfrage nennt die Handlung (LFH-980), nicht „Ja“.
+    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer deaktivieren' }));
 
     await waitFor(() =>
       expect(within(evaZeile).getByRole('button', { name: /Deaktivieren/ })).toHaveClass(

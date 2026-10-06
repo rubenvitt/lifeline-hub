@@ -11,16 +11,13 @@
  * Jeder Zugriff liegt in `try`/`catch`: im Privatmodus wirft der Speicher, und eine
  * vergessene Navigation ist kein Grund, den Einsatz-Rahmen abstürzen zu lassen.
  */
+import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 
 const SCHLUESSEL = 'lfh:nav:eingeklappt';
 
 /** Liest den gemerkten Zustand; ohne Eintrag (und bei gesperrtem Speicher) „offen". */
 export function leseNavEingeklappt(): boolean {
-  try {
-    return localStorage.getItem(SCHLUESSEL) === '1';
-  } catch {
-    return false;
-  }
+  return sicherLesen(SCHLUESSEL) === '1';
 }
 
 /**
@@ -29,10 +26,7 @@ export function leseNavEingeklappt(): boolean {
  * oben nur eine kennt.
  */
 export function schreibeNavEingeklappt(eingeklappt: boolean): void {
-  try {
-    if (eingeklappt) localStorage.setItem(SCHLUESSEL, '1');
-    else localStorage.removeItem(SCHLUESSEL);
-  } catch {
-    /* Speicher gesperrt (Privatmodus) — ohne Persistenz weiterarbeiten */
-  }
+  // Speicher gesperrt (Privatmodus): ohne Persistenz weiterarbeiten.
+  if (eingeklappt) sicherSchreiben(SCHLUESSEL, '1');
+  else sicherEntfernen(SCHLUESSEL);
 }

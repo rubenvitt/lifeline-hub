@@ -197,3 +197,87 @@ describe('Antworten aus dem Browser-Cache (LFH-705, D2)', () => {
     });
   }
 });
+
+describe('Seltener in localStorage schreiben (LFH-942, design.md D4)', () => {
+  const SCHLUESSEL = 'lifeline-serveruhr';
+
+  function zaehleSchreiben() {
+    const echt = Storage.prototype.setItem;
+    return vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      k: string,
+      v: string,
+    ) {
+      echt.call(this, k, v);
+    });
+  }
+  const schreibungen = (spion: ReturnType<typeof zaehleSchreiben>) =>
+    spion.mock.calls.filter(([k]) => k === SCHLUESSEL).length;
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('50 Antworten mit stabilem Versatz schreiben höchstens einmal', () => {
+    const spion = zaehleSchreiben();
+    for (let i = 0; i < 50; i++) {
+      // Je Antwort 5 s weiter, auf beiden Uhren: der Versatz bleibt stabil.
+      vi.setSystemTime(SERVER + 5 * MINUTE + i * 5_000);
+      merkeServerzeit(antwort(SERVER + i * 5_000));
+    }
+    expect(schreibungen(spion)).toBe(1);
+  });
+
+  it('ein Versatzsprung über 1 s schreibt sofort', () => {
+    vi.setSystemTime(SERVER + 5 * MINUTE);
+    merkeServerzeit(antwort(SERVER));
+    const spion = zaehleSchreiben();
+    // Die Geräteuhr wird 2 min vorgestellt.
+    vi.setSystemTime(SERVER + 7 * MINUTE + 1_000);
+    merkeServerzeit(antwort(SERVER + 1_000));
+    expect(schreibungen(spion)).toBe(1);
+    const gespeichert = JSON.parse(localStorage.getItem(SCHLUESSEL)!);
+    expect(gespeichert.versatzMs).toBe(-7 * MINUTE + 500);
+  });
+
+  it('eine Abweichung bis 1 s schreibt nicht', () => {
+    vi.setSystemTime(SERVER + 5 * MINUTE);
+    merkeServerzeit(antwort(SERVER));
+    const spion = zaehleSchreiben();
+    vi.setSystemTime(SERVER + 5 * MINUTE + 60_000 + 900);
+    merkeServerzeit(antwort(SERVER + 60_000));
+    expect(schreibungen(spion)).toBe(0);
+  });
+
+  it('eine gespeicherte Messung älter als 10 min wird erneuert', () => {
+    vi.setSystemTime(SERVER + 5 * MINUTE);
+    merkeServerzeit(antwort(SERVER));
+    const spion = zaehleSchreiben();
+    vi.setSystemTime(SERVER + 15 * MINUTE);
+    merkeServerzeit(antwort(SERVER + 10 * MINUTE));
+    expect(schreibungen(spion)).toBe(0);
+    vi.setSystemTime(SERVER + 15 * MINUTE + 1_000);
+    merkeServerzeit(antwort(SERVER + 10 * MINUTE + 1_000));
+    expect(schreibungen(spion)).toBe(1);
+    expect(JSON.parse(localStorage.getItem(SCHLUESSEL)!).gemessenAt).toBe(Date.now());
+  });
+
+  it('eine frische Messung eines anderen Tabs erspart das Schreiben', () => {
+    vi.setSystemTime(SERVER + 5 * MINUTE);
+    localStorage.setItem(
+      SCHLUESSEL,
+      JSON.stringify({ versatzMs: -5 * MINUTE + 500, gemessenAt: Date.now() - 60_000 }),
+    );
+    const spion = zaehleSchreiben();
+    merkeServerzeit(antwort(SERVER));
+    expect(schreibungen(spion)).toBe(0);
+  });
+
+  it('serverJetzt() nutzt weiter die jüngste Messung des Tabs, auch ungeschrieben', () => {
+    vi.setSystemTime(SERVER + 5 * MINUTE);
+    merkeServerzeit(antwort(SERVER));
+    // 9 min später, Versatz genau 1 s anders: nicht geschrieben, im Tab aber übernommen.
+    vi.setSystemTime(SERVER + 14 * MINUTE);
+    merkeServerzeit(antwort(SERVER + 9 * MINUTE - 1_000));
+    expect(JSON.parse(localStorage.getItem(SCHLUESSEL)!).gemessenAt).toBe(SERVER + 5 * MINUTE);
+    expect(serverJetzt().valueOf() - Date.now()).toBe(-5 * MINUTE - 500);
+  });
+});

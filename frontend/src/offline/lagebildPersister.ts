@@ -1,18 +1,28 @@
 import type { PersistedClient, Persister } from '@tanstack/query-persist-client-core';
 import { lagebildClientSchreiben, lagebildLesen, lagebildLoeschenPlatte } from './lagebildSpeicher';
 
-/** Drosselung der Speicherung (design.md D1). Der Persister wird bei JEDER Cache-Änderung
- *  gerufen, das Dehydrieren davor läuft ungedrosselt (`persistQueryClientSave`). Gedrosselt
- *  wird der IndexedDB-Schreibvorgang samt Structured Clone — ohne ihn schriebe ein ETB mit
- *  vielen Seiten bei jedem Ereignis den ganzen Stand. */
+/**
+ * Drosselung der Speicherung (design.md D1, LFH-939 D1). Gedrosselt wird schon das
+ * Dehydrieren: Der Persister bekommt bei jedem Cache-Ereignis nur einen Erzeuger
+ * ({@link LagebildPersister.vormerken}) und ruft ihn erst, wenn er wirklich schreibt. Sonst liefe
+ * bei Ereignissen im Sekundentakt (Fahrzeugstatus, Live-Kanal) je Ereignis ein voller
+ * Structured Clone auf dem Main-Thread.
+ */
 export const LAGEBILD_DROSSEL_MS = 1_000;
 
 export interface LagebildPersister extends Persister {
   /**
+   * Merkt einen Stand vor, ohne ihn schon zu erzeugen. Single-Flight (LFH-939 D1): Läuft ein
+   * Schreibvorgang, ersetzt ein neuer Erzeuger nur den wartenden; nach dem Ende folgt nach der
+   * Drossel genau ein weiterer Durchlauf mit dem jüngsten. Es wartet also höchstens ein
+   * Erzeuger, nie ein fertiger Stand, und keine Kette wächst.
+   */
+  vormerken(erzeuge: () => PersistedClient): void;
+  /**
    * Beendet den Persister endgültig: ein ausstehender Durchlauf entfällt, ein laufender wird
-   * abgewartet, und jeder spätere `persistClient` bleibt wirkungslos. Muss VOR dem Löschen
-   * laufen — sonst schriebe der gedrosselte Durchlauf den alten Stand hinter dem Löschen
-   * zurück (design.md D5).
+   * abgewartet, und jeder spätere Aufruf bleibt wirkungslos. Muss VOR dem Löschen laufen —
+   * sonst schriebe der gedrosselte Durchlauf den alten Stand hinter dem Löschen zurück
+   * (design.md D5).
    */
   abbrechen(): Promise<void>;
 }
@@ -29,24 +39,48 @@ export function erzeugeLagebildPersister(
   benutzerId: number,
   { drosselMs = LAGEBILD_DROSSEL_MS, schreiben = lagebildClientSchreiben }: Optionen = {},
 ): LagebildPersister {
-  let ausstehend: PersistedClient | null = null;
+  let wartend: (() => PersistedClient) | null = null;
   let uhr: ReturnType<typeof setTimeout> | null = null;
-  let laufend: Promise<void> = Promise.resolve();
+  let laufend: Promise<void> | null = null;
   let tot = false;
+
+  const planen = () => {
+    if (uhr === null && laufend === null && wartend !== null && !tot) {
+      uhr = setTimeout(durchlauf, drosselMs);
+    }
+  };
 
   const durchlauf = () => {
     uhr = null;
-    const client = ausstehend;
-    ausstehend = null;
-    if (tot || !client) return;
-    laufend = laufend.then(() => schreiben(benutzerId, client));
+    const erzeuge = wartend;
+    wartend = null;
+    if (tot || !erzeuge) return;
+    let client: PersistedClient;
+    try {
+      client = erzeuge();
+    } catch (fehler) {
+      console.warn('Lagebild: Stand ließ sich nicht erzeugen', fehler);
+      return;
+    }
+    laufend = Promise.resolve()
+      .then(() => schreiben(benutzerId, client))
+      .catch((fehler: unknown) => console.warn('Lagebild: Schreiben fehlgeschlagen', fehler))
+      .finally(() => {
+        laufend = null;
+        planen();
+      });
+  };
+
+  const vormerken = (erzeuge: () => PersistedClient) => {
+    if (tot) return;
+    wartend = erzeuge;
+    planen();
   };
 
   return {
+    vormerken,
     persistClient(client) {
-      if (tot) return;
-      ausstehend = client;
-      if (uhr === null) uhr = setTimeout(durchlauf, drosselMs);
+      vormerken(() => client);
     },
     // Vom Start nicht genutzt: er stellt selbst wieder her, weil unmittelbar vor `hydrate`
     // gefiltert werden muss (`wiederherstellen` in `lagebildSitzung.ts`, Review Befund 2).
@@ -58,7 +92,7 @@ export function erzeugeLagebildPersister(
     removeClient: lagebildLoeschenPlatte,
     async abbrechen() {
       tot = true;
-      ausstehend = null;
+      wartend = null;
       if (uhr !== null) clearTimeout(uhr);
       uhr = null;
       await laufend;

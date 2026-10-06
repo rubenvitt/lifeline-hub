@@ -371,10 +371,23 @@ describe('StabPage', () => {
 });
 
 describe('StabPage · Sektion Lagebesprechung', () => {
-  it('zeigt den Stand und die leere Historie', async () => {
-    rendere();
+  // LFH-961: ohne Besprechung sagt der Stand „Letzte: noch keine" — die Historie wiederholt es
+  // nicht mit ihrem Leertext.
+  it('zeigt den Stand; „noch keine" steht einmal, ohne Leertext der Historie', async () => {
+    const { client } = rendere();
     const sektion = await lagebesprechungSektion();
     expect(await within(sektion).findByText('kein Termin')).toBeInTheDocument();
+    expect(within(sektion).getByText('noch keine')).toBeInTheDocument();
+    // Positiv abwarten, dass die Historie geladen hat — sonst wäre das `null` unten trivial.
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.stabLagebesprechungen(1))?.status).toBe('success'),
+    );
+    expect(within(sektion).queryByText('Noch keine Lagebesprechung abgeschlossen')).toBeNull();
+  });
+
+  it('mit Besprechungen laut Stand bleibt der Leertext der Historie (Gegenfall)', async () => {
+    rendere({ stab: { ...leererStab, anzahl_lagebesprechungen: 2 } });
+    const sektion = await lagebesprechungSektion();
     expect(
       await within(sektion).findByText('Noch keine Lagebesprechung abgeschlossen'),
     ).toBeInTheDocument();

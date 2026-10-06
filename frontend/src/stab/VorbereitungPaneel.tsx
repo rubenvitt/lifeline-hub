@@ -179,8 +179,10 @@ export default function VorbereitungPaneel({
             data-zustand={z.zustand}
             style={{
               display: 'grid',
-              // Beide Spalten dürfen schrumpfen: die Sichtung ist lang und bricht an ihren
-              // Trennern um, statt auf 390 px über den Rand zu laufen.
+              // Beide Spalten dürfen schrumpfen: die Sichtung ist lang und bricht um, statt auf
+              // 390 px über den Rand zu laufen. Nur hinter „ · “: im Teil und vor dem Punkt stehen
+              // geschützte Leerzeichen (`sichtungText`, LFH-978); `overflowWrap` an der
+              // Wertspalte bleibt Notbremse für einen Teil, der allein nicht passt.
               gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)',
               columnGap: token.marginSM,
               rowGap: token.marginXXS,

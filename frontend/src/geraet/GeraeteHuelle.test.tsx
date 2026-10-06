@@ -287,7 +287,9 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
     expect(screen.getByRole('button', { name: 'Patient aufnehmen' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Plätze bearbeiten' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Auflösen' })).toBeNull();
-    expect(screen.queryByRole('tablist')).toBeNull();
+    // Die Reiterleiste von Material, Bewegungen und Dateien; die Reiter des Grundrisses selbst
+    // stehen hier (jsdom misst keine Breite, also die Reiterform).
+    expect(screen.queryByRole('tablist', { name: /Material|Bewegungen|Dateien/ })).toBeNull();
     expect(screen.queryByText('Material')).toBeNull();
     expect(screen.getByRole('region', { name: 'Bewegungen' })).toBeVisible();
   });
@@ -378,7 +380,9 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     expect(await screen.findByRole('button', { name: 'Plätze bearbeiten' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Auflösen' })).toBeNull();
     // Material und Dateien stehen im Bereich „UHS“, nicht unter dem Grundriss.
-    expect(screen.queryByRole('tablist')).toBeNull();
+    // Die Reiterleiste von Material, Bewegungen und Dateien; die Reiter des Grundrisses selbst
+    // stehen hier (jsdom misst keine Breite, also die Reiterform).
+    expect(screen.queryByRole('tablist', { name: /Material|Bewegungen|Dateien/ })).toBeNull();
   });
 
   it('Plätze in Zahlen, Material der UHS nur lesend und ohne die Einsatzliste', async () => {

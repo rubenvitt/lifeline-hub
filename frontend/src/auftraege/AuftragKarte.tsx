@@ -117,7 +117,7 @@ export default function AuftragKarte({
           <Popconfirm
             key="ab"
             title="Auftrag abnehmen?"
-            okText="Bestätigen"
+            okText="Auftrag abnehmen"
             cancelText="Abbrechen"
             onConfirm={() => onAbnehmen(a.id)}
           >
@@ -131,13 +131,23 @@ export default function AuftragKarte({
 
   return (
     // Erteilungszeit links in Mono, darunter die Nummer; überfällig schlägt „offen" am Rand.
+    // `erteilt_at`, nicht `erstellt_at` (LFH-972): ein über Funk erteilter Auftrag wird oft erst
+    // später erfasst, und der Überblick zeigt dieselbe Zeit. Die Beschriftung steht im Text, weil
+    // ein Tooltip auf Touch nie erscheint.
     <KommKarte
       data-auftrag-id={a.id}
       data-ueberfaellig={ueberfaellig ? 'true' : undefined}
       alarm={ueberfaellig}
       unbearbeitet={unbearbeitet}
       hervorgehoben={hervorgehoben}
-      zeit={<ZeitAnzeige wert={a.erstellt_at} format="uhrzeit" />}
+      zeit={
+        <>
+          <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>erteilt</span>
+          <span>
+            <ZeitAnzeige wert={a.erteilt_at} format="uhrzeit" />
+          </span>
+        </>
+      }
       nr={a.lfd_nr != null ? `#${a.lfd_nr}` : undefined}
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
@@ -216,7 +226,7 @@ export default function AuftragKarte({
               {darfQuittieren && (
                 <Popconfirm
                   title="Empfang/Kenntnis quittieren?"
-                  okText="Bestätigen"
+                  okText="Empfang quittieren"
                   cancelText="Abbrechen"
                   disabled={quittierungLaeuft}
                   onConfirm={() => {
@@ -270,7 +280,9 @@ export default function AuftragKarte({
           items={[
             {
               key: 'details',
-              label: 'Befehlsdetails',
+              // „Auftrag", nicht „Befehl": ein Befehl ist auf dieser Seite das Dokument im
+              // Nachbarreiter (LFH-972). „Schema" meint das Befehlsschema als Fachbegriff.
+              label: 'Auftragsdetails (Schema)',
               children: (
                 <Descriptions size="small" column={1} bordered>
                   {details.map(({ label, wert }) => (

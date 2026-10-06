@@ -102,9 +102,10 @@ const ZUGELASSEN = [
   },
   {
     pfad: 'pages/BenutzerPage.tsx',
-    anzahl: 4,
+    anzahl: 2,
     // Neben der Fließspalte trägt jede übrige Spalte eine Zahl (LFH-523), sonst bleibt die
-    // fixierte Namensspalte ungedeckelt (LFH-819).
+    // fixierte Namensspalte ungedeckelt (LFH-819). Name und Aktionen tragen ihre Breite seit
+    // LFH-980 als Konstante bzw. je Breite und fallen aus der Zahlform.
     grund: 'Spaltenbreiten der Benutzertabelle neben ihrer Fließspalte',
   },
 ];

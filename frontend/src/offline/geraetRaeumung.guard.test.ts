@@ -9,7 +9,8 @@ import { GERAETESPEICHER } from './geraetRaeumung';
  * stehen gelassen werden.
  *
  * Gesucht wird in Code ohne Kommentare. Tests und `src/test/` sind ausgenommen, sie legen
- * Speicher gerade zum Prüfen an.
+ * Speicher gerade zum Prüfen an. Seit LFH-942 schreibt der Code über `sicherSchreiben` aus
+ * `lib/sichererSpeicher`; der Helfer selbst speichert nichts aus eigenem Antrieb und fällt heraus.
  */
 
 const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
@@ -18,12 +19,14 @@ const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
   eager: true,
 }) as Record<string, string>;
 
-const SCHREIBT = /\bopenDB\s*[<(]|\b(?:localStorage|sessionStorage)\s*\??\.\s*setItem\b/;
+const SCHREIBT =
+  /\bopenDB\s*[<(]|\b(?:localStorage|sessionStorage)\s*\??\.\s*setItem\b|\bsicherSchreiben\s*\(/;
+const HELFER = '/src/lib/sichererSpeicher.ts';
 
 export function speicherDateien(quellen: Record<string, string>): string[] {
   const treffer: string[] = [];
   for (const [pfad, inhalt] of Object.entries(quellen)) {
-    if (/\.test\.tsx?$/.test(pfad) || pfad.startsWith('/src/test/')) continue;
+    if (/\.test\.tsx?$/.test(pfad) || pfad.startsWith('/src/test/') || pfad === HELFER) continue;
     if (ohneKommentare(inhalt).some((zeile) => SCHREIBT.test(zeile))) treffer.push(pfad);
   }
   return treffer.sort();
@@ -56,16 +59,18 @@ describe('Gerätespeicher-Guard (LFH-767): jeder Speicherort hat eine Entscheidu
     }
   });
 
-  it('erkennt openDB, setItem mit und ohne ?. , aber keinen Kommentar (Selbst-Beweis)', () => {
+  it('erkennt openDB, setItem mit und ohne ?. und sicherSchreiben, aber keinen Kommentar (Selbst-Beweis)', () => {
     expect(
       speicherDateien({
         '/src/a/idb.ts': "const d = openDB<X>('x', 1);",
         '/src/a/lokal.ts': "window.localStorage.setItem('k', 'v');",
         '/src/a/sitzung.ts': "globalThis.sessionStorage?.setItem('k', 'v');",
-        '/src/a/nurLesen.ts': "localStorage.getItem('k');",
+        '/src/a/helfer.ts': "sicherSchreiben('k', 'v');",
+        '/src/a/nurLesen.ts': "sicherLesen('k');",
+        [HELFER]: "globalThis.localStorage.setItem('k', 'v');",
         '/src/a/kommentar.ts': "// localStorage.setItem('k', 'v')\n/* openDB('x') */",
         '/src/a/test.test.ts': "localStorage.setItem('k', 'v');",
       }),
-    ).toEqual(['/src/a/idb.ts', '/src/a/lokal.ts', '/src/a/sitzung.ts']);
+    ).toEqual(['/src/a/helfer.ts', '/src/a/idb.ts', '/src/a/lokal.ts', '/src/a/sitzung.ts']);
   });
 });

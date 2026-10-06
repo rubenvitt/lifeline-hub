@@ -36,15 +36,30 @@ describe('Datenraster', () => {
     expect(screen.getByText('Hauptstr.').style.fontFamily).toBe('');
   });
 
-  it('Fugenraster auf linie, Spalten gedeckelt und mit Mindestbreite', () => {
+  it('Fugenraster auf flaeche, Spalten gedeckelt und mit Mindestbreite', () => {
     const stil = datenrasterStil(farbenHell, 4);
-    expect(stil).toMatchObject({ gap: 1, background: farbenHell.linie });
+    // LFH-961: eine leere Spur zeigt den Grund — `flaeche`, keine graue Kachel in `linie`.
+    expect(stil).toMatchObject({
+      gap: 1,
+      background: farbenHell.flaeche,
+      border: `1px solid ${farbenHell.linie}`,
+    });
+    expect(stil.background).not.toBe(farbenHell.linie);
     expect(String(stil.gridTemplateColumns)).toContain('calc((100% - 3px) / 4)');
     expect(String(stil.gridTemplateColumns)).toContain(`${DATENRASTER_MINDESTBREITE}px`);
     // Unsinnige Spaltenzahl fällt auf eine Spalte, statt eine kaputte Vorlage zu bauen.
     expect(String(datenrasterStil(farbenHell, 0).gridTemplateColumns)).toContain(
       'calc((100% - 0px) / 1)',
     );
+  });
+
+  it('meldet sich als Fugenraster, damit jede Zelle ihre Fuge zeichnet', () => {
+    renderMitProviders(
+      <Datenraster beschriftung="Raster">
+        <Datenfeld label="A">1</Datenfeld>
+      </Datenraster>,
+    );
+    expect(screen.getByLabelText('Raster')).toHaveAttribute('data-fugenraster');
   });
 
   it('Zelle auf flaeche; breit zieht über alle Spalten', () => {

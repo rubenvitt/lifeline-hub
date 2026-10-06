@@ -16,6 +16,8 @@ import KatalogTabelle, {
   setzeKopfFreiraum,
   tabellenTokens,
   type KatalogSpalte,
+  suchfeldStil,
+  SUCHFELD_TEXT_MAX,
 } from './KatalogTabelle';
 import { farbenDunkel, farbenHell } from '../theme/tokens';
 
@@ -1037,5 +1039,32 @@ describe('tabellenTokens — Kopftext (LFH-652)', () => {
   it('der Kopftext liest gedaempft, nicht schwach: am Tag hielte schwach auf kopf nur 5,58', () => {
     expect(tabellenTokens(farbenHell, false, polster).headerColor).toBe(farbenHell.gedaempft);
     expect(tabellenTokens(farbenDunkel, true, polster).headerColor).toBe(farbenDunkel.gedaempft);
+  });
+});
+
+/**
+ * Suchfeldbreite (LFH-980): ein fester 220-px-Deckel kürzte die Platzhalter, die die durchsuchten
+ * Felder nennen, auf jedem Schirm. Ob der Text wirklich passt, misst
+ * `e2e/verwaltungstabellen-schmal.spec.ts`; hier steht die Rechenregel.
+ */
+describe('suchfeldStil', () => {
+  const token = { controlHeight: 30, paddingSM: 8, fontSize: 14 };
+
+  it('unter md nimmt das Feld die volle Zeile, ohne Deckel', () => {
+    expect(suchfeldStil('Name oder Benutzername', true, token)).toEqual({ width: '100%' });
+  });
+
+  it('ab md folgt die Breite dem Platzhalter, kein 220-px-Deckel', () => {
+    const stil = suchfeldStil('Funkrufname, Typ, Träger oder Kennzeichen', false, token);
+    expect(stil.maxWidth).toBe('100%');
+    expect(String(stil.width)).toContain('41ch');
+    expect(String(stil.width)).toContain(`${SUCHFELD_TEXT_MAX}px`);
+    expect(JSON.stringify(stil)).not.toContain('220');
+  });
+
+  it('der Rahmen wächst mit der Dichte (Suchknopf in Steuerhöhe)', () => {
+    const kompakt = suchfeldStil('x', false, token);
+    const handschuh = suchfeldStil('x', false, { controlHeight: 72, paddingSM: 16, fontSize: 18 });
+    expect(kompakt.width).not.toEqual(handschuh.width);
   });
 });

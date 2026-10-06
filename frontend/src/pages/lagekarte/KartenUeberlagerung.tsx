@@ -9,7 +9,14 @@ import {
   IconStandortZiel,
   IconStift,
 } from '../../icons';
-import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { Popover } from 'antd';
 import {
   naechsterIndex,
@@ -21,7 +28,7 @@ import {
 } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
-import type { GrundlageOption, GrundlageWert } from './leistenDaten';
+import { blindHinweis, type GrundlageOption, type GrundlageWert } from './leistenDaten';
 import '../../theme/sprache.css';
 import './lagekarte.css';
 
@@ -93,16 +100,23 @@ export function naechsterFreierIndex(
 }
 
 /**
- * Segmentleiste der Kartengrundlage — lokale Ergänzung zu `components/instrument/Segmentleiste`,
- * die keinen gesperrten Zustand kennt. Nicht konfigurierte Grundlagen stehen gesperrt da (Grund als
- * `title`), statt zu fehlen. Dieselben Klassen und dieselbe Geometrie (`segmentStil`), Tastatur
- * nach APG mit übersprungenen Sperren.
+ * Segmentleiste der Kartengrundlage — lokale Ergänzung zu `components/instrument/Segmentleiste`
+ * (einzeilig, Hinweiszeile). Nicht konfigurierte Grundlagen stehen gesperrt da, statt zu fehlen.
+ * Dieselben Klassen und dieselbe Geometrie (`segmentStil`), Tastatur nach APG mit übersprungenen
+ * Sperren.
+ *
+ * GESPERRT wie {@link Kartenknopf} (LFH-971): `aria-disabled` statt `disabled`, der Grund als
+ * Beschreibung (`aria-describedby`). Ein Tipp wählt nicht, sondern nennt den Grund als Text in der
+ * Hinweiszeile unter der Leiste — auf Touch der einzige Weg, ein `title` erscheint dort nie.
+ * Steht die Grundlage auf „Ohne Karte" (`blind`), trägt dieselbe Zeile dauerhaft
+ * {@link blindHinweis}: sonst hielte man die schwarze Karte für defekt.
  */
 export function GrundlageLeiste({
   optionen,
   wert,
   onWechsel,
   einzeilig = false,
+  blindHinweisZeigen = true,
 }: {
   optionen: readonly GrundlageOption[];
   wert: GrundlageWert;
@@ -113,71 +127,155 @@ export function GrundlageLeiste({
    * Segment in den sichtbaren Bereich.
    */
   einzeilig?: boolean;
+  /**
+   * `false`: der Hinweis zu „Ohne Karte" steht anderswo. Auf dem Handschirm liegt die Leiste im
+   * zugeklappten Paneel, dort zeigt ihn die Karte selbst ({@link GrundlageHinweis}).
+   */
+  blindHinweisZeigen?: boolean;
 }) {
   const { token } = useRollen();
+  const grundId = useId();
   const knoepfe = useRef<(HTMLButtonElement | null)[]>([]);
+  // Der zuletzt angetippte gesperrte Wert, gemerkt zur Grundlage, bei der er angetippt wurde:
+  // wechselt die Grundlage (Wahl, geladene Ansicht), räumt sich der Grund ab, ein zweiter Tipp
+  // auf dasselbe Segment ebenso.
+  const [angetippt, setAngetippt] = useState<{ wert: GrundlageWert; bei: GrundlageWert } | null>(
+    null,
+  );
   const aktivIndex = optionen.findIndex((o) => o.wert === wert);
   const gesperrt = optionen.map((o) => o.gesperrt != null);
   // Roving tabindex: das gewählte Segment, ohne Wahl das erste freie.
   const tabZiel = aktivIndex >= 0 ? aktivIndex : gesperrt.findIndex((g) => !g);
+  const grund =
+    angetippt?.bei === wert ? optionen.find((o) => o.wert === angetippt.wert)?.gesperrt : undefined;
+  const hinweise = [
+    grund,
+    blindHinweisZeigen && wert === 'blind' ? blindHinweis(optionen) : undefined,
+  ].filter((h): h is string => h != null);
+
+  const waehle = (o: GrundlageOption) => {
+    if (o.gesperrt != null) {
+      setAngetippt((vorher) =>
+        vorher?.wert === o.wert && vorher.bei === wert ? null : { wert: o.wert, bei: wert },
+      );
+      return;
+    }
+    setAngetippt(null);
+    onWechsel(o.wert);
+  };
 
   const taste = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const ziel = naechsterFreierIndex(e.key, index, gesperrt);
     if (ziel == null) return;
     e.preventDefault();
-    onWechsel(optionen[ziel].wert);
+    waehle(optionen[ziel]);
     knoepfe.current[ziel]?.focus();
   };
 
   return (
+    // Die Hülle trägt Leiste und Hinweiszeile; sie ist so breit wie ihr Inhalt, höchstens wie
+    // die Überlagerung, damit die einzeilige Leiste darin rollt.
     <div
-      role="radiogroup"
-      aria-label="Kartengrundlage"
-      className="lfh-segmente"
-      data-lfh="grundlage-leiste"
-      style={
-        einzeilig
-          ? { flexWrap: 'nowrap', maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'thin' }
-          : undefined
-      }
+      data-lfh="grundlage"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: token.marginXXS,
+        maxWidth: '100%',
+      }}
     >
-      {optionen.map((o, i) => {
-        const aktiv = i === aktivIndex;
-        const aus = o.gesperrt != null;
-        // Zelle wie in `Segmentleiste` (Zielabstand, LFH-865); `flexShrink: 0` an der Zelle,
-        // sie ist das Kind der einzeiligen Leiste.
-        return (
-          <span
-            key={o.wert}
-            role="none"
-            className="lfh-segment-zelle"
-            data-lfh="segment-zelle"
-            style={{ ...segmentZelleStil(token), flexShrink: 0 }}
-          >
-            <button
-              ref={(el) => {
-                knoepfe.current[i] = el;
-              }}
-              type="button"
-              role="radio"
-              aria-checked={aktiv}
-              disabled={aus}
-              title={o.gesperrt}
-              tabIndex={i === tabZiel ? 0 : -1}
-              className={aktiv ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
-              onClick={() => onWechsel(o.wert)}
-              onKeyDown={(e) => taste(e, i)}
-              style={{
-                ...segmentStil(token),
-                whiteSpace: 'nowrap',
-                ...(aus ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
-              }}
+      <div
+        role="radiogroup"
+        aria-label="Kartengrundlage"
+        className="lfh-segmente"
+        data-lfh="grundlage-leiste"
+        style={{
+          // Bedienbar, auch wenn die Überlagerung darüber Tipps durchreicht.
+          pointerEvents: 'auto',
+          ...(einzeilig
+            ? { flexWrap: 'nowrap', maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'thin' }
+            : {}),
+        }}
+      >
+        {optionen.map((o, i) => {
+          const aktiv = i === aktivIndex;
+          const aus = o.gesperrt != null;
+          const beschreibungId = aus ? `${grundId}-${i}` : undefined;
+          // Zelle wie in `Segmentleiste` (Zielabstand, LFH-865); `flexShrink: 0` an der Zelle,
+          // sie ist das Kind der einzeiligen Leiste.
+          return (
+            <span
+              key={o.wert}
+              role="none"
+              className="lfh-segment-zelle"
+              data-lfh="segment-zelle"
+              style={{ ...segmentZelleStil(token), flexShrink: 0 }}
             >
-              {o.label}
-            </button>
-          </span>
-        );
-      })}
+              <button
+                ref={(el) => {
+                  knoepfe.current[i] = el;
+                }}
+                type="button"
+                role="radio"
+                aria-checked={aktiv}
+                aria-disabled={aus || undefined}
+                aria-describedby={beschreibungId}
+                tabIndex={i === tabZiel ? 0 : -1}
+                className={aktiv ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
+                onClick={() => waehle(o)}
+                onKeyDown={(e) => taste(e, i)}
+                // Farbe und Zeiger des Gesperrten aus `.lfh-segment[aria-disabled]`
+                // (`sprache.css`) — ein Inline-Wert schlüge die Regel.
+                style={{ ...segmentStil(token), whiteSpace: 'nowrap' }}
+              >
+                {o.label}
+                {aus && (
+                  // Versteckt wie in `Segmentleiste`: `aria-describedby` liest ihn trotzdem, in den
+                  // Namen geht er nicht ein. Sichtbar trägt ihn nach dem Tipp die Hinweiszeile.
+                  <span id={beschreibungId} hidden>
+                    {o.gesperrt}
+                  </span>
+                )}
+              </button>
+            </span>
+          );
+        })}
+      </div>
+      {/* Höflich angesagt: der Grund erscheint als Antwort auf den eigenen Tipp. */}
+      <div aria-live="polite">
+        <GrundlageHinweis zeilen={hinweise} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Hinweiszeile der Kartengrundlage (Sperrgrund, „Ohne Karte") — unter der Leiste und, auf dem
+ * Handschirm, allein über der Karte. Ohne Zeilen nichts.
+ */
+export function GrundlageHinweis({ zeilen }: { zeilen: readonly string[] }) {
+  const { token, rollen } = useRollen();
+  if (zeilen.length === 0) return null;
+  return (
+    <div
+      data-lfh="grundlage-hinweis"
+      style={{
+        // Reiner Text über der Karte: ein Tipp darauf gehört der Karte darunter (die linke
+        // Überlagerung reicht durch). Auf dem kleinen Ausschnitt (Handschirm quer, Messmodus am
+        // Tablet) läge sonst ein Ziel unter dem Hinweis.
+        pointerEvents: 'none',
+        padding: `${token.paddingXXS}px ${token.paddingSM}px`,
+        background: rollen.kopf,
+        border: `1px solid ${rollen.linieStark}`,
+        color: rollen.text2,
+        fontSize: token.fontSizeSM,
+        lineHeight: token.lineHeightSM,
+      }}
+    >
+      {zeilen.map((h) => (
+        <div key={h}>{h}</div>
+      ))}
     </div>
   );
 }
@@ -188,26 +286,33 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
   const { formatKoordinate } = useAnzeigeKonventionen();
   const lage = useZeigerLage(quelle);
   return (
+    // Nur mit feinem Zeiger (`.lfh-nur-feiner-zeiger`, LFH-712/LFH-971): gespeist wird sie über
+    // `mousemove`, auf reinem Touch bliebe sie ein „—“-Kästchen, das wie ein Fehler aussieht. Die
+    // Klasse sitzt an einer Hülle ohne Inline-`display` — der schlüge die Regel.
     <div
-      data-lfh="zeiger-koordinate"
-      title="Position des Zeigers"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: token.marginXS,
-        alignSelf: 'flex-start',
-        minHeight: 28,
-        padding: `0 ${token.paddingSM}px`,
-        background: rollen.kopf,
-        border: `1px solid ${rollen.linieStark}`,
-        color: rollen.gedaempft,
-        ...monoStil(11),
-      }}
+      className="lfh-nur-feiner-zeiger"
+      style={{ alignSelf: 'flex-start', pointerEvents: 'auto' }}
     >
-      <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
-        <IconFadenkreuz size={14} />
-      </span>
-      {lage ? formatKoordinate(lage.lat, lage.lon) : '—'}
+      <div
+        data-lfh="zeiger-koordinate"
+        title="Position des Zeigers"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: token.marginXS,
+          minHeight: 28,
+          padding: `0 ${token.paddingSM}px`,
+          background: rollen.kopf,
+          border: `1px solid ${rollen.linieStark}`,
+          color: rollen.gedaempft,
+          ...monoStil(11),
+        }}
+      >
+        <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
+          <IconFadenkreuz size={14} />
+        </span>
+        {lage ? formatKoordinate(lage.lat, lage.lon) : '—'}
+      </div>
     </div>
   );
 }
@@ -355,6 +460,9 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           flexDirection: 'column',
           // Nicht strecken: die Segmentleiste und die Koordinate sind so breit wie ihr Inhalt.
           alignItems: 'flex-start',
+          // Der Block reicht Tipps durch, bedienbar sind nur seine Ziele (Muster `KartenFuss`):
+          // der Hinweis unter der Leiste macht ihn so breit wie die Überlagerung (LFH-971).
+          pointerEvents: 'none',
           gap: token.marginXS,
         }}
       >

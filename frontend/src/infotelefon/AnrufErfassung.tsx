@@ -95,6 +95,9 @@ export default function AnrufErfassung({
         {fehler != null && <SpeicherFehler fehler={fehler} titel="Anruf nicht erfasst" />}
         <Schnellerfassungszeile
           gestapelt={istSchmal}
+          // Vier Bedienelemente in einer Zelle: jedes Feld mit eigenem Rahmen, sonst stand die
+          // Notiz rahmenlos neben dem umrandeten Anliegen (LFH-978).
+          felderUmrandet
           hinweis={gespeichert > 0 ? `${gespeichert} erfasst` : undefined}
           hinweiszeile={<span>{TASTATURVERTRAG}</span>}
         >

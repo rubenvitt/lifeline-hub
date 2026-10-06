@@ -17,6 +17,7 @@
  * `src`-Baum (repoweit gegengeprüft). Ein Konsument dieser Datei importiert ab jetzt
  * `'./direkteinstiegKern'` bzw. `'../../components/direkteinstiegKern'`.
  */
+import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 export function waehleDefaultEintrag<T extends { id: number }>(
   liste: T[],
   letzteId: number | null,
@@ -34,19 +35,11 @@ export function letzteAuswahlSpeicher(praefix: string) {
   const schluessel = (einsatzId: number) => `${praefix}:letzteAuswahl:${einsatzId}`;
   return {
     merke(einsatzId: number, id: number): void {
-      try {
-        localStorage.setItem(schluessel(einsatzId), String(id));
-      } catch {
-        /* ohne Persistenz weiter */
-      }
+      sicherSchreiben(schluessel(einsatzId), String(id));
     },
     lies(einsatzId: number): number | null {
-      try {
-        const wert = localStorage.getItem(schluessel(einsatzId));
-        return wert ? Number(wert) : null;
-      } catch {
-        return null;
-      }
+      const wert = sicherLesen(schluessel(einsatzId));
+      return wert ? Number(wert) : null;
     },
   };
 }

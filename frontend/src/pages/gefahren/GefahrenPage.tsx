@@ -230,7 +230,10 @@ export default function GefahrenPage() {
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
                 <span>{gefahrengebietName(g.label, g.id)}</span>
-                <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
+                {/* Zahl vor Wort, mit Einheit (LFH-971): „(1)" las sich als Rang oder Meldung. */}
+                <Typography.Text type="secondary">
+                  {g.zonen_ids.length === 1 ? '1 Zone' : `${g.zonen_ids.length} Zonen`}
+                </Typography.Text>
               </Space>
             </ListenEintrag>
           )}

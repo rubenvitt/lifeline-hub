@@ -304,7 +304,7 @@ export default function AuftraegeListe({
 
       {darfSchreiben && formOffen && (
         <Paneel
-          titel="Neuer Auftrag/Befehl"
+          titel="Neuer Auftrag"
           koerperPolster
           style={{ marginBottom: token.margin }}
           aktion={

@@ -6,7 +6,6 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import SprechgruppenTab from './SprechgruppenTab';
 import { adminFixture } from '../test/fixtures';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 const admin = adminFixture();
@@ -253,12 +252,14 @@ describe('SprechgruppenTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
     await screen.findByText('412_F_DRK');
 
     await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    // Die Rückfrage ist ein Modal mit benanntem Knopf (LFH-980), nicht „OK“.
+    await userEvent.click(await screen.findByRole('button', { name: 'Sprechgruppe deaktivieren' }));
     const hinweis = await stehenderFehler('Sprechgruppe ist einem laufenden Einsatz zugeordnet');
     expect(hinweis).toHaveTextContent('Nicht deaktiviert');
 
     await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    // Die Rückfrage ist ein Modal mit benanntem Knopf (LFH-980), nicht „OK“.
+    await userEvent.click(await screen.findByRole('button', { name: 'Sprechgruppe deaktivieren' }));
     await keinStehenderFehler('Sprechgruppe ist einem laufenden Einsatz zugeordnet');
     expect(versuch).toBe(2);
   });

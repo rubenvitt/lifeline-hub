@@ -6,6 +6,7 @@ import { Aufgliederung, type Segment } from './Aufgliederung';
 import { monoStil, schriftStil, useRollen } from './rollenwerte';
 import { statusFlaeche, type StatusTon } from './statusFlaeche';
 import { zielEinzug } from './zielEinzug';
+import { fugenrasterGrund } from './fugenraster';
 // Grund und Hover/Fokus der Zelle stehen als Klasse `.lfh-kennzahl` in der Gestaltungssprache:
 // ein Inline-Grund schlüge jede `:hover`-Regel.
 import '../../theme/sprache.css';
@@ -376,10 +377,11 @@ export function Kennzahl({
 
 /**
  * Stil des Fugenrasters. `spalten` fest, sonst so viele, wie mit ≥ 160 px passen —
- * das Band bricht auf dem Handschirm um, statt Etiketten abzuschneiden.
+ * das Band bricht auf dem Handschirm um, statt Etiketten abzuschneiden. Grund und Fuge aus
+ * {@link fugenrasterGrund}; wer den Stil übernimmt, setzt auch `data-fugenraster`.
  */
 export function kennzahlenbandStil(
-  rollen: Pick<Farbrollen, 'linie'>,
+  rollen: Pick<Farbrollen, 'linie' | 'flaeche'>,
   spalten?: number,
 ): CSSProperties {
   return {
@@ -388,9 +390,7 @@ export function kennzahlenbandStil(
       spalten != null
         ? `repeat(${spalten}, minmax(0, 1fr))`
         : 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))',
-    gap: 1,
-    background: rollen.linie,
-    border: `1px solid ${rollen.linie}`,
+    ...fugenrasterGrund(rollen),
   };
 }
 
@@ -433,6 +433,7 @@ export function Kennzahlenband({
       role={beschriftung ? 'group' : undefined}
       aria-label={beschriftung}
       data-lfh="kennzahlenband"
+      data-fugenraster=""
       className={klassen.length > 0 ? klassen.join(' ') : undefined}
       style={{
         ...kennzahlenbandStil(rollen, spalten),

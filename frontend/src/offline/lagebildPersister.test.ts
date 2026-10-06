@@ -42,6 +42,53 @@ describe('Lagebild-Persister', () => {
     expect((await speicher.lagebildLesen())?.client.timestamp).toBe(3);
   });
 
+  it('hält bei langsamem Schreibweg höchstens einen laufenden und einen wartenden Stand (LFH-939)', async () => {
+    await datensatzAnlegen();
+    let gleichzeitig = 0;
+    let hoechstens = 0;
+    const schreiben = vi.fn(async (id: number, c: PersistedClient) => {
+      gleichzeitig += 1;
+      hoechstens = Math.max(hoechstens, gleichzeitig);
+      await warte(DROSSEL * 4);
+      await speicher.lagebildClientSchreiben(id, c);
+      gleichzeitig -= 1;
+    });
+    const p = erzeugeLagebildPersister(BENUTZER.id, { drosselMs: DROSSEL, schreiben });
+    const erzeugt: number[] = [];
+    // Ein Ereignis je Drittel der Drossel über die Dauer mehrerer Schreibvorgänge.
+    for (let i = 1; i <= 30; i++) {
+      p.vormerken(() => {
+        erzeugt.push(i);
+        return client(i);
+      });
+      await warte(DROSSEL / 3);
+    }
+    await warte(DROSSEL * 12);
+    expect(hoechstens).toBe(1);
+    // Dehydriert wird nur, was auch geschrieben wird: kein Stand wartet in einer Kette.
+    expect(erzeugt.length).toBe(schreiben.mock.calls.length);
+    expect(erzeugt.length).toBeLessThan(10);
+    expect((await speicher.lagebildLesen())?.client.timestamp).toBe(30);
+  });
+
+  it('wartet beim Abbrechen den laufenden Schreibvorgang ab und verwirft den wartenden', async () => {
+    await datensatzAnlegen();
+    const schreiben = vi.fn(async (id: number, c: PersistedClient) => {
+      await warte(DROSSEL * 2);
+      await speicher.lagebildClientSchreiben(id, c);
+    });
+    const p = erzeugeLagebildPersister(BENUTZER.id, { drosselMs: DROSSEL, schreiben });
+    p.vormerken(() => client(1));
+    await warte(DROSSEL * 1.5);
+    const zweiter = vi.fn(() => client(2));
+    p.vormerken(zweiter);
+    await p.abbrechen();
+    expect((await speicher.lagebildLesen())?.client.timestamp).toBe(1);
+    await warte(DROSSEL * 4);
+    expect(zweiter).not.toHaveBeenCalled();
+    expect(schreiben).toHaveBeenCalledTimes(1);
+  });
+
   it('schreibt nach dem Abbrechen keinen ausstehenden Durchlauf mehr', async () => {
     await datensatzAnlegen();
     const p = erzeugeLagebildPersister(BENUTZER.id, { drosselMs: DROSSEL });

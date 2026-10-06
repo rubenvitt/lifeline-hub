@@ -26,7 +26,9 @@ function useJetzt(taktMs: number): Dayjs {
  * Der Countdown tickt alle 30 s OHNE Toast und ohne Blinken: nur der Wortlaut im `StatusTag`
  * ändert sich. Der Termin kommt aus `StabAnzeige`, die ihn aus der Spalte am Einsatz mitliefert;
  * das Ereignis `einsatz` frischt sie mit dem Kopf zusammen auf (LFH-555).
- * „Letzte" zieht über die volle Breite (Nummer, Zeit, Entschluss und Link).
+ * „Letzte" zieht über die volle Breite (Nummer, Zeit, Entschluss und Link). Deshalb zwei
+ * Spalten, nicht drei: in der ersten Reihe stehen nur „Nächste" und „Anzahl", eine dritte Spur
+ * bliebe leer (LFH-961).
  */
 export default function LagebesprechungStand({
   einsatzId,
@@ -41,7 +43,7 @@ export default function LagebesprechungStand({
   const letzte = stab.letzte_lagebesprechung;
 
   return (
-    <Datenraster spalten={3} beschriftung="Stand der Lagebesprechung">
+    <Datenraster spalten={2} beschriftung="Stand der Lagebesprechung">
       <Datenfeld label="Nächste">
         <Space wrap>
           {termin && (

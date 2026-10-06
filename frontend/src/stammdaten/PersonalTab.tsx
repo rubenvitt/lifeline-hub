@@ -1,8 +1,12 @@
-import { Button, Space, Tag, type TableColumnsType } from 'antd';
+import { Button, Space, Tag } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import KatalogTabelle from '../components/KatalogTabelle';
+import KatalogTabelle, {
+  KENNUNG_SCHMAL_BREITE,
+  type KatalogSpalte,
+} from '../components/KatalogTabelle';
+import { useViewport } from '../components/useViewport';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -24,6 +28,7 @@ import { KennungsLink } from '../components/kennungsLink';
 export default function PersonalTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
+  const { istSchmal } = useViewport();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Personal | null>(null);
 
@@ -38,11 +43,15 @@ export default function PersonalTab() {
 
   const dienststatusMutation = useDienststatusMutation(setzeDienststatus, globalKeys.personal());
 
-  const spalten: TableColumnsType<Personal> = [
+  // Stärke-Position und Träger sind nachrangig und fallen unter `lg` weg; der Spaltenschalter
+  // zählt sie und holt sie zurück (LFH-980).
+  const spalten: KatalogSpalte<Personal>[] = [
     {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
+      width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       /**
        * Leitspalte: an ihr sucht ein Mensch die Person. Der Server sortiert zwar schon
        * (`ORDER BY name`), aber über SQLites Standardkollation byteweise: „Öttinger" landet hinter
@@ -59,8 +68,10 @@ export default function PersonalTab() {
        * ohne ihn fiele der Name aus dem Suchkorpus.
        */
       render: (_, p) => (
-        <Space size={4}>
-          <KennungsLink to={personalDetailPfad(p.id)}>{p.name}</KennungsLink>
+        <Space size={4} wrap>
+          <KennungsLink to={personalDetailPfad(p.id)} style={{ overflowWrap: 'anywhere' }}>
+            {p.name}
+          </KennungsLink>
           {p.ist_demo && <DemoMarke />}
         </Space>
       ),
@@ -88,6 +99,7 @@ export default function PersonalTab() {
     {
       title: 'Stärke-Position',
       key: 'staerke_position',
+      abBreite: 'lg',
       /**
        * Bewusst OHNE `dataIndex`: sonst lägen die Drahtwerte im Suchkorpus, „mann" und „sch"
        * träfen jede Mannschafts-Person (`mannschaft`), „Führer" mit Umlaut dagegen nichts. `render`
@@ -95,10 +107,18 @@ export default function PersonalTab() {
        */
       render: (_, p) => (p.staerke_position ? POSITION_LABELS[p.staerke_position] : '—'),
     },
-    { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
+    {
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      abBreite: 'lg',
+      render: (t) => t ?? '—',
+    },
     ...dienststatusSpalten<Personal>({
       mutation: dienststatusMutation,
       istAdmin,
+      schmal: istSchmal,
+      kennung: (p) => `Person ${p.name}`,
       onBearbeiten: (p) => {
         setBearbeite(p);
         setModalOffen(true);
@@ -156,6 +176,7 @@ export default function PersonalTab() {
            * sonst träfen ihre Drahtwerte (`mannschaft`, `in_dienst`) Zeilen, die niemand gemeint hat.
            */
           suche={{ platzhalter: 'Name, Personalnr. oder Träger' }}
+          spaltenSchalter={{ bezeichnung: 'Personal' }}
           locale={{ emptyText: 'Noch kein Personal' }}
         />
       )}

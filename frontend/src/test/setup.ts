@@ -7,6 +7,7 @@ import { server } from './server';
 import { lagebildLoeschenPlatte } from '../offline/lagebildSpeicher';
 import { verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
+import { setzeMasseZurueck } from './elementMasse';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -123,6 +124,7 @@ afterEach(() => {
   onlineManager.setOnline(true);
   localStorage.clear(); // Persistenz (z. B. gemerkte Basemap/UHS) nicht zwischen Tests lecken lassen
   setzeViewportZurueck(); // Breite/Zeigerart/Zuhörer zurück auf den Ausgangszustand
+  setzeMasseZurueck(); // gesetzte Layout-Maße (`elementMasse.ts`) nicht in den nächsten Test lecken
   // Vorgehaltenes Lagebild (LFH-723): jeder `AuthProvider` legt bei bestätigter Sitzung einen
   // Datensatz an. Bliebe er stehen, stellte der nächste Test mit derselben Benutzer-ID den
   // Stand des vorigen wieder her — frisch genug, dass `staleTime` den Abruf überspränge.

@@ -59,9 +59,35 @@ function geschriebeneKeys(qc: QueryClient): unknown[][] {
 
 describe('istLagebildOfflineKey', () => {
   it('nimmt gelistete Einsatz-Keys samt Sub-Keys', () => {
-    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { q: 'x' }))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, {}))).toBe(true);
     expect(istLagebildOfflineKey(einsatzKeys.personen(7))).toBe(true);
     expect(istLagebildOfflineKey(einsatzKeys.einsatz(7))).toBe(true);
+  });
+
+  it('nimmt vom ETB nur die festen Ansichten (LFH-939, design.md D4)', () => {
+    // Fest: ohne Filter, je Typ, feste Ausschnitte (Überblick, Lage-Dashboard), Lesemarke.
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, {}))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { typ: 'meldung' }))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { typ: 'entscheidung', limit: 50 }))).toBe(
+      true,
+    );
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { limit: 30 }))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbZaehler(7, {}))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbZaehler(7, { typ: 'lage' }))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbLesemarke(7))).toBe(true);
+    // Frei: jede Eingabe der Person, auch im Zähler.
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { q: 'x' }))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { typ: 'meldung', q: 'x' }))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { von: '2026-10-01' }))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { einheit_id: 3 }))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { before_lfd_nr: 5, limit: 1 }))).toBe(
+      false,
+    );
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { limit: 100, bezug: 'x' }))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { lageentwicklung: 4 }))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.etbZaehler(7, { q: 'x' }))).toBe(false);
+    // Ein unbekannter Sub-Key fällt heraus (Positivliste).
+    expect(istLagebildOfflineKey(['etb', 7, 'neu'])).toBe(false);
   });
 
   it('nimmt von den Meldungen nur die Rückmeldungen', () => {

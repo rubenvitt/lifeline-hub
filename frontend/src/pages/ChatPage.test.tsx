@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { Link, Route, Routes } from 'react-router';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import ChatPage from './ChatPage';
 import type { ChatKanal, ChatNachricht } from '../api/types';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
+import { setzeViewportBreite } from '../test/viewport';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -564,5 +565,92 @@ describe('ChatPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     await waitFor(() => expect(gesendetAn).toEqual(['8/9']));
     expect(await screen.findByText('Nach B')).toBeInTheDocument();
+  });
+});
+
+/**
+ * LFH-976: Unter `md` ersetzt die Kanal-Leiste die `KanalListe` — und damit deren Kopfaktion.
+ * Der Knopf daneben öffnet denselben Dialog; ohne Schreibrecht fehlt er wie ab `md`.
+ */
+describe('ChatPage — Kanal anlegen unter md (LFH-976)', () => {
+  function setupSchmal(meineRolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung') {
+    const kanaele: ChatKanal[] = [kanal];
+    const angelegt: { name: string; beschreibung?: string }[] = [];
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: meineRolle }),
+      ),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json(kanaele)),
+      http.get('/api/einsaetze/7/chat/kanaele/:kanalId/nachrichten', ({ params }) =>
+        HttpResponse.json(params.kanalId === '1' ? [nachricht] : []),
+      ),
+      http.post('/api/einsaetze/7/chat/kanaele', async ({ request }) => {
+        const body = (await request.json()) as { name: string; beschreibung?: string };
+        angelegt.push(body);
+        const neu: ChatKanal = {
+          ...kanal,
+          id: 2,
+          name: body.name,
+          beschreibung: body.beschreibung ?? null,
+          letzte_nachricht_at: null,
+        };
+        kanaele.push(neu);
+        return HttpResponse.json(neu, { status: 201 });
+      }),
+    );
+    setzeViewportBreite(390);
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
+      { route: '/einsaetze/7/chat' },
+    );
+    return { angelegt };
+  }
+
+  it('bietet neben der Kanal-Leiste „Kanal anlegen" an, außerhalb der Tabliste', async () => {
+    setupSchmal();
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.queryByTestId('kanal-spalte')).not.toBeInTheDocument();
+
+    const leiste = screen.getByTestId('kanal-leiste');
+    const knopf = within(leiste).getByRole('button', { name: 'Kanal anlegen' });
+    // Kein Segment: die Tabliste besitzt nur die Kanäle.
+    expect(knopf.closest('[role="tablist"]')).toBeNull();
+    expect(within(screen.getByRole('tablist', { name: 'Kanal' })).getAllByRole('tab')).toHaveLength(
+      1,
+    );
+    // Genau eine Anlage-Aktion auf der Seite.
+    expect(screen.getAllByRole('button', { name: 'Kanal anlegen' })).toHaveLength(1);
+  });
+
+  it('legt per Enter im Namensfeld einen Kanal an, der als Segment erscheint und wählbar ist', async () => {
+    const user = userEvent.setup();
+    const { angelegt } = setupSchmal();
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
+    expect(await screen.findByRole('dialog', { name: 'Neuer Kanal' })).toBeInTheDocument();
+    await user.type(await screen.findByLabelText('Name'), 'Verpflegung{Enter}');
+
+    await waitFor(() => expect(angelegt).toEqual([{ name: 'Verpflegung' }]));
+    const segment = await screen.findByRole('tab', { name: 'Verpflegung' });
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
+
+    await user.click(segment);
+    await waitFor(() => expect(segment).toHaveAttribute('aria-selected', 'true'));
+    expect(screen.queryByText('Erste Lage')).not.toBeInTheDocument();
+  });
+
+  it('zeigt ohne Schreibrecht keine Anlage, wie die Kanalliste ab md', async () => {
+    setupSchmal('beobachter');
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.getByTestId('kanal-leiste')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
+    // Erklärt wird es am Fuß, für Leiste und Spalte gleich (M16).
+    expect(
+      screen.getByText(/Einsatzleitung und dem Führungspersonal vorbehalten/i),
+    ).toBeInTheDocument();
   });
 });
