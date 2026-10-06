@@ -198,7 +198,7 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
     : [];
   const person =
     karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <IconPerson /> }] : [];
-  // Rückweg in den Wartebereich: der Drag auf `drop-inbox` ist unter `lg` strukturell weg (anderer
+  // Rückweg in den Wartebereich: der Drag auf `drop-inbox` ist in der Reiterform strukturell weg (anderer
   // Reiter, `destroyOnHidden`).
   const rueckweg = wartebereich
     ? [
@@ -587,7 +587,7 @@ function PlatzKarte({
         {belegtVon && <StatusChip ton="bedien" wort="belegt" />}
       </div>
       {/* Belegung: feste Höhe, auch wenn leer. Die belegte Person ist ziehbar (→ Wartebereich
-          oder Transport), im Bearbeiten-Modus nicht. Unter `lg` ist der Rückweg per Drag
+          oder Transport), im Bearbeiten-Modus nicht. In der Reiterform ist der Rückweg per Drag
           unmöglich (anderer Reiter), der Menüeintrag „Zurück in den Wartebereich" trägt ihn. In
           der Kartenform ist die Marke kein eigenes Klickziel: ihr Klick steigt zur Karte auf und
           öffnet das Menü; der Zug bleibt. */}
@@ -718,7 +718,7 @@ function PersonenSpalte({
   onOeffnen: (personId: number) => void;
   /**
    * Verbleib erfassen aus der Liste heraus: `onDragEnd` nimmt `kind === 'transport'` von jeder
-   * Person entgegen, `drop-transport` liegt unter `lg` aber in einem anderen Reiter, und die
+   * Person entgegen, `drop-transport` liegt in der Reiterform aber in einem anderen Reiter, und die
    * direkten Verbleib-Knöpfe gibt es nur an belegten Plätzen. Ohne diesen Weg bekäme eine Person im
    * Wartebereich auf schmalem Schirm keinen Verbleib.
    *
@@ -1335,7 +1335,7 @@ export default function Grundriss({
         height: '100%',
       }}
     >
-      {/* `onVerbleib` an beiden Listen: `drop-transport` liegt unter `lg` im dritten Reiter.
+      {/* `onVerbleib` an beiden Listen: `drop-transport` liegt in der Reiterform im dritten Reiter.
           Eine Person unter „Noch nicht aufgenommen" verlässt die Liste, sobald sie einen
           Verbleib trägt. */}
       <PersonenSpalte

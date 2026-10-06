@@ -355,7 +355,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
   /**
    * Verbleib aus beiden Wartelisten heraus: `onDragEnd` nimmt `kind: 'transport'` von jeder Person,
-   * `drop-transport` liegt unter `lg` im dritten Reiter, und die direkten Knöpfe sitzen nur an
+   * `drop-transport` liegt in der Reiterform im dritten Reiter, und die direkten Knöpfe sitzen nur an
    * belegten Plätzen.
    */
   it('erfasst den Verbleib aus beiden Wartelisten heraus — auf beiden Breiten', async () => {

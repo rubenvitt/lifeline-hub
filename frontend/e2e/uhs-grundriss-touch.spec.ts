@@ -4,8 +4,11 @@ import { wechsleZuRolle } from './rollen-kern';
 /**
  * UHS-Grundriss unter Berührungsbedienung.
  *
- * DRAG BEI 1024, KLICKWEG BEI 390 PX: unter `lg` bricht `pages/uhs/Grundriss.tsx` in drei
- * Reiter um, mit `destroyOnHidden` — ohne die Prop bliebe eine einmal besuchte Pane montiert.
+ * DRAG AUF DEM GROSSEN TOUCHSCHIRM, KLICKWEG BEI 390 PX: passt die Fläche nicht neben beide
+ * Seitenspalten, bricht `pages/uhs/Grundriss.tsx` in drei Reiter um (`dreiSpaltenPassen` in
+ * `pages/uhs/grundrissLayout.ts`, nach Inhaltsbreite, LFH-970) — auf dem Führungs-Tablet neben
+ * Rail und Modulpanel schon. Die Reiter tragen `destroyOnHidden`: ohne die Prop bliebe eine
+ * einmal besuchte Pane montiert.
  * Personenliste (Quelle) und Platzkarte (Ziel) liegen dann in verschiedenen Reitern, das
  * Droppable existiert nicht, während die Quelle sichtbar ist. Ein Drag-Test bei 390 px wäre
  * ein Test gegen eine bewusste Entwurfsentscheidung.
@@ -22,8 +25,14 @@ import { wechsleZuRolle } from './rollen-kern';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-/** Führungs-Tablet: 1024–1280 px, Touch. Beide Seitenspalten stehen hier nebeneinander. */
+/** Führungs-Tablet: 1024–1280 px, Touch. Neben Rail und Modulpanel steht hier die Reiterform. */
 const TABLET = { width: 1024, height: 900 };
+/**
+ * Großer Touchschirm: breit genug, dass Fläche und beide Seitenspalten nebeneinander stehen —
+ * nur dort gibt es den Zug zwischen Liste und Platz. Die Höhe des Tablets bleibt, damit die
+ * Spaltenhöhe im Scroll-Fall dieselbe ist.
+ */
+const TOUCH_BREIT = { width: 1920, height: 900 };
 /** Mobil: ~390 px, einhändig. Hier greift die Reiter-Weiche. */
 const HANDSCHIRM = { width: 390, height: 844 };
 
@@ -191,10 +200,10 @@ async function ziehePerTouch(page: Page, quelle: Locator, ziel: Locator) {
 }
 
 test.describe('UHS-Grundriss unter Touch', () => {
-  test('Führungs-Tablet (1024 px): Touch-Drag auf einen Platz — und die Karte steht VOR der Server-Antwort dort', async ({
+  test('Großer Touchschirm (1920 px): Touch-Drag auf einen Platz — und die Karte steht VOR der Server-Antwort dort', async ({
     page,
   }) => {
-    await page.setViewportSize(TABLET);
+    await page.setViewportSize(TOUCH_BREIT);
     const { personName } = await setupPatientUndPlatz(page);
 
     // Das optimistische Update des Drag-Aufrufers ist in jsdom nicht belegbar (dnd-kits
@@ -230,10 +239,10 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(platz).toContainText('belegt');
   });
 
-  test('Führungs-Tablet: eine abgelehnte Zuordnung rollt die Karte auf den Ausgangsplatz zurück', async ({
+  test('Großer Touchschirm: eine abgelehnte Zuordnung rollt die Karte auf den Ausgangsplatz zurück', async ({
     page,
   }) => {
-    await page.setViewportSize(TABLET);
+    await page.setViewportSize(TOUCH_BREIT);
     const { personName } = await setupPatientUndPlatz(page);
 
     let abgelehnt = false;
@@ -288,8 +297,10 @@ test.describe('UHS-Grundriss unter Touch', () => {
     ).toBe(false);
   });
 
-  test('Führungs-Tablet: die Warteliste scrollt bei ANGEHALTENEM Drag weiter', async ({ page }) => {
-    await page.setViewportSize(TABLET);
+  test('Großer Touchschirm: die Warteliste scrollt bei ANGEHALTENEM Drag weiter', async ({
+    page,
+  }) => {
+    await page.setViewportSize(TOUCH_BREIT);
     // Vierzig Füllpersonen: ohne Überlänge gibt es nichts zu scrollen.
     const { personName } = await setupPatientUndPlatz(page, 40);
 
@@ -314,7 +325,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     // erst danach beenden. Zwei Fallen am Ort des Drags:
     //  1. Der Auto-Scroller von dnd-kit scrollt, sobald die Karte im äußeren Fünftel des
     //     Containers steht, und klemmte `scrollTop` auf 0. Deshalb liegen beide Punkte im
-    //     mittleren Drittel (hergeleitet aus der Spaltenhöhe bei `TABLET`, `calc(100vh - 300px)`).
+    //     mittleren Drittel (hergeleitet aus der Spaltenhöhe bei `TOUCH_BREIT`, `calc(100vh - 300px)`).
     //  2. Das DragOverlay (`position: fixed`, `touchAction: 'none'`) schluckt das Rad, wenn es
     //     unter dem Zeiger liegt — die Scrollkette führt dann aufs Dokument. Deshalb wird die
     //     Maus ZUERST gesetzt und der Touch-Drag woanders angehalten.
@@ -413,7 +424,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
     await expect(bett1(page), 'der Klickweg hat zugewiesen').toContainText(personName);
 
-    // Rückweg: unter `lg` gibt es keinen Drag in den Wartebereich; der Ersatz ist der
+    // Rückweg: in der Reiterform gibt es keinen Drag in den Wartebereich; der Ersatz ist der
     // Menüeintrag.
     await bett1(page).tap();
     await eingeblendet(offenesPlatzmenue(page));
@@ -500,7 +511,8 @@ test.describe('UHS-Grundriss unter Touch', () => {
   test('Kartenform (komfortabel): Layout-Zug und Personen-Zug öffnen kein Menü', async ({
     page,
   }) => {
-    await page.setViewportSize(TABLET);
+    // Der Personen-Zug braucht den Wartebereich neben der Fläche.
+    await page.setViewportSize(TOUCH_BREIT);
     const { einsatzId, uhsId, personName } = await setupPatientUndPlatz(page);
     await page.evaluate(() => window.localStorage.setItem('lifeline-hub.dichte', 'komfortabel'));
     await page.reload();
