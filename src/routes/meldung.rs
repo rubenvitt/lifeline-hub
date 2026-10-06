@@ -12,7 +12,7 @@ use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
     PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
 };
-use crate::routes::support::{parse_enum, pflicht};
+use crate::routes::support::{hoechstens, parse_enum, pflicht_max};
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -247,8 +247,12 @@ pub async fn anlegen(
     ctx.fordere_aktiv()?;
 
     // Mindestfelder: Absender, Inhalt, Meldeweg.
-    let absender = pflicht(&req.absender, "Absender")?;
-    let inhalt = pflicht(&req.inhalt, "Inhalt")?;
+    // Absender, Empfänger und Inhalt landen unverändert im ETB: dessen Grenzen (LFH-937, D2).
+    let absender = pflicht_max(&req.absender, "Absender", crate::etb::PARTEI_MAX)?;
+    let inhalt = pflicht_max(&req.inhalt, "Inhalt", crate::etb::INHALT_MAX)?;
+    if let Some(e) = trimme(&req.empfaenger) {
+        hoechstens(e, "Empfänger", crate::etb::PARTEI_MAX)?;
+    }
     parse_enum(
         crate::meldung::MeldeWeg::parse,
         req.meldeweg.trim(),

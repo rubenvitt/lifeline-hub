@@ -1,4 +1,5 @@
 import { AutoComplete, Input, Space, Tag } from 'antd';
+import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
@@ -112,6 +113,9 @@ export default function MetaChip({
             aria-label={d.label}
             disabled={gesperrt}
             style={{ width: 200 }}
+            // Grenze des Servers (LFH-937); natives `maxLength` zählt UTF-16 und ist damit nie
+            // großzügiger als er.
+            maxLength={ETB_PARTEI_MAX}
             value={text}
             onChange={(v) => setText(v)}
             // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
@@ -132,6 +136,7 @@ export default function MetaChip({
             aria-label={d.label}
             disabled={gesperrt}
             style={{ width: 160 }}
+            maxLength={ETB_PARTEI_MAX}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onPressEnter={() => (text.trim() ? onCommit(feld, text.trim()) : onCancel(feld))}

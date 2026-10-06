@@ -21,6 +21,14 @@ use utoipa::ToSchema;
 pub mod mitteilung;
 pub mod repo;
 
+/// Höchstlänge von Medium, Kontaktname und Freigabe eines Medienkontakts (LFH-937, design.md
+/// D6). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const KURZ_MAX: usize = 200;
+/// Höchstlänge von Thema und Erreichbarkeit eines Medienkontakts (LFH-937).
+pub const THEMA_MAX: usize = 500;
+/// Höchstlänge der gegebenen Antwort (LFH-937).
+pub const ANTWORT_MAX: usize = 8_000;
+
 wire_enum! {
     /// Art eines Medienkontakts. Wire == `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

@@ -450,3 +450,47 @@ describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', ()
     await waitFor(() => expect(body.uebergeben_an).toBe('Bauhof'));
   });
 });
+
+describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
+  it('zeigt eine ältere, zu lange Beschreibung als Überlänge und speichert sie nicht', async () => {
+    let gepatcht = false;
+    render(einsatzAktiv, basisSchaden({ beschreibung: 'b'.repeat(8_001) }), [
+      http.patch('/api/einsaetze/1/schaeden/10', () => {
+        gepatcht = true;
+        return HttpResponse.json(basisSchaden());
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByText('8.001 / 8.000 · zu lang')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('z. B. Hauptstr. 17 oder L 235 km 12,5')).toHaveAttribute(
+      'maxlength',
+      '500',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(gepatcht).toBe(false);
+  });
+
+  it('eine ältere, zu lange Beschreibung bleibt beim Löschen eines Zeichens vollständig', async () => {
+    const start = `${'b'.repeat(8_000)}ENDE`;
+    render(einsatzAktiv, basisSchaden({ beschreibung: start }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByDisplayValue(start);
+    fireEvent.change(feld, { target: { value: start.slice(1) } });
+    expect(feld).toHaveValue(start.slice(1));
+  });
+
+  it('Geschädigt: ein Suchbegriff über 500 Zeichen wird nicht als externer Kontakt angeboten', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const geschaedigt = screen.getAllByRole('combobox')[2];
+    await userEvent.click(geschaedigt);
+    fireEvent.change(geschaedigt, { target: { value: 'k'.repeat(500) } });
+    expect(await screen.findByText(/Als externen Kontakt/)).toBeInTheDocument();
+    fireEvent.change(geschaedigt, { target: { value: 'k'.repeat(501) } });
+    expect(
+      await screen.findByText('Kontakt zu lang: höchstens 500 Zeichen (jetzt 501)'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Als externen Kontakt/)).toBeNull();
+  });
+});

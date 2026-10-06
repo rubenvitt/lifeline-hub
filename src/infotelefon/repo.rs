@@ -8,6 +8,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use super::{InfotelefonAnliegen, InfotelefonAnrufAnzeige, InfotelefonStatus};
 use crate::error::AppError;
+use crate::routes::support::hoechstens;
 
 /// Eingabe „Anruf erfassen“. Anliegen und Eingang hat die Route gelesen und normalisiert.
 #[derive(Debug, Clone)]
@@ -119,7 +120,19 @@ pub async fn anlegen_tx(
     benutzer_id: i64,
     e: &AnrufEingabe,
 ) -> Result<i64, AppError> {
+    // Grenzen vor dem Zusammenhang (400 vor 422; LFH-937, design.md D6).
+    let notiz = text_opt(e.notiz.as_deref());
+    let anrufer_name = text_opt(e.anrufer_name.as_deref());
     let rueckruf = text_opt(e.rueckruf.as_deref());
+    for (wert, feld, max) in [
+        (&notiz, "Notiz", super::NOTIZ_MAX),
+        (&anrufer_name, "Anrufername", super::KURZ_MAX),
+        (&rueckruf, "Rückruf", super::KURZ_MAX),
+    ] {
+        if let Some(w) = wert {
+            hoechstens(w, feld, max)?;
+        }
+    }
     if e.rueckruf_noetig && rueckruf.is_none() {
         return Err(AppError::UnprocessableEntity(
             "Für einen Rückruf fehlt die Rückrufnummer".into(),
@@ -138,8 +151,8 @@ pub async fn anlegen_tx(
     )
     .bind(einsatz_id)
     .bind(e.anliegen.as_str())
-    .bind(text_opt(e.notiz.as_deref()))
-    .bind(text_opt(e.anrufer_name.as_deref()))
+    .bind(notiz)
+    .bind(anrufer_name)
     .bind(rueckruf)
     .bind(status.as_str())
     .bind(&e.eingang_at)

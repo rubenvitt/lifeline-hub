@@ -8,8 +8,8 @@ use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::person::repo as person_repo; // Org-Isolation der Geschädigt-FK (404 bei fremder Person)
 use crate::routes::support::{
-    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri,
-    pruefe_koordinate, trimme,
+    deserialize_optional_field, hoechstens, optional_max, parse_enum, parse_enum_opt, pflicht,
+    pflicht_max, pflicht_max_tri, pruefe_koordinate, trimme,
 };
 use crate::schaden::{
     darf_uebergehen, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
@@ -165,9 +165,19 @@ pub async fn anlegen(
     let Some(ort_roh) = body.ort.clone() else {
         return Err(AppError::Validation("Ort ist Pflicht".into()));
     };
-    let ort = pflicht(&ort_roh, "Ort")?;
+    // Grenzen vor dem Zusammenhang (400 vor 422; LFH-937, design.md D6).
+    let ort = pflicht_max(&ort_roh, "Ort", crate::schaden::ORT_MAX)?;
+    let kontakt = optional_max(
+        body.geschaedigt_kontakt.clone(),
+        "Geschädigt-Kontakt",
+        crate::schaden::ORT_MAX,
+    )?;
+    let beschreibung = optional_max(
+        body.beschreibung.clone(),
+        "Beschreibung",
+        crate::schaden::BESCHREIBUNG_MAX,
+    )?;
     pruefe_koordinate(body.lat, body.lon, "lat", "lon")?;
-    let kontakt = trimme(body.geschaedigt_kontakt.clone());
 
     // Eigene Organisation: id wird IMMER serverseitig aus ctx.einsatz.org_id abgeleitet,
     // der vom Client gesendete Wert wird ignoriert (nie vertrauen).
@@ -198,7 +208,6 @@ pub async fn anlegen(
             return Err(AppError::NotFound);
         }
     }
-    let beschreibung = trimme(body.beschreibung.clone());
 
     // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
@@ -299,11 +308,6 @@ pub async fn aktualisieren(
         ));
     }
 
-    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
-    let eff_lat = body.lat.unwrap_or(vorher.lat);
-    let eff_lon = body.lon.unwrap_or(vorher.lon);
-    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
-
     // Enum-Prechecks: Feld isoliert unbrauchbar → 400 (LFH-305). Diese drei sind zugleich
     // der einzige Schutz vor einem stillen Durchfall auf die DB — schaden/repo.rs bindet
     // typ/ausmass/abschluss_grund per COALESCE bzw. CASE als ROHEN String, und die CHECKs
@@ -317,13 +321,26 @@ pub async fn aktualisieren(
     }
     // Vorhanden, aber leer: scheitert am Feld selbst → 400. Der Guard trennt „Feld fehlt"
     // (dann bleibt der Ort unverändert) sauber von „Feld ist da, aber leer".
-    let ort_norm = pflicht_tri(body.ort.as_deref(), "Ort")?;
+    let ort_norm = pflicht_max_tri(body.ort.as_deref(), "Ort", crate::schaden::ORT_MAX)?;
 
     // Normalisierte Bindungen (müssen den `aktualisiere`-Aufruf überleben → eigene `let`s).
-    let beschreibung_norm = trimme(body.beschreibung.clone());
+    let beschreibung_norm = optional_max(
+        body.beschreibung.clone(),
+        "Beschreibung",
+        crate::schaden::BESCHREIBUNG_MAX,
+    )?;
     let kontakt_norm: Option<Option<String>> = body
         .geschaedigt_kontakt
         .map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+    if let Some(Some(k)) = &kontakt_norm {
+        hoechstens(k, "Geschädigt-Kontakt", crate::schaden::ORT_MAX)?;
+    }
+
+    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500), nach allen
+    // Feldfehlern (`src/AGENTS.md`, Statuscode-Konvention).
+    let eff_lat = body.lat.unwrap_or(vorher.lat);
+    let eff_lon = body.lon.unwrap_or(vorher.lon);
+    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
     let uebergeben_an_norm: Option<Option<String>> = body
         .uebergeben_an
         .map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));

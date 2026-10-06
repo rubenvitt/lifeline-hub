@@ -1,6 +1,12 @@
 pub mod anhang;
 pub mod repo;
 
+/// Höchstlänge von Ort und Geschädigt-Kontakt eines Schadens (LFH-937, design.md D6). Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const ORT_MAX: usize = 500;
+/// Höchstlänge der Beschreibung eines Schadens (LFH-937, design.md D6).
+pub const BESCHREIBUNG_MAX: usize = 8_000;
+
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;

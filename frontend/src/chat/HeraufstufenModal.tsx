@@ -1,4 +1,6 @@
 import { Checkbox, Form, Input, Typography } from 'antd';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -80,9 +82,16 @@ export default function HeraufstufenModal({
       <Form.Item
         label="Text"
         name="inhalt"
-        rules={[{ required: true, whitespace: true, message: 'Text erforderlich' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Text erforderlich' },
+          // Eine ältere, längere Nachricht wird nicht still gekürzt (LFH-937, design.md D8).
+          zeichenRegel(ETB_INHALT_MAX, 'Text'),
+        ]}
       >
-        <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} />
+        <Input.TextArea
+          autoSize={{ minRows: 2, maxRows: 6 }}
+          count={zeichenGrenze(ETB_INHALT_MAX)}
+        />
       </Form.Item>
       {anhaenge.length > 0 && (
         <Form.Item

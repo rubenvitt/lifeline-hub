@@ -1,4 +1,5 @@
 import { Alert, AutoComplete, Button, Checkbox, Space, Typography } from 'antd';
+import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { useId, useState } from 'react';
 import { useRollen } from '../components/instrument';
 import { teilwortSuche } from '../components/teilwortSuche';
@@ -90,6 +91,8 @@ export default function RufnameAbfrage({
       }}
       options={auswahl}
       showSearch={teilwortSuche}
+      // Grenze des Servers für Von/An (LFH-937).
+      maxLength={ETB_PARTEI_MAX}
       onKeyDown={beiTaste}
       disabled={laeuft}
       style={{ minWidth: 200, flex: '1 1 200px', maxWidth: 320 }}

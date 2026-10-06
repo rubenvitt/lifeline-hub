@@ -10,7 +10,7 @@ import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { EINSATZ_STREAM_EVENTS, einsatzKeys } from '../api/queryKeys';
 import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
-import { queueEinreihen, queueLeerenFuerTests } from '../offline/queue';
+import { queueEinreihen, queueLaden, queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
@@ -495,6 +495,42 @@ describe('EtbPage', () => {
     const feld = await screen.findByPlaceholderText(/Inhalt/);
     await user.type(feld, 'Offline-Eintrag{Enter}');
     await waitFor(async () => expect(await entwuerfeLaden(admin.id, 7)).toHaveLength(0));
+  });
+
+  it('LFH-937: ein zu langer Baustein-Text geht weder hinaus noch in die Offline-Queue', async () => {
+    const langerText = 'x'.repeat(20_001);
+    let gesendet = 0;
+    setup('/einsaetze/7/etb', [
+      http.get('/api/etb-bausteine', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            label: 'Langer Baustein',
+            typ: 'meldung',
+            inhalt: langerText,
+            meldeweg: null,
+            veranlassung: null,
+            sortier: 0,
+          },
+        ]),
+      ),
+      // Ein Leitungsfehler reihte einen Eintrag ein: hier darf es gar nicht so weit kommen.
+      http.post('/api/einsaetze/7/etb', () => {
+        gesendet += 1;
+        return HttpResponse.error();
+      }),
+    ]);
+    const user = userEvent.setup();
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, '/langer');
+    await user.click(await screen.findByText('Langer Baustein'));
+    await waitFor(() => expect(feld).toHaveValue(langerText));
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
+
+    expect(await screen.findByText(/Inhalt ist zu lang/)).toHaveTextContent('20.000');
+    expect(gesendet).toBe(0);
+    expect(await queueLaden(admin.id, 7)).toHaveLength(0);
+    expect(feld).toHaveValue(langerText);
   });
 
   it('legt aus einem ETB-Eintrag eine Wiedervorlage mit ETB-Bezug an', async () => {

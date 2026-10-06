@@ -7,7 +7,7 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-use crate::routes::support::pflicht;
+use crate::routes::support::{hoechstens, pflicht, pflicht_max};
 // Vokabular modulübergreifend über das Kommunikations-Fundament referenziert
 // (LFH-84) statt direkt aus `etb` — Single Source of Truth bleibt `etb`.
 use crate::kommunikation::EtbTyp;
@@ -174,6 +174,8 @@ pub async fn nachricht_erfassen(
             "Nachricht braucht Text oder einen Anhang".into(),
         ));
     }
+    // Quelle des Heraufstufens ins ETB, deshalb dieselbe Grenze (LFH-937, design.md D2).
+    hoechstens(inhalt, "Nachricht", crate::etb::INHALT_MAX)?;
 
     // Doppelte IDs deduplizieren: ein Client darf denselben Anhang zweimal nennen,
     // ohne dass die Join-Tabellen-PK (nachricht_id, anhang_id) verletzt wird (sonst
@@ -225,7 +227,7 @@ pub async fn nachricht_bearbeiten(
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     fordere_autor(&state, ctx.benutzer.id, einsatz_id, nachricht_id).await?;
-    let inhalt = pflicht(&req.inhalt, "Nachricht")?;
+    let inhalt = pflicht_max(&req.inhalt, "Nachricht", crate::etb::INHALT_MAX)?;
     let nachricht = repo::bearbeiten(&state.pool, nachricht_id, &inhalt).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok(Json(nachricht))
@@ -359,6 +361,8 @@ pub async fn heraufstufen(
         // unveränderlicher ETB-Eintrag (LFH-700).
         .or_else(|| quelle.inhalt.clone().filter(|s| !s.trim().is_empty()))
         .ok_or_else(|| AppError::Validation("Kein Inhalt zum Heraufstufen".into()))?;
+    // Auch der Rückfall: eine ältere Nachricht kann länger sein als die Grenze (LFH-937).
+    hoechstens(&inhalt, "Inhalt", crate::etb::INHALT_MAX)?;
 
     let etb_id = repo::heraufstufen_zu_etb(
         &state.pool,

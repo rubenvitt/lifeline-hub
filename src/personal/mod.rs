@@ -11,6 +11,24 @@ use utoipa::ToSchema;
 
 /// Default-Qualifikations-Katalog je neu angelegter Organisation (label, sortier).
 /// **Muss mit dem Seed in `migrations/0011_qualifikation.sql` übereinstimmen.**
+/// Höchstzahl verschiedener Qualifikationen je Person (LFH-937, design.md D5). Darüber → 400.
+pub const QUALIFIKATIONEN_MAX: usize = 64;
+
+/// Qualifikations-Liste von außen: sortiert, entdoppelt, höchstens [`QUALIFIKATIONEN_MAX`]
+/// (sonst 400), vor jeder Abfrage (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+pub fn normalisiere_qualifikation_ids(
+    mut ids: Vec<i64>,
+) -> Result<Vec<i64>, crate::error::AppError> {
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() > QUALIFIKATIONEN_MAX {
+        return Err(crate::error::AppError::Validation(format!(
+            "Höchstens {QUALIFIKATIONEN_MAX} Qualifikationen je Person"
+        )));
+    }
+    Ok(ids)
+}
+
 pub const QUALIFIKATION_STARTLISTE: [(&str, i64); 9] = [
     ("Sanitäter", 10),
     ("Rettungssanitäter", 20),
