@@ -1,6 +1,6 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
@@ -135,8 +135,8 @@ export default function MeldungenPage() {
     [offeneQuery.data],
   );
   const abgeschlossene = useMemo(() => {
-    // Eine Meldung, die zwischen zwei Seitenabrufen erneut erledigt wurde, kann kurz in zwei
-    // Seiten stehen; die vordere (jüngere) gilt.
+    // Zwischen zwei Seitenabrufen kann sich der Bestand verschieben (neu erledigte oben), dann
+    // steht eine Meldung kurz in zwei Seiten; die vordere gilt.
     const gesehen = new Set<number>();
     return (abgeschlosseneQuery.data?.pages ?? []).flat().filter((m) => {
       if (gesehen.has(m.id)) return false;
@@ -156,23 +156,25 @@ export default function MeldungenPage() {
       { titel: `In Arbeit (${angefasste.length})`, meldungen: angefasste },
     ].filter((g) => g.meldungen.length > 0);
   }, [offene]);
-  /** Alles Geladene, für Rückrufe, die eine Meldung über ihre id brauchen. */
-  const geladene = useMemo(() => {
-    const karte = new Map<number, Meldung>();
-    for (const m of [...offene, ...abgeschlossene]) karte.set(m.id, m);
-    return karte;
-  }, [offene, abgeschlossene]);
 
   // Cross-Modul-Deeplink ?meldung=<id> hebt die Meldung hervor. Liegt sie nicht in den offenen,
   // holt die Seite sie einzeln (D4) und zeigt sie über der abgeschlossenen Liste, bis sie in einer
-  // geladenen Seite auftaucht. Kein Blättern bis zur Meldung. Scroll ist best-effort.
+  // geladenen Seite auftaucht. Kein Blättern bis zur Meldung. Jeder Deeplink zählt für sich, auch
+  // ein zweiter auf dieselbe Meldung (`deeplinkNr`).
   const [highlightMeldungId, setHighlightMeldungId] = useState<number | null>(null);
   const [verlinkteId, setVerlinkteId] = useState<number | null>(null);
+  const [deeplinkNr, setDeeplinkNr] = useState(0);
+  // Scroll einmal je Deeplink, sobald die Karte im DOM steht; nicht bei jedem späteren Nachladen.
+  const [scrollZiel, setScrollZiel] = useState<number | null>(null);
   useQueryParamSelektion('meldung', offeneQuery.isSuccess, (mid) => {
     setRichtungFilter(undefined);
     setHighlightMeldungId(mid);
+    setScrollZiel(mid);
+    setDeeplinkNr((n) => n + 1);
     if ((offeneQuery.data ?? []).some((x) => x.id === mid)) {
       setAnsicht('offen');
+      // Kein Einzelabruf mehr beobachten: er hinge sonst an jedem Ereignis mit.
+      setVerlinkteId(null);
       return;
     }
     setVerlinkteId(mid);
@@ -182,25 +184,44 @@ export default function MeldungenPage() {
     queryFn: () => ladeMeldung(einsatzId, verlinkteId ?? 0),
     enabled: verlinkteId != null,
   });
-  const verlinkte = verlinkteId != null ? verlinkteQuery.data : undefined;
+  const verlinkte =
+    verlinkteId != null && verlinkteQuery.data?.id === verlinkteId
+      ? verlinkteQuery.data
+      : undefined;
   // Die Ansicht folgt der verlinkten Meldung einmal je Deeplink, nicht jedem späteren Abgleich:
   // sonst risse eine fremde Statusänderung die Ansicht unter der Hand um.
-  const [verlinkteAngewandt, setVerlinkteAngewandt] = useState<number | null>(null);
+  const [angewandtNr, setAngewandtNr] = useState(0);
   useEffect(() => {
-    if (!verlinkte || verlinkteAngewandt === verlinkte.id) return;
-    setVerlinkteAngewandt(verlinkte.id);
+    if (!verlinkte || angewandtNr === deeplinkNr) return;
+    setAngewandtNr(deeplinkNr);
     setAnsicht(istErledigt(verlinkte) ? 'abgeschlossen' : 'offen');
-  }, [verlinkte, verlinkteAngewandt]);
+  }, [verlinkte, angewandtNr, deeplinkNr]);
   const verlinkteAngeheftet =
     verlinkte && istErledigt(verlinkte) && !abgeschlossene.some((m) => m.id === verlinkte.id)
       ? verlinkte
       : null;
   useEffect(() => {
-    if (highlightMeldungId == null) return;
-    document
-      .querySelector(`[data-meldung-id="${highlightMeldungId}"]`)
-      ?.scrollIntoView?.({ block: 'center' });
-  }, [highlightMeldungId, ansicht, verlinkteAngeheftet]);
+    if (scrollZiel == null) return;
+    const karte = document.querySelector(`[data-meldung-id="${scrollZiel}"]`);
+    if (!karte) return;
+    karte.scrollIntoView?.({ block: 'center' });
+    setScrollZiel(null);
+  }, [scrollZiel, ansicht, verlinkteAngeheftet, offene, abgeschlossene]);
+
+  /** Alles Geladene samt verlinkter Meldung, für Rückrufe, die eine Meldung über ihre id
+   *  brauchen. */
+  const geladene = useMemo(() => {
+    const karte = new Map<number, Meldung>();
+    if (verlinkte) karte.set(verlinkte.id, verlinkte);
+    for (const m of [...offene, ...abgeschlossene]) karte.set(m.id, m);
+    return karte;
+  }, [offene, abgeschlossene, verlinkte]);
+  // Die Rückrufe lesen den Bestand über einen Ref, damit sie über Live-Abgleiche stabil bleiben
+  // und `memo` an `MeldungKarte` auch dann trägt, wenn sich nur eine Meldung ändert.
+  const geladeneRef = useRef(geladene);
+  useLayoutEffect(() => {
+    geladeneRef.current = geladene;
+  }, [geladene]);
 
   const fehler = useFehlerMeldung();
   const invalidiere = useCallback(
@@ -305,7 +326,7 @@ export default function MeldungenPage() {
       // Bewusst ohne Rückgängig-Toast (`vorher` bleibt leer): ein Rückweg, der nur den
       // Meldungsstatus zurückdreht, ließe den Auftrag stehen und verspräche eine Rücknahme, die
       // keine ist.
-      const quelle = geladene.get(meldungId);
+      const quelle = geladeneRef.current.get(meldungId);
       if (quelle && quelle.status !== 'in_bearbeitung' && quelle.status !== 'erledigt') {
         statusMutation.mutate({ meldungId, status: 'in_bearbeitung' });
       }
@@ -321,16 +342,16 @@ export default function MeldungenPage() {
   const { mutate: bestaetigen } = bestaetigenMutation;
   const onStatus = useCallback(
     (meldungId: number, status: MeldungStatus) =>
-      statusSetzen({ meldungId, status, vorher: geladene.get(meldungId)?.status }),
-    [statusSetzen, geladene],
+      statusSetzen({ meldungId, status, vorher: geladeneRef.current.get(meldungId)?.status }),
+    [statusSetzen],
   );
   const onZuweisen = useCallback(
     (meldungId: number, bearbeiterId: number | null) => zuweisen({ meldungId, bearbeiterId }),
     [zuweisen],
   );
   const onLagerelevant = useCallback(
-    (meldungId: number) => setLageMeldung(geladene.get(meldungId) ?? null),
-    [geladene],
+    (meldungId: number) => setLageMeldung(geladeneRef.current.get(meldungId) ?? null),
+    [],
   );
   const onBestaetigen = useCallback((meldungId: number) => bestaetigen(meldungId), [bestaetigen]);
   const mitglieder = mitgliederQuery.data ?? KEINE_MITGLIEDER;
@@ -532,19 +553,22 @@ export default function MeldungenPage() {
           ) : (
             <MeldungListe meldungen={abgeschlossene} ansicht="abgeschlossen" {...listenProps} />
           )}
-          {abgeschlosseneQuery.hasNextPage && (
-            <div style={{ textAlign: 'center', marginTop: token.margin }}>
-              <Button
-                onClick={() => void abgeschlosseneQuery.fetchNextPage()}
-                loading={abgeschlosseneQuery.isFetchingNextPage}
-              >
-                Ältere laden
-              </Button>
-              <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                {abgeschlossene.length} von {abgeschlossenZahl} geladen
+          {/* Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
+              sagt, dass es keine gibt. */}
+          {abgeschlosseneQuery.hasNextPage &&
+            (kennzahlen == null || abgeschlossene.length < kennzahlen.erledigt) && (
+              <div style={{ textAlign: 'center', marginTop: token.margin }}>
+                <Button
+                  onClick={() => void abgeschlosseneQuery.fetchNextPage()}
+                  loading={abgeschlosseneQuery.isFetchingNextPage}
+                >
+                  Ältere laden
+                </Button>
+                <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
+                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </>
       )}
       <LagerelevantModal

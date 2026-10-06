@@ -6,6 +6,7 @@ import { App as AntApp } from 'antd';
 import ErinnerungenPage from './ErinnerungenPage';
 import {
   erledigeErinnerung,
+  ladeErinnerungKennzahlen,
   listeAbgeschlosseneErinnerungen,
   listeOffeneErinnerungen,
   oeffneErinnerung,
@@ -143,9 +144,10 @@ describe('ErinnerungenPage', () => {
     vi.mocked(listeAbgeschlosseneErinnerungen)
       .mockResolvedValueOnce(seite(0, 100))
       .mockResolvedValueOnce(seite(100, 3));
+    vi.mocked(ladeErinnerungKennzahlen).mockResolvedValueOnce({ offen: 1, abgeschlossen: 103 });
     renderPage();
     await screen.findByText('Lagemeldung');
-    fireEvent.click(screen.getByText('Abgeschlossen (2)'));
+    fireEvent.click(await screen.findByText('Abgeschlossen (103)'));
     expect(await screen.findByText('Alt 0')).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: 'Ältere laden' }));
     expect(await screen.findByText('Alt 102')).toBeInTheDocument();

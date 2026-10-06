@@ -252,19 +252,21 @@ export default function ErinnerungenPage() {
               {...listenProps}
             />
           )}
-          {abgeschlosseneQuery.hasNextPage && (
-            <div style={{ textAlign: 'center', marginTop: token.margin }}>
-              <Button
-                onClick={() => void abgeschlosseneQuery.fetchNextPage()}
-                loading={abgeschlosseneQuery.isFetchingNextPage}
-              >
-                Ältere laden
-              </Button>
-              <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                {abgeschlossene.length} von {abgeschlossenZahl} geladen
+          {abgeschlosseneQuery.hasNextPage &&
+            (kennzahlenQuery.data == null ||
+              abgeschlossene.length < kennzahlenQuery.data.abgeschlossen) && (
+              <div style={{ textAlign: 'center', marginTop: token.margin }}>
+                <Button
+                  onClick={() => void abgeschlosseneQuery.fetchNextPage()}
+                  loading={abgeschlosseneQuery.isFetchingNextPage}
+                >
+                  Ältere laden
+                </Button>
+                <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
+                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </>
       )}
     </EinsatzSeite>

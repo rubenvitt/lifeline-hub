@@ -175,8 +175,10 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 
 ## Backend — Antwortkompression und Phasenlisten (LFH-940)
 
-- **Gepackt wird nur JSON ab 1 KiB** (`CompressionLayer` mit `nur_json_ab` in `app.rs`, gzip
-  und br). SSE puffert sonst, Anhänge, Kacheln und Frontend-Dateien bleiben roh. Ein neuer
+- **Gepackt wird nur JSON ab 1 KiB ohne `ETag`/`Cache-Control`** (`CompressionLayer` mit
+  `nur_json_ab` in `app.rs`, gzip und br, Stufe fest `ANTWORT_KOMPRESSION_STUFE`). SSE puffert
+  sonst, Anhänge, Kacheln und Frontend-Dateien bleiben roh; Brotli auf Vorgabestufe 11 kostet
+  den kleinen Server mehr, als es spart. Ein neuer
   Antworttyp, der gepackt werden soll, kommt ins Prädikat, nicht als zweite Schicht. Nachweis
   `tests/antwortkompression.rs`.
 - **Eine Liste, die mit dem Einsatz wächst, trennt nach Phase** (`kommunikation::phase_und_seite`):

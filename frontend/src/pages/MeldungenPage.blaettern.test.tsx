@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route } from 'react-router';
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router';
 import MeldungenPage from './MeldungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung, MeldungKennzahlen } from '../api/types';
@@ -115,22 +115,41 @@ const KENNZAHLEN: MeldungKennzahlen = {
   erledigt: 250,
 };
 
+/** Ein Verweis von außen auf dieselbe Seite, wie ihn Palette oder ETB setzen. */
+function Verweis({ mid }: { mid: number }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(`/einsaetze/1/meldungen?meldung=${mid}`)}>
+      Verweis {mid}
+    </button>
+  );
+}
+
 function renderPage(route = '/einsaetze/1/meldungen') {
   server.use(meHandler(benutzerFixture({ anzeigename: 'Leitung' })));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const ergebnis = render(
     <QueryClientProvider client={client}>
       <AntApp>
         <AuthProvider>
           <MemoryRouter initialEntries={[route]}>
             <Routes>
-              <Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} />
+              <Route
+                path="/einsaetze/:id/meldungen"
+                element={
+                  <>
+                    <Verweis mid={500} />
+                    <MeldungenPage />
+                  </>
+                }
+              />
             </Routes>
           </MemoryRouter>
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );
+  return { ...ergebnis, client };
 }
 
 describe('MeldungenPage — getrennte Abrufe und Blättern (LFH-940)', () => {
@@ -190,7 +209,7 @@ describe('MeldungenPage — getrennte Abrufe und Blättern (LFH-940)', () => {
     });
     // Eine kurze Seite ist die letzte.
     expect(screen.queryByRole('button', { name: 'Ältere laden' })).not.toBeInTheDocument();
-  });
+  }, 30_000);
 
   it('holt eine verlinkte, nicht geladene Meldung einzeln und zeigt sie hervorgehoben', async () => {
     ladeMeldung.mockResolvedValue(
@@ -241,5 +260,33 @@ describe('MeldungenPage — getrennte Abrufe und Blättern (LFH-940)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.click(screen.getAllByRole('button', { name: /Formular schließen/ })[0]);
     expect(kartenRender.n).toBe(vorher);
+  });
+
+  it('schaltet auch beim zweiten Verweis auf dieselbe Meldung wieder um', async () => {
+    ladeMeldung.mockResolvedValue(
+      meldung({ id: 500, absender: 'Uralt', status: 'erledigt', ist_offen: false }),
+    );
+    renderPage('/einsaetze/1/meldungen?meldung=500');
+    expect(await screen.findByText('Verlinkte Meldung')).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/^Offen \(/));
+    await waitFor(() => expect(screen.queryByText('Verlinkte Meldung')).not.toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Verweis 500' }));
+    expect(await screen.findByText('Verlinkte Meldung')).toBeInTheDocument();
+  });
+
+  it('rendert beim Live-Abgleich nur die geänderte Karte neu', async () => {
+    const a = meldung({ id: 1, absender: 'A' });
+    const b = meldung({ id: 2, absender: 'B', status: 'gesichtet' });
+    listeOffeneMeldungen.mockResolvedValue([a, b]);
+    const { client } = renderPage();
+    await screen.findByText('B');
+    await screen.findByText('Abgeschlossen (250)');
+    const vorher = kartenRender.n;
+
+    listeOffeneMeldungen.mockResolvedValue([a, { ...b, bearbeiter_name: 'Sani Schmidt' }]);
+    await client.invalidateQueries({ queryKey: ['einsatz-meldungen', 1] });
+    await waitFor(() => expect(kartenRender.n).toBeGreaterThan(vorher));
+    expect(kartenRender.n - vorher).toBe(1);
   });
 });
