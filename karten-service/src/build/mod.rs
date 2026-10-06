@@ -35,7 +35,20 @@ pub async fn build_region(
     storage: &dyn Storage,
     bestand: &[PublishedVersion],
 ) -> anyhow::Result<Vec<PublishedVersion>> {
-    let art = runner.baue(reg.geofabrik_area).await?;
+    // LFH-927: Ein hängender make-/docker-Lauf darf den einzigen Bauplatz nicht dauerhaft belegen.
+    // Die Frist gilt nur für den Bau: Läuft sie ab, wird der Future verworfen (make stirbt über
+    // `kill_on_drop`). Den Upload deckt sie bewusst nicht ab — ein mitten im Multipart-Upload
+    // verworfener Future hinterließe einen unvollständigen Upload im Bucket; der Upload hat die
+    // Zeitschranken des object_store-Clients.
+    let frist = reg.max_dauer();
+    let art = tokio::time::timeout(frist, runner.baue(reg.geofabrik_area))
+        .await
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "Zeitüberschreitung: Bau länger als {} h",
+                frist.as_secs() / 3600
+            )
+        })??;
     let ergebnis = lade_hoch(reg, heute, &art, storage, bestand).await;
     entferne_artefakt(&art.datei).await;
     ergebnis
@@ -111,22 +124,9 @@ pub async fn fahre_build(
     registry.set_status(job_id, JobStatus::Building);
     let heute = chrono::Utc::now().date_naive();
     let snapshot = bestand.lock().unwrap().clone();
-    // LFH-927: Ein hängender make-/docker-Lauf darf den einzigen Bauplatz nicht dauerhaft belegen.
-    // Läuft die Frist ab, wird der Bau-Future verworfen (make stirbt über `kill_on_drop`), der
-    // Runner räumt Container und Teilartefakte ab, und der Aufrufer gibt den Guard regulär frei.
-    let frist = reg.max_dauer();
-    let gebaut = match tokio::time::timeout(
-        frist,
-        build_region(reg, heute, runner.as_ref(), storage.as_ref(), &snapshot),
-    )
-    .await
-    {
-        Ok(r) => r,
-        Err(_) => Err(anyhow::anyhow!(
-            "Zeitüberschreitung: Bau länger als {} h",
-            frist.as_secs() / 3600
-        )),
-    };
+    let gebaut = build_region(reg, heute, runner.as_ref(), storage.as_ref(), &snapshot).await;
+    // LFH-927: Nach einem Fehlschlag oder einer Zeitüberschreitung räumt der Runner Container und
+    // Teilartefakte ab; der Aufrufer gibt den Guard danach regulär frei.
     if gebaut.is_err() {
         runner.raeume_ab(reg.geofabrik_area).await;
     }

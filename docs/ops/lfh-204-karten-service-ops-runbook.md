@@ -134,8 +134,9 @@ Extrakt + `tmp/` **pro laufendem Build** (Disk-Guard-Sollwert — s. Abschnitt 9
 ist im Code **nicht implementiert**). Das fertige `.mbtiles`-Ergebnis einer Region liegt in
 `out/result/` nur, bis es hochgeladen ist: danach löscht der Service die Datei samt `.sha256`
 und `.versatiles`, nach einem Fehlschlag ebenso die Teilartefakte (LFH-927). Vor jedem Bau
-räumt er außerdem Altstände derselben Region in `out/result/` und leert `out/tmp/`. Es liegt
-also höchstens das Ergebnis des laufenden Baus auf der Platte. Ein Deutschland-weiter
+räumt er außerdem Altstände derselben Region in `out/result/` und leert `out/tmp/`. Ergebnisse
+aus der Zeit vor diesem Stand räumt er erst beim nächsten Bau ihrer Region; wer den Platz sofort
+braucht, leert `out/result/` beim Deploy einmal von Hand. Ein Deutschland-weiter
 Shortbread-Bau liegt üblicherweise im niedrigen bis mittleren GB-Bereich; kleinere
 Bundesländer entsprechend weniger.
 
@@ -399,7 +400,8 @@ automatisch aktuell.
 ### 6.3 Zeitgrenze und hängende Bauten (LFH-927)
 
 Jeder Bau hat eine Frist: **6 Stunden** für Länder und Bundesländer, **72 Stunden** für
-`planet` (`Region::max_dauer`, `karten-service/src/regions.rs`). Läuft sie ab, endet der Job
+`planet` (`Region::max_dauer`, `karten-service/src/regions.rs`). Sie umfasst Download und
+Kartenbau, nicht den Upload ins Object-Storage. Läuft sie ab, endet der Job
 auf `failed` mit „Zeitüberschreitung: Bau länger als … h“, der Service beendet `make` und
 entfernt den Bau-Container. Der Container heißt `ks-<area>` (`docker run --name` im
 Makefile); ein verwaister Container gleichen Namens wird vor dem nächsten Bau derselben
