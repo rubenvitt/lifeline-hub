@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
 import type { BenutzerAnzeige } from '../api/types';
 import {
@@ -8,6 +8,7 @@ import {
   lagebildBestaetigen,
   lagebildLesen,
   lagebildLoeschenPlatte,
+  lagebildSpeicherZuruecksetzenFuerTests,
   type LagebildDatensatz,
 } from './lagebildSpeicher';
 import { queueAlleLaden, queueEinreihen, queueLeerenFuerTests } from './queue';
@@ -27,8 +28,30 @@ const BENUTZER: BenutzerAnzeige = {
 const CLIENT = { timestamp: 1, buster: 'v1', clientState: { queries: [], mutations: [] } };
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await lagebildLoeschenPlatte();
 });
+
+/** Schlüssel, die ein Aufruf im Store `stand` liest bzw. schreibt (LFH-939 D2). */
+function zugriffeBeobachten() {
+  const gelesen: unknown[] = [];
+  const geschrieben: unknown[] = [];
+  const get = IDBObjectStore.prototype.get;
+  const put = IDBObjectStore.prototype.put;
+  vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (this: IDBObjectStore, k) {
+    gelesen.push(k);
+    return get.call(this, k);
+  });
+  vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+    this: IDBObjectStore,
+    wert,
+    k,
+  ) {
+    geschrieben.push(k);
+    return put.call(this, wert, k);
+  });
+  return { gelesen, geschrieben };
+}
 
 describe('lagebildSpeicher', () => {
   it('liest zurück, was angelegt wurde', async () => {
@@ -73,6 +96,90 @@ describe('lagebildSpeicher', () => {
     expect((await lagebildLesen())?.bestaetigtAt).toBe(1);
     await lagebildBestaetigen(BENUTZER.id, 50);
     expect((await lagebildLesen())?.bestaetigtAt).toBe(50);
+  });
+
+  it('bestätigt, ohne den gespeicherten Stand zu lesen oder zu schreiben (LFH-939)', async () => {
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    const { gelesen, geschrieben } = zugriffeBeobachten();
+    await lagebildBestaetigen(BENUTZER.id, 50);
+    expect(gelesen).toEqual(['kopf']);
+    expect(geschrieben).toEqual(['kopf']);
+    vi.restoreAllMocks();
+    const satz = await lagebildLesen();
+    expect(satz?.bestaetigtAt).toBe(50);
+    expect(satz?.client).toEqual(CLIENT);
+  });
+
+  it('prüft beim Schreiben des Stands nur den Kopf (LFH-939)', async () => {
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    const { gelesen, geschrieben } = zugriffeBeobachten();
+    await lagebildClientSchreiben(BENUTZER.id, { ...CLIENT, timestamp: 3 });
+    expect(gelesen).toEqual(['kopf']);
+    expect(geschrieben).toEqual(['client']);
+  });
+
+  /** Legt die DB im Zustand vor LFH-939 an: v1, Altdatensatz unter `aktuell`. */
+  async function altbestandAnlegen() {
+    lagebildSpeicherZuruecksetzenFuerTests();
+    await new Promise((fertig) => setTimeout(fertig, 0));
+    await new Promise<void>((fertig, fehler) => {
+      const loeschen = indexedDB.deleteDatabase(LAGEBILD_DB);
+      loeschen.onsuccess = () => fertig();
+      loeschen.onerror = () => fehler(loeschen.error);
+    });
+    const alt = await openDB(LAGEBILD_DB, 1, {
+      upgrade(d) {
+        d.createObjectStore('stand');
+      },
+    });
+    await alt.put(
+      'stand',
+      { benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v0', client: CLIENT },
+      'aktuell',
+    );
+    alt.close();
+  }
+
+  async function rohSchluessel() {
+    const roh = await openDB(LAGEBILD_DB);
+    const schluessel = await roh.getAllKeys('stand');
+    const version = roh.version;
+    roh.close();
+    return { schluessel, version };
+  }
+
+  it('bleibt bei v1 und liest einen Altdatensatz nicht (LFH-939)', async () => {
+    await altbestandAnlegen();
+    expect(await lagebildLesen()).toBeUndefined();
+    expect(await rohSchluessel()).toEqual({ schluessel: ['aktuell'], version: 1 });
+  });
+
+  it('nimmt den Altdatensatz beim Anlegen mit (LFH-939)', async () => {
+    await altbestandAnlegen();
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    expect((await rohSchluessel()).schluessel).toEqual(['client', 'kopf']);
+  });
+
+  it('nimmt den Altdatensatz beim Löschen mit (LFH-939)', async () => {
+    await altbestandAnlegen();
+    await lagebildLoeschenPlatte();
+    expect((await rohSchluessel()).schluessel).toEqual([]);
+  });
+
+  it('gibt die DB frei, wenn ein neueres Bundle hochstufen will', async () => {
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    const neu = await Promise.race([
+      openDB(LAGEBILD_DB, 2),
+      new Promise<'blockiert'>((fertig) => setTimeout(() => fertig('blockiert'), 500)),
+    ]);
+    expect(neu).not.toBe('blockiert');
+    if (neu !== 'blockiert') neu.close();
+    lagebildSpeicherZuruecksetzenFuerTests();
+    await new Promise<void>((fertig) => {
+      const loeschen = indexedDB.deleteDatabase(LAGEBILD_DB);
+      loeschen.onsuccess = () => fertig();
+      loeschen.onblocked = () => fertig();
+    });
   });
 
   it('fasst die Offline-Queue nicht an', async () => {

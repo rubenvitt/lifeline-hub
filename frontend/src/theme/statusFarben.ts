@@ -210,11 +210,16 @@ export const etbTypMehrzahl: Record<EtbTyp, string> = {
   system: 'Systemeinträge',
 };
 
-/** Status einer Unfallhilfsstelle. */
+/**
+ * Status einer Unfallhilfsstelle. `aufgeloest` ist `neutral`, nicht `alarm` (LFH-962): der
+ * planmäßige Endzustand nach Lageende, keine Gefahr — wie `dienststatus.ausser_dienst`,
+ * `schadenStatus.abgeschlossen` und `betreuungsstelleStatus.geschlossen`. Rot neben echten
+ * Alarmen verbrauchte die Alarmfarbe. Die Rangfolge in den Switchern hängt nicht an der Rolle.
+ */
 export const uhsStatus: Record<UhsStatus, StatusDarstellung> = {
   geplant: { rolle: 'neutral', label: 'geplant' },
   aktiv: { rolle: 'normal', label: 'aktiv' },
-  aufgeloest: { rolle: 'alarm', label: 'aufgelöst' },
+  aufgeloest: { rolle: 'neutral', label: 'aufgelöst' },
 };
 
 /** Typ einer Unfallhilfsstelle: eine Kategorie, keine Lage, deshalb durchgängig `neutral`;
@@ -251,11 +256,31 @@ export const dienststatus: Record<Dienststatus, StatusDarstellung> = {
   ausser_dienst: { rolle: 'neutral', label: 'außer Dienst' },
 };
 
-/** Status eines Bereitstellungsraums. */
+/** Status eines Bereitstellungsraums. `aufgeloest` ist `neutral` wie bei {@link uhsStatus}. */
 export const brStatus: Record<BrStatus, StatusDarstellung> = {
   geplant: { rolle: 'neutral', label: 'geplant' },
   aktiv: { rolle: 'normal', label: 'aktiv' },
-  aufgeloest: { rolle: 'alarm', label: 'aufgelöst' },
+  aufgeloest: { rolle: 'neutral', label: 'aufgelöst' },
+};
+
+/**
+ * Urteil über die Besatzung eines disponierten Fahrzeugs (Ist aus den zugeordneten Kräften gegen
+ * das Soll des Fahrzeugs). Kein Domänen-Enum: das Urteil fällt im Client
+ * (`pages/FahrzeugePage.tsx:besatzungsUrteilVon`).
+ */
+export type BesatzungsUrteil = 'nicht_erfasst' | 'kein_soll' | 'erfuellt' | 'unterbesetzt';
+
+/**
+ * Besatzungs-Ampel (LFH-962). Rot nur für die echte Unterbesetzung: eine Besatzung, die niemand
+ * dem Fahrzeug zugeordnet hat (das Personal läuft oft über die Einheit), ist „nicht erfasst" und
+ * neutral — sonst stünde jedes Fahrzeug rot, und die echte Unterbesetzung fiele nicht mehr auf
+ * (Alarmbudget EEMUA 191). Ohne Soll gibt es kein Urteil: neutral, nicht Blau (Blau bedient).
+ */
+export const besatzungsUrteil: Record<BesatzungsUrteil, StatusDarstellung> = {
+  nicht_erfasst: { rolle: 'neutral', label: 'Besatzung nicht erfasst' },
+  kein_soll: { rolle: 'neutral', label: 'kein Soll' },
+  erfuellt: { rolle: 'normal', label: 'Soll erfüllt' },
+  unterbesetzt: { rolle: 'alarm', label: 'unterbesetzt' },
 };
 
 /** Bewegungsart einer UHS-Belegung. */

@@ -1,4 +1,5 @@
 import type { FreiesZeichenUpdate } from '../../api/types';
+import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /**
  * „Zuletzt verwendete" taktische Zeichen (LFH-716).
@@ -64,15 +65,14 @@ function istBrauchbar(eintrag: unknown): eintrag is FreiesZeichenUpdate {
 }
 
 export function leseZuletztVerwendet(): FreiesZeichenUpdate[] {
+  const roh = sicherLesen(SPEICHER_SCHLUESSEL);
+  if (!roh) return [];
   try {
-    const roh = localStorage.getItem(SPEICHER_SCHLUESSEL);
-    if (!roh) return [];
     const geparst: unknown = JSON.parse(roh);
     if (!Array.isArray(geparst)) return [];
     return entdupliziere(geparst.filter(istBrauchbar).map(nurDasZeichen));
   } catch {
-    /* kein Speicher, kaputtes JSON → keine Vorschläge; eine Bedienvorliebe darf die Karte
-       nicht mitnehmen */
+    /* kaputtes JSON → keine Vorschläge; eine Bedienvorliebe darf die Karte nicht mitnehmen */
     return [];
   }
 }
@@ -95,11 +95,8 @@ export function merkeZuletztVerwendet(spec: FreiesZeichenUpdate): void {
   // Das Jüngste nach vorn; das gleiche Zeichen weiter hinten fällt beim Entduplizieren weg — ein
   // erneut benutztes Zeichen wandert also.
   const liste = entdupliziere([neu, ...leseZuletztVerwendet()]);
-  try {
-    localStorage.setItem(SPEICHER_SCHLUESSEL, JSON.stringify(liste));
-  } catch {
-    /* nicht verfügbar → nicht persistierbar, kein harter Fehler */
-  }
+  // Nicht verfügbar: nicht persistierbar, kein harter Fehler.
+  sicherSchreiben(SPEICHER_SCHLUESSEL, JSON.stringify(liste));
   benachrichtige();
 }
 

@@ -65,6 +65,11 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   höchstens 24 h ab der letzten Änderung. Regel und Weg hinaus: `offline/AGENTS.md`,
   „Gerätedaten“; Nachweis `auth/geraetRaeumung.integration.test.tsx`,
   `e2e/geraet-raeumung.spec.ts`.
+- **Leere Entwürfe räumt `entwuerfeLaden`** (LFH-941, D8): eigene Entwürfe ohne Inhalt, die
+  länger als 24 h unverändert sind, über alle Einsätze, mit Vorlauf-Disziplin; danach jeder
+  eigene Aktiv-Merker eines Einsatzes ohne Entwurf. Entwürfe mit Inhalt bleiben unabhängig vom
+  Alter (Entscheidung Ruben, 06.10.2026: keine Frist für ungesendeten Text). Herleitung:
+  `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
 - **Von und An sind Pflicht für jeden neuen Eintrag** (LFH-894, Spec `etb-absender-empfaenger`):
   der Server lehnt einen Eintrag ohne eine Seite mit 400 ab (`routes/etb.rs::erfassen`), der
   Client sendet ihn gar nicht erst (`fehlendeSeite`, vor Upload und Warteschlange). Bestehende

@@ -76,7 +76,8 @@ export interface Zeile {
 }
 
 export type Inhalt =
-  | { art: 'zeilen'; zeilen: Zeile[] }
+  /** `titel` gliedert einen Abschnitt in Gruppen („Nach Sichtung“, LFH-956). */
+  | { art: 'zeilen'; titel?: string; zeilen: Zeile[] }
   | { art: 'tabelle'; kopf: string[]; zeilen: string[][] }
   | { art: 'vermerk'; text: string }
   | { art: 'markdown'; abschnitte: { titel: string; text: string }[] };
@@ -110,7 +111,17 @@ function daten<T>(q: QuellenErgebnis<T>): T | null {
   throw new Error(`Einsatzbericht: Quelle im Zustand ${q.zustand} verdichtet`);
 }
 
-const zeilen = (z: Zeile[]): Inhalt => ({ art: 'zeilen', zeilen: z });
+/**
+ * Etiketten im Bericht beginnen groß (LFH-956): die Kataloge der Anzeige (`sichtung`,
+ * `personStatus`, …) schreiben klein, weil sie als Etikett im Satz stehen; im Bericht stehen sie
+ * am Zeilenanfang neben handgesetzten Etiketten. Die Kataloge selbst bleiben unverändert.
+ */
+const gross = (s: string): string => s.charAt(0).toLocaleUpperCase('de') + s.slice(1);
+const zeilen = (z: Zeile[], titel?: string): Inhalt => ({
+  art: 'zeilen',
+  ...(titel ? { titel } : {}),
+  zeilen: z.map((x) => ({ ...x, etikett: gross(x.etikett) })),
+});
 const vermerk = (text: string): Inhalt => ({ art: 'vermerk', text });
 const textOder = (s: string | null | undefined): string => (s && s.trim() ? s : LEER);
 const zahl = (n: number): string => String(n);
@@ -370,6 +381,12 @@ function lage(quelle: LageberichtQuelle | null, konv: AnzeigeKonventionen): Absc
   ];
 }
 
+/**
+ * Personenbilanz in drei Achsen mit Überschrift (LFH-956): Sichtung, Personenstatus und Verbleib
+ * zählen dieselben Personen je nach eigener Achse und dürfen sich nicht zu widersprechen
+ * scheinen. Kein Etikett steht zweimal (auch nicht in anderer Schreibweise); die Summe heißt
+ * „Personen gesamt“, damit sie nicht mit dem Status „Erfasst“ verwechselt wird.
+ */
 function personenBilanz(personen: Person[]): Inhalt[] {
   const bild = sichtungsbild(personen);
   const transport = transportBilanz(personen);
@@ -377,29 +394,44 @@ function personenBilanz(personen: Person[]): Inhalt[] {
   for (const p of personen) status[p.status] += 1;
   const patienten = bild.je.sk1 + bild.je.sk2 + bild.je.sk3 + bild.je.sk4;
   // Je UHS ein Posten wäre ein Name der Einrichtung; im Bericht genügt die Art des Verbleibs.
+  // Der Verbleib „verstorben“ hieße wie der Status und trägt deshalb seine Achse im Etikett.
   const verbleib = new Map<string, number>();
   for (const p of verbleibZaehlung(personen, () => undefined)) {
-    const label = p.schluessel.startsWith('uhs:') ? 'Unfallhilfsstelle' : p.label;
+    const label = p.schluessel.startsWith('uhs:')
+      ? 'Unfallhilfsstelle'
+      : p.schluessel === 'verstorben'
+        ? 'verstorben (Verbleib)'
+        : p.label;
     verbleib.set(label, (verbleib.get(label) ?? 0) + p.wert);
   }
   return [
     zeilen([
-      { etikett: 'Erfasst', wert: zahl(personen.length) },
-      { etikett: 'Patienten (SK I–IV)', wert: zahl(patienten) },
-      ...SICHTUNGSBILD_REIHE.map((k) => ({
-        etikett: k === 'ohne' ? 'ohne Sichtung' : sichtung[k].label,
-        wert: zahl(bild.je[k]),
-      })),
+      { etikett: 'Personen gesamt', wert: zahl(personen.length) },
       { etikett: 'Transportiert', wert: zahl(transport.transportiert) },
     ]),
+    zeilen(
+      [
+        { etikett: 'Patienten (SK I–IV)', wert: zahl(patienten) },
+        ...SICHTUNGSBILD_REIHE.map((k) => ({
+          etikett: k === 'ohne' ? 'ohne Sichtung' : sichtung[k].label,
+          wert: zahl(bild.je[k]),
+        })),
+      ],
+      'Nach Sichtung',
+    ),
     zeilen(
       (Object.keys(status) as (keyof typeof status)[]).map((k) => ({
         etikett: personStatus[k].label,
         wert: zahl(status[k]),
       })),
+      'Nach Personenstatus',
     ),
     zeilen(
-      [...verbleib].map(([etikett, n]) => ({ etikett: `Verbleib: ${etikett}`, wert: zahl(n) })),
+      [...verbleib].map(([etikett, n]) => ({ etikett, wert: zahl(n) })),
+      'Nach Verbleib',
+    ),
+    vermerk(
+      '„Tot“ ist die Sichtungskategorie, „Verstorben“ der Personenstatus und „Verstorben (Verbleib)“ der dokumentierte Verbleib; die Achsen werden getrennt geführt und müssen nicht übereinstimmen. „Transportiert“ zählt ohne Voranmeldung, der Verbleib nur angetroffene Personen (nicht vermisst, nicht abgemeldet).',
     ),
   ];
 }
@@ -412,18 +444,20 @@ function schadenBilanz(schaeden: Schaden[]): Inhalt[] {
     ausmass[s.ausmass] += 1;
   }
   return [
-    zeilen([
-      { etikett: 'Erfasst', wert: zahl(schaeden.length) },
-      ...(Object.keys(status) as (keyof typeof status)[]).map((k) => ({
+    zeilen([{ etikett: 'Schäden gesamt', wert: zahl(schaeden.length) }]),
+    zeilen(
+      (Object.keys(status) as (keyof typeof status)[]).map((k) => ({
         etikett: schadenStatus[k].label,
         wert: zahl(status[k]),
       })),
-    ]),
+      'Nach Status',
+    ),
     zeilen(
       (Object.keys(ausmass) as (keyof typeof ausmass)[]).map((k) => ({
         etikett: schadenAusmass[k].label,
         wert: zahl(ausmass[k]),
       })),
+      'Nach Ausmaß',
     ),
   ];
 }

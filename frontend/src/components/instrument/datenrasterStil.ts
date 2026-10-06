@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Farbrollen } from '../../theme/tokens';
+import { fugenrasterGrund } from './fugenraster';
 
 /**
  * Stilfunktionen des Datenrasters — rein und exportiert (Muster `bedienzielStil`), damit
@@ -12,20 +13,21 @@ import type { Farbrollen } from '../../theme/tokens';
 export const DATENRASTER_MINDESTBREITE = 180;
 
 /**
- * Das Fugenraster: `gap: 1px` auf `linie`, höchstens `spalten` Spalten. Die Deckelung
- * läuft über `max(Mindestbreite, Anteil)` in `auto-fill` — auf dem Handschirm fällt das
- * Raster von selbst auf eine Spalte, ohne Breitenfrage im Code (die gehörte sonst an
- * `useViewport`).
+ * Das Fugenraster (Grund und Fuge aus {@link fugenrasterGrund}), höchstens `spalten` Spalten.
+ * Die Deckelung läuft über `max(Mindestbreite, Anteil)` in `auto-fill` — auf dem Handschirm
+ * fällt das Raster von selbst auf eine Spalte, ohne Breitenfrage im Code (die gehörte sonst an
+ * `useViewport`). Eine frei bleibende Spur zeigt `flaeche`, keine graue Kachel (LFH-961).
  */
-export function datenrasterStil(rollen: Pick<Farbrollen, 'linie'>, spalten: number): CSSProperties {
+export function datenrasterStil(
+  rollen: Pick<Farbrollen, 'linie' | 'flaeche'>,
+  spalten: number,
+): CSSProperties {
   const n = Math.max(1, Math.floor(spalten));
   return {
     display: 'grid',
     gridTemplateColumns: `repeat(auto-fill, minmax(max(min(${DATENRASTER_MINDESTBREITE}px, 100%), calc((100% - ${n - 1}px) / ${n})), 1fr))`,
-    gap: 1,
     margin: 0,
-    background: rollen.linie,
-    border: `1px solid ${rollen.linie}`,
+    ...fugenrasterGrund(rollen),
   };
 }
 

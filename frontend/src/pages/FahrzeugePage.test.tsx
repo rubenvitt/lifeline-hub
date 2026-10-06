@@ -261,14 +261,35 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
   });
 
-  it('zeigt Unterbesetzung rot mit Soll-Kontext in Klammern', async () => {
+  /** Das Besatzungs-Urteil der Tabellenzeile (die Spalte „Besatzung"), nicht das im Aufklappteil. */
+  function urteilDerZeile(container: HTMLElement): HTMLElement {
+    const el = container.querySelector<HTMLElement>('[data-lfh="besatzung-urteil"]');
+    if (!el) throw new Error('kein Besatzungs-Urteil gerendert');
+    return el;
+  }
+
+  it('zeigt Unterbesetzung rot, mit beschriftetem Ist und Soll (LFH-962)', async () => {
     const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
     const { container } = render(einsatz(), [crew]);
     await screen.findByText('Florian 1');
-    // Besatzungs-Spalte dauerhaft sichtbar. Ist 1/0/0//1 < Soll 0/1/8//9 → unterbesetzt: roter
-    // Badge, Soll als Klammer-Kontext (zugleich nicht-farbliches Signal).
+    // Besatzungs-Spalte dauerhaft sichtbar. Ist 1/0/0//1 < Soll 0/1/8//9 → unterbesetzt.
     expect(screen.getByRole('columnheader', { name: 'Besatzung' })).toBeInTheDocument();
-    expect(container.querySelector('.ant-tag-red')).toHaveTextContent('1/0/0//1 (Soll 0/1/8//9)');
+    const urteil = urteilDerZeile(container);
+    expect(urteil).toHaveAttribute('data-urteil', 'unterbesetzt');
+    expect(within(urteil).getByText('unterbesetzt')).toBeInTheDocument();
+    expect(urteil).toHaveTextContent('Ist 1/0/0//1 · Soll 0/1/8//9');
+  });
+
+  it('zeigt eine nicht zugeordnete Besatzung neutral als „nicht erfasst", nie rot (LFH-962)', async () => {
+    const { container } = render(einsatz(), []);
+    await screen.findByText('Florian 1');
+    const urteil = urteilDerZeile(container);
+    expect(urteil).toHaveAttribute('data-urteil', 'nicht_erfasst');
+    expect(within(urteil).getByText('Besatzung nicht erfasst')).toBeInTheDocument();
+    // Kein Ist-Wert, der wie eine Unterschreitung aussähe; das Soll bleibt als Auskunft.
+    expect(urteil).not.toHaveTextContent('Ist');
+    expect(urteil).toHaveTextContent('Soll 0/1/8//9');
+    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
   });
 
   it('zählt Besatzung ohne Stärke-Position als Mannschaft (BOS-Σ ist Kopfzahl)', async () => {
@@ -284,33 +305,29 @@ describe('FahrzeugePage', () => {
     const { container } = render(einsatz(), [fuehrer, ohnePosition]);
     await screen.findByText('Florian 1');
     // 1 Führer + 1 ohne Position → 1/0/1//2 (nicht 1/0/0//1, die zweite Kraft verschwindet sonst).
-    expect(container.querySelector('.ant-tag-red')).toHaveTextContent('1/0/1//2 (Soll 0/1/8//9)');
+    expect(urteilDerZeile(container)).toHaveTextContent('Ist 1/0/1//2 · Soll 0/1/8//9');
   });
 
-  it('zeigt erfülltes Soll grün ohne Soll-Ballast', async () => {
+  it('zeigt erfülltes Soll als „Soll erfüllt"', async () => {
     const sollKlein = { ...ef, soll_besatzung: { fuehrer: 1, unterfuehrer: 0, mannschaft: 0 } };
     const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
-    render(einsatz(), [crew], sollKlein);
+    const { container } = render(einsatz(), [crew], sollKlein);
     await screen.findByText('Florian 1');
-    // Ist ≥ Soll in jeder Position → grün, ohne redundanten Soll-Text. Über den Stärke-Text wählen
-    // (der Einsatz-Status wäre ein zweiter grüner Tag); dieselbe Stärke steht auch in der
-    // Verdichtungszeile, gemeint ist die Marke der Zeile.
-    const badge = screen.getByText('1/0/0//1', { selector: '.ant-tag' });
-    expect(badge).toHaveClass('ant-tag-green');
-    expect(badge).not.toHaveTextContent('Soll');
+    const urteil = urteilDerZeile(container);
+    expect(urteil).toHaveAttribute('data-urteil', 'erfuellt');
+    expect(within(urteil).getByText('Soll erfüllt')).toBeInTheDocument();
   });
 
-  it('wertet Überbesetzung als erfüllt (grün)', async () => {
+  it('wertet Überbesetzung als erfüllt', async () => {
     const sollKlein = { ...ef, soll_besatzung: { fuehrer: 1, unterfuehrer: 0, mannschaft: 0 } };
     const crew = [
       person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' }),
       person({ id: 101, name: 'Bert', fahrzeug_id: 10, staerke_position: 'mannschaft' }),
     ];
-    render(einsatz(), crew, sollKlein);
+    const { container } = render(einsatz(), crew, sollKlein);
     await screen.findByText('Florian 1');
-    // Ist 1/0/1//2 ≥ Soll 1/0/0//1 in jeder Position (Mannschaft über Soll) → erfüllt. Der reine
-    // Text steht auch in der Verdichtungszeile.
-    expect(screen.getByText('1/0/1//2', { selector: '.ant-tag' })).toHaveClass('ant-tag-green');
+    // Ist 1/0/1//2 ≥ Soll 1/0/0//1 in jeder Position (Mannschaft über Soll) → erfüllt.
+    expect(urteilDerZeile(container)).toHaveAttribute('data-urteil', 'erfuellt');
   });
 
   it('zeigt fehlendes Soll neutral ohne Soll-Kontext', async () => {
@@ -318,12 +335,12 @@ describe('FahrzeugePage', () => {
     const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
     const { container } = render(einsatz(), [crew], ohneSoll);
     await screen.findByText('Florian 1');
-    // Kein hinterlegtes Soll → kein „erfüllt"-Urteil möglich → neutral (LFH-891: kein Preset,
-    // Blau bedient), nur Ist; der `title` nennt den Grund.
-    const badge = container.querySelector('.ant-tag[title="kein Soll hinterlegt"]');
-    expect(badge).toHaveTextContent('1/0/0//1');
-    expect(badge).not.toHaveTextContent('Soll');
-    expect(badge?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
+    // Kein hinterlegtes Soll → kein „erfüllt"-Urteil möglich → neutral (LFH-891: Blau bedient).
+    const urteil = urteilDerZeile(container);
+    expect(urteil).toHaveAttribute('data-urteil', 'kein_soll');
+    expect(urteil).toHaveTextContent('Ist 1/0/0//1');
+    expect(urteil).not.toHaveTextContent('Soll 0');
+    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
   });
 
   it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker nach dem Aufklappen', async () => {

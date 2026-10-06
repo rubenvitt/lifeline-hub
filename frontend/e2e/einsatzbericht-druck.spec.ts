@@ -1,5 +1,6 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
-import { wechsleZu, wechsleZuRolle } from './rollen-kern';
+import { erwarteHandyBreite, mitHandy } from './druckansicht-mobil-kern';
+import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Einsatzbericht (LFH-726) gegen einen echten Server: Einstieg über die Einsatzdaten, sieben
@@ -20,6 +21,10 @@ import { wechsleZu, wechsleZuRolle } from './rollen-kern';
  * Der dritte Fall wählt Blöcke ab und die Personal-Anlage an (LFH-902): ein abgewählter Block fehlt
  * im Blatt, die Auswahl übersteht ein Neuladen, ein unbekannter Schlüssel erscheint nirgends, die
  * Auswahlleiste steht nicht auf dem Papier.
+ *
+ * Der vierte Fall prüft den Bericht am Handy (LFH-956) im mobilen Kontext, als Admin und als
+ * Beobachter (`e2e/druckansicht-mobil-kern.ts`): der Layout-Viewport bleibt bei 390 px, und die
+ * Spalte „Freigegeben von“ (Wert „Administrator“) steht ohne Seitenscrollen im Bild.
  */
 
 const ADMIN = 'admin';
@@ -334,4 +339,61 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
     'Auswahlleiste im Druck ohne Box',
   ).toBe(0);
   await expect(wurzel).toBeVisible();
+});
+
+test('Einsatzbericht am Handy: Layout-Viewport bleibt 390 px, „Freigegeben von“ im Bild, auch als Beobachter (LFH-956)', async ({
+  page,
+  browser,
+  browserName,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht Handy ${Date.now()}`);
+  await saeen(page, einsatzId);
+  const beobachter = await benutzerAnlegen(page, 'beobachter');
+  await mitgliedEintragen(page, einsatzId, beobachter.id, 'beobachter');
+
+  for (const [wer, konto] of [
+    ['Admin', { benutzername: ADMIN, passwort: PW }],
+    ['Beobachter', beobachter],
+  ] as const) {
+    const { viewport, ergebnis } = await mitHandy(
+      browser,
+      browserName,
+      konto,
+      `/einsaetze/${einsatzId}/einsatzdaten/bericht`,
+      async (p) => {
+        const lage = p.locator('[data-lfh="einsatzbericht-block-lage"]');
+        // Vorbedingung: das Verzeichnis trägt den langen, untrennbaren Namen.
+        await expect(lage.locator('td', { hasText: /^Administrator$/ })).toHaveCount(1);
+        // Die Personenbilanz steht gegliedert (die Zahlen selbst prüft `verdichtung.test.ts`).
+        const personen = p
+          .locator('[data-lfh="einsatzbericht-block-bilanz"] section')
+          .filter({ has: p.getByRole('heading', { level: 4, name: 'Personen', exact: true }) });
+        await expect(personen.getByRole('heading', { level: 5 })).toHaveText([
+          'Nach Sichtung',
+          'Nach Personenstatus',
+          'Nach Verbleib',
+        ]);
+        return lage.evaluate((el) => {
+          const kopf = Array.from(el.querySelectorAll('th')).find(
+            (th) => th.textContent === 'Freigegeben von',
+          )!;
+          const wert = Array.from(el.querySelectorAll('td')).find(
+            (td) => td.textContent === 'Administrator',
+          )!;
+          return {
+            kopfRechts: kopf.getBoundingClientRect().right,
+            wertRechts: wert.getBoundingClientRect().right,
+          };
+        });
+      },
+    );
+    erwarteHandyBreite(wer, viewport);
+    expect
+      .soft(ergebnis.kopfRechts, `${wer}: „Freigegeben von“ im Bild`)
+      .toBeLessThanOrEqual(viewport.innerWidth);
+    expect
+      .soft(ergebnis.wertRechts, `${wer}: „Administrator“ im Bild`)
+      .toBeLessThanOrEqual(viewport.innerWidth);
+  }
 });

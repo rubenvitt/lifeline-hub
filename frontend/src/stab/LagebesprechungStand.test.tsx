@@ -118,3 +118,13 @@ describe('LagebesprechungStand · Letzte und Anzahl', () => {
     expect(within(zeile('Anzahl')).getByText('7')).toBeInTheDocument();
   });
 });
+
+describe('LagebesprechungStand · Raster', () => {
+  // LFH-961: „Nächste" und „Anzahl" in der ersten Reihe, „Letzte" breit — drei Spalten ließen
+  // eine leere Spur stehen.
+  it('hat zwei Spalten, weil „Letzte" über die volle Breite läuft', () => {
+    zeige(stab());
+    const raster = screen.getByLabelText('Stand der Lagebesprechung');
+    expect(raster.style.gridTemplateColumns).toContain('calc((100% - 1px) / 2)');
+  });
+});

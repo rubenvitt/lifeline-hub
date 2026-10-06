@@ -1,10 +1,10 @@
-import { Button, Form, Input } from 'antd';
+import { Button } from 'antd';
 import { useState, type CSSProperties } from 'react';
 import type { ChatKanal } from '../api/types';
-import { ErfassungsModal } from '../components/Erfassung';
 import { Liste, ListenEintrag } from '../components/Liste';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import KanalAnlegenDialog from './KanalAnlegenDialog';
 
 interface Props {
   kanaele: ChatKanal[];
@@ -28,11 +28,6 @@ const NUR_VORLESER: CSSProperties = {
   border: 0,
 };
 
-interface KanalFormWerte {
-  name: string;
-  beschreibung?: string;
-}
-
 /** Ungelesene Kanäle zuerst, innerhalb beider Gruppen die jüngste Aktivität zuerst. */
 export function sortiereKanaele(kanaele: ChatKanal[]): ChatKanal[] {
   return [...kanaele].sort((a, b) => {
@@ -50,7 +45,7 @@ export function sortiereKanaele(kanaele: ChatKanal[]): ChatKanal[] {
  *
  * Die aktive Zeile trägt die 2-px-Marke in `bedien` und `aria-current`; Ungelesenes steht als
  * Zahl UND Wort („2 ungelesen" für Vorleser), nicht bloß als Farbpunkt (WCAG 1.4.1).
- * Die Anlage läuft über die `ErfassungsModal`-Hülle.
+ * Die Anlage läuft über `KanalAnlegenDialog`, denselben Dialog wie unter `md`.
  */
 export default function KanalListe({
   kanaele,
@@ -60,7 +55,6 @@ export default function KanalListe({
   onKanalAnlegen,
 }: Props) {
   const [offen, setOffen] = useState(false);
-  const [form] = Form.useForm<KanalFormWerte>();
   const { token, rollen } = useRollen();
   const { formatZeitKurz } = useAnzeigeKonventionen();
 
@@ -152,26 +146,11 @@ export default function KanalListe({
           }}
         />
       )}
-      <ErfassungsModal<KanalFormWerte>
+      <KanalAnlegenDialog
         offen={offen}
-        titel="Neuer Kanal"
-        form={form}
-        erfassenText="Anlegen"
-        onErfassen={(w) => onKanalAnlegen(w.name.trim(), w.beschreibung?.trim() || undefined)}
-        onFertig={() => setOffen(false)}
-        onAbbrechen={() => setOffen(false)}
-      >
-        <Form.Item
-          label="Name"
-          name="name"
-          rules={[{ required: true, whitespace: true, message: 'Name erforderlich' }]}
-        >
-          <Input placeholder="z. B. S2/S3 oder Abschnitt Nord" />
-        </Form.Item>
-        <Form.Item label="Beschreibung (optional)" name="beschreibung">
-          <Input placeholder="Kurzbeschreibung" />
-        </Form.Item>
-      </ErfassungsModal>
+        onSchliessen={() => setOffen(false)}
+        onKanalAnlegen={onKanalAnlegen}
+      />
     </Paneel>
   );
 }

@@ -222,7 +222,9 @@ describe('BrDetailPage – Sidebar zuweisen (LFH-14)', () => {
 
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();
 
-    const btn = screen.getByRole('button', { name: 'zuweisen' });
+    // LFH-968: der zugängliche Name trägt die Zeilenkennung, der Knopf ist kein Primärknopf.
+    const btn = screen.getByRole('button', { name: 'Florian 1 zuweisen' });
+    expect(btn).not.toHaveClass('ant-btn-primary');
     await userEvent.click(btn);
 
     await waitFor(() => expect(capturedBody).not.toBeNull());
@@ -295,7 +297,7 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
     expect(screen.getByText('Einheit Frei')).toBeInTheDocument();
     // … aber keine Schreibaktionen (entfernen/zuweisen).
     expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'zuweisen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /zuweisen$/ })).not.toBeInTheDocument();
   });
 
   it('zeigt für Beobachter keine entfernen-/zuweisen-Buttons (BR aktiv)', async () => {
@@ -313,7 +315,7 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
 
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'zuweisen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /zuweisen$/ })).not.toBeInTheDocument();
   });
 });
 

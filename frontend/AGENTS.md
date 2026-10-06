@@ -62,7 +62,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
   per Messwert; Neuzuschnitt während der Betrachtung als Sammelbanner
   (`docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). Die Fuge
-  bleibt in jeder Dichte 1 px; eine klickbare Zelle rückt ihren Link um 0 / 4 / 8 px ein
+  zeichnet die Zelle, nicht der Rastergrund: Grund `flaeche`, Umriss je Zelle über
+  `[data-fugenraster]` (`components/instrument/fugenraster.ts`), damit eine leere Restspur keine
+  graue Kachel wird (LFH-961); wer den Grund übernimmt, setzt das Attribut mit. Sie bleibt in
+  jeder Dichte 1 px; eine klickbare Zelle rückt ihren Link um 0 / 4 / 8 px ein
   (`kennzahlZielEinzug`), damit Ziele ≥ 8 / ≥ 16 px auseinanderstehen (LFH-630,
   `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`).
   Segmentleiste, Kartengrundlage und Kartenknöpfe teilen den Einzug (`zielEinzug`, LFH-865).
@@ -382,14 +385,15 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 32 am 04.10.2026, LFH-881); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 33 am 06.10.2026, LFH-962); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4,
   `schwaerzungsantragStand` in
   `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md` D9, `capSchwere` in
   `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5,
-  `pegelZustand` in `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D2). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
+  `pegelZustand` in `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D2,
+  `besatzungsUrteil` in `openspec/changes/archive/2026-10-06-lfh-962-farbvertrag-wort/design.md` D1). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
   der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
 
 **Farbe und Zeichen**
@@ -672,6 +676,17 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 `pnpm lint` mit `--max-warnings 0`; Warnungen an der Wurzel beheben. `exhaustive-deps`
 strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur begründet,
 `-next-line` an der gemeldeten Zeile mit Kommentar; keine Block-Disables, keine toten Direktiven.
+
+## Frontend — Browserspeicher (LFH-942)
+
+- **`localStorage` nur über `lib/sichererSpeicher`** (`sicherLesen`, `sicherSchreiben`,
+  `sicherEntfernen`, `sicherSchluessel`); `lib/sichererSpeicher.guard.test.ts` macht jeden anderen
+  Zugriff rot. Auf gehärteten Rechnern ist `localStorage` `null` oder wirft, ein Wurf im Render
+  lässt die Seite weiß.
+- **Eine Einstellung wirkt auch ohne Speicher:** erst den State setzen, dann schreiben; ohne
+  gespeicherten Wert gilt die Vorgabe (Farbschema: Nachtbetrieb).
+- Jeder Speicherort steht in `GERAETESPEICHER`: `frontend/src/offline/AGENTS.md`.
+- Herleitung: `openspec/changes/archive/2026-10-06-lfh-942-browserspeicher-abgesichert/design.md`.
 
 ## Sitzung über mehrere Tabs (LFH-387)
 

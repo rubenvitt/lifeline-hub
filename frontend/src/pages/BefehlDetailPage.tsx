@@ -172,9 +172,9 @@ function BefehlDetail() {
     onError: fehler,
   });
 
-  // Ungültige Befehl-ID → zurück zu Aufträge/Befehle.
+  // Ungültige Befehl-ID → zurück auf den Reiter Befehle, nicht auf die Vorgabe „Aufträge" (LFH-972).
   if (!idGueltig) {
-    return <Navigate to={auftraegePfad(einsatzId)} replace />;
+    return <Navigate to={auftraegePfad(einsatzId, { reiter: 'befehle' })} replace />;
   }
   if (einsatzQuery.isLoading || befehlQuery.isLoading) {
     return (
@@ -184,7 +184,12 @@ function BefehlDetail() {
     );
   }
   if (befehlQuery.isError || !befehlQuery.data || !einsatzQuery.data) {
-    return <Typography.Text type="danger">Befehl nicht gefunden.</Typography.Text>;
+    return (
+      <Typography.Paragraph>
+        <Typography.Text type="danger">Befehl nicht gefunden.</Typography.Text>{' '}
+        <Link to={auftraegePfad(einsatzId, { reiter: 'befehle' })}>Zu den Befehlen</Link>
+      </Typography.Paragraph>
+    );
   }
   const einsatz = einsatzQuery.data;
   const befehl = befehlQuery.data;
@@ -262,11 +267,14 @@ function BefehlDetail() {
       ref={verankert ? leisteRef : undefined}
       style={aktionsleisteStil(verankert, token)}
     >
-      <Space wrap>
-        <DruckKnopf />
+      {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 7 / 11 / 16 px, antds
+          Vorgabe `paddingXS` ließ 3 / 5 / 7 px. Der Sprung steht vorn, abgesetzt von
+          den Handlungen, nicht neben „Fortschreiben“ (LFH-616). */}
+      <Space wrap size={token.marginSM}>
         {!istEntwurf && befehl.etb_eintrag_id != null && (
           <ZumEtbEintrag einsatzId={einsatzId} eintragId={befehl.etb_eintrag_id} />
         )}
+        <DruckKnopf />
         {!istEntwurf && darfSchreiben && (
           <Button
             onClick={() => fortschreibenMutation.mutate()}
@@ -381,7 +389,11 @@ function BefehlDetail() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={auftraegePfad(einsatzId)}>Aufträge/Befehle</Link> },
+              {
+                title: (
+                  <Link to={auftraegePfad(einsatzId, { reiter: 'befehle' })}>Aufträge/Befehle</Link>
+                ),
+              },
               { title: befehl.titel },
             ]}
           />

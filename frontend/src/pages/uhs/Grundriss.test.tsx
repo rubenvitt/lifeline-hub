@@ -1,4 +1,4 @@
-import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -21,6 +21,13 @@ import {
 } from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
+import { setzeMasse } from '../../test/elementMasse';
+
+// Diese Datei prüft den Grundriss in der Drei-Spalten-Form, alle Bereiche zugleich im Baum. Seit
+// LFH-970 entscheidet die gemessene Rahmenbreite, nicht die Fensterbreite; jsdom misst 0 (Reiter).
+// 1300 px liegen über dem Sockel für die Mindestfläche (1223 px, `grundrissLayout.ts`). Die
+// Weiche selbst prüft `GrundrissTabs.test.tsx`.
+beforeEach(() => setzeMasse('grundriss-mass', { clientWidth: 1300 }));
 
 function person(over: Partial<Person>): Person {
   return {
@@ -1194,14 +1201,26 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
       const items = platzMenueEintraege({ ...grund, form: 'zeile', zuweisbar: true });
       expect(folge(items)).toEqual(['zuweisen', '—', ...VERF]);
     });
-    it('belegt: Wartebereich vor den Verfügbarkeiten, keine Patientenaktionen (die sind Knöpfe)', () => {
+    // Verbleib steht zusätzlich zum Symbolknopf der Zeile im Menü, mit Wort (LFH-970, U73);
+    // „zurückweisen" und „Person öffnen" bleiben Knöpfe bzw. Klick auf die Marke.
+    it('belegt: Verbleib und Wartebereich vor den Verfügbarkeiten, keine weiteren Patientenaktionen', () => {
       const items = platzMenueEintraege({
         ...grund,
         form: 'zeile',
         belegt: true,
         wartebereich: true,
       });
-      expect(folge(items)).toEqual(['wartebereich', ...VERF]);
+      expect(folge(items)).toEqual(['verbleib', 'wartebereich', ...VERF]);
+    });
+    it('belegt bei laufender Belegung: Verbleib gesperrt, nicht entfernt', () => {
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'zeile',
+        belegt: true,
+        wartebereich: true,
+        belegungLaeuft: true,
+      });
+      expect(gesperrt(items)).toEqual(['verbleib', 'wartebereich']);
     });
     it('Bearbeiten-Modus: Löschen hinter dem Trenner, als Gefahr', () => {
       const items = platzMenueEintraege({ ...grund, form: 'zeile', bearbeitbar: true });

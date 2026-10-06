@@ -9,6 +9,7 @@ import {
 } from './entwurfStore';
 import type { MetadatenWerte } from '../schnellerfassungModell';
 import { neueClientId } from '../../offline/clientId';
+import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /**
  * Ein neuer, leerer Entwurf. Er trägt keine Von/An-Vorbelegung (LFH-894, design.md D2/D3): der
@@ -61,7 +62,7 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
         return;
       }
       setEntwuerfe(geladen);
-      const gemerkt = localStorage.getItem(aktivSchluessel(benutzerId, einsatzId));
+      const gemerkt = sicherLesen(aktivSchluessel(benutzerId, einsatzId));
       const gueltig = gemerkt && geladen.some((e) => e.id === gemerkt);
       setAktiverId(gueltig ? gemerkt! : geladen[0].id);
     })();
@@ -73,7 +74,7 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
   const aktivenSetzen = useCallback(
     (id: string) => {
       setAktiverId(id);
-      if (benutzerId !== null) localStorage.setItem(aktivSchluessel(benutzerId, einsatzId), id);
+      if (benutzerId !== null) sicherSchreiben(aktivSchluessel(benutzerId, einsatzId), id);
     },
     [benutzerId, einsatzId],
   );
@@ -139,7 +140,7 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
       setEntwuerfe((prev) => prev.map((e) => (e.id === id ? neu : e)));
       setAktiverId((aktuell) => {
         if (aktuell !== id) return aktuell;
-        localStorage.setItem(aktivSchluessel(neu.benutzer_id, einsatzId), neu.id);
+        sicherSchreiben(aktivSchluessel(neu.benutzer_id, einsatzId), neu.id);
         return neu.id;
       });
       await entwurfEntfernen(id);
@@ -169,7 +170,7 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
         if (aktuell !== id) return aktuell; // nicht-aktiven Tab geschlossen → aktiven behalten
         // aktiven Tab geschlossen → auf den letzten der neuen Liste wechseln.
         const naechster = naechsteListe[naechsteListe.length - 1].id;
-        localStorage.setItem(aktivSchluessel(benutzerId, einsatzId), naechster);
+        sicherSchreiben(aktivSchluessel(benutzerId, einsatzId), naechster);
         return naechster;
       });
     },

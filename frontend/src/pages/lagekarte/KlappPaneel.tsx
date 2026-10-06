@@ -1,6 +1,7 @@
 import { IconChevronRechts, IconChevronRunter } from '../../icons';
 import { useCallback, useId, useState, type CSSProperties, type ReactNode } from 'react';
 import { augenbraueStil, monoStil, paneelKopfStil, useRollen } from '../../components/instrument';
+import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /**
  * Abschnitt der rechten Kartenleiste, zwei Formen desselben Kopfes:
@@ -186,22 +187,15 @@ export function paneeleLesen(roh: string | null): Record<PaneelKennung, boolean>
  * abgesicherten Zugriffen.
  */
 export function usePaneelZustand() {
-  const [zustand, setZustand] = useState<Record<PaneelKennung, boolean>>(() => {
-    try {
-      return paneeleLesen(localStorage.getItem(SPEICHER_SCHLUESSEL));
-    } catch {
-      return { ...PANEEL_VORGABE };
-    }
-  });
+  const [zustand, setZustand] = useState<Record<PaneelKennung, boolean>>(() =>
+    paneeleLesen(sicherLesen(SPEICHER_SCHLUESSEL)),
+  );
   const setze = useCallback((kennung: PaneelKennung, offen: boolean) => {
     setZustand((alt) => {
       if (alt[kennung] === offen) return alt;
       const neu = { ...alt, [kennung]: offen };
-      try {
-        localStorage.setItem(SPEICHER_SCHLUESSEL, JSON.stringify(neu));
-      } catch {
-        // Kein Speicher (privates Fenster): der Zustand gilt dann nur bis zum Neuladen.
-      }
+      // Kein Speicher (privates Fenster): der Zustand gilt dann nur bis zum Neuladen.
+      sicherSchreiben(SPEICHER_SCHLUESSEL, JSON.stringify(neu));
       return neu;
     });
   }, []);

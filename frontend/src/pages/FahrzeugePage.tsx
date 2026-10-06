@@ -63,7 +63,12 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
+import {
+  besatzungsUrteil,
+  einsatzStatus,
+  statusKategorie,
+  type BesatzungsUrteil,
+} from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
@@ -100,30 +105,45 @@ function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
 }
 
 /**
- * Besatzungs-Ist als Ampel-Badge: neutral ohne hinterlegtes Soll (kein Urteil möglich; kein
- * Blau, weil Blau bedient, LFH-891), grün bei erfülltem Soll (nur Ist), sonst rot mit Soll in
- * Klammern. Die Klammer ist zugleich das nicht-farbliche Signal für Unterbesetzung, `title`
- * ergänzt grün/neutral.
+ * Das Urteil über die Besatzung, rein, damit die Regel ohne Render prüfbar ist. „nicht erfasst"
+ * geht vor allem anderen: ohne zugeordnete Kraft gibt es kein Ist, das man am Soll messen könnte
+ * (LFH-962, das Personal läuft oft über die Einheit).
  */
-function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | null }) {
-  if (!soll) {
-    return (
-      <Tag title="kein Soll hinterlegt">
-        <StaerkeAnzeige wert={ist} />
-      </Tag>
-    );
-  }
-  if (istSollErfuellt(ist, soll)) {
-    return (
-      <Tag color="green" title="Soll erfüllt">
-        <StaerkeAnzeige wert={ist} />
-      </Tag>
-    );
-  }
+function besatzungsUrteilVon(
+  anzahlKraefte: number,
+  ist: Staerke,
+  soll: Staerke | null,
+): BesatzungsUrteil {
+  if (anzahlKraefte === 0) return 'nicht_erfasst';
+  if (!soll) return 'kein_soll';
+  return istSollErfuellt(ist, soll) ? 'erfuellt' : 'unterbesetzt';
+}
+
+/**
+ * Besatzung als Urteil (`StatusTag` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
+ * „Ist 1/0/0//1 · Soll 0/1/8//9". Rot steht nur bei echter Unterbesetzung; das Wort ist der
+ * zweite Kanal, nicht die Farbe.
+ */
+function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll: Staerke | null }) {
+  const ist = istBesatzungsStaerke(crew);
+  const urteil = besatzungsUrteilVon(crew.length, ist, soll);
   return (
-    <Tag color="red" title="unterbesetzt">
-      <StaerkeAnzeige wert={ist} /> (Soll <StaerkeAnzeige wert={soll} />)
-    </Tag>
+    <Space size={abstand.sm} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
+      <StatusTag darstellung={besatzungsUrteil[urteil]} />
+      <span style={monoStil(12)}>
+        {urteil !== 'nicht_erfasst' && (
+          <>
+            Ist <StaerkeAnzeige wert={ist} />
+          </>
+        )}
+        {urteil !== 'nicht_erfasst' && soll && ' · '}
+        {soll && (
+          <>
+            Soll <StaerkeAnzeige wert={soll} />
+          </>
+        )}
+      </span>
+    </Space>
   );
 }
 
@@ -154,12 +174,11 @@ function BesatzungsBlock({
 }) {
   const crew = personal.filter((p) => p.fahrzeug_id === ef.id);
   const frei = personal.filter((p) => p.fahrzeug_id == null);
-  const ist = istBesatzungsStaerke(crew);
   return (
     <div style={{ paddingLeft: 8 }}>
       <Space size={abstand.sm} style={{ marginBottom: abstand.sm }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
-        <BesatzungsStaerkeBadge ist={ist} soll={ef.soll_besatzung ?? null} />
+        <BesatzungsStaerkeBadge crew={crew} soll={ef.soll_besatzung ?? null} />
       </Space>
       {crew.length === 0 ? (
         <div>
@@ -543,7 +562,7 @@ export default function FahrzeugePage() {
       key: 'besatzung',
       render: (_, ef) => (
         <BesatzungsStaerkeBadge
-          ist={istBesatzungsStaerke(personal.filter((p) => p.fahrzeug_id === ef.id))}
+          crew={personal.filter((p) => p.fahrzeug_id === ef.id)}
           soll={ef.soll_besatzung ?? null}
         />
       ),

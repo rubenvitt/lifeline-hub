@@ -6,11 +6,11 @@
  * Rendert `ThemeModeProvider` DIREKT statt über `renderMitProviders`: jenes hängt einen nackten
  * ConfigProvider ohne Theme-Provider auf.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button, Checkbox, Collapse, Popconfirm, Switch, theme } from 'antd';
-import { ThemeModeProvider, useDichte } from './ThemeModeProvider';
+import { ThemeModeProvider, useDichte, useThemeMode } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { sendeZeigerAenderung, setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
 
@@ -393,5 +393,62 @@ describe('Beschriftetes Kästchen folgt der Staffel über den Kontext (LFH-907)'
     );
     const label = container.querySelector<HTMLElement>('label.ant-checkbox-wrapper')!;
     expect(label.style.minHeight).toBe('');
+  });
+});
+
+/**
+ * Gesperrter Browserspeicher (LFH-942): Auf einem gehärteten Rechner ist `localStorage` `null`
+ * oder wirft. Der Provider sitzt über allem und ohne Error-Boundary; ein Wurf hier ließe die
+ * Seite weiß. Er muss mit den Vorgaben rendern, und jede Wahl muss im Tab trotzdem wirken.
+ */
+describe('Gesperrter Browserspeicher (LFH-942)', () => {
+  // Die Setter direkt aufrufen statt über einen Klick: React fängt Würfe aus Event-Handlern
+  // ab und meldet sie nur, ein Wurf im Setter bliebe dann unbemerkt.
+  let wert: ReturnType<typeof useThemeMode>;
+  function Fenster() {
+    wert = useThemeMode();
+    return null;
+  }
+
+  function pruefeOhneSpeicher() {
+    render(
+      <ThemeModeProvider>
+        <Fenster />
+      </ThemeModeProvider>,
+    );
+    expect(wert.modus).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+
+    act(() => wert.setModus('light'));
+    expect(wert.modus).toBe('light');
+    expect(document.documentElement.dataset.theme).toBe('light');
+    act(() => wert.setDichte('handschuh'));
+    expect(document.documentElement.dataset.dichte).toBe('handschuh');
+    act(() => wert.setHelligkeit(60));
+    expect(wert.helligkeit).toBe(60);
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('localStorage ist null: Nachtbetrieb, jede Wahl wirkt ohne Wurf', () => {
+    vi.stubGlobal('localStorage', null);
+    pruefeOhneSpeicher();
+  });
+
+  it('jeder Zugriff wirft: Nachtbetrieb, jede Wahl wirkt ohne Wurf', () => {
+    const wirf = () => {
+      throw new DOMException('gesperrt', 'SecurityError');
+    };
+    vi.stubGlobal('localStorage', {
+      getItem: wirf,
+      setItem: wirf,
+      removeItem: wirf,
+      key: wirf,
+      clear: wirf,
+      length: 0,
+    });
+    pruefeOhneSpeicher();
   });
 });

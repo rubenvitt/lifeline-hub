@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import BefehlListe from './BefehlListe';
@@ -75,12 +75,18 @@ const KETTE = [
   },
 ];
 
+/** Macht den aktuellen Pfad sichtbar: nach dem Anlegen springt die Liste zur Detailseite. */
+function PfadProbe() {
+  return <span data-testid="pfad">{useLocation().pathname}</span>;
+}
+
 function renderListe() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={['/einsaetze/1/auftraege?reiter=befehle']}>
+          <PfadProbe />
           {/* Die Tastatur-Registry trägt Escape in der Erfassungshülle (`keyboard={false}`). */}
           <CommandPaletteProvider>
             <BefehlListe einsatzId={1} darfSchreiben />
@@ -175,10 +181,12 @@ describe('BefehlListe', () => {
     expect(await screen.findByText(/^1 Befehl · 0 im Entwurf/)).toBeInTheDocument();
   });
 
-  it('zeigt "Befehl erteilen" bei Schreibrecht — mit exaktem Namen', async () => {
+  it('zeigt "Befehl entwerfen" bei Schreibrecht — mit exaktem Namen', async () => {
     renderListe();
     // EXAKT, nicht als Regex: antds Icon schiebt sein Etikett („plus") in den berechneten Namen.
-    expect(await screen.findByRole('button', { name: 'Befehl erteilen' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Befehl entwerfen' })).toBeInTheDocument();
+    // Angelegt wird ein Entwurf; erteilt ist ein Befehl erst mit der Freigabe (LFH-972).
+    expect(screen.queryByRole('button', { name: /erteilen/ })).toBeNull();
   });
 
   it('zeigt den Leerzustand ohne eigenen Leer-Knoten', async () => {
@@ -252,13 +260,13 @@ describe('BefehlListe — Fassungszeile (LFH-350 · H60)', () => {
  */
 describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
   async function oeffneDialog(nutzer: ReturnType<typeof userEvent.setup>) {
-    await nutzer.click(await screen.findByRole('button', { name: 'Befehl erteilen' }));
+    await nutzer.click(await screen.findByRole('button', { name: 'Befehl entwerfen' }));
     // Ohne Namen: das rohe `render` vergibt jede `useId` als `test-id`, `aria-labelledby` des
     // Dialogs zeigt deshalb nicht verlässlich auf den Titel. Der Titel wird stattdessen geprüft.
     // Kein Warten aufs Verschwinden beim Schliessen: jsdom beendet antds Ausblendung nicht, der
     // Dialog bleibt im Baum. Gerade dann zeigt das erneute Öffnen, was der Formularspeicher hält.
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Neuen Befehl anlegen')).toBeInTheDocument();
+    expect(within(dialog).getByText('Neuer Befehlsentwurf')).toBeInTheDocument();
     return dialog;
   }
 
@@ -297,7 +305,7 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     const nutzer = userEvent.setup();
     renderListe();
     const dialog = await oeffneDialog(nutzer);
-    const knopf = within(dialog).getByRole('button', { name: 'Anlegen' });
+    const knopf = within(dialog).getByRole('button', { name: 'Entwurf anlegen' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     await waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
@@ -320,16 +328,30 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     expect(within(dialog).getByLabelText('Titel')).toHaveValue('');
   });
 
+  it('springt nach dem Anlegen auf die Detailseite des neuen Entwurfs (LFH-972)', async () => {
+    vi.mocked(befehleApi.legeBefehlAn).mockResolvedValue({ ...KETTE[2], id: 11 } as never);
+    const nutzer = userEvent.setup();
+    renderListe();
+    const dialog = await oeffneDialog(nutzer);
+    await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl an 2. Zug');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Entwurf anlegen' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/auftraege/befehle/11'),
+    );
+  });
+
   it('lässt die Felder bei Ablehnung stehen', async () => {
     vi.mocked(befehleApi.legeBefehlAn).mockRejectedValue(new Error('abgelehnt'));
     const nutzer = userEvent.setup();
     renderListe();
     const dialog = await oeffneDialog(nutzer);
     await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl X');
-    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Entwurf anlegen' }));
 
     await waitFor(() => expect(befehleApi.legeBefehlAn).toHaveBeenCalled());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Titel')).toHaveValue('Befehl X');
+    expect(screen.getByTestId('pfad')).toHaveTextContent(/^\/einsaetze\/1\/auftraege$/);
   });
 });

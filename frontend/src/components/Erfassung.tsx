@@ -11,6 +11,8 @@ import {
   type Ref,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import { useViewport } from './useViewport';
+import './Erfassung.css';
 
 /**
  * Schnellerfassungs-Primitive (LFH-332 · B4) — Formularhülle, Serienmodus, Wertübernahme.
@@ -51,6 +53,11 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  * Die Knöpfe der Aktion stehen mit `size="middle"` auseinander (`token.padding` = 11 / 18 / 26 px,
  * LFH-653): der Primärknopf kann rot sein (`unumkehrbar`), und im Handschuh-Betrieb verlangt die
  * Leitlinie ≥ 16 px zwischen zwei Zielen. antds Vorgabe wären 3 / 5 / 7 px (`paddingXS`).
+ *
+ * **Unter `md` stehen die Knöpfe untereinander** (LFH-953), in voller Breite: oben „Abbrechen“,
+ * unten, dem Daumen am nächsten, der Primärknopf. Nebeneinander waren die drei Knöpfe der Serie
+ * auf 390 px breiter als der Dialog und liefen links hinaus („Abbrechen“ bei x = −75). Ab `md`
+ * bleibt die Reihe rechtsbündig und bricht im Notfall um (`wrap`), statt hinauszulaufen.
  *
  * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
  * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
@@ -100,6 +107,13 @@ export function serienKuerzel(userAgent: string) {
 
 // Einmal je Sitzung bestimmt — die Plattform wechselt nicht.
 const SERIEN_KUERZEL = serienKuerzel(typeof navigator === 'undefined' ? '' : navigator.userAgent);
+
+/**
+ * Klasse des Kürzels im Serienknopf: sichtbar nur bei feinem Zeiger mit Hover (`Erfassung.css`,
+ * LFH-953). Eine Medienabfrage statt eines Zuhörers auf die Zeigerart; auf dem Touchgerät
+ * verwirrte „Strg + ↵“ und machte den Knopf breiter.
+ */
+export const SERIEN_KUERZEL_KLASSE = 'lfh-serien-kuerzel';
 
 const UEBERNAHME_ERKLAERUNG =
   'Beim „Speichern und nächste" bleiben die Wiederholfelder stehen, alle übrigen Felder werden geleert. ' +
@@ -181,6 +195,7 @@ export function ErfassungsFormular<T extends object>({
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
+  const { istSchmal } = useViewport();
   const wurzel = useRef<HTMLDivElement>(null);
   const [zaehler, setZaehler] = useState(0);
   // Vorgabe AUS — siehe Dateikopf.
@@ -359,16 +374,29 @@ export function ErfassungsFormular<T extends object>({
               </Typography.Text>
             </div>
           )}
-          {/* AKTION */}
-          <Space size="middle" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            {onAbbrechen && <Button onClick={abbrechen}>Abbrechen</Button>}
+          {/* AKTION — unter `md` gestapelt, siehe Dateikopf. */}
+          <Space
+            size="middle"
+            orientation={istSchmal ? 'vertical' : 'horizontal'}
+            wrap={!istSchmal}
+            style={
+              istSchmal ? { display: 'flex' } : { display: 'flex', justifyContent: 'flex-end' }
+            }
+          >
+            {onAbbrechen && (
+              <Button block={istSchmal} onClick={abbrechen}>
+                Abbrechen
+              </Button>
+            )}
             {serie && (
               // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
-              // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt.
-              <Button loading={laeuft} onClick={serienSpeichern}>
+              // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
+              // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
+              <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
                 Speichern und nächste
                 <span
                   aria-hidden
+                  className={SERIEN_KUERZEL_KLASSE}
                   style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
                 >
                   {SERIEN_KUERZEL}
@@ -378,6 +406,7 @@ export function ErfassungsFormular<T extends object>({
             <Button
               type="primary"
               htmlType="submit"
+              block={istSchmal}
               loading={laeuft}
               danger={unumkehrbar}
               disabled={gesperrt}

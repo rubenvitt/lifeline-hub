@@ -38,7 +38,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   aenderePersonBelegung,
   aktualisierePlatz,
@@ -64,9 +64,15 @@ import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
 import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
-import { useViewport } from '../../components/useViewport';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 import { ZugPointerSensor } from '../../components/zugPointerSensor';
+import {
+  SEITENSPALTE_BREITE,
+  SPALTEN_LUECKE,
+  dreiSpaltenPassen,
+  markenZielStil,
+  seitlicherUeberlauf,
+} from './grundrissLayout';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -154,7 +160,9 @@ const VERFUEGBARKEIT_EINTRAEGE = [
  *
  * Zeilenform: das „…"-Menü; Patientenaktionen und „als frei" sind Knöpfe der Zeile. „Patient
  * zuweisen" steht trotzdem im Menü: der Wurzelklick ist die Berührungsfläche, das Menü der
- * Tastaturweg.
+ * Tastaturweg. „Verbleib / Entlassung erfassen" steht zusätzlich zum Symbolknopf der Zeile im Menü:
+ * in der 124-px-Zeile ist kein Platz für sein Wort, und ein Symbol allein erklärt sich auf Touch
+ * nicht (LFH-970, U73).
  *
  * Kartenform: die Karte ist das einzige Ziel, also wandert alles hinein — Primäraktion oben
  * (unbelegt „Patient zuweisen", belegt „Verbleib / Entlassung erfassen"), „Person öffnen", der
@@ -178,20 +186,19 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
         },
       ]
     : [];
-  const verbleib =
-    karte && belegt
-      ? [
-          {
-            key: 'verbleib',
-            label: 'Verbleib / Entlassung erfassen',
-            icon: <IconAuto />,
-            disabled: belegungLaeuft,
-          },
-        ]
-      : [];
+  const verbleib = belegt
+    ? [
+        {
+          key: 'verbleib',
+          label: 'Verbleib / Entlassung erfassen',
+          icon: <IconAuto />,
+          disabled: belegungLaeuft,
+        },
+      ]
+    : [];
   const person =
     karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <IconPerson /> }] : [];
-  // Rückweg in den Wartebereich: der Drag auf `drop-inbox` ist unter `lg` strukturell weg (anderer
+  // Rückweg in den Wartebereich: der Drag auf `drop-inbox` ist in der Reiterform strukturell weg (anderer
   // Reiter, `destroyOnHidden`).
   const rueckweg = wartebereich
     ? [
@@ -220,13 +227,13 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
       : []),
   ];
   const kopf = [...zuweisen, ...verbleib, ...person, ...rueckweg];
-  // Zeilenform: der Trenner steht nur hinter „zuweisen", der Rückweg geht bündig in die
+  // Zeilenform: der Trenner steht nur hinter „zuweisen", Verbleib und Rückweg gehen bündig in die
   // Verfügbarkeiten über (von den Zeilen-Tests gepinnt).
   const kopfMitTrenner = karte
     ? kopf.length > 0
       ? [...kopf, trenner]
       : []
-    : [...zuweisen, ...(zuweisen.length > 0 ? [trenner] : []), ...rueckweg];
+    : [...zuweisen, ...(zuweisen.length > 0 ? [trenner] : []), ...verbleib, ...rueckweg];
   return [
     ...kopfMitTrenner,
     ...VERFUEGBARKEIT_EINTRAEGE,
@@ -269,7 +276,9 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
   const style: React.CSSProperties = {
     display: 'inline-block',
     maxWidth: kompakt ? 124 : '100%',
-    margin: 2,
+    // In Listen polstert die Hülle (`markenZielStil`); nur auf der Platzkarte trägt die Marke ihren
+    // Abstand selbst.
+    margin: kompakt ? 2 : 0,
     paddingInline: token.paddingXS,
     border: `1px solid ${rollen.linie}`,
     borderRadius: 0,
@@ -325,9 +334,13 @@ function PersonenkarteDrag({
     data: { kind: 'person', personId: person.id },
     disabled,
   });
+  const { token } = theme.useToken();
+  const nurOeffnen = disabled && onOeffnen !== undefined;
   // Ein Klick ohne 5-px-Bewegung (PointerSensor) öffnet den Detail-Drawer; ein echter Drag
-  // unterdrückt den nativen Click.
+  // unterdrückt den nativen Click. In Listen ist die Hülle das Bedienziel und misst die Steuerhöhe
+  // der Stufe (LFH-970, U72); auf der Platzkarte (`kompakt`) bleibt sie im 24-px-Streifen.
   const style: React.CSSProperties = {
+    ...(kompakt ? {} : markenZielStil(token)),
     cursor: disabled ? 'pointer' : 'grab',
     opacity: isDragging ? 0.4 : undefined,
   };
@@ -345,7 +358,21 @@ function PersonenkarteDrag({
             'aria-roledescription': undefined,
             'aria-describedby': undefined,
           }
-        : {})}
+        : nurOeffnen
+          ? {
+              // Ohne Zug (kein Schreibrecht, laufende Belegung) bleibt die Hülle das Ziel „Person
+              // öffnen“: dnd-kits `aria-disabled` meldete sie der Hilfstechnik als gesperrt, und
+              // ohne Zug-Listener öffnete die Tastatur nichts (LFH-970).
+              'aria-disabled': undefined,
+              'aria-roledescription': undefined,
+              'aria-describedby': undefined,
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                onOeffnen?.(person.id);
+              },
+            }
+          : {})}
       style={style}
       onClick={onOeffnen ? () => onOeffnen(person.id) : undefined}
     >
@@ -575,7 +602,7 @@ function PlatzKarte({
         {belegtVon && <StatusChip ton="bedien" wort="belegt" />}
       </div>
       {/* Belegung: feste Höhe, auch wenn leer. Die belegte Person ist ziehbar (→ Wartebereich
-          oder Transport), im Bearbeiten-Modus nicht. Unter `lg` ist der Rückweg per Drag
+          oder Transport), im Bearbeiten-Modus nicht. In der Reiterform ist der Rückweg per Drag
           unmöglich (anderer Reiter), der Menüeintrag „Zurück in den Wartebereich" trägt ihn. In
           der Kartenform ist die Marke kein eigenes Klickziel: ihr Klick steigt zur Karte auf und
           öffnet das Menü; der Zug bleibt. */}
@@ -706,7 +733,7 @@ function PersonenSpalte({
   onOeffnen: (personId: number) => void;
   /**
    * Verbleib erfassen aus der Liste heraus: `onDragEnd` nimmt `kind === 'transport'` von jeder
-   * Person entgegen, `drop-transport` liegt unter `lg` aber in einem anderen Reiter, und die
+   * Person entgegen, `drop-transport` liegt in der Reiterform aber in einem anderen Reiter, und die
    * direkten Verbleib-Knöpfe gibt es nur an belegten Plätzen. Ohne diesen Weg bekäme eine Person im
    * Wartebereich auf schmalem Schirm keinen Verbleib.
    *
@@ -730,33 +757,43 @@ function PersonenSpalte({
       koerperPolster
       style={{ background: droppableId && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
-      <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
+      {/* Zeilen- und Knopfabstand aus der Dichte-Staffel (`marginXS`), nicht fest 4 px: neben einem
+          72-px-Handschuhknopf wäre das kein Abstand. */}
+      <div
+        ref={droppableId ? drop.setNodeRef : undefined}
+        style={{ minHeight: 48, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
+      >
         {personen.map((p) => (
-          <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div
+            key={p.id}
+            data-testid="personen-zeile"
+            style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}
+          >
             <PersonenkarteDrag
               person={p}
               disabled={schreibgeschuetzt || belegungLaeuft}
               onOeffnen={onOeffnen}
             />
+            {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in keinem
+                klickbaren Vorfahren und braucht keinen `stopPropagation`-/`onPointerDown`-Riegel.
+                Ein antd-`Button` ohne `size` erbt `controlHeight`. Das Wort steht sichtbar, kein
+                Tooltip: auf Touch gibt es keinen, und ein Auto-Symbol allein las sich als
+                Statusmarke (LFH-970, U73). Der Name trägt die Zeilenkennung und beginnt mit dem
+                sichtbaren Wort; das Icon steckt in einer `aria-hidden`-Hülle, weil antd-Icons ein
+                eigenes englisches `aria-label` mitbringen. */}
             {onVerbleib && (
-              <Tooltip title="Verbleib / Entlassung erfassen">
-                {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in
-                    keinem klickbaren Vorfahren und braucht keinen
-                    `stopPropagation`-/`onPointerDown`-Riegel. Ein antd-`Button` ohne `size` erbt
-                    `controlHeight`. Der Name trägt die Zeilenkennung; das Icon steckt in einer
-                    `aria-hidden`-Hülle, weil antd-Icons ein eigenes englisches `aria-label`
-                    mitbringen. */}
-                <Button
-                  type="text"
-                  aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
-                  icon={
-                    <span aria-hidden="true">
-                      <IconAuto />
-                    </span>
-                  }
-                  onClick={() => onVerbleib(p)}
-                />
-              </Tooltip>
+              <Button
+                aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
+                icon={
+                  <span aria-hidden="true">
+                    <IconAuto />
+                  </span>
+                }
+                style={{ flexShrink: 0 }}
+                onClick={() => onVerbleib(p)}
+              >
+                Verbleib
+              </Button>
             )}
           </div>
         ))}
@@ -823,6 +860,56 @@ function TransportSpalte({
         {personen.length === 0 && <Typography.Text type="secondary">keine</Typography.Text>}
       </div>
     </Paneel>
+  );
+}
+
+/**
+ * Rand der Fläche, hinter dem weitere Plätze liegen (LFH-970, U71): eine Kante in der Bedienfarbe
+ * plus das Wort. Ohne Bedienung (`pointer-events: none`) und für Vorleser stumm: dort sind alle
+ * Plätze ohnehin im Baum, der Hinweis gilt dem Auge.
+ */
+function UeberlaufKante({
+  seite,
+  abstand,
+}: {
+  seite: 'links' | 'rechts';
+  /** Abstand zur Außenkante: der Rand der Fläche, rechts dazu eine senkrechte Bildlaufleiste. */
+  abstand: number;
+}) {
+  const { token } = theme.useToken();
+  const { rollen } = useRollen();
+  const rechts = seite === 'rechts';
+  return (
+    <div
+      aria-hidden="true"
+      data-testid={`grundriss-ueberlauf-${seite}`}
+      style={{
+        position: 'absolute',
+        top: 1,
+        bottom: 1,
+        [seite]: abstand,
+        display: 'flex',
+        // Oben: unten läge das Wort auf der waagerechten Bildlaufleiste.
+        alignItems: 'flex-start',
+        justifyContent: rechts ? 'flex-end' : 'flex-start',
+        pointerEvents: 'none',
+        boxShadow: `inset ${rechts ? -3 : 3}px 0 0 0 ${rollen.bedien}`,
+      }}
+    >
+      <span
+        style={{
+          margin: token.marginXS,
+          paddingInline: token.paddingXS,
+          border: `1px solid ${rollen.linie}`,
+          background: rollen.paneel,
+          color: rollen.text2,
+          fontSize: token.fontSizeSM,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {rechts ? 'weitere Plätze →' : '← weitere Plätze'}
+      </span>
+    </div>
   );
 }
 
@@ -910,9 +997,54 @@ export default function Grundriss({
     useSensor(ZugPointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor),
   );
-  // Ab `lg` nebeneinander, darunter drei Reiter (Details am Rahmen-`div` unten).
-  const { abBreite } = useViewport();
-  const breit = abBreite('lg');
+  // Gemessene Breite des Grundriss-Rahmens; ob drei Spalten passen, entscheidet sie zusammen mit
+  // der Flächenbreite unten (Details am Rahmen-`div`). Keine Medienabfrage: Rail und Modulpanel
+  // ziehen dem Fenster bis zu 270 px ab (LFH-970, U71). Gemessen wird im Callback-Ref, also vor dem
+  // ersten Zeichnen; der Rahmen kippt nicht sichtbar um. Muster `components/FensterRahmen.tsx`.
+  const [rahmenBreite, setRahmenBreite] = useState(0);
+  const rahmenMessen = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const messen = () => setRahmenBreite(el.clientWidth);
+    messen();
+    const beobachter = new ResizeObserver(messen);
+    beobachter.observe(el);
+    return () => beobachter.disconnect();
+  }, []);
+
+  // Läuft die Fläche seitlich über (Reiterform am Handy, ein Platz weit rechts), zeigt ein Rand
+  // mit Hinweis die Richtung; auf Touch ist der innere Bildlauf sonst kaum zu erkennen (U71).
+  const [ueberlauf, setUeberlauf] = useState({ links: false, rechts: false, leiste: 0 });
+  const flaecheKnoten = useRef<HTMLDivElement | null>(null);
+  const ueberlaufPruefen = useCallback(() => {
+    const el = flaecheKnoten.current;
+    if (!el) return;
+    // `leiste`: Breite einer senkrechten Bildlaufleiste, damit die rechte Kante neben ihr steht
+    // und nicht auf ihr (Rand 2 × 1 px abgezogen).
+    const neu = {
+      ...seitlicherUeberlauf(el),
+      leiste: Math.max(0, el.offsetWidth - el.clientWidth - 2),
+    };
+    setUeberlauf((alt) =>
+      alt.links === neu.links && alt.rechts === neu.rechts && alt.leiste === neu.leiste ? alt : neu,
+    );
+  }, []);
+  const flaecheMessen = useCallback(
+    (el: HTMLDivElement | null) => {
+      flaecheKnoten.current = el;
+      if (!el) return;
+      ueberlaufPruefen();
+      // Container und Innenfläche: die eine ändert sich mit dem Fenster, die andere mit den
+      // Plätzen (ein verschobener Platz, ein neuer Plan).
+      const beobachter = new ResizeObserver(ueberlaufPruefen);
+      beobachter.observe(el);
+      if (el.firstElementChild) beobachter.observe(el.firstElementChild);
+      return () => {
+        beobachter.disconnect();
+        flaecheKnoten.current = null;
+      };
+    },
+    [ueberlaufPruefen],
+  );
 
   // Geplant → Plätze-Bearbeitung ist Primäraktion und standardmäßig an. Aktiv → Patienten zuweisen
   // steht vorn, Bearbeiten ist sekundär.
@@ -977,6 +1109,12 @@ export default function Grundriss({
   const plan = uhs.plan ?? null;
   const flaecheBreite = Math.max(700, maxX + 160, plan ? plan.x + plan.breite : 0);
   const flaecheHoehe = Math.max(420, maxY + 140, plan ? plan.y + planHoehe(plan) : 0);
+  // Während eines Zugs steht die Form: ein Live-Update, das die Fläche verbreitert (ein Platz in
+  // einer neuen Rasterspalte), montierte sonst Quelle und Ziel des laufenden Zugs neu.
+  const [formImZug, setFormImZug] = useState<boolean | null>(null);
+  const breit = formImZug ?? dreiSpaltenPassen(rahmenBreite, flaecheBreite);
+  // Der gewählte Reiter überdauert einen Formwechsel hin und zurück.
+  const [reiter, setReiter] = useState('flaeche');
 
   function invalidate() {
     // Promise zurückgeben: React Query hält die Mutation so bis zum Ende aller Refetches `pending`,
@@ -1155,6 +1293,7 @@ export default function Grundriss({
   });
 
   function onDragStart(event: DragStartEvent) {
+    setFormImZug(breit);
     const data = event.active.data.current as { kind: string; personId?: number } | undefined;
     if (data?.kind === 'person' && data.personId != null) setAktivePersonId(data.personId);
   }
@@ -1163,10 +1302,12 @@ export default function Grundriss({
   // am Ende ließe einen Geister-Overlay stehen.
   function onDragCancel() {
     setAktivePersonId(null);
+    setFormImZug(null);
   }
 
   function onDragEnd(event: DragEndEvent) {
     setAktivePersonId(null);
+    setFormImZug(null);
     const { active, over, delta } = event;
     const data = active.data.current as
       { kind: string; personId?: number; platzId?: number } | undefined;
@@ -1217,7 +1358,7 @@ export default function Grundriss({
         height: '100%',
       }}
     >
-      {/* `onVerbleib` an beiden Listen: `drop-transport` liegt unter `lg` im dritten Reiter.
+      {/* `onVerbleib` an beiden Listen: `drop-transport` liegt in der Reiterform im dritten Reiter.
           Eine Person unter „Noch nicht aufgenommen" verlässt die Liste, sobald sie einen
           Verbleib trägt. */}
       <PersonenSpalte
@@ -1294,71 +1435,80 @@ export default function Grundriss({
           <UhsPlanPaneel einsatzId={einsatzId} uhs={uhs} />
         </div>
       )}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflow: 'auto',
-          border: `1px dashed ${rollen.linieStark}`,
-          background: rollen.grund,
-          borderRadius: 0,
-        }}
-      >
-        <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
-          {plan && <PlanEbene einsatzId={einsatzId} plan={plan} />}
-          {uhs.plaetze.map((p) => {
-            const belegt = belegtAn(p.id);
-            return (
-              <PlatzKarte
-                key={p.id}
-                platz={p}
-                belegtVon={belegt}
-                schreibgeschuetzt={schreibgeschuetzt}
-                belegungLaeuft={belegMut.isPending}
-                bearbeitbar={platzEditAktiv && !layoutMut.isPending}
-                onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
-                onAustritt={() => {
-                  const b = belegtAn(p.id);
-                  if (b) austrittMut.mutate(b.id);
-                }}
-                onTransport={() => {
-                  const b = belegtAn(p.id);
-                  if (b) setTransportPerson(b);
-                }}
-                onStorno={() => stornoMut.mutate(p.id)}
-                onOeffnen={setDetailPersonId}
-                onZuweisen={() => {
-                  // Ohne Kandidaten gar nicht öffnen: der Dialog trüge einen Primär-Knopf, der
-                  // nichts erfasst.
-                  if (zuweisbarePersonen.length === 0) {
-                    message.info(
-                      'Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.',
-                    );
-                    return;
+      {/* Hülle für den Überlaufhinweis: er liegt über dem Bildlauf, nicht in ihm, sonst liefe er
+          mit. */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', position: 'relative' }}>
+        <div
+          ref={flaecheMessen}
+          data-testid="grundriss-flaeche-scroll"
+          onScroll={ueberlaufPruefen}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: 'auto',
+            border: `1px dashed ${rollen.linieStark}`,
+            background: rollen.grund,
+            borderRadius: 0,
+          }}
+        >
+          <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
+            {plan && <PlanEbene einsatzId={einsatzId} plan={plan} />}
+            {uhs.plaetze.map((p) => {
+              const belegt = belegtAn(p.id);
+              return (
+                <PlatzKarte
+                  key={p.id}
+                  platz={p}
+                  belegtVon={belegt}
+                  schreibgeschuetzt={schreibgeschuetzt}
+                  belegungLaeuft={belegMut.isPending}
+                  bearbeitbar={platzEditAktiv && !layoutMut.isPending}
+                  onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
+                  onAustritt={() => {
+                    const b = belegtAn(p.id);
+                    if (b) austrittMut.mutate(b.id);
+                  }}
+                  onTransport={() => {
+                    const b = belegtAn(p.id);
+                    if (b) setTransportPerson(b);
+                  }}
+                  onStorno={() => stornoMut.mutate(p.id)}
+                  onOeffnen={setDetailPersonId}
+                  onZuweisen={() => {
+                    // Ohne Kandidaten gar nicht öffnen: der Dialog trüge einen Primär-Knopf, der
+                    // nichts erfasst.
+                    if (zuweisbarePersonen.length === 0) {
+                      message.info(
+                        'Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.',
+                      );
+                      return;
+                    }
+                    setZuweisenPlatz(p);
+                  }}
+                  onZurueckInWartebereich={
+                    // Nur bei belegtem Platz und mit Schreibrecht. `belegMut` errechnet `art` selbst
+                    // — für eine Person an dieser UHS `'wechsel'`. Nicht an `belegMut.isPending`
+                    // hängen: ein fehlender Callback nähme den Eintrag aus dem Menü; gesperrt wird er
+                    // über `belegungLaeuft` in der Karte.
+                    (() => {
+                      if (!belegt || schreibgeschuetzt) return undefined;
+                      return () => belegMut.mutate({ personId: belegt.id, platzId: null });
+                    })()
                   }
-                  setZuweisenPlatz(p);
-                }}
-                onZurueckInWartebereich={
-                  // Nur bei belegtem Platz und mit Schreibrecht. `belegMut` errechnet `art` selbst
-                  // — für eine Person an dieser UHS `'wechsel'`. Nicht an `belegMut.isPending`
-                  // hängen: ein fehlender Callback nähme den Eintrag aus dem Menü; gesperrt wird er
-                  // über `belegungLaeuft` in der Karte.
-                  (() => {
-                    if (!belegt || schreibgeschuetzt) return undefined;
-                    return () => belegMut.mutate({ personId: belegt.id, platzId: null });
-                  })()
-                }
-              />
-            );
-          })}
-          {uhs.plaetze.length === 0 && (
-            <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
-              {schreibgeschuetzt
-                ? 'Keine Plätze angelegt.'
-                : 'Keine Plätze. Lege Plätze über „Plätze anlegen" an.'}
-            </Typography.Text>
-          )}
+                />
+              );
+            })}
+            {uhs.plaetze.length === 0 && (
+              <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
+                {schreibgeschuetzt
+                  ? 'Keine Plätze angelegt.'
+                  : 'Keine Plätze. Lege Plätze über „Plätze anlegen" an.'}
+              </Typography.Text>
+            )}
+          </div>
         </div>
+        {ueberlauf.links && <UeberlaufKante seite="links" abstand={1} />}
+        {ueberlauf.rechts && <UeberlaufKante seite="rechts" abstand={1 + ueberlauf.leiste} />}
       </div>
     </div>
   );
@@ -1383,63 +1533,75 @@ export default function Grundriss({
       onDragEnd={onDragEnd}
       onDragCancel={onDragCancel}
     >
-      {breit ? (
-        <div
-          data-testid="grundriss-rahmen"
-          style={{
-            display: 'flex',
-            flexDirection: 'row',
-            gap: 12,
-            height: '100%',
-            minHeight: 0,
-            alignItems: 'stretch',
-          }}
-        >
-          {/* Links: Eingang / Wartebereich */}
-          <div style={{ width: 240, flexShrink: 0, minHeight: 0 }}>{wartebereich}</div>
-          {/* Mitte: Unfallhilfsstelle */}
-          {flaeche}
-          {/* Rechts: Auf Transport gebracht */}
-          <div style={{ width: 240, flexShrink: 0, minHeight: 0 }}>{transport}</div>
-        </div>
-      ) : (
-        /**
-         * Unter `lg` gestapelt: zwei 240-px-Seitenspalten plus Abstände sind ein 504-px-Sockel vor
-         * einer Fläche ab 700 px Innenbreite.
-         *
-         * Genau ein Zweig im Baum — ein verborgener zweiter trüge `drop-inbox` doppelt. Getragen
-         * wird das von `destroyOnHidden`, nicht vom fehlenden `forceRender`: ohne die Prop bleibt
-         * eine einmal besuchte Pane montiert (`removeOnLeave: false`, nur `display: none`).
-         *
-         * Folge: der Drag von der Warteliste auf einen Platz ist hier unmöglich (verschiedene
-         * Reiter). Der Weg ist der Klickweg „Patient zuweisen", der Rückweg „Zurück in den
-         * Wartebereich" — deshalb ist die Fläche der Default-Reiter.
-         */
-        <div
-          data-testid="grundriss-rahmen"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-            height: '100%',
-            minHeight: 0,
-          }}
-        >
-          <Tabs
-            defaultActiveKey="flaeche"
-            destroyOnHidden
-            style={{ height: '100%' }}
-            // Body und Pane reichen die Resthöhe weiter, sonst wächst die Fläche über den
-            // begrenzten Grundriss hinaus.
-            styles={{ body: { height: '100%' }, content: { height: '100%' } }}
-            items={[
-              { key: 'flaeche', label: 'Fläche', children: flaeche },
-              { key: 'warte', label: 'Wartebereich', children: wartebereich },
-              { key: 'transport', label: 'Transport', children: transport },
-            ]}
-          />
-        </div>
-      )}
+      {/* Messknoten: seine Breite hängt nicht am Zweig darin, ein Wechsel der Form misst also nicht
+          um. */}
+      <div ref={rahmenMessen} data-testid="grundriss-mass" style={{ height: '100%', minHeight: 0 }}>
+        {breit ? (
+          <div
+            data-testid="grundriss-rahmen"
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              gap: SPALTEN_LUECKE,
+              height: '100%',
+              minHeight: 0,
+              alignItems: 'stretch',
+            }}
+          >
+            {/* Links: Eingang / Wartebereich */}
+            <div style={{ width: SEITENSPALTE_BREITE, flexShrink: 0, minHeight: 0 }}>
+              {wartebereich}
+            </div>
+            {/* Mitte: Unfallhilfsstelle */}
+            {flaeche}
+            {/* Rechts: Auf Transport gebracht */}
+            <div style={{ width: SEITENSPALTE_BREITE, flexShrink: 0, minHeight: 0 }}>
+              {transport}
+            </div>
+          </div>
+        ) : (
+          /**
+           * Gestapelt, sobald die Fläche neben zwei 240-px-Seitenspalten (506-px-Sockel samt Lücken
+           * und Rand, `grundrissLayout.ts`) nicht ganz in den gemessenen Rahmen passt — nicht nach
+           * der Fensterbreite: auf dem Tablet quer stand die Fläche sonst zur Hälfte im inneren
+           * Bildlauf (LFH-970). Bei der Mindestfläche von 700 px sind das 1206 px Rahmen, also
+           * neben Rail und Modulpanel erst rund 1500 px Fenster.
+           *
+           * Genau ein Zweig im Baum — ein verborgener zweiter trüge `drop-inbox` doppelt. Getragen
+           * wird das von `destroyOnHidden`, nicht vom fehlenden `forceRender`: ohne die Prop bleibt
+           * eine einmal besuchte Pane montiert (`removeOnLeave: false`, nur `display: none`).
+           *
+           * Folge: der Drag von der Warteliste auf einen Platz ist hier unmöglich (verschiedene
+           * Reiter). Der Weg ist der Klickweg „Patient zuweisen", der Rückweg „Zurück in den
+           * Wartebereich" — deshalb ist die Fläche der Default-Reiter.
+           */
+          <div
+            data-testid="grundriss-rahmen"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              height: '100%',
+              minHeight: 0,
+            }}
+          >
+            <Tabs
+              activeKey={reiter}
+              onChange={setReiter}
+              destroyOnHidden
+              style={{ height: '100%' }}
+              // Body und Pane reichen die Resthöhe weiter, sonst wächst die Fläche über den
+              // begrenzten Grundriss hinaus.
+              styles={{ body: { height: '100%' }, content: { height: '100%' } }}
+              items={[
+                { key: 'flaeche', label: 'Fläche', children: flaeche },
+                { key: 'warte', label: 'Wartebereich', children: wartebereich },
+                { key: 'transport', label: 'Transport', children: transport },
+              ]}
+            />
+          </div>
+        )}
+      </div>
       {/* Portal-Overlay: folgt dem Cursor auf Body-Ebene, beeinflusst keine Scroll-Region. */}
       <DragOverlay>
         {aktivePerson ? <Personenkarte person={aktivePerson} testId="drag-overlay" /> : null}

@@ -830,7 +830,7 @@ describe('LagekartePage', () => {
     expect(screen.queryByRole('button', { name: /Verortung löschen/ })).not.toBeInTheDocument();
   });
 
-  it('Basemap-Umschalter: von Online auf Blind wechseln, Marker bleiben sichtbar', async () => {
+  it('Basemap-Umschalter: von Online auf „Ohne Karte“ wechseln, Marker bleiben sichtbar', async () => {
     basisHandler([], {
       online_styles: [
         { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
@@ -848,11 +848,11 @@ describe('LagekartePage', () => {
     expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
     const grundlage = screen.getByRole('radiogroup', { name: 'Kartengrundlage' });
     expect(within(grundlage).getByRole('radio', { name: 'Online' })).toBeChecked();
-    expect(within(grundlage).getByRole('radio', { name: 'Blind' })).not.toBeChecked();
-    await user.click(within(grundlage).getByRole('radio', { name: 'Blind' }));
-    expect(within(grundlage).getByRole('radio', { name: 'Blind' })).toBeChecked();
+    expect(within(grundlage).getByRole('radio', { name: 'Ohne Karte' })).not.toBeChecked();
+    await user.click(within(grundlage).getByRole('radio', { name: 'Ohne Karte' }));
+    expect(within(grundlage).getByRole('radio', { name: 'Ohne Karte' })).toBeChecked();
     expect(within(grundlage).getByRole('radio', { name: 'Online' })).not.toBeChecked();
-    // Marker bleiben im Blind-Modus sichtbar (Spec-Garantie):
+    // Marker bleiben ohne Karte sichtbar (Spec-Garantie):
     expect(screen.getByText('marker-schaden-9')).toBeInTheDocument();
   });
 
@@ -872,38 +872,51 @@ describe('LagekartePage', () => {
     await screen.findByText('marker-schaden-9');
     // Frisch hydratisiert = deckungsgleich mit der Ansicht → noch kein Speichern-Button.
     expect(screen.queryByRole('button', { name: 'In dieser Ansicht speichern' })).toBeNull();
-    // Basemap auf Blind wechseln → der Zustand weicht von der gespeicherten Ansicht ab.
-    await user.click(screen.getByRole('radio', { name: 'Blind' }));
+    // Basemap auf „Ohne Karte" wechseln → der Zustand weicht von der gespeicherten Ansicht ab.
+    await user.click(screen.getByRole('radio', { name: 'Ohne Karte' }));
     expect(
       await screen.findByRole('button', { name: 'In dieser Ansicht speichern' }),
     ).toBeInTheDocument();
   });
 
-  it('Basemap-Umschalter: ohne Config sind Online/Offline gesperrt, Blind aktiv', async () => {
-    // Default-Config: leer → nur Blind verfügbar. Gesperrt statt ausgeblendet: dass es keine
-    // Online-/Offline-Karte gibt, ist eine Aussage über die Installation — der Grund steht am
-    // Segment.
+  it('Basemap-Umschalter: ohne Config sind Online/Offline gesperrt, „Ohne Karte“ aktiv', async () => {
+    // Default-Config: leer → nur „Ohne Karte" verfügbar. Gesperrt statt ausgeblendet: dass es
+    // keine Online-/Offline-Karte gibt, ist eine Aussage über die Installation — der Grund steht
+    // am Segment (LFH-971: als Beschreibung und beim Antippen, nie nur als `title`).
     basisHandler();
     renderSeite();
     await screen.findByText('marker-schaden-9');
     const online = screen.getByRole('radio', { name: 'Online' });
-    expect(online).toBeDisabled();
-    expect(online).toHaveAttribute('title', 'Online-Karte nicht konfiguriert');
-    expect(screen.getByRole('radio', { name: 'Offline' })).toBeDisabled();
-    expect(screen.getByRole('radio', { name: 'Blind' })).toBeEnabled();
-    expect(screen.getByRole('radio', { name: 'Blind' })).toBeChecked();
+    expect(online).toHaveAttribute('aria-disabled', 'true');
+    expect(online).toHaveAccessibleDescription(
+      'Online-Karte nicht konfiguriert (Verwaltung › Karten)',
+    );
+    expect(screen.getByRole('radio', { name: 'Offline' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('radio', { name: 'Ohne Karte' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByRole('radio', { name: 'Ohne Karte' })).toBeChecked();
   });
 
-  it('Basemap-Umschalter: Blind-Modus zeigt erklärenden Hinweistext', async () => {
+  it('Basemap-Umschalter: ohne Karte steht der Hinweis an der Leiste, ohne Aufklappen (LFH-971)', async () => {
     basisHandler();
-    const user = userEvent.setup();
     renderSeite();
-    // Der Hinweis steht im Paneel „Kartengrundlage" der Leiste — zu Beginn zugeklappt.
-    await user.click(await screen.findByRole('button', { name: 'Kartengrundlage' }));
-    expect(await screen.findByText(/Keine Kartengrundlage eingerichtet/i)).toBeInTheDocument();
+    // Vorher stand er nur im zugeklappten Paneel „Kartengrundlage" der Leiste.
+    expect(
+      await screen.findByText(/Keine Kartengrundlage konfiguriert \(Verwaltung › Karten\)/),
+    ).toBeInTheDocument();
   });
 
-  it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
+  it('Basemap-Umschalter: am Handschirm steht der Hinweis „Ohne Karte“ auf der Karte (LFH-971)', async () => {
+    setzeViewportBreite(390);
+    basisHandler();
+    renderSeite();
+    // Die Leiste mit der Grundlage-Wahl ist dort zu; der Hinweis steht trotzdem genau einmal.
+    expect(
+      await screen.findByText(/Keine Kartengrundlage konfiguriert \(Verwaltung › Karten\)/),
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-lfh="grundlage-hinweis"]')).toHaveLength(1);
+  });
+
+  it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Hinweis „Ohne Karte“', async () => {
     basisHandler([], {
       online_styles: [
         { name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' },
@@ -917,11 +930,13 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    expect(screen.getByRole('radio', { name: 'Online' })).toBeEnabled();
-    expect(screen.getByRole('radio', { name: 'Offline' })).toBeEnabled();
-    // Default-Modus ist 'online' → kein Blind-Hinweis, auch bei aufgeklapptem Paneel.
+    expect(screen.getByRole('radio', { name: 'Online' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByRole('radio', { name: 'Offline' })).not.toHaveAttribute('aria-disabled');
+    // Default-Modus ist 'online' → kein Hinweis „Ohne Karte", auch bei aufgeklapptem Paneel.
     await user.click(screen.getByRole('button', { name: 'Kartengrundlage' }));
-    expect(screen.queryByText(/Keine Kartengrundlage eingerichtet/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Ohne Hintergrundkarte|Keine Kartengrundlage/),
+    ).not.toBeInTheDocument();
   });
 
   it('Basemap-Umschalter: nur Offline konfiguriert → Online disabled, Offline aktiv', async () => {
@@ -935,8 +950,8 @@ describe('LagekartePage', () => {
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    expect(screen.getByRole('radio', { name: 'Online' })).toBeDisabled();
-    expect(screen.getByRole('radio', { name: 'Offline' })).toBeEnabled();
+    expect(screen.getByRole('radio', { name: 'Online' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('radio', { name: 'Offline' })).not.toHaveAttribute('aria-disabled');
     // defaultModus springt auf 'offline'
     expect(screen.getByRole('radio', { name: 'Offline' })).toBeChecked();
   });

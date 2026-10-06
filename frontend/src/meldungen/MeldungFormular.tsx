@@ -174,7 +174,9 @@ export default function MeldungFormular({
     >
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       <Space style={{ marginBottom: 16 }} wrap>
-        <Button danger icon={<IconBlitz />} onClick={sofortVorbelegen}>
+        {/* Kein `danger` (LFH-962): der Knopf belegt nur Felder vor, und Rot bedient nichts. Die
+            Dringlichkeit trägt das Prio-Etikett „Sofort". */}
+        <Button icon={<IconBlitz />} onClick={sofortVorbelegen}>
           Sofortmeldung
         </Button>
         <Button icon={<IconPapierflieger />} onClick={lagemeldungVorbelegen}>

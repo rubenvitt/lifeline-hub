@@ -117,6 +117,14 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     ).toEqual(['In Bearbeitung', 'Erledigt', 'An Lage übergeben', 'Auftrag erteilen']);
   });
 
+  it('„Bestätigen" ist der Primärknopf, nicht rot — Rot bedient nichts (LFH-962)', () => {
+    const cb = alleCallbacks();
+    renderKarte(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} />);
+    const knopf = screen.getByRole('button', { name: 'Bestätigen' });
+    expect(knopf).toHaveClass('ant-btn-primary');
+    expect(knopf).not.toHaveClass('ant-btn-dangerous');
+  });
+
   it('löst „Bestätigen" über den sichtbaren Knopf aus', async () => {
     const cb = alleCallbacks();
     renderKarte(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} />);

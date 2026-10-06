@@ -1,5 +1,10 @@
-import { App, Button, Collapse, Form, Input, Popconfirm, Space } from 'antd';
-import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { App, Button, Collapse, Form, Input, Modal, Space } from 'antd';
+import KatalogTabelle, {
+  KENNUNG_SCHMAL_BREITE,
+  type KatalogSpalte,
+} from '../components/KatalogTabelle';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { useViewport } from '../components/useViewport';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
@@ -45,6 +50,10 @@ export default function BenutzerPage() {
   const [form] = Form.useForm<NeuerBenutzer>();
   const [zuBearbeiten, setZuBearbeiten] = useState<BenutzerAnzeige | null>(null);
   const [editForm] = Form.useForm<BearbeitenWerte>();
+  // Die Rückfrage steht als EIN Modal außerhalb der Zeilen (LFH-980): im Aktionsmenü unter `md`
+  // kann keine Blase am Knopf hängen, und beide Formen fragen gleich.
+  const [zuDeaktivieren, setZuDeaktivieren] = useState<BenutzerAnzeige | null>(null);
+  const { istSchmal } = useViewport();
 
   const benutzerQuery = useQuery({
     queryKey: globalKeys.benutzer(),
@@ -63,6 +72,7 @@ export default function BenutzerPage() {
     mutationFn: (id: number) => deaktiviereBenutzer(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
     onError: (e) => message.error(fehlerText(e, 'Deaktivieren fehlgeschlagen')),
+    onSettled: () => setZuDeaktivieren(null),
   });
 
   const bearbeiten = useMutation({
@@ -101,13 +111,17 @@ export default function BenutzerPage() {
    * „Bearbeiten" vollständig unter ihr (WCAG 2.4.11, `e2e/fokus-verdeckung.spec.ts`). Die Zahl ist
    * gegen die schmalste Fläche (mobil, 390 px) gewählt; der Name bricht um, statt gekürzt zu
    * werden — die menschenlesbare Kennung bleibt ganz lesbar.
+   *
+   * Unter `md` fallen Benutzername und Rollen weg (der Spaltenschalter zählt sie), Status und
+   * Aktionen stehen rechts fixiert, die Aktionen dort im Menü (LFH-980): Name, Status und Menü
+   * passen in 390 px, zwei Knöpfe nicht.
    */
   const spalten: KatalogSpalte<BenutzerAnzeige>[] = [
     {
       title: 'Name',
       dataIndex: 'anzeigename',
       key: 'anzeigename',
-      width: 136,
+      width: KENNUNG_SCHMAL_BREITE,
       // Leitspalte: am Anzeigenamen sucht ein Mensch das Konto. Ein Angebot, keine Voreinstellung —
       // `routes/benutzer.rs` liefert ORDER BY id.
       sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
@@ -121,6 +135,7 @@ export default function BenutzerPage() {
       // Die Fließspalte: ein Benutzername ist ein Wort ohne Bruchstelle und bricht notfalls
       // mitten im Wort, statt die Summe zu sprengen.
       mindestBreite: 160,
+      abBreite: 'md',
       // Kennung in Mono.
       render: (t) => <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>@{t}</span>,
     },
@@ -128,6 +143,7 @@ export default function BenutzerPage() {
       title: 'Rollen',
       key: 'rollen',
       width: 140,
+      abBreite: 'lg',
       render: (_, b) => (
         // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage (Blau
         // hieße Bedienung).
@@ -144,6 +160,8 @@ export default function BenutzerPage() {
       title: 'Status',
       key: 'status',
       width: 128,
+      immerSichtbar: true,
+      fixed: 'right',
       // Bewusst ohne `dataIndex`: `onFilter` bekommt den ganzen Datensatz, und ohne Datenbezug
       // fällt das Feld nicht in den Suchkorpus — sonst träfe die Suche nach „true"/„false" jede
       // aktive bzw. deaktivierte Zeile.
@@ -162,34 +180,57 @@ export default function BenutzerPage() {
     {
       title: 'Aktionen',
       key: 'aktionen',
-      width: 256,
-      render: (_, b) => (
-        <Space size="middle">
-          <Button onClick={() => setZuBearbeiten(b)}>Bearbeiten</Button>
-          {b.aktiv ? (
-            <Popconfirm
-              title="Benutzer deaktivieren?"
-              okText="Ja"
-              cancelText="Abbrechen"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => deaktivieren.mutate(b.id)}
-            >
-              {/* Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
-                  `variables` ist die nackte id. */}
-              <Button danger loading={deaktivieren.isPending && deaktivieren.variables === b.id}>
+      // Unter `md` nur der Menüauslöser: Steuerhöhe plus Zellpolster.
+      width: istSchmal ? 80 : 256,
+      immerSichtbar: true,
+      fixed: 'right',
+      render: (_, b) => {
+        const laeuft =
+          (deaktivieren.isPending && deaktivieren.variables === b.id) ||
+          (bearbeiten.isPending && bearbeiten.variables?.id === b.id);
+        if (istSchmal) {
+          return (
+            <MenueAusloeser
+              eintraege={[
+                { key: 'bearbeiten', label: 'Bearbeiten' },
+                b.aktiv
+                  ? { key: 'aktiv', label: 'Deaktivieren', gefahr: true }
+                  : { key: 'aktiv', label: 'Reaktivieren' },
+              ]}
+              zugaenglicherName={`Aktionen zu Benutzer ${b.anzeigename}`}
+              laeuft={laeuft}
+              onWahl={(aktion) => {
+                if (aktion === 'bearbeiten') setZuBearbeiten(b);
+                else if (b.aktiv) setZuDeaktivieren(b);
+                else bearbeiten.mutate({ id: b.id, patch: { aktiv: true } });
+              }}
+            />
+          );
+        }
+        return (
+          <Space size="middle">
+            <Button onClick={() => setZuBearbeiten(b)}>Bearbeiten</Button>
+            {b.aktiv ? (
+              // Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
+              // `variables` ist die nackte id.
+              <Button
+                danger
+                loading={deaktivieren.isPending && deaktivieren.variables === b.id}
+                onClick={() => setZuDeaktivieren(b)}
+              >
                 Deaktivieren
               </Button>
-            </Popconfirm>
-          ) : (
-            <Button
-              loading={bearbeiten.isPending && bearbeiten.variables?.id === b.id}
-              onClick={() => bearbeiten.mutate({ id: b.id, patch: { aktiv: true } })}
-            >
-              Reaktivieren
-            </Button>
-          )}
-        </Space>
-      ),
+            ) : (
+              <Button
+                loading={bearbeiten.isPending && bearbeiten.variables?.id === b.id}
+                onClick={() => bearbeiten.mutate({ id: b.id, patch: { aktiv: true } })}
+              >
+                Reaktivieren
+              </Button>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -221,8 +262,24 @@ export default function BenutzerPage() {
           columns={spalten}
           locale={{ emptyText: 'Noch keine Benutzer' }}
           suche={{ platzhalter: 'Name oder Benutzername' }}
+          spaltenSchalter={{ bezeichnung: 'Benutzer' }}
         />
       )}
+      <Modal
+        open={zuDeaktivieren != null}
+        title={
+          zuDeaktivieren
+            ? `Benutzer ${zuDeaktivieren.anzeigename} deaktivieren?`
+            : 'Benutzer deaktivieren?'
+        }
+        // Der Knopf nennt die Handlung, nie nur „Ja“ oder „OK“.
+        okText="Benutzer deaktivieren"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: deaktivieren.isPending }}
+        onOk={() => zuDeaktivieren && deaktivieren.mutate(zuDeaktivieren.id)}
+        onCancel={() => setZuDeaktivieren(null)}
+        destroyOnHidden
+      />
 
       {/* Auf der Hülle: der Absende-Knopf liegt im `<form>`, Enter sendet ab. Kein `serie` —
           ein Benutzerkonto legt man nicht im Minutentakt an. Den Fokus setzt die Hülle.

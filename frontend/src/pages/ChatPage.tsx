@@ -32,6 +32,7 @@ import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import KanalListe, { sortiereKanaele } from '../chat/KanalListe';
+import KanalAnlegenDialog from '../chat/KanalAnlegenDialog';
 import NachrichtenStrom from '../chat/NachrichtenStrom';
 import NachrichtEingabe from '../chat/NachrichtEingabe';
 import HeraufstufenModal from '../chat/HeraufstufenModal';
@@ -99,6 +100,8 @@ export default function ChatPage() {
     einsatzId: number;
     nachricht: ChatNachricht;
   } | null>(null);
+  /** Anlage-Dialog der schmalen Leiste; ab `md` führt die `KanalListe` ihren eigenen. */
+  const [kanalAnlageOffen, setKanalAnlageOffen] = useState(false);
   /** Zählt die eigenen Absendungen; jede Erhöhung holt die Sicht ans Ende zurück. */
   const [eigeneSendungen, setEigeneSendungen] = useState(0);
   const [dokumentSichtbar, setDokumentSichtbar] = useState(
@@ -406,25 +409,44 @@ export default function ChatPage() {
       {/* Unter `md` steht die Kanalauswahl als waagerechte Leiste über dem Strom, sonst bliebe
           auf 390 px für den Strom nichts. Bedingt gerendert, nicht bloß ausgeblendet: sonst
           stünden beide Navigationen im Baum und „unter md ist es die Leiste" wäre nicht
-          prüfbar. */}
+          prüfbar. Die Kanalanlage steht als eigener Knopf NEBEN der Tabliste, nicht als Segment
+          (LFH-976): die Tabliste besitzt nur Kanäle. Die Segmente scrollen in ihrer Spalte, der
+          Knopf bleibt stehen; `gap` hält mit dem Einzug der Segmentzellen den Zielabstand. */}
       {istSchmal && kanalId != null && (
         <div
           data-testid="kanal-leiste"
-          style={{ marginBottom: token.marginSM, overflowX: 'auto', flexShrink: 0 }}
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: token.marginXS,
+            marginBottom: token.marginSM,
+            flexShrink: 0,
+          }}
         >
-          <Segmentleiste
-            beschriftung="Kanal"
-            rolle="tablist"
-            wert={kanalId}
-            onWechsel={(neu) => setKanalAuswahl({ einsatzId, kanalId: neu })}
-            optionen={sortiereKanaele(kanaele).map((k) => ({
-              wert: k.id,
-              // Ungelesen: Punkt in Bedienfarbe und die Zahl im Wortlaut — zweiter Kanal neben der
-              // Farbe.
-              label: k.ungelesen_anzahl > 0 ? `${k.name} (${k.ungelesen_anzahl})` : k.name,
-              punkt: k.ungelesen_anzahl > 0 ? rollen.bedien : undefined,
-            }))}
-          />
+          <div style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
+            <Segmentleiste
+              beschriftung="Kanal"
+              rolle="tablist"
+              wert={kanalId}
+              onWechsel={(neu) => setKanalAuswahl({ einsatzId, kanalId: neu })}
+              optionen={sortiereKanaele(kanaele).map((k) => ({
+                wert: k.id,
+                // Ungelesen: Punkt in Bedienfarbe und die Zahl im Wortlaut — zweiter Kanal neben der
+                // Farbe.
+                label: k.ungelesen_anzahl > 0 ? `${k.name} (${k.ungelesen_anzahl})` : k.name,
+                punkt: k.ungelesen_anzahl > 0 ? rollen.bedien : undefined,
+              }))}
+            />
+          </div>
+          {darfSchreiben && (
+            <Button
+              aria-label="Kanal anlegen"
+              onClick={() => setKanalAnlageOffen(true)}
+              style={{ flex: '0 0 auto' }}
+            >
+              <span aria-hidden>+</span> Kanal
+            </Button>
+          )}
         </div>
       )}
       {/* `flexWrap: 'nowrap'` ist tragend: `ant-row` bringt `flex-wrap: wrap` mit, und eine
@@ -546,6 +568,13 @@ export default function ChatPage() {
       }
       fensterInhalt={{ inhalt: arbeitsflaeche, mindestHoehe: CHAT_MINDESTHOEHE }}
     >
+      {istSchmal && darfSchreiben && (
+        <KanalAnlegenDialog
+          offen={kanalAnlageOffen}
+          onSchliessen={() => setKanalAnlageOffen(false)}
+          onKanalAnlegen={(name, beschreibung) => kanalMutation.mutateAsync({ name, beschreibung })}
+        />
+      )}
       <BezugDialog
         offen={bezugNachricht !== null}
         nachricht={bezugNachricht}

@@ -29,6 +29,12 @@ async function fuellePflichtfelder(absender: string, inhalt: string) {
 }
 
 describe('MeldungFormular', () => {
+  it('der Fast-Path „Sofortmeldung" ist kein roter Knopf — er belegt nur vor (LFH-962)', () => {
+    renderFormular();
+    const knopf = screen.getByRole('button', { name: /Sofortmeldung/ });
+    expect(knopf).not.toHaveClass('ant-btn-dangerous');
+  });
+
   it('Fast-Path-Button belegt Sofortmeldung + Bestätigungspflicht vor', async () => {
     const onAnlegen = renderFormular();
     await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));

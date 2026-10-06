@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setzeViewportBreite } from '../../test/viewport';
+import { setzeMasse } from '../../test/elementMasse';
 import { renderMitProviders } from '../../test/utils';
 import { ConfigProvider } from 'antd';
 import type { ReactElement } from 'react';
@@ -170,11 +171,26 @@ function kompakt(ui: ReactElement) {
   );
 }
 
+/**
+ * Gemessene Breite des Grundriss-Rahmens (LFH-970). jsdom rechnet kein Layout; die Weiche liest
+ * `clientWidth` des Messknotens. Fenster und Rahmen getrennt zu setzen ist der Kern des Befunds:
+ * ab `lg` stand die Drei-Spalten-Form, auch wenn der Rahmen neben Rail und Modulpanel zu schmal war.
+ */
+function setzeRahmen(fenster: number, rahmen: number) {
+  setzeViewportBreite(fenster);
+  setzeMasse('grundriss-mass', { clientWidth: rahmen });
+}
+
+/** Breit genug für die Mindestfläche von 700 px neben beiden Seitenspalten (Sockel 523 px). */
+const RAHMEN_BREIT = 1300;
+/** Unter dem Umschaltpunkt: Reiterform. */
+const RAHMEN_SCHMAL = 800;
+
 describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
-  it('stellt ab lg alle drei Bereiche nebeneinander, ohne Reiter', async () => {
+  it('stellt alle drei Bereiche nebeneinander, wenn die Fläche ganz in den Rahmen passt', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    setzeViewportBreite(1280);
+    setzeRahmen(1600, RAHMEN_BREIT);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     // Beide Seitenspalten und die Fläche gleichzeitig im Baum — die Aussage „nebeneinander".
@@ -187,10 +203,10 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     expect((await screen.findByTestId('grundriss-rahmen')).style.flexDirection).toBe('row');
   });
 
-  it('stapelt unter lg zu drei Reitern mit der Fläche voran', async () => {
+  it('stapelt zu drei Reitern mit der Fläche voran, wenn sie nicht ganz passt', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    setzeViewportBreite(800); // < lg (992)
+    setzeRahmen(800, RAHMEN_SCHMAL);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     const reiter = await screen.findByRole('tablist');
@@ -202,10 +218,10 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     expect(within(reiter).getByRole('tab', { name: 'Transport' })).toBeInTheDocument();
   });
 
-  it('hält unter lg genau EINEN Zweig im Baum — der inaktive Reiter ist nicht bloß verborgen', async () => {
+  it('hält in der Reiterform genau EINEN Zweig im Baum — der inaktive Reiter ist nicht bloß verborgen', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    setzeViewportBreite(800);
+    setzeRahmen(800, RAHMEN_SCHMAL);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     await screen.findByRole('tablist');
@@ -229,12 +245,13 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     vi.mocked(listePersonen).mockResolvedValue(personenMitBelegung);
     // Der Drag auf `drop-inbox` ist unter lg weg (anderer Reiter); ohne diesen Eintrag gäbe es auf
     // schmalem Schirm keinen Rückweg vom Platz.
-    for (const breite of [1280, 800]) {
-      setzeViewportBreite(breite);
+    for (const breite of [RAHMEN_BREIT, RAHMEN_SCHMAL]) {
+      setzeRahmen(breite + 300, breite);
       const { unmount } = renderMitProviders(
         kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
       );
-      if (breite < 992) await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
+      if (breite === RAHMEN_SCHMAL)
+        await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
 
       await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
       // Genau ein offenes Portal (offenesMenue() wirft sonst).
@@ -260,7 +277,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
       zeitpunkt_at: 'x',
       erfasst_von: 1,
     });
-    setzeViewportBreite(800);
+    setzeRahmen(800, RAHMEN_SCHMAL);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
     await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
 
@@ -302,7 +319,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
         ablehnen = rej;
       }),
     );
-    setzeViewportBreite(800);
+    setzeRahmen(800, RAHMEN_SCHMAL);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
     await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
     expect(await screen.findByText('belegt')).toBeInTheDocument();
@@ -326,7 +343,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
   it('bietet den Rückweg an einem unbelegten Platz gar nicht erst an', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    setzeViewportBreite(1280);
+    setzeRahmen(1600, RAHMEN_BREIT);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
@@ -338,18 +355,18 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
 
   /**
    * Verbleib aus beiden Wartelisten heraus: `onDragEnd` nimmt `kind: 'transport'` von jeder Person,
-   * `drop-transport` liegt unter `lg` im dritten Reiter, und die direkten Knöpfe sitzen nur an
+   * `drop-transport` liegt in der Reiterform im dritten Reiter, und die direkten Knöpfe sitzen nur an
    * belegten Plätzen.
    */
   it('erfasst den Verbleib aus beiden Wartelisten heraus — auf beiden Breiten', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    for (const breite of [1280, 800]) {
-      setzeViewportBreite(breite);
+    for (const breite of [RAHMEN_BREIT, RAHMEN_SCHMAL]) {
+      setzeRahmen(breite + 300, breite);
       const { unmount } = renderMitProviders(
         kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
       );
-      if (breite < 992)
+      if (breite === RAHMEN_SCHMAL)
         await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
 
       // Je eigener Auslöser mit Zeilenkennung im Namen — ein bloßes Zählen ließe offen, ob die
@@ -372,7 +389,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
   it('öffnet damit denselben Verbleib-Dialog wie der Drag auf „Auf Transport gebracht"', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    setzeViewportBreite(800);
+    setzeRahmen(800, RAHMEN_SCHMAL);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
     await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
 
@@ -389,7 +406,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
   it('rendert den Verbleib-Auslöser ohne Schreibrecht gar nicht erst', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    setzeViewportBreite(1280);
+    setzeRahmen(1600, RAHMEN_BREIT);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt />));
 
     // Auf die Zeile warten, nicht auf den Spaltentitel: der steht sofort, und die Prüfung liefe
@@ -404,7 +421,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
   it('setzt an keiner Seitenspalte mehr eine feste Breite, wenn gestapelt wird', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
-    setzeViewportBreite(800);
+    setzeRahmen(800, RAHMEN_SCHMAL);
     renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     // Die 240 px saßen an den inneren Wrappern der Seitenspalten, nicht am Rahmen — geprüft wird
@@ -412,5 +429,155 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const rahmen = await screen.findByTestId('grundriss-rahmen');
     expect(rahmen.querySelectorAll('[style*="width: 240px"]')).toHaveLength(0);
     expect(rahmen.style.flexDirection).toBe('column');
+  });
+});
+
+describe('Grundriss — Umschaltpunkt nach Inhaltsbreite und Überlauf (LFH-970)', () => {
+  /**
+   * Der Befund U71: Tablet quer (1180 px) liegt über `lg`; neben Rail und Modulpanel bleiben dem
+   * Rahmen rund 910 px. Die Drei-Spalten-Form ließ davon 358 px für eine 700-px-Fläche. Die
+   * Rücknahme auf `abBreite('lg')` macht diesen Fall rot.
+   */
+  it('nimmt auf dem Tablet quer neben Rail und Modulpanel die Reiterform', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeRahmen(1180, 1180 - 60 - 208);
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
+
+    expect(await screen.findByRole('tablist')).toBeInTheDocument();
+    expect((await screen.findByTestId('grundriss-rahmen')).style.flexDirection).toBe('column');
+  });
+
+  it('richtet den Umschaltpunkt nach der Fläche: ein Platz weit rechts verlangt mehr Rahmen', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    // Fläche = maxX + 160 = 900 px; der Sockel davor 523 px. 1300 px reichen nicht mehr.
+    const weit = uhsDetail({
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', pos_x: 740 })],
+      belegungen: [transportBelegung],
+    });
+    setzeRahmen(1600, RAHMEN_BREIT);
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={weit} schreibgeschuetzt={false} />));
+
+    expect(await screen.findByRole('tablist')).toBeInTheDocument();
+  });
+
+  /**
+   * Ein Live-Update kann die Fläche über den Umschaltpunkt schieben (ein Platz in einer neuen
+   * Rasterspalte) und zurück. Der gewählte Reiter darf dabei nicht auf „Fläche“ zurückspringen.
+   */
+  it('behält den gewählten Reiter über einen Formwechsel hin und zurück', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    const weit = uhsDetail({
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', pos_x: 740 })],
+      belegungen: [transportBelegung],
+    });
+    setzeRahmen(1600, RAHMEN_BREIT);
+    const { rerender } = renderMitProviders(
+      kompakt(<Grundriss einsatzId={1} uhs={weit} schreibgeschuetzt={false} />),
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
+
+    rerender(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
+    expect(await screen.findByText('Noch nicht aufgenommen')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+
+    rerender(kompakt(<Grundriss einsatzId={1} uhs={weit} schreibgeschuetzt={false} />));
+    expect(await screen.findByRole('tab', { name: 'Wartebereich' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('zeigt „weitere Plätze →“, solange die Fläche rechts weitergeht, und nimmt ihn am Ende zurück', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeRahmen(390, 358);
+    setzeMasse('grundriss-flaeche-scroll', { clientWidth: 356, scrollWidth: 700, scrollLeft: 0 });
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
+
+    const kante = await screen.findByTestId('grundriss-ueberlauf-rechts');
+    expect(kante).toHaveTextContent('weitere Plätze →');
+    // Ein Hinweis für das Auge, kein Ziel: Vorleser haben die Plätze ohnehin im Baum.
+    expect(kante).toHaveAttribute('aria-hidden', 'true');
+    expect(kante.style.pointerEvents).toBe('none');
+    expect(screen.queryByTestId('grundriss-ueberlauf-links')).not.toBeInTheDocument();
+
+    // Ans Ende gescrollt: rechts nichts mehr, links der Rückweg.
+    setzeMasse('grundriss-flaeche-scroll', { scrollLeft: 344 });
+    fireEvent.scroll(screen.getByTestId('grundriss-flaeche-scroll'));
+    await waitFor(() =>
+      expect(screen.queryByTestId('grundriss-ueberlauf-rechts')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('grundriss-ueberlauf-links')).toHaveTextContent('← weitere Plätze');
+  });
+
+  it('zeigt keinen Hinweis, wenn die Fläche ganz sichtbar ist', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeRahmen(1600, RAHMEN_BREIT);
+    setzeMasse('grundriss-flaeche-scroll', { clientWidth: 702, scrollWidth: 702, scrollLeft: 0 });
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
+
+    await screen.findByTestId('grundriss-flaeche-scroll');
+    expect(screen.queryByTestId('grundriss-ueberlauf-rechts')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('grundriss-ueberlauf-links')).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss — Personenmarke und Verbleib in den Listen (LFH-970)', () => {
+  it('trägt das Wort „Verbleib“ sichtbar am Knopf, die Zeilenkennung bleibt im Namen', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    for (const breite of [RAHMEN_BREIT, RAHMEN_SCHMAL]) {
+      setzeRahmen(breite + 300, breite);
+      const { unmount } = renderMitProviders(
+        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
+      );
+      if (breite === RAHMEN_SCHMAL)
+        await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
+
+      const knopf = await screen.findByRole('button', {
+        name: 'Verbleib / Entlassung erfassen — R-006 · unbekannt',
+      });
+      // Sichtbarer Text, kein Tooltip als einzige Erklärung (Touch kennt keinen).
+      expect(knopf, `Breite ${breite}`).toHaveTextContent(/^Verbleib$/);
+      unmount();
+    }
+  });
+
+  it('macht die Hülle der Marke zum Ziel in Steuerhöhe, nicht die 26-px-Marke', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeRahmen(1600, RAHMEN_BREIT);
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
+
+    const marke = await screen.findByText('R-006');
+    const huelle = marke.closest('[role="button"]') as HTMLElement;
+    expect(huelle).not.toBeNull();
+    // `kompakt`: controlHeight 30 — der Boden der Staffel 30/48/72.
+    expect(huelle.style.minHeight).toBe('30px');
+    expect(huelle.style.flex).toBe('1 1 auto');
+  });
+
+  it('lässt die Marke ohne Schreibrecht das Klickziel für die Detailansicht bleiben', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeRahmen(1600, RAHMEN_BREIT);
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt />));
+
+    const marke = await screen.findByText('R-006');
+    const huelle = marke.closest('[role="button"]') as HTMLElement;
+    expect(huelle.style.minHeight).toBe('30px');
+    expect(
+      screen.queryByRole('button', { name: /Verbleib \/ Entlassung erfassen/ }),
+    ).not.toBeInTheDocument();
+    // Ohne Zug ist die Hülle kein gesperrter Knopf, sondern „Person öffnen“ — auch per Tastatur.
+    expect(huelle).not.toHaveAttribute('aria-disabled');
+    expect(huelle).not.toHaveAttribute('aria-roledescription');
+    huelle.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 });
