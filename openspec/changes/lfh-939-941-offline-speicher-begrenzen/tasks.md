@@ -13,10 +13,10 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
   Dehydrieren, erste Speicherung beim Abonnieren. Prüfen: viele Cache-Ereignisse in einem
   Drosselfenster → genau ein Dehydrieren; ein Mutations-Ereignis löst keins aus; bestehende
   Sitzungstests grün.
-- [x] 1.3 `offline/lagebildSpeicher.ts`: v2 mit `kopf` und `client`, Upgrade verwirft
-  `aktuell`. Prüfen: `lagebildBestaetigen` lässt den `client`-Satz unverändert (rohe IDB);
-  Mehrtab: nach einem Löschen schreibt weder Bestätigung noch Stand etwas zurück; ein
-  v1-Datensatz ist nach dem Upgrade weg.
+- [x] 1.3 `offline/lagebildSpeicher.ts`: `kopf` und `client` im v1-Store, Anlegen und Löschen
+  nehmen `aktuell` mit (D9). Prüfen: `lagebildBestaetigen` lässt den `client`-Satz unverändert
+  (rohe IDB); Mehrtab: nach einem Löschen schreibt weder Bestätigung noch Stand etwas zurück;
+  ein Altdatensatz wird nicht gelesen und geht beim Anlegen und Löschen; die Version bleibt 1.
 - [x] 1.4 Vorrat kürzen (D3). Prüfen: nach einer Speicherung mit live überdecktem Eintrag
   enthält der Vorrat ihn nicht mehr; ein nicht überdeckter, zulässiger bleibt.
 
@@ -38,27 +38,33 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 4. Erfassungsquittung (D6)
 
-- [x] 4.1 `offline/queue.ts`: v6, Quittung mit `person_id`/`registrier_nr`, Upgrade schreibt
-  v5-Quittungen um. Prüfen: gespeicherte Quittung ohne Name und Sichtung (rohe IDB); eine
-  v5-Quittung ist nach dem Öffnen umgeschrieben.
+- [x] 4.1 `offline/queue.ts`: Quittung mit `person_id`/`registrier_nr`, Bestand wird nach dem
+  Öffnen gekürzt, beim Lesen noch einmal (D9). Prüfen: gespeicherte Quittung ohne Name und
+  Sichtung (rohe IDB); eine Bestandsquittung ist nach dem Öffnen gekürzt, Version bleibt 5; eine
+  später von einem alten Tab geschriebene wird gekürzt geliefert.
 - [x] 4.2 `pages/PersonenPage.tsx`: Personen aus dem Cache, Fallback nur Hervorhebung.
   Prüfen: Sammelquittung zeigt weiter „Erfasst als …“; ohne Person im Cache bleibt die Sicht.
 - [x] 4.3 `offline/geraetRaeumung.ts`: Grund der Quittung im Verzeichnis nachführen.
 
 ## 5. Ortscache (D7)
 
-- [x] 5.1 `anzeige/ortCache.ts`: v2 mit `{ name, at }`, Frist 30 Tage, Obergrenze 5 000.
-  Prüfen: abgelaufener Eintrag nach dem Öffnen weg; bei 5 010 Einträgen bleiben die 5 000
-  jüngsten; `holeOrt` liefert den Namen.
+- [x] 5.1 `anzeige/ortCache.ts`: `{ name, at }` im v1-Store ohne Index, Frist 30 Tage,
+  Obergrenze 5 000 (D9). Prüfen: abgelaufener Eintrag nach dem Öffnen weg; bei 5 010 Einträgen
+  bleiben die 5 000 jüngsten; `holeOrt` liefert den Namen, auch einen nackten aus einem alten
+  Tab; Version bleibt 1. `anzeige/useOrtVorschau.ts` wartet `setzeOrt` nicht ab.
 
 ## 6. ETB-Entwürfe (D8)
 
 - [x] 6.1 `etb/entwuerfe/entwurfStore.ts`: leere eigene Entwürfe älter als 24 h und verwaiste
   Aktiv-Merker beim Laden räumen. Prüfen: leerer Altentwurf in Einsatz 3 samt Merker weg beim
   Laden von Einsatz 7; Entwurf mit Text bleibt; frischer leerer bleibt; offener Vorlauf geht
-  nicht verloren.
+  nicht verloren, auch nicht der eines anderen Tabs während des Räumens.
 
 ## 7. Regeln und Abschluss
+
+- [x] 7.0 Kein Versionssprung (D9, Review): je DB ein `blocking`-Handler. Prüfen: ein zweiter
+  Öffner stuft `lifeline-lagebild`, `lifeline-offline` und `lifeline-ortcache` hoch, ohne
+  blockiert zu werden.
 
 - [x] 7.1 `frontend/src/offline/AGENTS.md`: Persister-Drossel und Kopf, ETB-Allowlist,
   Quittung nur mit Kennungen, Ortscache-Frist. `frontend/src/etb/AGENTS.md`: Räumen leerer

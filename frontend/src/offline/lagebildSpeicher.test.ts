@@ -118,7 +118,8 @@ describe('lagebildSpeicher', () => {
     expect(geschrieben).toEqual(['client']);
   });
 
-  it('verwirft beim Upgrade einen Datensatz der Vorversion (LFH-939)', async () => {
+  /** Legt die DB im Zustand vor LFH-939 an: v1, Altdatensatz unter `aktuell`. */
+  async function altbestandAnlegen() {
     lagebildSpeicherZuruecksetzenFuerTests();
     await new Promise((fertig) => setTimeout(fertig, 0));
     await new Promise<void>((fertig, fehler) => {
@@ -137,10 +138,48 @@ describe('lagebildSpeicher', () => {
       'aktuell',
     );
     alt.close();
-    expect(await lagebildLesen()).toBeUndefined();
+  }
+
+  async function rohSchluessel() {
     const roh = await openDB(LAGEBILD_DB);
-    expect(await roh.getAllKeys('stand')).toEqual([]);
+    const schluessel = await roh.getAllKeys('stand');
+    const version = roh.version;
     roh.close();
+    return { schluessel, version };
+  }
+
+  it('bleibt bei v1 und liest einen Altdatensatz nicht (LFH-939)', async () => {
+    await altbestandAnlegen();
+    expect(await lagebildLesen()).toBeUndefined();
+    expect(await rohSchluessel()).toEqual({ schluessel: ['aktuell'], version: 1 });
+  });
+
+  it('nimmt den Altdatensatz beim Anlegen mit (LFH-939)', async () => {
+    await altbestandAnlegen();
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    expect((await rohSchluessel()).schluessel).toEqual(['client', 'kopf']);
+  });
+
+  it('nimmt den Altdatensatz beim Löschen mit (LFH-939)', async () => {
+    await altbestandAnlegen();
+    await lagebildLoeschenPlatte();
+    expect((await rohSchluessel()).schluessel).toEqual([]);
+  });
+
+  it('gibt die DB frei, wenn ein neueres Bundle hochstufen will', async () => {
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    const neu = await Promise.race([
+      openDB(LAGEBILD_DB, 2),
+      new Promise<'blockiert'>((fertig) => setTimeout(() => fertig('blockiert'), 500)),
+    ]);
+    expect(neu).not.toBe('blockiert');
+    if (neu !== 'blockiert') neu.close();
+    lagebildSpeicherZuruecksetzenFuerTests();
+    await new Promise<void>((fertig) => {
+      const loeschen = indexedDB.deleteDatabase(LAGEBILD_DB);
+      loeschen.onsuccess = () => fertig();
+      loeschen.onblocked = () => fertig();
+    });
   });
 
   it('fasst die Offline-Queue nicht an', async () => {

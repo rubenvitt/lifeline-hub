@@ -1,10 +1,4 @@
-import {
-  openDB,
-  type DBSchema,
-  type IDBPDatabase,
-  type IDBPTransaction,
-  type StoreNames,
-} from 'idb';
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import { neueClientId } from './clientId';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -144,10 +138,13 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
     // v2: `abgelehnt`-Store. v3: Personen-/Meldungs-Schreibaktionen; die ETB-Stores bleiben
     // byte-kompatibel. v4 bindet alle Stores an die Benutzer-ID; Legacy-Zeilen ohne `benutzer_id`
     // erscheinen in keinem Index und werden nie automatisch unter einer späteren Sitzung versendet.
-    // v5: Personen-Erfolgsquittungen. v6 (LFH-941): Quittungen tragen nur noch Kennungen,
-    // Bestandsquittungen werden umgeschrieben. Jeder Store wird versionsgeguardet angelegt, sonst
-    // würfe `createObjectStore` auf einer Bestands-DB.
-    dbPromise = openDB<OfflineDB>('lifeline-offline', 6, {
+    // v5: Personen-Erfolgsquittungen. Jeder Store wird versionsgeguardet angelegt, sonst würfe
+    // `createObjectStore` auf einer Bestands-DB.
+    //
+    // Die Kürzung der Quittungen (LFH-941, design.md D6) läuft bewusst OHNE Versionssprung nach
+    // dem Öffnen: ein Tab mit altem Bundle hielte v5 offen, ein Upgrade hinge und mit ihm Queue,
+    // Abgleich und Anmeldung.
+    const offen: Promise<IDBPDatabase<OfflineDB>> = openDB<OfflineDB>('lifeline-offline', 5, {
       upgrade(d, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           const store = d.createObjectStore('ausstehend', { keyPath: 'id', autoIncrement: true });
@@ -198,26 +195,46 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
           quittungen.createIndex('by-benutzer', 'benutzer_id');
           quittungen.createIndex('by-benutzer-einsatz', ['benutzer_id', 'einsatz_id']);
         }
-        if (oldVersion >= 5 && oldVersion < 6) void quittungenKuerzen(tx);
       },
+      // Will ein neueres Bundle die DB hochstufen, gibt dieser Tab sie frei, statt es zu blockieren.
+      blocking() {
+        void offen.then((d) => d.close());
+        if (dbPromise === offen) dbPromise = null;
+      },
+    }).then(async (d) => {
+      await quittungenKuerzen(d).catch((fehler: unknown) =>
+        console.warn('Offline-Queue: Kürzen der Quittungen fehlgeschlagen', fehler),
+      );
+      return d;
     });
+    dbPromise = offen;
   }
   return dbPromise;
 }
 
-/** v5 → v6 (LFH-941, design.md D6): jede Bestandsquittung auf ihre Kennungen kürzen. */
-async function quittungenKuerzen(
-  tx: IDBPTransaction<OfflineDB, ArrayLike<StoreNames<OfflineDB>>, 'versionchange'>,
-): Promise<void> {
-  let cursor = await tx.objectStore('personErfassungsQuittungen').openCursor();
+type Bestandsquittung = Omit<PersonErfassungsQuittung, 'person_id' | 'registrier_nr'> & {
+  person: Person;
+};
+
+/** Eine Quittung der Vorversion (oder aus einem Tab mit altem Bundle) auf ihre Kennungen kürzen. */
+function nurKennungen(
+  q: PersonErfassungsQuittung | Bestandsquittung,
+): PersonErfassungsQuittung | null {
+  if (!('person' in q)) return null;
+  const { person, ...rest } = q;
+  return { ...rest, person_id: person.id, registrier_nr: person.registrier_nr };
+}
+
+/** LFH-941, design.md D6: jede Bestandsquittung mit voller Person auf ihre Kennungen kürzen. */
+async function quittungenKuerzen(d: IDBPDatabase<OfflineDB>): Promise<void> {
+  const tx = d.transaction('personErfassungsQuittungen', 'readwrite');
+  let cursor = await tx.store.openCursor();
   while (cursor) {
-    const alt = cursor.value as PersonErfassungsQuittung & { person?: Person };
-    if (alt.person) {
-      const { person, ...rest } = alt;
-      await cursor.update({ ...rest, person_id: person.id, registrier_nr: person.registrier_nr });
-    }
+    const gekuerzt = nurKennungen(cursor.value as PersonErfassungsQuittung | Bestandsquittung);
+    if (gekuerzt) await cursor.update(gekuerzt);
     cursor = await cursor.continue();
   }
+  await tx.done;
 }
 
 /** Nur für Tests: vergisst die offene Verbindung, damit ein Test ein Upgrade nachstellen kann. */
@@ -532,9 +549,13 @@ export async function personErfassungsQuittungenLaden(
     'by-benutzer-einsatz',
     benutzerEinsatz(benutzerId, einsatzId),
   );
-  return alle.sort(
-    (a, b) => a.erstellt_at.localeCompare(b.erstellt_at) || a.client_id.localeCompare(b.client_id),
-  );
+  // Ein Tab mit altem Bundle kann bis zu seinem Neuladen noch volle Quittungen schreiben.
+  return alle
+    .map((q) => nurKennungen(q as PersonErfassungsQuittung | Bestandsquittung) ?? q)
+    .sort(
+      (a, b) =>
+        a.erstellt_at.localeCompare(b.erstellt_at) || a.client_id.localeCompare(b.client_id),
+    );
 }
 
 /** Quittiert eine bereits in der Personen-UI dargestellte Erfolgsquittung.

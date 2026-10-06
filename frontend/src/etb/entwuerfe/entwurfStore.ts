@@ -189,7 +189,9 @@ async function leereAufraeumen(
   while (cursor) {
     const e = cursor.value;
     const zuletzt = Date.parse(e.geaendert_at ?? e.erstellt_at);
-    if (istLeer(zuWerte(e)) && zuletzt < grenze) {
+    // Ein offener Vorlauf heißt: ein anderer Tab schreibt gerade an diesem Entwurf. Er gewinnt,
+    // `vormerken(id, null)` überschriebe sonst seinen Auftrag (LFH-521).
+    if (istLeer(zuWerte(e)) && zuletzt < grenze && !vorlaufLesen(e.id)) {
       gemerkt.push({ id: e.id, stand: vormerken(e.id, null) });
       await cursor.delete();
     } else {

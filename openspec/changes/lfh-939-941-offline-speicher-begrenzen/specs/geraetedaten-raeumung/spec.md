@@ -20,6 +20,13 @@ hervorheben.
 - **THEN** ist die Quittung auf Kennung und Registriernummer gekürzt und wird weiter
   angezeigt
 
+#### Scenario: Ein Tab der Vorversion ist noch offen
+
+- **WHEN** auf demselben Gerät ein Tab der Vorversion offen ist und ein Tab der neuen Version
+  startet
+- **THEN** wartet der neue Tab nicht auf den alten, und Anmeldung, Warteschlange und
+  Ortsvorschau arbeiten
+
 ### Requirement: Ortscache mit Frist und Obergrenze
 
 Der geräteseitige Ortscache MUST Einträge, die älter als 30 Tage sind, beim Öffnen löschen

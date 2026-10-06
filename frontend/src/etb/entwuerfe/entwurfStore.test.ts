@@ -372,6 +372,36 @@ describe('Leere Entwürfe und verwaiste Merker räumen (LFH-941, design.md D8)',
     expect(await rohLesen('lifeline-etb-entwuerfe', 'entwuerfe')).toHaveLength(1);
   });
 
+  it('lässt einen leeren Altentwurf stehen, an dem ein anderer Tab gerade schreibt', async () => {
+    await entwurfSpeichern(
+      entwurf({ id: 'leer-alt', einsatz_id: 3, inhalt: '', geaendert_at: vorTagen(2) }),
+    );
+    // Der andere Tab merkt seinen Auftrag vor, nachdem dieser Tab nachgetragen hat und bevor er
+    // räumt — also beim Öffnen des Räum-Cursors.
+    const oeffnen = IDBIndex.prototype.openCursor;
+    vi.spyOn(IDBIndex.prototype, 'openCursor').mockImplementation(function (
+      this: IDBIndex,
+      ...args
+    ) {
+      localStorage.setItem(
+        'lifeline-etb-entwuerfe-ausstehend:leer-alt',
+        JSON.stringify({
+          stand: 'anderer-tab',
+          entwurf: entwurf({
+            id: 'leer-alt',
+            einsatz_id: 3,
+            inhalt: 'gerade getippt',
+            geaendert_at: new Date().toISOString(),
+          }),
+        }),
+      );
+      return oeffnen.apply(this, args);
+    });
+    await entwuerfeLaden(A, 7);
+    vi.restoreAllMocks();
+    expect((await entwuerfeLaden(A, 3)).map((e) => e.inhalt)).toEqual(['gerade getippt']);
+  });
+
   it('verliert keinen offenen Vorlauf', async () => {
     const spione = schreibenBrichtAb();
     await entwurfSpeichern(

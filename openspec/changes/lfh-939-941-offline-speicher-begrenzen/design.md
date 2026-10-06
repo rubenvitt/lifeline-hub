@@ -69,9 +69,11 @@ SSE) käme ein Debounce nie zum Zug, und der Stand auf der Platte veraltete.
 
 ### D2 — Kopf und Stand unter zwei Schlüsseln
 
-`lifeline-lagebild` geht auf v2. Im Store `stand` liegen `kopf` (`benutzer`, `bestaetigtAt`,
-`buster`) und `client` (der `PersistedClient`). Das Upgrade löscht `aktuell`: Ein Altdatensatz
-trägt den `buster` der Vorversion und würde beim Start ohnehin verworfen (`startEntscheidung`).
+`lifeline-lagebild` bleibt auf v1 (D9). Im Store `stand` liegen `kopf` (`benutzer`,
+`bestaetigtAt`, `buster`) und `client` (der `PersistedClient`). Der Altdatensatz unter
+`aktuell` wird nicht mehr gelesen; `lagebildAnlegen` und `lagebildLoeschenPlatte` löschen ihn
+in derselben Transaktion mit. Er trägt den `buster` der Vorversion und würde beim Start ohnehin
+verworfen (`startEntscheidung`), danach legt der Start ohnehin neu an.
 
 - `lagebildLesen` liest beide in einer Lesetransaktion und setzt den bisherigen
   `LagebildDatensatz` zusammen; fehlt einer, gibt es keinen Datensatz.
@@ -126,7 +128,10 @@ liegt ein HTTP-Roundtrip, den ein Microtask-Bündel nicht überbrückt.
 ### D6 — Quittung nur mit Kennungen
 
 `PersonErfassungsQuittung` trägt `person_id` und `registrier_nr` statt `person`;
-`lifeline-offline` geht auf v6 und schreibt im Upgrade jede Bestandsquittung per Cursor um.
+`lifeline-offline` bleibt auf v5 (D9): Nach dem Öffnen kürzt eine Schreibtransaktion per
+Cursor jede Bestandsquittung, Fehler darin sind nicht fatal. `personErfassungsQuittungenLaden`
+kürzt beim Lesen noch einmal, denn ein Tab mit altem Bundle schreibt bis zu seinem Neuladen
+volle Quittungen.
 `schreibaktionPersonAbschliessen` gibt weiter die volle Person an den Aufrufer zurück
 (`OFFLINE_SCHREIBAKTION_GESENDET_EVENT` trägt sie im Speicher), legt aber nur die Kennungen ab.
 
@@ -137,10 +142,13 @@ wird per Kennung gesetzt. Der Text „Erfasst als R-…“ kommt aus `registrier
 
 ### D7 — Ortscache mit Frist und Obergrenze
 
-`lifeline-ortcache` geht auf v2: Store neu mit Wert `{ name, at }` und Index `by-at`; der
-v1-Store wird verworfen (reiner Cache, der Server hält `geocoding_cache`). Beim ersten Öffnen
-löscht ein Cursor über `by-at` alles älter als 30 Tage und, falls danach mehr als 5 000
-übrig sind, die ältesten bis zur Grenze. `holeOrt` liefert `name`. Ein Treffer frischt `at`
+`lifeline-ortcache` bleibt auf v1 (D9), ohne Index: Der Wert ist `{ name, at }`; ein nackter
+Name der Vorversion gilt als `at = 0`, also abgelaufen (reiner Cache, der Server hält
+`geocoding_cache`). Beim ersten Öffnen liest eine Schreibtransaktion alle Schlüssel und Werte,
+sortiert nach `at` und löscht alles älter als 30 Tage und, falls danach mehr als 5 000 übrig
+sind, die ältesten bis zur Grenze. Bei höchstens 5 000 kleinen Werten ist das billig.
+`holeOrt` liefert `name`, bei einem nackten Namen aus einem alten Tab diesen. Die Ortsvorschau
+wartet `setzeOrt` nicht ab. Ein Treffer frischt `at`
 nicht auf: Ortsnamen ändern sich nicht, und Schreiben beim Lesen kostete mehr als ein erneutes
 Nachschlagen nach 30 Tagen.
 
@@ -150,6 +158,8 @@ Nachschlagen nach 30 Tagen.
 Schreibtransaktion über `by-benutzer-einsatz` (alle Einsätze der Person) jeden Entwurf, dessen
 Werte leer sind (`istLeer`) und dessen `geaendert_at` (ersatzweise `erstellt_at`) mehr als 24 h
 zurückliegt. Gelöscht wird mit derselben Vorlauf-Disziplin wie `entwurfEntfernen` (LFH-521).
+Trägt ein Entwurf einen offenen Vorlauf, schreibt ein anderer Tab gerade an ihm; er bleibt
+stehen, `vormerken(id, null)` überschriebe sonst dessen Auftrag.
 Danach entfernt `aktivMerkerAufraeumen(benutzerId, einsatzeMitEntwurf)` jeden Merker
 `etb-entwurf-aktiv-<benutzer>-<einsatz>` ohne verbliebenen Entwurf; die Funktion steht neben
 `aktivSchluessel`. Entwürfe mit Text bleiben wie in LFH-767 D4.
@@ -161,20 +171,35 @@ nächsten Änderung neu; die Dateien selbst liegen nie auf der Platte.
 *Verworfen (Entscheidung 06.10.2026):* 14 Tage Frist für alle Entwürfe (ändert D4 aus
 LFH-767) oder nichts ändern.
 
+### D9 — Kein Versionssprung (Review, 06.10.2026)
+
+Der erste Schnitt hob `lifeline-lagebild` auf v2, `lifeline-offline` auf v6 und
+`lifeline-ortcache` auf v2. Das Review fand: Ein Tab mit altem Bundle hält die alte Version
+offen und bekommt `versionchange` nur, wenn er darauf hört; das tut keine der drei Dateien.
+Dann hinge das Öffnen im neuen Tab, und mit ihm der Start im `AuthProvider` (Lagebild),
+Queue und Abgleich (Offline-DB) und die Ortsvorschau. Alle drei Änderungen passen in die
+bestehenden Stores, also bleibt jede DB auf ihrer Version. Jede der drei trägt dazu einen
+`blocking`-Handler, der die eigene Verbindung schließt und vergisst: Ein künftiges Upgrade
+wartet dann nicht auf Tabs mit diesem Bundle. Nachweis je DB ein Test, der aus einem zweiten
+Öffner hochstuft.
+
 ## Risks / Trade-offs
 
 - **Drossel verschiebt den Stand um bis zu 1 s:** wie bisher; die Drossel saß vorher am
   Schreiben, jetzt am Dehydrieren.
-- **Upgrade `lifeline-lagebild` verwirft den Stand:** Ein Ausrollen ohne Netz kostet den
+- **Neue Version verwirft den Lagebild-Stand:** Ein Ausrollen ohne Netz kostet den
   vorgehaltenen Stand, wie jede neue Version heute über den `buster` auch.
-- **Upgrade-Blockade:** Ein Tab mit altem Bundle hält v1/v5 offen. Lagebild und Offline-DB
-  warten dann, bis er schließt; beide Zugriffe sind schon heute fehlertolerant und hängen den
-  Login nicht (LFH-767).
+- **Alte und neue Tabs nebeneinander:** Ohne Versionssprung (D9) blockiert nichts. Ein alter
+  Tab liest `aktuell`, das der neue nicht mehr schreibt, und hat dann keine Vorhaltung; er
+  schreibt volle Quittungen und nackte Ortsnamen, die der neue beim Lesen kürzt bzw. annimmt.
 - **Freie ETB-Varianten ohne Netz:** Eine Suche, die vor dem Netzverlust lief, ist nach einem
   Neuladen weg. Gewollt (D4).
 
 ## Migration Plan
 
-Reine Frontend-Änderung mit drei IndexedDB-Upgrades, alle im `upgrade`-Callback. Kein
-Rückweg nötig: Eine ältere Version öffnet eine neuere DB nicht und fällt in ihren
-fehlertoleranten Pfad (ohne Vorhaltung bzw. ohne Ortscache).
+Reine Frontend-Änderung ohne IndexedDB-Versionssprung (D9). Bestand wird beim Öffnen bzw.
+Anlegen umgeschrieben: der Lagebild-Altdatensatz beim nächsten Anlegen oder Löschen, die
+Quittungen und der Ortscache beim ersten Öffnen je Seitenaufruf. Kein Rückweg nötig: Eine
+ältere Version öffnet dieselben Versionen und kommt mit dem neuen Inhalt aus (ohne
+Vorhaltung, Quittung ohne `person` wird nicht angezeigt, Ortsname als Objekt wird nicht
+genutzt).

@@ -32,10 +32,10 @@ Das Räumen beim Abmelden, Sitzungsende und Benutzerwechsel hat LFH-767 schon um
   Query-Cache (Mutationen werden nie geschrieben) mit Drossel vor dem Dehydrieren. Der Persister
   hält höchstens einen laufenden und einen wartenden Stand. Die erste Speicherung beim
   Abonnieren bleibt.
-- **Kopf und Stand getrennt** in `lifeline-lagebild` (DB v2): Identität und `bestaetigtAt` unter
+- **Kopf und Stand getrennt** in `lifeline-lagebild`: Identität und `bestaetigtAt` unter
   `kopf`, der dehydrierte Stand unter `client`, beide im selben Store und in einer Transaktion
-  (Mehrtab-Schutz aus D1 bleibt). Die Bestätigung liest und schreibt nur noch den Kopf. Ein
-  Altdatensatz wird beim Upgrade verworfen (er trägt ohnehin den alten `buster`).
+  (Mehrtab-Schutz aus D1 bleibt). Die Bestätigung liest und schreibt nur noch den Kopf. Den
+  Altdatensatz nehmen Anlegen und Löschen mit (er trägt ohnehin den alten `buster`).
 - **Vorrat schrumpft:** Nach jeder Speicherung bleibt im Vorrat nur, was zulässig und nicht live
   überdeckt ist.
 - **ETB offline nur in festen Ansichten** (entschieden 06.10.2026): Auf die Platte gehen
@@ -46,11 +46,11 @@ Das Räumen beim Abmelden, Sitzungsende und Benutzerwechsel hat LFH-767 schon um
 - **Queue-Zähler ohne Payload:** Altzeilen werden per `count()` je Store gezählt, in einer
   Lesetransaktion. Der Zähler-Hook lädt höchstens einmal je Drosselfenster neu, egal wie viele
   Queue-Ereignisse ein Abgleich auslöst.
-- **Quittung nur mit Kennungen** (`lifeline-offline` v6): `person_id` und `registrier_nr` statt
-  `person`; Bestandsquittungen werden im Upgrade umgeschrieben. Die Personenseite holt die
+- **Quittung nur mit Kennungen** (`lifeline-offline`): `person_id` und `registrier_nr` statt
+  `person`; Bestandsquittungen werden beim Öffnen gekürzt. Die Personenseite holt die
   volle Person aus dem Cache; fehlt sie, bleibt die Sicht stehen und nur die Hervorhebung wird
   gesetzt.
-- **Ortscache befristet** (`lifeline-ortcache` v2): Wert `{ name, at }`, Index `by-at`. Beim
+- **Ortscache befristet** (`lifeline-ortcache`): Wert `{ name, at }`. Beim
   ersten Öffnen gehen Einträge älter als 30 Tage, die Anzahl ist auf 5 000 gedeckelt (älteste
   zuerst).
 - **Leere ETB-Entwürfe** (entschieden 06.10.2026): Beim Laden der Entwürfe gehen
@@ -80,6 +80,7 @@ Keine.
   `lagebildSitzung.ts`, `queue.ts`, `useOfflineQueueZaehler.ts`, `geraetRaeumung.ts`;
   `api/queryKeys.ts`; `pages/EtbPage.tsx`, `dokumente/bezugswahl.ts`; `pages/PersonenPage.tsx`;
   `anzeige/ortCache.ts`; `etb/entwuerfe/entwurfStore.ts`.
-- IndexedDB-Versionen: `lifeline-lagebild` v2, `lifeline-offline` v6, `lifeline-ortcache` v2.
+- IndexedDB: kein Versionssprung (design.md D9); `lifeline-lagebild`, `lifeline-offline` und
+  `lifeline-ortcache` geben ihre Verbindung bei einem künftigen Upgrade frei (`blocking`).
 - Regeln: `frontend/src/offline/AGENTS.md`, `frontend/src/etb/AGENTS.md`.
 - Kein Backend, keine Migration, keine API-Änderung.

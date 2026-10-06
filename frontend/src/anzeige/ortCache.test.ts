@@ -77,7 +77,7 @@ describe('ortCache', () => {
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toHaveLength(ORTCACHE_OBERGRENZE);
   });
 
-  it('verwirft den Bestand der Vorversion ohne Zeitstempel (LFH-941)', async () => {
+  it('verwirft den Bestand der Vorversion ohne Zeitstempel, ohne Versionssprung (LFH-941)', async () => {
     ortCacheZuruecksetzenFuerTests();
     await new Promise<void>((fertig, fehler) => {
       const loeschen = indexedDB.deleteDatabase('lifeline-ortcache');
@@ -96,5 +96,32 @@ describe('ortCache', () => {
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([
       { name: 'Neuer Ort', at: expect.any(Number) },
     ]);
+    const roh = await openDB('lifeline-ortcache');
+    expect(roh.version).toBe(1);
+    roh.close();
+  });
+
+  it('liest einen nackten Namen, den ein alter Tab nach dem Öffnen schreibt', async () => {
+    await holeOrt('vorher-oeffnen');
+    const roh = await openDB('lifeline-ortcache');
+    await roh.put('ortsnamen', 'Alter Tab', ortKeyVon(3, 3));
+    roh.close();
+    expect(await holeOrt(ortKeyVon(3, 3))).toBe('Alter Tab');
+  });
+
+  it('gibt die DB frei, wenn ein neueres Bundle hochstufen will', async () => {
+    await holeOrt('vorher-oeffnen');
+    const neu = await Promise.race([
+      openDB('lifeline-ortcache', 2),
+      new Promise<'blockiert'>((fertig) => setTimeout(() => fertig('blockiert'), 500)),
+    ]);
+    expect(neu).not.toBe('blockiert');
+    if (neu !== 'blockiert') neu.close();
+    ortCacheZuruecksetzenFuerTests();
+    await new Promise<void>((fertig) => {
+      const loeschen = indexedDB.deleteDatabase('lifeline-ortcache');
+      loeschen.onsuccess = () => fertig();
+      loeschen.onblocked = () => fertig();
+    });
   });
 });

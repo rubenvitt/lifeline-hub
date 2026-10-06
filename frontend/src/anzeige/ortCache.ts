@@ -22,20 +22,28 @@ interface OrtEintrag {
   at: number;
 }
 
+/** Ein Tab mit altem Bundle schreibt bis zu seinem Neuladen noch nackte Namen. */
+type OrtWert = OrtEintrag | string;
+
 interface OrtCacheDB extends DBSchema {
-  ortsnamen: { key: string; value: OrtEintrag; indexes: { 'by-at': number } };
+  ortsnamen: { key: string; value: OrtWert };
 }
 
 let dbPromise: Promise<IDBPDatabase<OrtCacheDB>> | null = null;
 
 function db(): Promise<IDBPDatabase<OrtCacheDB>> {
   if (!dbPromise) {
-    // v2 (LFH-941): Wert mit Zeitstempel und Index. Der v1-Store (nackte Namen) wird verworfen —
-    // ein reiner Cache, der Server hält `geocoding_cache`.
-    dbPromise = openDB<OrtCacheDB>(DB_NAME, 2, {
+    // Bewusst OHNE Versionssprung (LFH-941, design.md D7): ein Tab mit altem Bundle hielte v1
+    // offen, das Upgrade hinge und mit ihm die Ortsvorschau. Deshalb kein Index, sondern
+    // `{ name, at }` im v1-Store; ein nackter Name aus der Vorversion gilt als abgelaufen.
+    const offen: Promise<IDBPDatabase<OrtCacheDB>> = openDB<OrtCacheDB>(DB_NAME, 1, {
       upgrade(d) {
-        if (d.objectStoreNames.contains(STORE)) d.deleteObjectStore(STORE);
-        d.createObjectStore(STORE).createIndex('by-at', 'at');
+        d.createObjectStore(STORE);
+      },
+      // Will ein neueres Bundle die DB hochstufen, gibt dieser Tab sie frei, statt es zu blockieren.
+      blocking() {
+        void offen.then((d) => d.close());
+        if (dbPromise === offen) dbPromise = null;
       },
     }).then(async (d) => {
       try {
@@ -45,29 +53,27 @@ function db(): Promise<IDBPDatabase<OrtCacheDB>> {
       }
       return d;
     });
+    dbPromise = offen;
   }
   return dbPromise;
 }
 
-/** Frist und Obergrenze, beim ersten Öffnen je Seitenaufruf, die ältesten zuerst. */
+function zeitpunkt(wert: OrtWert): number {
+  return typeof wert === 'string' ? 0 : wert.at;
+}
+
+/** Frist und Obergrenze, beim ersten Öffnen je Seitenaufruf, die ältesten zuerst. Ohne Index
+ *  liest es einmal alle Einträge; bei höchstens 5 000 kleinen Werten ist das billig. */
 async function ausduennen(d: IDBPDatabase<OrtCacheDB>): Promise<void> {
   const tx = d.transaction(STORE, 'readwrite');
-  const index = tx.store.index('by-at');
-  let cursor = await index.openCursor(IDBKeyRange.upperBound(Date.now() - ORTCACHE_FRIST_MS, true));
-  while (cursor) {
-    await cursor.delete();
-    cursor = await cursor.continue();
-  }
-  let ueber = (await tx.store.count()) - ORTCACHE_OBERGRENZE;
-  if (ueber > 0) {
-    let aelteste = await index.openCursor();
-    while (aelteste && ueber > 0) {
-      await aelteste.delete();
-      ueber -= 1;
-      aelteste = await aelteste.continue();
-    }
-  }
-  await tx.done;
+  const [schluessel, werte] = await Promise.all([tx.store.getAllKeys(), tx.store.getAll()]);
+  const grenze = Date.now() - ORTCACHE_FRIST_MS;
+  const nachAlter = schluessel
+    .map((key, i) => ({ key, at: zeitpunkt(werte[i]) }))
+    .sort((a, b) => a.at - b.at);
+  const ueber = Math.max(0, nachAlter.length - ORTCACHE_OBERGRENZE);
+  const weg = nachAlter.filter((e, i) => i < ueber || e.at < grenze);
+  await Promise.all([...weg.map((e) => tx.store.delete(e.key)), tx.done]);
 }
 
 /** Nur für Tests: vergisst die offene Verbindung, damit das nächste Öffnen erneut ausdünnt. */
@@ -84,7 +90,9 @@ export function ortKeyVon(lat: number, lon: number): string {
 
 export async function holeOrt(key: string): Promise<string | null> {
   try {
-    return (await (await db()).get(STORE, key))?.name ?? null;
+    const wert = await (await db()).get(STORE, key);
+    if (wert === undefined) return null;
+    return typeof wert === 'string' ? wert : wert.name;
   } catch (e) {
     console.warn('ortCache: Lesefehler', e);
     return null;

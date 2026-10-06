@@ -31,8 +31,8 @@ draußen gelassen werden.
   dehydriert. Der Persister ist Single-Flight: höchstens ein laufender Schreibvorgang und ein
   wartender Erzeuger, keine `.then`-Kette. Der Vorrat schrumpft bei jeder Speicherung auf das,
   was zulässig und nicht live überdeckt ist (D3).
-- **Kopf und Stand liegen getrennt** (`lifeline-lagebild` v2, D2): `kopf` (Identität,
-  `bestaetigtAt`, `buster`) und `client`. Bestätigung und Identitätsprüfung lesen nur den Kopf,
+- **Kopf und Stand liegen getrennt** (D2): `kopf` (Identität, `bestaetigtAt`, `buster`) und
+  `client`, im v1-Store; den Altdatensatz `aktuell` nehmen Anlegen und Löschen mit. Bestätigung und Identitätsprüfung lesen nur den Kopf,
   in derselben Transaktion wie das Schreiben (Mehrtab-Schutz). Herleitung: `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
 
 - **Offline-Identität nur bei einem Leitungsfehler.** Scheitert `/api/auth/me` an einem
@@ -114,11 +114,18 @@ draußen gelassen werden.
   `'sitzungsende'`; eine 401 schon beim Start räumt mit demselben Anlass. Nach Start und jeder Anmeldung räumt `geraetFuerBenutzerRaeumen` fremde und
   abgelaufene Daten. Beide werfen nie, jeder Ort wird einzeln versucht, und **keiner wird abgewartet**: Ein Tab mit altem Bundle hält eine DB im alten Schema offen, dann hinge das Upgrade und mit ihm der Login (`auth/geraetRaeumung.haengt.test.tsx`). Die Kanalmeldung `abgemeldet` trägt den Anlass, damit andere Tabs beim Abmelden auch die Entwürfe räumen.
 - **Während der Sitzung begrenzt** (LFH-941): Die Personen-Erfassungsquittung trägt nur
-  `person_id` und `registrier_nr` (`lifeline-offline` v6, Upgrade kürzt den Bestand); die
-  Personenseite holt die Person aus dem Cache. Der Ortscache (`lifeline-ortcache` v2) löscht
+  `person_id` und `registrier_nr` (Bestand wird beim Öffnen und beim Lesen gekürzt); die
+  Personenseite holt die Person aus dem Cache. Der Ortscache (`{ name, at }`) löscht
   beim Öffnen, was älter als 30 Tage ist, und hält höchstens 5 000 Einträge. Leere Entwürfe:
   `etb/AGENTS.md`. Der Queue-Zähler zählt Altzeilen per `count()` ohne Payload, der Hook lädt
   höchstens einmal je `ZAEHLER_DROSSEL_MS` (LFH-939, D5). Herleitung: `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
+- **Kein IndexedDB-Versionssprung ohne Not** (LFH-941, D9): Ein Tab mit altem Bundle hält die
+  alte Version offen, das Upgrade im neuen Tab hinge, mit ihm Anmeldung, Queue oder
+  Ortsvorschau. Neuer Inhalt geht in die bestehenden Stores, der Bestand wird beim Öffnen
+  umgeschrieben und beim Lesen toleriert. `lifeline-lagebild`, `lifeline-offline` und
+  `lifeline-ortcache` tragen einen `blocking`-Handler (Verbindung schließen und vergessen), damit
+  ein künftiges Upgrade nicht auf sie wartet; Nachweis je DB ein Test, der aus einem zweiten
+  Öffner hochstuft.
 - **Testfalle:** Ein Räumtest liest die Platte über `test/rohIdb.ts` (eigene Verbindung), nicht
   über die Modulfunktionen — ein Index blendet fremde Zeilen nur aus.
 - Herleitung: `openspec/changes/archive/2026-10-02-lfh-767-geraet-raeumung-abmelden/design.md`.

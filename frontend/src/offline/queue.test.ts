@@ -312,7 +312,7 @@ describe('Erfassungsquittung nur mit Kennungen (LFH-941, design.md D6)', () => {
     expect(JSON.stringify(roh)).not.toContain('SK1');
   });
 
-  it('kürzt eine v5-Quittung mit voller Person beim Öffnen', async () => {
+  it('kürzt eine Bestandsquittung mit voller Person beim Öffnen, ohne Versionssprung', async () => {
     queueDbZuruecksetzenFuerTests();
     await new Promise<void>((fertig, fehler) => {
       const loeschen = indexedDB.deleteDatabase('lifeline-offline');
@@ -350,16 +350,52 @@ describe('Erfassungsquittung nur mit Kennungen (LFH-941, design.md D6)', () => {
     });
     alt.close();
 
-    expect(await personErfassungsQuittungenLaden(BENUTZER_A, 7)).toEqual([
-      {
-        benutzer_id: BENUTZER_A,
-        einsatz_id: 7,
-        client_id: 'alt-41',
-        person_id: 41,
-        registrier_nr: 12,
-        sicht: 'betroffen',
-        erstellt_at: '2026-10-05T10:00:00.000Z',
-      },
+    const gekuerzt = {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      client_id: 'alt-41',
+      person_id: 41,
+      registrier_nr: 12,
+      sicht: 'betroffen',
+      erstellt_at: '2026-10-05T10:00:00.000Z',
+    };
+    expect(await personErfassungsQuittungenLaden(BENUTZER_A, 7)).toEqual([gekuerzt]);
+    const roh = await openDB('lifeline-offline');
+    expect(roh.version).toBe(5);
+    expect(await roh.getAll('personErfassungsQuittungen')).toEqual([gekuerzt]);
+    roh.close();
+  });
+
+  it('liefert auch eine später von einem alten Tab geschriebene Quittung nur mit Kennungen', async () => {
+    await queueLeerenFuerTests();
+    const roh = await openDB('lifeline-offline');
+    await roh.put('personErfassungsQuittungen', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      client_id: 'alt-42',
+      person,
+      sicht: 'erfasst',
+      erstellt_at: '2026-10-05T10:00:00.000Z',
+    });
+    roh.close();
+    const [q] = await personErfassungsQuittungenLaden(BENUTZER_A, 7);
+    expect(q).toMatchObject({ person_id: 41, registrier_nr: 12 });
+    expect(q).not.toHaveProperty('person');
+  });
+
+  it('gibt die DB frei, wenn ein neueres Bundle hochstufen will', async () => {
+    await queueNichtZugeordnetZaehlen();
+    const neu = await Promise.race([
+      openDB('lifeline-offline', 6),
+      new Promise<'blockiert'>((fertig) => setTimeout(() => fertig('blockiert'), 500)),
     ]);
+    expect(neu).not.toBe('blockiert');
+    if (neu !== 'blockiert') neu.close();
+    queueDbZuruecksetzenFuerTests();
+    await new Promise<void>((fertig) => {
+      const loeschen = indexedDB.deleteDatabase('lifeline-offline');
+      loeschen.onsuccess = () => fertig();
+      loeschen.onblocked = () => fertig();
+    });
   });
 });

@@ -20,7 +20,7 @@ const STORE = 'stand';
 const KOPF = 'kopf';
 /** Der dehydrierte Stand — groß, nur beim Speichern und Lesen angefasst (LFH-939 D2). */
 const CLIENT = 'client';
-/** Datensatz bis v1: alles unter einem Schlüssel. Das Upgrade verwirft ihn. */
+/** Datensatz vor LFH-939: alles unter einem Schlüssel. Anlegen und Löschen nehmen ihn mit. */
 const ALT = 'aktuell';
 
 export interface LagebildDatensatz {
@@ -44,12 +44,17 @@ let dbPromise: Promise<IDBPDatabase<LagebildDB>> | null = null;
 
 function db(): Promise<IDBPDatabase<LagebildDB>> {
   if (!dbPromise) {
-    // v2 (LFH-939 D2): Kopf und Stand unter getrennten Schlüsseln. Ein v1-Datensatz trägt den
-    // `buster` der Vorversion und würde beim Start ohnehin verworfen — er geht hier gleich.
-    dbPromise = openDB<LagebildDB>(LAGEBILD_DB, 2, {
-      upgrade(d, oldVersion, _newVersion, tx) {
-        if (oldVersion < 1) d.createObjectStore(STORE);
-        else void tx.objectStore(STORE).delete(ALT);
+    // Kopf und Stand unter getrennten Schlüsseln im selben Store (LFH-939 D2) — bewusst OHNE
+    // Versionssprung: ein Tab mit altem Bundle hielte v1 offen, das Upgrade hinge und mit ihm
+    // die Anmeldung. Den Altdatensatz `aktuell` nehmen Anlegen und Löschen mit.
+    const offen: Promise<IDBPDatabase<LagebildDB>> = openDB<LagebildDB>(LAGEBILD_DB, 1, {
+      upgrade(d) {
+        d.createObjectStore(STORE);
+      },
+      // Will ein neueres Bundle die DB hochstufen, gibt dieser Tab sie frei, statt es zu blockieren.
+      blocking() {
+        void offen.then((d) => d.close());
+        if (dbPromise === offen) dbPromise = null;
       },
     }).catch((fehler: unknown) => {
       // Beim nächsten Zugriff neu versuchen statt dauerhaft an einer gescheiterten Öffnung
@@ -57,6 +62,7 @@ function db(): Promise<IDBPDatabase<LagebildDB>> {
       dbPromise = null;
       throw fehler;
     });
+    dbPromise = offen;
   }
   return dbPromise;
 }
@@ -75,8 +81,7 @@ function melde(was: string, fehler: unknown): void {
 export async function lagebildLesen(): Promise<LagebildDatensatz | undefined> {
   try {
     const tx = (await db()).transaction(STORE, 'readonly');
-    const [kopf, client] = await Promise.all([tx.store.get(KOPF), tx.store.get(CLIENT)]);
-    await tx.done;
+    const [kopf, client] = await Promise.all([tx.store.get(KOPF), tx.store.get(CLIENT), tx.done]);
     if (!kopf || !client) return undefined;
     return { ...(kopf as LagebildKopf), client: client as PersistedClient };
   } catch (fehler) {
@@ -90,7 +95,12 @@ export async function lagebildAnlegen(satz: LagebildDatensatz): Promise<void> {
   try {
     const { client, ...kopf } = satz;
     const tx = (await db()).transaction(STORE, 'readwrite');
-    await Promise.all([tx.store.put(kopf, KOPF), tx.store.put(client, CLIENT), tx.done]);
+    await Promise.all([
+      tx.store.put(kopf, KOPF),
+      tx.store.put(client, CLIENT),
+      tx.store.delete(ALT),
+      tx.done,
+    ]);
   } catch (fehler) {
     melde('Anlegen', fehler);
   }
@@ -135,7 +145,12 @@ export function lagebildBestaetigen(benutzerId: number, zeitpunkt: number) {
 export async function lagebildLoeschenPlatte(): Promise<void> {
   try {
     const tx = (await db()).transaction(STORE, 'readwrite');
-    await Promise.all([tx.store.delete(KOPF), tx.store.delete(CLIENT), tx.done]);
+    await Promise.all([
+      tx.store.delete(KOPF),
+      tx.store.delete(CLIENT),
+      tx.store.delete(ALT),
+      tx.done,
+    ]);
   } catch (fehler) {
     melde('Löschen', fehler);
   }
