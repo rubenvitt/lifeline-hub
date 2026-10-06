@@ -53,7 +53,7 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 6. ETB-Entwürfe (D8)
 
-- [ ] 6.1 `etb/entwuerfe/entwurfStore.ts`: leere eigene Entwürfe älter als 24 h und verwaiste
+- [x] 6.1 `etb/entwuerfe/entwurfStore.ts`: leere eigene Entwürfe älter als 24 h und verwaiste
   Aktiv-Merker beim Laden räumen. Prüfen: leerer Altentwurf in Einsatz 3 samt Merker weg beim
   Laden von Einsatz 7; Entwurf mit Text bleibt; frischer leerer bleibt; offener Vorlauf geht
   nicht verloren.
