@@ -264,3 +264,66 @@ async fn etb_an_der_anordnung_ist_gekappt_und_die_empfaenger_vollstaendig() {
     assert!(an.chars().count() <= 500, "{}", an.chars().count());
     assert!(an.ends_with(" … und 48 weitere"), "{an}");
 }
+
+#[tokio::test]
+async fn textgrenze_eines_empfaengers_kommt_vor_der_422_eines_frueheren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let uri = format!("/api/einsaetze/{e}/auftraege");
+    // S7 ist in der Test-Organisation aus: 422 des Zusammenhangs.
+    let fremd = json!({ "empfaenger_typ": "funktion", "funktion": "s7" });
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &uri,
+        &admin,
+        Some(&auftrag("T", vec![fremd.clone()])),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Gegenprobe: S7 aus");
+
+    for (zu_lang, feld) in [
+        (
+            json!({ "empfaenger_typ": "extern", "extern_kategorie": "leitstelle", "extern_bezeichnung": x(201) }),
+            "Externe Bezeichnung",
+        ),
+        (funktion(&x(201)), "Funktion/Bezeichnung"),
+    ] {
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &uri,
+            &admin,
+            Some(&auftrag("T", vec![fremd.clone(), zu_lang])),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}: {j:?}");
+        assert!(j["error"].as_str().unwrap().starts_with(feld), "{j:?}");
+    }
+}
+
+#[tokio::test]
+async fn ein_typ_mit_leerzeichen_wird_nicht_weggeduppelt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let einheit = einheit_bilden(&app, &admin, e, "Zug 1").await;
+    let body = auftrag(
+        "T",
+        vec![
+            json!({ "empfaenger_typ": "einheit", "einheit_id": einheit }),
+            json!({ "empfaenger_typ": " einheit", "einheit_id": einheit }),
+        ],
+    );
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
+    assert_eq!(j["error"], "Ungültiger Empfänger-Typ");
+}

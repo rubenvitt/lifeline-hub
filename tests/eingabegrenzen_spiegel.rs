@@ -24,6 +24,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "NACHFORDERUNG_BEZEICHNUNG_MAX",
             nachforderung::BEZEICHNUNG_MAX,
         ),
+        ("NACHFORDERUNG_ART_MAX", nachforderung::ART_MAX),
         ("INFOTELEFON_NOTIZ_MAX", infotelefon::NOTIZ_MAX),
         ("INFOTELEFON_KURZ_MAX", infotelefon::KURZ_MAX),
         ("PRESSE_KURZ_MAX", presse::KURZ_MAX),

@@ -104,6 +104,8 @@ pub fn validiere_neu(
     geometrie: &str,
 ) -> Result<(), crate::error::AppError> {
     use crate::error::AppError;
+    // Größe vor jeder 422 und vor dem Parsen (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    pruefe_geometrie_groesse(geometrie, "geometrie")?;
     parse_enum(
         LageZoneTyp::parse,
         typ,
@@ -120,7 +122,6 @@ pub fn validiere_neu(
             typ, geometrie_typ
         )));
     }
-    pruefe_geometrie_groesse(geometrie, "geometrie")?;
     // geometrie muss gültiges JSON und vom angegebenen geometrie_typ sein.
     let v: serde_json::Value = serde_json::from_str(geometrie)
         .map_err(|_| AppError::UnprocessableEntity("geometrie ist kein gültiges JSON".into()))?;

@@ -6,7 +6,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::nachforderung::{repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT};
-use crate::routes::support::{hoechstens, pflicht, pflicht_max};
+use crate::routes::support::{hoechstens, pflicht_max};
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -77,7 +77,7 @@ pub async fn anlegen(
     JsonBody(req): JsonBody<NeueNachforderung>,
 ) -> Result<(StatusCode, Json<NachforderungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let art = pflicht(&req.art, "Art")?;
+    let art = pflicht_max(&req.art, "Art", crate::nachforderung::ART_MAX)?;
     let bezeichnung = pflicht_max(
         &req.bezeichnung,
         "Bezeichnung",

@@ -282,11 +282,6 @@ pub async fn aktualisieren(
         ));
     }
 
-    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
-    let eff_lat = body.lat.unwrap_or(vorher.lat);
-    let eff_lon = body.lon.unwrap_or(vorher.lon);
-    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
-
     // Enum-Prechecks: Feld isoliert unbrauchbar → 400 (LFH-305). Diese drei sind zugleich
     // der einzige Schutz vor einem stillen Durchfall auf die DB — schaden/repo.rs bindet
     // typ/ausmass/abschluss_grund per COALESCE bzw. CASE als ROHEN String, und die CHECKs
@@ -314,6 +309,12 @@ pub async fn aktualisieren(
     if let Some(Some(k)) = &kontakt_norm {
         hoechstens(k, "Geschädigt-Kontakt", crate::schaden::ORT_MAX)?;
     }
+
+    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500), nach allen
+    // Feldfehlern (`src/AGENTS.md`, Statuscode-Konvention).
+    let eff_lat = body.lat.unwrap_or(vorher.lat);
+    let eff_lon = body.lon.unwrap_or(vorher.lon);
+    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
     let uebergeben_an_norm: Option<Option<String>> = body
         .uebergeben_an
         .map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));

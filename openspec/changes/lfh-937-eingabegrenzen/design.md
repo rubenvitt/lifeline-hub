@@ -165,10 +165,10 @@ vorher geprüft.
 
 ### D7 — GeoJSON: eine Prüfung, 400 nur für Neues
 
-`lage_zone::pruefe_geometrie(geometrie_typ, geometrie: &str) -> Result<()>` läuft in
-`validiere_neu` nach den bestehenden Prüfungen und in der Flächen-Route nach den bestehenden
-422-Zweigen:
-1. `geometrie.len() > GEOMETRIE_BYTES_MAX` (256 KiB) → 400, vor dem Parsen.
+Zwei Funktionen in `lage_zone`: `pruefe_geometrie_groesse(geometrie, feld)` läuft als erste
+Prüfung (in `validiere_neu` vor Typ und Klasse, in der Flächen-Route vor dem Parsen),
+`pruefe_geometrie_struktur(&Value, feld)` nach den bestehenden 422-Zweigen:
+1. `geometrie.len() > GEOMETRIE_BYTES_MAX` (256 KiB) → 400, vor dem Parsen und vor jedem 422.
 2. Kaputtes JSON und `type`-Abweichung bleiben 422 (bestehende Zweige, unverändert).
 3. `coordinates` fehlt oder hat die falsche Verschachtelung, eine Position ist kein Array aus
    2 oder 3 endlichen Zahlen, `lon` außerhalb [-180, 180] oder `lat` außerhalb [-90, 90] → 400.
@@ -184,9 +184,12 @@ lesbar bleiben (es wird nur beim Schreiben geprüft).
 - `frontend/src/api/eingabegrenzen.ts` hält alle Werte als benannte Konstanten. Ein
   Rust-Test (`tests/eingabegrenzen_spiegel.rs`) liest die Datei und vergleicht jede Konstante
   mit dem Backend; so driftet keine Seite still.
-- `components/zeichenGrenze.ts`: `zeichenGrenze(max)` liefert antd-`count`-Props
-  (`max`, `strategy: s => [...s].length` wie der Server, `exceedFormatter` schneidet ab,
-  `show` ab 80 % der Grenze als `n / max` in Mono mit `tabular-nums`). Unter 80 % bleibt die
+- `components/zeichenGrenze.tsx`: `zeichenGrenze(max)` liefert antd-`count`-Props
+  (`max`, `strategy: s => [...s].length` wie der Server, `show` ab 80 % der Grenze als
+  `n / max` in Mono mit `tabular-nums`, darüber „· zu lang“ in `alarmText`). **Es kürzt nie**:
+  antds `exceedFormatter` liefe bei jeder Änderung eines Werts über der Grenze und schnitte
+  einen vorbelegten Text beim ersten Löschen still ab (Befund im Review). Gesperrt wird über
+  `zeichenRegel(max, feld)` am Formularfeld bzw. die Längenprüfung der Schnellerfassung. Unter 80 % bleibt die
   Maske unverändert; die Erfassungsleiste des ETB hat ein Höhenbudget.
 - Felder ohne antd-Zähler (`AutoComplete` für Von/An, Tags der Empfänger) bekommen natives
   `maxLength` bzw. eine Regel; natives `maxLength` zählt UTF-16-Einheiten und ist damit nie

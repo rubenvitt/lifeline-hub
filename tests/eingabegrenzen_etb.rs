@@ -273,6 +273,7 @@ async fn nachforderung_texte_sind_begrenzt() {
         nachforderung_body(&x(201), "L", "b"),
         nachforderung_body("RTW", &x(PARTEI_MAX + 1), "b"),
         nachforderung_body("RTW", "L", &x(PARTEI_MAX + 1)),
+        nachforderung_body("Bez", "L", "b").replace("\"RTW\"", &format!("\"{}\"", x(201))),
     ] {
         let (s, _) = anfrage(&app, "POST", &uri, &admin, Some(&body)).await;
         assert_eq!(s, StatusCode::BAD_REQUEST);

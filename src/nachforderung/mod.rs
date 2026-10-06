@@ -13,6 +13,8 @@ use utoipa::ToSchema;
 /// Höchstlänge der Bezeichnung einer Nachforderung (LFH-937); sie steht im Inhalt des
 /// ETB-Eintrags. Spiegel: `frontend/src/api/eingabegrenzen.ts`.
 pub const BEZEICHNUNG_MAX: usize = 200;
+/// Höchstlänge der Art einer Nachforderung (Freitext, landet im ETB-Inhalt; LFH-937).
+pub const ART_MAX: usize = 200;
 
 /// Priorität (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();

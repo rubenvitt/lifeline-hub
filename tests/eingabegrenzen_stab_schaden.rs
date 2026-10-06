@@ -178,11 +178,22 @@ async fn schaden_ort_beschreibung_kontakt() {
             json!({ "geschaedigt_kontakt": x(501) }),
             "Geschädigt-Kontakt",
         ),
+        // Feldfehler vor dem Koordinaten-Zusammenhang (halbes lat/lon-Paar wäre 422).
+        (
+            json!({ "lat": 52.0, "beschreibung": x(8_001) }),
+            "Beschreibung",
+        ),
     ] {
         let (s, j) = patch(&app, &admin, &sid_uri, body).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}");
         assert!(fehler_beginnt_mit(&j, feld), "{feld}: {j:?}");
     }
+    let (s, _) = patch(&app, &admin, &sid_uri, json!({ "lat": 52.0 })).await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Gegenprobe: halbes Paar"
+    );
     let (s, j) = anfrage_json(&app, "GET", &sid_uri, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["ort"], x(500), "unverändert");

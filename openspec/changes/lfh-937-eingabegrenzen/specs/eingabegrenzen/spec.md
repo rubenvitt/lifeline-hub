@@ -122,14 +122,19 @@ Schäden (Anlegen, Ändern) MUST die Grenzen der Tabelle in `design.md` (D6) ein
 - **THEN** antwortet der Server mit 400, und der Schaden bleibt unverändert
 
 ### Requirement: Masken lassen nicht mehr zu als der Server
-Jede Eingabemaske eines begrenzten Feldes MUST die Eingabe an der Grenze des Servers enden
-lassen. Ab 80 % der Grenze MUST eine Zählanzeige den Stand als „n / max“ zeigen. Die
+Jede Eingabemaske eines begrenzten Feldes MUST verhindern, dass ein Wert über der Grenze des
+Servers gesendet wird, und MUST NOT einen Text dabei still kürzen. Ab 80 % der Grenze MUST eine
+Zählanzeige den Stand als „n / max“ zeigen, über der Grenze zusätzlich „zu lang“. Die
 ETB-Erfassung MUST einen zu langen Eintrag vor dem Senden zurückhalten, ihn weder senden noch
 in die Offline-Queue einreihen und den Text im Feld lassen.
 
 #### Scenario: Zähler erscheint kurz vor der Grenze
 - **WHEN** jemand in die Schadensbeschreibung 6 400 von 8 000 erlaubten Zeichen eingibt
-- **THEN** zeigt die Maske „6 400 / 8 000“, und bei 8 000 nimmt das Feld keine weiteren Zeichen an
+- **THEN** zeigt die Maske „6.400 / 8.000“
+
+#### Scenario: Vorbelegter Text über der Grenze
+- **WHEN** eine Maske mit einem Text über der Grenze vorbelegt ist und die Person darin ein Wort löscht
+- **THEN** bleibt der übrige Text vollständig stehen, die Zählanzeige nennt die Überlänge, und Senden ist gesperrt, bis gekürzt ist
 
 #### Scenario: Baustein macht den ETB-Text zu lang
 - **WHEN** ein eingefügter Baustein den ETB-Inhalt über 20 000 Zeichen bringt und die Person sendet

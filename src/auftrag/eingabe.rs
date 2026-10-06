@@ -34,12 +34,12 @@ fn befehlsfeld(o: &Option<String>, feld: &str) -> Result<Option<String>, AppErro
 }
 
 /// Schlüssel, unter dem zwei Empfänger-Zeilen dasselbe Ziel meinen (LFH-937, design.md D3):
-/// Typ und jedes Ziel-Feld, Texte getrimmt.
+/// Typ wörtlich (wie ihn die Validierung prüft) und jedes Ziel-Feld, Texte getrimmt.
 type EmpfaengerSchluessel<'a> = (&'a str, [Option<i64>; 4], [Option<&'a str>; 4]);
 
 fn empfaenger_schluessel(r: &EmpfaengerEingabeReq) -> EmpfaengerSchluessel<'_> {
     (
-        r.empfaenger_typ.trim(),
+        r.empfaenger_typ.as_str(),
         [r.abschnitt_id, r.einheit_id, r.person_id, r.fahrzeug_id],
         [
             trimme(&r.funktion),
@@ -184,10 +184,10 @@ async fn validiere_empfaenger(
                     "Ungültige externe Adressat-Kategorie".into(),
                 ));
             }
-            let Some(bezeichnung) = trimme(&req.extern_bezeichnung) else {
+            // Die Länge prüft schon `validiere_neuen_auftrag` vor der ersten Abfrage.
+            if trimme(&req.extern_bezeichnung).is_none() {
                 return Err(AppError::Validation("externe Bezeichnung fehlt".into()));
-            };
-            hoechstens(bezeichnung, "Externe Bezeichnung", EXTERN_BEZEICHNUNG_MAX)?;
+            }
             EMPF_EXTERN
         }
         _ => return Err(AppError::Validation("Ungültiger Empfänger-Typ".into())),
@@ -336,6 +336,16 @@ pub async fn validiere_neuen_auftrag(
         .iter()
         .filter(|r| gesehen.insert(empfaenger_schluessel(r)))
         .collect();
+    // Textgrenzen der Empfänger vor der ersten Abfrage, damit eine 400 nie hinter einer 422
+    // eines früheren Empfängers verschwindet (`src/AGENTS.md`, „Eingabegrenzen“).
+    for r in &eindeutig {
+        if let Some(t) = trimme(&r.funktion_text) {
+            hoechstens(t, "Funktion/Bezeichnung", crate::fuehrung::TEXT_MAX)?;
+        }
+        if let Some(b) = trimme(&r.extern_bezeichnung) {
+            hoechstens(b, "Externe Bezeichnung", EXTERN_BEZEICHNUNG_MAX)?;
+        }
+    }
     // Die Labelkarte einmal je Request, nicht je Funktionsempfänger.
     let s7_aktiv = if eindeutig
         .iter()

@@ -63,6 +63,20 @@ async fn zone_mit_5001_punkten_ist_400_und_kaputtes_json_bleibt_422() {
     let (s, _) = zone(&app, &admin, e, r#"{"type":"LineString","coordinates":[]}"#).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
+    // Größe vor dem Typ-Zusammenhang: Linie als Gefahrengebiet wäre 422, über 256 KiB ist 400.
+    let riesig = format!("{{\"pad\":\"{}\"}}", "x".repeat(256 * 1024));
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        Some(
+            &json!({ "typ": "gefahrengebiet", "geometrie_typ": "LineString", "geometrie": riesig }),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
     let (_, liste) = anfrage_json(
         &app,
         "GET",

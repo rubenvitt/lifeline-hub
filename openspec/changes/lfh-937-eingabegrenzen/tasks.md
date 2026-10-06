@@ -25,8 +25,8 @@
 
 ## 5. GeoJSON (D7)
 
-- [ ] 5.1 Unit-Tests für `pruefe_geometrie` (Polygon und LineString gültig, 5 000 / 5 001 Positionen, 10 / 11 Ringe, `["a", 52]`, `NaN` als Zeichenkette, Länge 181, Höhe als dritte Zahl ok, 256 KiB + 1 Byte) und Integrationstests: Zone mit 5 001 Punkten 400, kaputtes JSON weiter 422; erster Integrationstest für `PATCH …/abschnitte/{aid}/flaeche` (gültig, 400, 422). Prüfen: rot vor 5.2.
-- [ ] 5.2 `lage_zone::pruefe_geometrie`, Aufruf in `validiere_neu` und in der Flächen-Route. Prüfen: 5.1 grün, `tests/lage_zone.rs`, `tests/gefahr.rs` grün.
+- [ ] 5.1 Unit-Tests für `pruefe_geometrie_groesse`/`pruefe_geometrie_struktur` (Polygon und LineString gültig, 5 000 / 5 001 Positionen, 10 / 11 Ringe, `["a", 52]`, `NaN` als Zeichenkette, Länge 181, Höhe als dritte Zahl ok, 256 KiB + 1 Byte) und Integrationstests: Zone mit 5 001 Punkten 400, kaputtes JSON weiter 422; erster Integrationstest für `PATCH …/abschnitte/{aid}/flaeche` (gültig, 400, 422). Prüfen: rot vor 5.2.
+- [ ] 5.2 `lage_zone::pruefe_geometrie_groesse` und `pruefe_geometrie_struktur`, Aufruf in `validiere_neu` und in der Flächen-Route. Prüfen: 5.1 grün, `tests/lage_zone.rs`, `tests/gefahr.rs` grün.
 
 ## 6. Infotelefon, Presse, Schaden (D6)
 
@@ -36,7 +36,7 @@
 ## 7. Frontend (D8)
 
 - [ ] 7.1 `api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs` (liest die Datei, vergleicht jede Konstante mit dem Backend). Prüfen: grün; Mutationsprobe: ein Wert geändert → rot.
-- [ ] 7.2 `components/zeichenGrenze.ts` mit Vitest (Zähler unter 80 % aus, ab 80 % „n / max“, Abschneiden an der Grenze, Emoji zählt einfach). Prüfen: rot vor Umsetzung, dann grün.
+- [ ] 7.2 `components/zeichenGrenze.tsx` mit Vitest (Zähler unter 80 % aus, ab 80 % „n / max“, Überlänge bleibt stehen und sperrt, Emoji zählt einfach). Prüfen: rot vor Umsetzung, dann grün.
 - [ ] 7.3 ETB: `MarkdownEditor` mit `maxLength`, `Schnellerfassung` (Zähler in der Hinweiszeile, Längenprüfung vor Upload und Queue), `MetaChip` und `RufnameAbfrage` mit `maxLength`, `HeraufstufenModal`. Vitest: zu langer Baustein-Text → kein Senden, kein `queueEinreihen`, Text bleibt. Prüfen: rot vor Umsetzung, dann grün; e2e `leisten-flaeche`, `fokus-verdeckung` grün.
 - [ ] 7.4 Auftragsmaske (`AuftragFormular`: Text, Extern-Bezeichnung, Befehlsschema, `maxCount` und Tag-Länge der Empfänger, `initialText` über der Grenze sperrt Senden), Meldungs-, Nachforderungs-, Vollzugs- und Chat-Eingabe mit `maxLength`. Vitest für `AuftragFormular`. Prüfen: grün.
 - [ ] 7.5 Infotelefon, Presse, Schaden (Erfassen, Detail, `GeschaedigtPicker` bietet keinen zu langen Kontakt an). Vitest je Maske für Zähler und Grenze. Prüfen: grün.

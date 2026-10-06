@@ -44,9 +44,11 @@ Spec `eingabegrenzen`, Herleitung
 - **Text, der unverändert ins ETB gelangt, trägt die ETB-Grenzen** (`etb::INHALT_MAX`,
   `etb::PARTEI_MAX`) an seinem Eingang, nicht in `etb::repo`: Systemtexte dürfen dort nicht
   scheitern. Ein neuer Weg ins ETB prüft selbst.
-- **Listen von außen** (IDs, Empfänger) werden sortiert und entdoppelt und gegen ein `*_MAX`
-  geprüft (400), bevor eine Abfrage läuft; Prüfen und Schreiben brauchen eine von N
-  unabhängige Zahl von Anweisungen (`json_each(?)`, Muster `sprechgruppe::repo::ersetzen_tx`).
+- **Listen von außen** werden gegen ein `*_MAX` geprüft (400) und entdoppelt, bevor eine
+  Abfrage läuft. **ID-Listen** brauchen zum Prüfen und Schreiben eine von N unabhängige Zahl
+  von Anweisungen (`json_each(?)`, Muster `sprechgruppe::repo::ersetzen_tx`); die
+  **Auftragsempfänger** bleiben je Zeile geprüft und geschrieben, gedeckelt durch
+  `auftrag::EMPFAENGER_MAX` (gezählt vor dem Entdoppeln).
 - **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
   `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
 - **Spiegel:** jede Grenze, die eine Maske kennt, steht in `frontend/src/api/eingabegrenzen.ts`;
