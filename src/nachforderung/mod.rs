@@ -10,6 +10,10 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+/// Höchstlänge der Bezeichnung einer Nachforderung (LFH-937); sie steht im Inhalt des
+/// ETB-Eintrags. Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const BEZEICHNUNG_MAX: usize = 200;
+
 /// Priorität (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
 pub const PRIO_DRINGEND: &str = Prioritaet::Dringend.as_str();

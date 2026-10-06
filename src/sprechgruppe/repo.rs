@@ -213,23 +213,33 @@ pub(crate) async fn pruefe_zuordenbar(
     einsatz_id: i64,
     ids: &[i64],
 ) -> Result<(), AppError> {
-    for &id in ids {
-        let ok: Option<i64> = sqlx::query_scalar(
-            "SELECT 1 FROM sprechgruppe \
-             WHERE id = ? AND org_id = ? AND (einsatz_id IS NULL OR einsatz_id = ?)",
-        )
-        .bind(id)
-        .bind(org_id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?;
-        if ok.is_none() {
-            return Err(AppError::UnprocessableEntity(format!(
-                "Sprechgruppe {id} ist für diese Organisation/diesen Einsatz nicht zuordenbar"
-            )));
-        }
+    if ids.is_empty() {
+        return Ok(());
+    }
+    // Eine Abfrage für die ganze Liste (LFH-937, design.md D5); die erste fehlende ID der
+    // Eingabe steht im 422 wie zuvor.
+    let zuordenbar: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM sprechgruppe \
+         WHERE id IN (SELECT value FROM json_each(?)) AND org_id = ? \
+           AND (einsatz_id IS NULL OR einsatz_id = ?)",
+    )
+    .bind(ids_json(ids)?)
+    .bind(org_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    if let Some(id) = ids.iter().find(|id| !zuordenbar.contains(id)) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Sprechgruppe {id} ist für diese Organisation/diesen Einsatz nicht zuordenbar"
+        )));
     }
     Ok(())
+}
+
+/// IDs als JSON-Array für `json_each(?)`.
+fn ids_json(ids: &[i64]) -> Result<String, AppError> {
+    serde_json::to_string(ids)
+        .map_err(|e| AppError::Internal(format!("Sprechgruppen-ids serialisieren: {e}")))
 }
 
 /// Wer eine Sprechgruppe trägt (Zuordnungen aus 0073 und 0145). Eine Zuordnung entsteht und
@@ -293,25 +303,32 @@ pub async fn loesen_tx(
 }
 
 /// Ersetzt die Zuordnung des Ziels durch genau `ids` (PATCH mit `sprechgruppe_ids`): löst, was
-/// nicht mehr dazugehört, und ordnet jede ID über [`zuordnen_tx`] zu.
+/// nicht mehr dazugehört, und ordnet den Rest zu — in zwei Anweisungen, unabhängig von der
+/// Länge der Liste (LFH-937, design.md D5). Dieselben Zeilen wie [`loesen_tx`]/[`zuordnen_tx`]
+/// je ID; Dubletten in `ids` schaden nicht (`INSERT OR IGNORE`).
 pub async fn ersetzen_tx(
     conn: &mut SqliteConnection,
     ziel: Zuordnungsziel,
     ids: &[i64],
 ) -> Result<(), AppError> {
     let (tabelle, spalte, bezug) = ziel.ort();
-    let vorhanden: Vec<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT sprechgruppe_id FROM {tabelle} WHERE {spalte} = ?"
+    let ids = ids_json(ids)?;
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "DELETE FROM {tabelle} WHERE {spalte} = ? \
+           AND sprechgruppe_id NOT IN (SELECT value FROM json_each(?))"
     )))
     .bind(bezug)
-    .fetch_all(&mut *conn)
+    .bind(&ids)
+    .execute(&mut *conn)
     .await?;
-    for sg in vorhanden.into_iter().filter(|sg| !ids.contains(sg)) {
-        loesen_tx(conn, ziel, sg).await?;
-    }
-    for &id in ids {
-        zuordnen_tx(conn, ziel, id).await?;
-    }
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "INSERT OR IGNORE INTO {tabelle} ({spalte}, sprechgruppe_id) \
+         SELECT ?, value FROM json_each(?)"
+    )))
+    .bind(bezug)
+    .bind(&ids)
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 

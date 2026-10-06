@@ -324,6 +324,8 @@ pub async fn anlegen_tx(
 
     // Wirksame Mandantenlabels für den Snapshot eines Katalogempfängers (LFH-549).
     let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut *tx, einsatz_id).await?;
+    // Jeder Anzeigename entsteht einmal: für die Zeile und für das ETB-`an` (LFH-937, D3).
+    let mut namen = Vec::with_capacity(daten.empfaenger.len());
     for e in &daten.empfaenger {
         debug_assert!(empfaenger_typ_gueltig(&e.empfaenger_typ));
         let snap = snap_anzeige_fuer(&mut *tx, e, &karte).await?;
@@ -346,13 +348,15 @@ pub async fn anlegen_tx(
         .bind(&snap)
         .execute(&mut *tx)
         .await?;
+        namen.push(snap);
     }
 
     // ETB-Anordnung (Pattern B): erst NACH den Inserts, im selben Commit.
     // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish wird kein
     // ETB-Folgeeintrag erzeugt; etb_anordnung_id bleibt NULL.
     if auto_etb {
-        let an = empfaenger_klartext(&daten.empfaenger, &mut *tx, &karte).await?;
+        // Gekappt auf `etb::PARTEI_MAX`; die vollständige Liste steht in `auftrag_empfaenger`.
+        let an = super::kappe_an(&namen);
         let etb_id = crate::etb::repo::anlegen_tx(
             &mut *tx,
             einsatz_id,
@@ -504,19 +508,6 @@ async fn snap_anzeige_fuer(
         .or_else(|| e.funktion_text.clone())
         .or_else(|| e.extern_bezeichnung.clone())
         .unwrap_or_else(|| "—".to_string()))
-}
-
-/// Empfänger als ETB-`an`-Klartext, kommagetrennt.
-async fn empfaenger_klartext(
-    empf: &[EmpfaengerEingabe],
-    tx: &mut sqlx::SqliteConnection,
-    karte: &crate::fuehrung::Labelkarte,
-) -> Result<String, AppError> {
-    let mut teile = Vec::with_capacity(empf.len());
-    for e in empf {
-        teile.push(snap_anzeige_fuer(&mut *tx, e, karte).await?);
-    }
-    Ok(teile.join(", "))
 }
 
 /// Setzt Vollzug → 'in_arbeit' (geteilte Achse) und hält den Zeitstempel am Auftrag.

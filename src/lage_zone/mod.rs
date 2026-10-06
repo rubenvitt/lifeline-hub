@@ -120,6 +120,7 @@ pub fn validiere_neu(
             typ, geometrie_typ
         )));
     }
+    pruefe_geometrie_groesse(geometrie, "geometrie")?;
     // geometrie muss gültiges JSON und vom angegebenen geometrie_typ sein.
     let v: serde_json::Value = serde_json::from_str(geometrie)
         .map_err(|_| AppError::UnprocessableEntity("geometrie ist kein gültiges JSON".into()))?;
@@ -127,6 +128,78 @@ pub fn validiere_neu(
         return Err(AppError::UnprocessableEntity(
             "geometrie.type passt nicht zu geometrie_typ".into(),
         ));
+    }
+    pruefe_geometrie_struktur(&v, "geometrie")
+}
+
+/// Höchstgröße des Geometrie-Strings einer Zone oder Abschnittsfläche in Bytes (LFH-937,
+/// design.md D7).
+pub const GEOMETRIE_BYTES_MAX: usize = 256 * 1024;
+/// Höchstzahl der Ringe eines Polygons (Außenring plus Löcher).
+pub const RINGE_MAX: usize = 10;
+/// Höchstzahl der Positionen einer Geometrie, über alle Ringe. Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts` (`GEOMETRIE_STUETZPUNKTE_MAX`).
+pub const STUETZPUNKTE_MAX: usize = 5_000;
+
+/// Erster Schritt der Geometrie-Prüfung (LFH-937, design.md D7): ein String über
+/// [`GEOMETRIE_BYTES_MAX`] ist 400, noch bevor er geparst wird.
+pub fn pruefe_geometrie_groesse(geometrie: &str, feld: &str) -> Result<(), crate::error::AppError> {
+    if geometrie.len() > GEOMETRIE_BYTES_MAX {
+        return Err(crate::error::AppError::Validation(format!(
+            "{feld} darf höchstens {} KiB groß sein",
+            GEOMETRIE_BYTES_MAX / 1024
+        )));
+    }
+    Ok(())
+}
+
+/// Struktur einer schon als Polygon oder LineString erkannten Geometrie (LFH-937, design.md D7):
+/// `coordinates` richtig verschachtelt, jede Position 2 oder 3 endliche Zahlen mit Länge in
+/// [-180, 180] und Breite in [-90, 90], höchstens [`RINGE_MAX`] Ringe und
+/// [`STUETZPUNKTE_MAX`] Positionen. Verstöße sind Feldfehler → 400. Typ und JSON prüft der
+/// Aufrufer vorher (bestehende 422).
+pub fn pruefe_geometrie_struktur(
+    v: &serde_json::Value,
+    feld: &str,
+) -> Result<(), crate::error::AppError> {
+    use crate::error::AppError;
+    let fehler = |was: &str| AppError::Validation(format!("{feld}: {was}"));
+    let coords = v
+        .get("coordinates")
+        .and_then(|c| c.as_array())
+        .ok_or_else(|| fehler("coordinates fehlt oder ist keine Liste"))?;
+    let ringe: Vec<&Vec<serde_json::Value>> = match v.get("type").and_then(|t| t.as_str()) {
+        Some("Polygon") => {
+            if coords.is_empty() || coords.len() > RINGE_MAX {
+                return Err(fehler(&format!(
+                    "ein Polygon braucht 1 bis {RINGE_MAX} Ringe"
+                )));
+            }
+            coords
+                .iter()
+                .map(|r| r.as_array().ok_or_else(|| fehler("ein Ring ist keine Liste")))
+                .collect::<Result<_, _>>()?
+        }
+        Some("LineString") => vec![coords],
+        _ => return Err(fehler("unbekannter Geometrietyp")),
+    };
+    let punkte: usize = ringe.iter().map(|r| r.len()).sum();
+    if punkte > STUETZPUNKTE_MAX {
+        return Err(fehler(&format!(
+            "höchstens {STUETZPUNKTE_MAX} Stützpunkte, waren {punkte}"
+        )));
+    }
+    for position in ringe.iter().flat_map(|r| r.iter()) {
+        let zahlen: Option<Vec<f64>> = position
+            .as_array()
+            .filter(|p| p.len() == 2 || p.len() == 3)
+            .and_then(|p| p.iter().map(|z| z.as_f64()).collect());
+        let Some(zahlen) = zahlen.filter(|z| z.iter().all(|x| x.is_finite())) else {
+            return Err(fehler("jede Position ist [Länge, Breite] aus Zahlen"));
+        };
+        if !(-180.0..=180.0).contains(&zahlen[0]) || !(-90.0..=90.0).contains(&zahlen[1]) {
+            return Err(fehler("Koordinate außerhalb von WGS84"));
+        }
     }
     Ok(())
 }
@@ -145,6 +218,65 @@ mod tests {
             LageZoneTyp::parse("evakuierungsbezirk"),
             Some(LageZoneTyp::Evakuierungsbezirk)
         );
+    }
+
+    fn ring(n: usize) -> String {
+        // n Positionen auf einem Kreis um (9, 51), geschlossen.
+        let mut p: Vec<String> = (0..n - 1)
+            .map(|i| {
+                let w = i as f64 / (n - 1) as f64 * std::f64::consts::TAU;
+                format!("[{},{}]", 9.0 + 0.01 * w.cos(), 51.0 + 0.01 * w.sin())
+            })
+            .collect();
+        p.push(p[0].clone());
+        format!("[{}]", p.join(","))
+    }
+
+    fn polygon(ringe: &[String]) -> String {
+        format!(r#"{{"type":"Polygon","coordinates":[{}]}}"#, ringe.join(","))
+    }
+
+    fn status(geo: &str, g: &str) -> Option<u16> {
+        validiere_neu("freie_skizze", g, geo)
+            .err()
+            .map(|e| e.status().as_u16())
+    }
+
+    /// LFH-937, design.md D7: Struktur und Grenzen sind 400, gültige Zeichnungen gehen durch.
+    #[test]
+    fn geometrie_grenzen_und_struktur() {
+        assert_eq!(status(&polygon(&[ring(5_000)]), "Polygon"), None);
+        assert_eq!(status(&polygon(&[ring(5_001)]), "Polygon"), Some(400));
+        assert_eq!(status(&polygon(&[ring(4_000), ring(1_001)]), "Polygon"), Some(400));
+        let zehn: Vec<String> = (0..10).map(|_| ring(4)).collect();
+        assert_eq!(status(&polygon(&zehn), "Polygon"), None);
+        let elf: Vec<String> = (0..11).map(|_| ring(4)).collect();
+        assert_eq!(status(&polygon(&elf), "Polygon"), Some(400));
+        assert_eq!(status(r#"{"type":"Polygon","coordinates":[]}"#, "Polygon"), Some(400));
+        let linie = r#"{"type":"LineString","coordinates":[[9,51],[9.1,51.1,12.5]]}"#;
+        assert_eq!(status(linie, "LineString"), None, "Höhe als dritte Zahl ist erlaubt");
+        for kaputt in [
+            r#"{"type":"LineString","coordinates":[["a",51],[9,51]]}"#,
+            r#"{"type":"LineString","coordinates":[["NaN",51],[9,51]]}"#,
+            r#"{"type":"LineString","coordinates":[[181,51],[9,51]]}"#,
+            r#"{"type":"LineString","coordinates":[[9,-90.5],[9,51]]}"#,
+            r#"{"type":"LineString","coordinates":[[9],[9,51]]}"#,
+            r#"{"type":"LineString","coordinates":[[9,51,1,2],[9,51]]}"#,
+            r#"{"type":"LineString","coordinates":"x"}"#,
+            r#"{"type":"LineString"}"#,
+            r#"{"type":"Polygon","coordinates":[[9,51]]}"#,
+        ] {
+            let g = if kaputt.contains("Polygon") { "Polygon" } else { "LineString" };
+            assert_eq!(status(kaputt, g), Some(400), "{kaputt}");
+        }
+    }
+
+    #[test]
+    fn geometrie_ueber_256_kib_ist_400_vor_dem_parsen() {
+        // Kein gültiges JSON, aber zu groß: die Größe entscheidet zuerst (400, nicht 422).
+        let gross = "x".repeat(GEOMETRIE_BYTES_MAX + 1);
+        assert_eq!(status(&gross, "Polygon"), Some(400));
+        assert_eq!(status(&"x".repeat(10), "Polygon"), Some(422), "kaputtes JSON bleibt 422");
     }
 
     /// Die reine Prüfung aus dem Handler, Wortlaut und Code je Fall (LFH-690).

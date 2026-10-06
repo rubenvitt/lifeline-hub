@@ -6,7 +6,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::nachforderung::{repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT};
-use crate::routes::support::pflicht;
+use crate::routes::support::{hoechstens, pflicht, pflicht_max};
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -78,7 +78,18 @@ pub async fn anlegen(
 ) -> Result<(StatusCode, Json<NachforderungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     let art = pflicht(&req.art, "Art")?;
-    let bezeichnung = pflicht(&req.bezeichnung, "Bezeichnung")?;
+    let bezeichnung = pflicht_max(
+        &req.bezeichnung,
+        "Bezeichnung",
+        crate::nachforderung::BEZEICHNUNG_MAX,
+    )?;
+    // Adressat und Begründung werden An und Veranlassung des ETB-Eintrags (LFH-937, D2).
+    if let Some(a) = trimme(&req.adressat_bezeichnung) {
+        hoechstens(a, "Adressat", crate::etb::PARTEI_MAX)?;
+    }
+    if let Some(b) = trimme(&req.begruendung) {
+        hoechstens(b, "Begründung", crate::etb::PARTEI_MAX)?;
+    }
     if let Some(a) = req.anzahl {
         if a < 1 {
             return Err(AppError::Validation("Anzahl muss mindestens 1 sein".into()));

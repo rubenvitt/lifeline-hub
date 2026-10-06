@@ -28,6 +28,15 @@ pub const TYP_BERICHTIGUNG: &str = EtbTyp::Berichtigung.as_str();
 /// ausgelöst hat, steht in `erfasser_id`/`erfasser_funktion`.
 pub const SYSTEM_RUFNAME: &str = "System";
 
+/// Höchstlänge des Inhalts eines ETB-Eintrags, der von außen kommt (LFH-937, design.md D2):
+/// auf jedem Weg, auf dem Text unverändert im ETB landet (Erfassung, Chat, Meldung, Vollzug).
+/// Systemtexte sind ausgenommen. Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const INHALT_MAX: usize = 20_000;
+
+/// Höchstlänge von Von, An und Veranlassung eines ETB-Eintrags (LFH-937, design.md D2); auch
+/// die Grenze des gekappten An eines Auftrags (D4).
+pub const PARTEI_MAX: usize = 500;
+
 /// Baut die `EintragDaten` eines pseudonymen System-ETB-Eintrags (nur `inhalt`, Rest leer).
 fn system_daten(inhalt: &str) -> repo::EintragDaten<'_> {
     repo::EintragDaten {

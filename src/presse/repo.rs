@@ -16,7 +16,16 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use super::{MedienkontaktAnzeige, MedienkontaktArt, MedienkontaktStatus};
 use crate::error::AppError;
-use crate::routes::support::pflicht;
+use crate::routes::support::{hoechstens, pflicht_max};
+
+/// Optionaler Text mit Grenze (LFH-937, design.md D6): getrimmt, leer → `None`.
+fn text_max(s: Option<&str>, feld: &str, max: usize) -> Result<Option<String>, AppError> {
+    let t = text_opt(s);
+    if let Some(t) = &t {
+        hoechstens(t, feld, max)?;
+    }
+    Ok(t)
+}
 
 /// Eingabe „Medienkontakt erfassen“. Art und Eingang hat die Route gelesen und normalisiert.
 #[derive(Debug, Clone)]
@@ -155,8 +164,14 @@ pub async fn anlegen_tx(
     benutzer_id: i64,
     e: &KontaktEingabe,
 ) -> Result<i64, AppError> {
-    let medium = pflicht(&e.medium, "medium")?;
-    let thema = pflicht(&e.thema, "thema")?;
+    let medium = pflicht_max(&e.medium, "medium", super::KURZ_MAX)?;
+    let thema = pflicht_max(&e.thema, "thema", super::THEMA_MAX)?;
+    let kontakt_name = text_max(e.kontakt_name.as_deref(), "kontakt_name", super::KURZ_MAX)?;
+    let kontakt_erreichbarkeit = text_max(
+        e.kontakt_erreichbarkeit.as_deref(),
+        "kontakt_erreichbarkeit",
+        super::THEMA_MAX,
+    )?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO medienkontakt \
             (einsatz_id, art, medium, thema, kontakt_name, kontakt_erreichbarkeit, eingang_at, \
@@ -167,8 +182,8 @@ pub async fn anlegen_tx(
     .bind(e.art.as_str())
     .bind(medium)
     .bind(thema)
-    .bind(text_opt(e.kontakt_name.as_deref()))
-    .bind(text_opt(e.kontakt_erreichbarkeit.as_deref()))
+    .bind(kontakt_name)
+    .bind(kontakt_erreichbarkeit)
     .bind(&e.eingang_at)
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
@@ -183,23 +198,32 @@ pub async fn aendern_tx(
     id: i64,
     a: &KontaktAenderung,
 ) -> Result<(), AppError> {
-    let alt = laden(&mut *conn, einsatz_id, id).await?;
+    // Felder für sich zuerst (400), dann der Datensatz (LFH-937, design.md D6).
     let medium = match &a.medium {
-        Some(m) => pflicht(m, "medium")?,
-        None => alt.medium,
+        Some(m) => Some(pflicht_max(m, "medium", super::KURZ_MAX)?),
+        None => None,
     };
     let thema = match &a.thema {
-        Some(t) => pflicht(t, "thema")?,
-        None => alt.thema,
+        Some(t) => Some(pflicht_max(t, "thema", super::THEMA_MAX)?),
+        None => None,
     };
     let kontakt_name = match &a.kontakt_name {
-        Some(n) => text_opt(n.as_deref()),
-        None => alt.kontakt_name,
+        Some(n) => Some(text_max(n.as_deref(), "kontakt_name", super::KURZ_MAX)?),
+        None => None,
     };
     let kontakt_erreichbarkeit = match &a.kontakt_erreichbarkeit {
-        Some(n) => text_opt(n.as_deref()),
-        None => alt.kontakt_erreichbarkeit,
+        Some(n) => Some(text_max(
+            n.as_deref(),
+            "kontakt_erreichbarkeit",
+            super::THEMA_MAX,
+        )?),
+        None => None,
     };
+    let alt = laden(&mut *conn, einsatz_id, id).await?;
+    let medium = medium.unwrap_or(alt.medium);
+    let thema = thema.unwrap_or(alt.thema);
+    let kontakt_name = kontakt_name.unwrap_or(alt.kontakt_name);
+    let kontakt_erreichbarkeit = kontakt_erreichbarkeit.unwrap_or(alt.kontakt_erreichbarkeit);
     let eingang_at = a.eingang_at.clone().unwrap_or(alt.eingang_at);
     sqlx::query(
         "UPDATE medienkontakt SET medium = ?, thema = ?, kontakt_name = ?, \
@@ -231,6 +255,9 @@ pub async fn status_tx(
     benutzer_id: i64,
     w: &StatusWechsel,
 ) -> Result<(), AppError> {
+    // Grenzen vor jedem Zusammenhang (400 vor 422; LFH-937, design.md D6).
+    let antwort = text_max(w.antwort.as_deref(), "antwort", super::ANTWORT_MAX)?;
+    let freigabe_durch = text_max(w.freigabe_durch.as_deref(), "freigabe_durch", super::KURZ_MAX)?;
     let alt = laden(&mut *conn, einsatz_id, id).await?;
     if alt.status == w.ziel {
         return Err(AppError::UnprocessableEntity(format!(
@@ -253,8 +280,6 @@ pub async fn status_tx(
         }
     }
 
-    let antwort = text_opt(w.antwort.as_deref());
-    let freigabe_durch = text_opt(w.freigabe_durch.as_deref());
     if w.ziel == MedienkontaktStatus::Beantwortet && antwort.is_none() {
         return Err(AppError::UnprocessableEntity(
             "Eine beantwortete Anfrage braucht die gegebene Antwort".into(),

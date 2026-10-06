@@ -16,6 +16,12 @@ use utoipa::ToSchema;
 
 pub mod repo;
 
+/// Höchstlänge der Notiz eines Anrufs (LFH-937, design.md D6). Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const NOTIZ_MAX: usize = 2_000;
+/// Höchstlänge von Anrufername und Rückrufnummer (LFH-937, design.md D6).
+pub const KURZ_MAX: usize = 200;
+
 wire_enum! {
     /// Anliegen eines Anrufs. Wire == `as_str()`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

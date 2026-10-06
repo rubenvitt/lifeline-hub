@@ -422,6 +422,48 @@ pub fn pflicht_tri(wert: Option<&str>, feld: &str) -> Result<Option<String>, App
     wert.map(|w| pflicht(w, feld)).transpose()
 }
 
+/// Grenze eines schon getrimmten Freitexts (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“):
+/// mehr als `max` Zeichen (Unicode-Skalarwerte, wie jede Grenze im Backend) → 400
+/// „{feld} darf höchstens {max} Zeichen lang sein“. Die Grenze heißt `*_MAX` und steht im Modul,
+/// das das Feld besitzt.
+pub fn hoechstens(wert: &str, feld: &str, max: usize) -> Result<(), AppError> {
+    if wert.chars().count() > max {
+        return Err(AppError::Validation(format!(
+            "{feld} darf höchstens {max} Zeichen lang sein"
+        )));
+    }
+    Ok(())
+}
+
+/// [`pflicht`] mit Grenze: getrimmt, nicht leer, höchstens `max` Zeichen ([`hoechstens`]).
+pub fn pflicht_max(wert: &str, feld: &str, max: usize) -> Result<String, AppError> {
+    let w = pflicht(wert, feld)?;
+    hoechstens(&w, feld, max)?;
+    Ok(w)
+}
+
+/// [`pflicht_max`] für ein PATCH-Feld: ein absentes Feld bleibt `None`.
+pub fn pflicht_max_tri(
+    wert: Option<&str>,
+    feld: &str,
+    max: usize,
+) -> Result<Option<String>, AppError> {
+    wert.map(|w| pflicht_max(w, feld, max)).transpose()
+}
+
+/// [`trimme`] mit Grenze: leer bleibt `None`, sonst höchstens `max` Zeichen ([`hoechstens`]).
+pub fn optional_max(
+    wert: Option<String>,
+    feld: &str,
+    max: usize,
+) -> Result<Option<String>, AppError> {
+    let w = trimme(wert);
+    if let Some(w) = &w {
+        hoechstens(w, feld, max)?;
+    }
+    Ok(w)
+}
+
 /// Liest einen Enum-Wert über dessen `parse`; unbekannt → 400 mit `meldung` (LFH-267).
 pub fn parse_enum<T>(
     parse: impl FnOnce(&str) -> Option<T>,
@@ -603,6 +645,65 @@ pub fn sse_stream_mit_replay(
 mod tests {
     use super::*;
     use serde::Deserialize;
+
+    fn meldung(e: AppError) -> String {
+        match e {
+            AppError::Validation(m) => m,
+            andere => panic!("400 erwartet, war {andere:?}"),
+        }
+    }
+
+    #[test]
+    fn pflicht_max_nimmt_genau_max_und_lehnt_eins_mehr_ab() {
+        assert_eq!(pflicht_max(&"x".repeat(5), "Inhalt", 5).unwrap(), "xxxxx");
+        assert_eq!(
+            meldung(pflicht_max(&"x".repeat(6), "Inhalt", 5).unwrap_err()),
+            "Inhalt darf höchstens 5 Zeichen lang sein"
+        );
+    }
+
+    #[test]
+    fn grenze_zaehlt_zeichen_nach_dem_trimmen() {
+        // Ein „ä“ ist ein Zeichen, auch wenn es zwei Bytes hat; Rand-Leerraum zählt nicht.
+        assert_eq!(
+            pflicht_max(&format!("  {}  ", "ä".repeat(3)), "Ort", 3).unwrap(),
+            "äää"
+        );
+        assert!(pflicht_max("äääa", "Ort", 3).is_err());
+    }
+
+    #[test]
+    fn pflicht_max_lehnt_leer_wie_pflicht_ab() {
+        assert_eq!(
+            meldung(pflicht_max("   ", "Von", 5).unwrap_err()),
+            "Von darf nicht leer sein"
+        );
+    }
+
+    #[test]
+    fn optional_max_laesst_leer_als_none_und_prueft_sonst() {
+        assert_eq!(optional_max(None, "Notiz", 3).unwrap(), None);
+        assert_eq!(optional_max(Some("  ".into()), "Notiz", 3).unwrap(), None);
+        assert_eq!(
+            optional_max(Some(" abc ".into()), "Notiz", 3).unwrap(),
+            Some("abc".into())
+        );
+        assert_eq!(
+            meldung(optional_max(Some("abcd".into()), "Notiz", 3).unwrap_err()),
+            "Notiz darf höchstens 3 Zeichen lang sein"
+        );
+    }
+
+    #[test]
+    fn pflicht_max_tri_laesst_absentes_feld_in_ruhe() {
+        assert_eq!(pflicht_max_tri(None, "Ort", 3).unwrap(), None);
+        assert_eq!(
+            pflicht_max_tri(Some(" ab "), "Ort", 3).unwrap(),
+            Some("ab".into())
+        );
+        assert!(pflicht_max_tri(Some("   "), "Ort", 3).is_err());
+        assert!(pflicht_max_tri(Some("abcd"), "Ort", 3).is_err());
+    }
 
     fn fassung_aus(werte: &[&str]) -> Result<Fassung, AppError> {
         FassungParam(werte.iter().map(|w| w.to_string()).collect()).fassung()
