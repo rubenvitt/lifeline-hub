@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import { abBreiteAus, useViewport } from './useViewport';
+import Zeitachseneintrag from './instrument/Zeitachseneintrag';
 import {
   erfassteQueries,
+  hoererAnzahl,
+  sendeBreitenAenderung,
   sendeZeigerAenderung,
   setzeViewportBreite,
   setzeZeigerGrob,
@@ -100,5 +103,54 @@ describe('useViewport (LFH-329 · H24)', () => {
 
     unmount();
     expect(sendeZeigerAenderung(false)).toBe(0);
+  });
+});
+
+describe('useViewport — ein Satz Hörer je Seite (LFH-947)', () => {
+  function Liste({ anzahl }: { anzahl: number }) {
+    return (
+      <div>
+        {Array.from({ length: anzahl }, (_, i) => (
+          <Zeitachseneintrag key={i} zeit="10:00" typwort="Meldung" data-testid="zeile">
+            Eintrag {i}
+          </Zeitachseneintrag>
+        ))}
+      </div>
+    );
+  }
+
+  it('100 Zeitachseneinträge hängen höchstens 8 Hörer an, nach dem Aushängen keinen', () => {
+    const { unmount } = render(<Liste anzahl={100} />);
+    expect(screen.getAllByTestId('zeile')).toHaveLength(100);
+    expect(hoererAnzahl()).toBeGreaterThan(0);
+    expect(hoererAnzahl()).toBeLessThanOrEqual(8);
+    unmount();
+    expect(hoererAnzahl()).toBe(0);
+  });
+
+  it('ein Breiten- und ein Zeigerwechsel erreichen jeden Fragenden', () => {
+    setzeViewportBreite(1024);
+    const a = renderHook(() => useViewport());
+    const b = renderHook(() => useViewport());
+    expect(a.result.current.istSchmal).toBe(false);
+
+    act(() => {
+      sendeBreitenAenderung(390);
+    });
+    expect(a.result.current.istSchmal).toBe(true);
+    expect(b.result.current.istSchmal).toBe(true);
+
+    act(() => {
+      sendeZeigerAenderung(true);
+    });
+    expect(a.result.current.istBeruehrung).toBe(true);
+    expect(b.result.current.istBeruehrung).toBe(true);
+  });
+
+  it('ohne Änderung bleibt der Zustand dieselbe Referenz', () => {
+    const { result, rerender } = renderHook(() => useViewport());
+    const vorher = result.current;
+    rerender();
+    expect(result.current).toBe(vorher);
   });
 });

@@ -46,7 +46,9 @@ export function useOrtVorschau(
       try {
         const live = await ladeOrtVorschau(einsatzId, debounced!.lat, debounced!.lon, exclude);
         if (live.ortsname) {
-          await setzeOrt(key, live.ortsname); // Ortsname (unveränderlich) lang persistieren
+          // Ortsname (unveränderlich) lang persistieren. Nicht abwarten: die Vorschau steht
+          // schon, und ein blockiertes Öffnen der DB hielte sie sonst fest (LFH-941).
+          void setzeOrt(key, live.ortsname);
           return live;
         }
         // Live ohne Ortsname (offline/Rate-Limit) → persistierten Ort als Fallback zeigen

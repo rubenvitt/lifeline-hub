@@ -1380,12 +1380,13 @@ export default function Sidebar(props: SidebarProps) {
               Gewählt wird die Grundlage oben links auf der Karte.
             </Typography.Text>
           )}
-          {!props.onlineVerfuegbar && (
+          {/* Mit der Leiste im Paneel (Handschirm) nennt deren Sperrgrund das schon. */}
+          {!props.grundlageWahl && !props.onlineVerfuegbar && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Online-Karte: nicht konfiguriert
             </Typography.Text>
           )}
-          {!props.offlineVerfuegbar && (
+          {!props.grundlageWahl && !props.offlineVerfuegbar && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Offline-Karte: nicht konfiguriert
             </Typography.Text>
@@ -1412,11 +1413,6 @@ export default function Sidebar(props: SidebarProps) {
                 <Radio.Button value="dark">Dunkel</Radio.Button>
               </Radio.Group>
             </div>
-          )}
-          {props.basemap === 'blind' && (
-            <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
-              Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
-            </Typography.Paragraph>
           )}
         </Space>
       </KlappPaneel>

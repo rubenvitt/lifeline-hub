@@ -567,3 +567,30 @@ afterEach(() => {
   // Die Melde-Sperre ist modulweit — ohne Reset bliebe ein zweiter 401-Test stumm.
   sitzungsMeldungZuruecksetzen();
 });
+
+describe('useEtbErfassung – Neuladen nur nach Versand (LFH-947)', () => {
+  it('eine leere Queue lädt das Seitenfenster nicht neu, ein gesendeter Eintrag schon', async () => {
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 }),
+      ),
+    );
+    const client = neuerQueryClient();
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const mitClient = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper: mitClient });
+
+    await act(async () => {
+      await result.current.flush();
+    });
+    expect(invalidiert).not.toHaveBeenCalled();
+
+    await queueEinreihen(11, 9, eintrag);
+    await act(async () => {
+      await result.current.flush();
+    });
+    expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['etb', 9] });
+  });
+});

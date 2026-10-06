@@ -657,6 +657,9 @@ describe('PersonenPage', () => {
     expect(
       await schreibaktionPersonAbschliessen(nutzer.id, pending, crossTabPerson),
     ).not.toBeNull();
+    // Der andere Tab hat die Person auf den Server gebracht; dieser Tab kennt sie noch nicht.
+    // Die Quittung trägt nur Kennungen (LFH-941): erst das Nachladen der Liste zeigt die Zeile.
+    server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([crossTabPerson])));
 
     const kanal = FakeBroadcastChannel.instanzen[0];
     await act(async () => {
