@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Space, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Space, Switch, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   useInfiniteQuery,
@@ -54,7 +54,7 @@ import type { AbgelehnterEintrag } from '../offline/queue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
+import { Segmentleiste, monoStil, useRollen, type SegmentOption } from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -88,10 +88,16 @@ function inLeiste(wurzel: HTMLElement, ziel: EventTarget | Element | null): bool
   return wurzel.contains(ziel) || ziel.closest(LEISTEN_SCHWEBE) != null;
 }
 
-/** Wie viele Filter der aufklappbaren Leiste gesetzt sind: Volltext, Zeitraum, Einheit. */
+/**
+ * Wie viele Filter der aufklappbaren Leiste gesetzt sind: Volltext, Zeitraum, Einheit und der
+ * Ausschluss der Systemeinträge (LFH-958).
+ */
 function leistenFilterZahl(filter: EtbFilterWerte): number {
   return (
-    (filter.q ? 1 : 0) + (filter.von || filter.bis ? 1 : 0) + (filter.einheit_id != null ? 1 : 0)
+    (filter.q ? 1 : 0) +
+    (filter.von || filter.bis ? 1 : 0) +
+    (filter.einheit_id != null ? 1 : 0) +
+    (filter.ohne_system ? 1 : 0)
   );
 }
 
@@ -242,6 +248,20 @@ export default function EtbPage() {
     queryKey: einsatzKeys.etbZaehler(einsatzId, filter),
     queryFn: () => ladeEtbZaehler(einsatzId, filter),
   });
+  // Wie viele Systemeinträge der Ausschluss verbirgt (LFH-958): dieselbe Zählung ohne ihn. Läuft
+  // nur, solange er gilt; ohne Ausschluss steht die Zahl schon in `zaehlerQuery`.
+  const filterMitSystem = useMemo<EtbFilterWerte>(() => {
+    const { ohne_system: _aus, ...rest } = filter;
+    void _aus;
+    return rest;
+  }, [filter]);
+  const systemZaehlerQuery = useQuery({
+    queryKey: einsatzKeys.etbZaehler(einsatzId, filterMitSystem),
+    queryFn: () => ladeEtbZaehler(einsatzId, filterMitSystem),
+    enabled: filter.ohne_system === true,
+  });
+  const systemAnzahl = (filter.ohne_system ? systemZaehlerQuery.data : zaehlerQuery.data)?.je_typ
+    .system;
 
   // Dokumente der Ablage mit ETB-Bezug (LFH-743): EINE Sammelabfrage über die Dokumentenliste,
   // nach Eintrag zugeordnet. Das Modulrecht `dokumente` bleibt maßgeblich — ohne Freigabe (auch
@@ -414,6 +434,15 @@ export default function EtbPage() {
       etbQuery.fetchPreviousPage();
       return;
     }
+    if (richtung !== 'da' && !gescheitert && filter.ohne_system) {
+      // Das Ziel kann ein ausgeblendeter Systemeintrag sein (LFH-958, design.md D5): einblenden
+      // und erneut suchen. Der zweite Durchlauf findet ihn oder räumt den Param wie sonst.
+      navigate(etbPfad(einsatzId, { ...filterMitSystem, eintrag: zielEintragId }), {
+        replace: true,
+      });
+      message.info('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen');
+      return;
+    }
     if (richtung === 'da') {
       setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
     }
@@ -430,6 +459,7 @@ export default function EtbPage() {
     etbQuery.isFetchNextPageError,
     etbQuery.isFetchPreviousPageError,
     etbQuery.isLoading,
+    filter.ohne_system,
   ]);
 
   useEffect(() => {
@@ -757,17 +787,40 @@ export default function EtbPage() {
                 startWerte={filter}
                 onChange={leisteGeaendert}
                 zusatz={
-                  // Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an der
-                  // Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert.
-                  <Select<number>
-                    aria-label="Nach Einheit filtern"
-                    placeholder="Einheit"
-                    allowClear
-                    style={{ minWidth: 180 }}
-                    value={filter.einheit_id}
-                    options={einheitOptionen}
-                    onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
-                  />
+                  <>
+                    {/* Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
+                        der Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert. */}
+                    <Select<number>
+                      aria-label="Nach Einheit filtern"
+                      placeholder="Einheit"
+                      allowClear
+                      style={{ minWidth: 180 }}
+                      value={filter.einheit_id}
+                      options={einheitOptionen}
+                      onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
+                    />
+                    {/* Ausschluss der Systemeinträge (LFH-958): ein Filter wie die übrigen, in der
+                        URL, mit der Zahl, die er zeigt bzw. verbirgt. */}
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: token.marginXS,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Switch
+                        checked={!filter.ohne_system}
+                        onChange={(an) => filterAendern({ ohne_system: an ? undefined : true })}
+                      />
+                      Systemeinträge zeigen
+                      {systemAnzahl != null && (
+                        <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
+                          {filter.ohne_system ? `${systemAnzahl} ausgeblendet` : systemAnzahl}
+                        </span>
+                      )}
+                    </label>
+                  </>
                 }
               />
             )}

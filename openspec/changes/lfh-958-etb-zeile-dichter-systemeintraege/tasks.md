@@ -5,9 +5,9 @@
 
 ## 2. Frontend: Filter (D4, D5)
 
-- [ ] 2.1 Tests zuerst: `routing/deeplinks.test.ts` (Rundlauf `ohne_system`, Druckpfad), `etb/zeitachseModell.test.ts` (Zusammenführen entfernt den Schlüssel, Segment `system` hebt den Ausschluss auf), `api/etb.test.ts` (Parameter).
-- [ ] 2.2 Tests zuerst (`pages/EtbPage.test.tsx`): Schalter aus → URL trägt `ohne_system=true`, Liste und Zählung werden mit dem Parameter abgefragt, Kopf „n Treffer“; Zahl der ausgeblendeten Einträge; Sprung auf einen Systemeintrag bei aktivem Ausschluss blendet ein und hebt hervor.
-- [ ] 2.3 Umsetzen in `api/etb.ts`, `routing/deeplinks.ts`, `etb/zeitachseModell.ts`, `pages/EtbPage.tsx`, `etb/druckAuswahl.ts`. Mutationsprobe: `parseEtbFilter` ohne den Schlüssel → 2.1 rot.
+- [x] 2.1 Tests zuerst: `routing/deeplinks.test.ts` (Rundlauf `ohne_system`, Druckpfad), `etb/zeitachseModell.test.ts` (Zusammenführen entfernt den Schlüssel, Segment `system` hebt den Ausschluss auf), `api/etb.test.ts` (Parameter).
+- [x] 2.2 Tests zuerst (`pages/EtbPage.test.tsx`): Schalter aus → URL trägt `ohne_system=true`, Liste und Zählung werden mit dem Parameter abgefragt, Kopf „n Treffer“; Zahl der ausgeblendeten Einträge; Sprung auf einen Systemeintrag bei aktivem Ausschluss blendet ein und hebt hervor.
+- [x] 2.3 Umsetzen in `api/etb.ts`, `routing/deeplinks.ts`, `etb/zeitachseModell.ts`, `pages/EtbPage.tsx`, `etb/druckAuswahl.ts`. Mutationsprobe: `parseEtbFilter` ohne den Schlüssel → 2.1 rot.
 
 ## 3. Frontend: kompakte Zeile (D1, D2)
 

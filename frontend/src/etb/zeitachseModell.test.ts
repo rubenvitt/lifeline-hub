@@ -194,6 +194,35 @@ describe('Typfilter', () => {
   });
 });
 
+describe('Ausschluss der Systemeinträge (LFH-958)', () => {
+  it('Ausschalten entfernt den Schlüssel, statt `false` mitzuführen', () => {
+    expect(
+      filterZusammenfuehren({ q: 'a', ohne_system: true }, { ohne_system: undefined }),
+    ).toEqual({ q: 'a' });
+  });
+
+  it('der Ausschluss hebt typ=system auf, andere Typen bleiben', () => {
+    expect(filterZusammenfuehren({ typ: 'system' }, { ohne_system: true })).toEqual({
+      ohne_system: true,
+    });
+    expect(filterZusammenfuehren({ typ: 'lage' }, { ohne_system: true })).toEqual({
+      typ: 'lage',
+      ohne_system: true,
+    });
+  });
+
+  it('das Segment `system` hebt den Ausschluss auf, jedes andere Segment behält ihn', () => {
+    expect(filterMitTyp({ ohne_system: true }, 'system')).toEqual({ typ: 'system' });
+    expect(filterZusammenfuehren({ ohne_system: true }, { typ: 'system' })).toEqual({
+      typ: 'system',
+    });
+    expect(filterMitTyp({ ohne_system: true }, 'meldung')).toEqual({
+      ohne_system: true,
+      typ: 'meldung',
+    });
+  });
+});
+
 describe('teileZufluss', () => {
   const zeilen = baueZeilen({
     eintraege: [e({ id: 3, lfd_nr: 3 }), e({ id: 2, lfd_nr: 2 }), e({ id: 1, lfd_nr: 1 })],
