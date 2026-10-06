@@ -29,3 +29,4 @@
 - [x] 6.1 Regel „Browserspeicher nur über `lib/sichererSpeicher`“ in `frontend/AGENTS.md`.
 - [ ] 6.2 Lint, Typecheck, Vitest der berührten Dateien.
 - [ ] 6.3 `./scripts/check-all.sh` (Bündel `schnell` und Vitest; e2e der Einstellungs- und Offline-Specs).
+- [x] 6.4 e2e `browserspeicher-gesperrt.spec.ts`: Anmeldung mit `localStorage` `null` und mit werfendem Zugriff, Nachtbetrieb, kein unbehandelter Fehler der App. Mutationsprobe: Farbschema roh lesen → beide rot.
