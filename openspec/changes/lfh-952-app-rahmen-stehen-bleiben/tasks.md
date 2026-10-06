@@ -19,7 +19,7 @@
 
 ## 4. Fokusabstand (D3)
 
-- [ ] 4.1 `index.css`: `scroll-margin-block-start` an Seitenkopf und Inhalt; im Browser messen, ob ein im Fenster stehendes, verdecktes Ziel gerollt wird, Ergebnis hier notieren
+- [ ] 4.1 `index.css`: `scroll-padding-block-start` am Dokument mit `:has`-Ausnahme für Fokus im Rahmen (D3)
 - [ ] 4.2 `e2e/fokus-verdeckung.spec.ts`: „Kopf verdeckt keinen Fokus“ (Shift+Tab bei 1366 × 520, Vorbedingung Stopps am Kopf) und „Tab durch den Kopf rollt nicht“; Mutationsprobe ohne Abstand dokumentieren
 
 ## 5. Modulpanel (D5)

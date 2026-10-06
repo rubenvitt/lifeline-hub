@@ -60,15 +60,22 @@ Jedes oben klebende Element liest diese Höhe:
 
 ### D3 Fokusabstand oben (WCAG 2.4.11)
 
-Wie LFH-373 als `scroll-margin-block-start: var(--lfh-rahmen-oben, 0px)` an den Zielen in
-`[data-lfh='seitenkopf']` und `[data-lfh='seiten-inhalt']` (Regel in `index.css` neben dem
-ETB-Abstand). Damit sind die Ziele im Kopf ausgenommen: Ein `scroll-padding` am Dokument zählte
-den Kopf selbst zum verdeckten Streifen und rollte bei jedem Fokus darin die Seite nach oben
-(dieselbe Falle wie die ETB-Leiste unten, LFH-373). Zeigt die Messung, dass Chromium ein schon
-im Fenster stehendes, aber verdecktes Ziel mit `scroll-margin` nicht rollt (die Beobachtung aus
-LFH-475), kommt `scroll-padding-block-start` am Scrollport dazu, und der Nachweis prüft
-zusätzlich, dass Tab durch den Kopf die Seite nicht bewegt. Welche Form gilt, steht nach der
-Messung in `tasks.md`.
+`scroll-padding-block-start: var(--lfh-rahmen-oben, 0px)` am Scrollport (`:root`, Regel in
+`index.css`), ausgesetzt, solange der Fokus im klebenden Rahmen selbst steht:
+`:root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus)` setzt ihn auf
+`0px`. Gemessen am 06.10.2026 in Chromium mit einem 60-px-Kopf und 30-px-Zielen:
+
+| Form | Shift+Tab auf ein Ziel ganz hinter dem Kopf | Fokus auf ein Ziel im Kopf |
+| --- | --- | --- |
+| ohne Abstand | bleibt bei `top = 28`, verdeckt | rollt nicht |
+| `scroll-margin-block-start` an den Zielen (Muster LFH-373) | bleibt bei `top = 28`, verdeckt | rollt nicht |
+| `scroll-padding-block-start` am Dokument | rollt, Ziel frei | rollt die Seite (1000 → 787 px) |
+| `scroll-padding` mit `:has(… :focus)`-Ausnahme | rollt, Ziel frei | rollt nicht |
+
+`scroll-margin` versagt also wie bei LFH-475: ein Ziel, das schon im Fenster liegt, rollt
+Chromium nicht. `scroll-padding` allein rollte bei jedem Tab in den Kopf die Seite (dieselbe
+Falle wie die ETB-Leiste unten, LFH-373). Die Ausnahme per `:has` greift, weil der Browser den
+Stil mit dem neuen Fokus rechnet, bevor er das Ziel ins Bild rollt.
 
 ### D4 Benutzermenü
 
