@@ -213,7 +213,7 @@ export default function UhsDetailPage() {
           )}
           {verwalten && uhs.status === 'aktiv' && (
             <Popconfirm
-              title="UHS auflösen?"
+              title="Unfallhilfsstelle auflösen?"
               description="Nur möglich, wenn keine Person mehr belegt ist."
               onConfirm={() => statusMut.mutate('aufgeloest')}
               okButtonProps={{ danger: true }}

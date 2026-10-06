@@ -300,7 +300,13 @@ export function ZeitfensterDialog({
       <Form.Item<ZeitfensterWerte>
         name="bedarf_kraefte"
         label="Einsatzkräfte (EP)"
-        extra={vorschlagHilfe(vorschlag.kraefte, anlegen)}
+        extra={
+          // Einmal am ersten Feld, sichtbar statt Tooltip: am Tablet gibt es kein Hover (LFH-948).
+          <>
+            <div>EP = Essensportionen</div>
+            <div>{vorschlagHilfe(vorschlag.kraefte, anlegen)}</div>
+          </>
+        }
         rules={[{ required: true, message: 'Bitte eine Anzahl angeben — 0, wenn niemand' }]}
       >
         <InputNumber

@@ -82,3 +82,54 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
     );
   });
 });
+
+/**
+ * LFH-948: vor der Wahl der Einheit sagt der Dialog nichts über die Vorgabe eines Abschnitts,
+ * und der Rhythmus ist noch kein Pflichtfeld.
+ */
+describe('Schicht beginnen — Rhythmus-Hinweis erst nach der Einheitenwahl (LFH-948)', () => {
+  function oeffne(vorgabeJeEinheit: Map<number, number>) {
+    renderMitProviders(
+      <SchichtBeginnenDialog
+        offen
+        einheiten={[{ value: 5, label: 'Florian 1' }]}
+        vorgabeJeEinheit={vorgabeJeEinheit}
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn().mockResolvedValue(undefined)}
+        onSchliessen={vi.fn()}
+      />,
+    );
+  }
+
+  async function waehleFlorian(dialog: HTMLElement) {
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    const option = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>(
+        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="Florian 1"]',
+      );
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    await userEvent.click(option);
+  }
+
+  it('ohne Einheit kein Satz über die Vorgabe und kein Pflichtfeld', async () => {
+    oeffne(new Map());
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText(/Vorgabe/)).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' }),
+    ).not.toBeRequired();
+  });
+
+  it('mit Einheit ohne Vorgabe nennt er das, und der Rhythmus wird Pflicht', async () => {
+    oeffne(new Map());
+    const dialog = await screen.findByRole('dialog');
+    await waehleFlorian(dialog);
+    expect(
+      await within(dialog).findByText('Der Abschnitt der Einheit hat keine Vorgabe'),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' })).toBeRequired();
+  });
+});

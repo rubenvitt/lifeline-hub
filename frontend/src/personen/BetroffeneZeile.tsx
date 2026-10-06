@@ -8,7 +8,14 @@ import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
 import { formatKoordinate } from './koordinate';
-import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './personBefehl';
+import {
+  SICHTUNG_BUCHSTABEN,
+  loeseBefehl,
+  loeseUhsAuf,
+  parsePersonBefehl,
+  type BefehlTeil,
+} from './personBefehl';
+import { SK_META } from './personMeta';
 
 /** Aus dem Bild, nicht aus dem Baum: der Vorleser liest die Kürzel weiter als Feldbeschreibung. */
 const NUR_VORLESER = {
@@ -189,10 +196,17 @@ export default function BetroffeneZeile({
               Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
             </span>
             <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
-            <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+            {/* Die Buchstaben-Kürzel ausgeschrieben (LFH-948), aus derselben Quelle wie der
+                Parser. */}
+            <span style={{ color: rollen.gedaempft }}>
+              sk1–sk4 ·{' '}
+              {SICHTUNG_BUCHSTABEN.map((k) => `${k.kuerzel} = ${SK_META[k.kategorie].label}`).join(
+                ' · ',
+              )}
+            </span>
             {/* Das Format zeigt der Platzhalter nicht, also hier. */}
-            <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
-            <span style={{ color: rollen.gedaempft }}>@UHS</span>
+            <span style={{ color: rollen.gedaempft }}>#Fundort (52.2691/9.1342)</span>
+            <span style={{ color: rollen.gedaempft }}>@Unfallhilfsstelle</span>
           </span>
           {/* EIN Knopf für beide Richtungen: er bleibt beim Umschalten derselbe Knoten, der Fokus
               bleibt auf ihm. Beim Tippen unsichtbar wie die Ebene, seine Höhe bleibt stehen. */}

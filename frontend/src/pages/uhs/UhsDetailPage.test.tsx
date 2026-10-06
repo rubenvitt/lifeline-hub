@@ -174,6 +174,20 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
     expect(container.querySelector('[data-lfh="seitenkopf-aktionen"]')).not.toBeNull();
   });
 
+  it('fragt vor dem Auflösen ohne Kürzel nach (LFH-948)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      typ: 'patientenablage',
+      status: 'aktiv',
+    } as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    expect(await screen.findByText('Unfallhilfsstelle auflösen?')).toBeInTheDocument();
+    expect(screen.queryByText('UHS auflösen?')).not.toBeInTheDocument();
+  });
+
   it('hält die Primäraktionen im Kopf je Zustand auf der gezählten Zahl', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
 

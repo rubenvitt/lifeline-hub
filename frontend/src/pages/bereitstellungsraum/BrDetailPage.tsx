@@ -38,6 +38,20 @@ import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { summiereStaerke } from '../../anzeige/staerke';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
+/** Die Bezeichnung reist nur für die Quittung mit, der Server bekommt allein `daten`. */
+type BelegungMitName = { daten: Parameters<typeof belegeBr>[2]; bezeichnung: string };
+
+/**
+ * Quittung der Belegung mit Handlung und Objekt (LFH-948). Dieselbe Mutation weist zu und
+ * entfernt; ein bloßes „Erfolgreich“ sagte nicht, was geschehen ist.
+ */
+export function belegungsQuittung(b: BelegungMitName): string {
+  const objekt = `${b.daten.objekt_typ === 'einheit' ? 'Einheit' : 'Fahrzeug'} „${b.bezeichnung}“`;
+  return b.daten.art === 'eintritt'
+    ? `${objekt} dem BR zugewiesen`
+    : `${objekt} aus dem BR entfernt`;
+}
+
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
@@ -104,11 +118,11 @@ export default function BrDetailPage() {
   });
 
   const belegungMut = useMutation({
-    mutationFn: belegeBr.bind(null, einsatzId, brId),
+    mutationFn: ({ daten }: BelegungMitName) => belegeBr(einsatzId, brId, daten),
     // Fester Schlüssel: ein serieller Lauf ersetzt den stehenden Toast statt ihn zu stapeln (wie
     // `kommunikation/rueckgaengig.tsx`).
-    onSuccess: () => {
-      message.success({ content: 'Erfolgreich', key: 'br-belegung' });
+    onSuccess: (_antwort, belegung) => {
+      message.success({ content: belegungsQuittung(belegung), key: 'br-belegung' });
       invalidate();
     },
     onError: fehler,
@@ -140,19 +154,31 @@ export default function BrDetailPage() {
     br.status === 'aufgeloest';
 
   function onZuweisenEinheit(einheit: Einheit) {
-    belegungMut.mutate({ objekt_typ: 'einheit', objekt_id: einheit.id, art: 'eintritt' });
+    belegungMut.mutate({
+      daten: { objekt_typ: 'einheit', objekt_id: einheit.id, art: 'eintritt' },
+      bezeichnung: einheit.name,
+    });
   }
 
   function onZuweisenFahrzeug(fahrzeug: EinsatzFahrzeug) {
-    belegungMut.mutate({ objekt_typ: 'fahrzeug', objekt_id: fahrzeug.id, art: 'eintritt' });
+    belegungMut.mutate({
+      daten: { objekt_typ: 'fahrzeug', objekt_id: fahrzeug.id, art: 'eintritt' },
+      bezeichnung: fahrzeug.funkrufname,
+    });
   }
 
-  function onEntfernenEinheit(einheitId: number) {
-    belegungMut.mutate({ objekt_typ: 'einheit', objekt_id: einheitId, art: 'austritt' });
+  function onEntfernenEinheit(einheit: { id: number; name: string }) {
+    belegungMut.mutate({
+      daten: { objekt_typ: 'einheit', objekt_id: einheit.id, art: 'austritt' },
+      bezeichnung: einheit.name,
+    });
   }
 
-  function onEntfernenFahrzeug(fahrzeugId: number) {
-    belegungMut.mutate({ objekt_typ: 'fahrzeug', objekt_id: fahrzeugId, art: 'austritt' });
+  function onEntfernenFahrzeug(fahrzeug: { id: number; funkrufname: string }) {
+    belegungMut.mutate({
+      daten: { objekt_typ: 'fahrzeug', objekt_id: fahrzeug.id, art: 'austritt' },
+      bezeichnung: fahrzeug.funkrufname,
+    });
   }
 
   // Typ und Stärke aus Einheiten-/Fahrzeugliste: `BrEinheitKurz` trägt nur id+name.
@@ -281,7 +307,7 @@ export default function BrDetailPage() {
                         <Button
                           key="entfernen"
                           danger
-                          onClick={() => onEntfernenEinheit(e.id)}
+                          onClick={() => onEntfernenEinheit(e)}
                           loading={belegungMut.isPending}
                         >
                           entfernen
@@ -313,7 +339,7 @@ export default function BrDetailPage() {
                         <Button
                           key="entfernen"
                           danger
-                          onClick={() => onEntfernenFahrzeug(f.id)}
+                          onClick={() => onEntfernenFahrzeug(f)}
                           loading={belegungMut.isPending}
                         >
                           entfernen
