@@ -1,6 +1,5 @@
-import { Alert, App, Button, Form, Popconfirm, Space } from 'antd';
+import { Alert, App, Button, Flex, Form, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
-import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
@@ -16,7 +15,8 @@ import { dekodiere, kodiere } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { listeBenutzer } from '../api/benutzer';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import KatalogTabelle from '../components/KatalogTabelle';
+import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { useViewport } from '../components/useViewport';
 import Datenstand from '../components/Datenstand';
 import { Paneel, useRollen } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -32,6 +32,13 @@ interface Props {
   darfVerwalten: boolean;
   darfFuehrungsstelleVerwalten: boolean;
 }
+
+/**
+ * Spaltenbreiten unter `md` (LFH-964), gegen 390 px gewählt: die Spalte Rolle · Aktion hält
+ * „Führungspersonal“ ungekürzt, der Name fließt im Rest (≈ 190 px bei 390).
+ */
+const SCHMAL_ROLLE = 172;
+const SCHMAL_NAME_MIN = 96;
 
 type StellenZiel = MitgliedAnzeige & { einsatzId: number };
 /** Höchstens EIN Wert: Katalogwahl `funktion:<code>[:<Bezeichnung>]` oder Freitext (LFH-549). */
@@ -104,8 +111,11 @@ function FuehrungsstelleModal({
  *
  * Träger ist `KatalogTabelle`, und für die gilt: auf schmalem Schirm wird eine Tabelle angepasst,
  * nicht in Karten aufgelöst. Das Primitiv bringt Scrollcontainer, stehende Kopfzeile und fixierte
- * Kennungsspalte mit; drei Spalten (Name · Rolle · Aktion) passen auch auf 390 px. Die Anpassung
- * ist das `minWidth` am Rollenfeld statt einer festen Breite.
+ * Kennungsspalte mit. Ab `md` vier Spalten (Name · Führungsstelle · Rolle · Aktion). Unter `md`
+ * zwei (LFH-964): die Führungsstelle steht als zweite Zeile in der Namenszelle, „Entfernen“ unter
+ * dem Rollenfeld — vier Spalten reichten bei 390 px bis 606 px, „Entfernen“ lag außerhalb. Die
+ * Breiten folgen dann der Regel „Fließende Spalte“ (LFH-523): der Name fließt, Rolle · Aktion
+ * trägt eine Zahlbreite gegen 390 px ({@link SCHMAL_ROLLE}).
  */
 export default function MitgliederAbschnitt({
   einsatzId,
@@ -114,7 +124,8 @@ export default function MitgliederAbschnitt({
 }: Props) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token } = useRollen();
+  const { token, rollen } = useRollen();
+  const { istSchmal } = useViewport();
   const [neuerBenutzer, setNeuerBenutzer] = useState<number | undefined>();
   const [neueRolle, setNeueRolle] = useState<EinsatzRolle>('fuehrungspersonal');
   const [stelleZiel, setStelleZiel] = useState<StellenZiel | null>(null);
@@ -180,65 +191,109 @@ export default function MitgliederAbschnitt({
   const mitgliedIds = new Set(mitglieder.map((m) => m.benutzer_id));
   const verfuegbar = (benutzerQuery.data ?? []).filter((b) => b.aktiv && !mitgliedIds.has(b.id));
 
-  const spalten: ColumnsType<MitgliedAnzeige> = [
-    { title: 'Name', dataIndex: 'anzeigename' },
-    {
-      title: 'Führungsstelle',
-      key: 'fuehrungsstelle',
-      render: (_, m) =>
-        darfFuehrungsstelleVerwalten ? (
-          <Button
-            type="link"
-            disabled={stelleSetzen.isPending}
-            aria-label={`Führungsstelle für ${m.anzeigename} bearbeiten`}
-            onClick={() => {
-              stelleSetzen.reset();
-              setStelleZiel({ ...m, einsatzId });
-            }}
-          >
-            {m.fuehrungsstelle_anzeige || m.fuehrungsstelle || 'Führungsstelle festlegen'}
-          </Button>
-        ) : (
-          m.fuehrungsstelle_anzeige || m.fuehrungsstelle || '—'
-        ),
-    },
-    {
-      title: 'Rolle',
-      key: 'rolle',
-      render: (_, m) => (
-        <Select
-          value={m.einsatz_rolle}
-          disabled={!darfVerwalten}
-          // `minWidth` statt fester `width`: eine feste Breite drückt die Zelle am schmalen Schirm
-          // auf. Der Boden bleibt, damit „Führungspersonal" nicht abgeschnitten wird.
-          style={{ minWidth: 170, maxWidth: '100%' }}
-          options={ROLLEN}
-          onChange={(rolle) => setzen.mutate({ benutzerId: m.benutzer_id, rolle })}
-        />
-      ),
-    },
-    {
-      // Beschriftet: eine namenlose Spalte ist für einen Screenreader eine Zelle ohne
-      // Zugehörigkeit.
-      title: 'Aktion',
-      key: 'aktion',
-      render: (_, m) =>
-        darfVerwalten ? (
-          <Popconfirm
-            title="Mitglied entfernen?"
-            okText="Ja"
-            cancelText="Abbrechen"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => entfernen.mutate(m.benutzer_id)}
-          >
-            {/* Regulärer Knopf statt `type="link"`: ein Textlink sieht aus wie Fließtext,
-                obwohl er die einzige destruktive Handlung der Zeile auslöst. `danger` bleibt,
-                die Rückfrage ist der zweite Handgriff. */}
-            <Button danger>Entfernen</Button>
-          </Popconfirm>
-        ) : null,
-    },
-  ];
+  const fuehrungsstelle = (m: MitgliedAnzeige) =>
+    darfFuehrungsstelleVerwalten ? (
+      <Button
+        type="link"
+        disabled={stelleSetzen.isPending}
+        aria-label={`Führungsstelle für ${m.anzeigename} bearbeiten`}
+        // Darf umbrechen: unter `md` steht der Knopf in der schmalen Namenszelle.
+        style={{
+          height: 'auto',
+          maxWidth: '100%',
+          whiteSpace: 'normal',
+          textAlign: 'start',
+          overflowWrap: 'anywhere',
+          ...(istSchmal ? { paddingInline: 0 } : {}),
+        }}
+        onClick={() => {
+          stelleSetzen.reset();
+          setStelleZiel({ ...m, einsatzId });
+        }}
+      >
+        {m.fuehrungsstelle_anzeige || m.fuehrungsstelle || 'Führungsstelle festlegen'}
+      </Button>
+    ) : (
+      m.fuehrungsstelle_anzeige || m.fuehrungsstelle || '—'
+    );
+
+  const rolleFeld = (m: MitgliedAnzeige) => (
+    <Select
+      value={m.einsatz_rolle}
+      disabled={!darfVerwalten}
+      aria-label={`Rolle von ${m.anzeigename}`}
+      // `minWidth` statt fester `width`: eine feste Breite drückt die Zelle am schmalen Schirm
+      // auf. Der Boden bleibt, damit „Führungspersonal" nicht abgeschnitten wird; unter `md`
+      // füllt das Feld die Zahlbreite der Spalte.
+      style={istSchmal ? { width: '100%' } : { minWidth: 170, maxWidth: '100%' }}
+      options={ROLLEN}
+      onChange={(rolle) => setzen.mutate({ benutzerId: m.benutzer_id, rolle })}
+    />
+  );
+  const aktion = (m: MitgliedAnzeige) =>
+    darfVerwalten ? (
+      <Popconfirm
+        title="Mitglied entfernen?"
+        okText="Ja"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true }}
+        onConfirm={() => entfernen.mutate(m.benutzer_id)}
+      >
+        {/* Regulärer Knopf statt `type="link"`: ein Textlink sieht aus wie Fließtext,
+            obwohl er die einzige destruktive Handlung der Zeile auslöst. `danger` bleibt,
+            die Rückfrage ist der zweite Handgriff. */}
+        <Button danger>Entfernen</Button>
+      </Popconfirm>
+    ) : null;
+
+  const spalten: KatalogSpalte<MitgliedAnzeige>[] = istSchmal
+    ? [
+        {
+          title: 'Name',
+          key: 'name',
+          mindestBreite: SCHMAL_NAME_MIN,
+          render: (_, m) => (
+            <div style={{ minWidth: 0, overflowWrap: 'break-word' }}>
+              <div>{m.anzeigename}</div>
+              <div
+                data-lfh="mitglied-fuehrungsstelle"
+                style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}
+              >
+                {fuehrungsstelle(m)}
+              </div>
+            </div>
+          ),
+        },
+        {
+          // Rolle und Aktion teilen sich eine Spalte: zwei Zahlbreiten nebeneinander ließen dem
+          // Namen bei 390 px keine 90 px.
+          title: darfVerwalten ? 'Rolle · Aktion' : 'Rolle',
+          key: 'rolle',
+          width: SCHMAL_ROLLE,
+          render: (_, m) => (
+            <Flex vertical gap={token.marginXS} align="flex-start">
+              {rolleFeld(m)}
+              {aktion(m)}
+            </Flex>
+          ),
+        },
+      ]
+    : [
+        { title: 'Name', dataIndex: 'anzeigename' },
+        {
+          title: 'Führungsstelle',
+          key: 'fuehrungsstelle',
+          render: (_, m) => fuehrungsstelle(m),
+        },
+        { title: 'Rolle', key: 'rolle', render: (_, m) => rolleFeld(m) },
+        {
+          // Beschriftet: eine namenlose Spalte ist für einen Screenreader eine Zelle ohne
+          // Zugehörigkeit.
+          title: 'Aktion',
+          key: 'aktion',
+          render: (_, m) => aktion(m),
+        },
+      ];
 
   return (
     // Ein Paneel mit Augenbraue: Zählung und Datenstand stehen im Kopf rechts, die Hinzufügen-Zeile

@@ -1,5 +1,13 @@
 import { IconStift } from '../icons';
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import {
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { Button, Space } from 'antd';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
@@ -74,6 +82,31 @@ export interface InlineAngabeProps<T> {
    * offen und der Fehler steht an der Zeile. Erfüllt erst, wenn der neue Wert im Cache steht.
    */
   onSpeichern: (wert: T) => Promise<unknown>;
+}
+
+/**
+ * Stil der Aufforderung „… eintragen“ — rein und exportiert (Muster `wertKnopfStil`). antds
+ * Linkknopf bricht nicht um: am Handy lief „Nächste Lagebesprechung eintragen“ über den
+ * Paneelrand und weitete den Layout-Viewport auf (LFH-964). Darum `whiteSpace: normal` mit
+ * `height: auto`; der Boden aus `controlHeight` hält die Trefffläche auf der Dichte-Staffel.
+ */
+export function leerKnopfStil(
+  token: { controlHeight: number; paddingXS: number },
+  bedienText: string,
+): CSSProperties {
+  return {
+    // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
+    color: bedienText,
+    paddingInline: 0,
+    paddingBlock: token.paddingXS,
+    height: 'auto',
+    minHeight: token.controlHeight,
+    maxWidth: '100%',
+    whiteSpace: 'normal',
+    textAlign: 'start',
+    justifyContent: 'flex-start',
+    overflowWrap: 'anywhere',
+  };
 }
 
 export function InlineAngabe<T>({
@@ -231,8 +264,7 @@ export function InlineAngabe<T>({
         <Button
           ref={knopfRef}
           type="link"
-          // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
-          style={{ color: rollen.bedienText, paddingInline: 0 }}
+          style={leerKnopfStil(token, rollen.bedienText)}
           onClick={oeffnen}
         >
           {`${etikett} eintragen`}
