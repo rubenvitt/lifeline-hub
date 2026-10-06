@@ -44,7 +44,7 @@ pub async fn hochladen(
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<HintergrundbildAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let mut bytes: Option<Vec<u8>> = None;
+    let mut bytes: Option<axum::body::Bytes> = None;
     let mut ecken: Option<String> = None;
     let mut name: Option<String> = None;
     // Ansichts-Zugehörigkeit (LFH-320) als Multipart-Feld — es gibt keinen JSON-Body.
@@ -63,7 +63,8 @@ pub async fn hochladen(
                 let b = feld.bytes().await.map_err(|e| {
                     AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}"))
                 })?;
-                bytes = Some(b.to_vec());
+                // Ohne Kopie: die Bytes gehen als Slice bis zum Binden (LFH-938).
+                bytes = Some(b);
             }
             Some("ecken") => {
                 ecken = Some(feld.text().await.map_err(|e| {

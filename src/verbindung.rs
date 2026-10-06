@@ -8,6 +8,9 @@
 //!   [`HEADER_READ_TIMEOUT`] vollständig sendet, wird abgeräumt.
 //! * **Verbindungs-Obergrenze** — höchstens [`MAX_VERBINDUNGEN`] Verbindungen werden
 //!   gleichzeitig bedient ([`SemaphorAkzeptor`]).
+//! * **TCP-Keepalive** — jede angenommene Verbindung prüft nach [`TCP_KEEPALIVE_ZEIT`] Stille,
+//!   ob die Gegenstelle noch da ist (LFH-938). Ein Feld-Tablet, das mitten im Upload in den
+//!   Standby geht, sendet kein FIN; ohne Keepalive hielte die Verbindung ihren Platz unbegrenzt.
 //!
 //! ## Die Timer-Falle
 //!
@@ -52,6 +55,31 @@ pub const HTTP2_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(20);
 /// Wie lange auf die PING-Antwort gewartet wird. Muss deutlich unter dem Intervall liegen.
 pub const HTTP2_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Stille, nach der das Betriebssystem die erste Keepalive-Probe sendet.
+pub const TCP_KEEPALIVE_ZEIT: Duration = Duration::from_secs(60);
+
+/// Abstand der folgenden Keepalive-Proben (wo das System ihn einstellen lässt).
+pub const TCP_KEEPALIVE_INTERVALL: Duration = Duration::from_secs(10);
+
+/// Schaltet TCP-Keepalive an einer angenommenen Verbindung ein. Eigener Trait, weil der
+/// Akzeptor generisch über den Verbindungstyp ist; beide Serve-Pfade nehmen
+/// `tokio::net::TcpStream` an (TLS setzt erst danach auf).
+pub trait KeepaliveSetzen {
+    fn keepalive_setzen(&self);
+}
+
+impl KeepaliveSetzen for tokio::net::TcpStream {
+    fn keepalive_setzen(&self) {
+        let params = socket2::TcpKeepalive::new().with_time(TCP_KEEPALIVE_ZEIT);
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+        let params = params.with_interval(TCP_KEEPALIVE_INTERVALL);
+        // Kein Abbruch: ohne Keepalive bleibt die Verbindung so geschützt wie vorher.
+        if let Err(fehler) = socket2::SockRef::from(self).set_tcp_keepalive(&params) {
+            tracing::debug!(%fehler, "TCP-Keepalive ließ sich nicht setzen");
+        }
+    }
+}
+
 /// Akzeptor, der jede Verbindung an ein Semaphore-Permit bindet. Das Permit lebt in
 /// [`PermitStream`] und fällt zurück, sobald die Verbindung geschlossen wird.
 #[derive(Clone)]
@@ -80,7 +108,7 @@ impl Default for SemaphorAkzeptor {
 
 impl<I, S> Accept<I, S> for SemaphorAkzeptor
 where
-    I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    I: AsyncRead + AsyncWrite + KeepaliveSetzen + Unpin + Send + 'static,
     S: Send + 'static,
 {
     type Stream = PermitStream<I>;
@@ -88,6 +116,7 @@ where
     type Future = Pin<Box<dyn Future<Output = io::Result<(Self::Stream, Self::Service)>> + Send>>;
 
     fn accept(&self, stream: I, service: S) -> Self::Future {
+        stream.keepalive_setzen();
         let plaetze = self.plaetze.clone();
         Box::pin(async move {
             // Hier wird GEWARTET statt abgewiesen: auf Verbindungsebene gibt es noch keinen
@@ -218,6 +247,22 @@ mod tests {
         // Dem Listener einen Moment geben, bevor der erste Client verbindet.
         tokio::time::sleep(Duration::from_millis(120)).await;
         (addr, akzeptor)
+    }
+
+    /// LFH-938: Keepalive ist an der Verbindung wirklich gesetzt, mit der Frist von oben.
+    #[tokio::test]
+    async fn keepalive_wird_an_der_verbindung_gesetzt() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let (server, _) = listener.accept().await.unwrap();
+
+        let sock = socket2::SockRef::from(&server);
+        assert!(!sock.keepalive().unwrap(), "Vorgabe: aus");
+        server.keepalive_setzen();
+        assert!(sock.keepalive().unwrap());
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        assert_eq!(sock.tcp_keepalive_time().unwrap(), TCP_KEEPALIVE_ZEIT);
     }
 
     /// Regressionstest gegen die Timer-Falle: ohne `.timer()` paniked hyper in der

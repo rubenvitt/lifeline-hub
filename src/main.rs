@@ -313,6 +313,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         state,
         RouterOptionen {
             demo_daten: config.demo_daten,
+            zulassungs_budget: None,
         },
     );
 
