@@ -168,6 +168,16 @@ async fn geocode_und_schreibe(
                 }
             }
         }
+        // Ein Redirect wird nicht verfolgt (s. `geocoder_client`); ohne `warn` fiele eine
+        // `http://`-Basis, die auf https umleitet, im Betrieb nur als fehlender Ortsname auf.
+        Ok(r) if r.status().is_redirection() => {
+            tracing::warn!(
+                "Geocoder antwortet mit Umleitung (HTTP {}); Geocoder-URL in den \
+                 Org-Einstellungen prüfen",
+                r.status()
+            );
+            None
+        }
         Ok(r) => {
             tracing::debug!("Geocoder HTTP {}", r.status());
             None
@@ -453,11 +463,20 @@ mod tests {
         .await
     }
 
-    /// LFH-923: Eine gzip-Bombe (8 MiB Nullen, wenige KB gepackt) endet am Deckel mit `None`,
-    /// nicht mit einem Speicherwachstum um das Entpackte.
+    /// Gültige Reverse-Antwort mit `n` Bytes Füllung: ohne Deckel lieferte sie `Some("X")`.
+    fn aufgeblaehte_antwort(n: usize) -> Vec<u8> {
+        crate::http_begrenzt::fixture::aufgeblaehtes_json(
+            r#"{"display_name":"X","f":""#,
+            n,
+            r#""}"#,
+        )
+    }
+
+    /// LFH-923: Eine gzip-Bombe (8 MiB gültiges JSON, wenige KB gepackt) endet am Deckel mit
+    /// `None`, nicht mit einem Speicherwachstum um das Entpackte.
     #[tokio::test]
     async fn gzip_bombe_liefert_none() {
-        let gepackt = crate::http_begrenzt::fixture::gzip_nullen(8 * 1024 * 1024);
+        let gepackt = crate::http_begrenzt::fixture::gzip(&aufgeblaehte_antwort(8 * 1024 * 1024));
         let base =
             reverse_fixture(move || crate::http_begrenzt::fixture::gzip_antwort(gepackt.clone()))
                 .await;
@@ -468,10 +487,24 @@ mod tests {
     #[tokio::test]
     async fn uebergrosse_antwort_liefert_none() {
         let base = reverse_fixture(|| {
-            crate::http_begrenzt::fixture::strom_antwort(crate::http_begrenzt::DECKEL_GEOCODER + 1)
+            crate::http_begrenzt::fixture::strom_aus(aufgeblaehte_antwort(
+                crate::http_begrenzt::DECKEL_GEOCODER,
+            ))
         })
         .await;
         assert_eq!(reverse_ueber_prod_client(&base).await, None);
+    }
+
+    /// Gegenprobe: dieselbe Antwort knapp unter dem Deckel wird gelesen.
+    #[tokio::test]
+    async fn aufgeblaehte_antwort_unter_dem_deckel_wird_gelesen() {
+        let base = reverse_fixture(|| {
+            crate::http_begrenzt::fixture::strom_aus(aufgeblaehte_antwort(
+                crate::http_begrenzt::DECKEL_GEOCODER - 100,
+            ))
+        })
+        .await;
+        assert_eq!(reverse_ueber_prod_client(&base).await.as_deref(), Some("X"));
     }
 
     /// LFH-923: Der Client folgt keinem Redirect; das Ziel hätte einen Namen geliefert.

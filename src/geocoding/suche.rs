@@ -236,6 +236,14 @@ pub async fn suche_mit(
                 }
             }
         }
+        Ok(r) if r.status().is_redirection() => {
+            tracing::warn!(
+                "Geocoder-Suche antwortet mit Umleitung (HTTP {}); Geocoder-URL in den \
+                 Org-Einstellungen prüfen",
+                r.status()
+            );
+            None
+        }
         Ok(r) => {
             tracing::debug!("Geocoder-Suche HTTP {}", r.status());
             None
@@ -423,7 +431,14 @@ mod tests {
     /// nicht gecacht.
     #[tokio::test]
     async fn gzip_bombe_ist_nicht_erreichbar() {
-        let gepackt = crate::http_begrenzt::fixture::gzip_nullen(8 * 1024 * 1024);
+        // Gültiges JSON mit einem Treffer: ohne Deckel käme `Ok` mit „X“ heraus.
+        let gepackt = crate::http_begrenzt::fixture::gzip(
+            &crate::http_begrenzt::fixture::aufgeblaehtes_json(
+                r#"[{"lat":"50.0","lon":"9.0","display_name":"X","f":""#,
+                8 * 1024 * 1024,
+                r#""}]"#,
+            ),
+        );
         let base = crate::http_begrenzt::fixture::bediene(axum::Router::new().route(
             "/search",
             axum::routing::get(move || {

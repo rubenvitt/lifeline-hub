@@ -94,12 +94,16 @@ where
 }
 
 /// Holt eine externe URL und parst sie als GeoJSON-Value (FeatureCollection durchgereicht).
-async fn hole_geojson(client: &reqwest::Client, url: &str) -> Result<serde_json::Value, String> {
+async fn hole_geojson(
+    client: &reqwest::Client,
+    url: &str,
+    deckel: usize,
+) -> Result<serde_json::Value, String> {
     let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
     }
-    let v: serde_json::Value = lies_json_begrenzt(resp, DECKEL_FACHEBENE)
+    let v: serde_json::Value = lies_json_begrenzt(resp, deckel)
         .await
         .map_err(|e| e.to_string())?;
     if v.get("type").and_then(|t| t.as_str()) == Some("FeatureCollection") {
@@ -138,6 +142,10 @@ async fn hole_text(client: &reqwest::Client, url: &str) -> Result<String, String
 
 const DWD_ATTRIB: &str = "Datenbasis: Deutscher Wetterdienst";
 const DWD_TTL: Duration = Duration::from_secs(300);
+/// Eigener, weiter Deckel (LFH-923): Die DWD-Antwort trägt ganze Gemeindepolygone und wächst mit
+/// der Wetterlage; gemessen ist nur der ruhige Fall (`docs/fachebenen-quellen.md`). Bei einer
+/// bundesweiten Lage darf die Ebene nicht am Deckel für ruhiges Wetter scheitern.
+const DWD_DECKEL: usize = 64 * 1024 * 1024;
 const DWD_URL: &str = "https://maps.dwd.de/geoserver/dwd/ows?service=WFS&version=2.0.0&request=GetFeature&typeName=dwd:Warnungen_Gemeinden_vereinigt&outputFormat=application/json&srsName=EPSG:4326";
 
 pub async fn fetch_dwd(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
@@ -203,7 +211,7 @@ pub(crate) fn dwd_gueltige(
 }
 
 async fn erneuere_dwd(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
-    match hole_geojson(&client, DWD_URL).await {
+    match hole_geojson(&client, DWD_URL, DWD_DECKEL).await {
         Ok(fc) => {
             let a = FachebeneAntwort::ok("dwd", DWD_ATTRIB, None, fc);
             cache::setze(&pool, "dwd", &a).await;
@@ -2724,7 +2732,9 @@ mod deckel_tests {
         let url = format!("{basis}/");
         for fehler in [
             hole_json(&client, &url).await.unwrap_err(),
-            hole_geojson(&client, &url).await.unwrap_err(),
+            hole_geojson(&client, &url, DECKEL_FACHEBENE)
+                .await
+                .unwrap_err(),
             hole_text(&client, &url).await.unwrap_err(),
         ] {
             assert!(fehler.contains("größer als"), "{fehler}");
@@ -2759,7 +2769,9 @@ mod deckel_tests {
         ))
         .await;
         let client = FachebenenState::neu().client;
-        let v = hole_geojson(&client, &format!("{basis}/")).await.unwrap();
+        let v = hole_geojson(&client, &format!("{basis}/"), DECKEL_FACHEBENE)
+            .await
+            .unwrap();
         assert_eq!(v["type"], "FeatureCollection");
     }
 }

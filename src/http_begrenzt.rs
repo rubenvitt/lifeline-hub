@@ -18,8 +18,9 @@ use serde::de::DeserializeOwned;
 /// Normalfall, 256 KiB lassen reichlich Luft.
 pub const DECKEL_GEOCODER: usize = 256 * 1024;
 
-/// Deckel für Fachebenen-Quellen. Die größte bekannte Antwort ist die ODL-Zeitreihe mit rund
-/// 8,6 MB entpackt (`karte::quellen`, Grundpegel), der MaStR-Abzug je Seite rund 5 MB.
+/// Deckel für Fachebenen-Quellen. Die größte gemessene Antwort ist die ODL-Zeitreihe mit rund
+/// 8,6 MB entpackt (`karte::quellen`, Grundpegel), der MaStR-Abzug je Seite rund 5 MB. DWD wächst
+/// mit der Wetterlage und hat einen eigenen Deckel (`karte::quellen::DWD_DECKEL`).
 pub const DECKEL_FACHEBENE: usize = 16 * 1024 * 1024;
 
 /// Deckel für OIDC-Antworten (Discovery-Dokument, JWKS, Token-Antwort): wenige KB im
@@ -125,6 +126,33 @@ pub(crate) mod fixture {
             rest -= teil;
         }
         enc.finish().unwrap()
+    }
+
+    /// Gültiges JSON aus `kopf`, `n` Nullen und `fuss`: ein Dokument, das ohne Deckel lesbar
+    /// wäre. So unterscheidet ein Test den Deckel von einem bloßen JSON-Fehler.
+    pub fn aufgeblaehtes_json(kopf: &str, n: usize, fuss: &str) -> Vec<u8> {
+        let mut rumpf = Vec::with_capacity(kopf.len() + n + fuss.len());
+        rumpf.extend_from_slice(kopf.as_bytes());
+        rumpf.resize(kopf.len() + n, b'0');
+        rumpf.extend_from_slice(fuss.as_bytes());
+        rumpf
+    }
+
+    /// `rumpf` gzip-gepackt.
+    pub fn gzip(rumpf: &[u8]) -> Vec<u8> {
+        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
+        enc.write_all(rumpf).unwrap();
+        enc.finish().unwrap()
+    }
+
+    /// Antwort aus `rumpf` in Stücken ohne Content-Length (chunked).
+    pub fn strom_aus(rumpf: Vec<u8>) -> axum::response::Response {
+        let stuecke: Vec<Result<Vec<u8>, std::io::Error>> =
+            rumpf.chunks(4096).map(|c| Ok(c.to_vec())).collect();
+        axum::response::Response::builder()
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from_stream(futures::stream::iter(stuecke)))
+            .unwrap()
     }
 
     /// Antwort aus `rumpf` als gzip-Strom mit `Content-Encoding: gzip`, gestückelt und ohne

@@ -15,7 +15,8 @@ nicht erreichbarer IdP blockiert den Start also nicht.
 Server 30 s lang ohne neuen Netzversuch mit dem Fehler-Redirect auf die
 Login-Seite; danach versucht es genau eine Anmeldung erneut. Gleichzeitige
 Klicks teilen sich einen Abruf, und keine Anmeldung wartet länger als 2 s
-darauf. Ein schon geladenes, aber abgelaufenes Discovery-Dokument (TTL 1 h)
+darauf; bei einer langsamen Leitung kann deshalb der erste Klick nach dem
+Serverstart auf der Login-Seite landen, der nächste gelingt. Ein schon geladenes, aber abgelaufenes Discovery-Dokument (TTL 1 h)
 bleibt in Gebrauch, solange die Erneuerung scheitert.
 
 ## PocketID-Client anlegen

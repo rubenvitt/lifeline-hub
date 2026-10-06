@@ -232,12 +232,13 @@ impl DiscoveryCache {
     ) -> watch::Receiver<Option<DiscoveryErgebnis>> {
         let (tx, rx) = watch::channel(None);
         z.laufend = Some((issuer.as_str().to_string(), rx.clone()));
+        // Vor dem Spawn gebaut: wird die Task nie gepollt (Runtime endet), räumt `Drop` trotzdem.
+        let mut ende = FlugEnde {
+            cache: self,
+            issuer: issuer.as_str().to_string(),
+            erledigt: false,
+        };
         tokio::spawn(async move {
-            let mut ende = FlugEnde {
-                cache: self,
-                issuer: issuer.as_str().to_string(),
-                erledigt: false,
-            };
             let ergebnis =
                 match tokio::time::timeout(self.abruf_frist, discover(issuer, http)).await {
                     Ok(ergebnis) => ergebnis,
@@ -432,14 +433,21 @@ const OIDC_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 /// `https_pflicht` lehnt jeden `http://`-Abruf ab, auch einen `jwks_uri` oder Token-Endpoint aus
 /// dem Discovery-Dokument.
 fn baue_http_client(https_pflicht: bool) -> reqwest::Client {
-    reqwest::Client::builder()
+    let builder = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(OIDC_HTTP_TIMEOUT)
         .connect_timeout(OIDC_HTTP_CONNECT_TIMEOUT)
         .no_gzip()
-        .https_only(https_pflicht)
-        .build()
-        .expect("OIDC-HTTP-Client baubar")
+        .https_only(https_pflicht);
+    // Loopback dient Entwicklung und Tests: dort teilen sich mehrere Tokio-Runtimes eines
+    // Test-Binaries diesen prozessweiten Client. Eine Keep-alive-Verbindung, deren Task auf einer
+    // schon beendeten Runtime lebte, scheiterte mit „runtime dropped the dispatch task“.
+    let builder = if https_pflicht {
+        builder
+    } else {
+        builder.pool_max_idle_per_host(0)
+    };
+    builder.build().expect("OIDC-HTTP-Client baubar")
 }
 
 /// Einmal je Prozess gebaut (LFH-923), mit Verbindungspool: vorher entstand je Discovery und je
@@ -732,7 +740,8 @@ mod tests {
     #[tokio::test]
     async fn negativfenster_ohne_netz_danach_genau_ein_versuch() {
         let (issuer, abrufe) = fixture_idp(Arc::new(AtomicBool::new(true))).await;
-        let fenster = Duration::from_millis(300);
+        // Großzügige Fenster: die Zeitschranken müssen auch unter CI-Last halten.
+        let fenster = Duration::from_secs(1);
         let cache = testcache(DISCOVERY_TTL, fenster, Duration::from_secs(2));
 
         assert!(cache.hole(&issuer, &OIDC_HTTP_LOOPBACK).await.is_err());
@@ -742,7 +751,7 @@ mod tests {
         for _ in 0..5 {
             assert!(cache.hole(&issuer, &OIDC_HTTP_LOOPBACK).await.is_err());
         }
-        assert!(beginn.elapsed() < Duration::from_millis(100));
+        assert!(beginn.elapsed() < fenster / 2, "{:?}", beginn.elapsed());
         assert_eq!(abrufe.load(Ordering::SeqCst), 1, "kein Netz im Fenster");
 
         tokio::time::sleep(fenster + Duration::from_millis(50)).await;
@@ -756,8 +765,9 @@ mod tests {
     async fn veralteter_eintrag_traegt_bei_scheiterndem_refresh() {
         let gestoert = Arc::new(AtomicBool::new(false));
         let (issuer, abrufe) = fixture_idp(gestoert.clone()).await;
-        let ttl = Duration::from_millis(100);
-        let fenster = Duration::from_millis(300);
+        // Großzügige Fenster: die Zeitschranken müssen auch unter CI-Last halten.
+        let ttl = Duration::from_secs(1);
+        let fenster = Duration::from_secs(1);
         let cache = testcache(ttl, fenster, Duration::from_secs(2));
 
         assert!(cache.hole(&issuer, &OIDC_HTTP_LOOPBACK).await.is_ok());
@@ -784,13 +794,14 @@ mod tests {
         // Nach dem Fenster: wieder ein Versuch, der IdP ist zurück.
         gestoert.store(false, Ordering::SeqCst);
         tokio::time::sleep(fenster + Duration::from_millis(20)).await;
+        let vor_dem_versuch = Instant::now();
         assert!(cache.hole(&issuer, &OIDC_HTTP_LOOPBACK).await.is_ok());
         abruf_beendet(cache).await;
         assert_eq!(abrufe.load(Ordering::SeqCst), 3);
         let z = cache.zustand();
         assert!(z.fehlschlag.is_none());
         assert!(
-            z.eintrag.as_ref().unwrap().geholt.elapsed() < ttl,
+            z.eintrag.as_ref().unwrap().geholt >= vor_dem_versuch,
             "frischer Eintrag"
         );
     }
