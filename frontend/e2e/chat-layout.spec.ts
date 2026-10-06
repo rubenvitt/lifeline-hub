@@ -222,11 +222,9 @@ test('Chat: unter md fehlt dem Beobachter die Kanalanlage, die Leiste läuft nic
   const leiste = page.getByTestId('kanal-leiste');
   await expect(leiste.getByRole('tab')).toHaveCount(9);
   await expect(
-    page
-      .getByRole('alert')
-      .filter({
-        hasText: 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.',
-      }),
+    page.getByRole('alert').filter({
+      hasText: 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.',
+    }),
   ).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Kanal anlegen' })).toHaveCount(0);
 
