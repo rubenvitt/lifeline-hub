@@ -319,6 +319,15 @@
 .ant-table-wrapper.lfh-katalog .ant-table-tbody * {
   scroll-margin-top: var(--lfh-tabellenkopf-hoehe, 0px);
 }
+/* Freiraum neben der fixierten Kennung (LFH-967, WCAG 2.4.11): beim Zurücktabben richtet der
+   Browser das Ziel am linken Rand des Scrollports aus, also unter der Kennung. Kopf und Körper
+   scrollen getrennt (`sticky`), deshalb alle drei Container. Die Breite misst `KatalogTabelle`
+   (`setzeKopfFreiraum`). */
+.ant-table-wrapper.lfh-katalog .ant-table-header,
+.ant-table-wrapper.lfh-katalog .ant-table-body,
+.ant-table-wrapper.lfh-katalog .ant-table-content {
+  scroll-padding-inline-start: var(--lfh-tabellen-kennung-breite, 0px);
+}
 /* Abschneide-Indikator (LFH-980, Bedien-Leitlinie „Wenn Tabelle, dann vollständig“ Nr. 4):
    kann die Tabelle waagerecht weiterlaufen, zeigt der Rand, auf dessen Seite Inhalt verborgen
    liegt, eine Kante in `steuerRahmen` (≥ 3 : 1 auf jeder Fläche) plus Schatten. antd setzt die
