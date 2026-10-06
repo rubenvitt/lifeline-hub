@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
 import type { BenutzerAnzeige } from '../api/types';
 import {
@@ -8,6 +8,7 @@ import {
   lagebildBestaetigen,
   lagebildLesen,
   lagebildLoeschenPlatte,
+  lagebildSpeicherZuruecksetzenFuerTests,
   type LagebildDatensatz,
 } from './lagebildSpeicher';
 import { queueAlleLaden, queueEinreihen, queueLeerenFuerTests } from './queue';
@@ -27,8 +28,30 @@ const BENUTZER: BenutzerAnzeige = {
 const CLIENT = { timestamp: 1, buster: 'v1', clientState: { queries: [], mutations: [] } };
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await lagebildLoeschenPlatte();
 });
+
+/** Schlüssel, die ein Aufruf im Store `stand` liest bzw. schreibt (LFH-939 D2). */
+function zugriffeBeobachten() {
+  const gelesen: unknown[] = [];
+  const geschrieben: unknown[] = [];
+  const get = IDBObjectStore.prototype.get;
+  const put = IDBObjectStore.prototype.put;
+  vi.spyOn(IDBObjectStore.prototype, 'get').mockImplementation(function (this: IDBObjectStore, k) {
+    gelesen.push(k);
+    return get.call(this, k);
+  });
+  vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+    this: IDBObjectStore,
+    wert,
+    k,
+  ) {
+    geschrieben.push(k);
+    return put.call(this, wert, k);
+  });
+  return { gelesen, geschrieben };
+}
 
 describe('lagebildSpeicher', () => {
   it('liest zurück, was angelegt wurde', async () => {
@@ -73,6 +96,51 @@ describe('lagebildSpeicher', () => {
     expect((await lagebildLesen())?.bestaetigtAt).toBe(1);
     await lagebildBestaetigen(BENUTZER.id, 50);
     expect((await lagebildLesen())?.bestaetigtAt).toBe(50);
+  });
+
+  it('bestätigt, ohne den gespeicherten Stand zu lesen oder zu schreiben (LFH-939)', async () => {
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    const { gelesen, geschrieben } = zugriffeBeobachten();
+    await lagebildBestaetigen(BENUTZER.id, 50);
+    expect(gelesen).toEqual(['kopf']);
+    expect(geschrieben).toEqual(['kopf']);
+    vi.restoreAllMocks();
+    const satz = await lagebildLesen();
+    expect(satz?.bestaetigtAt).toBe(50);
+    expect(satz?.client).toEqual(CLIENT);
+  });
+
+  it('prüft beim Schreiben des Stands nur den Kopf (LFH-939)', async () => {
+    await lagebildAnlegen({ benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v1', client: CLIENT });
+    const { gelesen, geschrieben } = zugriffeBeobachten();
+    await lagebildClientSchreiben(BENUTZER.id, { ...CLIENT, timestamp: 3 });
+    expect(gelesen).toEqual(['kopf']);
+    expect(geschrieben).toEqual(['client']);
+  });
+
+  it('verwirft beim Upgrade einen Datensatz der Vorversion (LFH-939)', async () => {
+    lagebildSpeicherZuruecksetzenFuerTests();
+    await new Promise((fertig) => setTimeout(fertig, 0));
+    await new Promise<void>((fertig, fehler) => {
+      const loeschen = indexedDB.deleteDatabase(LAGEBILD_DB);
+      loeschen.onsuccess = () => fertig();
+      loeschen.onerror = () => fehler(loeschen.error);
+    });
+    const alt = await openDB(LAGEBILD_DB, 1, {
+      upgrade(d) {
+        d.createObjectStore('stand');
+      },
+    });
+    await alt.put(
+      'stand',
+      { benutzer: BENUTZER, bestaetigtAt: 1, buster: 'v0', client: CLIENT },
+      'aktuell',
+    );
+    alt.close();
+    expect(await lagebildLesen()).toBeUndefined();
+    const roh = await openDB(LAGEBILD_DB);
+    expect(await roh.getAllKeys('stand')).toEqual([]);
+    roh.close();
   });
 
   it('fasst die Offline-Queue nicht an', async () => {

@@ -191,6 +191,32 @@ describe('Lagebild-Sitzung', () => {
       expect(await plattenKeys()).toContainEqual(einsatzKeys.einheiten(3));
     });
 
+    it('holt einen live überdeckten Vorrat-Stand nicht zurück (LFH-939)', async () => {
+      await vorratAnlegen((q) => {
+        q.setQueryData(einsatzKeys.personen(3), [{ id: 1, alt: true }]);
+        q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+      });
+      const qc = neuerClient();
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+      await qc.fetchQuery({ queryKey: einsatzKeys.personen(3), queryFn: async () => [{ id: 1 }] });
+      const personenAufPlatte = async () =>
+        (await lagebildLesen())?.client.clientState.queries.find(
+          (q) => q.queryKey[0] === 'einsatz-personen',
+        )?.state.data;
+      await expect
+        .poll(personenAufPlatte, { timeout: 2000, interval: DROSSEL })
+        .toEqual([{ id: 1 }]);
+      // Die Live-Query verlässt den Cache: der ältere Vorrat-Stand kommt nicht wieder.
+      qc.removeQueries({ queryKey: einsatzKeys.personen(3) });
+      qc.setQueryData(einsatzKeys.abschnitte(3), [{ id: 9 }]);
+      await expect
+        .poll(plattenKeys, { timeout: 2000, interval: DROSSEL })
+        .toContainEqual(einsatzKeys.abschnitte(3));
+      const keys = await plattenKeys();
+      expect(keys).not.toContainEqual(einsatzKeys.personen(3));
+      expect(keys).toContainEqual(einsatzKeys.einheiten(3));
+    });
+
     it('behält bei erneuter Anmeldung derselben Person den Vorrat', async () => {
       await vorratAnlegen((q) => q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]));
       const qc = neuerClient();

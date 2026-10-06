@@ -6,18 +6,18 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 1. Lagebild-Persister (D1–D3)
 
-- [ ] 1.1 `offline/lagebildPersister.ts`: Single-Flight. Prüfen: Test mit einem Schreibweg,
+- [x] 1.1 `offline/lagebildPersister.ts`: Single-Flight. Prüfen: Test mit einem Schreibweg,
   der langsamer ist als die Drossel — höchstens ein laufender und ein wartender Stand, am Ende
   ist der jüngste geschrieben; `abbrechen()` wartet den laufenden ab und verwirft den wartenden.
-- [ ] 1.2 `offline/lagebildSitzung.ts`: eigenes Abo nur auf den Query-Cache, Drossel vor dem
+- [x] 1.2 `offline/lagebildSitzung.ts`: eigenes Abo nur auf den Query-Cache, Drossel vor dem
   Dehydrieren, erste Speicherung beim Abonnieren. Prüfen: viele Cache-Ereignisse in einem
   Drosselfenster → genau ein Dehydrieren; ein Mutations-Ereignis löst keins aus; bestehende
   Sitzungstests grün.
-- [ ] 1.3 `offline/lagebildSpeicher.ts`: v2 mit `kopf` und `client`, Upgrade verwirft
+- [x] 1.3 `offline/lagebildSpeicher.ts`: v2 mit `kopf` und `client`, Upgrade verwirft
   `aktuell`. Prüfen: `lagebildBestaetigen` lässt den `client`-Satz unverändert (rohe IDB);
   Mehrtab: nach einem Löschen schreibt weder Bestätigung noch Stand etwas zurück; ein
   v1-Datensatz ist nach dem Upgrade weg.
-- [ ] 1.4 Vorrat kürzen (D3). Prüfen: nach einer Speicherung mit live überdecktem Eintrag
+- [x] 1.4 Vorrat kürzen (D3). Prüfen: nach einer Speicherung mit live überdecktem Eintrag
   enthält der Vorrat ihn nicht mehr; ein nicht überdeckter, zulässiger bleibt.
 
 ## 2. ETB-Allowlist (D4)
