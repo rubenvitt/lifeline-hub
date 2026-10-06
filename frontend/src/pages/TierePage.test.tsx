@@ -964,9 +964,7 @@ describe('TierePage', () => {
     server.use(http.get('/api/einsaetze/1/tiere', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.tiere(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('T-001')).toBeInTheDocument();
     expect(screen.queryByText('Tiere konnten nicht geladen werden')).not.toBeInTheDocument();

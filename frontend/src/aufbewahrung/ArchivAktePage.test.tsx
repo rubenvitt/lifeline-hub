@@ -371,9 +371,7 @@ describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
       ),
     );
     await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungAkte(7) });
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     expect(screen.getByText('R-001')).toBeInTheDocument();
   });
 
@@ -386,9 +384,7 @@ describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
       ),
     );
     await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungEtb(7, undefined) });
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     expect(screen.getByText('Eintrag 3')).toBeInTheDocument();
   });
 

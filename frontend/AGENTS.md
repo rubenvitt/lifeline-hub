@@ -262,8 +262,9 @@ anwendbar), „nicht geprüft" ist keins.
   gefüllt wird, zeigen Platzhalter (der wirksame Wert, etwa „jetzt“), Einheit und Prüfung; was
   fehlt, zeigt der Leerzustand mit Knopf (`SeitenLeer` mit `aktion`); warum etwas gesperrt ist,
   steht in wenigen Wörtern sichtbar am Element, nie nur im Tooltip (Touch).
-- Kein Satz nennt Dateiformate, Server, Phasen oder Datenflüsse; Seiten tragen keinen
-  Zweck-Absatz unter dem Titel.
+- Kein Satz nennt Dateiformate, Server, Phasen oder Datenflüsse. Neue Seiten tragen keinen
+  Zweck-Absatz unter dem Titel; bestehende `beschreibung="…"` baut LFH-1078 schrittweise ab
+  (der Wächter erfasst sie nicht).
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
   Modulbeschreibungen aus wenigen Fachwörtern.
@@ -482,8 +483,9 @@ und `pages/personen/`.
   `entwurf/FreigabeDialog.tsx`, kein `modal.confirm`; `freigabeGrund`, Vorrang Speicherfehler;
   Öffnen ruft `freigebenMutation.reset()`. Test zählt `.ant-message`, offen/zu über `ant-zoom-leave`.
 - **Fehlende Berechtigung wird benannt, nicht stumm weggeschaltet** (M16): `RechteHinweis` zeigt
-  „Nur Ansicht · Grund“ (Grund aus `components/nurAnsicht.ts`, wenige Wörter, kein Satz),
-  Primäraktion gesperrt sichtbar; Zeilenaktionsspalte entfällt (M45).
+  „Nur Ansicht · Grund“ über dem Block (Grund aus `components/nurAnsicht.ts`, wenige Wörter,
+  Rollen wie in der Mitgliederverwaltung), Primäraktion gesperrt sichtbar; Zeilenaktionsspalte
+  entfällt (M45); gesperrte Einzelzeilen tragen ihren Kurzgrund selbst.
 - Sofort-Speichern-Zeile sperrt nur sich (`ModulEinstellungsListe`: `laeuftKey`/`fehlerKey` aus
   `mutation.variables`, Fehlerzeile `data-fehler`).
 - Zeilenlayouts ohne feste Spaltenbreite (Grid `minmax(0, 1fr) auto auto`, unter `md` gestapelt

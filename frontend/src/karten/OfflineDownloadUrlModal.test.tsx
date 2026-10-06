@@ -186,17 +186,19 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     expect(gesendet).not.toHaveBeenCalled();
   });
 
-  it('nimmt eine .mbtiles-Adresse mit Abfrageteil an', async () => {
+  /** Nicht strenger als der Server: keine Endungspflicht, Loopback entscheidet der Server. */
+  it.each([
+    'https://example.test/de.mbtiles?v=2',
+    'https://example.test/s/abc/download',
+    'http://maps.garage.localhost:3902/de.mbtiles',
+  ])('nimmt %s an', async (url) => {
     const gesendet = vi.fn();
     handler(gesendet);
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
 
     await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
-    await nutzer.type(
-      screen.getByLabelText('URL (.mbtiles)'),
-      'https://example.test/de.mbtiles?v=2',
-    );
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), url);
     await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
     await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
 

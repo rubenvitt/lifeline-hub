@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { einsatzRechteGrund, NUR_ADMIN } from './nurAnsicht';
+import {
+  einsatzRechteGrund,
+  NUR_ADMIN,
+  NUR_LEITUNG_FUEHRUNG_ADMIN,
+  NUR_LEITUNG_ORG_ADMIN,
+} from './nurAnsicht';
 
 describe('nurAnsicht (LFH-1078)', () => {
   it('nennt beim abgeschlossenen Einsatz den Abschluss, sonst die Rolle', () => {
     expect(einsatzRechteGrund('abgeschlossen')).toBe('Einsatz abgeschlossen');
-    expect(einsatzRechteGrund('aktiv')).toBe('nur Einsatzleitung und Führung');
+    expect(einsatzRechteGrund('aktiv')).toBe('nur Einsatzleitung und Führungspersonal');
   });
 
   it('bleibt bei wenigen Wörtern', () => {
@@ -12,6 +17,8 @@ describe('nurAnsicht (LFH-1078)', () => {
       einsatzRechteGrund('abgeschlossen'),
       einsatzRechteGrund('aktiv'),
       NUR_ADMIN,
+      NUR_LEITUNG_FUEHRUNG_ADMIN,
+      NUR_LEITUNG_ORG_ADMIN,
     ])
       expect(grund.split(' ').length).toBeLessThanOrEqual(5);
   });

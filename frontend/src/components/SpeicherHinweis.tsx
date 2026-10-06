@@ -3,7 +3,7 @@ import { ApiError } from '../api/client';
 import { StatusChip } from './instrument/Status';
 
 /**
- * Persistenter Speicher-Fehler und erklärender Rechte-Hinweis (LFH-345 · C10).
+ * Persistenter Speicher-Fehler und Rechte-Hinweis „Nur Ansicht · Grund“ (LFH-345 · C10, LFH-1078).
  *
  * ── Warum nicht der Toast ──────────────────────────────────────────────────────
  * Ein Toast ist nach rund drei Sekunden weg, das ausgefüllte Formular steht unverändert da und
@@ -53,15 +53,16 @@ interface RechteHinweisProps {
  * eine Ein-Kanal-Aussage (WCAG 1.4.1) und nennt keinen Grund. Hier steht der Grund über einem
  * ganzen Block, nicht je Zeile.
  *
- * Eine Zeile „Nur Ansicht · Grund“, kein Kasten mit Satz (LFH-1078, Spec `bedien-erklaertexte`):
- * dass Werte nur zu lesen sind, zeigen die gesperrten Knöpfe; der Grund bleibt ohne Hover lesbar.
+ * Eine Zeile „Nur Ansicht · Grund“, kein Kasten mit Satz (LFH-1078): dass Werte nur zu lesen
+ * sind, zeigen die gesperrten Knöpfe; der Grund bleibt ohne Hover lesbar. Das Leerzeichen
+ * zwischen Marke und Grund rendert im Flex nicht, trennt aber für Screenreader und `textContent`.
  */
 export function RechteHinweis({ text, sichtbar }: RechteHinweisProps) {
   const { token } = theme.useToken();
   if (!sichtbar) return null;
   return (
     <Flex role="status" align="center" wrap gap={token.marginXS} data-lfh="rechte-hinweis">
-      <StatusChip ton="neutral" wort="Nur Ansicht" />
+      <StatusChip ton="neutral" wort="Nur Ansicht" />{' '}
       <Typography.Text type="secondary">{text}</Typography.Text>
     </Flex>
   );
@@ -70,7 +71,7 @@ export function RechteHinweis({ text, sichtbar }: RechteHinweisProps) {
 interface SeitenHinweiseProps {
   /** `mutation.error`; mehrere Mutationen einer Seite werden mit `??` verkettet. */
   fehler?: unknown;
-  /** Erklärung der fehlenden Berechtigung; ohne Text kein Hinweis. */
+  /** Grund der fehlenden Berechtigung (`components/nurAnsicht.ts`); ohne Text kein Hinweis. */
   rechteText?: string;
   /** Nur bei FEHLENDER Berechtigung. */
   rechteFehlt?: boolean;

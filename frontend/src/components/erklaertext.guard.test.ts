@@ -38,11 +38,11 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** Erklärmuster mit je einem Beispiel, das der Selbstbeweis trifft. */
 const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
   // „Leer: jetzt“, „Leer = Vorgabe“: der wirksame Wert gehört als Platzhalter ins Feld.
-  { name: 'leer', muster: /\bLeer(?: gelassen)?\s*[:=]/, beispiel: 'Leer gelassen: jetzt' },
+  { name: 'leer', muster: /\b[Ll]eer(?: gelassen)?\s*[:=]/, beispiel: 'Feld leer = Vorgabe' },
   {
     name: 'klick',
     muster:
-      /\b(?:[Kk]lick(?:e|en)?\s+(?:auf|zum)\b|per Klick\b|[Kk]licken\b|[Dd]oppelklick|antippen\b|[Tt]ippen\b)/,
+      /\b(?:[Kk]lick(?:e|en)?\s+(?:auf|zum)\b|per Klick\b|[Kk]licken\b|anklicken\b|[Dd]oppelklick|antippen\b|[Tt]ippen\b)/,
     beispiel: 'Klick auf die Karte setzt die Koordinate.',
   },
   {
@@ -68,7 +68,7 @@ const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
   },
   {
     name: 'hier',
-    muster: /\b[Hh]ier (?:kannst du|können Sie|lässt sich)/,
+    muster: /\b[Hh]ier (?:kannst du|können Sie|lässt sich|gibt es nichts)/,
     beispiel: 'hier lässt sich nichts erfassen',
   },
 ];
@@ -91,9 +91,11 @@ const OFFEN: Record<string, number> = {
   'geraet/KopplungBeendetPage.tsx': 1,
   'infotelefon/AnrufErfassung.tsx': 2,
   'karten/KartenOnlineSektion.tsx': 1,
+  'meldungen/MeldungFormular.tsx': 1,
   'pages/AbloesungPage.tsx': 2,
   'pages/BefehlDetailPage.tsx': 1,
   'pages/BetreuungPage.tsx': 2,
+  'pages/EinheitDetailPage.tsx': 3,
   'pages/EtbPage.tsx': 1,
   'pages/LageberichtDetailPage.tsx': 1,
   'pages/LageberichtePage.tsx': 1,

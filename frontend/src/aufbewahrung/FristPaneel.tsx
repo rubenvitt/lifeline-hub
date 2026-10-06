@@ -19,7 +19,7 @@ import {
   istFristverkuerzung,
   liegtInDerVergangenheit,
 } from './fristModell';
-import { NUR_LEITUNG_ADMIN } from '../components/nurAnsicht';
+import { NUR_LEITUNG_ORG_ADMIN } from '../components/nurAnsicht';
 
 /**
  * Aufbewahrungsfrist am Einsatz anzeigen und ändern.
@@ -54,7 +54,7 @@ interface Rueckfrage {
 }
 
 /** Text des Rechte-Hinweises — eine Stelle für Paneel und Akte. */
-const FRIST_RECHTE_TEXT = NUR_LEITUNG_ADMIN;
+const FRIST_RECHTE_TEXT = NUR_LEITUNG_ORG_ADMIN;
 
 interface FristAenderung {
   /** Öffnet den Dialog „Frist ändern". */

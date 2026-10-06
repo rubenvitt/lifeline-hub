@@ -357,7 +357,7 @@ describe('BetreuungPage (LFH-639)', () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     renderPage();
     await screen.findByText('Uferstraße 12–40');
-    expect(screen.getByText('nur Einsatzleitung und Führung')).toBeInTheDocument();
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Betreuungsstelle anlegen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^Stand melden/ })).toBeNull();

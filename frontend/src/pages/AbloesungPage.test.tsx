@@ -184,7 +184,7 @@ describe('AbloesungPage (LFH-635)', () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     renderPage();
     await screen.findAllByRole('article');
-    expect(screen.getByText('nur Einsatzleitung und Führung')).toBeInTheDocument();
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Schicht beginnen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Ablösung vollziehen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();

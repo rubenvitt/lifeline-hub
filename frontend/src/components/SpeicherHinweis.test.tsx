@@ -38,12 +38,12 @@ describe('SpeicherFehler', () => {
 });
 
 describe('RechteHinweis', () => {
-  // LFH-1078 (Spec bedien-erklaertexte): eine Zeile „Nur Ansicht · Grund“, kein Kasten mit Satz.
+  // LFH-1078: eine Zeile „Nur Ansicht · Grund“, kein Kasten mit Satz.
   it('zeigt „Nur Ansicht“ und den Grund in einer Statuszeile, ohne Alert', () => {
     render(<RechteHinweis sichtbar text="Einsatz abgeschlossen" />);
     const zeile = screen.getByRole('status');
-    expect(zeile).toHaveTextContent('Nur Ansicht');
-    expect(zeile).toHaveTextContent('Einsatz abgeschlossen');
+    // Mit Trenner: Screenreader lesen „Nur Ansicht Einsatz abgeschlossen“, nicht zusammengezogen.
+    expect(zeile).toHaveTextContent('Nur Ansicht Einsatz abgeschlossen');
     expect(screen.queryByRole('alert')).toBeNull();
     expect(document.querySelector('.ant-alert')).toBeNull();
   });

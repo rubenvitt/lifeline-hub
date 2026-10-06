@@ -148,7 +148,7 @@ describe('InfotelefonPage (LFH-554)', () => {
   it('Beobachtung liest, die Erfassung fehlt, und der Grund steht da', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
     setup();
-    expect(await screen.findByText('nur Einsatzleitung und Führung')).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     await screen.findByText('Sperrung B 3');
     expect(screen.queryByRole('button', { name: 'Erfassen' })).toBeNull();
   });

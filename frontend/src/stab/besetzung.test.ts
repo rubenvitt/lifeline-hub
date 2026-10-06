@@ -176,6 +176,6 @@ describe('besetzungRechteText', () => {
   /** Der Grund steht neben der Marke „Nur Ansicht“ (LFH-1078): wenige Wörter, kein Satz. */
   it('unterscheidet abgeschlossenen Einsatz und fehlende Rolle', () => {
     expect(besetzungRechteText('abgeschlossen')).toBe('Einsatz abgeschlossen');
-    expect(besetzungRechteText('aktiv')).toBe('nur Einsatzleitung und Führung');
+    expect(besetzungRechteText('aktiv')).toBe('nur Einsatzleitung und Führungspersonal');
   });
 });

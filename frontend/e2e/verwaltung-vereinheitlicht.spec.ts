@@ -243,7 +243,9 @@ test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Defaults breit genug z
  */
 async function nurLeseZweigSteht(page: Page) {
   await expect(
-    page.getByRole('alert').filter({ hasText: 'dürfen die Org-Defaults ändern' }),
+    page
+      .locator('[data-lfh="rechte-hinweis"]')
+      .filter({ hasText: 'dürfen die Org-Defaults ändern' }),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
   await expect(

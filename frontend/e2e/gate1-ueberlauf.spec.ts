@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
 
 // Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen. Die gespeicherte Wahl
 // muss auch bei Touch gelten; Pixel prüft nur der Browser.
@@ -560,12 +561,12 @@ type Gate1Route = {
 /** Der Rechtehinweis des Nur-Lese-Zweigs (`RechteHinweis`: „Nur Ansicht · Grund“, LFH-1078). */
 function rechteHinweis(p: Page, text: RegExp) {
   return expect(
-    p.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: text }),
+    rechteHinweisZeile(p, text),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
 }
 
-const NUR_SCHREIBENDE = /nur Einsatzleitung und Führung$/;
+const NUR_SCHREIBENDE = /nur Einsatzleitung und Führungspersonal$/;
 
 function gate1Routen(einsatzId: string): Gate1Route[] {
   // Eine Route je Layoutfamilie (Ebene-1-Shell, Lagebild, Einsatz-Workspace, Admin-Layout)

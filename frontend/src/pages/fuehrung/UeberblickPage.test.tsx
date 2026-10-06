@@ -801,7 +801,7 @@ describe('UeberblickPage', () => {
     rendern();
     await screen.findByText('Hochwasser Weserlauf');
     expect(screen.getByRole('button', { name: 'Eintrag' })).toBeEnabled();
-    expect(screen.queryByText(/Nur Einsatzleitung und Führungspersonal/)).toBeNull();
+    expect(screen.queryByText('nur Einsatzleitung und Führungspersonal')).toBeNull();
   });
 
   it('ohne Schreibrecht: „Eintrag" gesperrt mit Grund, Leer-Aktionen zum Schreiben fehlen', async () => {
@@ -811,7 +811,7 @@ describe('UeberblickPage', () => {
       ),
     ]);
     rendern();
-    expect(await screen.findByText(/Nur Einsatzleitung und Führungspersonal/)).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Eintrag' })).toBeDisabled();
     expect(
       await screen.findByText('Noch keine Entscheidung im Einsatztagebuch.'),
@@ -832,7 +832,7 @@ describe('UeberblickPage', () => {
       ),
     ]);
     rendern();
-    expect(await screen.findByText(/Der Einsatz ist abgeschlossen/)).toBeInTheDocument();
+    expect(await screen.findByText('Einsatz abgeschlossen')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Eintrag' })).toBeDisabled();
   });
 
@@ -936,10 +936,10 @@ describe('UeberblickPage', () => {
       expect(document.querySelector('[data-lfh="seiten-inhalt"]')).toBeEmptyDOMElement(),
     );
     expect(screen.queryByRole('group', { name: 'Lage in Zahlen' })).toBeNull();
-    expect(screen.queryByText(/Nur Einsatzleitung und Führungspersonal/)).toBeNull();
+    expect(screen.queryByText('nur Einsatzleitung und Führungspersonal')).toBeNull();
     act(() => freigeben());
     // Mit dem Einsatz kommen Hinweis und Körper im selben Zug.
-    expect(await screen.findByText(/Nur Einsatzleitung und Führungspersonal/)).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(await bandDa()).toBeInTheDocument();
   });
 

@@ -216,7 +216,7 @@ describe('PressePage (LFH-554)', () => {
   it('Beobachtung: Aktionen gesperrt sichtbar, der Grund steht da', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
     setup();
-    expect(await screen.findByText('nur Einsatzleitung und Führung')).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Medienkontakt erfassen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Neue Pressemitteilung' })).toBeDisabled();
     await screen.findByText('NDR 1 · Evakuierte');

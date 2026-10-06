@@ -207,7 +207,7 @@ describe('VerpflegungPage (LFH-634)', () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     renderPage();
     await screen.findAllByRole('article');
-    expect(screen.getByText('nur Einsatzleitung und Führung')).toBeInTheDocument();
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(within(kopf()).getByRole('button', { name: 'Zeitfenster anlegen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^Ausgabe erfassen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();

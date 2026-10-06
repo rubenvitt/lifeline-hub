@@ -214,7 +214,7 @@ describe('DokumentePage', () => {
     rendere(einsatzBeobachter, [dokument()]);
     await screen.findByRole('link', { name: 'Lageplan Nord' });
     expect(within(kopfAktionen()).getByRole('button', { name: 'Dokument ablegen' })).toBeDisabled();
-    expect(screen.getByText('nur Einsatzleitung und Führung')).toBeInTheDocument();
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
     ).not.toBeInTheDocument();

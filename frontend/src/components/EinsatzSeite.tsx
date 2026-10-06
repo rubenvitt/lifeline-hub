@@ -157,7 +157,7 @@ interface EinsatzSeiteProps {
    * Fehlt sie, wird **gar keine** Ebene registriert (siehe `aktiv` unten).
    */
   neueZeile?: () => void;
-  /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
+  /** Optionaler Hinweis unter dem Header (z. B. `RechteHinweis` „Nur Ansicht · Grund“). */
   hinweis?: ReactNode;
   /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
   dataUpdatedAt?: number;

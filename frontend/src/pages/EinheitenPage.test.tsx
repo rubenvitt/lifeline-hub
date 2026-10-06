@@ -364,9 +364,7 @@ describe('EinheitenPage · Datenzustände', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.einheiten(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn nicht.
     expect(screen.getByText('1. Zug')).toBeInTheDocument();
     expect(screen.queryByText('Gliederung konnte nicht geladen werden')).not.toBeInTheDocument();

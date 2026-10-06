@@ -11,20 +11,25 @@ interface FormWerte {
   lizenz: string;
 }
 
+/** Loopback-Hosts: der Server lässt sie nur im Dev-Betrieb zu und entscheidet selbst. */
+const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[::1\])$|\.localhost$/i;
+
 /**
- * Prüft, was früher ein Erklärkasten beschrieb (LFH-1078): https und eine `.mbtiles`-Datei.
- * Interne Adressen weist der Server ab; seine Meldung steht dann in der Maske.
+ * Prüft, was früher ein Erklärkasten beschrieb (LFH-1078): eine https-Adresse. Nicht strenger
+ * als der Server (`src/karte/download.rs`, `url_ist_sicher_mit`): Loopback lässt die Maske
+ * durch, weil der Server sie im Dev-Betrieb annimmt; eine Dateiendung verlangt er nicht, weil
+ * Download-Links oft keine tragen. Interne Adressen weist der Server ab, seine Meldung steht
+ * dann in der Maske.
  */
-export function mbtilesUrlFehler(url: string): string | null {
+export function downloadUrlFehler(url: string): string | null {
   let adresse: URL;
   try {
     adresse = new URL(url.trim());
   } catch {
     return 'Keine gültige Adresse';
   }
-  if (adresse.protocol !== 'https:') return 'Nur https-Adressen';
-  if (!adresse.pathname.toLowerCase().endsWith('.mbtiles')) return 'Keine .mbtiles-Datei';
-  return null;
+  if (adresse.protocol === 'https:' || LOOPBACK.test(adresse.hostname)) return null;
+  return 'Nur https-Adressen';
 }
 
 /**
@@ -86,7 +91,7 @@ export default function OfflineDownloadUrlModal({
           { required: true, whitespace: true, message: 'URL darf nicht leer sein' },
           {
             validator: (_, wert?: string) => {
-              const fehler = wert?.trim() ? mbtilesUrlFehler(wert) : null;
+              const fehler = wert?.trim() ? downloadUrlFehler(wert) : null;
               return fehler ? Promise.reject(new Error(fehler)) : Promise.resolve();
             },
           },

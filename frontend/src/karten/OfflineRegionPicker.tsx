@@ -58,7 +58,7 @@ function istRasterKarte(k: OfflineKarte): boolean {
 /**
  * Regions-Picker: EIN Weg, eine Region aufs Gerät zu bringen. Je Region ein adaptiver Button —
  * „Bauen & laden" (Bau, danach automatisch Download), „Laden", „Lädt…", „Baut…", „Auf dem
- * Gerät" oder „Kein Karten-Dienst".
+ * Gerät" oder „Nicht gebaut".
  */
 export default function OfflineRegionPicker({
   offen,
@@ -272,7 +272,7 @@ export default function OfflineRegionPicker({
     // 5) Nicht gebaut und kein Bau möglich: der Grund steht sichtbar da, kein Tooltip (Touch).
     return (
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        Kein Karten-Dienst
+        Nicht gebaut
       </Typography.Text>
     );
   };
