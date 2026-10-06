@@ -758,7 +758,7 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
       anker: (page) => inMain(page).getByTestId('kraefte-ohne-br'),
       ziele: [
         { sorte: 'BR Raumwechsler', ziele: knopf('BR Sportplatz'), mindestens: 1 },
-        { sorte: 'BR zuweisen', ziele: knopf('zuweisen'), mindestens: 2 },
+        { sorte: 'BR zuweisen', ziele: knopf(/ zuweisen$/), mindestens: 2 },
       ],
     },
   ];
@@ -796,7 +796,7 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
     {
       pfad: `${R}/bereitstellungsraeume/${brId}`,
       anker: (page) => inMain(page).getByTestId('kraefte-ohne-br'),
-      fehlt: knopf('zuweisen'),
+      fehlt: knopf(/zuweisen$/),
       ziele: [{ sorte: 'BR Raumwechsler', ziele: knopf('BR Sportplatz'), mindestens: 1 }],
     },
   ]);
