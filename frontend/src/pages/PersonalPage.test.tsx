@@ -588,9 +588,7 @@ describe('PersonalPage · Datenzustände', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.personal(7) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('Thomas Müller')).toBeInTheDocument();
     expect(

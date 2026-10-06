@@ -83,7 +83,6 @@ const OFFEN: Record<string, number> = {
   'aufbewahrung/SchwaerzungsantragDialog.tsx': 2,
   'betreuung/BetreuungDialoge.tsx': 3,
   'command-palette/VorschauZustand.tsx': 1,
-  'components/Platzhalter.tsx': 1,
   'einsatz/AlarmZentrale.tsx': 2,
   'einsatz/modulRegistry.ts': 1,
   'etb/EtbZeitachse.tsx': 1,

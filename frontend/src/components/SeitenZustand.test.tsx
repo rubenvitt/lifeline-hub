@@ -232,7 +232,7 @@ describe('SeitenStandVeraltet', () => {
     renderMitProviders(<SeitenStandVeraltet onWiederholen={wiederholen} />);
 
     const banner = screen.getByRole('alert');
-    expect(banner).toHaveTextContent(/nicht aktualisiert/i);
+    expect(banner).toHaveTextContent('Aktualisierung fehlgeschlagen · Stand womöglich veraltet');
 
     await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
     expect(wiederholen).toHaveBeenCalledTimes(1);

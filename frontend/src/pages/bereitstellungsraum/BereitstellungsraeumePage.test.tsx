@@ -142,9 +142,7 @@ describe('BereitstellungsraeumePage', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie NICHT.
     expect(screen.getByText('BR Ost')).toBeInTheDocument();
     expect(
@@ -192,9 +190,7 @@ describe('BereitstellungsraeumePage', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.br(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     expect(screen.getByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
     expect(
       screen.queryByText('Bereitstellungsräume konnten nicht geladen werden'),
