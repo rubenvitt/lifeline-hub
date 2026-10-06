@@ -1,0 +1,17 @@
+/* Tastenkürzel im Serienknopf der Erfassungshülle (LFH-953, `Erfassung.tsx`).
+
+   „Strg + ↵“ bzw. „⌘ ↵“ hilft nur mit Tastatur. Auf dem Touchgerät verwirrte es Gelegenheitshelfer
+   und machte den Knopf breiter. Sichtbar ist es deshalb nur, wenn der primäre Zeiger fein ist und
+   schweben kann: eine Medienabfrage, kein Zuhörer auf die Zeigerart (`frontend/AGENTS.md`,
+   „Die Stufe folgt dem Gerät“). Der zugängliche Name bleibt „Speichern und nächste“, das Kürzel
+   steht `aria-hidden`. Nachweis: `e2e/dialoge-handy.spec.ts`. */
+
+.lfh-serien-kuerzel {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lfh-serien-kuerzel {
+    display: inline;
+  }
+}

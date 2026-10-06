@@ -1,4 +1,6 @@
 import { Form, Input } from 'antd';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,11 +8,13 @@ import { createRef, type ReactElement, type Ref } from 'react';
 import {
   ErfassungsFormular,
   ErfassungsModal,
+  SERIEN_KUERZEL_KLASSE,
   serienKuerzel,
   type ErfassungsFormularSteuerung,
 } from './Erfassung';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -464,6 +468,28 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     expect(knopf).toHaveTextContent('Strg + ↵');
   });
 
+  it('zeigt das Kürzel nur bei feinem Zeiger: Klasse am Span, Medienabfrage im CSS (LFH-953)', () => {
+    renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue(undefined)} serie />);
+    const knopf = screen.getByRole('button', { name: 'Speichern und nächste' });
+    const kuerzel = knopf.querySelector(`.${SERIEN_KUERZEL_KLASSE}`);
+    expect(kuerzel).not.toBeNull();
+    expect(kuerzel).toHaveAttribute('aria-hidden');
+    expect(kuerzel).toHaveTextContent('Strg + ↵');
+
+    // jsdom wertet kein CSS aus; der Vertrag steht deshalb am Quelltext: ohne Medienabfrage aus,
+    // nur mit feinem Zeiger und Hover an. Die Darstellung belegt `e2e/dialoge-handy.spec.ts`.
+    const css = readFileSync(join(process.cwd(), 'src/components/Erfassung.css'), 'utf8');
+    const ohneKommentare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const [vorher, abfrage] = ohneKommentare.split(
+      /@media\s*\(hover:\s*hover\)\s*and\s*\(pointer:\s*fine\)/,
+    );
+    expect(abfrage, 'Medienabfrage (hover: hover) and (pointer: fine) fehlt').toBeDefined();
+    expect(vorher).toMatch(new RegExp(`\\.${SERIEN_KUERZEL_KLASSE}\\s*\\{\\s*display:\\s*none;`));
+    expect(abfrage).toMatch(
+      new RegExp(`\\.${SERIEN_KUERZEL_KLASSE}\\s*\\{\\s*display:\\s*inline;`),
+    );
+  });
+
   it('beschriftet das Kürzel nach der Plattform', () => {
     // jsdom ist kein Mac, deshalb über die reine Funktion.
     expect(serienKuerzel('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')).toBe('⌘ ↵');
@@ -482,6 +508,40 @@ describe('ErfassungsFormular — Tastenkürzel für den Serienlauf', () => {
     await nutzer.keyboard('{Control>}{Enter}{/Control}');
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('ErfassungsFormular — Fuß unter md (LFH-953)', () => {
+  function fussKnoepfe() {
+    return ['Abbrechen', 'Speichern und nächste', 'Erfassen'].map((name) =>
+      screen.getByRole('button', { name }),
+    );
+  }
+
+  it('stapelt die Knöpfe auf dem Handschirm in voller Breite: Abbrechen oben, Primärknopf unten', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(
+      <Harness onErfassen={vi.fn().mockResolvedValue(undefined)} onAbbrechen={vi.fn()} serie />,
+    );
+    const knoepfe = fussKnoepfe();
+    for (const k of knoepfe) expect(k).toHaveClass('ant-btn-block');
+    const reihe = knoepfe[0].closest('.ant-space');
+    expect(reihe).toHaveClass('ant-space-vertical');
+    // Reihenfolge im Baum = Reihenfolge von oben nach unten.
+    const imBaum = Array.from(reihe!.querySelectorAll('button'));
+    expect(imBaum).toEqual(knoepfe);
+  });
+
+  it('lässt die Reihe ab md rechtsbündig nebeneinander, mit Umbruch als Rückfall', () => {
+    renderMitProviders(
+      <Harness onErfassen={vi.fn().mockResolvedValue(undefined)} onAbbrechen={vi.fn()} serie />,
+    );
+    const knoepfe = fussKnoepfe();
+    for (const k of knoepfe) expect(k).not.toHaveClass('ant-btn-block');
+    const reihe = knoepfe[0].closest<HTMLElement>('.ant-space');
+    expect(reihe).toHaveClass('ant-space-horizontal');
+    expect(reihe!.style.flexWrap).toBe('wrap');
+    expect(reihe!.style.justifyContent).toBe('flex-end');
   });
 });
 
