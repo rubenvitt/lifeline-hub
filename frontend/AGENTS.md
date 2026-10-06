@@ -625,7 +625,8 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   `live/liveVerbindung.ts`, keine zweite `EventSource`.
 - **Live-Ereignisse invalidieren nur über den Sammler** `live/liveInvalidierung.ts` (LFH-922,
   Spec `live-abgleich`): je Key ein Abgleich je 300-ms-Fenster, `cancelRefetch: false`, verdeckte
-  Tabs markieren nur. Seiteneffekte (Ton, Toast, Status) bleiben sofort. Spätere Live-Abnehmer
+  Tabs markieren nur. `modulZaehler` läuft über einen zweiten Sammler mit 1-s-Fenster
+  (`ZAEHLER_SAMMELFENSTER_MS`, LFH-935): ein Burst kostet je Tab einen Zählerabruf. Seiteneffekte (Ton, Toast, Status) bleiben sofort. Spätere Live-Abnehmer
   (Modulzähler, ETB-Zeitachse, Meldungen) übernehmen ihn, statt eigene Timer zu bauen. Ein
   Neuaufbau des Browsers nach dem Kontroll-Ereignis `position` gleicht im Einsatz-Strom nur die
   Org-Keys ab (der Server liefert per `Last-Event-ID` nach), sonst und bei neuer Verbindung voll.
