@@ -623,6 +623,12 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   öffnet die Betriebszeile `/api/live` (`live/useOrgLiveStream.ts`), der ruht, solange ein
   Einsatz-Strom offen ist (`live/einsatzStromStore.ts`). Verbindungsbau nur über
   `live/liveVerbindung.ts`, keine zweite `EventSource`.
+- **Live-Ereignisse invalidieren nur über den Sammler** `live/liveInvalidierung.ts` (LFH-922,
+  Spec `live-abgleich`): je Key ein Abgleich je 300-ms-Fenster, `cancelRefetch: false`, verdeckte
+  Tabs markieren nur. Seiteneffekte (Ton, Toast, Status) bleiben sofort. Spätere Live-Abnehmer
+  (Modulzähler, ETB-Zeitachse, Meldungen) übernehmen ihn, statt eigene Timer zu bauen. Ein
+  Neuaufbau des Browsers gleicht im Einsatz-Strom nur die Org-Keys ab (der Server liefert per
+  `Last-Event-ID` nach), eine neue Verbindung voll.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

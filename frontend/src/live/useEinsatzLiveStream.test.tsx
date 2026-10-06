@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useEinsatzLiveStream } from './useEinsatzLiveStream';
+import { LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
+import { WIEDERAUFBAU_SCHONFRIST_MS } from './liveVerbindung';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 
 class FakeEventSource {
@@ -53,11 +55,24 @@ class FakeEventSource {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
   FakeEventSource.instanzen = [];
   // Die Melde-Sperre ist modulweit — ohne Reset bliebe der zweite 401-Test stumm.
   sitzungsMeldungZuruecksetzen();
 });
+
+/** Die Argumente, mit denen der Sammler einen Key abgleicht (LFH-922, liveInvalidierung.ts). */
+function abgleich(queryKey: unknown[], refetchType: 'active' | 'none' = 'active') {
+  return [{ queryKey, refetchType }, { cancelRefetch: false }] as const;
+}
+
+/** Alle invalidierten Keys, in der Reihenfolge der Aufrufe. */
+function keysVon(spy: { mock: { calls: unknown[][] } }): unknown[][] {
+  return spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+}
 
 function Probe({ id }: { id: number }) {
   useEinsatzLiveStream(id);
@@ -482,7 +497,8 @@ describe('useEinsatzLiveStream', () => {
   });
 
   // Reconnect-Resync + sichtbarer Fehlerpfad.
-  it('invalidiert beim ersten open keinen Einsatz-Key und meldet Status open (skip-first, F14)', async () => {
+  it('invalidiert beim ersten open keinen Einsatz-Key und meldet Status open (skip-first, F14)', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -496,9 +512,10 @@ describe('useEinsatzLiveStream', () => {
       </QueryClientProvider>,
     );
     FakeEventSource.letzte?.emit('open');
-    await waitFor(() => expect(status).toContain('open'));
+    expect(status).toContain('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     // Erstes open: KEIN Einsatz-Vollabgleich (die Abfragen laden beim Mount ohnehin) …
-    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    const keys = keysVon(spy);
     expect(keys.filter((k) => typeof k[1] === 'number')).toEqual([]);
     // … aber die Org-Keys (LFH-734): beim Wechsel aus dem Org-Strom kann ein Org-Ereignis
     // zwischen beiden Verbindungen verloren gehen.
@@ -507,7 +524,11 @@ describe('useEinsatzLiveStream', () => {
     window.removeEventListener('lfh:live-status', onStatus);
   });
 
-  it('invalidiert beim Re-Open alle Registry-Keys (Reconnect-Resync wie lagged, F14)', async () => {
+  // LFH-922, design.md D3: verbindet der Browser dieselbe EventSource neu, liefert der Server per
+  // `Last-Event-ID` nach (oder meldet `lagged`). Dann gleichen nur die Org-Keys ab, die keinen
+  // Nachlieferweg haben.
+  it('gleicht beim Neuaufbau durch den Browser nur die Org-Keys ab (Nachlieferung, LFH-922)', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -516,18 +537,142 @@ describe('useEinsatzLiveStream', () => {
         <Probe id={3} />
       </QueryClientProvider>,
     );
-    const quelle = FakeEventSource.letzte;
-    quelle?.emit('open'); // erstes open → skip
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('open'); // erstes open
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     spy.mockClear();
-    quelle?.emit('open'); // Reconnect → Voll-Resync
+    quelle.emitError(FakeEventSource.CONNECTING);
+    quelle.emit('open'); // der Browser hat dieselbe Quelle neu verbunden
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    const keys = keysVon(spy);
+    expect(keys.filter((k) => typeof k[1] === 'number')).toEqual([]);
+    expect(keys).toContainEqual(['einsaetze']);
+    expect(keys).toContainEqual(['fahrzeuge']);
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+  });
+
+  it('gleicht nach einem Neuaufbau mit neuer Verbindung alle Registry-Keys ab (F14)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 3 }, { status: 200 })),
+      http.get('/api/einsaetze/3', () => HttpResponse.json({ id: 3 }, { status: 200 })),
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    const erste = FakeEventSource.letzte!;
+    erste.emit('open');
+    erste.emitError(FakeEventSource.CLOSED);
+    await waitFor(() => expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(true));
+    const [neuaufbau] = setTimeoutSpy.mock.calls.find(([, d]) => d === 1000)!;
+    (neuaufbau as () => void)();
+    const zweite = FakeEventSource.letzte!;
+    expect(zweite).not.toBe(erste);
+    spy.mockClear();
+    zweite.emit('open'); // neue Verbindung ohne Last-Event-ID → Vollabgleich
     await waitFor(() => {
-      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
-      expect(calls).toContainEqual(['einsatz-uhs', 3]);
-      expect(calls).toContainEqual(['etb', 3]);
+      expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-uhs', 3]));
+      expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 3]));
+      expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
     });
   });
 
-  it('meldet connecting bei transientem Fehler (readyState CONNECTING, F14)', async () => {
+  it('bündelt einen Burst zu je einem Abgleich je Key, ohne laufende Abrufe abzubrechen (LFH-922)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    for (let i = 0; i < 50; i += 1) quelle.emit(i % 2 === 0 ? 'etb' : 'einheit');
+    expect(spy).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    const keys = keysVon(spy).map((k) => JSON.stringify(k));
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 3]));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-personal', 3]));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-fahrzeuge', 3]));
+  });
+
+  it('ruft in einem verdeckten Tab nicht ab, sondern markiert nur (LFH-922)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte!.emit('etb');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['etb', 3], 'none'));
+    expect(spy).not.toHaveBeenCalledWith(...abgleich(['etb', 3]));
+  });
+
+  it('alarmiert bei sofortmeldung sofort, der Abgleich folgt im Fenster (LFH-922)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const alarm = vi.fn();
+    window.addEventListener('lfh:sofortmeldung', alarm);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={7} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte!.emit('sofortmeldung', JSON.stringify({ einsatz_id: 7, meldung_id: 3 }));
+    expect(alarm).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-meldungen', 7]));
+    window.removeEventListener('lfh:sofortmeldung', alarm);
+  });
+
+  it('macht aus lagged direkt nach einem Vollabgleich nur eine Abrufwelle (LFH-922)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    // Endzustand, dann Wiedergewähren: die neue Verbindung gleicht beim Erst-Open voll ab.
+    FakeEventSource.letzte!.emitError(FakeEventSource.CLOSED);
+    await waitFor(() => expect(keysVon(spy)).toContainEqual(['einsatz', 1]));
+    await client.fetchQuery({ queryKey: ['einsatz', 1], queryFn: () => ({ id: 1 }) });
+    const neue = FakeEventSource.letzte!;
+    vi.useFakeTimers();
+    spy.mockClear();
+    neue.emit('open');
+    neue.emit('lagged', 'resync');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    const keys = keysVon(spy).map((k) => JSON.stringify(k));
+    expect(keys).toContain(JSON.stringify(['einsatz-material', 1]));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('meldet connecting erst nach der Schonfrist (readyState CONNECTING, F14, LFH-922)', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const status: string[] = [];
@@ -539,12 +684,67 @@ describe('useEinsatzLiveStream', () => {
         <Probe id={1} />
       </QueryClientProvider>,
     );
-    FakeEventSource.letzte?.emitError(FakeEventSource.CONNECTING);
-    await waitFor(() => expect(status).toContain('connecting'));
+    expect(WIEDERAUFBAU_SCHONFRIST_MS).toBe(8000);
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('open');
+    quelle.emitError(FakeEventSource.CONNECTING);
+    vi.advanceTimersByTime(WIEDERAUFBAU_SCHONFRIST_MS - 1);
+    expect(status).not.toContain('connecting');
+    // Ein weiterer Fehlversuch des Browsers verlängert die Frist nicht.
+    quelle.emitError(FakeEventSource.CONNECTING);
+    vi.advanceTimersByTime(1);
+    expect(status[status.length - 1]).toBe('connecting');
+    window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('zeigt einen kurzen Abriss mit open in der Schonfrist gar nicht an (LFH-922)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const status: string[] = [];
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    render(
+      <QueryClientProvider client={neuerQueryClient()}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('open');
+    quelle.emitError(FakeEventSource.CONNECTING);
+    vi.advanceTimersByTime(WIEDERAUFBAU_SCHONFRIST_MS - 1);
+    quelle.emit('open');
+    vi.advanceTimersByTime(WIEDERAUFBAU_SCHONFRIST_MS * 2);
+    expect(status).not.toContain('connecting');
+    expect(status[status.length - 1]).toBe('open');
+    window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('meldet lost sofort, wenn der Browser aufgibt, auch in der Schonfrist (LFH-922)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    vi.stubGlobal('fetch', () => new Promise(() => {}));
+    const status: string[] = [];
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    render(
+      <QueryClientProvider client={neuerQueryClient()}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('open');
+    quelle.emitError(FakeEventSource.CONNECTING);
+    quelle.emitError(FakeEventSource.CLOSED);
+    expect(status[status.length - 1]).toBe('lost');
+    vi.advanceTimersByTime(WIEDERAUFBAU_SCHONFRIST_MS);
+    expect(status[status.length - 1]).toBe('lost');
     window.removeEventListener('lfh:live-status', onStatus);
   });
 
   it('meldet beim Unmount idle, damit der globale Hinweis nicht auf anderen Routen stehenbleibt', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const status: string[] = [];
     const onStatus = (e: Event) =>
@@ -557,8 +757,13 @@ describe('useEinsatzLiveStream', () => {
     );
 
     FakeEventSource.letzte?.emitError(FakeEventSource.CONNECTING);
+    vi.advanceTimersByTime(WIEDERAUFBAU_SCHONFRIST_MS);
     expect(status).toContain('connecting');
     unmount();
+    expect(status[status.length - 1]).toBe('idle');
+    // Auch eine laufende Schonfrist meldet nach dem Unmount nichts mehr.
+    FakeEventSource.letzte?.emitError(FakeEventSource.CONNECTING);
+    vi.advanceTimersByTime(WIEDERAUFBAU_SCHONFRIST_MS);
     expect(status[status.length - 1]).toBe('idle');
     window.removeEventListener('lfh:live-status', onStatus);
   });
@@ -596,6 +801,7 @@ describe('useEinsatzLiveStream', () => {
 
   it('reconnectet nach CLOSED-Fehler bei gültiger Session statt Login (F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
       http.get('/api/einsaetze/1', () => HttpResponse.json({ id: 1 }, { status: 200 })),
@@ -748,8 +954,10 @@ describe('useEinsatzLiveStream', () => {
     spy.mockClear();
     neue.emit('open');
     expect(status[status.length - 1]).toBe('open');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsatz-material', 1] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-material', 1]));
+      expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
+    });
 
     // Ein weiterer Erfolg baut keine zweite Verbindung daneben.
     await client.fetchQuery({ queryKey: ['einsatz', 1], queryFn: () => ({ id: 1 }), staleTime: 0 });
@@ -802,6 +1010,7 @@ describe('useEinsatzLiveStream', () => {
 
   it('baut nach dem Backoff neu auf, steigert ihn und setzt ihn nach open zurück (F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
       http.get('/api/einsaetze/4', () => HttpResponse.json({ id: 4 }, { status: 200 })),
@@ -836,13 +1045,34 @@ describe('useEinsatzLiveStream', () => {
     const dritte = await fehlerUndBackoff(zweite, 3000);
     spy.mockClear();
     dritte.emit('open');
-    expect(spy).toHaveBeenCalled(); // Wiederaufbau → Vollabgleich
+    // Neue Verbindung → Vollabgleich
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(...abgleich(['einsatz-material', 4])));
     await fehlerUndBackoff(dritte, 1000); // nach open wieder ab der ersten Stufe
     setTimeoutSpy.mockRestore();
   });
 
+  it('streut den manuellen Neuaufbau um bis zu 50 Prozent (LFH-922)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 4 }, { status: 200 })),
+      http.get('/api/einsaetze/4', () => HttpResponse.json({ id: 4 }, { status: 200 })),
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    render(
+      <QueryClientProvider client={neuerQueryClient()}>
+        <Probe id={4} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte!.emitError(FakeEventSource.CLOSED);
+    // 1000 ms Grundwert, Aufschlag 0,5 × 50 % = 25 %.
+    await waitFor(() => expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1250)).toBe(true));
+    expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(false);
+  });
+
   // LFH-734: der Einsatz-Strom trägt die Org-Ereignisse mit. Literale, nicht die Registry.
   it('invalidiert bei einsatzliste die Einsatzliste und die Admin-Listen (LFH-734)', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -852,13 +1082,15 @@ describe('useEinsatzLiveStream', () => {
       </QueryClientProvider>,
     );
     FakeEventSource.letzte?.emit('einsatzliste', '{}');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['demo-daten'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['aufbewahrung'] });
-    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['einsatz', 7] });
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['demo-daten']));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['aufbewahrung']));
+    expect(keysVon(spy)).not.toContainEqual(['einsatz', 7]);
   });
 
   it('invalidiert bei stammdaten die Kataloge samt Filter-Fächern (LFH-734)', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = new QueryClient();
     client.setQueryData(['personal', 'alle'], []);
@@ -870,12 +1102,14 @@ describe('useEinsatzLiveStream', () => {
       </QueryClientProvider>,
     );
     FakeEventSource.letzte?.emit('stammdaten', '{}');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     expect(client.getQueryState(['personal', 'alle'])?.isInvalidated).toBe(true);
     expect(client.getQueryState(['fahrzeuge', 'im-dienst'])?.isInvalidated).toBe(true);
     expect(client.getQueryState(['einsatz-personal', 7])?.isInvalidated).toBe(false);
   });
 
   it('nimmt die Org-Keys in lagged und Wiederaufbau auf (LFH-734)', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -886,12 +1120,31 @@ describe('useEinsatzLiveStream', () => {
     );
     const quelle = FakeEventSource.letzte!;
     quelle.emit('lagged');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['fahrzeuge'] });
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['fahrzeuge']));
     quelle.emit('open'); // Erst-Open
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     spy.mockClear();
     quelle.emit('open');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['organisation'] });
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['organisation']));
+  });
+
+  it('verwirft beim Unmount Vorgemerktes, statt nach dem Abbau abzurufen (LFH-922)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const { unmount } = render(
+      <QueryClientProvider client={client}>
+        <Probe id={7} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte!.emit('etb');
+    unmount();
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).not.toHaveBeenCalled();
   });
 });
