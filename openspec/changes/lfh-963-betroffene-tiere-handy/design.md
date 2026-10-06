@@ -41,8 +41,12 @@ Restspuren keine graue Kachel mehr.
 `Nebenweg = { key; label; onWahl; ziel?; laeuft? }`. Ab `md` rendert sie je Eintrag einen
 sekundären Knopf hinter `aktionen` (mit `ziel` als Link mit Knopfgestalt: Strg/⌘+Klick öffnet
 einen Tab, wie der bisherige `DruckAnsichtKnopf`), unter `md` einen `MenueAusloeser` mit `name` als
-zugänglichem Namen („Weitere Aktionen zu den Betroffenen“). Ist ein Eintrag `laeuft`, zeigt der
-Auslöser das. Leere Liste: kein Auslöser, kein Knopf. Die Weiche liest `useViewport().istSchmal`;
+zugänglichem Namen („Weitere Aktionen zu den Betroffenen“), VOR `aktionen`: hinten bräche er bei
+390 px in eine eigene Zeile (gemessen: 64 px, die erste Personenzeile stand dann nur zu 81 % im
+Bild), vorn teilt er die Zeile mit der Segmentleiste; umgestellt im Baum, damit Lese- und Tabfolge
+die sichtbare Folge bleiben. Ist ein Eintrag `laeuft`, ist nur dieser Eintrag gesperrt („… (läuft
+…)“), nicht der Auslöser: ein Knopf im Ladezustand schluckt Klicks. Leere Liste: kein Auslöser,
+kein Knopf. Die Weiche liest `useViewport().istSchmal`;
 das erste Bild ist breit, wie überall.
 
 Strukturierte Einträge statt eines zweiten `ReactNode`: aus einem Knoten lässt sich kein

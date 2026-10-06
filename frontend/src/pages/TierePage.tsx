@@ -325,15 +325,17 @@ export default function TierePage() {
         />
       }
       aktionen={
+        // Ein Fragment, kein `Space`: die Knöpfe sind Kinder der Kopfzeile und teilen sie unter
+        // `md` mit dem Auslöser „Weitere“ (LFH-963).
         darfSchreiben && (
-          <Space wrap style={{ minWidth: 0 }}>
+          <>
             <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'erfassen' })}>
               Tier erfassen
             </Button>
             <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>
               Vermisst melden
             </Button>
-          </Space>
+          </>
         )
       }
       // Drucken und CSV öffnen, senden nichts ab — Nebenwege im Kopf, unter `md` hinter

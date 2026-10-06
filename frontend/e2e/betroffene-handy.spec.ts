@@ -86,9 +86,12 @@ async function pruefeListeAmHandy(page: Page, einsatzId: string, mitSchreibrecht
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await stelleKomfortabel(page);
 
-  // Anker vor jeder Messung: die gesäte Person ist da (sonst mäße der Test den Ladezustand).
-  const ersteZeile = page.locator('[data-lfh="datensicht-karte"]').first();
-  await expect(ersteZeile).toContainText('Handtest');
+  // Anker vor jeder Messung: beide gesäten Personen sind da (sonst mäße der Test den
+  // Ladezustand). Die Liste steht jüngste zuerst, oben also R-002.
+  const karten = page.locator('[data-lfh="datensicht-karte"]');
+  await expect(karten).toHaveCount(2);
+  const ersteZeile = karten.first();
+  await expect(ersteZeile).toContainText('R-002');
   await expect(ersteZeile, 'erste Personenzeile ohne Scrollen ganz im Bild').toBeInViewport({
     ratio: 1,
   });

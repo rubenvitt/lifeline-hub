@@ -319,6 +319,7 @@ export default function EinsatzSeite({
   const { token } = theme.useToken();
   const farben = useModusFarben();
   const aktionenRef = useRef<HTMLDivElement>(null);
+  const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
 
   /*
@@ -420,8 +421,13 @@ export default function EinsatzSeite({
             data-lfh="seitenkopf-aktionen"
             style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginXS * 2 }}
           >
+            {/* Unter `md` steht der Auslöser „Weitere“ VORN (LFH-963): hinten bräche er bei 390 px in
+                eine eigene Zeile und kostete die erste Personenzeile ihren Platz; vorn teilt er die
+                Zeile mit der Segmentleiste. Ab `md` folgen die Knöpfe den Aktionen. Umgestellt wird
+                im Baum, nicht per CSS-`order`: Lese- und Tabfolge bleiben die sichtbare Folge. */}
+            {weitere && istSchmal && <NebenwegeImKopf {...weitere} />}
             {aktionen}
-            {weitere && <NebenwegeImKopf {...weitere} />}
+            {weitere && !istSchmal && <NebenwegeImKopf {...weitere} />}
           </div>
         )}
       </div>
