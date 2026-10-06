@@ -49,13 +49,20 @@ pub async fn lies_tile(
 /// Welt-Übersicht; die Grenze fängt nur den Ausreißer ab (alle Bundesländer plus Welt passen).
 const MAX_READER: usize = 32;
 
+/// Eine Zelle: einmal gefüllt mit dem realen Ziel, das geöffnet wurde, und seinem Pool.
+type Zelle = Arc<OnceCell<(PathBuf, sqlx::SqlitePool)>>;
+
 /// Read-only-Pools der Offline-MBTiles, **je Pfad einer** (LFH-934). Mehrere bereite Regionen
 /// fragt MapLibre verschränkt ab; ein Cache mit nur einem Platz öffnete fast für jede Kachel einen
 /// neuen Pool. Jede Zelle wird höchstens einmal gefüllt (`OnceCell`): parallele Fehltreffer auf
 /// denselben Pfad warten auf dieselbe Öffnung statt je einen eigenen Pool zu bauen. Die
 /// `std`-Mutex hält niemand über ein `await`.
+///
+/// Neben dem Pool merkt sich die Zelle das reale Ziel (`canonicalize`), das der Aufrufer bei jeder
+/// Anfrage neu auflöst und auf Containment prüft. Zeigt der Pfad inzwischen woanders hin (Symlink
+/// umgebogen), gilt das als Fehltreffer.
 pub struct ReaderCache {
-    pools: Mutex<HashMap<PathBuf, Arc<OnceCell<sqlx::SqlitePool>>>>,
+    pools: Mutex<HashMap<PathBuf, Zelle>>,
 }
 
 impl Default for ReaderCache {
@@ -72,16 +79,21 @@ impl ReaderCache {
     }
 
     /// Poisoning-fest: unter der Sperre laufen nur infallible Map-Operationen.
-    fn map(&self) -> std::sync::MutexGuard<'_, HashMap<PathBuf, Arc<OnceCell<sqlx::SqlitePool>>>> {
+    fn map(&self) -> std::sync::MutexGuard<'_, HashMap<PathBuf, Zelle>> {
         self.pools.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Zelle für `pfad`, bei Bedarf neu angelegt. Ist der Cache voll, verdrängt ein neuer Pfad
-    /// einen beliebigen anderen; dessen Pool baut sich ab, sobald laufende Abfragen ihn freigeben.
-    fn zelle(&self, pfad: &Path) -> Arc<OnceCell<sqlx::SqlitePool>> {
+    /// Zelle für `pfad`, bei Bedarf neu angelegt. Eine Zelle, die auf ein anderes Ziel als `ziel`
+    /// zeigt, wird ersetzt. Ist der Cache voll, verdrängt ein neuer Pfad einen beliebigen anderen;
+    /// dessen Pool baut sich ab, sobald laufende Abfragen ihn freigeben.
+    fn zelle(&self, pfad: &Path, ziel: &Path) -> Zelle {
         let mut m = self.map();
         if let Some(z) = m.get(pfad) {
-            return z.clone();
+            match z.get() {
+                Some((offen, _)) if offen != ziel => {}
+                _ => return z.clone(),
+            }
+            m.remove(pfad);
         }
         if m.len() >= MAX_READER {
             if let Some(k) = m.keys().next().cloned() {
@@ -93,20 +105,25 @@ impl ReaderCache {
         z
     }
 
-    /// Liefert den gecachten Pool für `pfad`; nur beim Fehltreffer läuft `oeffne`. Scheitert das
-    /// Öffnen, bleibt nichts im Cache, der nächste Abruf versucht es erneut.
+    /// Liefert den gecachten Pool für `pfad`, dessen reales Ziel `ziel` ist; nur beim Fehltreffer
+    /// läuft `oeffne`. Scheitert das Öffnen, bleibt nichts im Cache, der nächste Abruf versucht es
+    /// erneut.
     pub async fn reader_fuer<F, Fut, E>(
         &self,
         pfad: &Path,
+        ziel: &Path,
         oeffne: F,
     ) -> Result<sqlx::SqlitePool, E>
     where
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<sqlx::SqlitePool, E>>,
     {
-        let zelle = self.zelle(pfad);
-        match zelle.get_or_try_init(oeffne).await {
-            Ok(pool) => Ok(pool.clone()),
+        let zelle = self.zelle(pfad, ziel);
+        let ergebnis = zelle
+            .get_or_try_init(|| async { Ok((ziel.to_path_buf(), oeffne().await?)) })
+            .await;
+        match ergebnis {
+            Ok((_, pool)) => Ok(pool.clone()),
             Err(e) => {
                 let mut m = self.map();
                 // Nur die eigene, leere Zelle entfernen: ein paralleler Abruf kann sie inzwischen
@@ -121,11 +138,18 @@ impl ReaderCache {
         }
     }
 
-    /// Verwirft den Pool für `pfad`. Nach Löschen oder Ersetzen dieser Karte aufrufen: Neu-Download
+    /// Verwirft den Pool für `pfad` und jeden weiteren Eintrag, der auf dasselbe reale Ziel zeigt
+    /// (Alias über einen Symlink). Nach Löschen oder Ersetzen dieser Karte aufrufen: Neu-Download
     /// und In-Place-Reload vergeben denselben Pfad bei neuer Inode, der alte Pool hielte das alte
     /// Datei-Handle und servierte die alte Datei weiter.
     pub fn verwerfen(&self, pfad: &Path) {
-        self.map().remove(pfad);
+        let mut m = self.map();
+        let ziel = m
+            .remove(pfad)
+            .and_then(|z| z.get().map(|(ziel, _)| ziel.clone()));
+        if let Some(ziel) = ziel {
+            m.retain(|_, z| z.get().is_none_or(|(offen, _)| *offen != ziel));
+        }
     }
 
     /// Verwirft alle Pools (Sonderfälle).
@@ -239,12 +263,12 @@ mod tests {
 
         for _ in 0..10 {
             let pa = cache
-                .reader_fuer(&a, || oeffne_gezaehlt(&a, &oeffnungen))
+                .reader_fuer(&a, &a, || oeffne_gezaehlt(&a, &oeffnungen))
                 .await
                 .unwrap();
             assert_eq!(lies_tile(&pa, 1, 0, 0).await.unwrap(), Some(vec![0xAA]));
             let pb = cache
-                .reader_fuer(&b, || oeffne_gezaehlt(&b, &oeffnungen))
+                .reader_fuer(&b, &b, || oeffne_gezaehlt(&b, &oeffnungen))
                 .await
                 .unwrap();
             assert_eq!(lies_tile(&pb, 1, 0, 0).await.unwrap(), Some(vec![0xBB]));
@@ -267,7 +291,7 @@ mod tests {
             let (cache, a, oeffnungen) = (cache.clone(), a.clone(), oeffnungen.clone());
             tasks.push(tokio::spawn(async move {
                 cache
-                    .reader_fuer(&a, || async {
+                    .reader_fuer(&a, &a, || async {
                         // Öffnen dauert: alle Abrufe laufen in den Fehltreffer.
                         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                         oeffne_gezaehlt(&a, &oeffnungen).await
@@ -295,11 +319,11 @@ mod tests {
         let cache = ReaderCache::new();
         let oeffnungen = AtomicUsize::new(0);
         cache
-            .reader_fuer(&a, || oeffne_gezaehlt(&a, &oeffnungen))
+            .reader_fuer(&a, &a, || oeffne_gezaehlt(&a, &oeffnungen))
             .await
             .unwrap();
         cache
-            .reader_fuer(&b, || oeffne_gezaehlt(&b, &oeffnungen))
+            .reader_fuer(&b, &b, || oeffne_gezaehlt(&b, &oeffnungen))
             .await
             .unwrap();
 
@@ -309,7 +333,7 @@ mod tests {
 
         // Ohne Invalidierung liefert der gecachte Pool weiterhin den alten Inhalt.
         let noch_alt = cache
-            .reader_fuer(&a, || oeffne_gezaehlt(&a, &oeffnungen))
+            .reader_fuer(&a, &a, || oeffne_gezaehlt(&a, &oeffnungen))
             .await
             .unwrap();
         assert_eq!(
@@ -319,18 +343,68 @@ mod tests {
 
         cache.verwerfen(&a);
         let neu = cache
-            .reader_fuer(&a, || oeffne_gezaehlt(&a, &oeffnungen))
+            .reader_fuer(&a, &a, || oeffne_gezaehlt(&a, &oeffnungen))
             .await
             .unwrap();
         assert_eq!(lies_tile(&neu, 1, 0, 0).await.unwrap(), Some(vec![0xCC]));
         cache
-            .reader_fuer(&b, || oeffne_gezaehlt(&b, &oeffnungen))
+            .reader_fuer(&b, &b, || oeffne_gezaehlt(&b, &oeffnungen))
             .await
             .unwrap();
         assert_eq!(oeffnungen.load(Ordering::SeqCst), 3, "nur a neu geöffnet");
 
         cache.leeren();
         assert_eq!(cache.anzahl(), 0);
+    }
+
+    // Zeigt derselbe Pfad auf ein anderes reales Ziel (Symlink umgebogen), öffnet der Cache neu
+    // statt den alten Pool zu liefern.
+    #[tokio::test]
+    async fn neues_ziel_unter_altem_pfad_oeffnet_neu() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.mbtiles");
+        let b = dir.path().join("b.mbtiles");
+        let link = dir.path().join("link.mbtiles");
+        schreibe_datei_fixture(&a, &[0xAA]).await;
+        schreibe_datei_fixture(&b, &[0xBB]).await;
+        let cache = ReaderCache::new();
+        let pool = cache
+            .reader_fuer(&link, &a, || oeffne_readonly(&a))
+            .await
+            .unwrap();
+        assert_eq!(lies_tile(&pool, 1, 0, 0).await.unwrap(), Some(vec![0xAA]));
+        let pool = cache
+            .reader_fuer(&link, &b, || oeffne_readonly(&b))
+            .await
+            .unwrap();
+        assert_eq!(lies_tile(&pool, 1, 0, 0).await.unwrap(), Some(vec![0xBB]));
+        assert_eq!(cache.anzahl(), 1);
+    }
+
+    // Verwerfen trifft auch einen Alias, der auf dasselbe reale Ziel zeigt.
+    #[tokio::test]
+    async fn verwerfen_trifft_alias_auf_dasselbe_ziel() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("karte-1.mbtiles");
+        let alias = dir.path().join("alias.mbtiles");
+        let b = dir.path().join("karte-2.mbtiles");
+        schreibe_datei_fixture(&a, &[0xAA]).await;
+        schreibe_datei_fixture(&b, &[0xBB]).await;
+        let cache = ReaderCache::new();
+        cache
+            .reader_fuer(&a, &a, || oeffne_readonly(&a))
+            .await
+            .unwrap();
+        cache
+            .reader_fuer(&alias, &a, || oeffne_readonly(&a))
+            .await
+            .unwrap();
+        cache
+            .reader_fuer(&b, &b, || oeffne_readonly(&b))
+            .await
+            .unwrap();
+        cache.verwerfen(&a);
+        assert_eq!(cache.anzahl(), 1, "nur b bleibt");
     }
 
     // Ein gescheitertes Öffnen hinterlässt keinen Eintrag; der nächste Abruf versucht es erneut.
@@ -340,12 +414,15 @@ mod tests {
         let a = dir.path().join("karte-1.mbtiles");
         let cache = ReaderCache::new();
         let r: Result<sqlx::SqlitePool, &str> =
-            cache.reader_fuer(&a, || async { Err("weg") }).await;
+            cache.reader_fuer(&a, &a, || async { Err("weg") }).await;
         assert_eq!(r.err(), Some("weg"));
         assert_eq!(cache.anzahl(), 0);
 
         schreibe_datei_fixture(&a, &[0xAA]).await;
-        let pool = cache.reader_fuer(&a, || oeffne_readonly(&a)).await.unwrap();
+        let pool = cache
+            .reader_fuer(&a, &a, || oeffne_readonly(&a))
+            .await
+            .unwrap();
         assert_eq!(lies_tile(&pool, 1, 0, 0).await.unwrap(), Some(vec![0xAA]));
     }
 
@@ -356,7 +433,7 @@ mod tests {
         for i in 0..MAX_READER + 5 {
             let pfad = PathBuf::from(format!("/nirgends/karte-{i}.mbtiles"));
             cache
-                .reader_fuer(&pfad, || async {
+                .reader_fuer(&pfad, &pfad, || async {
                     SqlitePoolOptions::new()
                         .max_connections(1)
                         .connect("sqlite::memory:")

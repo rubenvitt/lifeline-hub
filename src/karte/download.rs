@@ -57,6 +57,34 @@ pub fn reserviere_fortschritt(map: &FortschrittMap, id: i64, f: Arc<Fortschritt>
     true
 }
 
+/// Hält den Slot einer Karte belegt, solange ein Handler an ihr arbeitet, ohne selbst zu laden
+/// (LFH-934, Löschen). Gibt ihn beim Fallenlassen frei, aber nur den eigenen Eintrag.
+pub struct SlotSperre {
+    map: FortschrittMap,
+    id: i64,
+    eigen: Arc<Fortschritt>,
+}
+
+impl Drop for SlotSperre {
+    fn drop(&mut self) {
+        let mut m = schreibe_fortschritt(&self.map);
+        if m.get(&self.id).is_some_and(|f| Arc::ptr_eq(f, &self.eigen)) {
+            m.remove(&self.id);
+        }
+    }
+}
+
+/// Belegt den Slot von `id` wie [`reserviere_fortschritt`]; `None`, wenn schon ein Download oder
+/// Reload läuft.
+pub fn sperre_slot(map: &FortschrittMap, id: i64) -> Option<SlotSperre> {
+    let eigen = Arc::new(Fortschritt::default());
+    reserviere_fortschritt(map, id, eigen.clone()).then(|| SlotSperre {
+        map: map.clone(),
+        id,
+        eigen,
+    })
+}
+
 /// Ergebnis eines erfolgreichen Downloads.
 #[derive(Debug)]
 pub struct DownloadErgebnis {

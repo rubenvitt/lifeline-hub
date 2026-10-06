@@ -247,42 +247,29 @@ async fn serve_offline_tile(
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
     let voll = state.karten_dir.join(p);
-    // Gecacht je registriertem Pfad (LFH-934); Containment und Öffnen laufen nur beim Fehltreffer.
     // Containment via canonicalize fängt zusätzlich Symlinks: der reale Zielpfad MUSS unter dem
     // realen karten_dir liegen, sonst keine Auslieferung (Parität zum `tiles`-Handler,
-    // Defense-in-Depth gegen einen Symlink auf eine fremde SQLite-Datei → kein Blob-Leak).
-    // `canonicalize` blockiert (Dateisystem), deshalb im Blocking-Pool.
-    enum Oeffnen {
-        Ausserhalb,
-        Fehler(String),
-    }
-    let geoeffnet = mbtiles::reader()
-        .reader_fuer(&voll, || {
-            let basis_dir = state.karten_dir.clone();
-            let ziel = voll.clone();
-            async move {
-                let (basis, real) = tokio::task::spawn_blocking(move || {
-                    (basis_dir.canonicalize(), ziel.canonicalize())
-                })
-                .await
-                .map_err(|e| Oeffnen::Fehler(format!("Pfad auflösen: {e}")))?;
-                let basis = basis
-                    .map_err(|e| Oeffnen::Fehler(format!("karten_dir nicht auflösbar: {e}")))?;
-                let real = match real {
-                    Ok(r) if r.starts_with(&basis) => r,
-                    _ => return Err(Oeffnen::Ausserhalb),
-                };
-                mbtiles::oeffne_readonly(&real)
-                    .await
-                    .map_err(|e| Oeffnen::Fehler(format!("MBTiles öffnen: {e}")))
-            }
-        })
-        .await;
-    let pool = match geoeffnet {
-        Ok(pool) => pool,
-        Err(Oeffnen::Ausserhalb) => return Ok(StatusCode::NO_CONTENT.into_response()),
-        Err(Oeffnen::Fehler(text)) => return Err(AppError::Internal(text)),
+    // Defense-in-Depth gegen einen Symlink auf eine fremde SQLite-Datei → kein Blob-Leak). Geprüft
+    // wird bei jeder Anfrage, auch beim Cache-Treffer: sqlx öffnet Verbindungen später erneut über
+    // den Pfad. `canonicalize` blockiert (Dateisystem), deshalb im Blocking-Pool (LFH-934).
+    let (basis, real) = {
+        let basis_dir = state.karten_dir.clone();
+        let ziel = voll.clone();
+        tokio::task::spawn_blocking(move || (basis_dir.canonicalize(), ziel.canonicalize()))
+            .await
+            .map_err(|e| AppError::Internal(format!("Pfad auflösen: {e}")))?
     };
+    let basis =
+        basis.map_err(|e| AppError::Internal(format!("karten_dir nicht auflösbar: {e}")))?;
+    let real = match real {
+        Ok(r) if r.starts_with(&basis) => r,
+        _ => return Ok(StatusCode::NO_CONTENT.into_response()),
+    };
+    // Gecacht je registriertem Pfad (LFH-934): mehrere Regionen behalten je ihren Pool.
+    let pool = mbtiles::reader()
+        .reader_fuer(&voll, &real, || mbtiles::oeffne_readonly(&real))
+        .await
+        .map_err(|e| AppError::Internal(format!("MBTiles öffnen: {e}")))?;
     match mbtiles::lies_tile(&pool, z, x, y).await {
         Ok(Some(daten)) => {
             let (content_type, encoding) = format_mime_encoding(format);
@@ -1228,12 +1215,13 @@ pub async fn offline_loeschen(
     PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
     // LFH-934: Ein laufender Download schriebe über sein offenes Handle weiter in die entlinkte
-    // `.part` und belegte Bandbreite und Platte bis zum Ende. Erst abbrechen, dann löschen.
-    if download::lies_fortschritt(&state.download_fortschritt).contains_key(&id) {
+    // `.part` und belegte Bandbreite und Platte bis zum Ende. Erst abbrechen, dann löschen. Den
+    // Slot hält das Löschen bis zum Ende selbst, damit kein Reload dazwischen startet.
+    let Some(_slot) = download::sperre_slot(&state.download_fortschritt, id) else {
         return Err(AppError::UnprocessableEntity(
             "Für diese Karte läuft ein Download; zuerst abbrechen, dann löschen".into(),
         ));
-    }
+    };
     // Zeile vor dem DB-Delete lesen, um gemanagte Downloads von extern Registrierten zu trennen.
     let karte = repo::finde_offline_karte(&state.pool, id).await?;
     if !repo::loesche_offline_karte(&state.pool, id).await? {
@@ -1486,7 +1474,7 @@ fn pruefe_gemanagt(karte: &OfflineKarte) -> Result<(), AppError> {
 /// Gemeinsamer In-Place-Start (D3, LFH-993) für „Jetzt aktualisieren“ und den Wächter: Plattenplatz prüfen, Fortschritts-Slot atomar reservieren, Download im Hintergrund,
 /// danach Tausch oder Aufräumen und Meldung an den Wächter. Die `url` ist bereits geprüft
 /// (`validiere_download_url`). `422` bei registrierter Karte, zu wenig Platz oder laufendem
-/// Download.
+/// Download; `404`, wenn die Karte inzwischen gelöscht ist.
 pub(crate) async fn starte_in_place_reload(
     state: &AppState,
     karte: &OfflineKarte,
@@ -1519,6 +1507,16 @@ pub(crate) async fn starte_in_place_reload(
         return Err(AppError::UnprocessableEntity(
             "Für diese Karte läuft bereits ein Download".into(),
         ));
+    }
+    // LFH-934: Zwischen dem Lesen der Zeile und der Reservierung kann ein Löschen gelaufen sein
+    // (der Katalogabruf davor dauert). Ohne Zeile lüde der Reload eine verwaiste Datei.
+    match repo::finde_offline_karte(&state.pool, id).await {
+        Ok(Some(_)) => {}
+        weg => {
+            download::schreibe_fortschritt(&state.download_fortschritt).remove(&id);
+            weg?;
+            return Err(AppError::NotFound);
+        }
     }
 
     let pool = state.pool.clone();
@@ -2507,7 +2505,7 @@ mod finalisierung_tests {
         )
         .await;
         let alt = mbtiles::reader()
-            .reader_fuer(&ziel, || mbtiles::oeffne_readonly(&ziel))
+            .reader_fuer(&ziel, &ziel, || mbtiles::oeffne_readonly(&ziel))
             .await
             .unwrap();
         assert_eq!(
@@ -2520,13 +2518,46 @@ mod finalisierung_tests {
             .expect("Swap ok");
 
         let neu = mbtiles::reader()
-            .reader_fuer(&ziel, || mbtiles::oeffne_readonly(&ziel))
+            .reader_fuer(&ziel, &ziel, || mbtiles::oeffne_readonly(&ziel))
             .await
             .unwrap();
         assert_eq!(
             mbtiles::lies_tile(&neu, 1, 0, 0).await.unwrap(),
             Some(vec![0xBB])
         );
+    }
+
+    // LFH-934: Läuft zwischen dem Lesen der Zeile und der Reservierung ein Löschen, startet der
+    // Reload nicht (404) und gibt den Slot wieder frei.
+    #[tokio::test]
+    async fn in_place_start_fuer_geloeschte_karte_ist_404_und_gibt_slot_frei() {
+        use crate::karte::auto_aktualisierung::{AutoAktualisierung, Einstellung};
+        let pool = crate::db::test_pool().await;
+        let tmp = tempfile::tempdir().unwrap();
+        let id = bereite_karte(&pool, "DE").await;
+        let karte = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
+        assert!(repo::loesche_offline_karte(&pool, id).await.unwrap());
+        let state = AppState {
+            pool,
+            live: crate::live::LiveHub::new(),
+            fachebenen: crate::karte::FachebenenState::neu(),
+            karten_dir: tmp.path().into(),
+            download_client: download::download_client(),
+            download_fortschritt: download::neue_fortschritt_map(),
+            karten_service_url: None,
+            karten_service_token: None,
+            auto_aktualisierung: AutoAktualisierung::neu(
+                Einstellung::default(),
+                reqwest::Client::new(),
+            ),
+            backup_download: Default::default(),
+        };
+        let url = reqwest::Url::parse("https://example.test/de.mbtiles").unwrap();
+
+        let r = starte_in_place_reload(&state, &karte, url, None, None).await;
+
+        assert!(matches!(r, Err(AppError::NotFound)));
+        assert!(download::lies_fortschritt(&state.download_fortschritt).is_empty());
     }
 
     // B3-Fehlerpfad: schlägt der Reload-Download fehl, bleibt die alte Karte UNANGETASTET aktiv

@@ -2583,6 +2583,34 @@ async fn loeschen_bei_laufendem_download_ist_422() {
     let res = anfrage(&app, "DELETE", &uri, Some(&cookie), None).await;
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
     assert!(!datei.exists() && !part.exists(), "Dateien gelöscht");
+    assert!(
+        fortschritt.read().unwrap().is_empty(),
+        "Löschen gibt seinen Slot wieder frei"
+    );
+}
+
+// Containment je Anfrage, auch nach einem Cache-Treffer: wird die ausgelieferte Datei durch einen
+// Symlink nach außen ersetzt, antwortet die Auslieferung 204 statt die fremde Datei zu lesen.
+#[cfg(unix)]
+#[tokio::test]
+async fn symlink_nach_cache_treffer_liefert_nichts() {
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let fremd = tempfile::tempdir().unwrap();
+    let ziel = fremd.path().join("fremd.mbtiles");
+    schreibe_fixture_mbtiles(&ziel, &[0xEE]).await;
+    let id = heruntergeladene_karte(&pool, dir.path(), &[0xAA]).await;
+    let app = app_mit(pool, dir.path().to_path_buf());
+    let uri = format!("/api/karte/offline/{id}/tiles/1/0/0");
+    assert_eq!(kachel(&app, &uri).await, (StatusCode::OK, vec![0xAA]));
+
+    let datei = dir.path().join(format!("karte-{id}.mbtiles"));
+    std::fs::remove_file(&datei).unwrap();
+    std::os::unix::fs::symlink(&ziel, &datei).unwrap();
+
+    let (s, d) = kachel(&app, &uri).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert!(d.is_empty());
 }
 
 // Löschen gibt den Pool genau dieser Karte frei: ein Neu-Download unter derselben id (gleicher
