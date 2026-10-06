@@ -105,6 +105,11 @@ export function erzeugeZeilenSammler(
   let timer: ReturnType<typeof setTimeout> | null = null;
   let beendet = false;
 
+  // Eine als veraltet markierte Liste (verdeckter Tab, Grenze, inaktive Seite) bekommt keine
+  // Zeile: `setQueryData` nähme die Markierung weg, und die Liste gälte ohne die früheren
+  // Änderungen als frisch. Sie bleibt beim Sammler, der sie beim nächsten Beobachter abruft.
+  const aktuell = (key: QueryKey) => qc.getQueryState(key)?.isInvalidated === false;
+
   const listenAnSammler = (ziel: ZeilenZiel) =>
     ZIELE[ziel].listen.forEach((l) => sammler.vormerken(l.key(einsatzId)));
 
@@ -129,8 +134,8 @@ export function erzeugeZeilenSammler(
     } else {
       for (const l of def.listen) {
         const key = l.key(einsatzId);
-        if (qc.isFetching({ queryKey: key, exact: true }) > 0) {
-          sammler.vormerken(key);
+        if (qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
+          if (qc.getQueryData(key) !== undefined) sammler.vormerken(key);
           continue;
         }
         qc.setQueryData<readonly unknown[]>(key, (alt) => {
@@ -154,7 +159,7 @@ export function erzeugeZeilenSammler(
     for (const [ziel, ids] of faellig) {
       const listen = ZIELE[ziel].listen.map((l) => l.key(einsatzId));
       const geladen = listen.filter((key) => qc.getQueryData(key) !== undefined);
-      if (verdeckt || geladen.length === 0 || ids.size > ZEILEN_GRENZE) {
+      if (verdeckt || !geladen.some(aktuell) || ids.size > ZEILEN_GRENZE) {
         listenAnSammler(ziel);
       } else if (
         laufend.has(ziel) ||

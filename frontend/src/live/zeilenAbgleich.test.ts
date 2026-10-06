@@ -39,6 +39,11 @@ const schaden = (id: number, registrier_nr: number, extra: Partial<Schaden> = {}
     ...extra,
   }) as unknown as Schaden;
 
+/** Markiert eine Liste als veraltet wie `invalidateQueries` (das `aufbau` abfängt) ohne Abruf. */
+function markieren(qc: QueryClient, queryKey: readonly unknown[]) {
+  qc.getQueryCache().find({ queryKey, exact: true })?.invalidate();
+}
+
 /** Fenster ablaufen lassen und die Zeilenabrufe auflösen. */
 async function fenster() {
   await vi.advanceTimersByTimeAsync(LIVE_SAMMELFENSTER_MS);
@@ -172,6 +177,40 @@ describe('erzeugeZeilenSammler (LFH-931)', () => {
 
     expect(qc.getQueryData<Schaden[]>(einsatzKeys.schaeden(E))?.map((s) => s.id)).toEqual([1]);
     expect(qc.getQueryData<{ id: number }[]>(einsatzKeys.schadenMarker(E))).toEqual([{ id: 1 }]);
+  });
+
+  it('sortiert in eine als veraltet markierte Liste nichts ein, sie bleibt beim Sammler', async () => {
+    const { qc, sammler, zeilen } = aufbau();
+    const vormerken = vi.spyOn(sammler, 'vormerken');
+    const veraltet = [schaden(1, 1)];
+    qc.setQueryData(einsatzKeys.schaeden(E), veraltet);
+    qc.setQueryData(einsatzKeys.schadenMarker(E), []);
+    // Ein früheres Fenster hat die inaktive Schadenliste nur markiert (verdeckter Tab, Grenze).
+    markieren(qc, einsatzKeys.schaeden(E));
+    api.ladeSchaden.mockResolvedValue(schaden(2, 2));
+
+    zeilen.vormerken('schaeden', 2);
+    await fenster();
+
+    expect(qc.getQueryData(einsatzKeys.schaeden(E))).toBe(veraltet);
+    expect(qc.getQueryState(einsatzKeys.schaeden(E))?.isInvalidated).toBe(true);
+    expect(
+      qc.getQueryData<{ id: number }[]>(einsatzKeys.schadenMarker(E))?.map((m) => m.id),
+    ).toEqual([2]);
+    expect(vormerken.mock.calls.map((c) => c[0])).toEqual([einsatzKeys.schaeden(E)]);
+  });
+
+  it('ist keine geladene Liste aktuell, lädt sie keine Zeile', async () => {
+    const { qc, sammler, zeilen } = aufbau();
+    const vormerken = vi.spyOn(sammler, 'vormerken');
+    qc.setQueryData(einsatzKeys.medienkontakte(E), []);
+    markieren(qc, einsatzKeys.medienkontakte(E));
+
+    zeilen.vormerken('medienkontakte', 2);
+    await fenster();
+
+    expect(api.ladeMedienkontakt).not.toHaveBeenCalled();
+    expect(vormerken.mock.calls.map((c) => c[0])).toEqual([einsatzKeys.medienkontakte(E)]);
   });
 
   it('lässt eine nicht geladene Liste ungeladen', async () => {

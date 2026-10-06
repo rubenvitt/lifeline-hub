@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Spin, Typography } from 'antd';
+import { ApiError } from '../api/client';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 
 /**
@@ -28,7 +29,8 @@ export interface VorschauAbfrage<T> {
  * Der Grund für die Hülle ist „nicht mehr vorhanden“: die Vorschau liest per `select` aus dem
  * Listenfach der Palette; fehlt der Datensatz dort, ist `data` schlicht `undefined`, und ohne
  * eigenen Zweig sähe das aus wie „lädt noch“. Ein Fehler bei vorhandenem Stand zeigt den Stand mit
- * `SeitenStandVeraltet`.
+ * `SeitenStandVeraltet`. Liest eine Vorschau ein Detailfach (Lagebericht, LFH-931), heißt eine
+ * 404 dasselbe: der Datensatz ist weg.
  *
  * `sorte` ist die Nominalphrase mit Artikel („Die Meldung“); ein Artikel lässt sich nicht
  * ableiten.
@@ -60,7 +62,8 @@ export function VorschauZustand<T>({
     );
   }
   if (abfrage.data === undefined) {
-    if (abfrage.isError) {
+    const weg = abfrage.error instanceof ApiError && abfrage.error.status === 404;
+    if (abfrage.isError && !weg) {
       return (
         <SeitenFehler
           text={`${sorte} konnte nicht geladen werden`}

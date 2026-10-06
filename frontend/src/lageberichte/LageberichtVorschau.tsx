@@ -3,8 +3,7 @@ import { Space } from 'antd';
 import { Datenfeld, Datenraster } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
-import { ladeLagebericht } from '../api/lageberichte';
-import { einsatzKeys } from '../api/queryKeys';
+import { lageberichtAbfrage } from '../command-palette/datensatzAbfrage';
 import { VORSCHAU_UNTER_EBENE, VorschauZustand } from '../command-palette/VorschauZustand';
 import LageberichtText from './LageberichtText';
 import { vorlage } from './vorlagen';
@@ -18,10 +17,7 @@ import { vorlage } from './vorlagen';
  * Berichtstext aus demselben Bauteil wie der Lesezweig der Seite.
  */
 export default function LageberichtVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
-  const abfrage = useQuery({
-    queryKey: einsatzKeys.lagebericht(einsatzId, id),
-    queryFn: () => ladeLagebericht(einsatzId, id),
-  });
+  const abfrage = useQuery(lageberichtAbfrage(einsatzId, id));
 
   return (
     <VorschauZustand abfrage={abfrage} sorte="Der Lagebericht">

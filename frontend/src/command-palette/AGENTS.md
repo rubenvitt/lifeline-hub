@@ -14,7 +14,8 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   in der Quellentabelle von `datensaetze.ts` (nicht in `befehlFuer`), Inhalt als wiederverwendbares Lese-Bauteil
   (`personen/PersonVorschau.tsx`). Vorschau liest das Listenfach per `select` über
   `command-palette/datensatzAbfrage.ts` (gleicher Schlüssel, `queryFn`, `FRISCH_MS`), kein
-  Detailfach; ETB über `lfdNr` nur bei gleicher `id`; fehlt der Satz, sagt `VorschauZustand` es.
+  Detailfach — außer beim Lagebericht, dessen Liste nur Kopfdaten trägt (LFH-931,
+  `lageberichtAbfrage`, ebenfalls mit `FRISCH_MS`); ETB über `lfdNr` nur bei gleicher `id`; fehlt der Satz, sagt `VorschauZustand` es.
   Verweise in der Vorschau schließen die Palette.
 - **Zeiger** (LFH-1055): eine Zeile markiert sich nur bei **bewegtem** Zeiger (`onMouseMove`
   mit Positionsvergleich, nie `onMouseEnter`); sonst stiehlt ein ruhender Zeiger beim Öffnen und
