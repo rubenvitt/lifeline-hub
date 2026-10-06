@@ -26,6 +26,13 @@ import { istOfflineTransient } from './fehler';
  *  - 400/403/404/409/422 → fachliche Ablehnung → dequeuen.
  *  - alles andere (Programmier-/Parse-Fehler) → NICHT behalten.
  */
+/**
+ * Stabile leere Listen: die Zeitachse leitet ihre Chronologie gemerkt ab (LFH-947), ein neues
+ * `[]` je Render ließe das Memo leerlaufen.
+ */
+const KEINE_AUSSTEHENDEN: AusstehenderEintrag[] = [];
+const KEINE_ABGELEHNTEN: AbgelehnterEintrag[] = [];
+
 /** Exponentieller Backoff (ms) für den automatischen Retry transient gebliebener Einträge.
  *  Nach der letzten Stufe bleibt es beim Cap. */
 const BACKOFF_MS = [1000, 5000, 15000, 30000];
@@ -237,9 +244,9 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
 
   return {
     erfassen,
-    ausstehend: ausstehendStand.scope === scopeKey ? ausstehendStand.werte : [],
+    ausstehend: ausstehendStand.scope === scopeKey ? ausstehendStand.werte : KEINE_AUSSTEHENDEN,
     flush,
-    abgelehnt: abgelehntStand.scope === scopeKey ? abgelehntStand.werte : [],
+    abgelehnt: abgelehntStand.scope === scopeKey ? abgelehntStand.werte : KEINE_ABGELEHNTEN,
     abgelehntVerwerfen,
   };
 }

@@ -19,7 +19,7 @@ Schnellerfassung.
   Knopf „Neuere laden“. Er führt lückenlos zurück bis zum neuesten Eintrag.
 - **Aufsteigender Cursor in der API:** `GET /api/einsaetze/{id}/etb` nimmt `after_lfd_nr`: die
   Einträge direkt über dieser Nummer, Seite weiter absteigend sortiert. `before_lfd_nr` und
-  `after_lfd_nr` zusammen weist der Server mit 400 ab. Zählungen bleiben unverändert.
+  `after_lfd_nr` zusammen weist der Server mit 422 ab. Zählungen bleiben unverändert.
 - **Sprung auf einen Eintrag (`?eintrag=`):** Liegt das Ziel außerhalb des Fensters, blättert die
   Seite in die richtige Richtung (älter oder neuer), bis es da ist. Das Ziel bleibt im Fenster und
   wird hervorgehoben, auch offline aus dem Gerätespeicher.

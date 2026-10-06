@@ -1,7 +1,9 @@
 import { Button, Space } from 'antd';
 import {
+  memo,
   useCallback,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -34,6 +36,7 @@ import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { istNachgetragen } from './typFarben';
 import { verfasserText } from './verfasser';
 import {
+  type Berichtigungsindex,
   berichtigungsindex,
   einfrieren,
   type Einfrierstand,
@@ -187,9 +190,14 @@ export default function EtbZeitachse({
     [zeilen],
   );
   const index = useMemo(() => berichtigungsindex(eintraege), [eintraege]);
-  const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, gefroren, eigeneBenutzerId);
-  const gruppen = gruppiereNachStunde(sichtbar, (utc) =>
-    inZone(utc, konventionen).format('YYYY-MM-DD HH'),
+  const { sichtbar, zurueckgehalten } = useMemo(
+    () => teileZufluss(zeilen, gefroren, eigeneBenutzerId),
+    [zeilen, gefroren, eigeneBenutzerId],
+  );
+  const gruppen = useMemo(
+    () =>
+      gruppiereNachStunde(sichtbar, (utc) => inZone(utc, konventionen).format('YYYY-MM-DD HH')),
+    [sichtbar, konventionen],
   );
 
   const betreten = useCallback(() => {
@@ -205,210 +213,53 @@ export default function EtbZeitachse({
     setGefroren(null);
   }, []);
 
-  function aktionen(z: EtbZeile): ReactNode {
-    if (z.art === 'abgelehnt') {
-      // Eine Entscheidung, kein Menü: das Verwerfen ist unumkehrbar, das erneute Senden
-      // der wahrscheinlichere Griff — beide stehen offen da, mit Abstand zum Roten.
-      return (
-        <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
-          <Button onClick={() => onErneutSenden?.(z.puffer)}>Erneut senden</Button>
-          <Button danger onClick={() => onVerwerfen?.(z.puffer)}>
-            Verwerfen
-          </Button>
-        </Space>
-      );
-    }
-    // Ausstehend: noch nicht im Tagebuch — nichts zu berichtigen, nichts zu beauftragen.
-    if (z.art === 'ausstehend') return null;
-    const e = z.eintrag;
-    const eintraege: MenueEintrag<'berichtigen' | 'wiedervorlage' | 'auftrag'>[] = [
-      ...(onBerichtigen && e.typ !== 'berichtigung'
-        ? [
-            {
-              key: 'berichtigen' as const,
-              label: berichtigenGesperrt ? `Berichtigen (${berichtigenGesperrt})` : 'Berichtigen',
-              ...(berichtigenGesperrt ? { gesperrt: true as const } : {}),
-            },
-          ]
-        : []),
-      ...(onWiedervorlage ? [{ key: 'wiedervorlage' as const, label: 'Wiedervorlage' }] : []),
-      ...(onAuftragErteilen ? [{ key: 'auftrag' as const, label: 'Auftrag erteilen' }] : []),
-    ];
-    // Auch hier, nicht nur im Baustein: `Zeitachseneintrag` zeigt seine Fußzeile, sobald
-    // `aktionen` nicht `null` ist.
-    if (eintraege.length === 0) return null;
-    // Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
-    // auseinanderzuhalten.
-    return (
-      <MenueAusloeser
-        eintraege={eintraege}
-        zugaenglicherName={`Aktionen zu Eintrag ${e.lfd_nr}`}
-        onWahl={(key) => {
-          if (key === 'berichtigen') onBerichtigen?.(e);
-          if (key === 'wiedervorlage') onWiedervorlage?.(e);
-          if (key === 'auftrag') onAuftragErteilen?.(e);
-        }}
-      />
-    );
-  }
-
-  function eintragsHinweis(e: EtbEintragAnzeige): ReactNode {
-    const grund = index.grundeintrag(e);
-    const durch = index.berichtigtDurch(e);
-    const doks = dokumente?.get(e.id);
-    const stil = verweisStil(token);
-    return hinweisZeile(
-      [
-        istNachgetragen(e.ereigniszeit, e.received_at) && (
-          <span key="nachtrag">
-            <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
-            {formatUhrzeit(e.received_at, konventionen)}
-          </span>
-        ),
-        /*
-         * Der Verweis ist blau, nicht rot wie im Entwurf: Rot bedient nichts. Das Signal
-         * „Berichtigung" tragen Kante, Typwort und Zeilentönung.
-         *
-         * Der Sprung führt über `?eintrag=` OHNE den aktiven Filter: der Grundeintrag passt selten zu
-         * dem Filter, unter dem man seine Berichtigung fand, und die Seite lädt ältere Seiten nach,
-         * bis er da ist (LFH-25).
-         */
-        grund && (
-          <span key="grund">
-            berichtigt {grund.lfd_nr != null ? `Nr. ${grund.lfd_nr}` : 'einen älteren Eintrag'} —{' '}
-            <Link to={etbPfad(einsatzId, { eintrag: grund.id })} style={stil}>
-              Grundeintrag anzeigen<span aria-hidden="true"> ↗</span>
-            </Link>
-          </span>
-        ),
-        ...durch.map((b) => (
-          <Link key={`durch-${b.id}`} to={etbPfad(einsatzId, { eintrag: b.id })} style={stil}>
-            berichtigt durch Nr. {b.lfd_nr}
-            <span aria-hidden="true"> ↗</span>
-          </Link>
-        )),
-        hatVerknuepfung(e) && <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />,
-        // Anhänge sind KEINE Kopplung: eigene Bedingung, nicht über `hatVerknuepfung` — die steuert
-        // die Rückverweise.
-        e.anhaenge.length > 0 && (
-          <EtbAnhaenge
-            key="anhaenge"
-            eintrag={e}
-            einsatzId={einsatzId}
-            darfOriginal={darfOriginal}
-          />
-        ),
-        // Dokumente der Ablage mit Bezug auf diesen Eintrag (LFH-743) — eigene Datei, eigene Route.
-        doks && doks.length > 0 && (
-          <EtbDokumente
-            key="dokumente"
-            einsatzId={einsatzId}
-            lfdNr={e.lfd_nr}
-            dokumente={doks}
-            darfOriginal={darfOriginal}
-          />
-        ),
-      ],
-      token.marginXS,
-    );
-  }
-
-  function zeile(z: EtbZeile): ReactNode {
-    const hervorgehoben = z.art === 'eintrag' && z.eintrag.id === highlightId;
-    // Die `etb-*`-Klassen tragen keine Regel (die Tönung macht der Baustein über `toenung`); sie
-    // bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
-    const klassen = [
-      z.art === 'eintrag' && z.eintrag.typ === 'berichtigung' ? 'etb-berichtigung' : '',
-      z.art === 'ausstehend' ? 'etb-ausstehend' : '',
-      z.art === 'abgelehnt' ? 'etb-abgelehnt' : '',
-      hervorgehoben ? HERVORGEHOBEN : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-    const gemeinsam = {
-      als: 'li' as const,
-      'data-lfh': 'datensicht-karte',
-      'data-testid': 'etb-ereigniszeile',
-      'data-zeile': z.schluessel,
-      className: klassen || undefined,
-      aktionen: aktionen(z),
-      // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
-      // Klassenregel käme dagegen nicht an.
-      style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
+  /*
+   * Die Handler über einen Ref (LFH-947): die Zeile ist gemerkt, und eine neue Handler-Identität
+   * des Aufrufers (Pfeilfunktion je Render) renderte sonst jede Zeile neu. Die Zeile ruft über
+   * die stabilen Aufrufer immer den aktuellen Handler.
+   */
+  const handler = useRef({
+    onBerichtigen,
+    onWiedervorlage,
+    onAuftragErteilen,
+    onErneutSenden,
+    onVerwerfen,
+  });
+  useLayoutEffect(() => {
+    handler.current = {
+      onBerichtigen,
+      onWiedervorlage,
+      onAuftragErteilen,
+      onErneutSenden,
+      onVerwerfen,
     };
-
-    if (z.art !== 'eintrag') {
-      const p = z.puffer;
-      return (
-        <Zeitachseneintrag
-          key={z.schluessel}
-          {...gemeinsam}
-          zeit={formatUhrzeit(p.erstellt_at, konventionen)}
-          // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der Sendezustand steht
-          // als Chip in der Meta-Zeile, NICHT in der inhaltsbreiten Nummernspalte — dort machte ein
-          // `nowrap`-Chip die Zeitspalte dieser Zeile breiter als die der Nachbarn.
-          typ={p.eintrag.typ}
-          typwort={etbTyp[p.eintrag.typ].label}
-          meta={
-            <span
-              style={{
-                display: 'inline-flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: token.marginXS,
-              }}
-            >
-              {z.art === 'ausstehend' ? (
-                <StatusChip ton="achtung" wort="wird gesendet …" />
-              ) : (
-                <StatusChip ton="alarm" wort="abgelehnt" />
-              )}
-              {vonAn(p.eintrag.von, p.eintrag.an)}
-            </span>
-          }
-          toenung={z.art === 'abgelehnt' ? 'problem' : undefined}
-          hinweis={hinweisZeile(
-            [
-              z.art === 'abgelehnt'
-                ? `Vom Server abgelehnt: ${z.puffer.grund}`
-                : 'Wird gesendet, sobald wieder Verbindung besteht.',
-              // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit — die Zahl macht
-              // sichtbar, DASS sie mitgehen.
-              anhangZahl(p.eintrag.anhang_ids),
-            ],
-            token.marginXS,
-          )}
-          hinweisTon={z.art === 'abgelehnt' ? 'alarm' : 'schwach'}
-        >
-          <Markdown variante="kompakt" unterEbene={2}>
-            {p.eintrag.inhalt}
-          </Markdown>
-        </Zeitachseneintrag>
-      );
-    }
-
-    const e = z.eintrag;
-    return (
-      <Zeitachseneintrag
-        key={z.schluessel}
-        {...gemeinsam}
-        zeit={formatUhrzeit(e.ereigniszeit, konventionen)}
-        nr={`Nr. ${e.lfd_nr}`}
-        typ={e.typ}
-        typwort={etbTyp[e.typ].label}
-        meta={vonAn(e.von, e.an)}
-        toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
-        hinweis={eintragsHinweis(e)}
-        verfasser={verfasserText(e)}
-        weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
-      >
-        {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
-        <Markdown variante="kompakt" unterEbene={2}>
-          {e.inhalt}
-        </Markdown>
-      </Zeitachseneintrag>
-    );
-  }
+  });
+  const aufrufe = useMemo<ZeilenAufrufe>(
+    () => ({
+      berichtigen: (e) => handler.current.onBerichtigen?.(e),
+      wiedervorlage: (e) => handler.current.onWiedervorlage?.(e),
+      auftragErteilen: (e) => handler.current.onAuftragErteilen?.(e),
+      erneutSenden: (p) => handler.current.onErneutSenden?.(p),
+      verwerfen: (p) => handler.current.onVerwerfen?.(p),
+    }),
+    [],
+  );
+  const zeile = (z: EtbZeile) => (
+    <EtbZeitachsenZeile
+      key={z.schluessel}
+      z={z}
+      einsatzId={einsatzId}
+      hervorgehoben={z.art === 'eintrag' && z.eintrag.id === highlightId}
+      index={index}
+      dokumente={z.art === 'eintrag' ? dokumente?.get(z.eintrag.id) : undefined}
+      darfOriginal={darfOriginal}
+      kannBerichtigen={onBerichtigen != null}
+      berichtigenGesperrt={berichtigenGesperrt}
+      kannWiedervorlage={onWiedervorlage != null}
+      kannAuftrag={onAuftragErteilen != null}
+      aufrufe={aufrufe}
+    />
+  );
 
   /**
    * Laden und Fehler behaupten nichts über die Menge (LFH-331): sonst blitzte „Noch keine
@@ -475,3 +326,252 @@ export default function EtbZeitachse({
     </div>
   );
 }
+
+/** Die stabilen Aufrufer einer Zeile — sie lesen den aktuellen Handler der Zeitachse. */
+interface ZeilenAufrufe {
+  berichtigen: (e: EtbEintragAnzeige) => void;
+  wiedervorlage: (e: EtbEintragAnzeige) => void;
+  auftragErteilen: (e: EtbEintragAnzeige) => void;
+  erneutSenden: (p: AbgelehnterEintrag) => void;
+  verwerfen: (p: AbgelehnterEintrag) => void;
+}
+
+interface ZeilenProps {
+  z: EtbZeile;
+  einsatzId: number;
+  hervorgehoben: boolean;
+  index: Berichtigungsindex;
+  dokumente?: readonly EtbDokument[];
+  darfOriginal: boolean;
+  kannBerichtigen: boolean;
+  berichtigenGesperrt?: string;
+  kannWiedervorlage: boolean;
+  kannAuftrag: boolean;
+  aufrufe: ZeilenAufrufe;
+}
+
+/**
+ * Eine Zeile der Zeitachse, gemerkt (LFH-947, Spec `etb-zeitachse-fenster`): sie bekommt nur
+ * Werte, die sich je Zeile ändern, und stabile Aufrufer. Ein Rerender der Seite ohne geänderte
+ * Einträge (Einsatzkopf, Einheiten, Fokus) rendert keine Zeile und parst kein Markdown.
+ */
+const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
+  z,
+  einsatzId,
+  hervorgehoben,
+  index,
+  dokumente,
+  darfOriginal,
+  kannBerichtigen,
+  berichtigenGesperrt,
+  kannWiedervorlage,
+  kannAuftrag,
+  aufrufe,
+}: ZeilenProps) {
+  const { token, rollen } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
+
+  function aktionen(): ReactNode {
+    if (z.art === 'abgelehnt') {
+      // Eine Entscheidung, kein Menü: das Verwerfen ist unumkehrbar, das erneute Senden
+      // der wahrscheinlichere Griff — beide stehen offen da, mit Abstand zum Roten.
+      return (
+        <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
+          <Button onClick={() => aufrufe.erneutSenden(z.puffer)}>Erneut senden</Button>
+          <Button danger onClick={() => aufrufe.verwerfen(z.puffer)}>
+            Verwerfen
+          </Button>
+        </Space>
+      );
+    }
+    // Ausstehend: noch nicht im Tagebuch — nichts zu berichtigen, nichts zu beauftragen.
+    if (z.art === 'ausstehend') return null;
+    const e = z.eintrag;
+    const eintraege: MenueEintrag<'berichtigen' | 'wiedervorlage' | 'auftrag'>[] = [
+      ...(kannBerichtigen && e.typ !== 'berichtigung'
+        ? [
+            {
+              key: 'berichtigen' as const,
+              label: berichtigenGesperrt ? `Berichtigen (${berichtigenGesperrt})` : 'Berichtigen',
+              ...(berichtigenGesperrt ? { gesperrt: true as const } : {}),
+            },
+          ]
+        : []),
+      ...(kannWiedervorlage ? [{ key: 'wiedervorlage' as const, label: 'Wiedervorlage' }] : []),
+      ...(kannAuftrag ? [{ key: 'auftrag' as const, label: 'Auftrag erteilen' }] : []),
+    ];
+    // Auch hier, nicht nur im Baustein: `Zeitachseneintrag` zeigt seine Fußzeile, sobald
+    // `aktionen` nicht `null` ist.
+    if (eintraege.length === 0) return null;
+    // Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
+    // auseinanderzuhalten.
+    return (
+      <MenueAusloeser
+        eintraege={eintraege}
+        zugaenglicherName={`Aktionen zu Eintrag ${e.lfd_nr}`}
+        onWahl={(key) => {
+          if (key === 'berichtigen') aufrufe.berichtigen(e);
+          if (key === 'wiedervorlage') aufrufe.wiedervorlage(e);
+          if (key === 'auftrag') aufrufe.auftragErteilen(e);
+        }}
+      />
+    );
+  }
+
+  function eintragsHinweis(e: EtbEintragAnzeige): ReactNode {
+    const grund = index.grundeintrag(e);
+    const durch = index.berichtigtDurch(e);
+    const doks = dokumente;
+    const stil = verweisStil(token);
+    return hinweisZeile(
+      [
+        istNachgetragen(e.ereigniszeit, e.received_at) && (
+          <span key="nachtrag">
+            <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
+            {formatUhrzeit(e.received_at, konventionen)}
+          </span>
+        ),
+        /*
+         * Der Verweis ist blau, nicht rot wie im Entwurf: Rot bedient nichts. Das Signal
+         * „Berichtigung" tragen Kante, Typwort und Zeilentönung.
+         *
+         * Der Sprung führt über `?eintrag=` OHNE den aktiven Filter: der Grundeintrag passt selten zu
+         * dem Filter, unter dem man seine Berichtigung fand, und die Seite lädt ältere Seiten nach,
+         * bis er da ist (LFH-25).
+         */
+        grund && (
+          <span key="grund">
+            berichtigt {grund.lfd_nr != null ? `Nr. ${grund.lfd_nr}` : 'einen älteren Eintrag'} —{' '}
+            <Link to={etbPfad(einsatzId, { eintrag: grund.id })} style={stil}>
+              Grundeintrag anzeigen<span aria-hidden="true"> ↗</span>
+            </Link>
+          </span>
+        ),
+        ...durch.map((b) => (
+          <Link key={`durch-${b.id}`} to={etbPfad(einsatzId, { eintrag: b.id })} style={stil}>
+            berichtigt durch Nr. {b.lfd_nr}
+            <span aria-hidden="true"> ↗</span>
+          </Link>
+        )),
+        hatVerknuepfung(e) && <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />,
+        // Anhänge sind KEINE Kopplung: eigene Bedingung, nicht über `hatVerknuepfung` — die steuert
+        // die Rückverweise.
+        e.anhaenge.length > 0 && (
+          <EtbAnhaenge
+            key="anhaenge"
+            eintrag={e}
+            einsatzId={einsatzId}
+            darfOriginal={darfOriginal}
+          />
+        ),
+        // Dokumente der Ablage mit Bezug auf diesen Eintrag (LFH-743) — eigene Datei, eigene Route.
+        doks && doks.length > 0 && (
+          <EtbDokumente
+            key="dokumente"
+            einsatzId={einsatzId}
+            lfdNr={e.lfd_nr}
+            dokumente={doks}
+            darfOriginal={darfOriginal}
+          />
+        ),
+      ],
+      token.marginXS,
+    );
+  }
+
+  function inhalt(): ReactNode {
+    // Die `etb-*`-Klassen tragen keine Regel (die Tönung macht der Baustein über `toenung`); sie
+    // bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
+    const klassen = [
+      z.art === 'eintrag' && z.eintrag.typ === 'berichtigung' ? 'etb-berichtigung' : '',
+      z.art === 'ausstehend' ? 'etb-ausstehend' : '',
+      z.art === 'abgelehnt' ? 'etb-abgelehnt' : '',
+      hervorgehoben ? HERVORGEHOBEN : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const gemeinsam = {
+      als: 'li' as const,
+      'data-lfh': 'datensicht-karte',
+      'data-testid': 'etb-ereigniszeile',
+      'data-zeile': z.schluessel,
+      className: klassen || undefined,
+      aktionen: aktionen(),
+      // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
+      // Klassenregel käme dagegen nicht an.
+      style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
+    };
+
+    if (z.art !== 'eintrag') {
+      const p = z.puffer;
+      return (
+        <Zeitachseneintrag
+          {...gemeinsam}
+          zeit={formatUhrzeit(p.erstellt_at, konventionen)}
+          // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der Sendezustand steht
+          // als Chip in der Meta-Zeile, NICHT in der inhaltsbreiten Nummernspalte — dort machte ein
+          // `nowrap`-Chip die Zeitspalte dieser Zeile breiter als die der Nachbarn.
+          typ={p.eintrag.typ}
+          typwort={etbTyp[p.eintrag.typ].label}
+          meta={
+            <span
+              style={{
+                display: 'inline-flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: token.marginXS,
+              }}
+            >
+              {z.art === 'ausstehend' ? (
+                <StatusChip ton="achtung" wort="wird gesendet …" />
+              ) : (
+                <StatusChip ton="alarm" wort="abgelehnt" />
+              )}
+              {vonAn(p.eintrag.von, p.eintrag.an)}
+            </span>
+          }
+          toenung={z.art === 'abgelehnt' ? 'problem' : undefined}
+          hinweis={hinweisZeile(
+            [
+              z.art === 'abgelehnt'
+                ? `Vom Server abgelehnt: ${z.puffer.grund}`
+                : 'Wird gesendet, sobald wieder Verbindung besteht.',
+              // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit — die Zahl macht
+              // sichtbar, DASS sie mitgehen.
+              anhangZahl(p.eintrag.anhang_ids),
+            ],
+            token.marginXS,
+          )}
+          hinweisTon={z.art === 'abgelehnt' ? 'alarm' : 'schwach'}
+        >
+          <Markdown variante="kompakt" unterEbene={2}>
+            {p.eintrag.inhalt}
+          </Markdown>
+        </Zeitachseneintrag>
+      );
+    }
+
+    const e = z.eintrag;
+    return (
+      <Zeitachseneintrag
+        {...gemeinsam}
+        zeit={formatUhrzeit(e.ereigniszeit, konventionen)}
+        nr={`Nr. ${e.lfd_nr}`}
+        typ={e.typ}
+        typwort={etbTyp[e.typ].label}
+        meta={vonAn(e.von, e.an)}
+        toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
+        hinweis={eintragsHinweis(e)}
+        verfasser={verfasserText(e)}
+        weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
+      >
+        {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
+        <Markdown variante="kompakt" unterEbene={2}>
+          {e.inhalt}
+        </Markdown>
+      </Zeitachseneintrag>
+    );
+  }
+
+  return inhalt();
+});

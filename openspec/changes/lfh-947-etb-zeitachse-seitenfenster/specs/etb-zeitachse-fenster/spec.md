@@ -12,7 +12,7 @@ offener Tab bei jedem neuen Eintrag gleich wenig Last erzeugt.
 `GET /api/einsaetze/{id}/etb` SHALL den Parameter `after_lfd_nr` annehmen. Mit ihm liefert der
 Server die bis zu `limit` Einträge mit der kleinsten laufenden Nummer größer als `after_lfd_nr`,
 die zum Filter passen, sortiert absteigend nach laufender Nummer wie jede andere Seite.
-`before_lfd_nr` und `after_lfd_nr` zusammen MUST mit 400 abgewiesen werden.
+`before_lfd_nr` und `after_lfd_nr` zusammen MUST mit 422 abgewiesen werden.
 
 #### Scenario: Seite direkt über dem Cursor
 - **WHEN** ein Einsatz die Einträge Nr. 1 bis 250 hat und `after_lfd_nr=100&limit=100` abgefragt wird
@@ -28,7 +28,7 @@ die zum Filter passen, sortiert absteigend nach laufender Nummer wie jede andere
 
 #### Scenario: Beide Cursor zugleich
 - **WHEN** `before_lfd_nr` und `after_lfd_nr` in derselben Abfrage stehen
-- **THEN** antwortet der Server mit 400
+- **THEN** antwortet der Server mit 422
 
 #### Scenario: Zählungen unberührt
 - **WHEN** `GET …/etb/zaehler` oder `GET …/etb/anzahl` mit `after_lfd_nr` abgefragt wird

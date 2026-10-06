@@ -68,8 +68,8 @@ Verworfen: Fenster ohne Rückweg (nur `maxPages`): nach einem Sprung wäre der n
 `EtbAbfrageParams.after_lfd_nr` → `repo::EtbFilter.after_lfd_nr`. `abfrage` schreibt dafür
 `AND e.lfd_nr > ? ORDER BY e.lfd_nr ASC LIMIT ?` und dreht das Ergebnis vor dem Nachladen der
 Folgeaufträge, Anhänge und Berichtigungen auf absteigend; jede Seite hat damit dieselbe Ordnung.
-Beide Cursor zugleich → `AppError::Validation` (400, ein Feld für sich ist falsch kombiniert;
-`src/AGENTS.md`, Statuscode-Konvention). Der Cursor bleibt außerhalb von `filter_merkmale`/
+Beide Cursor zugleich → `AppError::UnprocessableEntity` (422: jedes Feld für sich ist gültig,
+erst die Kombination nicht; `src/AGENTS.md`, Statuscode-Konvention). Der Cursor bleibt außerhalb von `filter_merkmale`/
 `EtbZaehlFilter`: Zählungen können ihn strukturell nicht tragen (LFH-612). Kein neues
 Response-DTO, kein Typ-Codegen.
 

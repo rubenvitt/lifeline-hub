@@ -1,7 +1,7 @@
 ## 1. Server: aufsteigender Cursor (D2)
 
 - [ ] 1.1 Test zuerst (`src/etb/repo.rs`): `after_lfd_nr` liefert die Einträge direkt über dem Cursor absteigend, am oberen Ende die restlichen, mit Filter nur passende.
-- [ ] 1.2 Test zuerst (`tests/`): `GET …/etb?after_lfd_nr=…` liefert dieselbe Seite über die Route; `before_lfd_nr` und `after_lfd_nr` zusammen → 400; `zaehler`/`anzahl` ignorieren den Parameter.
+- [ ] 1.2 Test zuerst (`tests/`): `GET …/etb?after_lfd_nr=…` liefert dieselbe Seite über die Route; `before_lfd_nr` und `after_lfd_nr` zusammen → 422; `zaehler`/`anzahl` ignorieren den Parameter.
 - [ ] 1.3 Test: In einem Einsatz wächst `id` mit `lfd_nr` (Grundlage von D4).
 - [ ] 1.4 `EtbAbfrageParams.after_lfd_nr`, `EtbFilter.after_lfd_nr`, `abfrage` (aufsteigend lesen, absteigend liefern), Validierung. Mutationsprobe: Umdrehen weglassen → 1.1 rot.
 

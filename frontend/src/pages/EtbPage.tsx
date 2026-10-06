@@ -8,7 +8,6 @@ import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrec
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
 import {
-  SEITENGROESSE,
   erteileAuftragAusEtb,
   ladeEtbZaehler,
   listeEtb,
@@ -37,6 +36,13 @@ import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
 import { useEntwurfsVersand } from '../etb/entwuerfe/useEntwurfsVersand';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { baueZeilen } from '../etb/etbZeile';
+import {
+  ETB_MAX_SEITEN,
+  naechsterSeitenParam,
+  sprungRichtung,
+  vorigerSeitenParam,
+  type EtbSeitenParam,
+} from '../etb/seitenfenster';
 import { scrolleZurZeile } from '../components/Datensicht';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
@@ -194,12 +200,23 @@ export default function EtbPage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
+  /**
+   * Seitenfenster (LFH-947, `etb/seitenfenster.ts`): höchstens `ETB_MAX_SEITEN` Seiten, in beide
+   * Richtungen blätterbar. Ein Live-Ereignis lädt damit höchstens so viele Seiten neu, wie im
+   * Fenster liegen — nicht so viele, wie je geblättert wurde.
+   */
   const etbQuery = useInfiniteQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, filter),
-    queryFn: ({ pageParam }) => listeEtb(einsatzId, { ...filter, before_lfd_nr: pageParam }),
-    initialPageParam: undefined as number | undefined,
-    getNextPageParam: (letzteSeite) =>
-      letzteSeite.length === SEITENGROESSE ? letzteSeite[letzteSeite.length - 1].lfd_nr : undefined,
+    queryFn: ({ pageParam }) =>
+      listeEtb(einsatzId, {
+        ...filter,
+        before_lfd_nr: pageParam && 'aelter' in pageParam ? pageParam.aelter : undefined,
+        after_lfd_nr: pageParam && 'neuer' in pageParam ? pageParam.neuer : undefined,
+      }),
+    initialPageParam: undefined as EtbSeitenParam,
+    maxPages: ETB_MAX_SEITEN,
+    getNextPageParam: (letzte, _alle, param) => naechsterSeitenParam(letzte, param),
+    getPreviousPageParam: (erste, _alle, param) => vorigerSeitenParam(erste, param),
   });
 
   // Riegel für die Bilanz unter `xl`: sie erscheint erst, wenn die Liste zum ersten Mal steht
@@ -242,7 +259,8 @@ export default function EtbPage() {
 
   // Die leere Ersatzliste bleibt, die Chronologie braucht ein Array. Lade- und Fehler-Gate stehen
   // in `leerInhalt` weiter unten.
-  const eintraege = etbQuery.data?.pages.flat() ?? [];
+  const etbSeiten = etbQuery.data?.pages;
+  const eintraege = useMemo(() => etbSeiten?.flat() ?? [], [etbSeiten]);
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -369,19 +387,27 @@ export default function EtbPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Deeplink ?eintrag=<id>: die Liste paginiert neueste zuerst, ältere Seiten werden nachgeladen,
-  // bis der Eintrag gefunden ist (begrenzt durch das Pagination-Ende). Danach Highlight setzen und
-  // den Param räumen.
+  // Deeplink ?eintrag=<id>: die Seite blättert in die Richtung des Ziels (LFH-947, design.md D4:
+  // die Kennung wächst mit der laufenden Nummer), bis es im Fenster liegt; mit `maxPages` fällt
+  // dabei das andere Ende weg, das Ziel liegt in der zuletzt geholten Seite. Ist in der Richtung
+  // nichts mehr zu holen, wird der Param ohne Highlight geräumt.
   const zielEintragId = parseRouteId(searchParams.get('eintrag') ?? undefined);
   useEffect(() => {
     if (zielEintragId == null) return;
     if (etbQuery.isLoading) return;
-    const gefunden = (etbQuery.data?.pages.flat() ?? []).some((e) => e.id === zielEintragId);
-    if (!gefunden && etbQuery.hasNextPage) {
-      if (!etbQuery.isFetchingNextPage) etbQuery.fetchNextPage();
+    if (etbQuery.isFetchingNextPage || etbQuery.isFetchingPreviousPage) return;
+    const richtung = sprungRichtung(etbQuery.data?.pages ?? [], zielEintragId);
+    if (richtung === 'aelter' && etbQuery.hasNextPage) {
+      etbQuery.fetchNextPage();
       return; // nach dem Laden re-läuft der Effekt (etbQuery.data ändert sich)
     }
-    if (gefunden) setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
+    if (richtung === 'neuer' && etbQuery.hasPreviousPage) {
+      etbQuery.fetchPreviousPage();
+      return;
+    }
+    if (richtung === 'da') {
+      setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
+    }
     searchParams.delete('eintrag');
     setSearchParams(searchParams, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,7 +415,9 @@ export default function EtbPage() {
     zielEintragId,
     etbQuery.data,
     etbQuery.hasNextPage,
+    etbQuery.hasPreviousPage,
     etbQuery.isFetchingNextPage,
+    etbQuery.isFetchingPreviousPage,
     etbQuery.isLoading,
   ]);
 
@@ -430,7 +458,10 @@ export default function EtbPage() {
    * Gesendete und gepufferte Einträge als eine Chronologie. Die Banner unten fassen zusammen, die
    * Zeilen zeigen — sonst fehlte in der Chronologie die eigene, gerade erfasste Meldung.
    */
-  const chronologie = baueZeilen({ eintraege, ausstehend, abgelehnt });
+  const chronologie = useMemo(
+    () => baueZeilen({ eintraege, ausstehend, abgelehnt }),
+    [eintraege, ausstehend, abgelehnt],
+  );
 
   /**
    * Eingabe unten, neueste oben — und was nach dem eigenen Eintrag passiert.
@@ -767,6 +798,24 @@ export default function EtbPage() {
             {/* „neu seit Ihrer letzten Sichtung" — im Fluss über der Zeitachse; das
                 Sammelbanner des Live-Zuflusses liegt dagegen auf ihr. */}
             <EtbLesemarkeBanner einsatzId={einsatzId} />
+            {/* Das Fenster steht nicht am neuesten Eintrag (LFH-947): der Rückweg nach oben,
+                lückenlos über den Cursor nach oben. Keine Zahl — die zählt der Server im Kopf. */}
+            {etbQuery.hasPreviousPage && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: token.paddingXS,
+                  borderBlockEnd: `1px solid ${rollen.linie}`,
+                }}
+              >
+                <Button
+                  onClick={() => etbQuery.fetchPreviousPage()}
+                  loading={etbQuery.isFetchingPreviousPage}
+                >
+                  Neuere laden
+                </Button>
+              </div>
+            )}
             <EtbZeitachse
               zeilen={chronologie}
               einsatzId={einsatzId}

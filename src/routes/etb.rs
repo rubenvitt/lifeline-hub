@@ -309,13 +309,16 @@ pub struct EtbAbfrageParams {
     pub einheit_id: Option<i64>,
     /// Cursor: nur Einträge mit lfd_nr < diesem Wert.
     pub before_lfd_nr: Option<i64>,
+    /// Cursor nach oben (LFH-947): die Seite direkt über diesem Wert, absteigend geliefert.
+    pub after_lfd_nr: Option<i64>,
     /// Seitengröße (Default STANDARD_LIMIT, max MAX_LIMIT).
     pub limit: Option<i64>,
 }
 
 /// GET /api/einsaetze/{id}/etb — ETB-Einträge eines Einsatzes (gefiltert,
 /// volltextdurchsucht, paginiert). Nur für Mitglieder (auch Beobachter).
-/// Sortierung: lfd_nr DESC (neueste zuerst); Cursor über before_lfd_nr.
+/// Sortierung: lfd_nr DESC (neueste zuerst); Cursor über before_lfd_nr bzw. nach oben über
+/// after_lfd_nr (beide zugleich: 422).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Etb>,
@@ -323,6 +326,13 @@ pub async fn liste(
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let merkmale = filter_merkmale(&params)?;
+    if params.before_lfd_nr.is_some() && params.after_lfd_nr.is_some() {
+        // Jeder Cursor ist für sich gültig, erst die Kombination nicht (`src/AGENTS.md`,
+        // Statuscode-Konvention).
+        return Err(AppError::UnprocessableEntity(
+            "before_lfd_nr und after_lfd_nr schließen sich aus".into(),
+        ));
+    }
     let limit = params
         .limit
         .unwrap_or(repo::STANDARD_LIMIT)
@@ -336,6 +346,7 @@ pub async fn liste(
         erfasser_id: merkmale.erfasser_id,
         einheit_id: merkmale.einheit_id,
         before_lfd_nr: params.before_lfd_nr,
+        after_lfd_nr: params.after_lfd_nr,
         limit,
     };
 
