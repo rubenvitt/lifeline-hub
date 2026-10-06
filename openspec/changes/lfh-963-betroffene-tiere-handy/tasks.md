@@ -30,4 +30,4 @@
 - [x] 6.2 Bestehende e2e-Specs auf die neuen Namen ziehen („Betroffene erfassen“, „Tier erfassen“, Filter „Erfasst“).
 - [x] 6.3 Regeln: `frontend/AGENTS.md` (Aktionen: Nebenwege über `weitere`), `frontend/src/personen/AGENTS.md` (eine Maske, „erfasst“, „gesamt“).
 - [x] 6.4 Folgeticket für die übrigen Seiten mit Nebenwegen im Kopf anlegen.
-- [ ] 6.5 Bündel `schnell`, volle Vitest-Suite, berührte e2e-Specs grün; `check-all.sh` belegt die CI des PRs.
+- [x] 6.5 Bündel `schnell`, volle Vitest-Suite, berührte e2e-Specs grün; `check-all.sh` belegt die CI des PRs.
