@@ -264,8 +264,9 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Nicht-GET-Menge).
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
-  stehen), und nach einer Schwärzung schreibt der Purge-Lauf den WAL per
-  `db::wal_zurueckschreiben` zurück. Die Haupt-DB nur über `db::connect` öffnen. Netz:
+  stehen) und `journal_size_limit` (LFH-928), und nach einer Schwärzung oder einem Sweep mit
+  Löschungen schreibt der Purge-Lauf den WAL per `db::wal_zurueckschreiben` zurück. Die Haupt-DB
+  nur über `db::connect` öffnen. Netz:
   `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler.rs`). Herleitung und
   Messung: `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
 - **Fristen je Datenkategorie** (LFH-749, Spec `aufbewahrung-kategorien`): jede Scrub-Spalte
