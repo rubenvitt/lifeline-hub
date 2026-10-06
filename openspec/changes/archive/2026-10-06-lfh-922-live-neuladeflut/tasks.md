@@ -27,8 +27,8 @@
 ## 5. Regel und Abschluss
 
 - [x] 5.1 `frontend/AGENTS.md`, „Query-Key-Registry“: Regel aus D7.
-- [ ] 5.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests von `live_feed`, `org_live`, `modul_override` und `live::`.
-- [ ] 5.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der Live-Specs).
+- [x] 5.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests von `live_feed`, `org_live`, `modul_override` und `live::`.
+- [x] 5.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der Live-Specs).
 
 ## 6. Nachzug aus dem Review
 
