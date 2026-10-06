@@ -434,7 +434,12 @@ function StatusSpalte({
     const verteilung = 'verteilung' in z.status ? z.status.verteilung : null;
     status = (
       <>
-        <StatusChip ton={z.status.ton} code={z.status.code ?? undefined} wort={z.status.wort} />
+        <StatusChip
+          ton={z.status.ton}
+          code={z.status.code ?? undefined}
+          wort={z.status.wort}
+          trenner
+        />
         {verteilung && (
           <span
             data-lfh="meldebild-statusverteilung"

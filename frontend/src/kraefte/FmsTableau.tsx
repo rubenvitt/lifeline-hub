@@ -298,7 +298,9 @@ export default function FmsTableau({
                     optionen={optionen}
                     onWaehlen={(w) => waehle(ef, bedienung, Number(w))}
                     darstellung={darstellungVon(ef)}
-                    etikett={<StatusChip ton={status.ton} code={status.code} wort={status.wort} />}
+                    etikett={
+                      <StatusChip ton={status.ton} code={status.code} wort={status.wort} trenner />
+                    }
                     darfSchreiben={darfSchreiben}
                   />
                   {einheiten !== null && (

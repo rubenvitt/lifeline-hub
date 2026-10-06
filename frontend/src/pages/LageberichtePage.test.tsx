@@ -778,10 +778,10 @@ describe('LageberichtePage', () => {
     // Die Vorlage steht je KETTE einmal, nicht je Fassung.
     expect(screen.getAllByText('Freier Bericht')).toHaveLength(1);
 
-    // Gruppenköpfe mit Zähler über Köpfe, Entwürfe zuerst (`gruppen.reihenfolge`). Trennzeichen und
-    // Zählerform gehören dem Primitiv → `[·(]` auf der Region.
-    expect(sicht).toHaveTextContent(/Entwürfe\s*[·(]\s*1/);
-    expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*1/);
+    // Gruppenköpfe mit Zähler, Entwürfe zuerst; die Zählerform (Zahl vor Wort) gehört dem
+    // Primitiv (`gruppenZahl`).
+    expect(sicht).toHaveTextContent(/1\s*Entwürfe/);
+    expect(sicht).toHaveTextContent(/1\s*Freigegeben/);
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
 
