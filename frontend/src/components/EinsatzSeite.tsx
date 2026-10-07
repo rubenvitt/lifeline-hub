@@ -1,5 +1,5 @@
 import { IconChevronRechts } from '../icons';
-import { ConfigProvider, Typography, theme } from 'antd';
+import { Button, ConfigProvider, Typography, theme } from 'antd';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
@@ -9,6 +9,8 @@ import '../theme/sprache.css';
 import './EinsatzSeite.css';
 import Datenstand from './Datenstand';
 import FensterRahmen from './FensterRahmen';
+import { MenueAusloeser } from './MenueAusloeser';
+import { useViewport } from './useViewport';
 import { useModusFarben } from './rahmenStil';
 
 /** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — Aktionen in
@@ -126,6 +128,85 @@ function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrolle
   );
 }
 
+/**
+ * Ein Nebenweg des Seitenkopfs (LFH-963, design.md D1): was ÖFFNET, aber nicht erfasst —
+ * Drucken, CSV-Export, Listenzugriffe. Strukturiert statt als `ReactNode`, weil dieselbe Stelle
+ * ab `md` einen Knopf und unter `md` einen Menüeintrag braucht.
+ */
+export interface Nebenweg {
+  key: string;
+  /** Nur Text: er steht als Knopf UND als Menüeintrag da. */
+  label: string;
+  onWahl: () => void;
+  /**
+   * Das Ziel als Adresse, wenn der Nebenweg eine Seite öffnet (Druckansicht): ab `md` ein Link mit
+   * Knopfgestalt, Strg/⌘+Klick öffnet einen Tab; ein einfacher Klick ruft `onWahl`.
+   */
+  ziel?: string;
+  /** Läuft gerade (CSV-Abruf); zeigt sich am Knopf bzw. am Auslöser. */
+  laeuft?: boolean;
+}
+
+/** Nebenwege samt dem zugänglichen Namen des Auslösers „Weitere“ (nennt die Seite). */
+export interface SeitenNebenwege {
+  /** z. B. „Weitere Aktionen zu den Betroffenen“ — beginnt mit „Weitere“, nennt die Seite. */
+  name: string;
+  /** Nach Rechteprüfung. Leer ⇒ weder Knopf noch Auslöser. */
+  eintraege: readonly Nebenweg[];
+}
+
+/**
+ * Die Nebenwege im Kopf (LFH-963): ab `md` je Eintrag ein sekundärer Knopf, unter `md` EIN
+ * Auslöser „Weitere“ — Regel `frontend/AGENTS.md`, Aktionen. Der Dreipunkt ist derselbe Baustein
+ * wie im ETB-Kopf (`MenueAusloeser`), damit der Weg auf jeder Seite gleich aussieht.
+ */
+function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
+  const { istSchmal } = useViewport();
+  if (eintraege.length === 0) return null;
+  if (istSchmal) {
+    return (
+      <MenueAusloeser
+        // Ein laufender Nebenweg sperrt nur seinen Eintrag, nicht den Auslöser: ein Knopf im
+        // Ladezustand schluckt Klicks, und Drucken wäre bis zum Ende des Exports unerreichbar.
+        eintraege={eintraege.map((e) =>
+          e.laeuft
+            ? { key: e.key, label: `${e.label} (läuft …)`, gesperrt: true as const }
+            : { key: e.key, label: e.label },
+        )}
+        zugaenglicherName={name}
+        onWahl={(key) => eintraege.find((e) => e.key === key)?.onWahl()}
+      />
+    );
+  }
+  return (
+    <>
+      {eintraege.map((e) => (
+        <Button
+          key={e.key}
+          href={e.ziel}
+          loading={e.laeuft}
+          onClick={(ereignis) => {
+            if (e.ziel != null) {
+              // Strg/⌘/Umschalt oder mittlere Taste: der Browser öffnet den Link selbst.
+              if (
+                ereignis.metaKey ||
+                ereignis.ctrlKey ||
+                ereignis.shiftKey ||
+                ereignis.button !== 0
+              )
+                return;
+              ereignis.preventDefault();
+            }
+            e.onWahl();
+          }}
+        >
+          {e.label}
+        </Button>
+      ))}
+    </>
+  );
+}
+
 interface EinsatzSeiteProps {
   titel: ReactNode;
   /** Einzeilige, gedämpfte Beschreibung unter dem Titel. */
@@ -147,6 +228,13 @@ interface EinsatzSeiteProps {
    */
   aktionen?: ReactNode;
   /**
+   * Nebenwege des Kopfes (Drucken, CSV, Listenzugriffe): ab `md` als sekundäre Knöpfe hinter
+   * `aktionen`, unter `md` gebündelt hinter „Weitere“ (LFH-963, `frontend/AGENTS.md`, Aktionen).
+   * In `aktionen` bleibt, was unter `md` sichtbar stehen muss: Segmentleiste und genau eine
+   * Erfassung.
+   */
+  weitere?: SeitenNebenwege;
+  /**
    * Anlegen-Aktion der Seite für die Kommandopalette („Neue Zeile", LFH-391 · B5).
    *
    * Ein CALLBACK, weil sich aus dem `ReactNode` in `aktionen` kein Aufruf ziehen lässt. Die Seite
@@ -157,7 +245,7 @@ interface EinsatzSeiteProps {
    * Fehlt sie, wird **gar keine** Ebene registriert (siehe `aktiv` unten).
    */
   neueZeile?: () => void;
-  /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
+  /** Optionaler Hinweis unter dem Header (z. B. `RechteHinweis` „Nur Ansicht · Grund“). */
   hinweis?: ReactNode;
   /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
   dataUpdatedAt?: number;
@@ -219,6 +307,7 @@ export default function EinsatzSeite({
   breadcrumb,
   meta,
   aktionen,
+  weitere,
   neueZeile,
   hinweis,
   dataUpdatedAt,
@@ -230,6 +319,7 @@ export default function EinsatzSeite({
   const { token } = theme.useToken();
   const farben = useModusFarben();
   const aktionenRef = useRef<HTMLDivElement>(null);
+  const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
 
   /*
@@ -325,13 +415,19 @@ export default function EinsatzSeite({
         {/* Die Marke macht „genau eine Primäraktion IM KOPF" von außen prüfbar (LFH-340 · C5);
             global gezählt fiele eine Seite mit Formular im Inhalt zu Unrecht durch. Die
             Dev-Warnung oben zählt denselben Teilbaum. */}
-        {aktionen && (
+        {(aktionen || (weitere && weitere.eintraege.length > 0)) && (
           <div
             ref={aktionenRef}
             data-lfh="seitenkopf-aktionen"
             style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginXS * 2 }}
           >
+            {/* Unter `md` steht der Auslöser „Weitere“ VORN (LFH-963): hinten bräche er bei 390 px in
+                eine eigene Zeile und kostete die erste Personenzeile ihren Platz; vorn teilt er die
+                Zeile mit der Segmentleiste. Ab `md` folgen die Knöpfe den Aktionen. Umgestellt wird
+                im Baum, nicht per CSS-`order`: Lese- und Tabfolge bleiben die sichtbare Folge. */}
+            {weitere && istSchmal && <NebenwegeImKopf {...weitere} />}
             {aktionen}
+            {weitere && !istSchmal && <NebenwegeImKopf {...weitere} />}
           </div>
         )}
       </div>

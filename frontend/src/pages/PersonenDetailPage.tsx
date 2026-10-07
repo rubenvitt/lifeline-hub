@@ -1,4 +1,5 @@
 import { useRollen } from '../components/instrument/rollenwerte';
+import { Datenfeld, Datenraster } from '../components/instrument';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { bezugsDarstellung } from '../theme/statusFarben';
@@ -11,7 +12,6 @@ import {
   Button,
   Col,
   Collapse,
-  Descriptions,
   Form,
   Input,
   InputNumber,
@@ -26,7 +26,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -145,6 +145,50 @@ type Kopfaktion =
       status: PersonStatus;
       gefahr?: true;
     };
+
+interface StammdatenAngabe {
+  label: string;
+  /** `null`/leer = ohne Angabe; landet in der Zeile „Ohne Angabe", nicht als Strich im Raster. */
+  wert: ReactNode;
+  mono?: boolean;
+  breit?: boolean;
+}
+
+function leer(wert: ReactNode): boolean {
+  return wert == null || wert === false || (typeof wert === 'string' && wert.trim() === '');
+}
+
+/**
+ * Stammdaten als `Datenraster` (LFH-963, design.md D8): nur gesetzte Angaben als Feld, die leeren
+ * in EINER Zeile darunter. Eine Spalte voller Striche läse sich am Handy als Inhalt und schöbe die
+ * gesetzten Angaben aus dem Bild.
+ */
+function StammdatenRaster({ angaben }: { angaben: readonly StammdatenAngabe[] }) {
+  const gesetzt = angaben.filter((a) => !leer(a.wert));
+  const ohne = angaben.filter((a) => leer(a.wert)).map((a) => a.label);
+  return (
+    <div>
+      {gesetzt.length > 0 && (
+        <Datenraster spalten={2} beschriftung="Stammdaten">
+          {gesetzt.map((a) => (
+            <Datenfeld key={a.label} label={a.label} mono={a.mono} breit={a.breit}>
+              {a.wert}
+            </Datenfeld>
+          ))}
+        </Datenraster>
+      )}
+      {ohne.length > 0 && (
+        <Typography.Paragraph
+          type="secondary"
+          data-lfh="ohne-angabe"
+          style={{ marginTop: 8, marginBottom: 0 }}
+        >
+          Ohne Angabe: {ohne.join(', ')}
+        </Typography.Paragraph>
+      )}
+    </div>
+  );
+}
 
 export default function PersonenDetailPage() {
   const { token, rollen } = useRollen();
@@ -589,6 +633,77 @@ export default function PersonenDetailPage() {
     );
   }
 
+  /**
+   * Lesezweig der Stammdaten (LFH-963, design.md D8): `null` = ohne Angabe. Zustand und Koordinate
+   * beschreiben eine angetroffene Person und fehlen bei einer vermissten ganz, wie im
+   * Bearbeiten-Zweig; „vermisst seit" nur bei einer vermissten.
+   */
+  function stammdatenAngaben(person: PersonDetail, angetroffen: boolean): StammdatenAngabe[] {
+    const koordinate = koordinatenText(person);
+    const verorten = darfSchreiben && !person.storniert_at && angetroffen && darf('fremde-module');
+    return [
+      { label: 'Name', wert: person.name },
+      { label: 'Vorname', wert: person.vorname },
+      { label: 'Geschlecht', wert: person.geschlecht },
+      { label: 'Geburtsdatum', wert: person.geburtsdatum, mono: true },
+      { label: 'Alter (geschätzt)', wert: person.alter_geschaetzt, mono: true },
+      { label: 'Herkunft / Adresse', wert: person.herkunft_adresse, breit: true },
+      ...(angetroffen || person.zustand ? [{ label: 'Zustand', wert: person.zustand }] : []),
+      { label: 'Antreffort', wert: person.antreff_ort },
+      ...(angetroffen || koordinate
+        ? [
+            {
+              label: 'Koordinate',
+              // Als Feld, sobald etwas dasteht: der Wert oder der Weg, ihn zu setzen.
+              wert:
+                koordinate || verorten ? (
+                  <Space wrap size="middle">
+                    {koordinate && (
+                      <span data-lfh="koordinate" style={{ fontFamily: token.fontFamilyCode }}>
+                        {koordinate}
+                      </span>
+                    )}
+                    {verorten && karteGesperrt && (
+                      // Gesperrte Lagekarte (LFH-888): der Auftrag steht gesperrt mit Grund (M16).
+                      <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
+                        Auf Lagekarte verorten
+                      </Button>
+                    )}
+                    {verorten && !karteGesperrt && (
+                      // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
+                      // Lagekarte), in einem neuen Tab öffenbar. Die zwei Angaben des
+                      // handgebauten Bedienziels trägt `verortenLinkStil`.
+                      <Link
+                        to={lagekartePfad(einsatzId, {
+                          platzieren: { typ: 'person', id: person.id },
+                        })}
+                        style={verortenLinkStil(token, rollen.bedienText)}
+                      >
+                        Auf Lagekarte verorten
+                      </Link>
+                    )}
+                  </Space>
+                ) : null,
+              breit: true,
+            },
+          ]
+        : []),
+      ...(person.status === 'vermisst'
+        ? [
+            {
+              label: 'vermisst seit',
+              wert: person.vermisst_seit ? (
+                <ZeitAnzeige wert={person.vermisst_seit} format="dtgVoll" />
+              ) : null,
+              mono: true,
+            },
+          ]
+        : []),
+      { label: 'Melder / Kontakt', wert: person.melder_kontakt, breit: true },
+      { label: 'Notiz', wert: person.notiz, breit: true },
+    ];
+  }
+
   function stammdatenSpalte(person: PersonDetail) {
     const angetroffen = istAngetroffen(person);
     // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen" verengt:
@@ -664,67 +779,7 @@ export default function PersonenDetailPage() {
             </Space>
           </Form>
         ) : (
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Name">{person.name ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Vorname">{person.vorname ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Geschlecht">{person.geschlecht ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Geburtsdatum">{person.geburtsdatum ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Alter (geschätzt)">
-              {person.alter_geschaetzt ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Herkunft / Adresse">
-              {person.herkunft_adresse ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Zustand">{person.zustand ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Antreffort">{person.antreff_ort ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Koordinate">
-              <Space wrap size="middle">
-                <span data-lfh="koordinate" style={{ fontFamily: token.fontFamilyCode }}>
-                  {koordinatenText(person) ?? '—'}
-                </span>
-                {darfSchreiben &&
-                  !person.storniert_at &&
-                  angetroffen &&
-                  darf('fremde-module') &&
-                  karteGesperrt && (
-                    // Gesperrte Lagekarte (LFH-888): der Auftrag steht gesperrt mit Grund (M16).
-                    <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
-                      Auf Lagekarte verorten
-                    </Button>
-                  )}
-                {darfSchreiben &&
-                  !person.storniert_at &&
-                  angetroffen &&
-                  darf('fremde-module') &&
-                  !karteGesperrt && (
-                    // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
-                    // Lagekarte), in einem neuen Tab öffenbar. Die zwei Angaben des handgebauten
-                    // Bedienziels trägt `verortenLinkStil`.
-                    <Link
-                      to={lagekartePfad(einsatzId, {
-                        platzieren: { typ: 'person', id: person.id },
-                      })}
-                      style={verortenLinkStil(token, rollen.bedienText)}
-                    >
-                      Auf Lagekarte verorten
-                    </Link>
-                  )}
-              </Space>
-            </Descriptions.Item>
-            {person.status === 'vermisst' && (
-              <Descriptions.Item label="vermisst seit">
-                {person.vermisst_seit ? (
-                  <ZeitAnzeige wert={person.vermisst_seit} format="dtgVoll" />
-                ) : (
-                  '—'
-                )}
-              </Descriptions.Item>
-            )}
-            <Descriptions.Item label="Melder / Kontakt">
-              {person.melder_kontakt ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Notiz">{person.notiz ?? '—'}</Descriptions.Item>
-          </Descriptions>
+          <StammdatenRaster angaben={stammdatenAngaben(person, angetroffen)} />
         )}
 
         {/* Zuordnungen, Fotos und Dateien und Audit laden erst beim Aufklappen; Kopf und
@@ -1063,8 +1118,12 @@ export default function PersonenDetailPage() {
         )
       }
     >
+      {/* Unter `lg` steht die medizinische Spalte zuerst (LFH-963, design.md D8): am Handy und
+          am Tablet hoch ist Sichtung und Verlauf die erste Frage, die Stammdaten folgen. Ab
+          `lg` nebeneinander, Stammdaten links. `order` statt zweier Bäume: ein Formular im
+          Bearbeiten-Zweig darf nicht doppelt hängen. */}
       <Row gutter={24}>
-        <Col xs={24} lg={12}>
+        <Col xs={{ span: 24, order: 2 }} lg={{ span: 12, order: 1 }}>
           <Typography.Text
             type="secondary"
             style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
@@ -1073,7 +1132,7 @@ export default function PersonenDetailPage() {
           </Typography.Text>
           {stammdatenSpalte(p)}
         </Col>
-        <Col xs={24} lg={12}>
+        <Col xs={{ span: 24, order: 1 }} lg={{ span: 12, order: 2 }}>
           {medSpalte(p)}
         </Col>
       </Row>

@@ -6,7 +6,7 @@ import { App, Breadcrumb, Button, Modal, Popconfirm, Space, Typography } from 'a
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { dokumentDownloadPfad, entferneDokument, listeDokumente } from '../api/dokumente';
-import type { Dokument, EinsatzStatus } from '../api/types';
+import type { Dokument } from '../api/types';
 import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
 import { istBildMime, originalPfad } from '../api/anhangFassung';
 import { useAuth } from '../auth/AuthContext';
@@ -22,6 +22,7 @@ import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from '../dokument
 import DokumentAblegenModal from '../dokumente/DokumentAblegenModal';
 import DokumentBearbeitenModal from '../dokumente/DokumentBearbeitenModal';
 import DownloadAnker from '../components/DownloadAnker';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 
 /**
  * Dokumentenablage eines Einsatzes (LFH-632), strukturgleich zu `SchaedenPage`.
@@ -64,10 +65,7 @@ import DownloadAnker from '../components/DownloadAnker';
  * stünde die Zeile kurz ohne Zusatz da.
  */
 
-const rechteText = (status: EinsatzStatus) =>
-  status !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — die Dokumente stehen nur noch zum Nachlesen bereit.'
-    : 'Nur Einsatzleitung und Führungspersonal können Dokumente ablegen und entfernen — zum Nachlesen und Herunterladen stehen sie hier bereit.';
+const rechteText = einsatzRechteGrund;
 
 const ENTFERNEN_TEXT = 'Es verschwindet aus der Liste; der ETB-Nachweis bleibt.';
 

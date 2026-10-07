@@ -5,7 +5,7 @@ import { renderMitProviders } from '../test/utils';
 import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungModal';
 
 /**
- * Unit-Netz für die Personen-Schnellerfassung: was die Hülle zusichert (Fokus, Enter,
+ * Unit-Netz für die Erfassungsmaske der Betroffenen: was die Hülle zusichert (Fokus, Enter,
  * Serienlauf) plus das Feldbudget. Keine Pixel — `renderMitProviders` hat kein Theme.
  */
 
@@ -17,7 +17,7 @@ function zeige(opts: { modus?: ErfassungsModus; onErfassen?: Mock; einsatzId?: n
   const ansicht = renderMitProviders(
     <PersonErfassungModal
       einsatzId={opts.einsatzId ?? 1}
-      modus={opts.modus ?? 'schnell'}
+      modus={opts.modus ?? 'erfassen'}
       isPending={false}
       onErfassen={onErfassen}
       onFertig={onFertig}
@@ -159,7 +159,7 @@ describe('PersonErfassungModal — Feldbudget', () => {
     await waitFor(() => expect(screen.getByLabelText('Melder / Kontakt')).toBeInTheDocument());
     unmount();
 
-    zeige({ modus: 'betroffen' });
+    zeige({ modus: 'erfassen' });
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await waitFor(() => expect(screen.getByLabelText('Vorname')).toBeInTheDocument());
     expect(screen.queryByLabelText('Melder / Kontakt')).not.toBeInTheDocument();

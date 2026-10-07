@@ -193,7 +193,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
 
     const knopf = await screen.findByRole('button', { name: 'Speichern' });
     expect(knopf).toBeDisabled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/Systemrolle/);
+    expect(screen.getByRole('status')).toHaveTextContent('Nur Ansicht nur System-Admin');
   });
 
   it('mit Admin-Recht ist derselbe Knopf bedienbar', async () => {

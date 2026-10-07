@@ -219,6 +219,47 @@ describe('EinheitenPage', () => {
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
+  /**
+   * LFH-975: der Knoten ist ein Block aus zwei Zeilen, kein `Space`, dessen Kinder einzeln
+   * umbrechen. Ist und Soll stehen in EINER Zeile, und der Ist-Wert trägt sein Etikett.
+   */
+  it('baut den Knoten als zweizeiligen Block mit „Ist … · Soll …“ in einer Zeile', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+    const knoten = await screen.findByTestId('einheit-knoten-10');
+    expect(knoten.querySelector('.ant-space')).toBeNull();
+    const ist = within(knoten).getByText('1/0/2//3');
+    const zeile = ist.parentElement!;
+    expect(zeile).toHaveTextContent(/^Ist 1\/0\/2\/\/3 · Soll 1\/3\/18\/\/22$/);
+    expect(zeile).toContainElement(within(knoten).getByText('1/3/18//22'));
+    expect(zeile).not.toContainElement(within(knoten).getByRole('link', { name: '1. Zug' }));
+  });
+
+  it('trägt das Etikett „Ist“ auch ohne Soll', async () => {
+    // Die erste passende Antwort gewinnt: die Abweichung steht vor dem Grundsatz.
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([{ ...einheiten[0], soll: null }]),
+      ),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+    const knoten = await screen.findByTestId('einheit-knoten-10');
+    expect(within(knoten).getByText('1/0/2//3').parentElement).toHaveTextContent(
+      /^Ist 1\/0\/2\/\/3$/,
+    );
+  });
+
   it('weist den Stand der Gliederung aus', async () => {
     /**
      * Die Seite trägt nur die Gliederung; die Zusicherung über den ältesten Stand mehrerer Bestände
@@ -364,9 +405,7 @@ describe('EinheitenPage · Datenzustände', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.einheiten(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Der Baum aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt ihn nicht.
     expect(screen.getByText('1. Zug')).toBeInTheDocument();
     expect(screen.queryByText('Gliederung konnte nicht geladen werden')).not.toBeInTheDocument();

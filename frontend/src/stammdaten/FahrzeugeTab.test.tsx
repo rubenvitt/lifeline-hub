@@ -110,8 +110,8 @@ describe('FahrzeugeTab', () => {
     const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
     const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
 
-    // Keine Rückfrage (LFH-477): „Außer Dienst" ist umkehrbar, der Klick setzt sofort.
-    await userEvent.click(within(erste).getByRole('button', { name: 'Außer Dienst' }));
+    // Keine Rückfrage (LFH-477): „Außer Dienst nehmen" ist umkehrbar, der Klick setzt sofort.
+    await userEvent.click(within(erste).getByRole('button', { name: 'Außer Dienst nehmen' }));
     expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
     await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1']));
 
@@ -123,12 +123,12 @@ describe('FahrzeugeTab', () => {
     expect(within(erste).getByRole('button', { name: 'Bearbeiten' })).toBeDisabled();
     // … die FREMDE Zeile bleibt bedienbar.
     expect(within(zweite).getByRole('button', { name: 'Bearbeiten' })).toBeEnabled();
-    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).toBeEnabled();
-    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst' })).not.toHaveClass(
+    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst nehmen' })).toBeEnabled();
+    expect(within(zweite).getByRole('button', { name: 'Wieder in Dienst nehmen' })).not.toHaveClass(
       'ant-btn-loading',
     );
 
-    await userEvent.click(within(zweite).getByRole('button', { name: 'Wieder in Dienst' }));
+    await userEvent.click(within(zweite).getByRole('button', { name: 'Wieder in Dienst nehmen' }));
     await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1', 'in-dienst/2']));
     await act(async () => {
       freigeben?.();
@@ -261,11 +261,11 @@ describe('FahrzeugeTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
     render(admin);
     await screen.findByText('Florian 1');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst nehmen' }));
     const hinweis = await stehenderFehler('Fahrzeug ist einem laufenden Einsatz zugeordnet');
     expect(hinweis).toHaveTextContent('Dienststatus nicht geändert');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst nehmen' }));
     await keinStehenderFehler('Fahrzeug ist einem laufenden Einsatz zugeordnet');
     expect(versuch).toBe(2);
   });

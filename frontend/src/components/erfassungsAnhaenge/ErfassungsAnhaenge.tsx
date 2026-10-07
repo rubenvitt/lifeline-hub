@@ -249,7 +249,7 @@ export default function ErfassungsAnhaenge({
           {aktionen && (
             <Popconfirm
               title="Datei entfernen?"
-              description="Sie verschwindet aus der Liste; der ETB-Nachweis bleibt."
+              description="ETB-Nachweis bleibt."
               okText="Entfernen"
               cancelText="Abbrechen"
               okButtonProps={{ danger: true }}
@@ -310,7 +310,7 @@ export default function ErfassungsAnhaenge({
                 aktion={{ label: 'anzeigen', onKlick: zeigeZurueckgehaltene }}
                 style={{ position: 'absolute', insetInline: 0, top: 0 }}
               >
-                {zuflussText(zurueckgehalten.length)} — oben einsortiert
+                {zuflussText(zurueckgehalten.length)}
               </Sammelbanner>
             )}
           </div>

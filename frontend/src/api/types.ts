@@ -243,6 +243,9 @@ export interface FuehrungsstellePatch {
 // ============================== E‑2 Personen ==============================
 export type PersonStatus = S['PersonStatus'];
 export type Person = S['PersonAnzeige'];
+/** Personenauswahl ohne Freitexte (LFH-940): Zeile je nicht stornierter Person für Picker,
+ *  Sprungpalette und Chat-Bezug. */
+export type PersonAuswahl = S['PersonAuswahl'];
 export type Sichtungskategorie = S['Sichtungskategorie'];
 export type VerbleibArt = S['VerbleibArt'];
 export type VerbleibStatus = S['VerbleibStatus'];
@@ -723,6 +726,8 @@ export interface AusgabeEingabe {
 
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
+/** Zahlen der Erinnerungsseite aus einem eigenen Abruf (LFH-940). */
+export type ErinnerungKennzahlen = S['ErinnerungKennzahlen'];
 
 /** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeueErinnerung {
@@ -787,6 +792,8 @@ export type MeldungStatus = S['MeldungStatus'];
 export type Meldungsart = S['Meldungsart'];
 export type MeldungMeldeweg = S['MeldeWeg'];
 export type Meldung = S['MeldungAnzeige'];
+/** Zahlen der Meldungsseite aus einem eigenen Abruf (LFH-940): „Alarmiert“ quer zur Phase. */
+export type MeldungKennzahlen = S['MeldungKennzahlen'];
 
 /** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeueMeldung {

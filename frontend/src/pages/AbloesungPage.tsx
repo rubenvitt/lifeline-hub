@@ -15,7 +15,7 @@ import {
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Abloesung, AbloesungVorgabe, EinsatzStatus } from '../api/types';
+import type { Abloesung, AbloesungVorgabe } from '../api/types';
 import AbloesungKarte from '../abloesung/AbloesungKarte';
 import {
   AbloeserDialog,
@@ -50,15 +50,12 @@ import {
 import { useViewport } from '../components/useViewport';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 
 const { Text } = Typography;
 
-/** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
-function abloesungRechteText(status: EinsatzStatus): string {
-  return status !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — die Ablösungen sind nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können Schichten beginnen und Ablösungen vollziehen.';
-}
+/** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
+const abloesungRechteText = einsatzRechteGrund;
 
 type Rhythmusziel =
   | { art: 'schicht'; schicht: Abloesung; vorgabe: number | undefined }

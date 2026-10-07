@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 import { AusgangUnbekannt, NetzFehler, type UploadFortschritt } from './client';
-import { etbAnhangPfad, ladeEtbAnhangHoch } from './etb';
+import { etbAnhangPfad, ladeEtbAnhangHoch, ladeEtbZaehler, listeEtb, zaehleEtb } from './etb';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -55,5 +55,30 @@ describe('ETB-Anhänge (LFH-117)', () => {
   it('baut den Download-Pfad unter dem ETB-Präfix — nie den generischen', () => {
     expect(etbAnhangPfad(7, 42, 9)).toBe('/api/einsaetze/7/etb/42/anhaenge/9');
     expect(etbAnhangPfad(7, 42, 9)).not.toMatch(/^\/api\/einsaetze\/7\/anhaenge/);
+  });
+});
+
+describe('Ausschluss der Systemeinträge (LFH-958)', () => {
+  function antwort(body: unknown) {
+    return vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => new Response(JSON.stringify(body), { status: 200 }));
+  }
+
+  it('Liste und beide Zählungen schicken `ohne_system=true` über denselben Filter', async () => {
+    const fetchMock = antwort([]);
+    await listeEtb(7, { ohne_system: true, before_lfd_nr: 40 });
+    await ladeEtbZaehler(7, { ohne_system: true });
+    await zaehleEtb(7, { ohne_system: true });
+    const pfade = fetchMock.mock.calls.map(([p]) => String(p));
+    expect(pfade[0]).toBe('/api/einsaetze/7/etb?ohne_system=true&before_lfd_nr=40&limit=100');
+    expect(pfade[1]).toBe('/api/einsaetze/7/etb/zaehler?ohne_system=true');
+    expect(pfade[2]).toBe('/api/einsaetze/7/etb/anzahl?ohne_system=true');
+  });
+
+  it('ohne den Schalter fehlt der Parameter ganz', async () => {
+    const fetchMock = antwort([]);
+    await listeEtb(7, {});
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/einsaetze/7/etb?limit=100');
   });
 });

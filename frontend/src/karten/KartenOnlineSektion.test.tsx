@@ -49,4 +49,23 @@ describe('KartenOfflineSektion', () => {
     expect(screen.getByRole('heading', { name: 'Offline-Karten' })).toBeInTheDocument();
     expect(screen.getByText('offline-kind')).toBeInTheDocument();
   });
+
+  /** LFH-1078: Titel und Liste reichen — kein Absatz über MBTiles, Prep-Phase und Auslieferung. */
+  it('erklärt nichts: keine Beschreibung, kein Absatz', () => {
+    renderMitProviders(<KartenOfflineSektion />);
+    expect(screen.queryByText(/MBTiles/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Prep-Phase/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Nur Ansicht')).not.toBeInTheDocument();
+  });
+
+  it('Nicht-Admin: „Nur Ansicht · nur System-Admin“ statt Info-Kasten', () => {
+    setzeRolle('keiner', 'fuehrungskraft');
+    renderMitProviders(<KartenOfflineSektion />);
+    const zeile = screen.getByRole('status');
+    expect(zeile).toHaveTextContent('Nur Ansicht');
+    expect(zeile).toHaveTextContent('nur System-Admin');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/read-only/)).not.toBeInTheDocument();
+    expect(screen.getByText('offline-kind')).toBeInTheDocument();
+  });
 });

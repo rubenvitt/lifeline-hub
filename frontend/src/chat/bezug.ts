@@ -57,7 +57,10 @@ export function uhsLabel(u: Uhs): string {
   return `${u.bezeichnung} (${u.typ})`;
 }
 
-export function personLabel(p: Person): string {
+/** Was Label und Kurzinfo einer Person brauchen: die Vollliste wie die Auswahl (LFH-940). */
+type PersonKopf = Pick<Person, 'registrier_nr' | 'name' | 'vorname'>;
+
+export function personLabel(p: PersonKopf): string {
   const name = [p.vorname, p.name].filter(Boolean).join(' ');
   const nr = registrierAnzeige(p.registrier_nr);
   return name ? `${nr} · ${name}` : nr;
@@ -85,7 +88,7 @@ export function schadenInfo(s: Schaden): BezugKurzinfo {
 export function uhsInfo(u: Uhs): BezugKurzinfo {
   return { titel: uhsLabel(u), zeilen: [`Typ: ${u.typ}`] };
 }
-export function personInfo(p: Person): BezugKurzinfo {
+export function personInfo(p: PersonKopf): BezugKurzinfo {
   const name = [p.vorname, p.name].filter(Boolean).join(' ');
   return { titel: personLabel(p), zeilen: name ? [`Name: ${name}`] : ['Name nicht erfasst'] };
 }

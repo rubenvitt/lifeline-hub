@@ -130,6 +130,8 @@ describe('PersonalPage', () => {
   });
 
   it('zeigt disponiertes Personal mit Funktion und Position', async () => {
+    // Die Funktion steht erst ab `xl` (LFH-975).
+    setzeViewportBreite(1440);
     render(einsatz());
     expect(await screen.findByText('Thomas Müller')).toBeInTheDocument();
     expect(screen.getByText('Sanitäter, Gruppenführer')).toBeInTheDocument();
@@ -327,6 +329,8 @@ describe('PersonalPage', () => {
   // Gegenrichtung zur Fahrzeugseite: je Kraft das zugeordnete Fahrzeug (Funkrufname/Kennzeichen) +
   // die Einheit, jeweils als Deeplink zur Modulseite.
   it('zeigt zugeordnetes Fahrzeug (Funkrufname/Kennzeichen) und Einheit je Kraft, verlinkt (LFH-139)', async () => {
+    // Fahrzeug und Einheit stehen erst ab `xxl` (LFH-975).
+    setzeViewportBreite(1600);
     render(einsatz());
     await screen.findByText('Thomas Müller');
 
@@ -359,6 +363,7 @@ describe('PersonalPage', () => {
         fahrzeug_id: null,
       },
     ];
+    setzeViewportBreite(1600);
     const { container } = render(einsatz(), unzugeordnet);
     await screen.findByText('Erika Mustermann');
 
@@ -400,8 +405,10 @@ describe('PersonalPage', () => {
      * bei einem Platzhalter irgendwo sonst.
      *
      * Die Voreinstellung bleibt: schreibtragende Spalten bekommen kein `abBreite`, sie weichen nur
-     * über die Voreinstellung. Der Zähler stimmt vorher wie nachher.
+     * über die Voreinstellung. Der Zähler stimmt vorher wie nachher. Ab `xxl`, damit nur die
+     * Bemerkung fehlt (LFH-975).
      */
+    setzeViewportBreite(1600);
     const { container } = render(einsatz());
     await screen.findByText('Thomas Müller');
     expect(
@@ -424,6 +431,7 @@ describe('PersonalPage', () => {
      * `token.colorError` — Rot für einen Spaltenzähler bricht „Rot bedient nichts". Der Zähler
      * steht im zugänglichen Namen des Knopfes.
      */
+    setzeViewportBreite(1600);
     render(einsatz());
     await screen.findByText('Thomas Müller');
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
@@ -432,6 +440,26 @@ describe('PersonalPage', () => {
     // (1024–1280 px) sie sonst genau dort verlöre, und es keine Detailroute als Ausweichort gibt.
     expect(screen.getByRole('columnheader', { name: 'Position' })).toBeInTheDocument();
   });
+
+  it.each([
+    [1024, 5],
+    [1440, 4],
+    [1600, 1],
+  ])(
+    'bei %i px weichen die Nebenspalten über den Schalter und stehen im Zähler (%i ausgeblendet, LFH-975)',
+    async (breite, anzahl) => {
+      setzeViewportBreite(breite);
+      render(einsatz());
+      await screen.findByText('Thomas Müller');
+      expect(
+        screen.getByRole('button', { name: new RegExp(`Spalten · ${anzahl} ausgeblendet`) }),
+      ).toBeInTheDocument();
+      // Ruhe, Position und die Aktion weichen nie.
+      for (const kopf of ['Position', 'Ruhe', 'Aktionen']) {
+        expect(screen.getByRole('columnheader', { name: kopf })).toBeInTheDocument();
+      }
+    },
+  );
 
   it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
     const { container } = render(einsatz(), [epGebunden, epVerfuegbar]);
@@ -588,9 +616,7 @@ describe('PersonalPage · Datenzustände', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.personal(7) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('Thomas Müller')).toBeInTheDocument();
     expect(

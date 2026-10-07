@@ -61,7 +61,7 @@ beforeEach(() => {
       zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/:id/personen', json('personen', [PERSON])),
+    http.get('/api/einsaetze/:id/personen/auswahl', json('personen', [PERSON])),
     http.get('/api/einsaetze/:id/schaeden', json('schaeden', [])),
     http.get('/api/einsaetze/:id/uhs', json('uhs', [])),
     http.get('/api/einsaetze/:id/meldungen', json('meldungen', [])),
@@ -217,7 +217,7 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
         reihenfolge.push('modul-freigaben');
         return HttpResponse.json(freigabenFixture());
       }),
-      http.get('/api/einsaetze/:id/personen', () => {
+      http.get('/api/einsaetze/:id/personen/auswahl', () => {
         zaehler.personen = (zaehler.personen ?? 0) + 1;
         reihenfolge.push('personen');
         return HttpResponse.json([PERSON]);

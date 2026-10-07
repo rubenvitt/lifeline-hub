@@ -160,7 +160,7 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     renderRoute('/admin/stammdaten/personal/5');
 
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeDisabled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/Systemrolle/);
+    expect(screen.getByRole('status')).toHaveTextContent('Nur Ansicht nur System-Admin');
   });
 
   it('mit Admin-Recht ist derselbe Knopf bedienbar', async () => {

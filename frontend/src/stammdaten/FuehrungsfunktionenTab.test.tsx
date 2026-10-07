@@ -106,7 +106,7 @@ describe('FuehrungsfunktionenTab', () => {
       http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([eintrag('s4', 'Versorgung')])),
     );
     renderMitProviders(<FuehrungsfunktionenTab />);
-    expect(await screen.findByText(/Nur Benutzer mit der Systemrolle/)).toBeInTheDocument();
+    expect(await screen.findByText('nur System-Admin')).toBeInTheDocument();
     expect(await screen.findByText('Versorgung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bezeichnung S4 bearbeiten' })).toBeNull();
     expect(screen.getByRole('switch', { name: 'S7 PSNV eingeschaltet' })).toBeDisabled();

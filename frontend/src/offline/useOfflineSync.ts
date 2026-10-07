@@ -96,6 +96,9 @@ export function useOfflineSync(benutzerId?: number): void {
               queryKey: einsatzKeys.personen(element.wert.einsatz_id),
               refetchType: 'none',
             });
+            void qc.invalidateQueries({
+              queryKey: einsatzKeys.personenAuswahl(element.wert.einsatz_id),
+            });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
             // Der Anlege-Request kann den UHS-Eintritt enthalten; die offene UHS muss auch ohne
             // Live-Stream nachladen.

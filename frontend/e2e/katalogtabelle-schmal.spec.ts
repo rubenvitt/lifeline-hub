@@ -143,6 +143,12 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
   await page.setViewportSize({ width: BREITE, height: 400 });
   await expect(zeile).toBeVisible();
 
+  // Von oben messen: ein Klick in den Spaltenschalter kann die Seite mitrollen, sobald sie lang
+  // genug ist (in der Suite säen andere Specs Benutzer vor). Dann klebt die Kopfzeile schon vor
+  // der Messung oben, und `kopfVor.y` wäre nicht ihr Startpunkt im Dokument.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
   const kopfVor = (await kopf.boundingBox())!;
   const hoeheVor = kopfVor.height;
   // Ziel: knapp ÜBER den Startpunkt der Kopfzeile — ohne Fixierung stünde sie bei −20 px. Ein
@@ -211,7 +217,7 @@ test('Katalogtabelle bei 390 px: scrollt auch ohne Aktionsspalte in sich, Kopfze
 
   // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
   await expect(
-    page.getByRole('alert').filter({ hasText: 'dürfen die Stammdaten ändern' }),
+    page.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: 'nur System-Admin' }),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
   await expect(
@@ -223,7 +229,7 @@ test('Katalogtabelle bei 390 px: scrollt auch ohne Aktionsspalte in sich, Kopfze
     page.getByRole('columnheader', { name: 'Aktionen' }),
     'Vorbedingung: ohne Admin-Recht entfällt die Aktionsspalte',
   ).toHaveCount(0);
-  for (const aktion of ['Bearbeiten', 'Außer Dienst', 'Wieder in Dienst']) {
+  for (const aktion of ['Bearbeiten', 'Außer Dienst nehmen', 'Wieder in Dienst nehmen']) {
     await expect(
       page.locator('tr.ant-table-row').getByRole('button', { name: aktion }),
       `Vorbedingung: keine Zeilenaktion „${aktion}"`,

@@ -1566,6 +1566,78 @@ async fn laptop_meldet_und_liest_nur_eigene_meldungen() {
     assert_eq!(s, StatusCode::FORBIDDEN, "Tablet liest keine Meldungen");
 }
 
+/// LFH-940, D5: die Gerätebindung steht im SQL, nicht hinter dem LIMIT. Sonst wäre die erste
+/// Seite der Abgeschlossenen für das Gerät leer, obwohl es eigene erledigte Meldungen hat.
+#[tokio::test]
+async fn laptop_blaettert_nur_durch_eigene_abgeschlossene_meldungen() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldung = |inhalt: String| {
+        json!({
+            "absender": "UHS Nord",
+            "meldeweg": "persoenlich",
+            "inhalt": inhalt,
+            "ereigniszeit": "2026-10-04 10:00:00",
+        })
+    };
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &geraet,
+        Some(&meldung("Eigene".into())),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let eigene = v["id"].as_i64().unwrap();
+    for i in 0..3 {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &meldungen,
+            &admin,
+            Some(&meldung(format!("Fremd {i}"))),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    // Die eigene ist am frühesten erledigt und läge ohne Bindung im SQL nicht auf Seite 1.
+    sqlx::query(
+        "UPDATE meldung SET status = 'erledigt', \
+         erledigt_at = CASE WHEN id = ? THEN '2026-10-04 11:00:00' ELSE '2026-10-04 12:00:00' END \
+         WHERE einsatz_id = ?",
+    )
+    .bind(eigene)
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{meldungen}?phase=abgeschlossen&limit=1"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let seite: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        seite,
+        vec![eigene],
+        "erste Seite des Geräts trägt seine Meldung"
+    );
+}
+
 async fn lagemonitor(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
     let (_, code) = kopplung(
         app,

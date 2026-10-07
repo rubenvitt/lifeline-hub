@@ -69,7 +69,7 @@ function render(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tier)),
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
+    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([einePerson])),
     http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([])),
   );
   // extra-Handler separat voranstellen, damit sie Vorrang vor den Defaults haben.

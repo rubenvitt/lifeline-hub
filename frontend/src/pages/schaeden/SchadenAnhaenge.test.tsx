@@ -130,7 +130,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     expect(entferne).not.toHaveBeenCalled();
     const frage = await screen.findByText('Datei entfernen?');
     const pop = frage.closest('.ant-popover') as HTMLElement;
-    expect(pop).toHaveTextContent('Sie verschwindet aus der Liste; der ETB-Nachweis bleibt.');
+    expect(pop).toHaveTextContent('ETB-Nachweis bleibt.');
     const ok = within(pop).getByRole('button', { name: 'Entfernen' });
     expect(ok.className).toMatch(/ant-btn-dangerous/);
     await userEvent.click(ok);

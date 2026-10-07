@@ -1,5 +1,5 @@
 import { IconUhr } from '../icons';
-import { Button, Flex, Space, Tooltip, Typography } from 'antd';
+import { Button, Flex, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
@@ -10,7 +10,7 @@ import {
   parseRouteId,
   abloesungPfad,
 } from '../routing/deeplinks';
-import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator } from '../kommunikation';
+import { ERINNERUNG_HANDLUNG, ERINNERUNG_STATUS, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil } from '../components/instrument';
@@ -19,10 +19,6 @@ import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
 
 const { Text } = Typography;
-
-/** Fachliche Erklärung der beiden Abschluss-Wege. */
-const TOOLTIP_QUITTIEREN = 'Quittiert = zur Kenntnis genommen; die Erinnerung erübrigt sich.';
-const TOOLTIP_ERLEDIGT = 'Erledigt = die erinnerte Handlung wurde durchgeführt (Vollzug).';
 
 /**
  * bezug_typ → Deeplink-Builder mit Objekt-Selektion + Anzeige-Wort. Ohne Treffer: kein Deeplink.
@@ -60,16 +56,19 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
 
 interface ErinnerungKarteProps {
   erinnerung: Erinnerung;
-  /** Steuert die Abschluss-Spalten (Erledigt/Quittiert-Zeitpunkt) in der Abgeschlossen-Ansicht. */
+  /** Steuert die Abschluss-Spalten (Erledigt/Erübrigt-Zeitpunkt) in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';
   darfSchreiben?: boolean;
   onErledigen?: (id: number) => void;
+  /** „Erübrigt (zur Kenntnis)": schließt über den Drahtweg `…/quittieren` (Status `quittiert`). */
   onQuittieren?: (id: number) => void;
 }
 
 /**
  * Erinnerungs-Karte: Fällig-Hervorhebung über den Kartenrand-Vertrag von `KommKarte`.
- * Quittiert und Erledigt bleiben fachlich getrennt (Tooltips + getrennte Aktionen).
+ * Erübrigt und Erledigt bleiben fachlich getrennt: der Knopf trägt die Abgrenzung in der Klammer,
+ * ohne Tooltip (Entscheidung 10, LFH-959). „Quittieren" heißt in der Oberfläche nur Empfang
+ * bestätigt; der Drahtwert `quittiert` bleibt.
  */
 export default function ErinnerungKarte({
   erinnerung: e,
@@ -87,18 +86,16 @@ export default function ErinnerungKarte({
   const faellig = e.ist_faellig && !istAbg;
 
   // Beide Schritte schalten mit EINEM Klick; der Rückweg steht im Rückgängig-Toast der Seite
-  // (`POST …/erinnerungen/{eid}/oeffnen`). Die Tooltips tragen die Trennung Quittiert/Erledigt.
+  // (`POST …/erinnerungen/{eid}/oeffnen`).
   const aktionen: ReactNode[] =
     darfSchreiben && !istAbg
       ? [
-          <Tooltip key="q" title={TOOLTIP_QUITTIEREN}>
-            <Button onClick={() => onQuittieren?.(e.id)}>Quittieren</Button>
-          </Tooltip>,
-          <Tooltip key="e" title={TOOLTIP_ERLEDIGT}>
-            <Button type="primary" onClick={() => onErledigen?.(e.id)}>
-              Erledigt
-            </Button>
-          </Tooltip>,
+          <Button key="q" onClick={() => onQuittieren?.(e.id)}>
+            {ERINNERUNG_HANDLUNG.quittiert}
+          </Button>,
+          <Button key="e" type="primary" onClick={() => onErledigen?.(e.id)}>
+            {ERINNERUNG_HANDLUNG.erledigt}
+          </Button>,
         ]
       : [];
 
@@ -149,8 +146,6 @@ export default function ErinnerungKarte({
         {e.beschreibung && <Text style={{ fontSize: 13 }}>{e.beschreibung}</Text>}
         {istAbg && (
           <Space wrap size={[8, 4]}>
-            {/* QuittungIndikator nur bei quittiert: bei erledigt widerspräche „Quittung offen" dem Badge. */}
-            {e.status === 'quittiert' && <QuittungIndikator quittiert am={e.quittiert_at} />}
             {e.status === 'erledigt' && e.erledigt_at && (
               <Text type="secondary" style={{ fontSize: 13 }}>
                 Erledigt: {formatZeit(e.erledigt_at)}
@@ -158,7 +153,7 @@ export default function ErinnerungKarte({
             )}
             {e.status === 'quittiert' && e.quittiert_at && (
               <Text type="secondary" style={{ fontSize: 13 }}>
-                Quittiert: {formatZeit(e.quittiert_at)}
+                Erübrigt: {formatZeit(e.quittiert_at)}
               </Text>
             )}
           </Space>

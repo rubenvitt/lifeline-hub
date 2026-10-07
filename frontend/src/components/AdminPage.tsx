@@ -20,7 +20,7 @@ interface AdminPageProps {
    * legt `<Form form={form}>` in `children`.
    */
   aktionen?: ReactNode;
-  /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
+  /** Optionaler Hinweis unter dem Header (z. B. `RechteHinweis` „Nur Ansicht · Grund“). */
   hinweis?: ReactNode;
   /**
    * Breite der Spalte — dieselbe Achse und Vorgabe `'voll'` wie an `EinsatzSeite`: Tabellen und

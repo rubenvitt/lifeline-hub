@@ -84,6 +84,14 @@ describe('auswahlZeilen', () => {
     expect(z.join(' ')).not.toMatch(/12/);
   });
 
+  it('nennt den Ausschluss der Systemeinträge (LFH-958)', () => {
+    expect(zeilen({ ohne_system: true })).toEqual(['ohne Systemeinträge']);
+    expect(zeilen({ typ: 'meldung', ohne_system: true })).toEqual([
+      'Typ: Meldung',
+      'ohne Systemeinträge',
+    ]);
+  });
+
   it('reiht mehrere Merkmale in fester Folge: Typ, Zeitraum, Suchbegriff, Einheit', () => {
     expect(
       zeilen({ q: 'Damm', typ: 'meldung', von: '2026-09-21 06:00:00', einheit_id: 3 }),

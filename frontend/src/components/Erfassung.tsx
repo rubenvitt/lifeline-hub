@@ -1,4 +1,4 @@
-import { Button, Checkbox, Form, Modal, Space, Tooltip, Typography, theme } from 'antd';
+import { Button, Checkbox, Form, Modal, Space, Typography, theme } from 'antd';
 import type { FormInstance, FormProps } from 'antd';
 import {
   useCallback,
@@ -114,10 +114,6 @@ const SERIEN_KUERZEL = serienKuerzel(typeof navigator === 'undefined' ? '' : nav
  * verwirrte „Strg + ↵“ und machte den Knopf breiter.
  */
 export const SERIEN_KUERZEL_KLASSE = 'lfh-serien-kuerzel';
-
-const UEBERNAHME_ERKLAERUNG =
-  'Beim „Speichern und nächste" bleiben die Wiederholfelder stehen, alle übrigen Felder werden geleert. ' +
-  'Auf den Knopf rechts hat der Schalter keinen Einfluss — der schliesst den Dialog.';
 
 export interface ErfassungsFormularSteuerung {
   /** Bricht über denselben Reset-Pfad wie Knopf und Tastatur-Registry ab. */
@@ -363,11 +359,9 @@ export function ErfassungsFormular<T extends object>({
               }}
             >
               {uebernahme != null && uebernahme.length > 0 && (
-                <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-                  <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
-                    <Typography.Text type="secondary">Werte behalten</Typography.Text>
-                  </Checkbox>
-                </Tooltip>
+                <Checkbox checked={behalten} onChange={(e) => setBehalten(e.target.checked)}>
+                  <Typography.Text type="secondary">Werte behalten</Typography.Text>
+                </Checkbox>
               )}
               <Typography.Text type="secondary" aria-live="polite" style={{ marginLeft: 'auto' }}>
                 {zaehler > 0 ? `Erfasst: ${zaehler}` : ''}

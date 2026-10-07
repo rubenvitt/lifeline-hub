@@ -170,4 +170,12 @@ describe('OfflineRegionPicker', () => {
     // … aber ohne konfigurierten karten-service gibt es keinen Bau.
     expect(screen.queryByRole('button', { name: /Bauen & laden/ })).not.toBeInTheDocument();
   });
+
+  /** LFH-1078: Titel und Knöpfe je Region reichen — kein Absatz über Bau, Download und Quelle. */
+  it('erklärt nichts: kein Absatz über Ablauf und Quelle', async () => {
+    mockPicker({ karten: [], katalog: [bremenEintrag] });
+    render();
+    await screen.findByRole('button', { name: /^Laden/ });
+    expect(screen.queryByText(/Planetiler|Shortbread|ohne Netz nutzbar/)).not.toBeInTheDocument();
+  });
 });

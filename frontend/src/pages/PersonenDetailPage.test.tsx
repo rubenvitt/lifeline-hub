@@ -723,6 +723,80 @@ describe('PersonenDetailPage — Stammdaten', () => {
   });
 });
 
+/**
+ * Stammdaten im Datenraster (LFH-963, design.md D8): kein `Descriptions` mehr, nur gesetzte
+ * Angaben als Feld, die leeren in EINER Zeile „Ohne Angabe: …". Die Reihenfolge der Spalten
+ * (medizinisch zuerst unter `lg`) ist CSS und steht im e2e-Gate `e2e/betroffene-handy.spec.ts`.
+ */
+describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
+  function raster(): HTMLElement {
+    const r = document.querySelector<HTMLElement>('[data-lfh="datenraster"]');
+    expect(r).not.toBeNull();
+    return r!;
+  }
+  function begriffe(): string[] {
+    return [...raster().querySelectorAll('dt')].map((dt) => dt.textContent ?? '');
+  }
+
+  it('zeigt gesetzte Angaben als Begriff und Wert, ohne Descriptions', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(document.querySelector('.ant-descriptions')).toBeNull();
+    const name = within(raster()).getByText('Name');
+    expect(name.tagName).toBe('DT');
+    expect(name.nextElementSibling).toHaveTextContent('Mustermann');
+    expect(begriffe()).toEqual(
+      expect.arrayContaining(['Name', 'Vorname', 'Geschlecht', 'Alter (geschätzt)', 'Antreffort']),
+    );
+  });
+
+  it('sammelt leere Angaben in einer Zeile „Ohne Angabe", statt Striche zu zeigen', async () => {
+    render(einsatzBeobachter, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
+      'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, Zustand, Koordinate, Melder / Kontakt, Notiz',
+    );
+    for (const leer of ['Geburtsdatum', 'Herkunft / Adresse', 'Zustand', 'Koordinate', 'Notiz']) {
+      expect(begriffe()).not.toContain(leer);
+    }
+    expect(within(raster()).queryByText('—')).toBeNull();
+  });
+
+  it('zeigt die Koordinate als Feld, sobald „Auf Lagekarte verorten" angeboten wird', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(begriffe()).toContain('Koordinate');
+    expect(
+      within(raster()).getByRole('link', { name: 'Auf Lagekarte verorten' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Ohne Angabe:/)).not.toHaveTextContent('Koordinate');
+  });
+
+  it('nennt bei einer vermissten Person weder Zustand noch Koordinate', async () => {
+    render(einsatzAktiv, { ...detail, status: 'vermisst', vermisst_seit: null } as PersonDetail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
+      'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, vermisst seit, Melder / Kontakt, Notiz',
+    );
+  });
+
+  it('lässt die Zeile weg, wenn alles gesetzt ist', async () => {
+    render(einsatzAktiv, {
+      ...detail,
+      geburtsdatum: '1980-01-01',
+      herkunft_adresse: 'Hauptstr. 1',
+      zustand: 'gehfähig',
+      antreff_lat: 52.1,
+      antreff_lon: 9.1,
+      melder_kontakt: 'Nachbar',
+      notiz: 'ruhig',
+    } as PersonDetail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByText(/^Ohne Angabe:/)).toBeNull();
+    expect(begriffe()).toContain('Notiz');
+  });
+});
+
 describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
   it('Einsatzleitung kann einen Verdachts-Abgleich bestätigen', async () => {
     const vermissteDetail = {

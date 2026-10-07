@@ -30,7 +30,7 @@ for (const modus of ['light', 'dark'] as const) {
     const basis = await vorbereiten(page, modus);
     for (const ort of ['route', 'modal']) {
       await page.goto(`${basis}/personen${ort === 'route' ? '/aufnahme' : ''}`);
-      if (ort === 'modal') await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+      if (ort === 'modal') await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
       const gruppe = page.locator('#sichtung');
       await expect(gruppe.locator('.ant-tag')).toHaveText([
         'SK I',

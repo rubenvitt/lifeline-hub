@@ -82,7 +82,7 @@ const TABELLEN: Tabelle[] = [
     },
     status: 'in Dienst',
     menue: (k) => `Aktionen zu Fahrzeug ${k}`,
-    zweiteAktion: 'Außer Dienst',
+    zweiteAktion: 'Außer Dienst nehmen',
   },
   {
     name: 'Personal',
@@ -99,7 +99,7 @@ const TABELLEN: Tabelle[] = [
     },
     status: 'in Dienst',
     menue: (k) => `Aktionen zu Person ${k}`,
-    zweiteAktion: 'Außer Dienst',
+    zweiteAktion: 'Außer Dienst nehmen',
   },
   {
     name: 'Sprechgruppen',
@@ -217,7 +217,7 @@ test.describe('Verwaltungstabellen ohne Schreibrecht', () => {
     await wechsleZuRolle(page, 'fuehrungskraft');
     await page.goto('/admin/stammdaten/fahrzeuge');
     await expect(
-      page.getByRole('alert').filter({ hasText: 'dürfen die Stammdaten ändern' }),
+      page.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: 'nur System-Admin' }),
       'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
     ).toBeVisible();
     await page.locator('[data-lfh="katalog-werkzeuge"] input').fill(marke);

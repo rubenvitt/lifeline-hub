@@ -1,21 +1,17 @@
 import type { EinsatzStatus } from '../api/types';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 
 /**
- * Wortlaut der fehlenden Berechtigung auf den S5-Seiten (LFH-554, M16): gesperrt bleibt
- * sichtbar, und der Satz nennt den Grund.
+ * Grund der fehlenden Berechtigung auf den S5-Seiten (LFH-554, M16): gesperrt bleibt sichtbar,
+ * die Zeile „Nur Ansicht · Grund“ nennt ihn in wenigen Wörtern (LFH-1078).
  */
 export function presseRechteText(einsatzStatus: EinsatzStatus): string {
-  return einsatzStatus !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — Presse-Log und Pressemitteilungen sind nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können Medienkontakte erfassen und Pressemitteilungen schreiben.';
+  return einsatzRechteGrund(einsatzStatus);
 }
 
 export function infotelefonRechteText(einsatzStatus: EinsatzStatus): string {
-  return einsatzStatus !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — das Anrufprotokoll ist nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können Anrufe erfassen.';
+  return einsatzRechteGrund(einsatzStatus);
 }
 
-/** Grund an der gesperrten Freigabe einer Pressemitteilung. */
-export const FREIGABE_NUR_LEITUNG =
-  'Freigeben darf nur die Einsatzleitung. Entwürfe können Einsatzleitung und Führungspersonal schreiben.';
+/** Grund an der gesperrten Freigabe einer Pressemitteilung; Entwürfe bleiben schreibbar. */
+export const FREIGABE_NUR_LEITUNG = 'Freigabe nur durch die Einsatzleitung';

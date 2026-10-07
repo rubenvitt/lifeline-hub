@@ -222,7 +222,9 @@ describe('EinsatzAllgemein', () => {
 
     rendern();
 
-    expect(await screen.findByText(/Nur die Einsatzleitung/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Admin'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 

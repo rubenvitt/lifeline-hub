@@ -173,15 +173,9 @@ describe('besetzungAktion', () => {
 });
 
 describe('besetzungRechteText', () => {
+  /** Der Grund steht neben der Marke „Nur Ansicht“ (LFH-1078): wenige Wörter, kein Satz. */
   it('unterscheidet abgeschlossenen Einsatz und fehlende Rolle', () => {
-    expect(besetzungRechteText('abgeschlossen')).toMatch(/abgeschlossen/);
-    expect(besetzungRechteText('aktiv')).toMatch(/Einsatzleitung und Führungspersonal/);
-  });
-
-  /** Der Hinweis sperrt ZWEI Wege — Zeilenaktion und Kopfaktion. */
-  it('nennt beide gesperrten Wege', () => {
-    expect(besetzungRechteText('aktiv')).toMatch(/Besetzung ändern/);
-    expect(besetzungRechteText('aktiv')).toMatch(/Lagebesprechungen abschließen/);
-    expect(besetzungRechteText('abgeschlossen')).toMatch(/Lagebesprechungen/);
+    expect(besetzungRechteText('abgeschlossen')).toBe('Einsatz abgeschlossen');
+    expect(besetzungRechteText('aktiv')).toBe('nur Einsatzleitung und Führungspersonal');
   });
 });

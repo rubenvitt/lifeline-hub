@@ -74,8 +74,7 @@ export interface KraftZeitachseProps {
   rechteText?: string;
 }
 
-export const ZEITACHSE_RECHTE_TEXT =
-  'Nachtragen und Streichen brauchen Schreibrecht in einem laufenden Einsatz.';
+export const ZEITACHSE_RECHTE_TEXT = 'kein Schreibrecht';
 
 function zeitachseKey(einsatzId: number, art: KraftArt, id: number) {
   return art === 'einheit'

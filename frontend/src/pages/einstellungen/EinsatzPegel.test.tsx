@@ -441,7 +441,9 @@ describe('EinsatzPegel', () => {
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
     aufbau.rolle = 'beobachter';
     await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) });
-    expect(await screen.findByText(/Nur die Einsatzleitung, Führungspersonal/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Admin'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
   });
 
@@ -510,7 +512,9 @@ describe('EinsatzPegel', () => {
     stelleBereit({ rolle: 'beobachter' });
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
-    expect(await screen.findByText(/Nur die Einsatzleitung, Führungspersonal/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Admin'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Station wählen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^Aktionen zu Pegel/ })).toBeNull();
@@ -520,7 +524,7 @@ describe('EinsatzPegel', () => {
     stelleBereit();
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
-    expect(screen.queryByText(/Nur die Einsatzleitung, Führungspersonal/)).toBeNull();
+    expect(screen.queryByText('nur Einsatzleitung, Führungspersonal oder Admin')).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Aktionen zu Pegel/ })).toHaveLength(2);
   });
 

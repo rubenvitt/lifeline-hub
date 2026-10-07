@@ -154,9 +154,8 @@ export default function OfflineKartenVerwaltung() {
     onSuccess: ({ phase }) => {
       invalidiereKarte(qc);
       if (phase === 'aktuell') message.info('Die Karte ist aktuell');
-      else if (phase === 'laedt')
-        message.success('Update lädt — die Karte bleibt in Betrieb und wird danach getauscht');
-      else message.success('Neubau angestoßen — die Karte wird danach automatisch getauscht');
+      else if (phase === 'laedt') message.success('Update lädt');
+      else message.success('Neubau gestartet');
     },
     onError: (e) => message.error(fehlerText(e, 'Aktualisieren fehlgeschlagen')),
   });

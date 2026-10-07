@@ -22,7 +22,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeSchaeden } from '../api/einsatzSchaden';
 import { listeUhs } from '../api/einsatzUhs';
-import { listePersonen } from '../api/einsatzPerson';
+import { listePersonenAuswahl } from '../api/einsatzPerson';
 import { listeLageberichte } from '../api/lageberichte';
 import { listeMeldungen } from '../api/meldungen';
 import { listeAuftraege } from '../api/auftraege';
@@ -231,9 +231,10 @@ export default function ChatPage() {
     queryFn: () => listeUhs(einsatzId),
     enabled: typAktiv('uhs'),
   });
+  // Auswahl ohne Freitexte (LFH-940): nur Nummer, Name, Status.
   const personenQuery = useQuery({
-    queryKey: einsatzKeys.personen(einsatzId),
-    queryFn: () => listePersonen(einsatzId),
+    queryKey: einsatzKeys.personenAuswahl(einsatzId),
+    queryFn: () => listePersonenAuswahl(einsatzId),
     enabled: typAktiv('person'),
   });
   const lageberichteQuery = useQuery({

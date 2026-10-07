@@ -47,7 +47,7 @@ import type {
   EtbEintragAnzeige,
   Meldung,
   ModulFreigaben,
-  Person,
+  PersonAuswahl,
   Schaden,
   Uhs,
 } from '../api/types';
@@ -67,7 +67,7 @@ import type {
 type Nummernsorte = 'person' | 'schaden';
 
 export interface DatensatzQuellen {
-  personen?: Person[];
+  personen?: PersonAuswahl[];
   schaeden?: Schaden[];
   uhs?: Uhs[];
   meldungen?: Meldung[];
