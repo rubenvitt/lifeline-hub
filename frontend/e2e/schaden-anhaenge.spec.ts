@@ -127,7 +127,7 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
     .getByRole('button', { name: 'Datei Müller_Hauswand.jpg von Schaden S-001 entfernen' })
     .click();
   const rueckfrage = page.locator('.ant-popover:not(.ant-popover-hidden)');
-  await expect(rueckfrage).toContainText('der ETB-Nachweis bleibt');
+  await expect(rueckfrage).toContainText('ETB-Nachweis bleibt');
   await rueckfrage.getByRole('button', { name: 'Entfernen' }).click();
   await expect(anker).toHaveCount(0);
   await expect(paneel(page).getByText('Noch keine Fotos oder Dateien')).toBeVisible();

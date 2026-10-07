@@ -1236,9 +1236,7 @@ describe('PersonenPage', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.personen(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('R-001')).toBeInTheDocument();
     expect(screen.queryByText('Personen konnten nicht geladen werden')).not.toBeInTheDocument();
@@ -1259,9 +1257,7 @@ describe('PersonenPage', () => {
 
     expect(await screen.findByText('Personen konnten nicht geladen werden')).toBeInTheDocument();
     expect(screen.queryByText('R-001')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Aktualisierung fehlgeschlagen/)).not.toBeInTheDocument();
   });
 
   describe('Erfassungszeile /person', () => {
@@ -1566,7 +1562,7 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
     expect(meldung.closest('.ant-message')).toBeNull();
     expect(meldung.closest('.ant-alert')).not.toBeNull();
     expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
-    expect(screen.getByText('Einsatz ist abgeschlossen — nur Ansicht.')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz abgeschlossen')).toBeInTheDocument();
     expect(speichern).not.toHaveBeenCalled();
   });
 });

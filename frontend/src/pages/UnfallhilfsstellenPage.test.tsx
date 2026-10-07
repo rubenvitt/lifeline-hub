@@ -227,9 +227,7 @@ describe('UnfallhilfsstellenPage', () => {
     server.use(http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })));
     await qc.refetchQueries({ queryKey: einsatzKeys.uhs(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('BHP 50')).toBeInTheDocument();
     expect(

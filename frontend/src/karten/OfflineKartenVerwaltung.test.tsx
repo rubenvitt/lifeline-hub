@@ -260,6 +260,8 @@ describe('OfflineKartenVerwaltung', () => {
     );
     // Default-Name aus dem Dateinamen abgeleitet (osm.-Präfix + Datum entfernt).
     expect(await screen.findByDisplayValue('bremen')).toBeInTheDocument();
+    // LFH-1078: kein Absatz über Karten-Verzeichnis und karten-build.
+    expect(screen.queryByText(/karten-build|Karten-Verzeichnis liegende/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => {
       expect(regBody?.pfad).toBe('osm.bremen.2026-07-02.mbtiles');
@@ -364,7 +366,10 @@ describe('OfflineKartenVerwaltung', () => {
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Per URL herunterladen' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Eigener Extrakt');
-    await userEvent.type(within(dialog).getByLabelText('URL'), 'https://example.test/de.mbtiles');
+    await userEvent.type(
+      within(dialog).getByLabelText('URL (.mbtiles)'),
+      'https://example.test/de.mbtiles',
+    );
     await userEvent.type(within(dialog).getByLabelText('Attribution / Lizenz'), '© OSM');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Download starten' }));
 
@@ -701,8 +706,9 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
   });
 
   it.each([
-    ['bau_wartet', 202, /Neubau angestoßen/],
-    ['laedt', 202, /Update lädt/],
+    // LFH-1078: der Zustand, nicht der Ablauf („… wird danach getauscht“).
+    ['bau_wartet', 202, /^Neubau gestartet$/],
+    ['laedt', 202, /^Update lädt$/],
     ['aktuell', 200, /Die Karte ist aktuell/],
   ] as const)(
     '„Jetzt aktualisieren“ mit Antwort %s meldet sich passend',

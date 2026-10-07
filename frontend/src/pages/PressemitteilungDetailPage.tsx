@@ -29,7 +29,7 @@ import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
-import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -325,7 +325,8 @@ function PressemitteilungDetail() {
       >
         {istEntwurf && darfSchreiben && !darfFreigeben && (
           <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
-            <RechteHinweis sichtbar text={FREIGABE_NUR_LEITUNG} />
+            {/* Kein „Nur Ansicht“: der Entwurf bleibt schreibbar, nur die Freigabe fehlt. */}
+            <Typography.Text type="secondary">{FREIGABE_NUR_LEITUNG}</Typography.Text>
           </div>
         )}
         {schutz.speicherFehler != null && (

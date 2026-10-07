@@ -171,7 +171,8 @@ async function messeImRollenzweig(
     }
     if (f.hinweis) {
       await expect(
-        page.getByRole('alert').filter({ hasText: f.hinweis }),
+        // Rechtehinweis („Nur Ansicht · Grund“, role=status) oder ein anderer Alarm-Hinweis.
+        page.locator('[role="alert"], [data-lfh="rechte-hinweis"]').filter({ hasText: f.hinweis }),
         `${f.pfad}: Vorbedingung — der Rechtehinweis steht`,
       ).toBeVisible();
     }
@@ -617,8 +618,7 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
     {
       pfad: `${R}/einstellungen/allgemein`,
       anker: segment(/^Allgemein$/, 'tab'),
-      hinweis:
-        /^Nur die Einsatzleitung, Führungspersonal oder ein System-Admin darf die Einstellungen/,
+      hinweis: /nur Einsatzleitung, Führungspersonal oder Admin$/,
       gesperrt: knopf('Speichern'),
       ziele: [
         {

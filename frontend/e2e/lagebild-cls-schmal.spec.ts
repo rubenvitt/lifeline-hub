@@ -195,9 +195,9 @@ for (const route of ['ueberblick', 'lage-dashboard'] as const) {
           // Beobachter-Fall den Admin-Zustand.
           if (route === 'ueberblick') {
             await expect(inhalt(page).getByRole('alert')).toHaveCount(0);
-            await expect(page.getByText(/Nur Einsatzleitung und Führungspersonal/)).toHaveCount(
-              rolle === 'beobachter' ? 1 : 0,
-            );
+            await expect(
+              page.getByText('nur Einsatzleitung und Führungspersonal', { exact: true }),
+            ).toHaveCount(rolle === 'beobachter' ? 1 : 0);
           }
           werte.push(`${folge}: ${bericht(m)}`);
           expect

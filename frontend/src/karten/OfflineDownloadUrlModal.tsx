@@ -1,4 +1,4 @@
-import { Alert, App, Form, Input } from 'antd';
+import { App, Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -11,10 +11,31 @@ interface FormWerte {
   lizenz: string;
 }
 
+/** Loopback-Hosts: der Server lässt sie nur im Dev-Betrieb zu und entscheidet selbst. */
+const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[::1\])$|\.localhost$/i;
+
+/**
+ * Prüft, was früher ein Erklärkasten beschrieb (LFH-1078): eine https-Adresse. Nicht strenger
+ * als der Server (`src/karte/download.rs`, `url_ist_sicher_mit`): Loopback lässt die Maske
+ * durch, weil der Server sie im Dev-Betrieb annimmt; eine Dateiendung verlangt er nicht, weil
+ * Download-Links oft keine tragen. Interne Adressen weist der Server ab, seine Meldung steht
+ * dann in der Maske.
+ */
+export function downloadUrlFehler(url: string): string | null {
+  let adresse: URL;
+  try {
+    adresse = new URL(url.trim());
+  } catch {
+    return 'Keine gültige Adresse';
+  }
+  if (adresse.protocol === 'https:' || LOOPBACK.test(adresse.hostname)) return null;
+  return 'Nur https-Adressen';
+}
+
 /**
  * Schnellerfassung für einen Offline-Download per eigener URL (selbst gebaute/gehostete
  * MBTiles-Extrakte). `lizenz` ist Pflicht (Server erzwingt es; offline sichtbar). v1:
- * Shortbread-Schema fest. Zurückgesetzt wird von `ErfassungsModal` auf allen Auswegen.
+ * Kachelschema fest `shortbread`. Zurückgesetzt wird von `ErfassungsModal` auf allen Auswegen.
  */
 export default function OfflineDownloadUrlModal({
   offen,
@@ -56,17 +77,6 @@ export default function OfflineDownloadUrlModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        title="MBTiles im Shortbread-Schema"
-        description={
-          'Die URL muss auf eine herunterladbare .mbtiles-Datei (Shortbread-Schema) zeigen — nur ' +
-          'https, keine internen Adressen. Wird in der Prep-Phase (mit Netz) geladen und im Feld ' +
-          'offline ausgeliefert.'
-        }
-      />
       <Form.Item
         label="Name"
         name="name"
@@ -75,16 +85,23 @@ export default function OfflineDownloadUrlModal({
         <Input placeholder="z. B. Deutschland (eigener Extrakt)" />
       </Form.Item>
       <Form.Item
-        label="URL"
+        label="URL (.mbtiles)"
         name="url"
-        rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'URL darf nicht leer sein' },
+          {
+            validator: (_, wert?: string) => {
+              const fehler = wert?.trim() ? downloadUrlFehler(wert) : null;
+              return fehler ? Promise.reject(new Error(fehler)) : Promise.resolve();
+            },
+          },
+        ]}
       >
         <Input placeholder="https://…/de.mbtiles" />
       </Form.Item>
       <Form.Item
         label="Attribution / Lizenz"
         name="lizenz"
-        tooltip="Pflichtangabe — wird offline auf der Karte angezeigt (rechtlich erforderlich)."
         rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
       >
         <Input.TextArea rows={2} placeholder="© OpenStreetMap contributors (ODbL)" />

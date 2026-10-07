@@ -22,7 +22,7 @@ const eintrag = (lfd_nr: number, over: object = {}) => ({
 const LEER = 'Noch keine Lagebesprechung abgeschlossen';
 
 const FEHLER = 'Frühere Lagebesprechungen konnten nicht geladen werden';
-const VERALTET = /Angezeigter Stand konnte nicht aktualisiert werden/;
+const VERALTET = /Aktualisierung fehlgeschlagen/;
 
 function zeige(antwort: () => Response | Promise<Response>) {
   server.use(http.get('/api/einsaetze/1/stab/lagebesprechungen', antwort));

@@ -132,7 +132,7 @@ test('Person: aufklappen, ablegen, herunterladen, protokolliert, pseudonym im ET
     .getByRole('button', { name: 'Datei Erika_Mueller.jpg von Person R-001 entfernen' })
     .click();
   const rueckfrage = page.locator('.ant-popover:not(.ant-popover-hidden)');
-  await expect(rueckfrage).toContainText('der ETB-Nachweis bleibt');
+  await expect(rueckfrage).toContainText('ETB-Nachweis bleibt');
   await rueckfrage.getByRole('button', { name: 'Entfernen' }).click();
   await expect(bereich(page).getByText('Noch keine Fotos oder Dateien')).toBeVisible();
 

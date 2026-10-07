@@ -899,9 +899,7 @@ describe('SchaedenPage', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.schaeden(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher bleibt stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('S-001')).toBeInTheDocument();
     expect(screen.queryByText('Schäden konnten nicht geladen werden')).not.toBeInTheDocument();

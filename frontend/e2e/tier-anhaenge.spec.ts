@@ -110,7 +110,7 @@ test('legt am Tier ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und
     .getByRole('button', { name: 'Datei Müller_Bello.jpg von Tier T-001 entfernen' })
     .click();
   const rueckfrage = page.locator('.ant-popover:not(.ant-popover-hidden)');
-  await expect(rueckfrage).toContainText('der ETB-Nachweis bleibt');
+  await expect(rueckfrage).toContainText('ETB-Nachweis bleibt');
   await rueckfrage.getByRole('button', { name: 'Entfernen' }).click();
   await expect(anker).toHaveCount(0);
   await expect(paneel(page).getByText('Noch keine Fotos oder Dateien')).toBeVisible();
