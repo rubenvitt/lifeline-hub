@@ -7,12 +7,6 @@ import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/t
  * Labels für den Palettenkontext.
  */
 
-/**
- * Tooltip der Zeitzone. Was leer gilt, nennt der Platzhalter (Gerätezeit, `anzeige/format.ts`,
- * `inZone`, oder im Einsatz die Vorgabe der Organisation), nicht der Tooltip (LFH-944).
- */
-export const ZEITZONE_HILFE = 'Zeitzone wie Europe/Berlin.';
-
 /** Benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
 export const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
   { value: '', label: 'Frei (alle)' },

@@ -27,6 +27,8 @@ describe('BenutzerPage', () => {
     );
     // Benutzername-Zelle (@admin) ist eindeutig — der Name „Admin" kollidiert sonst mit dem Rollen-Tag.
     expect(await screen.findByText('@admin')).toBeInTheDocument();
+    // Kein Zweck-Absatz unter dem Titel (LFH-1078).
+    expect(screen.queryByText(/Benutzerkonten verwalten/)).toBeNull();
   });
 
   it('legt einen neuen Benutzer an', async () => {

@@ -82,23 +82,17 @@ type Rueckfrage = Exclude<Vorgang, 'import'>;
 
 /**
  * Der OK-Knopf heißt bewusst anders als der auslösende Knopf, sonst stünde bei offenem Dialog
- * zweimal „Entfernen“ im Baum.
+ * zweimal „Entfernen“ im Baum. Der Text ist genau EIN kurzer Satz zur Folge (LFH-1078).
  */
 const RUECKFRAGE: Record<Rueckfrage, { titel: string; text: string; ok: string }> = {
   neu: {
     titel: 'Demo-Daten neu importieren?',
-    text:
-      'Der bisherige Demo-Einsatz wird samt allen Einträgen gelöscht, auch mit Änderungen seit ' +
-      'dem Import. Danach entsteht ein neuer Demo-Einsatz mit frischer Zeitachse. Das lässt ' +
-      'sich nicht rückgängig machen.',
+    text: 'Der Demo-Einsatz wird samt Änderungen unwiderruflich ersetzt.',
     ok: 'Ersetzen',
   },
   entfernen: {
     titel: 'Demo-Daten entfernen?',
-    text:
-      'Der Demo-Einsatz wird samt allen Einträgen gelöscht, auch mit Änderungen seit dem ' +
-      'Import. Demo-Stammdaten, die nirgends mehr verwendet werden, werden gelöscht; die ' +
-      'übrigen bleiben als normale Stammdaten stehen. Das lässt sich nicht rückgängig machen.',
+    text: 'Der Demo-Einsatz wird samt Änderungen unwiderruflich gelöscht, ungenutzte Demo-Stammdaten ebenso.',
     ok: 'Endgültig entfernen',
   },
 };
@@ -218,7 +212,6 @@ export default function DemoDatenPage() {
   return (
     <AdminPage
       titel="Demo-Daten"
-      beschreibung="Ein Übungseinsatz samt Stammdaten für Vorführung und Schulung. Er entsteht in Ihrer Organisation und lässt sich wieder entfernen."
       aktionen={
         status.importiert ? undefined : (
           <Button

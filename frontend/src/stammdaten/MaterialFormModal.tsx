@@ -112,7 +112,7 @@ export default function MaterialFormModal({
         />
       </Form.Item>
       <Form.Item label="Bestandsnummer" name="bestandsnummer">
-        <Input placeholder="Inventarnr. (nur für einzeln verfolgte Geräte)" />
+        <Input placeholder="Inventarnr. (optional)" />
       </Form.Item>
       {/* FELDBUDGET: drei sichtbare Felder, drei eingeklappt. Pflicht ist allein die Bezeichnung,
          und die steht oben — kein Pflichtfeld wandert hinter den Collapse (LFH-343).

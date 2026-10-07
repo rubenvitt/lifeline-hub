@@ -264,7 +264,6 @@ export default function BenutzerPage() {
   return (
     <AdminPage
       titel="Benutzer"
-      beschreibung="System- und Org-Rollen der Benutzerkonten verwalten."
       aktionen={
         <Button
           type="primary"

@@ -99,24 +99,27 @@ export default function EtbBausteinFormModal({
       <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
         <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }))} />
       </Form.Item>
+      {/* Die automatischen Platzhalter als sichtbare Legende, kein Satz (LFH-1078); die Form
+         (TT.MM.JJJJ) gehört sichtbar dazu, nicht nur in einen `title` (Touch). Dass ein freier
+         Platzhalter wie `{einheit}` beim Einsetzen abgefragt wird, zeigt das Beispiel im Feld;
+         Klick-Chips wären eine neue Funktion. */}
       <Form.Item
-        label="Inhalt (Platzhalter wie {einheit} erlaubt)"
+        label="Inhalt"
         name="inhalt"
         rules={[{ required: true, whitespace: true }]}
         extra={
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Vorkonfigurierte Platzhalter werden beim Einsetzen automatisch befüllt:{' '}
-            {AUTO_PLATZHALTER.map((p) => (
+            Automatisch:{' '}
+            {AUTO_PLATZHALTER.map((p, i) => (
               <span key={p.name}>
-                <code>{`{${p.name}}`}</code> ({p.beschreibung}){' '}
+                {i > 0 && ' · '}
+                <code>{`{${p.name}}`}</code> {p.beschreibung}
               </span>
             ))}
-            . Beliebige weitere Platzhalter wie <code>{'{einheit}'}</code> werden beim Einsetzen
-            abgefragt. Gilt auch für die Veranlassung.
           </Typography.Text>
         }
       >
-        <Input.TextArea rows={2} placeholder="Vorlagentext mit {platzhalter}" />
+        <Input.TextArea rows={2} placeholder="z. B. {einheit} an Einsatzstelle eingetroffen" />
       </Form.Item>
       {/* FELDBUDGET: drei sichtbare Felder, drei eingeklappt. Label, Typ und Inhalt sind die
          Pflichtwerte und bleiben oben; Meldeweg und Veranlassung sind optional, die Sortierung hat

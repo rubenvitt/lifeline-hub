@@ -123,10 +123,12 @@ function optionenVon(feld: string): HTMLElement[] {
 }
 
 describe('EinsatzGeraete (LFH-892)', () => {
-  it('erklärt Führungspersonal das fehlende Recht und lädt keine Geräte', async () => {
+  it('nennt Führungspersonal das fehlende Recht und lädt keine Geräte', async () => {
     const { gelesen } = stelleBereit({ rolle: 'fuehrungspersonal' });
     rendern();
-    expect(await screen.findByText(/Geräte koppelt nur die Einsatzleitung/)).toBeInTheDocument();
+    // Nichts geladen, also nichts anzusehen: Leerzustand mit Grund statt „Nur Ansicht“.
+    expect(await screen.findByText('Nur die Einsatzleitung koppelt Geräte')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
     expect(gelesen).toEqual([]);
   });
 
@@ -178,6 +180,8 @@ describe('EinsatzGeraete (LFH-892)', () => {
     expect(code).toBeInTheDocument();
     const dialog = code.closest<HTMLElement>('[data-lfh="kopplungscode"]')!;
     expect(dialog.querySelector('svg')).not.toBeNull();
+    // Die Folge des Schließens in einem Satz: der Code steht nur jetzt da.
+    expect(dialog.textContent).toMatch(/Gültig bis .+, einmal einlösbar, nur jetzt sichtbar\./);
   });
 
   it('fragt bei einem Lagemonitor nach keiner UHS', async () => {

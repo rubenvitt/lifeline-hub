@@ -157,7 +157,11 @@ describe('EinsatzModule', () => {
 
     rendern();
 
-    expect(await screen.findByText(/Nur die Einsatzleitung/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+        'Nur Ansicht nur Einsatzleitung oder Org-Admin',
+      ),
+    );
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 
@@ -174,7 +178,7 @@ describe('EinsatzModule', () => {
     rendern();
 
     expect(await screen.findByRole('switch', { name: 'Sichtbar: ETB' })).toBeEnabled();
-    expect(screen.queryByText(/Nur die Einsatzleitung/)).toBeNull();
+    expect(screen.queryByText('nur Einsatzleitung oder Org-Admin')).toBeNull();
   });
 
   it('sperrt den Admin einer fremden Org ohne Mitgliedschaft', async () => {
@@ -189,7 +193,11 @@ describe('EinsatzModule', () => {
 
     rendern();
 
-    expect(await screen.findByText(/Organisation des Einsatzes/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+        'Nur Ansicht nur Einsatzleitung oder Org-Admin',
+      ),
+    );
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 
@@ -206,11 +214,11 @@ describe('EinsatzModule', () => {
     rendern();
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
-    expect(within(zeile).getByText('nur Einsatzleitung')).toBeInTheDocument();
+    expect(within(zeile).getByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
   });
 
   // `darfEinsatzLeiten` verlangt einen aktiven Einsatz; ein abgeschlossener sperrt auch die
-  // Einsatzleitung. Ein Rollenwort widerspräche dort dem Seitenbanner.
+  // Einsatzleitung. Ein Rollenwort widerspräche dort dem Seitenkopf.
   it('nennt im abgeschlossenen Einsatz den Abschluss, nicht die Rolle', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1,
@@ -223,7 +231,7 @@ describe('EinsatzModule', () => {
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
     expect(within(zeile).getByText('Einsatz abgeschlossen')).toBeInTheDocument();
-    expect(within(zeile).queryByText('nur Einsatzleitung')).toBeNull();
+    expect(within(zeile).queryByText('nur Einsatzleitung oder Org-Admin')).toBeNull();
   });
 
   it('zeigt bei nicht ladbaren Overrides KEINE Liste — sonst loegen die Bestandswerte', async () => {

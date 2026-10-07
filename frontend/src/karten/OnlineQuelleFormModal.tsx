@@ -29,8 +29,8 @@ const TYP_OPTIONEN: { value: OnlineStyleTyp; label: string }[] = [
 ];
 
 const URL_PLATZHALTER: Record<OnlineStyleTyp, string> = {
-  vektor: 'https://…/style.json',
-  raster: 'https://…/{z}/{x}/{y}.png',
+  vektor: 'https://…/style.json?key=…',
+  raster: 'https://…/{z}/{x}/{y}.png?key=…',
 };
 
 /**
@@ -41,8 +41,8 @@ const URL_PLATZHALTER: Record<OnlineStyleTyp, string> = {
  * und ohne brauchbare Vorgabe (Urheber und Lizenz je Quelle verschieden); hinter dem Collapse
  * käme eine Ablehnung von einem unsichtbaren Feld.
  *
- * Der Proxy-Schalter wird per `tooltip` an seinem `Form.Item` erklärt, der URL-Hinweis
- * (Schlüssel gehört in die URL, nicht ins Frontend) hängt am URL-Feld.
+ * Nur der Proxy-Schalter trägt einen `tooltip` (wann abschalten). Dass ein Schlüssel in die URL
+ * gehört, zeigt deren Platzhalter (LFH-1078, „Texte: zeigen statt erklären“).
  */
 export default function OnlineQuelleFormModal({
   offen,
@@ -59,6 +59,7 @@ export default function OnlineQuelleFormModal({
   const qc = useQueryClient();
   const { message } = App.useApp();
   const typ = Form.useWatch('typ', form) ?? 'vektor';
+  const proxy = Form.useWatch('proxy', form);
 
   // Vorbelegung, kein Zurücksetzen (siehe `FahrzeugFormModal`). Die Anlegen-Vorgaben stehen als
   // `initialValues` an der Hülle, jedes `resetFields` holt sie wieder — inklusive der aktuellen
@@ -132,11 +133,6 @@ export default function OnlineQuelleFormModal({
       <Form.Item
         label="URL"
         name="url"
-        tooltip={
-          'Bei schlüsselbasierten Anbietern (z. B. MapTiler, Stadia) die volle URL ' +
-          'inklusive Schlüssel eintragen — mit eingeschaltetem Proxy bleibt er ' +
-          'server-seitig und erscheint nie im Browser (LFH-182).'
-        }
         rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
       >
         <Input placeholder={URL_PLATZHALTER[typ]} />
@@ -144,7 +140,6 @@ export default function OnlineQuelleFormModal({
       <Form.Item
         label="Attribution"
         name="attribution"
-        tooltip="Pflichtangabe — Urheber/Lizenz der Kartendaten (rechtlich erforderlich)."
         rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
       >
         <Input.TextArea rows={2} placeholder="© OpenStreetMap-Mitwirkende" />
@@ -160,32 +155,20 @@ export default function OnlineQuelleFormModal({
             label: 'Weitere Angaben',
             children: (
               <>
-                <Form.Item
-                  label="Sortierung"
-                  name="sortier"
-                  tooltip="Reihenfolge in der Wahl der Kartengrundlage (kleiner = weiter oben)."
-                >
+                <Form.Item label="Sortierung" name="sortier">
                   <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
                 </Form.Item>
-                <Form.Item
-                  label="Aktiv"
-                  name="aktiv"
-                  valuePropName="checked"
-                  tooltip="Nur aktive Quellen erscheinen in der Wahl der Kartengrundlage auf der Lagekarte."
-                >
+                <Form.Item label="Aktiv" name="aktiv" valuePropName="checked">
                   <Switch />
                 </Form.Item>
-                {/* Ein Alert erklärt einen Zustand der Seite, ein Tooltip ein Feld. */}
+                {/* Proxy hält den Schlüssel server-seitig und cacht (LFH-182/190). Abgeschaltet
+                    steht die Folge sichtbar am Feld, nicht im Tooltip (Touch). */}
                 <Form.Item
                   label="Über Server proxen"
                   name="proxy"
                   valuePropName="checked"
-                  tooltip={
-                    'Vorgabe: an (empfohlen). Der Server holt Style, Tiles, Sprite und Glyphs, ' +
-                    'hält Schlüssel server-seitig und speichert die Antworten zwischen — ' +
-                    'gleiche Kacheln treffen den Anbieter nur einmal (LFH-182/190). ' +
-                    'Abschalten nur, wenn der Anbieter Proxying oder Caching untersagt ' +
-                    '(z. B. die Kacheln von openstreetmap.org); dann läuft die URL direkt im Browser.'
+                  extra={
+                    proxy === false ? 'Schlüssel in der URL ist im Browser sichtbar.' : undefined
                   }
                 >
                   <Switch />

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { Alert, Spin, Switch, theme, Tooltip, Typography } from 'antd';
+import { Alert, Spin, Switch, theme, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { providerListeAdmin, providerSchalten } from '../../api/auth';
 import AdminPage from '../../components/AdminPage';
@@ -7,6 +7,7 @@ import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
 import { Paneel } from '../../components/instrument';
+import { NUR_ADMIN } from '../../components/nurAnsicht';
 
 /**
  * Trefflächenboden für die Beschriftungszeile — rein und exportiert, damit die Zusicherung ohne
@@ -29,12 +30,13 @@ export function zeilenzielStil(token: {
 /**
  * Admin-Sektion `/admin/einstellungen/anmeldung` — Auth-Provider an-/abschalten. Jede Umschaltung
  * speichert sofort. Der Passwort-Provider bleibt nicht deaktivierbar (letzter Admin-Login-Weg).
- * Bearbeiten nur für `system_rolle=admin`, Führungskräfte sehen read-only.
+ * Bearbeiten nur für `system_rolle=admin`, Führungskräfte sehen read-only. Nur beim Serverstart
+ * konfigurierte Verfahren erscheinen.
  *
- * Der Sperrgrund steht sichtbar als gedämpfter Kurztext, nicht nur im Tooltip: auf dem Tablet gibt
- * es kein Hover, und „ausgegraut" allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1). An gesperrten
- * Zeilen entsteht kein `<label>`: den Klick auf ein `disabled` Steuerelement leitet der Browser
- * ohnehin nicht weiter — ohne Aktion keine Aufforderung.
+ * Der Sperrgrund steht sichtbar als gedämpftes Kurzwort, ohne Erklär-Tooltip (LFH-1078): auf dem
+ * Tablet gibt es kein Hover, und „ausgegraut" allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1). An
+ * gesperrten Zeilen entsteht kein `<label>`: den Klick auf ein `disabled` Steuerelement leitet der
+ * Browser ohnehin nicht weiter — ohne Aktion keine Aufforderung.
  */
 export default function Anmeldeverfahren() {
   const { benutzer } = useAuth();
@@ -67,13 +69,12 @@ export default function Anmeldeverfahren() {
     <AdminPage
       titel="Anmeldeverfahren"
       breite="schmal"
-      beschreibung="Verfügbare Anmeldewege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren erscheinen hier. Änderungen werden sofort gespeichert."
       hinweis={
         <SeitenHinweise
           fehler={schaltenMutation.error}
           fehlerTitel="Nicht umgeschaltet"
           rechteFehlt={!istAdmin}
-          rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen Anmeldeverfahren umschalten — die Liste steht hier zum Nachlesen."
+          rechteText={NUR_ADMIN}
         />
       }
     >
@@ -95,14 +96,7 @@ export default function Anmeldeverfahren() {
               // Rauschen.
               const bedienbar = istAdmin && !istPasswort;
               const gesperrt = !bedienbar || schaltenMutation.isPending;
-              const sperrGrund = !istAdmin
-                ? 'nur Admins'
-                : istPasswort
-                  ? 'nicht deaktivierbar'
-                  : null;
-              const langGrund = !istAdmin
-                ? 'Nur Benutzer mit der Systemrolle „Admin" dürfen Anmeldeverfahren umschalten'
-                : 'Garantierter Admin-Login-Weg — nicht deaktivierbar';
+              const sperrGrund = !istAdmin ? NUR_ADMIN : istPasswort ? 'nicht deaktivierbar' : null;
               const feldId = `anmeldeverfahren-${p.id}`;
               // Nur die abgelehnte Zeile markieren; `variables` trägt die zuletzt gescheiterte
               // Zeile.
@@ -133,13 +127,9 @@ export default function Anmeldeverfahren() {
                     <span style={{ ...zeilenzielStil(token), flex: 1 }}>{p.anzeigename}</span>
                   )}
                   {sperrGrund && (
-                    // Kurzwort sichtbar, lange Begründung im Tooltip — an einem nicht gesperrten
-                    // Element, also ohne Wrapper.
-                    <Tooltip title={langGrund}>
-                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                        {sperrGrund}
-                      </Typography.Text>
-                    </Tooltip>
+                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                      {sperrGrund}
+                    </Typography.Text>
                   )}
                   <Switch
                     id={feldId}

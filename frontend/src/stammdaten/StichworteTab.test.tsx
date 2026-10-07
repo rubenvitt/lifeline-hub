@@ -28,6 +28,8 @@ describe('StichworteTab', () => {
   it('zeigt geladene Stichworte', async () => {
     renderTab(admin);
     expect(await screen.findByText('H1')).toBeInTheDocument();
+    // Kein Zweck-Absatz unter dem Titel (LFH-1078).
+    expect(screen.queryByText(/Combobox/)).toBeNull();
   });
 
   it('Admin sieht Hinzufügen und Löschen', async () => {

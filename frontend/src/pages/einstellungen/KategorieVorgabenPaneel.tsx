@@ -1,6 +1,7 @@
 import { Form, Input, InputNumber, Typography } from 'antd';
 import { Formularpaneel } from '../../components/instrument';
 import { KATEGORIE_TEXT, KATEGORIEN, PERSONENSTAMM_TEXT } from '../../aufbewahrung/kategorieText';
+import { mitVorgabe } from '../../components/vorgabeText';
 import type { FormWerteEinsatz } from './orgEinstellungenForm';
 
 /**
@@ -11,6 +12,12 @@ import type { FormWerteEinsatz } from './orgEinstellungenForm';
  * **Keine Vorgabewerte:** der Vorschlag steht als Text mit Quelle unter dem Feld, nie als Wert.
  * Eine Dauer braucht eine Rechtsgrundlage (der Server antwortet sonst 422). Übersteigt die Dauer
  * die Aufbewahrungsdauer der Organisation, sagt ein Hinweis, dass dann die Einsatz-Frist greift.
+ *
+ * Kein Erklär-Absatz unter dem Titel (LFH-1078): was ein leeres Feld heißt, sagt der Platzhalter
+ * (die Kategorie folgt der Frist des Einsatzes), die Pflicht zur Rechtsgrundlage die Prüfung am
+ * Feld. Die erfassten Daten stehen sichtbar unter dem Feld (Spec: „kurze Beschreibung der erfassten
+ * Daten“; kein Tooltip, der auf Touch nicht erreichbar ist), der Personenstamm als Datenschutz-Zeile
+ * am Ende.
  */
 export default function KategorieVorgabenPaneel() {
   const form = Form.useFormInstance<FormWerteEinsatz>();
@@ -18,10 +25,7 @@ export default function KategorieVorgabenPaneel() {
   const kategorien = Form.useWatch('kategorien', form);
 
   return (
-    <Formularpaneel
-      titel="Aufbewahrung je Datenkategorie"
-      beschreibung={`Eigene Frist für einzelne Datenkategorien, ab Abschluss des Einsatzes. Nach Ablauf wird die Kategorie vorgemerkt und nach 30 Tagen Karenz unwiderruflich geschwärzt; der Einsatz bleibt lesbar. Leer = die Kategorie folgt der Frist des Einsatzes. Jede Dauer braucht eine Rechtsgrundlage. ${PERSONENSTAMM_TEXT}`}
-    >
+    <Formularpaneel titel="Aufbewahrung je Datenkategorie">
       {KATEGORIEN.map((k) => {
         const text = KATEGORIE_TEXT[k];
         const dauer = kategorien?.[k]?.dauer_tage;
@@ -31,14 +35,14 @@ export default function KategorieVorgabenPaneel() {
             <Form.Item
               label={`Dauer ${text.bezeichnung} (Tage)`}
               name={['kategorien', k, 'dauer_tage']}
-              tooltip={`0 bis 3650 Tage. Umfasst: ${text.daten}.`}
               extra={
                 <>
+                  <span style={{ display: 'block' }}>Umfasst: {text.daten}</span>
                   Vorschlag: {text.vorschlag.tage} Tage — {text.vorschlag.quelle}
                   {laengerAlsEinsatz && (
                     <Typography.Text type="warning" style={{ display: 'block' }}>
-                      Länger als die Aufbewahrungs-Dauer der Organisation ({einsatzDauer} Tage) —
-                      dann greift die Einsatz-Frist zuerst.
+                      Länger als die Aufbewahrungs-Dauer ({einsatzDauer} Tage) — dann greift die
+                      Einsatz-Frist zuerst.
                     </Typography.Text>
                   )}
                 </>
@@ -48,7 +52,7 @@ export default function KategorieVorgabenPaneel() {
                 min={0}
                 max={3650}
                 style={{ width: '100%', maxWidth: 200 }}
-                placeholder="keine"
+                placeholder={mitVorgabe('Einsatz-Frist')}
               />
             </Form.Item>
             <Form.Item
@@ -70,6 +74,9 @@ export default function KategorieVorgabenPaneel() {
           </div>
         );
       })}
+      <Typography.Text type="secondary" data-lfh="personenstamm">
+        {PERSONENSTAMM_TEXT}
+      </Typography.Text>
     </Formularpaneel>
   );
 }

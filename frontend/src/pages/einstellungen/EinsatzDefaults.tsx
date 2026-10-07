@@ -28,10 +28,23 @@ import type { OrgEinstellungenUpdate } from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
 import { mitVorgabe } from '../../components/vorgabeText';
+import { NUR_ADMIN } from '../../components/nurAnsicht';
 
-/** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Modulzeile. */
-const RECHTE_TEXT =
-  'Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Vorgaben ändern — die Werte stehen hier zum Nachlesen.';
+/** Vorgabe des Servers für ein leeres Einsatznummer-Präfix (`einsatz/nummer.rs`, `PRAEFIX_VORGABE`). */
+const EINSATZ_PRAEFIX_VORGABE = 'E-';
+
+/**
+ * Form der Nummer eines neuen Einsatzes mit diesem Präfix — Spiegel von `einsatz/nummer.rs`,
+ * `formatiere` (`<Präfix><JJJJ>-<NNNN>`). Rein und exportiert. Die Vorschau ersetzt den Satz „Steht
+ * vor Jahr und laufender Nummer …“ (LFH-1078); „Neue Einsätze“ davor trägt die Folge, dass
+ * bestehende Nummern bleiben. Die laufende Nummer bleibt offen („…“): der Server zählt je Org und
+ * Jahr über alle Präfixe weiter (`einsatz/repo.rs`), eine „0001“ wäre meist falsch. Das Jahr ist
+ * das des Geräts — der Server nimmt das der Org-Zeitzone, was nur in der Silvesternacht
+ * auseinanderfällt.
+ */
+export function einsatznummerVorschau(praefix: string | null | undefined, jahr: number): string {
+  return `${praefix?.trim() || EINSATZ_PRAEFIX_VORGABE}${jahr}-…`;
+}
 
 /**
  * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen, Auto-ETB +
@@ -56,6 +69,8 @@ export default function EinsatzDefaults() {
   const istAdmin = benutzer?.system_rolle === 'admin';
   const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin });
   const [rueckfrage, setRueckfrage] = useState<OrgEinstellungenUpdate | null>(null);
+  // Vor den frühen Returns: ein Hook danach bräche die Hook-Reihenfolge.
+  const einsatzPraefix = Form.useWatch('einsatz_nummer_praefix', form);
 
   const einstellungenQuery = useQuery({
     queryKey: globalKeys.orgEinstellungen(),
@@ -125,7 +140,6 @@ export default function EinsatzDefaults() {
     <AdminPage
       titel="Einsatz-Vorgaben"
       breite="schmal"
-      beschreibung="Vorgaben der Organisation für neue Einsätze. Einstellungen im Einsatz gehen diesen Werten vor."
       hinweis={
         // Nur der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
         // Ablehnung selbst (unten) — zwei Vorgänge in einem Kasten sagen nicht mehr, was
@@ -133,7 +147,7 @@ export default function EinsatzDefaults() {
         <SeitenHinweise
           fehler={speichernMutation.error}
           rechteFehlt={!istAdmin}
-          rechteText={RECHTE_TEXT}
+          rechteText={NUR_ADMIN}
         />
       }
     >
@@ -146,75 +160,59 @@ export default function EinsatzDefaults() {
         onValuesChange={schutz.geaendert}
         disabled={!istAdmin}
       >
-        <Formularpaneel
-          titel="Aufbewahrung"
-          beschreibung="Vorgabe der Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist."
-        >
-          <Form.Item
-            label="Aufbewahrungs-Dauer (Tage)"
-            name="retention_dauer_tage"
-            tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
-          >
+        <Formularpaneel titel="Aufbewahrung">
+          <Form.Item label="Aufbewahrungs-Dauer (Tage)" name="retention_dauer_tage">
             <InputNumber
               min={1}
               max={3650}
               style={{ width: '100%', maxWidth: 200 }}
-              placeholder="keine"
+              placeholder={mitVorgabe('keine Frist')}
             />
           </Form.Item>
           <Form.Item
             label="Skelett endgültig löschen nach (Tage ab Abschluss)"
             name="skelett_dauer_tage"
-            tooltip="1 bis 36500 Tage. Nach der Schwärzung bleibt ein pseudonymes Skelett (ETB, Registriernummern, Kategorien); nach dieser Frist wird es samt ETB endgültig gelöscht, frühestens mit der Schwärzung. Gilt für alle Einsätze der Organisation. Leer = das Skelett bleibt unbegrenzt erhalten."
           >
             <InputNumber
               min={1}
               max={36500}
               style={{ width: '100%', maxWidth: 200 }}
-              placeholder="unbegrenzt"
+              placeholder={mitVorgabe('unbegrenzt')}
             />
           </Form.Item>
         </Formularpaneel>
 
         <KategorieVorgabenPaneel />
 
-        <Formularpaneel
-          titel="Verhalten & Automatik"
-          beschreibung={`Nummernkreis-Präfixe und Vorgabe-Fristen für neue Einsätze. Das Präfix der Einsatznummer wird beim Anlegen fest in die Nummer übernommen; die übrigen Präfixe sind reine Anzeige.`}
-        >
+        <Formularpaneel titel="Verhalten & Automatik">
           <Form.Item
             label="Präfix Einsatznummer"
             name="einsatz_nummer_praefix"
-            tooltip="Steht vor Jahr und laufender Nummer (z. B. E-2026-0001). Gilt nur für neu angelegte Einsätze — bestehende Nummern ändern sich nicht. Leer = E-. Max. 8 Zeichen."
+            extra={`Neue Einsätze: ${einsatznummerVorschau(
+              // Vor dem ersten Durchlauf des Formulars liefert `useWatch` noch nichts.
+              einsatzPraefix === undefined ? einstellungen.einsatz_nummer_praefix : einsatzPraefix,
+              new Date().getFullYear(),
+            )}`}
           >
-            <Input maxLength={8} placeholder="E-" style={{ width: '100%', maxWidth: 200 }} />
+            <Input
+              maxLength={8}
+              placeholder={mitVorgabe(EINSATZ_PRAEFIX_VORGABE)}
+              style={{ width: '100%', maxWidth: 200 }}
+            />
           </Form.Item>
-          <Form.Item
-            label="Präfix ETB"
-            name="etb_nummer_praefix"
-            tooltip="Wird der laufenden ETB-Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
-          >
+          <Form.Item label="Präfix ETB" name="etb_nummer_praefix">
             <Input maxLength={8} placeholder="z. B. EB-" style={{ width: '100%', maxWidth: 200 }} />
           </Form.Item>
-          <Form.Item
-            label="Präfix Meldungen"
-            name="meldung_nummer_praefix"
-            tooltip="Wird der laufenden Meldungs-Nummer vorangestellt. Max. 8 Zeichen."
-          >
+          <Form.Item label="Präfix Meldungen" name="meldung_nummer_praefix">
             <Input maxLength={8} placeholder="z. B. M-" style={{ width: '100%', maxWidth: 200 }} />
           </Form.Item>
-          <Form.Item
-            label="Präfix Aufträge"
-            name="auftrag_nummer_praefix"
-            tooltip="Wird der laufenden Auftrags-Nummer vorangestellt. Max. 8 Zeichen."
-          >
+          <Form.Item label="Präfix Aufträge" name="auftrag_nummer_praefix">
             <Input maxLength={8} placeholder="z. B. A-" style={{ width: '100%', maxWidth: 200 }} />
           </Form.Item>
 
           <Form.Item
             label="Vorgabe-Bestätigungsfrist Meldungen (Minuten)"
             name="meldung_bestaetigung_frist_min"
-            tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = 5 Minuten."
           >
             <InputNumber
               min={1}
@@ -226,7 +224,6 @@ export default function EinsatzDefaults() {
           <Form.Item
             label="Vorgabe-Quittierungsfrist Aufträge (Minuten)"
             name="auftrag_quittierung_frist_min"
-            tooltip="Frist für unquittierte Aufträge ohne eigene Frist. Leer = keine Frist."
           >
             <InputNumber
               min={1}
@@ -235,11 +232,7 @@ export default function EinsatzDefaults() {
               placeholder={mitVorgabe('keine Frist')}
             />
           </Form.Item>
-          <Form.Item
-            label="Rückmeldefrist Einheiten (Minuten)"
-            name="rueckmeldung_frist_min"
-            tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig. Leer = 60."
-          >
+          <Form.Item label="Rückmeldefrist Einheiten (Minuten)" name="rueckmeldung_frist_min">
             <InputNumber
               min={1}
               max={10080}
@@ -252,7 +245,6 @@ export default function EinsatzDefaults() {
             label="Automatische ETB-Einträge"
             name="auto_etb_eintraege"
             valuePropName="checked"
-            tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
           >
             <Switch />
           </Form.Item>
@@ -273,10 +265,7 @@ export default function EinsatzDefaults() {
 
       {/* ── Rollen-Vorgabe je Modul (Sofort-Speichern, kein Form-Feld) ── */}
       <div style={{ marginTop: token.marginXL }}>
-        <Formularpaneel
-          titel="Rollen-Vorgabe je Modul"
-          beschreibung="Vorgabe der Organisation für die benötigte Rolle je Modul. Jeder Einsatz kann sie ändern. Änderungen werden sofort gespeichert."
-        >
+        <Formularpaneel titel="Rollen-Vorgabe je Modul">
           {/* Die Ablehnung der Liste steht bei der Liste, nicht im Seitenkopf; mit der
               Zeilenmarke (`fehlerKey`) zeigen Text und Rand auf dieselbe Zeile. */}
           <div style={{ marginBottom: token.marginSM }}>
@@ -293,7 +282,7 @@ export default function EinsatzDefaults() {
               })
             }
             darfVerwalten={istAdmin}
-            rechteGrund={{ kurz: 'nur Admins', lang: RECHTE_TEXT }}
+            rechteGrund={NUR_ADMIN}
             // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert. `variables`
             // trägt die laufende bzw. zuletzt gescheiterte Zeile.
             laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}
@@ -314,19 +303,23 @@ export default function EinsatzDefaults() {
         onCancel={() => setRueckfrage(null)}
         destroyOnHidden
       >
+        {/* Alt → neu als Werte, dazu genau EIN Satz zur Folge (LFH-1078): der nächste Lauf des
+            Servers (spätestens 10 Minuten) löscht jedes danach fällige Skelett samt ETB. */}
         {rueckfrage && (
-          <Typography.Paragraph>
-            Die Skelett-Frist wird von{' '}
-            <strong>
-              {einstellungen.skelett_dauer_tage != null
-                ? `${einstellungen.skelett_dauer_tage} Tagen`
-                : 'unbegrenzt'}
-            </strong>{' '}
-            auf <strong>{rueckfrage.skelett_dauer_tage} Tage</strong> ab Abschluss gesetzt. Jedes
-            geschwärzte Skelett, dessen Frist danach abgelaufen ist, wird mit dem nächsten
-            Purge-Lauf (spätestens in 10 Minuten) samt ETB unwiderruflich gelöscht. Nur eine Zeile
-            im Löschprotokoll bleibt.
-          </Typography.Paragraph>
+          <>
+            <Typography.Paragraph>
+              <strong>
+                {einstellungen.skelett_dauer_tage != null
+                  ? `${einstellungen.skelett_dauer_tage} Tage`
+                  : 'unbegrenzt'}{' '}
+                → {rueckfrage.skelett_dauer_tage} Tage
+              </strong>{' '}
+              ab Abschluss
+            </Typography.Paragraph>
+            <Typography.Paragraph>
+              Abgelaufene Skelette werden binnen 10 Minuten samt ETB unwiderruflich gelöscht.
+            </Typography.Paragraph>
+          </>
         )}
       </Modal>
     </AdminPage>

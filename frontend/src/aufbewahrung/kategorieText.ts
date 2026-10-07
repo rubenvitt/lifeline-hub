@@ -44,9 +44,13 @@ export const KATEGORIE_TEXT: Record<Datenkategorie, KategorieText> = {
 /** Die Kategorien in fester Reihenfolge (wie der Server sie liefert). */
 export const KATEGORIEN: readonly Datenkategorie[] = ['behandlung', 'personenauskunft', 'anhaenge'];
 
-/** Was mit den Personendaten passiert, die beiden Zwecken dienen — für die Beschreibung. */
+/**
+ * Was mit den Personendaten passiert, die beiden Zwecken dienen (Spec `aufbewahrung-kategorien`,
+ * „Personenstamm folgt den Zwecken der Person“). Ein Datenschutz-Hinweis, keine Bedienung: ohne ihn
+ * läse „Personenauskunft 0 Tage“ sich so, als verschwänden die Namen mit dem Abschluss.
+ */
 export const PERSONENSTAMM_TEXT =
-  'Name, Geburtsdatum, Antreffort und Verbleib einer Person bleiben, bis alle ihre Zwecke abgelaufen sind: bei einer gesichteten oder behandelten Person Behandlung und Personenauskunft, sonst nur die Personenauskunft.';
+  'Name, Geburtsdatum, Antreffort und Verbleib bleiben, bis alle Zwecke der Person abgelaufen sind.';
 
 /** Der Satz zur Vorgabe einer Kategorie an einem aktiven Einsatz bzw. ohne eigene Dauer. */
 export function vorgabeSatz(dauerTage: number | null | undefined): string {
