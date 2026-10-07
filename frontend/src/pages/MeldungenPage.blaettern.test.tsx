@@ -185,8 +185,8 @@ describe('MeldungenPage — getrennte Abrufe und Blättern (LFH-940)', () => {
         .closest('[data-lfh="kennzahl"]')!
         .querySelector('[data-lfh="kennzahl-wert"]')!.textContent;
     await waitFor(() => expect(wert('Erledigt')).toBe('250'));
-    // „Alarmiert" quer zur Phase: auch erledigte zählen, die nicht geladen sind.
-    expect(wert('Alarmiert')).toBe('3');
+    // „Bestätigung überfällig" quer zur Phase: auch erledigte zählen, die nicht geladen sind.
+    expect(wert('Bestätigung überfällig')).toBe('3');
   });
 
   it('lädt ältere Seiten mit dem Cursor der letzten Zeile nach', async () => {

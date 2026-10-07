@@ -167,22 +167,24 @@ describe('ErinnerungenPage', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('Lagemeldung')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /Erledigt/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
     await waitFor(() => expect(erledigeErinnerung).toHaveBeenCalledWith(1, 7));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     await waitFor(() => expect(oeffneErinnerung).toHaveBeenCalledWith(1, 7));
   });
 
-  it('quittiert mit einem Klick und bietet denselben Rückweg an', async () => {
+  it('erübrigt mit einem Klick und bietet denselben Rückweg an', async () => {
     vi.mocked(quittiereErinnerung).mockResolvedValue(
       {} as Awaited<ReturnType<typeof quittiereErinnerung>>,
     );
     renderPage();
     await waitFor(() => expect(screen.getByText('Lagemeldung')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /Quittieren/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Erübrigt (zur Kenntnis)' }));
     await waitFor(() => expect(quittiereErinnerung).toHaveBeenCalledWith(1, 7));
+    // Der Toast sagt, was geschah, im Wortlaut der Erinnerung (LFH-959).
+    expect(await screen.findByText('Erinnerung erübrigt')).toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     await waitFor(() => expect(oeffneErinnerung).toHaveBeenCalledWith(1, 7));

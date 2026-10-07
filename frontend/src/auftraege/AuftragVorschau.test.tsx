@@ -128,7 +128,7 @@ describe('AuftragVorschau (LFH-664)', () => {
 
     await screen.findByText('Deich sichern');
     expect(screen.queryByRole('button', { name: /quittieren/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'In Bearbeitung' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bearbeitung beginnen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Vollzug melden' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Abnehmen' })).not.toBeInTheDocument();
     expect(screen.queryAllByRole('combobox')).toHaveLength(0);

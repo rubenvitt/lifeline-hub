@@ -423,7 +423,7 @@ export default function MeldungenPage() {
       }
     >
       {/* Kennzahlen der Triage aus EINER Zählung am Server über dieselben Prädikate wie die Liste
-          (LFH-940, D3); „Alarmiert" quer zur Phase. */}
+          (LFH-940, D3); „Bestätigung überfällig" quer zur Phase. */}
       <Kennzahlenband beschriftung="Meldungen in Zahlen" style={{ marginBottom: token.margin }}>
         <Kennzahl
           titel="Unbearbeitet"
@@ -441,7 +441,7 @@ export default function MeldungenPage() {
           zustand={kennzahlZustand}
         />
         <Kennzahl
-          titel="Alarmiert"
+          titel="Bestätigung überfällig"
           groesse="klein"
           wert={kennzahlen?.alarmiert ?? 0}
           ton={(kennzahlen?.alarmiert ?? 0) > 0 ? 'alarm' : 'neutral'}

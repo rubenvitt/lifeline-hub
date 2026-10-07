@@ -1,6 +1,7 @@
 import { IconPersonPlus } from '../../icons';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
+import { sprungGesperrtText } from '../../components/Sprung';
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -187,7 +188,9 @@ export default function UhsDetailPage() {
               title={personenGesperrt ? KEINE_BERECHTIGUNG : undefined}
               onClick={() => navigate(pfade.aufnahme(einsatzId, { uhs: uhs.id }))}
             >
-              Patient aufnehmen
+              {/* Gesperrt nennt der Knopf den Grund sichtbar (`components/Sprung.tsx`); der
+                  `title` erscheint auf Touch nie. Er bleibt Primäraktion, kein Sprung mit „↗“. */}
+              {personenGesperrt ? sprungGesperrtText('Patient aufnehmen') : 'Patient aufnehmen'}
             </Button>
           )}
           {verwalten && uhs.status === 'geplant' && (

@@ -65,7 +65,7 @@ vi.mock('../api/meldungen', async () => {
       return {
         unbearbeitet: k.unbearbeitet,
         in_arbeit: k.inArbeit,
-        alarmiert: k.alarmiert,
+        alarmiert: k.bestaetigungUeberfaellig,
         erledigt: k.erledigt,
       };
     },
@@ -342,12 +342,12 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'erledigt' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // Die Meldung ist `neu` → „Erledigt" ist der Sprung und liegt im Menü. Die Rückfrage dort ist
-    // ein Dialog, kein Popconfirm.
+    // Die Meldung ist `neu` → „Als erledigt melden" ist der Sprung und liegt im Menü. Die
+    // Rückfrage dort ist ein Dialog, kein Popconfirm.
     const menue = await oeffneAktionsmenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /Erledigt/ }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Als erledigt melden/ }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Als erledigt melden' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'erledigt'));
   });
 
@@ -447,7 +447,9 @@ describe('MeldungenPage', () => {
     );
     renderPage();
     await screen.findByText('Florian Nord 1');
-    expect(screen.getByText(/Bestätigung überfällig/)).toBeInTheDocument();
+    // Auf der Karte; dasselbe Wort steht seit LFH-959 auch als Kennzahl im Band darüber.
+    const karte = document.querySelector('[data-meldung-id="1"]') as HTMLElement;
+    expect(within(karte).getByText(/Bestätigung überfällig/)).toBeInTheDocument();
     // Link-Button „Bestätigen" öffnet Popconfirm; OK-Knopf heißt ebenfalls „Bestätigen".
     await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
     const popconfirms = await screen.findAllByRole('button', { name: 'Bestätigen' });
@@ -758,7 +760,13 @@ describe('MeldungenPage', () => {
         .querySelector('[data-lfh="kennzahl-wert"]')!.textContent;
     await waitFor(() => expect(wert('Unbearbeitet')).toBe('1'));
     expect(wert('In Arbeit')).toBe('1');
-    expect(wert('Alarmiert')).toBe('1');
+    // Derselbe Wortlaut wie Modulzähler und Lage-Dashboard (LFH-959).
+    expect(wert('Bestätigung überfällig')).toBe('1');
     expect(wert('Erledigt')).toBe('1');
+    expect(screen.queryByText(/Alarmiert/)).not.toBeInTheDocument();
+    // Auf der Karte steht dasselbe Wort im Chip, kein eigenes „Alarm" daneben.
+    const karte = document.querySelector('[data-meldung-id="2"]') as HTMLElement;
+    expect(within(karte).getByText('Bestätigung überfällig')).toBeInTheDocument();
+    expect(within(karte).queryByText(/^\s*Alarm\s*$/)).not.toBeInTheDocument();
   });
 });

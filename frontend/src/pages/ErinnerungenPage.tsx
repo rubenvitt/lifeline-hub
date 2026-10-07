@@ -89,7 +89,7 @@ export default function ErinnerungenPage() {
     onError: fehler,
   });
   /**
-   * Der Rückweg beider Abschluss-Aktionen: „Erledigt" und „Quittieren" schalten mit einem Klick
+   * Der Rückweg beider Abschluss-Aktionen: „Erledigt" und „Erübrigt" schalten mit einem Klick
    * statt mit Rückfrage; `POST …/erinnerungen/{eid}/oeffnen` räumt dafür alle drei Achsen (Status,
    * Vollzug, Quittung).
    */
@@ -110,7 +110,7 @@ export default function ErinnerungenPage() {
     mutationFn: (eid: number) => quittiereErinnerung(einsatzId, eid),
     onSuccess: (_daten, eid) => {
       invalidiere();
-      zeigeRueckgaengig(message, 'Erinnerung quittiert', () => oeffnenMutation.mutate(eid));
+      zeigeRueckgaengig(message, 'Erinnerung erübrigt', () => oeffnenMutation.mutate(eid));
     },
     onError: fehler,
   });

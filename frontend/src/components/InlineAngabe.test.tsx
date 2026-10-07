@@ -4,7 +4,7 @@ import { Input } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { ApiError } from '../api/client';
-import { InlineAngabe, type InlineAngabeProps } from './InlineAngabe';
+import { InlineAngabe, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
 
 /**
  * Verhalten der inline bearbeitbaren Angabe (LFH-472).
@@ -43,6 +43,28 @@ describe('InlineAngabe · Anzeige', () => {
     expect(screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' })).toHaveTextContent(
       'Leitstellen-Nr. eintragen',
     );
+  });
+
+  // LFH-964: am Handy (390 px) lief „Nächste Lagebesprechung eintragen“ über den Paneelrand,
+  // weil antds Knopf nicht umbricht. Der Knopf bricht um und hält den Boden der Dichte-Staffel.
+  it('leer: der Knopf bricht um, statt über den Rand zu laufen', () => {
+    renderMitProviders(<TextAngabe wert="" />);
+    const knopf = screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' });
+    expect(knopf.style.whiteSpace).toBe('normal');
+    expect(knopf.style.height).toBe('auto');
+    expect(knopf.style.maxWidth).toBe('100%');
+    expect(knopf.style.overflowWrap).toBe('anywhere');
+  });
+
+  it('leerKnopfStil: Boden aus controlHeight in jeder Dichtestufe', () => {
+    for (const controlHeight of [30, 48, 72]) {
+      expect(leerKnopfStil({ controlHeight, paddingXS: 4 }, '#00f')).toMatchObject({
+        minHeight: controlHeight,
+        whiteSpace: 'normal',
+        textAlign: 'start',
+        color: '#00f',
+      });
+    }
   });
 
   it('ohne Schreibrecht: kein Knopf, leer als „—"', () => {
