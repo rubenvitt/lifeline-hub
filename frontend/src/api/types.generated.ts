@@ -432,6 +432,22 @@ export interface components {
             quittiert_von_id?: number | null;
             snap_anzeige: string;
         };
+        /**
+         * @description Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und
+         *     „Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
+         */
+        AuftragKennzahlen: {
+            /**
+             * Format: int64
+             * @description Vollzogen oder abgenommen.
+             */
+            abgeschlossen: number;
+            /**
+             * Format: int64
+             * @description Offen oder in Bearbeitung.
+             */
+            offen: number;
+        };
         /** @description Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig. */
         AuftragsZaehler: {
             /**

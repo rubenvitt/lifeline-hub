@@ -20,7 +20,7 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { listeAuftraege } from '../api/auftraege';
+import { listeOffeneAuftraege } from '../api/auftraege';
 import { ApiError } from '../api/client';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { holeRueckmeldungen } from '../api/meldungen';
@@ -44,7 +44,7 @@ vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
-vi.mock('../api/auftraege', () => ({ listeAuftraege: vi.fn() }));
+vi.mock('../api/auftraege', () => ({ listeOffeneAuftraege: vi.fn() }));
 vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
 vi.mock('../api/meldungen', () => ({ holeRueckmeldungen: vi.fn() }));
 vi.mock('../api/kraefteZeitachse', () => ({ listeEinheitenPerioden: vi.fn() }));
@@ -213,7 +213,7 @@ beforeEach(() => {
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([]);
   vi.mocked(listeEinsatzMaterial).mockResolvedValue([]);
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
-  vi.mocked(listeAuftraege).mockResolvedValue([]);
+  vi.mocked(listeOffeneAuftraege).mockResolvedValue([]);
   vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
   vi.mocked(holeRueckmeldungen).mockResolvedValue(KEINE_RUECKMELDUNGEN);
   vi.mocked(listeEinheitenPerioden).mockResolvedValue([]);
@@ -553,7 +553,7 @@ describe('KraefteuebersichtPage — Raster', () => {
 
   it('zeigt den jüngsten offenen Auftrag der Einheit als Deeplink', async () => {
     mitEinheit();
-    vi.mocked(listeAuftraege).mockResolvedValue([AUFTRAG_A3]);
+    vi.mocked(listeOffeneAuftraege).mockResolvedValue([AUFTRAG_A3]);
     const { container } = setup();
     const link = await within(
       await waitFor(() => {
@@ -568,7 +568,7 @@ describe('KraefteuebersichtPage — Raster', () => {
 
   it('ein gescheiterter Auftragsabruf nimmt nicht die Tabelle, die Zelle sagt „?"', async () => {
     mitEinheit();
-    vi.mocked(listeAuftraege).mockRejectedValue(new Error('403'));
+    vi.mocked(listeOffeneAuftraege).mockRejectedValue(new Error('403'));
     const { container } = setup();
     await screen.findByText('1. Zug');
     await waitFor(() =>
@@ -580,7 +580,7 @@ describe('KraefteuebersichtPage — Raster', () => {
 
   it('eine Rolle ohne Auftragsrecht (403) sieht „—", nicht die Störungsmarke', async () => {
     mitEinheit();
-    vi.mocked(listeAuftraege).mockRejectedValue(new ApiError(403, 'verboten'));
+    vi.mocked(listeOffeneAuftraege).mockRejectedValue(new ApiError(403, 'verboten'));
     const { container } = setup();
     await screen.findByText('1. Zug');
     const e = await waitFor(() => {

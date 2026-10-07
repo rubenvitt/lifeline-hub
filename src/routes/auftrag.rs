@@ -29,43 +29,76 @@ pub struct ListeParams {
     pub richtung: Option<String>,
     pub abschnitt_id: Option<i64>,
     pub einheit_id: Option<i64>,
+    /// `offen` | `abgeschlossen` (LFH-1071); ohne: alle Aufträge wie bisher.
+    pub phase: Option<String>,
+    /// Cursor nur mit `phase=abgeschlossen`: Ordnungszeitpunkt und id des letzten Eintrags.
+    pub vor_zeit: Option<String>,
+    pub vor_id: Option<i64>,
+    /// Seitengröße nur mit `phase=abgeschlossen` (Vorgabe 100, geklemmt auf 1…500).
+    pub limit: Option<i64>,
+}
+
+/// Empfänger- und Richtungsfilter prüfen (Liste und Kennzahlen).
+fn filter_pruefen(
+    richtung: Option<&str>,
+    abschnitt_id: Option<i64>,
+    einheit_id: Option<i64>,
+) -> Result<(Option<&str>, Option<repo::EmpfaengerFilter>), AppError> {
+    if abschnitt_id.is_some() && einheit_id.is_some() {
+        // Feldkombination: 422 (`src/AGENTS.md`, Statuscode-Konvention).
+        return Err(AppError::UnprocessableEntity(
+            "Nur ein Empfänger-Filter erlaubt (Abschnitt ODER Einheit)".into(),
+        ));
+    }
+    let filter =
+        (abschnitt_id.is_some() || einheit_id.is_some()).then_some(repo::EmpfaengerFilter {
+            abschnitt_id,
+            einheit_id,
+        });
+    let richtung = richtung.map(str::trim).filter(|s| !s.is_empty());
+    if let Some(r) = richtung {
+        if !crate::auftrag::richtung_gueltig(r) {
+            return Err(AppError::Validation("Ungültige Richtung".into()));
+        }
+    }
+    Ok((richtung, filter))
 }
 
 /// GET /api/einsaetze/{id}/auftraege — Aufträge listen (Lesezugriff, auch Beobachter).
+/// Mit `phase=abgeschlossen` seitenweise (LFH-1071, Spec `auftraege-blaettern`).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Auftraege>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<AuftragDetail>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-
-    if params.abschnitt_id.is_some() && params.einheit_id.is_some() {
-        return Err(AppError::Validation(
-            "Nur ein Empfänger-Filter erlaubt (Abschnitt ODER Einheit)".into(),
-        ));
-    }
-    let filter = (params.abschnitt_id.is_some() || params.einheit_id.is_some()).then_some(
-        repo::EmpfaengerFilter {
-            abschnitt_id: params.abschnitt_id,
-            einheit_id: params.einheit_id,
-        },
-    );
-    let richtung = params
-        .richtung
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    if let Some(r) = richtung {
-        if !crate::auftrag::richtung_gueltig(r) {
-            return Err(AppError::Validation("Ungültige Richtung".into()));
+    let (richtung, filter) = filter_pruefen(
+        params.richtung.as_deref(),
+        params.abschnitt_id,
+        params.einheit_id,
+    )?;
+    let (phase, seite) = crate::kommunikation::phase_und_seite(
+        params.phase.as_deref(),
+        params.vor_zeit.as_deref(),
+        params.vor_id,
+        params.limit,
+    )?;
+    // Der Cursor vergleicht Zeichenketten: nur das kanonische Format ordnet richtig.
+    if let Some(vor) = seite.as_ref().and_then(|s| s.vor.as_ref()) {
+        if crate::zeit::parse_streng(&vor.zeit).is_none() {
+            return Err(AppError::Validation("Ungültiges vor_zeit".into()));
         }
     }
-    let mut liste = repo::liste(
+    let mut liste = repo::liste_gefiltert(
         &state.pool,
         einsatz_id,
-        params.status.as_deref(),
-        richtung,
-        filter.as_ref(),
+        &repo::AuftragFilter {
+            status: params.status.as_deref(),
+            richtung,
+            empfaenger: filter.as_ref(),
+            phase,
+            seite,
+        },
         &jetzt(),
     )
     .await?;
@@ -78,6 +111,48 @@ pub async fn liste(
     )
     .await?;
     Ok(Json(liste))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KennzahlenParams {
+    pub richtung: Option<String>,
+    pub abschnitt_id: Option<i64>,
+    pub einheit_id: Option<i64>,
+}
+
+/// GET /api/einsaetze/{id}/auftraege/kennzahlen — Zahlen des Auftragsboards (LFH-1071, D3).
+pub async fn kennzahlen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Auftraege>,
+    Query(params): Query<KennzahlenParams>,
+) -> Result<Json<crate::auftrag::AuftragKennzahlen>, AppError> {
+    let (richtung, filter) = filter_pruefen(
+        params.richtung.as_deref(),
+        params.abschnitt_id,
+        params.einheit_id,
+    )?;
+    Ok(Json(
+        repo::kennzahlen(&state.pool, ctx.einsatz.id, richtung, filter.as_ref()).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/auftraege/{aid} — ein Auftrag des Einsatzes (LFH-1071, Deeplink auf
+/// eine nicht geladene Seite). Einsatzfremd → 404.
+pub async fn detail(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Auftraege>,
+    PfadParam((_, aid)): PfadParam<(i64, i64)>,
+) -> Result<Json<AuftragDetail>, AppError> {
+    let mut d = repo::laden_im_einsatz(&state.pool, ctx.einsatz.id, aid, &jetzt()).await?;
+    anreichern_alle(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        std::slice::from_mut(&mut d),
+    )
+    .await?;
+    Ok(Json(d))
 }
 
 /// Leitet die Default-Quittierungs-Frist (Minuten) aus Einsatz- und Org-Einstellungen ab.

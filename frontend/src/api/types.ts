@@ -751,6 +751,7 @@ export type EmpfaengerTyp = S['EmpfaengerTyp'];
 export type Richtung = S['Richtung'];
 export type AuftragEmpfaenger = S['AuftragEmpfaengerAnzeige'];
 export type Auftrag = S['AuftragDetail'];
+export type AuftragKennzahlen = S['AuftragKennzahlen'];
 
 /** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeuerEmpfaenger {

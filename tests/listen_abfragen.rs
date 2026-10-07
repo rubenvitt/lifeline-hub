@@ -221,6 +221,58 @@ async fn auftragsliste_setzt_feste_zahl_an_statements_ab() {
     );
 }
 
+/// Eine Seite abgeschlossener Aufträge (LFH-1071) braucht gleich viele Statements, ob sie 3 oder
+/// 30 Aufträge trägt: Seite und Empfänger, jeweils eines.
+#[tokio::test]
+async fn auftragsseite_setzt_feste_zahl_an_statements_ab() {
+    use lifeline_hub::kommunikation::{ListenPhase, Seite, ZeitCursor};
+    let _sperre = SPERRE.lock().await;
+    let pool = lifeline_hub::db::test_pool().await;
+    let b = org_und_benutzer(&pool, 1, "leit").await;
+    let e = einsatz_mit_auftraegen(&pool, b, 40).await;
+    sqlx::query("UPDATE auftrag SET abgenommen_at = '2026-06-11 09:30:00' WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let jetzt = "2026-06-11 10:00:00";
+    let seite = |limit: i64, vor: Option<ZeitCursor>| auftrag_repo::AuftragFilter {
+        phase: Some(ListenPhase::Abgeschlossen),
+        seite: Some(Seite { vor, limit }),
+        ..Default::default()
+    };
+
+    let klein_filter = seite(3, None);
+    let (klein, sql_klein) = mitschneiden(auftrag_repo::liste_gefiltert(
+        &pool,
+        e,
+        &klein_filter,
+        jetzt,
+    ))
+    .await;
+    let klein = klein.unwrap();
+    assert_eq!(klein.len(), 3);
+    let gross_filter = seite(
+        30,
+        Some(ZeitCursor {
+            zeit: "2026-06-11 09:30:00".into(),
+            id: klein[2].auftrag.id,
+        }),
+    );
+    let (gross, sql_gross) = mitschneiden(auftrag_repo::liste_gefiltert(
+        &pool,
+        e,
+        &gross_filter,
+        jetzt,
+    ))
+    .await;
+    let gross = gross.unwrap();
+    assert_eq!(gross.len(), 30);
+    assert!(gross.iter().all(|d| d.empfaenger.len() == 2));
+    assert_eq!(sql_klein.len(), 2, "Seite + Empfänger: {sql_klein:#?}");
+    assert_eq!(sql_gross.len(), 2, "Seite + Empfänger: {sql_gross:#?}");
+}
+
 /// Die Einsatzliste lädt Labelkarten nur für Orgs, deren Einsätze der Benutzer sieht — für
 /// den Helfer die eigene, für den System-Admin alle.
 #[tokio::test]

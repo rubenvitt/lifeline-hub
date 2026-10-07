@@ -45,8 +45,10 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolv
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
 const listeAuftraege = vi.fn();
-vi.mock('../api/auftraege', () => ({
-  listeAuftraege: (...a: unknown[]) => listeAuftraege(...a),
+vi.mock('../api/auftraege', async () => ({
+  ...(await import('../test/auftraegeAttrappe')).auftraegeLeseAttrappe((...a) =>
+    listeAuftraege(...a),
+  ),
   legeAuftragAn: vi.fn(),
   quittiereEmpfaenger: vi.fn(),
   setzeVollzug: vi.fn(),
@@ -125,7 +127,7 @@ describe('Auftragsboard mit großen Mengen (LFH-949)', () => {
     gezeichnet.mockClear();
     act(() => {
       client.setQueryData(
-        einsatzKeys.auftraegeListe(1, 'alle', 'alle'),
+        einsatzKeys.auftraegePhase(1, 'offen', 'alle', 'alle'),
         zehn.map((a) => (a.id === 4 ? { ...a, auftrag_text: 'Geändert' } : a)),
       );
     });
@@ -136,17 +138,18 @@ describe('Auftragsboard mit großen Mengen (LFH-949)', () => {
   it('Abgeschlossen mit 120 Aufträgen rendert nur den Ausschnitt', async () => {
     listeAuftraege.mockResolvedValue(Array.from({ length: 120 }, (_, i) => abgenommen(i + 1)));
     renderPage('/einsaetze/1/auftraege?auftrag=1');
-    await screen.findByText('Auftrag 1');
+    // Der Deeplink holt den Auftrag zuerst einzeln (LFH-1071, D4), die Seite folgt.
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-lfh="auftraege-platzhalter"]')).toHaveLength(2),
+    );
     expect(karten().length).toBeGreaterThan(0);
     expect(karten().length).toBeLessThan(120);
-    expect(document.querySelectorAll('[data-lfh="auftraege-platzhalter"]')).toHaveLength(2);
   });
 
   it('bis 50 abgeschlossene Aufträge stehen alle da', async () => {
     listeAuftraege.mockResolvedValue(Array.from({ length: 50 }, (_, i) => abgenommen(i + 1)));
     renderPage('/einsaetze/1/auftraege?auftrag=1');
-    await screen.findByText('Auftrag 1');
-    expect(karten()).toHaveLength(50);
+    await waitFor(() => expect(karten()).toHaveLength(50));
     expect(document.querySelectorAll('[data-lfh="auftraege-platzhalter"]')).toHaveLength(0);
   });
 

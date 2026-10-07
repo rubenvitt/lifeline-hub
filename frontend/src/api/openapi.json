@@ -1296,6 +1296,26 @@
           }
         }
       },
+      "AuftragKennzahlen": {
+        "type": "object",
+        "description": "Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und\n„Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
+        "required": [
+          "offen",
+          "abgeschlossen"
+        ],
+        "properties": {
+          "abgeschlossen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Vollzogen oder abgenommen."
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Offen oder in Bearbeitung."
+          }
+        }
+      },
       "AuftragsZaehler": {
         "type": "object",
         "description": "Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig.",

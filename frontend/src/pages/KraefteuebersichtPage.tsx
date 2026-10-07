@@ -19,7 +19,7 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { listeAuftraege } from '../api/auftraege';
+import { listeOffeneAuftraege } from '../api/auftraege';
 import { holeRueckmeldungen } from '../api/meldungen';
 import {
   MELDEWEG_WORT,
@@ -670,9 +670,11 @@ export default function KraefteuebersichtPage() {
     queryKey: globalKeys.fahrzeugStatus(),
     queryFn: listeFahrzeugStatus,
   });
+  // Nur offene (LFH-1071): das Raster wertet nur offene und laufende Aufträge aus. Derselbe Cache
+  // wie die ungefilterte Offen-Ansicht des Auftragsboards.
   const auftraegeQuery = useQuery({
-    queryKey: einsatzKeys.auftraege(einsatzId),
-    queryFn: () => listeAuftraege(einsatzId),
+    queryKey: einsatzKeys.auftraegePhase(einsatzId, 'offen', 'alle', 'alle'),
+    queryFn: () => listeOffeneAuftraege(einsatzId),
   });
   // Dritter Zusatzabruf. Liegt unter dem `meldungen`-Präfix und wird vom Live-Ereignis `meldung`
   // mit invalidiert. 403 heißt „Meldungen für diese Rolle nicht lesbar" — dann gibt es weder Spalte

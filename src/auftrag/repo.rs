@@ -214,12 +214,86 @@ pub async fn empfaenger_von_allen(
     Ok(je_auftrag)
 }
 
+/// Abgeschlossen heißt vollzogen oder abgenommen (LFH-1071, D1); `offen` ist das Gegenteil.
+/// EINMAL definiert für Liste und [`kennzahlen`].
+macro_rules! ist_abgeschlossen_sql {
+    () => {
+        concat!(
+            "(",
+            bearbeitungsstatus_sql!(),
+            " IN ('vollzogen', 'abgenommen'))"
+        )
+    };
+}
+
+/// Ordnungszeitpunkt der Abgeschlossen-Ansicht (LFH-1071, D2): zuletzt abgenommen bzw. vollzogen
+/// oben, ohne Stempel die Anlage. Dieselbe Ordnung wie bisher im Board. Liste und Cursor lesen
+/// denselben Ausdruck.
+macro_rules! abschluss_zeit_sql {
+    () => {
+        "COALESCE(a.abgenommen_at, ks.vollzogen_at, a.erstellt_at)"
+    };
+}
+
+/// Filter einer Auftragsliste. `seite` gilt nur zusammen mit `phase = Abgeschlossen`
+/// ([`crate::kommunikation::phase_und_seite`]).
+#[derive(Debug, Default)]
+pub struct AuftragFilter<'a> {
+    pub status: Option<&'a str>,
+    pub richtung: Option<&'a str>,
+    pub empfaenger: Option<&'a EmpfaengerFilter>,
+    pub phase: Option<crate::kommunikation::ListenPhase>,
+    pub seite: Option<crate::kommunikation::Seite>,
+}
+
+/// WHERE-Ergänzungen (ohne Cursor) samt Bindwerten in textueller Reihenfolge.
+fn filter_bedingung(f: &AuftragFilter<'_>) -> (String, Vec<FilterWert>) {
+    use crate::kommunikation::ListenPhase;
+    let mut sql = String::new();
+    let mut werte = Vec::new();
+    match f.phase {
+        Some(ListenPhase::Offen) => sql.push_str(concat!(" AND NOT ", ist_abgeschlossen_sql!())),
+        Some(ListenPhase::Abgeschlossen) => {
+            sql.push_str(concat!(" AND ", ist_abgeschlossen_sql!()))
+        }
+        None => {}
+    }
+    if let Some(r) = f.richtung {
+        sql.push_str(" AND a.richtung = ?");
+        werte.push(FilterWert::Text(r.to_string()));
+    }
+    if let Some(s) = f.status {
+        sql.push_str(concat!(" AND ", bearbeitungsstatus_sql!(), " = ?"));
+        werte.push(FilterWert::Text(s.to_string()));
+    }
+    let empfaenger_slot = f.empfaenger.map(|f| match (f.abschnitt_id, f.einheit_id) {
+        (Some(a), _) => Some(("abschnitt_id", a)),
+        (None, Some(u)) => Some(("einheit_id", u)),
+        (None, None) => None,
+    });
+    match empfaenger_slot {
+        Some(Some((spalte, id))) => {
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM auftrag_empfaenger fe \
+                   WHERE fe.auftrag_id = a.id AND fe.{spalte} = ?)"
+            ));
+            werte.push(FilterWert::Zahl(id));
+        }
+        Some(None) => sql.push_str(
+            " AND EXISTS (SELECT 1 FROM auftrag_empfaenger fe WHERE fe.auftrag_id = a.id)",
+        ),
+        None => {}
+    }
+    (sql, werte)
+}
+
+enum FilterWert {
+    Text(String),
+    Zahl(i64),
+}
+
 /// Listet Aufträge eines Einsatzes (optional gefiltert nach Bearbeitungsstatus, Richtung
-/// und/oder Empfänger). Sortierung: Priorität (sofort→normal), dann Frist, dann ID.
-///
-/// Zwei Statements, gleich wie viele Aufträge (LFH-933): alle Filter wirken im WHERE, die
-/// Empfänger kommen gebündelt aus [`empfaenger_von_allen`]. Kein `empfaenger_von` je Zeile —
-/// das war N+1 hinter Board, Kräfteübersicht und Modulzähler.
+/// und/oder Empfänger), ohne Phase. Kurzform von [`liste_gefiltert`].
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -228,44 +302,78 @@ pub async fn liste(
     empfaenger_filter: Option<&EmpfaengerFilter>,
     jetzt: &str,
 ) -> Result<Vec<AuftragDetail>, AppError> {
-    let mut sql = format!("{ANZEIGE_SELECT} WHERE a.einsatz_id = ?");
-    if richtung_filter.is_some() {
-        sql.push_str(" AND a.richtung = ?");
+    liste_gefiltert(
+        pool,
+        einsatz_id,
+        &AuftragFilter {
+            status: status_filter,
+            richtung: richtung_filter,
+            empfaenger: empfaenger_filter,
+            ..Default::default()
+        },
+        jetzt,
+    )
+    .await
+}
+
+/// Listet Aufträge eines Einsatzes.
+///
+/// - ohne Phase und `offen`: Priorität (sofort→normal), dann Frist, dann ID; ungeblättert.
+/// - `abgeschlossen`: zuletzt abgeschlossen oben ([`abschluss_zeit_sql`]), bei Gleichstand die
+///   höhere id; eine Seite ab dem Cursor (LFH-1071).
+///
+/// Zwei Statements, gleich wie viele Aufträge (LFH-933): alle Filter wirken im WHERE, die
+/// Empfänger kommen gebündelt aus [`empfaenger_von_allen`]. Kein `empfaenger_von` je Zeile —
+/// das war N+1 hinter Board, Kräfteübersicht und Modulzähler.
+pub async fn liste_gefiltert(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &AuftragFilter<'_>,
+    jetzt: &str,
+) -> Result<Vec<AuftragDetail>, AppError> {
+    let (bedingung, werte) = filter_bedingung(filter);
+    let mut sql = format!("{ANZEIGE_SELECT} WHERE a.einsatz_id = ?{bedingung}");
+    let seite = match filter.phase {
+        Some(crate::kommunikation::ListenPhase::Abgeschlossen) => filter.seite.as_ref(),
+        _ => None,
+    };
+    if let Some(seite) = seite {
+        if seite.vor.is_some() {
+            sql.push_str(concat!(
+                " AND (",
+                abschluss_zeit_sql!(),
+                " < ? OR (",
+                abschluss_zeit_sql!(),
+                " = ? AND a.id < ?))"
+            ));
+        }
+        sql.push_str(concat!(
+            " ORDER BY ",
+            abschluss_zeit_sql!(),
+            " DESC, a.id DESC LIMIT ?"
+        ));
+    } else {
+        sql.push_str(
+            " ORDER BY CASE a.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
+              a.frist_at IS NULL, a.frist_at, a.id",
+        );
     }
-    if status_filter.is_some() {
-        sql.push_str(concat!(" AND ", bearbeitungsstatus_sql!(), " = ?"));
-    }
-    let empfaenger_slot = empfaenger_filter.map(|f| match (f.abschnitt_id, f.einheit_id) {
-        (Some(a), _) => Some(("abschnitt_id", a)),
-        (None, Some(u)) => Some(("einheit_id", u)),
-        (None, None) => None,
-    });
-    match empfaenger_slot {
-        Some(Some((spalte, _))) => sql.push_str(&format!(
-            " AND EXISTS (SELECT 1 FROM auftrag_empfaenger fe \
-               WHERE fe.auftrag_id = a.id AND fe.{spalte} = ?)"
-        )),
-        Some(None) => sql.push_str(
-            " AND EXISTS (SELECT 1 FROM auftrag_empfaenger fe WHERE fe.auftrag_id = a.id)",
-        ),
-        None => {}
-    }
-    sql.push_str(
-        " ORDER BY CASE a.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
-          a.frist_at IS NULL, a.frist_at, a.id",
-    );
-    // Bind-Reihenfolge: jetzt (computed) → einsatz_id → richtung → status → Empfänger-Slot.
+    // Bind-Reihenfolge = textuelle ?-Reihenfolge: jetzt (computed), einsatz_id, Filter,
+    // [Cursor], [limit].
     let mut q = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(&*sql))
         .bind(jetzt)
         .bind(einsatz_id);
-    if let Some(r) = richtung_filter {
-        q = q.bind(r);
+    for w in werte {
+        q = match w {
+            FilterWert::Text(t) => q.bind(t),
+            FilterWert::Zahl(z) => q.bind(z),
+        };
     }
-    if let Some(s) = status_filter {
-        q = q.bind(s);
-    }
-    if let Some(Some((_, id))) = empfaenger_slot {
-        q = q.bind(id);
+    if let Some(seite) = seite {
+        if let Some(vor) = &seite.vor {
+            q = q.bind(vor.zeit.clone()).bind(vor.zeit.clone()).bind(vor.id);
+        }
+        q = q.bind(seite.limit);
     }
     let auftraege = q.fetch_all(pool).await?;
 
@@ -278,6 +386,63 @@ pub async fn liste(
             auftrag,
         })
         .collect())
+}
+
+/// Kennzahlen des Auftragsboards (LFH-1071, D3): EINE gruppierte Abfrage über dieselben
+/// Fragmente wie die Liste, mit deren Richtungs- und Empfängerfilter (ohne Status, Phase und
+/// Seite). Bind-Reihenfolge: `einsatz_id`, Filter.
+pub async fn kennzahlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    richtung: Option<&str>,
+    empfaenger: Option<&EmpfaengerFilter>,
+) -> Result<super::AuftragKennzahlen, AppError> {
+    let (bedingung, werte) = filter_bedingung(&AuftragFilter {
+        richtung,
+        empfaenger,
+        ..Default::default()
+    });
+    let sql = format!(
+        concat!(
+            "SELECT ",
+            ist_abgeschlossen_sql!(),
+            " AS ist_abgeschlossen, COUNT(*) AS anzahl FROM auftrag a",
+            vollzug_join_sql!(),
+            " WHERE a.einsatz_id = ?{} GROUP BY 1"
+        ),
+        bedingung
+    );
+    let mut q = sqlx::query_as::<_, (bool, i64)>(sqlx::AssertSqlSafe(&*sql)).bind(einsatz_id);
+    for w in werte {
+        q = match w {
+            FilterWert::Text(t) => q.bind(t),
+            FilterWert::Zahl(z) => q.bind(z),
+        };
+    }
+    let mut k = super::AuftragKennzahlen::default();
+    for (ist_abgeschlossen, anzahl) in q.fetch_all(pool).await? {
+        if ist_abgeschlossen {
+            k.abgeschlossen += anzahl;
+        } else {
+            k.offen += anzahl;
+        }
+    }
+    Ok(k)
+}
+
+/// Lädt einen Auftrag des Einsatzes samt Empfängern (LFH-1071, Einzelabruf für den Deeplink).
+/// `NotFound` für eine unbekannte oder einsatzfremde Kennung.
+pub async fn laden_im_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    jetzt: &str,
+) -> Result<AuftragDetail, AppError> {
+    let d = laden(pool, id, jetzt).await?;
+    if d.auftrag.einsatz_id != einsatz_id {
+        return Err(AppError::NotFound);
+    }
+    Ok(d)
 }
 
 /// Prüft, ob ein Auftrag zum Einsatz gehört (Cross-Einsatz-Schutz).
