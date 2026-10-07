@@ -98,7 +98,7 @@ test('bei 390 px läuft keine der vier Einstellungs-Sektionen waagerecht über',
 
   // Je Sektion ein Wortlaut, der erst MIT dem geladenen Inhalt erscheint.
   const sektionen: [string, string | RegExp][] = [
-    ['allgemein', 'Standard-Modul (Einstieg)'],
+    ['allgemein', 'Einstiegsmodul'],
     ['verhalten', /Präfix ETB/],
     ['aufbewahrung', /Aufbewahrungs-Dauer/],
     ['module', MODUL],
@@ -329,7 +329,7 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit gesperrten
   await page.setViewportSize(HANDSCHIRM);
   const basis = `/einsaetze/${einsatzId}/einstellungen`;
 
-  await keinQuerlauf(page, `${basis}/allgemein`, 'Standard-Modul (Einstieg)', async (p) => {
+  await keinQuerlauf(page, `${basis}/allgemein`, 'Einstiegsmodul', async (p) => {
     await expect(
       rechteHinweis(p, HINWEIS_EINSTELLUNGEN),
       'Vorbedingung: Führungspersonal darf die Einstellungen ändern — kein Hinweis',
@@ -379,7 +379,7 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit Rechtehinw
     ).toBeDisabled();
   };
 
-  await keinQuerlauf(page, `${basis}/allgemein`, 'Standard-Modul (Einstieg)', formularGesperrt);
+  await keinQuerlauf(page, `${basis}/allgemein`, 'Einstiegsmodul', formularGesperrt);
   await keinQuerlauf(page, `${basis}/verhalten`, /Präfix ETB/, formularGesperrt);
   await keinQuerlauf(page, `${basis}/aufbewahrung`, /Aufbewahrungs-Dauer/, async (p) => {
     await formularGesperrt(p);

@@ -22,6 +22,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
+import { POSITION_LABELS } from '../api/personal';
 import {
   aktualisiereDisposition,
   disponiereAdhoc,
@@ -193,7 +194,7 @@ function BesatzungsBlock({
             <Space size={abstand.sm}>
               <span>
                 {m.name}
-                {m.staerke_position ? ` (${m.staerke_position})` : ''}
+                {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
               </span>
               {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
                 <Tag color="orange" style={{ margin: 0 }}>
@@ -240,6 +241,8 @@ export default function FahrzeugePage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
+  const [disponierenOffen, setDisponierenOffen] = useState(false);
+  const [stammForm] = Form.useForm<{ fahrzeug_id: number }>();
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
   // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
@@ -623,10 +626,8 @@ export default function FahrzeugePage() {
           ]}
         />
       }
+      // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
       aktionen={
-        // `wrap` plus `maxWidth`: das `minWidth: 260` des Auswahlfeldes und der Knopf daneben
-        // ergeben mehr als 390 px. Der Umbruch im Seitenkopf allein reicht nicht — er schiebt den
-        // Block nur unter den Titel, wo er weiter zu breit ist.
         <Space wrap style={{ minWidth: 0 }}>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
           <Segmentleiste<FahrzeugeAnsicht>
@@ -637,18 +638,9 @@ export default function FahrzeugePage() {
           />
           {darfSchreiben && (
             <>
-              <Select
-                style={{ minWidth: 260, maxWidth: '100%' }}
-                placeholder="Stamm-Fahrzeug disponieren …"
-                value={null}
-                options={poolOptionen}
-                notFoundContent={poolInhalt}
-                loading={disponiereMutation.isPending}
-                disabled={disponiereMutation.isPending}
-                onSelect={(fahrzeugId) => {
-                  if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId);
-                }}
-              />
+              <Button type="primary" onClick={() => setDisponierenOffen(true)}>
+                Fahrzeug disponieren
+              </Button>
               <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
             </>
           )}
@@ -774,6 +766,29 @@ export default function FahrzeugePage() {
           )}
         </>
       )}
+
+      {/* Fahrzeug aus dem Stamm disponieren, im Serienmodus: eine Einheit bringt mehrere. */}
+      <ErfassungsModal<{ fahrzeug_id: number }>
+        offen={disponierenOffen}
+        titel="Fahrzeug disponieren"
+        form={stammForm}
+        erfassenText="Disponieren"
+        serie
+        laeuft={disponiereMutation.isPending}
+        onErfassen={async (w) => {
+          await disponiereMutation.mutateAsync(w.fahrzeug_id);
+        }}
+        onFertig={() => setDisponierenOffen(false)}
+        onAbbrechen={() => setDisponierenOffen(false)}
+      >
+        <Form.Item
+          label="Fahrzeug"
+          name="fahrzeug_id"
+          rules={[{ required: true, message: 'Fahrzeug wählen' }]}
+        >
+          <Select options={poolOptionen} notFoundContent={poolInhalt} />
+        </Form.Item>
+      </ErfassungsModal>
 
       {/* Ad-hoc-Disposition als Schnellerfassung.
 

@@ -176,7 +176,7 @@ describe('EinsatzAufbewahrung', () => {
 
     rendern();
 
-    expect(await screen.findByText('Standard (Org): 365 Tage')).toBeInTheDocument();
+    expect(await screen.findByText('Vorgabe der Organisation: 365 Tage')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>

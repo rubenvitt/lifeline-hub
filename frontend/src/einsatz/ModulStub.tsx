@@ -18,7 +18,7 @@ import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
  */
 function rueckwegLabel(zielRoute: string): string {
   const ziel = modulZuRoute(zielRoute);
-  return ziel ? `${ziel.label} öffnen` : 'Standardmodul öffnen';
+  return ziel ? `${ziel.label} öffnen` : 'Einstiegsmodul öffnen';
 }
 
 /**

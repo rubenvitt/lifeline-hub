@@ -44,6 +44,9 @@ describe('Anmeldeverfahren', () => {
       await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Anmeldeverfahren: Passwort' })).toBeInTheDocument();
+    // Deutsch statt „Login-Wege“ (LFH-944).
+    expect(screen.getByText('Anmeldewege')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Login-Wege/);
   });
 
   it('zeigt auch deaktivierte Provider (Admin-Endpoint, LFH-277)', async () => {

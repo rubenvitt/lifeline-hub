@@ -10,6 +10,7 @@ import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
 import { useViewport } from '../components/useViewport';
+import { anzahl } from '../anzeige/anzahl';
 
 /**
  * Eine globale Betriebszeile für Leitung, Einsatz-Live-Feed und App-Version.
@@ -102,7 +103,14 @@ export default function LiveStatusBanner({
   const queueBadges = (
     <Space size={12} wrap>
       {queue.ausstehend > 0 && (
-        <Space size={4} aria-label={`${queue.ausstehend} ausstehende Offline-Aktionen`}>
+        <Space
+          size={4}
+          aria-label={anzahl(
+            queue.ausstehend,
+            'ausstehende Offline-Aktion',
+            'ausstehende Offline-Aktionen',
+          )}
+        >
           <Badge count={queue.ausstehend} overflowCount={999} color={token.colorWarning} />
           <span>ausstehend</span>
         </Space>
@@ -111,7 +119,11 @@ export default function LiveStatusBanner({
         <Button
           type="text"
           danger
-          aria-label={`${queue.abgelehnt} abgelehnte Offline-Aktionen`}
+          aria-label={anzahl(
+            queue.abgelehnt,
+            'abgelehnte Offline-Aktion',
+            'abgelehnte Offline-Aktionen',
+          )}
           onClick={() => setRecoveryOffen(true)}
         >
           <Space size={4}>
@@ -123,12 +135,15 @@ export default function LiveStatusBanner({
       {queue.nicht_zugeordnet > 0 && (
         <Button
           type="text"
-          aria-label={`${queue.nicht_zugeordnet} nicht attribuierbare Offline-Alt-Daten`}
+          // Der Name beginnt mit dem sichtbaren Wortlaut (WCAG 2.5.3), die Zahl folgt.
+          aria-label={`Alte Offline-Daten ansehen (${anzahl(queue.nicht_zugeordnet, 'Aktion', 'Aktionen')} ohne Zuordnung)`}
           onClick={() => setRecoveryOffen(true)}
         >
           <Space size={4}>
             <Badge count={queue.nicht_zugeordnet} overflowCount={999} color={token.colorWarning} />
-            <span>Alt-Daten – verwerfen</span>
+            {/* Der Knopf öffnet nur den Drawer; dort fragt das Verwerfen nach. „verwerfen“ las
+                sich wie die Löschung selbst und wurde gemieden (LFH-944). */}
+            <span>Alte Offline-Daten ansehen</span>
           </Space>
         </Button>
       )}

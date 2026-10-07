@@ -187,6 +187,7 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           'Vorbedingung: der lesende Aufklapper der Besatzung steht (LFH-697)',
         ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Fahrzeug disponieren' })).toHaveCount(0);
       },
     ],
     [
@@ -210,6 +211,7 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           'Vorbedingung: der lesende Aufklapper der Zeitachse steht',
         ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Person disponieren' })).toHaveCount(0);
       },
     ],
     [
@@ -221,6 +223,10 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           page.getByRole('button', { name: `Status von ${MATERIAL} ändern` }),
           'Vorbedingung: ohne Schreibrecht kein Statusauslöser (MaterialPage `statusBedienung`)',
         ).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Material disponieren' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Ad-hoc-Material' })).toHaveCount(0);
+        // Nur Ansicht: die Menge steht als Zahl, nicht als Feld.
+        await expect(page.getByRole('spinbutton')).toHaveCount(0);
       },
     ],
     [
@@ -255,6 +261,80 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
   for (const [modul, wortlaut, vorbedingung] of routen) {
     await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`, wortlaut, vorbedingung);
   }
+});
+
+/**
+ * LFH-983: Der Seitenkopf der drei Kräfte-Seiten ÖFFNET nur. Kein Auswahl- und kein Mengenfeld im
+ * Kopf, kein englischer Stufentext von rc-input-number im DOM, auf allen vier Schirmen. Am Desktop
+ * steht der Kopf einzeilig: alle Knöpfe auf einer Höhe, der Titel so hoch wie bei Personal.
+ * Der Beobachter-Zweig steht im Test darüber (kein Disponier-Knopf).
+ */
+const SCHIRME = [
+  { width: 390, height: 844 },
+  { width: 820, height: 1180 },
+  { width: 1180, height: 820 },
+  { width: 1440, height: 900 },
+] as const;
+
+test('der Kopf der Kräfte-Seiten disponiert nicht selbst, Mengen haben deutsche Namen', async ({
+  page,
+}) => {
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Kopf oeffnet ${Date.now()}`);
+  await seedeAlles(page, einsatzId);
+  const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
+
+  for (const schirm of SCHIRME) {
+    await page.setViewportSize(schirm);
+    for (const [modul, wortlaut, knopf] of [
+      ['material', MATERIAL, 'Material disponieren'],
+      ['personal', KRAFT, 'Person disponieren'],
+      ['fahrzeuge', FUNKRUFNAME, 'Fahrzeug disponieren'],
+    ] as const) {
+      await page.goto(`/einsaetze/${einsatzId}/${modul}`);
+      await expect(page.getByText(wortlaut).first()).toBeVisible();
+      await expect(
+        kopf.getByRole('button', { name: knopf }),
+        `${modul} @${schirm.width}`,
+      ).toBeVisible();
+      await expect(
+        kopf.getByRole('combobox'),
+        `${modul} @${schirm.width}: Auswahl im Kopf`,
+      ).toHaveCount(0);
+      await expect(
+        kopf.getByRole('spinbutton'),
+        `${modul} @${schirm.width}: Menge im Kopf`,
+      ).toHaveCount(0);
+    }
+
+    // Material: das Mengenfeld der Zeile bzw. Karte hat einen Namen, der Dialog sein Feld „Menge".
+    await page.goto(`/einsaetze/${einsatzId}/material`);
+    await expect(page.getByRole('spinbutton', { name: `Menge ${MATERIAL}` })).toBeVisible();
+    await page.getByRole('button', { name: 'Material disponieren' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toBeVisible();
+    expect(await page.content(), `Stufentexte @${schirm.width}`).not.toMatch(
+      /Increase Value|Decrease Value/,
+    );
+    await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+    await expect(dialog).toBeHidden();
+  }
+
+  // Desktop: einzeilig. Alle Knöpfe im Kopf auf einer Höhe, der Titel so hoch wie bei Personal.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const titelOben = async (modul: string, wortlaut: string) => {
+    await page.goto(`/einsaetze/${einsatzId}/${modul}`);
+    await expect(page.getByText(wortlaut).first()).toBeVisible();
+    const oben = await kopf
+      .getByRole('button')
+      .evaluateAll((knoepfe) => knoepfe.map((k) => Math.round(k.getBoundingClientRect().top)));
+    expect(new Set(oben).size, `${modul}: Knöpfe auf mehreren Zeilen (${oben})`).toBe(1);
+    return (await page.getByRole('heading', { level: 1 }).boundingBox())!.y;
+  };
+  const material = await titelOben('material', MATERIAL);
+  const personal = await titelOben('personal', KRAFT);
+  expect(Math.abs(material - personal)).toBeLessThanOrEqual(1);
 });
 
 for (const { dichte, soll } of STAFFEL) {

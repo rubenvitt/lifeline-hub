@@ -11,7 +11,7 @@ function messageAttrappe() {
 describe('quittiereModulGespeichert (LFH-478)', () => {
   it('quittiert fünf Schaltvorgänge in Folge unter EINEM Schlüssel', () => {
     const { api, success } = messageAttrappe();
-    for (let i = 0; i < 5; i++) quittiereModulGespeichert(api, 'Modul-Default gespeichert');
+    for (let i = 0; i < 5; i++) quittiereModulGespeichert(api, 'Modul-Vorgabe gespeichert');
 
     // Fünf Aufrufe, aber ein Schlüssel: antd ersetzt die stehende Meldung, statt zu stapeln.
     expect(success).toHaveBeenCalledTimes(5);
@@ -19,7 +19,7 @@ describe('quittiereModulGespeichert (LFH-478)', () => {
     expect(schluessel[0]).toEqual(expect.any(String));
     expect(schluessel[0]).not.toBe('');
     expect(new Set(schluessel).size).toBe(1);
-    expect(success.mock.calls[0][0].content).toBe('Modul-Default gespeichert');
+    expect(success.mock.calls[0][0].content).toBe('Modul-Vorgabe gespeichert');
   });
 
   it('teilt den Schlüssel nicht mit dem Rückgängig-Toast', () => {

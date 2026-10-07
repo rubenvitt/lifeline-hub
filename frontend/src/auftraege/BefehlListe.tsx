@@ -15,6 +15,7 @@ import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { ErfassungsModal } from '../components/Erfassung';
+import { anzahl } from '../anzeige/anzahl';
 
 /**
  * Befehlsliste des Aufträge/Befehle-Tabs.
@@ -138,7 +139,7 @@ export default function BefehlListe({
         titel="Befehle"
         // Ausdrücklich statt Vorgabe: die Gruppenköpfe der Datensicht rechnen mit dieser Ebene.
         ueberschrift="h3"
-        meta={`${befehle.length} Befehle · ${entwuerfe} im Entwurf`}
+        meta={`${anzahl(befehle.length, 'Befehl', 'Befehle')} · ${entwuerfe} im Entwurf`}
         dataUpdatedAt={befehleQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (

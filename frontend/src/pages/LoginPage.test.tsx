@@ -156,6 +156,12 @@ describe('LoginPage', () => {
     renderMitProviders(<LoginPage />);
 
     expect(await screen.findByLabelText('Passwort')).toBeInTheDocument();
+    // Weg zur Hilfe bei vergessenem Passwort (LFH-946): statisch, verrät nichts über das Konto.
+    expect(
+      screen.getByText(
+        'Passwort vergessen? Die Administration deiner Organisation setzt es zurück.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('blendet das Passwort-Feld aus, wenn kein aktiver Passwort-Provider konfiguriert ist', async () => {
@@ -171,6 +177,8 @@ describe('LoginPage', () => {
     // Das Formular ist initial sichtbar (provider.length === 0, bevor der Effect greift) und
     // verschwindet erst nach geladener Provider-Liste.
     await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
+    // Ohne Passwortweg gibt es auch kein Passwort zu vergessen.
+    expect(screen.queryByText(/Passwort vergessen\?/)).not.toBeInTheDocument();
   });
 
   it('blendet das Passwort-Feld aus, wenn der Passwort-Provider deaktiviert ist', async () => {
@@ -847,7 +855,7 @@ describe('LoginPage', () => {
       expect(codeFeld).toHaveAttribute('maxlength', '6');
     });
 
-    it('schaltet per „Recovery-Code verwenden" auf die Recovery-Eingabe um und schickt den Code an totp/finish', async () => {
+    it('schaltet per „Wiederherstellungscode verwenden" auf dessen Eingabe um und schickt den Code an totp/finish', async () => {
       let totpBody: unknown = null;
       server.use(http.get('/api/auth/me', () => HttpResponse.json(adminBody)));
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
@@ -867,9 +875,11 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       await screen.findByLabelText('Code aus deiner Authenticator-App');
-      await userEvent.click(screen.getByRole('button', { name: 'Recovery-Code verwenden' }));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Wiederherstellungscode verwenden' }),
+      );
 
-      const recoveryFeld = await screen.findByLabelText('Recovery-Code');
+      const recoveryFeld = await screen.findByLabelText('Wiederherstellungscode');
       expect(screen.queryByLabelText('Code aus deiner Authenticator-App')).not.toBeInTheDocument();
 
       await userEvent.type(recoveryFeld, 'a1b2-c3d4-e5f6-0718-293a');
@@ -895,15 +905,17 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       await screen.findByLabelText('Code aus deiner Authenticator-App');
-      await userEvent.click(screen.getByRole('button', { name: 'Recovery-Code verwenden' }));
-      await screen.findByLabelText('Recovery-Code');
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Wiederherstellungscode verwenden' }),
+      );
+      await screen.findByLabelText('Wiederherstellungscode');
 
       await userEvent.click(
         screen.getByRole('button', { name: 'Code aus der Authenticator-App verwenden' }),
       );
 
       expect(await screen.findByLabelText('Code aus deiner Authenticator-App')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Recovery-Code')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Wiederherstellungscode')).not.toBeInTheDocument();
     });
 
     it('meldet einen normalen (Nicht-MFA) Login unverändert direkt an — keine Code-Eingabe', async () => {

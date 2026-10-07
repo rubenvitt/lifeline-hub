@@ -10,6 +10,7 @@ import type { LiveVerbindungsStatus } from '../live/liveVerbindung';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useOnline } from '../offline/useOnline';
 import { useMinutenTakt } from './useMinutenTakt';
+import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
@@ -254,8 +255,10 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
     getrennt: false,
   },
   ausstehend: {
-    wort: 'QUEUE',
-    satz: (q) => `${q.ausstehend} Offline-Aktionen ausstehend`,
+    // Deutsch statt „QUEUE“ (LFH-944): wer das Wort nicht kennt, hält ausstehende Einträge für
+    // schon beim Server.
+    wort: 'WARTET',
+    satz: (q) => `${anzahl(q.ausstehend, 'Offline-Aktion', 'Offline-Aktionen')} ausstehend`,
     farbe: farbenDunkel.achtung,
     getrennt: false,
   },
@@ -273,7 +276,8 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
   },
   abgelehnt: {
     wort: 'PRÜFEN',
-    satz: (q) => `${q.abgelehnt} Offline-Aktionen abgelehnt — bitte prüfen`,
+    satz: (q) =>
+      `${anzahl(q.abgelehnt, 'Offline-Aktion', 'Offline-Aktionen')} abgelehnt — bitte prüfen`,
     farbe: rahmenFarben.alarm,
     getrennt: false,
   },
@@ -290,7 +294,7 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * `kompakt` (unter `md`): nur Icon, das Wort wandert in den zugänglichen Namen und `title`.
  *
  * `ruheOhneWort` (zwischen `md` und `xl`): nur der RUHEZUSTAND „SYNC" steht als Icon. Jede
- * Störung (VERBINDE, QUEUE, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort — Farbe allein wäre ein
+ * Störung (VERBINDE, WARTET, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort — Farbe allein wäre ein
  * Kanal (WCAG 1.4.1).
  */
 export function syncZeigtWort(

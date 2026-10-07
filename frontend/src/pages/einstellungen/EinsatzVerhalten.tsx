@@ -14,6 +14,7 @@ import {
   normalisiereVerhalten,
   orgHinweisAutoEtb,
   orgHinweisWert,
+  platzhalterVorgabe,
   zuUpdate,
   type FormWerteVerhalten,
 } from './einsatzEinstellungenForm';
@@ -21,6 +22,7 @@ import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
+import { mitVorgabe } from '../../components/vorgabeText';
 
 /** Tristate-Optionen für automatische ETB-Einträge (leer = erbt Org, true = An, false = Aus).
  *  Bleibt bewusst hier: diese Liste gibt es nur auf der Einsatz-Ebene. */
@@ -97,7 +99,7 @@ export default function EinsatzVerhalten() {
       >
         <Formularpaneel
           titel="Verhalten & Automatik"
-          beschreibung="Nummernkreise (Präfix + Startwert), Default-Fristen und automatische ETB-Einträge für diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises vergeben ist, sind Präfix und Startwert nicht mehr änderbar."
+          beschreibung="Nummernkreise (Präfix + Startwert), Fristen und automatische ETB-Einträge für diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises vergeben ist, sind Präfix und Startwert nicht mehr änderbar."
         >
           <div style={feldrasterStil(abBreite('lg'), token.margin)}>
             {(
@@ -147,13 +149,13 @@ export default function EinsatzVerhalten() {
                   // `flex: 0 1 160px` statt `width: 160`: eine feste Pixelbreite ragte am schmalen
                   // Schirm über den Rand (`feldbreiten.guard.test.ts`).
                   style={{ flex: '0 1 160px' }}
-                  tooltip="Erste laufende Nummer (Default 1)."
+                  tooltip="Erste laufende Nummer."
                 >
                   <InputNumber
                     min={1}
                     max={999999}
                     style={{ width: '100%' }}
-                    placeholder="1"
+                    placeholder={mitVorgabe('1')}
                     disabled={nk.eingefroren}
                   />
                 </Form.Item>
@@ -161,53 +163,63 @@ export default function EinsatzVerhalten() {
             ))}
 
             <Form.Item
-              label="Default-Bestätigungsfrist Meldungen (Minuten)"
+              label="Bestätigungsfrist Meldungen (Minuten)"
               name="meldung_bestaetigung_frist_min"
-              tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = projektweiter Standard."
+              tooltip="Frist für die Bestätigung pflichtiger Meldungen."
               extra={orgHinweisWert(orgDefaults?.meldung_bestaetigung_frist_min, 'Min.')}
             >
               <InputNumber
                 min={1}
                 max={10080}
                 style={{ width: '100%', maxWidth: 200 }}
-                placeholder="Standard"
+                placeholder={platzhalterVorgabe(orgDefaults?.meldung_bestaetigung_frist_min, '5')}
               />
             </Form.Item>
             <Form.Item
-              label="Default-Quittierfrist Aufträge (Minuten)"
+              label="Quittierfrist Aufträge (Minuten)"
               name="auftrag_quittierung_frist_min"
-              tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = keine automatische Frist."
+              tooltip="Frist für unquittierte Aufträge ohne eigene Frist."
               extra={orgHinweisWert(orgDefaults?.auftrag_quittierung_frist_min, 'Min.')}
             >
               <InputNumber
                 min={1}
                 max={10080}
                 style={{ width: '100%', maxWidth: 200 }}
-                placeholder="keine"
+                placeholder={platzhalterVorgabe(
+                  orgDefaults?.auftrag_quittierung_frist_min,
+                  'keine Frist',
+                )}
               />
             </Form.Item>
             <Form.Item
               label="Rückmeldefrist Einheiten (Minuten)"
               name="rueckmeldung_frist_min"
-              tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig. Leer = Organisations-Vorgabe, sonst 60."
+              tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig."
               extra={orgHinweisWert(orgDefaults?.rueckmeldung_frist_min, 'Min.')}
             >
               <InputNumber
                 min={1}
                 max={10080}
                 style={{ width: '100%', maxWidth: 200 }}
-                placeholder="60"
+                placeholder={platzhalterVorgabe(orgDefaults?.rueckmeldung_frist_min, '60')}
               />
             </Form.Item>
             <Form.Item
               label="Automatische ETB-Einträge"
               name="auto_etb_eintraege"
-              tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Leer = Org-Standard erben."
+              tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
               extra={orgHinweisAutoEtb(orgDefaults?.auto_etb_eintraege)}
             >
               <Select
                 allowClear
-                placeholder="Org-Standard"
+                placeholder={platzhalterVorgabe(
+                  orgDefaults?.auto_etb_eintraege == null
+                    ? null
+                    : orgDefaults.auto_etb_eintraege === 0
+                      ? 'Aus'
+                      : 'An',
+                  'An',
+                )}
                 options={AUTO_ETB_OPTIONEN}
                 style={{ width: '100%', maxWidth: 200 }}
               />

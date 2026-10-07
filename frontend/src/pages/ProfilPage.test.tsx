@@ -100,7 +100,7 @@ describe('ProfilPage — Kopfdaten (LFH-345)', () => {
   it('endet nicht mehr im Baustellen-Platzhalter', async () => {
     setup();
 
-    await screen.findByText('Zwei-Faktor (TOTP)');
+    await screen.findByText('Zweiter Faktor (Code aus App)');
     expect(screen.queryByText('Eigener Account und app-weite Einstellungen.')).toBeNull();
   });
 
@@ -223,7 +223,7 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
     starteMacHuelle();
     setup(false, []);
 
-    await screen.findByText('Zwei-Faktor (TOTP)');
+    await screen.findByText('Zweiter Faktor (Code aus App)');
     await waitFor(() => expect(screen.queryByText(/Nur im Browser/)).not.toBeInTheDocument());
   });
 
@@ -241,7 +241,7 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
  * ebenso der Riegel gegen doppeltes Absenden.
  */
 describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
-  it('zeigt „2FA einrichten", wenn totp_aktiviert=false, und durchläuft enroll/start → QR/Secret → enroll/finish → Recovery-Codes', async () => {
+  it('zeigt „Zweiten Faktor einrichten", wenn totp_aktiviert=false, und durchläuft enroll/start → QR/Schlüssel → enroll/finish → Wiederherstellungscodes', async () => {
     setup(false);
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
@@ -256,24 +256,31 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       ),
     );
 
-    const startKnopf = await screen.findByRole('button', { name: '2FA einrichten' });
+    const startKnopf = await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' });
     await userEvent.click(startKnopf);
 
     expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
+    // Ein Wort für die Sache, kein Entwicklerjargon (LFH-944).
+    expect(screen.getByText(/Schlüssel zur manuellen Eingabe/)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/TOTP|Secret|2FA/);
 
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
 
-    expect(await screen.findByText('Recovery-Codes jetzt sichern')).toBeInTheDocument();
+    expect(await screen.findByText('Wiederherstellungscodes jetzt sichern')).toBeInTheDocument();
     expect(screen.getByText(/aaaa-1111/)).toBeInTheDocument();
     expect(screen.getByText(/bbbb-2222/)).toBeInTheDocument();
     expect(screen.getByText(/cccc-3333/)).toBeInTheDocument();
   });
 
-  it('zeigt „2FA aktiv", wenn totp_aktiviert=true, und KEINEN Einrichten-Button', async () => {
+  it('zeigt „Zweiter Faktor aktiv", wenn totp_aktiviert=true, und KEINEN Einrichten-Button', async () => {
     setup(true);
 
-    expect(await screen.findByText('2FA aktiv')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '2FA einrichten' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Zweiter Faktor aktiv')).toBeInTheDocument();
+    expect(screen.getByText('Abschalten kann nur ein Administrator.')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/self-service|Admin-Reset|2FA|TOTP/);
+    expect(
+      screen.queryByRole('button', { name: 'Zweiten Faktor einrichten' }),
+    ).not.toBeInTheDocument();
   });
 
   // Der Rückfallweg: der Knopf trägt einen unvollständigen Code, den das Auto-Absenden nicht
@@ -295,7 +302,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       }),
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: '2FA einrichten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
     await screen.findByText('JBSWY3DPEHPK3PXP');
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '12345');
     expect(gesendet).toEqual([]);
@@ -333,13 +340,13 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       }),
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: '2FA einrichten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
     const feld = screen.getByLabelText('Code aus deiner Authenticator-App');
     await userEvent.type(feld, '123456');
 
-    await screen.findByText('Recovery-Codes jetzt sichern');
+    await screen.findByText('Wiederherstellungscodes jetzt sichern');
     expect(aufrufe).toBe(1);
     // Die zweite Hälfte: der Knopf ist weg. Ohne diese Aussage könnte der Test grün sein, obwohl
     // ein zweiter Absendeweg offenstünde.
@@ -361,7 +368,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       ),
     );
 
-    const startKnopf = await screen.findByRole('button', { name: '2FA einrichten' });
+    const startKnopf = await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' });
     await userEvent.click(startKnopf);
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
@@ -370,7 +377,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     expect(await screen.findByText('Code ungültig')).toBeInTheDocument();
   });
 
-  it('behält die Recovery-Codes sichtbar, wenn der Status-Refresh nach enrollFinish auf „2FA aktiv" dreht (Regressionsschutz)', async () => {
+  it('behält die Wiederherstellungscodes sichtbar, wenn der Status-Refresh nach enrollFinish auf „Zweiter Faktor aktiv" dreht (Regressionsschutz)', async () => {
     setup(false);
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
@@ -385,7 +392,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       ),
     );
 
-    const startKnopf = await screen.findByRole('button', { name: '2FA einrichten' });
+    const startKnopf = await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' });
     await userEvent.click(startKnopf);
 
     expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
@@ -398,7 +405,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
 
-    expect(await screen.findByText('2FA aktiv')).toBeInTheDocument();
+    expect(await screen.findByText('Zweiter Faktor aktiv')).toBeInTheDocument();
     expect(screen.getByText(/CODE-1111/)).toBeInTheDocument();
     expect(screen.getByText(/CODE-2222/)).toBeInTheDocument();
   });
@@ -428,10 +435,10 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
         HttpResponse.json({ recovery_codes: ['aaaa-1111', 'bbbb-2222'] }),
       ),
     );
-    await userEvent.click(await screen.findByRole('button', { name: '2FA einrichten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
     await screen.findByText('JBSWY3DPEHPK3PXP');
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
-    await screen.findByText('Recovery-Codes jetzt sichern');
+    await screen.findByText('Wiederherstellungscodes jetzt sichern');
   }
 
   function setzeZwischenablage(wert: unknown) {
@@ -454,7 +461,7 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Codes kopieren' }));
 
     expect(writeText).toHaveBeenCalledWith('aaaa-1111\nbbbb-2222');
-    expect(await screen.findByText('Recovery-Codes kopiert')).toBeInTheDocument();
+    expect(await screen.findByText('Wiederherstellungscodes kopiert')).toBeInTheDocument();
   });
 
   it('meldet auch die ABLEHNUNG — vorhanden heisst nicht erlaubt', async () => {
@@ -510,7 +517,7 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
   it('erscheint NICHT ohne aktiven Passwort-Provider', async () => {
     setup(false, webauthnProvider);
     // Anker: die Seite ist fertig geladen, erst dann trägt die Abwesenheit etwas.
-    await screen.findByText('Zwei-Faktor (TOTP)');
+    await screen.findByText('Zweiter Faktor (Code aus App)');
     await waitFor(() => expect(screen.queryByText('Passwort')).toBeNull());
     expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
   });
@@ -538,7 +545,7 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
 
   it('erscheint NICHT, wenn der Passwort-Provider als deaktiviert geliefert wird', async () => {
     setup(false, [{ ...passwortProvider[0], aktiviert: false }]);
-    await screen.findByText('Zwei-Faktor (TOTP)');
+    await screen.findByText('Zweiter Faktor (Code aus App)');
     expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
   });
 

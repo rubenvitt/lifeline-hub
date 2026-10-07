@@ -50,6 +50,11 @@ describe('adminNav — Registry', () => {
     expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(12);
     expect(adminBenutzer.key).toBe('benutzer');
     expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
+    // Voreingestellte Werte heißen „Vorgabe“ (LFH-944), auch im Menü.
+    const einsatz = adminGruppen
+      .find((g) => g.key === 'einstellungen')!
+      .sektionen.find((sektion) => sektion.key === 'einsatz')!;
+    expect(einsatz.label).toBe('Einsatz-Vorgaben');
     // Nur für den System-Admin (die Führungskraft liest die Verwaltung, dieses Archiv nicht).
     expect(adminAufbewahrung).toEqual({ key: 'aufbewahrung', label: 'Aufbewahrung' });
     const ersteEbene = [

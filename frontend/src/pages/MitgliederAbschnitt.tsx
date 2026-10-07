@@ -23,12 +23,8 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
-
-const ROLLEN: { value: EinsatzRolle; label: string }[] = [
-  { value: 'einsatzleitung', label: 'Einsatzleitung' },
-  { value: 'fuehrungspersonal', label: 'Führungspersonal' },
-  { value: 'beobachter', label: 'Beobachter' },
-];
+import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
+import { anzahl } from '../anzeige/anzahl';
 
 /** Rang einer Einsatzrolle: kleiner ist stärker. Herabstufen heißt, der Rang wächst. */
 const RANG: Record<EinsatzRolle, number> = {
@@ -280,8 +276,8 @@ export default function MitgliederAbschnitt({
       // An der letzten Einsatzleitung ist jede schwächere Rolle gesperrt (Grund unter der Aktion).
       options={
         istLetzteLeitung(m)
-          ? ROLLEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
-          : ROLLEN
+          ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
+          : EINSATZ_ROLLE_OPTIONEN
       }
       onChange={(rolle) => rolleWaehlen(m, rolle)}
     />
@@ -373,7 +369,7 @@ export default function MitgliederAbschnitt({
       meta={
         mitgliederQuery.isSuccess ? (
           <>
-            {mitglieder.length} Mitglieder{' '}
+            {anzahl(mitglieder.length, 'Mitglied', 'Mitglieder')}{' '}
             <Datenstand dataUpdatedAt={mitgliederQuery.dataUpdatedAt} />
           </>
         ) : undefined
@@ -399,7 +395,7 @@ export default function MitgliederAbschnitt({
           <Select
             value={neueRolle}
             style={{ width: 170 }}
-            options={ROLLEN}
+            options={EINSATZ_ROLLE_OPTIONEN}
             onChange={setNeueRolle}
           />
           <Button
@@ -457,7 +453,7 @@ export default function MitgliederAbschnitt({
           }}
           onCancel={() => setHerabstufung(null)}
         >
-          {`Mit „${ROLLEN.find((r) => r.value === herabstufung.rolle)?.label}“ endet das Recht, den Zugriff dieses Einsatzes zu verwalten.`}
+          {`Mit „${EINSATZ_ROLLE_OPTIONEN.find((r) => r.value === herabstufung.rolle)?.label}“ endet das Recht, den Zugriff dieses Einsatzes zu verwalten.`}
         </Modal>
       )}
     </Paneel>

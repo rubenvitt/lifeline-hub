@@ -163,7 +163,7 @@ export default function OnlineQuelleFormModal({
                 <Form.Item
                   label="Sortierung"
                   name="sortier"
-                  tooltip="Reihenfolge im Basemap-Switcher (kleiner = weiter oben)."
+                  tooltip="Reihenfolge in der Wahl der Kartengrundlage (kleiner = weiter oben)."
                 >
                   <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
                 </Form.Item>
@@ -171,7 +171,7 @@ export default function OnlineQuelleFormModal({
                   label="Aktiv"
                   name="aktiv"
                   valuePropName="checked"
-                  tooltip="Nur aktive Quellen erscheinen im Basemap-Switcher der Lagekarte."
+                  tooltip="Nur aktive Quellen erscheinen in der Wahl der Kartengrundlage auf der Lagekarte."
                 >
                   <Switch />
                 </Form.Item>
@@ -181,11 +181,11 @@ export default function OnlineQuelleFormModal({
                   name="proxy"
                   valuePropName="checked"
                   tooltip={
-                    'Standard an (empfohlen): Der Server holt Style, Tiles, Sprite und Glyphs, ' +
+                    'Vorgabe: an (empfohlen). Der Server holt Style, Tiles, Sprite und Glyphs, ' +
                     'hält Schlüssel server-seitig und speichert die Antworten zwischen — ' +
                     'gleiche Kacheln treffen den Anbieter nur einmal (LFH-182/190). ' +
                     'Abschalten nur, wenn der Anbieter Proxying oder Caching untersagt ' +
-                    '(z. B. OSM-Standard-Tiles); dann läuft die URL direkt im Browser.'
+                    '(z. B. die Kacheln von openstreetmap.org); dann läuft die URL direkt im Browser.'
                   }
                 >
                   <Switch />

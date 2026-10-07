@@ -56,6 +56,18 @@ describe('syncZustand — Rangfolge der SYNC-Anzeige', () => {
     expect(SYNC_DARSTELLUNG.getrennt.farbe).toBe(rahmenFarben.alarm);
     expect(SYNC_DARSTELLUNG.offline.wort).toBe('OFFLINE');
   });
+
+  it('meldet ausstehende Offline-Aktionen auf Deutsch, mit Zähler und richtiger Einzahl (LFH-944)', () => {
+    expect(SYNC_DARSTELLUNG.ausstehend.wort).toBe('WARTET');
+    expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 1 })).toBe(
+      '1 Offline-Aktion ausstehend',
+    );
+    expect(SYNC_DARSTELLUNG.ausstehend.satz({ ...LEER, ausstehend: 3 })).toBe(
+      '3 Offline-Aktionen ausstehend',
+    );
+    // SYNC und PRÜFEN bleiben (Entscheidung „Anzeige, kein Bedienziel“).
+    expect(SYNC_DARSTELLUNG.abgelehnt.wort).toBe('PRÜFEN');
+  });
 });
 
 describe('Kopfleiste · Stile', () => {

@@ -298,9 +298,9 @@ export default function LoginPage() {
           >
             {recoveryModus ? (
               <Form.Item
-                label="Recovery-Code"
+                label="Wiederherstellungscode"
                 name="code"
-                rules={[{ required: true, message: 'Bitte Recovery-Code eingeben' }]}
+                rules={[{ required: true, message: 'Bitte Wiederherstellungscode eingeben' }]}
               >
                 <Input
                   size="large"
@@ -334,7 +334,7 @@ export default function LoginPage() {
             <Button type="link" block onClick={wechsleRecoveryModus}>
               {recoveryModus
                 ? 'Code aus der Authenticator-App verwenden'
-                : 'Recovery-Code verwenden'}
+                : 'Wiederherstellungscode verwenden'}
             </Button>
             <Button type="link" block onClick={zurueckZumPasswort}>
               Zurück
@@ -452,6 +452,13 @@ export default function LoginPage() {
                   </Button>
                 )}
               </Form>
+            )}
+            {/* Statisch, damit die 401-Meldung enumerationssicher bleibt: der Satz nennt den Weg,
+                ohne etwas über das Konto zu verraten (LFH-946). */}
+            {passwortAktiv && (
+              <p className="login-hinweis">
+                Passwort vergessen? Die Administration deiner Organisation setzt es zurück.
+              </p>
             )}
             {imBrowserAnmelden && (
               <>
