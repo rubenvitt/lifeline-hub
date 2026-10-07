@@ -129,6 +129,15 @@ export function fmsWort(label: string, anker: number | null | undefined): string
   return m && Number(m[1]) === anker ? m[2] : label;
 }
 
+/**
+ * Das EINE Format eines FMS-Status als Text: „S4 · Am Einsatzort“ (LFH-973, Klärungsrunde
+ * Welle 4, Entscheidung 2) — im Meldebild, im FMS-Tableau und auf der Fahrzeugseite. Ohne Anker
+ * bleibt das Katalogwort. Der Chip (`StatusChip`) setzt Code, Trenner und Wort selbst.
+ */
+export function fmsEtikett(label: string, anker: number | null | undefined): string {
+  return anker != null ? `S${anker} · ${fmsWort(label, anker)}` : label;
+}
+
 export function fahrzeugStatus(
   ef: EinsatzFahrzeug,
   katalog: ReadonlyMap<number, FahrzeugStatus>,
@@ -530,6 +539,31 @@ export function rueckmeldungDerZeile(
 /** Überfällig oder nie zurückgemeldet — die Zeile wird getönt wie eine Problemzeile. */
 export function istRueckmeldungProblem(r: RueckmeldungAnzeige | null | undefined): boolean {
   return r != null && r.zustand !== 'aktuell';
+}
+
+/** Das Wort zur Tönung, wenn die Rückmeldung den Grund liefert. */
+const TOENUNG_RUECKMELDUNG: Record<Exclude<RueckmeldungZustand, 'aktuell'>, string> = {
+  ueberfaellig: 'Rückm. überfällig',
+  keine: 'keine Rückm.',
+};
+
+/**
+ * Warum eine Zeile getönt ist, als Wörter für die Statusspalte (LFH-973): die Tönung allein
+ * trägt die Aussage nicht (WCAG 1.4.1), und Ausfall-Zahl und Rückmeldung stehen in Spalten, die
+ * am schmalen Schirm weichen oder hinten liegen. Ein Einheitenstatus „nicht verfügbar“ braucht
+ * kein Wort, sein Chip in derselben Spalte nennt ihn schon.
+ */
+export function toenungsGruende(
+  z: RasterZeile,
+  r: RueckmeldungAnzeige | null | undefined,
+): string[] {
+  const gruende: string[] = [];
+  const ausfall = z.verteilung?.ausfall ?? 0;
+  if (ausfall > 0 && z.einheitStatus?.kategorie !== 'nicht_verfuegbar') {
+    gruende.push(`${ausfall} Ausfall`);
+  }
+  if (r != null && r.zustand !== 'aktuell') gruende.push(TOENUNG_RUECKMELDUNG[r.zustand]);
+  return gruende;
 }
 
 /**

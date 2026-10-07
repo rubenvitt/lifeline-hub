@@ -242,8 +242,8 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
           rules={[{ required: true, message: 'Zeitpunkt wählen' }]}
           extra={
             auswahl?.vorgemerkt_at
-              ? 'Die Kategorie ist vorgemerkt — eine Frist in der Zukunft nimmt die Vormerkung zurück.'
-              : 'Ab diesem Zeitpunkt wird die Kategorie vorgemerkt und nach 30 Tagen Karenz unwiderruflich geschwärzt.'
+              ? 'Vorgemerkt; eine Frist in der Zukunft nimmt die Vormerkung zurück.'
+              : 'Danach vorgemerkt, nach 30 Tagen Karenz unwiderruflich geschwärzt.'
           }
         >
           <ZeitpunktEingabe format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />

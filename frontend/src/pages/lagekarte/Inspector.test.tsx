@@ -496,7 +496,8 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Im Fachmodul öffnen' })).toBeNull(),
     );
-    const knopf = screen.getByRole('button', { name: 'Im Fachmodul öffnen' });
+    // Der Grund steht im sichtbaren Text, nicht nur im `title` (der auf Touch nie erscheint).
+    const knopf = screen.getByRole('button', { name: 'Im Fachmodul öffnen (Keine Berechtigung)' });
     expect(knopf).toBeDisabled();
     expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
   });
@@ -518,7 +519,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     );
     const name = `Einsatztagebuch zu ${einheitMarker.label}`;
     await waitFor(() => expect(screen.queryByRole('link', { name })).toBeNull());
-    const knopf = screen.getByRole('button', { name });
+    const knopf = screen.getByRole('button', { name: 'ETB (Keine Berechtigung)' });
     expect(knopf).toBeDisabled();
     expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
     // Der Fachmodul-Sprung (Einheiten frei) bleibt ein Link.

@@ -51,6 +51,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`einsatz/IconRail.tsx`, Kurzetikett `kurz`, voller Name als `aria-label`, Einstellungen per
   `fuss: true`) · Modulpanel (`einsatz/ModulPanel.tsx`) · Sprungpalette
   (`command-palette/CommandPalette.tsx`). Maße im Entwurf.
+  - **Stehenbleiben, gestuft** (LFH-952, Spec `einsatztauglichkeit-layout`): ab `md` klebt der
+    Kopf (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter; unter
+    `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung (offline, Live `lost`).
+  - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
+    rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
+    nie gerechnet). Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
+    `components/rahmenOben.guard.test.ts`). Den Fokusabstand trägt `scroll-padding-block-start`
+    am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
+  - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
+    offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
   (`redirectZiel()`); Aufträge/Befehle unter Führung; **Meldebild** heißt sichtbar die
   Kräfteübersicht — **Schlüssel und Route bleiben `kraefteuebersicht`**.
@@ -509,6 +519,11 @@ und `pages/personen/`.
   „Nur Ansicht · Grund“ über dem Block (Grund aus `components/nurAnsicht.ts`, wenige Wörter,
   Rollen wie in der Mitgliederverwaltung), Primäraktion gesperrt sichtbar; Zeilenaktionsspalte
   entfällt (M45); gesperrte Einzelzeilen tragen ihren Kurzgrund selbst.
+- **Was der Server sicher ablehnt, steht gesperrt mit Grund** (LFH-966): Entfernen und
+  Herabstufen der letzten Einsatzleitung, Deaktivieren des letzten aktiven Admins und des
+  eigenen Kontos. Der Grund steht in wenigen Wörtern neben der Aktion (`aria-describedby`),
+  Wortlaut in `stammdaten/rechteText.ts`. Die eigene Herabstufung ohne Systemrolle fragt nach
+  (kein eigener Rückweg); der Knopf nennt die Handlung.
 - Sofort-Speichern-Zeile sperrt nur sich (`ModulEinstellungsListe`: `laeuftKey`/`fehlerKey` aus
   `mutation.variables`, Fehlerzeile `data-fehler`).
 - Zeilenlayouts ohne feste Spaltenbreite (Grid `minmax(0, 1fr) auto auto`, unter `md` gestapelt

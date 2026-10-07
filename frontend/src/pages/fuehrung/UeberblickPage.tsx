@@ -89,6 +89,7 @@ import {
   type Marke,
 } from './ueberblickDaten';
 import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
+import './ueberblick.css';
 
 /**
  * Führung · Überblick — die Startseite eines Einsatzes. Die Bedeutung jeder Zahl steht in
@@ -271,6 +272,11 @@ function Zustandsfeld({
     );
   }
   return <>{children}</>;
+}
+
+/** „1 Einheit“, „2 Einheiten“ — Zahl vor Wort, Einzahl und Mehrzahl richtig (LFH-973). */
+function anzahlWort(anzahl: number, einzahl: string, mehrzahl: string): string {
+  return `${anzahl} ${anzahl === 1 ? einzahl : mehrzahl}`;
 }
 
 export default function UeberblickPage() {
@@ -650,7 +656,8 @@ export default function UeberblickPage() {
                 groesse="gross"
                 zustand={kennzahlZustand(zKraefte)}
                 wert={zKraefte === 'gesperrt' ? '—' : kraefte.gesamt}
-                einheit={zKraefte === 'gesperrt' ? undefined : 'Ges.'}
+                // „Σ“ wie in der Stärkeschreibweise darunter, nicht „Ges.“ (LFH-973).
+                einheit={zKraefte === 'gesperrt' ? undefined : 'Σ'}
                 notiz={zKraefte === 'gesperrt' ? NICHT_FREIGEGEBEN : `F/UF/M//Σ ${kraefte.text}`}
                 ziel={meldebildGesperrt ? undefined : kraefteuebersichtPfad(einsatzId)}
               />
@@ -715,7 +722,8 @@ export default function UeberblickPage() {
                 // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883).
                 meta={
                   zAbschnitte === 'daten' ? (
-                    `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
+                    // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
+                    `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
                   ) : zAbschnitte === 'laden' ? (
                     <span
                       data-lfh="paneel-meta-platzhalter"
@@ -765,7 +773,10 @@ export default function UeberblickPage() {
                   >
                     Einheiten nach Status: bereit · gebunden · Ausfall
                   </div>
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  <ul
+                    className="ueberblick-abschnitte"
+                    style={{ listStyle: 'none', margin: 0, padding: 0 }}
+                  >
                     {zeilen.map((z) => (
                       <li key={z.key}>
                         <AbschnittEintrag
@@ -1075,7 +1086,10 @@ function AbschnittEintrag({
     <Link
       to={ziel}
       data-lfh="ueberblick-abschnitt"
-      style={{ ...zeilenzielStil(rollen, token), flexWrap: 'wrap', paddingBlock: token.padding }}
+      // Raster mit Containerabfrage (LFH-952, `ueberblick.css`): ab schmaler Liste stehen Name und
+      // Stärke oben, der Auftrag darunter. `display` inline, weil `zeilenzielStil` Flex setzt.
+      className="ueberblick-abschnitt"
+      style={{ ...zeilenzielStil(rollen, token), display: 'grid', paddingBlock: token.padding }}
     >
       {/* Lagekante: Farbe nur als Rand, das Wort steht im StatusTag daneben. Ohne Beurteilung
           durchsichtig — eine graue Kante sähe aus wie eine Stufe „neutral". */}
@@ -1083,22 +1097,24 @@ function AbschnittEintrag({
         aria-hidden
         data-lfh="abschnitt-lagekante"
         data-rolle={lage?.rolle}
+        className="ueberblick-abschnitt__kante"
         style={{
-          flex: '0 0 3px',
-          alignSelf: 'stretch',
           background: lage ? rollenFarbe(lage.rolle, token) : 'transparent',
         }}
       />
       <span
-        style={{ flex: '0 0 158px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
+        className="ueberblick-abschnitt__name"
+        style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
       >
         <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
         </span>
         {leitung && <span style={{ ...monoStil(11), color: rollen.schwach }}>{leitung}</span>}
         <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
-          {zeile.einheiten === 1 ? '1 Einheit' : `${zeile.einheiten} Einheiten`}
-          {zeile.unterabschnitte > 0 && ` · ${zeile.unterabschnitte} UA`}
+          {/* Was gezählt wird, steht dran (LFH-973): hier der ganze Teilbaum, im Abschnittsbaum
+              nur die direkt zugeordneten. */}
+          {anzahlWort(zeile.einheiten, 'Einheit', 'Einheiten')}
+          {zeile.unterabschnitte > 0 && ` inkl. UA · ${zeile.unterabschnitte} UA`}
         </span>
         {(lage || zeile.unterLage) && (
           <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
@@ -1119,8 +1135,8 @@ function AbschnittEintrag({
         )}
       </span>
       <span
+        className="ueberblick-abschnitt__auftrag"
         style={{
-          flex: '1 1 160px',
           minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -1198,8 +1214,8 @@ function AbschnittEintrag({
         )}
       </span>
       <span
+        className="ueberblick-abschnitt__staerke"
         style={{
-          flex: '0 0 132px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',

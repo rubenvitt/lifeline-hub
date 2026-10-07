@@ -80,9 +80,7 @@ describe('KategorieFristen', () => {
       personenauskunft: { dauer_tage_vorgabe: 0, rechtsgrundlage: '§ 46 Abs. 5 BHKG NRW' },
     });
     zeige(ME_ADMIN, 'aktiv');
-    expect(
-      await screen.findByText(/Frist entsteht beim Abschluss \(sofort fällig\)/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('fällig mit Abschluss')).toBeInTheDocument();
     expect(screen.getAllByText('folgt der Frist des Einsatzes')).toHaveLength(2);
     expect(screen.getByText('Rechtsgrundlage: § 46 Abs. 5 BHKG NRW')).toBeInTheDocument();
     expect(

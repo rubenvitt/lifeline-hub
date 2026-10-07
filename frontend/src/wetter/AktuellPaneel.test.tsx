@@ -155,13 +155,13 @@ describe('AktuellPaneel (LFH-864)', () => {
     zeige(ok(messung({ gemessen_at: vor(4 * 60 * MIN) })));
     expect(paneel()).toHaveTextContent('Stand unbekannt');
     expect(paneel()).toHaveTextContent('Keine Messung aus den letzten drei Stunden');
-    expect(paneel()).not.toHaveTextContent('kein verwertbarer Stand');
+    expect(paneel()).not.toHaveTextContent('Wetterquelle nicht erreichbar');
     expect(paneel()).not.toHaveTextContent('14,8');
   });
 
   it('ohne Einsatzort erklärt das Paneel, was fehlt — ohne eigenen Knopf', () => {
     zeige({ zustand: 'kein_ort' });
-    expect(paneel()).toHaveTextContent('verorteten Einsatzort');
+    expect(paneel()).toHaveTextContent('Einsatzort nicht verortet');
     expect(within(paneel()).queryByRole('button')).toBeNull();
     expect(paneel().querySelector('[data-lfh="kennzahlenband"]')).toBeNull();
   });

@@ -1,6 +1,7 @@
 import { Form, Input } from 'antd';
 import { useEffect, useRef } from 'react';
 import { ErfassungsModal } from '../../components/Erfassung';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import type { GefahrBewertung } from '../../api/types';
 
 interface Werte {
@@ -23,6 +24,8 @@ export interface GefahrenZelleDetailsProps {
   /** „Brand × Menschen" — steht im Dialogtitel. */
   titel: string;
   laeuft: boolean;
+  /** Grund eines abgelehnten Speicherns; steht im Dialog bis zum nächsten Absenden (LFH-966). */
+  fehler?: unknown;
   onSpeichern: (beschreibung: string | null, gemeldetVon: string | null) => Promise<unknown>;
   onSchliessen: () => void;
 }
@@ -38,6 +41,7 @@ export default function GefahrenZelleDetails({
   zelle,
   titel,
   laeuft,
+  fehler,
   onSpeichern,
   onSchliessen,
 }: GefahrenZelleDetailsProps) {
@@ -84,6 +88,7 @@ export default function GefahrenZelleDetails({
       <Form.Item name="gemeldet_von" label="Gemeldet von">
         <Input />
       </Form.Item>
+      <SpeicherFehler fehler={fehler} />
     </ErfassungsModal>
   );
 }

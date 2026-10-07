@@ -525,7 +525,7 @@ describe('LoginPage', () => {
       expect(screen.queryByText(/in der Mac-App/)).not.toBeInTheDocument();
     });
 
-    it('erklärt, wenn in der Hülle kein Anmeldeweg übrig bleibt', async () => {
+    it('nennt den Browser, wenn in der Hülle kein Anmeldeweg übrig bleibt', async () => {
       starteMacHuelle();
       server.use(
         http.get('/api/auth/providers', () =>
@@ -536,7 +536,7 @@ describe('LoginPage', () => {
       );
       renderMitProviders(<LoginPage />);
 
-      expect(await screen.findByText(/in der Mac-App/)).toBeInTheDocument();
+      expect(await screen.findByText('Passkey-Anmeldung nur im Browser')).toBeInTheDocument();
       expect(
         screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
       ).not.toBeInTheDocument();
@@ -626,7 +626,7 @@ describe('LoginPage', () => {
       starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
       zeige([{ id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true }]);
       expect(await screen.findByRole('button', { name: /Im Browser anmelden/ })).toBeEnabled();
-      expect(screen.queryByText(/Passkey geht in der Mac-App nicht/)).toBeNull();
+      expect(screen.queryByText('Passkey-Anmeldung nur im Browser')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Mit Passkey anmelden' })).toBeNull();
     });
 

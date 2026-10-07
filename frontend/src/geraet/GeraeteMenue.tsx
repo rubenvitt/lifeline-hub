@@ -143,10 +143,7 @@ export function GeraeteMenue() {
         onCancel={() => setAbmeldenOffen(false)}
         destroyOnHidden
       >
-        <p>
-          Das Gerät verlässt den Einsatz. Wieder koppeln lässt es sich nur mit einem neuen Code der
-          Einsatzleitung.
-        </p>
+        <p>Das Gerät verlässt den Einsatz. Erneut koppeln nur mit neuem Code.</p>
       </Modal>
     </>
   );

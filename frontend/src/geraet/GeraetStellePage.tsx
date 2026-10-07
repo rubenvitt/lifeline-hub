@@ -162,7 +162,7 @@ function MeldungenBereich({
     // Leeren übernimmt `ErfassungsFormular`, und nur nach Erfolg; abgelehnt bleibt der Wortlaut.
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning('Offline vorgemerkt — Meldung wird bei Verbindung gesendet');
+        message.warning('Offline vorgemerkt');
         return;
       }
       qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });

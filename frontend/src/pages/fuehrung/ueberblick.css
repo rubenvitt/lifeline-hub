@@ -1,0 +1,44 @@
+/* Abschnittszeile im Überblick (LFH-952, D6 in
+   `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`). Hier und
+   nicht inline, weil sie von der Breite des PANEELS abhängt, nicht vom Viewport: bei 1180 px mit
+   offenem Modulmenü ist die linke Spalte ~460 px schmal, bei 1440 px ohne Menü ~750. Das kann nur
+   eine Container-Abfrage (Muster `pages/lage-dashboard/gefahrenmatrix.css`).
+
+   Breit: Kante · Name · Auftrag · Stärke in einer Zeile.
+   Schmal (Liste unter 560 px; breit braucht 3 + 158 + 132 px, drei Lücken und zwei Polster
+   `padding`, das sind 11 / 18 / 26 px je Dichtestufe, und dem Auftrag bleiben dann noch
+   137 bis 177 px): Name und Stärke oben, der Auftrag darunter über beide Spalten. Vorher brach
+   die Flex-Zeile die Stärke unter den Auftrag, ans Zeilenende, weit weg vom Namen.
+   Die DOM-Reihenfolge bleibt, der Linkname bildet sich aus ihr. */
+
+.ueberblick-abschnitte {
+  container-type: inline-size;
+}
+
+.ueberblick-abschnitt {
+  grid-template-columns: 3px 158px minmax(0, 1fr) 132px;
+  grid-template-areas: 'kante name auftrag staerke';
+}
+
+.ueberblick-abschnitt__kante {
+  grid-area: kante;
+  align-self: stretch;
+}
+.ueberblick-abschnitt__name {
+  grid-area: name;
+}
+.ueberblick-abschnitt__auftrag {
+  grid-area: auftrag;
+}
+.ueberblick-abschnitt__staerke {
+  grid-area: staerke;
+}
+
+@container (max-width: 559.98px) {
+  .ueberblick-abschnitt {
+    grid-template-columns: 3px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'kante name staerke'
+      'kante auftrag auftrag';
+  }
+}

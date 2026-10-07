@@ -1,11 +1,10 @@
 import { IconOrtsmarke, IconPlus } from '../icons';
-import { Alert, App, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
+import { Alert, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
-import { fehlerText } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -14,6 +13,7 @@ import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { EINSATZ_ROLLE_LABELS } from '../einsatz/einsatzRolle';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { Select } from '../components/Select';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
@@ -131,7 +131,6 @@ function EinsaetzeInhalt() {
   const { token } = theme.useToken();
   const { rollen } = useRollen();
   const { benutzer } = useAuth();
-  const { message } = App.useApp();
   const qc = useQueryClient();
   const [dialogOffen, setDialogOffen] = useState(false);
   const [form] = Form.useForm<AnlegeWerte>();
@@ -218,7 +217,7 @@ function EinsaetzeInhalt() {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       navigate(einsatzPfad(neuerEinsatz.id));
     },
-    onError: (e) => message.error(fehlerText(e, 'Einsatz konnte nicht angelegt werden')),
+    // Kein `onError`-Toast (LFH-966): der Grund steht im Dialog, bis zum nächsten Absenden.
   });
 
   const [suche, setSuche] = useState('');
@@ -434,7 +433,11 @@ function EinsaetzeInhalt() {
           await anlegen.mutateAsync(w);
         }}
         onFertig={() => setDialogOffen(false)}
-        onAbbrechen={() => setDialogOffen(false)}
+        onAbbrechen={() => {
+          // Der nächste Dialog öffnet ohne den Grund des vorigen Versuchs.
+          anlegen.reset();
+          setDialogOffen(false);
+        }}
       >
         <Form.Item
           label="Bezeichnung"
@@ -452,6 +455,11 @@ function EinsaetzeInhalt() {
         <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
           <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
         </Form.Item>
+        <SpeicherFehler
+          fehler={anlegen.error}
+          titel="Einsatz nicht angelegt"
+          fallback="Einsatz konnte nicht angelegt werden"
+        />
       </ErfassungsModal>
     </EinsatzSeite>
   );

@@ -366,7 +366,7 @@ describe('UeberblickPage', () => {
     // Die Legende steht über den Zeilen, nicht am Fuß (LFH-962): sie geht dem ersten Raster voraus.
     const legende = within(p).getByText(/Einheiten nach Status: bereit · gebunden · Ausfall/);
     expect(legende.compareDocumentPosition(zeile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
+    expect(within(p).getByText('1 Abschnitt · 1 Einheit')).toBeInTheDocument();
   });
 
   it('Abschnittszeile: letzte Rückmeldung im Teilbaum mit Zeit und Text (LFH-610)', async () => {
@@ -941,6 +941,29 @@ describe('UeberblickPage', () => {
     // Mit dem Einsatz kommen Hinweis und Körper im selben Zug.
     expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(await bandDa()).toBeInTheDocument();
+  });
+
+  /**
+   * LFH-952 (D6): die Abschnittszeile ist ein Raster mit Containerabfrage am Paneel
+   * (`ueberblick.css`). jsdom rechnet weder Raster noch Abfrage; hier stehen die Klassen und die
+   * DOM-Reihenfolge (der Linkname hängt an ihr), die Lage misst `e2e/rahmen-stehen-bleiben.spec.ts`.
+   */
+  it('die Abschnittszeile trägt die Rasterbereiche in fester Reihenfolge (LFH-952)', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const name = await screen.findByText('Abschnitt Nord', {
+      selector: '[data-lfh="ueberblick-abschnitt"] *',
+    });
+    const zeile = name.closest<HTMLElement>('[data-lfh="ueberblick-abschnitt"]')!;
+    expect(zeile).toHaveClass('ueberblick-abschnitt');
+    expect(zeile.style.display).toBe('grid');
+    expect(zeile.closest('ul')).toHaveClass('ueberblick-abschnitte');
+    expect(Array.from(zeile.children).map((k) => k.className)).toEqual([
+      'ueberblick-abschnitt__kante',
+      'ueberblick-abschnitt__name',
+      'ueberblick-abschnitt__auftrag',
+      'ueberblick-abschnitt__staerke',
+    ]);
   });
 
   /**

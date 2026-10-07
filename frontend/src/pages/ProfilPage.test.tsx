@@ -202,7 +202,7 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
     starteMacHuelle();
     setup(false, webauthnProvider);
 
-    expect(await screen.findByText(/Passkeys richtest du im Browser ein/)).toBeInTheDocument();
+    expect(await screen.findByText('Nur im Browser verfügbar.')).toBeInTheDocument();
     expect(screen.getByText('Passkey')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Passkey registrieren' })).not.toBeInTheDocument();
   });
@@ -213,9 +213,7 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
     setup(false, webauthnProvider);
 
     expect(
-      await screen.findByText(
-        'Passkeys richtest du im Browser ein. In der Mac-App meldest du dich damit über „Im Browser anmelden“ an.',
-      ),
+      await screen.findByText('Nur im Browser einrichtbar; Anmeldung über „Im Browser anmelden“.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Passkey registrieren' })).not.toBeInTheDocument();
   });
@@ -226,9 +224,7 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
     setup(false, []);
 
     await screen.findByText('Zweiter Faktor (Code aus App)');
-    await waitFor(() =>
-      expect(screen.queryByText(/Passkeys richtest du im Browser ein/)).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByText(/Nur im Browser/)).not.toBeInTheDocument());
   });
 
   it('bietet ohne Kennung die Einrichtung wie bisher an (Gegenprobe)', async () => {
@@ -236,7 +232,7 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
     setup(false, webauthnProvider);
 
     expect(await screen.findByRole('button', { name: 'Passkey registrieren' })).toBeInTheDocument();
-    expect(screen.queryByText(/Passkeys richtest du im Browser ein/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nur im Browser/)).not.toBeInTheDocument();
   });
 });
 
@@ -484,7 +480,7 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
     await bisZuDenCodes();
 
     expect(screen.queryByRole('button', { name: 'Codes kopieren' })).not.toBeInTheDocument();
-    expect(screen.getByText(/lassen\s+sich markieren und kopieren/)).toBeInTheDocument();
+    expect(screen.getByText('Keine Zwischenablage auf dieser Verbindung')).toBeInTheDocument();
     // Die Codes bleiben erreichbar — der Hinweis verweist auf sie, statt einen zweiten Mechanismus
     // zu bauen.
     expect(screen.getByText(/aaaa-1111/)).toBeInTheDocument();

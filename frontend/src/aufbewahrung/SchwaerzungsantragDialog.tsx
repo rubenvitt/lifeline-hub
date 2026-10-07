@@ -123,21 +123,19 @@ export default function SchwaerzungsantragDialog({
         }
         description={
           istEinsatz
-            ? 'Der Purge-Lauf schwärzt 24 Stunden nach dem Antrag alle personenbezogenen Angaben des Einsatzes, unabhängig von Frist und Karenz. Bis dahin lässt sich der Antrag zurücknehmen. Das Einsatztagebuch bleibt im Wortlaut erhalten.'
-            : `Der Purge-Lauf entfernt 24 Stunden nach dem Antrag ${personenUmfang(ziel.art)}. Bis dahin lässt sich der Antrag zurücknehmen.`
+            ? 'Schwärzt alle personenbezogenen Angaben, unabhängig von Frist und Karenz. Das Einsatztagebuch bleibt im Wortlaut. Bis zum Vollzug zurücknehmbar.'
+            : `Entfernt ${personenUmfang(ziel.art)}. Bis zum Vollzug zurücknehmbar.`
         }
       />
       {!istEinsatz && (
         <Typography.Paragraph type="secondary" data-lfh="antrag-freitext-hinweis">
-          Erwähnungen der Person in Freitexten — im Einsatztagebuch, in Chat-Nachrichten und in den
-          Führungsmodulen — bleiben stehen. Wer sie ebenfalls entfernen muss, stellt den Antrag für
-          den ganzen Einsatz.
+          Erwähnungen in Freitexten (Einsatztagebuch, Chat, Führungsmodule) bleiben stehen.
         </Typography.Paragraph>
       )}
       <Form.Item
         label="Aktenzeichen des Löschersuchens"
         name="aktenzeichen"
-        extra="Ohne Namen — das Aktenzeichen steht im Einsatztagebuch und bleibt als Nachweis."
+        extra="Ohne Namen; bleibt im Einsatztagebuch stehen"
         rules={[
           { required: true, whitespace: true, message: 'Aktenzeichen angeben' },
           { max: 64, message: 'Höchstens 64 Zeichen' },

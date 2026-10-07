@@ -210,8 +210,7 @@ export default function ProfilPage() {
                   Passwort
                 </Augenbraue>
                 <Typography.Paragraph type="secondary">
-                  Ändere dein Passwort mit Angabe des bisherigen. Diese Sitzung bleibt angemeldet,
-                  alle anderen Anmeldungen deines Kontos werden beendet.
+                  Beendet alle anderen Anmeldungen deines Kontos.
                 </Typography.Paragraph>
                 <Button onClick={() => setPasswortDialogOffen(true)}>Passwort ändern</Button>
                 <PasswortAendernDialog
@@ -230,8 +229,8 @@ export default function ProfilPage() {
                     anbietet (LFH-818); sonst nichts versprechen (LFH-817). */}
                 <Typography.Paragraph type="secondary">
                   {huelleAnmeldungImBrowser()
-                    ? 'Passkeys richtest du im Browser ein. In der Mac-App meldest du dich damit über „Im Browser anmelden“ an.'
-                    : 'Passkeys richtest du im Browser ein und meldest dich dort damit an, in der Mac-App gehen sie nicht.'}
+                    ? 'Nur im Browser einrichtbar; Anmeldung über „Im Browser anmelden“.'
+                    : 'Nur im Browser verfügbar.'}
                 </Typography.Paragraph>
               </section>
             )}
@@ -241,9 +240,6 @@ export default function ProfilPage() {
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
                   Passkey
                 </Augenbraue>
-                <Typography.Paragraph type="secondary">
-                  Registriere einen Passkey für passwortlose Anmeldung auf diesem Gerät.
-                </Typography.Paragraph>
                 {fehler && (
                   <Alert type="error" title={fehler} showIcon style={{ marginBottom: 12 }} />
                 )}
@@ -276,9 +272,8 @@ export default function ProfilPage() {
                   description={
                     <div>
                       <Typography.Paragraph style={{ marginBottom: 8 }}>
-                        Diese Codes werden nur einmal angezeigt und sind der einzige Ausweg bei
-                        Geräteverlust (Authenticator-App weg/gelöscht). Jeder Code ist genau einmal
-                        verwendbar.
+                        Nur jetzt sichtbar. Einziger Zugang bei Geräteverlust; jeder Code gilt
+                        einmal.
                       </Typography.Paragraph>
                       <pre
                         style={{
@@ -294,16 +289,14 @@ export default function ProfilPage() {
                       </pre>
                       {/* `block` statt Klein-Angabe: der einzige Ein-Klick-Weg zu Codes, die
                           nur einmal angezeigt werden. Ohne Zwischenablage kein toter Knopf,
-                          sondern der Hinweis auf das markierbare `<pre>` darüber. Bewusst ohne
-                          „Strg+C": das Führungs-Tablet hat keine Strg-Taste. */}
+                          sondern der Zustand; das `<pre>` darüber bleibt markierbar (LFH-1078). */}
                       {kopierenMoeglich ? (
                         <Button block onClick={recoveryCodesKopieren}>
                           Codes kopieren
                         </Button>
                       ) : (
                         <Typography.Text type="secondary">
-                          Kopieren ist auf dieser Verbindung nicht möglich — die Codes oben lassen
-                          sich markieren und kopieren.
+                          Keine Zwischenablage auf dieser Verbindung
                         </Typography.Text>
                       )}
                     </div>
@@ -329,10 +322,7 @@ export default function ProfilPage() {
                 </>
               ) : totpEnrollment ? (
                 <div>
-                  <Typography.Paragraph type="secondary">
-                    QR-Code mit deiner Authenticator-App scannen (oder den Schlüssel von Hand
-                    eintragen) und den generierten Code bestätigen.
-                  </Typography.Paragraph>
+                  <Typography.Paragraph strong>QR-Code scannen</Typography.Paragraph>
                   <div
                     style={{
                       // Ein QR-Code braucht hellen Grund, auch im Nachtbetrieb — Scanner lesen
@@ -375,9 +365,6 @@ export default function ProfilPage() {
                 </div>
               ) : (
                 <>
-                  <Typography.Paragraph type="secondary">
-                    Sichere dein Konto mit einem zweiten Faktor aus einer Authenticator-App ab.
-                  </Typography.Paragraph>
                   <Button onClick={totpEinrichtenStarten} loading={totpLaedt}>
                     Zweiten Faktor einrichten
                   </Button>

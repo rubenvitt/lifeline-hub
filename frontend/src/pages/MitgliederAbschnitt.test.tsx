@@ -3,7 +3,9 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfigProvider } from 'antd';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
+import { benutzerFixture } from '../test/fixtures';
+import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { einsatzKeys } from '../api/queryKeys';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
@@ -329,7 +331,8 @@ describe('MitgliederAbschnitt', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
     const popup = await screen.findByRole('tooltip');
-    await userEvent.click(within(popup).getByRole('button', { name: 'Ja' }));
+    // Der Knopf nennt die Handlung, nicht „Ja“.
+    await userEvent.click(within(popup).getByRole('button', { name: 'Entfernen' }));
     await waitFor(() => expect(screen.queryByText('Eva Einsatz')).not.toBeInTheDocument());
   });
 
@@ -371,5 +374,198 @@ describe('MitgliederAbschnitt', () => {
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
+  });
+
+  describe('LFH-966: Fehler im Paneel, letzte Einsatzleitung, eigene Herabstufung', () => {
+    const leitung = (id: number, name: string) =>
+      mitglied({
+        benutzer_id: id,
+        anzeigename: name,
+        benutzername: name.toLowerCase(),
+        einsatz_rolle: 'einsatzleitung',
+      });
+    const keinToast = () =>
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    const zeile = async (name: string) =>
+      (await screen.findByText(name)).closest('tr') as HTMLElement;
+    /** Öffnet das Rollenfeld einer Zeile und liefert die Option `name` der offenen Liste. */
+    /** Die Rückfrage; über den Titel, weil antd im Test `aria-labelledby="test-id"` mehrfach vergibt. */
+    const rueckfrage = async () =>
+      (await screen.findByText('Eigene Rolle herabstufen?')).closest(
+        '[role="dialog"]',
+      ) as HTMLElement;
+    async function rollenOption(name: string, option: string): Promise<HTMLElement> {
+      await userEvent.click(screen.getByRole('combobox', { name: `Rolle von ${name}` }));
+      const treffer = await screen.findAllByTitle(option);
+      const sichtbar = treffer.filter((el) => el.closest('.ant-select-item-option'));
+      return sichtbar[sichtbar.length - 1].closest('.ant-select-item-option') as HTMLElement;
+    }
+
+    it('ein abgelehntes Entfernen steht im Paneel, ohne Toast', async () => {
+      server.use(
+        meHandler(benutzerFixture({ id: 9, system_rolle: 'admin' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), mitglied()]),
+        ),
+        http.get('/api/benutzer', () => HttpResponse.json([])),
+        http.delete('/api/einsaetze/7/mitglieder/2', () =>
+          HttpResponse.json({ error: 'Entfernen abgelehnt' }, { status: 409 }),
+        ),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await userEvent.click(
+        within(await zeile('Eva Einsatz')).getByRole('button', { name: 'Entfernen' }),
+      );
+      await userEvent.click(
+        within(await screen.findByRole('tooltip')).getByRole('button', { name: 'Entfernen' }),
+      );
+      const hinweis = await screen.findByText('Entfernen abgelehnt');
+      expect(hinweis.closest('[data-fehler]')).not.toBeNull();
+      keinToast();
+    });
+
+    it('eine abgelehnte Rolle steht im Paneel, bis zum nächsten Absenden', async () => {
+      let versuch = 0;
+      server.use(
+        meHandler(benutzerFixture({ id: 9, system_rolle: 'admin' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), mitglied()]),
+        ),
+        http.get('/api/benutzer', () => HttpResponse.json([])),
+        http.put('/api/einsaetze/7/mitglieder/2', () => {
+          versuch += 1;
+          return versuch === 1
+            ? HttpResponse.json({ error: 'Rolle abgelehnt' }, { status: 409 })
+            : new Promise<never>(() => {});
+        }),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await zeile('Eva Einsatz');
+      await userEvent.click(await rollenOption('Eva Einsatz', 'Beobachter'));
+      expect(await screen.findByText('Rolle abgelehnt')).toBeInTheDocument();
+      keinToast();
+      await userEvent.click(await rollenOption('Eva Einsatz', 'Einsatzleitung'));
+      await waitFor(() => expect(screen.queryByText('Rolle abgelehnt')).toBeNull());
+    });
+
+    it('sperrt an der einzigen Einsatzleitung Entfernen und Herabstufen, mit Grund', async () => {
+      server.use(
+        meHandler(benutzerFixture({ id: 9, system_rolle: 'admin' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), mitglied()]),
+        ),
+        http.get('/api/benutzer', () => HttpResponse.json([])),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      const lea = await zeile('Lea');
+      const knopf = within(lea).getByRole('button', { name: 'Entfernen' });
+      expect(knopf).toBeDisabled();
+      const grund = within(lea).getByText(LETZTE_EINSATZLEITUNG_TEXT);
+      expect(knopf).toHaveAttribute('aria-describedby', grund.id);
+      expect(await rollenOption('Lea', 'Beobachter')).toHaveClass(
+        'ant-select-item-option-disabled',
+      );
+      // Das andere Mitglied bleibt frei.
+      const eva = await zeile('Eva Einsatz');
+      expect(within(eva).getByRole('button', { name: 'Entfernen' })).toBeEnabled();
+      expect(within(eva).queryByText(LETZTE_EINSATZLEITUNG_TEXT)).toBeNull();
+    });
+
+    it('mit zwei Einsatzleitungen ist keine gesperrt', async () => {
+      server.use(
+        meHandler(benutzerFixture({ id: 9, system_rolle: 'admin' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
+        ),
+        http.get('/api/benutzer', () => HttpResponse.json([])),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await zeile('Lea');
+      for (const b of screen.getAllByRole('button', { name: 'Entfernen' })) expect(b).toBeEnabled();
+      expect(screen.queryByText(LETZTE_EINSATZLEITUNG_TEXT)).toBeNull();
+    });
+
+    it('die eigene Herabstufung fragt nach; ohne Bestätigung wird nichts gespeichert', async () => {
+      const gesendet: unknown[] = [];
+      server.use(
+        // Keine Systemrolle: ohne Leitung bliebe kein eigener Rückweg (LFH-343).
+        meHandler(benutzerFixture({ id: 1, anzeigename: 'Lea' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
+        ),
+        http.get('/api/benutzer', () => HttpResponse.json([])),
+        http.put('/api/einsaetze/7/mitglieder/1', async ({ request }) => {
+          gesendet.push(await request.json());
+          return HttpResponse.json([
+            mitglied({ benutzer_id: 1, anzeigename: 'Lea', einsatz_rolle: 'beobachter' }),
+            leitung(3, 'Leo'),
+          ]);
+        }),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await zeile('Lea');
+      await userEvent.click(await rollenOption('Lea', 'Beobachter'));
+      const frage = await rueckfrage();
+      await userEvent.click(within(frage).getByRole('button', { name: 'Abbrechen' }));
+      await waitFor(() => expect(screen.queryByText('Eigene Rolle herabstufen?')).toBeNull());
+      expect(gesendet).toHaveLength(0);
+
+      await userEvent.click(await rollenOption('Lea', 'Beobachter'));
+      const zweite = await rueckfrage();
+      await userEvent.click(within(zweite).getByRole('button', { name: 'Rolle herabstufen' }));
+      await waitFor(() =>
+        expect(gesendet).toEqual([expect.objectContaining({ einsatz_rolle: 'beobachter' })]),
+      );
+    });
+
+    it('fremde Zeilen und das Hochstufen fragen nicht nach', async () => {
+      const gesendet: string[] = [];
+      server.use(
+        meHandler(benutzerFixture({ id: 1, anzeigename: 'Lea' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
+        ),
+        http.get('/api/benutzer', () => HttpResponse.json([])),
+        http.put('/api/einsaetze/7/mitglieder/:id', ({ params }) => {
+          gesendet.push(String(params.id));
+          return new Promise<never>(() => {});
+        }),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await zeile('Leo');
+      await userEvent.click(await rollenOption('Leo', 'Beobachter'));
+      await waitFor(() => expect(gesendet).toEqual(['3']));
+      expect(screen.queryByText('Eigene Rolle herabstufen?')).toBeNull();
+    });
+
+    it('ohne Verwaltungsrecht: keine Sperrtexte, kein Entfernen', async () => {
+      server.use(
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), mitglied()]),
+        ),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt
+          einsatzId={7}
+          darfVerwalten={false}
+          darfFuehrungsstelleVerwalten={false}
+        />,
+      );
+      await zeile('Lea');
+      expect(screen.queryByText(LETZTE_EINSATZLEITUNG_TEXT)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Entfernen' })).toBeNull();
+    });
   });
 });

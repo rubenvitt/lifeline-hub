@@ -1,9 +1,9 @@
-import { Alert, App, Button, Flex, Form, Popconfirm, Space } from 'antd';
+import { Alert, Button, Flex, Form, Modal, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
-import { ApiError, fehlerText } from '../api/client';
+import { ApiError } from '../api/client';
 import {
   entferneMitglied,
   ladeMitglieder,
@@ -20,8 +20,21 @@ import { useViewport } from '../components/useViewport';
 import Datenstand from '../components/Datenstand';
 import { Paneel, useRollen } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { useAuth } from '../auth/AuthContext';
+import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
 import { anzahl } from '../anzeige/anzahl';
+
+/** Rang einer Einsatzrolle: kleiner ist stärker. Herabstufen heißt, der Rang wächst. */
+const RANG: Record<EinsatzRolle, number> = {
+  einsatzleitung: 0,
+  fuehrungspersonal: 1,
+  beobachter: 2,
+};
+
+/** Eine gewählte, noch nicht bestätigte Herabstufung der eigenen Rolle (LFH-966). */
+type Herabstufung = { benutzerId: number; rolle: EinsatzRolle };
 
 interface Props {
   einsatzId: number;
@@ -119,9 +132,11 @@ export default function MitgliederAbschnitt({
   darfFuehrungsstelleVerwalten,
 }: Props) {
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { benutzer: ich } = useAuth();
   const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
+  const grundPraefix = useId();
+  const [herabstufung, setHerabstufung] = useState<Herabstufung | null>(null);
   const [neuerBenutzer, setNeuerBenutzer] = useState<number | undefined>();
   const [neueRolle, setNeueRolle] = useState<EinsatzRolle>('fuehrungspersonal');
   const [stelleZiel, setStelleZiel] = useState<StellenZiel | null>(null);
@@ -175,15 +190,48 @@ export default function MitgliederAbschnitt({
       qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste);
       setNeuerBenutzer(undefined);
     },
-    onError: (e) => message.error(fehlerText(e)),
   });
   const entfernen = useMutation({
     mutationFn: (benutzerId: number) => entferneMitglied(einsatzId, benutzerId),
     onSuccess: (liste) => qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste),
-    onError: (e) => message.error(fehlerText(e)),
   });
+  /*
+   * Kein `onError`-Toast (LFH-966, `frontend/AGENTS.md`, „Speicherfehler an die Seite“): der
+   * Grund steht im Paneel über der Tabelle, bis zum nächsten Absenden. Beide Mutationen teilen
+   * diesen einen Hinweis, deshalb räumt jede beim Absenden den Fehler der anderen.
+   */
+  const rolleSetzen = (v: { benutzerId: number; rolle: EinsatzRolle }) => {
+    entfernen.reset();
+    setzen.mutate(v);
+  };
+  const mitgliedEntfernen = (benutzerId: number) => {
+    setzen.reset();
+    entfernen.mutate(benutzerId);
+  };
 
   const mitglieder = mitgliederQuery.data ?? [];
+  /**
+   * Die einzige Einsatzleitung (LFH-966): Entfernen und Herabstufen lehnte der Server mit 409 ab
+   * (`routes/einsatz.rs`). Statt einer Aktion, die nie gelingt, steht sie gesperrt mit Grund da.
+   * Abgeleitet aus der Liste, die die Tabelle zeigt.
+   */
+  const leitungen = mitglieder.filter((m) => m.einsatz_rolle === 'einsatzleitung').length;
+  const istLetzteLeitung = (m: MitgliedAnzeige) =>
+    m.einsatz_rolle === 'einsatzleitung' && leitungen <= 1;
+  const grundId = (m: MitgliedAnzeige) => `${grundPraefix}-leitung-${m.benutzer_id}`;
+  /**
+   * Die eigene Herabstufung fragt nach (LFH-966, Linie aus LFH-343): danach fehlt das Recht, die
+   * Rolle selbst zurückzuholen. Ein System-Admin behält es (`darfEinsatzLeiten`), also kein
+   * Rückfragebedarf; ebenso wenig beim Hochstufen oder in fremden Zeilen.
+   */
+  const rolleWaehlen = (m: MitgliedAnzeige, rolle: EinsatzRolle) => {
+    const eigeneHerabstufung =
+      m.benutzer_id === ich?.id &&
+      ich.system_rolle !== 'admin' &&
+      RANG[rolle] > RANG[m.einsatz_rolle];
+    if (eigeneHerabstufung) setHerabstufung({ benutzerId: m.benutzer_id, rolle });
+    else rolleSetzen({ benutzerId: m.benutzer_id, rolle });
+  };
   const mitgliedIds = new Set(mitglieder.map((m) => m.benutzer_id));
   const verfuegbar = (benutzerQuery.data ?? []).filter((b) => b.aktiv && !mitgliedIds.has(b.id));
 
@@ -220,29 +268,49 @@ export default function MitgliederAbschnitt({
       value={m.einsatz_rolle}
       disabled={!darfVerwalten}
       aria-label={`Rolle von ${m.anzeigename}`}
+      aria-describedby={darfVerwalten && istLetzteLeitung(m) ? grundId(m) : undefined}
       // `minWidth` statt fester `width`: eine feste Breite drückt die Zelle am schmalen Schirm
       // auf. Der Boden bleibt, damit „Führungspersonal" nicht abgeschnitten wird; unter `md`
       // füllt das Feld die Zahlbreite der Spalte.
       style={istSchmal ? { width: '100%' } : { minWidth: 170, maxWidth: '100%' }}
-      options={EINSATZ_ROLLE_OPTIONEN}
-      onChange={(rolle) => setzen.mutate({ benutzerId: m.benutzer_id, rolle })}
+      // An der letzten Einsatzleitung ist jede schwächere Rolle gesperrt (Grund unter der Aktion).
+      options={
+        istLetzteLeitung(m)
+          ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
+          : EINSATZ_ROLLE_OPTIONEN
+      }
+      onChange={(rolle) => rolleWaehlen(m, rolle)}
     />
   );
-  const aktion = (m: MitgliedAnzeige) =>
-    darfVerwalten ? (
+  const aktion = (m: MitgliedAnzeige) => {
+    if (!darfVerwalten) return null;
+    if (istLetzteLeitung(m)) {
+      return (
+        <Flex vertical gap={token.marginXXS} align="flex-start">
+          <Button danger disabled aria-describedby={grundId(m)}>
+            Entfernen
+          </Button>
+          <span id={grundId(m)} style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+            {LETZTE_EINSATZLEITUNG_TEXT}
+          </span>
+        </Flex>
+      );
+    }
+    return (
       <Popconfirm
         title="Mitglied entfernen?"
-        okText="Ja"
+        okText="Entfernen"
         cancelText="Abbrechen"
         okButtonProps={{ danger: true }}
-        onConfirm={() => entfernen.mutate(m.benutzer_id)}
+        onConfirm={() => mitgliedEntfernen(m.benutzer_id)}
       >
         {/* Regulärer Knopf statt `type="link"`: ein Textlink sieht aus wie Fließtext,
             obwohl er die einzige destruktive Handlung der Zeile auslöst. `danger` bleibt,
             die Rückfrage ist der zweite Handgriff. */}
         <Button danger>Entfernen</Button>
       </Popconfirm>
-    ) : null;
+    );
+  };
 
   const spalten: KatalogSpalte<MitgliedAnzeige>[] = istSchmal
     ? [
@@ -335,13 +403,20 @@ export default function MitgliederAbschnitt({
             disabled={neuerBenutzer == null}
             loading={setzen.isPending}
             onClick={() =>
-              neuerBenutzer != null &&
-              setzen.mutate({ benutzerId: neuerBenutzer, rolle: neueRolle })
+              neuerBenutzer != null && rolleSetzen({ benutzerId: neuerBenutzer, rolle: neueRolle })
             }
           >
             Hinzufügen
           </Button>
         </Space>
+      )}
+      {(setzen.isError || entfernen.isError) && (
+        <div data-fehler style={{ paddingInline: token.padding, paddingBottom: token.padding }}>
+          <SpeicherFehler
+            fehler={setzen.error ?? entfernen.error}
+            titel={setzen.isError ? 'Rolle nicht gespeichert' : 'Mitglied nicht entfernt'}
+          />
+        </div>
       )}
       <KatalogTabelle<MitgliedAnzeige>
         rowKey="benutzer_id"
@@ -363,6 +438,24 @@ export default function MitgliederAbschnitt({
             fehler={stelleSetzen.error}
           />
         )}
+      {/* Rückfrage vor der eigenen Herabstufung. Der Knopf nennt die Handlung, nicht „Ja“.
+          Nur bei offener Frage im Baum: ein geschlossener Dialog trüge keinen Inhalt. */}
+      {herabstufung !== null && (
+        <Modal
+          open
+          title="Eigene Rolle herabstufen?"
+          okText="Rolle herabstufen"
+          cancelText="Abbrechen"
+          okButtonProps={{ danger: true }}
+          onOk={() => {
+            rolleSetzen(herabstufung);
+            setHerabstufung(null);
+          }}
+          onCancel={() => setHerabstufung(null)}
+        >
+          {`Mit „${EINSATZ_ROLLE_OPTIONEN.find((r) => r.value === herabstufung.rolle)?.label}“ endet das Recht, den Zugriff dieses Einsatzes zu verwalten.`}
+        </Modal>
+      )}
     </Paneel>
   );
 }

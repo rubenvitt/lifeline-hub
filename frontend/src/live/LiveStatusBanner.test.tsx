@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { App as AntApp } from 'antd';
 import LiveStatusBanner from './LiveStatusBanner';
+import { setzeViewportBreite } from '../test/viewport';
+import { leseRahmenOben } from '../components/rahmenOben';
 import {
   meldeAppAktualisierungVerfuegbar,
   setzeAppAktualisierer,
@@ -24,11 +26,11 @@ function melde(status: string) {
   });
 }
 
-function renderBanner(route = '/einsaetze') {
+function renderBanner(route = '/einsaetze', klebend = false) {
   return render(
     <AntApp>
       <MemoryRouter initialEntries={[route]}>
-        <LiveStatusBanner benutzerId={11} />
+        <LiveStatusBanner benutzerId={11} klebend={klebend} />
       </MemoryRouter>
     </AntApp>,
   );
@@ -152,5 +154,62 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
 
     await waitFor(async () => expect(await queueLaden(11, 7)).toHaveLength(1));
+  });
+});
+
+/**
+ * LFH-952 (D1): unter `md` rollt der Kopf mit; dann klebt die Betriebszeile, solange sie eine
+ * Verbindungsstörung meldet (offline oder Live-Verbindung `lost`). Ab `md` trägt die SYNC-Zelle
+ * im klebenden Kopf die Störung, und die Zeile rollt.
+ */
+describe('LiveStatusBanner — klebt bei Störung am Handy (LFH-952)', () => {
+  function zeile() {
+    return document.querySelector<HTMLElement>("[data-lfh='betriebszeile']");
+  }
+
+  it('390, offline: die Zeile klebt auf der Rahmenebene', () => {
+    setzeViewportBreite(390);
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderBanner('/einsaetze', true);
+    expect(zeile()).toHaveStyle({ position: 'sticky', top: '0px', zIndex: '100' });
+  });
+
+  it('390, Live-Verbindung lost: die Zeile klebt', () => {
+    setzeViewportBreite(390);
+    renderBanner('/einsaetze', true);
+    melde('lost');
+    expect(zeile()).toHaveStyle({ position: 'sticky' });
+  });
+
+  it('390, Verbindungsaufbau: die Zeile rollt (kein Störungsfall)', () => {
+    setzeViewportBreite(390);
+    renderBanner('/einsaetze', true);
+    melde('connecting');
+    expect(zeile()).not.toBeNull();
+    expect(zeile()!.style.position).toBe('');
+  });
+
+  it('1024, offline: die Zeile rollt, der Kopf klebt', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderBanner('/einsaetze', true);
+    expect(zeile()!.style.position).toBe('');
+  });
+
+  it('meldet ihre Höhe als Rahmen, solange sie klebt, und nimmt sie mit der Störung wieder weg', () => {
+    setzeViewportBreite(390);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(40);
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderBanner('/einsaetze', true);
+    expect(leseRahmenOben()).toBe(40);
+    online.mockReturnValue(true);
+    act(() => window.dispatchEvent(new Event('online')));
+    expect(leseRahmenOben()).toBe(0);
+  });
+
+  it('ohne `klebend` (Gerätehülle mit eigenem Scrollbereich) klebt sie nie', () => {
+    setzeViewportBreite(390);
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    renderBanner();
+    expect(zeile()!.style.position).toBe('');
   });
 });

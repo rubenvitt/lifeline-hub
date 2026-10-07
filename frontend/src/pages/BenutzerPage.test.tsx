@@ -5,8 +5,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import BenutzerPage from './BenutzerPage';
 import { adminFixture } from '../test/fixtures';
+import { EIGENES_KONTO, LETZTER_ADMIN } from '../stammdaten/rechteText';
 
 const benutzer = adminFixture;
 
@@ -237,9 +239,8 @@ describe('BenutzerPage', () => {
 
     const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
     const maxZeile = (await screen.findByText('Max')).closest('tr') as HTMLElement;
+    // Ohne Rückfrage (LFH-966): Deaktivieren ist über „Reaktivieren" umkehrbar (LFH-363).
     await userEvent.click(within(evaZeile).getByRole('button', { name: 'Deaktivieren' }));
-    // Die Rückfrage nennt die Handlung (LFH-980), nicht „Ja“.
-    await userEvent.click(await screen.findByRole('button', { name: 'Benutzer deaktivieren' }));
 
     await waitFor(() =>
       expect(within(evaZeile).getByRole('button', { name: /Deaktivieren/ })).toHaveClass(
@@ -574,8 +575,10 @@ describe('BenutzerPage', () => {
     await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
-    await screen.findByText('Benutzername bereits vergeben');
     const dialog = dialogMitTitel('Neuen Benutzer anlegen');
+    // Der Grund steht IM Dialog (LFH-966), nicht im Toast.
+    expect(await within(dialog).findByText('Benutzername bereits vergeben')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     expect(within(dialog).getByLabelText('Anzeigename')).toHaveValue('Eva');
     expect(within(dialog).getByLabelText('Benutzername')).toHaveValue('admin');
   });
@@ -672,5 +675,182 @@ describe('BenutzerPage', () => {
 
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(5));
+  });
+
+  describe('LFH-966: Fehler an Seite und Dialog, Sperren mit Grund', () => {
+    const seite = () =>
+      renderMitProviders(
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>,
+        { route: '/admin/benutzer' },
+      );
+    const zeile = async (name: string) =>
+      (await screen.findByText(name)).closest('tr') as HTMLElement;
+    const keinToast = () =>
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    it('Deaktivieren wirkt ohne Rückfrage', async () => {
+      let deaktiviert: string | null = null;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
+          ]),
+        ),
+        http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+          deaktiviert = String(params.id);
+          return HttpResponse.json(benutzer({ id: 2, aktiv: false }));
+        }),
+      );
+      seite();
+      await userEvent.click(
+        within(await zeile('Eva')).getByRole('button', { name: 'Deaktivieren' }),
+      );
+      await waitFor(() => expect(deaktiviert).toBe('2'));
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    });
+
+    it('sperrt Deaktivieren am letzten aktiven Admin und nennt den Grund', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            // Ein deaktivierter Admin zählt nicht: der angemeldete bleibt der letzte AKTIVE.
+            benutzer({ id: 3, anzeigename: 'Alt', benutzername: 'alt', aktiv: false }),
+          ]),
+        ),
+      );
+      seite();
+      const eigene = await zeile('@admin');
+      const knopf = within(eigene).getByRole('button', { name: 'Deaktivieren' });
+      expect(knopf).toBeDisabled();
+      const grund = within(eigene).getByText(LETZTER_ADMIN.text);
+      expect(knopf).toHaveAttribute('aria-describedby', grund.id);
+    });
+
+    it('sperrt Deaktivieren am eigenen Konto, nicht am zweiten Admin', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 4, anzeigename: 'Zweit', benutzername: 'zweit' }),
+          ]),
+        ),
+      );
+      seite();
+      const eigene = await zeile('@admin');
+      expect(within(eigene).getByRole('button', { name: 'Deaktivieren' })).toBeDisabled();
+      expect(within(eigene).getByText(EIGENES_KONTO.text)).toBeInTheDocument();
+      const zweit = await zeile('Zweit');
+      expect(within(zweit).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
+      expect(within(zweit).queryByText(/^Gesperrt/)).toBeNull();
+    });
+
+    it('unter md: der Menüeintrag ist gesperrt und nennt den Grund', async () => {
+      setzeViewportBreite(390);
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      );
+      seite();
+      await screen.findByText('Admin', { selector: 'span' });
+      await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Benutzer Admin' }));
+      const menue = await waitFor(() => {
+        const m = document.querySelector<HTMLElement>(
+          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+        );
+        if (!m) throw new Error('kein offenes Menü');
+        return m;
+      });
+      const eintrag = within(menue).getByRole('menuitem', {
+        name: `Deaktivieren gesperrt: ${LETZTER_ADMIN.kurz}`,
+      });
+      expect(eintrag).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    it('ein abgelehntes Deaktivieren steht an der Seite, bis zum nächsten Absenden', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
+            benutzer({ id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner' }),
+          ]),
+        ),
+        http.post('/api/benutzer/2/deaktivieren', () =>
+          HttpResponse.json(
+            { error: 'Gerätekonten werden unter Geräte verwaltet' },
+            { status: 409 },
+          ),
+        ),
+        http.post('/api/benutzer/3/deaktivieren', () => new Promise(() => {})),
+      );
+      seite();
+      await userEvent.click(
+        within(await zeile('Eva')).getByRole('button', { name: 'Deaktivieren' }),
+      );
+      const hinweis = await screen.findByText('Gerätekonten werden unter Geräte verwaltet');
+      expect(hinweis.closest('[role="alert"]')).not.toBeNull();
+      keinToast();
+      await userEvent.click(
+        within(await zeile('Max')).getByRole('button', { name: 'Deaktivieren' }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByText('Gerätekonten werden unter Geräte verwaltet')).toBeNull(),
+      );
+    });
+
+    it('ein abgelehntes Reaktivieren steht an der Seite, ohne Toast', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', aktiv: false }),
+          ]),
+        ),
+        http.patch('/api/benutzer/2', () =>
+          HttpResponse.json({ error: 'Reaktivieren abgelehnt' }, { status: 409 }),
+        ),
+      );
+      seite();
+      await userEvent.click(
+        within(await zeile('Eva')).getByRole('button', { name: 'Reaktivieren' }),
+      );
+      const hinweis = await screen.findByText('Reaktivieren abgelehnt');
+      expect(hinweis.closest('[role="dialog"]')).toBeNull();
+      keinToast();
+    });
+
+    it('eine abgelehnte Herabstufung steht im Bearbeiten-Dialog; Abbrechen räumt sie', async () => {
+      const grund = 'Der letzte aktive Admin kann nicht deaktiviert oder herabgestuft werden';
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+        http.patch('/api/benutzer/1', () => HttpResponse.json({ error: grund }, { status: 409 })),
+      );
+      seite();
+      const eigene = await zeile('@admin');
+      await userEvent.click(within(eigene).getByRole('button', { name: 'Bearbeiten' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const dialog = dialogMitTitel('Benutzer bearbeiten');
+      expect(await within(dialog).findByText(grund)).toBeInTheDocument();
+      keinToast();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      await userEvent.click(within(eigene).getByRole('button', { name: 'Bearbeiten' }));
+      await waitFor(() =>
+        expect(
+          within(dialogMitTitel('Benutzer bearbeiten')).getByLabelText('Anzeigename'),
+        ).toHaveValue('Admin'),
+      );
+      expect(screen.queryByText(grund)).toBeNull();
+    });
   });
 });

@@ -193,7 +193,6 @@ export default function AufbewahrungUebersicht() {
   return (
     <AdminPage
       titel="Aufbewahrung"
-      beschreibung="Abgeschlossene Einsätze der eigenen Organisation mit ihrer Aufbewahrungsfrist. Nach Fristablauf ist ein Einsatz gesperrt und zur Löschung vorgemerkt; nach 30 Tagen Karenz werden die Personendaten unwiderruflich geschwärzt. Mit einer Skelett-Frist der Organisation wird das pseudonyme Skelett danach endgültig gelöscht. Eine Zeile öffnet die pseudonyme Archivakte."
       hinweis={
         ohneStand ? (
           <SeitenFehler

@@ -325,7 +325,7 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
   }
 
   return (
-    <Paneel titel="Einsatztagebuch" meta="ETB im Wortlaut · gesetzliches Aufbewahrungsskelett">
+    <Paneel titel="Einsatztagebuch" meta="ETB im Wortlaut">
       <div style={{ padding: token.padding }}>
         <Segmentleiste<EtbFilter>
           beschriftung="Eintragstyp"
@@ -389,7 +389,7 @@ function AkteInhalt({
           ? `${kopf.einsatznummer_intern} · ${kopf.bezeichnung}`
           : kopf.bezeichnung
       }
-      beschreibung="Pseudonyme Archivakte — Namen, Kontakte, Orte und der Sachverhalt erscheinen hier nicht, auch nicht während der Karenz."
+      beschreibung="Pseudonym: ohne Namen, Kontakte, Orte und Sachverhalt"
       hinweis={veraltet && <SeitenStandVeraltet onWiederholen={veraltet.onWiederholen} />}
       aktionen={
         aktion === 'frist' ? (

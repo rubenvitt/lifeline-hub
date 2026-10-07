@@ -387,11 +387,7 @@ export default function LoginPage() {
               webauthnAktiv &&
               !formSichtbar &&
               ssoProvider.length === 0 && (
-                <Alert
-                  type="info"
-                  showIcon
-                  title="Die Anmeldung per Passkey geht in der Mac-App nicht. Melde dich im Browser an."
-                />
+                <Alert type="info" showIcon title="Passkey-Anmeldung nur im Browser" />
               )}
             {ssoProvider.length > 0 && formSichtbar && <Divider>oder</Divider>}
             {formSichtbar && (
@@ -475,11 +471,8 @@ export default function LoginPage() {
                   disabled={laedt !== null && laedt !== 'browser'}
                   onClick={imBrowserStarten}
                 >
-                  Im Browser anmelden
+                  Im Browser anmelden (Passkey, SSO)
                 </Button>
-                <p className="login-hinweis">
-                  Für Passkeys und Konten, die nur über Single Sign-On angemeldet werden.
-                </p>
               </>
             )}
           </>

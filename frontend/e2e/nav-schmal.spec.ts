@@ -332,6 +332,14 @@ test('Navigationsrahmen: auf 1024 px hält die Liste gesperrte Zeilen (Beobachte
   // Ab `lg` inline: Rail und Modulpanel, kein Hamburger.
   await expect(page.getByRole('navigation', { name: 'Kategorien' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Navigation öffnen' })).toHaveCount(0);
+  // Am Tablet quer ist das Modulmenü ohne Wahl zu (LFH-952); der Griff öffnet es.
+  const griff = page.getByRole('button', { name: 'Menü ausklappen' });
+  await expect(griff).toHaveAttribute('aria-expanded', 'false');
+  await griff.click();
+  await expect(page.getByRole('button', { name: 'Menü einklappen' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
   const panel = page.locator('[data-lfh="modul-panel"]');
   await sperrzweigSteht(panel);
 

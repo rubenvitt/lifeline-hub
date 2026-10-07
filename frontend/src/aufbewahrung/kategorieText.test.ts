@@ -26,7 +26,7 @@ describe('kategorieText', () => {
 
   it('vorgabeSatz unterscheidet keine Dauer, 0 und eine Zahl', () => {
     expect(vorgabeSatz(null)).toBe('folgt der Frist des Einsatzes');
-    expect(vorgabeSatz(0)).toMatch(/sofort/);
-    expect(vorgabeSatz(30)).toMatch(/30 Tagen/);
+    expect(vorgabeSatz(0)).toBe('fällig mit Abschluss');
+    expect(vorgabeSatz(30)).toBe('30 Tage ab Abschluss');
   });
 });

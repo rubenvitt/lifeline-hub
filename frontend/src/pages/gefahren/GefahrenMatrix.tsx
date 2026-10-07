@@ -16,6 +16,7 @@ import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../the
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
+import { useRahmenOben } from '../../components/rahmenOben';
 import './gefahrenMatrix.css';
 
 /**
@@ -157,6 +158,10 @@ export interface GefahrenMatrixProps {
    * Detail-Speichern kostete sonst den getippten Wortlaut, weil die Hülle leert und schließt.
    */
   onDetailsSpeichern: (daten: BewertungEingabe) => Promise<unknown>;
+  /** Grund eines abgelehnten Detail-Speicherns — steht IM Dialog, nicht als Toast (LFH-966). */
+  detailsFehler?: unknown;
+  /** Der Detail-Dialog schließt: der Aufrufer räumt seinen Fehler, der nächste öffnet leer. */
+  onDetailsSchliessen?: () => void;
 }
 
 /** Das 13×5-Raster eines Gefahrengebiets. */
@@ -167,11 +172,14 @@ export default function GefahrenMatrix({
   laufendeZelle,
   onSetzen,
   onDetailsSpeichern,
+  detailsFehler,
+  onDetailsSchliessen,
 }: GefahrenMatrixProps) {
   const { token } = theme.useToken();
   // Freiraum unter der stehenden Kopfzeile beim Rückwärtstabben.
   const tabelleRef = useRef<TableRef>(null);
   useKopfFreiraum(tabelleRef);
+  const rahmenOben = useRahmenOben();
   // Freiraum neben der fixierten Spalte beim Tabben nach links.
   useSpaltenFreiraum(tabelleRef);
   /**
@@ -341,8 +349,9 @@ export default function GefahrenMatrix({
         columns={spalten}
         dataSource={zeilen}
         pagination={false}
-        // Stehende Kopfzeile — Restposten der Ausnahme in `katalogTabelle.guard.test.ts`.
-        sticky
+        // Stehende Kopfzeile — Restposten der Ausnahme in `katalogTabelle.guard.test.ts`; sie steht
+        // unter dem klebenden Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen).
+        sticky={{ offsetHeader: rahmenOben }}
         scroll={{ x: 'max-content' }}
         ref={tabelleRef}
         className="gefahren-matrix"
@@ -367,7 +376,11 @@ export default function GefahrenMatrix({
             gemeldet_von: gemeldetVon,
           })
         }
-        onSchliessen={() => setDetailKennung(null)}
+        fehler={detailsFehler}
+        onSchliessen={() => {
+          setDetailKennung(null);
+          onDetailsSchliessen?.();
+        }}
       />
     </>
   );
