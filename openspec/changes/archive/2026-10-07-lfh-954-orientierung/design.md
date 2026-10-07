@@ -50,10 +50,19 @@ als Quelle fest.
 ### D2 Ortspfad
 
 - **Einsatzdaten:** h1 „Einsatzdaten“, Pfad `[Einsätze, <Einsatz>, Einsatzdaten]`.
-- **ETB, Meldebild, Einstellungen:** Pfad `[Einsätze, <Einsatz>, <Seite>]`. Die Beschreibung der
+- **ETB:** Pfad `[Einsätze, <Seite>]`, wie vorher, also „Einsätze ›“. Mit dem Einsatznamen
+  (175 px bei „E2E Zeilenhöhe …“) passten Pfad, Titel, Meta und die 743 px Aktionen bei 1440 px
+  nicht mehr in eine Zeile (gemessen 1294 gegen 1124 px); der Kopf wuchs um 28 px, und
+  `e2e/etb-zeilenhoehe.spec.ts` (LFH-958) zählte 8 statt 9 Einträge. Schon ohne Namen bleiben
+  nur 20 px Luft, ein Kürzen des Namens hätte ihn auf „…“ gebracht. Den Einsatz nennt der
+  Wechsler direkt darüber.
+- **Meldebild, Einstellungen:** Pfad `[Einsätze, <Einsatz>, <Seite>]`. Die Beschreibung der
   Einstellungen („Einsatzbezogene Einstellungen für …“) fällt weg, der Pfad nennt den Einsatz.
 - **Lagekarte:** baut ihren Kopf selbst; `EinsatzSeite` exportiert dafür `Ortspfad`, die Lagekarte
-  setzt ihn vor ihr h1.
+  setzt ihn vor ihr h1, aber erst ab `md` (Klasse `lfh-ortspfad--ab-md`). Bei 390 px und
+  `handschuh` kostete die Pfadzeile die Karte so viel Höhe (414 px übrig), dass die 420 px hohe
+  Zeichentafel aus dem Fuß über den Kopf ragte und „Leiste einblenden“ verdeckte
+  (`e2e/fokus-verdeckung.spec.ts`, LFH-811).
 - **CSS unter `md`:** Der erste Eintrag („Einsätze“) und die Trenner schrumpfen nicht
   (`flex-shrink: 0`), nur die mittleren Einträge kürzen mit Auslassung. Die Trefffläche aus
   LFH-909 bleibt.

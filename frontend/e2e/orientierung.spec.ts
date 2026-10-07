@@ -56,8 +56,12 @@ test.describe('Orientierung (LFH-954)', () => {
     await page.goto(`/einsaetze/${id}/einsatzdaten`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Einsatzdaten');
     await expect(page.locator('.lfh-seitenkopf__pfad')).toContainText(name);
-    await page.goto(`/einsaetze/${id}/etb`);
+    await page.goto(`/einsaetze/${id}/einstellungen`);
     await expect(page.locator('.lfh-seitenkopf__pfad')).toContainText(name);
+    // Das ETB nennt den Einsatz nicht: sonst bräche sein Kopf bei 1440 px um (Spec, Ortspfad).
+    await page.goto(`/einsaetze/${id}/etb`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Einsatztagebuch');
+    await expect(page.locator('.lfh-seitenkopf__pfad')).not.toContainText(name);
   });
 
   test('abgeschlossener Einsatz: „Einsatzstatus“ neben dem Titel, nicht im h1', async ({

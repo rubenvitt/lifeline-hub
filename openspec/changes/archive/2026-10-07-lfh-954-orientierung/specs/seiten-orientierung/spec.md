@@ -31,8 +31,10 @@ zurückkehren.
 
 ### Requirement: Ortspfad nennt den Einsatz und kürzt nur ihn
 
-Die Seiten Einsatzdaten, ETB, Meldebild, Lagekarte und Einsatz-Einstellungen SHALL einen Ortspfad
-„Einsätze › <Einsatz> ›“ vor ihrem h1 führen. Einsatzdaten SHALL das h1 „Einsatzdaten“ tragen.
+Die Seiten Einsatzdaten, Meldebild, Lagekarte und Einsatz-Einstellungen SHALL einen Ortspfad
+„Einsätze › <Einsatz> ›“ vor ihrem h1 führen, das ETB nur „Einsätze ›“ (Kopf einzeilig bei
+1440 px), die Lagekarte erst ab `md` (Kartenhöhe). Einsatzdaten SHALL das h1 „Einsatzdaten“
+tragen.
 Unter `md` SHALL der Eintrag „Einsätze“ ungekürzt bleiben; nur der Einsatzname SHALL mit
 Auslassung kürzen, und jeder Eintrag SHALL seinen vollen Wortlaut im `title` tragen.
 
@@ -40,6 +42,11 @@ Auslassung kürzen, und jeder Eintrag SHALL seinen vollen Wortlaut im `title` tr
 
 - **WHEN** eine Person die Einsatzdaten öffnet
 - **THEN** ist das h1 „Einsatzdaten“, und der Pfad nennt den Einsatz
+
+#### Scenario: ETB bei 1440 px
+
+- **WHEN** eine Person das ETB eines Einsatzes bei 1440 × 900 öffnet
+- **THEN** steht der Seitenkopf in einer Zeile, und der Pfad lautet „Einsätze ›“
 
 #### Scenario: Handy mit langem Einsatznamen
 

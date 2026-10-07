@@ -100,7 +100,16 @@ export function ortspfadStil(token: { controlHeight: number }): CSSProperties {
  * Eintrag nennt die Seite selbst und wird ausgeblendet (`EinsatzSeite.css`), sonst stünde
  * „Schäden › Schäden" da.
  */
-export function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrollen }) {
+export function Ortspfad({
+  children,
+  farben,
+  className,
+}: {
+  children: ReactNode;
+  farben: Farbrollen;
+  /** Zusatzklasse, etwa `lfh-ortspfad--ab-md` (`EinsatzSeite.css`). */
+  className?: string;
+}) {
   // Der Token der umgebenden Stufe, nicht der des verschachtelten Providers unten (der setzt nur
   // Schrift und Farben).
   const { token } = theme.useToken();
@@ -137,7 +146,11 @@ export function Ortspfad({ children, farben }: { children: ReactNode; farben: Fa
         },
       }}
     >
-      <div ref={wurzel} className="lfh-seitenkopf__pfad" style={ortspfadStil(token)}>
+      <div
+        ref={wurzel}
+        className={className ? `lfh-seitenkopf__pfad ${className}` : 'lfh-seitenkopf__pfad'}
+        style={ortspfadStil(token)}
+      >
         {children}
       </div>
     </ConfigProvider>

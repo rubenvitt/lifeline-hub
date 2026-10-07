@@ -956,10 +956,7 @@ export default function LagekartePage() {
 
   const kopf = (
     <div data-lfh="seitenkopf" style={{ ...seitenkopfStil(token, farben, true), marginBottom: 0 }}>
-      {/* Titelblock wie in `EinsatzSeite`: unter `md` eigene Zeile, damit nicht die Länge des
-          Einsatznamens im Pfad entscheidet, ob die Aktionen daneben passen (LFH-629, LFH-954). */}
       <div
-        className="lfh-seitenkopf__titelblock"
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -969,8 +966,11 @@ export default function LagekartePage() {
           minWidth: 0,
         }}
       >
+        {/* Der Pfad erst ab `md` (Spec `seiten-orientierung`, Ortspfad): bei 390 px kostete seine
+            Zeile die Karte so viel Höhe, dass die Zeichentafel aus dem Fuß über den Kopf ragte
+            und „Leiste einblenden“ verdeckte (`e2e/fokus-verdeckung.spec.ts`, LFH-811). */}
         {rahmenEinsatz && (
-          <Ortspfad farben={farben}>
+          <Ortspfad farben={farben} className="lfh-ortspfad--ab-md">
             <Breadcrumb
               items={[
                 { title: <Link to="/einsaetze">Einsätze</Link> },

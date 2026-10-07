@@ -86,6 +86,14 @@
   }
 }
 
+/* Ein Pfad erst ab `md` (LFH-954): die Lagekarte gibt unter `md` keine Zeile ihrer Kartenhöhe her.
+   Per CSS, nicht per `useViewport`, dessen erstes Bild bewusst breit ist. */
+@media (max-width: 767.98px) {
+  .lfh-ortspfad--ab-md {
+    display: none;
+  }
+}
+
 /* Der Datenstand-Platzhalter gilt nur dort, wo er eine Zeile hält: unter `md` (oben). Ab `md`
    steht die Gruppe in der Titelzeile, und die spät eintreffende Meta schob den schon stehenden
    Platzhalter weit nach rechts. CLS rechnet die größte Strecke eines Bildes mal der ganzen
