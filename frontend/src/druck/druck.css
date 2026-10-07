@@ -107,6 +107,15 @@
     break-inside: avoid;
   }
 
+  /* Eine überlange Tabellenzeile bricht frei, samt ihren Textblöcken (LFH-1009). Zusammenhalten
+     hieße hier: die Zeile rückt auf die nächste Seite und lässt die aktuelle leer, und ihre
+     Absätze reißen auf jeder Folgeseite Lücken. Welche Zeile überlang ist, entscheidet die Seite
+     (`etb/druckUmbruch.ts`); sie markiert nur. */
+  [data-lfh='druckwurzel'] tr[data-lfh='druck-ueberlang'],
+  [data-lfh='druckwurzel'] tr[data-lfh='druck-ueberlang'] :is(p, ul, ol, blockquote, pre) {
+    break-inside: auto;
+  }
+
   [data-lfh='druckwurzel'] thead {
     display: table-header-group;
   }

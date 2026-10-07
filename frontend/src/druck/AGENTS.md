@@ -38,7 +38,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   kein POST + PATCH; Fehler an die Seite.
 - **ETB-Druck** (`pages/EtbDruckPage.tsx`, `etb/EtbDruckTabelle.tsx`): schlichtes `<table>` nach
   `lfd_nr`, Vollabruf `etb/druckAbruf.ts` über die bestehende Liste, Drucken erst komplett;
-  `einsatzKeys.etbDruck` nicht live, `refetchOnMount: 'always'`.
+  `einsatzKeys.etbDruck` nicht live, `refetchOnMount: 'always'`. Eine Zeile bricht nicht über
+  den Rand, außer sie ist überlang (LFH-1009, `etb/druckUmbruch.ts`, Mechanik
+  `tr[data-lfh='druck-ueberlang']` in `druck.css`): der freigegebene Lagebericht steht mit vollem
+  Text im ETB und beginnt trotzdem auf Seite 1.
 - **Druckansichten am Handy** (LFH-956): Einsatzbericht und ETB-Druck bleiben bei 390 px im
   Layout-Viewport. Ihre Bildschirmregeln stehen in `druck/druckansichtSchmal.css`, nur unter
   `@media screen`, nie in `druck.css`; das Blatt bleibt unberührt. Gate im mobilen Kontext,

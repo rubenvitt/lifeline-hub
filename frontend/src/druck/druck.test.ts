@@ -254,6 +254,16 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     }
   });
 
+  /** LFH-1009: ein überlanger ETB-Eintrag rückte sonst auf Seite 2 und ließe Seite 1 leer. */
+  it('lässt eine als überlang markierte Zeile samt Absätzen und Listen umbrechen', () => {
+    const zeile = `${WURZEL} tr[data-lfh='druck-ueberlang']`;
+    for (const sel of [zeile, `${zeile} :is(p, ul, ol, blockquote, pre)`]) {
+      const r = regelFuer(sel);
+      expect(r, `keine Regel für ${sel}`).toBeDefined();
+      expect(r!.koerper).toMatch(/break-inside:\s*auto/);
+    }
+  });
+
   it('wiederholt Tabellenköpfe je Seite', () => {
     const r = regelFuer(`${WURZEL} thead`);
     expect(r, 'keine thead-Regel').toBeDefined();
