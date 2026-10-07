@@ -372,7 +372,21 @@ export const KOPF_FREIRAUM = '--lfh-tabellenkopf-hoehe';
 export function setzeKopfFreiraum(wurzel: HTMLElement): void {
   const kopf = wurzel.querySelector<HTMLElement>('.ant-table-sticky-holder');
   wurzel.style.setProperty(KOPF_FREIRAUM, `${kopf?.offsetHeight ?? 0}px`);
+  // Dieselbe Messung für die fixierte Kennung, siehe `SPALTEN_FREIRAUM`.
+  const kennung = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-start');
+  wurzel.style.setProperty(SPALTEN_FREIRAUM, `${kennung?.offsetWidth ?? 0}px`);
 }
+
+/**
+ * CSS-Variable für den Freiraum NEBEN der fixierten Kennung; gelesen in `theme/sprache.css`
+ * (`scroll-padding-inline-start` an Kopf- und Körpercontainer). Rückwärts getabbt richtet der
+ * Browser eine Kopf- oder Zellenmarke am linken Rand des Scrollports aus, also unter der
+ * Kennung, sobald die Tabelle waagerecht überläuft (LFH-967: eine breite Kennung mit
+ * Meldeknopf bei 390 px verdeckte „belegt“ ganz). Dasselbe Mittel wie die Gefahrenmatrix
+ * (`pages/gefahren/gefahrenMatrix.css`, LFH-373); gemessen, weil die Spalte mit Dichte und
+ * Inhalt wächst.
+ */
+export const SPALTEN_FREIRAUM = '--lfh-tabellen-kennung-breite';
 
 /**
  * Hält {@link KOPF_FREIRAUM} aktuell. Beobachtet wird die WURZEL: die Kopfzeile kann nach dem
@@ -387,6 +401,9 @@ export function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
     setzeKopfFreiraum(wurzel);
     const beobachter = new ResizeObserver(() => setzeKopfFreiraum(wurzel));
     beobachter.observe(wurzel);
+    // Die Kennung wächst mit der Dichte, ohne dass sich die Wurzel ändern muss.
+    const kennung = wurzel.querySelector('th.ant-table-cell-fix-start');
+    if (kennung) beobachter.observe(kennung);
     return () => beobachter.disconnect();
   }, [tabelle]);
 }

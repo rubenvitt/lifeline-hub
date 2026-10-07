@@ -325,6 +325,14 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Aktionen**
 
+- **Knöpfe nennen die Handlung** (LFH-959, Spec `bedien-wortlaut`): ein Knopf trägt, was er
+  tut („Bearbeitung beginnen“, „Außer Dienst nehmen“), ein Zustand steht nur auf dem Etikett.
+  Kein Knopftext gleicht einem Statuswort desselben Moduls; die Texte stehen je Zielstatus in
+  `kommunikation/phase.ts` (`…_HANDLUNG`) bzw. `stammdaten/dienststatus.tsx`, Guard
+  `kommunikation/wortlaut.guard.test.ts`. Der Bestätigungsknopf einer Rückfrage nennt die
+  Handlung, nie nur „Ja“/„OK“. Eine fachliche Unterscheidung ist ohne Hover lesbar, ein Tooltip
+  ergänzt nur. „Quittieren“ heißt Empfang bestätigt (Meldung, Auftrag, Fernmeldeskizze), eine
+  Erinnerung „erübrigt“ sich.
 - **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) hinter
   **`components/MenueAusloeser.tsx`** (LFH-683, Spec `datensatz-aktionsmenue`). Der Baustein
   trägt Auslöser, `autoFocus`, Einheitsform (neutral, ein Trenner, Gefahr rot) und den Riegel

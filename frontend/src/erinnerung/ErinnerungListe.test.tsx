@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import ErinnerungListe from './ErinnerungListe';
 import type { Erinnerung } from '../api/types';
@@ -65,13 +65,13 @@ describe('ErinnerungListe', () => {
         onQuittieren={() => {}}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /erledigt/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
     expect(onErledigen).toHaveBeenCalledWith(1);
     // Gegenaussage: sonst bliebe der Test grün, wenn die Rückfrage zurückkäme.
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
 
-  it('löst onQuittieren mit EINEM Klick aus, ohne Rückfrage', () => {
+  it('löst „Erübrigt (zur Kenntnis)" mit EINEM Klick aus, ohne Rückfrage', () => {
     const onQuittieren = vi.fn();
     renderListe(
       <ErinnerungListe
@@ -81,9 +81,33 @@ describe('ErinnerungListe', () => {
         onQuittieren={onQuittieren}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /quittieren/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Erübrigt (zur Kenntnis)' }));
     expect(onQuittieren).toHaveBeenCalledWith(1);
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
+  });
+
+  /**
+   * Entscheidung 10 (LFH-959): die Klammer trägt die Abgrenzung sichtbar. Am Tablet gibt es kein
+   * Hover; ein Tooltip, ohne den der Unterschied verloren ginge, ist der Fehlerfall.
+   */
+  it('trägt die Abgrenzung im Knopf, ohne Tooltip und ohne „Quittier…"', async () => {
+    renderListe(
+      <ErinnerungListe
+        erinnerungen={[erinnerung({})]}
+        darfSchreiben
+        onErledigen={() => {}}
+        onQuittieren={() => {}}
+      />,
+    );
+    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(knoepfe).toEqual(['Erübrigt (zur Kenntnis)', 'Erledigt (durchgeführt)']);
+    for (const knopf of screen.getAllByRole('button')) {
+      fireEvent.mouseEnter(knopf);
+      fireEvent.focus(knopf);
+    }
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/quittier/i);
   });
 
   it('blendet Aktionen ohne Schreibrecht aus', () => {
@@ -112,7 +136,7 @@ describe('ErinnerungListe', () => {
     expect(screen.getByText('Vollzogen')).toBeInTheDocument();
   });
 
-  it('unterscheidet Erledigt und Quittiert in der Abgeschlossen-Ansicht via Status-Badge', () => {
+  it('unterscheidet Erledigt und Erübrigt in der Abgeschlossen-Ansicht via Status-Badge', () => {
     renderListe(
       <ErinnerungListe
         ansicht="abgeschlossen"
@@ -125,7 +149,7 @@ describe('ErinnerungListe', () => {
           }),
           erinnerung({
             id: 3,
-            titel: 'Quittierte',
+            titel: 'Erübrigte',
             status: 'quittiert',
             quittiert_at: '2026-06-11 10:30:00',
           }),
@@ -137,7 +161,11 @@ describe('ErinnerungListe', () => {
     );
     // Status-Badge zeigt das jeweilige Fachlabel.
     expect(screen.getByText('Erledigt')).toBeInTheDocument();
-    expect(screen.getAllByText(/Quittiert/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Erübrigt')).toBeInTheDocument();
+    // Zeitzeile wie bei „Erledigt: ‹Zeit›"; kein Quittungs-Chip, kein „Quittiert" (LFH-959).
+    expect(screen.getByText(/^Erübrigt: /)).toBeInTheDocument();
+    expect(screen.getByText(/^Erledigt: /)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/quittier|quittung/i);
   });
 
   it('zeigt einen Deeplink zum Bezugsobjekt (Auftrag) mit Objekt-Selektion', () => {

@@ -74,7 +74,7 @@ describe('Status-Deskriptoren', () => {
   it('ERINNERUNG mappt offen/erledigt/quittiert', () => {
     expect(ERINNERUNG_STATUS.offen).toEqual({ label: 'Offen', phase: 'offen' });
     expect(ERINNERUNG_STATUS.erledigt).toEqual({ label: 'Erledigt', phase: 'abgeschlossen' });
-    expect(ERINNERUNG_STATUS.quittiert).toEqual({ label: 'Quittiert', phase: 'abgeschlossen' });
+    expect(ERINNERUNG_STATUS.quittiert).toEqual({ label: 'Erübrigt', phase: 'abgeschlossen' });
   });
 
   it('BEFEHL/LAGEBERICHT mappen entwurf→offen, freigegeben→abgeschlossen', () => {

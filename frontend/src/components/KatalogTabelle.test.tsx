@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import KatalogTabelle, {
   BLAETTER_SCHWELLE,
   KOPF_FREIRAUM,
+  SPALTEN_FREIRAUM,
   fliessBreite,
   setzeKopfFreiraum,
   tabellenTokens,
@@ -994,6 +995,41 @@ describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
     expect(css).toMatch(
       /\.ant-table-wrapper\.lfh-katalog \.ant-table-tbody \*\s*\{[^}]*scroll-margin-top:\s*var\(--lfh-tabellenkopf-hoehe/,
     );
+  });
+});
+
+/**
+ * Freiraum neben der fixierten Kennung (LFH-967, WCAG 2.4.11). Die Wirkung misst
+ * `e2e/betreuung-pruefliste.spec.ts` (390 px handschuh, rückwärts getabbt); hier die Messung und
+ * die Regel, die sie liest.
+ */
+describe('KatalogTabelle — Freiraum neben der fixierten Kennung', () => {
+  it('setzt die Variable auf die Breite der fixierten Kopfzelle, ohne sie auf 0', () => {
+    const wurzel = document.createElement('div');
+    const kennung = document.createElement('th');
+    kennung.className = 'ant-table-cell ant-table-cell-fix-start';
+    Object.defineProperty(kennung, 'offsetWidth', { value: 184 });
+    wurzel.appendChild(kennung);
+    setzeKopfFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(SPALTEN_FREIRAUM)).toBe('184px');
+
+    wurzel.removeChild(kennung);
+    setzeKopfFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(SPALTEN_FREIRAUM)).toBe('0px');
+  });
+
+  it('die Regel hält Kopf UND Körper frei — beide scrollen getrennt', () => {
+    const css = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '..', 'theme', 'sprache.css'),
+      'utf8',
+    );
+    for (const container of ['ant-table-header', 'ant-table-body', 'ant-table-content']) {
+      expect(css).toMatch(
+        new RegExp(
+          `\\.ant-table-wrapper\\.lfh-katalog \\.${container}[^{]*\\{[^}]*scroll-padding-inline-start:\\s*var\\(${SPALTEN_FREIRAUM}`,
+        ),
+      );
+    }
   });
 });
 
