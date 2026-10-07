@@ -311,7 +311,7 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     ] as unknown as Person[]);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    const knopf = await screen.findByRole('button', { name: 'Auflösen (noch 2 belegt)' });
+    const knopf = await screen.findByRole('button', { name: 'Auflösen (noch 2 Personen)' });
     expect(knopf).toBeDisabled();
     expect(screen.queryByText(/Nur möglich, wenn/)).not.toBeInTheDocument();
   });

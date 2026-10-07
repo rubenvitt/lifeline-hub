@@ -231,7 +231,9 @@ export default function UhsDetailPage() {
             >
               {/* Gesperrt mit Grund im Wort (LFH-1078), solange jemand in der UHS steht. */}
               <Button danger disabled={nochBelegt > 0}>
-                {nochBelegt > 0 ? `Auflösen (noch ${nochBelegt} belegt)` : 'Auflösen'}
+                {nochBelegt > 0
+                  ? `Auflösen (noch ${nochBelegt} ${nochBelegt === 1 ? 'Person' : 'Personen'})`
+                  : 'Auflösen'}
               </Button>
             </Popconfirm>
           )}
