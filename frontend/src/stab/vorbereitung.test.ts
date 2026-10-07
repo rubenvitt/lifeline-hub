@@ -137,9 +137,9 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
       'termin',
     ]);
     expect(zeilen.map((z) => z.quelle)).toEqual([
-      'Personen',
-      'Personen',
-      'Personen',
+      'Betroffene',
+      'Betroffene',
+      'Betroffene',
       'Meldebild',
       'Gefahren',
       'Aufträge/Befehle',
@@ -202,7 +202,7 @@ describe('vorbereitungMarkdown', () => {
           titel: 'Betroffene',
           wert: '3',
           notiz: '2 Patienten',
-          quelle: 'Personen',
+          quelle: 'Betroffene',
           zustand: 'daten',
         },
         {
@@ -230,7 +230,7 @@ describe('vorbereitungMarkdown', () => {
         '',
         '**Stand:** 111400JUN2026',
         '',
-        '- **Betroffene:** 3 (2 Patienten) — Quelle: Personen',
+        '- **Betroffene:** 3 (2 Patienten) — Quelle: Betroffene',
         '- **Meldungen offen:** — (nicht freigegeben) — Quelle: Meldungen (eingehend)',
         '- **Letzter Lagebericht:** 11:30 (Entwurf · Lage \\*Nord\\* \\[2\\]) — Quelle: Lageberichte',
         '',

@@ -60,7 +60,7 @@ import {
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
 import { ladeModulFreigaben } from '../../api/einsaetze';
-import { istKeyFreigegeben, istPfadGesperrt } from '../../einsatz/modulRegistry';
+import { istKeyFreigegeben, istPfadGesperrt, modulName } from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import { ladeMatrix } from '../../api/gefahren';
 import { listeEtb } from '../../api/etb';
@@ -342,13 +342,16 @@ export default function LageDashboardPage() {
     // `display: contents`: die Hülle trägt nur den Fänger und nimmt am Layout nicht teil.
     <div style={{ display: 'contents' }} {...linkFaenger}>
       <EinsatzSeite
-        titel={`Lagebild ${lagebildZeit(jetzt, konv)}`}
+        titel={modulName('lage-dashboard')}
+        // Die Uhrzeit des Lagebilds steht neben dem Titel, nicht in ihm (LFH-965): das h1 ist der
+        // Menüname.
+        meta={lagebildZeit(jetzt, konv)}
         breadcrumb={
           <Breadcrumb
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz?.bezeichnung ?? '…' },
-              { title: 'Lage-Dashboard' },
+              { title: modulName('lage-dashboard') },
             ]}
           />
         }

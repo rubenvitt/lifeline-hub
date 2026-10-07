@@ -24,6 +24,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { KennungsLink } from '../components/kennungsLink';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Lageberichte als Kartensicht — Zwilling der Befehlsliste. `form="karte"` in jeder Breite: ein
@@ -209,7 +210,7 @@ export default function LageberichtePage() {
     // laufen die Zahlen auseinander. Gewollt: der Seitenkopf ist die Lageauskunft, der Gruppenkopf
     // die Auskunft über die Trefferliste.
     <EinsatzSeite
-      titel="Lageberichte"
+      titel={modulName('lageberichte')}
       meta={`${anzahl(berichte.length, 'Bericht', 'Berichte')} in ${anzahl(koepfe.length, 'Kette', 'Ketten')} · ${entwuerfe} im Entwurf`}
       dataUpdatedAt={berichteQuery.dataUpdatedAt}
       breadcrumb={
@@ -217,7 +218,7 @@ export default function LageberichtePage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Lageberichte' },
+            { title: modulName('lageberichte') },
           ]}
         />
       }

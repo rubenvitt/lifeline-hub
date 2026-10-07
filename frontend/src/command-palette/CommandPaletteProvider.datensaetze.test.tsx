@@ -92,7 +92,7 @@ describe('Kommandopalette · Datensätze finden (LFH-391 · C3)', () => {
 
     const zeile = await screen.findByRole(
       'option',
-      { name: /R-042 · Müller/, description: 'Personen' },
+      { name: /R-042 · Müller/, description: 'Betroffene' },
       { timeout: 3000 },
     );
     await u.click(zeile);
@@ -147,7 +147,7 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     expect(
       await screen.findByRole(
         'option',
-        { name: /R-042 · Müller/, description: 'Personen' },
+        { name: /R-042 · Müller/, description: 'Betroffene' },
         { timeout: 3000 },
       ),
     ).toBeInTheDocument();
@@ -163,7 +163,7 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     // Der Schaden trägt dieselbe Nummer und kommt — die Suche läuft, nur das Modul fehlt.
     await screen.findByRole('option', { name: /S-042/, description: 'Schäden' }, { timeout: 3000 });
     expect(
-      screen.queryByRole('option', { name: /R-042/, description: 'Personen' }),
+      screen.queryByRole('option', { name: /R-042/, description: 'Betroffene' }),
     ).not.toBeInTheDocument();
   });
 
@@ -188,7 +188,7 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     // Die Person trägt dieselbe Nummer und kommt — die Suche läuft, nur das Modul fehlt.
     await screen.findByRole(
       'option',
-      { name: /R-042 · Müller/, description: 'Personen' },
+      { name: /R-042 · Müller/, description: 'Betroffene' },
       { timeout: 3000 },
     );
     expect(

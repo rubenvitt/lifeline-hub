@@ -26,6 +26,7 @@ import {
   type NachforderungVorbelegung,
 } from '../routing/deeplinks';
 import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { modulName } from '../einsatz/modulRegistry';
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
 function abschlussZeit(n: Nachforderung): string {
@@ -214,7 +215,7 @@ export default function NachforderungenPage() {
 
   return (
     <EinsatzSeite
-      titel="Nachforderung Kräfte/Mittel"
+      titel={modulName('nachforderungen')}
 
       meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
       dataUpdatedAt={nfQuery.dataUpdatedAt}
@@ -223,7 +224,7 @@ export default function NachforderungenPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Nachforderung' },
+            { title: modulName('nachforderungen') },
           ]}
         />
       }

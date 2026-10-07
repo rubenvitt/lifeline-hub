@@ -26,6 +26,7 @@ import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensic
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
@@ -245,13 +246,13 @@ export default function SchaedenPage() {
           ? `${alle.length} Schäden · ${alle.filter((s) => s.status === 'offen').length} offen`
           : undefined
       }
-      titel="Schäden"
+      titel={modulName('schaeden')}
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Schäden' },
+            { title: modulName('schaeden') },
           ]}
         />
       }

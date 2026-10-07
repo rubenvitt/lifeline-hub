@@ -41,6 +41,7 @@ function renderPage() {
         <MemoryRouter initialEntries={['/einsaetze/1/lagemeldungen']}>
           <Routes>
             <Route path="/einsaetze/:id/lagemeldungen" element={<LagemeldungenPage />} />
+            <Route path="/einsaetze/:id/meldungen" element={<div>MELDUNGEN-MODUL</div>} />
           </Routes>
         </MemoryRouter>
       </AntApp>
@@ -161,22 +162,16 @@ describe('LagemeldungenPage', () => {
     expect(screen.queryByText('Vortag')).toBeNull();
   });
 
-  /**
-   * Der Wortlaut bleibt gleich, getauscht wird der Knoten; die zweite Zusicherung ist die tragende.
-   *
-   * Keine Primäraktion: eine Lagemeldung entsteht, indem jemand anderswo eine Meldung als
-   * lagerelevant übergibt. Ein Knopf auf die Meldungsliste führte zur Voraussetzung, nicht aus dem
-   * Leerzustand heraus.
-   */
-  it('zeigt Leerzustand ohne Lageobjekte', async () => {
+  /** Leer führt der Knopf in die Meldungen, wo eine Lagemeldung entsteht (LFH-965). */
+  it('zeigt Leerzustand ohne Lageobjekte mit dem Weg in die Meldungen', async () => {
     listeLageMeldungen.mockResolvedValue([]);
     const { container } = renderPage();
-    expect(
-      await screen.findByText('Noch keine lagerelevanten Meldungen übergeben'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Noch keine Lagemeldungen')).toBeInTheDocument();
     expect(container.querySelector('.ant-empty')).toBeNull();
     // Ohne Menge keine Filterleiste: sie filterte nichts.
     expect(screen.queryByRole('search', { name: 'Lagemeldungen filtern' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Zu den Meldungen' }));
+    expect(await screen.findByText('MELDUNGEN-MODUL')).toBeInTheDocument();
   });
 
   it('Fehler ist nicht leer: Fehlermeldung mit Wiederholen, kein Leerzustand', async () => {

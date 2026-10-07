@@ -87,6 +87,7 @@ import type { Standquelle } from './lagekarte/snapshotDaten';
 import Datenstand from '../components/Datenstand';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
@@ -969,13 +970,13 @@ export default function LagekartePage() {
               items={[
                 { title: <Link to="/einsaetze">Einsätze</Link> },
                 { title: rahmenEinsatz.bezeichnung },
-                { title: 'Lagekarte' },
+                { title: modulName('lagekarte') },
               ]}
             />
           </Ortspfad>
         )}
         <Typography.Title level={1} style={seitentitelStil(farben)}>
-          Lagekarte
+          {modulName('lagekarte')}
         </Typography.Title>
         <EinsatzstatusMarke einsatz={rahmenEinsatz} />
         <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>

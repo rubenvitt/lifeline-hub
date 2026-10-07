@@ -92,7 +92,7 @@ describe('EtbPage – kein Einsatzabschluss (LFH-960)', () => {
       </Routes>,
       { route: '/einsaetze/7/etb' },
     );
-    await screen.findByRole('heading', { name: 'Einsatztagebuch' });
+    await screen.findByRole('heading', { name: 'ETB' });
     expect(screen.queryByRole('button', { name: 'Erfassen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mitglieder' })).not.toBeInTheDocument();
   });

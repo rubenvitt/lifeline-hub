@@ -75,6 +75,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte, clientseitig gezählt und
@@ -606,13 +607,13 @@ export default function FahrzeugePage() {
     <EinsatzSeite
       dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
       meta={efQuery.isSuccess ? `${efs.length} Fahrzeuge` : undefined}
-      titel="Fahrzeuge"
+      titel={modulName('fahrzeuge')}
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Fahrzeuge' },
+            { title: modulName('fahrzeuge') },
           ]}
         />
       }

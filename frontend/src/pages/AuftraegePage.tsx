@@ -9,6 +9,7 @@ import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { parseAuftraegeReiter, type AuftraegeReiter } from '../routing/deeplinks';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Abgrenzung der zwei Objekte dieser Seite (LFH-972): ein Auftrag geht einzeln an einen Empfänger
@@ -70,14 +71,14 @@ export default function AuftraegePage() {
     // Titel und Ortspfad trägt der Seitenkopf; Mengen, Datenstand und Anlegen-Aktion
     // gehören dem jeweiligen Reiter (`Bereichskopf`) — die zwei Bereiche zählen Verschiedenes.
     <EinsatzSeite
-      titel="Aufträge/Befehle"
+      titel={modulName('auftraege')}
 
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Aufträge/Befehle' },
+            { title: modulName('auftraege') },
           ]}
         />
       }

@@ -48,6 +48,11 @@ export interface Befehl {
    * soll, trägt ihn zusätzlich in `schlagworte`.
    */
   kontext?: string;
+  /**
+   * Zweite Zeile unter dem Label: die Kurzbeschreibung eines Moduls aus der Registry (LFH-965,
+   * Spec `modul-benennung`). Wie {@link Befehl.kontext} Beschreibung, kein Name.
+   */
+  nebenzeile?: string;
   kuerzel?: string;
   /**
    * Dieser eine Befehl geht NICHT ins Gedächtnis, obwohl seine Gruppe merkbar ist.

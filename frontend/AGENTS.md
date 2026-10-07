@@ -69,6 +69,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
   (`redirectZiel()`); Aufträge/Befehle unter Führung; **Meldebild** heißt sichtbar die
   Kräfteübersicht — **Schlüssel und Route bleiben `kraefteuebersicht`**.
+- **Ein Name je Modul** (LFH-965, Spec `modul-benennung`): Menü, Sprungpalette, h1, Ortspfad und
+  Tab tragen das `label` der Registry, Seiten holen es über `modulName(key)`, nie als Literal.
+  `beschreibung` ist die zweite Zeile in Modulmenü und Sprungpalette: wenige Fachwörter, kein
+  Satz, keine Bedienung (Guard in `modulRegistry.test.ts`). Ausnahmen nur für Detailseiten,
+  Paneel- und Bereichsnamen.
 - **Keine erfundenen Daten:** was ohne Datenquelle ist, wird weggelassen (Epic LFH-606…617),
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
   Evakuiert (LFH-607, `openspec/changes/archive/2026-09-29-lfh-607-kennzahl-evakuiert/`), Pegel auf Platz 1

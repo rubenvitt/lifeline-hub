@@ -1,6 +1,6 @@
 import { IconPlus, IconTrichter } from '../icons';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
-import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { App as AntApp, Breadcrumb, Button, Input, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
@@ -946,13 +946,13 @@ export default function KraefteuebersichtPage() {
     // `EinsatzSeite` nimmt kein `className`.
     <div className="kraefte-print-root" data-lfh="druckwurzel">
       <EinsatzSeite
-        titel="Meldebild"
+        titel={modulName('kraefteuebersicht')}
         breadcrumb={
           <Breadcrumb
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: 'Meldebild' },
+              { title: modulName('kraefteuebersicht') },
             ]}
           />
         }

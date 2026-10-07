@@ -17,6 +17,7 @@ import { auswahlZeilen } from '../etb/druckAuswahl';
 import EtbDruckTabelle from '../etb/EtbDruckTabelle';
 import { etbPfad, parseEtbFilter } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
+import { modulName } from '../einsatz/modulRegistry';
 
 /** „1 200 Einträge" — Tausender mit geschütztem Leerzeichen, Einzahl bei genau einem. */
 function umfang(anzahl: number): string {
@@ -109,7 +110,7 @@ export default function EtbDruckPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>Einsatztagebuch</Link> },
+            { title: <Link to={zurueck}>{modulName('etb')}</Link> },
             { title: 'Druckansicht' },
           ]}
         />

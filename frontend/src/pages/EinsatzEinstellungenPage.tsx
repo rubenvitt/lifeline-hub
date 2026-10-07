@@ -17,6 +17,7 @@ import {
 import type { EinsatzEinstellungen } from '../api/types';
 import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_FUEHRUNG_ADMIN } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Datenkontext der Einstellungs-Sektionen.
@@ -109,14 +110,14 @@ export default function EinsatzEinstellungenPage() {
 
   return (
     <EinsatzSeite
-      titel="Einstellungen"
+      titel={modulName('einsatz-einstellungen')}
       // Der Pfad nennt den Einsatz (LFH-954); ein Satz „Einstellungen für …“ darunter wiederholte ihn.
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: daten.einsatz.bezeichnung },
-            { title: 'Einstellungen' },
+            { title: modulName('einsatz-einstellungen') },
           ]}
         />
       }

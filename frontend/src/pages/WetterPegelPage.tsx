@@ -16,6 +16,7 @@ import { einsatzdatenPfad, einsatzEinstellungenPfad } from '../routing/deeplinks
 import PegelPaneel from '../wetter/PegelPaneel';
 import { AktuellPaneel, VorhersagePaneel, WarnungenPaneel } from '../wetter/WetterPaneele';
 import { teileWarnungen } from '../wetter/wetterStand';
+import { modulName } from '../einsatz/modulRegistry';
 
 /** „1 Warnung" · „n Warnungen" (Seitenkopf). Rein. */
 export function warnungenMeta(n: number): string {
@@ -111,7 +112,7 @@ export default function WetterPegelPage() {
 
   return (
     <EinsatzSeite
-      titel="Wetter & Pegel"
+      titel={modulName('wetter-pegel')}
       meta={[
         pegelQuery.data ? `${pegel.length} Pegel` : null,
         warnAnzahl != null ? warnungenMeta(warnAnzahl) : null,
@@ -124,7 +125,7 @@ export default function WetterPegelPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Wetter & Pegel' },
+            { title: modulName('wetter-pegel') },
           ]}
         />
       }

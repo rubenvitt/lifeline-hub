@@ -55,6 +55,7 @@ import { abrufZustand } from '../api/abrufZustand';
 import { parseAbschnitteAnsicht, type AbschnitteAnsicht } from '../routing/deeplinks';
 import type { Quelle } from '../stab/luecken';
 import Organigramm from './einsatzabschnitte/Organigramm';
+import { modulName } from '../einsatz/modulRegistry';
 
 /** Auswahl des Lagezustands in Stufenfolge — Wortlaut aus dem Farbvertrag, nicht doppelt. */
 const LAGEZUSTAND_OPTIONEN = (['planmaessig', 'angespannt', 'kritisch'] as const).map((l) => ({
@@ -370,7 +371,7 @@ export default function EinsatzabschnittePage() {
 
   return (
     <EinsatzSeite
-      titel="Einsatzabschnitte"
+      titel={modulName('einsatzabschnitte')}
 
       meta={abschnitteQuery.isSuccess ? `${abschnitte.length} Abschnitte` : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(
@@ -383,7 +384,7 @@ export default function EinsatzabschnittePage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Einsatzabschnitte' },
+            { title: modulName('einsatzabschnitte') },
           ]}
         />
       }

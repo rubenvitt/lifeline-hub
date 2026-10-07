@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
-import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
@@ -715,13 +715,13 @@ export default function EtbPage() {
 
   return (
     <EinsatzSeite
-      titel="Einsatztagebuch"
+      titel={modulName('etb')}
       breadcrumb={
         // Ohne Einsatznamen (Spec `seiten-orientierung`, Ortspfad): mit ihm bräche der Kopf bei
         // 1440 px in eine zweite Zeile und kostete die Zeitachse einen Eintrag (LFH-958). Den
         // Einsatz nennt der Wechsler darüber. Der letzte Eintrag steht nur für den Trenner.
         <Breadcrumb
-          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: 'Einsatztagebuch' }]}
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: modulName('etb') }]}
         />
       }
       meta={kopfMeta({ gesamt: zaehlerQuery.data?.gesamt, filterAktiv })}

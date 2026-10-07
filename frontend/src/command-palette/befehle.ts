@@ -349,6 +349,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         gruppe: 'zuletzt',
         label: m.label,
         kontext: kategorieKontext(m.kategorie),
+        nebenzeile: m.beschreibung,
         icon: m.icon,
         ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(m.key)),
       });
@@ -363,6 +364,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         gruppe: 'module',
         label: m.label,
         kontext: kategorieKontext(m.kategorie),
+        nebenzeile: m.beschreibung,
         icon: m.icon,
         schlagworte: m.beschreibung ? [m.beschreibung] : undefined,
         ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(m.key)),

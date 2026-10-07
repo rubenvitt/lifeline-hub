@@ -540,7 +540,7 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
     rendere({ lage: { personen: [person(1), person(2, { status: 'vermisst' })] } });
     const p = await paneel();
     await waitFor(() => expect(zeile(p, 'betroffene')).toHaveTextContent('2'));
-    expect(zeile(p, 'betroffene')).toHaveTextContent('Quelle: Personen');
+    expect(zeile(p, 'betroffene')).toHaveTextContent('Quelle: Betroffene');
     expect(zeile(p, 'vermisste')).toHaveTextContent('1');
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
     expect(zeile(p, 'auftraege')).toHaveTextContent('1 überfällig');
@@ -689,7 +689,7 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
     expect(text.schluessel).toBe('text');
     expect(text.text).toContain('**Stand:**');
     expect(text.text).toContain('- **Betroffene:** 1');
-    expect(text.text).toContain('Quelle: Personen');
+    expect(text.text).toContain('Quelle: Betroffene');
   });
 
   it('scheitert die Übernahme, steht der Fehler an der Seite, und es geht nicht weiter', async () => {

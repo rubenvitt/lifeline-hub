@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
-import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
+import { KEINE_BERECHTIGUNG, modulName } from '../../einsatz/modulRegistry';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -148,7 +148,7 @@ export default function GefahrenPage() {
   // Seitenkopf für alle Zweige unterhalb des Einsatzes (Laden, Fehler, leer, Matrix).
   const seite = (inhalt: ReactNode, dataUpdatedAt?: number) => (
     <EinsatzSeite
-      titel="Gefahrenmatrix"
+      titel={modulName('gefahrenzonen')}
 
       meta={gebieteQuery.isSuccess ? `${gebiete.length} Gefahrengebiete` : undefined}
       dataUpdatedAt={dataUpdatedAt}
@@ -157,7 +157,7 @@ export default function GefahrenPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Gefahrenmatrix' },
+            { title: modulName('gefahrenzonen') },
           ]}
         />
       }

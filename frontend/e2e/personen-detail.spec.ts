@@ -61,6 +61,6 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
   await expect(page.getByRole('tab', { name: 'Medizinischer Verlauf' })).toHaveCount(0);
 
   // Zurück zur Liste über den Breadcrumb.
-  await page.getByRole('link', { name: 'Personen', exact: true }).click();
+  await page.getByRole('link', { name: 'Betroffene', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 });

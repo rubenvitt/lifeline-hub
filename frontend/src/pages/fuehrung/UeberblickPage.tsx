@@ -12,6 +12,7 @@ import {
   istSprungGesperrt,
   KEINE_BERECHTIGUNG,
   modulRegistry,
+  modulName,
 } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
@@ -579,13 +580,13 @@ export default function UeberblickPage() {
     // `display: contents`: die Hülle trägt nur den Fänger und nimmt am Layout nicht teil.
     <div style={{ display: 'contents' }} {...linkFaenger}>
       <EinsatzSeite
-        titel="Überblick"
+        titel={modulName('ueberblick')}
         breadcrumb={
           <Breadcrumb
             items={[
               { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
               { title: einsatz?.bezeichnung ?? '…' },
-              { title: 'Überblick' },
+              { title: modulName('ueberblick') },
             ]}
           />
         }

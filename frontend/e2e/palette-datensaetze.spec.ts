@@ -95,7 +95,7 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
   await zumModul(page, einsatzId, 'etb');
 
   await suche(page, kennung);
-  const treffer = datensatzOption(page, 'Personen', new RegExp(kennung));
+  const treffer = datensatzOption(page, 'Betroffene', new RegExp(kennung));
   await expect(treffer).toBeVisible();
 
   /*
@@ -105,7 +105,7 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
    */
   const nachbar = `R-${String(Number(kennung.slice(2)) + 1).padStart(3, '0')}`;
   await paletteInput(page).fill(nachbar);
-  await expect(datensatzOption(page, 'Personen', /R-/)).toHaveCount(0);
+  await expect(datensatzOption(page, 'Betroffene', /R-/)).toHaveCount(0);
 
   await paletteInput(page).fill(kennung);
   await expect(treffer).toBeVisible();
@@ -186,7 +186,7 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
   await zumModul(page, einsatzId, 'personen');
 
   const etbTreffer = datensatzOption(page, 'ETB', new RegExp(`#${zahl} · ${ZIELTEXT}`));
-  const personTreffer = datensatzOption(page, 'Personen', new RegExp(personKennung));
+  const personTreffer = datensatzOption(page, 'Betroffene', new RegExp(personKennung));
 
   /*
    * Erst OHNE Präfix: dieselbe Zahl findet im Vorgabemodus BEIDE Datensätze — sonst wäre die

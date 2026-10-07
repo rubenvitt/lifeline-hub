@@ -38,7 +38,7 @@ async function etbOhneAbschluss(page: Page, einsatzId: string, breite: number, w
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   const main = page.locator('main');
   await expect(
-    main.getByRole('heading', { name: 'Einsatztagebuch', exact: true }),
+    main.getByRole('heading', { level: 1, name: 'ETB', exact: true }),
     `${wo}: ETB geladen`,
   ).toBeVisible();
   await expect(main.getByText('Einsatz abschließen'), `${wo}: kein Abschluss im ETB`).toHaveCount(

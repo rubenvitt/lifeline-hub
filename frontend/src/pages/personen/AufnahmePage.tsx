@@ -27,6 +27,7 @@ import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
 import { parseRouteId } from '../../routing/deeplinks';
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
+import { modulName } from '../../einsatz/modulRegistry';
 
 /**
  * Vollseiten-Aufnahme für Personen. Die Maske ist dieselbe wie in der Schnellerfassung
@@ -150,7 +151,7 @@ export default function AufnahmePage() {
                 title: uhsAuftrag ? (
                   <Link to={pfade.uhsDetail(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
                 ) : (
-                  <Link to={pfade.personenListe(einsatzId)}>Personen</Link>
+                  <Link to={pfade.personenListe(einsatzId)}>{modulName('personen')}</Link>
                 ),
               },
               { title: 'Aufnahme' },

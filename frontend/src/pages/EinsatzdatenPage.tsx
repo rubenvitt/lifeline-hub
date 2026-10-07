@@ -71,6 +71,7 @@ import {
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
+import { modulName } from '../einsatz/modulRegistry';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -585,13 +586,13 @@ export default function EinsatzdatenPage() {
       // Datenblatt und Bearbeitungsformular: ausdrücklich die schmale Lesebreite.
       breite="schmal"
       // Die Seite nennt sich (LFH-954): der Einsatzname steht im Pfad, der Status im Seitenkopf.
-      titel="Einsatzdaten"
+      titel={modulName('einsatzdaten')}
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Einsatzdaten' },
+            { title: modulName('einsatzdaten') },
           ]}
         />
       }

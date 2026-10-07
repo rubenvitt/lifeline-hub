@@ -29,6 +29,7 @@ import {
   IconPersonengruppe,
   IconPfeileGegenlaeufig,
   IconPfote,
+  IconPapierflieger,
   IconPosteingang,
   IconSprechblase,
   IconSprechblaseGefuellt,
@@ -90,7 +91,10 @@ export interface ModulEintrag {
   /** Relativer Pfad-Abschnitt unter /einsaetze/:id (z. B. 'etb'). */
   route: string;
   status: ModulStatus;
-  /** Kurztext für die WIP-/Platzhalter-Seite. */
+  /**
+   * Kurzbeschreibung aus wenigen Fachwörtern, zweite Zeile im Modulmenü und in der Sprungpalette
+   * (LFH-965, Spec `modul-benennung`). Kein Satz, keine Bedienung, keine Technik.
+   */
   beschreibung?: string;
   /**
    * Deep-Link: das Modul leitet auf die `route` eines anderen Moduls um. Heute von keinem Eintrag
@@ -157,7 +161,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKacheln,
     route: 'ueberblick',
     status: 'fertig',
-    beschreibung: 'Führungsüberblick des Einsatzes — Startseite des Einsatz-Workspace.',
+    beschreibung: 'Kennzahlen, Fristen, Entscheidungen',
   },
   {
     key: 'einsatzdaten',
@@ -166,7 +170,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconDokument,
     route: 'einsatzdaten',
     status: 'fertig',
-    beschreibung: 'Stammdaten des Einsatzes: Bezeichnung, Stichwort, Zeiten, Leitung.',
+    beschreibung: 'Bezeichnung, Stichwort, Zeiten, Leitung',
   },
   {
     key: 'einsatzabschnitte',
@@ -175,7 +179,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconOrganigramm,
     route: 'einsatzabschnitte',
     status: 'fertig',
-    beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.',
+    beschreibung: 'Abschnitte und ihre Einheiten',
     zaehlerQuelle: 'einsatzabschnitte',
   },
   {
@@ -185,7 +189,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKlemmbrettListe,
     route: 'auftraege',
     status: 'fertig',
-    beschreibung: 'Aufträge und Befehle mit Quittierung.',
+    beschreibung: 'Aufträge, Befehle, Quittungen',
     zaehlerQuelle: 'auftraege',
   },
   {
@@ -195,7 +199,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconGebaeudegruppe,
     route: 'stab',
     status: 'fertig',
-    beschreibung: 'Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung',
+    beschreibung: 'S1–S6, Lagebesprechung',
   },
   {
     key: 'dokumente',
@@ -204,7 +208,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconDokumente,
     route: 'dokumente',
     status: 'fertig',
-    beschreibung: 'Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos.',
+    beschreibung: 'Lagepläne, Formulare, Fotos',
     zaehlerQuelle: 'dokumente',
   },
   // Kräfte & Mittel — das Meldebild steht vorn als Verdichtung der Kategorie. Route und Schlüssel
@@ -216,7 +220,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconListeDetails,
     route: 'kraefteuebersicht',
     status: 'fertig',
-    beschreibung: 'Meldebild der eingesetzten Kräfte: Status, Stärke und Gliederung.',
+    beschreibung: 'Status, Stärke, Gliederung',
   },
   {
     key: 'einheiten',
@@ -225,7 +229,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconPersonengruppe,
     route: 'einheiten',
     status: 'fertig',
-    beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.',
+    beschreibung: 'Führer, Mannschaft, Fahrzeug',
     zaehlerQuelle: 'einheiten',
   },
   {
@@ -235,7 +239,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconPerson,
     route: 'personal',
     status: 'fertig',
-    beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.',
+    beschreibung: 'Einsatzkräfte, Ad-hoc-Kräfte',
   },
   {
     key: 'fahrzeuge',
@@ -244,7 +248,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconLkw,
     route: 'fahrzeuge',
     status: 'fertig',
-    beschreibung: 'Disponierte Fahrzeuge des Einsatzes.',
+    beschreibung: 'Disponierte Fahrzeuge',
   },
   {
     key: 'material',
@@ -253,7 +257,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKistenstapel,
     route: 'material',
     status: 'fertig',
-    beschreibung: 'Material und Verbrauchsgüter im Einsatz.',
+    beschreibung: 'Material, Verbrauchsgüter',
   },
   {
     // Essensportionen je Zeitfenster. Bewusst KEIN Zähler: Unterdeckung ist kein Alarmereignis.
@@ -264,8 +268,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconBesteck,
     route: 'verpflegung',
     status: 'fertig',
-    beschreibung:
-      'Zeitfenster mit Bedarf und Ausgabe von Essensportionen, Sonderkost, Unterdeckung.',
+    beschreibung: 'Portionen, Sonderkost, Ausgabe',
   },
   {
     key: 'bereitstellungsraeume',
@@ -274,7 +277,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconLagerhalle,
     route: 'bereitstellungsraeume',
     status: 'fertig',
-    beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.',
+    beschreibung: 'Bereitgestellte Einheiten und Fahrzeuge',
   },
   {
     // Schichten und fällige Ablösungen. Der Zähler nennt die Schichten in der Vorwarnzeit oder
@@ -285,7 +288,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconPfeileGegenlaeufig,
     route: 'abloesung',
     status: 'fertig',
-    beschreibung: 'Schichten der Einheiten: Rhythmus, fällige Ablösungen, Vollzug.',
+    beschreibung: 'Schichten, fällige Ablösungen',
     zaehlerQuelle: 'abloesung',
   },
   // Erfassung
@@ -296,18 +299,17 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKlemmbrett,
     route: 'etb',
     status: 'fertig',
-    beschreibung: 'Einsatztagebuch.',
+    beschreibung: 'Einsatztagebuch',
     zaehlerQuelle: 'etb',
   },
   {
     key: 'personen',
     kategorie: 'erfassung',
-    label: 'Personen',
+    label: 'Betroffene',
     icon: IconPersonen,
     route: 'personen',
     status: 'fertig',
-    beschreibung:
-      'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).',
+    beschreibung: 'Vermisste, Betroffene, Patienten',
     zaehlerQuelle: 'personen',
   },
   {
@@ -317,8 +319,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconArzttasche,
     route: 'unfallhilfsstellen',
     status: 'fertig',
-    beschreibung:
-      'Behandlungs-/Sammelstellen als Örtlichkeiten mit Plätzen, Belegung und Material.',
+    beschreibung: 'Behandlungsplätze, Belegung, Material',
   },
   {
     // Evakuierung und Unterbringung als MENGEN mit Zeitbezug. Der Zähler nennt die aktiven
@@ -330,7 +331,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconHausHerz,
     route: 'betreuung',
     status: 'fertig',
-    beschreibung: 'Evakuierungsbezirke mit Stand „evakuiert" und Betreuungsstellen mit Belegung.',
+    beschreibung: 'Evakuierung, Betreuungsstellen',
     zaehlerQuelle: 'betreuung',
   },
   {
@@ -340,7 +341,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconPfote,
     route: 'tiere',
     status: 'fertig',
-    beschreibung: 'Betroffene Tiere, getrennt vom Personenstamm.',
+    beschreibung: 'Betroffene Tiere',
   },
   {
     key: 'schaeden',
@@ -349,17 +350,17 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconHaus,
     route: 'schaeden',
     status: 'fertig',
-    beschreibung: 'Sach-/Infrastruktur-/Umweltschäden mit Bearbeitungs-Workflow.',
+    beschreibung: 'Sach-, Infrastruktur-, Umweltschäden',
   },
   // Lage
   {
     key: 'lage-dashboard',
     kategorie: 'lage',
-    label: 'Dashboard',
+    label: 'Lagebild',
     icon: IconKachelraster,
     route: 'lage-dashboard',
     status: 'fertig',
-    beschreibung: 'Verdichtete Lageübersicht des Einsatzes.',
+    beschreibung: 'Lage in Zahlen, Meldungsstrom',
   },
   {
     key: 'lagekarte',
@@ -368,8 +369,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKarte,
     route: 'lagekarte',
     status: 'fertig',
-    beschreibung:
-      'Karte der verortbaren Objekte: Einsatzort, Unfallhilfsstellen, Schäden — verorten per Klick.',
+    beschreibung: 'Einsatzort, Objekte, Gefahrengebiete',
   },
   {
     key: 'lageberichte',
@@ -378,7 +378,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconBericht,
     route: 'lageberichte',
     status: 'fertig',
-    beschreibung: 'Strukturierte Lageberichte.',
+    beschreibung: 'Gegliederte Lageberichte',
   },
   {
     key: 'gefahrenzonen',
@@ -387,8 +387,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconWarndreieck,
     route: 'gefahren',
     status: 'fertig',
-    beschreibung:
-      'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.',
+    beschreibung: 'Gefahrenmatrix, Warnstufen',
   },
   {
     key: 'wetter-pegel',
@@ -399,17 +398,16 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     // Gültige Unwetterwarnungen (schwer/extrem) am Einsatzort, neutral (LFH-663).
     zaehlerQuelle: 'wetter-pegel',
-    beschreibung:
-      'Maßgebliche Pegel mit 24-h-Verlauf, DWD-Warnungen und Vorhersage für den Einsatzort.',
+    beschreibung: 'Pegel, DWD-Warnungen, Vorhersage',
   },
   {
     key: 'lagemeldungen',
     kategorie: 'lage',
     label: 'Lagemeldungen',
-    icon: IconPosteingang,
+    icon: IconPapierflieger,
     route: 'lagemeldungen',
     status: 'fertig',
-    beschreibung: 'Lagerelevante Meldungen, die an die Lage übergeben wurden.',
+    beschreibung: 'An die Lage übergebene Meldungen',
   },
   // Kommunikation
   {
@@ -419,7 +417,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconSprechblaseRund,
     route: 'chat',
     status: 'fertig',
-    beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).',
+    beschreibung: 'Nachrichten im Einsatz',
     zaehlerQuelle: 'chat',
   },
   {
@@ -429,7 +427,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconGlocke,
     route: 'erinnerungen',
     status: 'fertig',
-    beschreibung: 'Terminierte Erinnerungen.',
+    beschreibung: 'Termine, Fristen',
     zaehlerQuelle: 'erinnerungen',
   },
   {
@@ -439,7 +437,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconPosteingang,
     route: 'meldungen',
     status: 'fertig',
-    beschreibung: 'Eingehende Meldungen zur Bearbeitung.',
+    beschreibung: 'Eingang, Bearbeitung',
     zaehlerQuelle: 'meldungen',
   },
   {
@@ -449,8 +447,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKistenstapel,
     route: 'nachforderungen',
     status: 'fertig',
-    beschreibung:
-      'Nachforderung von Kräften/Mitteln bei Leitstelle/Nachbar-EA/übergeordneter Führung mit Status-Workflow.',
+    beschreibung: 'Kräfte und Mittel, Leitstelle',
   },
   // Einstellungen
   {
@@ -460,9 +457,20 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconZahnrad,
     route: 'einstellungen',
     status: 'fertig',
-    beschreibung: 'Einsatzbezogene Einstellungen.',
+    beschreibung: 'Module, Darstellung, Einstieg',
   },
 ];
+
+/**
+ * Der eine sichtbare Name eines Moduls (LFH-965, Spec `modul-benennung`): Menü, h1, letzter
+ * Pfadeintrag, Sprungpalette und Tab. Seiten holen ihren Titel hier statt aus einem eigenen
+ * String. Ein unbekannter Schlüssel ist ein Programmierfehler und wirft.
+ */
+export function modulName(key: string): string {
+  const modul = modulRegistry.find((m) => m.key === key);
+  if (!modul) throw new Error(`Unbekanntes Modul: ${key}`);
+  return modul.label;
+}
 
 export function moduleNachKategorie(kategorie: KategorieKey): ModulEintrag[] {
   return modulRegistry.filter((m) => m.kategorie === kategorie);

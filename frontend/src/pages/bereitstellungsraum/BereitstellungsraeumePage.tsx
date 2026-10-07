@@ -21,6 +21,7 @@ import { brStatus } from '../../theme/statusFarben';
 import KatalogTabelle from '../../components/KatalogTabelle';
 import BrAnlegenDrawer from './BrAnlegenDrawer';
 import { KennungsLink } from '../../components/kennungsLink';
+import { modulName } from '../../einsatz/modulRegistry';
 
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
@@ -102,7 +103,7 @@ export default function BereitstellungsraeumePage() {
 
   return (
     <EinsatzSeite
-      titel="Bereitstellungsräume"
+      titel={modulName('bereitstellungsraeume')}
       dataUpdatedAt={brQuery.dataUpdatedAt}
       meta={brQuery.isSuccess ? `${alle.length} Räume` : undefined}
 
@@ -111,7 +112,7 @@ export default function BereitstellungsraeumePage() {
           items={[
             { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
             { title: <Link to={einsatzPfad(einsatzId)}>{einsatzQuery.data?.bezeichnung}</Link> },
-            { title: 'Bereitstellungsräume' },
+            { title: modulName('bereitstellungsraeume') },
           ]}
         />
       }

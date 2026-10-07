@@ -51,6 +51,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig, erfasseStandOfflineFaehig } from '../offline/schreiben';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { modulName } from '../einsatz/modulRegistry';
 
 /** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
 const betreuungRechteText = einsatzRechteGrund;
@@ -392,7 +393,7 @@ export default function BetreuungPage() {
 
   return (
     <EinsatzSeite
-      titel="Betreuung"
+      titel={modulName('betreuung')}
       // „n voll" auch hier, nicht nur im Blockkopf der Stellen: der Seitenkopf ist die einzige
       // Zeile, die mit vielen Bezirkskarten über der Falz steht.
       meta={
@@ -406,7 +407,7 @@ export default function BetreuungPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Betreuung' },
+            { title: modulName('betreuung') },
           ]}
         />
       }

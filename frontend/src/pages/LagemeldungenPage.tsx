@@ -31,6 +31,7 @@ import {
   type Zeitfenster,
 } from '../lagemeldungen/zeitachse';
 import { KennungsLink } from '../components/kennungsLink';
+import { modulName } from '../einsatz/modulRegistry';
 
 const FENSTER_OPTIONEN: SegmentOption<Zeitfenster | 'alle'>[] = [
   { wert: 'alle', label: 'Alle' },
@@ -142,12 +143,12 @@ export default function LagemeldungenPage() {
       />
     );
   } else if (eintraege.length === 0) {
-    // Keine Primäraktion: eine Lagemeldung entsteht, indem jemand anderswo eine Meldung als
-    // lagerelevant übergibt. Der Hinweis nennt den Weg.
+    // Eine Lagemeldung entsteht in den Meldungen: der Knopf führt dorthin, kein Satz erklärt den
+    // Weg (LFH-965, Spec `modul-benennung`).
     inhalt = (
       <SeitenLeer
-        titel="Noch keine lagerelevanten Meldungen übergeben"
-        hinweis="Eine Meldung wird in der Meldungsliste als lagerelevant übergeben."
+        titel="Noch keine Lagemeldungen"
+        aktion={{ label: 'Zu den Meldungen', pfad: meldungenPfad(einsatzId) }}
       />
     );
   } else if (gefiltert === 0) {
@@ -177,7 +178,7 @@ export default function LagemeldungenPage() {
 
   return (
     <EinsatzSeite
-      titel="Lagerelevante Meldungen"
+      titel={modulName('lagemeldungen')}
       meta={
         lageQuery.isSuccess
           ? filterAktiv(filter)
@@ -191,7 +192,7 @@ export default function LagemeldungenPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Lagemeldungen' },
+            { title: modulName('lagemeldungen') },
           ]}
         />
       }

@@ -47,6 +47,7 @@ import DemoMarke from '../components/DemoMarke';
 import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -374,11 +375,11 @@ export default function MaterialPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Material' },
+            { title: modulName('material') },
           ]}
         />
       }
-      titel="Material"
+      titel={modulName('material')}
       meta={emQuery.isSuccess ? `${ems.length} Positionen` : undefined}
       dataUpdatedAt={emQuery.dataUpdatedAt}
       hinweis={

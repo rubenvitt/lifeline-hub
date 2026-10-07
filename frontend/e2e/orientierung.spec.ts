@@ -24,6 +24,12 @@ function registryModule(): { route: string; label: string }[] {
   return module;
 }
 
+/**
+ * Direkteinstieg: UHS und Bereitstellungsräume öffnen ohne Eintrag einen Leerzustand ohne
+ * Seitenkopf, mit Eintrag dessen Detailseite. Ihr Name steht dort im Tab, nicht im h1.
+ */
+const DIREKTEINSTIEG = new Set(['unfallhilfsstellen', 'bereitstellungsraeume']);
+
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
   const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);
@@ -31,7 +37,7 @@ async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> 
 }
 
 test.describe('Orientierung (LFH-954)', () => {
-  test('jedes Modul nennt sich und den Einsatz im Tab, kein h1 trägt den Einsatzstatus', async ({
+  test('jedes Modul nennt sich im h1 und mit dem Einsatz im Tab, kein h1 trägt den Einsatzstatus', async ({
     page,
   }) => {
     test.setTimeout(240_000);
@@ -41,6 +47,10 @@ test.describe('Orientierung (LFH-954)', () => {
     for (const { route, label } of registryModule()) {
       await page.goto(`/einsaetze/${id}/${route}`);
       await expect(page, route).toHaveTitle(`${label} · ${name} · lifeline-hub`);
+      // Ein Name je Modul: das h1 ist der Menüname (LFH-965, Spec `modul-benennung`).
+      if (!DIREKTEINSTIEG.has(route)) {
+        await expect.soft(page.locator('h1').first(), `${route}: h1 = Menüname`).toHaveText(label);
+      }
       for (const h1 of await page.locator('h1').allTextContents()) {
         expect.soft(h1, `${route}: h1 ohne Einsatzstatus`).not.toMatch(/Aktiv/);
       }
@@ -60,7 +70,7 @@ test.describe('Orientierung (LFH-954)', () => {
     await expect(page.locator('.lfh-seitenkopf__pfad')).toContainText(name);
     // Das ETB nennt den Einsatz nicht: sonst bräche sein Kopf bei 1440 px um (Spec, Ortspfad).
     await page.goto(`/einsaetze/${id}/etb`);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Einsatztagebuch');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('ETB');
     await expect(page.locator('.lfh-seitenkopf__pfad')).not.toContainText(name);
   });
 

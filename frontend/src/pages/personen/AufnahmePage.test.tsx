@@ -116,7 +116,7 @@ describe('AufnahmePage', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /Aufnahme/ })).toBeInTheDocument();
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     // Der Breadcrumb trägt den Rückweg in die Liste — deshalb gibt es keinen Zurück-Knopf.
-    expect(screen.getByRole('link', { name: 'Personen' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Betroffene' })).toHaveAttribute(
       'href',
       '/einsaetze/1/personen',
     );
@@ -247,7 +247,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
       'href',
       '/einsaetze/1/unfallhilfsstellen/7',
     );
-    expect(screen.queryByRole('link', { name: 'Personen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Betroffene' })).not.toBeInTheDocument();
   });
 
   it('erfasst Person und UHS-Eintritt mit genau einem Schreibrequest', async () => {

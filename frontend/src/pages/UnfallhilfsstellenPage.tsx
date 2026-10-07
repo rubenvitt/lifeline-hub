@@ -21,6 +21,7 @@ import {
 import { uhsStatus, uhsTyp } from '../theme/statusFarben';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { KennungsLink } from '../components/kennungsLink';
+import { modulName } from '../einsatz/modulRegistry';
 
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
@@ -102,7 +103,7 @@ export default function UnfallhilfsstellenPage() {
 
   return (
     <EinsatzSeite
-      titel="Unfallhilfsstellen"
+      titel={modulName('unfallhilfsstellen')}
       dataUpdatedAt={uhsQuery.dataUpdatedAt}
       meta={uhsQuery.isSuccess ? `${alle.length} Hilfsstellen` : undefined}
       breadcrumb={
@@ -110,7 +111,7 @@ export default function UnfallhilfsstellenPage() {
           items={[
             { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
             { title: <Link to={einsatzPfad(einsatzId)}>{einsatzQuery.data?.bezeichnung}</Link> },
-            { title: 'Unfallhilfsstellen' },
+            { title: modulName('unfallhilfsstellen') },
           ]}
         />
       }

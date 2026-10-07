@@ -65,6 +65,7 @@ import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
@@ -643,7 +644,7 @@ export default function PersonenPage() {
   return (
     <EinsatzSeite
       dataUpdatedAt={personenQuery.dataUpdatedAt}
-      titel="Betroffene"
+      titel={modulName('personen')}
       // „gesamt“, nicht „erfasst“: das ist ein Personenstatus (LFH-963, `personen/AGENTS.md`).
       meta={personenQuery.data ? `${alle.length} gesamt` : undefined}
       breadcrumb={
@@ -651,7 +652,7 @@ export default function PersonenPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Betroffene' },
+            { title: modulName('personen') },
           ]}
         />
       }
