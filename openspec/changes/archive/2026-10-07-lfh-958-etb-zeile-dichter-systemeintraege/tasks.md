@@ -23,8 +23,8 @@
 ## 5. Regeln und Abschluss
 
 - [x] 5.1 `frontend/src/etb/AGENTS.md`: Ausschluss über denselben Filter; Kopfplatz der Zeile für Menüs (`menue`).
-- [ ] 5.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests `etb_zaehler`, `etb_anzahl`.
-- [ ] 5.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der ETB-Specs).
+- [x] 5.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests `etb_zaehler`, `etb_anzahl`.
+- [x] 5.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der ETB-Specs): `schnell` grün, `cargo test --workspace --exclude lifeline-desktop` grün, ganze Vitest-Suite grün (751 Dateien, 10 957 Tests; der eine rote Guard kam von alpha und ist nach dem Merge von alpha grün), e2e siehe 4.2.
 
 ## Messung
 
