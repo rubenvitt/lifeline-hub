@@ -6,7 +6,6 @@ import {
   Collapse,
   Form,
   Input,
-  InputNumber,
   Popconfirm,
   Space,
   Tag,
@@ -15,6 +14,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
+import { MengenFeld } from '../components/MengenFeld';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import {
   nichtGefundenInhalt,
@@ -87,9 +87,10 @@ function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: n
   };
   return (
     // Die Höhe kommt aus `controlHeight` und zieht mit der Dichtestufe mit. Die Breite bleibt fest:
-    // sie trägt eine zweistellige Menge, keine Trefffläche.
-    <InputNumber
-      min={1}
+    // sie trägt eine zweistellige Menge, keine Trefffläche. Der Name nennt die Position, sonst
+    // hörte man in jeder Zeile nur „Menge“.
+    <MengenFeld
+      beschriftung={`Menge ${em.bezeichnung}`}
       style={{ width: 80 }}
       value={wert}
       onChange={(v) => setWert(v ?? 1)}
@@ -97,6 +98,12 @@ function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: n
       onPressEnter={commit}
     />
   );
+}
+
+/** Werte des Disponier-Dialogs für Stamm-Material. */
+interface StammDisposition {
+  material_id: number;
+  menge: number;
 }
 
 export default function MaterialPage() {
@@ -107,8 +114,8 @@ export default function MaterialPage() {
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [form] = Form.useForm<MaterialAdhocEingabe & { menge: number }>();
-  const [poolAuswahl, setPoolAuswahl] = useState<number | null>(null);
-  const [poolMenge, setPoolMenge] = useState<number>(1);
+  const [disponierenOffen, setDisponierenOffen] = useState(false);
+  const [stammForm] = Form.useForm<StammDisposition>();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -132,11 +139,10 @@ export default function MaterialPage() {
   const disponiereMutation = useMutation({
     mutationFn: (v: { materialId: number; menge: number }) =>
       disponiereMaterial(einsatzId, v.materialId, v.menge),
+    // Schließen und Leeren gehören der Erfassungshülle (`onFertig`).
     onSuccess: () => {
       message.success('Material disponiert');
       invalidate();
-      setPoolAuswahl(null);
-      setPoolMenge(1);
     },
     onError: fehler,
   });
@@ -388,40 +394,14 @@ export default function MaterialPage() {
         )
       }
       /**
-       * Der Seitenkopf muss umbrechen: die Disponier-Leiste bringt ein `Select` mit `minWidth:
-       * 260`, ein Mengenfeld und zwei Knöpfe mit. `EinsatzSeite` bricht selbst um; `wrap` +
-       * `maxWidth` am Block bleiben, weil der Umbruch allein den Block nur unter den Titel schiebt.
+       * Der Kopf ÖFFNET nur (LFH-983, `frontend/AGENTS.md`, Bedien-Leitlinie): disponiert wird im
+       * Dialog mit Absende-Knopf im `<form>`. Vorher stand hier eine Maske, die direkt absendete.
        */
       aktionen={
         darfSchreiben && (
           <Space wrap style={{ minWidth: 0 }}>
-            <Select
-              // `minWidth` als Lesbarkeitsboden, `maxWidth` gegen das Sprengen: sonst drückte das
-              // Feld die Reihe über den Schirm hinaus.
-              style={{ minWidth: 260, maxWidth: '100%' }}
-              placeholder="Stamm-Material wählen …"
-              value={poolAuswahl}
-              options={poolOptionen}
-              notFoundContent={poolInhalt}
-              disabled={disponiereMutation.isPending}
-              onChange={(v) => setPoolAuswahl(v ?? null)}
-            />
-            <InputNumber
-              min={1}
-              value={poolMenge}
-              disabled={disponiereMutation.isPending}
-              onChange={(v) => setPoolMenge(v ?? 1)}
-            />
-            <Button
-              type="primary"
-              disabled={poolAuswahl == null}
-              loading={disponiereMutation.isPending}
-              onClick={() => {
-                if (poolAuswahl != null)
-                  disponiereMutation.mutate({ materialId: poolAuswahl, menge: poolMenge });
-              }}
-            >
-              Disponieren
+            <Button type="primary" onClick={() => setDisponierenOffen(true)}>
+              Material disponieren
             </Button>
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Material</Button>
           </Space>
@@ -485,6 +465,34 @@ export default function MaterialPage() {
         </>
       )}
 
+      {/* Stamm-Material disponieren. Serienmodus, weil eine Anlieferung mehrere Positionen bringt.
+          Die Pflichtprüfung meldet ein fehlendes Material; der Knopf ist nie grau ohne Grund. */}
+      <ErfassungsModal<StammDisposition>
+        offen={disponierenOffen}
+        titel="Material disponieren"
+        form={stammForm}
+        erfassenText="Disponieren"
+        serie
+        initialValues={{ menge: 1 }}
+        laeuft={disponiereMutation.isPending}
+        onErfassen={async (w) => {
+          await disponiereMutation.mutateAsync({ materialId: w.material_id, menge: w.menge });
+        }}
+        onFertig={() => setDisponierenOffen(false)}
+        onAbbrechen={() => setDisponierenOffen(false)}
+      >
+        <Form.Item
+          label="Material"
+          name="material_id"
+          rules={[{ required: true, message: 'Material wählen' }]}
+        >
+          <Select options={poolOptionen} notFoundContent={poolInhalt} />
+        </Form.Item>
+        <Form.Item label="Menge" name="menge" rules={[{ required: true }]}>
+          <MengenFeld beschriftung="Menge" style={{ width: 120 }} />
+        </Form.Item>
+      </ErfassungsModal>
+
       {/* Ad-hoc-Erfassung auf der Schnellerfassungs-Hülle.
 
           Serienmodus, weil Ad-hoc-Material stückweise nachkommt. Wertübernahme auf Kategorie
@@ -499,7 +507,7 @@ export default function MaterialPage() {
           (antd baut den Bereich nicht ab, `Form.Item` bewahrt per Vorgabe). */}
       <ErfassungsModal<MaterialAdhocEingabe & { menge: number }>
         offen={adhocOffen}
-        titel="Ad-hoc-Material disponieren"
+        titel="Ad-hoc-Material ohne Stammeintrag"
         form={form}
         erfassenText="Disponieren"
         serie
@@ -522,7 +530,7 @@ export default function MaterialPage() {
           <Input placeholder="z. B. Spende-Decken" />
         </Form.Item>
         <Form.Item label="Menge" name="menge" rules={[{ required: true }]}>
-          <InputNumber min={1} style={{ width: 120 }} />
+          <MengenFeld beschriftung="Menge" style={{ width: 120 }} />
         </Form.Item>
         <Form.Item label="Kategorie" name="kategorie">
           <Input />

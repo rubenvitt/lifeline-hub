@@ -395,6 +395,10 @@ anwendbar), „nicht geprüft" ist keins.
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
   Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung und Koordinate nur
   im Vollformular.
+- **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
+  Zeile mit Kennung: „Menge Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
+  benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
+  kommt erst nach dem Sweep.
 - **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`,
   `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`): jede Zeiteingabe nimmt
   `anzeige/ZeitpunktEingabe.tsx` (`ZeitpunktEingabe`, `ZeitraumEingabe`), nie antds `DatePicker`;
