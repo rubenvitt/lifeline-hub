@@ -2,7 +2,7 @@ import { IconKreuz } from '../icons';
 import { Alert, App, Breadcrumb, Button, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parsePersonenSicht, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
@@ -91,6 +91,8 @@ import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
  */
 
 const SEITENLEISTE_BREITE = 268;
+/** Ohne Abgleich: eine feste leere Menge, damit die gemerkten Spalten stehen bleiben. */
+const KEINE_GEFUNDENEN: readonly Person[] = [];
 
 const ANSICHT_OPTIONEN = [
   { wert: 'zeilen', label: 'Zeilen' },
@@ -528,6 +530,57 @@ export default function PersonenPage() {
     },
     onError: fehler,
   });
+  const abgleichVorschlagen = abgleichVorschlagMutation.mutate;
+
+  /**
+   * Spalten und Kartenplan GEMERKT (LFH-949, D4): `Datensicht` rendert eine Zelle nur bei
+   * geändertem Datensatz oder neuen Spalten. Je Render neue Spalten zeichneten bei jedem
+   * `person`-Ereignis alle Zeilen. Steht vor dem Frühausstieg, wie jeder Hook; das Schreibrecht
+   * ist ohne Einsatz `false`, wie unten.
+   */
+  const darfSchreibenListe = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfAbgleichenListe = darfSchreibenListe && sicht.filter === 'vermisst';
+  // Nur im Abgleich gebraucht; dort entsteht die Liste je Datenstand neu, die Menge ist klein.
+  const gefundeneListe = darfAbgleichenListe
+    ? gefundenePersonen(frischErfasst.alle)
+    : KEINE_GEFUNDENEN;
+  const uhsDaten = uhsQuery.data;
+  const register = useMemo(() => {
+    const namen = new Map((uhsDaten ?? []).map((u) => [u.id, u.bezeichnung]));
+    return personenSpalten((id) => namen.get(id), {
+      einsatzId,
+      darfSchreiben: darfSchreibenListe,
+    });
+  }, [uhsDaten, einsatzId, darfSchreibenListe]);
+  /**
+   * Die Spaltenliste der Zeilen-Ansicht: Register plus Abgleichspalte. Durch
+   * `spaltenFuer<Person>()` geführt, nicht annotiert — eine Annotation weitete die
+   * Schlüsselliterale auf `string`.
+   */
+  const listenSpalten = useMemo(
+    () =>
+      spaltenFuer<Person>()([
+        ...register,
+        ...(darfAbgleichenListe
+          ? abgleichSpalten(gefundeneListe, (vermisstId, gefundenId) =>
+              abgleichVorschlagen({ vermisstId, gefundenId }),
+            )
+          : []),
+      ]),
+    [register, darfAbgleichenListe, gefundeneListe, abgleichVorschlagen],
+  );
+  const rasterKarte = useMemo(() => personenKarte(einsatzId), [einsatzId]);
+  const listenKarte = useMemo(
+    () => ({
+      ...personenKarte(einsatzId),
+      // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (200 px fest) —
+      // der Deskriptor ersetzt es durch Knopf plus Dialog.
+      aktion: darfAbgleichenListe
+        ? { etikett: 'Abgleich vorschlagen …', onKlick: (p: Person) => setAbgleichFuer(p) }
+        : undefined,
+    }),
+    [einsatzId, darfAbgleichenListe],
+  );
 
   /**
    * Seitenzustand — nur `einsatzQuery`: Breadcrumb, Titelzeile und `darfImEinsatzSchreiben(...)`
@@ -561,25 +614,9 @@ export default function PersonenPage() {
    */
   const listeGescheitert = personenQuery.isError && alle.length === 0;
   const standVeraltet = personenQuery.isError && alle.length > 0;
-  const darfAbgleichen = darfSchreiben && sicht.filter === 'vermisst';
   const zeilen = filterPersonen(alle, sicht);
   const uhsNamen = new Map(uhsListe.map((u) => [u.id, u.bezeichnung]));
   const uhsName = (id: number) => uhsNamen.get(id);
-  const register = personenSpalten(uhsName, { einsatzId, darfSchreiben });
-
-  /**
-   * Die Spaltenliste der Zeilen-Ansicht: Register plus Abgleichspalte. Durch
-   * `spaltenFuer<Person>()` geführt, nicht annotiert — eine Annotation weitete die
-   * Schlüsselliterale auf `string`.
-   */
-  const listenSpalten = spaltenFuer<Person>()([
-    ...register,
-    ...(darfAbgleichen
-      ? abgleichSpalten(gefundene, (vermisstId, gefundenId) =>
-          abgleichVorschlagMutation.mutate({ vermisstId, gefundenId }),
-        )
-      : []),
-  ]);
 
   /** Eine Klasse für beide Zweige: Hervorhebung vor Lückentönung. */
   const zeilenKlasse = (p: Person) =>
@@ -822,7 +859,7 @@ export default function PersonenPage() {
                 }}
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
-                karte={personenKarte(einsatzId)}
+                karte={rasterKarte}
               />
             ) : (
               <Datensicht
@@ -846,14 +883,7 @@ export default function PersonenPage() {
                 standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
-                karte={{
-                  ...personenKarte(einsatzId),
-                  // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (200 px fest) —
-                  // der Deskriptor ersetzt es durch Knopf plus Dialog.
-                  aktion: darfAbgleichen
-                    ? { etikett: 'Abgleich vorschlagen …', onKlick: (p) => setAbgleichFuer(p) }
-                    : undefined,
-                }}
+                karte={listenKarte}
               />
             )}
           </div>

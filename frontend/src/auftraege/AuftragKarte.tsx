@@ -1,6 +1,6 @@
 import { IconUhr } from '../icons';
 import { Button, Collapse, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
-import type { ReactNode } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import type { Auftrag } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -55,8 +55,13 @@ interface AuftragKarteProps {
   onAbnehmen?: (auftragId: number) => void;
 }
 
-/** Auftrags-Karte. */
-export default function AuftragKarte({
+/**
+ * Auftrags-Karte. `memo` (LFH-949, D6): ein Live-Ereignis mit einem geänderten Auftrag rendert nur
+ * dessen Karte; die Handler der Liste sind dafür stabil.
+ */
+export default memo(AuftragKarte);
+
+function AuftragKarte({
   auftrag: a,
   ansicht = 'offen',
   einsatzId,
@@ -88,8 +93,15 @@ export default function AuftragKarte({
   // Der optimistische Cache markiert das Ziel sofort als quittiert. Solange der Request
   // läuft, bleibt es trotzdem als ladender Aktionsknopf sichtbar; andere Quittierungen
   // sind serialisiert und damit gesperrt.
-  const quittierteEmpf = a.empfaenger.filter((e) => e.quittiert_at && !istQuittierungZiel(e.id));
-  const offeneEmpf = a.empfaenger.filter((e) => !e.quittiert_at || istQuittierungZiel(e.id));
+  const zielEmpfaenger =
+    quittierungLaeuft && quittierungZiel?.auftragId === a.id ? quittierungZiel.empfaengerId : null;
+  const [quittierteEmpf, offeneEmpf] = useMemo(
+    () => [
+      a.empfaenger.filter((e) => e.quittiert_at && e.id !== zielEmpfaenger),
+      a.empfaenger.filter((e) => !e.quittiert_at || e.id === zielEmpfaenger),
+    ],
+    [a.empfaenger, zielEmpfaenger],
+  );
   // Die Anzeigegrenze schneidet nur QUITTIERTE Chips: Quittiertes ist Lesestoff, Offenes ist
   // Arbeit und steht immer da. Schnitte sie die ganze Liste, verlöre ein offener Empfänger seinen
   // Knopf, und die Auto-Frist-Erinnerung schlösse nie.
