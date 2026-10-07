@@ -1,4 +1,4 @@
-import { IconAbmelden, IconChevronRunter, IconPerson, type Icon } from '../icons';
+import { IconAbmelden, IconChevronRunter, IconDokument, IconPerson, type Icon } from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -30,6 +30,9 @@ function initialen(name: string): string {
 const DARSTELLUNG_PRAEFIX = 'darstellung:';
 const DICHTE_PRAEFIX = 'stufe:';
 const HELLIGKEIT_PRAEFIX = 'helligkeit:';
+
+/** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`). */
+const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
 
 /**
  * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
@@ -209,11 +212,17 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         };
       }),
     },
+    // Hinweis auf die LGPL-Bibliotheken (HEIC-Decoder, LFH-1000, `heic/LIESMICH.md`), ganz
+    // unten, weil er selten gebraucht wird. Über `onClick`, nicht als `<a>` im Label: sonst
+    // öffnete nur ein Klick genau auf den Text, Enter und die Polsterung nicht.
+    { type: 'divider' },
+    { key: 'lizenzen', icon: <IconDokument />, label: 'Lizenzen' },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') void abmelden();
+    else if (key === 'lizenzen') window.open(LIZENZ_HINWEIS, '_blank', 'noopener');
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);
     else if (key.startsWith(DICHTE_PRAEFIX)) setDichte(key.slice(DICHTE_PRAEFIX.length) as Dichte);

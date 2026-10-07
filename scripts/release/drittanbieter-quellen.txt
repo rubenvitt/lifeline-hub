@@ -1,0 +1,11 @@
+# Quelltext der LGPL-Bibliotheken im Binary (LFH-1000, frontend/src/heic/LIESMICH.md).
+# Jedes Release trägt diese Stände als Archiv (scripts/release/drittanbieter-quellen.sh): die
+# GPL § 6 verlangt, dass die Quelle verfügbar bleibt, solange das Binary verteilt wird.
+# Die Commits pinnen den Stand; ein umgehängter Tag lässt den Release-Schritt scheitern.
+# Bei jedem Wechsel von libheif-js alle vier Zeilen nachziehen (Test: frontend/src/heic/lizenz.test.ts).
+#
+# name                repository                                              tag      commit
+libheif-js            https://github.com/catdad-experiments/libheif-js         1.23.2   6ca00b818c0ff51cb2a5c75b9ce97d708083335a
+libheif-emscripten    https://github.com/catdad-experiments/libheif-emscripten v1.23.2  dd5a19b878149437a5a427f6e1afa8bac624a714
+libheif               https://github.com/strukturag/libheif                    v1.23.2  ac1cb05c39008f01525c991ff8b88f84ddf70fd2
+libde265              https://github.com/strukturag/libde265                   v1.0.15  17bb8d9fcea62db8cdeb0fc7ef8d15dbd19a22e4

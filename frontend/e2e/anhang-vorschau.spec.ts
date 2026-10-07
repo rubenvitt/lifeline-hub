@@ -125,9 +125,12 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   ]);
   expect(hoehe, 'Drehung aus irot angewendet: hochkant').toBeGreaterThan(breite);
 
-  expect(
-    anfragen.some((u) => /libheif.*\.wasm/.test(u)),
-    'der Decoder kam erst jetzt',
-  ).toBe(true);
+  // Glue und WASM kommen als eigene Dateien vom festen Pfad, austauschbar (LGPL, LFH-1000).
+  for (const datei of ['libheif.js', 'libheif.wasm']) {
+    expect(
+      anfragen.some((u) => new URL(u).pathname === `/bibliotheken/libheif/${datei}`),
+      `${datei} kam erst jetzt, vom festen Pfad`,
+    ).toBe(true);
+  }
   expect(anfragen.filter((u) => u.includes('fassung=original'))).toEqual([]);
 });

@@ -4,27 +4,39 @@ HEIC/HEIF-Fotos (iPhone) bekommen ihre Vorschau auf dem Gerät (LFH-759, Spec `a
 Herleitung `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`, D8). Der Server dekodiert
 kein HEIC: dafür bräuchte er HEVC in C (libheif, libde265), und das Binary bleibt reines Rust.
 
-| Datei               | Rolle                                                                                     |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| `dekodiereHeic.ts`  | Client: lädt die bereinigte Fassung, Warteschlange, ein Worker                            |
-| `heicWorker.ts`     | Worker: libheif als WASM, verkleinert per `OffscreenCanvas` auf 256 / 1600 px, JPEG-Blobs |
-| `heicDekodieren.ts` | Dekodierkern ohne DOM (auch in Node getestet), 50-MP-Grenze                               |
-| `libheif.d.ts`      | Typ des Emscripten-Glue                                                                   |
-| `__fixtures__/`     | Testbild, Erzeugung in `mach_heic.py`                                                     |
+| Datei               | Rolle                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `dekodiereHeic.ts`  | Client: lädt die bereinigte Fassung, Warteschlange, ein Worker                         |
+| `heicWorker.ts`     | Worker: lädt libheif zur Laufzeit, verkleinert per `OffscreenCanvas` auf 256 / 1600 px |
+| `heicDekodieren.ts` | Dekodierkern ohne DOM (auch in Node getestet), 50-MP-Grenze, Laden des Glue            |
+| `lizenz.test.ts`    | Wächter: Paketfassung, Quellenliste, Hinweis und WASM passen zusammen                  |
+| `__fixtures__/`     | Testbild, Erzeugung in `mach_heic.py`                                                  |
 
-## Bibliothek
+## Bibliothek und Lizenz (LFH-1000)
 
-**`libheif-js` 1.23.2** (npm, exakt gepinnt), Variante `libheif-wasm/libheif.js` mit eigener
-`libheif.wasm`. Darin libheif 1.23 und libde265 (HEVC-Decoder), alle unter der **GNU LGPL 3.0**.
+**`libheif-js` 1.23.2** (npm, exakt gepinnt), Variante `libheif-wasm/` mit Glue `libheif.js` und
+eigener `libheif.wasm`. Darin libheif 1.23.2 und libde265 1.0.15 (HEVC-Decoder), alle unter der
+**GNU LGPL 3.0**. Gebaut wird die WASM von `libheif-emscripten` v1.23.2 aus dem unveränderten
+libheif.
 
-- Die `.wasm` geht **unverändert und als eigene Datei** aus (Vite `?url`, im Bündel
-  `assets/libheif-*.wasm`), getrennt vom App-Code und austauschbar. Nicht `wasm-bundle` und nicht
-  `heic-to`: dort steckt die WASM als Base64 im JavaScript.
-- Die Lizenztexte liegen unter `public/lizenzen/` (`HEIC-DECODER.txt`, `libheif-LGPL-3.0.txt`,
-  `libheif-js-LGPL-3.0.txt`) und gehen mit `dist` ins Binary. **Bei jedem Versionswechsel
-  mitziehen** (Version in `HEIC-DECODER.txt`, Texte aus dem Paket kopieren).
-- Offene Rechtsfrage (design.md, Risiken): wie das Austauschen bei einem ins Binary eingebetteten
-  Frontend zu bewerten ist.
+**Entscheidung (Ruben, 07.10.2026):** die Vorschau bleibt, die Auslieferung erfüllt die LGPL 3.0
+so (Beurteilung und verworfene Wege im Ticket; keine Rechtsberatung):
+
+| Pflicht                              | Wie                                                                                                                                                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Austauschbarkeit (LGPL § 4 d 1)      | Glue und WASM gehen **unverändert und nie gebündelt** unter `/bibliotheken/libheif/` aus (`vite.config.ts`, `libheifBibliothek`), der Worker lädt sie zur Laufzeit. `--heic-decoder-verzeichnis` ersetzt sie ohne Neubau (`src/static_files.rs`). |
+| Hinweis (§ 4 a), Lizenztexte (§ 4 b) | `public/lizenzen/` (Hinweis `HEIC-DECODER.txt`, LGPL- und GPL-Text) geht mit `dist` ins Binary; das Benutzermenü verlinkt den Hinweis; jedes Release trägt ihn als `…-DRITTANBIETER.txt`.                                                         |
+| Quelle (GPL § 6 über LGPL § 1)       | Jedes Release trägt `…-drittanbieter.zip` mit den Archiven der gepinnten Stände (`scripts/release/drittanbieter-quellen.sh`, Liste `drittanbieter-quellen.txt` mit Commit).                                                                       |
+| Installationsinformationen (§ 4 e)   | entfallen: das Binary ist kein Verbrauchergerät („User Product“).                                                                                                                                                                                 |
+
+Was das Ganze still brechen würde, hält ein Wächter fest: der Build bricht, sobald ein Chunk
+unter `assets/` den Glue enthält (`vite.config.ts`); `lizenz.test.ts` vergleicht Paketfassung,
+Quellenliste, Hinweis und die Versionsstrings in der WASM.
+
+**Bei jedem Versionswechsel** von `libheif-js`: die vier Zeilen in
+`scripts/release/drittanbieter-quellen.txt` (Tag und Commit von libheif-js, libheif-emscripten,
+libheif, libde265; die libheif-emscripten-Fassung steht in `scripts/install.js` von libheif-js),
+`public/lizenzen/HEIC-DECODER.txt` und die Lizenztexte aus dem Paket nachziehen.
 
 ## Testbild
 

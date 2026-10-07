@@ -235,7 +235,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest, Drittanbieter-Quellen (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -245,6 +245,9 @@ schritt_8() {
   # Das Update-Manifest der Desktop-Hülle (LFH-721): ein falscher Eintrag lässt jede installierte
   # Hülle ins Leere laden oder bietet ein Update an, das keins ist — beides still.
   mise exec -- node --test "$ROOT/scripts/release/desktop-manifest.test.mjs"
+  # Hinweis und Quelltext der LGPL-Bibliotheken (LFH-1000): fehlt die Quelle am Release, ist die
+  # Weitergabe des Binarys nicht mehr lizenzgerecht — und niemand merkt es. Ohne Netz.
+  "$ROOT/scripts/release/drittanbieter-quellen.test.sh"
 }
 
 schritt_9() {

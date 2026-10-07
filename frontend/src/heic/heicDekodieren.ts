@@ -102,3 +102,50 @@ export function zielmasse(breite: number, hoehe: number, kante: number): [number
   const faktor = Math.min(1, kante / Math.max(breite, hoehe));
   return [Math.max(1, Math.round(breite * faktor)), Math.max(1, Math.round(hoehe * faktor))];
 }
+
+/**
+ * Pfad, unter dem der Server die Bibliothek ausliefert: Glue `libheif.js` und `libheif.wasm`,
+ * beide unverändert aus `libheif-js` (LGPL 3.0, LFH-1000, `LIESMICH.md`). Der Betreiber kann
+ * sie dort ersetzen (`--heic-decoder-verzeichnis`); deshalb gehören sie nie in einen App-Chunk.
+ */
+export const LIBHEIF_PFAD = '/bibliotheken/libheif/';
+
+/** Die Fabrik des Emscripten-Glue: füllt das übergebene Objekt selbst zum Modul aus. */
+export type LibheifFabrik = (modul: Record<string, unknown>) => unknown;
+
+/**
+ * Lädt den Glue als eigene Datei und gibt seine Fabrik zurück. Er ist ein UMD-Skript, das sich
+ * nur über `module.exports` mitteilt; ein Modul-Worker kennt kein `importScripts`. Deshalb
+ * stehen `module` und `exports` für die Dauer der Ausführung als globale Namen bereit, und der
+ * Glue legt seine Fabrik dort ab. `ausfuehren` führt die Datei aus (Worker: `import(url)`).
+ */
+export async function ladeLibheifFabrik(
+  ausfuehren: (url: string) => Promise<unknown>,
+): Promise<LibheifFabrik> {
+  const global = globalThis as { module?: unknown; exports?: unknown };
+  const modul: { exports: unknown } = { exports: {} };
+  global.module = modul;
+  global.exports = modul.exports;
+  try {
+    await ausfuehren(`${LIBHEIF_PFAD}libheif.js`);
+  } finally {
+    delete global.module;
+    delete global.exports;
+  }
+  if (typeof modul.exports !== 'function') throw new Error('libheif: Glue ohne Fabrik');
+  return modul.exports as LibheifFabrik;
+}
+
+/**
+ * Lader für den Worker: der Glue wird genau einmal ausgeführt, seine Fabrik bleibt gemerkt;
+ * nur das Instanziieren (WASM laden) wiederholt sich nach einem Fehlschlag. Ein zweites
+ * `import()` derselben Adresse führt die Datei nicht noch einmal aus (Modul-Cache des
+ * Browsers), die Fabrik käme dann nie wieder an.
+ */
+export function erzeugeLibheifLader<T>(
+  ausfuehren: (url: string) => Promise<unknown>,
+  instanziieren: (fabrik: LibheifFabrik) => Promise<T>,
+): () => Promise<T> {
+  const fabrik = einmalLaden(() => ladeLibheifFabrik(ausfuehren));
+  return einmalLaden(async () => instanziieren(await fabrik()));
+}

@@ -99,6 +99,7 @@ async fn mit_freischaltung_anonym_401() {
     let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
         demo_daten: true,
         zulassungs_budget: None,
+        heic_decoder_verzeichnis: None,
     })
     .await;
     for (methode, pfad) in ENDPUNKTE {
@@ -114,6 +115,7 @@ async fn mit_freischaltung_fuehrungskraft_403() {
     let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
         demo_daten: true,
         zulassungs_budget: None,
+        heic_decoder_verzeichnis: None,
     })
     .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
@@ -133,6 +135,7 @@ async fn mit_freischaltung_admin_status_nicht_importiert() {
     let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
         demo_daten: true,
         zulassungs_budget: None,
+        heic_decoder_verzeichnis: None,
     })
     .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
@@ -153,6 +156,7 @@ async fn mit_freischaltung_schreibende_endpunkte_tragen_die_codes_aus_d3() {
     let (app, _pool) = common::setup_mit_optionen(RouterOptionen {
         demo_daten: true,
         zulassungs_budget: None,
+        heic_decoder_verzeichnis: None,
     })
     .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
@@ -370,6 +374,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 const AN: RouterOptionen = RouterOptionen {
     demo_daten: true,
     zulassungs_budget: None,
+    heic_decoder_verzeichnis: None,
 };
 
 /// Einen Demo-Endpunkt aufrufen; liefert `(Status, Body)`.
