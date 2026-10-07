@@ -74,7 +74,7 @@ describe('berichtFreigabe', () => {
   it('ein Modul ohne Zugriff (Rolle oder Org-Vorgabe) sperrt den Bericht', () => {
     const f = berichtFreigabe(freigabenFixture({ personen: { zugriff: false } }));
     expect(f.je.personen).toBe('gesperrt');
-    expect(f.gesperrteModule).toEqual(['Personen']);
+    expect(f.gesperrteModule).toEqual(['Betroffene']);
   });
 
   it('nennt ein gesperrtes Modul mit mehreren Quellen genau einmal', () => {
@@ -99,7 +99,7 @@ describe('berichtFreigabe', () => {
     delete freigaben.personen;
     const f = berichtFreigabe(freigaben);
     expect(f.je.personen).toBe('gesperrt');
-    expect(f.gesperrteModule).toEqual(['Personen']);
+    expect(f.gesperrteModule).toEqual(['Betroffene']);
   });
 
   it('Einsatz und Mitglieder hängen an keinem Modul und werden immer abgerufen', () => {
@@ -125,7 +125,7 @@ describe('berichtFreigabe mit Auswahl (LFH-902, design.md D3)', () => {
       'stammdaten',
       'bilanz',
     ]);
-    expect(f.gesperrteModule).toEqual(['Personen']);
+    expect(f.gesperrteModule).toEqual(['Betroffene']);
   });
 
   it('ein gesperrtes Modul eines abgewählten Blocks sperrt nicht und wird nicht abgerufen', () => {

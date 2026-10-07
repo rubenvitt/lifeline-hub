@@ -175,7 +175,7 @@ describe('EinsatzberichtDruckPage', () => {
     freigaben({ personen: { zugriff: false } });
     rendere();
     expect(
-      await screen.findByText(/^Für den Einsatzbericht fehlen Rechte an: Personen\./),
+      await screen.findByText(/^Für den Einsatzbericht fehlen Rechte an: Betroffene\./),
     ).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
     expect(aufrufe.get('/personen')).toBeUndefined();
@@ -394,7 +394,7 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     freigaben({ personen: { zugriff: false } });
     rendere();
     expect(
-      await screen.findByText(/Für den Einsatzbericht fehlen Rechte an: Personen\./),
+      await screen.findByText(/Für den Einsatzbericht fehlen Rechte an: Betroffene\./),
     ).toBeInTheDocument();
     // Die Leiste bleibt in der Sackgasse: dort liegt der Ausweg.
     await userEvent.click(within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' }));
