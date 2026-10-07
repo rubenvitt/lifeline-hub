@@ -358,6 +358,114 @@ test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async 
 });
 
 /**
+ * LFH-952 (D3): ab `md` klebt der Kopf. Rückwärts getabbt rollt der Browser ein Ziel an den
+ * oberen Rand — ohne Fokusabstand genau HINTER den Kopf, und ein Ziel, das schon ganz hinter ihm
+ * im Fenster liegt, rollt Chromium gar nicht (gemessen, D3 in
+ * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`). Den Abstand trägt
+ * `scroll-padding-block-start` am Dokument (`index.css`).
+ *
+ * Eigene Messung statt `pruefeFokusVerdeckung`: dessen `stoppsBeruehrt` zählt jede klebende
+ * Fläche (Speicherleiste unten, Rail-Gruppe), die Vorbedingung hier ist aber genau der Kopf.
+ *
+ * Mutationsproben (06.10.2026, Chromium): `scroll-padding-block-start: 0px` statt der Rahmenhöhe
+ * → der erste Test rot (vier Ziele hinter dem Kopf); die `:has`-Ausnahme auf einen leeren
+ * Selektor → der zweite rot (der Fokus auf den Einsatzwechsler rollt die Seite von 158 auf 0).
+ */
+async function kopfStopp(page: Page) {
+  return page.evaluate(() => {
+    const kopf = document.querySelector('[data-lfh="rahmen-kopf"]')!;
+    const fokus = document.activeElement as HTMLElement | null;
+    const kr = kopf.getBoundingClientRect();
+    if (!fokus || fokus === document.body) return null;
+    const r = fokus.getBoundingClientRect();
+    return {
+      ziel: `${fokus.tagName.toLowerCase()}[${(fokus.getAttribute('aria-label') ?? fokus.textContent ?? '').trim().slice(0, 30)}]`,
+      oben: r.top,
+      unten: r.bottom,
+      hoehe: r.height,
+      kopfUnten: kr.bottom,
+      imKopf: kopf.contains(fokus),
+      scrollY: window.scrollY,
+    };
+  });
+}
+
+test('Kopf (LFH-952): rückwärts getabbt verschwindet kein Ziel hinter dem klebenden Kopf', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Fokus Kopf ${Date.now()}`);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/verhalten`);
+  await expect(page.getByLabel('Präfix ETB')).toBeVisible();
+
+  const kopf = page.locator('[data-lfh="rahmen-kopf"]');
+  await expect(kopf, 'Vorbedingung: der Kopf klebt').toHaveCSS('position', 'sticky');
+  const kopfHoehe = (await kopf.boundingBox())!.height;
+  const reserve = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(
+    reserve,
+    `Vorbedingung: die Bildlaufreserve (${reserve}px) übersteigt den Kopf (${kopfHoehe}px)`,
+  ).toBeGreaterThan(kopfHoehe);
+
+  // Ans Seitenende und von dort rückwärts: jedes Ziel kommt von oben ins Bild.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.getByRole('button', { name: 'Speichern', exact: true }).focus();
+
+  const verdeckt: string[] = [];
+  let buendig = 0;
+  let stopps = 0;
+  for (let i = 0; i < 40; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    const s = await kopfStopp(page);
+    if (!s || s.hoehe === 0 || s.imKopf) continue;
+    stopps += 1;
+    // Vollständig hinter dem Kopf: die Unterkante liegt nicht unter ihm.
+    if (s.unten <= s.kopfUnten) verdeckt.push(`${s.ziel} bei ${Math.round(s.oben)}`);
+    if (Math.abs(s.oben - s.kopfUnten) <= 2) buendig += 1;
+  }
+
+  expect(stopps, 'Vorbedingung: der Lauf erreicht die Formularziele').toBeGreaterThanOrEqual(8);
+  expect(
+    buendig,
+    'Vorbedingung: mindestens ein Ziel wurde bis an den Kopf gerollt — sonst kam keins in seine Nähe',
+  ).toBeGreaterThan(0);
+  expect(verdeckt, `Ziele hinter dem Kopf:\n${verdeckt.join('\n')}`).toEqual([]);
+
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `Kopf 1366×520: ${stopps} Stopps, ${buendig} bündig unter dem Kopf (${kopfHoehe}px), Reserve ${reserve}px`,
+  });
+});
+
+test('Kopf (LFH-952): Tab durch den klebenden Kopf rollt die Seite nicht', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Fokus Kopf Tab ${Date.now()}`);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/verhalten`);
+  await expect(page.getByLabel('Präfix ETB')).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, 200));
+  const vorher = await page.evaluate(() => window.scrollY);
+  expect(vorher, 'Vorbedingung: die Seite ist gerollt').toBeGreaterThan(0);
+
+  // Erstes Ziel im Kopf: der Einsatzwechsler.
+  await page.locator('[data-lfh="rahmen-kopf"] button').first().focus();
+  let imKopf = 0;
+  for (let i = 0; i < 6; i += 1) {
+    const s = await kopfStopp(page);
+    if (s?.imKopf) {
+      imKopf += 1;
+      expect(s.scrollY, `Fokus auf ${s.ziel} rollt die Seite`).toBe(vorher);
+    }
+    await page.keyboard.press('Tab');
+  }
+  expect(imKopf, 'Vorbedingung: der Lauf bleibt mehrere Stopps im Kopf').toBeGreaterThanOrEqual(3);
+});
+
+/**
  * LFH-475 (Nachzug N2 aus LFH-346 · C11): die zwei sticky Speicherleisten, die C11 gebaut hat.
  * Dieselbe Stilfunktion wie oben (`speicherLeisteStil`) belegt nur die GEOMETRIE der Leiste,
  * nicht die Tabulaturordnung über DIESEN Formularen — deshalb je Route ein eigener Lauf.
@@ -1041,6 +1149,14 @@ test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der f
     for (const dichte of ['kompakt', 'handschuh']) {
       const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
       await page.goto(`/einsaetze/${einsatzId}/gefahren`);
+      if (flaeche.width === 1024 && dichte === 'kompakt') {
+        // Bei 1024 ist das Modulmenü ohne Wahl zu (LFH-952), und die Matrix passt ganz hinein.
+        // Offen läuft sie über; die Wahl gilt danach auch für `handschuh`.
+        await page.getByRole('button', { name: 'Menü ausklappen' }).click();
+      }
+      if (flaeche.width === 1024) {
+        await expect(page.getByRole('button', { name: 'Menü einklappen' })).toBeVisible();
+      }
       await stelleDichte(page, dichte);
       const zellen = page.getByRole('button', { name: /^Bewertung / });
       await expect(zellen).toHaveCount(58);

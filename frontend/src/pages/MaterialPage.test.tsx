@@ -192,12 +192,12 @@ describe('MaterialPage', () => {
     await screen.findByText('Wolldecke');
     expect(screen.queryByRole('button', { name: 'Disponieren' })).not.toBeInTheDocument();
     /**
-     * Diese Abfrage hält nur, weil das Gruppenetikett ein Textknoten ist (`einsatzbereit · 1`) und
-     * RTL exakt gegen den normalisierten Text matcht — `'einsatzbereit'` trifft `'einsatzbereit ·
-     * 1'` nicht. Wäre der Kopf aus zwei Knoten gebaut, würfe der Test mit Mehrfachtreffern.
+     * Diese Abfrage hält nur, weil das Gruppenetikett ein Textknoten ist (`1 einsatzbereit`) und
+     * RTL exakt gegen den normalisierten Text matcht — `'einsatzbereit'` trifft `'1
+     * einsatzbereit'` nicht. Wäre der Kopf aus zwei Knoten gebaut, würfe der Test mit Mehrfachtreffern.
      */
     expect(screen.getByText('einsatzbereit')).toBeInTheDocument();
-    expect(screen.getByText('einsatzbereit · 1')).toBeInTheDocument();
+    expect(screen.getByText('1 einsatzbereit')).toBeInTheDocument();
   });
 
   // ── Datensicht ──
@@ -220,8 +220,8 @@ describe('MaterialPage', () => {
     // Server- noch Namensordnung.
     const { container } = render(einsatzAktiv, [emDefekt, em]);
     await screen.findByText('Wolldecke');
-    expect(screen.getByText('einsatzbereit · 1')).toBeInTheDocument();
-    expect(screen.getByText('defekt · 1')).toBeInTheDocument();
+    expect(screen.getByText('1 einsatzbereit')).toBeInTheDocument();
+    expect(screen.getByText('1 defekt')).toBeInTheDocument();
     expect(
       [...container.querySelectorAll('tr.ant-table-row')].map((r) =>
         r.getAttribute('data-row-key'),

@@ -263,6 +263,13 @@ test('„Spalten" öffnet die Spaltenwahl UND legt den Fokus hinein (Fokus-Renne
     .toBe(true);
 });
 
+/** Nachbildung von `fmsEtikett` (`src/kraefte/meldebildRaster.ts`): „S2 · Frei auf Wache“. */
+function fmsEtikett(label: string, anker: number | null): string {
+  if (anker == null) return label;
+  const m = /^\s*(\d+)\s*[–-]\s*(.+)$/.exec(label);
+  return `S${anker} · ${m && Number(m[1]) === anker ? m[2] : label}`;
+}
+
 /**
  * „Status setzen“ wirkt auf die FOKUSZEILE (LFH-507): die Ebene hängt am Primitiv `StatusWahl`,
  * ihre Wurzel ist die umgebende Tabellenzeile. Zwei Fahrzeuge, damit „genau diese Zeile“
@@ -276,7 +283,11 @@ test('„Status setzen“ öffnet das Statusmenü der Fokuszeile UND legt den Fo
   const basis = `/api/einsaetze/${einsatzId}`;
   const katalogAntwort = await page.request.get('/api/fahrzeug-status');
   expect(katalogAntwort.ok(), await katalogAntwort.text()).toBeTruthy();
-  const katalog = (await katalogAntwort.json()) as { id: number; label: string }[];
+  const katalog = (await katalogAntwort.json()) as {
+    id: number;
+    label: string;
+    fms_anker: number | null;
+  }[];
   const [start, ziel] = katalog;
   expect(ziel, 'Katalog mit mindestens zwei Status').toBeDefined();
   for (const funkrufname of ['Florian Palette 1', 'Florian Palette 2']) {
@@ -320,9 +331,12 @@ test('„Status setzen“ öffnet das Statusmenü der Fokuszeile UND legt den Fo
     .poll(() => fokusImOffenenMenue(page), { message: 'Fokus steht im geöffneten Statusmenü' })
     .toBe(true);
 
-  await menue.getByRole('menuitem', { name: ziel.label, exact: true }).click();
-  await expect(ausloeser(2)).toContainText(ziel.label);
-  await expect(ausloeser(1)).toContainText(start.label);
+  // Menüpunkt und Auslöser tragen das FMS-Format „S2 · Frei auf Wache“ (LFH-973).
+  await menue
+    .getByRole('menuitem', { name: fmsEtikett(ziel.label, ziel.fms_anker), exact: true })
+    .click();
+  await expect(ausloeser(2)).toContainText(fmsEtikett(ziel.label, ziel.fms_anker));
+  await expect(ausloeser(1)).toContainText(fmsEtikett(start.label, start.fms_anker));
 });
 
 /*

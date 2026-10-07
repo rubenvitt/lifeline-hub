@@ -1,4 +1,4 @@
-import { App, Button, Collapse, Form, Input, Modal, Space } from 'antd';
+import { Button, Collapse, Flex, Form, Input, Space } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -9,12 +9,11 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
-import { useEffect, useState } from 'react';
+import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { useEffect, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
-import { fehlerText } from '../api/client';
 import { PASSWORT_MIN_LAENGE } from '../api/auth';
 import {
   bearbeiteBenutzer,
@@ -26,6 +25,8 @@ import {
 } from '../api/benutzer';
 import { useAuth } from '../auth/AuthContext';
 import { globalKeys } from '../api/queryKeys';
+import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import { EIGENES_KONTO, LETZTER_ADMIN } from '../stammdaten/rechteText';
 
 interface BearbeitenWerte {
   anzeigename: string;
@@ -45,14 +46,10 @@ const ORG_ROLLEN = [
 export default function BenutzerPage() {
   const { benutzer: angemeldeterBenutzer, laedt: authLaedt } = useAuth();
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [offen, setOffen] = useState(false);
   const [form] = Form.useForm<NeuerBenutzer>();
   const [zuBearbeiten, setZuBearbeiten] = useState<BenutzerAnzeige | null>(null);
   const [editForm] = Form.useForm<BearbeitenWerte>();
-  // Die Rückfrage steht als EIN Modal außerhalb der Zeilen (LFH-980): im Aktionsmenü unter `md`
-  // kann keine Blase am Knopf hängen, und beide Formen fragen gleich.
-  const [zuDeaktivieren, setZuDeaktivieren] = useState<BenutzerAnzeige | null>(null);
   const { istSchmal } = useViewport();
 
   const benutzerQuery = useQuery({
@@ -61,28 +58,58 @@ export default function BenutzerPage() {
   });
   const benutzerListe = benutzerQuery.data ?? [];
 
+  /*
+   * Kein `onError`-Toast (LFH-966, `frontend/AGENTS.md`, „Speicherfehler an die Seite, Erfolg an
+   * den Toast“): die Dialoge zeigen ihren Fehler im Dialog, die Zeilenaktionen über der Tabelle.
+   * Der Grund steht, bis zum nächsten Absenden — react-query räumt `error` beim nächsten `mutate`.
+   */
   const anlegen = useMutation({
     mutationFn: (b: NeuerBenutzer) => legeBenutzerAn(b),
     // Nur invalidieren: das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBenutzer(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(fehlerText(e, 'Deaktivieren fehlgeschlagen')),
-    onSettled: () => setZuDeaktivieren(null),
   });
 
+  // Der Bearbeiten-Dialog. Das Schließen macht `onFertig` an der Hülle, nicht dieser Erfolgszweig.
   const bearbeiten = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) =>
       bearbeiteBenutzer(id, patch),
-    // Diese Mutation trägt zwei Wege, den Bearbeiten-Dialog und „Reaktivieren" in der Zeile. Das
-    // Schließen des Dialogs macht deshalb `onFertig` an der Hülle, nicht dieser Erfolgszweig.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
+
+  // „Reaktivieren" in der Zeile — eigene Mutation, damit sein Fehler an der Seite steht und
+  // nicht im Bearbeiten-Dialog (und umgekehrt).
+  const reaktivieren = useMutation({
+    mutationFn: (id: number) => bearbeiteBenutzer(id, { aktiv: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+  });
+
+  /** Zeilenaktionen teilen EINEN Hinweis: die neue räumt den Fehler der anderen. */
+  const zeilenAktion = (aktion: 'deaktivieren' | 'reaktivieren', id: number) => {
+    if (aktion === 'deaktivieren') {
+      reaktivieren.reset();
+      deaktivieren.mutate(id);
+    } else {
+      deaktivieren.reset();
+      reaktivieren.mutate(id);
+    }
+  };
+
+  /**
+   * Gesperrtes „Deaktivieren" (LFH-966): beim letzten aktiven Admin lehnte der Server ab
+   * (`routes/benutzer.rs`, `verweigere_admin_lockout`), beim eigenen Konto endete die eigene
+   * Sitzung ohne Rückweg. Statt einer Aktion, die nie gelingt, steht der Grund in der Zeile.
+   */
+  const aktiveAdmins = benutzerListe.filter((b) => b.aktiv && b.system_rolle === 'admin').length;
+  const sperrGrund = (b: BenutzerAnzeige): { kurz: string; text: string } | null => {
+    if (b.aktiv && b.system_rolle === 'admin' && aktiveAdmins <= 1) return LETZTER_ADMIN;
+    if (b.id === angemeldeterBenutzer?.id) return EIGENES_KONTO;
+    return null;
+  };
 
   /**
    * Vorbelegung, kein `key`: die Hülle setzt auf allen vier Auswegen zurück, der zweite Datensatz
@@ -185,50 +212,50 @@ export default function BenutzerPage() {
       immerSichtbar: true,
       fixed: 'right',
       render: (_, b) => {
-        const laeuft =
-          (deaktivieren.isPending && deaktivieren.variables === b.id) ||
-          (bearbeiten.isPending && bearbeiten.variables?.id === b.id);
+        const grund = sperrGrund(b);
+        const onBearbeiten = () => {
+          bearbeiten.reset();
+          setZuBearbeiten(b);
+        };
         if (istSchmal) {
           return (
             <MenueAusloeser
               eintraege={[
                 { key: 'bearbeiten', label: 'Bearbeiten' },
                 b.aktiv
-                  ? { key: 'aktiv', label: 'Deaktivieren', gefahr: true }
+                  ? grund
+                    ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
+                      {
+                        key: 'aktiv',
+                        label: `Deaktivieren gesperrt: ${grund.kurz}`,
+                        gesperrt: true,
+                      }
+                    : { key: 'aktiv', label: 'Deaktivieren', gefahr: true }
                   : { key: 'aktiv', label: 'Reaktivieren' },
               ]}
               zugaenglicherName={`Aktionen zu Benutzer ${b.anzeigename}`}
-              laeuft={laeuft}
+              laeuft={
+                (deaktivieren.isPending && deaktivieren.variables === b.id) ||
+                (reaktivieren.isPending && reaktivieren.variables === b.id)
+              }
               onWahl={(aktion) => {
-                if (aktion === 'bearbeiten') setZuBearbeiten(b);
-                else if (b.aktiv) setZuDeaktivieren(b);
-                else bearbeiten.mutate({ id: b.id, patch: { aktiv: true } });
+                if (aktion === 'bearbeiten') onBearbeiten();
+                else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
+                else zeilenAktion('reaktivieren', b.id);
               }}
             />
           );
         }
         return (
-          <Space size="middle">
-            <Button onClick={() => setZuBearbeiten(b)}>Bearbeiten</Button>
-            {b.aktiv ? (
-              // Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
-              // `variables` ist die nackte id.
-              <Button
-                danger
-                loading={deaktivieren.isPending && deaktivieren.variables === b.id}
-                onClick={() => setZuDeaktivieren(b)}
-              >
-                Deaktivieren
-              </Button>
-            ) : (
-              <Button
-                loading={bearbeiten.isPending && bearbeiten.variables?.id === b.id}
-                onClick={() => bearbeiten.mutate({ id: b.id, patch: { aktiv: true } })}
-              >
-                Reaktivieren
-              </Button>
-            )}
-          </Space>
+          <BenutzerAktionen
+            benutzer={b}
+            sperrGrund={grund?.text ?? null}
+            deaktiviert={deaktivieren.isPending && deaktivieren.variables === b.id}
+            reaktiviert={reaktivieren.isPending && reaktivieren.variables === b.id}
+            onBearbeiten={onBearbeiten}
+            onDeaktivieren={() => zeilenAktion('deaktivieren', b.id)}
+            onReaktivieren={() => zeilenAktion('reaktivieren', b.id)}
+          />
         );
       },
     },
@@ -239,9 +266,21 @@ export default function BenutzerPage() {
       titel="Benutzer"
       beschreibung="System- und Org-Rollen der Benutzerkonten verwalten."
       aktionen={
-        <Button type="primary" onClick={() => setOffen(true)}>
+        <Button
+          type="primary"
+          onClick={() => {
+            anlegen.reset();
+            setOffen(true);
+          }}
+        >
           Benutzer anlegen
         </Button>
+      }
+      hinweis={
+        <SeitenHinweise
+          fehler={deaktivieren.error ?? reaktivieren.error}
+          fehlerTitel={deaktivieren.isError ? 'Nicht deaktiviert' : 'Nicht reaktiviert'}
+        />
       }
     >
       {/* Der Fehler tauscht die Tabelle aus, statt durch sie gereicht zu werden: `Datensicht`
@@ -265,21 +304,6 @@ export default function BenutzerPage() {
           spaltenSchalter={{ bezeichnung: 'Benutzer' }}
         />
       )}
-      <Modal
-        open={zuDeaktivieren != null}
-        title={
-          zuDeaktivieren
-            ? `Benutzer ${zuDeaktivieren.anzeigename} deaktivieren?`
-            : 'Benutzer deaktivieren?'
-        }
-        // Der Knopf nennt die Handlung, nie nur „Ja“ oder „OK“.
-        okText="Benutzer deaktivieren"
-        cancelText="Abbrechen"
-        okButtonProps={{ danger: true, loading: deaktivieren.isPending }}
-        onOk={() => zuDeaktivieren && deaktivieren.mutate(zuDeaktivieren.id)}
-        onCancel={() => setZuDeaktivieren(null)}
-        destroyOnHidden
-      />
 
       {/* Auf der Hülle: der Absende-Knopf liegt im `<form>`, Enter sendet ab. Kein `serie` —
           ein Benutzerkonto legt man nicht im Minutentakt an. Den Fokus setzt die Hülle.
@@ -308,7 +332,10 @@ export default function BenutzerPage() {
         // `mutationFn`.
         onErfassen={() => anlegen.mutateAsync(form.getFieldsValue(true))}
         onFertig={() => setOffen(false)}
-        onAbbrechen={() => setOffen(false)}
+        onAbbrechen={() => {
+          anlegen.reset();
+          setOffen(false);
+        }}
       >
         <Form.Item
           label="Anzeigename"
@@ -360,6 +387,11 @@ export default function BenutzerPage() {
             },
           ]}
         />
+        <SpeicherFehler
+          fehler={anlegen.error}
+          titel="Benutzer nicht angelegt"
+          fallback="Anlegen fehlgeschlagen"
+        />
       </ErfassungsModal>
 
       {/* Der Dialog steht unbedingt im Baum (`offen` statt `{zuBearbeiten && …}`):
@@ -370,7 +402,7 @@ export default function BenutzerPage() {
         titel="Benutzer bearbeiten"
         form={editForm}
         erfassenText="Speichern"
-        laeuft={bearbeiten.isPending && bearbeiten.variables?.id === zuBearbeiten?.id}
+        laeuft={bearbeiten.isPending}
         // Werfen statt stillem `return`: ein aufgelöstes Versprechen läse die Hülle als Erfolg und
         // schlösse den Dialog, ohne dass etwas gesendet wurde.
         onErfassen={async (w) => {
@@ -378,7 +410,10 @@ export default function BenutzerPage() {
           await bearbeiten.mutateAsync({ id: zuBearbeiten.id, patch: w });
         }}
         onFertig={() => setZuBearbeiten(null)}
-        onAbbrechen={() => setZuBearbeiten(null)}
+        onAbbrechen={() => {
+          bearbeiten.reset();
+          setZuBearbeiten(null);
+        }}
       >
         <Form.Item
           label="Anzeigename"
@@ -393,7 +428,72 @@ export default function BenutzerPage() {
         <Form.Item label="Org-Rolle" name="org_rolle">
           <Select options={ORG_ROLLEN} />
         </Form.Item>
+        {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}
+        <SpeicherFehler fehler={bearbeiten.error} />
       </ErfassungsModal>
     </AdminPage>
+  );
+}
+
+/**
+ * Die Aktionszelle einer Zeile. Eigene Komponente, weil der Sperrgrund eine `useId` braucht:
+ * der gesperrte Knopf verweist per `aria-describedby` auf seinen sichtbaren Grund.
+ */
+function BenutzerAktionen({
+  benutzer: b,
+  sperrGrund,
+  deaktiviert,
+  reaktiviert,
+  onBearbeiten,
+  onDeaktivieren,
+  onReaktivieren,
+}: {
+  benutzer: BenutzerAnzeige;
+  sperrGrund: string | null;
+  deaktiviert: boolean;
+  reaktiviert: boolean;
+  onBearbeiten: () => void;
+  onDeaktivieren: () => void;
+  onReaktivieren: () => void;
+}) {
+  const { token, rollen } = useRollen();
+  const grundId = useId();
+  return (
+    <Flex vertical gap={token.marginXXS} align="flex-start">
+      <Space size="middle">
+        <Button onClick={onBearbeiten}>Bearbeiten</Button>
+        {b.aktiv ? (
+          // KEINE Rückfrage (LFH-966, Linie aus LFH-363 wie „Außer Dienst“ in
+          // `stammdaten/dienststatus.tsx`): Deaktivieren ist über „Reaktivieren“ umkehrbar.
+          // `danger` und Abstand (`size="middle"`) bleiben. Zeilengescopte Ladeanzeige: ohne
+          // Rückmeldung lädt der Klick zum zweiten ein.
+          <Button
+            danger
+            loading={deaktiviert}
+            disabled={sperrGrund !== null}
+            aria-describedby={sperrGrund !== null ? grundId : undefined}
+            onClick={() => {
+              if (!deaktiviert) onDeaktivieren();
+            }}
+          >
+            Deaktivieren
+          </Button>
+        ) : (
+          <Button
+            loading={reaktiviert}
+            onClick={() => {
+              if (!reaktiviert) onReaktivieren();
+            }}
+          >
+            Reaktivieren
+          </Button>
+        )}
+      </Space>
+      {b.aktiv && sperrGrund !== null && (
+        <span id={grundId} style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+          {sperrGrund}
+        </span>
+      )}
+    </Flex>
   );
 }

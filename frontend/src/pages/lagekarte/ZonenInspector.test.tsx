@@ -130,7 +130,9 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
   it('LFH-888: gesperrtes Modul Gefahren → „Gefahrenmatrix bearbeiten" gesperrt mit Grund', async () => {
     const onMatrixOeffnen = vi.fn<ZonenInspectorProps['onMatrixOeffnen']>();
     renderInspector({ onMatrixOeffnen, matrixGesperrt: true });
-    const knopf = screen.getByRole('button', { name: /Gefahrenmatrix bearbeiten/i });
+    const knopf = screen.getByRole('button', {
+      name: 'Gefahrenmatrix bearbeiten (Keine Berechtigung)',
+    });
     expect(knopf).toBeDisabled();
     expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
     await userEvent.click(knopf);

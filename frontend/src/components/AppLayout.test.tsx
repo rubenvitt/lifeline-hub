@@ -31,6 +31,20 @@ describe('AppLayout (globale Topbar)', () => {
   // Der Name steht erst ab `xl` im Benutzer-Trigger; die Tests lesen ihn als Ladeanker.
   beforeEach(() => setzeViewportBreite(1366));
 
+  it('ab md klebt der Kopf auf der Rahmenebene, unter md rollt er mit (LFH-952)', async () => {
+    const { unmount } = setup(admin);
+    await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
+    const kopf = screen.getByRole('banner');
+    expect(kopf).toHaveAttribute('data-lfh', 'rahmen-kopf');
+    expect(kopf).toHaveStyle({ position: 'sticky', top: '0px', zIndex: '100' });
+    unmount();
+
+    setzeViewportBreite(390);
+    setup(admin);
+    await waitFor(() => expect(screen.getByRole('banner')).toBeInTheDocument());
+    expect(screen.getByRole('banner').style.position).toBe('');
+  });
+
   it('Admin: Verwaltung ist Link, Profil/Abmelden im Benutzermenü (Benutzer wohnt in der Sidebar)', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());

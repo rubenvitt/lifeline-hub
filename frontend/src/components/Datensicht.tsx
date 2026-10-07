@@ -3,6 +3,7 @@ import { Button, ConfigProvider, Popconfirm, Space, Typography, theme } from 'an
 import type { Key, ReactNode } from 'react';
 import type { TableColumnType } from 'antd';
 import {
+  Fragment,
   isValidElement,
   useCallback,
   useContext,
@@ -541,6 +542,14 @@ export function gruppiere<T>(
   return [...eimer.keys()]
     .sort((a, b) => rang.get(a)! - rang.get(b)!)
     .map((wert) => ({ wert, etikett: gruppen.etikett(wert), zeilen: eimer.get(wert)! }));
+}
+
+/**
+ * Zähler einer Gruppe: Zahl vor Wort („6 gebunden“), wie in der Verdichtungszeile (LFH-973,
+ * Klärungsrunde Welle 4, Entscheidung 2). Rein und exportiert.
+ */
+export function gruppenZahl(g: { etikett: string; zeilen: readonly unknown[] }): string {
+  return `${g.zeilen.length} ${g.etikett}`;
 }
 
 /** Klasse, die eine per Deeplink angesteuerte Zeile markiert (LFH-25). */
@@ -1096,14 +1105,18 @@ export default function Datensicht<T extends object, const K extends string>(
             onOffen={setSpaltenOffen}
           />
         )}
+        {/* ZAHL VOR WORT, MIT SICHTBAREM TRENNER (LFH-973): „1 verfügbar · 6 gebunden · 1 nicht
+            verfügbar“. Wort vor Zahl und nur ein Abstand dazwischen las sich als „6 nicht
+            verfügbar“. Der Punkt ist Optik; vorgelesen trennen die Glieder sich selbst. */}
         {gruppenZaehler.length > 0 && alsTabelle && (
-          <Space size={token.paddingXS} wrap>
-            {gruppenZaehler.map((g) => (
-              <Typography.Text key={g.wert} type="secondary">
-                {g.etikett} · {g.zeilen.length}
-              </Typography.Text>
+          <Typography.Text type="secondary" data-lfh="datensicht-gruppenzaehler">
+            {gruppenZaehler.map((g, i) => (
+              <Fragment key={g.wert}>
+                {i > 0 && <span aria-hidden="true"> · </span>}
+                <span style={{ whiteSpace: 'nowrap' }}>{gruppenZahl(g)}</span>
+              </Fragment>
             ))}
-          </Space>
+          </Typography.Text>
         )}
         {zufluessig > 0 && (
           // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5). Kein `danger`: Rot bedient nichts.
@@ -1605,11 +1618,7 @@ export default function Datensicht<T extends object, const K extends string>(
         {gruppenKarten.map((g) => (
           <div key={g.wert}>
             {kartenListe(g.zeilen, {
-              inhalt: (
-                <Typography.Text strong>
-                  {g.etikett} · {g.zeilen.length}
-                </Typography.Text>
-              ),
+              inhalt: <Typography.Text strong>{gruppenZahl(g)}</Typography.Text>,
               unterEbene: gruppen.unterEbene,
             })}
           </div>

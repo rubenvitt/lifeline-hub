@@ -45,7 +45,10 @@ const FAELLE: Fall[] = [
       server.use(
         meHandler(admin),
         http.get('/api/benutzer', () =>
+          // Der angemeldete Admin steht mit in der Liste: sonst wäre Eva der letzte aktive Admin,
+          // und „Deaktivieren“ stünde gesperrt (LFH-966).
           HttpResponse.json([
+            admin,
             adminFixture({ id: 2, anzeigename: 'Eva Muster', benutzername: 'eva' }),
           ]),
         ),
@@ -232,7 +235,7 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     await waitFor(() => expect(gesetzt).toEqual(['1 ausser-dienst']));
   });
 
-  it('Benutzer: „Deaktivieren“ fragt mit benanntem Knopf nach, erst dieser sendet', async () => {
+  it('Benutzer: „Deaktivieren“ im Menü wirkt ohne Rückfrage (LFH-966, umkehrbar)', async () => {
     setzeViewportBreite(390);
     const gesendet: string[] = [];
     server.use(
@@ -246,17 +249,11 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Benutzer Eva Muster' }));
     await waitFor(() => expect(offenesMenue()).not.toBeNull());
     await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: 'Deaktivieren' }));
-    const knopf = await screen.findByRole('button', { name: 'Benutzer deaktivieren' });
-    expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
-    expect(gesendet).toEqual([]);
-    await userEvent.click(knopf);
     await waitFor(() => expect(gesendet).toEqual(['2']));
-    // Nach der Antwort schließt die Rückfrage, sonst stünde sie über der aktualisierten Liste.
-    await waitFor(() => expect(rueckfrageZu()).toBe(true));
+    expect(document.querySelector('.ant-modal')).toBeNull();
   });
 
   it.each([
-    ['Benutzer', 0, '/api/benutzer/:id/deaktivieren', 'Benutzer deaktivieren'],
     ['Sprechgruppen', 3, '/api/sprechgruppen/:id/deaktivieren', 'Sprechgruppe deaktivieren'],
   ] as const)(
     '%s: scheitert die Deaktivierung, schließt die Rückfrage trotzdem',

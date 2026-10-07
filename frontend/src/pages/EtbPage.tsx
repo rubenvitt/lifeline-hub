@@ -956,7 +956,8 @@ export default function EtbPage() {
                     flex: `0 0 ${LEISTE_BREITE}px`,
                     width: LEISTE_BREITE,
                     position: 'sticky',
-                    top: token.margin,
+                    // Unter dem klebenden Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen).
+                    top: `calc(var(--lfh-rahmen-oben, 0px) + ${token.margin}px)`,
                   }
                 : undefined
             }

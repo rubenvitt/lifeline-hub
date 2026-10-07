@@ -307,7 +307,7 @@ const BODEN = 4.5;
 const ZIEL = { light: 7, dark: 5 } as const;
 
 /** Die drei Statusrollen, wie sie in der Verdichtungszeile ausgeschrieben stehen. */
-const ZEILEN_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. verf\.$/];
+const ZEILEN_ZAHLEN = [/^\d+ verfügbar$/, /^\d+ gebunden$/, /^\d+ nicht verfügbar$/];
 
 /** Die drei Kategorien des FMS-Katalogs und der Ton, den das Band ihnen gibt. */
 const BAND_TOENE = [
@@ -389,7 +389,8 @@ for (const modus of ['light', 'dark'] as const) {
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.getByRole('link', { name: 'Meldebild', exact: true })).toHaveCount(1);
     for (const m of ZEILEN_ZAHLEN) {
-      const ziel = page.getByRole('main').getByText(m);
+      // In der Zeile gesucht: der Zählerstreifen der Tabelle schreibt dieselben Wörter (LFH-973).
+      const ziel = page.locator('[data-lfh="verdichtungszeile"]').getByText(m);
       await expect(ziel, `Verdichtungszeile ${m}: genau ein Knoten`).toHaveCount(1);
       await pruefe(ziel, 'Verdichtungszeile (Seitengrund)', String(m), ZIEL[modus]);
     }

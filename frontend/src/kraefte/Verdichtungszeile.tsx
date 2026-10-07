@@ -1,4 +1,5 @@
 import { Space } from 'antd';
+import { Fragment } from 'react';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -60,6 +61,8 @@ export function verdichtungsTextfarbe(
  * Den Pfad baut der Aufrufer; die Komponente kennt keine Einsatz-Routen.
  */
 
+const KATEGORIEN = ['verfuegbar', 'gebunden', 'nicht_verfuegbar'] as const;
+
 export default function Verdichtungszeile({
   einsatzId,
   pfad,
@@ -86,22 +89,26 @@ export default function Verdichtungszeile({
 
   const v = verdichte(personalQuery.data, fahrzeugeQuery.data, []);
   return (
-    <Space wrap align="center" style={{ marginBlockEnd: token.margin }}>
+    <Space
+      wrap
+      align="center"
+      data-lfh="verdichtungszeile"
+      style={{ marginBlockEnd: token.margin }}
+    >
       <span style={{ color: token.colorTextSecondary }}>Stärke</span>
       <strong>{staerkeText(v.staerke)}</strong>
       <span aria-hidden>·</span>
       <span style={{ color: token.colorTextSecondary }}>Fzg {v.anzahlFahrzeuge}</span>
-      <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie.verfuegbar.rolle) }}>
-        {v.fahrzeugStatus.verfuegbar} frei
-      </span>
-      <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie.gebunden.rolle) }}>
-        {v.fahrzeugStatus.gebunden} gebunden
-      </span>
-      <span
-        style={{ color: verdichtungsTextfarbe(rollen, statusKategorie.nicht_verfuegbar.rolle) }}
-      >
-        {v.fahrzeugStatus.nicht_verfuegbar} n. verf.
-      </span>
+      {/* Zahl vor Wort, dieselben Wörter wie der Zählerstreifen der Tabelle darunter (LFH-973,
+          `statusKategorie`): „verfügbar“ statt „frei“, „nicht verfügbar“ ausgeschrieben. */}
+      {KATEGORIEN.map((k, i) => (
+        <Fragment key={k}>
+          {i > 0 && <span aria-hidden>·</span>}
+          <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie[k].rolle) }}>
+            {v.fahrzeugStatus[k]} {statusKategorie[k].label}
+          </span>
+        </Fragment>
+      ))}
       {/* Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`. */}
       {!meldebildGesperrt && (
         <Link to={pfad} style={verdichtungsLinkStil(token)}>

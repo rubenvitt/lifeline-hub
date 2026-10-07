@@ -1,7 +1,7 @@
 import { IconPlus, IconTrichter } from '../icons';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
-import { App as AntApp, Button, Input, Segmented, Space, Tag, theme } from 'antd';
+import { App as AntApp, Button, Input, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -50,6 +50,7 @@ import {
   keineRueckmeldungZelle,
   personalBand,
   rueckmeldungDerZeile,
+  toenungsGruende,
   type RasterZeile,
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
@@ -69,6 +70,7 @@ import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
+import Segmentleiste from '../components/instrument/Segmentleiste';
 import './kraefteuebersichtPrint.css';
 import { KennungsLink } from '../components/kennungsLink';
 
@@ -179,6 +181,9 @@ export const KEIN_HANDSTATUS = -1;
 /** Kurzwort der Mittelart — Satz, kein Piktogramm (Regel „Ein Emoji ist kein Icon"). */
 const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as const;
 
+/** Breite der Auftragsspalte: gekürzt auf zwei Zeilen, der Volltext steht im `title`. */
+const AUFTRAG_BREITE = 180;
+
 /**
  * Die Spalten des Rasters. Eine Fabrik, weil zwei Zellen vom Kontext abhängen (Einsatz-ID für den
  * Auftrags-Deeplink, Abrufzustand der Aufträge). Durch `spaltenFuer<RasterZeile>()` geführt, nicht
@@ -216,40 +221,71 @@ function rasterSpalten(
   rueckmeldung: RueckmeldungSpalte,
   imEinsatz: ImEinsatzSpalte,
 ) {
+  // Spaltenfolge nach der Frage am Schirm (LFH-973): Status, Rückmeldung und Auftrag stehen
+  // vorn, damit sie bei 1440 px ohne Querscrollen im Bild liegen; Funkrufname und Mittel weichen
+  // als Zusatz unter xxl. „Rückmeldung“ und „Im Einsatz“ bleiben ohne `abBreite`: `abBreite`
+  // hängt an der Fensterbreite, nicht an `@media print`, und das Meldeblatt auf A4 braucht sie.
+  // Die Einheit ist die Fließspalte (LFH-523): ohne sie liefe die Tabelle auf die einzeilige
+  // Länge des längsten Namens, gemessen 317 px und 130 px Überlauf bei 1440. Alle übrigen
+  // Spalten tragen deshalb eine Zahlbreite; zusammen passen sie in die 1050 px Inhaltsbreite des
+  // Fükw-Hauptgeräts (1366), gemessen in `e2e/meldebild-tabelle.spec.ts`.
   return spaltenFuer<RasterZeile>()([
     {
       title: 'Einheit',
       key: 'einheit',
       immerSichtbar: true,
+      mindestBreite: 170,
       render: (_t, z) => <EinheitZelle zeile={z} />,
-    },
-    {
-      title: 'Funkrufname',
-      key: 'funk',
-      width: 140,
-      abBreite: 'lg',
-      render: (_t, z) =>
-        z.art === 'einheit' && z.funkrufname ? (
-          <span style={monoStil(12)}>{z.funkrufname}</span>
-        ) : null,
-    },
-    // Kein `abBreite`: als Spalte ist der Abschnitt die Gliederung. `abBreite` hängt an der
-    // Fensterbreite, nicht an `@media print`, und ein Meldeblatt auf A4 ginge sonst ohne die
-    // Zuordnung Einheit → Abschnitt hinaus.
-    { title: 'Abschnitt', dataIndex: 'abschnitt', key: 'abschnitt', width: 140 },
-    {
-      title: 'Stärke',
-      key: 'staerke',
-      width: 120,
-      render: (_t, z) =>
-        z.staerke ? <span style={monoStil(12)}>{staerkeText(z.staerke)}</span> : null,
     },
     {
       title: 'Status',
       key: 'status',
-      width: 200,
-      render: (_t, z) => <StatusSpalte zeile={z} handStatus={kontext.handStatus} />,
+      width: 180,
+      render: (_t, z) => (
+        <StatusSpalte
+          zeile={z}
+          handStatus={kontext.handStatus}
+          gruende={toenungsGruende(z, rueckmeldung.jeZeile.get(z.key))}
+        />
+      ),
     },
+    // Für eine Rolle ohne Leserecht auf „Meldungen" (403) entfällt die Spalte — ein grauer Strich
+    // stünde verwechselbar neben dem roten „—" für „nie zurückgemeldet".
+    ...(rueckmeldung.zustand === 'gesperrt'
+      ? []
+      : [
+          {
+            title: 'Rückmeldung',
+            key: 'rueckmeldung',
+            // Der Kopf selbst braucht 114 px; schmaler setzte die Messzeile die Breite ohnehin.
+            width: 116,
+            render: (_t: unknown, z: RasterZeile) => (
+              <RueckmeldungZelle
+                zeile={z}
+                zustand={rueckmeldung.zustand}
+                anzeige={rueckmeldung.jeZeile.get(z.key) ?? null}
+              />
+            ),
+          },
+        ]),
+    {
+      title: 'Auftrag',
+      key: 'auftrag',
+      width: AUFTRAG_BREITE,
+      render: (_t, z) => (
+        <AuftragZelle einsatzId={einsatzId} zeile={z} zustand={auftraegeZustand} />
+      ),
+    },
+    {
+      title: 'Stärke',
+      key: 'staerke',
+      width: 100,
+      render: (_t, z) =>
+        z.staerke ? <span style={monoStil(12)}>{staerkeText(z.staerke)}</span> : null,
+    },
+    // Kein `abBreite`: als Spalte ist der Abschnitt die Gliederung, und ein Meldeblatt auf A4
+    // ginge sonst ohne die Zuordnung Einheit → Abschnitt hinaus.
+    { title: 'Abschnitt', dataIndex: 'abschnitt', key: 'abschnitt', width: 110 },
     {
       title: 'Seit',
       key: 'seit',
@@ -278,9 +314,20 @@ function rasterSpalten(
               ) : null,
           },
         ]),
-    // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht auf
-    // schmalem Schirm zuerst (Zähler im Spaltenschalter). Der Kopf heißt wie die Gruppe der Zellen
-    // und trägt ihre Legende (LFH-962): das Wort der Zelle steht sonst nur im `title`.
+    {
+      title: 'Funkrufname',
+      key: 'funk',
+      width: 140,
+      abBreite: 'xxl',
+      render: (_t, z) =>
+        z.art === 'einheit' && z.funkrufname ? (
+          <span style={monoStil(12)}>{z.funkrufname}</span>
+        ) : null,
+    },
+    // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht
+    // zuerst (Zähler im Spaltenschalter); die Statusspalte nennt einen Ausfall als Wort. Der Kopf
+    // heißt wie die Gruppe der Zellen und trägt ihre Legende (LFH-962): das Wort der Zelle steht
+    // sonst nur im `title`.
     {
       title: (
         <span style={{ display: 'flex', flexDirection: 'column' }}>
@@ -293,36 +340,9 @@ function rasterSpalten(
       etikett: 'Fahrzeuge und Personal',
       key: 'mittel',
       width: 190,
-      abBreite: 'xl',
+      abBreite: 'xxl',
       render: (_t, z) => <MittelVerteilungZellen zeile={z} />,
     },
-    {
-      title: 'Auftrag',
-      key: 'auftrag',
-      render: (_t, z) => (
-        <AuftragZelle einsatzId={einsatzId} zeile={z} zustand={auftraegeZustand} />
-      ),
-    },
-    // Letzte Spalte, rechtsbündig. Kein `abBreite` (das Meldeblatt auf A4 braucht sie). Für eine
-    // Rolle ohne Leserecht auf „Meldungen" (403) entfällt die Spalte — ein grauer Strich stünde
-    // verwechselbar neben dem roten „—" für „nie zurückgemeldet".
-    ...(rueckmeldung.zustand === 'gesperrt'
-      ? []
-      : [
-          {
-            title: 'Rückmeldung',
-            key: 'rueckmeldung',
-            width: 96,
-            align: 'right' as const,
-            render: (_t: unknown, z: RasterZeile) => (
-              <RueckmeldungZelle
-                zeile={z}
-                zustand={rueckmeldung.zustand}
-                anzeige={rueckmeldung.jeZeile.get(z.key) ?? null}
-              />
-            ),
-          },
-        ]),
   ]);
 }
 
@@ -394,25 +414,48 @@ function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
 function StatusSpalte({
   zeile: z,
   handStatus,
+  gruende,
 }: {
   zeile: RasterZeile;
   handStatus: StatusKontext['handStatus'];
+  gruende: readonly string[];
 }) {
   const { token, rollen } = useRollen();
-  if (z.art === 'einheit' && z.handStatus && handStatus) return <>{handStatus(z)}</>;
-  if (!z.status) return null;
-  const verteilung = 'verteilung' in z.status ? z.status.verteilung : null;
+  // Der Grund der Zeilentönung als Wort (LFH-973): sichtbar in einer Spalte, die auch bei
+  // 1180 px steht; der Text ist zugleich der zugängliche Name, kein abweichendes `aria-label`.
+  const grund = gruende.length > 0 && (
+    <span data-lfh="meldebild-toenungsgrund" style={{ fontSize: 12, fontWeight: 500 }}>
+      {gruende.join(' · ')}
+    </span>
+  );
+  let status: React.ReactNode = null;
+  if (z.art === 'einheit' && z.handStatus && handStatus) status = handStatus(z);
+  else if (z.status) {
+    const verteilung = 'verteilung' in z.status ? z.status.verteilung : null;
+    status = (
+      <>
+        <StatusChip
+          ton={z.status.ton}
+          code={z.status.code ?? undefined}
+          wort={z.status.wort}
+          trenner
+        />
+        {verteilung && (
+          <span
+            data-lfh="meldebild-statusverteilung"
+            style={{ ...monoStil(11), color: rollen.gedaempft }}
+          >
+            {verteilung}
+          </span>
+        )}
+      </>
+    );
+  }
+  if (!status && !grund) return null;
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: token.marginXXS }}>
-      <StatusChip ton={z.status.ton} code={z.status.code ?? undefined} wort={z.status.wort} />
-      {verteilung && (
-        <span
-          data-lfh="meldebild-statusverteilung"
-          style={{ ...monoStil(11), color: rollen.gedaempft }}
-        >
-          {verteilung}
-        </span>
-      )}
+      {status}
+      {grund}
     </span>
   );
 }
@@ -507,7 +550,7 @@ function AuftragZelle({
           WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
-          maxWidth: 360,
+          maxWidth: AUFTRAG_BREITE,
         }}
       >
         {text}
@@ -1017,6 +1060,7 @@ export default function KraefteuebersichtPage() {
           )}
           <Select
             placeholder="Trägerorganisation"
+            aria-label="Nach Trägerorganisation filtern"
             allowClear
             style={{ minWidth: 180 }}
             value={filter.traeger ?? undefined}
@@ -1027,6 +1071,7 @@ export default function KraefteuebersichtPage() {
               === f.kategorie`, ein Wert `'ohne'` träfe nie eine Zeile. */}
           <Select
             placeholder="Status"
+            aria-label="Nach Status filtern"
             allowClear
             style={{ minWidth: 160 }}
             value={filter.kategorie ?? undefined}
@@ -1036,8 +1081,11 @@ export default function KraefteuebersichtPage() {
             }))}
             onChange={(wert) => setFilter((f) => ({ ...f, kategorie: wert ?? null }))}
           />
-          <Input.Search
+          {/* Ein schlichtes Feld: `Input.Search` brächte einen Lupenknopf mit dem englischen
+              Namen „search“ mit, und die Suche wirkt ohnehin bei jeder Eingabe. */}
+          <Input
             placeholder="Suche..."
+            aria-label="Einheiten und Kräfte durchsuchen"
             allowClear
             style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 320 }}
             value={filter.suche}
@@ -1046,14 +1094,15 @@ export default function KraefteuebersichtPage() {
           {/* Zwei Zustände desselben Rasters. Der Wert wird aus `expandedKeys` gegen die
               Vollzähligkeit abgeleitet — mit `length > 0` stünde der Umschalter nach dem
               Zuklappen einer einzelnen Zeile weiter auf „alles". */}
-          <Segmented
-            value={alleAufgeklappt ? 'mittel' : 'einheiten'}
-            onChange={(wert) =>
+          <Segmentleiste<'einheiten' | 'mittel'>
+            beschriftung="Zeilen auf- oder zuklappen"
+            wert={alleAufgeklappt ? 'mittel' : 'einheiten'}
+            onWechsel={(wert) =>
               setExpandedKeys(wert === 'mittel' ? aufklappbareSchluessel(raster) : [])
             }
-            options={[
-              { value: 'einheiten', label: 'Nur Einheiten' },
-              { value: 'mittel', label: 'Mit Mitteln' },
+            optionen={[
+              { wert: 'einheiten', label: 'Einheiten zugeklappt' },
+              { wert: 'mittel', label: 'Fahrzeuge und Personal zeigen' },
             ]}
           />
           {darfSchreiben && (

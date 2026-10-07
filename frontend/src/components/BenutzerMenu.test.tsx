@@ -144,6 +144,49 @@ describe('BenutzerMenu — unter lg', () => {
   });
 });
 
+/**
+ * LFH-952 (U89): Profil und Abmelden stehen DIREKT unter dem Kopf, vor den Umschaltgruppen. Das
+ * Menü ist in `handschuh` höher als der Handschirm; unten lagen sie unter dem Rand. Die Lage im
+ * Fenster misst `e2e/rahmen-stehen-bleiben.spec.ts`, hier die Reihenfolge.
+ */
+describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
+  beforeEach(() => setzeViewportBreite(390));
+
+  it('Profil und Abmelden stehen vor Darstellung, Bediendichte und Helligkeit', async () => {
+    zeige();
+    await oeffne();
+    const eintraege = (await screen.findAllByRole('menuitem')).map((e) => e.textContent ?? '');
+    // Gegenprobe: die Gruppen sind da, sonst wäre „vorne" trivial.
+    const ersteStufe = eintraege.findIndex((t) => t.includes('Dunkel'));
+    expect(ersteStufe).toBeGreaterThan(-1);
+    expect(eintraege[0]).toContain('Profil');
+    expect(eintraege[1]).toContain('Abmelden');
+    expect(ersteStufe).toBeGreaterThan(1);
+  });
+
+  it('der Menükopf nennt die Funktion auch unter xl', async () => {
+    setzeViewportBreite(1024);
+    server.use(meHandler(benutzer));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <BenutzerMenu funktion="S2 Lage" />
+      </ThemeModeProvider>,
+    );
+    await oeffne();
+    const kopf = await screen.findByTestId('benutzermenue-kopf');
+    expect(kopf.textContent).toContain('S2 Lage');
+    expect(kopf.textContent).toContain(ANZEIGENAME);
+  });
+
+  it('ohne Funktion steht im Menükopf keine leere Funktionszeile', async () => {
+    zeige();
+    await oeffne();
+    const kopf = await screen.findByTestId('benutzermenue-kopf');
+    expect(kopf.textContent).toContain(ANZEIGENAME);
+    expect(kopf.querySelector('[data-lfh="benutzermenue-funktion"]')).toBeNull();
+  });
+});
+
 /** LFH-387: „Abmelden“ aus einem veralteten Tab beendet keine fremde Sitzung und verlässt die
  *  Seite nicht — der Server lehnt mit 412 ab, der Tab zeigt den Benutzerkonflikt. */
 describe('Abmelden', () => {

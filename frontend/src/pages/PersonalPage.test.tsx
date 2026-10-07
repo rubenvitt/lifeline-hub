@@ -464,8 +464,12 @@ describe('PersonalPage', () => {
   it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
     const { container } = render(einsatz(), [epGebunden, epVerfuegbar]);
     await screen.findByText('Thomas Müller');
-    expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
-    expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
+    // Im Streifen gesucht: die Verdichtungszeile darüber schreibt dieselben Wörter (LFH-973).
+    const streifen = within(
+      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+    );
+    expect(streifen.getByText('1 verfügbar')).toBeInTheDocument();
+    expect(streifen.getByText('1 gebunden')).toBeInTheDocument();
     // Die Gruppenachse führt: verfügbar (Zora) steht vor gebunden (Thomas) — weder Server- noch
     // Namensordnung.
     expect(zeilenFolge(container)).toEqual(['12', '10']);
@@ -493,7 +497,13 @@ describe('PersonalPage', () => {
       ]);
     });
 
-    await waitFor(() => expect(screen.getByText('verfügbar · 2')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        within(
+          container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+        ).getByText('2 verfügbar'),
+      ).toBeInTheDocument(),
+    );
     expect(zeilenFolge(container)).toEqual(vorher);
   });
 

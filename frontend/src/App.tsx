@@ -192,7 +192,7 @@ function BetriebsLayout() {
   useOrgLiveStream(benutzer != null);
   return (
     <>
-      <LiveStatusBanner benutzerId={benutzer?.id} />
+      <LiveStatusBanner benutzerId={benutzer?.id} klebend />
       <Outlet />
     </>
   );
