@@ -1,5 +1,6 @@
 import type { EinsatzFahrzeug, EinsatzPersonal } from '../api/types';
 import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
+import { fmsEtikett } from './meldebildRaster';
 
 /**
  * Statusanzeige eines disponierten Mittels (Fahrzeug, Personal) als `StatusDarstellung` — EINE
@@ -21,11 +22,16 @@ import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
  * Nicht über antds `color`-Prop: ein Nicht-Preset-Wert würde dort eine Vollfläche mit
  * erzwungen weißem Text. Auslöser (`StatusWahl`) und Anzeige tragen dasselbe Etikett.
  */
-export function fahrzeugStatusDarstellung(ef: EinsatzFahrzeug): StatusDarstellung {
+export function fahrzeugStatusDarstellung(
+  ef: EinsatzFahrzeug,
+  fmsAnker?: number | null,
+): StatusDarstellung {
   // Ohne Status der neutrale Wortlaut — ein „—" sagte weniger, und die Zeile muss von hier aus
   // einen Status bekommen können.
   if (!ef.status_label || !ef.status_kategorie) return { rolle: 'neutral', label: 'kein Status' };
-  return { ...statusKategorie[ef.status_kategorie], label: ef.status_label };
+  // Mit Katalog-Anker im einen FMS-Format „S4 · Am Einsatzort“ (LFH-973); die Anzeige trägt
+  // keinen Anker, der Aufrufer reicht ihn aus dem Katalog herein.
+  return { ...statusKategorie[ef.status_kategorie], label: fmsEtikett(ef.status_label, fmsAnker) };
 }
 
 /**

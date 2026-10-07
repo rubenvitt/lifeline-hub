@@ -73,6 +73,7 @@ import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
 import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
+import { fmsEtikett } from '../kraefte/meldebildRaster';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import {
   katalogStatusWechsel,
@@ -405,9 +406,13 @@ export default function FahrzeugePage() {
    * Kategorie und Farbe aus der Antwort. `fms_anker` bleibt Sortierachse und ist keine Bedienform:
    * die Spalte ist nullable, ein Ziffernfeld darauf hätte Löcher.
    */
+  const ankerJeStatus = new Map(stati.map((s) => [s.id, s.fms_anker]));
+  const statusDarstellung = (ef: EinsatzFahrzeug) =>
+    fahrzeugStatusDarstellung(ef, ef.status_id != null ? ankerJeStatus.get(ef.status_id) : null);
   const statusOptionen: StatusOption<number>[] = stati.map((s) => ({
     wert: s.id,
-    label: s.label,
+    // Ein FMS-Format überall, „S4 · Am Einsatzort“ (LFH-973), wie Meldebild und FMS-Tableau.
+    label: fmsEtikett(s.label, s.fms_anker),
     darstellung: s.kategorie ? statusKategorie[s.kategorie] : undefined,
     farbe: s.farbe,
   }));
@@ -550,7 +555,7 @@ export default function FahrzeugePage() {
       // auseinanderlaufen.
       render: (_, ef) => (
         <StatusWahl
-          darstellung={fahrzeugStatusDarstellung(ef)}
+          darstellung={statusDarstellung(ef)}
           darfSchreiben={darfSchreiben}
           {...statusBedienungVon(ef)}
         />
@@ -752,7 +757,7 @@ export default function FahrzeugePage() {
                 // Deskriptor. Beide Zweige tragen dieselbe Darstellung und denselben Bedienweg; die
                 // Mandantenfarbe geht über `statusBedienung.farbe` mit und steht auf Rand und Text,
                 // nie auf der Fläche.
-                status: (ef) => fahrzeugStatusDarstellung(ef),
+                status: (ef) => statusDarstellung(ef),
                 // Der Bedienweg sitzt hier und nicht im `aktion`-Slot: der ist mit „Entfernen"
                 // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),

@@ -1019,10 +1019,10 @@ describe('PersonenPage', () => {
     ).toBeInTheDocument();
     // Die Gruppenachse erscheint im Tabellenzweig als Zählerstreifen der Werkzeugzeile, keine
     // synthetischen Zwischenzeilen.
-    expect(screen.getByText('SK II · 1')).toBeInTheDocument();
-    expect(screen.getByText('tot · 1')).toBeInTheDocument();
-    expect(screen.getByText('unverletzt · 1')).toBeInTheDocument();
-    expect(screen.getByText('ohne Sichtung · 1')).toBeInTheDocument();
+    expect(screen.getByText('1 SK II')).toBeInTheDocument();
+    expect(screen.getByText('1 tot')).toBeInTheDocument();
+    expect(screen.getByText('1 unverletzt')).toBeInTheDocument();
+    expect(screen.getByText('1 ohne Sichtung')).toBeInTheDocument();
     // Dringlichkeit zuerst: SK II vor tot vor unverletzt vor ohne Sichtung.
     await waitFor(() => expect(regFolge()).toEqual(['R-003', 'R-004', 'R-005', 'R-001']));
     // Der Statusfilter gilt auch im Raster.
@@ -1116,17 +1116,17 @@ describe('PersonenPage', () => {
     };
     render(einsatzAktiv, [sk2, tot]);
     await userEvent.click(await screen.findByRole('radio', { name: 'Sichtungsraster' }));
-    expect(await screen.findByText('SK II · 1')).toBeInTheDocument();
-    expect(screen.getByText('tot · 1')).toBeInTheDocument();
+    expect(await screen.findByText('1 SK II')).toBeInTheDocument();
+    expect(screen.getByText('1 tot')).toBeInTheDocument();
     /**
      * Die tragende Hälfte: SK I, III und IV stehen in der festen Gruppenfolge, haben aber keine
-     * Zeile. Emittierte `gruppiere` sie mit Zähler 0, zöge lautlos ein „SK I · 0" ein. `^`-Anker,
+     * Zeile. Emittierte `gruppiere` sie mit Zähler 0, zöge lautlos ein „0 SK I" ein. `$`-Anker,
      * weil „SK I" sonst in „SK II" matcht.
      */
-    expect(screen.queryByText(/^SK I · /)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^SK III · /)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^SK IV · /)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^ohne Sichtung · /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ SK I$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ SK III$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ SK IV$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ ohne Sichtung$/)).not.toBeInTheDocument();
   });
 
   it('trägt die Zeit in den Kartenzweig und ersetzt dort die Abgleich-Zelle durch einen Dialog', async () => {

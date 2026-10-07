@@ -74,12 +74,17 @@ interface StatusChipProps {
   wort: string;
   /** Optionaler Code vor dem Wort (FMS „2", „SK III"), Mono 11/500. */
   code?: ReactNode;
+  /**
+   * Sichtbarer Punkt zwischen Code und Wort, das FMS-Format „S4 · Am Einsatzort“ (LFH-973).
+   * Nur für einen Status-Code: eine Zahl als Code („2 ausstehend“) bleibt ohne Punkt.
+   */
+  trenner?: boolean;
   title?: string;
   style?: CSSProperties;
 }
 
 /** Inline-Chip, Höhe 22 (Entwurf S6): Fläche + Code Mono + Wort 11. */
-export function StatusChip({ ton, wort, code, title, style }: StatusChipProps) {
+export function StatusChip({ ton, wort, code, trenner, title, style }: StatusChipProps) {
   const { token, rollen } = useRollen();
   const f = statusFlaeche(rollen, ton);
   return (
@@ -100,6 +105,8 @@ export function StatusChip({ ton, wort, code, title, style }: StatusChipProps) {
       }}
     >
       {code != null && <span style={monoStil(11, 500)}>{code}</span>}
+      {/* Vorgelesen trennt der Abstand, der Punkt ist Optik. */}
+      {code != null && trenner && <span aria-hidden="true">·</span>}
       <span style={{ fontSize: 11 }}>{wort}</span>
     </span>
   );

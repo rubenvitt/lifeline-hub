@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { SUBPIXEL, anmelden, einsatzAnlegen, seedeKraefte } from './meldebild-kern';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Die Nachweise des Meldebilds am Bildschirm, die NUR im Browser gehen (jsdom rechnet kein
@@ -229,4 +230,105 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
     type: 'messwert',
     description: `Statusband bei 1024px Sichtfeld: Inhaltsbreite ${mass.clientWidth}px, Inhalt ${mass.scrollWidth}px, ${anzahl} Zellen`,
   });
+});
+
+/**
+ * NACHWEIS 4 — Rückmeldung und Auftrag im Bild (LFH-973). Am Desktop 1440 lagen beide Spalten
+ * hinter Funkrufname, Seit, Im Einsatz und Mittel, also erst nach waagerechtem Scrollen; die
+ * Tönung einer Problemzeile hatte so keinen sichtbaren Grund. Gemessen wird die Kopfzelle gegen
+ * den sichtbaren Bereich des Bildlaufcontainers, als Admin und als Führungspersonal (LFH-435).
+ * Beide lesen Meldungen; den Zweig ohne Leserecht (403, die Rückmeldungsspalte entfällt) erzwingt
+ * ein dritter Durchgang per `page.route`, dort muss der Auftrag allein im Bild stehen.
+ *
+ * Bei 1440 (Desktop) und 1366 (Fükw-Hauptgerät) scrollt die Tabelle gar nicht; bei 1180
+ * (Tablet quer) darf sie scrollen, beide Köpfe stehen aber im Bild.
+ */
+const SPALTEN_SCHIRME = [
+  { breite: 1440, ohneQuerscrollen: true },
+  { breite: 1366, ohneQuerscrollen: true },
+  { breite: 1180, ohneQuerscrollen: false },
+];
+
+test('Meldebild bei 1440 px: Rückmeldung und Auftrag ohne Querscrollen im Bild, Admin und Führungspersonal', async ({
+  page,
+}) => {
+  // Drei Durchgänge zu je drei Schirmen, jeder mit frischem `goto`.
+  test.setTimeout(120_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Meldebild Spalten ${Date.now()}`);
+  await seedeKraefte(page, einsatzId, 2);
+  // Lange Einheitennamen: die Einheit ist die Fließspalte und darf die Tabelle nicht aufweiten.
+  for (let i = 0; i < 3; i += 1) {
+    const fahrzeug = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+      data: { adhoc: { funkrufname: `Florian Musterstadt-Nordwest 3/44-${i}` } },
+    });
+    expect(fahrzeug.ok(), `Seeding Fahrzeug ${i}: ${fahrzeug.status()}`).toBeTruthy();
+    const ef = ((await fahrzeug.json()) as { id: number }).id;
+    const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+      data: { name: `Sanitätsgruppe Musterstadt-Nordwest ${i}` },
+    });
+    expect(einheit.ok(), `Seeding Einheit ${i}: ${einheit.status()}`).toBeTruthy();
+    const eid = ((await einheit.json()) as { id: number }).id;
+    const zu = await page.request.put(
+      `/api/einsaetze/${einsatzId}/einheiten/${eid}/fahrzeug/${ef}`,
+    );
+    expect(zu.ok(), `Zuordnung ${i}: ${zu.status()}`).toBeTruthy();
+  }
+
+  const pruefe = async (wer: string, rueckmeldungErwartet: boolean) => {
+    for (const { breite, ohneQuerscrollen } of SPALTEN_SCHIRME) {
+      await page.setViewportSize({ width: breite, height: 900 });
+      await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+      const bereich = page.getByRole('region', { name: 'Meldebild' });
+      await expect(bereich.locator('tr.ant-table-row')).toHaveCount(4);
+      const kopf = (name: string) => bereich.getByRole('columnheader', { name, exact: true });
+      // Gepollt: solange der Abruf läuft, steht die Spalte, erst die 403 nimmt sie weg.
+      await expect(kopf('Rückmeldung'), `${wer}: Rückmeldungsspalte`).toHaveCount(
+        rueckmeldungErwartet ? 1 : 0,
+      );
+      const rueckmeldung = rueckmeldungErwartet;
+      const ort = `${wer} ${breite}px`;
+      for (const name of rueckmeldung ? ['Auftrag', 'Rückmeldung'] : ['Auftrag']) {
+        const lage = await kopf(name).evaluate((th) => {
+          const huelle = th.closest('.ant-table-container')!;
+          const bild = (huelle.querySelector('.ant-table-body') ??
+            huelle.querySelector('.ant-table-content'))!;
+          const b = bild.getBoundingClientRect();
+          const k = th.getBoundingClientRect();
+          return {
+            links: k.left - b.left,
+            rechts: k.right - b.left,
+            sichtbar: bild.clientWidth,
+            restweg: bild.scrollWidth - bild.clientWidth,
+          };
+        });
+        expect(lage.links, `${ort}: Kopf „${name}“ links im Bild`).toBeGreaterThanOrEqual(
+          -SUBPIXEL,
+        );
+        expect(
+          lage.rechts,
+          `${ort}: Kopf „${name}“ endet bei ${lage.rechts}px, sichtbar sind ${lage.sichtbar}px`,
+        ).toBeLessThanOrEqual(lage.sichtbar + SUBPIXEL);
+        if (ohneQuerscrollen) {
+          expect(
+            lage.restweg,
+            `${ort}: die Tabelle scrollt waagerecht (${lage.restweg}px)`,
+          ).toBeLessThanOrEqual(SUBPIXEL);
+        }
+        await expect(kopf(name)).toBeInViewport({ ratio: 1 });
+        test.info().annotations.push({
+          type: 'messwert',
+          description: `${ort}: „${name}“ ${Math.round(lage.links)}–${Math.round(lage.rechts)} von ${lage.sichtbar}px, Restweg ${lage.restweg}px`,
+        });
+      }
+    }
+  };
+
+  await pruefe('Admin', true);
+  await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
+  await pruefe('Führungspersonal', true);
+  await page.route('**/meldungen/rueckmeldungen', (route) =>
+    route.fulfill({ status: 403, json: { fehler: 'keine Berechtigung' } }),
+  );
+  await pruefe('Führungspersonal ohne Leserecht auf Meldungen', false);
 });
