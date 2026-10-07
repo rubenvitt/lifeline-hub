@@ -21,6 +21,7 @@ import { parseGeometry, geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
+import { sprungGesperrtText } from '../../components/Sprung';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
@@ -263,7 +264,10 @@ export default function ZonenInspector({
                 title={matrixGesperrt ? KEINE_BERECHTIGUNG : undefined}
                 onClick={() => onMatrixOeffnen(entwurf.gefahrengebiet_id as number)}
               >
-                Gefahrenmatrix bearbeiten
+                {/* Der Grund steht im Text: ein `title` erscheint auf Touch nie. */}
+                {matrixGesperrt
+                  ? sprungGesperrtText('Gefahrenmatrix bearbeiten')
+                  : 'Gefahrenmatrix bearbeiten'}
               </Button>
             )}
           </>
