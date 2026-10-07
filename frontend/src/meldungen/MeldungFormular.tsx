@@ -1,13 +1,14 @@
 import { IconBlitz, IconPapierflieger } from '../icons';
-import { Button, Col, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { Button, Col, Collapse, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
 import type {
@@ -65,6 +66,45 @@ const UEBERNAHME: (keyof MeldungFormWerte & string)[] = [
   'empfaenger',
 ];
 
+const MELDEWEG_OPTIONEN: { value: MeldungMeldeweg; label: string }[] = [
+  { value: 'funk', label: 'Funk' },
+  { value: 'telefon', label: 'Telefon' },
+  { value: 'persoenlich', label: 'Persönlich' },
+  { value: 'sonstige', label: 'Sonstige' },
+];
+const MELDUNGSART_OPTIONEN: { value: Meldungsart; label: string }[] = [
+  { value: 'lagemeldung', label: 'Lagemeldung' },
+  { value: 'sofortmeldung', label: 'Sofortmeldung' },
+  { value: 'rueckmeldung', label: 'Rückmeldung' },
+  { value: 'vollzugsmeldung', label: 'Vollzugsmeldung' },
+  { value: 'anfrage', label: 'Anfrage' },
+  { value: 'sonstige', label: 'Sonstige' },
+];
+const PRIORITAET_OPTIONEN: { value: MeldungPrioritaet; label: string }[] = [
+  { value: 'sofort', label: 'Sofort' },
+  { value: 'dringend', label: 'Dringend' },
+  { value: 'normal', label: 'Normal' },
+];
+const RICHTUNG_OPTIONEN: { value: Richtung; label: string }[] = [
+  { value: 'intern', label: 'Intern' },
+  { value: 'extern', label: 'Extern' },
+];
+
+const etikett = <V extends string>(optionen: { value: V; label: string }[], v: V | undefined) =>
+  optionen.find((o) => o.value === v)?.label;
+
+/** Felder hinter „Weitere Angaben". Scheitert die Prüfung an einem davon, klappt der Teil auf. */
+const EINGEKLAPPT = new Set<string>([
+  'von',
+  'meldeweg',
+  'meldungsart',
+  'prioritaet',
+  'richtung',
+  'ereigniszeit',
+  'bestaetigung_pflicht',
+  'frist_min',
+]);
+
 /** `einheit:<id>` / `abschnitt:<id>` → Bezugsfelder der Meldung. Unbekanntes → kein Bezug. */
 export function vonZuBezug(
   von: string | undefined,
@@ -98,6 +138,14 @@ export default function MeldungFormular({
   const meldungsart = Form.useWatch('meldungsart', form);
   const prioritaet = Form.useWatch('prioritaet', form);
   const bestaetigungPflicht = Form.useWatch('bestaetigung_pflicht', form);
+  const von = Form.useWatch('von', form);
+  const meldeweg = Form.useWatch('meldeweg', form);
+  const richtung = Form.useWatch('richtung', form);
+  const ereigniszeit = Form.useWatch('ereigniszeit', form);
+  const fristMin = Form.useWatch('frist_min', form);
+  const { formatiere } = useZeitEingabe();
+  const wortlautRef = useRef<TextAreaRef>(null);
+  const [weitereOffen, setWeitereOffen] = useState(false);
 
   // Sofort (Art oder Priorität) ⇒ Bestätigungspflicht automatisch an; abwählbar.
   const istSofort = meldungsart === 'sofortmeldung' || prioritaet === 'sofort';
@@ -112,11 +160,13 @@ export default function MeldungFormular({
       prioritaet: 'sofort',
       bestaetigung_pflicht: true,
     });
+    wortlautRef.current?.focus();
   };
 
   /** Fast-Path: Lagemeldung an übergeordnete Führung (extern). */
   const lagemeldungVorbelegen = () => {
     form.setFieldsValue({ meldungsart: 'lagemeldung', richtung: 'extern' });
+    wortlautRef.current?.focus();
   };
 
   // Das `return` ist tragend: die Hülle wartet auf diese Zusage und lässt die Felder bei
@@ -158,6 +208,24 @@ export default function MeldungFormular({
     if (name) form.setFieldValue('absender', name);
   };
 
+  /** Jeder Wert, der von der Vorgabe abweicht, steht im Kopf — eingeklappt bleibt nichts verborgen. */
+  const abweichungen = [
+    von ? vonName.get(von) : undefined,
+    meldeweg !== DEFAULTS.meldeweg ? etikett(MELDEWEG_OPTIONEN, meldeweg) : undefined,
+    meldungsart !== DEFAULTS.meldungsart ? etikett(MELDUNGSART_OPTIONEN, meldungsart) : undefined,
+    // `useWatch` liefert im ersten Render `undefined`: ohne den Riegel stünde kurz „Priorität “ da.
+    prioritaet && prioritaet !== DEFAULTS.prioritaet
+      ? `Priorität ${etikett(PRIORITAET_OPTIONEN, prioritaet) ?? ''}`
+      : undefined,
+    richtung !== DEFAULTS.richtung ? etikett(RICHTUNG_OPTIONEN, richtung) : undefined,
+    ereigniszeit ? `Ereignis ${formatiere(ereigniszeit, 'DD.MM. HH:mm')}` : undefined,
+    bestaetigungPflicht
+      ? fristMin != null
+        ? `Bestätigung ${fristMin} Min`
+        : 'Bestätigung'
+      : undefined,
+  ].filter((t): t is string => !!t);
+
   const formular = (
     <ErfassungsFormular<MeldungFormWerte>
       form={form}
@@ -171,6 +239,9 @@ export default function MeldungFormular({
       erfassenText="Meldung erfassen"
       serie
       uebernahme={UEBERNAHME}
+      onPruefungGescheitert={(felder) => {
+        if (felder.some((f) => EINGEKLAPPT.has(f))) setWeitereOffen(true);
+      }}
     >
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       <Space style={{ marginBottom: 16 }} wrap>
@@ -183,117 +254,6 @@ export default function MeldungFormular({
           Lagemeldung (extern)
         </Button>
       </Space>
-      <Row gutter={16}>
-        {vonOptionen.length > 0 && (
-          <Col xs={24} sm={8}>
-            <Form.Item
-              name="von"
-              label="Von Einheit / Abschnitt"
-              tooltip="Bindet die Meldung an die Einheit. Sie zählt dann als deren Rückmeldung im Meldebild."
-            >
-              <Select<string>
-                aria-label="Von Einheit / Abschnitt"
-                allowClear
-                placeholder="nicht zugeordnet"
-                options={vonOptionen}
-                onChange={vonGewaehlt}
-              />
-            </Form.Item>
-          </Col>
-        )}
-        <Col xs={24} sm={vonOptionen.length > 0 ? 8 : 12}>
-          <Form.Item
-            name="absender"
-            label="Absender (Funkrufname/Stelle)"
-            rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
-          >
-            <Input aria-label="Absender" maxLength={ETB_PARTEI_MAX} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={vonOptionen.length > 0 ? 8 : 12}>
-          <Form.Item name="empfaenger" label="Empfänger / Adressat">
-            <Input placeholder="z. B. ELW 1, S3" maxLength={ETB_PARTEI_MAX} />
-          </Form.Item>
-        </Col>
-      </Row>
-      <Row gutter={16}>
-        <Col xs={24} sm={12}>
-          <Form.Item name="meldeweg" label="Meldeweg">
-            <Select<MeldungMeldeweg>
-              options={[
-                { value: 'funk', label: 'Funk' },
-                { value: 'telefon', label: 'Telefon' },
-                { value: 'persoenlich', label: 'Persönlich' },
-                { value: 'sonstige', label: 'Sonstige' },
-              ]}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12}>
-          <Form.Item name="meldungsart" label="Meldungsart">
-            <Select<Meldungsart>
-              options={[
-                { value: 'lagemeldung', label: 'Lagemeldung' },
-                { value: 'sofortmeldung', label: 'Sofortmeldung' },
-                { value: 'rueckmeldung', label: 'Rückmeldung' },
-                { value: 'vollzugsmeldung', label: 'Vollzugsmeldung' },
-                { value: 'anfrage', label: 'Anfrage' },
-                { value: 'sonstige', label: 'Sonstige' },
-              ]}
-            />
-          </Form.Item>
-        </Col>
-      </Row>
-      <Row gutter={16}>
-        <Col xs={24} sm={8}>
-          <Form.Item name="prioritaet" label="Priorität">
-            <Select<MeldungPrioritaet>
-              options={[
-                { value: 'sofort', label: 'Sofort' },
-                { value: 'dringend', label: 'Dringend' },
-                { value: 'normal', label: 'Normal' },
-              ]}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Form.Item name="richtung" label="Richtung">
-            <Select<Richtung>
-              aria-label="Richtung"
-              options={[
-                { value: 'intern', label: 'Intern' },
-                { value: 'extern', label: 'Extern' },
-              ]}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Form.Item name="ereigniszeit" label="Ereigniszeit (≠ Erfassung)">
-            <ZeitpunktEingabe
-              style={{ width: '100%' }}
-              format="YYYY-MM-DD HH:mm"
-              placeholder="leer = jetzt"
-            />
-          </Form.Item>
-        </Col>
-      </Row>
-      <Form.Item label="Bestätigung erforderlich (Sofortmeldung)">
-        <Space>
-          <Form.Item name="bestaetigung_pflicht" valuePropName="checked" noStyle>
-            <Switch aria-label="Bestätigung erforderlich" />
-          </Form.Item>
-          {bestaetigungPflicht && (
-            <Form.Item name="frist_min" noStyle>
-              <InputNumber
-                min={1}
-                suffix="Min"
-                placeholder="Frist (Default 5)"
-                aria-label="Bestätigungsfrist in Minuten"
-              />
-            </Form.Item>
-          )}
-        </Space>
-      </Form.Item>
       <Form.Item
         name="inhalt"
         label="Inhalt / Wortlaut"
@@ -302,8 +262,121 @@ export default function MeldungFormular({
           zeichenRegel(ETB_INHALT_MAX, 'Inhalt'),
         ]}
       >
-        <TextArea aria-label="Inhalt / Wortlaut" rows={3} count={zeichenGrenze(ETB_INHALT_MAX)} />
+        {/* Ausdrückliches Fokusziel der Hülle: beim Öffnen und nach jedem Serien-Speichern. */}
+        <TextArea
+          ref={wortlautRef}
+          data-erfassung-fokus
+          aria-label="Inhalt / Wortlaut"
+          rows={3}
+          count={zeichenGrenze(ETB_INHALT_MAX)}
+        />
       </Form.Item>
+      <Row gutter={16}>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="absender"
+            label="Absender (Funkrufname/Stelle)"
+            rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
+          >
+            <Input aria-label="Absender" maxLength={ETB_PARTEI_MAX} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item name="empfaenger" label="Empfänger / Adressat">
+            <Input placeholder="z. B. ELW 1, S3" maxLength={ETB_PARTEI_MAX} />
+          </Form.Item>
+        </Col>
+      </Row>
+      {/* Feldbudget (LFH-974): eingeklappt drei Felder. `forceRender`, damit Vorbelegung, Übernahme
+          und Prüfung die Felder auch zugeklappt erreichen. */}
+      <Collapse
+        ghost
+        style={{ marginInline: -8 }}
+        activeKey={weitereOffen ? ['weitere'] : []}
+        onChange={(k) => setWeitereOffen(k.includes('weitere'))}
+        items={[
+          {
+            key: 'weitere',
+            forceRender: true,
+            label: ['Weitere Angaben', ...abweichungen].join(' · '),
+            children: (
+              <>
+                <Row gutter={16}>
+                  {vonOptionen.length > 0 && (
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        name="von"
+                        label="Von Einheit / Abschnitt"
+                        tooltip="Bindet die Meldung an die Einheit. Sie zählt dann als deren Rückmeldung im Meldebild."
+                      >
+                        <Select<string>
+                          aria-label="Von Einheit / Abschnitt"
+                          allowClear
+                          placeholder="nicht zugeordnet"
+                          options={vonOptionen}
+                          onChange={vonGewaehlt}
+                        />
+                      </Form.Item>
+                    </Col>
+                  )}
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="meldeweg" label="Meldeweg">
+                      <Select<MeldungMeldeweg> options={MELDEWEG_OPTIONEN} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="meldungsart" label="Meldungsart">
+                      <Select<Meldungsart> options={MELDUNGSART_OPTIONEN} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="prioritaet" label="Priorität">
+                      <Select<MeldungPrioritaet> options={PRIORITAET_OPTIONEN} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="richtung" label="Richtung">
+                      <Select<Richtung> aria-label="Richtung" options={RICHTUNG_OPTIONEN} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="ereigniszeit" label="Zeitpunkt des Ereignisses">
+                      <ZeitpunktEingabe
+                        style={{ width: '100%' }}
+                        format="YYYY-MM-DD HH:mm"
+                        placeholder="jetzt"
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Form.Item label="Bestätigung erforderlich (Sofortmeldung)">
+                  <Space>
+                    <Form.Item name="bestaetigung_pflicht" valuePropName="checked" noStyle>
+                      <Switch aria-label="Bestätigung erforderlich" />
+                    </Form.Item>
+                    {bestaetigungPflicht && (
+                      <Form.Item
+                        name="frist_min"
+                        noStyle
+                        // Der Server lehnt eine Frist unter einer Minute ab. Als Regel statt `min`
+                        // am Feld: das klemmte still, statt den Wert stehen zu lassen.
+                        rules={[{ type: 'integer', min: 1, message: 'Frist mindestens 1 Min' }]}
+                      >
+                        <InputNumber
+                          precision={0}
+                          suffix="Min"
+                          placeholder="Frist (Default 5)"
+                          aria-label="Bestätigungsfrist in Minuten"
+                        />
+                      </Form.Item>
+                    )}
+                  </Space>
+                </Form.Item>
+              </>
+            ),
+          },
+        ]}
+      />
     </ErfassungsFormular>
   );
 

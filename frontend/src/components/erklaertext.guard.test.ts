@@ -91,7 +91,6 @@ const OFFEN: Record<string, number> = {
   'geraet/KopplungBeendetPage.tsx': 1,
   'infotelefon/AnrufErfassung.tsx': 2,
   'karten/KartenOnlineSektion.tsx': 1,
-  'meldungen/MeldungFormular.tsx': 1,
   'pages/AbloesungPage.tsx': 2,
   'pages/BefehlDetailPage.tsx': 1,
   'pages/BetreuungPage.tsx': 2,
