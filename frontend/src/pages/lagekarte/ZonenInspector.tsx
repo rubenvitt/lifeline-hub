@@ -273,10 +273,16 @@ export default function ZonenInspector({
           </>
         )}
 
+        {/* Gesperrt mit Grund in wenigen Wörtern (LFH-1083), nie nur im Tooltip. */}
         {istBezirksflaeche && !betreuungFrei && (
-          <Typography.Text type="secondary">
-            Zuordnung zu einem Evakuierungsbezirk nur mit Zugriff auf das Modul Betreuung
-          </Typography.Text>
+          <FeldLabel text="Gehört zu Evakuierungsbezirk" htmlFor={bezirkFeldId}>
+            <Select<number>
+              id={bezirkFeldId}
+              style={{ width: '100%' }}
+              disabled
+              placeholder="kein Zugriff auf Betreuung"
+            />
+          </FeldLabel>
         )}
         {istBezirksflaeche && betreuungFrei && darfSchreiben && (
           <FeldLabel text="Gehört zu Evakuierungsbezirk" htmlFor={bezirkFeldId}>
@@ -380,13 +386,11 @@ export default function ZonenInspector({
             über den Hinweis. */}
         {darfSchreiben && (
           <Popconfirm
-            title="Zone aufheben?"
+            title={`Zone „${titel}“ aufheben?`}
             description={
-              <>
-                „{titel}“ wird endgültig gelöscht.
-                {aktuellHatWarnstufen &&
-                  ' Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren.'}
-              </>
+              aktuellHatWarnstufen
+                ? 'Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren.'
+                : undefined
             }
             okText="Aufheben"
             okButtonProps={{ danger: true }}

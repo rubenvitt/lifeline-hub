@@ -175,7 +175,7 @@ describe('Fachebenen-Registry', () => {
     // Wer die Ebene für die amtliche KRITIS-Liste hält, liest eine Lücke als „hier ist nichts".
     expect(FACHEBENEN.kritis.geltung).toMatch(/OpenStreetMap/);
     expect(FACHEBENEN.kritis.geltung).toMatch(/wöchentlich/);
-    expect(FACHEBENEN.kritis.geltung).toMatch(/keine amtliche KRITIS-Liste/);
+    expect(FACHEBENEN.kritis.geltung).toMatch(/nicht amtlich/);
   });
 
   it('nur ODL, Luftqualität, KRITIS und Autobahn nennen einen einschränkenden Geltungsbereich', () => {

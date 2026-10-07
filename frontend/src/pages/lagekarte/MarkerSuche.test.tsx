@@ -98,6 +98,8 @@ describe('MarkerSuche (LFH-716)', () => {
     zeige({ marker: [] });
     expect(screen.getByText('Nichts verortet')).toBeInTheDocument();
     expect(screen.queryByText('Keine Daten')).toBeNull();
+    // Der Titel reicht, keine Anleitung darunter (LFH-1083).
+    expect(screen.queryByText(/sobald sie|Suchbegriff kürzen/)).toBeNull();
   });
 
   it('behauptet im Fehlerfall gar keine Leere — auch nicht mit Suchbegriff', async () => {

@@ -465,14 +465,10 @@ describe('Kartengrundlage', () => {
   });
 
   it('LFH-971: der Hinweis ohne Karte unterscheidet gewählt und nicht konfiguriert', () => {
-    expect(blindHinweis(grundlageOptionen(STILE, false))).toBe(
-      'Ohne Hintergrundkarte – Marker und Verorten funktionieren weiterhin.',
-    );
-    expect(blindHinweis(grundlageOptionen([], true))).toBe(
-      'Ohne Hintergrundkarte – Marker und Verorten funktionieren weiterhin.',
-    );
+    expect(blindHinweis(grundlageOptionen(STILE, false))).toBe('Ohne Hintergrundkarte');
+    expect(blindHinweis(grundlageOptionen([], true))).toBe('Ohne Hintergrundkarte');
     expect(blindHinweis(grundlageOptionen([], false))).toBe(
-      'Keine Kartengrundlage konfiguriert (Verwaltung › Karten) – Marker und Verorten funktionieren weiterhin.',
+      'Keine Kartengrundlage konfiguriert (Verwaltung › Karten)',
     );
   });
 

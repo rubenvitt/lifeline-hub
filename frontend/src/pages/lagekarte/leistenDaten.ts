@@ -426,8 +426,6 @@ export interface GrundlageOption {
 /** Wo eine Kartengrundlage eingerichtet wird — sagt dem Bediener, wer die Sperre lösen kann. */
 const EINRICHTEN = 'Verwaltung › Karten';
 
-const OHNE_KARTE_WIRKT = 'Marker und Verorten funktionieren weiterhin.';
-
 /**
  * Hinweis zur Grundlage „Ohne Karte" (Wert `blind`) — EINE Quelle für Karte und Leiste (LFH-971).
  * Ist keine andere Grundlage wählbar, ist die schwarze Karte keine Wahl, sondern die Installation:
@@ -436,8 +434,8 @@ const OHNE_KARTE_WIRKT = 'Marker und Verorten funktionieren weiterhin.';
 export function blindHinweis(optionen: readonly GrundlageOption[]): string {
   const andereWaehlbar = optionen.some((o) => o.wert !== 'blind' && o.gesperrt == null);
   return andereWaehlbar
-    ? `Ohne Hintergrundkarte – ${OHNE_KARTE_WIRKT}`
-    : `Keine Kartengrundlage konfiguriert (${EINRICHTEN}) – ${OHNE_KARTE_WIRKT}`;
+    ? 'Ohne Hintergrundkarte'
+    : `Keine Kartengrundlage konfiguriert (${EINRICHTEN})`;
 }
 
 /**

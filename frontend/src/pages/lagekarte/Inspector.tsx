@@ -336,7 +336,7 @@ export default function Inspector({
             // Punkt dazu, gehörte diese Bedingung an die Geometrie.
             <Popconfirm
               title={`Fläche von „${marker.label}“ löschen?`}
-              description="Die gezeichnete Fläche geht verloren und muss neu gezeichnet werden."
+              description="Die Fläche geht verloren."
               okText="Löschen"
               okButtonProps={{ danger: true }}
               cancelText="Abbrechen"

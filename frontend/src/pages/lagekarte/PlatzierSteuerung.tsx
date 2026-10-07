@@ -60,14 +60,7 @@ export default function PlatzierSteuerung({ modus }: { modus: PlatzierModus | nu
     >
       <Space orientation="vertical" size={8} style={{ width: '100%' }}>
         <Typography.Text strong>{titel}</Typography.Text>
-        {modus.art === 'platzieren' && (
-          <>
-            <Typography.Text type="secondary">
-              Tipp auf die Karte setzt die Position.
-            </Typography.Text>
-            <Button onClick={modus.onAbbrechen}>Abbrechen</Button>
-          </>
-        )}
+        {modus.art === 'platzieren' && <Button onClick={modus.onAbbrechen}>Abbrechen</Button>}
         {modus.art === 'zeichen' && (
           <>
             {/* Schalter, Zähler und Beenden teilen eine umbrechende Reihe: jede Zeile mehr hebt

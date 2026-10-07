@@ -628,6 +628,7 @@ export default function Sidebar(props: SidebarProps) {
     props.betreuung,
   );
   const zeigeSichtungslegende = props.layer.person && props.personen?.zugriff === 'frei';
+  const bildGriffHinweis = griffHinweis(props.griffModus, { kantenAus: props.griffKantenAus });
 
   // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. Der Effekt hängt allein am
   // Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
@@ -672,11 +673,9 @@ export default function Sidebar(props: SidebarProps) {
             background: rollen.flaeche2,
           }}
         >
-          <Typography.Text type="secondary">
-            Klick auf die Karte setzt die Koordinate.{' '}
-            {props.modusBedienungImFuss ? '(Beenden über der Karte.)' : '(Abbrechen beendet.)'}
-          </Typography.Text>
-          <div style={{ marginTop: token.marginXS }}>
+          {/* Ein Tipp auf die Karte setzt die Position (Fadenkreuz, LFH-1083); hier steht nur
+              der Weg über die Koordinate. Abbrechen steht an der Zeile des Objekts oder im Fuß. */}
+          <div>
             <KoordinatenEingabe
               value={koord}
               onChange={setKoord}
@@ -723,7 +722,7 @@ export default function Sidebar(props: SidebarProps) {
               color: rollen.gedaempft,
             }}
           >
-            Nichts gewählt. Ein Objekt auf der Karte oder unter „Verortet" antippen.
+            Nichts gewählt
           </p>
         )}
       </LeistenAbschnitt>
@@ -941,12 +940,8 @@ export default function Sidebar(props: SidebarProps) {
                 <Typography.Text type="secondary">Taktisches Zeichen</Typography.Text>
                 {props.zeichenPlatzieren ? (
                   <Space orientation="vertical" style={{ width: '100%' }}>
-                    <Typography.Text type="secondary">
-                      Auf Karte klicken zum Platzieren.
-                    </Typography.Text>
-                    {props.modusBedienungImFuss ? (
-                      <Typography.Text type="secondary">Bedienung über der Karte.</Typography.Text>
-                    ) : (
+                    {/* Unter `lg` steht die Bedienung im Fuß-Band über der Karte (LFH-765). */}
+                    {props.modusBedienungImFuss ? null : (
                       <>
                         {/* Serienmodus: der Schalter beschreibt den laufenden Modus und steht
                             deshalb hier, nicht im Picker. `wrap`: im Handschuh ist er 144 px breit. */}
@@ -1028,7 +1023,7 @@ export default function Sidebar(props: SidebarProps) {
         {darfSchreiben && props.ansichtDirty && (
           <Space orientation="vertical" style={{ width: '100%', marginTop: token.marginSM }}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Karten-Konfiguration weicht von der gespeicherten Ansicht ab.
+              Ungespeicherte Änderungen
             </Typography.Text>
             {/* Schreibt in die aktive Ansicht, nicht in eine einsatzweite Einstellung. */}
             <Button
@@ -1109,25 +1104,19 @@ export default function Sidebar(props: SidebarProps) {
                   {laedt ? (
                     <Spin size="small" />
                   ) : zoomHinweis ? (
-                    <Tooltip
-                      title={`${def.label}: Objekte werden erst ab einer näheren Zoomstufe geladen`}
-                    >
-                      <Typography.Text type="warning" style={{ fontSize: 11 }}>
-                        näher heranzoomen
-                      </Typography.Text>
-                    </Tooltip>
+                    <Typography.Text type="warning" style={{ fontSize: 11 }}>
+                      näher heranzoomen
+                    </Typography.Text>
                   ) : (
                     <>
                       {/* `nowrap`: sonst bricht die Marke mitten im Wort. */}
                       {sichtbar && offline && (
-                        <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
-                          <Typography.Text
-                            type="secondary"
-                            style={{ fontSize: 11, whiteSpace: 'nowrap' }}
-                          >
-                            offline
-                          </Typography.Text>
-                        </Tooltip>
+                        <Typography.Text
+                          type="secondary"
+                          style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                        >
+                          offline
+                        </Typography.Text>
                       )}
                       {sichtbar && status === 'leer' && (
                         <Typography.Text
@@ -1267,11 +1256,7 @@ export default function Sidebar(props: SidebarProps) {
                     {/* Ein Umschalter statt zehn gleichzeitig scharfer Griffe: in Fingergröße
                         lägen Ecken, Kanten, Drehung und Mitte auf einem kleinen Bild
                         übereinander. Der Hinweis nennt nur die aktiven Griffe. */}
-                    {props.modusBedienungImFuss ? (
-                      <Typography.Text type="secondary" style={{ display: 'block' }}>
-                        Bedienung über der Karte.
-                      </Typography.Text>
-                    ) : (
+                    {props.modusBedienungImFuss ? null : (
                       <Segmentleiste<GriffModus>
                         beschriftung="Griffe auf der Karte"
                         wert={props.griffModus}
@@ -1284,17 +1269,19 @@ export default function Sidebar(props: SidebarProps) {
                         style={{ marginBottom: token.marginXS }}
                       />
                     )}
-                    <Typography.Text
-                      type="secondary"
-                      style={{ fontSize: 12, display: 'block' }}
-                      data-lfh="bildgriff-hinweis"
-                    >
-                      {griffHinweis(props.griffModus, {
-                        kantenAus: props.griffKantenAus,
-                      })}{' '}
-                      Oder Mittelpunkt numerisch:
-                    </Typography.Text>
+                    {bildGriffHinweis && (
+                      <Typography.Text
+                        type="warning"
+                        style={{ fontSize: 12, display: 'block' }}
+                        data-lfh="bildgriff-hinweis"
+                      >
+                        {bildGriffHinweis}
+                      </Typography.Text>
+                    )}
                     <div style={{ marginTop: token.marginSM }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                        Mittelpunkt
+                      </Typography.Text>
                       <KoordinatenEingabe
                         value={bildMitte ?? props.bildPlatzierZentrum}
                         onChange={setBildMitte}
@@ -1363,9 +1350,7 @@ export default function Sidebar(props: SidebarProps) {
         onCancel={() => setLoeschBildId(null)}
         destroyOnHidden
       >
-        <Typography.Paragraph>
-          Das Bild wird aus der Lagekarte entfernt. Bereits gesetzte Eckpunkte gehen dabei verloren.
-        </Typography.Paragraph>
+        <Typography.Paragraph>Gesetzte Eckpunkte gehen verloren.</Typography.Paragraph>
       </Modal>
 
       <KlappPaneel
@@ -1375,11 +1360,8 @@ export default function Sidebar(props: SidebarProps) {
         onUmschalten={umschalten('grundlage')}
       >
         <Space orientation="vertical" style={{ width: '100%' }}>
-          {props.grundlageWahl ?? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Gewählt wird die Grundlage oben links auf der Karte.
-            </Typography.Text>
-          )}
+          {/* Ab `lg` steht die Wahl oben links auf der Karte, ein Weg je Breite. */}
+          {props.grundlageWahl}
           {/* Mit der Leiste im Paneel (Handschirm) nennt deren Sperrgrund das schon. */}
           {!props.grundlageWahl && !props.onlineVerfuegbar && (
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>

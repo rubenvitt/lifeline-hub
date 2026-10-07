@@ -1023,6 +1023,11 @@ export default function LagekartePage() {
   const karte = (
     <div
       data-lfh="kartenspalte"
+      // Ein Tipp setzt eine Position: das Fadenkreuz zeigt es statt eines Satzes (LFH-1083,
+      // `lagekarte.css`). Bild einpassen zieht an Griffen und behält deren Zeiger.
+      className={
+        platzierungZiel != null || zeichenPlatzieren != null ? 'lfh-karte-setzen' : undefined
+      }
       style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}
     >
       <Kartenflaeche

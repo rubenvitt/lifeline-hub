@@ -178,10 +178,7 @@ export default function AnsichtSwitcher({
         onCancel={() => setLoeschDialog(false)}
         destroyOnHidden
       >
-        <Typography.Paragraph>
-          Was soll mit den auf dieser Ansicht angelegten Objekten (Zeichen, Zonen, Bilder)
-          geschehen?
-        </Typography.Paragraph>
+        <Typography.Paragraph>Zeichen, Zonen und Bilder dieser Ansicht:</Typography.Paragraph>
         <Radio.Group
           name="objekt-behandlung"
           value={objektBehandlung}

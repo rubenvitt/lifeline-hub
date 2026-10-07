@@ -1,4 +1,4 @@
-import { Button, Card, Space, Typography } from 'antd';
+import { Button, Card, Space } from 'antd';
 import { Segmentleiste, monoStil, useRollen } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import { messErgebnis, type MessForm } from './messung';
@@ -65,11 +65,6 @@ export default function MessSteuerung(props: MessSteuerungProps) {
             </span>
           )}
         </output>
-        <Typography.Text type="secondary">
-          {fertig
-            ? 'Gemessen. Ein neuer Klick beginnt eine neue Messung.'
-            : 'Punkte per Klick setzen, doppelklicken oder „Abschließen".'}
-        </Typography.Text>
         <Space>
           {fertig ? (
             <Button onClick={props.onNeu}>Neu messen</Button>

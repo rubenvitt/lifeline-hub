@@ -2,7 +2,7 @@ import { IconLupe } from '../../icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Input, Typography, theme } from 'antd';
+import { Button, Input, Typography, theme } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { monoStil } from '../../components/instrument';
@@ -79,10 +79,10 @@ function adressAussage(
   fehler: boolean,
 ): string | null {
   if (fehler || antwort?.zustand === 'nicht_erreichbar') {
-    return 'Adresssuche nicht erreichbar — eine Koordinate lässt sich trotzdem anspringen.';
+    return 'Adresssuche nicht erreichbar';
   }
   if (antwort?.zustand === 'ausgelastet') {
-    return 'Adresssuche gerade ausgelastet — in einer Sekunde erneut Enter drücken.';
+    return 'Adresssuche ausgelastet';
   }
   if (antwort?.zustand === 'ok' && antwort.treffer.length === 0) {
     return `Keine Adresse zu „${begriff}“ gefunden`;
@@ -215,13 +215,6 @@ export default function MarkerSuche({
                 ? `Kein Kartenobjekt zu „${begriff}“`
                 : 'Nichts verortet'
           }
-          hinweis={
-            zaehlerUnbekannt
-              ? 'Was hier steht, ist unvollständig — die Karte zeigt womöglich mehr.'
-              : begriff !== ''
-                ? 'Suchbegriff kürzen oder Schreibweise prüfen.'
-                : 'Objekte erscheinen hier, sobald sie auf der Karte platziert sind.'
-          }
         />
       ) : (
         gruppen.map((g) => (
@@ -282,8 +275,7 @@ function AdressGruppe({
   const { refetch, isError, data } = adresse;
 
   // Ein neues Enter auf denselben Begriff (gleicher Key, Gruppe bleibt eingehängt) fragt nach einem
-  // Fehlzustand neu — „in einer Sekunde erneut Enter drücken“ muss stimmen. Treffer kommen aus dem
-  // Cache.
+  // Fehlzustand neu, wie „Erneut suchen“. Treffer kommen aus dem Cache.
   const gefragtFuerRef = useRef(anfrage.nr);
   useEffect(() => {
     if (gefragtFuerRef.current === anfrage.nr) return;
@@ -312,6 +304,9 @@ function AdressGruppe({
     if (orte.length === 1) onOrtWaehlen(orte[0]);
   }, [data, anfrage.nr, erledigtRef, orte, onOrtWaehlen]);
 
+  const aussage = adressAussage(anfrage.begriff, adresse.data, adresse.isError);
+  const nochmal = isError || (data != null && data.zustand !== 'ok');
+
   return (
     <Liste
       size="small"
@@ -319,7 +314,26 @@ function AdressGruppe({
       dataSource={orte}
       rowKey={(o, i) => `${i}:${o.lat},${o.lon}`}
       loading={adresse.isPending}
-      emptyText={adressAussage(anfrage.begriff, adresse.data, adresse.isError)}
+      emptyText={
+        aussage && (
+          <span
+            style={{
+              display: 'inline-flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: token.marginXS,
+            }}
+          >
+            {aussage}
+            {/* Ein Fehlzustand nennt den Ausweg als Knopf statt als Satz (LFH-1083). */}
+            {nochmal && (
+              <Button size="small" loading={adresse.isFetching} onClick={() => void refetch()}>
+                Erneut suchen
+              </Button>
+            )}
+          </span>
+        )
+      }
       style={{ marginBottom: token.marginXS }}
       renderItem={(o) => eintrag(o)}
     />

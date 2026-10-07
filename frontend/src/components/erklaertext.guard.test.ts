@@ -102,9 +102,6 @@ const OFFEN: Record<string, number> = {
   'pages/einstellungen/EinsatzModule.tsx': 1,
   'pages/einstellungen/KategorieVorgabenPaneel.tsx': 1,
   'pages/einstellungen/ModulEinstellungsListe.tsx': 1,
-  'pages/lagekarte/MessSteuerung.tsx': 1,
-  'pages/lagekarte/Sidebar.tsx': 3,
-  'pages/lagekarte/ZeichnenSteuerung.tsx': 2,
   'stab/LagebesprechungModal.tsx': 1,
   'stab/skizze/Eigenschaftspaneel.tsx': 1,
 };
