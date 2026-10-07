@@ -501,6 +501,11 @@ und `pages/personen/`.
   „Nur Ansicht · Grund“ über dem Block (Grund aus `components/nurAnsicht.ts`, wenige Wörter,
   Rollen wie in der Mitgliederverwaltung), Primäraktion gesperrt sichtbar; Zeilenaktionsspalte
   entfällt (M45); gesperrte Einzelzeilen tragen ihren Kurzgrund selbst.
+- **Was der Server sicher ablehnt, steht gesperrt mit Grund** (LFH-966): Entfernen und
+  Herabstufen der letzten Einsatzleitung, Deaktivieren des letzten aktiven Admins und des
+  eigenen Kontos. Der Grund steht in wenigen Wörtern neben der Aktion (`aria-describedby`),
+  Wortlaut in `stammdaten/rechteText.ts`. Die eigene Herabstufung ohne Systemrolle fragt nach
+  (kein eigener Rückweg); der Knopf nennt die Handlung.
 - Sofort-Speichern-Zeile sperrt nur sich (`ModulEinstellungsListe`: `laeuftKey`/`fehlerKey` aus
   `mutation.variables`, Fehlerzeile `data-fehler`).
 - Zeilenlayouts ohne feste Spaltenbreite (Grid `minmax(0, 1fr) auto auto`, unter `md` gestapelt
