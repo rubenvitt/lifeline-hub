@@ -54,6 +54,12 @@ describe('MeldungFormular', () => {
     // Bestätigungspflicht aktivieren, dann Frist-Override setzen.
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.click(screen.getByRole('switch', { name: 'Bestätigung erforderlich' }));
+    // Leer gilt die Vorgabe des Einsatzes bzw. der Organisation (LFH-944); die Zahl kennt das
+    // Formular nicht, deshalb nennt der Platzhalter keine.
+    expect(screen.getByLabelText('Bestätigungsfrist in Minuten')).toHaveAttribute(
+      'placeholder',
+      'Frist (Vorgabe)',
+    );
     await userEvent.type(screen.getByLabelText('Bestätigungsfrist in Minuten'), '30');
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));

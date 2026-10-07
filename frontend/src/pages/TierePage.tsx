@@ -519,14 +519,11 @@ export default function TierePage() {
                       <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung">
                         <Input />
                       </Form.Item>
-                      <Form.Item
-                        label="Kennzeichnung (Chip/Tätowierung/Halsband)"
-                        name="kennzeichnung"
-                      >
-                        <Input />
+                      <Form.Item label="Kennzeichnung" name="kennzeichnung">
+                        <Input placeholder="Chip / Tätowierung / Halsband" />
                       </Form.Item>
-                      <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt">
-                        <Input placeholder="meldender Halter" />
+                      <Form.Item label="Halter-Kontakt" name="halter_kontakt">
+                        <Input placeholder="Name, Telefon" />
                       </Form.Item>
                     </>
                   )}

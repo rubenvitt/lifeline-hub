@@ -9,12 +9,10 @@ import { sichtungsfarben } from '../theme/tokens';
  * Das Farbfeld ist kein Bedienziel und trägt bewusst keine Dichte-Mindesthöhe. */
 export default function SichtungsTag({
   kategorie,
-  praefix = '',
   anzahl,
   style,
 }: {
   kategorie: Sichtungskategorie;
-  praefix?: string;
   anzahl?: number;
   style?: CSSProperties;
 }) {
@@ -44,7 +42,6 @@ export default function SichtungsTag({
           }}
         />
       )}
-      {praefix}
       {darstellung.label}
       {anzahl !== undefined ? `: ${anzahl}` : ''}
     </Tag>

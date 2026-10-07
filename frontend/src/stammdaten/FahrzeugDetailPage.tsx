@@ -162,7 +162,7 @@ export default function FahrzeugDetailPage() {
             {fahrzeug.ist_demo && <DemoMarke />}
           </Space>
         }
-        beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die ein Fahrzeug nicht auffindbar ist."
+        beschreibung="Alle Stammdaten des Fahrzeugs. In der Liste erfasst du nur vier Grundfelder, hier ergänzt du den Rest."
         hinweis={
           <SeitenHinweise
             fehler={speichern.error}

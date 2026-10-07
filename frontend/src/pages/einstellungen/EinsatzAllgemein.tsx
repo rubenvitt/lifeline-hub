@@ -6,7 +6,7 @@ import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
-import { modulRegistry } from '../../einsatz/modulRegistry';
+import { modulRegistry, modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
 import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import { Formularpaneel } from '../../components/instrument';
 import {
@@ -14,12 +14,15 @@ import {
   KOORDINATEN_OPTIONEN,
   ZEITFORMAT_OPTIONEN,
   ZEITZONEN_OPTIONEN,
+  ZEITZONE_HILFE,
 } from './optionen';
 import {
   initialAllgemein,
   normalisiereAllgemein,
   orgHinweisSelect,
   orgHinweisWert,
+  platzhalterVorgabe,
+  platzhalterVorgabeSelect,
   zuUpdate,
   type FormWerteAllgemein,
 } from './einsatzEinstellungenForm';
@@ -27,6 +30,7 @@ import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { teilwortSuche } from '../../components/teilwortSuche';
+import { mitVorgabe } from '../../components/vorgabeText';
 
 /**
  * Sektion `…/einstellungen/allgemein` — Einstieg + Anzeige-Konventionen. Fünf Felder, deshalb
@@ -76,6 +80,8 @@ export default function EinsatzAllgemein() {
 
   const orgDefaults = daten.einstellungen.org_defaults;
   // Nur fertige Module sind als Default-Modul wählbar.
+  // Leer öffnet der Einsatz das Modul aus `redirectZiel` (LFH-944: der Platzhalter nennt es).
+  const einstiegVorgabe = modulZuRoute(redirectZiel())?.label ?? 'ETB';
   const standardModulOptionen = modulRegistry
     .filter((m) => m.status === 'fertig')
     .map((m) => ({ value: m.key, label: m.label }));
@@ -103,13 +109,13 @@ export default function EinsatzAllgemein() {
       >
         <Formularpaneel titel="Einstieg">
           <Form.Item
-            label="Standard-Modul (Einstieg)"
+            label="Einstiegsmodul"
             name="standard_modul"
-            tooltip="Modul, das beim Öffnen des Einsatzes angezeigt wird. Leer = Standard (Lage-Dashboard bzw. ETB)."
+            tooltip={`Modul, das beim Öffnen des Einsatzes erscheint. Leer = ${einstiegVorgabe}.`}
           >
             <Select
               allowClear
-              placeholder="Standard (Lage-Dashboard bzw. ETB)"
+              placeholder={mitVorgabe(einstiegVorgabe)}
               options={standardModulOptionen}
             />
           </Form.Item>
@@ -117,18 +123,18 @@ export default function EinsatzAllgemein() {
 
         <Formularpaneel
           titel="Anzeige-Konventionen"
-          beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Standard."
+          beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild)."
         >
           <Form.Item
             label="Zeitzone"
             name="zeitzone"
-            tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
+            tooltip={ZEITZONE_HILFE}
             extra={orgHinweisWert(orgDefaults?.zeitzone)}
           >
             <AutoComplete
               allowClear
               options={ZEITZONEN_OPTIONEN}
-              placeholder="Europe/Berlin (Standard)"
+              placeholder={platzhalterVorgabe(orgDefaults?.zeitzone, 'Gerätezeit')}
               showSearch={teilwortSuche}
             />
           </Form.Item>
@@ -137,14 +143,30 @@ export default function EinsatzAllgemein() {
             name="zeitformat"
             extra={orgHinweisSelect(orgDefaults?.zeitformat, ZEITFORMAT_OPTIONEN)}
           >
-            <Select allowClear placeholder="24 Stunden (Standard)" options={ZEITFORMAT_OPTIONEN} />
+            <Select
+              allowClear
+              placeholder={platzhalterVorgabeSelect(
+                orgDefaults?.zeitformat,
+                ZEITFORMAT_OPTIONEN,
+                '24 Stunden',
+              )}
+              options={ZEITFORMAT_OPTIONEN}
+            />
           </Form.Item>
           <Form.Item
             label="Einheiten"
             name="einheiten"
             extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
           >
-            <Select allowClear placeholder="Metrisch (Standard)" options={EINHEITEN_OPTIONEN} />
+            <Select
+              allowClear
+              placeholder={platzhalterVorgabeSelect(
+                orgDefaults?.einheiten,
+                EINHEITEN_OPTIONEN,
+                'Metrisch',
+              )}
+              options={EINHEITEN_OPTIONEN}
+            />
           </Form.Item>
           <Form.Item
             label="Koordinatenformat"
@@ -153,7 +175,11 @@ export default function EinsatzAllgemein() {
           >
             <Select
               allowClear
-              placeholder="WGS84 dezimal (Standard)"
+              placeholder={platzhalterVorgabeSelect(
+                orgDefaults?.koordinatenformat,
+                KOORDINATEN_OPTIONEN,
+                'WGS84 dezimal',
+              )}
               options={KOORDINATEN_OPTIONEN}
             />
           </Form.Item>

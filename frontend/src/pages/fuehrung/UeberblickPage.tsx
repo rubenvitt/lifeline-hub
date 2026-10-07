@@ -274,6 +274,11 @@ function Zustandsfeld({
   return <>{children}</>;
 }
 
+/** „1 Einheit“, „2 Einheiten“ — Zahl vor Wort, Einzahl und Mehrzahl richtig (LFH-973). */
+function anzahlWort(anzahl: number, einzahl: string, mehrzahl: string): string {
+  return `${anzahl} ${anzahl === 1 ? einzahl : mehrzahl}`;
+}
+
 export default function UeberblickPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -651,7 +656,8 @@ export default function UeberblickPage() {
                 groesse="gross"
                 zustand={kennzahlZustand(zKraefte)}
                 wert={zKraefte === 'gesperrt' ? '—' : kraefte.gesamt}
-                einheit={zKraefte === 'gesperrt' ? undefined : 'Ges.'}
+                // „Σ“ wie in der Stärkeschreibweise darunter, nicht „Ges.“ (LFH-973).
+                einheit={zKraefte === 'gesperrt' ? undefined : 'Σ'}
                 notiz={zKraefte === 'gesperrt' ? NICHT_FREIGEGEBEN : `F/UF/M//Σ ${kraefte.text}`}
                 ziel={meldebildGesperrt ? undefined : kraefteuebersichtPfad(einsatzId)}
               />
@@ -716,7 +722,8 @@ export default function UeberblickPage() {
                 // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883).
                 meta={
                   zAbschnitte === 'daten' ? (
-                    `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
+                    // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
+                    `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
                   ) : zAbschnitte === 'laden' ? (
                     <span
                       data-lfh="paneel-meta-platzhalter"
@@ -1104,8 +1111,10 @@ function AbschnittEintrag({
         </span>
         {leitung && <span style={{ ...monoStil(11), color: rollen.schwach }}>{leitung}</span>}
         <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
-          {zeile.einheiten === 1 ? '1 Einheit' : `${zeile.einheiten} Einheiten`}
-          {zeile.unterabschnitte > 0 && ` · ${zeile.unterabschnitte} UA`}
+          {/* Was gezählt wird, steht dran (LFH-973): hier der ganze Teilbaum, im Abschnittsbaum
+              nur die direkt zugeordneten. */}
+          {anzahlWort(zeile.einheiten, 'Einheit', 'Einheiten')}
+          {zeile.unterabschnitte > 0 && ` inkl. UA · ${zeile.unterabschnitte} UA`}
         </span>
         {(lage || zeile.unterLage) && (
           <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>

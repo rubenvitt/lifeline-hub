@@ -15,6 +15,8 @@ import {
 } from '../../components/erfassungsSitzung';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
+import { RechteHinweis } from '../../components/SpeicherHinweis';
+import { einsatzRechteGrund } from '../../components/nurAnsicht';
 import { SK_META } from '../../personen/personMeta';
 import AufnahmeFelder, {
   aufnahmeZuEingabe,
@@ -92,7 +94,7 @@ export default function AufnahmePage() {
     },
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        setQuittung('Offline vorgemerkt — Registriernummer folgt nach der Übertragung.');
+        setQuittung('Offline vorgemerkt · R-…');
       } else {
         const person = ergebnis.daten;
         const zusatz =
@@ -136,11 +138,6 @@ export default function AufnahmePage() {
     <EinsatzSeite
       breite="schmal"
       titel="Aufnahme"
-      beschreibung={
-        uhsAuftrag
-          ? 'Sichtungskategorie zuerst — die Person landet danach im Wartebereich der Unfallhilfsstelle.'
-          : 'Sichtungskategorie zuerst — die übrigen Angaben sind optional.'
-      }
       breadcrumb={
         darf('fremde-module') && (
           <Breadcrumb
@@ -162,17 +159,7 @@ export default function AufnahmePage() {
         )
       }
       hinweis={
-        !darfSchreiben && (
-          <Alert
-            type="info"
-            showIcon
-            title={
-              einsatz.status === 'aktiv'
-                ? 'Keine Schreibberechtigung in diesem Einsatz.'
-                : 'Einsatz ist abgeschlossen — nur Ansicht.'
-            }
-          />
-        )
+        !darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
       }
     >
       {quittung && (

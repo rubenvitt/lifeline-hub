@@ -9,6 +9,7 @@ import type {
   Stellenart,
   Verbindungsmittel,
 } from '../api/types';
+import { anzahl } from '../anzeige/anzahl';
 import { kommunikationsmittelLabel } from '../components/kommunikationsmittel';
 import { einheitDetailPfad, einsatzabschnittePfad } from '../routing/deeplinks';
 import { besetzungDarstellung, zeileFuer } from './besetzung';
@@ -308,10 +309,6 @@ export function brauchtRueckfrage(u: EntfernUmfang): boolean {
     u.skizzenVerbindungen == null ||
     u.skizzenVerbindungen > 0
   );
-}
-
-function anzahl(n: number, einzahl: string, mehrzahl: string): string {
-  return `${n} ${n === 1 ? einzahl : mehrzahl}`;
 }
 
 /** Der Text der Rückfrage: nennt jede Zahl größer null, eine unbekannte mit Grund. */

@@ -433,10 +433,6 @@ for (const modus of ['light', 'dark'] as const) {
       ['inhalt', 'Betreuungsstelle anlegen'],
       // Leermeldungs-Hinweis und die Felder von „Stelle bearbeiten".
       ['Stelle bearbeiten', 'Die Stelle ist mit 150 Personen belegt.'],
-      [
-        'Stelle bearbeiten',
-        'Geschlossen werden kann sie erst, wenn alle sie verlassen haben. Das wird als Belegung 0 gemeldet und steht im Einsatztagebuch.',
-      ],
       ['Stelle bearbeiten', 'Alle haben die Stelle verlassen — Belegung 0 melden'],
       ['Stelle bearbeiten', 'Status'],
       ['Stelle bearbeiten', 'Kapazität (Personen)'],
@@ -469,18 +465,7 @@ for (const modus of ['light', 'dark'] as const) {
       ['inhalt', 'Betreuungsstellen'],
       ['inhalt', 'Evakuiert'],
       ['inhalt', 'Kapazität'],
-      [
-        'Stelle bearbeiten',
-        'Leer: keine Kapazität — dann wird keine Zahl freier Plätze ausgewiesen.',
-      ],
-      [
-        'Evakuierungsbezirk anlegen',
-        'Straßenzug oder Bezirksnummer — keine Namen von Bewohnern. Die Bezeichnung steht im Einsatztagebuch.',
-      ],
-      [
-        'Stand melden: Uferstraße 12–40',
-        'Leer: jetzt. Eine nachgetragene ältere Meldung ändert den aktuellen Stand nicht.',
-      ],
+      ['Evakuierungsbezirk anlegen', 'Keine Namen von Bewohnern.'],
     ] as const)
       pruefeGesehen(flaeche, tertiaer);
     // Rot, bis LFH-693 am Tag unter einer Ausnahme: der Menüeintrag und der rote Knopf im

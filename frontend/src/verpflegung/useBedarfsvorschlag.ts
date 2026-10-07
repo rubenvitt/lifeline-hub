@@ -60,6 +60,8 @@ function betreuteVorschlag(
   k: BelegungKopfzahl,
   vonAt: string | undefined,
   jetzt: Dayjs,
+  /** Uhrzeit des Abrufs in der Anzeigezone — „Stand“ heißt in beiden Feldern eine Uhrzeit. */
+  stand: string,
 ): Vorschlag {
   // `stellen` führt auch Stellen OHNE Meldung: „nichts gemeldet“ heißt „keine Stelle mit Meldung“,
   // nicht `stellen.length === 0`. Eine gemeldete 0 ist ein Wert.
@@ -69,9 +71,9 @@ function betreuteVorschlag(
   const von = vonAt ? dayjs.utc(vonAt) : null;
   const zukunft = !von || !von.isValid() || von.valueOf() > jetzt.valueOf();
   const herkunft = !vonAt
-    ? 'Vorschlag: in Betreuung, Stand jetzt'
+    ? `Vorschlag: in Betreuung, Stand ${stand}`
     : zukunft
-      ? 'Vorschlag: in Betreuung, Stand jetzt, nicht zum Beginn'
+      ? `Vorschlag: in Betreuung, Stand ${stand}, nicht zum Beginn`
       : 'Vorschlag: in Betreuung zum Beginn';
   const n = k.stellen_ohne_meldung;
   const untergrenze =
@@ -103,23 +105,31 @@ export function useBedarfsvorschlag({
     retry: false,
   });
 
+  // „Stand“ ist in beiden Feldern die Uhrzeit des Abrufs in der Anzeigezone, wie jede andere
+  // Uhrzeit im Dialog (LFH-692); vorher stand beim Betreuten-Feld „Stand jetzt“ (LFH-948).
+  const standVon = (ms: number) => zuWanduhr(dayjs(ms), konventionen.zeitzone).format('HH:mm');
+
   let kraefte = LEER;
   // Ein Fehler lässt die Quelle leer; `data` eines früheren Erfolgs bliebe bei einem
   // Refetch-Fehler stehen — deshalb zusätzlich `isError`.
   if (personalFrei && personalQ.data && !personalQ.isError) {
     const gesamt = verdichte(personalQ.data, [], []).staerke.gesamt;
     if (gesamt > 0) {
-      // Stand in der Anzeigezone, wie jede andere Uhrzeit im Dialog (LFH-692).
-      const stand = zuWanduhr(dayjs(personalQ.dataUpdatedAt), konventionen.zeitzone).format(
-        'HH:mm',
-      );
-      kraefte = { wert: gesamt, hinweis: `Vorschlag: Personal im Einsatz, Stand ${stand}` };
+      kraefte = {
+        wert: gesamt,
+        hinweis: `Vorschlag: Personal im Einsatz, Stand ${standVon(personalQ.dataUpdatedAt)}`,
+      };
     }
   }
 
   let betreute = LEER;
   if (betreuungFrei && kopfzahlQ.data && !kopfzahlQ.isError) {
-    betreute = betreuteVorschlag(kopfzahlQ.data, vonAt, jetzt ?? dayjs());
+    betreute = betreuteVorschlag(
+      kopfzahlQ.data,
+      vonAt,
+      jetzt ?? dayjs(),
+      standVon(kopfzahlQ.dataUpdatedAt),
+    );
   }
 
   return { kraefte, betreute };

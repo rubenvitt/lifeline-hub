@@ -184,6 +184,11 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
 
     await waitFor(() => expect(capturedBody).not.toBeNull());
     expect(capturedBody).toMatchObject({ art: 'austritt', objekt_typ: 'einheit', objekt_id: 10 });
+    // Die Quittung nennt Handlung und Objekt (LFH-948); die Bezeichnung geht nicht zum Server.
+    expect(
+      await screen.findByText('Einheit „Einheit Alpha“ aus dem BR entfernt'),
+    ).toBeInTheDocument();
+    expect(capturedBody).not.toHaveProperty('bezeichnung');
   });
 });
 
@@ -229,6 +234,8 @@ describe('BrDetailPage – Sidebar zuweisen (LFH-14)', () => {
 
     await waitFor(() => expect(capturedBody).not.toBeNull());
     expect(capturedBody).toMatchObject({ art: 'eintritt', objekt_typ: 'fahrzeug', objekt_id: 20 });
+    expect(await screen.findByText('Fahrzeug „Florian 1“ dem BR zugewiesen')).toBeInTheDocument();
+    expect(capturedBody).not.toHaveProperty('bezeichnung');
   });
 });
 

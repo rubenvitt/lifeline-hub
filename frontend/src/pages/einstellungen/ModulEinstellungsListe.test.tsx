@@ -38,12 +38,12 @@ describe('ModulEinstellungsListe', () => {
       <ModulEinstellungsListe
         {...einsatzProps()}
         sichtbarSpalte={undefined}
-        rollenSpalte="Benötigte Rolle (Default)"
+        rollenSpalte="Benötigte Rolle (Vorgabe)"
       />,
     );
 
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-    expect(screen.getByText('Benötigte Rolle (Default)')).toBeInTheDocument();
+    expect(screen.getByText('Benötigte Rolle (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' })).toBeInTheDocument();
   });
 
@@ -86,11 +86,13 @@ describe('ModulEinstellungsListe', () => {
     renderMitProviders(
       <ModulEinstellungsListe
         {...einsatzProps()}
-        hinweisVon={(key) => (key === 'etb' ? 'Org: Führungskraft' : undefined)}
+        hinweisVon={(key) =>
+          key === 'etb' ? 'Vorgabe der Organisation: Führungskraft' : undefined
+        }
       />,
     );
 
-    expect(screen.getByText('Org: Führungskraft')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: Führungskraft')).toBeInTheDocument();
   });
 
   it('zeigt den aktuellen Wert je Modul an (Rolle und Sichtbarkeit kommen von außen)', () => {

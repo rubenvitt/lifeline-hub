@@ -1022,11 +1022,7 @@ describe('TierePage — Feldbudget der Erfassung (LFH-963)', () => {
 
   it('„Vermisst melden" legt Farbe, Kennzeichnung und Halter-Kontakt unter „Weitere Angaben"', async () => {
     const dialog = await oeffne('Vermisst melden');
-    for (const name of [
-      'Farbe / Erscheinung',
-      'Kennzeichnung (Chip/Tätowierung/Halsband)',
-      'Halter-Kontakt (Name, Tel.)',
-    ]) {
+    for (const name of ['Farbe / Erscheinung', 'Kennzeichnung', 'Halter-Kontakt']) {
       expect(within(dialog).getByLabelText(name)).not.toBeVisible();
     }
   });

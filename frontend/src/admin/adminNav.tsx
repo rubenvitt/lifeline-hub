@@ -68,7 +68,7 @@ export const adminGruppen: AdminGruppe[] = [
     label: 'Einstellungen',
     sektionen: [
       { key: 'anzeige', label: 'Anzeige', element: <AnzeigeEinstellungen /> },
-      { key: 'einsatz', label: 'Einsatz-Defaults', element: <EinsatzDefaults /> },
+      { key: 'einsatz', label: 'Einsatz-Vorgaben', element: <EinsatzDefaults /> },
       { key: 'anmeldung', label: 'Anmeldeverfahren', element: <Anmeldeverfahren /> },
     ],
   },

@@ -308,6 +308,35 @@ describe('EinsatzDefaults', () => {
     await waitFor(() => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(1));
   });
 
+  it('nennt voreingestellte Werte „Vorgabe“ — Titel, Fristen, Rollenspalte, Quittung (LFH-944)', async () => {
+    const { container } = renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    expect(await screen.findByRole('heading', { name: 'Einsatz-Vorgaben' })).toBeInTheDocument();
+    expect(screen.getByText('Rollen-Vorgabe je Modul')).toBeInTheDocument();
+    expect(screen.getByText('Benötigte Rolle (Vorgabe)')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Vorgabe-Bestätigungsfrist Meldungen (Minuten)'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Vorgabe-Quittierungsfrist Aufträge (Minuten)'),
+    ).toBeInTheDocument();
+    // Leere Meldungsfrist heißt 5 Minuten (System), leere Auftragsfrist heißt keine Frist.
+    expect(screen.getByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('keine Frist (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
+    // Was leer gilt, sagt der Platzhalter; kein Satz erklärt das Feld (LFH-1078).
+    expect(container.textContent).not.toMatch(/Leer = Vorgabe/);
+    const platzhalter = [...container.querySelectorAll('[placeholder]')].map((e) =>
+      e.getAttribute('placeholder'),
+    );
+    expect([container.textContent, ...platzhalter].join(' ')).not.toMatch(/Default|Fallback/);
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
+    const optionen = await screen.findAllByText('Admin');
+    fireEvent.click(optionen[optionen.length - 1]);
+    expect(await screen.findByText('Modul-Vorgabe gespeichert')).toBeInTheDocument();
+  });
+
   it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {
     // 'einsatzdaten' und 'einsatz-einstellungen' sind NICHT_AUSBLENDBAR — ihr Rollen-Select bleibt
     // gesperrt; ein ausblendbares Modul (ETB) ist editierbar.

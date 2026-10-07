@@ -283,6 +283,7 @@ describe('PersonalPage', () => {
   it('Leitung im aktiven Einsatz sieht Dispositions-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');
+    expect(screen.getByRole('button', { name: 'Person disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
   });
@@ -297,6 +298,7 @@ describe('PersonalPage', () => {
     );
     await screen.findByText('Thomas Müller');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Person' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Person disponieren' })).not.toBeInTheDocument();
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
   });
 
@@ -464,8 +466,12 @@ describe('PersonalPage', () => {
   it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
     const { container } = render(einsatz(), [epGebunden, epVerfuegbar]);
     await screen.findByText('Thomas Müller');
-    expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
-    expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
+    // Im Streifen gesucht: die Verdichtungszeile darüber schreibt dieselben Wörter (LFH-973).
+    const streifen = within(
+      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+    );
+    expect(streifen.getByText('1 verfügbar')).toBeInTheDocument();
+    expect(streifen.getByText('1 gebunden')).toBeInTheDocument();
     // Die Gruppenachse führt: verfügbar (Zora) steht vor gebunden (Thomas) — weder Server- noch
     // Namensordnung.
     expect(zeilenFolge(container)).toEqual(['12', '10']);
@@ -493,7 +499,13 @@ describe('PersonalPage', () => {
       ]);
     });
 
-    await waitFor(() => expect(screen.getByText('verfügbar · 2')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        within(
+          container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+        ).getByText('2 verfügbar'),
+      ).toBeInTheDocument(),
+    );
     expect(zeilenFolge(container)).toEqual(vorher);
   });
 
@@ -644,11 +656,9 @@ describe('PersonalPage · Datenzustände', () => {
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Personen"', async () => {
-    const { container } = zeige(
-      http.get('/api/personal', () => new HttpResponse(null, { status: 500 })),
-    );
+    zeige(http.get('/api/personal', () => new HttpResponse(null, { status: 500 })));
     await screen.findByText('Noch kein Personal disponiert');
-    await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
+    await oeffnePersonalAuswahl();
     expect(
       await screen.findByText('Personalliste konnte nicht geladen werden'),
     ).toBeInTheDocument();
@@ -656,9 +666,9 @@ describe('PersonalPage · Datenzustände', () => {
   });
 
   it('Partnerhälfte: leerer Stamm-Pool behält „Keine freien Personen"', async () => {
-    const { container } = zeige();
+    zeige();
     await screen.findByText('Noch kein Personal disponiert');
-    await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
+    await oeffnePersonalAuswahl();
     expect(await screen.findByText('Keine freien Personen')).toBeInTheDocument();
     expect(screen.queryByText('Personalliste konnte nicht geladen werden')).not.toBeInTheDocument();
   });
@@ -792,17 +802,11 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
   });
 });
 
-/**
- * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:
- * dessen Knoten trägt `pointer-events: none`. Gegriffen wird die Combobox — der Knoten, den auch
- * die Tastatur fokussiert.
- */
-async function oeffnePersonalAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
-    s.textContent?.includes(platzhalter),
-  );
-  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
-  await userEvent.click(within(feld!).getByRole('combobox'));
+/** Öffnet den Disponier-Dialog über den Kopfknopf und darin die Personenauswahl. */
+async function oeffnePersonalAuswahl() {
+  await userEvent.click(screen.getByRole('button', { name: 'Person disponieren' }));
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Person' }));
 }
 
 describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
@@ -907,12 +911,9 @@ describe('PersonalPage · Demo-Marke', () => {
         return HttpResponse.json({ ...disponiert[0], id: 30, personal_id: 2, ist_demo: true });
       }),
     );
-    const { container } = zeige(
-      [],
-      [stamm(2, 'Dora Demo', 'DEMO-P-001', true), stamm(1, 'Erna Echt', 'P-1', false)],
-    );
+    zeige([], [stamm(2, 'Dora Demo', 'DEMO-P-001', true), stamm(1, 'Erna Echt', 'P-1', false)]);
     await screen.findByText('Noch kein Personal disponiert');
-    await oeffnePersonalAuswahl(container, 'Person aus Pool disponieren …');
+    await oeffnePersonalAuswahl();
     await screen.findByText('Erna Echt (P-1)');
     const eintraege = [
       ...document.querySelectorAll<HTMLElement>('.ant-select-dropdown .ant-select-item'),
@@ -920,6 +921,11 @@ describe('PersonalPage · Demo-Marke', () => {
     expect(eintraege).toEqual(['Erna Echt (P-1)', 'Demo-Daten', 'Dora Demo (DEMO-P-001)Demo']);
 
     await userEvent.click(screen.getByText('Dora Demo (DEMO-P-001)'));
+    // Die Auswahl allein disponiert nicht (LFH-983), erst der Knopf im Dialog.
+    expect(gesendet).toEqual([]);
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Disponieren' }),
+    );
     await waitFor(() => expect(gesendet).toEqual([{ personal_id: 2, staerke_position: null }]));
   });
 
@@ -935,5 +941,28 @@ describe('PersonalPage · Demo-Marke', () => {
     const echteZeile = screen.getByText('Erna Echt').closest('tr')!;
     expect(within(demoZeile).getByText('Demo')).toBeInTheDocument();
     expect(within(echteZeile).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});
+
+/** LFH-983: Der Kopf öffnet nur; disponiert wird im Dialog mit Absende-Knopf im Formular. */
+describe('PersonalPage · Disponieren im Dialog (LFH-983)', () => {
+  it('der Kopf trägt Knöpfe, kein Auswahlfeld; der Dialog sendet erst über den Knopf', async () => {
+    const { container } = render(einsatz());
+    await screen.findByText('Thomas Müller');
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).queryByRole('combobox')).toBeNull();
+    expect(
+      within(kopf)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Person disponieren', 'Ad-hoc-Person']);
+
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Person disponieren' }));
+    const dialog = await screen.findByRole('dialog');
+    const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
+    await userEvent.click(knopf);
+    expect(await within(dialog).findByText('Person wählen')).toBeInTheDocument();
   });
 });

@@ -46,7 +46,9 @@ describe('PersonVorschau', () => {
     renderMitProviders(<PersonVorschau einsatzId={1} personId={10} />);
     expect(await screen.findByText('Mustermann')).toBeInTheDocument();
     expect(screen.getByText('Brücke')).toBeInTheDocument();
-    expect(screen.getByText(/SK: /)).toBeInTheDocument();
+    // „SK I“ steht schon im Etikett, ein Vorsatz „SK: “ verdoppelte es (LFH-944).
+    expect(screen.getByText('SK I')).toBeInTheDocument();
+    expect(screen.queryByText(/SK: /)).not.toBeInTheDocument();
     expect(screen.getByText(/Medizinischer Verlauf/)).toBeInTheDocument();
   });
 

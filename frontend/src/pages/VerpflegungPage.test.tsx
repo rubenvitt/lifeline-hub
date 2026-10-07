@@ -294,7 +294,7 @@ describe('VerpflegungPage (LFH-634)', () => {
       await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '40');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
 
-      expect(await screen.findByText(/Offline vorgemerkt — Ausgabe 40 EP/)).toBeInTheDocument();
+      expect(await screen.findByText(/Offline vorgemerkt: 40 EP/)).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
       expect(screen.queryByRole('button', { name: /Rückgängig/ })).toBeNull();
       expect(erfasseAusgabe).not.toHaveBeenCalled();

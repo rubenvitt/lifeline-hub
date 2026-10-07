@@ -560,7 +560,11 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
         a.schluessel === 'eigene_lage' ? { ...a, text: 'jetzt befüllt' } : a,
       ),
     });
-    expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage')).toBeInTheDocument();
+    // Der Refetch kann unter Last einen Takt nach `invalidateQueries` rendern; bis dahin trägt der
+    // Kopf noch „(leer)“. Wanderte das Akkordeon, stünde dort nie „Eigene Lage“.
+    await waitFor(() =>
+      expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage')).toBeInTheDocument(),
+    );
   });
 
   it('setzt offenen Abschnitt und Vorschau-Schalter beim Wechsel auf einen anderen Bericht zurück', async () => {
@@ -778,10 +782,10 @@ describe('LageberichtePage', () => {
     // Die Vorlage steht je KETTE einmal, nicht je Fassung.
     expect(screen.getAllByText('Freier Bericht')).toHaveLength(1);
 
-    // Gruppenköpfe mit Zähler über Köpfe, Entwürfe zuerst (`gruppen.reihenfolge`). Trennzeichen und
-    // Zählerform gehören dem Primitiv → `[·(]` auf der Region.
-    expect(sicht).toHaveTextContent(/Entwürfe\s*[·(]\s*1/);
-    expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*1/);
+    // Gruppenköpfe mit Zähler, Entwürfe zuerst; die Zählerform (Zahl vor Wort) gehört dem
+    // Primitiv (`gruppenZahl`).
+    expect(sicht).toHaveTextContent(/1\s*Entwürfe/);
+    expect(sicht).toHaveTextContent(/1\s*Freigegeben/);
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
 
@@ -880,6 +884,11 @@ describe('LageberichtePage', () => {
       await screen.findByRole('heading', { name: 'Lageberichte', level: 1 }),
     ).toBeInTheDocument();
     expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
+  });
+
+  it('zählt einen einzelnen Bericht in einer Kette in der Einzahl', async () => {
+    setup([bericht]);
+    expect(await screen.findByText(/^1 Bericht in 1 Kette · /)).toBeInTheDocument();
   });
 });
 

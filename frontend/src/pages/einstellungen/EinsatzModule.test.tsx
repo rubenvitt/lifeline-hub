@@ -133,7 +133,7 @@ describe('EinsatzModule', () => {
 
     rendern();
 
-    expect(await screen.findByText('Org: Führungskraft')).toBeInTheDocument();
+    expect(await screen.findByText('Vorgabe der Organisation: Führungskraft')).toBeInTheDocument();
   });
 
   it('traegt KEINE Speicher-Leiste — jede Zeile speichert sofort (H15)', async () => {

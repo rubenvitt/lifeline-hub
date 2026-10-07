@@ -43,7 +43,7 @@ const STAFFEL = [
   { dichte: 'handschuh', zeilenhoehe: 72, abstandSm: 16, abstandMd: 26 },
 ] as const;
 
-/** Ein Modul, dessen Zeile in den Einsatz-Defaults immer steht. */
+/** Ein Modul, dessen Zeile in den Einsatz-Vorgaben immer steht. */
 const MODUL = 'Einsatzabschnitte';
 
 async function anmelden(page: Page) {
@@ -151,7 +151,7 @@ for (const { dichte, zeilenhoehe, abstandSm, abstandMd } of STAFFEL) {
 
 // ── MESSUNG 2 ───────────────────────────────────────────────────────────────────────────
 //
-// Die Modulzeile der Einsatz-Defaults (`/admin/einstellungen/einsatz`), bei 390 px
+// Die Modulzeile der Einsatz-Vorgaben (`/admin/einstellungen/einsatz`), bei 390 px
 // gestapelt. `einstellungen-schmal.spec.ts` misst dagegen die Einsatz-Route mit drei
 // Rasterkindern.
 
@@ -170,7 +170,7 @@ async function rollenspaltenMasse(page: Page) {
 // Die Breite, ab der die längste Option („Führungskraft") lesbar steht statt abgeschnitten.
 const LESBAR = 120;
 
-test('bei 390 px stapelt die Modulzeile der Einsatz-Defaults, die Spaltenköpfe fallen weg und der Rollen-Auswähler bleibt breit', async ({
+test('bei 390 px stapelt die Modulzeile der Einsatz-Vorgaben, die Spaltenköpfe fallen weg und der Rollen-Auswähler bleibt breit', async ({
   page,
 }) => {
   await anmelden(page);
@@ -182,7 +182,7 @@ test('bei 390 px stapelt die Modulzeile der Einsatz-Defaults, die Spaltenköpfe 
 
   // Ein Kopf über gestapelten Zeilen benennt keine Spalten mehr.
   await expect(
-    page.getByText('Benötigte Rolle (Default)', { exact: true }),
+    page.getByText('Benötigte Rolle (Vorgabe)', { exact: true }),
     'unter md fallen die Spaltenköpfe GANZ weg',
   ).toHaveCount(0);
 
@@ -213,7 +213,7 @@ test('bei 390 px stapelt die Modulzeile der Einsatz-Defaults, die Spaltenköpfe 
  * 56 px zusammen, weil ein `<Select>` mit `width: 100%` keine Inhaltsbreite beiträgt. Die Spur
  * ist jetzt fest (`modulRasterSpalten`); gemessen wird dieselbe Schwelle wie bei 390 px.
  */
-test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Defaults breit genug zum Lesen', async ({
+test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Vorgaben breit genug zum Lesen', async ({
   page,
 }) => {
   await anmelden(page);
@@ -221,7 +221,7 @@ test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Defaults breit genug z
   await page.goto('/admin/einstellungen/einsatz');
 
   await expect(
-    page.getByText('Benötigte Rolle (Default)', { exact: true }),
+    page.getByText('Benötigte Rolle (Vorgabe)', { exact: true }),
     'bei 1280 px gibt es Spalten, also auch Spaltenköpfe',
   ).toBeVisible();
 
@@ -245,7 +245,7 @@ async function nurLeseZweigSteht(page: Page) {
   await expect(
     page
       .locator('[data-lfh="rechte-hinweis"]')
-      .filter({ hasText: 'dürfen die Org-Defaults ändern' }),
+      .filter({ hasText: 'dürfen die Org-Vorgaben ändern' }),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
   await expect(
@@ -277,7 +277,7 @@ async function ueberlaufendeModulzeilen(page: Page) {
 
 /**
  * LFH-435 · Zweig „Org-Führungskraft": dieselbe Messung ohne Admin-Recht. Die Führungskraft
- * erreicht die Einsatz-Defaults, darf sie aber nicht ändern: Rechtehinweis, gesperrtes
+ * erreicht die Einsatz-Vorgaben, darf sie aber nicht ändern: Rechtehinweis, gesperrtes
  * Formular, und JEDE Modulzeile trägt den Sperrgrund „nur Admins" in ihrer Beschriftungszelle
  * (`EinsatzDefaults.tsx`, `ModulEinstellungsListe.tsx`). Der Sperrgrund ist das Element, das
  * die Rolle hinzufügt — gemessen wird deshalb zusätzlich, dass keine Zeile in sich überläuft;
@@ -286,7 +286,7 @@ async function ueberlaufendeModulzeilen(page: Page) {
  * Nicht gespiegelt: Messung 1 (die Aktionsspalte entfällt ohne Admin-Recht, `dienststatus.tsx`
  * — es gibt nichts zu messen). Messung 3 (1280 px) spiegelt der Test darunter (LFH-822).
  */
-test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und keine Zeile läuft über (Führungskraft)', async ({
+test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Vorgaben, und keine Zeile läuft über (Führungskraft)', async ({
   page,
 }) => {
   await anmelden(page);
@@ -301,7 +301,7 @@ test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und kein
 
   // Wie im Admin-Test: Spaltenköpfe weg, gestapelt, Auswähler lesbar und in seiner Zeile.
   await expect(
-    page.getByText('Benötigte Rolle (Default)', { exact: true }),
+    page.getByText('Benötigte Rolle (Vorgabe)', { exact: true }),
     'unter md fallen die Spaltenköpfe GANZ weg',
   ).toHaveCount(0);
   const label = page.getByText(MODUL, { exact: true }).first();
@@ -342,7 +342,7 @@ test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und kein
  * `minWidth: 2000` → dieser Test und der 390-px-Durchgang rot (Modulzeilen laufen um 1669 px
  * über), der Admin-Test bei 1280 px grün.
  */
-test('bei 1280 px steht der gesperrte Rollen-Auswähler der Einsatz-Defaults breit genug zum Lesen, und keine Zeile läuft über (Führungskraft)', async ({
+test('bei 1280 px steht der gesperrte Rollen-Auswähler der Einsatz-Vorgaben breit genug zum Lesen, und keine Zeile läuft über (Führungskraft)', async ({
   page,
 }) => {
   await anmelden(page);
@@ -353,7 +353,7 @@ test('bei 1280 px steht der gesperrte Rollen-Auswähler der Einsatz-Defaults bre
   await nurLeseZweigSteht(page);
 
   await expect(
-    page.getByText('Benötigte Rolle (Default)', { exact: true }),
+    page.getByText('Benötigte Rolle (Vorgabe)', { exact: true }),
     'bei 1280 px gibt es Spalten, also auch Spaltenköpfe',
   ).toBeVisible();
 

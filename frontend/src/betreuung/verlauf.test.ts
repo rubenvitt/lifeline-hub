@@ -4,7 +4,7 @@ import {
   aktuellWort,
   belegungZeile,
   istNachgetragenMeldung,
-  rueckfrageHinweis,
+  rueckfrageFrage,
   ruecknahmeName,
   standZeile,
 } from './verlauf';
@@ -87,17 +87,19 @@ describe('Wortlaut', () => {
   });
 
   it('die Rückfrage sagt, ob die Meldung den Stand trägt — ohne eine neue Zahl vorherzusagen', () => {
-    expect(rueckfrageHinweis('bezirk', true)).toBe(
-      'Das ist der aktuelle Stand. Er wird danach aus den übrigen Meldungen bestimmt.',
+    const stand = standZeile(STAND);
+    const belegung = belegungZeile(BELEGUNG);
+    expect(rueckfrageFrage('bezirk', stand, '10:30')).toBe(
+      'Aktuellen Stand 1\u202f320 evakuiert (geschätzt) von 10:30 zurücknehmen?',
     );
-    expect(rueckfrageHinweis('bezirk', false)).toBe(
-      'Der aktuelle Stand ändert sich dadurch nicht.',
+    expect(rueckfrageFrage('bezirk', { ...stand, aktuell: false }, '10:30')).toBe(
+      'Meldung 1\u202f320 evakuiert (geschätzt) von 10:30 zurücknehmen?',
     );
-    expect(rueckfrageHinweis('stelle', true)).toBe(
-      'Das ist die aktuelle Belegung. Sie wird danach aus den übrigen Meldungen bestimmt.',
+    expect(rueckfrageFrage('stelle', { ...belegung, aktuell: true }, '11:00')).toBe(
+      'Aktuelle Belegung 89 untergebracht von 11:00 zurücknehmen?',
     );
-    expect(rueckfrageHinweis('stelle', false)).toBe(
-      'Die aktuelle Belegung ändert sich dadurch nicht.',
+    expect(rueckfrageFrage('stelle', belegung, '11:00')).toBe(
+      'Meldung 89 untergebracht von 11:00 zurücknehmen?',
     );
   });
 });

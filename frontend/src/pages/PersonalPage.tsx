@@ -1,6 +1,7 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Popconfirm, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
+import { ErfassungsModal } from '../components/Erfassung';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -64,6 +65,8 @@ export default function PersonalPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
+  const [disponierenOffen, setDisponierenOffen] = useState(false);
+  const [stammForm] = Form.useForm<{ personal_id: number }>();
   const [highlightId, setHighlightId] = useState<number | null>(null);
 
   const einsatzQuery = useQuery({
@@ -462,22 +465,13 @@ export default function PersonalPage() {
           ]}
         />
       }
+      // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
       aktionen={
         darfSchreiben && (
-          // `wrap` plus `maxWidth` — Herleitung in `FahrzeugePage.tsx`.
           <Space wrap style={{ minWidth: 0 }}>
-            <Select
-              style={{ minWidth: 260, maxWidth: '100%' }}
-              placeholder="Person aus Pool disponieren …"
-              value={null}
-              options={poolOptionen}
-              notFoundContent={poolInhalt}
-              loading={disponiereMutation.isPending}
-              disabled={disponiereMutation.isPending}
-              onSelect={(personalId) => {
-                if (personalId != null) disponiereMutation.mutate(personalId);
-              }}
-            />
+            <Button type="primary" onClick={() => setDisponierenOffen(true)}>
+              Person disponieren
+            </Button>
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
           </Space>
         )
@@ -577,6 +571,29 @@ export default function PersonalPage() {
           />
         </>
       )}
+
+      {/* Person aus dem Stamm disponieren, im Serienmodus wie die Ad-hoc-Kette. */}
+      <ErfassungsModal<{ personal_id: number }>
+        offen={disponierenOffen}
+        titel="Person disponieren"
+        form={stammForm}
+        erfassenText="Disponieren"
+        serie
+        laeuft={disponiereMutation.isPending}
+        onErfassen={async (w) => {
+          await disponiereMutation.mutateAsync(w.personal_id);
+        }}
+        onFertig={() => setDisponierenOffen(false)}
+        onAbbrechen={() => setDisponierenOffen(false)}
+      >
+        <Form.Item
+          label="Person"
+          name="personal_id"
+          rules={[{ required: true, message: 'Person wählen' }]}
+        >
+          <Select options={poolOptionen} notFoundContent={poolInhalt} />
+        </Form.Item>
+      </ErfassungsModal>
 
       {/* Ad-hoc-Disposition mit Serienmodus: an der Bereitstellung wird eine Helferkette am
           Stück aufgenommen. Trägerorganisation und Stärke-Position überleben das Speichern,

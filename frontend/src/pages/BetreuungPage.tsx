@@ -233,9 +233,7 @@ export default function BetreuungPage() {
     onMutate: raeumeRuecknahmeFehler,
     onSuccess: (ergebnis, { bezirk, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(
-          `Offline vorgemerkt — Standmeldung ${bezirk.bezeichnung} wird bei Verbindung gesendet`,
-        );
+        message.warning(`Offline vorgemerkt: Standmeldung ${bezirk.bezeichnung}`);
         return;
       }
       const r = ergebnis.daten;
@@ -290,9 +288,7 @@ export default function BetreuungPage() {
     onMutate: raeumeRuecknahmeFehler,
     onSuccess: (ergebnis, { stelle, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(
-          `Offline vorgemerkt — Belegungsmeldung ${stelle.bezeichnung} wird bei Verbindung gesendet`,
-        );
+        message.warning(`Offline vorgemerkt: Belegungsmeldung ${stelle.bezeichnung}`);
         return;
       }
       const r = ergebnis.daten;
@@ -511,7 +507,11 @@ export default function BetreuungPage() {
       {dialog?.art === 'bezirkStornieren' && (
         <StornierenDialog
           titel={`Bezirk ${dialog.bezirk.bezeichnung} stornieren?`}
-          text="Stornieren ist für Fehlanlagen gedacht und lässt sich nicht rückgängig machen. Der Bezirk verschwindet aus der Liste und zählt in keiner Kennzahl mehr; der Nachweis im Einsatztagebuch bleibt. Eine aufgehobene Evakuierung wird stattdessen über „Räumung setzen“ erfasst."
+          text="Nur für Fehlanlagen. Nicht umkehrbar; der ETB-Nachweis bleibt."
+          stattdessen={{
+            text: 'Stattdessen Räumung setzen',
+            onKlick: () => bezirkAktion('raeumung', dialog.bezirk),
+          }}
           laeuft={bezirkStornierenMut.isPending}
           fehler={bezirkStornierenMut.error}
           onBestaetigen={() => bezirkStornierenMut.mutate(dialog.bezirk.id)}
@@ -554,7 +554,11 @@ export default function BetreuungPage() {
       {dialog?.art === 'stelleStornieren' && (
         <StornierenDialog
           titel={`Betreuungsstelle ${dialog.stelle.bezeichnung} stornieren?`}
-          text="Stornieren ist für Fehlanlagen gedacht und lässt sich nicht rückgängig machen. Die Stelle verschwindet aus der Liste und zählt in keiner Kopfzahl mehr; der Nachweis im Einsatztagebuch bleibt. Eine Stelle, die nur außer Betrieb geht, wird stattdessen geschlossen."
+          text="Nur für Fehlanlagen. Nicht umkehrbar; der ETB-Nachweis bleibt."
+          stattdessen={{
+            text: 'Stattdessen Status setzen',
+            onKlick: () => stelleAktion('bearbeiten', dialog.stelle),
+          }}
           laeuft={stelleStornierenMut.isPending}
           fehler={stelleStornierenMut.error}
           onBestaetigen={() => stelleStornierenMut.mutate(dialog.stelle.id)}

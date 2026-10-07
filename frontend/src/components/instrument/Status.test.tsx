@@ -33,6 +33,18 @@ describe('StatusChip', () => {
     expect(screen.getByText('gebunden')).toBeVisible();
   });
 
+  it('mit `trenner` steht der FMS-Punkt zwischen Code und Wort, ohne bleibt die Zahl am Wort', () => {
+    renderMitProviders(
+      <>
+        <StatusChip ton="bedien" code="S4" wort="Am Einsatzort" trenner />
+        <StatusChip ton="achtung" code={2} wort="ausstehend" />
+      </>,
+    );
+    const [fms, zahl] = document.querySelectorAll<HTMLElement>('[data-lfh="status-chip"]');
+    expect(fms.textContent).toBe('S4·Am Einsatzort');
+    expect(zahl.textContent).toBe('2ausstehend');
+  });
+
   it('ohne Code steht das Wort allein', () => {
     renderMitProviders(<StatusChip ton="neutral" wort="abgemeldet" />);
     const chip = document.querySelector<HTMLElement>('[data-lfh="status-chip"]')!;

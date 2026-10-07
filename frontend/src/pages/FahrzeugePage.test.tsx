@@ -241,7 +241,7 @@ describe('FahrzeugePage', () => {
   it('Einsatzleitung im aktiven Einsatz sieht Disponieren-/Entfernen-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByText('Stamm-Fahrzeug disponieren …')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fahrzeug disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
   });
@@ -250,8 +250,10 @@ describe('FahrzeugePage', () => {
     render(einsatz({ meine_rolle: 'beobachter' }));
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Fahrzeug' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fahrzeug disponieren' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
-    expect(screen.getByText('disponiert')).toBeInTheDocument();
+    // Ein FMS-Format überall: „S3 · disponiert“ aus dem Katalog-Anker (LFH-973).
+    expect(screen.getByText('S3 · disponiert')).toBeInTheDocument();
   });
 
   it('abgeschlossener Einsatz ist read-only und zeigt Hinweis', async () => {
@@ -368,6 +370,8 @@ describe('FahrzeugePage', () => {
 
     // Besatzungsmitglied (fahrzeug_id === 10) wird angezeigt, mit Freigeben-Aktion.
     expect(await screen.findByText(/Anna Crew/)).toBeInTheDocument();
+    // Die Stärke-Position steht als Wort, nicht als Wire-Wert (LFH-946).
+    expect(screen.getByText('Anna Crew (Mannschaft)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Freigeben' })).toBeInTheDocument();
     // Frei-Pool-Picker vorhanden (nur freie Kräfte).
     expect(screen.getByText('Kraft zur Besatzung …')).toBeInTheDocument();
@@ -424,9 +428,13 @@ describe('FahrzeugePage', () => {
     const { container } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
     await screen.findByText('Florian 1');
     // Ein Textknoten, nicht zwei: sonst würfe dieselbe Abfrage später mit Mehrfachtreffern, sobald
-    // ein Zähler daneben steht.
-    expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
-    expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
+    // ein Zähler daneben steht. Im Streifen gesucht: die Verdichtungszeile darüber schreibt
+    // dieselben Wörter in derselben Folge (LFH-973).
+    const streifen = within(
+      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+    );
+    expect(streifen.getByText('1 verfügbar')).toBeInTheDocument();
+    expect(streifen.getByText('1 gebunden')).toBeInTheDocument();
     // Und die Gruppenachse führt wirklich: verfügbar (Florian 9) steht vor gebunden.
     expect(zeilenFolge(container)).toEqual(['11', '10']);
   });
@@ -465,8 +473,11 @@ describe('FahrzeugePage', () => {
      * eingefroren. Und weil der Statuswechsel keinen Schlüssel ändert, ist `zufluessig === 0`, ein
      * Sammelbanner erscheint nie. Beides gehört dem Primitiv.
      */
-    expect(screen.getByText('verfügbar · 2')).toBeInTheDocument();
-    expect(screen.queryByText(/^gebunden · /)).toBeNull();
+    const streifen = within(
+      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+    );
+    expect(streifen.getByText('2 verfügbar')).toBeInTheDocument();
+    expect(streifen.queryByText(/^\d+ gebunden$/)).toBeNull();
     expect(screen.queryByRole('button', { name: /neue? Ein(trag|träge)/ })).toBeNull();
   });
 
@@ -709,11 +720,9 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Keine freien Fahrzeuge"', async () => {
-    const { container } = zeige(
-      http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })),
-    );
+    zeige(http.get('/api/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
     await screen.findByText('Noch keine Fahrzeuge disponiert');
-    await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
+    await oeffneStammAuswahl();
     expect(
       await screen.findByText('Fahrzeugliste konnte nicht geladen werden'),
     ).toBeInTheDocument();
@@ -721,9 +730,9 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   it('Partnerhälfte: leerer Stamm-Pool behält „Keine freien Fahrzeuge"', async () => {
-    const { container } = zeige();
+    zeige();
     await screen.findByText('Noch keine Fahrzeuge disponiert');
-    await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
+    await oeffneStammAuswahl();
     expect(await screen.findByText('Keine freien Fahrzeuge')).toBeInTheDocument();
     expect(screen.queryByText('Fahrzeugliste konnte nicht geladen werden')).not.toBeInTheDocument();
   });
@@ -1065,6 +1074,13 @@ async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
   await userEvent.click(within(feld!).getByRole('combobox'));
 }
 
+/** Öffnet den Disponier-Dialog über den Kopfknopf und darin die Fahrzeugauswahl. */
+async function oeffneStammAuswahl() {
+  await userEvent.click(screen.getByRole('button', { name: 'Fahrzeug disponieren' }));
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Fahrzeug' }));
+}
+
 /** Klappt die Zeile von „Florian 1" auf — dort hängt der Besatzungsblock. */
 async function klappeZeileAuf(container: HTMLElement) {
   await userEvent.click(within(container).getByRole('button', { name: 'Besatzung zu Florian 1' }));
@@ -1119,12 +1135,9 @@ describe('FahrzeugePage · Demo-Marke', () => {
         return HttpResponse.json({ ...ef, id: 30, fahrzeug_id: 2, ist_demo: true });
       }),
     );
-    const { container } = zeige(
-      [],
-      [stamm(2, 'Florian Demo', true), stamm(1, 'Florian Echt', false)],
-    );
+    zeige([], [stamm(2, 'Florian Demo', true), stamm(1, 'Florian Echt', false)]);
     await screen.findByText('Noch keine Fahrzeuge disponiert');
-    await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
+    await oeffneStammAuswahl();
     await screen.findByText('Florian Echt (LF 20)');
     const eintraege = [
       ...document.querySelectorAll<HTMLElement>('.ant-select-dropdown .ant-select-item'),
@@ -1132,6 +1145,11 @@ describe('FahrzeugePage · Demo-Marke', () => {
     expect(eintraege).toEqual(['Florian Echt (LF 20)', 'Demo-Daten', 'Florian Demo (LF 20)Demo']);
 
     await userEvent.click(screen.getByText('Florian Demo (LF 20)'));
+    // Die Auswahl allein disponiert nicht (LFH-983), erst der Knopf im Dialog.
+    expect(gesendet).toEqual([]);
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Disponieren' }),
+    );
     await waitFor(() => expect(gesendet).toEqual([{ fahrzeug_id: 2 }]));
   });
 
@@ -1147,5 +1165,25 @@ describe('FahrzeugePage · Demo-Marke', () => {
     const echteZeile = screen.getByText('Florian Echt').closest('tr')!;
     expect(within(demoZeile).getByText('Demo')).toBeInTheDocument();
     expect(within(echteZeile).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});
+
+/** LFH-983: Der Kopf öffnet nur; disponiert wird im Dialog mit Absende-Knopf im Formular. */
+describe('FahrzeugePage · Disponieren im Dialog (LFH-983)', () => {
+  it('der Kopf trägt Ansicht und Knöpfe, kein Auswahlfeld; der Dialog prüft die Pflicht', async () => {
+    const { container } = render(einsatz());
+    await screen.findByText('Florian 1');
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).queryByRole('combobox')).toBeNull();
+    expect(within(kopf).getByRole('radiogroup', { name: 'Ansicht' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Fahrzeug disponieren' })).toBeInTheDocument();
+
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Fahrzeug disponieren' }));
+    const dialog = await screen.findByRole('dialog');
+    const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
+    await userEvent.click(knopf);
+    expect(await within(dialog).findByText('Fahrzeug wählen')).toBeInTheDocument();
   });
 });

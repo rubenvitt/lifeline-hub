@@ -123,10 +123,10 @@ describe('BefehlListe', () => {
     expect(screen.getAllByText('Befehl LAD (vereinfacht)')).toHaveLength(2);
     expect(screen.getByText('Einzelauftrag (EA/ZMW)')).toBeInTheDocument();
 
-    // Gruppenköpfe mit Zähler, Entwürfe zuerst. Trennzeichen und Zählerform gehören dem Primitiv,
-    // deshalb `[·(]` auf der Region.
-    expect(sicht).toHaveTextContent(/Entwürfe\s*[·(]\s*1/);
-    expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*2/);
+    // Gruppenköpfe mit Zähler, Entwürfe zuerst; die Zählerform (Zahl vor Wort) gehört dem
+    // Primitiv (`gruppenZahl`).
+    expect(sicht).toHaveTextContent(/1\s*Entwürfe/);
+    expect(sicht).toHaveTextContent(/2\s*Freigegeben/);
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
 
@@ -173,6 +173,12 @@ describe('BefehlListe', () => {
     expect(await screen.findByRole('heading', { name: 'Befehle', level: 3 })).toBeInTheDocument();
     // `findBy`, nicht `getBy`: die Überschrift steht sofort, die Kennzahl erst mit den Daten.
     expect(await screen.findByText(/3 Befehle · 1 im Entwurf/)).toBeInTheDocument();
+  });
+
+  it('zählt einen einzelnen Befehl in der Einzahl', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockResolvedValue([KETTE[0]] as never);
+    renderListe();
+    expect(await screen.findByText(/^1 Befehl · 0 im Entwurf/)).toBeInTheDocument();
   });
 
   it('zeigt "Befehl entwerfen" bei Schreibrecht — mit exaktem Namen', async () => {

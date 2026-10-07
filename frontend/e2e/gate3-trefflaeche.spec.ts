@@ -292,10 +292,10 @@ test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px',
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// Profil → „2FA einrichten“ (LFH-763): die Kopieraktion neben dem TOTP-Geheimnis. antds
+// Profil → „Zweiten Faktor einrichten“ (LFH-763): die Kopieraktion neben dem Schlüssel. antds
 // `Typography copyable` maß hier 15 × 13 px in jeder Stufe; `KopierbarerText` trägt einen echten
 // Knopf. Eigenes Konto, damit das unbestätigte Geheimnis nicht am Admin hängt.
-test('Profil: die Kopieraktion des TOTP-Geheimnisses hält 30 / 48 / 72 px in beiden Achsen', async ({
+test('Profil: die Kopieraktion des Schlüssels zum zweiten Faktor hält 30 / 48 / 72 px in beiden Achsen', async ({
   page,
 }) => {
   await page.setViewportSize(FUEKW);
@@ -305,13 +305,13 @@ test('Profil: die Kopieraktion des TOTP-Geheimnisses hält 30 / 48 / 72 px in be
   for (const { dichte, soll } of STAFFEL) {
     await page.goto('/profil');
     await stelleDichte(page, dichte);
-    await page.getByRole('button', { name: '2FA einrichten' }).click();
-    const knopf = page.getByRole('button', { name: 'TOTP-Geheimnis kopieren', exact: true });
-    const hoehe = await haeltStufe(knopf, soll, `TOTP-Geheimnis kopieren (${dichte})`);
+    await page.getByRole('button', { name: 'Zweiten Faktor einrichten' }).click();
+    const knopf = page.getByRole('button', { name: 'Schlüssel kopieren', exact: true });
+    const hoehe = await haeltStufe(knopf, soll, `Schlüssel kopieren (${dichte})`);
     const breite = (await knopf.boundingBox())!.width;
     expect(
       breite,
-      `TOTP-Geheimnis kopieren (${dichte}, ${breite}px breit, Soll ≥ ${soll})`,
+      `Schlüssel kopieren (${dichte}, ${breite}px breit, Soll ≥ ${soll})`,
     ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
     gemessen.push(`${dichte} (Soll ≥ ${soll}): ${breite} × ${hoehe}px`);
   }
@@ -795,19 +795,14 @@ test('Navigations-Drawer auf 390 px: Hamburger, Akkordeon-Kopf, Modulzeilen und 
 
 // ── Kräfteübersicht und Verdichtungszeile ────────────────────────────────────────────
 //
-// DER UMSCHALTER: die Hülle trägt die Staffel, das einzelne Wahlfeld liegt konstant 4 px
-// darunter (antds `segmentedContainerPadding`, 2 px je Seite). Das ist kein Mangel: die
-// Wahlfelder kacheln die Hülle lückenlos, und ein 72-px-Wahlfeld machte die Hülle 76 px hoch.
-// Zugesichert werden deshalb die Hülle gegen den Boden und die lückenlose Kachelung.
+// DER UMSCHALTER ist die `Segmentleiste` (LFH-973, vorher antds `Segmented`): jedes Segment
+// ist ein eigenes Ziel und hält die Staffel selbst, die Fuge zwischen den Zellen bleibt 1 px.
 //
 // DIE FILTER-MARKE ist eine benannte Ausnahme: `Tag closable` hängt nicht am
 // `ConfigProvider` (Marke 22 px, Kreuz 10×10 in jeder Stufe). Getragen wird sie davon, dass
 // „Filter zurücksetzen" als vollwertiger Knopf danebensteht — steht eine Marke, MUSS dieser
 // Zweitweg dastehen und den Boden halten. Die Maße der Marke werden protokolliert, nicht
 // gepinnt: sie sind antd-Bestand, ein Pin bräche bei einem antd-Sprung grundlos.
-
-/** Innenpolsterung der Segmented-Hülle je Seite (`segmentedContainerPadding`), als Literal. */
-const SEGMENTED_POLSTER = 2;
 
 test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
@@ -836,28 +831,17 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
     // Anker: die Seite ist fertig geladen.
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
 
-    // (1) Umschalter: Hülle gegen den Boden, dazu die lückenlose Kachelung.
-    const huelle = page.locator('.ant-segmented');
-    const umschalter = await haeltStufe(huelle, soll, `Umschalter-Hülle (${dichte})`);
-    const wahlfelder = page.locator('.ant-segmented-item');
-    const wahlfeld = await alleHaltenStufe(
-      wahlfelder,
-      soll - 2 * SEGMENTED_POLSTER,
-      `Umschalter-Wahlfeld (${dichte})`,
-      2,
-    );
-    // Lückenlos: ohne diese Hälfte wäre die Nachsicht oben ein Freibrief für ein halbhohes Wahlfeld.
-    expect(
-      umschalter - wahlfeld,
-      `Umschalter (${dichte}): Wahlfeld kachelt die Hülle (Hülle ${umschalter}, Wahlfeld ${wahlfeld})`,
-    ).toBeLessThanOrEqual(2 * SEGMENTED_POLSTER + SUBPIXEL);
+    // (1) Umschalter: jedes Segment der Leiste (`role="radio"`) hält den Boden selbst.
+    const leiste = page.locator('[data-lfh="meldebild-werkzeuge"] [data-lfh="segmentleiste"]');
+    const segmente = leiste.locator('button');
+    await expect(segmente).toHaveCount(2);
+    const segment = await alleHaltenStufe(segmente, soll, `Umschalter-Segment (${dichte})`, 2);
 
     // (2) Suchfeld der Filterleiste, an der sichtbaren Feldhülle gemessen.
     const suchfeld = page.locator('.ant-input-affix-wrapper');
     const feld = await haeltStufe(suchfeld, soll, `Filter-Suchfeld (${dichte})`);
 
-    // (3) Filter setzen — der Suchfilter kommt als einziger ohne Stammdaten aus. Über den
-    //     Platzhalter gegriffen: `Input.Search` hat die Rolle `searchbox`, nicht `textbox`.
+    // (3) Filter setzen — der Suchfilter kommt als einziger ohne Stammdaten aus.
     await page.getByPlaceholder('Suche...').fill('Messkraft');
     const marke = page.locator('.ant-tag').filter({ hasText: 'Suche:' });
     await expect(marke).toHaveCount(1);
@@ -871,7 +855,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
     const kreuz = (await marke.locator('.ant-tag-close-icon').boundingBox())!;
 
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Umschalter-Hülle ${umschalter}, Wahlfeld ${wahlfeld}, ` +
+      `${dichte} (Soll ≥ ${soll}): Umschalter-Segment ${segment}, ` +
         `Suchfeld ${feld}, Zurücksetzen ${knopf} | dichteblind: Marke ${markenKasten.height}, ` +
         `Schließkreuz ${kreuz.height}×${kreuz.width}`,
     );
@@ -925,17 +909,11 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
     ).toHaveCount(0);
 
     // ── Was bleibt: Umschalter, Suchfeld, nach dem Filtern „Filter zurücksetzen".
-    const umschalter = await haeltStufe(
-      page.locator('.ant-segmented'),
-      soll,
-      `Umschalter-Hülle (${dichte})`,
+    const segmente = page.locator(
+      '[data-lfh="meldebild-werkzeuge"] [data-lfh="segmentleiste"] button',
     );
-    const wahlfeld = await alleHaltenStufe(
-      page.locator('.ant-segmented-item'),
-      soll - 2 * SEGMENTED_POLSTER,
-      `Umschalter-Wahlfeld (${dichte})`,
-      2,
-    );
+    await expect(segmente).toHaveCount(2);
+    const segment = await alleHaltenStufe(segmente, soll, `Umschalter-Segment (${dichte})`, 2);
     const feld = await haeltStufe(
       page.locator('.ant-input-affix-wrapper'),
       soll,
@@ -950,7 +928,7 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
     );
 
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Umschalter-Hülle ${umschalter}, Wahlfeld ${wahlfeld}, ` +
+      `${dichte} (Soll ≥ ${soll}): Umschalter-Segment ${segment}, ` +
         `Suchfeld ${feld}, Zurücksetzen ${knopf}`,
     );
   }

@@ -4,11 +4,17 @@ import type { Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
 import SichtungsTag from '../components/SichtungsTag';
-import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
 import { formatKoordinate } from './koordinate';
-import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './personBefehl';
+import {
+  SICHTUNG_BUCHSTABEN,
+  loeseBefehl,
+  loeseUhsAuf,
+  parsePersonBefehl,
+  type BefehlTeil,
+} from './personBefehl';
+import { SK_META } from './personMeta';
 
 /** Aus dem Bild, nicht aus dem Baum: der Vorleser liest die Kürzel weiter als Feldbeschreibung. */
 const NUR_VORLESER = {
@@ -109,8 +115,10 @@ export default function BetroffeneZeile({
   const eigenesFeld = useRef<InputRef>(null);
   const sendetRef = useRef(false);
   const [text, setText] = useState('');
-  /** Kürzel-Hinweis unter `md` aufgeklappt? Ab `md` steht er immer (LFH-963). */
+  /** Kürzel-Hinweis unter `md` aufgeklappt? Ab `md` steht er, solange das Feld den Fokus hat. */
   const [kuerzelOffen, setKuerzelOffen] = useState(false);
+  /** Fokus im Feld: ab `md` zeigt nur er die Kürzel (LFH-1078, zeigen statt erklären). */
+  const [fokus, setFokus] = useState(false);
   /** Fehler des letzten Absende-Versuchs (Prüfung ODER Server) — steht bis zur nächsten Eingabe. */
   const [versuchFehler, setVersuchFehler] = useState<string[] | null>(null);
 
@@ -147,6 +155,10 @@ export default function BetroffeneZeile({
 
   const leer = befehl.leer;
   const kuerzelEingeklappt = istSchmal && !kuerzelOffen;
+  // Ab `md` nur bei Fokus auf dem leeren Feld (LFH-1078): sonst reichen Platzhalter und
+  // „erkannt:“-Marken. Durchsichtig, nicht ausgehängt: die Zeile behält ihre Höhe, und die Kürzel
+  // bleiben die Beschreibung des Felds (`visibility: hidden` nähme sie Vorlesenden).
+  const kuerzelVerdeckt = !istSchmal && !fokus;
   // Kürzel-Hinweis und „erkannt: …" liegen GESTAPELT in derselben Rasterzelle: der Hinweis bleibt
   // im Baum und wird nur unsichtbar, die Zeile behält also ihre Höhe (sonst sprang bei 390 px
   // der Inhalt darunter beim ersten Zeichen). Unter `md` hält der Knopf „Kürzel anzeigen“ in
@@ -182,6 +194,7 @@ export default function BetroffeneZeile({
                     alignItems: 'center',
                     columnGap: token.padding,
                     rowGap: token.marginXXS,
+                    ...(kuerzelVerdeckt ? { opacity: 0 } : {}),
                   }
             }
           >
@@ -189,10 +202,17 @@ export default function BetroffeneZeile({
               Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
             </span>
             <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
-            <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+            {/* Die Buchstaben-Kürzel ausgeschrieben (LFH-948), aus derselben Quelle wie der
+                Parser. */}
+            <span style={{ color: rollen.gedaempft }}>
+              sk1–sk4 ·{' '}
+              {SICHTUNG_BUCHSTABEN.map((k) => `${k.kuerzel} = ${SK_META[k.kategorie].label}`).join(
+                ' · ',
+              )}
+            </span>
             {/* Das Format zeigt der Platzhalter nicht, also hier. */}
-            <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
-            <span style={{ color: rollen.gedaempft }}>@UHS</span>
+            <span style={{ color: rollen.gedaempft }}>#Fundort (52.2691/9.1342)</span>
+            <span style={{ color: rollen.gedaempft }}>@Unfallhilfsstelle</span>
           </span>
           {/* EIN Knopf für beide Richtungen: er bleibt beim Umschalten derselbe Knoten, der Fokus
               bleibt auf ihm. Beim Tippen unsichtbar wie die Ebene, seine Höhe bleibt stehen. */}
@@ -242,17 +262,7 @@ export default function BetroffeneZeile({
   );
 
   return (
-    <Schnellerfassungszeile
-      praefix="/person"
-      hinweis={
-        istSchmal ? undefined : (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXXS }}>
-            <Tastenkuerzel aria-hidden>↵</Tastenkuerzel> erfassen &amp; nächste
-          </span>
-        )
-      }
-      hinweiszeile={hinweiszeile}
-    >
+    <Schnellerfassungszeile praefix="/person" hinweiszeile={hinweiszeile}>
       <Input
         ref={setzeFeld}
         value={text}
@@ -270,6 +280,8 @@ export default function BetroffeneZeile({
           setVersuchFehler(null);
         }}
         onPressEnter={() => void senden()}
+        onFocus={() => setFokus(true)}
+        onBlur={() => setFokus(false)}
         onKeyDown={(e) => {
           if (e.key === 'Escape' && text !== '') {
             e.stopPropagation();

@@ -415,6 +415,8 @@ describe('KraefteuebersichtPage — Statusband', () => {
 
 describe('KraefteuebersichtPage — Raster', () => {
   it('eine Zeile je Einheit mit Abschnitt, Stärke und Funkrufname; Mittel sind zugeklappt', async () => {
+    // Die Spalte „Funkrufname" steht ab `xxl`, darunter im Spaltenschalter.
+    setzeViewportBreite(1600);
     mitEinheit();
     vi.mocked(listeEinheiten).mockResolvedValue([
       {
@@ -450,8 +452,8 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('die Einheitenzeile trägt die verdichtete Verteilung bereit / gebunden / Ausfall — auch die 0', async () => {
-    // Die Spalte „Fahrzeuge und Personal" steht ab `xl`, darunter im Spaltenschalter.
-    setzeViewportBreite(1440);
+    // Die Spalte „Fahrzeuge und Personal" steht ab `xxl`, darunter im Spaltenschalter.
+    setzeViewportBreite(1600);
     mitEinheit();
     const { container } = setup();
     await screen.findByText('1. Zug');
@@ -470,8 +472,8 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('tönt eine Einheit mit Ausfall als Problemzeile — mit der Ausfall-Zahl als zweitem Kanal', async () => {
-    // Die Spalte „Fahrzeuge und Personal" steht ab `xl`.
-    setzeViewportBreite(1440);
+    // Die Spalte „Fahrzeuge und Personal" steht ab `xxl`.
+    setzeViewportBreite(1600);
     // Beide Einheiten haben in der Frist zurückgemeldet: sonst tönte schon die fehlende Rückmeldung
     // die Zeile, und die Gegenprobe an eh-20 prüfte nichts über Ausfall.
     vi.mocked(holeRueckmeldungen).mockResolvedValue({
@@ -492,6 +494,30 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(within(problem).getByTitle('Ausfall')).toHaveTextContent('1');
     expect(within(problem).getByTitle('Ausfall')).toHaveAttribute('data-ton', 'alarm');
     expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
+  it('nennt den Grund der Tönung als Wort in der Statusspalte, auch bei 1180 px', async () => {
+    // Bei 1180 weicht die Spalte „Fahrzeuge und Personal": der Ausfall muss in der Statusspalte
+    // stehen, sonst bliebe die Tönung ein Signal allein über Farbe.
+    setzeViewportBreite(1180);
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30)],
+    });
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      EINHEIT_E10,
+      { ...EINHEIT_E10, id: 21, name: '2. Zug' },
+    ]);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { ...FAHRZEUG_F1, einheit_id: 21, status_id: 106, status_kategorie: 'nicht_verfuegbar' },
+    ]);
+    const { container } = setup();
+    await screen.findByText('2. Zug');
+    expect(screen.queryByRole('columnheader', { name: /Fahrzeuge und Personal/ })).toBeNull();
+    const grund = (key: string) =>
+      zeile(container, key)!.querySelector('[data-lfh="meldebild-toenungsgrund"]');
+    await waitFor(() => expect(grund('eh-21')).toHaveTextContent(/^1 Ausfall · keine Rückm\.$/));
+    expect(grund('eh-20')).toBeNull();
   });
 
   it('die Einheitenzeile trägt Status-Chip und „Seit" (LFH-609)', async () => {
@@ -723,23 +749,23 @@ describe('KraefteuebersichtPage — Raster', () => {
 });
 
 describe('KraefteuebersichtPage — Aufklappen', () => {
-  it('„Mit Mitteln" klappt alle auf, „Nur Einheiten" wieder zu', async () => {
+  it('„Fahrzeuge und Personal zeigen" klappt alle auf, „Einheiten zugeklappt" wieder zu', async () => {
     mitEinheit();
     setup();
     await screen.findByText('1. Zug');
-    fireEvent.click(screen.getByText('Mit Mitteln'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Fahrzeuge und Personal zeigen' }));
     expect(await screen.findByText('HLF 20')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Nur Einheiten'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Einheiten zugeklappt' }));
     await waitFor(() => expect(screen.queryByText('HLF 20')).toBeNull());
     expect(screen.getByText('1. Zug')).toBeInTheDocument();
   });
 
-  it('klappt nach dem Zuklappen EINER Zeile über „Mit Mitteln" wieder vollständig auf', async () => {
+  it('klappt nach dem Zuklappen EINER Zeile über „Fahrzeuge und Personal zeigen" wieder vollständig auf', async () => {
     mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
     await screen.findByText('1. Zug');
-    fireEvent.click(screen.getByText('Mit Mitteln'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Fahrzeuge und Personal zeigen' }));
     await screen.findByText('HLF 20');
 
     fireEvent.click(screen.getByText('1. Zug'));
@@ -747,7 +773,7 @@ describe('KraefteuebersichtPage — Aufklappen', () => {
     // „Ohne Einheit" steht noch offen — die Liste ist also nicht leer, aber unvollständig.
     expect(screen.getByText('P1')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('Mit Mitteln'));
+    fireEvent.click(screen.getByRole('radio', { name: 'Fahrzeuge und Personal zeigen' }));
     expect(await screen.findByText('HLF 20')).toBeInTheDocument();
   });
 });
@@ -757,6 +783,17 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
     setup();
     expect(await screen.findByText('Trägerorganisation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
+  });
+
+  it('Filter, Suche und Umschalter tragen deutsche zugängliche Namen, keinen englischen Rest', async () => {
+    setup();
+    await screen.findByText('Trägerorganisation');
+    expect(screen.getByRole('combobox', { name: 'Nach Trägerorganisation filtern' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Nach Status filtern' })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Einheiten und Kräfte durchsuchen' })).toBeVisible();
+    expect(screen.getByRole('radiogroup', { name: 'Zeilen auf- oder zuklappen' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /search/i })).toBeNull();
+    expect(document.querySelector('[aria-label="segmented control"]')).toBeNull();
   });
 
   it('übernimmt das Meldebild in EINEM Aufruf mit Startinhalt, ohne nachgeschobenen PATCH', async () => {

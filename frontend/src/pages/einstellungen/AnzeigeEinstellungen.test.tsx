@@ -97,6 +97,32 @@ describe('AnzeigeEinstellungen', () => {
     );
   });
 
+  it('nennt leere Felder „Vorgabe“ und die Gerätezeit als Wert der leeren Zeitzone (LFH-944)', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue({
+      ...VOLL,
+      zeitzone: null,
+      zeitformat: null,
+      einheiten: null,
+      koordinatenformat: null,
+    } as never);
+    const { container } = renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
+
+    // Die AutoComplete zeigt den Platzhalter als Text, nicht als Attribut.
+    expect(await screen.findByText('Gerätezeit (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('24 Stunden (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('Metrisch (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('WGS84 dezimal (Vorgabe)')).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText('https://nominatim.openstreetmap.org (Vorgabe)'),
+    ).toBeInTheDocument();
+    // Was leer gilt, sagt der Platzhalter; kein Satz erklärt das Feld (LFH-1078).
+    expect(container.textContent).not.toMatch(/Leer = Vorgabe/);
+    const platzhalter = [...container.querySelectorAll('[placeholder]')].map((e) =>
+      e.getAttribute('placeholder'),
+    );
+    expect([container.textContent, ...platzhalter].join(' ')).not.toMatch(/Default|Fallback/);
+  });
+
   // Der Knopf steht gesperrt da, mit Grund — er verschwindet nicht.
   it('ist read-only für Nicht-Admins (fuehrungskraft): Speichern-Button gesperrt, Feld disabled', async () => {
     vi.mocked(useAuth).mockReturnValue(

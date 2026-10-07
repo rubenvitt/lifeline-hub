@@ -35,21 +35,25 @@ describe('OfflineRecoveryDrawer: nicht attribuierbare Legacy-Daten', () => {
       </App>,
     );
 
-    expect(await screen.findByText(/1 lokale Offline-Aktion\(en\)/)).toBeInTheDocument();
+    // Einzahl richtig, Klartext statt „attribuierbar“ (LFH-944).
+    expect(
+      await screen.findByText(/1 lokale Offline-Aktion aus einer früheren App-Version ist/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Alte Offline-Daten ohne Zuordnung')).toBeInTheDocument();
     expect(screen.queryByText(/Geheimer Inhalt/)).not.toBeInTheDocument();
     expect(screen.queryByText(/legacy-geheim-1/)).not.toBeInTheDocument();
     expect(screen.queryByText('#73')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Mir zuordnen/i })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Alle Alt-Daten verwerfen' }));
+    await user.click(screen.getByRole('button', { name: 'Alle alten Offline-Daten verwerfen' }));
     expect(
-      await screen.findByText('Alle nicht attribuierbaren Alt-Daten endgültig verwerfen?'),
+      await screen.findByText('Alle alten Offline-Daten ohne Zuordnung endgültig verwerfen?'),
     ).toBeInTheDocument();
     expect(await queueNichtZugeordnetZaehlen()).toBe(1);
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Alle Alt-Daten endgültig verwerfen',
+        name: 'Alle alten Offline-Daten endgültig verwerfen',
       }),
     );
 

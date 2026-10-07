@@ -182,7 +182,7 @@ describe('MaterialPage', () => {
   it('Einsatzleitung sieht Disponier- und Ad-hoc-Aktionen', async () => {
     render(einsatzAktiv, []);
     await screen.findByRole('heading', { name: /^Material/ });
-    expect(screen.getByRole('button', { name: 'Disponieren' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Material disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Material' })).toBeInTheDocument();
   });
 
@@ -190,14 +190,14 @@ describe('MaterialPage', () => {
     const abgeschlossen = { ...einsatzAktiv, status: 'abgeschlossen' as const };
     render(abgeschlossen, [em]);
     await screen.findByText('Wolldecke');
-    expect(screen.queryByRole('button', { name: 'Disponieren' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Material disponieren' })).not.toBeInTheDocument();
     /**
-     * Diese Abfrage hält nur, weil das Gruppenetikett ein Textknoten ist (`einsatzbereit · 1`) und
-     * RTL exakt gegen den normalisierten Text matcht — `'einsatzbereit'` trifft `'einsatzbereit ·
-     * 1'` nicht. Wäre der Kopf aus zwei Knoten gebaut, würfe der Test mit Mehrfachtreffern.
+     * Diese Abfrage hält nur, weil das Gruppenetikett ein Textknoten ist (`1 einsatzbereit`) und
+     * RTL exakt gegen den normalisierten Text matcht — `'einsatzbereit'` trifft `'1
+     * einsatzbereit'` nicht. Wäre der Kopf aus zwei Knoten gebaut, würfe der Test mit Mehrfachtreffern.
      */
     expect(screen.getByText('einsatzbereit')).toBeInTheDocument();
-    expect(screen.getByText('einsatzbereit · 1')).toBeInTheDocument();
+    expect(screen.getByText('1 einsatzbereit')).toBeInTheDocument();
   });
 
   // ── Datensicht ──
@@ -220,8 +220,8 @@ describe('MaterialPage', () => {
     // Server- noch Namensordnung.
     const { container } = render(einsatzAktiv, [emDefekt, em]);
     await screen.findByText('Wolldecke');
-    expect(screen.getByText('einsatzbereit · 1')).toBeInTheDocument();
-    expect(screen.getByText('defekt · 1')).toBeInTheDocument();
+    expect(screen.getByText('1 einsatzbereit')).toBeInTheDocument();
+    expect(screen.getByText('1 defekt')).toBeInTheDocument();
     expect(
       [...container.querySelectorAll('tr.ant-table-row')].map((r) =>
         r.getAttribute('data-row-key'),
@@ -379,11 +379,9 @@ describe('MaterialPage · Datenzustände', () => {
   });
 
   it('gescheiterter Stamm-Pool: das Auswahlfeld nennt den Ausfall statt „Kein Material im Dienst"', async () => {
-    const { container } = zeige(
-      http.get('/api/material', () => new HttpResponse(null, { status: 500 })),
-    );
+    zeige(http.get('/api/material', () => new HttpResponse(null, { status: 500 })));
     await screen.findByText('Noch kein Material disponiert');
-    await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
+    await oeffneMaterialAuswahl();
     expect(
       await screen.findByText('Materialliste konnte nicht geladen werden'),
     ).toBeInTheDocument();
@@ -391,9 +389,9 @@ describe('MaterialPage · Datenzustände', () => {
   });
 
   it('Partnerhälfte: leerer Stamm-Pool behält „Kein Material im Dienst"', async () => {
-    const { container } = zeige();
+    zeige();
     await screen.findByText('Noch kein Material disponiert');
-    await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
+    await oeffneMaterialAuswahl();
     expect(await screen.findByText('Kein Material im Dienst')).toBeInTheDocument();
     expect(screen.queryByText('Materialliste konnte nicht geladen werden')).not.toBeInTheDocument();
   });
@@ -549,16 +547,11 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
   });
 });
 
-/**
- * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:
- * dessen Knoten trägt `pointer-events: none`.
- */
-async function oeffneMaterialAuswahl(container: HTMLElement, platzhalter: string) {
-  const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
-    s.textContent?.includes(platzhalter),
-  );
-  expect(feld, `Auswahlfeld „${platzhalter}" nicht gefunden`).toBeTruthy();
-  await userEvent.click(within(feld!).getByRole('combobox'));
+/** Öffnet den Disponier-Dialog über den Kopfknopf und darin die Materialauswahl. */
+async function oeffneMaterialAuswahl() {
+  await userEvent.click(screen.getByRole('button', { name: 'Material disponieren' }));
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.click(within(dialog).getByRole('combobox', { name: 'Material' }));
 }
 
 /**
@@ -605,9 +598,9 @@ describe('MaterialPage · Demo-Marke', () => {
         return HttpResponse.json({ ...em, id: 30, material_id: 2, ist_demo: true });
       }),
     );
-    const { container } = zeige([], [stamm(2, 'Demo-Decke', true), stamm(1, 'Echte Decke', false)]);
+    zeige([], [stamm(2, 'Demo-Decke', true), stamm(1, 'Echte Decke', false)]);
     await screen.findByText('Noch kein Material disponiert');
-    await oeffneMaterialAuswahl(container, 'Stamm-Material wählen …');
+    await oeffneMaterialAuswahl();
     await screen.findByText('Echte Decke (Betreuung)');
     const eintraege = [
       ...document.querySelectorAll<HTMLElement>('.ant-select-dropdown .ant-select-item'),
@@ -619,7 +612,9 @@ describe('MaterialPage · Demo-Marke', () => {
     ]);
 
     await userEvent.click(screen.getByText('Demo-Decke (Betreuung)'));
-    await userEvent.click(screen.getByRole('button', { name: 'Disponieren' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Disponieren' }),
+    );
     await waitFor(() => expect(gesendet).toEqual([{ material_id: 2, menge: 1 }]));
   });
 
@@ -635,5 +630,114 @@ describe('MaterialPage · Demo-Marke', () => {
     const echteZeile = screen.getByText('Echte Decke').closest('tr')!;
     expect(within(demoZeile).getByText('Demo')).toBeInTheDocument();
     expect(within(echteZeile).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * LFH-983: Der Kopf öffnet nur, disponiert wird im Dialog. Jedes Mengenfeld hat einen Namen, und
+ * die englischen Stufentexte von rc-input-number stehen nirgends im DOM.
+ */
+describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
+  const pool = [
+    {
+      id: 5,
+      bezeichnung: 'Wolldecke',
+      kategorie: 'Betreuung',
+      bestandsnummer: null,
+      traegerorganisation: null,
+      standort: null,
+      bemerkung: null,
+      dienststatus: 'in_dienst',
+      angelegt_at: '2026-05-26 09:00:00',
+      ist_demo: false,
+    },
+  ];
+
+  function zeige(ems: (typeof em)[] = []) {
+    const gesendet: unknown[] = [];
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/material', () => HttpResponse.json(ems)),
+      http.get('/api/material', () => HttpResponse.json(pool)),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...em, id: 40 });
+      }),
+    );
+    const ergebnis = renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/material' },
+    );
+    return { ...ergebnis, gesendet };
+  }
+
+  function kopf(container: HTMLElement): HTMLElement {
+    const k = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+    if (!k) throw new Error('Seitenkopf-Aktionen fehlen');
+    return k;
+  }
+
+  it('der Kopf trägt Knöpfe, kein Auswahl- und kein Mengenfeld', async () => {
+    const { container } = zeige();
+    await screen.findByText('Noch kein Material disponiert');
+    expect(within(kopf(container)).queryByRole('combobox')).toBeNull();
+    expect(within(kopf(container)).queryByRole('spinbutton')).toBeNull();
+    expect(
+      within(kopf(container))
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Material disponieren', 'Ad-hoc-Material']);
+  });
+
+  it('der Dialog hat Material und Menge, den Absende-Knopf im Formular', async () => {
+    zeige();
+    await screen.findByText('Noch kein Material disponiert');
+    await userEvent.click(screen.getByRole('button', { name: 'Material disponieren' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('combobox', { name: 'Material' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('spinbutton', { name: 'Menge' })).toHaveValue('1');
+    // Ein `Select` schluckt Enter (`frontend/AGENTS.md`, Erfassungs-Norm): der Knopf muss im Formular stehen.
+    const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
+  });
+
+  it('ohne Material meldet die Prüfung den Grund und sendet nichts', async () => {
+    const { gesendet } = zeige();
+    await screen.findByText('Noch kein Material disponiert');
+    await userEvent.click(screen.getByRole('button', { name: 'Material disponieren' }));
+    const dialog = await screen.findByRole('dialog');
+    const knopf = within(dialog).getByRole('button', { name: 'Disponieren' });
+    expect(knopf).toBeEnabled();
+    await userEvent.click(knopf);
+    expect(await within(dialog).findByText('Material wählen')).toBeInTheDocument();
+    expect(gesendet).toEqual([]);
+  });
+
+  it('sendet Material und Menge aus dem Dialog', async () => {
+    const { gesendet } = zeige();
+    await screen.findByText('Noch kein Material disponiert');
+    await oeffneMaterialAuswahl();
+    await userEvent.click(await screen.findByText('Wolldecke (Betreuung)'));
+    const dialog = screen.getByRole('dialog');
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '3');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(gesendet).toEqual([{ material_id: 5, menge: 3 }]));
+  });
+
+  it('das Mengenfeld der Zeile nennt die Position; keine englischen Stufentexte auf der Seite', async () => {
+    zeige([em]);
+    await screen.findByText('Wolldecke');
+    expect(screen.getByRole('spinbutton', { name: 'Menge Wolldecke' })).toHaveValue('50');
+    await userEvent.click(screen.getByRole('button', { name: 'Ad-hoc-Material' }));
+    await screen.findByRole('dialog');
+    expect(document.body.innerHTML).not.toMatch(/Increase Value|Decrease Value/);
   });
 });

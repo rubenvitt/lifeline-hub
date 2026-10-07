@@ -79,7 +79,6 @@ const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
  */
 const OFFEN: Record<string, number> = {
   'abloesung/AbloesungDialoge.tsx': 5,
-  'betreuung/BetreuungDialoge.tsx': 3,
   'command-palette/VorschauZustand.tsx': 1,
   'einsatz/AlarmZentrale.tsx': 2,
   'einsatz/modulRegistry.ts': 1,
@@ -89,23 +88,18 @@ const OFFEN: Record<string, number> = {
   'karten/KartenOnlineSektion.tsx': 1,
   'pages/AbloesungPage.tsx': 2,
   'pages/BefehlDetailPage.tsx': 1,
-  'pages/BetreuungPage.tsx': 2,
   'pages/EinheitDetailPage.tsx': 3,
   'pages/EtbPage.tsx': 1,
   'pages/LageberichtDetailPage.tsx': 1,
   'pages/LageberichtePage.tsx': 1,
   'pages/MeldungenPage.tsx': 1,
-  'pages/PersonenDetailPage.tsx': 2,
   'pages/PressePage.tsx': 1,
-  'pages/TiereDetailPage.tsx': 1,
-  'pages/VerpflegungPage.tsx': 1,
   'pages/einstellungen/Anmeldeverfahren.tsx': 1,
-  'pages/einstellungen/AnzeigeEinstellungen.tsx': 4,
-  'pages/einstellungen/EinsatzAllgemein.tsx': 3,
+  'pages/einstellungen/AnzeigeEinstellungen.tsx': 2,
+  'pages/einstellungen/EinsatzAllgemein.tsx': 1,
   'pages/einstellungen/EinsatzAufbewahrung.tsx': 2,
-  'pages/einstellungen/EinsatzDefaults.tsx': 10,
+  'pages/einstellungen/EinsatzDefaults.tsx': 9,
   'pages/einstellungen/EinsatzModule.tsx': 1,
-  'pages/einstellungen/EinsatzVerhalten.tsx': 4,
   'pages/einstellungen/KategorieVorgabenPaneel.tsx': 1,
   'pages/einstellungen/ModulEinstellungsListe.tsx': 1,
   'pages/lagekarte/MessSteuerung.tsx': 1,
@@ -113,7 +107,6 @@ const OFFEN: Record<string, number> = {
   'pages/lagekarte/ZeichnenSteuerung.tsx': 2,
   'stab/LagebesprechungModal.tsx': 1,
   'stab/skizze/Eigenschaftspaneel.tsx': 1,
-  'verpflegung/VerpflegungDialoge.tsx': 1,
 };
 
 /** Sichtbare Zeichenketten einer Quelle: Literale, Template-Teile, JSX-Text. Ohne Importpfade. */
