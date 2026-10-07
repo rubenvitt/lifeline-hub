@@ -298,8 +298,20 @@ for (const modus of ['light', 'dark'] as const) {
       const zeile = stellenZeile(page, stellen[a.stelle]);
       const etiketten = zeile.locator('.ant-tag');
       await expect(etiketten).toHaveCount(2);
-      await pruefeEtikett(etiketten.nth(0), `Stelle ${a.stelle}`, 'in Betrieb', 'normal');
-      await pruefeEtikett(etiketten.nth(1), `Stelle ${a.stelle}`, a.wort, a.rolle);
+      // Nach Wort, nicht nach Position: die Spaltenfolge richtet sich nach der Zielfrage
+      // (LFH-967, Belegung vor Status) und ist kein Gegenstand dieser Messung.
+      await pruefeEtikett(
+        etiketten.filter({ hasText: /^in Betrieb$/ }),
+        `Stelle ${a.stelle}`,
+        'in Betrieb',
+        'normal',
+      );
+      await pruefeEtikett(
+        etiketten.filter({ hasText: new RegExp(`^${a.wort}$`) }),
+        `Stelle ${a.stelle}`,
+        a.wort,
+        a.rolle,
+      );
     }
     for (const [stelle, wort] of [
       ['Sporthalle West', 'vorbereitet'],
