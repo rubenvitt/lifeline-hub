@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Select } from '../components/Select';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useQuery } from '@tanstack/react-query';
-import { listePersonen, registrierAnzeige } from '../api/einsatzPerson';
+import { listePersonenAuswahl, registrierAnzeige } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 
 /**
@@ -49,9 +49,10 @@ interface Props {
 export default function HalterPicker({ einsatzId, value = null, onChange }: Props) {
   const [suche, setSuche] = useState('');
 
+  // Auswahl ohne Freitexte (LFH-940): nur Nummer, Name, Status.
   const personenQuery = useQuery({
-    queryKey: einsatzKeys.personen(einsatzId),
-    queryFn: () => listePersonen(einsatzId),
+    queryKey: einsatzKeys.personenAuswahl(einsatzId),
+    queryFn: () => listePersonenAuswahl(einsatzId),
     enabled: Number.isFinite(einsatzId),
   });
 

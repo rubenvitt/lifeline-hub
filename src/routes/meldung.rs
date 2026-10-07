@@ -59,41 +59,100 @@ fn meldung_bestaetigung_frist_min_ableiten(
 pub struct ListeParams {
     pub status: Option<String>,
     pub richtung: Option<String>,
+    /// `offen` | `abgeschlossen` (LFH-940); ohne: alle Meldungen wie bisher.
+    pub phase: Option<String>,
+    /// Cursor nur mit `phase=abgeschlossen`: Ordnungszeitpunkt und id des letzten Eintrags.
+    pub vor_zeit: Option<String>,
+    pub vor_id: Option<i64>,
+    /// Seitengröße nur mit `phase=abgeschlossen` (Vorgabe 100, geklemmt auf 1…500).
+    pub limit: Option<i64>,
+}
+
+/// Status- und Richtungsfilter prüfen (400 bei unbekanntem Wert).
+fn status_und_richtung(status: Option<&str>, richtung: Option<&str>) -> Result<(), AppError> {
+    if let Some(s) = status {
+        if !crate::meldung::status_gueltig(s) {
+            return Err(AppError::Validation("Ungültiger Status-Filter".into()));
+        }
+    }
+    if let Some(r) = richtung {
+        if !crate::meldung::richtung_gueltig(r) {
+            return Err(AppError::Validation("Ungültiger Richtungs-Filter".into()));
+        }
+    }
+    Ok(())
 }
 
 /// GET /api/einsaetze/{id}/meldungen — Posteingang listen (Lesezugriff, auch Beobachter).
+/// Mit `phase=abgeschlossen` seitenweise (LFH-940, Spec `meldungen-blaettern`).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Meldungen>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<MeldungAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let status = params
-        .status
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    if let Some(s) = status {
-        if !crate::meldung::status_gueltig(s) {
-            return Err(AppError::Validation("Ungültiger Status-Filter".into()));
-        }
-    }
-    let richtung = params
-        .richtung
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    if let Some(r) = richtung {
-        if !crate::meldung::richtung_gueltig(r) {
-            return Err(AppError::Validation("Ungültiger Richtungs-Filter".into()));
-        }
-    }
-    let mut meldungen = repo::liste(&state.pool, einsatz_id, status, richtung, &jetzt()).await?;
-    // Ein Gerät (UHS-Laptop, LFH-892) liest nur seine eigenen Meldungen.
-    if ctx.geraet.is_some() {
-        meldungen.retain(|m| m.erfasst_von_id == ctx.benutzer.id);
-    }
-    Ok(Json(meldungen))
+    let status = trimme(&params.status);
+    let richtung = trimme(&params.richtung);
+    status_und_richtung(status, richtung)?;
+    let (phase, seite) = crate::kommunikation::phase_und_seite(
+        params.phase.as_deref(),
+        params.vor_zeit.as_deref(),
+        params.vor_id,
+        params.limit,
+    )?;
+    let filter = repo::MeldungFilter {
+        status,
+        richtung,
+        // Ein Gerät (UHS-Laptop, LFH-892) liest nur seine eigenen Meldungen.
+        erfasst_von: ctx.geraet.is_some().then_some(ctx.benutzer.id),
+        phase,
+        seite,
+    };
+    Ok(Json(
+        repo::liste(&state.pool, einsatz_id, &filter, &jetzt()).await?,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KennzahlenParams {
+    pub richtung: Option<String>,
+}
+
+/// GET /api/einsaetze/{id}/meldungen/kennzahlen — Zahlen der Meldungsseite (LFH-940, D3).
+pub async fn kennzahlen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Meldungen>,
+    Query(params): Query<KennzahlenParams>,
+) -> Result<Json<crate::meldung::MeldungKennzahlen>, AppError> {
+    let richtung = trimme(&params.richtung);
+    status_und_richtung(None, richtung)?;
+    let filter = repo::MeldungFilter {
+        richtung,
+        erfasst_von: ctx.geraet.is_some().then_some(ctx.benutzer.id),
+        ..Default::default()
+    };
+    Ok(Json(
+        repo::kennzahlen(&state.pool, ctx.einsatz.id, &filter, &jetzt()).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/meldungen/{mid} — eine Meldung des Einsatzes (LFH-940, Deeplink auf
+/// eine nicht geladene Seite). Einsatzfremd → 404.
+pub async fn detail(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Meldungen>,
+    PfadParam((_, mid)): PfadParam<(i64, i64)>,
+) -> Result<Json<MeldungAnzeige>, AppError> {
+    Ok(Json(
+        repo::laden_im_einsatz(
+            &state.pool,
+            ctx.einsatz.id,
+            mid,
+            ctx.geraet.is_some().then_some(ctx.benutzer.id),
+            &jetzt(),
+        )
+        .await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]

@@ -4628,6 +4628,25 @@
           }
         }
       },
+      "ErinnerungKennzahlen": {
+        "type": "object",
+        "description": "Zahlen der Erinnerungsseite (LFH-940): die Abgeschlossenen kommen nur noch seitenweise.",
+        "required": [
+          "offen",
+          "abgeschlossen"
+        ],
+        "properties": {
+          "abgeschlossen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Erledigt oder quittiert."
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ErinnerungStatus": {
         "type": "string",
         "description": "LFH-120: Schema-Anker für die `status`-Union (geschlossenes Code-Vokabular, s. STATUS_*).",
@@ -7759,6 +7778,38 @@
           }
         }
       },
+      "MeldungKennzahlen": {
+        "type": "object",
+        "description": "Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie\ndas Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
+        "required": [
+          "unbearbeitet",
+          "in_arbeit",
+          "alarmiert",
+          "erledigt"
+        ],
+        "properties": {
+          "alarmiert": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pflichtig, unbestätigt, Frist abgelaufen oder eskaliert — quer zur Phase."
+          },
+          "erledigt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Abgeschlossen."
+          },
+          "in_arbeit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Offen und bereits angefasst."
+          },
+          "unbearbeitet": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Offen und noch von niemandem angefasst (Status `neu`)."
+          }
+        }
+      },
       "MeldungStatus": {
         "type": "string",
         "description": "Triage-Status einer Meldung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
@@ -9339,6 +9390,40 @@
               "null"
             ],
             "description": "Zustand in Kurzform (Freitext, z. B. „gehfähig, unterkühlt\")."
+          }
+        }
+      },
+      "PersonAuswahl": {
+        "type": "object",
+        "description": "Personenauswahl (LFH-940, Spec `listen-projektion`): je nicht stornierter Person nur, was\nAuswahlfelder, Sprungpalette und Chat-Bezug brauchen. Keine Freitexte (Notiz, Kontakt,\nAdresse, Antreffort, Zustand) — die bleiben der Personenliste und dem Detail.",
+        "required": [
+          "id",
+          "registrier_nr",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PersonStatus"
+          },
+          "vorname": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

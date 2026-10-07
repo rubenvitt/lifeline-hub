@@ -787,7 +787,11 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       ]);
       await screen.findByText('Erste Meldung');
       await userEvent.type(screen.getByPlaceholderText('Volltextsuche'), 'zzz');
-      await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('q=zzz'));
+      // Die Leiste entprellt 300 ms nach dem letzten Zeichen; unter Last reicht die Vorgabe von
+      // `waitFor` (1 s) dafür nicht immer.
+      await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('q=zzz'), {
+        timeout: 5000,
+      });
     });
 
     it('räumt beim Zurücksetzen die URL, nicht nur den Seitenzustand', async () => {

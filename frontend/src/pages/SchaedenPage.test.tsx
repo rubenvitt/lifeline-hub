@@ -92,7 +92,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json(schaeden)),
     // Quellen der Geschädigt-Combobox (mounten beim Öffnen der Formulare):
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
+    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json(personal)),
   );
   return renderMitProviders(
@@ -116,7 +116,7 @@ function renderSchaedenPage(route: string) {
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -133,7 +133,7 @@ function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -659,7 +659,7 @@ describe('SchaedenPage', () => {
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Lage ${id}` });
       }),
       http.get('/api/einsaetze/:einsatzId/schaeden', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/:einsatzId/personen', ({ params }) =>
+      http.get('/api/einsaetze/:einsatzId/personen/auswahl', ({ params }) =>
         HttpResponse.json(params.einsatzId === '1' ? [einePerson] : []),
       ),
       http.get('/api/einsaetze/:einsatzId/personal', () => HttpResponse.json([])),
@@ -862,7 +862,7 @@ describe('SchaedenPage', () => {
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/schaeden', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     );
     renderMitProviders(

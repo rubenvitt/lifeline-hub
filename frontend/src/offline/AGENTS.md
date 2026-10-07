@@ -19,6 +19,10 @@ ohne den Standard-Rufnamen hielte die Von/An-Pflicht jede Erfassung nach einem K
 Prefix landet also nicht still auf der Platte, er muss aufgenommen oder ausdrücklich
 draußen gelassen werden.
 
+- **Die Personenauswahl liegt neben der Vollliste auf der Platte** (`personenAuswahl`, LFH-940,
+  Entscheidung Ruben 06.10.2026): nur Nummer, Name und Status, keine neue Datenart. Sie hält
+  Sprungpalette und Auswahlfelder ohne Netz am Leben. Die Meldungsseite (offen, Seiten der
+  abgeschlossenen, Kennzahlen, Einzelabruf) bleibt draußen wie die Vollliste.
 - **Die Lagekarte liest Schäden als Marker** (`schadenMarker`, LFH-931, ohne Freitexte). Beide
   Prefixe stehen in `LAGEBILD_OFFLINE`: die Marker für Karte und Dashboard, die Volltextliste für
   die Schadenseite.

@@ -173,6 +173,25 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `static_files::content_type` braucht ihren richtigen MIME-Typ. Weitere Köpfe (App-CSP, HSTS
   …) sind eine eigene Entscheidung, s. „Anhänge“ zur CSP.
 
+## Backend — Antwortkompression und Phasenlisten (LFH-940)
+
+- **Gepackt wird nur JSON ab 1 KiB ohne `ETag`/`Cache-Control`** (`CompressionLayer` mit
+  `nur_json_ab` in `app.rs`, gzip und br, Stufe fest `ANTWORT_KOMPRESSION_STUFE`). SSE puffert
+  sonst, Anhänge, Kacheln und Frontend-Dateien bleiben roh; Brotli auf Vorgabestufe 11 kostet
+  den kleinen Server mehr, als es spart. Ein neuer
+  Antworttyp, der gepackt werden soll, kommt ins Prädikat, nicht als zweite Schicht. Nachweis
+  `tests/antwortkompression.rs`.
+- **Eine Liste, die mit dem Einsatz wächst, trennt nach Phase** (`kommunikation::phase_und_seite`):
+  `phase=offen` ungeblättert, `phase=abgeschlossen` mit Cursor `vor_zeit` + `vor_id` (beide
+  oder keiner, sonst 422), Ordnung Abschlusszeit absteigend und `id` als Gleichstand, `limit`
+  geklemmt auf `[1, SEITE_MAX]`. Zahlen über den ganzen Bestand kommen aus einem eigenen
+  `…/kennzahlen`-Abruf über dieselben SQL-Fragmente, nie aus der geladenen Seite.
+- **In einer geblätterten Liste steht jede Einschränkung, die Zeilen ausblendet**
+  (Gerätebindung), im SQL vor dem `LIMIT`. Ein `retain` danach machte Seiten kurz und den
+  Cursor falsch.
+- **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/personen/auswahl`), nicht die
+  Vollliste.
+
 ## Backend — Benutzername und KDF (LFH-921, LFH-981)
 
 Spec `passwort-anmeldung`, Herleitung
