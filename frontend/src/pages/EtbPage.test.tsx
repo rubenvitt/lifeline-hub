@@ -1673,3 +1673,141 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(feldKnopf()).toBeInTheDocument();
   });
 });
+
+/**
+ * Schalter „Systemeinträge zeigen“ (LFH-958): ein Filter wie die übrigen, Zustand in der URL,
+ * Liste und Zählung über denselben Parameter.
+ */
+describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
+  const systemEintrag = {
+    ...eintrag,
+    id: 2,
+    lfd_nr: 2,
+    typ: 'system',
+    inhalt: 'Person erfasst',
+  };
+  const abrufe: string[] = [];
+  const zaehlAbrufe: string[] = [];
+
+  function server958() {
+    abrufe.length = 0;
+    zaehlAbrufe.length = 0;
+    return [
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        abrufe.push(p.toString());
+        return HttpResponse.json(
+          p.get('ohne_system') === 'true' ? [eintrag] : [systemEintrag, eintrag],
+        );
+      }),
+      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        zaehlAbrufe.push(p.toString());
+        const ohne = p.get('ohne_system') === 'true';
+        return HttpResponse.json({
+          gesamt: ohne ? 1 : 99,
+          je_typ: {
+            meldung: 1,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: ohne ? 0 : 98,
+            berichtigung: 0,
+          },
+        });
+      }),
+    ];
+  }
+
+  it('Ausschalten schreibt die URL, fragt Liste und Zählung damit ab und zählt Treffer', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb', server958());
+    await screen.findByText('Person erfasst');
+    const schalter = screen.getByRole('switch', { name: /Systemeinträge zeigen/ });
+    expect(schalter).toBeChecked();
+    // Angeschaltet nennt er die Zahl der Systemeinträge aus der Serverzählung.
+    await waitFor(() => expect(schalter.closest('label')).toHaveTextContent('98'));
+
+    await userEvent.click(schalter);
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche')).toHaveTextContent('ohne_system=true'),
+    );
+    await waitFor(() => expect(screen.queryByText('Person erfasst')).toBeNull());
+    expect(screen.getByText('Erste Meldung')).toBeInTheDocument();
+    expect(abrufe.some((a) => a.includes('ohne_system=true'))).toBe(true);
+    expect(zaehlAbrufe.some((a) => a.includes('ohne_system=true'))).toBe(true);
+    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
+    await waitFor(() => expect(kopf).toHaveTextContent('1 Treffer'));
+    // Ausgeschaltet nennt er, wie viele er ausblendet (Zählung ohne den Ausschluss).
+    const neu = screen.getByRole('switch', { name: /Systemeinträge zeigen/ });
+    expect(neu).not.toBeChecked();
+    await waitFor(() => expect(neu.closest('label')).toHaveTextContent('98 ausgeblendet'));
+
+    await userEvent.click(neu);
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('ohne_system'),
+    );
+    expect(await screen.findByText('Person erfasst')).toBeInTheDocument();
+  });
+
+  it('übersteht ein Neuladen: aus der URL gelesen, Schalter aus', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb?ohne_system=true', server958());
+    await screen.findByText('Erste Meldung');
+    expect(screen.getByRole('switch', { name: /Systemeinträge zeigen/ })).not.toBeChecked();
+    expect(screen.queryByText('Person erfasst')).toBeNull();
+    expect(abrufe.every((a) => a.includes('ohne_system=true'))).toBe(true);
+  });
+
+  it('ein Sprung auf einen ausgeblendeten Systemeintrag blendet ein und hebt hervor', async () => {
+    setzeViewportBreite(1366);
+    const { container } = setup('/einsaetze/7/etb?ohne_system=true&eintrag=2', server958());
+    expect(
+      await screen.findByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(container.querySelector('[data-zeile="eintrag-2"]')).toHaveClass(
+        'zeile-hervorgehoben',
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+    expect(screen.getByRole('switch', { name: /Systemeinträge zeigen/ })).toBeChecked();
+  });
+
+  it('unter einem Typfilter blendet ein vergeblicher Sprung nichts ein', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb?typ=meldung&ohne_system=true&eintrag=2', server958());
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?typ=meldung&ohne_system=true$/),
+    );
+    expect(
+      screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
+    ).toBeNull();
+  });
+
+  it('der Schalter heißt fest, die Zahl beschreibt ihn', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb', server958());
+    await screen.findByText('Person erfasst');
+    const schalter = screen.getByRole('switch', { name: 'Systemeinträge zeigen' });
+    await waitFor(() => expect(schalter).toHaveAccessibleDescription('98'));
+  });
+
+  it('ein Sprung auf einen sichtbaren Eintrag behält den Ausschluss', async () => {
+    setzeViewportBreite(1366);
+    const { container } = setup('/einsaetze/7/etb?ohne_system=true&eintrag=1', server958());
+    await waitFor(() =>
+      expect(container.querySelector('[data-zeile="eintrag-1"]')).toHaveClass(
+        'zeile-hervorgehoben',
+      ),
+    );
+    // Der Sprungparameter ist geräumt, der Ausschluss bleibt.
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?ohne_system=true$/),
+    );
+    expect(
+      screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
+    ).toBeNull();
+  });
+});

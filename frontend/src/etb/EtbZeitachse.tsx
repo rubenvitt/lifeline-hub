@@ -504,7 +504,9 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
       'data-testid': 'etb-ereigniszeile',
       'data-zeile': z.schluessel,
       className: klassen || undefined,
-      aktionen: aktionen(),
+      // Das Menü steht in `kompakt` in der Kopfzeile; die Entscheidung einer abgelehnten Zeile
+      // bleibt rechts (LFH-958, `Zeitachseneintrag`).
+      ...(z.art === 'abgelehnt' ? { aktionen: aktionen() } : { menue: aktionen() }),
       // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
       // Klassenregel käme dagegen nicht an.
       style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
