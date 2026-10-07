@@ -1242,26 +1242,39 @@ export default function Datensicht<T extends object, const K extends string>(
       ? (basis(wert, zeile, index) as ReactNode)
       : zelle(ersteSpalte, zeile, index);
   };
+  const ausloeserNeben = abBreite('xl');
   const tabellenSpalten: KatalogSpalte<T>[] =
     aufklappen && antdSpalten.length > 0 && ersteSpalte
       ? [
           {
             ...antdSpalten[0],
-            // NEBENEINANDER, NICHT GESTAPELT (LFH-975): der Auslöser steht in derselben Zeile wie
-            // die Kennung und bricht erst um, wenn der Platz fehlt (am Handy). Gestapelt verdoppelte
-            // er die Zeilenhöhe (rund 71 px am Desktop), und nur die Hälfte der Kräfte passte auf
-            // einen Schirm. Der Ort bleibt die Kennungszelle (LFH-676, keine eigene Spalte); die
-            // Höhe des Knopfs folgt weiter der Dichte, die Trefffläche bleibt also.
+            // NEBENEINANDER AB xl, DARUNTER GESTAPELT (LFH-975): ab 1200 px steht der Auslöser in
+            // derselben Zeile wie die Kennung und bricht erst um, wenn der Platz fehlt. Gestapelt
+            // verdoppelte er dort die Zeilenhöhe (rund 71 px bei 1440), und nur die Hälfte der Kräfte
+            // passte auf einen Schirm. Darunter bleibt er gestapelt: die automatische
+            // Tabellenbreite rechnet Kennung UND Auslöser in die Wunschbreite der ersten Spalte, und
+            // am Handy und Tablet schob das die Zahlspalten aus dem Bild (`betreuung-stellen-schmal`).
+            // Der Ort bleibt die Kennungszelle (LFH-676, keine eigene Spalte); die Höhe des Knopfs
+            // folgt weiter der Dichte, die Trefffläche bleibt also.
             render: (wert: unknown, zeile: T, index: number) => (
               <div
                 data-lfh="datensicht-aufklapp-zelle"
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  columnGap: token.marginXS,
-                  rowGap: token.marginXXS,
-                }}
+                style={
+                  ausloeserNeben
+                    ? {
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        columnGap: token.marginXS,
+                        rowGap: token.marginXXS,
+                      }
+                    : {
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: token.marginXXS,
+                      }
+                }
               >
                 {ersteZelle(wert, zeile, index)}
                 {aufklappAusloeser(zeile, false)}

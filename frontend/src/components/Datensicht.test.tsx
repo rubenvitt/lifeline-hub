@@ -1176,9 +1176,10 @@ describe('Datensicht · Aufklappbereich (LFH-676)', () => {
     expect(container.querySelector('.ant-table-row-expand-icon-cell')).toBeNull();
   });
 
-  it('tabelle: Auslöser und Kennung stehen in EINER umbrechenden Zeile, nicht gestapelt (LFH-975)', () => {
-    // Gestapelt verdoppelte der Auslöser die Zeilenhöhe; nebeneinander bricht er nur um, wenn
-    // der Platz fehlt.
+  it('tabelle ab xl: Auslöser und Kennung stehen in EINER umbrechenden Zeile (LFH-975)', () => {
+    // Gestapelt verdoppelte der Auslöser bei 1440 px die Zeilenhöhe; nebeneinander bricht er nur
+    // um, wenn der Platz fehlt.
+    setzeViewportBreite(1200);
     const { container } = rendere({
       form: 'tabelle',
       aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`),
@@ -1191,6 +1192,22 @@ describe('Datensicht · Aufklappbereich (LFH-676)', () => {
     expect(zeile.style.flexDirection).not.toBe('column');
     expect(zeile.style.flexWrap).toBe('wrap');
     expect(zeile.style.alignItems).toBe('center');
+  });
+
+  it('tabelle unter xl: der Auslöser steht unter der Kennung (LFH-975)', () => {
+    // Nebeneinander zählte die automatische Tabellenbreite beide in die Wunschbreite der ersten
+    // Spalte; am Tablet schob das die Zahlspalten der Betreuungsstellen aus dem Bild.
+    setzeViewportBreite(1199);
+    const { container } = rendere({
+      form: 'tabelle',
+      aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`),
+    });
+    const kennung = container.querySelector('tr[data-row-key="1"] > td') as HTMLElement;
+    const knopf = within(kennung).getByRole('button', { name: 'Verlauf zu Florian 1' });
+    const zeile = knopf.parentElement as HTMLElement;
+    expect(zeile).toHaveTextContent('Florian 1');
+    expect(zeile.style.flexDirection).toBe('column');
+    expect(zeile.style.flexWrap).toBe('');
   });
 
   it('karte: der Inhalt steht in einer Region, auf die der Auslöser zeigt', async () => {
