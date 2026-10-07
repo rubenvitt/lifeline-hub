@@ -1,3 +1,49 @@
+## [1.0.0-alpha.87](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.86...v1.0.0-alpha.87) (2026-10-07)
+
+### Bedienung
+
+#### Sprungpalette auf Touchscreens
+
+Die Sprungpalette erkennt jetzt automatisch Touch-Bedienung und passt sich an:
+
+- Schließen-Button (mindestens 48 px groß) statt Esc-Taste-Hinweis
+- Präfixe (Meldung, Auftrag, Lage) als antippbare Chips statt Tastaturkürzel
+- „Öffnen" in der Vorschau statt Enter-Hinweis
+- Keine Tastaturmarken in Fußzeile und Zeilen
+
+An Geräten mit Tastatur und Maus bleibt alles wie gewohnt.
+
+#### Klarere Beschriftungen
+
+**Fortschaltknöpfe** benennen jetzt die Handlung statt den Zielstatus:
+- Meldungen: „Weitergeben" statt „Weitergegeben", „Als Auftrag erteilen" statt „Erteilt"
+- Aufträge: „Erteilen" statt „Erteilt", „Als erledigt melden" statt „Gemeldet"
+- Nachforderungen: „Weitergeben" statt „Weitergegeben", „Bewilligen" statt „Bewilligt"
+- Dienststatus: „Dienst übernehmen" statt „Im Dienst", „Dienst beenden" statt „Außer Dienst"
+
+**Erinnerungen** heißen jetzt:
+- „Erübrigt (zur Kenntnis)" statt nur „Zur Kenntnis"
+- „Erledigt (durchgeführt)" statt nur „Erledigt"
+- Hover-Tooltips entfallen (Text spricht für sich)
+
+**Meldungsseite** zählt „Bestätigung überfällig" statt „Alarmiert".
+
+**Gesperrte Funktionen** zeigen den Grund direkt im Button:
+- „Patient aufnehmen (Keine Berechtigung)" statt nur im Tooltip
+- Auch bei „Material zuordnen" sichtbar
+
+### Einsatzverwaltung
+
+#### Einsatzdaten auf schmalen Bildschirmen
+
+Die Einsatzdaten-Seite nutzt auf Smartphones (unter 768 px Breite) den Platz besser aus:
+
+- Lagedaten: Etikett steht über dem Wert statt daneben
+- Knöpfe („Führungsstelle eintragen", „Lagedaten eintragen") brechen um, wenn der Platz nicht reicht
+- Zugriffstabelle: zwei Spalten statt vier; Führungsstelle als zweite Zeile unter dem Namen, „Entfernen"-Button unter dem Rollenfeld
+
+Die Seite passt jetzt auf 390 px Breite ohne Verkleinerung durch den Browser.
+
 ## [1.0.0-alpha.86](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.85...v1.0.0-alpha.86) (2026-10-07)
 
 ### Wichtige Änderungen
