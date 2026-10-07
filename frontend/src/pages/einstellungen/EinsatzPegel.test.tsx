@@ -230,6 +230,9 @@ describe('EinsatzPegel', () => {
     expect(leit[0].closest('.listen-eintrag')).toHaveTextContent('HANN. MÜNDEN');
     expect(screen.getByText(/WESER · 6,84 m · fallend −3 cm\/h · Stand/)).toBeInTheDocument();
     expect(screen.getByText('FULDA · Stand unbekannt')).toBeInTheDocument();
+    // Der Zähler ersetzt den Satz zur Höchstzahl; unter dem Maximum bleibt „Hinzufügen“ offen.
+    expect(document.querySelector('[data-lfh="pegel-zaehler"]')?.textContent).toBe('2/5');
+    expect(screen.queryByText('Maximum erreicht')).toBeNull();
   });
 
   it('Hinzufügen: POST mit Name und Gewässer der Station, danach steht sie hinten', async () => {

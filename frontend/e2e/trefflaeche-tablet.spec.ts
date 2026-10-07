@@ -439,7 +439,7 @@ for (const { dichte, soll } of STAFFEL) {
 
 /**
  * LFH-435 · Zweig „Org-Führungskraft" auf den Anmeldeverfahren: sie kommt in die Verwaltung,
- * ist aber kein System-Admin. Jede Zeile trägt dann den Sperrgrund „nur Admins" neben dem
+ * ist aber kein System-Admin. Jede Zeile trägt dann den Sperrgrund „nur System-Admin" neben dem
  * gesperrten Kippschalter (`Anmeldeverfahren.tsx`) — der Zweig ist breiter als der des Admins,
  * der nur an „Passwort" einen Grund trägt.
  *
@@ -487,7 +487,7 @@ for (const { dichte, soll } of STAFFEL) {
       const zeile = zeilen.nth(i);
       const kennung = await zeile.getAttribute('data-provider-zeile');
       await expect(
-        zeile.getByText('nur Admins', { exact: true }),
+        zeile.getByText('nur System-Admin', { exact: true }),
         `Vorbedingung: Zeile „${kennung}" nennt ihren Sperrgrund sichtbar`,
       ).toBeVisible();
       const schalter = zeile.getByRole('switch');

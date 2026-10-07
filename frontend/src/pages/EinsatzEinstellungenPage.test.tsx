@@ -137,6 +137,15 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
 
     await screen.findByText('Sektionsinhalt Aufbewahrung');
     expect(container.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
+    expect(container.querySelector('[data-lfh="seiten-beschreibung"]')).toBeNull();
+  });
+
+  it('laesst beim laufenden Einsatz keinen leeren Hinweis-Abstand unter dem Kopf', async () => {
+    // Ein gesetzter `hinweis` reserviert in `EinsatzSeite` seinen Abstand auch ohne Inhalt.
+    const { container } = rendern();
+
+    await screen.findByText('Sektionsinhalt Allgemein');
+    expect(container.querySelector('[data-lfh="seiten-beschreibung"]')).toBeNull();
   });
 
   it('laesst den Kopf-Aktionen-Slot leer — der Speichern-Knopf liegt im Formular', async () => {

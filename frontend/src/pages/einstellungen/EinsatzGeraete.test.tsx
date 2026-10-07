@@ -126,12 +126,9 @@ describe('EinsatzGeraete (LFH-892)', () => {
   it('nennt Führungspersonal das fehlende Recht und lädt keine Geräte', async () => {
     const { gelesen } = stelleBereit({ rolle: 'fuehrungspersonal' });
     rendern();
-    const hinweis = await waitFor(() => {
-      const h = document.querySelector('[data-lfh="rechte-hinweis"]');
-      expect(h).not.toBeNull();
-      return h!;
-    });
-    expect(hinweis.textContent).toBe('Nur Ansicht nur Einsatzleitung');
+    // Nichts geladen, also nichts anzusehen: Leerzustand mit Grund statt „Nur Ansicht“.
+    expect(await screen.findByText('Nur die Einsatzleitung koppelt Geräte')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
     expect(gelesen).toEqual([]);
   });
 

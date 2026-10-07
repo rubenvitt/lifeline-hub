@@ -53,7 +53,8 @@ export function sperrSatz(
   const module = sperren.find((s) => s.ansicht === ansicht)?.gesperrte_module ?? [];
   if (module.length === 0) return null;
   const namen = module.map(modulName).join(', ');
-  return `${namen} für einfache Mitglieder gesperrt – fehlt auf dem ${ANSICHT_LABEL[ansicht]}`;
+  const fehlt = module.length === 1 ? 'fehlt' : 'fehlen';
+  return `${namen} für einfache Mitglieder gesperrt – ${fehlt} auf dem ${ANSICHT_LABEL[ansicht]}`;
 }
 
 /** Code in Vierergruppen („ABCD-1234"), wie er sich vorlesen lässt. */

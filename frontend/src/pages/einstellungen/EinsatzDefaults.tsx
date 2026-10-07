@@ -34,14 +34,16 @@ import { NUR_ADMIN } from '../../components/nurAnsicht';
 const EINSATZ_PRAEFIX_VORGABE = 'E-';
 
 /**
- * Erste Nummer eines neuen Einsatzes mit diesem Präfix — Spiegel von `einsatz/nummer.rs`,
+ * Form der Nummer eines neuen Einsatzes mit diesem Präfix — Spiegel von `einsatz/nummer.rs`,
  * `formatiere` (`<Präfix><JJJJ>-<NNNN>`). Rein und exportiert. Die Vorschau ersetzt den Satz „Steht
  * vor Jahr und laufender Nummer …“ (LFH-1078); „Neue Einsätze“ davor trägt die Folge, dass
- * bestehende Nummern bleiben. Das Jahr ist das des Geräts — der Server nimmt das der Org-Zeitzone,
- * was nur in der Silvesternacht auseinanderfällt.
+ * bestehende Nummern bleiben. Die laufende Nummer bleibt offen („…“): der Server zählt je Org und
+ * Jahr über alle Präfixe weiter (`einsatz/repo.rs`), eine „0001“ wäre meist falsch. Das Jahr ist
+ * das des Geräts — der Server nimmt das der Org-Zeitzone, was nur in der Silvesternacht
+ * auseinanderfällt.
  */
 export function einsatznummerVorschau(praefix: string | null | undefined, jahr: number): string {
-  return `${praefix?.trim() || EINSATZ_PRAEFIX_VORGABE}${jahr}-0001`;
+  return `${praefix?.trim() || EINSATZ_PRAEFIX_VORGABE}${jahr}-…`;
 }
 
 /**
@@ -280,7 +282,7 @@ export default function EinsatzDefaults() {
               })
             }
             darfVerwalten={istAdmin}
-            rechteGrund="nur Admins"
+            rechteGrund={NUR_ADMIN}
             // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert. `variables`
             // trägt die laufende bzw. zuletzt gescheiterte Zeile.
             laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}

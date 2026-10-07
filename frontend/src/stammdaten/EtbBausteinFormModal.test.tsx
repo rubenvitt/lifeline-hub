@@ -76,6 +76,8 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
     const zeile = feld.closest('.ant-form-item') as HTMLElement;
     expect(within(zeile).getByText('{datum}')).toBeInTheDocument();
     expect(within(zeile).getByText('{einsatznr}')).toBeInTheDocument();
+    // Die Form steht sichtbar daneben, nicht nur im Hover-Titel.
+    expect(zeile).toHaveTextContent('{datum} Aktuelles Datum (TT.MM.JJJJ)');
     expect(zeile).not.toHaveTextContent(/beim Einsetzen|befüllt|abgefragt/);
   });
 

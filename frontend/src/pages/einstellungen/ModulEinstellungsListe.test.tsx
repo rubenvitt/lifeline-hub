@@ -361,7 +361,7 @@ describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
     fireEvent.mouseEnter(
       within(zeileVon('Einsatzdaten')).getByText('immer sichtbar, nicht ausblendbar'),
     );
-    await new Promise((r) => setTimeout(r, 300));
-    expect(screen.queryByRole('tooltip')).toBeNull();
+    // antd öffnet nach 100 ms; gewartet wird darüber hinaus auf ein Tooltip, das nie kommt.
+    await expect(screen.findByRole('tooltip', {}, { timeout: 300 })).rejects.toThrow();
   });
 });

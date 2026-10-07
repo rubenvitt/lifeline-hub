@@ -174,7 +174,9 @@ describe('Anmeldeverfahren', () => {
     ).toBeDisabled();
     // LFH-1078: „Nur Ansicht · Grund“ statt eines Satzes.
     expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
-    expect(screen.getByText('nur System-Admin')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+      'Nur Ansicht nur System-Admin',
+    );
     expect(document.body.textContent).not.toMatch(/zum Nachlesen|Nur Benutzer mit/);
   });
 
@@ -205,14 +207,14 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
     renderMitProviders(<Anmeldeverfahren />);
     await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
     // Jede Zeile trägt ihn.
-    expect(screen.getAllByText('nur Admins').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('nur System-Admin').length).toBeGreaterThan(1);
   });
 
   it('nennt dem Admin den Grund NUR an der Passwort-Zeile', async () => {
     renderMitProviders(<Anmeldeverfahren />);
     await screen.findByRole('switch', { name: 'Anmeldeverfahren: Passwort' });
     expect(screen.getByText('nicht deaktivierbar')).toBeInTheDocument();
-    expect(screen.queryByText('nur Admins')).not.toBeInTheDocument();
+    expect(screen.queryByText('nur System-Admin')).not.toBeInTheDocument();
   });
 
   it('macht die bedienbare Zeile zum Ziel — und die gesperrte ausdruecklich nicht', async () => {

@@ -67,6 +67,7 @@ export default function EinsatzAufbewahrung() {
   }
 
   const orgDauer = daten.einstellungen.org_defaults?.retention_dauer_tage;
+  const orgHinweis = orgHinweisWert(orgDauer, 'Tage');
 
   return (
     <>
@@ -93,8 +94,18 @@ export default function EinsatzAufbewahrung() {
             label="Aufbewahrungs-Dauer (Tage)"
             name="retention_dauer_tage"
             // Abgeschlossen steht kein „Nur Ansicht“ im Seitenkopf (die Frist oben bleibt
-            // änderbar); der Grund der Sperre steht deshalb hier am Feld.
-            extra={daten.istAktiv ? orgHinweisWert(orgDauer, 'Tage') : EINSATZ_ABGESCHLOSSEN}
+            // änderbar); der Grund der Sperre steht deshalb hier am Feld, unter der Vorgabe der
+            // Organisation (Spec `bedien-begriffe`).
+            extra={
+              daten.istAktiv ? (
+                orgHinweis
+              ) : (
+                <>
+                  {orgHinweis && <span style={{ display: 'block' }}>{orgHinweis}</span>}
+                  {EINSATZ_ABGESCHLOSSEN}
+                </>
+              )
+            }
           >
             <InputNumber
               min={1}

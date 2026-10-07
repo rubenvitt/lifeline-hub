@@ -1,6 +1,6 @@
 import { Form, Input, InputNumber, Typography } from 'antd';
 import { Formularpaneel } from '../../components/instrument';
-import { KATEGORIE_TEXT, KATEGORIEN } from '../../aufbewahrung/kategorieText';
+import { KATEGORIE_TEXT, KATEGORIEN, PERSONENSTAMM_TEXT } from '../../aufbewahrung/kategorieText';
 import { mitVorgabe } from '../../components/vorgabeText';
 import type { FormWerteEinsatz } from './orgEinstellungenForm';
 
@@ -15,8 +15,9 @@ import type { FormWerteEinsatz } from './orgEinstellungenForm';
  *
  * Kein Erklär-Absatz unter dem Titel (LFH-1078): was ein leeres Feld heißt, sagt der Platzhalter
  * (die Kategorie folgt der Frist des Einsatzes), die Pflicht zur Rechtsgrundlage die Prüfung am
- * Feld. Die erfassten Daten nennt der Tooltip am Feld (Spec: „kurze Beschreibung der erfassten
- * Daten“).
+ * Feld. Die erfassten Daten stehen sichtbar unter dem Feld (Spec: „kurze Beschreibung der erfassten
+ * Daten“; kein Tooltip, der auf Touch nicht erreichbar ist), der Personenstamm als Datenschutz-Zeile
+ * am Ende.
  */
 export default function KategorieVorgabenPaneel() {
   const form = Form.useFormInstance<FormWerteEinsatz>();
@@ -34,9 +35,9 @@ export default function KategorieVorgabenPaneel() {
             <Form.Item
               label={`Dauer ${text.bezeichnung} (Tage)`}
               name={['kategorien', k, 'dauer_tage']}
-              tooltip={`Umfasst: ${text.daten}.`}
               extra={
                 <>
+                  <span style={{ display: 'block' }}>Umfasst: {text.daten}</span>
                   Vorschlag: {text.vorschlag.tage} Tage — {text.vorschlag.quelle}
                   {laengerAlsEinsatz && (
                     <Typography.Text type="warning" style={{ display: 'block' }}>
@@ -73,6 +74,9 @@ export default function KategorieVorgabenPaneel() {
           </div>
         );
       })}
+      <Typography.Text type="secondary" data-lfh="personenstamm">
+        {PERSONENSTAMM_TEXT}
+      </Typography.Text>
     </Formularpaneel>
   );
 }

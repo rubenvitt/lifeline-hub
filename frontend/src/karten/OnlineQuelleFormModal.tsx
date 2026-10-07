@@ -59,6 +59,7 @@ export default function OnlineQuelleFormModal({
   const qc = useQueryClient();
   const { message } = App.useApp();
   const typ = Form.useWatch('typ', form) ?? 'vektor';
+  const proxy = Form.useWatch('proxy', form);
 
   // Vorbelegung, kein Zurücksetzen (siehe `FahrzeugFormModal`). Die Anlegen-Vorgaben stehen als
   // `initialValues` an der Hülle, jedes `resetFields` holt sie wieder — inklusive der aktuellen
@@ -160,13 +161,15 @@ export default function OnlineQuelleFormModal({
                 <Form.Item label="Aktiv" name="aktiv" valuePropName="checked">
                   <Switch />
                 </Form.Item>
-                {/* Ein Alert erklärt einen Zustand der Seite, ein Tooltip ein Feld. */}
+                {/* Proxy hält den Schlüssel server-seitig und cacht (LFH-182/190). Abgeschaltet
+                    steht die Folge sichtbar am Feld, nicht im Tooltip (Touch). */}
                 <Form.Item
                   label="Über Server proxen"
                   name="proxy"
                   valuePropName="checked"
-                  // Proxy hält den Schlüssel server-seitig und cacht (LFH-182/190).
-                  tooltip="Nur abschalten, wenn der Anbieter Proxy oder Cache untersagt."
+                  extra={
+                    proxy === false ? 'Schlüssel in der URL ist im Browser sichtbar.' : undefined
+                  }
                 >
                   <Switch />
                 </Form.Item>

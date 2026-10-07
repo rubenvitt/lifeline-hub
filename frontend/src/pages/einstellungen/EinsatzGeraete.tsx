@@ -11,7 +11,7 @@ import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { Select } from '../../components/Select';
 import KopierbarerText from '../../components/KopierbarerText';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
+import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
@@ -49,8 +49,11 @@ import {
   verlaengernVorbelegung,
 } from './geraeteKern';
 
-/** Grund des `RechteHinweis`: der Server lässt nur die Einsatzleitung zu, auch keinen Admin. */
-const RECHTE_TEXT = 'nur Einsatzleitung';
+/**
+ * Ohne Einsatzleitung lädt die Sektion nichts (der Server lässt nur sie zu, auch keinen Admin):
+ * ein Leerzustand mit Grund, kein „Nur Ansicht“ — es gibt nichts anzusehen.
+ */
+const RECHTE_TEXT = 'Nur die Einsatzleitung koppelt Geräte';
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 
@@ -158,7 +161,7 @@ export default function EinsatzGeraete() {
 
   if (daten.laedt || (leitung && geraeteQ.isLoading)) return <SeitenSkeleton />;
   if (!leitung) {
-    return <SeitenHinweise rechteFehlt rechteText={RECHTE_TEXT} />;
+    return <SeitenLeer titel={RECHTE_TEXT} />;
   }
   if (geraeteQ.isError || !geraeteQ.data) {
     return (

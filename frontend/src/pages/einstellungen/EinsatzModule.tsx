@@ -134,7 +134,7 @@ export default function EinsatzModule() {
           darfVerwalten={darfVerwalten}
           // Zwei Ursachen, zwei Wörter: ein abgeschlossener Einsatz sperrt auch die Einsatzleitung,
           // ein Rollenwort widerspräche dann dem Seitenkopf.
-          rechteGrund={daten.istAktiv ? 'nur Einsatzleitung' : EINSATZ_ABGESCHLOSSEN}
+          rechteGrund={daten.istAktiv ? NUR_LEITUNG_ORG_ADMIN : EINSATZ_ABGESCHLOSSEN}
           // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert.
           laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
           fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}

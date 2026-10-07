@@ -34,9 +34,9 @@ export function zeilenzielStil(token: {
  * konfigurierte Verfahren erscheinen.
  *
  * Der Sperrgrund steht sichtbar als gedämpftes Kurzwort, ohne Erklär-Tooltip (LFH-1078): auf dem
- * Tablet gibt es kein Hover, und „ausgegraut" allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1). An gesperrten
- * Zeilen entsteht kein `<label>`: den Klick auf ein `disabled` Steuerelement leitet der Browser
- * ohnehin nicht weiter — ohne Aktion keine Aufforderung.
+ * Tablet gibt es kein Hover, und „ausgegraut" allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1). An
+ * gesperrten Zeilen entsteht kein `<label>`: den Klick auf ein `disabled` Steuerelement leitet der
+ * Browser ohnehin nicht weiter — ohne Aktion keine Aufforderung.
  */
 export default function Anmeldeverfahren() {
   const { benutzer } = useAuth();
@@ -96,11 +96,7 @@ export default function Anmeldeverfahren() {
               // Rauschen.
               const bedienbar = istAdmin && !istPasswort;
               const gesperrt = !bedienbar || schaltenMutation.isPending;
-              const sperrGrund = !istAdmin
-                ? 'nur Admins'
-                : istPasswort
-                  ? 'nicht deaktivierbar'
-                  : null;
+              const sperrGrund = !istAdmin ? NUR_ADMIN : istPasswort ? 'nicht deaktivierbar' : null;
               const feldId = `anmeldeverfahren-${p.id}`;
               // Nur die abgelehnte Zeile markieren; `variables` trägt die zuletzt gescheiterte
               // Zeile.

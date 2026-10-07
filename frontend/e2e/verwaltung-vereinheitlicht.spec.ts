@@ -252,7 +252,7 @@ async function nurLeseZweigSteht(page: Page) {
   ).toBeDisabled();
   const modulZeile = page.locator('[data-modul-zeile]').filter({ hasText: MODUL });
   await expect(
-    modulZeile.getByText('nur Admins', { exact: true }),
+    modulZeile.getByText('nur System-Admin', { exact: true }),
     'Vorbedingung: die Modulzeile nennt ihren Sperrgrund',
   ).toBeVisible();
   await expect(
@@ -276,7 +276,7 @@ async function ueberlaufendeModulzeilen(page: Page) {
 /**
  * LFH-435 · Zweig „Org-Führungskraft": dieselbe Messung ohne Admin-Recht. Die Führungskraft
  * erreicht die Einsatz-Vorgaben, darf sie aber nicht ändern: Rechtehinweis, gesperrtes
- * Formular, und JEDE Modulzeile trägt den Sperrgrund „nur Admins" in ihrer Beschriftungszelle
+ * Formular, und JEDE Modulzeile trägt den Sperrgrund „nur System-Admin" in ihrer Beschriftungszelle
  * (`EinsatzDefaults.tsx`, `ModulEinstellungsListe.tsx`). Der Sperrgrund ist das Element, das
  * die Rolle hinzufügt — gemessen wird deshalb zusätzlich, dass keine Zeile in sich überläuft;
  * die Breite des Auswählers sähe einen Sperrgrund nicht, der nur die Beschriftung sprengt.
@@ -330,7 +330,7 @@ test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Vorgaben, und kein
 
 /**
  * LFH-822 · Messung 3 (1280 px) als Org-Führungskraft, Geschwister des Admin-Tests oben. Bei
- * 1280 px steht der Sperrgrund „nur Admins" NEBEN dem Modulnamen in der fließenden Spalte
+ * 1280 px steht der Sperrgrund „nur System-Admin" NEBEN dem Modulnamen in der fließenden Spalte
  * (`minmax(0, 1fr)`), der Auswähler in der festen Spur daneben. Die feste Spur hält den
  * Auswähler auch dann breit, wenn der Sperrgrund die Beschriftung sprengt — deshalb misst der
  * Test wie bei 390 px zusätzlich, dass keine Zeile in sich überläuft.

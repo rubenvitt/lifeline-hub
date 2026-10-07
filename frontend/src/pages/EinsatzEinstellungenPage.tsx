@@ -123,12 +123,12 @@ export default function EinsatzEinstellungenPage() {
       // Reine Formularseite: ausdrücklich die schmale Lesebreite.
       breite="schmal"
       // Abgeschlossen ist alles eingefroren außer der Aufbewahrungsfrist: dort stünde „Nur Ansicht“
-      // falsch, die Sektion nennt den Grund am gesperrten Feld selbst.
+      // falsch, die Sektion nennt den Grund am gesperrten Feld selbst. Bedingt statt `sichtbar`:
+      // ein gesetzter `hinweis` reserviert in `EinsatzSeite` auch leer seinen Abstand.
       hinweis={
-        <RechteHinweis
-          sichtbar={!daten.istAktiv && aktiv !== 'aufbewahrung'}
-          text={EINSATZ_ABGESCHLOSSEN}
-        />
+        !daten.istAktiv && aktiv !== 'aufbewahrung' ? (
+          <RechteHinweis sichtbar text={EINSATZ_ABGESCHLOSSEN} />
+        ) : undefined
       }
     >
       {/* Die Reiter als Segmentleiste im Tablist-Modus. Die aktive Sektion kommt aus der URL;

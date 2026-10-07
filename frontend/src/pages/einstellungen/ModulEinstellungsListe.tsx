@@ -79,7 +79,7 @@ const MODUL_GRUND = 'immer sichtbar, nicht ausblendbar';
 
 /**
  * Rückfall ohne Wortlaut vom Aufrufer — ein Wort, das in jedem Fall stimmt: auf Einsatz-Ebene
- * sperrt auch ein abgeschlossener Einsatz, „nur Verwaltung" widerspräche dort dem Seitenbanner.
+ * sperrt auch ein abgeschlossener Einsatz, „nur Verwaltung" widerspräche dort dem Seitenkopf.
  */
 const RECHTE_GRUND_RUECKFALL = 'nur lesen';
 

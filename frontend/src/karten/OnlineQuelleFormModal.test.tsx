@@ -233,11 +233,12 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Der Proxy trägt als einziges Feld einen kurzen Tooltip (wann abschalten), kein Alert über dem
-   * Formular. Die übrigen Felder erklären sich selbst (LFH-1078): der Schlüssel steht im
-   * Platzhalter der URL, die Pflicht der Attribution zeigen Marke und Prüfung.
+   * Kein Feld trägt einen Erklär-Tooltip, kein Alert steht über dem Formular (LFH-1078): der
+   * Schlüssel steht im Platzhalter der URL, die Pflicht der Attribution zeigen Marke und Prüfung.
+   * Nur der abgeschaltete Proxy nennt seine Folge sichtbar am Feld — der Schlüssel landet dann im
+   * Browser.
    */
-  it('erklärt nur den Proxy, am Feld statt in einem Alert über dem Formular', async () => {
+  it('nennt nur beim abgeschalteten Proxy die Folge, sichtbar am Feld', async () => {
     handler();
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
@@ -250,8 +251,13 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     );
 
     await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    const zeile = (await screen.findByLabelText('Über Server proxen')).closest('.ant-form-item');
-    expect(zeile?.querySelector('.ant-form-item-tooltip')).not.toBeNull();
-    expect(dialog.querySelectorAll('.ant-form-item-tooltip')).toHaveLength(1);
+    const schalter = await screen.findByLabelText('Über Server proxen');
+    expect(dialog.querySelectorAll('.ant-form-item-tooltip')).toHaveLength(0);
+    expect(within(dialog).queryByText(/im Browser sichtbar/)).toBeNull();
+
+    await nutzer.click(schalter);
+    expect(
+      await within(dialog).findByText('Schlüssel in der URL ist im Browser sichtbar.'),
+    ).toBeInTheDocument();
   });
 });

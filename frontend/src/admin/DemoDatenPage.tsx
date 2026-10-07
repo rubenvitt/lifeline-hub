@@ -92,7 +92,7 @@ const RUECKFRAGE: Record<Rueckfrage, { titel: string; text: string; ok: string }
   },
   entfernen: {
     titel: 'Demo-Daten entfernen?',
-    text: 'Der Demo-Einsatz wird samt Änderungen unwiderruflich gelöscht; verwendete Stammdaten bleiben.',
+    text: 'Der Demo-Einsatz wird samt Änderungen unwiderruflich gelöscht, ungenutzte Demo-Stammdaten ebenso.',
     ok: 'Endgültig entfernen',
   },
 };

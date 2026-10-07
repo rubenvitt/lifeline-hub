@@ -102,6 +102,18 @@ describe('EinsatzDefaults', () => {
     expect(screen.getByText(/Vorschlag: 30 Tage — § 32b Abs\. 3 NKatSG/)).toBeInTheDocument();
   });
 
+  it('Spec „kurze Beschreibung der erfassten Daten“: sichtbar am Feld, nicht im Tooltip', async () => {
+    const { container } = renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+    const feld = await screen.findByLabelText('Dauer Personenauskunft (Tage)');
+    const zeile = feld.closest('.ant-form-item');
+    expect(zeile?.textContent).toContain('Umfasst: Herkunftsadresse und Melderkontakt');
+    expect(zeile?.querySelector('.ant-form-item-tooltip')).toBeNull();
+    // Der Personenstamm folgt den Zwecken der Person (Datenschutz-Zeile am Paneel).
+    expect(container.querySelector('[data-lfh="personenstamm"]')?.textContent).toMatch(
+      /bis alle Zwecke der Person abgelaufen sind/,
+    );
+  });
+
   it('Spec „Dauer länger als Einsatz-Dauer“: Hinweis, dass die Einsatz-Frist zuerst greift', async () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     const feld = await screen.findByLabelText('Dauer Behandlung (Tage)');
@@ -271,11 +283,11 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     const feld = await screen.findByLabelText('Präfix Einsatznummer');
-    expect(screen.getByText(`Neue Einsätze: WF-${jahr}-0001`)).toBeInTheDocument();
+    expect(screen.getByText(`Neue Einsätze: WF-${jahr}-…`)).toBeInTheDocument();
     await userEvent.clear(feld);
-    expect(await screen.findByText(`Neue Einsätze: E-${jahr}-0001`)).toBeInTheDocument();
+    expect(await screen.findByText(`Neue Einsätze: E-${jahr}-…`)).toBeInTheDocument();
     await userEvent.type(feld, ' OV- ');
-    expect(await screen.findByText(`Neue Einsätze: OV-${jahr}-0001`)).toBeInTheDocument();
+    expect(await screen.findByText(`Neue Einsätze: OV-${jahr}-…`)).toBeInTheDocument();
   });
 
   it('erklärt Felder und Paneele nicht in Sätzen (LFH-1078)', async () => {
@@ -400,7 +412,7 @@ describe('EinsatzDefaults', () => {
     const zeile = screen
       .getByRole('combobox', { name: 'Benötigte Rolle: ETB' })
       .closest('[data-modul-zeile]') as HTMLElement;
-    expect(within(zeile).getByText('nur Admins')).toBeInTheDocument();
+    expect(within(zeile).getByText('nur System-Admin')).toBeInTheDocument();
   });
 });
 
@@ -454,7 +466,11 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     // „Nur Ansicht · Grund“ statt eines Satzes (LFH-1078).
-    expect(await screen.findByText('nur System-Admin')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
+        'Nur Ansicht nur System-Admin',
+      ),
+    );
     expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });

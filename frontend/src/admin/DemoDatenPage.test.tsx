@@ -339,7 +339,7 @@ describe('DemoDatenPage — importiert', () => {
     // Genau EIN kurzer Satz zur Folge (LFH-1078).
     expect(
       within(dialog).getByText(
-        'Der Demo-Einsatz wird samt Änderungen unwiderruflich gelöscht; verwendete Stammdaten bleiben.',
+        'Der Demo-Einsatz wird samt Änderungen unwiderruflich gelöscht, ungenutzte Demo-Stammdaten ebenso.',
       ),
     ).toBeInTheDocument();
     // Die Rückfrage allein sendet nichts.

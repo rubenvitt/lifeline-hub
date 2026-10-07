@@ -245,9 +245,9 @@ for (const [name, fenster] of [
 
 // ── LFH-435: die Sektionen ohne volles Recht ────────────────────────────────────────────
 //
-// Ohne Recht fügen die Sektionen hinzu (Rechtehinweis, Sperrgrund „nur Einsatzleitung" an jeder
-// Modulzeile) — genau die Zweige, die ein Admin-Durchgang nie sieht. Jede Vorbedingung steht
-// VOR der Messung; ohne sie wäre der Durchgang grün durch Nichtstun.
+// Ohne Recht fügen die Sektionen hinzu (Rechtehinweis, Sperrgrund „nur Einsatzleitung oder
+// Org-Admin" an jeder Modulzeile) — genau die Zweige, die ein Admin-Durchgang nie sieht. Jede
+// Vorbedingung steht VOR der Messung; ohne sie wäre der Durchgang grün durch Nichtstun.
 
 /** Die Rechtehinweise der Sektionen, je über ein Fragment, das nur EINEN Hinweis trifft —
  *  auf der Aufbewahrung stehen zwei (Einstellungen und Frist). */
@@ -289,7 +289,10 @@ async function modulZeileGesperrt(page: Page) {
     'Vorbedingung: der Rechtehinweis der Modul-Sektion steht',
   ).toBeVisible();
   await expect(
-    page.locator(`[data-modul-zeile]`).filter({ hasText: MODUL }).getByText('nur Einsatzleitung'),
+    page
+      .locator(`[data-modul-zeile]`)
+      .filter({ hasText: MODUL })
+      .getByText(HINWEIS_MODULE, { exact: true }),
     'Vorbedingung: die Modulzeile nennt ihren Sperrgrund',
   ).toBeVisible();
   await expect(

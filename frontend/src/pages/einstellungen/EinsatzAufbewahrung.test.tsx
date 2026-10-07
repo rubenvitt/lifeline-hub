@@ -192,6 +192,25 @@ describe('EinsatzAufbewahrung', () => {
     );
   });
 
+  it('am abgeschlossenen Einsatz: Vorgabe der Organisation UND Grund der Sperre am Feld', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'abgeschlossen',
+      meine_rolle: 'einsatzleitung',
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      ...VOLL,
+      retention_dauer_tage: null,
+      org_defaults: { org_id: 1, retention_dauer_tage: 365 },
+    } as never);
+
+    rendern();
+
+    expect(await screen.findByText('Vorgabe der Organisation: 365 Tage')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz abgeschlossen')).toBeInTheDocument();
+  });
+
   it('haelt den Speichern-Knopf IM Formular (Erfassungs-Norm B4/LFH-332)', async () => {
     rendern();
 
