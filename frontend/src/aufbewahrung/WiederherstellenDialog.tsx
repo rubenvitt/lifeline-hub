@@ -81,7 +81,7 @@ export default function WiederherstellenDialog({
       <Form.Item
         label="Neue Aufbewahrungsfrist"
         name="frist"
-        extra="Die Löschvormerkung wird aufgehoben; ab dieser Frist beginnt die Aufbewahrung von vorn."
+        extra="Hebt die Löschvormerkung auf."
         rules={[
           {
             validator: (_, wert: Dayjs | null | undefined) => {

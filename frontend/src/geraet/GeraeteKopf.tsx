@@ -66,7 +66,7 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
       data-bald={bald ? 'ja' : 'nein'}
       role="img"
       aria-label={bald ? `Kopplung endet bald, um ${uhrzeit}` : `Kopplung bis ${uhrzeit}`}
-      title={bald ? 'Für eine Verlängerung bei der Einsatzleitung melden.' : undefined}
+      title={bald ? 'Verlängern: Einsatzleitung' : undefined}
       style={kopfZelleStil(token)}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: farbe }}>

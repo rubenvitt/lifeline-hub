@@ -1,4 +1,4 @@
-import { Alert, Button, Space, Spin, Typography } from 'antd';
+import { Button, Space, Spin, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -48,19 +48,7 @@ export default function KopplungBeendetPage() {
       <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
         {online ? 'Kopplung beendet' : 'Keine Verbindung'}
       </Typography.Title>
-      {online ? (
-        <Typography.Paragraph>
-          Dieses Gerät ist mit keinem Einsatz mehr verbunden. Melde dich bei der Einsatzleitung,
-          wenn du es weiter brauchst; sie gibt dir einen neuen Code.
-        </Typography.Paragraph>
-      ) : (
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-          title="Das Gerät erreicht den Server nicht. Ob die Kopplung noch gilt, prüft es, sobald das Netz zurück ist."
-        />
-      )}
+      {online && <Typography.Paragraph>Neuen Code gibt die Einsatzleitung.</Typography.Paragraph>}
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Button type="primary" size="large" block onClick={() => navigate(KOPPELN_PFAD)}>
           Neuen Code eingeben

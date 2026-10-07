@@ -61,16 +61,11 @@ import {
 } from './wetterText';
 
 const QUELLENVERMERK = 'Datenbasis: Deutscher Wetterdienst · über Bright Sky';
-const KEIN_ORT_TEXT =
-  'Warnungen und Vorhersage brauchen einen verorteten Einsatzort. Der Einsatz hat noch keine Koordinate.';
-const KEIN_ORT_AKTUELL =
-  'Die aktuellen Bedingungen brauchen einen verorteten Einsatzort. Der Einsatz hat noch keine Koordinate.';
-const AUSFALL_TEXT =
-  'Die Wetterquelle antwortet nicht, und es liegt kein verwertbarer Stand vor. Es werden keine Werte gezeigt.';
+const KEIN_ORT_TEXT = 'Einsatzort nicht verortet';
+const AUSFALL_TEXT = 'Wetterquelle nicht erreichbar';
 const VERALTET_GRUND = 'die Aktualisierung gelingt gerade nicht';
 /** Bei den aktuellen Bedingungen ist der Stand die Messzeit: alt ist die Station, nicht der Abruf. */
-const AUSFALL_AKTUELL =
-  'Keine Messung aus den letzten drei Stunden — die Wetterquelle antwortet nicht, oder die Stationen melden nichts. Es werden keine Werte gezeigt.';
+const AUSFALL_AKTUELL = 'Keine Messung aus den letzten drei Stunden';
 const VERALTET_AKTUELL = 'die Station hat seitdem keine neue Messung geliefert';
 
 interface TeilProps {
@@ -94,13 +89,11 @@ function standMeta(stand: TeilStand, vorne?: string | null): string | undefined 
 function StandHinweis({
   stand,
   onEinsatzdaten,
-  keinOrtText = KEIN_ORT_TEXT,
   ausfallText = AUSFALL_TEXT,
   veraltetGrund = VERALTET_GRUND,
 }: {
   stand: TeilStand;
   onEinsatzdaten?: () => void;
-  keinOrtText?: string;
   ausfallText?: string;
   veraltetGrund?: string;
 }) {
@@ -109,7 +102,7 @@ function StandHinweis({
   if (stand.art === 'kein_ort') {
     return (
       <div data-lfh="wetter-kein-ort" style={{ ...polster, display: 'grid', gap: token.marginXS }}>
-        <span style={{ color: rollen.text2, fontSize: 12 }}>{keinOrtText}</span>
+        <span style={{ color: rollen.text2, fontSize: 12 }}>{KEIN_ORT_TEXT}</span>
         {onEinsatzdaten && (
           <span>
             <Button onClick={onEinsatzdaten}>Einsatzort in den Einsatzdaten verorten</Button>
@@ -509,7 +502,6 @@ export function AktuellPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: Teil
           {stand && (
             <StandHinweis
               stand={stand}
-              keinOrtText={KEIN_ORT_AKTUELL}
               ausfallText={AUSFALL_AKTUELL}
               veraltetGrund={VERALTET_AKTUELL}
             />

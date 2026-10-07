@@ -79,16 +79,12 @@ const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
  */
 const OFFEN: Record<string, number> = {
   'abloesung/AbloesungDialoge.tsx': 5,
-  'aufbewahrung/FristPaneel.tsx': 1,
-  'aufbewahrung/SchwaerzungsantragDialog.tsx': 2,
   'betreuung/BetreuungDialoge.tsx': 3,
   'command-palette/VorschauZustand.tsx': 1,
   'einsatz/AlarmZentrale.tsx': 2,
   'einsatz/modulRegistry.ts': 1,
   'etb/EtbZeitachse.tsx': 1,
   'etb/Schnellerfassung.tsx': 2,
-  'geraet/GeraetStellePage.tsx': 1,
-  'geraet/KopplungBeendetPage.tsx': 1,
   'infotelefon/AnrufErfassung.tsx': 2,
   'karten/KartenOnlineSektion.tsx': 1,
   'pages/AbloesungPage.tsx': 2,

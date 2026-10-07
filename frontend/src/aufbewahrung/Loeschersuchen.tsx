@@ -186,7 +186,7 @@ export default function Loeschersuchen({
         <SpeicherFehler fehler={ruecknahme.error} titel="Rücknahme fehlgeschlagen" />
         {!wege.person && (
           <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Der Einsatz ist geschwärzt — ein weiteres Löschersuchen ist nicht nötig.
+            Einsatz bereits geschwärzt
           </Typography.Paragraph>
         )}
       </div>

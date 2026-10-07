@@ -44,15 +44,14 @@ export default function BenutzerKonfliktDialog() {
     >
       <Flex vertical gap={token.marginSM}>
         <span>
-          In einem anderen Tab dieses Browsers hat sich <strong>{jetzt.anzeigename}</strong>{' '}
-          angemeldet. Dieser Tab war für <strong>{bisher.anzeigename}</strong> geöffnet.
+          In einem anderen Tab ist jetzt <strong>{jetzt.anzeigename}</strong> angemeldet, dieser Tab
+          gehörte <strong>{bisher.anzeigename}</strong>.
         </span>
         <span>
-          Aus diesem Tab wird nichts mehr unter {bisher.anzeigename} gespeichert. Vorgemerkte
-          Einträge bleiben für {bisher.anzeigename} liegen, bis {bisher.anzeigename} wieder
-          angemeldet ist.
+          Unter {bisher.anzeigename} wird hier nichts mehr gespeichert. Vorgemerkte Einträge bleiben
+          für {bisher.anzeigename} liegen.
         </span>
-        <span>Weiterarbeiten lädt die Seite neu; ungesicherte Eingaben gehen dabei verloren.</span>
+        <span>Ungesicherte Eingaben gehen verloren.</span>
       </Flex>
     </Modal>
   );

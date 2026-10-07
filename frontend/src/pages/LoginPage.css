@@ -146,11 +146,3 @@
     animation: none;
   }
 }
-
-/* Erläuterung unter „Im Browser anmelden“ (LFH-818). `gedaempft` statt `schwach`: Fließtext,
-   keine Beischrift — er steht in der Rangfolge über Augenbraue und Meta. */
-.login-hinweis {
-  margin: 8px 0 0;
-  font-size: var(--lfh-typo-text-klein-groesse);
-  color: var(--lfh-gedaempft);
-}

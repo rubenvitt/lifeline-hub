@@ -73,28 +73,21 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
   } else if (benutzer && !geraet) {
     inhalt = (
       <>
-        <Typography.Paragraph>
-          In diesem Browser ist {benutzer.anzeigename} angemeldet. Ein Gerät lässt sich erst
-          koppeln, wenn niemand mehr angemeldet ist.
-        </Typography.Paragraph>
+        <Typography.Paragraph>Angemeldet als {benutzer.anzeigename}</Typography.Paragraph>
         <Button size="large" block onClick={() => void logout()}>
-          Abmelden
+          Abmelden zum Koppeln
         </Button>
       </>
     );
   } else {
     inhalt = (
       <>
-        <Typography.Paragraph type="secondary">
-          Gib den Code ein, den dir die Einsatzleitung gezeigt hat. Er gilt zehn Minuten und nur
-          einmal.
-        </Typography.Paragraph>
         {geraet && (
           <Alert
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
-            title={`Dieses Gerät ist schon als ${geraet.bezeichnung} gekoppelt. Ein neuer Code ersetzt die Kopplung.`}
+            title={`Gekoppelt als ${geraet.bezeichnung}. Ein neuer Code ersetzt die Kopplung.`}
           />
         )}
         {fehler && <Alert type="error" showIcon title={fehler} style={{ marginBottom: 16 }} />}
@@ -108,6 +101,7 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
           <Form.Item
             name="code"
             label="Kopplungscode"
+            extra="Von der Einsatzleitung, gilt 10 Minuten und einmal"
             rules={[{ required: true, whitespace: true, message: 'Code eingeben' }]}
           >
             <Input
