@@ -29,12 +29,32 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::parse();
 
     match config.command.clone() {
-        Some(Command::Backup { out }) => cmd_backup(&config.db_path, &out).await,
+        Some(Command::Backup {
+            out,
+            unverschluesselt,
+        }) => {
+            let empfaenger = if unverschluesselt {
+                backup::Empfaenger::default()
+            } else {
+                backup::Empfaenger::neu(config.backup_empfaenger.clone())
+            };
+            cmd_backup(&config.db_path, &out, &empfaenger).await
+        }
         Some(Command::Restore {
             from,
             force,
             server_gestoppt,
-        }) => cmd_restore(&config.db_path, &from, force, server_gestoppt).await,
+            identitaet,
+        }) => {
+            cmd_restore(
+                &config.db_path,
+                &from,
+                force,
+                server_gestoppt,
+                identitaet.as_deref(),
+            )
+            .await
+        }
         Some(Command::SqliteVersion) => cmd_sqlite_version().await,
         None => run_server(config).await,
     }
@@ -147,6 +167,19 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`. Das Stoppsignal setzt der
     // Shutdown-Handler, das Handle wartet am Ende von `run_server` (LFH-926).
     let (stopp, stopp_empfang) = tokio::sync::watch::channel(false);
+    // LFH-1002: an diese Schlüssel verschlüsseln automatische Sicherung und Download.
+    let backup_empfaenger = backup::Empfaenger::neu(config.backup_empfaenger.clone());
+    if backup_empfaenger.ist_leer() {
+        tracing::warn!(
+            "Sicherungen werden UNVERSCHLÜSSELT geschrieben (automatische Sicherung, Download): \
+             --backup-empfaenger setzen, damit sie verschlüsselt das Gerät verlassen"
+        );
+    } else {
+        tracing::info!(
+            empfaenger = backup_empfaenger.anzahl(),
+            "Sicherungen werden verschlüsselt"
+        );
+    }
     let backup_task = lifeline_hub::backup::scheduler::starte_backup_scheduler(
         pool.clone(),
         lifeline_hub::backup::scheduler::BackupConfig {
@@ -156,6 +189,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
                 .map(std::path::PathBuf::from),
             intervall: std::time::Duration::from_secs(config.backup_intervall_minuten * 60),
             behalten: config.backup_behalten,
+            empfaenger: backup_empfaenger.clone(),
         },
         stopp_empfang,
     );
@@ -325,6 +359,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .map(|t| t.als_str().to_string()),
         auto_aktualisierung,
         backup_download: Default::default(),
+        backup_empfaenger,
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());
@@ -453,28 +488,47 @@ async fn cmd_sqlite_version() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Subkommando `backup`: konsistente Sicherung in `out` schreiben.
-async fn cmd_backup(db_path: &str, out: &str) -> anyhow::Result<()> {
+/// Subkommando `backup`: konsistente Sicherung in `out` schreiben, mit Empfängern verschlüsselt
+/// (LFH-1002). Fehlt dann die Endung `.age`, wird sie angehängt, damit niemand die Datei für
+/// eine lesbare Datenbank hält.
+async fn cmd_backup(
+    db_path: &str,
+    out: &str,
+    empfaenger: &backup::Empfaenger,
+) -> anyhow::Result<()> {
     if !Path::new(db_path).exists() {
         anyhow::bail!("Datenbank nicht gefunden: {db_path} — Server wurde noch nicht gestartet?");
     }
-    let ziel = Path::new(out);
+    let out = if !empfaenger.ist_leer() && !out.ends_with(backup::verschluesselung::AGE_ENDUNG) {
+        format!("{out}{}", backup::verschluesselung::AGE_ENDUNG)
+    } else {
+        out.to_owned()
+    };
+    let ziel = Path::new(&out);
     if ziel.exists() {
         anyhow::bail!("Zieldatei existiert bereits: {out} (VACUUM INTO überschreibt nicht)");
     }
     let pool = db::connect(db_path).await?;
-    let groesse = backup::erzeuge_sicherung(&pool, ziel).await?;
+    let groesse = backup::erzeuge_sicherung_mit(&pool, ziel, empfaenger).await?;
     pool.close().await;
-    println!("Sicherung erstellt: {out} ({groesse} Bytes)");
+    if empfaenger.ist_leer() {
+        println!("Sicherung erstellt: {out} ({groesse} Bytes, unverschlüsselt)");
+    } else {
+        println!("Sicherung erstellt: {out} ({groesse} Bytes, verschlüsselt)");
+    }
     Ok(())
 }
 
 /// Subkommando `restore`: Sicherung `from` an Stelle von `db_path` einspielen.
+///
+/// Eine verschlüsselte Sicherung braucht `identitaet` (LFH-1002): eine `age`-Identitätsdatei oder
+/// `-` für stdin. Ist die Datei mit einer Passphrase geschützt, kommt diese von stdin.
 async fn cmd_restore(
     db_path: &str,
     from: &str,
     force: bool,
     server_gestoppt: bool,
+    identitaet: Option<&str>,
 ) -> anyhow::Result<()> {
     if !force {
         anyhow::bail!(
@@ -482,10 +536,48 @@ async fn cmd_restore(
              (Server vorher stoppen!)."
         );
     }
-    backup::restore::restore_aus_datei(Path::new(from), Path::new(db_path), server_gestoppt)
-        .await?;
+    let schluessel = match identitaet {
+        None => None,
+        Some(quelle) => Some(identitaet_laden(quelle)?),
+    };
+    backup::restore::restore_aus_datei_mit(
+        Path::new(from),
+        Path::new(db_path),
+        server_gestoppt,
+        schluessel.as_ref(),
+    )
+    .await?;
     println!("Sicherung {from} wurde nach {db_path} eingespielt.");
     Ok(())
+}
+
+/// Liest die Identität für `restore --identitaet`: aus der Datei oder bei `-` von stdin. Eine mit
+/// Passphrase geschützte Datei entsperrt die erste Zeile von stdin; kommt schon die Identität von
+/// stdin, bleibt dafür nichts, und es bricht ab.
+fn identitaet_laden(quelle: &str) -> anyhow::Result<backup::verschluesselung::Schluessel> {
+    use std::io::{BufRead, Read};
+    let (inhalt, name) = if quelle == "-" {
+        let mut inhalt = Vec::new();
+        std::io::stdin().lock().read_to_end(&mut inhalt)?;
+        (inhalt, None)
+    } else {
+        let inhalt = std::fs::read(quelle)
+            .map_err(|e| anyhow::anyhow!("Identitätsdatei {quelle} nicht lesbar: {e}"))?;
+        (inhalt, Some(quelle.to_owned()))
+    };
+    let von_stdin = name.is_none();
+    let schluessel = backup::verschluesselung::Schluessel::laden(inhalt, name, || {
+        if von_stdin {
+            return Err(std::io::Error::other(
+                "die Identität kam schon über stdin; eine geschützte Identität als Datei angeben",
+            ));
+        }
+        eprintln!("Passphrase der Identitätsdatei (eine Zeile auf stdin):");
+        let mut zeile = String::new();
+        std::io::stdin().lock().read_line(&mut zeile)?;
+        Ok(zeile)
+    })?;
+    Ok(schluessel)
 }
 
 /// `Handle` für den Graceful Shutdown mit 10-Sekunden-Frist für beide Serve-Pfade — eine

@@ -1,7 +1,13 @@
+use crate::backup::verschluesselung::{self, Schluessel};
 use crate::error::AppError;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::SqlitePool;
 use std::path::Path;
+
+/// Präfix des Verzeichnisses neben der Ziel-Datenbank, in das eine verschlüsselte Sicherung vor
+/// dem Prüfen entschlüsselt wird (LFH-1002). Reste eines abgebrochenen Restores räumt der
+/// nächste Serverstart weg (`backup::raeume_download_reste`).
+pub const ENTSCHLUESSELT_PRAEFIX: &str = ".restore-entschluesselt-";
 
 /// Prüft, ob `quelle` eine gültige lifeline-hub-Sicherung ist (öffnet die Datei
 /// und liest den `app_meta`-Initialisierungsmarker).
@@ -59,12 +65,61 @@ pub async fn restore_aus_datei(
     ziel: &Path,
     server_gestoppt: bool,
 ) -> Result<(), AppError> {
+    restore_aus_datei_mit(quelle, ziel, server_gestoppt, None).await
+}
+
+/// Wie [`restore_aus_datei`], erkennt aber eine verschlüsselte Sicherung am `age`-Kopf
+/// (LFH-1002) und entschlüsselt sie mit `schluessel`.
+///
+/// Der Klartext entsteht in einem Verzeichnis **neben dem Ziel** (dasselbe Volume), wird dort
+/// geprüft und per `rename` eingehängt. Ein falscher Schlüssel, ein beschädigter Strom oder eine
+/// ungültige Datenbank brechen ab, bevor am Ziel etwas geändert ist; das Verzeichnis verschwindet
+/// bei jedem Ausgang.
+pub async fn restore_aus_datei_mit(
+    quelle: &Path,
+    ziel: &Path,
+    server_gestoppt: bool,
+    schluessel: Option<&Schluessel>,
+) -> Result<(), AppError> {
     if !quelle.exists() {
         return Err(AppError::Validation(format!(
             "Sicherungsdatei nicht gefunden: {}",
             quelle.display()
         )));
     }
+    let verschluesselt = verschluesselung::ist_verschluesselt(quelle)
+        .map_err(|e| AppError::Validation(format!("Sicherungsdatei nicht lesbar: {e}")))?;
+    // Hält den entschlüsselten Klartext; fällt er, ist der Klartext weg.
+    let mut _entschluesselt: Option<tempfile::TempDir> = None;
+    let quelle = if verschluesselt {
+        let schluessel = schluessel.ok_or_else(|| {
+            AppError::Validation(
+                "Die Sicherung ist verschlüsselt: den privaten Schlüssel mit --identitaet angeben"
+                    .into(),
+            )
+        })?;
+        let basis = ziel
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let verzeichnis = tempfile::Builder::new()
+            .prefix(ENTSCHLUESSELT_PRAEFIX)
+            .tempdir_in(basis)
+            .map_err(|e| AppError::Internal(format!("Entschlüsseln nicht möglich: {e}")))?;
+        let klartext = verzeichnis.path().join("sicherung.sqlite");
+        let datei = std::fs::File::create_new(&klartext)
+            .map_err(|e| AppError::Internal(format!("Entschlüsseln nicht möglich: {e}")))?;
+        schluessel
+            .entschluessele_datei(quelle, datei)?
+            .sync_all()
+            .map_err(|e| AppError::Internal(format!("Entschlüsselte Sicherung: {e}")))?;
+        _entschluesselt = Some(verzeichnis);
+        klartext
+    } else {
+        quelle.to_path_buf()
+    };
+    let quelle = quelle.as_path();
+
     if !ist_gueltige_sicherung(quelle).await? {
         return Err(AppError::Validation(
             "Datei ist keine gültige lifeline-hub-Sicherung".into(),
@@ -98,9 +153,14 @@ pub async fn restore_aus_datei(
 
     // Atomar einhängen: vollständig neben das Ziel kopieren, dann umbenennen. `rename` ist im
     // selben Dateisystem atomar; ein Abbruch beim Kopieren lässt die alte Datenbank unversehrt.
+    // Der entschlüsselte Klartext liegt schon neben dem Ziel und wird direkt umbenannt.
     let tmp = nebendatei(ziel, ".restore-tmp");
-    std::fs::copy(quelle, &tmp)
-        .map_err(|e| AppError::Internal(format!("Kopieren der Sicherung fehlgeschlagen: {e}")))?;
+    if verschluesselt {
+        std::fs::rename(quelle, &tmp)
+    } else {
+        std::fs::copy(quelle, &tmp).map(|_| ())
+    }
+    .map_err(|e| AppError::Internal(format!("Kopieren der Sicherung fehlgeschlagen: {e}")))?;
     if let Err(e) = std::fs::rename(&tmp, ziel) {
         // Aufräumen, damit kein Fragment zurückbleibt.
         let _ = std::fs::remove_file(&tmp);
@@ -218,6 +278,114 @@ mod tests {
             !nebendatei(&ziel, ".restore-tmp").exists(),
             "die Zwischendatei des atomaren Einhängens muss weg sein"
         );
+    }
+
+    /// Eine verschlüsselte Sicherung mit Daten und der Schlüssel dazu (LFH-1002).
+    async fn verschluesselte_sicherung(
+        dir: &tempfile::TempDir,
+    ) -> (std::path::PathBuf, Schluessel, Schluessel) {
+        let quell_pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Verschlüsselt')")
+            .execute(&quell_pool)
+            .await
+            .unwrap();
+        let (empfaenger, identitaet) = verschluesselung::tests::schluesselpaar();
+        let (_, fremd) = verschluesselung::tests::schluesselpaar();
+        let sicherung = dir.path().join("sicherung.sqlite.age");
+        crate::backup::erzeuge_sicherung_mit(&quell_pool, &sicherung, &empfaenger)
+            .await
+            .unwrap();
+        let laden = |id| Schluessel::laden(id, None, || unreachable!()).unwrap();
+        (sicherung, laden(identitaet), laden(fremd))
+    }
+
+    /// Einträge im Verzeichnis außer den genannten.
+    fn uebrige(dir: &Path, bekannt: &[&str]) -> Vec<String> {
+        let mut namen: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| !bekannt.contains(&n.as_str()))
+            .collect();
+        namen.sort();
+        namen
+    }
+
+    #[tokio::test]
+    async fn verschluesselte_sicherung_mit_richtigem_schluessel() {
+        let dir = tempfile::tempdir().unwrap();
+        let (sicherung, schluessel, _) = verschluesselte_sicherung(&dir).await;
+        let ziel_dir = tempfile::tempdir().unwrap();
+        let ziel = ziel_dir.path().join("lifeline.db");
+
+        restore_aus_datei_mit(&sicherung, &ziel, false, Some(&schluessel))
+            .await
+            .unwrap();
+
+        let pool = crate::db::connect(ziel.to_str().unwrap()).await.unwrap();
+        let name: String = sqlx::query_scalar("SELECT name FROM organisation WHERE id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(name, "Verschlüsselt");
+        pool.close().await;
+        assert!(
+            uebrige(ziel_dir.path(), &["lifeline.db"]).is_empty(),
+            "kein entschlüsselter Klartext bleibt neben der Datenbank liegen"
+        );
+    }
+
+    #[tokio::test]
+    async fn falscher_schluessel_bricht_ohne_teilschreiben_ab() {
+        let dir = tempfile::tempdir().unwrap();
+        let (sicherung, _, fremd) = verschluesselte_sicherung(&dir).await;
+        let ziel_dir = tempfile::tempdir().unwrap();
+        let ziel = ziel_dir.path().join("lifeline.db");
+        std::fs::write(&ziel, b"alt").unwrap();
+
+        let err = restore_aus_datei_mit(&sicherung, &ziel, true, Some(&fremd))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, AppError::Validation(m) if m.contains("passt nicht")));
+        assert_eq!(std::fs::read(&ziel).unwrap(), b"alt");
+        assert!(uebrige(ziel_dir.path(), &["lifeline.db"]).is_empty());
+    }
+
+    /// Ein abgeschnittener Strom scheitert erst mitten im Entschlüsseln: auch dann bleibt das Ziel
+    /// unberührt und kein Teil-Klartext liegen.
+    #[tokio::test]
+    async fn abgeschnittene_sicherung_bricht_ohne_teilschreiben_ab() {
+        let dir = tempfile::tempdir().unwrap();
+        let (sicherung, schluessel, _) = verschluesselte_sicherung(&dir).await;
+        let bytes = std::fs::read(&sicherung).unwrap();
+        std::fs::write(&sicherung, &bytes[..bytes.len() - 100]).unwrap();
+        let ziel_dir = tempfile::tempdir().unwrap();
+        let ziel = ziel_dir.path().join("lifeline.db");
+        std::fs::write(&ziel, b"alt").unwrap();
+
+        assert!(
+            restore_aus_datei_mit(&sicherung, &ziel, true, Some(&schluessel))
+                .await
+                .is_err()
+        );
+
+        assert_eq!(std::fs::read(&ziel).unwrap(), b"alt");
+        assert!(uebrige(ziel_dir.path(), &["lifeline.db"]).is_empty());
+    }
+
+    #[tokio::test]
+    async fn verschluesselte_sicherung_ohne_schluessel_wird_abgelehnt() {
+        let dir = tempfile::tempdir().unwrap();
+        let (sicherung, _, _) = verschluesselte_sicherung(&dir).await;
+        let ziel = dir.path().join("ziel.db");
+
+        let err = restore_aus_datei(&sicherung, &ziel, false)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, AppError::Validation(m) if m.contains("--identitaet")));
+        assert!(!ziel.exists());
     }
 
     #[tokio::test]

@@ -299,3 +299,96 @@ async fn backup_download_legt_die_kopie_neben_die_datenbank() {
         "nach dem letzten Chunk ist die Kopie wieder weg"
     );
 }
+
+/// LFH-1002: Mit Empfänger liefert der Download `.sqlite.age`: `age`-Kopf, kein SQLite-Klartext,
+/// neben der Datenbank liegt während des Streams nur die verschlüsselte Kopie. Mit dem privaten
+/// Schlüssel spielt der Restore sie wieder ein.
+#[tokio::test]
+async fn backup_download_mit_empfaenger_ist_verschluesselt() {
+    use age::secrecy::ExposeSecret;
+
+    let (db_dir, pool) = lifeline_hub::db::test_pool_datei().await;
+    lifeline_hub::auth::bootstrap::bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let identitaet = age::x25519::Identity::generate();
+    let state = lifeline_hub::app::AppState {
+        backup_empfaenger: lifeline_hub::backup::Empfaenger::neu(vec![identitaet.to_public()]),
+        ..common::test_state(&pool, &lifeline_hub::live::LiveHub::new())
+    };
+    let app = lifeline_hub::app::build_router(state);
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let resp = backup_abrufen(&app, &cookie).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let disposition = resp
+        .headers()
+        .get(header::CONTENT_DISPOSITION)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        disposition.ends_with(".sqlite.age\""),
+        "Dateiname endet auf .age: {disposition}"
+    );
+    let neben_der_db: Vec<String> = std::fs::read_dir(db_dir.path())
+        .unwrap()
+        .filter_map(Result::ok)
+        .flat_map(|e| {
+            let pfad = e.path();
+            if pfad.is_dir() {
+                std::fs::read_dir(&pfad)
+                    .unwrap()
+                    .filter_map(Result::ok)
+                    .map(|f| f.path().display().to_string())
+                    .collect()
+            } else {
+                vec![]
+            }
+        })
+        .collect();
+    assert_eq!(
+        neben_der_db.len(),
+        1,
+        "während des Streams liegt nur die verschlüsselte Kopie da: {neben_der_db:?}"
+    );
+    assert!(neben_der_db[0].ends_with("lifeline-backup.sqlite.age"));
+
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    assert!(bytes.starts_with(b"age-encryption.org/v1\n"));
+    assert!(
+        !bytes
+            .windows(b"SQLite format 3".len())
+            .any(|w| w == b"SQLite format 3"),
+        "der Download darf keinen SQLite-Klartext tragen"
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let sicherung = dir.path().join("heruntergeladen.sqlite.age");
+    std::fs::write(&sicherung, &bytes).unwrap();
+    let schluessel = lifeline_hub::backup::verschluesselung::Schluessel::laden(
+        identitaet.to_string().expose_secret().as_bytes().to_vec(),
+        None,
+        || unreachable!(),
+    )
+    .unwrap();
+    let ziel = dir.path().join("lifeline.db");
+    lifeline_hub::backup::restore::restore_aus_datei_mit(
+        &sicherung,
+        &ziel,
+        false,
+        Some(&schluessel),
+    )
+    .await
+    .unwrap();
+    let wieder = lifeline_hub::db::connect(ziel.to_str().unwrap())
+        .await
+        .unwrap();
+    let admin_da: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&wieder)
+            .await
+            .unwrap();
+    assert_eq!(admin_da, 1);
+}

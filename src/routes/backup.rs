@@ -29,6 +29,9 @@ const LEERLAUF_FRIST: Duration = Duration::from_secs(60);
 /// Datenbank** und streamt ihn chunkweise als Datei-Download. Nicht im System-Temp: `/tmp` ist
 /// auf Debian ein tmpfs, die Kopie läge in DB-Größe im RAM (LFH-926). Es läuft höchstens ein
 /// Download zugleich; ein zweiter bekommt 503.
+///
+/// Mit `--backup-empfaenger` ist die gestreamte Datei verschlüsselt (`.sqlite.age`, LFH-1002); der
+/// Klartext verlässt das Verzeichnis der Datenbank dann nicht.
 pub async fn download(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -42,7 +45,10 @@ pub async fn download(
         .prefix(backup::DOWNLOAD_PRAEFIX)
         .tempdir_in(&basis)
         .map_err(|e| AppError::Internal(format!("Tempverzeichnis fehlgeschlagen: {e}")))?;
-    let pfad = dir.path().join("lifeline-backup.sqlite");
+    let empfaenger = state.backup_empfaenger.clone();
+    let pfad = dir
+        .path()
+        .join(format!("lifeline-backup{}", empfaenger.endung()));
 
     // Vom Request entkoppelt: bricht der Client während der Kopie ab, führt sqlx das laufende
     // `VACUUM INTO` trotzdem zu Ende. Sperre und Verzeichnis halten so lange, sonst begänne ein
@@ -50,7 +56,7 @@ pub async fn download(
     let pool = state.pool.clone();
     let ziel = pfad.clone();
     let (dir, sperre) = tokio::spawn(async move {
-        backup::erzeuge_sicherung(&pool, &ziel)
+        backup::erzeuge_sicherung_mit(&pool, &ziel, &empfaenger)
             .await
             .map(|_| (dir, sperre))
     })
@@ -76,8 +82,9 @@ pub async fn download(
     );
 
     let dateiname = format!(
-        "lifeline-backup-{}.sqlite",
-        Local::now().format("%Y%m%d-%H%M%S")
+        "lifeline-backup-{}{}",
+        Local::now().format("%Y%m%d-%H%M%S"),
+        state.backup_empfaenger.endung()
     );
     let mut headers = HeaderMap::new();
     headers.insert(
