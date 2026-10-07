@@ -467,3 +467,50 @@ describe('BrDetailPage — Kräfte-Spalte bricht unter md um (LFH-341)', () => {
     expect(screen.getByTestId('br-detail-rahmen').style.flexDirection).toBe('row');
   });
 });
+
+describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
+  function seiteMit(br: BrDetail, aufrufe: string[]) {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/status', async ({ request }) => {
+        aufrufe.push(`status ${((await request.json()) as { status: string }).status}`);
+        return HttpResponse.json({ ...br, status: 'aufgeloest' });
+      }),
+      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', () => {
+        aufrufe.push('storno');
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderBrDetail();
+  }
+
+  it('aktiv: „BR auflösen“ bestätigt rot und löst erst dann auf', async () => {
+    const aufrufe: string[] = [];
+    seiteMit(brDetail({ status: 'aktiv' }), aufrufe);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    const ok = await screen.findByRole('button', { name: 'BR auflösen' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
+    expect(aufrufe).toEqual([]);
+    await userEvent.click(ok);
+    await waitFor(() => expect(aufrufe).toEqual(['status aufgeloest']));
+  });
+
+  it('geplant: „BR stornieren“ bestätigt rot und storniert erst dann', async () => {
+    const aufrufe: string[] = [];
+    seiteMit(brDetail({ status: 'geplant' }), aufrufe);
+
+    expect(await screen.findByRole('button', { name: 'In Betrieb nehmen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Stornieren' }));
+    const ok = await screen.findByRole('button', { name: 'BR stornieren' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
+    expect(aufrufe).toEqual([]);
+    await userEvent.click(ok);
+    await waitFor(() => expect(aufrufe).toEqual(['storno']));
+  });
+});

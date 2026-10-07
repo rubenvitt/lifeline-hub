@@ -24,7 +24,8 @@ ist, das Risiko ist klein); die acht Altstellen außerhalb dieses Tickets umstel
 **D1 – Ort: eigener letzter Abschnitt auf den Einsatzdaten, nicht der Seitenkopf.** Ein Paneel
 „Einsatzabschluss“ unter den Mitgliedern mit dem roten Knopf „Einsatz abschließen“, sichtbar nur
 bei `darfEinsatzLeiten` (aktiver Einsatz, Einsatzleitung oder Admin). Kein Satz daneben: die
-Folge steht in der Rückfrage (`ui-text-erklaert-nie-bedienung`). Verworfen: Knopf im Kopf der
+Folge steht in der Rückfrage (`ui-text-erklaert-nie-bedienung`). Während das Bearbeitungsformular
+offen ist, fehlt der Abschnitt. Verworfen: Knopf im Kopf der
 Einsatzdaten neben „Bearbeiten“ (die neue Regel nimmt Unumkehrbares aus jedem Seitenkopf, und am
 Handy stünde er wieder in der ersten Zeile); Menü „Weitere“ im Kopf (ein Menü für einen einzigen
 Eintrag, und der Abschluss wäre versteckt, ohne ferner zu liegen).
@@ -39,8 +40,11 @@ Einsatzdaten; nach Erfolg verschwindet der Abschnitt, weil der Einsatz nicht meh
 Das Menü „Weitere“ am Handy trägt danach nur „Drucken / als PDF“ und bleibt: Nebenwege liegen am
 Handy unter „Weitere“ (Entscheidung 8). Ein Hinweis auf den neuen Ort wäre ein Erklärtext.
 
-**D4 – Benannte Rückfragen bei UHS und BR.** „UHS auflösen“, „UHS stornieren“, „BR auflösen“,
-„BR stornieren“; `okButtonProps={{ danger: true }}` bleibt. Der BR-Kopf bekommt
+**D4 – Benannte Rückfragen bei UHS und BR.** „Unfallhilfsstelle auflösen“, „Unfallhilfsstelle
+stornieren“, „BR auflösen“, „BR stornieren“; `okButtonProps={{ danger: true }}` bleibt. Die
+Unfallhilfsstelle steht ausgeschrieben, weil die Rückfrage zum Auflösen seit der Kürzel-Bereinigung
+„Unfallhilfsstelle auflösen?“ fragt; die Storno-Rückfrage zieht ihren Titel nach („Unfallhilfsstelle
+stornieren?“). „BR“ bleibt wie in den Quittungen der BR-Seite. Der BR-Kopf bekommt
 `<Space wrap size="middle">` wie die UHS-Kopfzeile und steht in `MIT_NACHBARSCHAFT`.
 
 **D5 – Rückfrage-Guard baumweit mit Schuldliste.** `components/rueckfrage.guard.test.ts` scannt
@@ -57,5 +61,7 @@ nennt das unter „Was dieser Guard NICHT sieht“.
 ## Risks / Trade-offs
 
 - Der Abschluss liegt einen Schritt weiter weg. Gewollt: er kommt einmal je Einsatz vor.
+- Nachtrag Umsetzung: das e2e misst nicht-privilegiert als Führungspersonal (schreibt im Einsatz,
+  leitet ihn nicht), die schärfere Probe gegen „Schreibrecht statt Leitungsrecht“.
 - Die Schuldliste hält acht Verstöße gegen eine bestehende Regel fest, bis das Folgeticket sie
   abbaut. Neue Verstöße fallen sofort auf.

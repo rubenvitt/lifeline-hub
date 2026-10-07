@@ -82,6 +82,9 @@ const MIT_NACHBARSCHAFT = [
   // Je Zustand steht ein Knopf neben einem `danger`-Knopf („Auflösen" bzw. „Stornieren"); der
   // Scanner sieht alle vier `<Button>` im selben unmittelbar umschließenden `<Space>`.
   'pages/uhs/UhsDetailPage.tsx',
+  // ── BR-Kopfzeile (LFH-960) ────────────────────────────────────────────────
+  // Im Zustand „geplant“ steht „Stornieren“ (`danger`) neben „In Betrieb nehmen“, wie bei der UHS.
+  'pages/bereitstellungsraum/BrDetailPage.tsx',
   // ── Fuß der Erfassungs-Hülle (LFH-653) ───────────────────────────────────
   // Der Primärknopf trägt `danger={unumkehrbar}` und steht neben „Abbrechen" (und im Serienmodus
   // „Speichern und nächste"). Der Fuß jeder Erfassungsmaske hängt an dieser einen Reihe.

@@ -19,7 +19,7 @@ Eintippen der Einsatzbezeichnung.
   Einsatzdaten als eigener letzter Abschnitt „Einsatzabschluss“, nur für die Einsatzleitung eines
   aktiven Einsatzes. Rückfrage `Popconfirm` mit Bestätigungsknopf „Einsatz endgültig abschließen“
   (`danger`), die Folge bleibt als Beschreibung. Das ETB trägt keinen Hinweis.
-- **Benannte Rückfragen** bei UHS und BR: „UHS auflösen“, „UHS stornieren“, „BR auflösen“,
+- **Benannte Rückfragen** bei UHS und BR: „Unfallhilfsstelle auflösen“, „Unfallhilfsstelle stornieren“, „BR auflösen“,
   „BR stornieren“.
 - **BR-Kopf** mit `<Space wrap size="middle">`; `BrDetailPage.tsx` kommt in den Abstands-Guard.
 - **Rückfrage-Guard** über alle `<Popconfirm>` mit `danger`-Bestätigung: der Bestätigungsknopf

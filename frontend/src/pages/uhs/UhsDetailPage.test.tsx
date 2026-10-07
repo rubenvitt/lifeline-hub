@@ -8,7 +8,7 @@ import UhsDetailPage from './UhsDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { freigabenFixture } from '../../test/fixtures';
-import { ladeUhs } from '../../api/einsatzUhs';
+import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { listePersonen } from '../../api/einsatzPerson';
 import type { Person } from '../../api/types';
 
@@ -336,5 +336,52 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     expect(await screen.findByRole('button', { name: 'Auflösen' })).toBeEnabled();
+  });
+});
+
+describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
+  const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
+  const uhsBasis = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    typ: 'patientenablage',
+    standort: 'Halle 1',
+    notiz: null,
+  };
+
+  it('aktiv: „Unfallhilfsstelle auflösen“ bestätigt rot und löst erst dann auf', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'aktiv' } as Awaited<
+      ReturnType<typeof ladeUhs>
+    >);
+    vi.mocked(setzeUhsStatus).mockClear();
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    const ok = await screen.findByRole('button', { name: 'Unfallhilfsstelle auflösen' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
+    expect(setzeUhsStatus).not.toHaveBeenCalled();
+    await userEvent.click(ok);
+    await waitFor(() => expect(setzeUhsStatus).toHaveBeenCalledWith(1, 9, 'aufgeloest'));
+  });
+
+  it('geplant: „Unfallhilfsstelle stornieren“ bestätigt rot und storniert erst dann', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'geplant' } as Awaited<
+      ReturnType<typeof ladeUhs>
+    >);
+    vi.mocked(storniereUhs).mockClear();
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    expect(await screen.findByText('Unfallhilfsstelle stornieren?')).toBeInTheDocument();
+    const ok = screen.getByRole('button', { name: 'Unfallhilfsstelle stornieren' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
+    expect(storniereUhs).not.toHaveBeenCalled();
+    await userEvent.click(ok);
+    await waitFor(() => expect(storniereUhs).toHaveBeenCalledWith(1, 9));
   });
 });
