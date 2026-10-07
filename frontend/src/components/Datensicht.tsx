@@ -1,8 +1,9 @@
 import { IconChevronRechts, IconChevronRunter } from '../icons';
 import { Button, ConfigProvider, Popconfirm, Space, Typography, theme } from 'antd';
-import type { Key, ReactNode } from 'react';
+import type { HTMLAttributes, Key, ReactNode, TableHTMLAttributes } from 'react';
 import type { TableColumnType } from 'antd';
 import {
+  createContext,
   Fragment,
   isValidElement,
   useCallback,
@@ -38,6 +39,8 @@ export { etikettVon, hatWaehlbareSpalten, sichtbareSpalten };
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { kennungsLinkStil } from './kennungsLink';
+import { useDruckModus } from './druck/useDruckModus';
+import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAusschnitt';
 
 /**
  * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2): EINE Spaltendefinition je Modul, zwei
@@ -648,6 +651,68 @@ function schluesselVon<T extends object>(
     : (zeile[zeilenSchluessel] as Key);
 }
 
+// ── Ausschnitt großer Listen (LFH-949) ───────────────────────────────────────────────
+
+/**
+ * Ab wie vielen Zeilen auf oberster Ebene (nach Suche und Filter) `Datensicht` nur den Sichtbereich
+ * rendert. Darunter ändert sich nichts. Herleitung: `/mnt/project-files/lfh-949/design.md`, D1.
+ */
+export const DATENSICHT_SCHWELLE = 200;
+
+interface FensterTraeger {
+  oben: number;
+  unten: number;
+  spaltenZahl: number;
+  /** Alle Zeilen der Tabelle für `aria-rowcount`; `null` ohne Zeilennummern (Baum, Aufklappen). */
+  zeilenZahl: number | null;
+  setzeStart: (el: HTMLElement | null) => void;
+}
+
+/**
+ * Trägt den Ausschnitt in antds `components`. Die Komponenten stehen auf Modulebene, damit rc-table
+ * bei jedem Render dieselben bekommt und den Tabellenkörper nicht neu aufbaut.
+ */
+const FensterKontext = createContext<FensterTraeger | null>(null);
+
+function Platzhalterzeile(props: {
+  hoehe: number;
+  spalten: number;
+  zeigerRef?: (el: HTMLElement | null) => void;
+  ende?: boolean;
+}) {
+  return (
+    <tr
+      ref={props.zeigerRef}
+      aria-hidden
+      data-lfh="datensicht-platzhalter"
+      {...(props.ende ? { [FENSTER_ENDE]: '' } : {})}
+    >
+      <td colSpan={props.spalten} style={{ height: props.hoehe, padding: 0, border: 0 }} />
+    </tr>
+  );
+}
+
+function FensterKoerper({ children, ...rest }: HTMLAttributes<HTMLTableSectionElement>) {
+  const f = useContext(FensterKontext);
+  if (!f) return <tbody {...rest}>{children}</tbody>;
+  return (
+    <tbody {...rest}>
+      <Platzhalterzeile hoehe={f.oben} spalten={f.spaltenZahl} zeigerRef={f.setzeStart} />
+      {children}
+      <Platzhalterzeile hoehe={f.unten} spalten={f.spaltenZahl} ende />
+    </tbody>
+  );
+}
+
+function FensterTabelle(props: TableHTMLAttributes<HTMLTableElement>) {
+  const f = useContext(FensterKontext);
+  // Mit stehender Kopfzeile liegt der Kopf in einer eigenen Tabelle (`header.table`): gezählt
+  // werden hier nur die Datenzeilen.
+  return <table {...props} aria-rowcount={f?.zeilenZahl ?? undefined} />;
+}
+
+const FENSTER_KOMPONENTEN = { table: FensterTabelle, body: { wrapper: FensterKoerper } };
+
 // ── Die Komponente ───────────────────────────────────────────────────────────────────
 
 export default function Datensicht<T extends object, const K extends string>(
@@ -1018,7 +1083,53 @@ export default function Datensicht<T extends object, const K extends string>(
    * Zählerstreifen des Tabellenzweigs, dort ist sie eine ZAHL und muss sofort stimmen.
    */
   const gruppenZaehler = gruppen ? gruppiere(sichtbareZeilen, gruppen) : [];
-  const gruppenKarten = gruppenAchse ? gruppiere(sichtbareZeilen, gruppenAchse) : [];
+  const gruppenKarten = useMemo(
+    () => (gruppenAchse ? gruppiere(sichtbareZeilen, gruppenAchse) : []),
+    [gruppenAchse, sichtbareZeilen],
+  );
+
+  // ── Ausschnitt (LFH-949) ──────────────────────────────────────────────────────────
+  /**
+   * Ab {@link DATENSICHT_SCHWELLE} Zeilen rendert nur der Sichtbereich plus Überhang; Platzhalter
+   * tragen die Höhe der übrigen (`fensterAusschnitt.ts`). Geschnitten wird nur, was gerendert wird,
+   * nie die Folge: die Schleuse oben bleibt, wie sie ist (D2). Im Druck rendert alles.
+   *
+   * Die FOLGE ist die Reihenfolge auf dem Schirm: im gruppierten Kartenzweig nach Gruppen, sonst
+   * `sichtbareZeilen`. Im Baum zählt nur die oberste Ebene; Kinder zählen zur Höhe ihres Knotens.
+   */
+  const druckt = useDruckModus();
+  const virtuell = !druckt && sichtbareZeilen.length > DATENSICHT_SCHWELLE;
+  const kartenGruppiert = !alsTabelle && gruppen != null && !baum;
+  const folge = useMemo(
+    () => (kartenGruppiert ? gruppenKarten.flatMap((g) => g.zeilen) : sichtbareZeilen),
+    [kartenGruppiert, gruppenKarten, sichtbareZeilen],
+  );
+  const folgeSchluessel = useMemo(() => folge.map(schluessel), [folge, schluessel]);
+  const indexVon = useMemo(
+    () => new Map(folgeSchluessel.map((k, i) => [k, i] as const)),
+    [folgeSchluessel],
+  );
+  // Deeplink (D3): die hervorgehobene Zeile muss im Ausschnitt stehen, auch weit unten.
+  const ankerSchluessel = useMemo(() => {
+    if (!virtuell || !zeilenKlasse) return null;
+    const ziel = folge.find((z) => (zeilenKlasse(z) ?? '').split(/\s+/).includes(HERVORGEHOBEN));
+    return ziel ? schluessel(ziel) : null;
+  }, [virtuell, zeilenKlasse, folge, schluessel]);
+  const fensterStart = useRef<HTMLElement | null>(null);
+  const setzeFensterStart = useCallback((el: HTMLElement | null) => {
+    fensterStart.current = el;
+  }, []);
+  const ausschnitt = useFensterAusschnitt({
+    schluessel: folgeSchluessel,
+    aktiv: virtuell,
+    // Startwert, bis gemessen ist: eine Tabellenzeile, eine Karte mit Titel und Feldern.
+    schaetzung: alsTabelle ? token.controlHeight + token.paddingSM : token.controlHeight * 3,
+    start: fensterStart,
+    wurzel,
+    anker: ankerSchluessel,
+  });
+  const fensterAttribute = (zeile: T): HTMLAttributes<HTMLElement> =>
+    ({ [FENSTER_EINTRAG]: String(schluessel(zeile)) }) as HTMLAttributes<HTMLElement>;
 
   const werkzeugzeile =
     (
@@ -1330,101 +1441,148 @@ export default function Datensicht<T extends object, const K extends string>(
           ]
         : antdSpalten;
 
+  const { von: fensterVon, bis: fensterBis } = ausschnitt;
+  const tabellenZeilen = useMemo(
+    () => (virtuell ? sichtbareZeilen.slice(fensterVon, fensterBis) : [...sichtbareZeilen]),
+    [virtuell, sichtbareZeilen, fensterVon, fensterBis],
+  );
+  // Zeilennummern nur in der flachen Tabelle: Baumkinder und Aufklappbereiche sind eigene `tr`.
+  const zeilenNummern = virtuell && !baum && !aufklappen;
+  const fensterTraeger = useMemo<FensterTraeger | null>(
+    () =>
+      virtuell
+        ? {
+            oben: ausschnitt.oben,
+            unten: ausschnitt.unten,
+            spaltenZahl: Math.max(1, tabellenSpalten.length),
+            zeilenZahl: zeilenNummern ? sichtbareZeilen.length : null,
+            setzeStart: setzeFensterStart,
+          }
+        : null,
+    [
+      virtuell,
+      ausschnitt.oben,
+      ausschnitt.unten,
+      tabellenSpalten.length,
+      zeilenNummern,
+      sichtbareZeilen.length,
+      setzeFensterStart,
+    ],
+  );
+  const zeilenKlick = onZeileKlick
+    ? (zeile: T): HTMLAttributes<HTMLElement> => ({
+        onClick: (event) => {
+          if ((event.target as HTMLElement).closest('a')) return;
+          onZeileKlick(zeile);
+        },
+      })
+    : baum
+      ? (zeile: T): HTMLAttributes<HTMLElement> => ({
+          /**
+           * Derselbe Riegel für den Baum (LFH-548): die ganze Zeile klappt auf, außer der
+           * Klick galt einem Bedienziel der Zeile oder kam aus einem Portal. antds
+           * `expandRowByClick` kennt keinen Riegel: ein Klick auf den Titel-Link klappte
+           * sonst mit um, beim Strg-Klick sogar in der Seite, die stehen bleibt; ein
+           * Statusknopf klappte die Einheit zu, während sein Menü aufging. Das
+           * Aufklappsymbol selbst stoppt die Weitergabe (`baumSymbol`, im Test gepinnt).
+           */
+          onClick: (event) => {
+            const ziel = event.target as HTMLElement;
+            // Ein React-Portal (Menü eines Zeilenknopfs) reicht seinen Klick an die Zeile
+            // weiter, liegt im DOM aber woanders: er gehört nicht der Zeile.
+            if (!event.currentTarget.contains(ziel)) return;
+            // Eigene Bedienziele in der Zeile (Link, Knopf, Feld) bedienen den Klick allein.
+            if (ziel.closest('a, button, input, select, textarea, [role="button"]')) return;
+            const kinder = zeile[baum.kinder] as readonly T[] | undefined;
+            if (!kinder || kinder.length === 0) return;
+            const k = schluessel(zeile);
+            baum.onAufgeklappt(
+              baum.aufgeklappt.includes(k)
+                ? baum.aufgeklappt.filter((x) => x !== k)
+                : [...baum.aufgeklappt, k],
+            );
+          },
+        })
+      : undefined;
+  // Messpunkte des Ausschnitts: nur Zeilen der obersten Ebene, Baumkinder zählen zu ihrem Knoten.
+  const zeilenImFenster = virtuell
+    ? (zeile: T): HTMLAttributes<HTMLElement> => {
+        const i = indexVon.get(schluessel(zeile));
+        if (i == null) return {};
+        return {
+          ...fensterAttribute(zeile),
+          ...(zeilenNummern ? { 'aria-rowindex': i + 1 } : {}),
+        };
+      }
+    : undefined;
+
   const tabelle = (
-    <KatalogTabelle<T>
-      columns={tabellenSpalten}
-      dataSource={[...sichtbareZeilen]}
-      rowKey={(zeile) => schluessel(zeile)}
-      loading={ladend}
-      locale={leerInhalt != null ? { emptyText: leerInhalt } : undefined}
-      // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
-      // eine Seitenblätterung schnitte die Zeilenschleuse entzwei.
-      pagination={false}
-      rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
-      /**
-       * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340). Eine Zeile trägt echte `<a>` (Titel-Link,
-       * Deeplinks aus Spalten-`render`); ohne Riegel feuerten bei einem Klick Link UND `onZeileKlick`.
-       * Beim Modifier-Klick öffnete der Link den neuen Tab, und die aktuelle Seite navigierte trotzdem
-       * weg. Der Riegel sitzt hier statt an jedem Link, weil die Konsumenten den Titel-Link gar nicht
-       * selbst bauen.
-       */
-      onRow={
-        onZeileKlick
-          ? (zeile) => ({
-              onClick: (event) => {
-                if ((event.target as HTMLElement).closest('a')) return;
-                onZeileKlick(zeile);
-              },
-            })
-          : baum
-            ? (zeile) => ({
-                /**
-                 * Derselbe Riegel für den Baum (LFH-548): die ganze Zeile klappt auf, außer der
-                 * Klick galt einem Bedienziel der Zeile oder kam aus einem Portal. antds
-                 * `expandRowByClick` kennt keinen Riegel: ein Klick auf den Titel-Link klappte
-                 * sonst mit um, beim Strg-Klick sogar in der Seite, die stehen bleibt; ein
-                 * Statusknopf klappte die Einheit zu, während sein Menü aufging. Das
-                 * Aufklappsymbol selbst stoppt die Weitergabe (`baumSymbol`, im Test gepinnt).
-                 */
-                onClick: (event) => {
-                  const ziel = event.target as HTMLElement;
-                  // Ein React-Portal (Menü eines Zeilenknopfs) reicht seinen Klick an die Zeile
-                  // weiter, liegt im DOM aber woanders: er gehört nicht der Zeile.
-                  if (!event.currentTarget.contains(ziel)) return;
-                  // Eigene Bedienziele in der Zeile (Link, Knopf, Feld) bedienen den Klick allein.
-                  if (ziel.closest('a, button, input, select, textarea, [role="button"]')) return;
-                  const kinder = zeile[baum.kinder] as readonly T[] | undefined;
-                  if (!kinder || kinder.length === 0) return;
-                  const k = schluessel(zeile);
-                  baum.onAufgeklappt(
-                    baum.aufgeklappt.includes(k)
-                      ? baum.aufgeklappt.filter((x) => x !== k)
-                      : [...baum.aufgeklappt, k],
-                  );
-                },
-              })
+    <FensterKontext.Provider value={fensterTraeger}>
+      <KatalogTabelle<T>
+        columns={tabellenSpalten}
+        dataSource={tabellenZeilen}
+        components={virtuell ? FENSTER_KOMPONENTEN : undefined}
+        rowKey={(zeile) => schluessel(zeile)}
+        loading={ladend}
+        locale={leerInhalt != null ? { emptyText: leerInhalt } : undefined}
+        // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
+        // eine Seitenblätterung schnitte die Zeilenschleuse entzwei. Große Listen schneidet der
+        // Ausschnitt oben (LFH-949).
+        pagination={false}
+        rowClassName={zeilenKlasse ? (zeile) => zeilenKlasse(zeile) ?? '' : undefined}
+        /**
+         * DER ANKER BEDIENT DEN KLICK ALLEIN (LFH-340). Eine Zeile trägt echte `<a>` (Titel-Link,
+         * Deeplinks aus Spalten-`render`); ohne Riegel feuerten bei einem Klick Link UND `onZeileKlick`.
+         * Beim Modifier-Klick öffnete der Link den neuen Tab, und die aktuelle Seite navigierte trotzdem
+         * weg. Der Riegel sitzt hier statt an jedem Link, weil die Konsumenten den Titel-Link gar nicht
+         * selbst bauen.
+         */
+        onRow={
+          zeilenKlick || zeilenImFenster
+            ? (zeile) => ({ ...zeilenImFenster?.(zeile), ...zeilenKlick?.(zeile) })
             : undefined
-      }
-      /**
-       * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
-       * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
-       * ließe die Tabelle für immer absteigend.
-       */
-      onChange={(_seite, _filter, sorter) => {
-        const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
-        if (einzeln == null) return;
-        const spalte = einzeln.columnKey as K | undefined;
-        if (einzeln.order == null || spalte == null) {
-          setzeSortierung(null);
-          return;
         }
-        setzeSortierung({ spalte, richtung: einzeln.order === 'ascend' ? 'auf' : 'ab' });
-      }}
-      expandable={
-        baum
-          ? {
-              childrenColumnName: baum.kinder,
-              expandedRowKeys: [...baum.aufgeklappt],
-              // Einzug und Symbol zeichnet die erste Spalte selbst (LFH-977, `tabellenSpalten`).
-              indentSize: 0,
-              expandIcon: () => null,
-              onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
-              // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
-              // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
-              // Nicht über antds `expandRowByClick`, sondern über `onRow` oben: nur dort sitzt der
-              // Anker-Riegel (LFH-548).
-              expandRowByClick: false,
-            }
-          : aufklappen
+        /**
+         * Sortieren ist hier der EINZIGE Auslöser von `onChange`, also darf es die Sortierung auch
+         * LÖSCHEN: antds Zyklus endet mit `columnKey === undefined`, und ein früher Rücksprung darauf
+         * ließe die Tabelle für immer absteigend.
+         */
+        onChange={(_seite, _filter, sorter) => {
+          const einzeln = Array.isArray(sorter) ? sorter[0] : sorter;
+          if (einzeln == null) return;
+          const spalte = einzeln.columnKey as K | undefined;
+          if (einzeln.order == null || spalte == null) {
+            setzeSortierung(null);
+            return;
+          }
+          setzeSortierung({ spalte, richtung: einzeln.order === 'ascend' ? 'auf' : 'ab' });
+        }}
+        expandable={
+          baum
             ? {
-                expandedRowKeys: [...aufgeklappt],
-                expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
-                // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
-                showExpandColumn: false,
+                childrenColumnName: baum.kinder,
+                expandedRowKeys: [...baum.aufgeklappt],
+                // Einzug und Symbol zeichnet die erste Spalte selbst (LFH-977, `tabellenSpalten`).
+                indentSize: 0,
+                expandIcon: () => null,
+                onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
+                // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
+                // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
+                // Nicht über antds `expandRowByClick`, sondern über `onRow` oben: nur dort sitzt der
+                // Anker-Riegel (LFH-548).
+                expandRowByClick: false,
               }
-            : undefined
-      }
-    />
+            : aufklappen
+              ? {
+                  expandedRowKeys: [...aufgeklappt],
+                  expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
+                  // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
+                  showExpandColumn: false,
+                }
+              : undefined
+        }
+      />
+    </FensterKontext.Provider>
   );
 
   // ── Kartenzweig ───────────────────────────────────────────────────────────────────
@@ -1598,7 +1756,8 @@ export default function Datensicht<T extends object, const K extends string>(
     );
   };
 
-  const kartenListe = (zeilenMenge: readonly T[], kopf?: ListenKopf) => (
+  /** `indexAb`: Lage der ersten Karte in ihrer Liste, wenn der Ausschnitt vorn abschneidet. */
+  const kartenListe = (zeilenMenge: readonly T[], kopf?: ListenKopf, indexAb = 0) => (
     <Liste
       dataSource={zeilenMenge}
       rowKey={(zeile) => schluessel(zeile)}
@@ -1606,28 +1765,73 @@ export default function Datensicht<T extends object, const K extends string>(
       loading={ladend}
       // `emptyText` statt eines eigenen Leerzustands-Knotens.
       emptyText={leerInhalt}
-      renderItem={(zeile, index) =>
-        baum ? baumEintrag(zeile, index, 0) : kartenEintrag(zeile, index, 0)
-      }
+      renderItem={(zeile, index) => {
+        const eintrag = baum
+          ? baumEintrag(zeile, indexAb + index, 0)
+          : kartenEintrag(zeile, indexAb + index, 0);
+        // Messpunkt des Ausschnitts; eine eigene Hülle, weil `karte.art === 'eigen'` frei rendert.
+        return virtuell ? <div {...fensterAttribute(zeile)}>{eintrag}</div> : eintrag;
+      }}
     />
   );
 
-  const kartenZweig =
+  /**
+   * Gruppiert schneidet der Ausschnitt quer durch die Gruppen: gerendert werden nur Gruppen mit
+   * Karten im Ausschnitt, ihr Kopf zählt weiter die ganze Gruppe.
+   */
+  const gruppenImFenster = () => {
+    let lauf = 0;
+    return gruppenKarten.map((g) => {
+      const ab = lauf;
+      lauf += g.zeilen.length;
+      const teilVon = virtuell ? Math.max(0, fensterVon - ab) : 0;
+      const teilBis = virtuell ? Math.min(g.zeilen.length, fensterBis - ab) : g.zeilen.length;
+      if (teilVon >= teilBis) return null;
+      return (
+        <div key={g.wert}>
+          {kartenListe(
+            virtuell ? g.zeilen.slice(teilVon, teilBis) : g.zeilen,
+            {
+              inhalt: <Typography.Text strong>{gruppenZahl(g)}</Typography.Text>,
+              unterEbene: gruppen!.unterEbene,
+            },
+            teilVon,
+          )}
+        </div>
+      );
+    });
+  };
+
+  const kartenListen =
     gruppen && !baum ? (
       <>
-        {gruppenKarten.map((g) => (
-          <div key={g.wert}>
-            {kartenListe(g.zeilen, {
-              inhalt: <Typography.Text strong>{gruppenZahl(g)}</Typography.Text>,
-              unterEbene: gruppen.unterEbene,
-            })}
-          </div>
-        ))}
+        {gruppenImFenster()}
         {gruppenKarten.length === 0 && kartenListe([])}
       </>
+    ) : virtuell ? (
+      kartenListe(folge.slice(fensterVon, fensterBis), undefined, fensterVon)
     ) : (
       kartenListe(sichtbareZeilen)
     );
+  const kartenZweig = virtuell ? (
+    <>
+      <div
+        ref={setzeFensterStart}
+        aria-hidden
+        data-lfh="datensicht-platzhalter"
+        style={{ height: ausschnitt.oben }}
+      />
+      {kartenListen}
+      <div
+        aria-hidden
+        data-lfh="datensicht-platzhalter"
+        {...{ [FENSTER_ENDE]: '' }}
+        style={{ height: ausschnitt.unten }}
+      />
+    </>
+  ) : (
+    kartenListen
+  );
 
   return (
     <section
