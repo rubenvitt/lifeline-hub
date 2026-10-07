@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   dekodiereHeicPixel,
   einmalLaden,
+  erzeugeLibheifLader,
   HeicZuGross,
   ladeLibheifFabrik,
   zielmasse,
@@ -106,6 +107,40 @@ describe('ladeLibheifFabrik (LFH-1000)', () => {
   it('scheitert laut, wenn die Datei keine Fabrik ablegt', async () => {
     await expect(ladeLibheifFabrik(async () => undefined)).rejects.toThrow('Glue ohne Fabrik');
     expect('module' in globalThis).toBe(false);
+  });
+});
+
+describe('erzeugeLibheifLader (LFH-1000)', () => {
+  it('führt den Glue einmal aus und wiederholt nach einem Fehlschlag nur das Instanziieren', async () => {
+    const fabrik = vi.fn();
+    // Wie der Modul-Cache des Browsers: nur der erste Import führt die Datei aus.
+    const ausfuehren = vi.fn(async () => {
+      if (ausfuehren.mock.calls.length === 1) {
+        (globalThis as { module?: { exports: unknown } }).module!.exports = fabrik;
+      }
+    });
+    const instanziieren = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('WASM nicht geladen'))
+      .mockResolvedValue('modul');
+    const laden = erzeugeLibheifLader(ausfuehren, instanziieren);
+    await expect(laden()).rejects.toThrow('WASM nicht geladen');
+    expect(await laden()).toBe('modul');
+    expect(ausfuehren).toHaveBeenCalledTimes(1);
+    expect(instanziieren).toHaveBeenNthCalledWith(2, fabrik);
+  });
+
+  it('versucht den Glue erneut, wenn er nicht ankam', async () => {
+    const fabrik = vi.fn();
+    const ausfuehren = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('ohne Netz'))
+      .mockImplementation(async () => {
+        (globalThis as { module?: { exports: unknown } }).module!.exports = fabrik;
+      });
+    const laden = erzeugeLibheifLader(ausfuehren, async (f) => f);
+    await expect(laden()).rejects.toThrow('ohne Netz');
+    expect(await laden()).toBe(fabrik);
   });
 });
 

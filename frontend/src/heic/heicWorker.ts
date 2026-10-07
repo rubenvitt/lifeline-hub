@@ -10,8 +10,7 @@
  */
 import {
   dekodiereHeicPixel,
-  einmalLaden,
-  ladeLibheifFabrik,
+  erzeugeLibheifLader,
   LIBHEIF_PFAD,
   zielmasse,
   type Libheif,
@@ -21,18 +20,19 @@ const KANTE_KLEIN = 256;
 const KANTE_GROSS = 1600;
 const JPEG_QUALITAET = 0.8;
 
-const ladeLibheif = einmalLaden(async () => {
-  const fabrik = await ladeLibheifFabrik((url) => import(/* @vite-ignore */ url));
-  return new Promise<Libheif>((fertig, fehler) => {
-    // Emscripten füllt das übergebene Objekt selbst zum Modul aus.
-    const modul: Record<string, unknown> = {
-      locateFile: () => `${LIBHEIF_PFAD}libheif.wasm`,
-      onRuntimeInitialized: () => fertig(modul as unknown as Libheif),
-      onAbort: (grund: unknown) => fehler(new Error(`libheif: ${String(grund)}`)),
-    };
-    fabrik(modul);
-  });
-});
+const ladeLibheif = erzeugeLibheifLader(
+  (url) => import(/* @vite-ignore */ url),
+  (fabrik) =>
+    new Promise<Libheif>((fertig, fehler) => {
+      // Emscripten füllt das übergebene Objekt selbst zum Modul aus.
+      const modul: Record<string, unknown> = {
+        locateFile: () => `${LIBHEIF_PFAD}libheif.wasm`,
+        onRuntimeInitialized: () => fertig(modul as unknown as Libheif),
+        onAbort: (grund: unknown) => fehler(new Error(`libheif: ${String(grund)}`)),
+      };
+      fabrik(modul);
+    }),
+);
 
 /** Der Auftrag, der gerade dekodiert wird (der Client schickt einen nach dem anderen). */
 let laufend: number | null = null;

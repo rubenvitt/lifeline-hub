@@ -212,23 +212,17 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         };
       }),
     },
-    // Hinweis auf die LGPL-Bibliotheken (HEIC-Decoder, LFH-1000, `heic/LIESMICH.md`): ein echter
-    // Link auf die Datei im Binary, ganz unten, weil er selten gebraucht wird.
+    // Hinweis auf die LGPL-Bibliotheken (HEIC-Decoder, LFH-1000, `heic/LIESMICH.md`), ganz
+    // unten, weil er selten gebraucht wird. Über `onClick`, nicht als `<a>` im Label: sonst
+    // öffnete nur ein Klick genau auf den Text, Enter und die Polsterung nicht.
     { type: 'divider' },
-    {
-      key: 'lizenzen',
-      icon: <IconDokument />,
-      label: (
-        <a href={LIZENZ_HINWEIS} target="_blank" rel="noopener noreferrer">
-          Lizenzen
-        </a>
-      ),
-    },
+    { key: 'lizenzen', icon: <IconDokument />, label: 'Lizenzen' },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') void abmelden();
+    else if (key === 'lizenzen') window.open(LIZENZ_HINWEIS, '_blank', 'noopener');
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);
     else if (key.startsWith(DICHTE_PRAEFIX)) setDichte(key.slice(DICHTE_PRAEFIX.length) as Dichte);

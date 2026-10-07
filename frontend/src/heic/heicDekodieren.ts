@@ -135,3 +135,17 @@ export async function ladeLibheifFabrik(
   if (typeof modul.exports !== 'function') throw new Error('libheif: Glue ohne Fabrik');
   return modul.exports as LibheifFabrik;
 }
+
+/**
+ * Lader für den Worker: der Glue wird genau einmal ausgeführt, seine Fabrik bleibt gemerkt;
+ * nur das Instanziieren (WASM laden) wiederholt sich nach einem Fehlschlag. Ein zweites
+ * `import()` derselben Adresse führt die Datei nicht noch einmal aus (Modul-Cache des
+ * Browsers), die Fabrik käme dann nie wieder an.
+ */
+export function erzeugeLibheifLader<T>(
+  ausfuehren: (url: string) => Promise<unknown>,
+  instanziieren: (fabrik: LibheifFabrik) => Promise<T>,
+): () => Promise<T> {
+  const fabrik = einmalLaden(() => ladeLibheifFabrik(ausfuehren));
+  return einmalLaden(async () => instanziieren(await fabrik()));
+}

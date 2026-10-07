@@ -22,7 +22,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -152,14 +152,18 @@ describe('BenutzerMenu — unter lg', () => {
 describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
   beforeEach(() => setzeViewportBreite(390));
 
-  it('der Lizenzhinweis steht als Link ganz unten (LFH-1000)', async () => {
+  // Der ganze Eintrag öffnet, nicht nur ein Link im Text: Enter läuft bei antd über dasselbe
+  // `onClick` des Menüs.
+  it('der Lizenzhinweis steht ganz unten, der ganze Eintrag öffnet ihn (LFH-1000)', async () => {
+    const oeffnen = vi.spyOn(window, 'open').mockReturnValue(null);
     zeige();
     await oeffne();
     const eintraege = await screen.findAllByRole('menuitem');
-    expect(eintraege[eintraege.length - 1]?.textContent).toBe('Lizenzen');
-    const link = screen.getByRole('link', { name: 'Lizenzen' });
-    expect(link).toHaveAttribute('href', '/lizenzen/HEIC-DECODER.txt');
-    expect(link).toHaveAttribute('target', '_blank');
+    const lizenzen = eintraege[eintraege.length - 1]!;
+    expect(lizenzen.textContent).toBe('Lizenzen');
+    await userEvent.click(lizenzen);
+    expect(oeffnen).toHaveBeenCalledWith('/lizenzen/HEIC-DECODER.txt', '_blank', 'noopener');
+    oeffnen.mockRestore();
   });
 
   it('Profil und Abmelden stehen vor Darstellung, Bediendichte und Helligkeit', async () => {

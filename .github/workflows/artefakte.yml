@@ -252,6 +252,12 @@ jobs:
           VERSION: ${{ needs.vorbereiten.outputs.version }}
         run: |
           set -euo pipefail
+          # Ein Release von vor LFH-1000 (Nachbau per workflow_dispatch) kennt das Skript nicht
+          # und trägt auch den Decoder nicht austauschbar; die Binaries gehen trotzdem hoch.
+          if [ ! -x quelle/scripts/release/drittanbieter-quellen.sh ]; then
+            echo "::notice::Tag ohne drittanbieter-quellen.sh, Schritt übersprungen."
+            exit 0
+          fi
           quelle/scripts/release/drittanbieter-quellen.sh versand "$VERSION"
           ( cd versand && for f in lifeline-hub-"$VERSION"-DRITTANBIETER.txt lifeline-hub-"$VERSION"-drittanbieter.zip; do
               shasum -a 256 "$f" > "$f.sha256"
