@@ -327,7 +327,7 @@ function AdressGruppe({
             {aussage}
             {/* Ein Fehlzustand nennt den Ausweg als Knopf statt als Satz (LFH-1083). */}
             {nochmal && (
-              <Button size="small" loading={adresse.isFetching} onClick={() => void refetch()}>
+              <Button loading={adresse.isFetching} onClick={() => void refetch()}>
                 Erneut suchen
               </Button>
             )}
