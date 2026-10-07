@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams, useSearchParams } from 'react-router';
-import { Alert, App, Button, Typography } from 'antd';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Alert, App, Breadcrumb, Button, Typography } from 'antd';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import FensterRahmen from '../components/FensterRahmen';
-import { seitenkopfStil, seitenMetaStil, seitentitelStil } from '../components/EinsatzSeite';
+import {
+  EinsatzstatusMarke,
+  Ortspfad,
+  seitenkopfStil,
+  seitenMetaStil,
+  seitentitelStil,
+} from '../components/EinsatzSeite';
+import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { useModusFarben } from '../components/rahmenStil';
 import { useViewport } from '../components/useViewport';
 import { useRollen } from '../components/instrument';
@@ -129,6 +136,9 @@ export default function LagekartePage() {
 
   const { token } = useRollen();
   const farben = useModusFarben();
+  // Der Einsatz des Rahmens für Ortspfad und Einsatzstatus (LFH-954): die Karte baut ihren Kopf
+  // selbst, ohne `EinsatzSeite`.
+  const rahmenEinsatz = useEinsatzRahmen();
   const { abBreite, istSchmal } = useViewport();
   const breit = abBreite('lg');
   /** Scharfe Griffsorte beim Bild-Einpassen. Vorgabe: Größe. */
@@ -946,7 +956,10 @@ export default function LagekartePage() {
 
   const kopf = (
     <div data-lfh="seitenkopf" style={{ ...seitenkopfStil(token, farben, true), marginBottom: 0 }}>
+      {/* Titelblock wie in `EinsatzSeite`: unter `md` eigene Zeile, damit nicht die Länge des
+          Einsatznamens im Pfad entscheidet, ob die Aktionen daneben passen (LFH-629, LFH-954). */}
       <div
+        className="lfh-seitenkopf__titelblock"
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -956,9 +969,21 @@ export default function LagekartePage() {
           minWidth: 0,
         }}
       >
+        {rahmenEinsatz && (
+          <Ortspfad farben={farben}>
+            <Breadcrumb
+              items={[
+                { title: <Link to="/einsaetze">Einsätze</Link> },
+                { title: rahmenEinsatz.bezeichnung },
+                { title: 'Lagekarte' },
+              ]}
+            />
+          </Ortspfad>
+        )}
         <Typography.Title level={1} style={seitentitelStil(farben)}>
           Lagekarte
         </Typography.Title>
+        <EinsatzstatusMarke einsatz={rahmenEinsatz} />
         <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>
           {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>

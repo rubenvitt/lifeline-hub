@@ -1,4 +1,5 @@
 import type { EinsatzAnzeige } from '../api/types';
+import { einsatzKennung } from '../einsatz/einsatzKennung';
 
 /**
  * Reine Ableitungen der Einsatzkachel (Einsatzliste/Startseite).
@@ -6,18 +7,11 @@ import type { EinsatzAnzeige } from '../api/types';
  * Eigener Basename neben `EinsaetzePage.tsx`: ein gleichnamiges `.ts` beschattete die Komponente.
  */
 
-/**
- * Die Einsatznummer der Kachel: die interne Nummer, sonst die Leitstellennummer, sonst keine.
- * Dieselbe Regel wie `einsatzKennung` in `einsatz/EinsatzLayout.tsx` — eigene Funktion, weil der
- * Import das ganze Layout in die Startseite zöge. Die Datenbank-`id` ist keine Einsatznummer.
- */
+/** Die Einsatznummer der Kachel: dieselbe Regel wie im Kopf (`einsatz/einsatzKennung.ts`). */
 export function kachelKennung(
   einsatz: Pick<EinsatzAnzeige, 'einsatznummer_intern' | 'leitstellen_nr'>,
 ): string | null {
-  const intern = einsatz.einsatznummer_intern?.trim();
-  if (intern) return intern;
-  const leitstelle = einsatz.leitstellen_nr?.trim();
-  return leitstelle ? leitstelle : null;
+  return einsatzKennung(einsatz);
 }
 
 /** Mono-Meta des Seitenkopfs: „3 aktiv · 12 abgeschlossen". */

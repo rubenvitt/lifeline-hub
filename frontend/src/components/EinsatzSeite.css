@@ -79,6 +79,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* „Einsätze“ ist der Rückweg und kürzt nie (LFH-954): sonst schrumpften alle Einträge gleich, und
+     aus „Einsätze“ wurde „Einsätz“. Gekürzt wird nur, was dahinter steht — der Einsatzname. */
+  .lfh-seitenkopf__pfad .ant-breadcrumb ol > li:first-child {
+    flex-shrink: 0;
+  }
 }
 
 /* Der Datenstand-Platzhalter gilt nur dort, wo er eine Zeile hält: unter `md` (oben). Ab `md`

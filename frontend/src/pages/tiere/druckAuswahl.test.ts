@@ -8,7 +8,7 @@ describe('tiereDruckAuswahl', () => {
   });
 
   it('nennt Sicht und Spezies mit den Wörtern der Liste', () => {
-    expect(tiereDruckAuswahl({ sicht: 'aktiv' })).toBe('Sicht: Aktiv');
+    expect(tiereDruckAuswahl({ sicht: 'aktiv' })).toBe('Sicht: Offen');
     expect(tiereDruckAuswahl({ sicht: 'vermisst', spezies: 'hund' })).toBe(
       'Sicht: Vermisst · Spezies: Hund',
     );

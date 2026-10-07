@@ -31,7 +31,6 @@ import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
 import { werkzeugeFuer } from '../stab/werkzeuge';
 import { unterseitenFuer } from '../stab/unterseiten';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
-import { einsatzStatus } from '../theme/statusFarben';
 
 /**
  * Modul „Stab" (LFH-46): Lagebesprechung und Führungsorganisation S1–S6.
@@ -148,12 +147,7 @@ export default function StabPage() {
   return (
     <EinsatzSeite
       dataUpdatedAt={stabQuery.dataUpdatedAt}
-      titel={
-        <Space>
-          Stab
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Stab"
       beschreibung="Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung"
       breadcrumb={
         <Breadcrumb

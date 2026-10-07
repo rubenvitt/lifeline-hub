@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -9,6 +10,8 @@ import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvide
 import { rahmenFarben } from '../theme/tokens';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import AppLayout from './AppLayout';
+import { useEbene1Ort } from './Ebene1OrtKontext';
+import { merkeLetztenOrt } from '../einsatz/letzterOrt';
 import { adminFixture } from '../test/fixtures';
 import type { BenutzerAnzeige } from '../api/types';
 
@@ -241,5 +244,94 @@ describe('AppLayout · gesperrter Verwaltungs-Link (LFH-337 · M10)', () => {
     );
     await screen.findByRole('link', { name: 'Verwaltung' });
     expect(document.querySelector('[data-lfh="sperr-schloss"]')).toBeNull();
+  });
+});
+
+describe('AppLayout · Orientierung (LFH-954)', () => {
+  beforeEach(() => {
+    setzeViewportBreite(1366);
+    localStorage.clear();
+    document.title = 'lifeline-hub';
+  });
+
+  function Sonde() {
+    const ort = useEbene1Ort();
+    return (
+      <div>
+        <span data-testid="ort">{ort?.ort.join(' › ') ?? '—'}</span>
+        <span data-testid="rueckweg">
+          {ort?.rueckweg ? `${ort.rueckweg.label} → ${ort.rueckweg.pfad}` : '—'}
+        </span>
+      </div>
+    );
+  }
+
+  function setupAn(route: string, einsaetze: unknown[] = []) {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json(einsaetze)),
+    );
+    return renderMitProviders(
+      <CommandPaletteProvider>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/einsaetze" element={<Sonde />} />
+            <Route path="/profil" element={<Sonde />} />
+            <Route path="/admin/*" element={<Sonde />} />
+          </Route>
+        </Routes>
+      </CommandPaletteProvider>,
+      { route },
+    );
+  }
+
+  const aktiv = { id: 5, bezeichnung: 'Starkregen Nord', status: 'aktiv' };
+
+  it('setzt den Tab-Titel der Ebene 1', async () => {
+    setupAn('/admin/stammdaten/fahrzeuge');
+    await waitFor(() => expect(document.title).toBe('Fahrzeuge · Verwaltung · lifeline-hub'));
+  });
+
+  it('„Verwaltung“ trägt im Verwaltungsbereich aria-current, sonst nicht', async () => {
+    const { unmount } = setupAn('/admin/stammdaten/fahrzeuge');
+    const link = await screen.findByRole('link', { name: 'Verwaltung' });
+    expect(link).toHaveAttribute('aria-current', 'page');
+    // Zweiter Kanal neben der Farbe (WCAG 1.4.1): die Unterkante.
+    expect(link.style.boxShadow).toContain('inset');
+    unmount();
+    setupAn('/profil');
+    expect(await screen.findByRole('link', { name: 'Verwaltung' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it('Profil: Ortspfad und Rückweg an die gemerkte Adresse des aktiven Einsatzes', async () => {
+    merkeLetztenOrt(admin.id, { einsatzId: 5, pfad: '/einsaetze/5/etb?eintrag=3' });
+    setupAn('/profil', [aktiv]);
+    expect(screen.getByTestId('ort')).toHaveTextContent('Profil');
+    await waitFor(() =>
+      expect(screen.getByTestId('rueckweg')).toHaveTextContent(
+        'Zurück zu Starkregen Nord → /einsaetze/5/etb?eintrag=3',
+      ),
+    );
+  });
+
+  it('kein Rückweg, wenn der Einsatz abgeschlossen ist oder fehlt', async () => {
+    merkeLetztenOrt(admin.id, { einsatzId: 5, pfad: '/einsaetze/5/etb' });
+    const { unmount } = setupAn('/profil', [{ ...aktiv, status: 'abgeschlossen' }]);
+    await screen.findByTestId('ort');
+    // Der Listenabruf muss angekommen sein, sonst bewiese das „—“ nichts.
+    await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByTestId('rueckweg')).toHaveTextContent('—');
+    unmount();
+    setupAn('/profil', []);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByTestId('rueckweg')).toHaveTextContent('—');
+  });
+
+  it('die Einsatzliste trägt keinen Ortspfad', async () => {
+    setupAn('/einsaetze');
+    expect(await screen.findByTestId('ort')).toHaveTextContent('—');
   });
 });

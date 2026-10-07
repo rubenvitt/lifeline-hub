@@ -1,7 +1,11 @@
 import { IconSchloss } from '../icons';
 import { Layout, Tag, Typography, theme } from 'antd';
-import type { CSSProperties } from 'react';
-import { Link, Outlet } from 'react-router';
+import { useMemo, type CSSProperties } from 'react';
+import { Link, Outlet, useLocation } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
+import { listeEinsaetze } from '../api/einsaetze';
+import { globalKeys } from '../api/queryKeys';
+import { leseLetztenOrt } from '../einsatz/letzterOrt';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
@@ -18,6 +22,9 @@ import {
   kopfZelleStil,
 } from './Kopfleiste';
 import { useViewport } from './useViewport';
+import { useDokumentTitel } from './useDokumentTitel';
+import { ebene1Seite } from './ebene1Seite';
+import { Ebene1OrtProvider, type Ebene1OrtWert } from './Ebene1OrtKontext';
 
 const { Header, Content } = Layout;
 
@@ -53,12 +60,15 @@ function GlobalLink({
   gesperrt,
   grundSichtbar,
   linkStil,
+  aktiv = false,
 }: {
   to: string;
   label: string;
   gesperrt: boolean;
   grundSichtbar: boolean;
   linkStil: CSSProperties;
+  /** Die Person steht in diesem Bereich (LFH-954): `aria-current` und Unterkante, nicht nur Farbe. */
+  aktiv?: boolean;
 }) {
   if (gesperrt) {
     return (
@@ -107,14 +117,61 @@ function GlobalLink({
     );
   }
   return (
-    <Link to={to} style={linkStil}>
+    <Link
+      to={to}
+      aria-current={aktiv ? 'page' : undefined}
+      style={
+        aktiv
+          ? {
+              ...linkStil,
+              color: rahmenFarben.text,
+              // Unterkante als zweiter Kanal (WCAG 1.4.1). Als Schatten, nicht als Rand: ein Rand
+              // machte den Link höher und mit ihm den klebenden Kopf (`--lfh-rahmen-oben`).
+              boxShadow: `inset 0 -2px 0 ${rahmenFarben.text}`,
+            }
+          : linkStil
+      }
+    >
       {label}
     </Link>
   );
 }
 
+/**
+ * Ort und Rückweg der Ebene 1 (LFH-954, design.md D5): der Rückweg nur, wenn der zuletzt offene
+ * Einsatz der Person in der Liste steht und aktiv ist; der Name kommt aus der Liste, nicht aus dem
+ * Speicher. Abgerufen wird die Liste nur auf Profil und Verwaltung (derselbe Key wie im Wechsler).
+ */
+function useEbene1Ort(pathname: string, benutzerId: number | undefined): Ebene1OrtWert | undefined {
+  const { ort } = ebene1Seite(pathname);
+  // Je Adresse neu gelesen: die Person kann zwischendurch in einem anderen Tab im Einsatz sein.
+  const letzter = useMemo(
+    () =>
+      benutzerId == null || ebene1Seite(pathname).ort == null ? null : leseLetztenOrt(benutzerId),
+    [benutzerId, pathname],
+  );
+  const { data: einsaetze } = useQuery({
+    queryKey: globalKeys.einsaetze(),
+    queryFn: listeEinsaetze,
+    enabled: letzter != null,
+  });
+  if (ort == null) return undefined;
+  const einsatz = letzter && einsaetze?.find((e) => e.id === letzter.einsatzId);
+  return {
+    ort,
+    rueckweg:
+      letzter && einsatz && einsatz.status === 'aktiv'
+        ? { label: `Zurück zu ${einsatz.bezeichnung}`, pfad: letzter.pfad }
+        : undefined,
+  };
+}
+
 export default function AppLayout() {
   const { benutzer } = useAuth();
+  const { pathname } = useLocation();
+  // Tab-Titel der Ebene 1 (LFH-954): „Fahrzeuge · Verwaltung · lifeline-hub“.
+  useDokumentTitel(ebene1Seite(pathname).titel);
+  const ebene1Ort = useEbene1Ort(pathname, benutzer?.id);
   // Dieselbe Schwelle wie im Einsatz-Workspace. Sie trägt drei Fragen: ob der Sperrgrund als Tag
   // danebensteht, ob die Suche als Feld oder als Icon steht, und (ab `md`) ob die Uhr Platz hat.
   // Die Frage stellt ausschließlich `useViewport` (`useViewport.guard.test.ts`).
@@ -166,6 +223,7 @@ export default function AppLayout() {
               gesperrt={!darfVerwaltung(benutzer)}
               grundSichtbar={breit}
               linkStil={linkStil}
+              aktiv={pathname === '/admin' || pathname.startsWith('/admin/')}
             />
           </div>
         </div>
@@ -204,7 +262,9 @@ export default function AppLayout() {
         </KopfRechts>
       </Header>
       <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
-        <Outlet />
+        <Ebene1OrtProvider value={ebene1Ort}>
+          <Outlet />
+        </Ebene1OrtProvider>
       </Content>
     </Layout>
   );

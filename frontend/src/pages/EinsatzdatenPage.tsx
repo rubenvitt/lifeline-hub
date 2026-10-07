@@ -68,8 +68,6 @@ import {
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
-import StatusTag from '../components/StatusTag';
-import { einsatzStatus } from '../theme/statusFarben';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -581,17 +579,15 @@ export default function EinsatzdatenPage() {
     <EinsatzSeite
       // Datenblatt und Bearbeitungsformular: ausdrücklich die schmale Lesebreite.
       breite="schmal"
-      titel={
-        <Space>
-          {einsatz.bezeichnung}
-          {/* Beschriftung und Rollenfarbe aus `theme/statusFarben.ts` über `StatusTag`, nicht
-              der rohe Wire-Wert. */}
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      // Die Seite nennt sich (LFH-954): der Einsatzname steht im Pfad, der Status im Seitenkopf.
+      titel="Einsatzdaten"
       breadcrumb={
         <Breadcrumb
-          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Einsatzdaten' },
+          ]}
         />
       }
       dataUpdatedAt={einsatzQuery.dataUpdatedAt}

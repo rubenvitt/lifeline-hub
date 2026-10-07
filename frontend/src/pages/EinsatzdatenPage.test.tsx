@@ -505,14 +505,16 @@ describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
  * Knopf.
  */
 describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
-  it('zeigt den Status als Wort, nicht als Wire-Wert', async () => {
-    setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
-    const tag = await screen.findByText('Abgeschlossen');
-    expect(screen.queryByText('abgeschlossen')).toBeNull();
-
-    // Die unterscheidende Hälfte: ein lokales `status[0].toUpperCase()` erfüllte das Paar oben.
-    // Erst `data-rolle` belegt, dass der Wert durch `einsatzStatus` und `StatusTag` gelaufen ist.
-    expect(tag.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'neutral');
+  it('nennt sich „Einsatzdaten“, der Einsatzname steht im Pfad, der Status nicht im h1', async () => {
+    // LFH-954: vorher war das h1 der Einsatzname samt Status, „Einsatzdaten“ stand nirgends.
+    const { container } = setup({
+      einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' },
+    });
+    const h1 = await screen.findByRole('heading', { level: 1 });
+    expect(h1).toHaveTextContent(/^Einsatzdaten$/);
+    expect(container.querySelector('.lfh-seitenkopf__pfad')).toHaveTextContent(
+      basisEinsatz.bezeichnung,
+    );
   });
 
   it('hält die technischen Angaben eingeklappt, die Kopfangaben aber sichtbar', async () => {

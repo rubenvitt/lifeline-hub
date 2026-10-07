@@ -1,9 +1,11 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import { useLocation } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Button, Form, Input } from 'antd';
 import { renderMitProviders } from '../test/utils';
 import AdminPage from './AdminPage';
+import { Ebene1OrtProvider } from './Ebene1OrtKontext';
 
 describe('AdminPage', () => {
   it('rendert Titel (level 4), Beschreibung, Aktionen, Hinweis und Children', () => {
@@ -71,5 +73,64 @@ describe('AdminPage', () => {
     // Token, beide Seiten bewegten sich sonst gemeinsam. Dass die Zahl zum Token passt, sichert der
     // Byte-Pin in `theme/tokens.test.ts`; erst beide zusammen belegen die Verdrahtung.
     expect(wurzel(container).style.maxWidth).toBe('900px');
+  });
+});
+
+describe('AdminPage · Ortspfad und Rückweg (LFH-954)', () => {
+  function PfadSonde() {
+    const { pathname, search } = useLocation();
+    return <span data-testid="pfad">{`${pathname}${search}`}</span>;
+  }
+
+  it('ohne Ebene-1-Ort weder Pfad noch Rückweg', () => {
+    const { container } = renderMitProviders(
+      <AdminPage titel="Fahrzeuge">
+        <div>x</div>
+      </AdminPage>,
+    );
+    expect(container.querySelector('.lfh-seitenkopf__pfad')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Zurück zu/ })).toBeNull();
+  });
+
+  it('zeigt „Einsätze › Verwaltung ›“ und führt mit dem Rückweg an die gemerkte Adresse', async () => {
+    const { container } = renderMitProviders(
+      <>
+        <Ebene1OrtProvider
+          value={{
+            ort: ['Verwaltung', 'Fahrzeuge'],
+            rueckweg: { label: 'Zurück zu Starkregen Nord', pfad: '/einsaetze/5/etb?eintrag=3' },
+          }}
+        >
+          <AdminPage titel="Fahrzeuge" aktionen={<Button type="primary">Anlegen</Button>}>
+            <div>x</div>
+          </AdminPage>
+        </Ebene1OrtProvider>
+        <PfadSonde />
+      </>,
+      { route: '/admin/stammdaten/fahrzeuge' },
+    );
+    const pfad = container.querySelector('.lfh-seitenkopf__pfad')!;
+    expect(within(pfad as HTMLElement).getByRole('link', { name: 'Einsätze' })).toHaveAttribute(
+      'href',
+      '/einsaetze',
+    );
+    expect(pfad).toHaveTextContent('Verwaltung');
+    const zurueck = screen.getByRole('link', { name: 'Zurück zu Starkregen Nord' });
+    // Sekundär: „genau eine Primäraktion“ im Kopf bleibt die der Seite.
+    expect(zurueck.className).not.toMatch(/btn-primary/);
+    await userEvent.click(zurueck);
+    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/5/etb?eintrag=3');
+  });
+
+  it('ohne aktiven Einsatz nur der Pfad', () => {
+    renderMitProviders(
+      <Ebene1OrtProvider value={{ ort: ['Profil'] }}>
+        <AdminPage titel="Profil">
+          <div>x</div>
+        </AdminPage>
+      </Ebene1OrtProvider>,
+    );
+    expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Zurück zu/ })).toBeNull();
   });
 });

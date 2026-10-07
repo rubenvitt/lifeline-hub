@@ -45,7 +45,8 @@ export type TiereSicht = 'aktiv' | 'vermisst' | 'abgeschlossen' | 'alle';
 
 /** Reiter der Tierliste in Bedienreihenfolge — dieselben Wörter im Kopf der Druckansicht. */
 export const TIERE_SICHTEN: readonly { key: TiereSicht; label: string }[] = [
-  { key: 'aktiv', label: 'Aktiv' },
+  // „Offen“, nicht „Aktiv“ (LFH-954): „Aktiv“ ist der Status des Einsatzes; der Wert bleibt `aktiv`.
+  { key: 'aktiv', label: 'Offen' },
   { key: 'vermisst', label: 'Vermisst' },
   { key: 'abgeschlossen', label: 'Abgeschlossen' },
   { key: 'alle', label: 'Alle' },

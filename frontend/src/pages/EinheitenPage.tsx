@@ -7,7 +7,6 @@ import {
   ConfigProvider,
   Form,
   Input,
-  Space,
   Tag,
   Tree,
   type TreeDataNode,
@@ -36,8 +35,6 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ErfassungsModal } from '../components/Erfassung';
-import StatusTag from '../components/StatusTag';
-import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { KennungsLink } from '../components/kennungsLink';
 import { useViewport } from '../components/useViewport';
@@ -233,12 +230,7 @@ export default function EinheitenPage() {
           ]}
         />
       }
-      titel={
-        <Space>
-          Einheiten
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Einheiten"
       meta={einheitenQuery.isSuccess ? `${einheiten.length} Einheiten` : undefined}
       dataUpdatedAt={einheitenQuery.dataUpdatedAt}
       aktionen={

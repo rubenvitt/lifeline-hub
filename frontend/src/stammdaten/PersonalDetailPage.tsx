@@ -1,4 +1,4 @@
-import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, Row, Space, theme } from 'antd';
+import { App, AutoComplete, Button, Col, Form, Input, Row, Space, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -132,11 +132,9 @@ export default function PersonalDetailPage() {
   return (
     <div>
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
-      <Breadcrumb
-        style={{ marginBottom: token.marginSM }}
-        items={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
-      />
+      {/* Der Pfad steht im Kopf der `AdminPage`, nicht als zweite Zeile darüber (LFH-954). */}
       <AdminPage
+        pfad={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
         breite="schmal"
         titel={
           <Space size={8}>

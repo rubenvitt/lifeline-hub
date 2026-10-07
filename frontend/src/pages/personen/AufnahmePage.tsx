@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Form, Space } from 'antd';
+import { Alert, App, Breadcrumb, Form } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -25,8 +25,6 @@ import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
 import { parseRouteId } from '../../routing/deeplinks';
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
-import StatusTag from '../../components/StatusTag';
-import { einsatzStatus } from '../../theme/statusFarben';
 
 /**
  * Vollseiten-Aufnahme für Personen. Die Maske ist dieselbe wie in der Schnellerfassung
@@ -137,12 +135,7 @@ export default function AufnahmePage() {
   return (
     <EinsatzSeite
       breite="schmal"
-      titel={
-        <Space>
-          Aufnahme
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Aufnahme"
       beschreibung={
         uhsAuftrag
           ? 'Sichtungskategorie zuerst — die Person landet danach im Wartebereich der Unfallhilfsstelle.'

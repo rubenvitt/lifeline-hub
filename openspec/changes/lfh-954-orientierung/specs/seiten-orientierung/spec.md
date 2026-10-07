@@ -65,7 +65,8 @@ nicht abgeschlossene Tiere SHALL „Offen“ heißen.
 
 ### Requirement: Einsatzwechsler zeigt den eigenen Einsatz und keine Verwaltung
 
-Der Einsatzwechsler SHALL den aktuellen Einsatz als gewählt markieren. Ein Klick darauf SHALL
+Der Einsatzwechsler SHALL den aktuellen Einsatz als gewählt markieren, auch wenn er abgeschlossen
+ist. Ein Klick darauf SHALL
 das Menü schließen, ohne die Seite zu wechseln. Jeder Einsatz SHALL eine Nebenzeile mit
 Einsatznummer und Ort tragen, soweit sie vorliegen. Der Wechsler SHALL keinen Eintrag zur
 Verwaltung oder zu den Stammdaten führen.
@@ -75,14 +76,28 @@ Verwaltung oder zu den Stammdaten führen.
 - **WHEN** eine Person im ETB den Wechsler öffnet und ihren eigenen Einsatz wählt
 - **THEN** bleibt sie im ETB
 
+### Requirement: Letzter Ort je Person
+
+Das System SHALL je Person den zuletzt offenen Pfad im Einsatzrahmen merken, ohne die Suche der
+Adresse, für die Dauer einer Schicht (12 Stunden). Ein gesperrtes Modul SHALL nicht gemerkt
+werden.
+
+#### Scenario: Andere Person am selben Gerät
+
+- **WHEN** sich eine andere Person am selben Browser anmeldet
+- **THEN** sieht sie keinen Rückweg in den Einsatz der vorigen Person
+
+#### Scenario: Freitextfilter in der Adresse
+
+- **WHEN** eine Person das ETB mit einem Suchbegriff in der Adresse offen hat
+- **THEN** steht der Suchbegriff nicht im gemerkten Ort
+
 ### Requirement: Rückweg von Profil und Verwaltung
 
-Das System SHALL je Person die zuletzt offene Adresse im Einsatzrahmen merken, für die Dauer
-einer Schicht (12 Stunden). Auf `/profil` und `/admin/*` SHALL ein Ortspfad stehen („Einsätze ›
-Profil“ bzw. „Einsätze › Verwaltung ›“). Ist der gemerkte Einsatz aktiv und für die Person
-sichtbar, SHALL dort ein Knopf „Zurück zu <Einsatz>“ an genau diese Adresse führen. Der Kopflink
-„Verwaltung“ SHALL im Verwaltungsbereich `aria-current="page"` tragen und seinen Zustand nicht
-nur über die Farbe zeigen.
+Auf `/profil` und `/admin/*` SHALL ein Ortspfad stehen („Einsätze › Profil“ bzw. „Einsätze ›
+Verwaltung ›“). Ist der gemerkte Einsatz aktiv und für die Person sichtbar, SHALL dort ein Knopf
+„Zurück zu <Einsatz>“ an den gemerkten Pfad führen. Der Kopflink „Verwaltung“ SHALL im
+Verwaltungsbereich `aria-current="page"` tragen und seinen Zustand nicht nur über die Farbe zeigen.
 
 #### Scenario: Passwort geändert, zurück ins ETB
 
@@ -93,8 +108,3 @@ nur über die Farbe zeigen.
 
 - **WHEN** der gemerkte Einsatz abgeschlossen ist
 - **THEN** steht auf Profil kein Rückweg-Knopf
-
-#### Scenario: Andere Person am selben Gerät
-
-- **WHEN** sich eine andere Person am selben Browser anmeldet
-- **THEN** sieht sie keinen Rückweg in den Einsatz der vorigen Person

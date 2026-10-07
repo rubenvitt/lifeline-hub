@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
-import { Alert, Breadcrumb, Button, Space, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Button, Tag, Typography } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -26,7 +26,6 @@ import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensic
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { einsatzStatus } from '../theme/statusFarben';
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
@@ -246,12 +245,7 @@ export default function SchaedenPage() {
           ? `${alle.length} Schäden · ${alle.filter((s) => s.status === 'offen').length} offen`
           : undefined
       }
-      titel={
-        <Space>
-          Schäden
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Schäden"
       breadcrumb={
         <Breadcrumb
           items={[

@@ -1,7 +1,6 @@
 import {
   App,
   AutoComplete,
-  Breadcrumb,
   Button,
   Col,
   Form,
@@ -148,16 +147,14 @@ export default function FahrzeugDetailPage() {
   return (
     <div>
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
-      {/* Brotkrume statt eines zweiten „Zurück"-Knopfes im Kopf: der Aktionen-Slot sichert GENAU
-         EINE Primäraktion zu, und die ist hier das Speichern — das im Formular steht. */}
-      <Breadcrumb
-        style={{ marginBottom: token.marginSM }}
-        items={[
+      {/* Ortspfad statt eines zweiten „Zurück"-Knopfes im Kopf: der Aktionen-Slot sichert GENAU
+         EINE Primäraktion zu, und die ist hier das Speichern — das im Formular steht. Im Kopf
+         der `AdminPage`, damit nicht zwei Pfade übereinander stehen (LFH-954). */}
+      <AdminPage
+        pfad={[
           { title: <Link to={fahrzeugListePfad()}>Fahrzeuge</Link> },
           { title: fahrzeug.funkrufname },
         ]}
-      />
-      <AdminPage
         breite="schmal"
         titel={
           <Space size={8}>

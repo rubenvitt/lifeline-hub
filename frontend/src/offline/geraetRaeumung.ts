@@ -119,6 +119,12 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Modulnamen, schon je Benutzer getrennt; kein Inhalt aus dem Einsatz.',
   },
   {
+    ort: 'localStorage lfh:nav:letzter-ort:<benutzer>',
+    datei: 'einsatz/letzterOrt.ts',
+    entscheidung: 'bleibt',
+    grund: 'Eine Adresse im Einsatz (Kennungen, kein Inhalt), je Benutzer getrennt, 12 h gültig.',
+  },
+  {
     ort: 'localStorage lfh:nav:eingeklappt',
     datei: 'einsatz/navPersistenz.ts',
     entscheidung: 'bleibt',

@@ -83,25 +83,32 @@ als Quelle fest.
   (getrennt durch „ · “), nur wenn eins davon da ist. `einsatzKennung` zieht dafür aus
   `EinsatzLayout.tsx` nach `einsatz/einsatzKennung.ts`.
 - „Stammdaten“ fällt raus, „Alle Einsätze …“ bleibt.
+- Der eigene Einsatz steht auch abgeschlossen im Menü, sonst fehlte die Markierung dort, wo er nur
+  noch zum Nachlesen offen ist.
 
 ### D5 Rückweg von Profil und Verwaltung
 
 - `einsatz/letzterOrt.ts`: `merkeLetztenOrt(benutzerId, { einsatzId, pfad })` und
   `leseLetztenOrt(benutzerId, jetzt)`, Schlüssel `lfh:nav:letzter-ort:<benutzer>`, Wert
   `{ einsatzId, pfad, at }`, Frist eine Schicht (12 h wie `zuletztModule`). Zugriff nur über
-  `lib/sichererSpeicher` (`frontend/AGENTS.md`, Browserspeicher).
-- `EinsatzRahmen` merkt bei jedem Wechsel von `pathname`/`search` die Adresse. Anders als
+  `lib/sichererSpeicher` (`frontend/AGENTS.md`, Browserspeicher), Eintrag in `GERAETESPEICHER`.
+- `EinsatzRahmen` merkt bei jedem Wechsel des **Pfads** die Adresse, ohne Suche: dort stehen
+  Freitextfilter (ETB `q`), die nicht für eine Schicht in den Browserspeicher gehören. Anders als
   `zuletztModule` zählt hier auch die Ankunft: gefragt ist „wo war ich“, nicht „was habe ich
-  gewählt“. Nicht gemerkt wird, solange kein Benutzer geladen ist, und nicht im Modulwächter
-  (gesperrtes Modul).
+  gewählt“. Nicht gemerkt wird, solange kein Benutzer geladen ist, solange die Freigaben laden,
+  in einem gesperrten Modul und bei gescheitertem Einsatz.
 - `AppLayout` stellt für `/profil` und `/admin/*` einen Kontext `Ebene1Ort` bereit: Pfad
   (`[Einsätze, Profil]` bzw. `[Einsätze, Verwaltung, <Sektion>]`) und Rückweg. `AdminPage` liest
   ihn optional: Ortspfad vor dem h1, Rückweg als sekundärer Knopf „Zurück zu <Einsatz>“ vorn im
-  Aktionen-Slot (keine zweite Primäraktion).
+  Aktionen-Slot (keine zweite Primäraktion); ein langer Name kürzt im Knopf.
+- Detailseiten der Stammdaten (Fahrzeug, Personal) geben ihren Pfad über `AdminPage.pfad` in
+  denselben Kopf („Einsätze › Verwaltung › Fahrzeuge › FL 1“), statt eine zweite Pfadzeile darüber
+  zu setzen.
 - Der Rückweg erscheint nur, wenn der gemerkte Einsatz in `listeEinsaetze` (derselbe Query-Key wie
   im Wechsler) steht und `aktiv` ist; der Name kommt aus der Liste, nicht aus dem Speicher.
 - `GlobalLink` bekommt `aktiv`: `aria-current="page"`, Text in `rahmenFarben.text` und eine 2-px-
-  Unterkante (zweiter Kanal neben der Farbe, WCAG 1.4.1).
+  Unterkante als Innenschatten (zweiter Kanal neben der Farbe, WCAG 1.4.1); ein Rand machte den
+  Link und mit ihm den klebenden Kopf höher.
 
 ## Risks / Trade-offs
 

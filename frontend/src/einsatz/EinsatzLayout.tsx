@@ -26,6 +26,8 @@ import ModulPanel from './ModulPanel';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
+import { merkeLetztenOrt } from './letzterOrt';
+import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
@@ -44,6 +46,7 @@ import {
 } from '../components/Kopfleiste';
 import { SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
+import { useDokumentTitel } from '../components/useDokumentTitel';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
 import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
@@ -51,6 +54,7 @@ import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deepli
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
+import { einsatzKennung } from './einsatzKennung';
 import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useWarnsperre } from '../theme/ThemeModeProvider';
@@ -100,19 +104,6 @@ const KOPF_STIL = {
  * `EinsatzSwitcher` (ein antd-Knopf kürzt ohne eigenes `overflow` nicht).
  */
 const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
-
-/**
- * Die Einsatznummer im Kopf: die interne, sonst die Leitstellennummer, sonst KEINE — die
- * Datenbank-`id` ist keine Einsatznummer.
- */
-export function einsatzKennung(
-  einsatz: Pick<EinsatzAnzeige, 'einsatznummer_intern' | 'leitstellen_nr'> | undefined,
-): string | null {
-  const intern = einsatz?.einsatznummer_intern?.trim();
-  if (intern) return intern;
-  const leitstelle = einsatz?.leitstellen_nr?.trim();
-  return leitstelle ? leitstelle : null;
-}
 
 const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
 
@@ -209,6 +200,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   });
   const einsatz = einsatzQuery.data;
 
+  // Tab-Titel aus dem Menünamen (LFH-954, Entscheidung 3: „Seite · Einsatz · lifeline-hub“). Hier
+  // im Rahmen, nicht je Seite: so tragen auch Unterrouten und die Lagekarte ohne `EinsatzSeite`
+  // einen Titel, und der Name kommt aus derselben Quelle wie das Menü.
+  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung]);
+
   // Modulfreigaben des Servers für die Navigation (LFH-669); derselbe Key wie in jeder Seite,
   // die Daten eines fremden Moduls lädt.
   const modulFreigabenQuery = useQuery({
@@ -216,6 +212,19 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const modulFreigaben = modulFreigabenQuery.data;
+  // Der letzte Ort für den Rückweg von Profil und Verwaltung (LFH-954, `letzterOrt.ts`): jede
+  // Ankunft zählt, auch ein Deep-Link. Nur der Pfad, keine Suche: dort stehen Freitextfilter, und
+  // die gehören nicht für eine Schicht in den Browserspeicher. Nicht gemerkt wird ohne Benutzer
+  // (Sitzung lädt), bei gescheitertem Einsatz und in einem gesperrten Modul — der Rückweg führte
+  // sonst in die Sperre.
+  const benutzerId = benutzer?.id;
+  const gesperrt = aktuellesModul != null && istModulGesperrt(aktuellesModul, modulFreigaben);
+  // Solange die Freigaben laden, ist die Sperre unbekannt (wie beim Modulwächter unten).
+  const merkbar =
+    benutzerId != null && !einsatzQuery.isError && !modulFreigabenQuery.isLoading && !gesperrt;
+  useEffect(() => {
+    if (merkbar && benutzerId != null) merkeLetztenOrt(benutzerId, { einsatzId, pfad: pathname });
+  }, [merkbar, benutzerId, einsatzId, pathname]);
   const modulZaehler = useModulZaehler({ einsatzId, freigaben: modulFreigaben });
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
@@ -385,7 +394,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                   <Spin />
                 </span>
               ) : (
-                <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
+                <EinsatzSwitcher
+                  aktuellId={einsatzId}
+                  aktuellName={einsatz?.bezeichnung ?? 'Einsatz'}
+                />
               )}
             </div>
           </div>
@@ -476,11 +488,16 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         )}
         <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
-            {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
+            <EinsatzRahmenProvider value={einsatz}>
+              {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
-            <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} freigaben={modulFreigaben} />
-            {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
+              <UnwetterHinweis
+                einsatzId={einsatzId}
+                benutzer={benutzer}
+                freigaben={modulFreigaben}
+              />
+              {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
                `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`):
                meldet der Server für das Modul der Route `zugriff: false`, steht der Hinweis an der
                Stelle der Seite — auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
@@ -488,21 +505,22 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                raus); Einsatzdaten und Einstellungen sind nie gesperrt und warten nicht. Ein
                gescheiterter oder pausierter Abruf (offline) sperrt nicht, dann bleibt der
                403-Zustand der Seite das Netz. */}
-            {aktuellesModul &&
-            istModulAusblendbar(aktuellesModul.key) &&
-            modulFreigabenQuery.isLoading ? (
-              <div data-testid="modulwaechter-laedt">
-                <SeitenSkeleton />
-              </div>
-            ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
-              <GesperrtesModul
-                einsatzId={einsatzId}
-                modul={aktuellesModul}
-                freigaben={modulFreigaben!}
-              />
-            ) : (
-              <Outlet />
-            )}
+              {aktuellesModul &&
+              istModulAusblendbar(aktuellesModul.key) &&
+              modulFreigabenQuery.isLoading ? (
+                <div data-testid="modulwaechter-laedt">
+                  <SeitenSkeleton />
+                </div>
+              ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
+                <GesperrtesModul
+                  einsatzId={einsatzId}
+                  modul={aktuellesModul}
+                  freigaben={modulFreigaben!}
+                />
+              ) : (
+                <Outlet />
+              )}
+            </EinsatzRahmenProvider>
           </EinsatzAnzeigeProvider>
         </Content>
       </Layout>
