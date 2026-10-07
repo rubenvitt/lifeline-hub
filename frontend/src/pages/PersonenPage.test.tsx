@@ -943,7 +943,7 @@ describe('PersonenPage', () => {
 
     const offen = screen.getByRole('region', { name: 'Offene Felder' });
     expect(offen.querySelector('[data-lfh="offene-felder"]')).toHaveTextContent(
-      /^1 ohne Verbleib, 1 ohne Fundort — 2 Datensätze\./,
+      /^1 ohne Verbleib, 1 ohne Fundort — 2 Datensätze$/,
     );
     // Die Verbleib-Zelle nennt die UHS beim Namen.
     expect((await screen.findByText('R-022')).closest('tr')).toHaveTextContent('UHS Weserstadion');
@@ -1159,7 +1159,7 @@ describe('PersonenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Abgleich vorschlagen/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('R-002');
-    expect(screen.getByRole('combobox', { name: 'gefundene Person' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Gefundene Person' })).toBeInTheDocument();
   });
 
   it('navigiert beim Klick auf eine Zeile zur Detailseite', async () => {
@@ -1400,11 +1400,13 @@ describe('PersonenPage', () => {
        */
       render(einsatzAktiv, []);
       const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
-      expect(zeile).toHaveAccessibleDescription(/#Koordinate \(52\.2691\/9\.1342\)/);
+      expect(zeile).toHaveAccessibleDescription(/#Fundort \(52\.2691\/9\.1342\)/);
+      // Die Buchstaben-Kürzel stehen aufgelöst da, ebenso das „@“ (LFH-948).
+      expect(zeile).toHaveAccessibleDescription(/skt = tot · sku = unverletzt/);
+      expect(zeile).toHaveAccessibleDescription(/@Unfallhilfsstelle/);
       await userEvent.type(zeile, 'Kowalski sk2');
       // Die Ebene des Stapels: über der Kürzel-Gruppe (die unter `md` einklappt, LFH-963).
-      const hinweis = screen.getByText('#Koordinate (52.2691/9.1342)').parentElement!
-        .parentElement!;
+      const hinweis = screen.getByText('#Fundort (52.2691/9.1342)').parentElement!.parentElement!;
       expect(hinweis).toHaveStyle({ visibility: 'hidden' });
       expect(hinweis).toHaveAttribute('aria-hidden', 'true');
       expect(zeile).toHaveAccessibleDescription(/^erkannt:/);
@@ -1435,7 +1437,7 @@ describe('PersonenPage', () => {
       render(einsatzAktiv, []);
       const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
       // Die leere Zeile nennt das Kürzel — sonst wäre es nur über den Code auffindbar.
-      expect(screen.getByText('#Koordinate (52.2691/9.1342)')).toBeInTheDocument();
+      expect(screen.getByText('#Fundort (52.2691/9.1342)')).toBeInTheDocument();
       await userEvent.type(zeile, 'Kowalski, Anna w 34 sk3 #52.2691/9.1342');
       expect(document.querySelector('[data-lfh="erkannt"]')).toHaveTextContent('#52.2691/9.1342');
       await userEvent.keyboard('{Enter}');

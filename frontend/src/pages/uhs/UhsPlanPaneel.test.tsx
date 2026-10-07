@@ -113,8 +113,10 @@ describe('UhsPlanPaneel (LFH-999)', () => {
   it('ohne Plan: Hinweis, Hochladen und Übernahme, keine Lage und kein Entfernen', async () => {
     planServer();
     zeichne(uhs());
-    expect(screen.getByText('Nur Pläne, keine Fotos von Patienten.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Bild hochladen/ })).toBeInTheDocument();
+    expect(
+      screen.getByText('Keine Patientenfotos. Übernahme wird protokolliert.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Plan hochladen/ })).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton', { name: 'Breite' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Plan entfernen' })).not.toBeInTheDocument();
   });
@@ -146,7 +148,7 @@ describe('UhsPlanPaneel (LFH-999)', () => {
       anhang(35, 'foto.heic', 'image/heic'),
     ]);
     zeichne(uhs());
-    expect(screen.getByText(/Die Übernahme wird wie ein Abruf protokolliert/)).toBeInTheDocument();
+    expect(screen.getByText(/Übernahme wird protokolliert/)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('combobox', { name: 'Aus Dateien übernehmen' }));
     const liste = await waitFor(() => {
       const el = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');

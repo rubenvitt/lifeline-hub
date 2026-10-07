@@ -100,7 +100,7 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
       </Form.Item>
       {modus === 'vermisst' && (
         <>
-          <VermisstSeitFeld hinweis="Ohne Angabe gilt der Zeitpunkt der Meldung." />
+          <VermisstSeitFeld platzhalter="Zeitpunkt der Meldung" />
           <Form.Item label="Melder / Kontakt" name="melder_kontakt">
             <Input placeholder="Angehöriger, Kontaktdaten" />
           </Form.Item>

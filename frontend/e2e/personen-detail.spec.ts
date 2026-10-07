@@ -57,7 +57,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
 
   // Zwei-Spalten-Layout: Stammdaten UND med. Verlauf gleichzeitig sichtbar (keine Tabs).
   await expect(page.getByText('Stammdaten')).toBeVisible();
-  await expect(page.getByText(/Chronologischer Verlauf/)).toBeVisible();
+  await expect(page.getByText('Medizinischer Verlauf', { exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Medizinischer Verlauf' })).toHaveCount(0);
 
   // Zurück zur Liste über den Breadcrumb.

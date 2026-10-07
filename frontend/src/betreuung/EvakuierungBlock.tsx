@@ -170,7 +170,8 @@ export default function EvakuierungBlock({
         daten={bezirke}
         zeilenSchluessel={(b) => `bezirk-${b.id}`}
         ladend={ladend}
-        leerText="Keine Evakuierungsbezirke. Mit „Evakuierungsbezirk anlegen“ wird eine Räumung mit ihrer Plangröße erfasst."
+        // Der Anlegen-Knopf steht direkt darüber im Seitenkopf (die EINE Primäraktion).
+        leerText="Keine Evakuierungsbezirke"
         karte={karte}
         aufklappen={aufklappen}
         zeilenKlasse={(b) => (b.id === hervorgehoben ? HERVORGEHOBEN : undefined)}

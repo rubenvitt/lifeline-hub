@@ -221,9 +221,16 @@ describe('useBedarfsvorschlag — Zeitfenster in der Zukunft', () => {
     antworte(personal(3), MIT_MELDUNG);
     const { result } = rendere({ jetzt: dayjs('2026-09-24T09:59:59Z') });
     await waitFor(() => expect(result.current.betreute.wert).toBe(70));
-    expect(result.current.betreute.hinweis).toBe(
-      'Vorschlag: in Betreuung, Stand jetzt, nicht zum Beginn',
+    expect(result.current.betreute.hinweis).toMatch(
+      /^Vorschlag: in Betreuung, Stand \d\d:\d\d, nicht zum Beginn$/,
     );
+  });
+
+  it('ohne Beginn nennt der Vorschlag den Stand als Uhrzeit wie das Kräfte-Feld (LFH-948)', async () => {
+    antworte(personal(3), MIT_MELDUNG);
+    const { result } = rendere({ vonAt: undefined });
+    await waitFor(() => expect(result.current.betreute.wert).toBe(70));
+    expect(result.current.betreute.hinweis).toMatch(/^Vorschlag: in Betreuung, Stand \d\d:\d\d$/);
   });
 
   it('genau zum Beginn ist es nicht mehr Zukunft', async () => {
@@ -237,7 +244,7 @@ describe('useBedarfsvorschlag — Zeitfenster in der Zukunft', () => {
     antworte(personal(3), MIT_MELDUNG);
     const { result } = rendere({ jetzt: dayjs('2026-09-24T11:59:00+02:00') });
     await waitFor(() => expect(result.current.betreute.wert).toBe(70));
-    expect(result.current.betreute.hinweis).toContain('Stand jetzt, nicht zum Beginn');
+    expect(result.current.betreute.hinweis).toMatch(/Stand \d\d:\d\d, nicht zum Beginn$/);
   });
 });
 

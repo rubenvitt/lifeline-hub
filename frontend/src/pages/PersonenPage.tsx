@@ -279,7 +279,7 @@ export default function PersonenPage() {
         }
         setQuittungFuer(zielEinsatzId, {
           typ: 'warning',
-          text: 'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.',
+          text: 'Offline vorgemerkt · R-…',
           benutzerId: variablen.benutzerId,
         });
         return;

@@ -24,7 +24,7 @@ import {
   aktuellWort,
   belegungZeile,
   istNachgetragenMeldung,
-  rueckfrageHinweis,
+  rueckfrageFrage,
   ruecknahmeName,
   standZeile,
   type VerlaufZeile,
@@ -251,12 +251,8 @@ export default function MeldeVerlauf({
       >
         {ziel && (
           <>
-            <p>
-              Meldung {ziel.text} von {formatZeitKurz(ziel.zeitpunkt_at, konventionen)}{' '}
-              zurücknehmen. Die Meldung bleibt im Verlauf und im ETB stehen, gekennzeichnet als
-              zurückgenommen.
-            </p>
-            <p>{rueckfrageHinweis(art, ziel.aktuell)}</p>
+            <p>{rueckfrageFrage(art, ziel, formatZeitKurz(ziel.zeitpunkt_at, konventionen))}</p>
+            <p>Bleibt als „zurückgenommen“ in Verlauf und ETB.</p>
             <SpeicherFehler fehler={ruecknahme.error} titel="Rücknahme fehlgeschlagen" />
           </>
         )}

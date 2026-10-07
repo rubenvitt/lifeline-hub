@@ -52,7 +52,7 @@ const JETZT = dayjs('2026-09-24T08:00:00Z');
 
 const LEER = { wert: null, hinweis: null };
 const K_HINWEIS = 'Vorschlag: Personal im Einsatz, Stand 09:58';
-const B_HINWEIS = 'Vorschlag: in Betreuung, Stand jetzt, nicht zum Beginn';
+const B_HINWEIS = 'Vorschlag: in Betreuung, Stand 09:58, nicht zum Beginn';
 
 /** Zählt die BEDIENBAREN Felder. */
 function sichtbareFelder(dialog: HTMLElement): number {
@@ -260,6 +260,8 @@ describe('ZeitfensterDialog — anlegen', () => {
     expect(within(dialog).getByLabelText('Betreute (EP)')).toHaveValue('70');
     expect(within(dialog).getByText(K_HINWEIS)).toBeInTheDocument();
     expect(within(dialog).getByText(B_HINWEIS)).toBeInTheDocument();
+    // Das Kürzel erklärt sich einmal sichtbar am ersten Feld, nicht nur per Tooltip (LFH-948).
+    expect(within(dialog).getAllByText('EP = Essensportionen')).toHaveLength(1);
     // Die Freigaben gehen unverändert hinein — `undefined` hieße „unbekannt, nichts anfragen".
     expect(letzterAufruf().freigaben).toBe(FREIGABEN);
     expect(letzterAufruf().vonAt).toBeUndefined();
@@ -284,7 +286,7 @@ describe('ZeitfensterDialog — anlegen', () => {
         kraefte: LEER,
         betreute:
           a.vonAt == null
-            ? { wert: 55, hinweis: 'Vorschlag: in Betreuung, Stand jetzt' }
+            ? { wert: 55, hinweis: 'Vorschlag: in Betreuung, Stand 09:58' }
             : a.vonAt < wire('2026-09-24 12:00')
               ? { wert: 40, hinweis: 'Vorschlag: in Betreuung zum Beginn' }
               : { wert: 70, hinweis: 'Vorschlag: in Betreuung zum Beginn' },

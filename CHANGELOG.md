@@ -1,3 +1,57 @@
+## [1.0.0-alpha.88](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.87...v1.0.0-alpha.88) (2026-10-07)
+
+### Wichtige Änderungen
+
+Die Anwendung nutzt jetzt gestuft klebende Kopf- und Navigationsbereiche. Bei schmalen Bildschirmen bleibt die Betriebszeile (Offline-Hinweise, Verbindungsstatus) beim Scrollen sichtbar, ab mittleren Bildschirmen der gesamte Seitenkopf. Das Modulmenü ist am Tablet standardmäßig eingeklappt und lässt sich über einen neuen Griff öffnen oder schließen; ab großen Bildschirmen bleibt es automatisch geöffnet. Tabellenköpfe positionieren sich unterhalb des klebenden Rahmens.
+
+### Einsatztagebuch
+
+Die Zeitachse zeigt jetzt eine kompaktere Zeilenform: Verfasser und Meldeweg stehen einzeilig in der Metazeile, das Zeilenmenü erscheint am Ende dieser Zeile statt in einer separaten Spalte. Systemeinträge (z. B. automatisch erzeugte Status- oder Wechselmeldungen) lassen sich über einen neuen Schalter „Systemeinträge zeigen" ausblenden; der Schalter zeigt im ausgeschalteten Zustand die Anzahl der ausgeblendeten Einträge. Dieser Filter wirkt in Liste, Zählung, Druck und URL. Ein Sprung auf einen ausgeblendeten Eintrag blendet die Systemeinträge wieder ein und meldet das sichtbar.
+
+### Lagekarte
+
+Gesperrte Sprungaktionen im Objekt-Inspektor („Im Fachmodul öffnen", „ETB", „Gefahrenmatrix bearbeiten") zeigen den Grund der Sperrung jetzt sichtbar im Knopftext oder daneben – nicht mehr nur als Tooltip, der auf Touch-Geräten nicht erscheint.
+
+### Kräfte und Mittel
+
+Die Disponierung von Material, Personal und Fahrzeugen erfolgt nicht mehr durch sofortige Auswahl im Seitenkopf, sondern über einen „…disponieren"-Knopf, der ein Erfassungsformular mit explizitem Absenden-Knopf öffnet. Die Mengenfelder tragen jetzt Pflicht-Namen, erlauben nur ganze Zahlen ab 1 und zeigen keine englischen Stufenknopf-Beschriftungen mehr.
+
+Die Einheiten-Gliederung stellt Knoten am Handy als Block aus zwei Zeilen dar (Name und Typ, darunter Ist/Soll/Führer); der Einzug ist unter mittleren Bildschirmen schmaler. Aufklapp-Auslöser in Tabellen stehen nun neben der Kennung in derselben Zeile und brechen nur bei Platzmangel um. In der Personalübersicht fließt die Namensspalte, übrige Spalten nutzen Zahlbreite; Funktion, Träger, Fahrzeug und Einheit weichen gestaffelt aus. Bei 1440 und 1180 Pixeln Breite ist kein Querscrollen mehr nötig.
+
+Im Meldebild stehen Status, Rückmeldung und Auftrag ganz vorn; Funkrufname und Mittel erscheinen erst ab sehr großen Bildschirmen, die Einheit fließt. Bei 1440 und 1366 Pixeln entfällt das frühere Querscrollen vollständig. Getönte Zeilen nennen ihren Grund als Wort in der Statusspalte („Rückm. überfällig", „keine Rückm.", „N Ausfall"). Filter nutzen deutsche zugängliche Namen, die Suche zeigt keinen englischen Lupenknopf mehr. Zahlen vor Wörtern in Gruppen und Verdichtungszeilen erhalten sichtbare Trenner, FMS-Status erscheinen überall als „S4 · Wort", die Gesamtstärke als „Σ", Einheitenzahlen mit „direkt"/„inkl. UA", „verfügbar" statt „frei".
+
+### Betroffene und Tiere
+
+Die Erfassung von betroffenen Personen und Tieren erfolgt jetzt in einer gemeinsamen Maske. Nebenwege (z. B. Nacherfassung, Druck, Export) stehen unter „Weitere Angaben". Unter mittleren Bildschirmen erscheint der Auslöser „Weitere" vor den Hauptfeldern, damit die erste Personenzeile bei 390 Pixeln Breite vollständig im ersten Bildschirm liegt. Die Stammdaten-Felder nutzen ein Datenraster, die medizinische Spalte steht ab mittleren Bildschirmen zuerst. Tiere gehen jetzt ins Feldbudget der Betroffenen ein. Die Sichtungszeile zeigt kompaktere Darstellung.
+
+### Kommunikation
+
+Meldungen zeigen am Handy den Wortlaut vor Weg, Art und Bearbeiter. Statt des Kennzahlenbands erscheint eine Zeile, statt der Richtungs-Segmentleiste ein Filterknopf, damit der Wortlaut der ersten Karte bei 390×844 Pixeln vollständig im ersten Bildschirm liegt. Die Erfassungsmaske zeigt eingeklappt Wortlaut, Absender und Empfänger; der Kopf von „Weitere Angaben" nennt jede Abweichung von der Vorgabe, ein Prüffehler darin klappt ihn automatisch auf. Der Fokus liegt beim Öffnen und nach jeder Vorbelegung im Wortlaut.
+
+Meldungen und Erinnerungen werden jetzt in Phasen geladen: ohne Parameter nur offene, abgeschlossene seitenweise über einen „Ältere laden"-Knopf. Kennzahlen stammen aus einer gruppierten Abfrage. Verlinkte Meldungen zählen zu den geladenen, ein zweiter Verweis auf dieselbe Meldung schaltet erneut um. Die Personenauswahl verzichtet auf Freitexte für Auswahlfelder, Sprungpalette und Chat-Bezug und ist offline lesbar. Antworten werden mit gzip oder Brotli komprimiert, wenn sie mindestens 1 KiB JSON umfassen.
+
+### Führung
+
+Auf der Einsatzkachel steht die eigene Rolle jetzt als „Deine Rolle: …" in Klartext statt als Rohwert. Einheiten zeigen die Stärke-Position in Klartext und erklären einen Führer ohne Einheitsführer-Merkmal. Zähler in Mitgliedern, Lageberichten, Chat und Befehlen verwenden bei eins die Einzahl. Die Abschnittszeile im Führungsüberblick hält die Stärke auch bei schmaler Liste neben dem Namen.
+
+### Verwaltung
+
+Fehlende Rechte werden nicht mehr als Info-Kasten, sondern als Statuszeile mit Marke „Nur Ansicht" und dem Grund in wenigen Wörtern angezeigt; der Grund bleibt ohne Hover sichtbar. Die langen Modulsätze („… sind nur noch lesbar", „die Werte stehen hier zum Nachlesen") entfallen. Die Marke nennt den Grund je nach Kontext (z. B. „nur System-Admin", „Einsatz beendet", „nur Führungspersonal").
+
+Abgelehnte Speichervorgänge bei Einsatz anlegen, Zugriff, Gefahrenmatrix und Benutzerverwaltung erscheinen nicht mehr im Toast, sondern im Dialog oder an der Seite, bis zum nächsten Absenden. Die letzte Einsatzleitung lässt sich weder entfernen noch herabstufen, der letzte aktive Admin und das eigene Konto nicht deaktivieren; der Grund steht sichtbar neben der gesperrten Aktion. Die eigene Herabstufung ohne Systemrolle fragt nach. „Deaktivieren" wirkt ohne Rückfrage.
+
+Voreingestellte Werte heißen jetzt durchgängig „Vorgabe" statt „Default", „Fallback" oder „Standard". Platzhalter nennen den Wert, der leer gilt (z. B. Zeitzone „Gerätezeit", Meldungsfrist 5 Minuten, Rückmeldefrist 60). Die Einsatz-Einstellungen zeigen in Platzhaltern die Vorgabe der Organisation oder – falls nicht gesetzt – die des Systems.
+
+Die Bedienoberfläche verzichtet jetzt durchgängig auf erklärende Sätze, die beschreiben, was Felder tun oder wie sie funktionieren. Stattdessen zeigen Komponenten ihren Zustand direkt (z. B. „Aktualisierung fehlgeschlagen · Stand womöglich veraltet", „Kopieren fehlgeschlagen", „Update lädt", „Bau gestartet"). Dies betrifft Aufbewahrung, Anmeldung, Profil, Geräte, Wetter, Offline-Karten und allgemeine Bausteine.
+
+### Betrieb und Installation
+
+Die Kopfleiste zeigt „WARTET" statt „QUEUE", der Knopf der Betriebszeile heißt „Alte Offline-Daten ansehen". Profil und Anmeldung sagen „Zweiter Faktor", „Wiederherstellungscode" und „Schlüssel" statt 2FA, TOTP, Recovery und Secret. Die Anmeldung erklärt, wer ein vergessenes Passwort zurücksetzt.
+
+Offline-Karten zeigen die URL-Maske mit Prüfung auf https und .mbtiles statt eines beschreibenden Kastens. Die Sektion trägt Titel und Liste ohne Absatz über MBTiles und Prep-Phase; ohne Admin-Recht steht „Nur Ansicht · nur System-Admin". Region-Picker und Übernahme-Dialog verlieren ihre Erklärabsätze, die Meldungen nennen den Zustand.
+
+Der Browserspeicher-Zugriff für Aktiv-Merker von Entwürfen läuft jetzt über die gesicherten Hilfsfunktionen, die einen gesperrten Speicher selbst abfangen.
+
 ## [1.0.0-alpha.87](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.86...v1.0.0-alpha.87) (2026-10-07)
 
 ### Bedienung

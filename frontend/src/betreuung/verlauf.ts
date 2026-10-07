@@ -73,16 +73,15 @@ export function ruecknahmeName(z: Pick<VerlaufZeile, 'anzahl'>, zeit: string): s
 }
 
 /**
- * Zweiter Satz der Rückfrage: ob die Meldung den Stand trägt, aber KEINE vorhergesagte neue
- * Zahl — die bestimmt der Server; eine Vorhersage wäre eine zweite Definition von „aktuell“.
+ * Frage der Rückfrage. Sie nennt, ob die Meldung den Stand trägt („Aktuellen Stand …“), aber
+ * KEINE vorhergesagte neue Zahl — die bestimmt der Server; eine Vorhersage wäre eine zweite
+ * Definition von „aktuell“. `zeit` kommt formatiert vom Aufrufer.
  */
-export function rueckfrageHinweis(art: BetreuungVerlaufArt, aktuell: boolean): string {
-  const was = art === 'bezirk' ? 'aktuelle Stand' : 'aktuelle Belegung';
-  if (aktuell) {
-    // Nicht „danach gilt die vorherige Meldung“: ist es die einzige, gibt es keine.
-    return art === 'bezirk'
-      ? `Das ist der ${was}. Er wird danach aus den übrigen Meldungen bestimmt.`
-      : `Das ist die ${was}. Sie wird danach aus den übrigen Meldungen bestimmt.`;
-  }
-  return `${art === 'bezirk' ? 'Der' : 'Die'} ${was} ändert sich dadurch nicht.`;
+export function rueckfrageFrage(
+  art: BetreuungVerlaufArt,
+  z: Pick<VerlaufZeile, 'text' | 'aktuell'>,
+  zeit: string,
+): string {
+  const was = !z.aktuell ? 'Meldung' : art === 'bezirk' ? 'Aktuellen Stand' : 'Aktuelle Belegung';
+  return `${was} ${z.text} von ${zeit} zurücknehmen?`;
 }

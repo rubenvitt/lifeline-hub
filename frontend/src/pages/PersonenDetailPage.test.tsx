@@ -385,9 +385,7 @@ describe('PersonenDetailPage — med. Verlauf', () => {
     // Fachsprache statt Verwaltungssprache (LFH-944): der Satz nennt den Status, den die Person
     // noch hat, und kein „Admin-Status“.
     expect(
-      screen.getByText(
-        `Sichtung „tot“ – Personenstatus ist noch „${STATUS_META[totDetail.status].label}“. Bitte auf „verstorben“ setzen.`,
-      ),
+      screen.getByText(`Sichtung „tot“, Status noch „${STATUS_META[totDetail.status].label}“`),
     ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Admin-Status|append-only|SK: /);
     expect(
@@ -700,7 +698,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
     // Die Servermeldung belegt den else-Zweig (`fehler`); ein zweiter Dialog wäre eine Schleife,
-    // deren einziger Ausweg „Neu laden" ist.
+    // deren einziger Ausweg „Verwerfen und neu laden" ist.
     expect(
       await screen.findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
     ).toBeInTheDocument();
@@ -717,7 +715,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     render(einsatzAktiv, detail);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.getByText('Stammdaten')).toBeInTheDocument();
-    expect(screen.getByText(/Chronologischer Verlauf/)).toBeInTheDocument();
+    expect(screen.getByText('Medizinischer Verlauf', { exact: true })).toBeInTheDocument();
     // Keine Tab-Leiste mehr:
     expect(screen.queryByRole('tab', { name: 'Medizinischer Verlauf' })).not.toBeInTheDocument();
   });
@@ -1571,8 +1569,9 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
   });
 
   // LFH-916 (design.md D3): Export und Druck der Liste stehen im Audit der Person, wenn sie in der
-  // Liste stand; der Abschnitt sagt das, damit „Liste exportiert“ nicht wie ein Fehler aussieht.
-  it('das Zugriffs-Audit zeigt Listenzugriffe und erklärt sie', async () => {
+  // Liste stand. Ein Erklärsatz darüber entfällt (LFH-1078): die Art „Liste exportiert“ spricht
+  // für sich.
+  it('das Zugriffs-Audit zeigt Listenzugriffe ohne Erklärsatz', async () => {
     render(einsatzFixture({ meine_rolle: 'einsatzleitung' }), detail, [
       http.get('/api/einsaetze/1/personen/10/audit', () =>
         HttpResponse.json([
@@ -1590,11 +1589,7 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
     expect(await screen.findByText('Liste exportiert')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Export und Druck der Personenliste stehen hier, wenn die Person zu dem Zeitpunkt in der Liste stand.',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Export und Druck der Personenliste/)).toBeNull();
   });
 });
 

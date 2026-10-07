@@ -141,7 +141,7 @@ describe('PersonenDruckPage', () => {
     );
     rendere();
     await screen.findByRole('status');
-    expect(screen.getByTestId('druck-hinweis')).toHaveTextContent('Zugriffsprotokoll');
+    expect(screen.getByTestId('druck-hinweis')).toHaveTextContent('Zugriff wird protokolliert.');
   });
 
   it('„Neu laden“ ist genau ein weiterer protokollierter Abruf', async () => {
@@ -194,7 +194,7 @@ describe('PersonenDruckPage', () => {
     server_mit([person(1)]);
     rendere();
     await fertig();
-    expect(screen.getByTestId('druck-hinweis')).toHaveTextContent('Zugriffsprotokoll');
+    expect(screen.getByTestId('druck-hinweis')).toHaveTextContent('Zugriff wird protokolliert.');
   });
 
   it('nennt den UHS-Namen im Verbleib aus demselben Stand', async () => {

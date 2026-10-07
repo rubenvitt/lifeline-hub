@@ -221,16 +221,24 @@ describe('AufnahmePage', () => {
     );
   });
 
-  it('zeigt Beobachtern den Hinweis statt der Maske', async () => {
+  it('zeigt Beobachtern „Nur Ansicht · Grund“ statt der Maske (LFH-1078)', async () => {
     render(einsatzBeobachter);
-    expect(await screen.findByText(/Keine Schreibberechtigung/)).toBeInTheDocument();
+    const hinweis = await screen.findByRole('status');
+    expect(hinweis).toHaveTextContent('Nur Ansicht nur Einsatzleitung und Führungspersonal');
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+  });
+
+  it('nennt im abgeschlossenen Einsatz den Abschluss als Grund (LFH-1078)', async () => {
+    render(einsatzFixture({ status: 'abgeschlossen' }));
+    const hinweis = await screen.findByRole('status');
+    expect(hinweis).toHaveTextContent('Nur Ansicht Einsatz abgeschlossen');
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
   });
 });
 
 describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
   it('zeigt im Breadcrumb den Weg zur beauftragenden UHS statt zu Personen', async () => {
-    // Seitenbeschreibung und Breadcrumb zeigen den Auftrag; der UHS-Name wird bewusst nicht
+    // Der Breadcrumb zeigt den Auftrag; der UHS-Name wird bewusst nicht
     // geladen, die Rückverlinkung ist die Zusicherung.
     render(einsatzAktiv, [], '/einsaetze/1/personen/aufnahme?uhs=7');
     await screen.findByRole('radiogroup');
@@ -306,11 +314,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
       if (aktion === 'Erfassen') {
         await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7'));
       } else {
-        expect(
-          await screen.findByText(
-            'Offline vorgemerkt — Registriernummer folgt nach der Übertragung.',
-          ),
-        ).toBeInTheDocument();
+        expect(await screen.findByText('Offline vorgemerkt · R-…')).toBeInTheDocument();
       }
       const queue = await schreibaktionenLaden(1, 1);
       expect(queue).toHaveLength(1);

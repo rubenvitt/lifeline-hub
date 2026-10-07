@@ -93,7 +93,7 @@ test('Reiter „Dateien“: ablegen, herunterladen, Zugriff im Protokoll, entfer
   await paneel(page).getByRole('button', { name: 'Datei ablegen' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('Datei ablegen · UHS BHP 50')).toBeVisible();
-  await expect(dialog.getByText(/Jeder Abruf einer Datei wird/)).toBeVisible();
+  await expect(dialog.getByText('Abrufe werden protokolliert.')).toBeVisible();
   await dialog
     .locator('input[type="file"]')
     .setInputFiles({ name: 'grundriss_halle.jpg', mimeType: 'image/jpeg', buffer: JPG });

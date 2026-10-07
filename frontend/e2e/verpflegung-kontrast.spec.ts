@@ -332,8 +332,7 @@ for (const modus of ['light', 'dark'] as const) {
       'Bedarf',
       'EP',
       'Rest folgt mit der zweiten Tour',
-      'Leer: jetzt',
-      'Sonderkost ist ein Teil der Menge, kein Zuschlag.',
+      'davon Sonderkost (EP)',
     ])
       pruefeGesehen(tragend);
 

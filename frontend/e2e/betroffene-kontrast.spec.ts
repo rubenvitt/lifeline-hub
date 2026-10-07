@@ -305,18 +305,12 @@ for (const modus of ['light', 'dark'] as const) {
     // Feldmeldungen lesen am Formular `colorError` = `alarmText` (LFH-667, `antdKomponenten`).
     await misst(grund, minimum, `${modus}/Koordinatengrund`, werte);
 
-    // ── Modal „Vermisst melden": Hinweis und Zukunftsgrenze ──
+    // ── Modal „Vermisst melden": Zukunftsgrenze ──
+    // Der frühere `extra`-Hinweis unter „vermisst seit" ist ein Platzhalter geworden (LFH-1078).
     await page.goto(`${basis}/personen`);
     await page.getByRole('button', { name: 'Vermisst melden' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
-    // `extra` steht in `colorTextDescription` = `gedaempft` (LFH-652): voller Boden.
-    await misst(
-      dialog.getByText('Ohne Angabe gilt der Zeitpunkt der Meldung.'),
-      minimum,
-      `${modus}/Hinweis vermisst seit`,
-      werte,
-    );
     const seit = dialog.getByLabel('vermisst seit', { exact: true });
     await seit.click();
     await seit.fill('01.01.2099 10:00');
@@ -345,14 +339,7 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Leerzustand Titel`,
       werte,
     );
-    // Der Hinweissatz kommt aus dem geteilten `SeitenLeer` in `schwach`; seit LFH-643 voller
-    // Boden.
-    await misst(
-      page.getByText(/Eine Koordinate lässt sich/),
-      minimum,
-      `${modus}/Leerzustand Hinweis`,
-      werte,
-    );
+    // Der frühere Hinweissatz darunter entfällt (LFH-1078): der Titel sagt, was fehlt.
 
     // Marker je Sichtung, 0,5° auseinander; dazu ein enges Paar für den Cluster.
     const orte: [string | null, [number, number]][] = [

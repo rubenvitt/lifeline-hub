@@ -89,6 +89,15 @@ const ROEMISCH: Record<string, Sichtungskategorie> = {
   u: 'unverletzt',
 };
 
+/**
+ * Die Sichtungen mit Buchstabe statt Ziffer. Die Hinweiszeile der Schnellerfassung liest ihre
+ * Auflösung („skt = tot“) von hier, damit Hinweis und Erkennung nicht auseinanderlaufen
+ * (LFH-948).
+ */
+export const SICHTUNG_BUCHSTABEN: readonly { kuerzel: string; kategorie: Sichtungskategorie }[] = (
+  ['t', 'u'] as const
+).map((b) => ({ kuerzel: `sk${b}`, kategorie: ROEMISCH[b] }));
+
 const ALTER_MUSTER = /^~?(\d{1,3})$/;
 const GESCHLECHT_ALTER_MUSTER = /^([mwd])(~?\d{1,3})$/i;
 const SK_EIN_WORT = /^sk(i{1,3}|iv|[1-4tu])$/i;
