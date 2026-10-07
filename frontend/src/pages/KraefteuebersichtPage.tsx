@@ -387,7 +387,11 @@ function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
   if (z.art !== 'einheit') {
     return (
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: token.marginXS }}>
-        <span style={{ ...monoStil(11), color: rollen.schwach }}>{MITTEL_KURZ[z.art]}</span>
+        {/* Das Kürzel schrumpft nicht: im Druck ließ die Zellregel `overflow-wrap: anywhere` es
+            sonst als „Pers“ über „.“ brechen (LFH-1007). */}
+        <span style={{ ...monoStil(11), color: rollen.schwach, flexShrink: 0 }}>
+          {MITTEL_KURZ[z.art]}
+        </span>
         <span style={{ minWidth: 0 }}>
           {z.art === 'fahrzeug' ? <span style={monoStil(12)}>{z.bezeichnung}</span> : z.bezeichnung}
           {nebentext}
