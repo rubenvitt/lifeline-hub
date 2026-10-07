@@ -239,7 +239,7 @@ export function SeitenStandVeraltet({ onWiederholen }: SeitenStandVeraltetProps)
       type="warning"
       showIcon
       banner
-      title="Angezeigter Stand konnte nicht aktualisiert werden — die Zeilen unten sind womöglich veraltet."
+      title="Aktualisierung fehlgeschlagen · Stand womöglich veraltet"
       action={<Button onClick={onWiederholen}>Erneut abrufen</Button>}
     />
   );

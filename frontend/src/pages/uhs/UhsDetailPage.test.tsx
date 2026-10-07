@@ -239,8 +239,11 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
     } as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/7');
 
-    const knopf = await screen.findByRole('button', { name: 'Patient aufnehmen' });
-    await waitFor(() => expect(knopf).toBeDisabled());
+    // Der Grund steht sichtbar im Knopf, nicht nur im `title` (der auf Touch nie erscheint).
+    const knopf = await screen.findByRole('button', {
+      name: 'Patient aufnehmen (Keine Berechtigung)',
+    });
+    expect(knopf).toBeDisabled();
     expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
     vi.mocked(ladeModulFreigaben).mockReset();
   });

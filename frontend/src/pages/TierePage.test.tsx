@@ -114,6 +114,7 @@ function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[], route = '/einsae
     <>
       <Routes>
         <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+        <Route path="/einsaetze/:id/tiere/druck" element={<div>DRUCK-SEITE</div>} />
         <Route path="/einsaetze/:id/tiere/:tierId" element={<div>DETAIL-SEITE</div>} />
         <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
       </Routes>
@@ -234,7 +235,7 @@ describe('TierePage', () => {
   it('Einsatzleitung sieht Anlege-Buttons', async () => {
     render(einsatzAktiv, []);
     await screen.findByRole('heading', { name: /Tiere/ });
-    expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tier erfassen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
   });
 
@@ -396,17 +397,17 @@ describe('TierePage', () => {
   it('Beobachter sieht keine Schreibaktionen', async () => {
     render(einsatzBeobachter, [tierBasis]);
     await screen.findByText('T-001');
-    expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tier erfassen' })).not.toBeInTheDocument();
   });
 
   /**
    * Schnellaktion der Sprungpalette (LFH-506). Als Paar: ohne den Parameter bleibt die Maske zu —
    * sonst belegte die Positivaussage auch eine Seite, die die Maske immer öffnet.
    */
-  it('?neu=1 öffnet die Schnellerfassung und räumt den Parameter', async () => {
+  it('?neu=1 öffnet „Tier erfassen" und räumt den Parameter', async () => {
     render(einsatzAktiv, [], '/einsaetze/1/tiere?neu=1');
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Schnellerfassung')).toBeInTheDocument();
+    expect(within(dialog).getByText('Tier erfassen')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
@@ -429,7 +430,7 @@ describe('TierePage', () => {
     expect(document.querySelector('.ant-modal')).toBeNull();
   });
 
-  it('Schnellerfassung schickt status=aktiv + spezies', async () => {
+  it('„Tier erfassen" schickt status=aktiv + spezies', async () => {
     let body: { spezies?: string; status?: string } = {};
     server.use(
       http.post('/api/einsaetze/1/tiere', async ({ request }) => {
@@ -438,7 +439,7 @@ describe('TierePage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body.status).toBe('aktiv'));
     expect(body.spezies).toBe('hund'); // initialValues
@@ -559,14 +560,14 @@ describe('TierePage', () => {
   });
 
   /**
-   * Schnellerfassung auf der Erfassungshülle. Geprüft wird die Verdrahtung dieser Seite: das erste
+   * Tier-Erfassung auf der Erfassungshülle. Geprüft wird die Verdrahtung dieser Seite: das erste
    * Feld bekommt den Fokus, Enter schickt den Wortlaut mit dem aus dem Modus abgeleiteten Status,
    * und der Serienlauf nimmt die zwei Übernahmefelder mit. Die Hülle prüft
    * `components/Erfassung.test.tsx`.
    */
   it('setzt den Fokus beim Öffnen ins erste Feld der Maske', async () => {
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     const dialog = await screen.findByRole('dialog');
     // Im Dialog gesucht: die zweite Combobox der Seite ist der Spezies-Filter der Werkzeugzeile.
     await waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
@@ -610,7 +611,7 @@ describe('TierePage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     const dialog = await screen.findByRole('dialog');
 
     // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
@@ -668,13 +669,13 @@ describe('TierePage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Tier-Sammelstelle');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
     await waitFor(() =>
       expect(screen.getByLabelText('Antreffort')).toHaveValue('Tier-Sammelstelle'),
     );
@@ -690,7 +691,7 @@ describe('TierePage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Fehlerort Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
@@ -725,7 +726,7 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Abbruchort Tier');
     await userEvent.type(screen.getByLabelText('Rufname'), 'Abbruch-Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -753,7 +754,7 @@ describe('TierePage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
 
     await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager Nord'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
@@ -790,7 +791,7 @@ describe('TierePage', () => {
       { route: '/einsaetze/1/tiere' },
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
     await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager A'));
     const dialogA = screen.getByRole('dialog');
     await userEvent.click(within(dialogA).getByRole('combobox'));
@@ -803,7 +804,7 @@ describe('TierePage', () => {
     await userEvent.type(within(dialogA).getByLabelText('Notiz'), 'Alte Notiz');
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     await warteBisDialogWeg();
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
 
     const dialogB = await screen.findByRole('dialog');
     await waitFor(() =>
@@ -964,12 +965,95 @@ describe('TierePage', () => {
     server.use(http.get('/api/einsaetze/1/tiere', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.tiere(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('T-001')).toBeInTheDocument();
     expect(screen.queryByText('Tiere konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Feldbudget der Tiere-Erfassung (LFH-963, design.md D7; `frontend/AGENTS.md`, Feldbudget): in
+ * beiden Modi GENAU drei sichtbare Felder (Spezies, Rufname, Antreffort) — eine Obergrenze deckte
+ * eine Zählung, die ein Feld verliert. Der Rest liegt mit `forceRender` eingeklappt IM Baum, die
+ * Gegenprobe „Aufklappen → Zahl steigt" belegt, dass die Zählung Verstecktes nicht mitnimmt.
+ */
+describe('TierePage — Feldbudget der Erfassung (LFH-963)', () => {
+  function sichtbareFelder(dialog: HTMLElement): number {
+    const rollen = ['textbox', 'spinbutton', 'combobox', 'checkbox', 'radio', 'switch'] as const;
+    const felder = new Set<Element>();
+    for (const rolle of rollen) {
+      for (const el of within(dialog).queryAllByRole(rolle)) {
+        const item = el.closest('.ant-form-item');
+        if (item) felder.add(item);
+      }
+    }
+    return felder.size;
+  }
+
+  async function oeffne(knopf: 'Tier erfassen' | 'Vermisst melden'): Promise<HTMLElement> {
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: knopf }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(knopf)).toBeInTheDocument();
+    return dialog;
+  }
+
+  it.each(['Tier erfassen', 'Vermisst melden'] as const)(
+    '„%s" zeigt Spezies, Rufname und Antreffort — sonst nichts',
+    async (knopf) => {
+      const dialog = await oeffne(knopf);
+      expect(sichtbareFelder(dialog)).toBe(3);
+      // Außerhalb des Collapse, das Pflichtfeld zuerst. Gemessen am Ort, nicht an `toBeVisible`:
+      // der Dialog steht in jsdom in seiner Einblendbewegung (Deckkraft 0).
+      const spezies = within(dialog).getByRole('combobox', { name: 'Spezies' });
+      for (const feld of [
+        spezies,
+        within(dialog).getByLabelText('Rufname'),
+        within(dialog).getByLabelText('Antreffort'),
+      ]) {
+        expect(feld.closest('.ant-collapse')).toBeNull();
+      }
+      // Im Baum (forceRender), aber nicht sichtbar.
+      expect(within(dialog).getByLabelText('Rasse / Beschreibung')).not.toBeVisible();
+      expect(within(dialog).getByLabelText('Notiz')).not.toBeVisible();
+    },
+  );
+
+  it('„Vermisst melden" legt Farbe, Kennzeichnung und Halter-Kontakt unter „Weitere Angaben"', async () => {
+    const dialog = await oeffne('Vermisst melden');
+    for (const name of [
+      'Farbe / Erscheinung',
+      'Kennzeichnung (Chip/Tätowierung/Halsband)',
+      'Halter-Kontakt (Name, Tel.)',
+    ]) {
+      expect(within(dialog).getByLabelText(name)).not.toBeVisible();
+    }
+  });
+
+  it.each([
+    ['Tier erfassen', 2],
+    ['Vermisst melden', 5],
+  ] as const)('Aufklappen in „%s" macht %i Felder mehr sichtbar', async (knopf, mehr) => {
+    const dialog = await oeffne(knopf);
+    const vorher = sichtbareFelder(dialog);
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await waitFor(() => expect(sichtbareFelder(dialog)).toBe(vorher + mehr));
+  });
+
+  it('nimmt eingeklappte Angaben mit ins Anlegen', async () => {
+    let body: { rasse_beschreibung?: string | null } = {};
+    server.use(
+      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+        body = (await request.json()) as { rasse_beschreibung?: string | null };
+        return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+      }),
+    );
+    const dialog = await oeffne('Tier erfassen');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Rasse / Beschreibung'), 'Haflinger');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(body.rasse_beschreibung).toBe('Haflinger'));
   });
 });
 
@@ -1010,5 +1094,33 @@ describe('TierePage — Einstieg in den Druck (LFH-727)', () => {
     render(einsatzBeobachter, [tierBasis]);
     await screen.findByText('T-001');
     expect(await druckLink()).toBeInTheDocument();
+  });
+  /**
+   * Handschirm (LFH-963, Entscheidung 8): Erfassung und „Vermisst melden" bleiben sichtbar, Drucken
+   * und CSV stehen nur im Menü „Weitere". Die Gegenprobe ab `md` sind die Tests oben (Link im Kopf).
+   */
+  it('bündelt Drucken und CSV unter 768 px hinter „Weitere"', async () => {
+    setzeViewportBreite(390);
+    render(einsatzAktiv, [tierBasis]);
+    await screen.findByRole('link', { name: 'T-001' });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).getByRole('button', { name: 'Tier erfassen' })).toHaveClass(
+      'ant-btn-primary',
+    );
+    expect(within(kopf).getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
+    expect(within(kopf).queryByText('Drucken / als PDF')).not.toBeInTheDocument();
+    expect(within(kopf).queryByText('CSV exportieren')).not.toBeInTheDocument();
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Weitere Aktionen zu den Tieren' }),
+    );
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' }));
+    expect(await screen.findByText('DRUCK-SEITE')).toBeInTheDocument();
   });
 });

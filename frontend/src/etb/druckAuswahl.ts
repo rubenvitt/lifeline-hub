@@ -22,7 +22,8 @@ function zeit(wire: string, konventionen: AnzeigeKonventionen): string | null {
 
 /**
  * Die gedruckte Auswahl in Worten für den Druckkopf der ETB-Druckansicht (LFH-22,
- * design.md D6). Feste Folge: Typ, Zeitraum, Suchbegriff, Einheit. Ohne Filter heißt es
+ * design.md D6). Feste Folge: Typ, Zeitraum, Suchbegriff, Einheit, Ausschluss der
+ * Systemeinträge (LFH-958). Ohne Filter heißt es
  * „vollständiges Tagebuch" — ein Ausdruck muss sagen, OB er eine Auswahl ist.
  *
  * Eine Datenbank-Kennung erscheint nie: eine Einheit ohne lesbaren Namen heißt „eine
@@ -30,7 +31,7 @@ function zeit(wire: string, konventionen: AnzeigeKonventionen): string | null {
  * behauptete eine Zuordnung, die niemand prüfen kann.
  */
 export function auswahlZeilen(
-  filter: Pick<EtbFilterWerte, 'q' | 'typ' | 'von' | 'bis' | 'einheit_id'>,
+  filter: Pick<EtbFilterWerte, 'q' | 'typ' | 'von' | 'bis' | 'einheit_id' | 'ohne_system'>,
   { konventionen, typWort, einheitName }: AuswahlOptionen,
 ): string[] {
   const zeilen: string[] = [];
@@ -45,5 +46,6 @@ export function auswahlZeilen(
     const name = einheitName(filter.einheit_id);
     zeilen.push(name ? `betrifft ${name}` : 'betrifft eine Einheit (Name nicht verfügbar)');
   }
+  if (filter.ohne_system) zeilen.push('ohne Systemeinträge');
   return zeilen.length > 0 ? zeilen : ['vollständiges Tagebuch'];
 }

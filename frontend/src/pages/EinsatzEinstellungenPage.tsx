@@ -15,6 +15,7 @@ import {
   type EinstellungenSektion,
 } from '../routing/deeplinks';
 import type { EinsatzEinstellungen } from '../api/types';
+import { NUR_LEITUNG_FUEHRUNG_ADMIN } from '../components/nurAnsicht';
 
 /**
  * Datenkontext der Einstellungs-Sektionen.
@@ -63,8 +64,7 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
  * Erklärt die fehlende Berechtigung auf allen Sektionen mit Einsatz-Schreibrecht gleich. Ausgegraut
  * allein nennt keinen Grund; der Text steht einmal, damit er nicht auseinanderläuft.
  */
-export const RECHTE_TEXT =
-  'Nur die Einsatzleitung, Führungspersonal oder ein System-Admin darf die Einstellungen dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen.';
+export const RECHTE_TEXT = NUR_LEITUNG_FUEHRUNG_ADMIN;
 
 /** Aktive Sektion aus dem Pfad: `/einsaetze/1/einstellungen/verhalten` → `verhalten`. */
 function sektionAus(pathname: string): EinstellungenSektion {

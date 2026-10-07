@@ -83,7 +83,7 @@ test('findet eine eben erfasste Person über ihre Registriernummer und öffnet i
 
   // Über die Schnellaktion `?neu=1`, den Weg der Palette selbst.
   await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
-  await expect(page.getByRole('dialog', { name: 'Schnellerfassung' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Betroffene erfassen' })).toBeVisible();
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   // Die Kennung kommt aus der QUITTUNG — das, was auf Papier landet und abgetippt wird.

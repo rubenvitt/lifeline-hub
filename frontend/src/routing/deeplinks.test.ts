@@ -595,6 +595,32 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
     expect(parseEtbFilter(new URLSearchParams(`q=x&einheit_id=${wert}`))).toEqual({ q: 'x' });
   });
 
+  it('trägt den Ausschluss der Systemeinträge hin und zurück (LFH-958)', () => {
+    const pfad = etbPfad(7, { ohne_system: true, typ: 'meldung' });
+    expect(pfad).toBe('/einsaetze/7/etb?typ=meldung&ohne_system=true');
+    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({
+      typ: 'meldung',
+      ohne_system: true,
+    });
+  });
+
+  it.each(['false', '0', 'ja', ''])(
+    'liest ohne_system=%s nicht als Ausschluss (LFH-958)',
+    (wert) => {
+      expect(parseEtbFilter(new URLSearchParams(`q=x&ohne_system=${wert}`))).toEqual({ q: 'x' });
+    },
+  );
+
+  it('nimmt `1` als Ausschluss, schreibt aber `true` (LFH-958)', () => {
+    expect(parseEtbFilter(new URLSearchParams('ohne_system=1'))).toEqual({ ohne_system: true });
+  });
+
+  it('lässt typ=system vor dem Ausschluss gelten; die Seite schickt nie die 422 (LFH-958)', () => {
+    expect(parseEtbFilter(new URLSearchParams('typ=system&ohne_system=true'))).toEqual({
+      typ: 'system',
+    });
+  });
+
   it('liefert für eine leere Query ein leeres Filterobjekt', () => {
     // Ohne Parameter ist kein Filter gesetzt (Gegenaussage zu `filterAktiv` in `EtbPage`).
     expect(parseEtbFilter(new URLSearchParams(''))).toEqual({});
@@ -630,6 +656,7 @@ describe('etbDruckPfad (LFH-22)', () => {
       von: '2026-08-21 06:00:00',
       bis: '2026-08-21 10:00:00',
       einheit_id: 12,
+      ohne_system: true as const,
     };
     const pfad = etbDruckPfad(7, filter);
     expect(pfad.startsWith('/einsaetze/7/etb/druck?')).toBe(true);

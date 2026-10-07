@@ -56,7 +56,7 @@ percent-encoding = "2"
 rust-embed = "8"
 # OpenAPI-Codegen als Wahrheitsquelle für die Frontend-Typen.
 utoipa = "6"
-tower-http = { version = "0.7", features = ["fs", "catch-panic", "trace", "request-id", "set-header"] }
+tower-http = { version = "0.7", features = ["fs", "catch-panic", "trace", "request-id", "set-header", "compression-gzip", "compression-br"] }
 # Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot` (routes/karte.rs).
 tower = { version = "0.5", features = ["util", "limit"] }
 fs4 = "1.1.0"
@@ -144,7 +144,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.86"
+version = "1.0.0-alpha.87"
 
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]

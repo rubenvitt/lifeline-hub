@@ -117,6 +117,21 @@ pub async fn liste(
     Ok(Json(liste))
 }
 
+/// GET /api/einsaetze/{id}/personen/auswahl — Personenauswahl ohne Freitexte (LFH-940). NICHT
+/// auditiert, wie die Liste. Geräte erreichen die Route nicht (`geraet::ALLE_GERAETE`); bekäme
+/// eines sie, gälte die Stellenbindung der Liste.
+pub async fn auswahl(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Json<Vec<crate::person::PersonAuswahl>>, AppError> {
+    let mut liste = repo::auswahl(&state.pool, ctx.einsatz.id).await?;
+    if let Some(eigene) = stelle::stelle(ctx.geraet.as_ref()) {
+        let sichtbar = stelle::personen_der_uhs(&state.pool, eigene).await?;
+        liste.retain(|p| sichtbar.contains(&p.id));
+    }
+    Ok(Json(liste))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct AnlegenBody {
     pub name: Option<String>,

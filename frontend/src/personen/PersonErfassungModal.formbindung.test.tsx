@@ -25,7 +25,7 @@ let oeffne: () => void = () => {};
 
 function Huelle() {
   const [modus, setModus] = useState<ErfassungsModus | null>(null);
-  oeffne = () => setModus('schnell');
+  oeffne = () => setModus('erfassen');
   return (
     <PersonErfassungModal
       einsatzId={1}

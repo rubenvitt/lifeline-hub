@@ -129,13 +129,20 @@ export async function alleHaltenStufe(
   return kleinstes;
 }
 
-/** Wortanfang aller Rechtehinweise der Einsatzmodule (aktiver Einsatz, ohne Schreibrecht). */
-export const NUR_SCHREIBENDE = /^Nur Einsatzleitung und Führungspersonal/;
+/** Grund aller Rechtehinweise der Einsatzmodule (aktiver Einsatz, ohne Schreibrecht). */
+export const NUR_SCHREIBENDE = /nur Einsatzleitung und Führungspersonal$/;
 
-/** Der Rechtehinweis des Nur-Lese-Zweigs (`RechteHinweis`, antd `Alert` mit `role="alert"`). */
+/**
+ * Der Rechtehinweis des Nur-Lese-Zweigs: die Zeile „Nur Ansicht · Grund“ (`RechteHinweis`,
+ * `role="status"`, LFH-1078). EINE Stelle für alle Specs, die ihn als Vorbedingung prüfen.
+ */
+export function rechteHinweis(page: Page, grund: string | RegExp) {
+  return page.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: grund });
+}
+
 export async function rechteHinweisSteht(page: Page) {
   await expect(
-    page.getByRole('alert').filter({ hasText: NUR_SCHREIBENDE }),
+    rechteHinweis(page, NUR_SCHREIBENDE),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
 }

@@ -39,7 +39,7 @@ import { listeEinheiten } from '../../api/einheiten';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeAuftraege } from '../../api/auftraege';
-import { listeErinnerungen } from '../../api/erinnerungen';
+import { listeOffeneErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
 import { holeRueckmeldungen } from '../../api/meldungen';
 import { ladeModulZaehler } from '../../api/modulZaehler';
@@ -363,9 +363,11 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.modulZaehler(einsatzId),
     queryFn: () => ladeModulZaehler(einsatzId),
   });
+  // Nur offene (LFH-940): die Marken zeigen nur offene Fälligkeiten. Dasselbe Fach wie die offene
+  // Liste der Erinnerungsseite.
   const erinnerungenQ = useQuery({
-    queryKey: einsatzKeys.erinnerungen(einsatzId),
-    queryFn: () => listeErinnerungen(einsatzId, false),
+    queryKey: einsatzKeys.erinnerungenPhase(einsatzId, 'offen'),
+    queryFn: () => listeOffeneErinnerungen(einsatzId),
     enabled: erinnerungenFrei,
   });
   // Ablösungsmarken nur, wenn das Modul sichtbar und frei ist — sonst 403 und ein Seitenkanal über

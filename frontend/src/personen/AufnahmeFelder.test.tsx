@@ -13,7 +13,7 @@ import AufnahmeFelder, {
  * Die Feldgruppe der Personen-Aufnahme — geprüft wird, was in beiden Mounts gilt; die Wege durch
  * die Hülle prüfen die Aufrufer.
  */
-function zeige(modus: AufnahmeModus = 'schnell') {
+function zeige(modus: AufnahmeModus = 'erfassen') {
   return renderMitProviders(
     <Form>
       <AufnahmeFelder modus={modus} />
@@ -45,11 +45,11 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
    * Der API-Vertrag: `status: 'vermisst'` + `sichtung` ist 422. Als Paar, sonst wäre „fehlt im
    * Vermisst-Modus" auch grün, wenn es das Feld gar nicht gäbe.
    */
-  it('fehlt im Vermisst-Modus und steht im Betroffen-Modus', () => {
+  it('fehlt im Vermisst-Modus und steht in der allgemeinen Maske', () => {
     const { unmount } = zeige('vermisst');
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
     unmount();
-    zeige('betroffen');
+    zeige('erfassen');
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
   });
 
@@ -59,6 +59,25 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
     // Text in einer Farbe mit unzugesichertem Kontrast.
     const gruppe = screen.getByRole('radiogroup');
     expect(gruppe.querySelectorAll('.ant-tag')).toHaveLength(6);
+  });
+});
+
+/**
+ * EINE Maske (LFH-963, Entscheidung 9): sie sagt, was sie anlegt. Als Paar mit „Vermisst melden",
+ * das einen eigenen Status hat — sonst wäre die Zeile auch grün, wenn sie in jedem Modus stünde.
+ */
+describe('AufnahmeFelder — Folgestatus (LFH-963)', () => {
+  it('die allgemeine Maske nennt „erfasst" und „mit Sichtung → betroffen"', () => {
+    const { container } = zeige('erfassen');
+    const zeile = container.querySelector('[data-lfh="folgestatus"]');
+    expect(zeile).toHaveTextContent('Status: erfasst · mit Sichtung → betroffen');
+    // Text, kein Feld: das Budget zählt ihn nicht mit.
+    expect(zeile?.closest('.ant-form-item')).toBeNull();
+  });
+
+  it('„Vermisst melden" trägt die Zeile nicht', () => {
+    const { container } = zeige('vermisst');
+    expect(container.querySelector('[data-lfh="folgestatus"]')).toBeNull();
   });
 });
 
@@ -81,8 +100,7 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
   const feldZahl = (c: HTMLElement) => c.querySelectorAll('.ant-form-item').length;
 
   it.each<[AufnahmeModus, number]>([
-    ['schnell', 4],
-    ['betroffen', 4],
+    ['erfassen', 4],
     ['vermisst', 3],
   ])(
     '%s: sichtbares Budget unverändert (%i), die neuen Felder erst nach dem Aufklappen',

@@ -4,7 +4,6 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { parsePersonenSicht, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
-import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -48,6 +47,7 @@ import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonEr
 import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
 import BetroffeneZeile from '../personen/BetroffeneZeile';
 import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
+import Sichtungszeile from '../personen/Sichtungszeile';
 import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
 import '../personen/betroffene.css';
 import { erfassePersonOfflineFaehig } from '../offline/schreiben';
@@ -64,20 +64,24 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
  *
  * ── Aufbau ──
  *
- * - Seitenkopf: Titel „Betroffene", Mono-Meta „n erfasst", rechts die Ansicht als Segmentleiste
- *   („Zeilen" / „Sichtungsraster" / „Karte") und die Masken-Wege. Die Karte
+ * - Seitenkopf: Titel „Betroffene", Mono-Meta „n gesamt", rechts die Ansicht als Segmentleiste
+ *   („Zeilen" / „Sichtungsraster" / „Karte"), die eine Maske „Betroffene erfassen" und „Vermisst
+ *   melden"; Drucken, CSV und Listenzugriffe als Nebenwege (`weitere`, unter `md` gebündelt). Die Karte
  *   (`personen/BetroffeneKarte.tsx`) zeigt die Fundort-Koordinaten und nennt, wie viele ohne
  *   Koordinate fehlen; sie lädt per `React.lazy` erst bei Wahl. Ein UHS-Bezug im Meta fehlt — die
  *   Liste ist einsatzweit.
  * - Schnellerfassungszeile `/person` (`personen/BetroffeneZeile.tsx`): eine Eingabe, die per Kürzel
  *   parst und über dieselbe offlinefähige Mutation anlegt wie die Maske.
- * - Statusfilter als zweite Leiste (Neu/Vermisst/Betroffen/Verstorben/Alle; „Patienten" ist im
+ * - Unter `xl` die Sichtungszeile (`personen/Sichtungszeile.tsx`) über dem Statusfilter: die
+ *   Seitenleiste steht dort unter allen Zeilen, die Lagezahl gehört in den ersten Bildschirm.
+ * - Statusfilter als zweite Leiste (Erfasst/Vermisst/Betroffen/Verstorben/Alle; „Patienten" ist im
  *   Sichtungsraster aufgegangen) und die Tabelle über `Datensicht`.
  * - Seitenleiste 268 px ab `xl` (Sichtungsbild, Verbleib, Offene Felder), darunter gestapelt unter
  *   der Liste.
@@ -237,7 +241,7 @@ export default function PersonenPage() {
       benutzerId: number;
       einsatzId: number;
       daten: AufnahmeEingabe;
-      folgeStatus?: 'vermisst' | 'betroffen';
+      folgeStatus?: 'vermisst';
       /** Die Zeile quittiert an sich selbst („Zuletzt: …") und meldet Fehler an sich selbst. */
       quelle: 'maske' | 'zeile';
     }) => {
@@ -490,7 +494,7 @@ export default function PersonenPage() {
     setSearchParams(rest, { replace: true });
   }, [searchParams, setSearchParams, einsatzId]);
 
-  // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Command-Palette). Warten bis der Einsatz
+  // Schnellaktion: ?neu=1 öffnet die eine Maske „Betroffene erfassen“ (Command-Palette). Warten bis der Einsatz
   // geladen ist; Param immer löschen, Modal nur bei Schreibrecht. Bewusst die Maske und nicht die
   // Zeile: `?neu=1` ist die Adresse, über die andere Oberflächen „eine Person anlegen" anspringen
   // (`e2e/palette-datensaetze.spec.ts`). Die Zeile erreicht die Palette über „Neue Zeile"
@@ -500,7 +504,7 @@ export default function PersonenPage() {
     if (einsatzQuery.isLoading) return;
     const e = einsatzQuery.data;
     const darfSchr = darfImEinsatzSchreiben(e, benutzer);
-    if (darfSchr) setModusFuer(einsatzId, 'schnell');
+    if (darfSchr) setModusFuer(einsatzId, 'erfassen');
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
   }, [
@@ -585,6 +589,11 @@ export default function PersonenPage() {
     ? 'Keine Datensätze mit offenen Feldern in dieser Sicht.'
     : 'Keine Personen in dieser Sicht';
 
+  const druckPfad = personenDruckPfad(einsatzId, {
+    filter: sicht.filter,
+    nurLuecken: sicht.nurLuecken,
+  });
+
   const seitenleiste = (
     <BetroffenenSeitenleiste
       alle={alle}
@@ -598,7 +607,8 @@ export default function PersonenPage() {
     <EinsatzSeite
       dataUpdatedAt={personenQuery.dataUpdatedAt}
       titel="Betroffene"
-      meta={personenQuery.data ? `${alle.length} erfasst` : undefined}
+      // „gesamt“, nicht „erfasst“: das ist ein Personenstatus (LFH-963, `personen/AGENTS.md`).
+      meta={personenQuery.data ? `${alle.length} gesamt` : undefined}
       breadcrumb={
         <Breadcrumb
           items={[
@@ -616,36 +626,49 @@ export default function PersonenPage() {
             wert={sicht.ansicht}
             onWechsel={(ansicht) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, ansicht }))}
           />
-          <DruckAnsichtKnopf
-            pfad={personenDruckPfad(einsatzId, {
-              filter: sicht.filter,
-              nurLuecken: sicht.nurLuecken,
-            })}
-          />
-          {/* Die Masken bleiben der vollständige Weg (Name, Notiz, Melder; Vermisst-Meldung
-              ohne Sichtung). Alle drei sekundär: die Primärhandlung der Seite ist die Zeile. */}
+          {/* EINE Maske (LFH-963, Entscheidung 9): sie legt mit Status „erfasst" an und sagt das
+              im Dialog. Primär, weil sie der eine Erfassungsweg des Kopfes ist; die Zeile darunter
+              ist der schnelle Weg ohne Dialog. „Vermisst melden" bleibt ein eigener Weg. */}
           {darfSchreiben && (
             <>
-              <Button onClick={() => setModusFuer(einsatzId, 'schnell')}>Schnellerfassung</Button>
-              <Button onClick={() => setModusFuer(einsatzId, 'vermisst')}>Vermisst melden</Button>
-              <Button onClick={() => setModusFuer(einsatzId, 'betroffen')}>
-                Betroffene/n erfassen
+              <Button type="primary" onClick={() => setModusFuer(einsatzId, 'erfassen')}>
+                Betroffene erfassen
               </Button>
+              <Button onClick={() => setModusFuer(einsatzId, 'vermisst')}>Vermisst melden</Button>
             </>
-          )}
-          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (`frontend/AGENTS.md`,
-              Aktionen). Ohne Schreib-Riegel: der Endpunkt verlangt nur den Lesezugriff, den schon
-              die Liste braucht. Jeder Klick ist serverseitig ein `export`-Audit-Eintrag. */}
-          <Button loading={csvExport.laeuft} onClick={csvExport.exportieren}>
-            CSV exportieren
-          </Button>
-          {/* LFH-916: wer die Liste exportiert oder gedruckt hat — nur die Einsatzleitung (der
-              Server antwortet sonst 403). Öffnet eine Schnellansicht, sendet nichts ab. */}
-          {istEinsatzLeitung(einsatz) && (
-            <Button onClick={() => setListenzugriffeFuer(einsatzId)}>Listenzugriffe</Button>
           )}
         </>
       }
+      // Nebenwege: öffnen, erfassen nichts — ab `md` Knöpfe, unter `md` hinter „Weitere"
+      // (`frontend/AGENTS.md`, Aktionen). CSV ohne Schreib-Riegel: der Endpunkt verlangt nur den
+      // Lesezugriff, den schon die Liste braucht, und jeder Abruf ist ein `export`-Audit-Eintrag.
+      // Listenzugriffe nur für die Einsatzleitung (LFH-916, der Server antwortet sonst 403).
+      weitere={{
+        name: 'Weitere Aktionen zu den Betroffenen',
+        eintraege: [
+          {
+            key: 'druck',
+            label: 'Drucken / als PDF',
+            ziel: druckPfad,
+            onWahl: () => navigate(druckPfad),
+          },
+          {
+            key: 'csv',
+            label: 'CSV exportieren',
+            laeuft: csvExport.laeuft,
+            onWahl: csvExport.exportieren,
+          },
+          ...(istEinsatzLeitung(einsatz)
+            ? [
+                {
+                  key: 'listenzugriffe',
+                  label: 'Listenzugriffe',
+                  onWahl: () => setListenzugriffeFuer(einsatzId),
+                },
+              ]
+            : []),
+        ],
+      }}
       // Zweiter Bedienweg auf die Erfassung („Neue Zeile" in der Palette) mit demselben
       // Rechte-Riegel. Im nächsten Bild: die Palette gibt beim Schließen den Fokus zurück, ein
       // direkter Aufruf verlöre gegen sie.
@@ -656,7 +679,7 @@ export default function PersonenPage() {
       hinweis={
         (nurAnsicht || csvExport.fehler != null) && (
           <SeitenHinweise
-            rechteText="Einsatz ist abgeschlossen — nur Ansicht."
+            rechteText={EINSATZ_ABGESCHLOSSEN}
             rechteFehlt={nurAnsicht}
             fehler={csvExport.fehler}
             fehlerTitel="Export fehlgeschlagen"
@@ -740,6 +763,9 @@ export default function PersonenPage() {
             {standVeraltet && (
               <SeitenStandVeraltet onWiederholen={() => void personenQuery.refetch()} />
             )}
+            {/* Unter `xl` steht die Seitenleiste unter allen Zeilen; die Lagezahl bleibt hier im
+                ersten Bildschirm (LFH-963). Ab `xl` steht die Seitenleiste daneben. */}
+            {!mitSeitenleiste && !personenQuery.isLoading && <Sichtungszeile alle={alle} />}
             <Segmentleiste<PersonenFilter>
               rolle="tablist"
               beschriftung="Personen nach Status filtern"
@@ -881,8 +907,8 @@ export default function PersonenPage() {
             einsatzId,
             daten,
             quelle: 'maske',
-            folgeStatus:
-              modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
+            // Die allgemeine Maske legt immer `erfasst` an (LFH-963); mit Sichtung hebt der Server.
+            folgeStatus: modus === 'vermisst' ? 'vermisst' : undefined,
           });
         }}
       />

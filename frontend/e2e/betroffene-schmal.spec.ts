@@ -154,10 +154,10 @@ test('bei 390 px steht auf allen drei Listen die Karte statt der Tabelle, ohne Q
  */
 const LESEZWEIG: Record<(typeof MODULE)[number]['route'], { weg: string[]; bleibt?: string }> = {
   personen: {
-    weg: ['Schnellerfassung', 'Vermisst melden', 'Betroffene/n erfassen'],
+    weg: ['Betroffene erfassen', 'Vermisst melden'],
     bleibt: 'Ansicht',
   },
-  tiere: { weg: ['Schnellerfassung', 'Vermisst melden'], bleibt: 'Tiere nach Status filtern' },
+  tiere: { weg: ['Tier erfassen', 'Vermisst melden'], bleibt: 'Tiere nach Status filtern' },
   schaeden: { weg: ['Schnellerfassung'] },
 };
 

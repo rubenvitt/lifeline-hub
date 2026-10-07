@@ -139,7 +139,7 @@ export function kraefteuebersichtPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'kraefteuebersicht');
 }
 
-/** Tier-Liste; `?neu=1` öffnet die Schnellerfassung (`TierePage`). */
+/** Tier-Liste; `?neu=1` öffnet „Tier erfassen“ (`TierePage`). */
 export function tierePfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'tiere'), { neu: opts.neu ? 1 : undefined });
 }
@@ -389,6 +389,8 @@ export function etbPfad(
     bis?: string;
     /** „Betrifft Einheit" — der Knopf „ETB ↗" an der Einheit auf der Lagekarte. */
     einheit_id?: number;
+    /** Systemeinträge ausgeblendet (LFH-958). */
+    ohne_system?: true;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'etb'), {
@@ -399,6 +401,7 @@ export function etbPfad(
     von: opts.von,
     bis: opts.bis,
     einheit_id: opts.einheit_id,
+    ohne_system: opts.ohne_system ? 'true' : undefined,
   });
 }
 
@@ -408,7 +411,7 @@ export function etbPfad(
  */
 export function etbDruckPfad(
   einsatzId: number,
-  filter: Pick<EtbFilterWerte, 'q' | 'typ' | 'von' | 'bis' | 'einheit_id'>,
+  filter: Pick<EtbFilterWerte, 'q' | 'typ' | 'von' | 'bis' | 'einheit_id' | 'ohne_system'>,
 ): string {
   return mitQuery(`${einsatzModulPfad(einsatzId, 'etb')}/druck`, {
     q: filter.q,
@@ -416,6 +419,7 @@ export function etbDruckPfad(
     von: filter.von,
     bis: filter.bis,
     einheit_id: filter.einheit_id,
+    ohne_system: filter.ohne_system ? 'true' : undefined,
   });
 }
 
@@ -441,6 +445,12 @@ export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
   // Wie `parseRouteId`: `abc` oder `0` ergäben am Server 400 bzw. einen Filter auf nichts.
   const einheit = parseRouteId(params.get('einheit_id') ?? undefined);
   if (einheit != null) werte.einheit_id = einheit;
+  // Nur `true`/`1` blendet aus (LFH-958). Neben `typ=system` fällt der Ausschluss weg: der
+  // Server wiese die Kombination mit 422 ab, und der gewählte Typ ist die engere Absicht.
+  const ohneSystem = params.get('ohne_system');
+  if ((ohneSystem === 'true' || ohneSystem === '1') && werte.typ !== 'system') {
+    werte.ohne_system = true;
+  }
   return werte;
 }
 

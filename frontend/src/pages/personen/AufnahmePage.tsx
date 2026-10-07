@@ -212,7 +212,7 @@ export default function AufnahmePage() {
             )
           }
         >
-          <AufnahmeFelder modus="schnell" />
+          <AufnahmeFelder modus="erfassen" />
         </ErfassungsFormular>
       )}
     </EinsatzSeite>

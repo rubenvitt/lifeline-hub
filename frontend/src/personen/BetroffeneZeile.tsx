@@ -10,6 +10,17 @@ import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instr
 import { formatKoordinate } from './koordinate';
 import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './personBefehl';
 
+/** Aus dem Bild, nicht aus dem Baum: der Vorleser liest die Kürzel weiter als Feldbeschreibung. */
+const NUR_VORLESER = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  clipPath: 'inset(50%)',
+  whiteSpace: 'nowrap',
+} as const;
+
 /**
  * Die Betroffenen-Schnellerfassungszeile: EINE Eingabe, die per Kürzel parst
  * (`personen/personBefehl.ts`), etwa „Kowalski, Anna w 34 sk3 @Weserstadion #52.2691/9.1342".
@@ -93,10 +104,13 @@ export default function BetroffeneZeile({
 }: BetroffeneZeileProps) {
   const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
-  const hinweisId = useId();
+  const erkanntId = useId();
+  const kuerzelId = useId();
   const eigenesFeld = useRef<InputRef>(null);
   const sendetRef = useRef(false);
   const [text, setText] = useState('');
+  /** Kürzel-Hinweis unter `md` aufgeklappt? Ab `md` steht er immer (LFH-963). */
+  const [kuerzelOffen, setKuerzelOffen] = useState(false);
   /** Fehler des letzten Absende-Versuchs (Prüfung ODER Server) — steht bis zur nächsten Eingabe. */
   const [versuchFehler, setVersuchFehler] = useState<string[] | null>(null);
 
@@ -132,14 +146,16 @@ export default function BetroffeneZeile({
   }
 
   const leer = befehl.leer;
+  const kuerzelEingeklappt = istSchmal && !kuerzelOffen;
   // Kürzel-Hinweis und „erkannt: …" liegen GESTAPELT in derselben Rasterzelle: der Hinweis bleibt
   // im Baum und wird nur unsichtbar, die Zeile behält also ihre Höhe (sonst sprang bei 390 px
-  // der Inhalt darunter beim ersten Zeichen). `visibility: hidden` nimmt ihn zugleich aus
-  // `aria-describedby`.
+  // der Inhalt darunter beim ersten Zeichen). Unter `md` hält der Knopf „Kürzel anzeigen“ in
+  // derselben Ebene die Höhe (LFH-963). Das Feld beschreibt sich je nach Lage mit den Kürzeln
+  // oder mit „erkannt: …“, nie mit beidem und nie mit dem Knopf.
   const stapel = { gridArea: '1 / 1' } as const;
   const hinweiszeile = (
     <>
-      <span id={hinweisId} style={{ display: 'inline-grid', minWidth: 0 }}>
+      <span style={{ display: 'inline-grid', minWidth: 0 }}>
         <span
           aria-hidden={leer ? undefined : true}
           style={{
@@ -152,17 +168,49 @@ export default function BetroffeneZeile({
             visibility: leer ? 'visible' : 'hidden',
           }}
         >
-          <span>
-            Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
+          {/* Unter `md` eingeklappt (LFH-963, design.md D6): drei Zeilen Kürzel kosteten am Handy
+              den Platz der ersten Person. Eingeklappt bleiben sie für Vorleser im Baum (die
+              Beschreibung des Felds), nur unsichtbar. */}
+          <span
+            id={kuerzelId}
+            style={
+              kuerzelEingeklappt
+                ? NUR_VORLESER
+                : {
+                    display: 'inline-flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    columnGap: token.padding,
+                    rowGap: token.marginXXS,
+                  }
+            }
+          >
+            <span>
+              Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
+            </span>
+            <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
+            <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+            {/* Das Format zeigt der Platzhalter nicht, also hier. */}
+            <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
+            <span style={{ color: rollen.gedaempft }}>@UHS</span>
           </span>
-          <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
-          <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
-          {/* Das Format zeigt der Platzhalter nicht, also hier. */}
-          <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
-          <span style={{ color: rollen.gedaempft }}>@UHS</span>
+          {/* EIN Knopf für beide Richtungen: er bleibt beim Umschalten derselbe Knoten, der Fokus
+              bleibt auf ihm. Beim Tippen unsichtbar wie die Ebene, seine Höhe bleibt stehen. */}
+          {istSchmal && (
+            <Button
+              type="link"
+              aria-expanded={kuerzelOffen}
+              aria-controls={kuerzelId}
+              onClick={() => setKuerzelOffen((offen) => !offen)}
+              style={{ paddingInline: 0 }}
+            >
+              {kuerzelOffen ? 'Kürzel ausblenden' : 'Kürzel anzeigen'}
+            </Button>
+          )}
         </span>
         {!leer && (
           <span
+            id={erkanntId}
             data-lfh="erkannt"
             style={{
               ...stapel,
@@ -209,7 +257,7 @@ export default function BetroffeneZeile({
         ref={setzeFeld}
         value={text}
         aria-label="Kurzeingabe Person"
-        aria-describedby={hinweisId}
+        aria-describedby={leer ? kuerzelId : erkanntId}
         placeholder="Kowalski, Anna w 34 sk3"
         enterKeyHint="send"
         // Ohne `minWidth: 0` schrumpfte das Flex-Kind nicht unter seine Inhaltsbreite und drückte am

@@ -49,9 +49,10 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   // `person` und `personal` sind getrennte Wire-Events. Die Betreuungsübersicht hängt mit dran,
   // weil „davon namentlich n“ am Verbleib der Personen hängt.
   // LFH-757: dazu die Anhangliste einer Person, nie das auditierte Detail.
-  it('bildet person auf die Personen-Registrierung, Betreuungsübersicht und Anhänge ab', () => {
+  it('bildet person auf die Personen-Registrierung, Auswahl, Betreuungsübersicht und Anhänge ab', () => {
     expect(EINSATZ_STREAM_EVENTS.person).toEqual([
       EINSATZ_KEYS.personen,
+      EINSATZ_KEYS.personenAuswahl,
       EINSATZ_KEYS.modulZaehler,
       EINSATZ_KEYS.betreuung,
       EINSATZ_KEYS.personAnhaenge,
@@ -293,12 +294,28 @@ describe('einsatzKeys (Factory-Output)', () => {
       1,
       null,
     ]);
-    expect(einsatzKeys.meldungenListe(1, 'alle')).toEqual(['einsatz-meldungen', 1, 'alle']);
-    expect(einsatzKeys.meldungenListe(1, 'eingehend')).toEqual([
+    expect(einsatzKeys.meldungenPhase(1, 'offen', 'alle')).toEqual([
       'einsatz-meldungen',
       1,
-      'eingehend',
+      'offen',
+      'alle',
     ]);
+    expect(einsatzKeys.meldungenPhase(1, 'abgeschlossen', 'extern')).toEqual([
+      'einsatz-meldungen',
+      1,
+      'abgeschlossen',
+      'extern',
+    ]);
+    expect(einsatzKeys.meldungKennzahlen(1, 'alle')).toEqual([
+      'einsatz-meldungen',
+      1,
+      'kennzahlen',
+      'alle',
+    ]);
+    expect(einsatzKeys.meldungEinzeln(1, 9)).toEqual(['einsatz-meldungen', 1, 'einzeln', 9]);
+    expect(einsatzKeys.erinnerungenPhase(1, 'offen')).toEqual(['einsatz-erinnerungen', 1, 'offen']);
+    expect(einsatzKeys.erinnerungKennzahlen(1)).toEqual(['einsatz-erinnerungen', 1, 'kennzahlen']);
+    expect(einsatzKeys.personenAuswahl(1)).toEqual(['einsatz-personen-auswahl', 1]);
     expect(einsatzKeys.auftraegeListe(1, 'alle', 'alle')).toEqual([
       'einsatz-auftraege',
       1,

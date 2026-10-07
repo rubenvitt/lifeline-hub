@@ -262,6 +262,19 @@ pub fn registrier_anzeige(nr: i64) -> String {
     format!("R-{nr:03}")
 }
 
+/// Personenauswahl (LFH-940, Spec `listen-projektion`): je nicht stornierter Person nur, was
+/// Auswahlfelder, Sprungpalette und Chat-Bezug brauchen. Keine Freitexte (Notiz, Kontakt,
+/// Adresse, Antreffort, Zustand) — die bleiben der Personenliste und dem Detail.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct PersonAuswahl {
+    pub id: i64,
+    pub registrier_nr: i64,
+    #[sqlx(try_from = "String")]
+    pub status: PersonStatus,
+    pub name: Option<String>,
+    pub vorname: Option<String>,
+}
+
 /// Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
 /// `org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,
 /// kein Snapshot wie bei Material.

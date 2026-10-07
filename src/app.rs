@@ -362,6 +362,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::erinnerung::anlegen),
         )
         .route(
+            "/api/einsaetze/{id}/erinnerungen/kennzahlen",
+            get(routes::erinnerung::kennzahlen),
+        )
+        .route(
             "/api/einsaetze/{id}/erinnerungen/{eid}/erledigen",
             post(routes::erinnerung::erledigen),
         )
@@ -652,6 +656,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::meldung::rueckmeldungen),
         )
         .route(
+            "/api/einsaetze/{id}/meldungen/kennzahlen",
+            get(routes::meldung::kennzahlen),
+        )
+        .route(
+            "/api/einsaetze/{id}/meldungen/{mid}",
+            get(routes::meldung::detail),
+        )
+        .route(
             "/api/einsaetze/{id}/meldungen",
             post(routes::meldung::anlegen),
         )
@@ -792,6 +804,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen",
             post(routes::einsatz_person::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/auswahl",
+            get(routes::einsatz_person::auswahl),
         )
         .route(
             "/api/einsaetze/{id}/personen/export",
@@ -1660,6 +1676,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // greift
         // nur, wenn der Pfad existiert, die Methode aber nicht.
         .method_not_allowed_fallback(methode_nicht_erlaubt)
+        // Antwortkompression nur für JSON (LFH-940, Spec `antwortkompression`): Listen gehen über
+        // LTE. SSE darf nicht puffern, Anhänge und Kacheln sind schon gepackt oder tragen ETags,
+        // die eingebetteten Frontend-Dateien bleiben unberührt. Innen, damit Zulassung und Trace
+        // die ungepackte Antwort sehen. Gepackt wird beim Pollen auf dem Worker, nach der
+        // Zulassung: deshalb eine schnelle Stufe statt der Vorgabe (Brotli 11).
+        .layer(
+            tower_http::compression::CompressionLayer::new()
+                .quality(tower_http::CompressionLevel::Precise(
+                    ANTWORT_KOMPRESSION_STUFE,
+                ))
+                .no_deflate()
+                .no_zstd()
+                .compress_when(nur_json_ab(ANTWORT_KOMPRESSION_AB)),
+        )
         // Fängt eine Handler-Panik und antwortet mit 500 + `{error}`, statt die Verbindung
         // abzureißen
         // (das hielte das Frontend für „kein Netz“).
@@ -1718,6 +1748,33 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             ),
         )
         .with_state(state)
+}
+
+/// Ab dieser Größe (Bytes) wird eine JSON-Antwort komprimiert (LFH-940); darunter kostet das
+/// Packen mehr, als es spart.
+pub const ANTWORT_KOMPRESSION_AB: u64 = 1024;
+
+/// Kompressionsstufe für gzip und br (LFH-940). Brotli 11 (Vorgabe) kostet bei einer Liste im
+/// MB-Bereich CPU-Sekunden auf dem Worker; Stufe 4 packt JSON fast so gut in einem Bruchteil.
+const ANTWORT_KOMPRESSION_STUFE: i32 = 4;
+
+/// Prädikat der Antwortkompression: `application/json`, mindestens `ab` Bytes, ohne `ETag`
+/// (ein starker ETag gälte sonst für zwei Darstellungen) und ohne `Cache-Control` (das tragen
+/// die eingebetteten Frontend-Dateien und Assets, nie eine Liste der API).
+fn nur_json_ab(ab: u64) -> impl tower_http::compression::Predicate {
+    use tower_http::compression::predicate::{Predicate, SizeAbove};
+    SizeAbove::new(ab).and(
+        |_: axum::http::StatusCode,
+         _: axum::http::Version,
+         kopf: &axum::http::HeaderMap,
+         _: &axum::http::Extensions| {
+            kopf.get(axum::http::header::CONTENT_TYPE)
+                .and_then(|t| t.to_str().ok())
+                .is_some_and(|t| t.starts_with("application/json"))
+                && !kopf.contains_key(axum::http::header::ETAG)
+                && !kopf.contains_key(axum::http::header::CACHE_CONTROL)
+        },
+    )
 }
 
 /// Höchstlänge einer vom Client mitgeschickten Request-ID (LFH-925).
@@ -1847,6 +1904,34 @@ fn on_panic(_err: Box<dyn std::any::Any + Send + 'static>) -> axum::response::Re
 mod tests {
     use super::*;
     use axum::body::to_bytes;
+
+    /// Spec `antwortkompression`: nur JSON ohne ETag und ohne Cache-Control (LFH-940).
+    #[test]
+    fn kompression_nur_fuer_api_json() {
+        use axum::http::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE, ETAG};
+        use tower_http::compression::Predicate;
+        let p = nur_json_ab(ANTWORT_KOMPRESSION_AB);
+        let antwort = |kopf: &[(axum::http::HeaderName, &'static str)]| {
+            let mut r = axum::http::Response::new(axum::body::Body::from(vec![b'x'; 4096]));
+            r.headers_mut()
+                .insert(CONTENT_LENGTH, axum::http::HeaderValue::from_static("4096"));
+            for (k, v) in kopf {
+                r.headers_mut()
+                    .insert(k.clone(), axum::http::HeaderValue::from_static(v));
+            }
+            r
+        };
+        assert!(p.should_compress(&antwort(&[(CONTENT_TYPE, "application/json")])));
+        assert!(!p.should_compress(&antwort(&[
+            (CONTENT_TYPE, "application/json"),
+            (ETAG, "\"abc\""),
+        ])));
+        assert!(!p.should_compress(&antwort(&[
+            (CONTENT_TYPE, "application/json"),
+            (CACHE_CONTROL, "no-cache"),
+        ])));
+        assert!(!p.should_compress(&antwort(&[(CONTENT_TYPE, "text/event-stream")])));
+    }
 
     /// LFH-925: nur 1 bis 64 Zeichen aus `[A-Za-z0-9-]` gelten als Request-ID des Clients.
     #[test]

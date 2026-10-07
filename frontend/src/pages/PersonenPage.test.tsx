@@ -198,16 +198,16 @@ function OfflineSyncTest({ benutzerId }: { benutzerId: number }) {
 }
 
 describe('PersonenPage', () => {
-  it('zeigt in der Vorgabe ALLE Personen; der Filter „Neu" zeigt nur erfasste', async () => {
+  it('zeigt in der Vorgabe ALLE Personen; der Filter „Erfasst" zeigt nur erfasste', async () => {
     // Vorgabe „Alle": eine mit Sichtung erfasste Person hebt der Server auf `betroffen` — unter
-    // „Neu" verschwände sie beim Erfassen.
+    // „Erfasst" verschwände sie beim Erfassen.
     render(einsatzAktiv, [person, unbekannt]);
     expect(await screen.findByText('R-001')).toBeInTheDocument();
     expect(screen.getByText('R-002')).toBeInTheDocument();
     expect(screen.getByText('Mustermann, Max')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Neu' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Erfasst' }));
     await waitFor(() => expect(screen.queryByText('R-002')).not.toBeInTheDocument());
     expect(screen.getByText('R-001')).toBeInTheDocument();
   });
@@ -272,24 +272,71 @@ describe('PersonenPage', () => {
    * Der Seitenkopf kommt aus `EinsatzSeite`, nicht aus einem handgebauten Block. Die zweite Zeile
    * ist die tragende: „level 1 da" allein wäre auch mit Handbau daneben grün.
    */
-  it('trägt den Seitenkopf „Betroffene" mit Mono-Meta „n erfasst"', async () => {
+  it('trägt den Seitenkopf „Betroffene" mit Mono-Meta „n gesamt"', async () => {
     render(einsatzAktiv, [person, unbekannt]);
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Betroffene' }),
     ).toBeInTheDocument();
-    expect(await screen.findByText('2 erfasst')).toBeInTheDocument();
+    // „gesamt“, nicht „erfasst“: „erfasst“ ist ein Personenstatus (LFH-963).
+    expect(await screen.findByText('2 gesamt')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
   });
 
-  it('Einsatzleitung sieht die Erfassungszeile und die Masken-Wege', async () => {
+  it('Einsatzleitung sieht die Erfassungszeile, EINE Maske und „Vermisst melden"', async () => {
     render(einsatzAktiv, []);
     await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.getByRole('textbox', { name: 'Kurzeingabe Person' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Person erfassen' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Betroffene/n erfassen' })).toBeInTheDocument();
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).getByRole('button', { name: 'Betroffene erfassen' })).toHaveClass(
+      'ant-btn-primary',
+    );
+    expect(within(kopf).getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
+    // Die alten Doppelwege sind fort (LFH-963, Entscheidung 9).
+    expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Betroffene/n erfassen' })).not.toBeInTheDocument();
+    // Genau eine Primäraktion im Kopf.
+    expect(kopf.querySelectorAll('.ant-btn-primary')).toHaveLength(1);
+  });
+
+  /**
+   * EINE Maske (LFH-963): Kopfknopf und `?neu=1` öffnen dieselbe, sie nennt den Folgestatus und
+   * legt mit `erfasst` an — vorher hing der Status unsichtbar am gewählten Knopf.
+   */
+  it('die Maske nennt den Folgestatus und legt mit Status „erfasst" an', async () => {
+    let gesendet: { status?: string } = {};
+    server.use(
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        gesendet = (await request.json()) as { status?: string };
+        return HttpResponse.json({ ...person, id: 50, registrier_nr: 50 }, { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Betroffene erfassen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Betroffene erfassen' });
+    expect(dialog).toHaveTextContent('Status: erfasst · mit Sichtung → betroffen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Erfasst als R-050')).toBeInTheDocument();
+    expect(gesendet.status).toBe('erfasst');
+  });
+
+  it('stellt unter xl die Sichtungszeile über den Statusfilter', async () => {
+    // Vitest-Vorgabe 1024 px: unter `xl` steht die Seitenleiste unter der Liste.
+    render(einsatzAktiv, [{ ...person, aktuelle_sichtung: 'sk1' as const }, unbekannt]);
+    const zeile = await screen.findByRole('list', { name: 'Sichtungszahlen' });
+    expect(zeile).toHaveTextContent('2 gesamt');
+    expect(zeile).toHaveTextContent('1 SK I');
+    const filter = screen.getByRole('tablist', { name: 'Personen nach Status filtern' });
+    // Über dem Filter, also vor ihm im Dokument.
+    expect(zeile.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('ab xl steht die Sichtungszeile nicht: die Seitenleiste trägt die Zahlen daneben', async () => {
+    setzeViewportBreite(1366);
+    render(einsatzAktiv, [{ ...person, aktuelle_sichtung: 'sk1' as const }, unbekannt]);
+    expect(await screen.findByRole('region', { name: 'Sichtungsbild' })).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Sichtungszahlen' })).not.toBeInTheDocument();
   });
 
   it('bestätigt die Registriernummer, macht die neue Person sichtbar und hebt sie hervor', async () => {
@@ -311,7 +358,7 @@ describe('PersonenPage', () => {
     render(einsatzAktiv, []);
     // Ein Filter, der die neue Person verbirgt: er muss auf „Alle" zurückfallen, sonst stünde die
     // Hervorhebung an einer unsichtbaren Zeile.
-    await userEvent.click(await screen.findByRole('tab', { name: 'Neu' }));
+    await userEvent.click(await screen.findByRole('tab', { name: 'Erfasst' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     // Der Name liegt unter „Weitere Angaben" — hier genügt der Antreffort, die Maske hat keine
     // Pflichtfelder.
@@ -345,7 +392,7 @@ describe('PersonenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Betroffene erfassen' }));
     const skZwei = within(
       screen.getByRole('radiogroup', { name: 'Sichtungskategorie' }),
     ).getAllByRole('radio')[1];
@@ -365,7 +412,7 @@ describe('PersonenPage', () => {
       ),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Betroffene erfassen' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
@@ -496,8 +543,8 @@ describe('PersonenPage', () => {
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     expect(await screen.findByText('Person B')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Schnellerfassung');
+    await userEvent.click(screen.getByRole('button', { name: 'Betroffene erfassen' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Betroffene erfassen');
 
     await act(async () => {
       antwortFreigeben();
@@ -507,7 +554,7 @@ describe('PersonenPage', () => {
     expect(screen.queryByText('Person A')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Alle' })).toHaveAttribute('aria-selected', 'true');
     expect(container.querySelector('[data-row-key="77"]')).not.toHaveClass('zeile-hervorgehoben');
-    expect(screen.getByRole('dialog')).toHaveTextContent('Schnellerfassung');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Betroffene erfassen');
   });
 
   it('ersetzt die Offline-Warnung nach korreliertem Flush durch Registriernummer und Highlight', async () => {
@@ -821,7 +868,7 @@ describe('PersonenPage', () => {
   it('Beobachter sieht keine Schreibaktionen', async () => {
     render(einsatzBeobachter, [person]);
     await screen.findByText('R-001');
-    expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Betroffene erfassen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Kurzeingabe Person' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Person erfassen' })).not.toBeInTheDocument();
   });
@@ -983,14 +1030,14 @@ describe('PersonenPage', () => {
     await waitFor(() => expect(regFolge()).toEqual(['R-004']));
   });
 
-  it('öffnet via ?neu=1 die Schnellerfassung (die Maske, nicht die Zeile)', async () => {
+  it('öffnet via ?neu=1 die Maske „Betroffene erfassen“ (nicht die Zeile)', async () => {
     render(einsatzAktiv, [], '/einsaetze/1/personen?neu=1');
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
-    expect(dialog).toHaveTextContent('Schnellerfassung');
+    expect(dialog).toHaveTextContent('Betroffene erfassen');
   });
 
-  it('öffnet via ?neu=1 die Schnellerfassung NICHT für Beobachter', async () => {
+  it('öffnet via ?neu=1 die Maske NICHT für Beobachter', async () => {
     render(einsatzBeobachter, [], '/einsaetze/1/personen?neu=1');
     // Seite lädt durch (Tabelle leer, kein Spinner mehr)
     await screen.findByRole('heading', { name: /Betroffene/ });
@@ -1189,9 +1236,7 @@ describe('PersonenPage', () => {
     );
     await client.refetchQueries({ queryKey: einsatzKeys.personen(1) });
 
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie nicht.
     expect(screen.getByText('R-001')).toBeInTheDocument();
     expect(screen.queryByText('Personen konnten nicht geladen werden')).not.toBeInTheDocument();
@@ -1212,9 +1257,7 @@ describe('PersonenPage', () => {
 
     expect(await screen.findByText('Personen konnten nicht geladen werden')).toBeInTheDocument();
     expect(screen.queryByText('R-001')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Aktualisierung fehlgeschlagen/)).not.toBeInTheDocument();
   });
 
   describe('Erfassungszeile /person', () => {
@@ -1359,7 +1402,9 @@ describe('PersonenPage', () => {
       const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
       expect(zeile).toHaveAccessibleDescription(/#Koordinate \(52\.2691\/9\.1342\)/);
       await userEvent.type(zeile, 'Kowalski sk2');
-      const hinweis = screen.getByText('#Koordinate (52.2691/9.1342)').parentElement!;
+      // Die Ebene des Stapels: über der Kürzel-Gruppe (die unter `md` einklappt, LFH-963).
+      const hinweis = screen.getByText('#Koordinate (52.2691/9.1342)').parentElement!
+        .parentElement!;
       expect(hinweis).toHaveStyle({ visibility: 'hidden' });
       expect(hinweis).toHaveAttribute('aria-hidden', 'true');
       expect(zeile).toHaveAccessibleDescription(/^erkannt:/);
@@ -1500,7 +1545,7 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
       return el!;
     });
     expect(within(kopf).getByRole('button', { name: 'CSV exportieren' })).toBeInTheDocument();
-    expect(within(kopf).queryByRole('button', { name: 'Schnellerfassung' })).toBeNull();
+    expect(within(kopf).queryByRole('button', { name: 'Betroffene erfassen' })).toBeNull();
   });
 
   it('zeigt den Fehler an der Seite neben dem Abschluss-Hinweis, nicht im Toast', async () => {
@@ -1517,7 +1562,7 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
     expect(meldung.closest('.ant-message')).toBeNull();
     expect(meldung.closest('.ant-alert')).not.toBeNull();
     expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
-    expect(screen.getByText('Einsatz ist abgeschlossen — nur Ansicht.')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz abgeschlossen')).toBeInTheDocument();
     expect(speichern).not.toHaveBeenCalled();
   });
 });

@@ -317,6 +317,8 @@ pub struct EtbAbfrageParams {
     pub erfasser_id: Option<i64>,
     /// Filter „betrifft Einheit" (LFH-616, Semantik an `repo::EtbFilter::einheit_id`).
     pub einheit_id: Option<i64>,
+    /// Ausschluss der Systemeinträge (LFH-958); `false` und fehlend sind gleich.
+    pub ohne_system: Option<bool>,
     /// Cursor: nur Einträge mit lfd_nr < diesem Wert.
     pub before_lfd_nr: Option<i64>,
     /// Cursor nach oben (LFH-947): die Seite direkt über diesem Wert, absteigend geliefert.
@@ -355,6 +357,7 @@ pub async fn liste(
         bis_zeit: merkmale.bis_zeit,
         erfasser_id: merkmale.erfasser_id,
         einheit_id: merkmale.einheit_id,
+        ohne_system: merkmale.ohne_system,
         before_lfd_nr: params.before_lfd_nr,
         after_lfd_nr: params.after_lfd_nr,
         limit,
@@ -405,7 +408,7 @@ pub async fn zaehler(
 }
 
 /// Prüft und normalisiert die Filtermerkmale einer ETB-Abfrage (unbekannter Typ und
-/// unlesbare Zeit → 400). Liste und beide Zählungen rufen DIESE Funktion (LFH-612): eine
+/// unlesbare Zeit → 400, `typ=system` mit `ohne_system` → 422). Liste und beide Zählungen rufen DIESE Funktion (LFH-612): eine
 /// zweite Kopie wäre die Stelle, an der „n Treffer" im Kopf und die Liste still
 /// auseinanderliefen.
 fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, AppError> {
@@ -417,6 +420,14 @@ fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, Ap
     )?;
     let von_zeit = params.von.as_deref().map(normalisiere_zeit).transpose()?;
     let bis_zeit = params.bis.as_deref().map(normalisiere_zeit).transpose()?;
+    // Erst nach den Feldprüfungen (400): jedes Feld ist für sich gültig, erst die Kombination
+    // nicht (`src/AGENTS.md`, Statuscode-Konvention).
+    let ohne_system = params.ohne_system.unwrap_or(false);
+    if ohne_system && params.typ.as_deref() == Some("system") {
+        return Err(AppError::UnprocessableEntity(
+            "typ=system und ohne_system schließen sich aus".into(),
+        ));
+    }
     // q nur als Filter nutzen, wenn nach Trim nicht leer.
     let q = params
         .q
@@ -430,6 +441,7 @@ fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, Ap
         bis_zeit,
         erfasser_id: params.erfasser_id,
         einheit_id: params.einheit_id,
+        ohne_system,
     })
 }
 

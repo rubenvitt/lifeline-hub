@@ -1,9 +1,10 @@
-import { IconChevronRechts, IconLupe, IconPfeilLinks } from '../icons';
+import { IconChevronRechts, IconKreuz, IconLupe, IconPfeilLinks } from '../icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
+import { useViewport } from '../components/useViewport';
 import { paletteMaske, schrift, schriftskala } from '../theme/tokens';
 import { istApplePlattform } from './befehle';
 import { sichtbareDatensaetze } from './datensaetze';
@@ -27,7 +28,7 @@ import {
   type PaletteModus,
 } from './typen';
 import { Vorschau } from './Vorschau';
-import { palettenZeilenStil, vorschauZielStil } from './zeilenStil';
+import { palettenZeilenStil, schliessKnopfMass, vorschauZielStil } from './zeilenStil';
 
 /**
  * Frist der Meldung nach außen, Wert und Bauform wie in `etb/EtbFilterleiste.tsx`; ein zweiter
@@ -146,6 +147,12 @@ export function CommandPalette({
 }: Props) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
+  /**
+   * DIE Weiche nach Zeigerart (LFH-982): bei grobem Zeiger Tippwege statt Tastenhinweisen. Der
+   * PRIMÄRE Zeiger, nicht die Breite: ein Fükw mit schmalem Fenster hat eine Tastatur. Jede
+   * Touch-Abweichung der Palette liest nur diese Konstante.
+   */
+  const { istBeruehrung } = useViewport();
   const [suche, setSuche] = useState('');
   /**
    * Die Auswahl hängt an der BEFEHLS-ID, nicht am Listenindex: Datensatz-Treffer treffen
@@ -344,6 +351,20 @@ export function CommandPalette({
   }
 
   /**
+   * Präfix-Chip (LFH-982): setzt das Präfix vor den Rest und ersetzt dabei ein anderes; der Chip
+   * des aktiven Modus nimmt es weg. Der Fokus bleibt im Suchfeld (`mousedown` am Chip abgefangen),
+   * `focus()` holt ihn zurück, falls er woanders stand.
+   */
+  function waehleModus(m: PaletteModus, praefix: string) {
+    // Der Begriff aus der ROHEN Eingabe, nicht aus dem getrimmten `rest`: ein Leerzeichen am Ende
+    // gehört zum Weitertippen („florian “ → „@florian “ → „@florian m“).
+    const aktuell = PALETTE_MODI[modus].praefix ?? '';
+    const begriff = suche.trimStart().slice(aktuell.length).trimStart();
+    setSuche(m === modus ? begriff : `${praefix}${begriff}`);
+    inputRef.current?.focus();
+  }
+
+  /**
    * Esc/← aus der Vorschau, an der WURZEL der Palette: mit Fokus auf „Zurück“ käme Esc sonst allein
    * beim globalen Dispatcher an, der die ganze Palette schlösse. `preventDefault` ist tragend, sonst
    * liest der Dispatcher dieselbe Taste als `verwerfen`.
@@ -490,13 +511,15 @@ export function CommandPalette({
             {b.kontext}
           </span>
         )}
-        {b.kuerzel && (
+        {/* Bei grobem Zeiger keine Tastenmarke an der Zeile (LFH-982); ohne Pfeiltasten gibt es
+            auch kein Springen, gegen das die reservierte Breite der Enter-Marke hilft. */}
+        {b.kuerzel && !istBeruehrung && (
           <Tastenkuerzel style={{ ...tasteStil, color: farben.schwach }}>{b.kuerzel}</Tastenkuerzel>
         )}
         {/* Die Enter-Marke steht NUR an der aktiven Zeile: sie sagt, was Enter gerade auslöst.
             Satz, kein Ziel, deshalb `aria-hidden`. Ihre Breite ist auch an den übrigen Zeilen
             reserviert, sonst rückte der Kontext beim Pfeilen hin und her. */}
-        {!b.kuerzel && (
+        {!b.kuerzel && !istBeruehrung && (
           <Tastenkuerzel
             aria-hidden
             style={{
@@ -521,7 +544,7 @@ export function CommandPalette({
           <span
             aria-hidden="true"
             data-lfh="palette-vorschau-ziel"
-            title="Vorschau (→)"
+            title={istBeruehrung ? 'Vorschau' : 'Vorschau (→)'}
             onMouseDown={(e: MouseEvent) => e.preventDefault()}
             onClick={(e: MouseEvent) => {
               e.stopPropagation();
@@ -624,9 +647,30 @@ export function CommandPalette({
               {PALETTE_MODI[modus].hinweis}
             </span>
           )}
-          <Tastenkuerzel aria-hidden style={{ ...tasteStil, color: farben.schwach }}>
-            Esc
-          </Tastenkuerzel>
+          {/*
+           * Bei grobem Zeiger ein ECHTER Schließknopf statt der Esc-Marke (LFH-982): die Marke sähe
+           * wie ein Knopf aus und täte auf Touch nichts. In der Kopfzeile statt antds Schließkreuz,
+           * das absolut über dem Suchfeld säße; Boden 48, wächst mit der Staffel.
+           */}
+          {istBeruehrung ? (
+            <Button
+              type="text"
+              aria-label="Sprungpalette schließen"
+              icon={<IconKreuz size={18} />}
+              onClick={schliesse}
+              style={{
+                flexShrink: 0,
+                width: schliessKnopfMass(token),
+                height: schliessKnopfMass(token),
+                minWidth: schliessKnopfMass(token),
+                color: farben.gedaempft,
+              }}
+            />
+          ) : (
+            <Tastenkuerzel aria-hidden style={{ ...tasteStil, color: farben.schwach }}>
+              Esc
+            </Tastenkuerzel>
+          )}
         </div>
         {vorschau?.vorschau ? (
           // DIE VORSCHAU (Taste →) ersetzt die Liste: 640 px tragen Liste und Lese-Ansicht nicht
@@ -730,66 +774,118 @@ export function CommandPalette({
           }
         >
           {/* In der Vorschau sagt dieselbe Region an, WO man ist; der Fokus bleibt im Suchfeld. */}
-          {vorschau ? `Vorschau: ${vorschau.label}. Escape führt zurück.` : leerText}
+          {vorschau
+            ? `Vorschau: ${vorschau.label}. ${istBeruehrung ? '„Zurück“ führt zur Liste.' : 'Escape führt zurück.'}`
+            : leerText}
         </div>
         {/*
-         * FUSSZEILE: nur Hinweise, die wirklich funktionieren. Enter, die drei Präfixe aus
-         * `PALETTE_MODI` (eine Quelle) und, wo es einen Sprung gibt, die Koordinate (erkannt an ihrer
-         * Form, ohne Zeichen; `#` bleibt das ETB-Präfix). ⇧↵ ist frei: Strg/⌘+↵ öffnet im neuen Tab, →
-         * zeigt die Vorschau.
+         * FUSSZEILE: nur Hinweise, die wirklich funktionieren — und die hängen an der ZEIGERART
+         * (LFH-982, `command-palette/AGENTS.md`, „Zeigerart“).
+         *
+         * Feiner Zeiger: Enter, die drei Präfixe aus `PALETTE_MODI` (eine Quelle); ⇧↵ ist frei:
+         * Strg/⌘+↵ öffnet im neuen Tab, → zeigt die Vorschau. In der Vorschau stehen die drei
+         * gültigen Wege. Grober Zeiger: keine Taste; in der Liste die Präfixe als Chips, in der
+         * Vorschau „Öffnen“ (der Tippweg für ↵; zurück führt „Zurück“ im Vorschaukopf).
          *
          * Die Hinweise stehen STATISCH: ein je Zeile wechselnder Hinweis änderte die Zeilenzahl der
-         * umbrechenden Fußzeile, die Palette spränge beim Pfeilen. In der Vorschau stehen die drei
-         * gültigen Wege.
+         * umbrechenden Fußzeile, die Palette spränge beim Pfeilen. Die Touch-Fußzeile bricht nie
+         * um (eine Reihe Knöpfe gleicher Höhe in Liste und Vorschau), zu schmal scrollt sie.
          */}
-        <div
-          data-lfh="palette-fuss"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            columnGap: 12,
-            rowGap: 4,
-            padding: '6px 16px',
-            borderTop: `1px solid ${token.colorBorderSecondary}`,
-            fontFamily: schrift.text,
-            fontSize: schriftskala.textKlein.groesse,
-            color: farben.schwach,
-          }}
-        >
-          <span style={hinweisStil}>
-            <Tastenkuerzel style={tasteQuadrat}>↵</Tastenkuerzel>
-            öffnen
-          </span>
-          <span style={hinweisStil}>
-            <Tastenkuerzel style={tasteStil}>{neuerTabKuerzel(userAgent)}</Tastenkuerzel>
-            neuer Tab
-          </span>
-          {vorschau ? (
+        {istBeruehrung ? (
+          <div
+            data-lfh="palette-fuss"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'nowrap',
+              gap: token.paddingXS,
+              overflowX: 'auto',
+              padding: `${token.paddingXS}px ${token.paddingSM}px`,
+              borderTop: `1px solid ${token.colorBorderSecondary}`,
+              fontFamily: schrift.text,
+              fontSize: schriftskala.textKlein.groesse,
+            }}
+          >
+            {vorschau ? (
+              <Button type="primary" onClick={() => fuehreAus(vorschau)}>
+                Öffnen
+              </Button>
+            ) : (
+              modiMitPraefix().map((m) => (
+                <Button
+                  key={m.modus}
+                  aria-pressed={m.modus === modus}
+                  title={m.legende ?? undefined}
+                  // Das Suchfeld behält den Fokus: sonst klappte die Bildschirmtastatur zu und auf.
+                  onMouseDown={(e: MouseEvent) => e.preventDefault()}
+                  onClick={() => waehleModus(m.modus, m.praefix)}
+                  // Schmalere Seitenpolsterung als antds Knopf: so stehen die drei Chips bei 390 px
+                  // in einer Zeile (gemessen, `e2e/command-palette.spec.ts`).
+                  style={{
+                    flexShrink: 0,
+                    paddingInline: token.paddingSM,
+                    background: m.modus === modus ? farben.bedienFlaeche : undefined,
+                    color: m.modus === modus ? farben.bedienText : undefined,
+                  }}
+                >
+                  <span aria-hidden="true" style={{ fontFamily: schrift.zahl }}>
+                    {m.praefix}
+                  </span>{' '}
+                  {m.kurz}
+                </Button>
+              ))
+            )}
+          </div>
+        ) : (
+          <div
+            data-lfh="palette-fuss"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              columnGap: 12,
+              rowGap: 4,
+              padding: '6px 16px',
+              borderTop: `1px solid ${token.colorBorderSecondary}`,
+              fontFamily: schrift.text,
+              fontSize: schriftskala.textKlein.groesse,
+              color: farben.schwach,
+            }}
+          >
             <span style={hinweisStil}>
-              <Tastenkuerzel style={tasteStil}>Esc</Tastenkuerzel>
-              zurück
+              <Tastenkuerzel style={tasteQuadrat}>↵</Tastenkuerzel>
+              öffnen
             </span>
-          ) : (
-            <>
-              {vorschauVerfuegbar && (
-                <span style={hinweisStil}>
-                  <Tastenkuerzel style={tasteQuadrat}>→</Tastenkuerzel>
-                  Vorschau
-                </span>
-              )}
-              {/* Die Präfixe als eigene Gruppe rechts: sie filtern, die übrigen Tasten handeln. */}
-              <span style={{ ...hinweisStil, gap: 12, marginInlineStart: 'auto' }}>
-                {modiMitPraefix().map((m) => (
-                  <span key={m.modus} style={hinweisStil} title={m.legende ?? undefined}>
-                    <Tastenkuerzel style={tasteQuadrat}>{m.praefix}</Tastenkuerzel>
-                    {m.kurz}
-                  </span>
-                ))}
+            <span style={hinweisStil}>
+              <Tastenkuerzel style={tasteStil}>{neuerTabKuerzel(userAgent)}</Tastenkuerzel>
+              neuer Tab
+            </span>
+            {vorschau ? (
+              <span style={hinweisStil}>
+                <Tastenkuerzel style={tasteStil}>Esc</Tastenkuerzel>
+                zurück
               </span>
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                {vorschauVerfuegbar && (
+                  <span style={hinweisStil}>
+                    <Tastenkuerzel style={tasteQuadrat}>→</Tastenkuerzel>
+                    Vorschau
+                  </span>
+                )}
+                {/* Die Präfixe als eigene Gruppe rechts: sie filtern, die übrigen Tasten handeln. */}
+                <span style={{ ...hinweisStil, gap: 12, marginInlineStart: 'auto' }}>
+                  {modiMitPraefix().map((m) => (
+                    <span key={m.modus} style={hinweisStil} title={m.legende ?? undefined}>
+                      <Tastenkuerzel style={tasteQuadrat}>{m.praefix}</Tastenkuerzel>
+                      {m.kurz}
+                    </span>
+                  ))}
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );

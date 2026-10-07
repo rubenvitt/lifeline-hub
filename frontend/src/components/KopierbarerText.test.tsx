@@ -58,7 +58,7 @@ describe('KopierbarerText (LFH-763)', () => {
     schreibe.mockRejectedValue(new DOMException('verweigert', 'NotAllowedError'));
     renderMitProviders(<KopierbarerText text="JBSWY3DP" bezeichnung="TOTP-Geheimnis" />);
     await userEvent.click(screen.getByRole('button', { name: 'TOTP-Geheimnis kopieren' }));
-    await waitFor(() => expect(screen.getByText(/Kopieren fehlgeschlagen/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Kopieren fehlgeschlagen')).toBeInTheDocument());
   });
 
   it('zeigt ohne Zwischenablage (kein Secure Context) keinen Knopf, der nichts tut', () => {

@@ -418,38 +418,200 @@ async fn anlegen_mit_client_id_tx(
     Ok(meldung_id)
 }
 
-/// Listet Meldungen eines Einsatzes (optional Status-Filter). Sortierung:
-/// Priorität (sofort→normal), eskalierte zuerst, dann neueste Ereigniszeit, dann lfd_nr.
+/// Ordnungszeitpunkt der Abgeschlossen-Ansicht (LFH-940, D2): zuletzt erledigt oben; ohne
+/// Stempel (Altbestand vor LFH-113) die Ereigniszeit. Liste und Cursor lesen denselben Ausdruck.
+macro_rules! abschluss_zeit_sql {
+    () => {
+        "COALESCE(m.erledigt_at, m.ereigniszeit)"
+    };
+}
+
+/// Filter einer Meldungsliste. `seite` gilt nur zusammen mit `phase = Abgeschlossen`
+/// ([`crate::kommunikation::phase_und_seite`]).
+#[derive(Debug, Default)]
+pub struct MeldungFilter<'a> {
+    pub status: Option<&'a str>,
+    pub richtung: Option<&'a str>,
+    /// Gekoppeltes Gerät (LFH-892): nur die selbst erfassten Meldungen. Steht im SQL, nicht
+    /// hinter dem LIMIT, sonst wären Seiten kurz und der Cursor falsch (LFH-940, D5).
+    pub erfasst_von: Option<i64>,
+    pub phase: Option<crate::kommunikation::ListenPhase>,
+    pub seite: Option<crate::kommunikation::Seite>,
+}
+
+/// WHERE-Ergänzungen (ohne Cursor) samt Bindwerten in textueller Reihenfolge.
+fn filter_bedingung(f: &MeldungFilter<'_>) -> (String, Vec<FilterWert>) {
+    use crate::kommunikation::ListenPhase;
+    let mut sql = String::new();
+    let mut werte = Vec::new();
+    match f.phase {
+        Some(ListenPhase::Offen) => sql.push_str(concat!(" AND ", ist_offen_sql!())),
+        Some(ListenPhase::Abgeschlossen) => sql.push_str(concat!(" AND NOT ", ist_offen_sql!())),
+        None => {}
+    }
+    if let Some(s) = f.status {
+        sql.push_str(" AND m.status = ?");
+        werte.push(FilterWert::Text(s.to_string()));
+    }
+    if let Some(r) = f.richtung {
+        sql.push_str(" AND m.richtung = ?");
+        werte.push(FilterWert::Text(r.to_string()));
+    }
+    if let Some(von) = f.erfasst_von {
+        sql.push_str(" AND m.erfasst_von_id = ?");
+        werte.push(FilterWert::Zahl(von));
+    }
+    (sql, werte)
+}
+
+enum FilterWert {
+    Text(String),
+    Zahl(i64),
+}
+
+/// Listet Meldungen eines Einsatzes.
+///
+/// - ohne Phase und `offen`: Priorität (sofort→normal), eskalierte zuerst, dann neueste
+///   Ereigniszeit, dann lfd_nr; ungeblättert.
+/// - `abgeschlossen`: zuletzt erledigt oben ([`abschluss_zeit_sql`]), bei Gleichstand die höhere
+///   id; eine Seite ab dem Cursor.
+///
 /// Bind-Reihenfolge: zuerst `jetzt` (computed `ist_ueberfaellig`), dann WHERE-Parameter.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
-    status_filter: Option<&str>,
-    richtung_filter: Option<&str>,
+    filter: &MeldungFilter<'_>,
     jetzt: &str,
 ) -> Result<Vec<MeldungAnzeige>, AppError> {
-    let mut q = format!("{ANZEIGE_SELECT} WHERE m.einsatz_id = ?");
-    if status_filter.is_some() {
-        q.push_str(" AND m.status = ?");
+    let (bedingung, werte) = filter_bedingung(filter);
+    let mut q = format!("{ANZEIGE_SELECT} WHERE m.einsatz_id = ?{bedingung}");
+    let seite = match filter.phase {
+        Some(crate::kommunikation::ListenPhase::Abgeschlossen) => filter.seite.as_ref(),
+        _ => None,
+    };
+    if let Some(seite) = seite {
+        if seite.vor.is_some() {
+            q.push_str(concat!(
+                " AND (",
+                abschluss_zeit_sql!(),
+                " < ? OR (",
+                abschluss_zeit_sql!(),
+                " = ? AND m.id < ?))"
+            ));
+        }
+        q.push_str(concat!(
+            " ORDER BY ",
+            abschluss_zeit_sql!(),
+            " DESC, m.id DESC LIMIT ?"
+        ));
+    } else {
+        q.push_str(
+            " ORDER BY CASE m.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
+              m.eskaliert DESC, m.ereigniszeit DESC, m.lfd_nr DESC",
+        );
     }
-    if richtung_filter.is_some() {
-        q.push_str(" AND m.richtung = ?");
-    }
-    q.push_str(
-        " ORDER BY CASE m.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
-          m.eskaliert DESC, m.ereigniszeit DESC, m.lfd_nr DESC",
-    );
-    // Bind-Reihenfolge = textuelle ?-Reihenfolge: jetzt, einsatz_id, [status], [richtung].
+    // Bind-Reihenfolge = textuelle ?-Reihenfolge: jetzt, einsatz_id, Filter, [Cursor], [limit].
     let mut query = sqlx::query_as::<_, MeldungAnzeige>(sqlx::AssertSqlSafe(&*q))
         .bind(jetzt)
         .bind(einsatz_id);
-    if let Some(s) = status_filter {
-        query = query.bind(s);
+    for w in werte {
+        query = match w {
+            FilterWert::Text(t) => query.bind(t),
+            FilterWert::Zahl(z) => query.bind(z),
+        };
     }
-    if let Some(r) = richtung_filter {
-        query = query.bind(r);
+    if let Some(seite) = seite {
+        if let Some(vor) = &seite.vor {
+            query = query
+                .bind(vor.zeit.clone())
+                .bind(vor.zeit.clone())
+                .bind(vor.id);
+        }
+        query = query.bind(seite.limit);
     }
     query.fetch_all(pool).await.map_err(Into::into)
+}
+
+/// Lädt eine Meldung des Einsatzes als Anzeige (LFH-940, Einzelabruf für den Deeplink).
+/// `NotFound` für eine unbekannte oder einsatzfremde Kennung, ebenso für eine fremde Meldung,
+/// wenn `erfasst_von` gesetzt ist (Gerät).
+pub async fn laden_im_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    erfasst_von: Option<i64>,
+    jetzt: &str,
+) -> Result<MeldungAnzeige, AppError> {
+    let m = laden(pool, id, jetzt).await?;
+    if m.einsatz_id != einsatz_id || erfasst_von.is_some_and(|v| v != m.erfasst_von_id) {
+        return Err(AppError::NotFound);
+    }
+    Ok(m)
+}
+
+/// Eine Gruppe der Kennzahlen ([`kennzahlen`]).
+#[derive(sqlx::FromRow)]
+struct KennzahlGruppe {
+    ist_offen: bool,
+    ist_neu: bool,
+    ist_alarmiert: bool,
+    anzahl: i64,
+}
+
+/// Kennzahlen der Meldungsseite (LFH-940, D3): EINE gruppierte Abfrage über dieselben Fragmente
+/// wie Liste und Zähler, mit den Filtern der Liste (ohne Phase, ohne Seite). „Alarmiert“ zählt
+/// quer zur Phase wie `istAlarmiert` im Client: pflichtig, unbestätigt, Frist abgelaufen oder
+/// eskaliert. Bind-Reihenfolge: `jetzt` (Fragment im SELECT), `einsatz_id`, Filter.
+pub async fn kennzahlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &MeldungFilter<'_>,
+    jetzt: &str,
+) -> Result<super::MeldungKennzahlen, AppError> {
+    let (bedingung, werte) = filter_bedingung(&MeldungFilter {
+        phase: None,
+        seite: None,
+        ..*filter
+    });
+    let q = format!(
+        concat!(
+            "SELECT ",
+            ist_offen_sql!(),
+            " AS ist_offen, (m.status = 'neu') AS ist_neu, \
+             (m.bestaetigung_pflicht = 1 AND NOT ",
+            ist_bestaetigt_sql!(),
+            " AND (",
+            ist_ueberfaellig_sql!(),
+            " OR m.eskaliert = 1)) AS ist_alarmiert, COUNT(*) AS anzahl \
+             FROM meldung m",
+            quittung_join_sql!(),
+            " WHERE m.einsatz_id = ?{} GROUP BY 1, 2, 3"
+        ),
+        bedingung
+    );
+    let mut query = sqlx::query_as::<_, KennzahlGruppe>(sqlx::AssertSqlSafe(&*q))
+        .bind(jetzt)
+        .bind(einsatz_id);
+    for w in werte {
+        query = match w {
+            FilterWert::Text(t) => query.bind(t),
+            FilterWert::Zahl(z) => query.bind(z),
+        };
+    }
+    let mut k = super::MeldungKennzahlen::default();
+    for g in query.fetch_all(pool).await? {
+        if !g.ist_offen {
+            k.erledigt += g.anzahl;
+        } else if g.ist_neu {
+            k.unbearbeitet += g.anzahl;
+        } else {
+            k.in_arbeit += g.anzahl;
+        }
+        if g.ist_alarmiert {
+            k.alarmiert += g.anzahl;
+        }
+    }
+    Ok(k)
 }
 
 /// Cross-Einsatz-Schutz: gehört die Meldung zum Einsatz?
@@ -1078,7 +1240,7 @@ mod tests {
             ..d
         };
         anlegen(&pool, e, b, sofort).await.unwrap();
-        let liste = liste(&pool, e, None, None, "2026-06-12 10:00:00")
+        let liste = liste(&pool, e, &MeldungFilter::default(), "2026-06-12 10:00:00")
             .await
             .unwrap();
         assert_eq!(liste.len(), 2);
@@ -1100,13 +1262,29 @@ mod tests {
         )
         .await
         .unwrap();
-        let liste_neu = liste(&pool, e, Some("neu"), None, "2026-06-12 10:00:00")
-            .await
-            .unwrap();
+        let liste_neu = liste(
+            &pool,
+            e,
+            &MeldungFilter {
+                status: Some("neu"),
+                ..Default::default()
+            },
+            "2026-06-12 10:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(liste_neu.len(), 1);
-        let liste_erledigt = liste(&pool, e, Some("erledigt"), None, "2026-06-12 10:00:00")
-            .await
-            .unwrap();
+        let liste_erledigt = liste(
+            &pool,
+            e,
+            &MeldungFilter {
+                status: Some("erledigt"),
+                ..Default::default()
+            },
+            "2026-06-12 10:00:00",
+        )
+        .await
+        .unwrap();
         assert!(liste_erledigt.is_empty());
     }
 
@@ -1864,15 +2042,23 @@ mod tests {
         anlegen(&pool, e, b, extern_m).await.unwrap();
 
         assert_eq!(
-            liste(&pool, e, None, None, "2026-06-12 10:00:00")
+            liste(&pool, e, &MeldungFilter::default(), "2026-06-12 10:00:00")
                 .await
                 .unwrap()
                 .len(),
             2
         );
-        let nur_extern = liste(&pool, e, None, Some("extern"), "2026-06-12 10:00:00")
-            .await
-            .unwrap();
+        let nur_extern = liste(
+            &pool,
+            e,
+            &MeldungFilter {
+                richtung: Some("extern"),
+                ..Default::default()
+            },
+            "2026-06-12 10:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(nur_extern.len(), 1);
         assert_eq!(nur_extern[0].richtung, Richtung::Extern);
         assert_eq!(nur_extern[0].inhalt, "extern-m");

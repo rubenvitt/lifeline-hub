@@ -39,7 +39,7 @@ async function grundrissMitZweiPlaetzen(page: Page): Promise<string> {
   const einsatzId = page.url().match(/\/einsaetze\/(\d+)\//)![1];
 
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const personName = `MenuePat${Date.now()}`;
   await page.getByRole('button', { name: /Weitere Angaben/ }).click();
   await page.getByLabel('Name', { exact: true }).fill(personName);

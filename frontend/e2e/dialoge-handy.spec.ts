@@ -143,10 +143,10 @@ async function pruefeBlatt(page: Page, wo: string) {
   return p;
 }
 
-/** Serienmaske: die Personen-Schnellerfassung über ihre Adresse (`?neu=1`). */
+/** Serienmaske: „Betroffene erfassen“ über ihre Adresse (`?neu=1`). */
 async function pruefeSerienfuss(page: Page, einsatzId: string, wer: string) {
   await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
-  const dialog = page.getByRole('dialog', { name: 'Schnellerfassung' });
+  const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
   await expect(dialog).toBeVisible();
   await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
 
@@ -298,7 +298,7 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
     ).toBe(false);
 
     await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
-    const dialog = page.getByRole('dialog', { name: 'Schnellerfassung' });
+    const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
     const serie = dialog.getByRole('button', { name: 'Speichern und nächste', exact: true });
     await expect(serie).toBeVisible();
     await expect(serie.locator('.lfh-serien-kuerzel')).toHaveCount(1);
@@ -342,7 +342,7 @@ test('Tablet hoch und Desktop: Fußreihe bleibt einzeilig, Panel bleibt am Feld,
     const wo = `${groesse.width} px`;
     await page.setViewportSize(groesse);
     await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
-    const dialog = page.getByRole('dialog', { name: 'Schnellerfassung' });
+    const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
     await expect(dialog).toBeVisible();
     await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
     const serie = dialog.getByRole('button', { name: 'Speichern und nächste', exact: true });

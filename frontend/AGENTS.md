@@ -266,6 +266,23 @@ Die Lagekarte bedient den Kontext mobil (LFH-557): `frontend/src/pages/lagekarte
 ein Modul-Task nicht fertig. Jede Zeile trägt ein Verdikt (erfüllt / offen → Zielticket / nicht
 anwendbar), „nicht geprüft" ist keins.
 
+**Texte: zeigen statt erklären** (LFH-1078)
+
+- **Text erklärt nie die Bedienung.** Was ein Knopf tut, zeigt seine Beschriftung; wie ein Feld
+  gefüllt wird, zeigen Platzhalter (der wirksame Wert, etwa „jetzt“), Einheit und Prüfung; was
+  fehlt, zeigt der Leerzustand mit Knopf (`SeitenLeer` mit `aktion`); warum etwas gesperrt ist,
+  steht in wenigen Wörtern sichtbar am Element, nie nur im Tooltip (Touch).
+- Kein Satz nennt Dateiformate, Server, Phasen oder Datenflüsse. Neue Seiten tragen keinen
+  Zweck-Absatz unter dem Titel; bestehende `beschreibung="…"` baut LFH-1078 schrittweise ab
+  (der Wächter erfasst sie nicht).
+- Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
+  zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
+  Modulbeschreibungen aus wenigen Fachwörtern.
+- Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
+  „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. `OFFEN` ist
+  eine Schuldmenge, die nur schrumpft: wer eine Datei bereinigt, verkleinert ihren Eintrag; neue
+  Einträge gibt es nicht.
+
 **Tabelle und Dichte**
 
 - **Tabelle nur, wenn verglichen wird**: stehende Kopfzeile, fixierte **menschenlesbare** Kennung
@@ -353,6 +370,13 @@ anwendbar), „nicht geprüft" ist keins.
 - **Ein Anker in der Zeile bedient den Klick allein** (Riegel `closest('a')` in `Datensicht`);
   mit `titel.ziel` erzeugt das `render` keinen Anker.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET**; Speichern gehört ins `<form>`.
+- **Nebenwege im Kopf gehen über `weitere` der `EinsatzSeite`** (LFH-963, Spec
+  `einsatztauglichkeit-layout`, Entscheidung 8): Drucken, CSV, Listenzugriffe und ähnliche
+  Öffnen-Wege stehen ab `md` als sekundäre Knöpfe, unter `md` hinter EINEM Auslöser „Weitere“
+  (`MenueAusloeser`, Name nennt die Seite). In `aktionen` bleibt nur, was am Handy sichtbar sein
+  muss: Segmentleiste und genau eine Erfassung, auf Betroffenen- und Tiere-Liste dazu „Vermisst
+  melden“. Nachgezogen sind Betroffene, Tiere, Schäden; die übrigen Seiten folgen im Folgeticket.
+  Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt
   (`/admin/stammdaten/{fahrzeuge,personal}/:id`), sonst Einzel-GET; Admin-Pfade in
@@ -483,9 +507,10 @@ und `pages/personen/`.
 - **Gescheiterter Zustandsübergang meldet sich im Dialog** (LFH-535):
   `entwurf/FreigabeDialog.tsx`, kein `modal.confirm`; `freigabeGrund`, Vorrang Speicherfehler;
   Öffnen ruft `freigebenMutation.reset()`. Test zählt `.ant-message`, offen/zu über `ant-zoom-leave`.
-- **Fehlende Berechtigung wird erklärt, nicht stumm weggeschaltet** (M16): `RechteHinweis`,
-  Primäraktion gesperrt sichtbar; Zeilenaktionsspalte entfällt (M45); Wortlaut in
-  `stammdaten/rechteText.ts`.
+- **Fehlende Berechtigung wird benannt, nicht stumm weggeschaltet** (M16): `RechteHinweis` zeigt
+  „Nur Ansicht · Grund“ über dem Block (Grund aus `components/nurAnsicht.ts`, wenige Wörter,
+  Rollen wie in der Mitgliederverwaltung), Primäraktion gesperrt sichtbar; Zeilenaktionsspalte
+  entfällt (M45); gesperrte Einzelzeilen tragen ihren Kurzgrund selbst.
 - Sofort-Speichern-Zeile sperrt nur sich (`ModulEinstellungsListe`: `laeuftKey`/`fehlerKey` aus
   `mutation.variables`, Fehlerzeile `data-fehler`).
 - Zeilenlayouts ohne feste Spaltenbreite (Grid `minmax(0, 1fr) auto auto`, unter `md` gestapelt

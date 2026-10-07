@@ -1,40 +1,33 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import {
+  ERINNERUNGEN_SEITE,
+  erinnerungCursor,
   erledigeErinnerung,
+  ladeErinnerungKennzahlen,
   legeErinnerungAn,
-  listeErinnerungen,
+  listeAbgeschlosseneErinnerungen,
+  listeOffeneErinnerungen,
   oeffneErinnerung,
   quittiereErinnerung,
 } from '../api/erinnerungen';
+import type { AbschlussCursor } from '../api/meldungen';
 import type { Erinnerung, NeueErinnerung } from '../api/types';
-import {
-  ERINNERUNG_STATUS,
-  GRUPPE_LABEL,
-  GRUPPE_ORDNUNG,
-  faelligGruppe,
-  istAbgeschlossen,
-  type FaelligGruppe,
-} from '../kommunikation';
+import { GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, type FaelligGruppe } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
-
-/** Schluessel-Zeitstempel der Abgeschlossen-Ansicht: erledigt ODER erübrigt ODER Anlage. */
-function abschlussZeit(e: Erinnerung): string {
-  return e.erledigt_at ?? e.quittiert_at ?? e.erstellt_at;
-}
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -52,11 +45,33 @@ export default function ErinnerungenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  // Offen/Abgeschlossen-Trennung erfolgt clientseitig → ALLE Erinnerungen laden.
-  const erinnerungenQuery = useQuery({
-    queryKey: einsatzKeys.erinnerungen(einsatzId),
-    queryFn: () => listeErinnerungen(einsatzId, false),
+  // Offene ungeblättert, abgeschlossene seitenweise erst in ihrer Ansicht, Zahlen aus einem
+  // eigenen Abruf (LFH-940, design.md D7). Ordnung der abgeschlossenen am Server: zuletzt
+  // abgeschlossen zuerst.
+  const offeneQuery = useQuery({
+    queryKey: einsatzKeys.erinnerungenPhase(einsatzId, 'offen'),
+    queryFn: () => listeOffeneErinnerungen(einsatzId),
   });
+  const kennzahlenQuery = useQuery({
+    queryKey: einsatzKeys.erinnerungKennzahlen(einsatzId),
+    queryFn: () => ladeErinnerungKennzahlen(einsatzId),
+  });
+  const abgeschlosseneQuery = useInfiniteQuery({
+    queryKey: einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen'),
+    queryFn: ({ pageParam }) => listeAbgeschlosseneErinnerungen(einsatzId, pageParam),
+    initialPageParam: undefined as AbschlussCursor | undefined,
+    getNextPageParam: (letzte) =>
+      letzte.length < ERINNERUNGEN_SEITE ? undefined : erinnerungCursor(letzte[letzte.length - 1]),
+    enabled: ansicht === 'abgeschlossen',
+  });
+  const abgeschlossene = useMemo(() => {
+    const gesehen = new Set<number>();
+    return (abgeschlosseneQuery.data?.pages ?? []).flat().filter((e) => {
+      if (gesehen.has(e.id)) return false;
+      gesehen.add(e.id);
+      return true;
+    });
+  }, [abgeschlosseneQuery.data]);
 
   // „Heute fällig“ nach dem Kalendertag der Anzeigezone (LFH-692).
   const { konventionen } = useAnzeigeKonventionen();
@@ -112,15 +127,9 @@ export default function ErinnerungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  const alleErinnerungen = erinnerungenQuery.data ?? [];
-
-  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
-  const offene = alleErinnerungen.filter(
-    (e) => !istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'),
-  );
-  const abgeschlossene = alleErinnerungen.filter((e) =>
-    istAbgeschlossen(ERINNERUNG_STATUS[e.status]?.phase ?? 'offen'),
-  );
+  const offene = offeneQuery.data ?? [];
+  const offenZahl = kennzahlenQuery.data?.offen ?? offene.length;
+  const abgeschlossenZahl = kennzahlenQuery.data?.abgeschlossen ?? abgeschlossene.length;
 
   // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach faellig_at aufsteigend.
   const offeneGruppen: { gruppe: FaelligGruppe; erinnerungen: Erinnerung[] }[] = GRUPPE_ORDNUNG.map(
@@ -132,11 +141,6 @@ export default function ErinnerungenPage() {
     }),
   ).filter(({ erinnerungen }) => erinnerungen.length > 0);
 
-  // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
-  const abgeschlosseneSortiert = [...abgeschlossene].sort((a, b) =>
-    abschlussZeit(b).localeCompare(abschlussZeit(a)),
-  );
-
   const listenProps = {
     darfSchreiben,
     onErledigen: (eid: number) => erledigenMutation.mutate(eid),
@@ -147,8 +151,8 @@ export default function ErinnerungenPage() {
     <EinsatzSeite
       titel="Erinnerungen"
 
-      meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
-      dataUpdatedAt={erinnerungenQuery.dataUpdatedAt}
+      meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
+      dataUpdatedAt={offeneQuery.dataUpdatedAt}
       breadcrumb={
         <Breadcrumb
           items={[
@@ -195,7 +199,7 @@ export default function ErinnerungenPage() {
         </Paneel>
       )}
 
-      {erinnerungenQuery.isError && (
+      {(offeneQuery.isError || (ansicht === 'abgeschlossen' && abgeschlosseneQuery.isError)) && (
         <Alert
           type="error"
           showIcon
@@ -217,8 +221,8 @@ export default function ErinnerungenPage() {
           wert={ansicht}
           onWechsel={setAnsicht}
           optionen={[
-            { wert: 'offen', label: `Offen (${offene.length})` },
-            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+            { wert: 'offen', label: `Offen (${offenZahl})` },
+            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossenZahl})` },
           ]}
         />
       </div>
@@ -236,11 +240,34 @@ export default function ErinnerungenPage() {
           ))
         )
       ) : (
-        <ErinnerungListe
-          erinnerungen={abgeschlosseneSortiert}
-          ansicht="abgeschlossen"
-          {...listenProps}
-        />
+        <>
+          {abgeschlosseneQuery.isPending ? (
+            <div style={{ textAlign: 'center', padding: token.paddingLG }}>
+              <Spin />
+            </div>
+          ) : (
+            <ErinnerungListe
+              erinnerungen={abgeschlossene}
+              ansicht="abgeschlossen"
+              {...listenProps}
+            />
+          )}
+          {abgeschlosseneQuery.hasNextPage &&
+            (kennzahlenQuery.data == null ||
+              abgeschlossene.length < kennzahlenQuery.data.abgeschlossen) && (
+              <div style={{ textAlign: 'center', marginTop: token.margin }}>
+                <Button
+                  onClick={() => void abgeschlosseneQuery.fetchNextPage()}
+                  loading={abgeschlosseneQuery.isFetchingNextPage}
+                >
+                  Ältere laden
+                </Button>
+                <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
+                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                </div>
+              </div>
+            )}
+        </>
       )}
     </EinsatzSeite>
   );

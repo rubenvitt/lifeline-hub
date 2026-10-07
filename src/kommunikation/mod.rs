@@ -91,6 +91,80 @@ where
     }
 }
 
+wire_enum! {
+    #[wire(ohne_serde)]
+    /// Phase einer Kommunikationsliste (LFH-940): `offen` ungeblättert in fachlicher Ordnung,
+    /// `abgeschlossen` seitenweise ([`Seite`]). Nur Anfrage-Parameter, nie in einer Antwort.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ListenPhase {
+        Offen => "offen",
+        Abgeschlossen => "abgeschlossen",
+    }
+}
+
+/// Vorgabe der Seitengröße abgeschlossener Listen; dieselbe Zahl wie im ETB.
+pub const SEITE_STANDARD: i64 = crate::etb::repo::STANDARD_LIMIT;
+/// Obergrenze der Seitengröße; größere Werte werden geklemmt, nicht abgelehnt (wie im ETB).
+pub const SEITE_MAX: i64 = crate::etb::repo::MAX_LIMIT;
+
+/// Cursor einer abgeschlossenen Liste: der Ordnungszeitpunkt und die Kennung des letzten
+/// gelesenen Eintrags. Die Kennung bricht den Gleichstand, sonst fielen Einträge mit demselben
+/// Zeitstempel zwischen zwei Seiten heraus oder kämen doppelt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZeitCursor {
+    pub zeit: String,
+    pub id: i64,
+}
+
+/// Eine angeforderte Seite einer abgeschlossenen Liste.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Seite {
+    pub vor: Option<ZeitCursor>,
+    pub limit: i64,
+}
+
+/// Liest Phase, Cursor und Seitengröße aus den Anfrage-Parametern (LFH-940).
+///
+/// Unbekannte Phase → 400 (das Feld für sich). Ein halber Cursor oder Cursor/`limit` ohne
+/// `phase=abgeschlossen` → 422 (der Zusammenhang, `src/AGENTS.md`, Statuscode-Konvention).
+/// `limit` wird auf `[1, SEITE_MAX]` geklemmt. Ohne `phase=abgeschlossen` ist die Seite `None`.
+pub fn phase_und_seite(
+    phase: Option<&str>,
+    vor_zeit: Option<&str>,
+    vor_id: Option<i64>,
+    limit: Option<i64>,
+) -> Result<(Option<ListenPhase>, Option<Seite>), crate::error::AppError> {
+    use crate::error::AppError;
+    let phase = crate::routes::support::parse_enum_opt(
+        ListenPhase::parse,
+        phase.map(str::trim).filter(|p| !p.is_empty()),
+        "Ungültige Phase",
+    )?;
+    let vor_zeit = vor_zeit.map(str::trim).filter(|z| !z.is_empty());
+    let vor = match (vor_zeit, vor_id) {
+        (Some(zeit), Some(id)) => Some(ZeitCursor {
+            zeit: zeit.to_string(),
+            id,
+        }),
+        (None, None) => None,
+        _ => {
+            return Err(AppError::UnprocessableEntity(
+                "vor_zeit und vor_id gehören zusammen".into(),
+            ))
+        }
+    };
+    if phase != Some(ListenPhase::Abgeschlossen) {
+        if vor.is_some() || limit.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Blättern nur mit phase=abgeschlossen".into(),
+            ));
+        }
+        return Ok((phase, None));
+    }
+    let limit = limit.unwrap_or(SEITE_STANDARD).clamp(1, SEITE_MAX);
+    Ok((phase, Some(Seite { vor, limit })))
+}
+
 /// Geteilter Status eines Objekts: beide Achsen getrennt. `quittiert_at` ist die
 /// Quittungs-Achse, `vollzug_status`/`vollzogen_at` die Vollzugs-Achse — beide
 /// unabhängig setzbar.
@@ -108,6 +182,56 @@ pub struct KommunikationStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phase_und_seite_prueft_den_zusammenhang() {
+        use crate::error::AppError;
+        assert_eq!(
+            phase_und_seite(None, None, None, None).unwrap(),
+            (None, None)
+        );
+        assert_eq!(
+            phase_und_seite(Some("offen"), None, None, None).unwrap(),
+            (Some(ListenPhase::Offen), None)
+        );
+        assert!(matches!(
+            phase_und_seite(Some("alle"), None, None, None),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            phase_und_seite(
+                Some("abgeschlossen"),
+                Some("2026-10-01 10:00:00"),
+                None,
+                None
+            ),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            phase_und_seite(Some("offen"), None, None, Some(5)),
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        let (_, seite) = phase_und_seite(Some("abgeschlossen"), None, None, Some(5000)).unwrap();
+        assert_eq!(seite.unwrap().limit, SEITE_MAX);
+        let (_, seite) = phase_und_seite(Some("abgeschlossen"), None, None, Some(0)).unwrap();
+        assert_eq!(seite.unwrap().limit, 1);
+        let (_, seite) = phase_und_seite(
+            Some("abgeschlossen"),
+            Some("2026-10-01 10:00:00"),
+            Some(7),
+            None,
+        )
+        .unwrap();
+        let seite = seite.unwrap();
+        assert_eq!(seite.limit, SEITE_STANDARD);
+        assert_eq!(
+            seite.vor,
+            Some(ZeitCursor {
+                zeit: "2026-10-01 10:00:00".into(),
+                id: 7
+            })
+        );
+    }
 
     #[test]
     fn vollzug_konstanten_sind_eindeutig() {

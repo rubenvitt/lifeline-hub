@@ -1,6 +1,7 @@
 import type {
   Person,
   PersonAnhang,
+  PersonAuswahl,
   PersonDetail,
   PersonStatus,
   PersonZugriff,
@@ -74,6 +75,15 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
 export function listePersonen(einsatzId: number, status?: PersonStatus): Promise<Person[]> {
   const q = status ? `?status=${status}` : '';
   return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${q}`);
+}
+
+/**
+ * Schlanke Auswahl je nicht stornierter Person (`id`, `registrier_nr`, `name`, `vorname`,
+ * `status`) ohne Freitexte, für Picker, Sprungpalette und Chat-Bezug (LFH-940). Hinter
+ * demselben Recht wie die Liste, ohne Zugriffsprotokoll.
+ */
+export function listePersonenAuswahl(einsatzId: number): Promise<PersonAuswahl[]> {
+  return apiGet<PersonAuswahl[]>(`/api/einsaetze/${einsatzId}/personen/auswahl`);
 }
 
 /**
