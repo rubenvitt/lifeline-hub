@@ -46,9 +46,8 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
+import { statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
-import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
 import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
@@ -456,12 +455,7 @@ export default function PersonalPage() {
         einheitenQuery.dataUpdatedAt,
         fahrzeugeQuery.dataUpdatedAt,
       )}
-      titel={
-        <Space>
-          Personal
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Personal"
       breadcrumb={
         <Breadcrumb
           items={[

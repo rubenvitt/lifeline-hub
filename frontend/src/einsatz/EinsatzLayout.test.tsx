@@ -9,8 +9,11 @@ import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import EinsatzLayout, { einsatzKennung, navGriffMass } from './EinsatzLayout';
+import EinsatzLayout, { navGriffMass } from './EinsatzLayout';
+import { einsatzKennung } from './einsatzKennung';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
+import { leseLetztenOrt } from './letzterOrt';
+import { useEinsatzRahmen } from './EinsatzRahmenKontext';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
@@ -1055,5 +1058,62 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     await freigabenAngekommen();
     expect(screen.getByText('Lagemeldungen-Inhalt')).toBeInTheDocument();
     expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
+  });
+});
+
+describe('EinsatzLayout · Orientierung (LFH-954)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setzeViewportBreite(XL);
+    document.title = 'lifeline-hub';
+  });
+
+  it('setzt den Tab-Titel aus dem Modulnamen der Registry und dem Einsatz', async () => {
+    setup();
+    await waitFor(() => expect(document.title).toBe('ETB · Hochwasser Nord · lifeline-hub'));
+  });
+
+  it('folgt dem Modul der Route', async () => {
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/lagekarte');
+    await waitFor(() => expect(document.title).toBe('Lagekarte · Hochwasser Nord · lifeline-hub'));
+  });
+
+  it('merkt den offenen Pfad als letzten Ort der Person, ohne die Suche', async () => {
+    // Die Suche trägt Freitextfilter (ETB `q`); sie gehören nicht in den Browserspeicher.
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen?q=Meier');
+    await screen.findByText('Personen-Inhalt');
+    await waitFor(() =>
+      expect(leseLetztenOrt(admin.id)).toEqual({ einsatzId: 7, pfad: '/einsaetze/7/personen' }),
+    );
+  });
+
+  it('merkt kein gesperrtes Modul als letzten Ort', async () => {
+    setup(freigabenFixture({ personen: { zugriff: false } }), {}, admin, '/einsaetze/7/personen');
+    await freigabenAngekommen();
+    await waitFor(() => expect(document.title).toContain('Hochwasser Nord'));
+    expect(leseLetztenOrt(admin.id)).toBeNull();
+  });
+
+  it('reicht den geladenen Einsatz an die Seiten weiter', async () => {
+    function Sonde() {
+      return <span data-testid="rahmen-einsatz">{useEinsatzRahmen()?.bezeichnung ?? '—'}</span>;
+    }
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+    );
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <Routes>
+          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+            <Route path="etb" element={<Sonde />} />
+          </Route>
+        </Routes>
+      </CommandPaletteProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+    expect(await screen.findByTestId('rahmen-einsatz')).toHaveTextContent('Hochwasser Nord');
   });
 });

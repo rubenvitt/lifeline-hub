@@ -66,6 +66,11 @@ async function misst(page: Page, einsatzId: string, rolle: string) {
     }
 
     if (breite.width !== 1440) continue;
+    // Erst zählen, wenn die Erfassungsleiste steht: solange sie lädt, liegt ihre Oberkante
+    // 137 px tiefer, und lokal zählte das Gate 11 statt 8 Einträge (LFH-954).
+    if (rolle === 'admin') {
+      await expect(page.getByRole('button', { name: 'Erfassen', exact: true })).toBeVisible();
+    }
     const imBild = await page.evaluate(() => {
       const leiste = document.querySelector('#etb-filterleiste')!.getBoundingClientRect();
       const erfassung = document.querySelector('.etb-erfassung-sticky');

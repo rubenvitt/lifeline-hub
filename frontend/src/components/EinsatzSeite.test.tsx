@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 import userEvent from '@testing-library/user-event';
 import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Button, Form, Input } from 'antd';
+import { Breadcrumb, Button, Form, Input } from 'antd';
+import type { EinsatzAnzeige } from '../api/types';
+import { EinsatzRahmenProvider } from '../einsatz/EinsatzRahmenKontext';
 import {
   CommandPaletteProvider,
   useTastaturEbene,
@@ -459,5 +461,87 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
     expect(inhalt.contains(fuss)).toBe(false);
     expect(fuss.parentElement).toBe(inhalt.parentElement);
     expect(inhalt.parentElement!.lastElementChild).toBe(fuss);
+  });
+});
+
+describe('EinsatzSeite · Orientierung (LFH-954)', () => {
+  const einsatz = (status: 'aktiv' | 'abgeschlossen') =>
+    ({ id: 5, bezeichnung: 'Starkregen Nord', status }) as EinsatzAnzeige;
+
+  it('zeigt bei nicht aktivem Einsatz „Einsatzstatus <Etikett>“ neben dem Titel, nicht im h1', () => {
+    renderMitProviders(
+      <EinsatzRahmenProvider value={einsatz('abgeschlossen')}>
+        <EinsatzSeite titel="Tiere">
+          <div>x</div>
+        </EinsatzSeite>
+      </EinsatzRahmenProvider>,
+    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Tiere$/);
+    expect(screen.getByTestId('einsatzstatus')).toHaveTextContent('Einsatzstatus');
+    expect(screen.getByTestId('einsatzstatus')).toHaveTextContent('Abgeschlossen');
+    // Wort aus dem Statusfarb-Vertrag, nicht der Wire-Wert: `data-rolle` belegt den Weg über
+    // `einsatzStatus` und `StatusTag`.
+    expect(screen.getByText('Abgeschlossen').closest('[data-rolle]')).toHaveAttribute(
+      'data-rolle',
+      'neutral',
+    );
+  });
+
+  it('zeigt bei aktivem Einsatz und ohne Rahmen keinen Einsatzstatus', () => {
+    const { unmount } = renderMitProviders(
+      <EinsatzRahmenProvider value={einsatz('aktiv')}>
+        <EinsatzSeite titel="Tiere">
+          <div>x</div>
+        </EinsatzSeite>
+      </EinsatzRahmenProvider>,
+    );
+    expect(screen.queryByTestId('einsatzstatus')).toBeNull();
+    unmount();
+    renderMitProviders(
+      <EinsatzSeite titel="Tiere">
+        <div>x</div>
+      </EinsatzSeite>,
+    );
+    expect(screen.queryByTestId('einsatzstatus')).toBeNull();
+  });
+
+  it('trägt den vollen Wortlaut jedes Pfadeintrags im `title`', async () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite
+        titel="ETB"
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: 'Einsätze' },
+              { title: 'Starkregen Nord Abschnitt West' },
+              { title: 'ETB' },
+            ]}
+          />
+        }
+      >
+        <div>x</div>
+      </EinsatzSeite>,
+    );
+    const eintraege = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        '.lfh-seitenkopf__pfad li:not(.ant-breadcrumb-separator)',
+      ),
+    );
+    await waitFor(() =>
+      expect(eintraege.map((li) => li.title)).toEqual([
+        'Einsätze',
+        'Starkregen Nord Abschnitt West',
+        'ETB',
+      ]),
+    );
+  });
+
+  /** Vitest fährt mit `css: false`; ob „Einsätze“ bei 390 ganz bleibt, misst `orientierung.spec.ts`. */
+  it('lässt unter md den ersten Pfadeintrag ungekürzt', () => {
+    const regel = seiteCss.match(
+      /\.lfh-seitenkopf__pfad \.ant-breadcrumb ol > li:first-child\s*\{([^}]*)\}/,
+    );
+    expect(regel, 'EinsatzSeite.css trägt die Regel für „Einsätze“').not.toBeNull();
+    expect(regel![1]).toMatch(/flex-shrink:\s*0/);
   });
 });

@@ -311,11 +311,14 @@ describe('EtbPage', () => {
     });
   });
 
-  it('zeigt Seitentitel, Einsatz im Ortspfad, Einträge und die Serverzahl im Kopf', async () => {
+  it('zeigt Seitentitel, Ortspfad ohne Einsatz, Einträge und die Serverzahl im Kopf', async () => {
     setup();
-    // Der Seitenkopf trägt den Modultitel; der Einsatz steht im Ortspfad davor.
+    // Der Seitenkopf trägt den Modultitel. Den Einsatz nennt der Pfad nicht, sonst bräche der Kopf
+    // bei 1440 px um (Spec `seiten-orientierung`, Ortspfad; gemessen in `e2e/etb-zeilenhoehe`).
     expect(await screen.findByRole('heading', { name: 'Einsatztagebuch' })).toBeInTheDocument();
-    expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument();
+    const pfad = document.querySelector('.lfh-seitenkopf__pfad')!;
+    expect(pfad).toHaveTextContent('Einsätze');
+    expect(pfad).not.toHaveTextContent('Hochwasser Nord');
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
     // Kein Filter: der Kopf nennt die Gesamtzahl der Serverzählung.

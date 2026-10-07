@@ -116,7 +116,8 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
   await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
   await expect(page).toHaveURL(new RegExp(`/tiere/druck\\?sicht=aktiv$`));
   await expect(drucken).toBeEnabled({ timeout: 30_000 });
-  await expect(kopf).toContainText('Sicht: Aktiv');
+  // Das Wort der Liste („Offen“), der Wert in der Adresse bleibt `aktiv`.
+  await expect(kopf).toContainText('Sicht: Offen');
   await expect(zeilen(page, 'tiere-druck-tabelle')).toHaveCount(2);
 
   // ── Schäden: Vorgabe-Sicht „offen".

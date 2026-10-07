@@ -49,8 +49,7 @@ import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
 import AbschnittDaten from './einsatzabschnitte/AbschnittDaten';
-import StatusTag from '../components/StatusTag';
-import { abschnittLagezustand, einsatzStatus } from '../theme/statusFarben';
+import { abschnittLagezustand } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { abrufZustand } from '../api/abrufZustand';
 import { parseAbschnitteAnsicht, type AbschnitteAnsicht } from '../routing/deeplinks';
@@ -371,12 +370,7 @@ export default function EinsatzabschnittePage() {
 
   return (
     <EinsatzSeite
-      titel={
-        <Space>
-          Einsatzabschnitte
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Einsatzabschnitte"
 
       meta={abschnitteQuery.isSuccess ? `${abschnitte.length} Abschnitte` : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(

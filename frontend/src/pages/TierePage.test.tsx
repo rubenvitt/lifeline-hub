@@ -555,7 +555,7 @@ describe('TierePage', () => {
     });
     await waitFor(() => expect(screen.queryByText('Tier A')).not.toBeInTheDocument());
     expect(screen.getByText('Tier B')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Aktiv' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Offen' })).toHaveAttribute('aria-checked', 'true');
     expect(container.querySelector('[data-row-key="99"]')).not.toHaveClass('zeile-hervorgehoben');
   });
 

@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Space, Switch, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Switch, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   useInfiniteQuery,
@@ -52,14 +52,13 @@ import {
 import { scrolleZurZeile } from '../components/Datensicht';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
-import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, monoStil, useRollen, type SegmentOption } from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { neueClientId } from '../offline/clientId';
-import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
+import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
   dokumenteJeEintrag,
   filterZusammenfuehren,
@@ -754,21 +753,16 @@ export default function EtbPage() {
     <EinsatzSeite
       titel="Einsatztagebuch"
       breadcrumb={
+        // Ohne Einsatznamen (Spec `seiten-orientierung`, Ortspfad): mit ihm bräche der Kopf bei
+        // 1440 px in eine zweite Zeile und kostete die Zeitachse einen Eintrag (LFH-958). Den
+        // Einsatz nennt der Wechsler darüber. Der letzte Eintrag steht nur für den Trenner.
         <Breadcrumb
-          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
+          items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: 'Einsatztagebuch' }]}
         />
       }
       meta={kopfMeta({ gesamt: zaehlerQuery.data?.gesamt, filterAktiv })}
       dataUpdatedAt={etbQuery.dataUpdatedAt}
       aktionen={kopfAktionen}
-      hinweis={
-        einsatz.status !== 'aktiv' ? (
-          <Space>
-            <span>Einsatzstatus</span>
-            <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-          </Space>
-        ) : undefined
-      }
       fuss={erfassung}
     >
       <div

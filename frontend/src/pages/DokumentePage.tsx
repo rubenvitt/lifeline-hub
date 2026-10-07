@@ -14,10 +14,8 @@ import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensic
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import EinsatzSeite from '../components/EinsatzSeite';
-import StatusTag from '../components/StatusTag';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { formatGroesse } from '../karten/formatGroesse';
-import { einsatzStatus } from '../theme/statusFarben';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from '../dokumente/kategorien';
 import DokumentAblegenModal from '../dokumente/DokumentAblegenModal';
 import DokumentBearbeitenModal from '../dokumente/DokumentBearbeitenModal';
@@ -335,12 +333,7 @@ export default function DokumentePage() {
           ? `${alle.length} ${alle.length === 1 ? 'Dokument' : 'Dokumente'}`
           : undefined
       }
-      titel={
-        <Space>
-          Dokumente
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Dokumente"
       beschreibung="Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos."
       breadcrumb={
         <Breadcrumb

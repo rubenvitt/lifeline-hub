@@ -42,8 +42,7 @@ import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
-import { einsatzStatus, materialStatus, type StatusDarstellung } from '../theme/statusFarben';
-import StatusTag from '../components/StatusTag';
+import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
 import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
@@ -379,12 +378,7 @@ export default function MaterialPage() {
           ]}
         />
       }
-      titel={
-        <Space>
-          Material
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Material"
       meta={emQuery.isSuccess ? `${ems.length} Positionen` : undefined}
       dataUpdatedAt={emQuery.dataUpdatedAt}
       hinweis={

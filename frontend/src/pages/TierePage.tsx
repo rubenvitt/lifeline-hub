@@ -40,8 +40,6 @@ import {
   type TiereSicht,
 } from './tiere/tierHelfer';
 import type { Spezies, Tier } from '../api/types';
-import StatusTag from '../components/StatusTag';
-import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
@@ -310,12 +308,7 @@ export default function TierePage() {
     <EinsatzSeite
       dataUpdatedAt={tiereQuery.dataUpdatedAt}
       meta={tiereQuery.isSuccess ? `${tiereQuery.data.length} Tiere` : undefined}
-      titel={
-        <Space>
-          Tiere
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Tiere"
       breadcrumb={
         <Breadcrumb
           items={[

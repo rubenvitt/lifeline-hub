@@ -1,7 +1,7 @@
 import { IconPlus, IconTrichter } from '../icons';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
-import { App as AntApp, Button, Input, Space, Tag, theme } from 'antd';
+import { App as AntApp, Breadcrumb, Button, Input, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -947,6 +947,15 @@ export default function KraefteuebersichtPage() {
     <div className="kraefte-print-root" data-lfh="druckwurzel">
       <EinsatzSeite
         titel="Meldebild"
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: einsatz.bezeichnung },
+              { title: 'Meldebild' },
+            ]}
+          />
+        }
         meta={meta}
         dataUpdatedAt={datenstand}
         aktionen={

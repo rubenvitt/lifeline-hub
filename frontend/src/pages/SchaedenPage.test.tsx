@@ -206,14 +206,13 @@ describe('SchaedenPage', () => {
    * Der Kopf kommt aus `EinsatzSeite`, nicht aus einem handgebauten Rahmen: Breadcrumb und
    * Status-Tag und kein zweiter Überschriftenknoten.
    */
-  it('trägt den gemeinsamen Modulkopf: Breadcrumb, Einsatz-Status, eine Überschrift', async () => {
+  it('trägt den gemeinsamen Modulkopf: Breadcrumb, eine Überschrift ohne Einsatzstatus', async () => {
     render(einsatzAktiv, [basisSchaden()]);
     expect(await screen.findByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: /Schäden/ })).toBeInTheDocument();
+    // Genau „Schäden“: der Einsatzstatus hängt nicht mehr am h1 (LFH-954), er steht bei nicht
+    // aktivem Einsatz im Seitenkopf des Rahmens (`EinsatzSeite.test.tsx`).
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Schäden$/);
     expect(screen.getAllByRole('heading')).toHaveLength(1);
-    // „Aktiv", nicht „aktiv": der Kopf zeigt die Beschriftung aus dem Statusfarb-Vertrag über
-    // `StatusTag`, nicht den Wire-Wert.
-    expect(screen.getByText('Aktiv')).toBeInTheDocument();
   });
 
   it('weist Beobachter im Kopf auf die fehlende Schreibberechtigung hin', async () => {

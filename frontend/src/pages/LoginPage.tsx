@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError, fehlerText } from '../api/client';
 import OtpEingabe from '../components/OtpEingabe';
+import { useDokumentTitel } from '../components/useDokumentTitel';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
 import { totpFinish } from '../api/totp';
@@ -33,6 +34,7 @@ interface TotpFormWerte {
 }
 
 export default function LoginPage() {
+  useDokumentTitel(['Anmelden']);
   const { login, aktualisiere, benutzer, laedt: authLaedt } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

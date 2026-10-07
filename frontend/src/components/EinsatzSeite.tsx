@@ -1,6 +1,6 @@
 import { IconChevronRechts } from '../icons';
 import { Button, ConfigProvider, Typography, theme } from 'antd';
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
 // Seiten unter diesem Primitiv benutzen die `.lfh-*`-Klassen aus `sprache.css`. Alle Selektoren
@@ -12,6 +12,10 @@ import FensterRahmen from './FensterRahmen';
 import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
 import { useModusFarben } from './rahmenStil';
+import StatusTag from './StatusTag';
+import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
+import { einsatzStatus } from '../theme/statusFarben';
+import type { EinsatzAnzeige } from '../api/types';
 
 /** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — Aktionen in
  *  `komfortabel`/`handschuh` (48/72) lassen sie wachsen. */
@@ -96,10 +100,31 @@ export function ortspfadStil(token: { controlHeight: number }): CSSProperties {
  * Eintrag nennt die Seite selbst und wird ausgeblendet (`EinsatzSeite.css`), sonst stünde
  * „Schäden › Schäden" da.
  */
-function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrollen }) {
+export function Ortspfad({
+  children,
+  farben,
+  className,
+}: {
+  children: ReactNode;
+  farben: Farbrollen;
+  /** Zusatzklasse, etwa `lfh-ortspfad--ab-md` (`EinsatzSeite.css`). */
+  className?: string;
+}) {
   // Der Token der umgebenden Stufe, nicht der des verschachtelten Providers unten (der setzt nur
   // Schrift und Farben).
   const { token } = theme.useToken();
+  const wurzel = useRef<HTMLDivElement>(null);
+  // Der volle Wortlaut jedes Eintrags im `title` (LFH-954, design.md D2): unter `md` kürzt der
+  // Einsatzname mit Auslassung. Hier zentral statt in den `items` der Seiten; antd setzt am `li`
+  // kein eigenes `title`. Ohne Abhängigkeiten, weil ein `ReactNode` keinen stabilen Vergleich hat.
+  useLayoutEffect(() => {
+    wurzel.current
+      ?.querySelectorAll<HTMLElement>('li:not(.ant-breadcrumb-separator)')
+      .forEach((li) => {
+        const text = li.textContent?.trim() ?? '';
+        if (li.title !== text) li.title = text;
+      });
+  });
   return (
     <ConfigProvider
       breadcrumb={{
@@ -121,10 +146,41 @@ function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrolle
         },
       }}
     >
-      <div className="lfh-seitenkopf__pfad" style={ortspfadStil(token)}>
+      <div
+        ref={wurzel}
+        className={className ? `lfh-seitenkopf__pfad ${className}` : 'lfh-seitenkopf__pfad'}
+        style={ortspfadStil(token)}
+      >
         {children}
       </div>
     </ConfigProvider>
+  );
+}
+
+/**
+ * „Einsatzstatus <Etikett>“ neben dem Titel, nur wenn der Einsatz nicht aktiv ist (LFH-954,
+ * design.md D3; `frontend/AGENTS.md`, Seitenkopf). Nie im h1: unbeschriftet las man „Tiere Aktiv“
+ * als Filter. Neben dem Titel statt im `hinweis`, wo oft schon „Nur Ansicht · Einsatz
+ * abgeschlossen“ steht. Exportiert für die Lagekarte, die ihren Kopf selbst baut.
+ */
+export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | undefined }) {
+  const farben = useModusFarben();
+  if (!einsatz || einsatz.status === 'aktiv') return null;
+  return (
+    <span
+      data-testid="einsatzstatus"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontSize: 12,
+        color: farben.gedaempft,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      Einsatzstatus
+      <StatusTag darstellung={einsatzStatus[einsatz.status]} />
+    </span>
   );
 }
 
@@ -321,6 +377,7 @@ export default function EinsatzSeite({
   const aktionenRef = useRef<HTMLDivElement>(null);
   const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
+  const rahmenEinsatz = useEinsatzRahmen();
 
   /*
    * Seitenweite Tastatur-Ebene (LFH-391 · B5): sie liegt in der Ebenen-KETTE ÜBER den tiefen
@@ -383,6 +440,7 @@ export default function EinsatzSeite({
           <Typography.Title level={1} style={seitentitelStil(farben)}>
             {titel}
           </Typography.Title>
+          <EinsatzstatusMarke einsatz={rahmenEinsatz} />
           {/* Meta und Datenstand sind EINE Gruppe mit eigener Zeile unter `md` (`EinsatzSeite.css`,
               LFH-373): in der Titelzeile schöbe eine spät eintreffende Meta alles darunter nach unten.
               Per CSS, nicht per `useViewport`, dessen erstes Bild bewusst breit ist. */}

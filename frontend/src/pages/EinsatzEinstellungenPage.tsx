@@ -1,7 +1,7 @@
-import { Alert } from 'antd';
+import { Alert, Breadcrumb } from 'antd';
 import { useId } from 'react';
 import { Segmentleiste } from '../components/instrument';
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -109,9 +109,18 @@ export default function EinsatzEinstellungenPage() {
   return (
     <EinsatzSeite
       titel="Einstellungen"
+      // Der Pfad nennt den Einsatz (LFH-954); ein Satz „Einstellungen für …“ darunter wiederholte ihn.
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: daten.einsatz.bezeichnung },
+            { title: 'Einstellungen' },
+          ]}
+        />
+      }
       // Reine Formularseite: ausdrücklich die schmale Lesebreite.
       breite="schmal"
-      beschreibung={`Einsatzbezogene Einstellungen für „${daten.einsatz.bezeichnung}". Gelten nur für diesen Einsatz.`}
       hinweis={
         !daten.istAktiv && (
           <Alert

@@ -79,6 +79,19 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* „Einsätze“ ist der Rückweg und kürzt nie (LFH-954): sonst schrumpften alle Einträge gleich, und
+     aus „Einsätze“ wurde „Einsätz“. Gekürzt wird nur, was dahinter steht — der Einsatzname. */
+  .lfh-seitenkopf__pfad .ant-breadcrumb ol > li:first-child {
+    flex-shrink: 0;
+  }
+}
+
+/* Ein Pfad erst ab `md` (LFH-954): die Lagekarte gibt unter `md` keine Zeile ihrer Kartenhöhe her.
+   Per CSS, nicht per `useViewport`, dessen erstes Bild bewusst breit ist. */
+@media (max-width: 767.98px) {
+  .lfh-ortspfad--ab-md {
+    display: none;
+  }
 }
 
 /* Der Datenstand-Platzhalter gilt nur dort, wo er eine Zeile hält: unter `md` (oben). Ab `md`

@@ -63,12 +63,7 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import {
-  besatzungsUrteil,
-  einsatzStatus,
-  statusKategorie,
-  type BesatzungsUrteil,
-} from '../theme/statusFarben';
+import { besatzungsUrteil, statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
@@ -611,12 +606,7 @@ export default function FahrzeugePage() {
     <EinsatzSeite
       dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
       meta={efQuery.isSuccess ? `${efs.length} Fahrzeuge` : undefined}
-      titel={
-        <Space>
-          Fahrzeuge
-          <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-        </Space>
-      }
+      titel="Fahrzeuge"
       breadcrumb={
         <Breadcrumb
           items={[

@@ -60,8 +60,11 @@ describe('EtbPage – Abschließen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Einsatz abschließen' }));
     // Popconfirm bestätigen
     await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
-    // Beschriftung aus dem Statusfarb-Vertrag, nicht der Wire-Wert.
-    await waitFor(() => expect(screen.getByText('Abgeschlossen')).toBeInTheDocument());
+    // Der Einsatzstatus steht seit LFH-954 im Seitenkopf des Rahmens (`EinsatzSeite.test.tsx`);
+    // die Seite selbst belegt den Abschluss am verschwundenen Knopf.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull(),
+    );
   });
 
   it('zeigt den Abschließen-Button nicht für Nicht-Einsatzleitung', async () => {
