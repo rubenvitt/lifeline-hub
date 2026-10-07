@@ -69,6 +69,7 @@ const CHAT_MINDESTHOEHE = 320;
 import { useViewport } from '../components/useViewport';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { anzahl } from '../anzeige/anzahl';
+import { modulName } from '../einsatz/modulRegistry';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -551,7 +552,7 @@ export default function ChatPage() {
 
   return (
     <EinsatzSeite
-      titel="Chat"
+      titel={modulName('chat')}
 
       meta={kanaeleQuery.isSuccess ? anzahl(kanaele.length, 'Kanal', 'Kanäle') : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(
@@ -563,7 +564,7 @@ export default function ChatPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Chat' },
+            { title: modulName('chat') },
           ]}
         />
       }

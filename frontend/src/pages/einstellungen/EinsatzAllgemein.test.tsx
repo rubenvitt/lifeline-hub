@@ -3,6 +3,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../../test/utils';
 import EinsatzAllgemein from './EinsatzAllgemein';
+import { modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
+import { mitVorgabe } from '../../components/vorgabeText';
 
 // Die Systemrolle ist umschaltbar, weil `darfImEinsatzSchreiben` einen System-Admin unabhängig von
 // `meine_rolle` durchlässt — ein fest auf 'admin' verdrahteter Mock löste den Rechte-Hinweis nie
@@ -88,6 +90,19 @@ describe('EinsatzAllgemein', () => {
     expect(screen.queryByText('Karten-Defaults')).not.toBeInTheDocument();
     // Gewähltes Standard-Modul: das Select-Selection-Item trägt title="ETB".
     expect(screen.getByTitle('ETB')).toBeInTheDocument();
+  });
+
+  // Leer öffnet der Einsatz das Modul aus `redirectZiel`; der Platzhalter nennt es mit dem
+  // Menünamen (LFH-965), nicht fest „ETB“.
+  it('nennt im leeren Einstiegsmodul das Ziel von redirectZiel als Vorgabe', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({ ...BASIS, standard_modul: null } as never);
+
+    rendern();
+
+    const ziel = modulZuRoute(redirectZiel())!;
+    expect(ziel.key).toBe('ueberblick');
+    expect(await screen.findByText(mitVorgabe(ziel.label))).toBeInTheDocument();
+    expect(screen.getByText('Überblick (Vorgabe)')).toBeInTheDocument();
   });
 
   it('laesst die Karten-Defaults (basemap/fachebenen/zoom) als Bestandswert mitfahren (LFH-319)', async () => {

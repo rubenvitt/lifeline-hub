@@ -1,5 +1,5 @@
 import { IconExternPfeil, IconSchloss, IconSchraubenschluessel } from '../icons';
-import type { CSSProperties } from 'react';
+import { useId, type CSSProperties } from 'react';
 import { theme } from 'antd';
 import {
   istModulGesperrt,
@@ -99,6 +99,26 @@ export function modulZeilenStil(
 }
 
 /**
+ * Zweite Zeile einer Modulzeile: die Kurzbeschreibung aus der Registry (LFH-965, Spec
+ * `modul-benennung`). 12 px in `schwach`, das den Textboden auf jeder Flächenstufe hält; eine
+ * Zeile, zu Lange endet in „…“ und steht ganz im `title` des Knopfes.
+ */
+export function modulBeschreibungStil(
+  farben: Pick<Farbrollen, 'schwach'>,
+  gesperrt: boolean,
+): CSSProperties {
+  return {
+    display: 'block',
+    fontSize: 12,
+    lineHeight: 1.35,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    color: gesperrt ? 'inherit' : farben.schwach,
+  };
+}
+
+/**
  * Die aktive Marke links in der Zeile. Inaktiv bleibt sie als transparenter Platzhalter stehen,
  * sonst spränge das Etikett beim Aktivieren.
  */
@@ -152,6 +172,7 @@ export function ModulListe({
 }: ListeProps) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
+  const listenId = useId();
   // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben). Beide Aufrufer reichen die
   // Kategorieliste roh herein, der Filter gehört deshalb hierher. Die Anordnung mit den
   // Sprungmarken fällt VOR dem Filter (`navZeilen`).
@@ -206,14 +227,16 @@ export function ModulListe({
         const aktiv = m.key === aktiverModulKey;
         const modulZaehler = m.zaehlerQuelle ? zaehler?.[m.zaehlerQuelle] : undefined;
         const zaehlerSichtbar = modulZaehler !== undefined && modulZaehler.wert > 0;
+        const beschreibungId = m.beschreibung ? `${listenId}-${m.key}` : undefined;
         return (
           <button
             key={m.key}
             type="button"
             disabled={gesperrt}
-            title={gesperrt ? KEINE_BERECHTIGUNG : undefined}
+            title={gesperrt ? KEINE_BERECHTIGUNG : m.beschreibung}
             aria-current={aktiv ? 'true' : undefined}
             aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
+            aria-describedby={beschreibungId}
             onClick={() => !gesperrt && onModulKlick(m)}
             // Fokusabstand zum klebenden Einsatzdauer-Fuß (WCAG 2.4.11) neben, nicht in
             // `modulZeilenStil`: der ist die Dichte-Zusicherung.
@@ -225,7 +248,22 @@ export function ModulListe({
             {/* Keine Modulicon: die Zeile trägt Marke · Etikett · Zähler. Die Icons bleiben in der
                Kommandopalette, wo sie Module, Aktionen und Datensätze unterscheiden. */}
             <span aria-hidden="true" style={modulMarkeStil(farben, aktiv)} />
-            <span style={{ minWidth: 0, flex: 1 }}>{m.label}</span>
+            {/* Name und Beschreibung untereinander (LFH-965, Spec `modul-benennung`). Die
+               Beschreibung ist `aria-hidden` und hängt über `aria-describedby` am Knopf: der
+               zugängliche Name bleibt der Modulname. */}
+            <span style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <span>{m.label}</span>
+              {m.beschreibung && (
+                <span
+                  id={beschreibungId}
+                  aria-hidden="true"
+                  data-lfh="modul-beschreibung"
+                  style={modulBeschreibungStil(farben, gesperrt)}
+                >
+                  {m.beschreibung}
+                </span>
+              )}
+            </span>
             {/* Zähler als Mono-Zahl rechts, neutral: er zählt offene Vorgänge, er alarmiert nicht. Die
                Bedeutung steht im zugänglichen Namen des Knopfes. */}
             {zaehlerSichtbar && (

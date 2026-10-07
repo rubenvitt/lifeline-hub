@@ -129,7 +129,7 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
     await expect(
       page.getByRole('heading', {
         level: 1,
-        name: pfad === 'lageberichte' ? 'Lageberichte' : 'Lagerelevante Meldungen',
+        name: pfad === 'lageberichte' ? 'Lageberichte' : 'Lagemeldungen',
       }),
     ).toBeVisible();
     // Der gesäte Datensatz als Anker: eine leere Seite hätte trivial keinen Überlauf.

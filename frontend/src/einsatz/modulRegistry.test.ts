@@ -18,6 +18,7 @@ import {
   istPfadGesperrt,
   freiesRueckwegModul,
   KEINE_BERECHTIGUNG,
+  modulName,
   type ModulEintrag,
 } from './modulRegistry';
 import { freigabenFixture } from '../test/fixtures';
@@ -30,6 +31,32 @@ const offen: ModulEintrag = {
   route: 'x',
   status: 'geplant',
 };
+
+describe('modulName (LFH-965)', () => {
+  it('liefert das Menü-Label, der eine Name des Moduls', () => {
+    expect(modulName('etb')).toBe('ETB');
+    expect(modulName('lage-dashboard')).toBe('Lagebild');
+    expect(modulName('personen')).toBe('Betroffene');
+    expect(modulName('gefahrenzonen')).toBe('Gefahren');
+  });
+
+  it('wirft bei einem unbekannten Schlüssel statt still einen falschen Titel zu setzen', () => {
+    expect(() => modulName('gibt-es-nicht')).toThrow(/gibt-es-nicht/);
+  });
+
+  it('kein Modulname ist englisch', () => {
+    const englisch = /\b(Dashboard|Settings|Home|Overview)\b/;
+    expect(modulRegistry.filter((m) => englisch.test(m.label)).map((m) => m.label)).toEqual([]);
+  });
+
+  it('jede Beschreibung ist eine Wortgruppe: kein Satzpunkt, kein Gedankenstrich, kurz', () => {
+    for (const m of modulRegistry) {
+      expect(m.beschreibung, m.key).toBeTruthy();
+      expect(m.beschreibung!, m.key).not.toMatch(/[.—→]/);
+      expect(m.beschreibung!.length, m.key).toBeLessThanOrEqual(40);
+    }
+  });
+});
 
 describe('modulRegistry', () => {
   it('enthaelt das fertige ETB-Modul in der Kategorie Erfassung', () => {

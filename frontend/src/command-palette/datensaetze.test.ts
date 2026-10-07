@@ -193,7 +193,7 @@ describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('baueDatensatzTreffer — Rangfolge', () => {
   /**
-   * `praefixStufe` rechnet die Stufe aus dem LABEL: „Personen · R-042 · Müller“ läge bei '42' auf
+   * `praefixStufe` rechnet die Stufe aus dem LABEL: „Betroffene · R-042 · Müller“ läge bei '42' auf
    * Stufe 3, ein Einsatz „Einsatz 42“ auf Stufe 2 und damit VOR dem exakten Nummerntreffer.
    * Deshalb trägt ein Nummerntreffer seine Stufe selbst. Die Vorabprüfung auf den Fuse-Lauf ist
    * nötig, sonst wäre die Ordnungsaussage trivial grün.
@@ -499,7 +499,7 @@ describe('baueDatensatzTreffer — Sortenbindung und Nullbarkeit', () => {
         quellen: { personen: [person({ id: 7, registrier_nr: 42, name: null, vorname: null })] },
       }),
     );
-    expect(labels(t)).toEqual(['Personen · R-042']);
+    expect(labels(t)).toEqual(['Betroffene · R-042']);
   });
 
   /** `AuftragAnzeige.lfd_nr` ist nullbar; `null` darf nie matchen. */
@@ -733,9 +733,9 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
     const [p] = baueDatensatzTreffer(
       kontext({ suche: '42', quellen: { personen: [person({ id: 7, registrier_nr: 42 })] } }),
     );
-    expect(p.befehl.kontext).toBe('Personen');
-    expect(p.befehl.label.startsWith('Personen')).toBe(false);
-    expect(p.befehl.schlagworte).toContain('Personen');
+    expect(p.befehl.kontext).toBe('Betroffene');
+    expect(p.befehl.label.startsWith('Betroffene')).toBe(false);
+    expect(p.befehl.schlagworte).toContain('Betroffene');
   });
 
   it('setzt Kontext und Label zur gelesenen Zeile zusammen', () => {
@@ -745,8 +745,8 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
       meldungen: [meldung({ id: 9, lfd_nr: 42, absender: 'Leitstelle' })],
     };
     expect(labels(baueDatensatzTreffer(kontext({ suche: '42', quellen }))).sort()).toEqual([
+      'Betroffene · R-042 · Müller',
       'Meldungen (eingehend) · #42 · Leitstelle',
-      'Personen · R-042 · Müller',
     ]);
     expect(labels(baueDatensatzTreffer(kontext({ suche: 'bhp', quellen })))).toEqual([
       'Unfallhilfsstellen · BHP Nord (behandlungsplatz)',

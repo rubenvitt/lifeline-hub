@@ -63,7 +63,7 @@ describe('ModulAkkordeon', () => {
   it('meldet den Klick auf ein Modul mit dem Registry-Eintrag', async () => {
     const onModulKlick = vi.fn();
     zeige({ onModulKlick });
-    await userEvent.click(screen.getByRole('button', { name: 'Personen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Betroffene' }));
     expect(onModulKlick).toHaveBeenCalledWith(expect.objectContaining({ key: 'personen' }));
   });
 

@@ -38,6 +38,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { KennungsLink } from '../components/kennungsLink';
 import { useViewport } from '../components/useViewport';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Gliederung der Einheiten eines Einsatzes. Die Detailansicht liegt auf eigener Route
@@ -226,11 +227,11 @@ export default function EinheitenPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Einheiten' },
+            { title: modulName('einheiten') },
           ]}
         />
       }
-      titel="Einheiten"
+      titel={modulName('einheiten')}
       meta={einheitenQuery.isSuccess ? `${einheiten.length} Einheiten` : undefined}
       dataUpdatedAt={einheitenQuery.dataUpdatedAt}
       aktionen={

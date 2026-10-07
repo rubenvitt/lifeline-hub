@@ -7,6 +7,7 @@ import {
   TASTATUR_AKTION_REIHENFOLGE,
 } from './befehle';
 import { filtereBefehle, ordneTreffer } from './fuzzy';
+import { modulRegistry } from '../einsatz/modulRegistry';
 import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
 import type { BenutzerAnzeige, EinsatzAnzeige, Koordinatenformat } from '../api/types';
@@ -41,6 +42,18 @@ describe('baueBefehle — Module', () => {
     expect(etb).toBeDefined();
     etb!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/etb');
+  });
+  it('trägt die Registry-Beschreibung als Nebenzeile jedes Modulbefehls (LFH-965)', () => {
+    const b = baueBefehle(kontext());
+    const module = b.filter((x) => x.id.startsWith('modul:'));
+    expect(module.length).toBeGreaterThan(0);
+    for (const befehl of module) {
+      const m = modulRegistry.find((r) => `modul:${r.key}` === befehl.id)!;
+      expect(befehl.nebenzeile, befehl.id).toBe(m.beschreibung);
+    }
+    expect(b.find((x) => x.id === 'modul:personen')?.nebenzeile).toBe(
+      'Vermisste, Betroffene, Patienten',
+    );
   });
   it('blendet Module ohne Einsatz-Kontext ganz aus', () => {
     const b = baueBefehle(kontext({ einsatzId: null }));

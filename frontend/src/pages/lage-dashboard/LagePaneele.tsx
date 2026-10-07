@@ -23,6 +23,7 @@ import { warnstufeTon, type Quellzustand } from './lagebild';
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
 import { MATRIX_KLASSE } from './matrixGeometrie';
 import './gefahrenmatrix.css';
+import { modulName } from '../../einsatz/modulRegistry';
 
 /** Im Fugenraster trägt das Raster die Linien — ein eigener Paneelrahmen verdoppelte sie. */
 const IM_RASTER: CSSProperties = { border: 'none', minHeight: 0 };
@@ -206,7 +207,9 @@ export function SichtungsPaneel({
     <Paneel
       titel="Sichtung"
       meta={zustand === 'daten' ? `${erfasst} erfasst` : undefined}
-      aktion={gesperrt ? undefined : <PaneelLink label="Personen" onKlick={onPersonen} />}
+      aktion={
+        gesperrt ? undefined : <PaneelLink label={modulName('personen')} onKlick={onPersonen} />
+      }
       // Fuß: „Ohne Sichtung" und „Transportiert / offen" (`transportBilanz`: nach Verbleib-Art,
       // eine Voranmeldung ist kein Transport). „Ohne Sichtung" steht immer, auch mit 0 — sonst
       // schob die live kommende und gehende Zeile das Paneel.

@@ -45,6 +45,7 @@ import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
+import { modulName } from '../einsatz/modulRegistry';
 
 const STATUS_META = TIER_STATUS;
 
@@ -308,13 +309,13 @@ export default function TierePage() {
     <EinsatzSeite
       dataUpdatedAt={tiereQuery.dataUpdatedAt}
       meta={tiereQuery.isSuccess ? `${tiereQuery.data.length} Tiere` : undefined}
-      titel="Tiere"
+      titel={modulName('tiere')}
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Tiere' },
+            { title: modulName('tiere') },
           ]}
         />
       }

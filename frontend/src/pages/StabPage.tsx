@@ -15,7 +15,7 @@ import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
-import { modulZielRoute } from '../einsatz/modulRegistry';
+import { modulZielRoute, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import BesetzungModal from '../stab/BesetzungModal';
@@ -147,14 +147,14 @@ export default function StabPage() {
   return (
     <EinsatzSeite
       dataUpdatedAt={stabQuery.dataUpdatedAt}
-      titel="Stab"
+      titel={modulName('stab')}
       beschreibung="Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung"
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Stab' },
+            { title: modulName('stab') },
           ]}
         />
       }

@@ -1,7 +1,7 @@
 import { useRollen } from '../components/instrument/rollenwerte';
 import { Datenfeld, Datenraster } from '../components/instrument';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
-import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { bezugsDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
@@ -1079,7 +1079,7 @@ export default function PersonenDetailPage() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={zurueck}>Personen</Link> },
+              { title: <Link to={zurueck}>{modulName('personen')}</Link> },
               { title: registrierAnzeige(p.registrier_nr) },
             ]}
           />

@@ -854,13 +854,14 @@ describe('LageDashboardPage — Kennzahlenband', () => {
 });
 
 describe('LageDashboardPage — Seitenkopf', () => {
-  it('trägt „Lagebild TT.MM. HH:MM" als Titel und den Datenstand als Meta', async () => {
+  it('trägt den Menünamen als Titel, die Uhrzeit daneben und den Datenstand als Meta (LFH-965)', async () => {
     mockEndpunkte({});
     render();
     await kennzahlGeladen('Betroffene');
-    expect(
-      screen.getByRole('heading', { name: /^Lagebild \d{2}\.\d{2}\. \d{2}:\d{2}$/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Lagebild' })).toBeInTheDocument();
+    expect(document.querySelector('.lfh-seitenkopf__meta')?.textContent).toMatch(
+      /\d{2}\.\d{2}\. \d{2}:\d{2}/,
+    );
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="datenstand"]')?.textContent).toMatch(
         /^Stand vor \d+ s$/,

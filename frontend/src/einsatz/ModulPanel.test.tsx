@@ -460,3 +460,85 @@ describe('ModulListe — Sprungmarken', () => {
     expect(klick).not.toHaveBeenCalled();
   });
 });
+
+describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
+  const mitBeschreibung: ModulEintrag[] = [
+    basis({
+      key: 'etb',
+      label: 'ETB',
+      route: 'etb',
+      status: 'fertig',
+      beschreibung: 'Einsatztagebuch',
+    }),
+    basis({ key: 'sach', label: 'Sachschäden', route: 'sach', status: 'fertig' }),
+    basis({ key: 'geheim', label: 'Geheim', route: 'geheim', beschreibung: 'Verschlusssache' }),
+  ];
+
+  it('zeigt die Beschreibung unter dem Namen, der Name bleibt der zugängliche Name', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        module={mitBeschreibung}
+        freigaben={freigaben()}
+        aktiverModulKey="etb"
+        onModulKlick={() => {}}
+      />,
+    );
+    const etb = screen.getByRole('button', { name: 'ETB', description: 'Einsatztagebuch' });
+    expect(within(etb).getByText('Einsatztagebuch')).toHaveAttribute(
+      'data-lfh',
+      'modul-beschreibung',
+    );
+    // Zu Lange endet in „…“; der volle Text steht im `title`.
+    expect(etb).toHaveAttribute('title', 'Einsatztagebuch');
+  });
+
+  it('lässt ein Modul ohne Beschreibung einzeilig, ohne leere Beschreibung', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        module={mitBeschreibung}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    const sach = screen.getByRole('button', { name: 'Sachschäden' });
+    expect(sach).not.toHaveAttribute('aria-describedby');
+    expect(sach.querySelector('[data-lfh="modul-beschreibung"]')).toBeNull();
+  });
+
+  it('behält bei gesperrtem Modul „Keine Berechtigung“ als Titel und zeigt die Beschreibung', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        module={mitBeschreibung}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    const geheim = screen.getByRole('button', { name: 'Geheim', description: 'Verschlusssache' });
+    expect(geheim).toBeDisabled();
+    expect(geheim).toHaveAttribute('title', 'Keine Berechtigung');
+  });
+
+  it('trägt jede Registry-Beschreibung als zweite Zeile', () => {
+    const erfassung = modulRegistry.filter((m) => m.kategorie === 'erfassung');
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        module={erfassung}
+        freigaben={freigabenFixture()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    for (const m of erfassung) {
+      if (!m.beschreibung) continue;
+      expect(
+        screen.getByRole('button', { name: m.label, description: m.beschreibung }),
+      ).toBeInTheDocument();
+    }
+  });
+});

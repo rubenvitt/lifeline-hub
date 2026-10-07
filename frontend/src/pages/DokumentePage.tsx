@@ -21,6 +21,7 @@ import DokumentAblegenModal from '../dokumente/DokumentAblegenModal';
 import DokumentBearbeitenModal from '../dokumente/DokumentBearbeitenModal';
 import DownloadAnker from '../components/DownloadAnker';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Dokumentenablage eines Einsatzes (LFH-632), strukturgleich zu `SchaedenPage`.
@@ -333,14 +334,14 @@ export default function DokumentePage() {
           ? `${alle.length} ${alle.length === 1 ? 'Dokument' : 'Dokumente'}`
           : undefined
       }
-      titel="Dokumente"
+      titel={modulName('dokumente')}
       beschreibung="Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos."
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Dokumente' },
+            { title: modulName('dokumente') },
           ]}
         />
       }

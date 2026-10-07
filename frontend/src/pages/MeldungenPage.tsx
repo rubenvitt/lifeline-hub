@@ -44,6 +44,7 @@ import {
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useViewport } from '../components/useViewport';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
+import { modulName } from '../einsatz/modulRegistry';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
@@ -403,7 +404,7 @@ export default function MeldungenPage() {
 
   return (
     <EinsatzSeite
-      titel="Meldungen (eingehend)"
+      titel={modulName('meldungen')}
 
       meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
       dataUpdatedAt={offeneQuery.dataUpdatedAt}
@@ -412,7 +413,7 @@ export default function MeldungenPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Meldungen (eingehend)' },
+            { title: modulName('meldungen') },
           ]}
         />
       }

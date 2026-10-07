@@ -28,6 +28,7 @@ import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { modulName } from '../einsatz/modulRegistry';
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -149,7 +150,7 @@ export default function ErinnerungenPage() {
 
   return (
     <EinsatzSeite
-      titel="Erinnerungen"
+      titel={modulName('erinnerungen')}
 
       meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
       dataUpdatedAt={offeneQuery.dataUpdatedAt}
@@ -158,7 +159,7 @@ export default function ErinnerungenPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Erinnerungen' },
+            { title: modulName('erinnerungen') },
           ]}
         />
       }

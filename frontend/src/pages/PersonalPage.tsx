@@ -57,6 +57,7 @@ import {
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
 import { KennungsLink } from '../components/kennungsLink';
+import { modulName } from '../einsatz/modulRegistry';
 
 export default function PersonalPage() {
   const { id } = useParams();
@@ -455,13 +456,13 @@ export default function PersonalPage() {
         einheitenQuery.dataUpdatedAt,
         fahrzeugeQuery.dataUpdatedAt,
       )}
-      titel="Personal"
+      titel={modulName('personal')}
       breadcrumb={
         <Breadcrumb
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Personal' },
+            { title: modulName('personal') },
           ]}
         />
       }

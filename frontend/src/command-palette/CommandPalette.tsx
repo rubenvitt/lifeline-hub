@@ -61,6 +61,8 @@ function kernId(b: Befehl): string {
  * Tasten (↵, →, >, #, @) werden gleich breite Quadrate, damit die Legende nicht flattert.
  */
 const tasteStil = { padding: '0 4px', fontSize: 11, lineHeight: '16px' } as const;
+/** Label und Nebenzeile enden einzeilig in „…“. */
+const einzeilig = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
 const tasteQuadrat = { ...tasteStil, minWidth: 18, justifyContent: 'center' } as const;
 
 /**
@@ -454,14 +456,16 @@ export function CommandPalette({
     const istAktiv = i === aktiv;
     const Icon = b.icon;
     const kontextId = b.kontext ? `cmd-${b.id}-kontext` : undefined;
+    const nebenzeileId = b.nebenzeile ? `cmd-${b.id}-nebenzeile` : undefined;
+    const beschreibtVon = [nebenzeileId, kontextId].filter(Boolean).join(' ') || undefined;
     return (
       <div
         key={b.id}
         id={`cmd-${b.id}`}
         role="option"
         aria-selected={istAktiv}
-        // Der Kontext BESCHREIBT, er benennt nicht (Begründung an `Befehl.kontext`).
-        aria-describedby={kontextId}
+        // Kontext und Nebenzeile BESCHREIBEN, sie benennen nicht (Begründung an `Befehl.kontext`).
+        aria-describedby={beschreibtVon}
         onMouseMove={(e: MouseEvent) => aufZeiger(e, b)}
         onClick={(e: MouseEvent) => (e.ctrlKey || e.metaKey ? oeffneImNeuenTab(b) : fuehreAus(b))}
         style={{
@@ -489,13 +493,26 @@ export function CommandPalette({
           style={{
             flex: 1,
             minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
             fontSize: schriftskala.text.groesse,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
           }}
         >
-          {b.label}
+          <span style={einzeilig}>{b.label}</span>
+          {b.nebenzeile && (
+            <span
+              id={nebenzeileId}
+              aria-hidden="true"
+              data-lfh="cmd-nebenzeile"
+              style={{
+                ...einzeilig,
+                fontSize: schriftskala.textKlein.groesse,
+                color: farben.schwach,
+              }}
+            >
+              {b.nebenzeile}
+            </span>
+          )}
         </span>
         {b.kontext && (
           <span

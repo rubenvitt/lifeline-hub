@@ -315,7 +315,7 @@ describe('EtbPage', () => {
     setup();
     // Der Seitenkopf trägt den Modultitel. Den Einsatz nennt der Pfad nicht, sonst bräche der Kopf
     // bei 1440 px um (Spec `seiten-orientierung`, Ortspfad; gemessen in `e2e/etb-zeilenhoehe`).
-    expect(await screen.findByRole('heading', { name: 'Einsatztagebuch' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'ETB' })).toBeInTheDocument();
     const pfad = document.querySelector('.lfh-seitenkopf__pfad')!;
     expect(pfad).toHaveTextContent('Einsätze');
     expect(pfad).not.toHaveTextContent('Hochwasser Nord');
@@ -598,7 +598,7 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     expect(container.querySelector('.lfh-skelett')).not.toBeNull();
     expect(screen.getByLabelText(/wird geladen/i)).toBeInTheDocument();
     // Auflaufen lassen, damit kein Zustandswechsel nach Testende passiert.
-    await screen.findByRole('heading', { name: 'Einsatztagebuch' });
+    await screen.findByRole('heading', { name: 'ETB' });
   });
 
   it('bietet beim gescheiterten Einsatz-Abruf einen erneuten Abruf an', async () => {

@@ -1,30 +1,30 @@
 ## 1. Registry
 
-- [ ] 1.1 `modulName(key)` mit Vitest; Labels „Lagebild“ und „Betroffene“
-- [ ] 1.2 Beschreibungen kürzen (Anhang), JSDoc neu, Wächter-Eintrag `einsatz/modulRegistry.ts` entfernen
-- [ ] 1.3 Lagemeldungen mit `IconPapierflieger`
+- [x] 1.1 `modulName(key)` mit Vitest; Labels „Lagebild“ und „Betroffene“
+- [x] 1.2 Beschreibungen kürzen (Anhang), JSDoc neu, Wächter-Eintrag `einsatz/modulRegistry.ts` entfernen
+- [x] 1.3 Lagemeldungen mit `IconPapierflieger`
 
 ## 2. Seitentitel
 
-- [ ] 2.1 Alle Registry-Seiten setzen `titel` und letzten Pfadeintrag über `modulName`
-- [ ] 2.2 ETB, Lagebild (Zeit in `meta`), Gefahren, Lagemeldungen, Nachforderung folgen dem Menü
-- [ ] 2.3 Tests an die neuen Wörter anpassen (nur wo der Modulname gemeint ist)
+- [x] 2.1 Alle Registry-Seiten setzen `titel` und letzten Pfadeintrag über `modulName`
+- [x] 2.2 ETB, Lagebild (Zeit in `meta`), Gefahren, Lagemeldungen, Nachforderung folgen dem Menü
+- [x] 2.3 Tests an die neuen Wörter anpassen (nur wo der Modulname gemeint ist)
 
 ## 3. Beschreibung sichtbar
 
-- [ ] 3.1 `ModulListe`: zweite Zeile, `title`, `aria-describedby`, mit Vitest
-- [ ] 3.2 Sprungpalette: `nebenzeile` am `Befehl`, Modulbefehle setzen sie, `optionsZeile` zeigt sie, mit Vitest
+- [x] 3.1 `ModulListe`: zweite Zeile, `title`, `aria-describedby`, mit Vitest
+- [x] 3.2 Sprungpalette: `nebenzeile` am `Befehl`, Modulbefehle setzen sie, `optionsZeile` zeigt sie, mit Vitest
 
 ## 4. Lagemeldungen leer
 
-- [ ] 4.1 `SeitenLeer` mit „Zu den Meldungen“ auf `meldungenPfad`, ohne Hinweis, mit Vitest
+- [x] 4.1 `SeitenLeer` mit „Zu den Meldungen“ auf `meldungenPfad`, ohne Hinweis, mit Vitest
 
 ## 5. Nachweis und Abschluss
 
-- [ ] 5.1 Vitest: `EinsatzAllgemein`-Platzhalter folgt `redirectZiel()` (Überblick fertig und nicht)
-- [ ] 5.2 e2e: `orientierung.spec.ts` prüft h1 = Label je Modul; `modulnamen.spec.ts` Drawer 390/820 als Beobachter, Palette
-- [ ] 5.3 Regel in `frontend/AGENTS.md`, Modulstruktur
-- [ ] 5.4 Gates: tsc, Lint, Prettier, Vitest komplett, `check-all.sh --nur schnell`, betroffene e2e
+- [x] 5.1 Vitest: `EinsatzAllgemein`-Platzhalter folgt `redirectZiel()` (Überblick fertig; „nicht fertig“ deckt der `redirectZiel`-Test in `modulRegistry.test.ts`)
+- [x] 5.2 e2e: `orientierung.spec.ts` prüft h1 = Label je Modul; `modulnamen.spec.ts` Drawer 390/820 als Beobachter, Palette
+- [x] 5.3 Regel in `frontend/AGENTS.md`, Modulstruktur
+- [x] 5.4 Gates: tsc, Lint, Prettier, Vitest komplett, `check-all.sh --nur schnell`, betroffene e2e
 
 ## Anhang: Beschreibungen
 

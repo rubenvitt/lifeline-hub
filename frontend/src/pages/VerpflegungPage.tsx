@@ -35,7 +35,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { Sammelbanner, sammelbannerKurz, Segmentleiste, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseVerpflegungsausgabeOfflineFaehig } from '../offline/schreiben';
@@ -329,7 +329,7 @@ export default function VerpflegungPage() {
 
   return (
     <EinsatzSeite
-      titel="Verpflegung"
+      titel={modulName('verpflegung')}
       meta={`${alle.length} Zeitfenster · ${unterdeckung} mit Unterdeckung`}
       dataUpdatedAt={verpflegungQuery.dataUpdatedAt}
       breadcrumb={
@@ -337,7 +337,7 @@ export default function VerpflegungPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: 'Verpflegung' },
+            { title: modulName('verpflegung') },
           ]}
         />
       }

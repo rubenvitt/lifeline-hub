@@ -73,7 +73,7 @@ test('als Beobachter keine Abfrage', async ({ page }) => {
   await page.goto(`/einsaetze/${einsatzId}/etb`);
 
   // Vorbedingung: die Seite steht, die Erfassung fehlt (kein Schreibrecht).
-  await expect(page.getByRole('heading', { name: 'Einsatztagebuch' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ETB', level: 1 })).toBeVisible();
   await expect(page.getByPlaceholder('Inhalt …')).toHaveCount(0);
   await expect(page.getByRole('group', { name: /Rufnamen/ })).toHaveCount(0);
 });

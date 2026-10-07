@@ -72,7 +72,7 @@ async function railZumEtb(page: Page, schmal: boolean) {
 
 async function etbSteht(page: Page, seitenFehler: Error[]) {
   await expect(page).toHaveURL(/\/etb$/);
-  await expect(page.getByRole('heading', { name: 'Einsatztagebuch' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ETB', level: 1 })).toBeVisible();
   await expect(page.getByText('Unexpected Application Error')).toHaveCount(0);
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 }

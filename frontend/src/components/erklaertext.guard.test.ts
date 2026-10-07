@@ -81,7 +81,6 @@ const OFFEN: Record<string, number> = {
   'abloesung/AbloesungDialoge.tsx': 5,
   'command-palette/VorschauZustand.tsx': 1,
   'einsatz/AlarmZentrale.tsx': 2,
-  'einsatz/modulRegistry.ts': 1,
   'etb/EtbZeitachse.tsx': 1,
   'etb/Schnellerfassung.tsx': 2,
   'infotelefon/AnrufErfassung.tsx': 2,

@@ -100,6 +100,32 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Strg + S', { selector: 'kbd' })).toBeInTheDocument();
   });
 
+  it('zeigt die Nebenzeile unter dem Label, als Beschreibung neben dem Kontext (LFH-965)', () => {
+    renderMitProviders(
+      <CommandPalette
+        befehle={[
+          {
+            ...befehl('a', 'Betroffene'),
+            nebenzeile: 'Vermisste, Patienten',
+            kontext: 'Erfassung',
+          },
+          befehl('b', 'Lagekarte'),
+        ]}
+        schliesse={() => {}}
+      />,
+    );
+    const zeile = screen.getByRole('option', {
+      name: 'Betroffene',
+      description: 'Vermisste, Patienten Erfassung',
+    });
+    expect(zeile.querySelector('[data-lfh="cmd-nebenzeile"]')).toHaveTextContent(
+      'Vermisste, Patienten',
+    );
+    const ohne = screen.getByRole('option', { name: 'Lagekarte' });
+    expect(ohne).not.toHaveAttribute('aria-describedby');
+    expect(ohne.querySelector('[data-lfh="cmd-nebenzeile"]')).toBeNull();
+  });
+
   it('überlässt Escape dem globalen Dispatcher statt Ant Design', async () => {
     const u = userEvent.setup();
     const schliesse = vi.fn();
