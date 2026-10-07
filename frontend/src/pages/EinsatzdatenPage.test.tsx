@@ -1220,3 +1220,56 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     expect(p.getByRole('textbox', { name: 'Rufname' })).toHaveValue('X');
   });
 });
+
+/**
+ * Der Einsatzabschluss steht auf den Einsatzdaten, nicht im Kopf einer Arbeitsseite (LFH-960,
+ * Spec `bedien-wortlaut`): ein eigener letzter Abschnitt, nur für die Einsatzleitung eines aktiven
+ * Einsatzes, und die Rückfrage bestätigt mit der Handlung.
+ */
+describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
+  const leitung = { ...admin, system_rolle: 'keiner' as const };
+
+  it('fragt mit „Einsatz endgültig abschließen“ nach und schließt erst nach Bestätigung ab', async () => {
+    let abgeschlossen = false;
+    setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
+    server.use(
+      http.post('/api/einsaetze/7/abschliessen', () => {
+        abgeschlossen = true;
+        return HttpResponse.json({ ...basisEinsatz, status: 'abgeschlossen' });
+      }),
+    );
+    const user = userEvent.setup();
+
+    expect(await screen.findByRole('heading', { name: 'Einsatzabschluss' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Einsatz abschließen' }));
+    expect(await screen.findByText('Einsatz abschließen?')).toBeInTheDocument();
+    const ok = screen.getByRole('button', { name: 'Einsatz endgültig abschließen' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
+    expect(abgeschlossen).toBe(false);
+
+    await user.click(ok);
+    await waitFor(() => expect(abgeschlossen).toBe(true));
+  });
+
+  it('steht nicht im Seitenkopf', async () => {
+    const { container } = setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
+    await screen.findByRole('button', { name: 'Einsatz abschließen' });
+    const kopf = container.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
+    expect(kopf).not.toBeNull();
+    expect(within(kopf).queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
+  });
+
+  it.each(['fuehrungspersonal', 'beobachter'] as const)('fehlt für %s', async (meine_rolle) => {
+    setup({ benutzer: leitung, einsatz: { meine_rolle } });
+    await screen.findByText('Frank Führung');
+    expect(screen.queryByRole('heading', { name: 'Einsatzabschluss' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
+  });
+
+  it('fehlt bei einem abgeschlossenen Einsatz', async () => {
+    setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
+    await screen.findByText('Frank Führung');
+    expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
+  });
+});

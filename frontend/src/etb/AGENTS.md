@@ -29,8 +29,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   - **Feldbreite per Opt-in:** `Schnellerfassungszeile feldFuellt` streckt das Kind der Feldzelle
     (`.lfh-schnellerfassung__feld--fuellt`); das ETB setzt es immer, ab `md` ≥ 60 % der Zeile.
     Keine pauschale Regel: eine Zelle mit mehreren Feldern (Infotelefon) bleibt ungestreckt.
-  - **Unter `md` zuerst die Zeitachse:** Druck und Abschluss im Menü „Weitere“
-    (`MenueAusloeser`, Rückfrage als `<Modal>`), Typfilter einzeilig rollend, Volltext, Zeitraum
+  - **Unter `md` zuerst die Zeitachse:** Druck im Menü „Weitere“ (`MenueAusloeser`; der
+    Einsatzabschluss steht auf den Einsatzdaten, LFH-960), Typfilter einzeilig rollend, Volltext, Zeitraum
     und Einheit hinter „Filter (n)“ (ein Filter von außen klappt sie auf). Die Leiste startet
     eingeklappt (`EtbEntwurfsTabs einklappbar`, `Schnellerfassung eingeklappt`): kein Fokus beim
     Mount, ohne Reiterband, Feld- und Hinweiszeile, solange der Fokus nicht in ihr liegt und genau
