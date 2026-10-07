@@ -617,7 +617,9 @@ Spec `bedien-arbeitsplatz`).
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt".
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
   bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
-  `einheit:<id>`).
+  `einheit:<id>`). Einzige Ausnahme: ein Klappteil, der bei einem Prüffehler darin selbst aufgeht
+  (`onPruefungGescheitert` der Hülle) und dessen Kopf jede Abweichung von der Vorgabe nennt
+  (LFH-974, `meldungen/MeldungFormular.tsx`).
 - **Freitext nie länger als der Server erlaubt** (LFH-937, Spec `eingabegrenzen`): Grenzen nur aus
   `api/eingabegrenzen.ts` (Spiegeltest `tests/eingabegrenzen_spiegel.rs`). Mehrzeilige Felder
   (TextArea, Markdown) tragen den Zähler `count={zeichenGrenze(max)}` aus

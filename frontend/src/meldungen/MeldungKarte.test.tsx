@@ -387,3 +387,50 @@ describe('MeldungKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
     ).toBeInTheDocument();
   });
 });
+
+/** LFH-974 (Spec `meldungen-handy`): Wortlaut direkt nach Absender/Empfänger, Verwaltung danach. */
+describe('MeldungKarte — Wortlaut vor Verwaltung (LFH-974)', () => {
+  const mitBearbeiter = () =>
+    meldung({ inhalt: 'Deich instabil', bearbeiter_id: 4, bearbeiter_name: 'Anna Berg' });
+
+  function nachher(a: Node, b: Node) {
+    return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  }
+
+  it('steht mit Schreibrecht vor der Bearbeiter-Auswahl, ohne Eingabefeld davor', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={mitBearbeiter()}
+        einsatzId={7}
+        darfSchreiben
+        onZuweisen={vi.fn()}
+        mitglieder={[{ benutzer_id: 4, anzeigename: 'Anna Berg' }]}
+      />,
+    );
+    const wortlaut = screen.getByText('Deich instabil');
+    const auswahl = screen.getByRole('combobox', { name: 'Bearbeiter für Meldung 1' });
+    expect(nachher(wortlaut, auswahl)).toBe(true);
+    const karte = document.querySelector('[data-meldung-id="1"]') as HTMLElement;
+    const felder = [...karte.querySelectorAll('input, select, textarea')];
+    expect(felder.every((f) => nachher(wortlaut, f))).toBe(true);
+  });
+
+  it('nennt den Bearbeiter als Text, auch mit Schreibrecht', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={mitBearbeiter()}
+        einsatzId={7}
+        darfSchreiben
+        onZuweisen={vi.fn()}
+        mitglieder={[{ benutzer_id: 4, anzeigename: 'Anna Berg' }]}
+      />,
+    );
+    expect(screen.getByText('Bearbeiter: Anna Berg')).toBeInTheDocument();
+  });
+
+  it('nennt den Bearbeiter ohne Schreibrecht als Text und zeigt keine Auswahl', () => {
+    renderKarte(<MeldungKarte meldung={mitBearbeiter()} einsatzId={7} />);
+    expect(screen.getByText('Bearbeiter: Anna Berg')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+});

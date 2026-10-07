@@ -105,7 +105,7 @@ function MeldungKarte({
   onBestaetigen,
   onAuftragErteilen,
 }: MeldungKarteProps) {
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   // Ein Gerät (UHS-Laptop) springt nicht in die Aufträge (LFH-892).
   const darf = useGeraetDarf();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
@@ -184,6 +184,7 @@ function MeldungKarte({
   // darunter wäre ein Menü ein Umweg.
   const gesamt = (kannBestaetigen ? 1 : 0) + (naechster ? 1 : 0) + weitere.length;
   const buendeln = gesamt >= 3;
+  const zuweisbar = !!(darfSchreiben && onZuweisen);
 
   return (
     // Die Ereigniszeit führt links in Mono, darunter die laufende Nummer; der Rand folgt dem
@@ -229,7 +230,12 @@ function MeldungKarte({
         )}
       </Space>
 
-      <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
+      {/* Der Wortlaut ist der Grund der Karte und trägt den größten Schriftgrad (wie `AuftragKarte`);
+         Zeilenhöhe 1.5, weil er regelmäßig mehrzeilig ist. Er folgt direkt auf Absender und
+         Empfänger, die Verwaltung steht danach (LFH-974): am Handy liegt er so im ersten Schirm. */}
+      <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
+
+      <Flex align="center" gap={8} wrap style={{ marginTop: 8 }}>
         <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {WEG_LABEL[m.meldeweg]} · {MELDUNGSART_LABEL[m.meldungsart]} · Ereignis:{' '}
           {formatZeit(m.ereigniszeit)}
@@ -239,75 +245,81 @@ function MeldungKarte({
             Erledigt: {formatZeit(m.erledigt_at)}
           </Text>
         )}
-        {darfSchreiben && onZuweisen ? (
-          <Select<number | null>
-            allowClear
-            style={{ minWidth: 180 }}
-            placeholder="Bearbeiter zuweisen"
-            value={m.bearbeiter_id ?? undefined}
-            onChange={(v) => onZuweisen(m.id, v ?? null)}
-            options={(mitglieder ?? []).map((mi) => ({
-              value: mi.benutzer_id,
-              label: mi.anzeigename,
-            }))}
-            aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
-          />
-        ) : (
-          m.bearbeiter_name && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Bearbeiter: {m.bearbeiter_name}
-            </Text>
-          )
+        {m.bearbeiter_name && (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Bearbeiter: {m.bearbeiter_name}
+          </Text>
         )}
       </Flex>
 
-      {/* Der Wortlaut ist der Grund der Karte und trägt den größten Schriftgrad (wie `AuftragKarte`);
-         Zeilenhöhe 1.5, weil er regelmäßig mehrzeilig ist. */}
-      <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
-
-      {/* „Bestätigen" ist der Primärknopf, nicht `danger` (LFH-962): die Kenntnisnahme löscht nichts,
-         und Rot bedient nichts. Der weite Abstand bleibt als Trennung der Handschuh-Ziele. */}
-      {gesamt > 0 && (
-        <Space
-          size="middle"
+      {/* Aktionszeile: die Zuweisung links (ein Griff, Triage-Tempo), die Knöpfe rechts. Unter `md`
+         bricht die Auswahl in eine eigene Zeile. „Bestätigen" ist der Primärknopf, nicht `danger`
+         (LFH-962): die Kenntnisnahme löscht nichts, und Rot bedient nichts. Der weite Abstand
+         bleibt als Trennung der Handschuh-Ziele. */}
+      {(zuweisbar || gesamt > 0) && (
+        <Flex
+          justify="space-between"
+          align="center"
+          // Zwischen Auswahl und Knöpfen derselbe Abstand wie zwischen den Knöpfen (Handschuh).
+          gap={token.padding}
           wrap
-          style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}
+          style={{ marginTop: 8 }}
         >
-          {kannBestaetigen && (
-            <Popconfirm
-              title="Sofortmeldung bestätigen (Kenntnis genommen)?"
-              okText="Bestätigen"
-              cancelText="Abbrechen"
-              onConfirm={() => onBestaetigen?.(m.id)}
-            >
-              <Button type="primary">Bestätigen</Button>
-            </Popconfirm>
-          )}
-          {naechster &&
-            onStatus &&
-            (naechster.ziel === 'erledigt' ? (
-              <Button type="primary" ghost onClick={() => setErledigtOffen(true)}>
-                {naechster.label}
-              </Button>
-            ) : (
-              <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
-            ))}
-          {buendeln ? (
-            // Die Zuordnung hängt am Menü: die Einträge tragen ihre Handlung, der Baustein
-            // meldet nur den Schlüssel.
-            <MenueAusloeser
-              eintraege={weitere}
-              zugaenglicherName={`Aktionen zu Meldung ${m.lfd_nr}`}
-              onWahl={(key) => weitere.find((w) => w.key === key)?.onClick()}
+          {zuweisbar ? (
+            <Select<number | null>
+              allowClear
+              style={{ minWidth: 180 }}
+              placeholder="Bearbeiter zuweisen"
+              value={m.bearbeiter_id ?? undefined}
+              onChange={(v) => onZuweisen?.(m.id, v ?? null)}
+              options={(mitglieder ?? []).map((mi) => ({
+                value: mi.benutzer_id,
+                label: mi.anzeigename,
+              }))}
+              aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
             />
           ) : (
-            weitere.map((w) => (
-              <Button key={w.key} onClick={w.onClick}>
-                {w.label}
-              </Button>
-            ))
+            <span />
           )}
-        </Space>
+          {gesamt > 0 && (
+            <Space size="middle" wrap style={{ marginLeft: 'auto', justifyContent: 'flex-end' }}>
+              {kannBestaetigen && (
+                <Popconfirm
+                  title="Sofortmeldung bestätigen (Kenntnis genommen)?"
+                  okText="Bestätigen"
+                  cancelText="Abbrechen"
+                  onConfirm={() => onBestaetigen?.(m.id)}
+                >
+                  <Button type="primary">Bestätigen</Button>
+                </Popconfirm>
+              )}
+              {naechster &&
+                onStatus &&
+                (naechster.ziel === 'erledigt' ? (
+                  <Button type="primary" ghost onClick={() => setErledigtOffen(true)}>
+                    {naechster.label}
+                  </Button>
+                ) : (
+                  <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
+                ))}
+              {buendeln ? (
+                // Die Zuordnung hängt am Menü: die Einträge tragen ihre Handlung, der Baustein
+                // meldet nur den Schlüssel.
+                <MenueAusloeser
+                  eintraege={weitere}
+                  zugaenglicherName={`Aktionen zu Meldung ${m.lfd_nr}`}
+                  onWahl={(key) => weitere.find((w) => w.key === key)?.onClick()}
+                />
+              ) : (
+                weitere.map((w) => (
+                  <Button key={w.key} onClick={w.onClick}>
+                    {w.label}
+                  </Button>
+                ))
+              )}
+            </Space>
+          )}
+        </Flex>
       )}
       <Modal
         open={erledigtOffen}

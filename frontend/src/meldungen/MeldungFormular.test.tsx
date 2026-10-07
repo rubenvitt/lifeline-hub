@@ -52,6 +52,7 @@ describe('MeldungFormular', () => {
   it('reicht das Frist-Override in Minuten durch', async () => {
     const onAnlegen = renderFormular();
     // Bestätigungspflicht aktivieren, dann Frist-Override setzen.
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.click(screen.getByRole('switch', { name: 'Bestätigung erforderlich' }));
     await userEvent.type(screen.getByLabelText('Bestätigungsfrist in Minuten'), '30');
     await fuellePflichtfelder('RTW 2', 'MANV');
@@ -105,6 +106,7 @@ describe('MeldungFormular', () => {
     const onAnlegen = renderFormular();
     await userEvent.type(screen.getByPlaceholderText('z. B. ELW 1, S3'), 'ELW 1');
     // Meldeweg vom Default (Funk) wegdrehen, damit die Übernahme beweisbar ist.
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Meldeweg' }));
     await userEvent.click(await screen.findByText('Telefon'));
     await fuellePflichtfelder('RTW 2', 'Erste Meldung');
@@ -172,6 +174,8 @@ describe('MeldungFormular', () => {
     }
 
     async function waehle(name: string) {
+      const kopf = screen.getByRole('button', { name: /Weitere Angaben/ });
+      if (kopf.getAttribute('aria-expanded') !== 'true') await userEvent.click(kopf);
       await userEvent.click(screen.getByRole('combobox', { name: 'Von Einheit / Abschnitt' }));
       const eintrag = await screen.findByText(
         (_, el) =>
@@ -245,7 +249,8 @@ describe('MeldungFormular — Ereigniszeit in der Anzeigezone (LFH-692)', () => 
       </AntApp>,
     );
     await fuellePflichtfelder('RTW 2', 'MANV');
-    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit (≠ Erfassung)' });
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    const feld = screen.getByRole('textbox', { name: 'Zeitpunkt des Ereignisses' });
     await userEvent.click(feld);
     await userEvent.type(feld, '2026-09-24 13:00');
     await userEvent.keyboard('{Enter}');
@@ -291,7 +296,8 @@ describe('MeldungFormular — Ereigniszeit eines vorgehenden Geräts (LFH-895)',
   it('eine eingetragene Ereigniszeit bleibt unverändert', async () => {
     const onAnlegen = renderFormular();
     await fuellePflichtfelder('RTW 2', 'MANV');
-    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit (≠ Erfassung)' });
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    const feld = screen.getByRole('textbox', { name: 'Zeitpunkt des Ereignisses' });
     await userEvent.click(feld);
     await userEvent.type(feld, '2026-10-04 09:30');
     await userEvent.keyboard('{Enter}');
@@ -321,6 +327,102 @@ describe('MeldungFormular — Eingabegrenzen (LFH-937)', () => {
     expect(
       await screen.findByText('Inhalt darf höchstens 20.000 Zeichen lang sein'),
     ).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Feldbudget und Fokus (LFH-974, Spec `meldungen-handy`): eingeklappt Wortlaut, Absender,
+ * Empfänger; alles Übrige hinter „Weitere Angaben", im Baum (`forceRender`) und erst beim
+ * Aufklappen sichtbar. Sichtbarkeit über die positive Klasse `ant-collapse-panel-active` wie in
+ * `pages/FahrzeugePage.test.tsx`.
+ */
+describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
+  function sichtbareFelder() {
+    return [...document.querySelectorAll<HTMLElement>('.ant-form-item-label label')]
+      .filter((l) => {
+        const klapp = l.closest('.ant-collapse-panel');
+        return klapp == null || klapp.classList.contains('ant-collapse-panel-active');
+      })
+      .map((l) => l.textContent);
+  }
+
+  const klappkopf = () => screen.getByRole('button', { name: /Weitere Angaben/ });
+  const wortlaut = () => screen.getByLabelText('Inhalt / Wortlaut');
+
+  it('zeigt eingeklappt Wortlaut, Absender und Empfänger; Aufklappen deckt den Rest auf', async () => {
+    renderFormular();
+    expect(sichtbareFelder()).toEqual([
+      'Inhalt / Wortlaut',
+      'Absender (Funkrufname/Stelle)',
+      'Empfänger / Adressat',
+    ]);
+    // Im Baum, nur nicht sichtbar: die Zählung oben ist nicht aus Abwesenheit richtig.
+    expect(document.querySelector('[aria-label="Bestätigung erforderlich"]')).not.toBeNull();
+    await userEvent.click(klappkopf());
+    await waitFor(() => expect(sichtbareFelder().length).toBeGreaterThan(3));
+    expect(sichtbareFelder()).toContain('Zeitpunkt des Ereignisses');
+  });
+
+  it('der Kopf heißt ohne Abweichung nur „Weitere Angaben"', () => {
+    renderFormular();
+    expect(klappkopf()).toHaveTextContent(/^Weitere Angaben$/);
+  });
+
+  it('kein „≠" in der Maske', () => {
+    const { container } = render(
+      <AntApp>
+        <MeldungFormular senden={false} onAnlegen={anlegenMock()} />
+      </AntApp>,
+    );
+    expect(container.textContent).not.toContain('≠');
+  });
+
+  it('fokussiert beim Öffnen den Wortlaut', async () => {
+    renderFormular();
+    await waitFor(() => expect(wortlaut()).toHaveFocus());
+  });
+
+  it('„Sofortmeldung" setzt den Fokus in den Wortlaut und nennt die Vorbelegung im Kopf', async () => {
+    renderFormular();
+    await userEvent.click(screen.getByLabelText('Absender'));
+    await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
+    await waitFor(() => expect(wortlaut()).toHaveFocus());
+    expect(klappkopf()).toHaveTextContent('Sofortmeldung');
+    expect(klappkopf()).toHaveTextContent('Priorität Sofort');
+    expect(klappkopf()).toHaveTextContent('Bestätigung');
+  });
+
+  it('„Lagemeldung (extern)" setzt den Fokus in den Wortlaut und nennt Art und Richtung', async () => {
+    renderFormular();
+    await userEvent.click(screen.getByLabelText('Absender'));
+    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await waitFor(() => expect(wortlaut()).toHaveFocus());
+    expect(klappkopf()).toHaveTextContent('Lagemeldung');
+    expect(klappkopf()).toHaveTextContent('Extern');
+  });
+
+  it('fokussiert nach „Speichern und nächste" wieder den Wortlaut', async () => {
+    const onAnlegen = renderFormular();
+    await fuellePflichtfelder('RTW 2', 'Erste');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(wortlaut()).toHaveFocus());
+  });
+
+  it('klappt auf, wenn die Prüfung an einem eingeklappten Feld scheitert', async () => {
+    const onAnlegen = renderFormular();
+    await userEvent.click(klappkopf());
+    await userEvent.click(screen.getByRole('switch', { name: 'Bestätigung erforderlich' }));
+    fireEvent.change(screen.getByLabelText('Bestätigungsfrist in Minuten'), {
+      target: { value: '0' },
+    });
+    await userEvent.click(klappkopf());
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
+    await fuellePflichtfelder('RTW 2', 'MANV');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
+    expect(screen.getByText('Frist mindestens 1 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 });
