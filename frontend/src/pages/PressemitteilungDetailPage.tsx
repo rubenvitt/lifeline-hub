@@ -123,6 +123,7 @@ function PressemitteilungDetail() {
         <MarkdownEditor
           layout={vorschauNeben ? 'split' : 'toggle'}
           druckfassung
+          druckTitel={a.label}
           unterEbene={1}
           variante="dokument"
           autoSize={{ minRows: 6 }}

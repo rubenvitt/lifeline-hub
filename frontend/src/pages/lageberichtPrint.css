@@ -59,6 +59,17 @@
     display: block !important;
   }
 
+  /* Abschnittstitel (LFH-1008): auf Papier trägt ihn der Titel der gerenderten Fassung
+     (`MarkdownEditor druckTitel`), im selben Titelblock wie der erste Absatz. Der Akkordeonkopf
+     stünde getrennt davon und bliebe in Firefox allein am Seitenende stehen. */
+  .lagebericht-print-root .ant-collapse-header {
+    display: none !important;
+  }
+
+  .lagebericht-print-root .markdown-editor__titel {
+    display: block !important;
+  }
+
   /* Beschriftung und Vorschau-Umschalter des Editors sind Bedienung, kein Inhalt —
      dieselbe Trennung wie bei `.lagebericht-no-print`. Der Editor rendert keinen
      weiteren Knopf. */

@@ -100,6 +100,27 @@ describe('befehlPrint.css — Entwurfsausdruck (M86)', () => {
     }
   });
 
+  /**
+   * LFH-1008: das Feldetikett steht außerhalb der Vorschau und bliebe in Firefox allein am
+   * Seitenende. Auf Papier trägt der Titel der Vorschau (`druckTitel`) den Abschnitt.
+   */
+  it('ersetzt das Feldetikett auf Papier durch den Titel der Vorschau', () => {
+    const etikett = regeln().find((r) =>
+      einzeln(r).includes(
+        '.befehl-print-root .ant-form-item:has(.markdown-editor__titel) .ant-form-item-label',
+      ),
+    );
+    expect(etikett, 'Feldetikett wird mitgedruckt').toBeDefined();
+    expect(versteckt(etikett!)).toBe(true);
+    const titel = regeln().find((r) =>
+      einzeln(r).includes('.befehl-print-root .markdown-editor__titel'),
+    );
+    expect(titel, 'Titel der Vorschau bleibt verborgen').toBeDefined();
+    expect(titel!.koerper).toMatch(/display:\s*block\s*!important/);
+    const seite = readFileSync(join(hier, SEITE), 'utf8');
+    expect(seite).toMatch(/druckTitel=\{a\.label\}/);
+  });
+
   it('laesst Beschriftung und Vorschau-Umschalter des Editors weg', () => {
     const alle = regeln().filter(versteckt).flatMap(einzeln).join(' ');
     expect(alle).toContain('.markdown-editor__label');

@@ -49,18 +49,24 @@ export function AbschnittsText({
     <>
       {gliederung.map((a) => {
         const text = abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
+        // Eine Ebene unter dem Rahmen; Satz bleibt der von h5. Im Titelblock mit dem ersten
+        // Absatz, damit er im Druck nicht allein am Seitenende steht (LFH-1008).
+        const titel = (
+          <Typography.Title level={abschnittEbene} style={{ fontSize: token.fontSizeHeading5 }}>
+            {a.label}
+          </Typography.Title>
+        );
         return (
           <section key={a.schluessel} style={{ marginBottom: 16 }}>
-            {/* Eine Ebene unter dem Rahmen; Satz bleibt der von h5. */}
-            <Typography.Title level={abschnittEbene} style={{ fontSize: token.fontSizeHeading5 }}>
-              {a.label}
-            </Typography.Title>
             {text.trim() ? (
-              <Markdown variante="dokument" unterEbene={abschnittEbene}>
+              <Markdown variante="dokument" unterEbene={abschnittEbene} titel={titel}>
                 {text}
               </Markdown>
             ) : (
-              <Typography.Paragraph>—</Typography.Paragraph>
+              <div data-lfh="titelblock">
+                {titel}
+                <Typography.Paragraph>—</Typography.Paragraph>
+              </div>
             )}
           </section>
         );

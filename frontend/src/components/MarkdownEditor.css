@@ -25,6 +25,17 @@
   display: none;
 }
 
+/* Abschnittstitel auf Papier (Prop `druckTitel`, LFH-1008): am Bildschirm nie sichtbar; das
+   Druck-Stylesheet der Seite zeigt ihn und blendet dafür den Kopf des Einbauorts aus. Satz wie
+   der Abschnittstitel der Lesefassung (`LageberichtText`). */
+.markdown-editor__titel {
+  display: none;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 0.5em;
+}
+
 /* ---------- split: Eingabe links, Vorschau rechts ---------- */
 .markdown-editor--split {
   display: flex;

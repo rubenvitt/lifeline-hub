@@ -184,8 +184,14 @@ async function druckLage(page: Page) {
     const textfelder = Array.from(wurzel.querySelectorAll('textarea')).filter(
       (t) => t.getClientRects().length > 0,
     ).length;
-    // Abschnittstitel des Entwurfs: Akkordeonkopf (Lagebericht) bzw. Feldetikett (Befehl).
-    const titel = wurzel.querySelector('.ant-collapse-header, .ant-form-item-label');
+    // LFH-1008: jeder sichtbare Abschnittstitel steht in einem Titelblock mit seinem ersten
+    // Absatz. Abschnittstitel sind die Titel der Lesefassung (im Titelplatz des Markdowns) und
+    // die Papiertitel des Entwurfs; Akkordeonkopf und Feldetikett weichen dafür.
+    const sichtbar = (el: Element) => el.getClientRects().length > 0;
+    const titel = Array.from(
+      wurzel.querySelectorAll('[data-lfh="titelplatz"], .markdown-editor__titel'),
+    ).filter(sichtbar);
+    const bloecke = titel.map((t) => t.closest('[data-lfh="titelblock"]'));
     return {
       wurzelAnzahl: wurzeln.length,
       wurzelPosition: getComputedStyle(wurzel).position,
@@ -197,7 +203,16 @@ async function druckLage(page: Page) {
       meldung: anzeige('.ant-message'),
       endmarkeOben: knoten ? knoten.getBoundingClientRect().top + window.scrollY : -1,
       textfelder,
-      titelUmbruch: titel ? getComputedStyle(titel).breakAfter : 'kein Entwurfstitel',
+      abschnittstitel: titel.length,
+      titelOhneBlock: bloecke.filter((b) => !b || b.children.length < 2).length,
+      titelblockUmbruch: [
+        ...new Set(bloecke.map((b) => (b ? getComputedStyle(b).breakInside : 'ohne Block'))),
+      ].join(','),
+      entwurfskopf: Array.from(
+        wurzel.querySelectorAll(
+          '.ant-collapse-header, .ant-form-item:has(.markdown-editor) .ant-form-item-label',
+        ),
+      ).filter(sichtbar).length,
     };
   }, ENDMARKE);
 }
@@ -258,11 +273,16 @@ async function pruefeDruckImFluss(page: Page, fall: string) {
   // Die Marke erst NACH den Layoutaussagen: der Test soll an der Mechanik rot werden.
   expect(rahmen.wurzelAnzahl, `${fall}: genau eine Druckwurzel`).toBe(1);
   expect(rahmen.textfelder, `${fall}: kein Eingabefeld für Abschnittstext auf Papier`).toBe(0);
-  if (rahmen.titelUmbruch !== 'kein Entwurfstitel') {
-    // Belegt die KASKADE (die Regel greift am Entwurfstitel), nicht den Umbruch selbst — den
-    // zeigt nur das Blatt (Handprüfung).
-    expect(rahmen.titelUmbruch, `${fall}: Abschnittstitel bleibt bei seinem Text`).toBe('avoid');
-  }
+  // Belegt die KASKADE (Titel und erster Absatz in einer Box, die nicht bricht), nicht den
+  // Umbruch selbst — den zeigt nur das Blatt (Handprüfung, Firefox hält `break-after: avoid`
+  // nicht ein, LFH-1008).
+  expect(rahmen.abschnittstitel, `${fall}: Abschnittstitel auf Papier`).toBeGreaterThan(0);
+  expect(
+    rahmen.titelOhneBlock,
+    `${fall}: jeder Abschnittstitel steht mit seinem ersten Block zusammen`,
+  ).toBe(0);
+  expect(rahmen.titelblockUmbruch, `${fall}: Titelblock bricht nicht`).toBe('avoid');
+  expect(rahmen.entwurfskopf, `${fall}: Akkordeonkopf und Feldetikett weichen`).toBe(0);
 
   // (2) UMFANG — auf Papierbreite, weil die Zeilenzahl an der Breite hängt.
   await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });

@@ -211,6 +211,7 @@ function LageberichtDetail() {
               layout={vorschauNeben ? 'split' : 'toggle'}
               // Ohne sie druckte das Toggle-Layout sein Textfeld (`lageberichtPrint.css`).
               druckfassung
+              druckTitel={a.label}
               unterEbene={1}
               variante="dokument"
               autoSize={{ minRows: 6 }}

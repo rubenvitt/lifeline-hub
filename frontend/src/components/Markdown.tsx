@@ -1,6 +1,13 @@
-import { memo, type ComponentPropsWithoutRef } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import {
+  createContext,
+  memo,
+  useContext,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from 'react';
+import ReactMarkdown, { type Components, type Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import titelbloecke, { TITELPLATZ } from './markdownTitelbloecke';
 import './Markdown.css';
 
 type Variante = 'kompakt' | 'dokument';
@@ -18,6 +25,11 @@ interface Props {
    * weil nur der Einbauort sie kennt — siehe {@link zielEbene}.
    */
   unterEbene: UnterEbene;
+  /**
+   * Abschnittstitel des Einbauorts. Er steht im selben Titelblock wie der erste Block des Textes
+   * (`markdownTitelbloecke.ts`), damit er im Druck nicht allein am Seitenende bleibt (LFH-1008).
+   */
+  titel?: ReactNode;
 }
 
 /** Ebene einer Überschrift, die über einem Markdown-Text stehen kann (h1 … h5). */
@@ -53,6 +65,20 @@ function ueberschrift(quelle: Ebene, unterEbene: UnterEbene) {
   return Ueberschrift;
 }
 
+/** Der Titel des Einbauorts für den Platzhalter — über Kontext, damit die Tabellen stabil bleiben. */
+const TitelKontext = createContext<ReactNode>(null);
+
+/** Markdown selbst erzeugt keine `div` (kein rohes HTML); hier kommen nur die Titelhüllen an. */
+function Block(props: ComponentPropsWithoutRef<'div'> & { node?: unknown }) {
+  const titel = useContext(TitelKontext);
+  const rest = { ...props };
+  delete rest.node;
+  if ((rest as Record<string, unknown>)['data-lfh'] === TITELPLATZ) {
+    return <div {...rest}>{titel}</div>;
+  }
+  return <div {...rest} />;
+}
+
 /** Je Einbauebene EINE stabile Komponententabelle — eine neue Tabelle je Render ließe
  *  react-markdown jede Überschrift neu einhängen. */
 const KOMPONENTEN = Object.fromEntries(
@@ -65,12 +91,16 @@ const KOMPONENTEN = Object.fromEntries(
       h4: ueberschrift(4, unter),
       h5: ueberschrift(5, unter),
       h6: ueberschrift(6, unter),
+      div: Block,
     } satisfies Components,
   ]),
 ) as Record<UnterEbene, Components>;
 
 /** Eine Plugin-Liste für alle Aufrufe: ein neues Array je Render stieße den Parse jedes Mal an. */
 const REMARK_PLUGINS = [remarkGfm];
+type PluggableList = NonNullable<Options['rehypePlugins']>;
+const REHYPE_PLUGINS: PluggableList = [titelbloecke];
+const REHYPE_PLUGINS_MIT_KOPF: PluggableList = [[titelbloecke, { kopf: true }]];
 
 /**
  * Rendert Markdown sicher als formatiertes HTML.
@@ -80,18 +110,26 @@ const REMARK_PLUGINS = [remarkGfm];
  * über seine eingebaute URL-Transformation. Damit ist die Anzeige XSS-sicher,
  * ohne dass wir selbst sanitisieren müssen.
  */
-function Markdown({ children, variante = 'dokument', unterEbene }: Props) {
+function Markdown({ children, variante = 'dokument', unterEbene, titel }: Props) {
+  const mitKopf = titel !== undefined && titel !== null;
   return (
     <div className={`markdown markdown--${variante}`}>
-      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={KOMPONENTEN[unterEbene]}>
-        {children}
-      </ReactMarkdown>
+      <TitelKontext.Provider value={titel}>
+        <ReactMarkdown
+          remarkPlugins={REMARK_PLUGINS}
+          rehypePlugins={mitKopf ? REHYPE_PLUGINS_MIT_KOPF : REHYPE_PLUGINS}
+          components={KOMPONENTEN[unterEbene]}
+        >
+          {children}
+        </ReactMarkdown>
+      </TitelKontext.Provider>
     </div>
   );
 }
 
 /**
  * Gemerkt (LFH-947): alle Eigenschaften sind Werte, ein Rerender des Aufrufers mit demselben
- * Text parst nicht neu. Die Zeitachse rendert hunderte davon.
+ * Text parst nicht neu. Die Zeitachse rendert hunderte davon. Ausnahme ist `titel`, ein
+ * Element; das reichen nur die Lesefassungen der Vorlagendokumente herein, nicht die Zeitachse.
  */
 export default memo(Markdown);

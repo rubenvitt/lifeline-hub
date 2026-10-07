@@ -165,6 +165,58 @@ describe('MarkdownEditor – toggle-Variante', () => {
     expect(container.querySelector('.markdown-editor__druck')).toHaveTextContent(/^—$/);
   });
 
+  /**
+   * LFH-1008: der Kopf des Einbauorts (Akkordeonkopf, Feldetikett) liegt außerhalb der gerenderten
+   * Fassung und stünde in Firefox allein am Seitenende. Auf Papier trägt der Titel der Fassung
+   * den Abschnitt, im selben Titelblock wie der erste Absatz; am Bildschirm ist er verborgen.
+   */
+  it('setzt `druckTitel` in den Titelblock der Druckfassung und der Vorschau', async () => {
+    const { container } = renderMitProviders(
+      <MarkdownEditor
+        unterEbene={1}
+        layout="toggle"
+        druckfassung
+        druckTitel="Eigene Lage"
+        value={'Erster Absatz\n\nZweiter'}
+        onChange={() => {}}
+      />,
+    );
+    const block = container.querySelector('.markdown-editor__druck [data-lfh="titelblock"]');
+    expect(block, 'kein Titelblock in der Druckfassung').not.toBeNull();
+    expect(block!.querySelector('.markdown-editor__titel')).toHaveTextContent('Eigene Lage');
+    expect(block!.querySelector('p')).toHaveTextContent('Erster Absatz');
+
+    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
+    const vorschau = container.querySelector('.markdown-editor__vorschau [data-lfh="titelblock"]');
+    expect(vorschau!.querySelector('.markdown-editor__titel')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(vorschau!.querySelector('p')).toHaveTextContent('Erster Absatz');
+  });
+
+  it('hält `druckTitel` auch bei leerem Abschnitt beim „—"', () => {
+    const { container } = renderMitProviders(
+      <MarkdownEditor
+        unterEbene={1}
+        layout="toggle"
+        druckfassung
+        druckTitel="Medienlage"
+        value=""
+        onChange={() => {}}
+      />,
+    );
+    const block = container.querySelector('.markdown-editor__druck [data-lfh="titelblock"]');
+    expect(block).toHaveTextContent(/^Medienlage—$/);
+  });
+
+  it('rendert ohne `druckTitel` keinen Titel', () => {
+    const { container } = renderMitProviders(
+      <MarkdownEditor unterEbene={1} layout="split" value="Text" onChange={() => {}} />,
+    );
+    expect(container.querySelector('.markdown-editor__titel')).toBeNull();
+  });
+
   // `readOnly` (LFH-117) sperrt nur das Textfeld; die Druckfassung (LFH-22) bleibt dieselbe.
   it('rendert die Druckfassung im readOnly-Zustand unverändert', () => {
     const wert = '**fett**\n\nENDE';

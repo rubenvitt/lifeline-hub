@@ -30,6 +30,17 @@
     display: none !important;
   }
 
+  /* Abschnittstitel (LFH-1008): auf Papier trägt ihn der Titel der Vorschau
+     (`MarkdownEditor druckTitel`), im selben Titelblock wie der erste Absatz. Das Feldetikett
+     stünde getrennt davon und bliebe in Firefox allein am Seitenende stehen. */
+  .befehl-print-root .ant-form-item:has(.markdown-editor__titel) .ant-form-item-label {
+    display: none !important;
+  }
+
+  .befehl-print-root .markdown-editor__titel {
+    display: block !important;
+  }
+
   /* Beschriftung und Vorschau-Umschalter des Editors sind Bedienung, kein Inhalt —
      dieselbe Trennung wie bei `.befehl-no-print`. */
   .befehl-print-root .markdown-editor__label,

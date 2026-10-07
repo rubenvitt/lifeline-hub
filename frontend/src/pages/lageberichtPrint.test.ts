@@ -163,6 +163,31 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
     expect(treffer[0].koerper).toContain('!important');
   });
 
+  /**
+   * LFH-1008: der Akkordeonkopf steht außerhalb der gerenderten Fassung und bliebe in Firefox
+   * allein am Seitenende. Auf Papier trägt der Titel der Fassung (`druckTitel`) den Abschnitt.
+   */
+  it('ersetzt den Akkordeonkopf auf Papier durch den Titel der Fassung', () => {
+    const kopf = regeln().find((r) =>
+      einzeln(r).includes('.lagebericht-print-root .ant-collapse-header'),
+    );
+    expect(kopf, 'Akkordeonkopf wird mitgedruckt').toBeDefined();
+    expect(versteckt(kopf!)).toBe(true);
+    const titel = regeln().find((r) =>
+      einzeln(r).includes('.lagebericht-print-root .markdown-editor__titel'),
+    );
+    expect(titel, 'Titel der Fassung bleibt verborgen').toBeDefined();
+    expect(titel!.koerper).toMatch(/display:\s*block\s*!important/);
+    // Ohne `druckTitel` stünde der Abschnitt auf Papier ohne Namen.
+    const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), SEITE), 'utf8');
+    expect(seite).toMatch(/druckTitel=\{a\.label\}/);
+    const presse = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'PressemitteilungDetailPage.tsx'),
+      'utf8',
+    );
+    expect(presse).toMatch(/druckTitel=\{a\.label\}/);
+  });
+
   it('laesst Beschriftung und Vorschau-Umschalter des Editors weg', () => {
     const chrome = regeln().filter(
       (r) => versteckt(r) && /markdown-editor__label|markdown-editor \.ant-btn/.test(r.selektor),
