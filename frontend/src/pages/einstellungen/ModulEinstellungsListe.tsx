@@ -100,7 +100,7 @@ interface SichtbarSpalte {
 }
 
 interface ModulEinstellungsListeProps {
-  /** Überschrift der Rollen-Spalte („Benötigte Rolle" bzw. „… (Default)"). */
+  /** Überschrift der Rollen-Spalte („Benötigte Rolle" bzw. „… (Vorgabe)"). */
   rollenSpalte: string;
   /** Aktuelle Rolle des Moduls; '' = frei. */
   rolleVon: (modulKey: string) => string;
@@ -118,7 +118,7 @@ interface ModulEinstellungsListeProps {
   laeuftKey?: string | null;
   /** Modul-Key der zuletzt fehlgeschlagenen Zeile; nur diese wird markiert. */
   fehlerKey?: string | null;
-  /** Gedämpfter Zusatz unter dem Select, z. B. der geerbte Org-Default. */
+  /** Gedämpfter Zusatz unter dem Select, z. B. die geerbte Vorgabe der Organisation. */
   hinweisVon?: (modulKey: string) => ReactNode;
 }
 

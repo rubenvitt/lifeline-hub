@@ -122,7 +122,7 @@ export default function FuehrungsfunktionenTab() {
                       anzeige={
                         eintrag.label === eintrag.standard_label
                           ? eintrag.label
-                          : `${eintrag.label} (Standard: ${eintrag.standard_label})`
+                          : `${eintrag.label} (Vorgabe: ${eintrag.standard_label})`
                       }
                       leer={() => false}
                       gleich={(a, b) => a.trim() === b.trim()}

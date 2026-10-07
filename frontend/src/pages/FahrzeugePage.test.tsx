@@ -369,6 +369,8 @@ describe('FahrzeugePage', () => {
 
     // Besatzungsmitglied (fahrzeug_id === 10) wird angezeigt, mit Freigeben-Aktion.
     expect(await screen.findByText(/Anna Crew/)).toBeInTheDocument();
+    // Die Stärke-Position steht als Wort, nicht als Wire-Wert (LFH-946).
+    expect(screen.getByText('Anna Crew (Mannschaft)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Freigeben' })).toBeInTheDocument();
     // Frei-Pool-Picker vorhanden (nur freie Kräfte).
     expect(screen.getByText('Kraft zur Besatzung …')).toBeInTheDocument();

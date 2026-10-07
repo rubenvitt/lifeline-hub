@@ -11,6 +11,7 @@ import { useEinstufungsUhr } from '../abloesung/useUhr';
 import { istAktiverBezirk } from '../betreuung/evakuierungKennzahl';
 import { unwetterLage } from '../wetter/unwetter';
 import { useUnwetterUhr } from '../wetter/useUnwetterUhr';
+import { anzahl } from '../anzeige/anzahl';
 import { modulRegistry, type ModulZaehlerQuelle, type ServerZaehlerQuelle } from './modulRegistry';
 
 export interface ModulZaehlerWert {
@@ -26,10 +27,6 @@ interface Args {
   freigaben?: ModulFreigaben;
 }
 
-function plural(anzahl: number, singular: string, pluralText: string): string {
-  return `${anzahl} ${anzahl === 1 ? singular : pluralText}`;
-}
-
 type Antwort<Q extends ServerZaehlerQuelle> = NonNullable<ModulZaehler[Q]>;
 
 /**
@@ -40,39 +37,39 @@ type Antwort<Q extends ServerZaehlerQuelle> = NonNullable<ModulZaehler[Q]>;
 const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWert } = {
   etb: ({ gesamt }) => ({
     wert: gesamt,
-    beschreibung: `${plural(gesamt, 'Eintrag', 'Einträge')} im Einsatztagebuch`,
+    beschreibung: `${anzahl(gesamt, 'Eintrag', 'Einträge')} im Einsatztagebuch`,
   }),
   personen: ({ gesamt }) => ({
     wert: gesamt,
-    beschreibung: plural(gesamt, 'betroffene Person', 'Betroffene'),
+    beschreibung: anzahl(gesamt, 'betroffene Person', 'Betroffene'),
   }),
   einheiten: ({ gesamt }) => ({
     wert: gesamt,
-    beschreibung: plural(gesamt, 'Einheit', 'Einheiten'),
+    beschreibung: anzahl(gesamt, 'Einheit', 'Einheiten'),
   }),
   einsatzabschnitte: ({ gesamt }) => ({
     wert: gesamt,
-    beschreibung: plural(gesamt, 'Einsatzabschnitt', 'Einsatzabschnitte'),
+    beschreibung: anzahl(gesamt, 'Einsatzabschnitt', 'Einsatzabschnitte'),
   }),
   meldungen: ({ offen, ungesehen }) => ({
     wert: offen,
-    beschreibung: `${plural(offen, 'offene Meldung', 'offene Meldungen')}, davon ${plural(ungesehen, 'ungesehen', 'ungesehen')}`,
+    beschreibung: `${anzahl(offen, 'offene Meldung', 'offene Meldungen')}, davon ${anzahl(ungesehen, 'ungesehen', 'ungesehen')}`,
   }),
   auftraege: ({ offen, ueberfaellig }) => ({
     wert: offen,
-    beschreibung: `${plural(offen, 'offener Auftrag', 'offene Aufträge')}, davon ${plural(ueberfaellig, 'überfällig', 'überfällig')}`,
+    beschreibung: `${anzahl(offen, 'offener Auftrag', 'offene Aufträge')}, davon ${anzahl(ueberfaellig, 'überfällig', 'überfällig')}`,
   }),
   erinnerungen: ({ faellig }) => ({
     wert: faellig,
-    beschreibung: plural(faellig, 'fällige Erinnerung', 'fällige Erinnerungen'),
+    beschreibung: anzahl(faellig, 'fällige Erinnerung', 'fällige Erinnerungen'),
   }),
   chat: ({ ungelesen }) => ({
     wert: ungelesen,
-    beschreibung: plural(ungelesen, 'ungelesene Chat-Nachricht', 'ungelesene Chat-Nachrichten'),
+    beschreibung: anzahl(ungelesen, 'ungelesene Chat-Nachricht', 'ungelesene Chat-Nachrichten'),
   }),
   dokumente: ({ gesamt }) => ({
     wert: gesamt,
-    beschreibung: plural(gesamt, 'abgelegtes Dokument', 'abgelegte Dokumente'),
+    beschreibung: anzahl(gesamt, 'abgelegtes Dokument', 'abgelegte Dokumente'),
   }),
 };
 
@@ -119,7 +116,7 @@ export function berechneAbloesungZaehler(
   const faellig = zaehleFaellige(abloesungen, jetzt);
   return {
     wert: faellig,
-    beschreibung: `${plural(faellig, 'Ablösung', 'Ablösungen')} fällig oder in den nächsten 30 min`,
+    beschreibung: `${anzahl(faellig, 'Ablösung', 'Ablösungen')} fällig oder in den nächsten 30 min`,
   };
 }
 
@@ -133,7 +130,7 @@ export function berechneBetreuungZaehler(
   const aktiv = bezirke.filter(istAktiverBezirk).length;
   return {
     wert: aktiv,
-    beschreibung: plural(aktiv, 'aktiver Evakuierungsbezirk', 'aktive Evakuierungsbezirke'),
+    beschreibung: anzahl(aktiv, 'aktiver Evakuierungsbezirk', 'aktive Evakuierungsbezirke'),
   };
 }
 
@@ -154,7 +151,7 @@ export function berechneUnwetterZaehler(
     lage.angekuendigt.length > 0 ? `, davon ${lage.angekuendigt.length} angekündigt` : '';
   return {
     wert,
-    beschreibung: `${plural(wert, 'Unwetterwarnung', 'Unwetterwarnungen')} für den Einsatzort${davon}`,
+    beschreibung: `${anzahl(wert, 'Unwetterwarnung', 'Unwetterwarnungen')} für den Einsatzort${davon}`,
   };
 }
 

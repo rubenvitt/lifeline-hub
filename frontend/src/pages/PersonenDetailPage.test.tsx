@@ -11,6 +11,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { erzeugeQueryClient } from '../api/queryClient';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { STATUS_META } from '../personen/personMeta';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
@@ -259,9 +260,13 @@ describe('PersonenDetailPage — Kopfleiste', () => {
      * Die belastbare Negativaussage ist „kein direkter Knopf", nicht „kein Eintrag": rc-dropdown
      * mountet sein Portal lazy, `queryByRole('menuitem')` vor dem ersten Öffnen ist immer `null`.
      */
-    expect(screen.queryByRole('button', { name: '→ vermisst' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Auf „vermisst“ setzen' })).not.toBeInTheDocument();
     const menue = await oeffneKopfmenue();
-    expect(within(menue).getByRole('menuitem', { name: /vermisst/ })).toBeInTheDocument();
+    // Mit Verb statt Pfeil (LFH-944).
+    expect(
+      within(menue).getByRole('menuitem', { name: 'Auf „vermisst“ setzen' }),
+    ).toBeInTheDocument();
+    expect(within(menue).queryByText(/→/)).not.toBeInTheDocument();
     expect(within(menue).getByRole('menuitem', { name: /Stornieren/ })).toBeInTheDocument();
   });
 
@@ -356,7 +361,7 @@ describe('PersonenDetailPage — med. Verlauf', () => {
     await waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
   });
 
-  it('zeigt bei Sichtung=tot den Hinweis „Status → verstorben"', async () => {
+  it('zeigt bei Sichtung=tot den Hinweis mit dem Personenstatus und „Auf „verstorben“ setzen"', async () => {
     const totDetail = {
       ...detail,
       aktuelle_sichtung: 'tot' as Sichtungskategorie,
@@ -374,7 +379,20 @@ describe('PersonenDetailPage — med. Verlauf', () => {
       ],
     } as PersonDetail;
     render(einsatzAktiv, totDetail);
-    expect(await screen.findByRole('button', { name: /Status → verstorben/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Auf „verstorben“ setzen' }),
+    ).toBeInTheDocument();
+    // Fachsprache statt Verwaltungssprache (LFH-944): der Satz nennt den Status, den die Person
+    // noch hat, und kein „Admin-Status“.
+    expect(
+      screen.getByText(
+        `Sichtung „tot“ – Personenstatus ist noch „${STATUS_META[totDetail.status].label}“. Bitte auf „verstorben“ setzen.`,
+      ),
+    ).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/Admin-Status|append-only|SK: /);
+    expect(
+      screen.getByLabelText('Verlaufsnotiz (nicht änderbar, erscheint nicht im ETB)'),
+    ).toBeInTheDocument();
   });
 
   it('zeigt die Chronologie-Zeiten taktisch formatiert (LFH-141), nicht als Rohstring', async () => {

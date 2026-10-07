@@ -365,7 +365,7 @@ export default function MeldungFormular({
                         <InputNumber
                           precision={0}
                           suffix="Min"
-                          placeholder="Frist (Default 5)"
+                          placeholder="Frist (Vorgabe)"
                           aria-label="Bestätigungsfrist in Minuten"
                         />
                       </Form.Item>

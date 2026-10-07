@@ -8,19 +8,20 @@ import ModulEinstellungsListe from './ModulEinstellungsListe';
 import { quittiereModulGespeichert } from './modulQuittung';
 import { ladeModulOverrides, setzeModulOverride } from '../../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
+import { orgVorgabe } from '../../components/vorgabeText';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
 import { darfModuleVerwalten } from '../../einsatz/schreibrecht';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import type { ModulOverrideUpdate, OrgModulEinstellungen } from '../../api/types';
 
-/** Org-Rollen-Hinweis im Modul-Override (z. B. „Org: Führungskraft"). */
+/** Org-Rollen-Hinweis im Modul-Override („Vorgabe der Organisation: Führungskraft“, LFH-944). */
 function orgRollenHinweis(
   rolle: 'admin' | 'fuehrungskraft' | null | undefined,
 ): string | undefined {
   if (rolle == null) return undefined;
-  if (rolle === 'fuehrungskraft') return 'Org: Führungskraft';
-  if (rolle === 'admin') return 'Org: Admin';
+  if (rolle === 'fuehrungskraft') return orgVorgabe('Führungskraft');
+  if (rolle === 'admin') return orgVorgabe('Admin');
   return undefined;
 }
 

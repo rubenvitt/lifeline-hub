@@ -139,7 +139,7 @@ export default function ProfilPage() {
       const start = await enrollStart();
       setTotpEnrollment({ otpauthUrl: start.otpauth_url, secretBase32: start.secret_base32 });
     } catch (e) {
-      setTotpFehler(fehlerText(e, 'TOTP-Einrichtung fehlgeschlagen'));
+      setTotpFehler(fehlerText(e, 'Einrichtung des zweiten Faktors fehlgeschlagen'));
     } finally {
       setTotpLaedt(false);
     }
@@ -175,7 +175,7 @@ export default function ProfilPage() {
     // trotzdem ablehnen (NotAllowedError, fehlende Berechtigung). Kein `?.`, weil der Aufrufer die
     // Fähigkeit über `kopierenMoeglich` geprüft hat.
     navigator.clipboard.writeText(recoveryCodes.join('\n')).then(
-      () => message.success('Recovery-Codes kopiert'),
+      () => message.success('Wiederherstellungscodes kopiert'),
       () =>
         message.error(
           'Kopieren fehlgeschlagen — die Codes oben lassen sich markieren und kopieren',
@@ -259,7 +259,7 @@ export default function ProfilPage() {
 
             <section style={{ maxWidth: 480 }}>
               <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
-                Zwei-Faktor (TOTP)
+                Zweiter Faktor (Code aus App)
               </Augenbraue>
 
               {recoveryCodes && (
@@ -268,7 +268,7 @@ export default function ProfilPage() {
                   showIcon
                   style={{ marginBottom: 16 }}
                   // `title` statt des in antd 6 abgelösten `message`.
-                  title="Recovery-Codes jetzt sichern"
+                  title="Wiederherstellungscodes jetzt sichern"
                   description={
                     <div>
                       <Typography.Paragraph style={{ marginBottom: 8 }}>
@@ -310,9 +310,14 @@ export default function ProfilPage() {
 
               {totpAktiv ? (
                 <>
-                  <Alert type="success" title="2FA aktiv" showIcon style={{ marginBottom: 8 }} />
+                  <Alert
+                    type="success"
+                    title="Zweiter Faktor aktiv"
+                    showIcon
+                    style={{ marginBottom: 8 }}
+                  />
                   <Typography.Paragraph type="secondary">
-                    Deaktivieren nur per Admin-Reset
+                    Abschalten kann nur ein Administrator.
                   </Typography.Paragraph>
                 </>
               ) : totpEnrollment ? (
@@ -333,11 +338,8 @@ export default function ProfilPage() {
                   </div>
                   {/* Kopieren über einen Knopf der Dichte-Staffel statt `copyable` (LFH-763). */}
                   <div style={{ marginBottom: token.marginSM }}>
-                    <KopierbarerText
-                      text={totpEnrollment.secretBase32}
-                      bezeichnung="TOTP-Geheimnis"
-                    >
-                      Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>
+                    <KopierbarerText text={totpEnrollment.secretBase32} bezeichnung="Schlüssel">
+                      Schlüssel zur manuellen Eingabe: <code>{totpEnrollment.secretBase32}</code>
                     </KopierbarerText>
                   </div>
                   <Form
@@ -364,7 +366,7 @@ export default function ProfilPage() {
               ) : (
                 <>
                   <Button onClick={totpEinrichtenStarten} loading={totpLaedt}>
-                    2FA einrichten
+                    Zweiten Faktor einrichten
                   </Button>
                 </>
               )}

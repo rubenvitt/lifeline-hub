@@ -609,7 +609,7 @@ pub async fn einstellungen_setzen(
         if let Some(v) = f {
             if !einstellungen::ist_gueltige_frist_min(v) {
                 return Err(AppError::Validation(
-                    "Default-Frist muss zwischen 1 und 10080 Minuten liegen".into(),
+                    "Frist muss zwischen 1 und 10080 Minuten liegen".into(),
                 ));
             }
         }

@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
 import OnlineQuellenVerwaltung from './OnlineQuellenVerwaltung';
 
-/** Admin-Sektion `/admin/karten/online` — Online-Basemap-Quellen. Schreiben nur System-Admin;
+/** Admin-Sektion `/admin/karten/online` — Online-Quellen der Kartengrundlage. Schreiben nur System-Admin;
     Führungskräfte sehen read-only. */
 export default function KartenOnlineSektion() {
   const { benutzer } = useAuth();
@@ -11,7 +11,7 @@ export default function KartenOnlineSektion() {
   return (
     <AdminPage
       titel="Online-Quellen"
-      beschreibung="Online-Basemap-Quellen für die Lagekarte."
+      beschreibung="Online-Quellen für die Kartengrundlage der Lagekarte."
       hinweis={
         !istAdmin ? (
           <Alert
@@ -24,7 +24,7 @@ export default function KartenOnlineSektion() {
       }
     >
       <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-        Quellen mit Status „aktiv" erscheinen im Basemap-Switcher der Lagekarte.
+        Quellen mit Status „aktiv" erscheinen in der Wahl der Kartengrundlage auf der Lagekarte.
       </Typography.Paragraph>
       <OnlineQuellenVerwaltung />
     </AdminPage>

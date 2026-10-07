@@ -125,7 +125,7 @@ describe('EinsatzVerhalten', () => {
 
     rendern();
 
-    expect(await screen.findByText('Standard (Org): Aus')).toBeInTheDocument();
+    expect(await screen.findByText('Vorgabe der Organisation: Aus')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
@@ -136,7 +136,7 @@ describe('EinsatzVerhalten', () => {
     );
   });
 
-  it('zeigt die Org-Standard-Hinweise dieser Sektion und sendet trotzdem null', async () => {
+  it('zeigt die Org-Vorgaben dieser Sektion und sendet trotzdem null', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       ...BASIS,
       org_defaults: {
@@ -153,11 +153,23 @@ describe('EinsatzVerhalten', () => {
 
     rendern();
 
-    expect(await screen.findByText('Standard (Org): EB-')).toBeInTheDocument();
-    expect(screen.getByText('Standard (Org): 30 Min.')).toBeInTheDocument();
-    expect(screen.getByText('Standard (Org): 60 Min.')).toBeInTheDocument();
-    expect(screen.getByText('Standard (Org): 90 Min.')).toBeInTheDocument();
-    expect(screen.getByText('Standard (Org): An')).toBeInTheDocument();
+    expect(await screen.findByText('Vorgabe der Organisation: EB-')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: 30 Min.')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: 60 Min.')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: 90 Min.')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: An')).toBeInTheDocument();
+    // Leere Felder nennen den Wert, der gilt: hier die Vorgabe der Organisation (LFH-944).
+    expect(screen.getByLabelText('Bestätigungsfrist Meldungen (Minuten)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('30 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('90 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('An (Vorgabe)')).toBeInTheDocument();
+    const platzhalter = [...document.querySelectorAll('[placeholder]')].map((e) =>
+      e.getAttribute('placeholder'),
+    );
+    expect([document.body.textContent, ...platzhalter].join(' ')).not.toMatch(
+      /Standard|Default|Fallback/,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
@@ -171,6 +183,18 @@ describe('EinsatzVerhalten', () => {
         }),
       ),
     );
+  });
+
+  it('ohne Org-Vorgabe nennen die Platzhalter die Werte des Systems (LFH-944)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({ ...BASIS } as never);
+    rendern();
+
+    expect(await screen.findByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('keine Frist (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('An (Vorgabe)')).toBeInTheDocument();
+    // Startwert der Nummernkreise: leer beginnt die Zählung bei 1.
+    expect(screen.getAllByPlaceholderText('1 (Vorgabe)').length).toBeGreaterThan(0);
   });
 
   it('laesst die fremden Sektionen als Bestandswert mitfahren (Vollersatz-PUT)', async () => {

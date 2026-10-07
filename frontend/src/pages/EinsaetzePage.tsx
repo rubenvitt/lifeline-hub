@@ -10,6 +10,7 @@ import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { EINSATZ_ROLLE_LABELS } from '../einsatz/einsatzRolle';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -293,7 +294,9 @@ function EinsaetzeInhalt() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}>
             <StatusTag darstellung={einsatzStatus[e.status]} />
             <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
-            {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
+            {/* Mit Kontext: allein gelesen hielte man „Einsatzleitung“ für eine Eigenschaft des
+                Einsatzes, nicht für die eigene Rolle (LFH-946). */}
+            {e.meine_rolle && <Tag>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Tag>}
           </div>
           {/* Ort und Beginn beantworten „welcher ist meiner?". Das Icon trägt eine
               `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}

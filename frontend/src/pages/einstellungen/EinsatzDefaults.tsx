@@ -27,10 +27,11 @@ import {
 import type { OrgEinstellungenUpdate } from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
+import { mitVorgabe } from '../../components/vorgabeText';
 
 /** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Modulzeile. */
 const RECHTE_TEXT =
-  'Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Defaults ändern — die Werte stehen hier zum Nachlesen.';
+  'Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Vorgaben ändern — die Werte stehen hier zum Nachlesen.';
 
 /**
  * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen, Auto-ETB +
@@ -86,7 +87,7 @@ export default function EinsatzDefaults() {
       qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
       // Eine Org-Vorgabe wirkt auf die Freigaben JEDES Einsatzes der Org (LFH-669).
       qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigabenAlle() });
-      quittiereModulGespeichert(message, 'Modul-Default gespeichert');
+      quittiereModulGespeichert(message, 'Modul-Vorgabe gespeichert');
     },
   });
 
@@ -122,9 +123,9 @@ export default function EinsatzDefaults() {
 
   return (
     <AdminPage
-      titel="Einsatz-Defaults"
+      titel="Einsatz-Vorgaben"
       breite="schmal"
-      beschreibung="Org-weite Defaults für neue Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte."
+      beschreibung="Vorgaben der Organisation für neue Einsätze. Einstellungen im Einsatz gehen diesen Werten vor."
       hinweis={
         // Nur der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
         // Ablehnung selbst (unten) — zwei Vorgänge in einem Kasten sagen nicht mehr, was
@@ -147,7 +148,7 @@ export default function EinsatzDefaults() {
       >
         <Formularpaneel
           titel="Aufbewahrung"
-          beschreibung="Default-Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist."
+          beschreibung="Vorgabe der Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist."
         >
           <Form.Item
             label="Aufbewahrungs-Dauer (Tage)"
@@ -179,7 +180,7 @@ export default function EinsatzDefaults() {
 
         <Formularpaneel
           titel="Verhalten & Automatik"
-          beschreibung="Nummernkreis-Präfixe und Default-Fristen für neue Einsätze. Das Präfix der Einsatznummer wird beim Anlegen fest in die Nummer übernommen; die übrigen Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback)."
+          beschreibung={`Nummernkreis-Präfixe und Vorgabe-Fristen für neue Einsätze. Das Präfix der Einsatznummer wird beim Anlegen fest in die Nummer übernommen; die übrigen Präfixe sind reine Anzeige.`}
         >
           <Form.Item
             label="Präfix Einsatznummer"
@@ -211,27 +212,27 @@ export default function EinsatzDefaults() {
           </Form.Item>
 
           <Form.Item
-            label="Default-Bestätigungsfrist Meldungen (Minuten)"
+            label="Vorgabe-Bestätigungsfrist Meldungen (Minuten)"
             name="meldung_bestaetigung_frist_min"
-            tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = kein Default."
+            tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = 5 Minuten."
           >
             <InputNumber
               min={1}
               max={10080}
               style={{ width: '100%', maxWidth: 200 }}
-              placeholder="kein Default"
+              placeholder={mitVorgabe('5')}
             />
           </Form.Item>
           <Form.Item
-            label="Default-Quittierungsfrist Aufträge (Minuten)"
+            label="Vorgabe-Quittierungsfrist Aufträge (Minuten)"
             name="auftrag_quittierung_frist_min"
-            tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = kein Default."
+            tooltip="Frist für unquittierte Aufträge ohne eigene Frist. Leer = keine Frist."
           >
             <InputNumber
               min={1}
               max={10080}
               style={{ width: '100%', maxWidth: 200 }}
-              placeholder="kein Default"
+              placeholder={mitVorgabe('keine Frist')}
             />
           </Form.Item>
           <Form.Item
@@ -243,7 +244,7 @@ export default function EinsatzDefaults() {
               min={1}
               max={10080}
               style={{ width: '100%', maxWidth: 200 }}
-              placeholder="60"
+              placeholder={mitVorgabe('60')}
             />
           </Form.Item>
 
@@ -270,11 +271,11 @@ export default function EinsatzDefaults() {
         </div>
       </Form>
 
-      {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ── */}
+      {/* ── Rollen-Vorgabe je Modul (Sofort-Speichern, kein Form-Feld) ── */}
       <div style={{ marginTop: token.marginXL }}>
         <Formularpaneel
-          titel="Modul-Rollen-Default"
-          beschreibung="Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden. Änderungen werden sofort gespeichert."
+          titel="Rollen-Vorgabe je Modul"
+          beschreibung="Vorgabe der Organisation für die benötigte Rolle je Modul. Jeder Einsatz kann sie ändern. Änderungen werden sofort gespeichert."
         >
           {/* Die Ablehnung der Liste steht bei der Liste, nicht im Seitenkopf; mit der
               Zeilenmarke (`fehlerKey`) zeigen Text und Rand auf dieselbe Zeile. */}
@@ -283,7 +284,7 @@ export default function EinsatzDefaults() {
           </div>
 
           <ModulEinstellungsListe
-            rollenSpalte="Benötigte Rolle (Default)"
+            rollenSpalte="Benötigte Rolle (Vorgabe)"
             rolleVon={(key) => orgModul[key] ?? ''}
             aufRolle={(modulKey, val) =>
               modulMutation.mutate({
