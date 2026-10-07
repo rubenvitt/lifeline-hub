@@ -1048,6 +1048,75 @@ describe('Datensicht · Kartenzweig', () => {
   });
 });
 
+describe('Datensicht · Filteretikett und Leerzustand (LFH-967)', () => {
+  /**
+   * Ein Mehrfach-Select zeigt nach der Wahl nur noch den Wert („Feuerwehr ×“); der Platzhalter,
+   * bisher die einzige Beschriftung, verschwindet. Das Etikett steht deshalb als Präfix im Feld.
+   */
+  it.each([390, 1366])(
+    'das Filteretikett bleibt nach der Wahl sichtbar — %i px',
+    async (breite) => {
+      setzeViewportBreite(breite);
+      rendere({ suche: { platzhalter: 'Funkrufname' } });
+      const feld = screen.getByRole('combobox', { name: 'Träger' });
+      const huelle = feld.closest('.ant-select') as HTMLElement;
+      expect(huelle).toHaveTextContent('Träger');
+
+      await userEvent.click(feld);
+      await userEvent.click(await screen.findByTitle('Feuerwehr'));
+      // Auf die Wirkung warten: „Rotkreuz 2“ (HiOrg) fällt aus der Sicht.
+      await waitFor(() => expect(screen.queryByText('Rotkreuz 2')).toBeNull());
+      // Der Wert selbst steht in jsdom nicht als Text da (`maxTagCount="responsive"` misst 0 px);
+      // getragen wird die Aussage vom Präfix, der Platzhalter ist jetzt verschwunden.
+      expect(huelle.querySelector('.ant-select-placeholder')).toBeNull();
+      expect(huelle, 'die Achse steht neben dem gewählten Wert').toHaveTextContent('Träger');
+    },
+  );
+
+  it.each([390, 1366])(
+    'aktive Suche ohne Treffer nennt die Einschränkung und setzt sie zurück — %i px',
+    async (breite) => {
+      setzeViewportBreite(breite);
+      rendere({ leerText: 'Noch keine Fahrzeuge disponiert', suche: { platzhalter: 'Suche' } });
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Suche in Fahrzeuge im Einsatz' }), {
+        target: { value: 'gibt es nicht' },
+      });
+
+      expect(await screen.findByText('Keine Treffer für die gewählten Filter')).toBeInTheDocument();
+      expect(screen.queryByText('Noch keine Fahrzeuge disponiert')).toBeNull();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+      expect(screen.getByRole('searchbox', { name: 'Suche in Fahrzeuge im Einsatz' })).toHaveValue(
+        '',
+      );
+      expect(await screen.findByText('Rotkreuz 2')).toBeInTheDocument();
+      expect(screen.queryByText('Keine Treffer für die gewählten Filter')).toBeNull();
+    },
+  );
+
+  it('aktiver Spaltenfilter ohne Treffer nennt die Einschränkung', async () => {
+    setzeViewportBreite(1366);
+    rendere({ daten: [F(2, 'Rotkreuz 2', { traeger: 'HiOrg' })], leerText: 'Leer' });
+    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
+    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    expect(await screen.findByText('Keine Treffer für die gewählten Filter')).toBeInTheDocument();
+    expect(screen.queryByText('Leer')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeInTheDocument();
+  });
+
+  it('bei leerer Gesamtmenge bleibt der leerText des Moduls, auch mit Suchbegriff', () => {
+    setzeViewportBreite(1366);
+    rendere({
+      daten: [],
+      leerText: 'Noch keine Fahrzeuge disponiert',
+      suche: { platzhalter: 'S' },
+    });
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'x' } });
+    expect(screen.getByText('Noch keine Fahrzeuge disponiert')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Treffer für die gewählten Filter')).toBeNull();
+  });
+});
+
 describe('Datensicht · Aufklappbereich (LFH-676)', () => {
   /**
    * Ein beschrifteter Auslöser mit der Zeilenkennung im Namen, in BEIDEN Zweigen gleich. Der
