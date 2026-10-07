@@ -44,6 +44,7 @@ import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { InlineAngabe } from '../components/InlineAngabe';
+import { useViewport } from '../components/useViewport';
 import { useAuth } from '../auth/AuthContext';
 import {
   darfImEinsatzSchreiben,
@@ -293,10 +294,13 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
 
 /**
  * Beschriftete Angaben als Zeilen (`dl`) statt umrandeter `Descriptions`-Tabelle: Augenbraue links,
- * Wert rechts, Trenner `flaeche3`.
+ * Wert rechts, Trenner `flaeche3`. Unter `md` steht die Augenbraue ÜBER dem Wert (Muster
+ * `ModulEinstellungsListe`): die 140 px der Etikettspalte ließen dem Wert am Handy zu wenig, und
+ * die Seite lief über (LFH-964).
  */
 function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] }) {
   const { token, rollen } = useRollen();
+  const { istSchmal } = useViewport();
   return (
     <dl style={{ margin: 0 }}>
       {zeilen.map(({ etikett, wert }) => (
@@ -305,8 +309,8 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
           style={{
             ...paneelZeileStil(rollen, token),
             display: 'grid',
-            gridTemplateColumns: 'minmax(140px, 1fr) minmax(0, 2fr)',
-            gap: token.margin,
+            gridTemplateColumns: istSchmal ? '1fr' : 'minmax(140px, 1fr) minmax(0, 2fr)',
+            gap: istSchmal ? token.marginXXS : token.margin,
             alignItems: 'baseline',
           }}
         >

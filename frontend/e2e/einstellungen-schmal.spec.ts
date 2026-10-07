@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
 
 /**
  * Die Einsatz-Einstellungen am Handschirm. Die Modulzeile stapelt unter `md`, damit das
@@ -250,12 +251,12 @@ for (const [name, fenster] of [
 
 /** Die Rechtehinweise der Sektionen, je über ein Fragment, das nur EINEN Hinweis trifft —
  *  auf der Aufbewahrung stehen zwei (Einstellungen und Frist). */
-const HINWEIS_EINSTELLUNGEN = 'darf die Einstellungen dieses Einsatzes';
-const HINWEIS_FRIST = 'darf die Aufbewahrungsfrist';
+const HINWEIS_EINSTELLUNGEN = 'nur Einsatzleitung, Führungspersonal oder Admin';
+const HINWEIS_FRIST = 'nur Einsatzleitung oder Org-Admin';
 const HINWEIS_MODULE = 'darf die Modul-Sichtbarkeit';
 
 function rechteHinweis(p: Page, fragment: string) {
-  return p.getByRole('alert').filter({ hasText: fragment });
+  return rechteHinweisZeile(p, fragment);
 }
 
 /** Der Speichern-Knopf der Formular-Sektion (die Frist trägt „Frist ändern", nicht „Speichern"). */

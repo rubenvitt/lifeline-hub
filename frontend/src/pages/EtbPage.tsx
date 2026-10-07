@@ -1,6 +1,12 @@
-import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Space, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Space, Switch, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben, schliesseEinsatzAb } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -8,7 +14,6 @@ import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrec
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
 import {
-  SEITENGROESSE,
   erteileAuftragAusEtb,
   ladeEtbZaehler,
   listeEtb,
@@ -22,7 +27,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
 import EtbLesemarkeBanner from '../etb/EtbLesemarkeBanner';
@@ -37,12 +42,19 @@ import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
 import { useEntwurfsVersand } from '../etb/entwuerfe/useEntwurfsVersand';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { baueZeilen } from '../etb/etbZeile';
+import {
+  ETB_MAX_SEITEN,
+  naechsterSeitenParam,
+  sprungRichtung,
+  vorigerSeitenParam,
+  type EtbSeitenParam,
+} from '../etb/seitenfenster';
 import { scrolleZurZeile } from '../components/Datensicht';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
+import { Segmentleiste, monoStil, useRollen, type SegmentOption } from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -76,10 +88,16 @@ function inLeiste(wurzel: HTMLElement, ziel: EventTarget | Element | null): bool
   return wurzel.contains(ziel) || ziel.closest(LEISTEN_SCHWEBE) != null;
 }
 
-/** Wie viele Filter der aufklappbaren Leiste gesetzt sind: Volltext, Zeitraum, Einheit. */
+/**
+ * Wie viele Filter der aufklappbaren Leiste gesetzt sind: Volltext, Zeitraum, Einheit und der
+ * Ausschluss der Systemeinträge (LFH-958).
+ */
 function leistenFilterZahl(filter: EtbFilterWerte): number {
   return (
-    (filter.q ? 1 : 0) + (filter.von || filter.bis ? 1 : 0) + (filter.einheit_id != null ? 1 : 0)
+    (filter.q ? 1 : 0) +
+    (filter.von || filter.bis ? 1 : 0) +
+    (filter.einheit_id != null ? 1 : 0) +
+    (filter.ohne_system ? 1 : 0)
   );
 }
 
@@ -194,12 +212,23 @@ export default function EtbPage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
+  /**
+   * Seitenfenster (LFH-947, `etb/seitenfenster.ts`): höchstens `ETB_MAX_SEITEN` Seiten, in beide
+   * Richtungen blätterbar. Ein Live-Ereignis lädt damit höchstens so viele Seiten neu, wie im
+   * Fenster liegen — nicht so viele, wie je geblättert wurde.
+   */
   const etbQuery = useInfiniteQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, filter),
-    queryFn: ({ pageParam }) => listeEtb(einsatzId, { ...filter, before_lfd_nr: pageParam }),
-    initialPageParam: undefined as number | undefined,
-    getNextPageParam: (letzteSeite) =>
-      letzteSeite.length === SEITENGROESSE ? letzteSeite[letzteSeite.length - 1].lfd_nr : undefined,
+    queryFn: ({ pageParam }) =>
+      listeEtb(einsatzId, {
+        ...filter,
+        before_lfd_nr: pageParam && 'aelter' in pageParam ? pageParam.aelter : undefined,
+        after_lfd_nr: pageParam && 'neuer' in pageParam ? pageParam.neuer : undefined,
+      }),
+    initialPageParam: undefined as EtbSeitenParam,
+    maxPages: ETB_MAX_SEITEN,
+    getNextPageParam: (letzte, _alle, param) => naechsterSeitenParam(letzte, param),
+    getPreviousPageParam: (erste, _alle, param) => vorigerSeitenParam(erste, param),
   });
 
   // Riegel für die Bilanz unter `xl`: sie erscheint erst, wenn die Liste zum ersten Mal steht
@@ -219,6 +248,21 @@ export default function EtbPage() {
     queryKey: einsatzKeys.etbZaehler(einsatzId, filter),
     queryFn: () => ladeEtbZaehler(einsatzId, filter),
   });
+  // Wie viele Systemeinträge der Ausschluss verbirgt (LFH-958): dieselbe Zählung ohne ihn. Läuft
+  // nur, solange er gilt; ohne Ausschluss steht die Zahl schon in `zaehlerQuery`.
+  const filterMitSystem = useMemo<EtbFilterWerte>(() => {
+    const { ohne_system: _aus, ...rest } = filter;
+    void _aus;
+    return rest;
+  }, [filter]);
+  const systemZaehlerQuery = useQuery({
+    queryKey: einsatzKeys.etbZaehler(einsatzId, filterMitSystem),
+    queryFn: () => ladeEtbZaehler(einsatzId, filterMitSystem),
+    enabled: filter.ohne_system === true,
+  });
+  const systemZahlId = useId();
+  const systemAnzahl = (filter.ohne_system ? systemZaehlerQuery.data : zaehlerQuery.data)?.je_typ
+    .system;
 
   // Dokumente der Ablage mit ETB-Bezug (LFH-743): EINE Sammelabfrage über die Dokumentenliste,
   // nach Eintrag zugeordnet. Das Modulrecht `dokumente` bleibt maßgeblich — ohne Freigabe (auch
@@ -242,7 +286,8 @@ export default function EtbPage() {
 
   // Die leere Ersatzliste bleibt, die Chronologie braucht ein Array. Lade- und Fehler-Gate stehen
   // in `leerInhalt` weiter unten.
-  const eintraege = etbQuery.data?.pages.flat() ?? [];
+  const etbSeiten = etbQuery.data?.pages;
+  const eintraege = useMemo(() => etbSeiten?.flat() ?? [], [etbSeiten]);
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -369,19 +414,40 @@ export default function EtbPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Deeplink ?eintrag=<id>: die Liste paginiert neueste zuerst, ältere Seiten werden nachgeladen,
-  // bis der Eintrag gefunden ist (begrenzt durch das Pagination-Ende). Danach Highlight setzen und
-  // den Param räumen.
+  // Deeplink ?eintrag=<id>: die Seite blättert in die Richtung des Ziels (LFH-947, design.md D4:
+  // die Kennung wächst mit der laufenden Nummer), bis es im Fenster liegt; mit `maxPages` fällt
+  // dabei das andere Ende weg, das Ziel liegt in der zuletzt geholten Seite. Ist in der Richtung
+  // nichts mehr zu holen, wird der Param ohne Highlight geräumt.
   const zielEintragId = parseRouteId(searchParams.get('eintrag') ?? undefined);
   useEffect(() => {
     if (zielEintragId == null) return;
     if (etbQuery.isLoading) return;
-    const gefunden = (etbQuery.data?.pages.flat() ?? []).some((e) => e.id === zielEintragId);
-    if (!gefunden && etbQuery.hasNextPage) {
-      if (!etbQuery.isFetchingNextPage) etbQuery.fetchNextPage();
+    if (etbQuery.isFetchingNextPage || etbQuery.isFetchingPreviousPage) return;
+    const richtung = sprungRichtung(etbQuery.data?.pages ?? [], zielEintragId);
+    // Scheiterte das letzte Blättern an einer Serverantwort, gibt der Sprung auf: sonst riefe der
+    // Effekt nach jedem Fehler sofort wieder ab (ohne Wiederholung, `api/queryClient.ts`).
+    const gescheitert = etbQuery.isFetchNextPageError || etbQuery.isFetchPreviousPageError;
+    if (!gescheitert && richtung === 'aelter' && etbQuery.hasNextPage) {
+      etbQuery.fetchNextPage();
       return; // nach dem Laden re-läuft der Effekt (etbQuery.data ändert sich)
     }
-    if (gefunden) setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
+    if (!gescheitert && richtung === 'neuer' && etbQuery.hasPreviousPage) {
+      etbQuery.fetchPreviousPage();
+      return;
+    }
+    if (richtung !== 'da' && !gescheitert && filter.ohne_system && filter.typ == null) {
+      // Das Ziel kann ein ausgeblendeter Systemeintrag sein (LFH-958, design.md D5): einblenden
+      // und erneut suchen. Der zweite Durchlauf findet ihn oder räumt den Param wie sonst. Unter
+      // einem Typfilter verbirgt der Ausschluss nichts, was der Filter zeigen würde.
+      navigate(etbPfad(einsatzId, { ...filterMitSystem, eintrag: zielEintragId }), {
+        replace: true,
+      });
+      message.info('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen');
+      return;
+    }
+    if (richtung === 'da') {
+      setHervorhebung((v) => ({ id: zielEintragId, marke: (v?.marke ?? 0) + 1 }));
+    }
     searchParams.delete('eintrag');
     setSearchParams(searchParams, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,8 +455,13 @@ export default function EtbPage() {
     zielEintragId,
     etbQuery.data,
     etbQuery.hasNextPage,
+    etbQuery.hasPreviousPage,
     etbQuery.isFetchingNextPage,
+    etbQuery.isFetchingPreviousPage,
+    etbQuery.isFetchNextPageError,
+    etbQuery.isFetchPreviousPageError,
     etbQuery.isLoading,
+    filter.ohne_system,
   ]);
 
   useEffect(() => {
@@ -430,7 +501,31 @@ export default function EtbPage() {
    * Gesendete und gepufferte Einträge als eine Chronologie. Die Banner unten fassen zusammen, die
    * Zeilen zeigen — sonst fehlte in der Chronologie die eigene, gerade erfasste Meldung.
    */
-  const chronologie = baueZeilen({ eintraege, ausstehend, abgelehnt });
+  const chronologie = useMemo(
+    () => baueZeilen({ eintraege, ausstehend, abgelehnt }),
+    [eintraege, ausstehend, abgelehnt],
+  );
+
+  /**
+   * Steht das Fenster tief im Tagebuch, läge der eigene neue Eintrag außerhalb (LFH-947): das
+   * Neuladen nach dem Senden beginnt bei der ersten gehaltenen Seite. Die Seite holt deshalb den
+   * Kopf und ersetzt das Fenster durch ihn. Scheitert der Abruf, bleibt das Fenster, wie es ist —
+   * kein `resetQueries`, das ließe bei schlechtem Netz eine leere Zeitachse zurück.
+   */
+  async function zumKopf() {
+    const schluessel = einsatzKeys.etbListe(einsatzId, filter);
+    let kopf: EtbEintragAnzeige[];
+    try {
+      kopf = await listeEtb(einsatzId, filter);
+    } catch {
+      return;
+    }
+    await qc.cancelQueries({ queryKey: schluessel, exact: true });
+    qc.setQueryData<InfiniteData<EtbEintragAnzeige[], EtbSeitenParam>>(schluessel, {
+      pages: [kopf],
+      pageParams: [undefined],
+    });
+  }
 
   /**
    * Eingabe unten, neueste oben — und was nach dem eigenen Eintrag passiert.
@@ -446,6 +541,7 @@ export default function EtbPage() {
   async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
       await erfassen(e);
+      if (etbQuery.hasPreviousPage) await zumKopf();
       zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
     } catch (err) {
       message.error(fehlerText(err, 'Senden fehlgeschlagen'));
@@ -693,17 +789,47 @@ export default function EtbPage() {
                 startWerte={filter}
                 onChange={leisteGeaendert}
                 zusatz={
-                  // Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an der
-                  // Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert.
-                  <Select<number>
-                    aria-label="Nach Einheit filtern"
-                    placeholder="Einheit"
-                    allowClear
-                    style={{ minWidth: 180 }}
-                    value={filter.einheit_id}
-                    options={einheitOptionen}
-                    onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
-                  />
+                  <>
+                    {/* Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
+                        der Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert. */}
+                    <Select<number>
+                      aria-label="Nach Einheit filtern"
+                      placeholder="Einheit"
+                      allowClear
+                      style={{ minWidth: 180 }}
+                      value={filter.einheit_id}
+                      options={einheitOptionen}
+                      onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
+                    />
+                    {/* Ausschluss der Systemeinträge (LFH-958): ein Filter wie die übrigen, in der
+                        URL, mit der Zahl, die er zeigt bzw. verbirgt. */}
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: token.marginXS,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {/* Der Name bleibt fest, die Zahl ist Beschreibung: sonst sagte ein
+                          Bildschirmleser bei jeder neuen Zählung den Schalter neu an. */}
+                      <Switch
+                        aria-label="Systemeinträge zeigen"
+                        aria-describedby={systemAnzahl != null ? systemZahlId : undefined}
+                        checked={!filter.ohne_system}
+                        onChange={(an) => filterAendern({ ohne_system: an ? undefined : true })}
+                      />
+                      Systemeinträge zeigen
+                      {systemAnzahl != null && (
+                        <span
+                          id={systemZahlId}
+                          style={{ ...monoStil(11), color: rollen.gedaempft }}
+                        >
+                          {filter.ohne_system ? `${systemAnzahl} ausgeblendet` : systemAnzahl}
+                        </span>
+                      )}
+                    </label>
+                  </>
                 }
               />
             )}
@@ -767,6 +893,24 @@ export default function EtbPage() {
             {/* „neu seit Ihrer letzten Sichtung" — im Fluss über der Zeitachse; das
                 Sammelbanner des Live-Zuflusses liegt dagegen auf ihr. */}
             <EtbLesemarkeBanner einsatzId={einsatzId} />
+            {/* Das Fenster steht nicht am neuesten Eintrag (LFH-947): der Rückweg nach oben,
+                lückenlos über den Cursor nach oben. Keine Zahl — die zählt der Server im Kopf. */}
+            {etbQuery.hasPreviousPage && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: token.paddingXS,
+                  borderBlockEnd: `1px solid ${rollen.linie}`,
+                }}
+              >
+                <Button
+                  onClick={() => etbQuery.fetchPreviousPage()}
+                  loading={etbQuery.isFetchingPreviousPage}
+                >
+                  Neuere laden
+                </Button>
+              </div>
+            )}
             <EtbZeitachse
               zeilen={chronologie}
               einsatzId={einsatzId}
@@ -825,6 +969,7 @@ export default function EtbPage() {
               filterAktiv={filterAktiv}
               puffer={puffer}
               unbestimmt={!etbQuery.isSuccess}
+              ausschnitt={etbQuery.hasPreviousPage}
             />
           </aside>
         )}

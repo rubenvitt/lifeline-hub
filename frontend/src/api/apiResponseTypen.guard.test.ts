@@ -43,6 +43,9 @@ const AUSNAHMEN: Record<string, string> = {
     'weder Request- noch Response-Wire-DTO.',
 
   // ── Request-/Eingabe-DTOs, die die Namenskonvention nicht treffen. ──
+  'meldungen.ts#AbschlussCursor':
+    'Blätter-Position der abgeschlossenen Meldungen und Erinnerungen (LFH-940); geht als ' +
+    'Query-Parameter `vor_zeit`/`vor_id` hinaus, kein Body und keine Antwort.',
   'lagezonen.ts#ZoneNeu': 'POST-Body einer Lage-Zone (Wortstellung „Neu" hinten statt vorn).',
   'dokumente.ts#DokumentAblage':
     'Multipart-Eingabe-DTO fürs Ablegen eines Dokuments (Datei + Metadaten, LFH-632) — der ' +

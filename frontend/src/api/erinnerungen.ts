@@ -1,9 +1,39 @@
-import { apiGet, apiSend } from './client';
-import type { Erinnerung, NeueErinnerung } from './types';
+import { apiGet, apiSend, mitParametern } from './client';
+import type { AbschlussCursor } from './meldungen';
+import type { Erinnerung, ErinnerungKennzahlen, NeueErinnerung } from './types';
 
-export function listeErinnerungen(einsatzId: number, nurOffen = false): Promise<Erinnerung[]> {
-  const q = nurOffen ? '?nur_offen=true' : '';
-  return apiGet<Erinnerung[]>(`/api/einsaetze/${einsatzId}/erinnerungen${q}`);
+/** Seitengröße der abgeschlossenen Erinnerungen (LFH-940). */
+export const ERINNERUNGEN_SEITE = 100;
+
+/** Offene Erinnerungen; ohne Parameter liefert der Server nur offene (LFH-940). */
+export function listeOffeneErinnerungen(einsatzId: number): Promise<Erinnerung[]> {
+  return apiGet<Erinnerung[]>(`/api/einsaetze/${einsatzId}/erinnerungen`);
+}
+
+/** Ordnungszeit wie am Server: `COALESCE(erledigt_at, quittiert_at, erstellt_at)`. */
+export function erinnerungCursor(e: Erinnerung): AbschlussCursor {
+  return { zeit: e.erledigt_at ?? e.quittiert_at ?? e.erstellt_at, id: e.id };
+}
+
+/** Eine Seite abgeschlossener Erinnerungen, zuletzt abgeschlossene zuerst (LFH-940). */
+export function listeAbgeschlosseneErinnerungen(
+  einsatzId: number,
+  vor?: AbschlussCursor,
+  limit: number = ERINNERUNGEN_SEITE,
+): Promise<Erinnerung[]> {
+  return apiGet<Erinnerung[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/erinnerungen`, {
+      phase: 'abgeschlossen',
+      vor_zeit: vor?.zeit,
+      vor_id: vor?.id,
+      limit,
+    }),
+  );
+}
+
+/** Offen und abgeschlossen über den ganzen Bestand (LFH-940). */
+export function ladeErinnerungKennzahlen(einsatzId: number): Promise<ErinnerungKennzahlen> {
+  return apiGet<ErinnerungKennzahlen>(`/api/einsaetze/${einsatzId}/erinnerungen/kennzahlen`);
 }
 
 export function legeErinnerungAn(einsatzId: number, daten: NeueErinnerung): Promise<Erinnerung> {

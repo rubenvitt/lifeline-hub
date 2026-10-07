@@ -1703,6 +1703,16 @@ export interface components {
             vollzogen_von_id?: number | null;
             vollzug_status: string;
         };
+        /** @description Zahlen der Erinnerungsseite (LFH-940): die Abgeschlossenen kommen nur noch seitenweise. */
+        ErinnerungKennzahlen: {
+            /**
+             * Format: int64
+             * @description Erledigt oder quittiert.
+             */
+            abgeschlossen: number;
+            /** Format: int64 */
+            offen: number;
+        };
         /**
          * @description LFH-120: Schema-Anker für die `status`-Union (geschlossenes Code-Vokabular, s. STATUS_*).
          * @enum {string}
@@ -2878,6 +2888,32 @@ export interface components {
             status: components["schemas"]["MeldungStatus"];
         };
         /**
+         * @description Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie
+         *     das Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
+         */
+        MeldungKennzahlen: {
+            /**
+             * Format: int64
+             * @description Pflichtig, unbestätigt, Frist abgelaufen oder eskaliert — quer zur Phase.
+             */
+            alarmiert: number;
+            /**
+             * Format: int64
+             * @description Abgeschlossen.
+             */
+            erledigt: number;
+            /**
+             * Format: int64
+             * @description Offen und bereits angefasst.
+             */
+            in_arbeit: number;
+            /**
+             * Format: int64
+             * @description Offen und noch von niemandem angefasst (Status `neu`).
+             */
+            unbearbeitet: number;
+        };
+        /**
          * @description Triage-Status einer Meldung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
          * @enum {string}
          */
@@ -3510,6 +3546,20 @@ export interface components {
             vorname?: string | null;
             /** @description Zustand in Kurzform (Freitext, z. B. „gehfähig, unterkühlt"). */
             zustand?: string | null;
+        };
+        /**
+         * @description Personenauswahl (LFH-940, Spec `listen-projektion`): je nicht stornierter Person nur, was
+         *     Auswahlfelder, Sprungpalette und Chat-Bezug brauchen. Keine Freitexte (Notiz, Kontakt,
+         *     Adresse, Antreffort, Zustand) — die bleiben der Personenliste und dem Detail.
+         */
+        PersonAuswahl: {
+            /** Format: int64 */
+            id: number;
+            name?: string | null;
+            /** Format: int64 */
+            registrier_nr: number;
+            status: components["schemas"]["PersonStatus"];
+            vorname?: string | null;
         };
         /**
          * @description Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine

@@ -1,5 +1,5 @@
 import SichtungsTag from '../components/SichtungsTag';
-import { Collapse, Form, Input, InputNumber, Radio, theme } from 'antd';
+import { Collapse, Form, Input, InputNumber, Radio, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { Select } from '../components/Select';
 import type { PersonEingabe } from '../api/einsatzPerson';
@@ -38,8 +38,15 @@ export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
   };
 }
 
-/** Erfassungs-Modi der Personen-Aufnahme. */
-export type AufnahmeModus = 'schnell' | 'vermisst' | 'betroffen';
+/**
+ * Erfassungs-Modi der Personen-Aufnahme: EINE allgemeine Maske und „Vermisst melden“ (LFH-963,
+ * `personen/AGENTS.md`). Die allgemeine legt immer mit Status `erfasst` an; mit Sichtung hebt der
+ * Server auf `betroffen`.
+ */
+export type AufnahmeModus = 'erfassen' | 'vermisst';
+
+/** Der Folgestatus der allgemeinen Maske, sichtbar im Dialog (LFH-963, Entscheidung 9). */
+export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffen';
 
 /** Reihenfolge der Auswahlflächen — Dringlichkeit zuerst, wie an der Aufnahme gesprochen. */
 const SK_REIHE: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot', 'unverletzt'];
@@ -115,6 +122,13 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
 
   return (
     <>
+      {/* Text, kein Feld: das Budget von vier sichtbaren Feldern bleibt. Er sagt, was die Maske
+          anlegt, damit niemand zwischen zwei Knöpfen raten muss (LFH-963). */}
+      {modus === 'erfassen' && (
+        <Typography.Paragraph data-lfh="folgestatus" type="secondary">
+          {FOLGESTATUS_HINWEIS}
+        </Typography.Paragraph>
+      )}
       {modus !== 'vermisst' && (
         <Form.Item label="Sichtungskategorie" name="sichtung">
           {/* Dieselbe fachliche Kennzeichnung wie in Liste und Verlauf; die Beschriftung trägt den

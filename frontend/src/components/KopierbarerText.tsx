@@ -35,7 +35,7 @@ export default function KopierbarerText({
     // (NotAllowedError, fehlende Berechtigung).
     navigator.clipboard.writeText(text).then(
       () => message.success(`${bezeichnung} kopiert`),
-      () => message.error('Kopieren fehlgeschlagen — der Text lässt sich markieren und kopieren'),
+      () => message.error('Kopieren fehlgeschlagen'),
     );
   }
 

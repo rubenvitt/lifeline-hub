@@ -171,7 +171,8 @@ async function messeImRollenzweig(
     }
     if (f.hinweis) {
       await expect(
-        page.getByRole('alert').filter({ hasText: f.hinweis }),
+        // Rechtehinweis („Nur Ansicht · Grund“, role=status) oder ein anderer Alarm-Hinweis.
+        page.locator('[role="alert"], [data-lfh="rechte-hinweis"]').filter({ hasText: f.hinweis }),
         `${f.pfad}: Vorbedingung — der Rechtehinweis steht`,
       ).toBeVisible();
     }
@@ -333,7 +334,11 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
       anker: (page) => inMain(page).getByText('Lagemeldung an die Leitstelle').first(),
       ziele: [
         { sorte: 'Erinnerung anlegen', ziele: knopf('Erinnerung anlegen'), mindestens: 1 },
-        { sorte: 'Erinnerung Karte', ziele: knopf(/^(Quittieren|Erledigt)$/), mindestens: 2 },
+        {
+          sorte: 'Erinnerung Karte',
+          ziele: knopf(/^(Erübrigt \(zur Kenntnis\)|Erledigt \(durchgeführt\))$/),
+          mindestens: 2,
+        },
       ],
     },
     {
@@ -341,7 +346,11 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
       anker: (page) => inMain(page).getByText('RTW').first(),
       ziele: [
         { sorte: 'Nachforderung anlegen', ziele: knopf('Nachforderung anlegen'), mindestens: 1 },
-        { sorte: 'Nachforderung Karte', ziele: knopf(/^(→ Zugesagt|Ablehnen)$/), mindestens: 2 },
+        {
+          sorte: 'Nachforderung Karte',
+          ziele: knopf(/^(Zusage erfassen|Ablehnen)$/),
+          mindestens: 2,
+        },
       ],
     },
     {
@@ -356,7 +365,7 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
         { sorte: 'Auftrag erteilen', ziele: knopf('Auftrag erteilen'), mindestens: 1 },
         {
           sorte: 'Auftrag Karte',
-          ziele: knopf(/^(In Bearbeitung|Vollzug melden|Empfang für .* quittieren)$/),
+          ziele: knopf(/^(Bearbeitung beginnen|Vollzug melden|Empfang für .* quittieren)$/),
           mindestens: 3,
         },
         {
@@ -609,8 +618,7 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
     {
       pfad: `${R}/einstellungen/allgemein`,
       anker: segment(/^Allgemein$/, 'tab'),
-      hinweis:
-        /^Nur die Einsatzleitung, Führungspersonal oder ein System-Admin darf die Einstellungen/,
+      hinweis: /nur Einsatzleitung, Führungspersonal oder Admin$/,
       gesperrt: knopf('Speichern'),
       ziele: [
         {

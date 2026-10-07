@@ -17,7 +17,6 @@ import { listeNachforderungen } from '../api/nachforderungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
   AusgabeEingabe,
-  EinsatzStatus,
   VerpflegungAusgabe,
   VerpflegungZeitfenster,
   ZeitfensterEingabe,
@@ -52,13 +51,10 @@ import {
 import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
 import { nachforderungVorbelegung, zitat } from '../verpflegung/verpflegungText';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 
-/** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
-function verpflegungRechteText(status: EinsatzStatus): string {
-  return status !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — die Verpflegung ist nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können Zeitfenster anlegen und Ausgaben erfassen.';
-}
+/** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
+const verpflegungRechteText = einsatzRechteGrund;
 
 /**
  * Sortierschlüssel der Zeitfenster für die Zufluss-Schleuse: der Beginn, wie der Server ordnet

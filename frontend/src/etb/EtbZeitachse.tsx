@@ -1,7 +1,9 @@
 import { Button, Space } from 'antd';
 import {
+  memo,
   useCallback,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -34,6 +36,7 @@ import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { istNachgetragen } from './typFarben';
 import { verfasserText } from './verfasser';
 import {
+  type Berichtigungsindex,
   berichtigungsindex,
   einfrieren,
   type Einfrierstand,
@@ -187,9 +190,13 @@ export default function EtbZeitachse({
     [zeilen],
   );
   const index = useMemo(() => berichtigungsindex(eintraege), [eintraege]);
-  const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, gefroren, eigeneBenutzerId);
-  const gruppen = gruppiereNachStunde(sichtbar, (utc) =>
-    inZone(utc, konventionen).format('YYYY-MM-DD HH'),
+  const { sichtbar, zurueckgehalten } = useMemo(
+    () => teileZufluss(zeilen, gefroren, eigeneBenutzerId),
+    [zeilen, gefroren, eigeneBenutzerId],
+  );
+  const gruppen = useMemo(
+    () => gruppiereNachStunde(sichtbar, (utc) => inZone(utc, konventionen).format('YYYY-MM-DD HH')),
+    [sichtbar, konventionen],
   );
 
   const betreten = useCallback(() => {
@@ -205,14 +212,181 @@ export default function EtbZeitachse({
     setGefroren(null);
   }, []);
 
-  function aktionen(z: EtbZeile): ReactNode {
+  /*
+   * Die Handler über einen Ref (LFH-947): die Zeile ist gemerkt, und eine neue Handler-Identität
+   * des Aufrufers (Pfeilfunktion je Render) renderte sonst jede Zeile neu. Die Zeile ruft über
+   * die stabilen Aufrufer immer den aktuellen Handler.
+   */
+  const handler = useRef({
+    onBerichtigen,
+    onWiedervorlage,
+    onAuftragErteilen,
+    onErneutSenden,
+    onVerwerfen,
+  });
+  useLayoutEffect(() => {
+    handler.current = {
+      onBerichtigen,
+      onWiedervorlage,
+      onAuftragErteilen,
+      onErneutSenden,
+      onVerwerfen,
+    };
+  });
+  const aufrufe = useMemo<ZeilenAufrufe>(
+    () => ({
+      berichtigen: (e) => handler.current.onBerichtigen?.(e),
+      wiedervorlage: (e) => handler.current.onWiedervorlage?.(e),
+      auftragErteilen: (e) => handler.current.onAuftragErteilen?.(e),
+      erneutSenden: (p) => handler.current.onErneutSenden?.(p),
+      verwerfen: (p) => handler.current.onVerwerfen?.(p),
+    }),
+    [],
+  );
+  const zeile = (z: EtbZeile) => (
+    <EtbZeitachsenZeile
+      key={z.schluessel}
+      z={z}
+      einsatzId={einsatzId}
+      hervorgehoben={z.art === 'eintrag' && z.eintrag.id === highlightId}
+      index={index}
+      dokumente={z.art === 'eintrag' ? dokumente?.get(z.eintrag.id) : undefined}
+      darfOriginal={darfOriginal}
+      kannBerichtigen={onBerichtigen != null}
+      berichtigenGesperrt={berichtigenGesperrt}
+      kannWiedervorlage={onWiedervorlage != null}
+      kannAuftrag={onAuftragErteilen != null}
+      aufrufe={aufrufe}
+    />
+  );
+
+  /**
+   * Laden und Fehler behaupten nichts über die Menge (LFH-331): sonst blitzte „Noch keine
+   * Einträge." hinter dem Ladebalken auf. Im Fehlerfall bleibt die Liste montiert, bereits
+   * geladene Einträge bleiben lesbar.
+   */
+  let inhalt: ReactNode;
+  if (sichtbar.length === 0) {
+    inhalt = ladend ? <SeitenSkeleton /> : fehler ? null : leerText;
+  } else {
+    // Schlüssel: Stunde plus wievielte Gruppe dieser Stunde (dieselbe Stunde kann bei Nachträgen
+    // zweimal vorkommen). NICHT die erste Zeile: ein neuer Eintrag oben hängte sonst die ganze
+    // Gruppe neu ein und parste jeden Text darin neu (LFH-947).
+    const vorkommen = new Map<string, number>();
+    inhalt = gruppen.map((g, i) => {
+      const n = vorkommen.get(g.schluessel) ?? 0;
+      vorkommen.set(g.schluessel, n + 1);
+      return (
+        <div
+          key={`${g.schluessel}#${n}`}
+          className="etb-stundengruppe"
+          role="group"
+          // Benannt ÜBER den Kopf, nicht per eigenem `aria-label`: sonst sagte der Vorleser die
+          // Stunde doppelt an — einmal als Gruppe, einmal als Überschrift (LFH-621).
+          aria-labelledby={`${kopfIdBasis}-kopf-${i}`}
+        >
+          <div
+            style={{
+              paddingBlock: token.paddingXS,
+              paddingInline: token.padding,
+              borderBlockEnd: `1px solid ${rollen.linie}`,
+              background: rollen.grund,
+            }}
+          >
+            {/* Der Stundenkopf ist eine echte Überschrift (h2): er gliedert die Zeitachse, und
+              die Überschriften IN den Einträgen hängen darunter (LFH-621). */}
+            <Augenbraue als="h2" id={`${kopfIdBasis}-kopf-${i}`}>
+              {g.etikett}
+            </Augenbraue>
+          </div>
+          <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
+        </div>
+      );
+    });
+  }
+
+  return (
+    <div
+      ref={wurzel}
+      // Eine benannte Region: Vorleser springen hinein, und die e2e-Messungen greifen die Sicht darüber.
+      role="region"
+      aria-label="Einsatztagebuch"
+      data-lfh="etb-zeitachse"
+      onFocus={betreten}
+      onBlur={verlassen}
+      style={{ position: 'relative' }}
+    >
+      {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
+      <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
+        {zurueckgehalten > 0 && (
+          <Sammelbanner
+            aktion={{
+              label: 'anzeigen',
+              onKlick: () => setGefroren(einfrieren(zeilen)),
+            }}
+            style={{ position: 'absolute', insetInline: 0, top: 0 }}
+          >
+            {zuflussText(zurueckgehalten)} — oben einsortiert
+          </Sammelbanner>
+        )}
+      </div>
+      {inhalt}
+    </div>
+  );
+}
+
+/** Die stabilen Aufrufer einer Zeile — sie lesen den aktuellen Handler der Zeitachse. */
+interface ZeilenAufrufe {
+  berichtigen: (e: EtbEintragAnzeige) => void;
+  wiedervorlage: (e: EtbEintragAnzeige) => void;
+  auftragErteilen: (e: EtbEintragAnzeige) => void;
+  erneutSenden: (p: AbgelehnterEintrag) => void;
+  verwerfen: (p: AbgelehnterEintrag) => void;
+}
+
+interface ZeilenProps {
+  z: EtbZeile;
+  einsatzId: number;
+  hervorgehoben: boolean;
+  index: Berichtigungsindex;
+  dokumente?: readonly EtbDokument[];
+  darfOriginal: boolean;
+  kannBerichtigen: boolean;
+  berichtigenGesperrt?: string;
+  kannWiedervorlage: boolean;
+  kannAuftrag: boolean;
+  aufrufe: ZeilenAufrufe;
+}
+
+/**
+ * Eine Zeile der Zeitachse, gemerkt (LFH-947, Spec `etb-zeitachse-fenster`): sie bekommt nur
+ * Werte, die sich je Zeile ändern, und stabile Aufrufer. Ein Rerender der Seite ohne geänderte
+ * Einträge (Einsatzkopf, Einheiten, Fokus) rendert keine Zeile und parst kein Markdown.
+ */
+const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
+  z,
+  einsatzId,
+  hervorgehoben,
+  index,
+  dokumente,
+  darfOriginal,
+  kannBerichtigen,
+  berichtigenGesperrt,
+  kannWiedervorlage,
+  kannAuftrag,
+  aufrufe,
+}: ZeilenProps) {
+  const { token, rollen } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
+
+  function aktionen(): ReactNode {
     if (z.art === 'abgelehnt') {
       // Eine Entscheidung, kein Menü: das Verwerfen ist unumkehrbar, das erneute Senden
       // der wahrscheinlichere Griff — beide stehen offen da, mit Abstand zum Roten.
       return (
         <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
-          <Button onClick={() => onErneutSenden?.(z.puffer)}>Erneut senden</Button>
-          <Button danger onClick={() => onVerwerfen?.(z.puffer)}>
+          <Button onClick={() => aufrufe.erneutSenden(z.puffer)}>Erneut senden</Button>
+          <Button danger onClick={() => aufrufe.verwerfen(z.puffer)}>
             Verwerfen
           </Button>
         </Space>
@@ -222,7 +396,7 @@ export default function EtbZeitachse({
     if (z.art === 'ausstehend') return null;
     const e = z.eintrag;
     const eintraege: MenueEintrag<'berichtigen' | 'wiedervorlage' | 'auftrag'>[] = [
-      ...(onBerichtigen && e.typ !== 'berichtigung'
+      ...(kannBerichtigen && e.typ !== 'berichtigung'
         ? [
             {
               key: 'berichtigen' as const,
@@ -231,8 +405,8 @@ export default function EtbZeitachse({
             },
           ]
         : []),
-      ...(onWiedervorlage ? [{ key: 'wiedervorlage' as const, label: 'Wiedervorlage' }] : []),
-      ...(onAuftragErteilen ? [{ key: 'auftrag' as const, label: 'Auftrag erteilen' }] : []),
+      ...(kannWiedervorlage ? [{ key: 'wiedervorlage' as const, label: 'Wiedervorlage' }] : []),
+      ...(kannAuftrag ? [{ key: 'auftrag' as const, label: 'Auftrag erteilen' }] : []),
     ];
     // Auch hier, nicht nur im Baustein: `Zeitachseneintrag` zeigt seine Fußzeile, sobald
     // `aktionen` nicht `null` ist.
@@ -244,9 +418,9 @@ export default function EtbZeitachse({
         eintraege={eintraege}
         zugaenglicherName={`Aktionen zu Eintrag ${e.lfd_nr}`}
         onWahl={(key) => {
-          if (key === 'berichtigen') onBerichtigen?.(e);
-          if (key === 'wiedervorlage') onWiedervorlage?.(e);
-          if (key === 'auftrag') onAuftragErteilen?.(e);
+          if (key === 'berichtigen') aufrufe.berichtigen(e);
+          if (key === 'wiedervorlage') aufrufe.wiedervorlage(e);
+          if (key === 'auftrag') aufrufe.auftragErteilen(e);
         }}
       />
     );
@@ -255,7 +429,7 @@ export default function EtbZeitachse({
   function eintragsHinweis(e: EtbEintragAnzeige): ReactNode {
     const grund = index.grundeintrag(e);
     const durch = index.berichtigtDurch(e);
-    const doks = dokumente?.get(e.id);
+    const doks = dokumente;
     const stil = verweisStil(token);
     return hinweisZeile(
       [
@@ -313,8 +487,7 @@ export default function EtbZeitachse({
     );
   }
 
-  function zeile(z: EtbZeile): ReactNode {
-    const hervorgehoben = z.art === 'eintrag' && z.eintrag.id === highlightId;
+  function inhalt(): ReactNode {
     // Die `etb-*`-Klassen tragen keine Regel (die Tönung macht der Baustein über `toenung`); sie
     // bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
     const klassen = [
@@ -331,7 +504,9 @@ export default function EtbZeitachse({
       'data-testid': 'etb-ereigniszeile',
       'data-zeile': z.schluessel,
       className: klassen || undefined,
-      aktionen: aktionen(z),
+      // Das Menü steht in `kompakt` in der Kopfzeile; die Entscheidung einer abgelehnten Zeile
+      // bleibt rechts (LFH-958, `Zeitachseneintrag`).
+      ...(z.art === 'abgelehnt' ? { aktionen: aktionen() } : { menue: aktionen() }),
       // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
       // Klassenregel käme dagegen nicht an.
       style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
@@ -341,7 +516,6 @@ export default function EtbZeitachse({
       const p = z.puffer;
       return (
         <Zeitachseneintrag
-          key={z.schluessel}
           {...gemeinsam}
           zeit={formatUhrzeit(p.erstellt_at, konventionen)}
           // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der Sendezustand steht
@@ -390,7 +564,6 @@ export default function EtbZeitachse({
     const e = z.eintrag;
     return (
       <Zeitachseneintrag
-        key={z.schluessel}
         {...gemeinsam}
         zeit={formatUhrzeit(e.ereigniszeit, konventionen)}
         nr={`Nr. ${e.lfd_nr}`}
@@ -410,68 +583,5 @@ export default function EtbZeitachse({
     );
   }
 
-  /**
-   * Laden und Fehler behaupten nichts über die Menge (LFH-331): sonst blitzte „Noch keine
-   * Einträge." hinter dem Ladebalken auf. Im Fehlerfall bleibt die Liste montiert, bereits
-   * geladene Einträge bleiben lesbar.
-   */
-  let inhalt: ReactNode;
-  if (sichtbar.length === 0) {
-    inhalt = ladend ? <SeitenSkeleton /> : fehler ? null : leerText;
-  } else {
-    inhalt = gruppen.map((g, i) => (
-      <div
-        key={`${g.schluessel}-${g.zeilen[0].schluessel}`}
-        role="group"
-        // Benannt ÜBER den Kopf, nicht per eigenem `aria-label`: sonst sagte der Vorleser die
-        // Stunde doppelt an — einmal als Gruppe, einmal als Überschrift (LFH-621).
-        aria-labelledby={`${kopfIdBasis}-kopf-${i}`}
-      >
-        <div
-          style={{
-            paddingBlock: token.paddingXS,
-            paddingInline: token.padding,
-            borderBlockEnd: `1px solid ${rollen.linie}`,
-            background: rollen.grund,
-          }}
-        >
-          {/* Der Stundenkopf ist eine echte Überschrift (h2): er gliedert die Zeitachse, und
-              die Überschriften IN den Einträgen hängen darunter (LFH-621). */}
-          <Augenbraue als="h2" id={`${kopfIdBasis}-kopf-${i}`}>
-            {g.etikett}
-          </Augenbraue>
-        </div>
-        <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
-      </div>
-    ));
-  }
-
-  return (
-    <div
-      ref={wurzel}
-      // Eine benannte Region: Vorleser springen hinein, und die e2e-Messungen greifen die Sicht darüber.
-      role="region"
-      aria-label="Einsatztagebuch"
-      data-lfh="etb-zeitachse"
-      onFocus={betreten}
-      onBlur={verlassen}
-      style={{ position: 'relative' }}
-    >
-      {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
-      <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
-        {zurueckgehalten > 0 && (
-          <Sammelbanner
-            aktion={{
-              label: 'anzeigen',
-              onKlick: () => setGefroren(einfrieren(zeilen)),
-            }}
-            style={{ position: 'absolute', insetInline: 0, top: 0 }}
-          >
-            {zuflussText(zurueckgehalten)} — oben einsortiert
-          </Sammelbanner>
-        )}
-      </div>
-      {inhalt}
-    </div>
-  );
-}
+  return inhalt();
+});

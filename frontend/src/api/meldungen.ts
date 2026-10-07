@@ -2,6 +2,7 @@ import { apiGet, apiSend, type ApiSendOptionen, mitParametern } from './client';
 import type {
   LageMeldung,
   Meldung,
+  MeldungKennzahlen,
   MeldungStatus,
   NeueMeldung,
   NeuerAuftrag,
@@ -13,6 +14,8 @@ interface MeldungFilter {
   richtung?: string;
 }
 
+/** Vollliste ohne Phase (Sprungpalette, Chat-Bezug, Geräteseite, Übernahme); die Meldungsseite
+ *  liest getrennt nach Phase. */
 export function listeMeldungen(einsatzId: number, filter: MeldungFilter = {}): Promise<Meldung[]> {
   return apiGet<Meldung[]>(
     mitParametern(`/api/einsaetze/${einsatzId}/meldungen`, {
@@ -20,6 +23,62 @@ export function listeMeldungen(einsatzId: number, filter: MeldungFilter = {}): P
       richtung: filter.richtung,
     }),
   );
+}
+
+/** Seitengröße der abgeschlossenen Meldungen; der Server klemmt auf `[1, 500]` (LFH-940). */
+export const MELDUNGEN_SEITE = 100;
+
+/** Position hinter dem letzten geladenen abgeschlossenen Eintrag (`vor_zeit`, `vor_id`);
+ *  Meldungen und Erinnerungen blättern gleich (LFH-940). */
+export interface AbschlussCursor {
+  zeit: string;
+  id: number;
+}
+
+/** Cursor aus einer Meldung: dieselbe Ordnungszeit wie am Server,
+ *  `COALESCE(erledigt_at, ereigniszeit)` (Altbestand ohne Stempel). */
+export function abschlussCursor(m: Meldung): AbschlussCursor {
+  return { zeit: m.erledigt_at ?? m.ereigniszeit, id: m.id };
+}
+
+/** Alle offenen Meldungen in der Triage-Ordnung des Servers, ungeblättert (LFH-940). */
+export function listeOffeneMeldungen(einsatzId: number, richtung?: string): Promise<Meldung[]> {
+  return apiGet<Meldung[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/meldungen`, { phase: 'offen', richtung }),
+  );
+}
+
+/** Eine Seite abgeschlossener Meldungen, zuletzt erledigte zuerst (LFH-940). */
+export function listeAbgeschlosseneMeldungen(
+  einsatzId: number,
+  richtung?: string,
+  vor?: AbschlussCursor,
+  limit: number = MELDUNGEN_SEITE,
+): Promise<Meldung[]> {
+  return apiGet<Meldung[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/meldungen`, {
+      phase: 'abgeschlossen',
+      richtung,
+      vor_zeit: vor?.zeit,
+      vor_id: vor?.id,
+      limit,
+    }),
+  );
+}
+
+/** Zahlen der Meldungsseite über den ganzen Bestand (LFH-940): ein Abruf statt der Vollliste. */
+export function ladeMeldungKennzahlen(
+  einsatzId: number,
+  richtung?: string,
+): Promise<MeldungKennzahlen> {
+  return apiGet<MeldungKennzahlen>(
+    mitParametern(`/api/einsaetze/${einsatzId}/meldungen/kennzahlen`, { richtung }),
+  );
+}
+
+/** Eine Meldung einzeln, etwa für einen Deeplink auf eine nicht geladene Seite (LFH-940). */
+export function ladeMeldung(einsatzId: number, meldungId: number): Promise<Meldung> {
+  return apiGet<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}`);
 }
 
 /** Letzte Rückmeldung je Einheit/Abschnitt samt Frist (LFH-610). Lesezugriff Meldungen. */

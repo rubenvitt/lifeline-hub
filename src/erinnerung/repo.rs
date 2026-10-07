@@ -103,6 +103,72 @@ pub async fn liste(
         .map_err(Into::into)
 }
 
+/// Ordnungszeitpunkt der Abgeschlossen-Ansicht (LFH-940, D7): erledigt, sonst quittiert, sonst
+/// angelegt — dieselbe Folge wie bisher im Client. Liste und Cursor lesen denselben Ausdruck.
+macro_rules! abschluss_zeit_sql {
+    () => {
+        "COALESCE(e.erledigt_at, ks.quittiert_at, e.erstellt_at)"
+    };
+}
+
+/// Eine Seite abgeschlossener Erinnerungen (erledigt oder quittiert), zuletzt abgeschlossen
+/// oben, bei Gleichstand die höhere id (LFH-940). Bind-Reihenfolge: `jetzt`, `einsatz_id`,
+/// [Cursor zweimal Zeit, id], `limit`.
+pub async fn liste_abgeschlossen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    seite: &crate::kommunikation::Seite,
+    jetzt: &str,
+) -> Result<Vec<ErinnerungAnzeige>, AppError> {
+    let mut sql =
+        format!("{ANZEIGE_SELECT} WHERE e.einsatz_id = ? AND e.status != '{STATUS_OFFEN}'");
+    if seite.vor.is_some() {
+        sql.push_str(concat!(
+            " AND (",
+            abschluss_zeit_sql!(),
+            " < ? OR (",
+            abschluss_zeit_sql!(),
+            " = ? AND e.id < ?))"
+        ));
+    }
+    sql.push_str(concat!(
+        " ORDER BY ",
+        abschluss_zeit_sql!(),
+        " DESC, e.id DESC LIMIT ?"
+    ));
+    let mut q = sqlx::query_as::<_, ErinnerungAnzeige>(sqlx::AssertSqlSafe(&*sql))
+        .bind(jetzt)
+        .bind(einsatz_id);
+    if let Some(vor) = &seite.vor {
+        q = q.bind(vor.zeit.clone()).bind(vor.zeit.clone()).bind(vor.id);
+    }
+    q.bind(seite.limit)
+        .fetch_all(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// Zahl der offenen und der abgeschlossenen Erinnerungen (LFH-940, `…/erinnerungen/kennzahlen`),
+/// in einer Abfrage über `idx_erinnerung_einsatz_status`.
+pub async fn kennzahlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<super::ErinnerungKennzahlen, AppError> {
+    let (offen, abgeschlossen): (i64, i64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(status = ?), 0), COALESCE(SUM(status != ?), 0) \
+         FROM erinnerung WHERE einsatz_id = ?",
+    )
+    .bind(STATUS_OFFEN)
+    .bind(STATUS_OFFEN)
+    .bind(einsatz_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(super::ErinnerungKennzahlen {
+        offen,
+        abgeschlossen,
+    })
+}
+
 /// Legt eine manuelle Erinnerung an und liefert sie als Anzeige. Pool-Hülle um [`anlegen_tx`]
 /// ohne eigene Transaktion.
 pub async fn anlegen(

@@ -10,7 +10,9 @@ use axum::http::StatusCode;
 use serde_json::Value;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
+};
 
 async fn erfassen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) {
     let (status, v) = anfrage(
@@ -351,4 +353,153 @@ async fn nichtmitglied_ist_403_und_unbekannter_einsatz_404() {
     assert_eq!(status, StatusCode::FORBIDDEN);
     let (status, _) = zaehler(&app, &admin, 9999, "").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+/// LFH-947: der Cursor nach oben über die Route. Er ist ein Seiten-, kein Filtermerkmal —
+/// Zählungen ignorieren ihn wie `before_lfd_nr`; beide Cursor zugleich sind eine unzulässige
+/// Kombination (422).
+#[tokio::test]
+async fn cursor_nach_oben_liefert_die_seite_ueber_dem_cursor() {
+    let (app, admin, einsatz) = aufbau().await;
+    for i in 1..=5 {
+        typ_erfassen(&app, &admin, einsatz, "meldung", &format!("m{i}")).await;
+    }
+    let (status, alle) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?limit=500"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let nrn: Vec<i64> = alle
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["lfd_nr"].as_i64().unwrap())
+        .collect();
+    // Absteigend; der Cursor sitzt auf dem viertneuesten Eintrag.
+    let cursor = nrn[3];
+    let (status, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?limit=2&after_lfd_nr={cursor}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{v:?}");
+    let seite: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["lfd_nr"].as_i64().unwrap())
+        .collect();
+    assert_eq!(seite, vec![nrn[1], nrn[2]]);
+
+    let ohne = zaehler_ok(&app, &admin, einsatz, "").await;
+    let mit = zaehler_ok(&app, &admin, einsatz, &format!("?after_lfd_nr={cursor}")).await;
+    assert_eq!(ohne, mit);
+
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?before_lfd_nr={cursor}&after_lfd_nr=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// Ausschluss der Systemeinträge (LFH-958): Liste, `zaehler` und `anzahl` laufen über dieselbe
+/// Bedingung. Jede neue Einheit schreibt einen Systemeintrag, die Hand-Einträge kommen dazu. `typ=system` und `ohne_system=true` zugleich schließen sich aus (422).
+#[tokio::test]
+async fn ohne_system_schliesst_systemeintraege_aus_wie_die_liste() {
+    let (app, admin, einsatz) = aufbau().await;
+    for name in ["1. Zug", "2. Zug", "3. Zug"] {
+        einheit_bilden(&app, &admin, einsatz, name).await;
+    }
+    erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich bricht","ereigniszeit":"2026-05-23T08:00:00Z"}"#,
+    )
+    .await;
+    erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"anordnung","inhalt":"Deich sichern","ereigniszeit":"2026-05-23T12:00:00Z"}"#,
+    )
+    .await;
+    typ_erfassen(&app, &admin, einsatz, "lage", "Lage stabil").await;
+    let ungefiltert = zaehler_ok(&app, &admin, einsatz, "").await;
+    let system = ungefiltert["je_typ"]["system"].as_i64().unwrap();
+    assert_eq!(system, 3, "je Einheit ein Systemeintrag: {ungefiltert:?}");
+
+    for query in [
+        "?ohne_system=true",
+        "?ohne_system=true&q=Deich",
+        "?ohne_system=true&typ=meldung",
+        "?ohne_system=true&von=2026-05-23T10:00:00Z",
+        "?ohne_system=false",
+    ] {
+        let liste = liste_vollstaendig(&app, &admin, einsatz, query).await;
+        let v = zaehler_ok(&app, &admin, einsatz, query).await;
+        assert_eq!(v["gesamt"].as_i64(), Some(liste), "zaehler {query}: {v:?}");
+        assert_eq!(summe_je_typ(&v), liste, "Σ je_typ {query}: {v:?}");
+        let (status, a) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/etb/anzahl{query}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "anzahl {query}: {a:?}");
+        assert_eq!(a["anzahl"].as_i64(), Some(liste), "anzahl {query}: {a:?}");
+    }
+
+    // Handgerechnet: drei Hand-Einträge, kein Systemeintrag; `false` wirkt wie fehlend.
+    let v = zaehler_ok(&app, &admin, einsatz, "?ohne_system=true").await;
+    assert_eq!(v["gesamt"].as_i64(), Some(3), "{v:?}");
+    assert_eq!(v["je_typ"]["system"].as_i64(), Some(0), "{v:?}");
+    let v = zaehler_ok(&app, &admin, einsatz, "?ohne_system=false").await;
+    assert_eq!(v, ungefiltert);
+    let (status, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?ohne_system=true"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        v.as_array().unwrap().iter().all(|e| e["typ"] != "system"),
+        "{v:?}"
+    );
+
+    for pfad in ["etb", "etb/zaehler", "etb/anzahl"] {
+        let (status, v) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/{pfad}?typ=system&ohne_system=true"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{pfad}: {v:?}");
+    } // Ein für sich ungültiges Feld bleibt 400, auch neben der unzulässigen Kombination.
+    let (status, _) = zaehler(
+        &app,
+        &admin,
+        einsatz,
+        "?typ=system&ohne_system=true&von=gestern",
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }

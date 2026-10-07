@@ -87,6 +87,20 @@ pub async fn liste(
     )
 }
 
+/// Personenauswahl eines Einsatzes (LFH-940): nicht storniert, nach Registriernummer.
+pub async fn auswahl(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<super::PersonAuswahl>, AppError> {
+    Ok(sqlx::query_as::<_, super::PersonAuswahl>(
+        "SELECT id, registrier_nr, status, name, vorname FROM einsatz_person \
+         WHERE einsatz_id = ? AND storniert_at IS NULL ORDER BY registrier_nr",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 /// Lädt eine Person (auch stornierte) eines Einsatzes; `NotFound`, falls sie
 /// nicht zu diesem Einsatz gehört.
 pub async fn laden(

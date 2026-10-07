@@ -23,17 +23,9 @@ interface Props {
   rueckweg?: PlatzhalterRueckweg;
 }
 
-/** Erwartungshorizont: sagt, woran man ist — ob hier gleich etwas zu erfassen ist oder anderswo
- *  weitergearbeitet werden muss. Ein „In Arbeit"-Etikett allein beantwortet das nicht.
- *
- *  Kontextfrei formuliert („Bereich", kein Einsatz): `pages/ProfilPage` rendert den Platzhalter
- *  unter einer funktionierenden 2FA-Sektion und steht in keinem Einsatz. */
-const ERWARTUNGSHORIZONT =
-  'Dieser Bereich ist geplant, aber noch nicht bedienbar — hier lässt sich nichts ' +
-  'erfassen oder auswerten.';
-
-/** Der Einsatz-Bezug hängt am Rückweg, dem einzigen Signal für „steht in einem Einsatz". */
-const ERWARTUNGSHORIZONT_EINSATZ = ' Der Einsatz läuft davon unberührt weiter.';
+/** Erwartungshorizont (LFH-328): sagt, woran man ist — mehr als ein „In Arbeit"-Etikett, aber
+ *  ohne Erklärsatz (LFH-1078). Kontextfrei: `pages/ProfilPage` steht in keinem Einsatz. */
+const ERWARTUNGSHORIZONT = 'Noch nicht verfügbar.';
 
 /**
  * Einheitlicher Platzhalter für noch nicht implementierte Bereiche.
@@ -83,7 +75,7 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
           </p>
         )}
         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}>
-          {rueckweg ? ERWARTUNGSHORIZONT + ERWARTUNGSHORIZONT_EINSATZ : ERWARTUNGSHORIZONT}
+          {ERWARTUNGSHORIZONT}
         </p>
         {rueckweg && (
           <div>

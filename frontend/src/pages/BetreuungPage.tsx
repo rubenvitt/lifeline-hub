@@ -23,7 +23,6 @@ import type {
   Betreuungsstelle,
   BetreuungsstelleEingabe,
   BetreuungsstellePatch,
-  EinsatzStatus,
   Evakuierungsbezirk,
   EvakuierungsbezirkEingabe,
   EvakuierungsbezirkPatch,
@@ -51,13 +50,10 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig, erfasseStandOfflineFaehig } from '../offline/schreiben';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 
-/** Grund der fehlenden Schreibberechtigung als ganzer Satz. */
-function betreuungRechteText(status: EinsatzStatus): string {
-  return status !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — Bezirke und Betreuungsstellen sind nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können Bezirke und Betreuungsstellen anlegen und Meldungen erfassen.';
-}
+/** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
+const betreuungRechteText = einsatzRechteGrund;
 
 /**
  * Welcher Dialog offen ist — einer zur Zeit, jeder frisch montiert (`initialValues`). Der Datensatz

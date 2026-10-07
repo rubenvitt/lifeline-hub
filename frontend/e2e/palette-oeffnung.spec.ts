@@ -52,7 +52,7 @@ async function suche(page: Page, begriff: string) {
 /** Eine Person über die Schnellerfassung — die Kennung aus der Quittung. */
 async function personErfassen(page: Page, einsatzId: string): Promise<string> {
   await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
-  await expect(page.getByRole('dialog', { name: 'Schnellerfassung' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Betroffene erfassen' })).toBeVisible();
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   const quittung = page.getByText(/Erfasst als R-\d+/);
   await expect(quittung).toBeVisible();

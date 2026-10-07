@@ -91,7 +91,7 @@ describe('PressemitteilungDetailPage (LFH-554)', () => {
     setup();
     const knopf = await screen.findByRole('button', { name: 'Freigeben' });
     expect(knopf).toBeDisabled();
-    expect(screen.getByText(/Freigeben darf nur die Einsatzleitung/)).toBeInTheDocument();
+    expect(screen.getByText('Freigabe nur durch die Einsatzleitung')).toBeInTheDocument();
     // Schreiben darf sie trotzdem.
     expect(screen.getByRole('button', { name: 'Entwurf speichern' })).toBeEnabled();
   });

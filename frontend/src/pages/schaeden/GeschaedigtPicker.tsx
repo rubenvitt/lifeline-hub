@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Select } from '../../components/Select';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useQuery } from '@tanstack/react-query';
-import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { listePersonenAuswahl, registrierAnzeige } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { einsatzKeys } from '../../api/queryKeys';
 import { SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
@@ -56,9 +56,10 @@ interface Props {
 export default function GeschaedigtPicker({ einsatzId, orgName, value = null, onChange }: Props) {
   const [suche, setSuche] = useState('');
 
+  // Auswahl ohne Freitexte (LFH-940): nur Nummer, Name, Status.
   const personenQuery = useQuery({
-    queryKey: einsatzKeys.personen(einsatzId),
-    queryFn: () => listePersonen(einsatzId),
+    queryKey: einsatzKeys.personenAuswahl(einsatzId),
+    queryFn: () => listePersonenAuswahl(einsatzId),
     enabled: Number.isFinite(einsatzId),
   });
   const personalQuery = useQuery({

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
-import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
 import { Alert, Breadcrumb, Button, Space, Tag, Typography } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
@@ -263,15 +262,25 @@ export default function SchaedenPage() {
         />
       }
       aktionen={
-        <>
-          <DruckAnsichtKnopf pfad={schaedenDruckPfad(einsatzId, { sicht })} />
-          {darfSchreiben && (
-            <Button type="primary" onClick={() => setErfassenOffen(true)}>
-              Schnellerfassung
-            </Button>
-          )}
-        </>
+        darfSchreiben && (
+          <Button type="primary" onClick={() => setErfassenOffen(true)}>
+            Schnellerfassung
+          </Button>
+        )
       }
+      // Drucken öffnet und sendet nichts ab: Nebenweg, unter `md` hinter „Weitere"
+      // (`frontend/AGENTS.md`, Aktionen). Drucken ist Lesen — ohne Schreib-Riegel.
+      weitere={{
+        name: 'Weitere Aktionen zu den Schäden',
+        eintraege: [
+          {
+            key: 'druck',
+            label: 'Drucken / als PDF',
+            ziel: schaedenDruckPfad(einsatzId, { sicht }),
+            onWahl: () => navigate(schaedenDruckPfad(einsatzId, { sicht })),
+          },
+        ],
+      }}
       // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
       // Rechte-Riegel wie der Knopf.
       neueZeile={darfSchreiben ? () => setErfassenOffen(true) : undefined}

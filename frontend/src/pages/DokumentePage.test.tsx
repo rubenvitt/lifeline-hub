@@ -214,7 +214,7 @@ describe('DokumentePage', () => {
     rendere(einsatzBeobachter, [dokument()]);
     await screen.findByRole('link', { name: 'Lageplan Nord' });
     expect(within(kopfAktionen()).getByRole('button', { name: 'Dokument ablegen' })).toBeDisabled();
-    expect(screen.getByText(/Dokumente ablegen und entfernen/)).toBeInTheDocument();
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
     ).not.toBeInTheDocument();
@@ -268,7 +268,7 @@ describe('DokumentePage', () => {
     rendere(einsatzAktiv, [dokument()]);
     const knopf = await screen.findByRole('button', { name: 'Dokument Lageplan Nord entfernen' });
     expect(knopf).toHaveClass('ant-btn-dangerous');
-    expect(screen.queryByText(/Dokumente ablegen und entfernen/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Nur Ansicht')).not.toBeInTheDocument();
     await userEvent.click(knopf);
 
     const rueckfrage = (await screen.findByText('Dokument entfernen?')).closest<HTMLElement>(

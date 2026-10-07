@@ -224,9 +224,7 @@ describe('AufbewahrungUebersicht — gescheiterter Abruf (LFH-756)', () => {
       ),
     );
     await client.invalidateQueries({ queryKey: globalKeys.aufbewahrung() });
-    expect(
-      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     expect(screen.queryByText('Aufbewahrung nicht ladbar')).toBeNull();
     expect(within(t).getByText('E-2026-0007')).toBeInTheDocument();
   });

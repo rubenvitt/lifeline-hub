@@ -205,8 +205,8 @@ describe('StabPage', () => {
     await waitFor(() => expect(within(r).getAllByRole('checkbox')).toHaveLength(7));
     for (const b of within(r).getAllByRole('checkbox')) expect(b).toBeDisabled();
     // Der Grund steht EINMAL im Kopf der Seite, nicht noch einmal im Paneel.
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-    expect(within(r).queryByRole('alert')).toBeNull();
+    expect(screen.getAllByText('Nur Ansicht')).toHaveLength(1);
+    expect(within(r).queryByText('Nur Ansicht')).toBeNull();
   });
 
   it('nennt die Besetzung beim Wort', async () => {
@@ -247,7 +247,7 @@ describe('StabPage', () => {
       rendere({ einsatzObj: einsatz({ meine_rolle: 'beobachter' }) });
       const sektion = await besetzungsSektion();
       expect(
-        await screen.findByText(/Nur Einsatzleitung und Führungspersonal/),
+        await screen.findByText('nur Einsatzleitung und Führungspersonal'),
       ).toBeInTheDocument();
       expect(within(sektion).queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(
         0,
@@ -257,7 +257,7 @@ describe('StabPage', () => {
     it('im abgeschlossenen Einsatz: keine Zeilenaktion, Hinweis nennt den Abschluss', async () => {
       rendere({ einsatzObj: einsatz({ status: 'abgeschlossen' }) });
       await besetzungsSektion();
-      expect(await screen.findByText(/Der Einsatz ist abgeschlossen/)).toBeInTheDocument();
+      expect(await screen.findByText('Einsatz abgeschlossen')).toBeInTheDocument();
       expect(screen.queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
     });
   });
@@ -417,14 +417,14 @@ describe('StabPage · Kopfaktion „Lagebesprechung abschließen"', () => {
 
   it('ist als Beobachter gesperrt statt versteckt, der Hinweis nennt den Grund', async () => {
     rendere({ einsatzObj: einsatz({ meine_rolle: 'beobachter' }) });
-    expect(await screen.findByText(/Lagebesprechungen abschließen/)).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(await kopfaktion()).toBeDisabled();
     expect(primaerImKopf()).toBe(1);
   });
 
   it('ist im abgeschlossenen Einsatz gesperrt', async () => {
     rendere({ einsatzObj: einsatz({ status: 'abgeschlossen' }) });
-    await screen.findByText(/Der Einsatz ist abgeschlossen/);
+    await screen.findByText('Einsatz abgeschlossen');
     expect(await kopfaktion()).toBeDisabled();
   });
 
@@ -464,7 +464,7 @@ describe('StabPage · Kopfaktion „Lagebesprechung abschließen"', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ status: 'abgeschlossen' }))),
     );
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
-    expect(await screen.findByText(/Der Einsatz ist abgeschlossen/)).toBeInTheDocument();
+    expect(await screen.findByText('Einsatz abgeschlossen')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
 
     server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())));

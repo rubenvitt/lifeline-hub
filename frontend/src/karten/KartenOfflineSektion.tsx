@@ -1,32 +1,20 @@
-import { Alert, Typography } from 'antd';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
+import { NUR_ADMIN } from '../components/nurAnsicht';
+import { RechteHinweis } from '../components/SpeicherHinweis';
 import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
 
-/** Admin-Sektion `/admin/karten/offline` — Offline-Karten-Manager (MBTiles-Download).
-    Schreiben nur System-Admin; Führungskräfte sehen read-only. */
+/** Admin-Sektion `/admin/karten/offline` — Offline-Karten-Manager. Schreiben nur System-Admin;
+    alle anderen sehen „Nur Ansicht · nur System-Admin“ (LFH-1078, keine Erklärung im Text). */
 export default function KartenOfflineSektion() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   return (
     <AdminPage
       titel="Offline-Karten"
-      beschreibung="Offline-Karten (MBTiles) für den netzlosen Betrieb der Lagekarte."
-      hinweis={
-        !istAdmin ? (
-          <Alert
-            type="info"
-            showIcon
-            title="Nur lesend"
-            description="Karten-Quellen ändern dürfen nur System-Admins. Du siehst die Liste read-only."
-          />
-        ) : undefined
-      }
+      // Admin: kein `hinweis`, sonst trüge AdminPage einen leeren Abstand.
+      hinweis={istAdmin ? undefined : <RechteHinweis sichtbar text={NUR_ADMIN} />}
     >
-      <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-        MBTiles für den netzlosen Betrieb. In der Prep-Phase (mit Netz) herunterladen; die aktive
-        Karte wird im Feld offline ausgeliefert. Pflicht-Attribution ist auf der Karte sichtbar.
-      </Typography.Paragraph>
       <OfflineKartenVerwaltung />
     </AdminPage>
   );

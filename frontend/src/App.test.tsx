@@ -350,7 +350,7 @@ describe('App-Routing', () => {
     );
     // Der Stub trägt denselben Titel — unterschieden wird am Platzhalter selbst.
     expect(platzhalterTitel()).toBeNull();
-    expect(screen.queryByText(/Dieser Bereich ist geplant/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Noch nicht verfügbar.')).not.toBeInTheDocument();
   });
 
   it('fahrzeuge-Route rendert die echte FahrzeugePage statt Stub', async () => {

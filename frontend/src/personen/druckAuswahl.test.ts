@@ -11,8 +11,8 @@ describe('personenDruckAuswahl', () => {
     expect(personenDruckAuswahl({ filter: 'vermisst', nurLuecken: false })).toBe(
       'Status: Vermisst',
     );
-    // „erfasst“ heißt in der Liste „Neu“.
-    expect(personenDruckAuswahl({ filter: 'erfasst', nurLuecken: false })).toBe('Status: Neu');
+    // „erfasst“ heißt in Filter und Tabelle gleich (LFH-963).
+    expect(personenDruckAuswahl({ filter: 'erfasst', nurLuecken: false })).toBe('Status: Erfasst');
   });
 
   it('nennt „nur offene Felder“, allein und mit Status', () => {

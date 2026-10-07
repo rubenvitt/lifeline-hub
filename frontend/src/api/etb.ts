@@ -28,10 +28,17 @@ export interface EtbFilterWerte {
   erfasser_id?: number;
   /** „Betrifft Einheit“: Auftrag an die Einheit ODER ihr Name in von/an. */
   einheit_id?: number;
+  /**
+   * Systemeinträge ausblenden (LFH-958, Schalter „Systemeinträge zeigen“). Nur `true` oder
+   * fehlend: Ausschalten entfernt den Schlüssel, nie zusammen mit `typ: 'system'` (422).
+   */
+  ohne_system?: true;
 }
 
 export interface EtbAbfrage extends EtbFilterWerte {
   before_lfd_nr?: number;
+  /** Seite direkt über dieser Nummer, absteigend geliefert (LFH-947, `etb/seitenfenster.ts`). */
+  after_lfd_nr?: number;
   limit?: number;
 }
 
@@ -47,12 +54,14 @@ function filterParameter(filter: EtbFilterWerte): URLSearchParams {
   if (filter.bis) qs.set('bis', filter.bis);
   if (filter.erfasser_id != null) qs.set('erfasser_id', String(filter.erfasser_id));
   if (filter.einheit_id != null) qs.set('einheit_id', String(filter.einheit_id));
+  if (filter.ohne_system) qs.set('ohne_system', 'true');
   return qs;
 }
 
 export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<EtbEintragAnzeige[]> {
   const qs = filterParameter(params);
   if (params.before_lfd_nr != null) qs.set('before_lfd_nr', String(params.before_lfd_nr));
+  if (params.after_lfd_nr != null) qs.set('after_lfd_nr', String(params.after_lfd_nr));
   qs.set('limit', String(params.limit ?? SEITENGROESSE));
   return apiGet<EtbEintragAnzeige[]>(`/api/einsaetze/${einsatzId}/etb?${qs.toString()}`);
 }

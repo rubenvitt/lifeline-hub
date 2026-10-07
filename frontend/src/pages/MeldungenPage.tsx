@@ -1,17 +1,23 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import {
+  type AbschlussCursor,
+  MELDUNGEN_SEITE,
+  abschlussCursor,
   bestaetigeMeldung,
   erteileAuftragAusMeldung,
-  listeMeldungen,
+  ladeMeldung,
+  ladeMeldungKennzahlen,
+  listeAbgeschlosseneMeldungen,
+  listeOffeneMeldungen,
   markiereLagerelevant,
   setzeMeldungStatus,
   weiseBearbeiterZu,
@@ -35,7 +41,6 @@ import {
   Segmentleiste,
   useRollen,
 } from '../components/instrument';
-import { meldungKennzahlen } from '../meldungen/meldungKennzahlen';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
@@ -51,15 +56,13 @@ function vergleicheMeldung(a: Meldung, b: Meldung): number {
   return (b.ereigniszeit ?? '').localeCompare(a.ereigniszeit ?? '');
 }
 
-/**
- * Sortierung der Abgeschlossen-Ansicht: zuletzt Erledigtes oben (erledigt_at ↓). Ohne Stempel
- * (Altbestand) Fallback auf Ereigniszeit ↓.
- */
-function vergleicheAbgeschlossen(a: Meldung, b: Meldung): number {
-  const erledigt = (b.erledigt_at ?? '').localeCompare(a.erledigt_at ?? '');
-  if (erledigt !== 0) return erledigt;
-  return (b.ereigniszeit ?? '').localeCompare(a.ereigniszeit ?? '');
+/** Phase einer Meldung über die gemeinsame Phasen-Semantik. */
+function istErledigt(m: Meldung): boolean {
+  return istAbgeschlossen(MELDUNG_STATUS[m.status]?.phase ?? 'offen');
 }
+
+/** Stabile Vorgabe, damit `memo` an `MeldungKarte` bei fehlenden Mitgliedern greift. */
+const KEINE_MITGLIEDER: { benutzer_id: number; anzeigename: string }[] = [];
 
 export default function MeldungenPage() {
   const { id } = useParams();
@@ -87,44 +90,144 @@ export default function MeldungenPage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
-  // Offen/Abgeschlossen-Trennung clientseitig (alle Meldungen laden, Server-Default).
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
+  const richtungsKey = richtungFilter ?? 'alle';
   const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
   const [lageMeldung, setLageMeldung] = useState<Meldung | null>(null);
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
 
-  const meldungenQuery = useQuery({
-    queryKey: einsatzKeys.meldungenListe(einsatzId, richtungFilter ?? 'alle'),
-    queryFn: () => listeMeldungen(einsatzId, { richtung: richtungFilter }),
-    // Jeder Richtungsfilter ist ein eigener Query-Key. Beim ersten Wechsel ist der Key kalt, und
-    // ohne Platzhalter zeigte die Seite für die Dauer des Requests „Keine Meldungen" samt „0 offen"
-    // — unter Zeitdruck die Sekunde, in der man die Lage falsch abliest.
+  // Offene und abgeschlossene Meldungen getrennt vom Server (LFH-940, design.md D1/D6): die offenen
+  // ungeblättert in der Triage-Ordnung, die abgeschlossenen seitenweise und erst in ihrer Ansicht.
+  // Jeder Richtungsfilter ist ein eigener Key; beim ersten Wechsel ist er kalt, und ohne Platzhalter
+  // zeigte die Seite für die Dauer des Requests „Keine Meldungen" samt „0 offen" — unter Zeitdruck
+  // die Sekunde, in der man die Lage falsch abliest.
+  const offeneQuery = useQuery({
+    queryKey: einsatzKeys.meldungenPhase(einsatzId, 'offen', richtungsKey),
+    queryFn: () => listeOffeneMeldungen(einsatzId, richtungFilter),
+    placeholderData: (prev) => prev,
+  });
+  // Zahlen über den ganzen Bestand aus einem eigenen Abruf (D3): die abgeschlossenen liegen nicht
+  // mehr vollständig im Client.
+  const kennzahlenQuery = useQuery({
+    queryKey: einsatzKeys.meldungKennzahlen(einsatzId, richtungsKey),
+    queryFn: () => ladeMeldungKennzahlen(einsatzId, richtungFilter),
+    placeholderData: (prev) => prev,
+  });
+  // Kein Seitendeckel (D6): die Kette wächst nur, solange jemand tief in „Abgeschlossen" blättert.
+  // Ein Ereignis lädt nur die schon geladenen Seiten neu, die Cursor rechnet TanStack dabei aus den
+  // frischen Seiten nach.
+  const abgeschlosseneQuery = useInfiniteQuery({
+    queryKey: einsatzKeys.meldungenPhase(einsatzId, 'abgeschlossen', richtungsKey),
+    queryFn: ({ pageParam }) => listeAbgeschlosseneMeldungen(einsatzId, richtungFilter, pageParam),
+    initialPageParam: undefined as AbschlussCursor | undefined,
+    getNextPageParam: (letzte) =>
+      letzte.length < MELDUNGEN_SEITE ? undefined : abschlussCursor(letzte[letzte.length - 1]),
+    enabled: ansicht === 'abgeschlossen',
     placeholderData: (prev) => prev,
   });
 
-  // Cross-Modul-Deeplink ?meldung=<id> hebt die Meldung hervor; Ansicht und Richtungsfilter so
-  // setzen, dass sie sichtbar ist. Scroll ist best-effort.
+  // Ableitungen nur bei geändertem Bestand (D6). `offene` sortiert der Client nach: die
+  // optimistische Einfügung nach dem Anlegen steht sonst vorn statt an ihrem Triage-Platz.
+  const offene = useMemo(
+    () => [...(offeneQuery.data ?? [])].sort(vergleicheMeldung),
+    [offeneQuery.data],
+  );
+  const abgeschlossene = useMemo(() => {
+    // Zwischen zwei Seitenabrufen kann sich der Bestand verschieben (neu erledigte oben), dann
+    // steht eine Meldung kurz in zwei Seiten; die vordere gilt.
+    const gesehen = new Set<number>();
+    return (abgeschlosseneQuery.data?.pages ?? []).flat().filter((m) => {
+      if (gesehen.has(m.id)) return false;
+      gesehen.add(m.id);
+      return true;
+    });
+  }, [abgeschlosseneQuery.data]);
+  // Zwei Gruppen in der Offen-Ansicht: die erste Frage der Triage ist „was hat noch niemand
+  // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung steht danach unter
+  // einer neuen Normalmeldung; das ist gewollt. Innerhalb jeder Gruppe ordnet `vergleicheMeldung` —
+  // `offene` ist sortiert, `filter` erhält die Reihenfolge.
+  const offeneGruppen = useMemo(() => {
+    const neue = offene.filter((m) => MELDUNG_STATUS[m.status]?.unbearbeitet);
+    const angefasste = offene.filter((m) => !MELDUNG_STATUS[m.status]?.unbearbeitet);
+    return [
+      { titel: `Neu (${neue.length})`, meldungen: neue },
+      { titel: `In Arbeit (${angefasste.length})`, meldungen: angefasste },
+    ].filter((g) => g.meldungen.length > 0);
+  }, [offene]);
+
+  // Cross-Modul-Deeplink ?meldung=<id> hebt die Meldung hervor. Liegt sie nicht in den offenen,
+  // holt die Seite sie einzeln (D4) und zeigt sie über der abgeschlossenen Liste, bis sie in einer
+  // geladenen Seite auftaucht. Kein Blättern bis zur Meldung. Jeder Deeplink zählt für sich, auch
+  // ein zweiter auf dieselbe Meldung (`deeplinkNr`).
   const [highlightMeldungId, setHighlightMeldungId] = useState<number | null>(null);
-  useQueryParamSelektion('meldung', meldungenQuery.isSuccess, (mid) => {
-    const m = (meldungenQuery.data ?? []).find((x) => x.id === mid);
-    if (!m) return;
-    setAnsicht(
-      istAbgeschlossen(MELDUNG_STATUS[m.status]?.phase ?? 'offen') ? 'abgeschlossen' : 'offen',
-    );
+  const [verlinkteId, setVerlinkteId] = useState<number | null>(null);
+  const [deeplinkNr, setDeeplinkNr] = useState(0);
+  // Scroll einmal je Deeplink, sobald die Karte im DOM steht; nicht bei jedem späteren Nachladen.
+  const [scrollZiel, setScrollZiel] = useState<number | null>(null);
+  useQueryParamSelektion('meldung', offeneQuery.isSuccess, (mid) => {
     setRichtungFilter(undefined);
     setHighlightMeldungId(mid);
+    setScrollZiel(mid);
+    setDeeplinkNr((n) => n + 1);
+    if ((offeneQuery.data ?? []).some((x) => x.id === mid)) {
+      setAnsicht('offen');
+      // Kein Einzelabruf mehr beobachten: er hinge sonst an jedem Ereignis mit.
+      setVerlinkteId(null);
+      return;
+    }
+    setVerlinkteId(mid);
   });
+  const verlinkteQuery = useQuery({
+    queryKey: einsatzKeys.meldungEinzeln(einsatzId, verlinkteId ?? 0),
+    queryFn: () => ladeMeldung(einsatzId, verlinkteId ?? 0),
+    enabled: verlinkteId != null,
+  });
+  const verlinkte =
+    verlinkteId != null && verlinkteQuery.data?.id === verlinkteId
+      ? verlinkteQuery.data
+      : undefined;
+  // Die Ansicht folgt der verlinkten Meldung einmal je Deeplink, nicht jedem späteren Abgleich:
+  // sonst risse eine fremde Statusänderung die Ansicht unter der Hand um.
+  const [angewandtNr, setAngewandtNr] = useState(0);
   useEffect(() => {
-    if (highlightMeldungId == null) return;
-    document
-      .querySelector(`[data-meldung-id="${highlightMeldungId}"]`)
-      ?.scrollIntoView?.({ block: 'center' });
-  }, [highlightMeldungId]);
+    if (!verlinkte || angewandtNr === deeplinkNr) return;
+    setAngewandtNr(deeplinkNr);
+    setAnsicht(istErledigt(verlinkte) ? 'abgeschlossen' : 'offen');
+  }, [verlinkte, angewandtNr, deeplinkNr]);
+  const verlinkteAngeheftet =
+    verlinkte && istErledigt(verlinkte) && !abgeschlossene.some((m) => m.id === verlinkte.id)
+      ? verlinkte
+      : null;
+  useEffect(() => {
+    if (scrollZiel == null) return;
+    const karte = document.querySelector(`[data-meldung-id="${scrollZiel}"]`);
+    if (!karte) return;
+    karte.scrollIntoView?.({ block: 'center' });
+    setScrollZiel(null);
+  }, [scrollZiel, ansicht, verlinkteAngeheftet, offene, abgeschlossene]);
+
+  /** Alles Geladene samt verlinkter Meldung, für Rückrufe, die eine Meldung über ihre id
+   *  brauchen. */
+  const geladene = useMemo(() => {
+    const karte = new Map<number, Meldung>();
+    if (verlinkte) karte.set(verlinkte.id, verlinkte);
+    for (const m of [...offene, ...abgeschlossene]) karte.set(m.id, m);
+    return karte;
+  }, [offene, abgeschlossene, verlinkte]);
+  // Die Rückrufe lesen den Bestand über einen Ref, damit sie über Live-Abgleiche stabil bleiben
+  // und `memo` an `MeldungKarte` auch dann trägt, wenn sich nur eine Meldung ändert.
+  const geladeneRef = useRef(geladene);
+  useLayoutEffect(() => {
+    geladeneRef.current = geladene;
+  }, [geladene]);
 
   const fehler = useFehlerMeldung();
-  const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
+  const invalidiere = useCallback(
+    () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) }),
+    [qc, einsatzId],
+  );
 
   // Das Inline-Formular bleibt nach dem Senden offen, damit die nächste Meldung ohne Aufklappen
   // folgt; Zuklappen ist ausdrückliche Nutzeraktion. Ein Zuklappen unmountete es samt Serienzähler
@@ -143,10 +246,16 @@ export default function MeldungenPage() {
         return;
       }
       const meldung = ergebnis.daten;
-      qc.setQueriesData<Meldung[]>({ queryKey: einsatzKeys.meldungen(einsatzId) }, (alt = []) => {
-        const ohne = alt.filter((m) => m.id !== meldung.id);
-        return [meldung, ...ohne];
-      });
+      // Nur in die Arrays der offenen Listen, deren Richtung passt (D6): die Seitenstruktur der
+      // abgeschlossenen, die Kennzahlen und der Einzelabruf haben eine andere Form.
+      qc.setQueriesData<Meldung[]>(
+        {
+          queryKey: einsatzKeys.meldungen(einsatzId),
+          predicate: ({ queryKey: k }) =>
+            k[2] === 'offen' && (k[3] === 'alle' || k[3] === meldung.richtung),
+        },
+        (alt) => (alt ? [meldung, ...alt.filter((m) => m.id !== meldung.id)] : alt),
+      );
       invalidiere();
       message.success(`Meldung #${meldung.lfd_nr} erfasst`);
     },
@@ -217,7 +326,7 @@ export default function MeldungenPage() {
       // Bewusst ohne Rückgängig-Toast (`vorher` bleibt leer): ein Rückweg, der nur den
       // Meldungsstatus zurückdreht, ließe den Auftrag stehen und verspräche eine Rücknahme, die
       // keine ist.
-      const quelle = (meldungenQuery.data ?? []).find((m) => m.id === meldungId);
+      const quelle = geladeneRef.current.get(meldungId);
       if (quelle && quelle.status !== 'in_bearbeitung' && quelle.status !== 'erledigt') {
         statusMutation.mutate({ meldungId, status: 'in_bearbeitung' });
       }
@@ -225,6 +334,27 @@ export default function MeldungenPage() {
     },
     onError: fehler,
   });
+
+  // Stabile Rückrufe, sonst wirkt `memo` an `MeldungKarte` nicht (D6). `mutate` ist je Mutation
+  // stabil, das Mutationsobjekt nicht.
+  const { mutate: statusSetzen } = statusMutation;
+  const { mutate: zuweisen } = zuweisenMutation;
+  const { mutate: bestaetigen } = bestaetigenMutation;
+  const onStatus = useCallback(
+    (meldungId: number, status: MeldungStatus) =>
+      statusSetzen({ meldungId, status, vorher: geladeneRef.current.get(meldungId)?.status }),
+    [statusSetzen],
+  );
+  const onZuweisen = useCallback(
+    (meldungId: number, bearbeiterId: number | null) => zuweisen({ meldungId, bearbeiterId }),
+    [zuweisen],
+  );
+  const onLagerelevant = useCallback(
+    (meldungId: number) => setLageMeldung(geladeneRef.current.get(meldungId) ?? null),
+    [],
+  );
+  const onBestaetigen = useCallback((meldungId: number) => bestaetigen(meldungId), [bestaetigen]);
+  const mitglieder = mitgliederQuery.data ?? KEINE_MITGLIEDER;
 
   if (einsatzQuery.isLoading) {
     return (
@@ -238,46 +368,17 @@ export default function MeldungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  const alleMeldungen = meldungenQuery.data ?? [];
-
-  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
-  const phaseVon = (m: Meldung) => MELDUNG_STATUS[m.status]?.phase ?? 'offen';
-  const offene = alleMeldungen
-    .filter((m) => !istAbgeschlossen(phaseVon(m)))
-    .sort(vergleicheMeldung);
-  const abgeschlossene = alleMeldungen
-    .filter((m) => istAbgeschlossen(phaseVon(m)))
-    .sort(vergleicheAbgeschlossen);
-  const mitglieder = mitgliederQuery.data ?? [];
-
-  // Zwei Gruppen in der Offen-Ansicht: die erste Frage der Triage ist „was hat noch niemand
-  // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung steht danach unter
-  // einer neuen Normalmeldung; das ist gewollt. Innerhalb jeder Gruppe ordnet `vergleicheMeldung` —
-  // `offene` ist sortiert, `filter` erhält die Reihenfolge.
-  const neue = offene.filter((m) => MELDUNG_STATUS[m.status]?.unbearbeitet);
-  const angefasste = offene.filter((m) => !MELDUNG_STATUS[m.status]?.unbearbeitet);
-  const offeneGruppen = [
-    { titel: `Neu (${neue.length})`, meldungen: neue },
-    { titel: `In Arbeit (${angefasste.length})`, meldungen: angefasste },
-  ].filter((g) => g.meldungen.length > 0);
 
   const listenProps = {
     einsatzId,
     darfSchreiben,
     mitglieder,
     highlightId: highlightMeldungId,
-    onStatus: (meldungId: number, status: MeldungStatus) => {
-      const vorher = alleMeldungen.find((m) => m.id === meldungId)?.status;
-      statusMutation.mutate({ meldungId, status, vorher });
-    },
-    onZuweisen: (meldungId: number, bearbeiterId: number | null) =>
-      zuweisenMutation.mutate({ meldungId, bearbeiterId }),
-    onLagerelevant: (meldungId: number) => {
-      const m = alleMeldungen.find((x) => x.id === meldungId) ?? null;
-      setLageMeldung(m);
-    },
-    onBestaetigen: (meldungId: number) => bestaetigenMutation.mutate(meldungId),
-    onAuftragErteilen: (m: Meldung) => setAuftragMeldung(m),
+    onStatus,
+    onZuweisen,
+    onLagerelevant,
+    onBestaetigen,
+    onAuftragErteilen: setAuftragMeldung,
   };
 
   const auftragsZiele = {
@@ -285,14 +386,21 @@ export default function MeldungenPage() {
     einheiten: (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name })),
   };
 
-  const kennzahlen = meldungKennzahlen(alleMeldungen);
+  const kennzahlen = kennzahlenQuery.data;
+  const offenZahl = kennzahlen ? kennzahlen.unbearbeitet + kennzahlen.in_arbeit : offene.length;
+  const abgeschlossenZahl = kennzahlen?.erledigt ?? abgeschlossene.length;
+  const kennzahlZustand = kennzahlenQuery.isLoading
+    ? 'laden'
+    : kennzahlenQuery.isError
+      ? 'fehler'
+      : 'daten';
 
   return (
     <EinsatzSeite
       titel="Meldungen (eingehend)"
 
-      meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
-      dataUpdatedAt={meldungenQuery.dataUpdatedAt}
+      meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
+      dataUpdatedAt={offeneQuery.dataUpdatedAt}
       breadcrumb={
         <Breadcrumb
           items={[
@@ -314,37 +422,37 @@ export default function MeldungenPage() {
         )
       }
     >
-      {/* Kennzahlen der Triage: dieselben Mengen, aus denen die Liste gebaut ist — keine zweite
-          Zählung, `meldungKennzahlen` ist rein. */}
+      {/* Kennzahlen der Triage aus EINER Zählung am Server über dieselben Prädikate wie die Liste
+          (LFH-940, D3); „Bestätigung überfällig" quer zur Phase. */}
       <Kennzahlenband beschriftung="Meldungen in Zahlen" style={{ marginBottom: token.margin }}>
         <Kennzahl
           titel="Unbearbeitet"
           groesse="klein"
-          wert={kennzahlen.unbearbeitet}
-          ton={kennzahlen.unbearbeitet > 0 ? 'achtung' : 'neutral'}
+          wert={kennzahlen?.unbearbeitet ?? 0}
+          ton={(kennzahlen?.unbearbeitet ?? 0) > 0 ? 'achtung' : 'neutral'}
           notiz="noch nicht gesichtet"
-          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+          zustand={kennzahlZustand}
         />
         <Kennzahl
           titel="In Arbeit"
           groesse="klein"
-          wert={kennzahlen.inArbeit}
+          wert={kennzahlen?.in_arbeit ?? 0}
           notiz="gesichtet oder in Bearbeitung"
-          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+          zustand={kennzahlZustand}
         />
         <Kennzahl
-          titel="Alarmiert"
+          titel="Bestätigung überfällig"
           groesse="klein"
-          wert={kennzahlen.alarmiert}
-          ton={kennzahlen.alarmiert > 0 ? 'alarm' : 'neutral'}
+          wert={kennzahlen?.alarmiert ?? 0}
+          ton={(kennzahlen?.alarmiert ?? 0) > 0 ? 'alarm' : 'neutral'}
           notiz="Bestätigungsfrist verstrichen"
-          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+          zustand={kennzahlZustand}
         />
         <Kennzahl
           titel="Erledigt"
           groesse="klein"
-          wert={kennzahlen.erledigt}
-          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+          wert={kennzahlen?.erledigt ?? 0}
+          zustand={kennzahlZustand}
         />
       </Kennzahlenband>
 
@@ -374,7 +482,7 @@ export default function MeldungenPage() {
         </Paneel>
       )}
 
-      {meldungenQuery.isError && (
+      {(offeneQuery.isError || (ansicht === 'abgeschlossen' && abgeschlosseneQuery.isError)) && (
         <Alert
           type="error"
           showIcon
@@ -396,13 +504,13 @@ export default function MeldungenPage() {
           wert={ansicht}
           onWechsel={setAnsicht}
           optionen={[
-            { wert: 'offen', label: `Offen (${offene.length})` },
-            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+            { wert: 'offen', label: `Offen (${offenZahl})` },
+            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossenZahl})` },
           ]}
         />
         <Segmentleiste
           beschriftung="Richtung"
-          wert={richtungFilter ?? 'alle'}
+          wert={richtungsKey}
           onWechsel={(v) => setRichtungFilter(v === 'alle' ? undefined : v)}
           optionen={[
             { wert: 'alle', label: 'Alle Richtungen' },
@@ -425,7 +533,43 @@ export default function MeldungenPage() {
           ))
         )
       ) : (
-        <MeldungListe meldungen={abgeschlossene} ansicht="abgeschlossen" {...listenProps} />
+        <>
+          {verlinkteAngeheftet && (
+            <div style={{ marginBottom: token.margin }}>
+              <Augenbraue als="h2" style={{ display: 'block', marginBottom: token.marginXS }}>
+                Verlinkte Meldung
+              </Augenbraue>
+              <MeldungListe
+                meldungen={[verlinkteAngeheftet]}
+                ansicht="abgeschlossen"
+                {...listenProps}
+              />
+            </div>
+          )}
+          {abgeschlosseneQuery.isPending ? (
+            <div style={{ textAlign: 'center', padding: token.paddingLG }}>
+              <Spin />
+            </div>
+          ) : (
+            <MeldungListe meldungen={abgeschlossene} ansicht="abgeschlossen" {...listenProps} />
+          )}
+          {/* Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
+              sagt, dass es keine gibt. */}
+          {abgeschlosseneQuery.hasNextPage &&
+            (kennzahlen == null || abgeschlossene.length < kennzahlen.erledigt) && (
+              <div style={{ textAlign: 'center', marginTop: token.margin }}>
+                <Button
+                  onClick={() => void abgeschlosseneQuery.fetchNextPage()}
+                  loading={abgeschlosseneQuery.isFetchingNextPage}
+                >
+                  Ältere laden
+                </Button>
+                <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
+                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                </div>
+              </div>
+            )}
+        </>
       )}
       <LagerelevantModal
         offen={lageMeldung !== null}

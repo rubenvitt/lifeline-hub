@@ -28,7 +28,7 @@ export interface PersonenSicht {
 
 /**
  * Vorgabe: Zeilen, ALLE, Lücken-Filter AUS. „Alle", weil eine mit Sichtung erfasste Person
- * serverseitig `betroffen` wird und unter „Neu" beim Erfassen verschwände. Der Lücken-Filter
+ * serverseitig `betroffen` wird und unter „Erfasst" beim Erfassen verschwände. Der Lücken-Filter
  * ist eine Einstellung und steht nicht von selbst an.
  */
 export const SICHT_VORGABE: PersonenSicht = {
@@ -39,7 +39,8 @@ export const SICHT_VORGABE: PersonenSicht = {
 
 export const FILTER_OPTIONEN: readonly { wert: PersonenFilter; label: string }[] = [
   { wert: 'alle', label: 'Alle' },
-  { wert: 'erfasst', label: 'Neu' },
+  // Dasselbe Wort wie die Statusspalte (`personStatus`), nicht „Neu“ (LFH-963).
+  { wert: 'erfasst', label: 'Erfasst' },
   { wert: 'vermisst', label: 'Vermisst' },
   { wert: 'betroffen', label: 'Betroffen' },
   { wert: 'verstorben', label: 'Verstorben' },

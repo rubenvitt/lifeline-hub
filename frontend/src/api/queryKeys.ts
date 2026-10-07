@@ -40,6 +40,9 @@ export const EINSATZ_KEYS = {
   personal: 'einsatz-personal',
   abschnitte: 'einsatz-abschnitte',
   personen: 'einsatz-personen',
+  // Personenauswahl ohne Freitexte (LFH-940): Picker, Sprungpalette, Chat-Bezug. Eigener Prefix,
+  // live über `person`; im Lagebild offline wie die Vollliste (design.md D8).
+  personenAuswahl: 'einsatz-personen-auswahl',
   lageberichte: 'einsatz-lageberichte',
   lagebericht: 'einsatz-lagebericht',
   chatKanaele: 'einsatz-chat-kanaele',
@@ -204,6 +207,7 @@ export const EINSATZ_STREAM_EVENTS = {
   // eine Audit-Zeile, die Liste der Anhänge schreibt keine.
   person: [
     EINSATZ_KEYS.personen,
+    EINSATZ_KEYS.personenAuswahl,
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.betreuung,
     EINSATZ_KEYS.personAnhaenge,
@@ -408,6 +412,9 @@ export const NICHT_LIVE_KEYS = [
  * `[prefix, einsatzId]` sind zugleich der Invalidierungs-Prefix (TanStack matcht per Prefix);
  * Detail-/Filter-Varianten hängen weitere Elemente an.
  */
+/** Phase einer geteilten Liste (Meldungen, Erinnerungen; LFH-940). */
+export type ListenPhase = 'offen' | 'abgeschlossen';
+
 /** Sub-Key der Rückmeldungen unter dem `meldungen`-Prefix. */
 const RUECKMELDUNGEN_SUBKEY = 'rueckmeldungen';
 
@@ -462,6 +469,7 @@ export const einsatzKeys = {
 
   // Personen / Personal
   personen: (einsatzId: number) => [EINSATZ_KEYS.personen, einsatzId] as const,
+  personenAuswahl: (einsatzId: number) => [EINSATZ_KEYS.personenAuswahl, einsatzId] as const,
   // personId nullbar: der Person-Detail-Drawer rendert ohne Auswahl (enabled-Guard).
   person: (einsatzId: number, personId: number | null) =>
     [EINSATZ_KEYS.person, einsatzId, personId] as const,
@@ -627,9 +635,21 @@ export const einsatzKeys = {
   chatNachrichtenKanal: (einsatzId: number, kanalId: number | null) =>
     [EINSATZ_KEYS.chatNachrichten, einsatzId, kanalId] as const,
   erinnerungen: (einsatzId: number) => [EINSATZ_KEYS.erinnerungen, einsatzId] as const,
+  /** Erinnerungen nach Phase (LFH-940): offene ungeblättert, abgeschlossene als Seitenkette. */
+  erinnerungenPhase: (einsatzId: number, phase: ListenPhase) =>
+    [EINSATZ_KEYS.erinnerungen, einsatzId, phase] as const,
+  erinnerungKennzahlen: (einsatzId: number) =>
+    [EINSATZ_KEYS.erinnerungen, einsatzId, 'kennzahlen'] as const,
+  /** Vollliste ohne Phase: Sprungpalette, Chat-Bezug, Geräteseite, Übernahme. */
   meldungen: (einsatzId: number) => [EINSATZ_KEYS.meldungen, einsatzId] as const,
-  meldungenListe: (einsatzId: number, richtung: string) =>
-    [EINSATZ_KEYS.meldungen, einsatzId, richtung] as const,
+  /** Meldungsseite nach Phase und Richtung (LFH-940); `abgeschlossen` ist eine Seitenkette. */
+  meldungenPhase: (einsatzId: number, phase: ListenPhase, richtung: string) =>
+    [EINSATZ_KEYS.meldungen, einsatzId, phase, richtung] as const,
+  meldungKennzahlen: (einsatzId: number, richtung: string) =>
+    [EINSATZ_KEYS.meldungen, einsatzId, 'kennzahlen', richtung] as const,
+  /** Einzelabruf für einen Deeplink auf eine nicht geladene Meldung. */
+  meldungEinzeln: (einsatzId: number, meldungId: number) =>
+    [EINSATZ_KEYS.meldungen, einsatzId, 'einzeln', meldungId] as const,
   /** Letzte Rückmeldung je Einheit/Abschnitt, unter dem `meldungen`-Prefix: jede
    *  Meldungs-Invalidierung trifft sie mit. */
   meldungenRueckmeldungen: (einsatzId: number) =>
@@ -957,6 +977,8 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.befehle,
     // Betroffene
     EINSATZ_KEYS.personen,
+    // Auswahl ohne Freitexte (LFH-940, D8): hält die Personensuche der Palette ohne Netz.
+    EINSATZ_KEYS.personenAuswahl,
     EINSATZ_KEYS.uhs,
     // Lagekarte
     EINSATZ_KEYS.zonen,

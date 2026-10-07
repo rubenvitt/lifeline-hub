@@ -41,6 +41,11 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität
   `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
   Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
+- **Systemeinträge ausblenden** (LFH-958, Spec `etb-zeitachse-darstellung`): `ohne_system=true`
+  ist ein Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste,
+  `zaehler` und `anzahl` erben ihn zusammen. Zustand in der URL (`etbPfad`/`parseEtbFilter`),
+  nur `true` oder fehlend; neben `typ=system` fällt er weg (sonst 422, `filterZusammenfuehren`).
+  Ein `?eintrag=`, der unter dem Ausschluss nicht auftaucht, blendet wieder ein und sagt es.
 - **Modulzähler** (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
   Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat als
   Handlungsmenge. Der Server zählt sie per Aggregat ohne Listen zu laden, über dieselben
@@ -48,10 +53,29 @@ Ableitungen in `etb/zeitachseModell.ts`)
   (`ClientZaehlerQuelle`). Ohne Recht **fehlt** das Modul (`berechtigung::erlaubte_module`). Wer
   eine gezählte Liste invalidiert, invalidiert `modulZaehler` mit (`ZAEHLER_LISTEN_KEYS`,
   `queryKeys.test.ts`).
+- **Seitenfenster** (LFH-947, Spec `etb-zeitachse-fenster`, Herleitung
+  `openspec/changes/archive/2026-10-06-lfh-947-etb-zeitachse-seitenfenster/design.md`): die Liste
+  hält höchstens `ETB_MAX_SEITEN` (5) Seiten (`etb/seitenfenster.ts`); Seitenparameter mit
+  Richtung (`{ aelter }` → `before_lfd_nr`, `{ neuer }` → `after_lfd_nr`), nie eine nackte Zahl.
+  Fällt der Kopf heraus, steht „Neuere laden“ über der Zeitachse. Ein `?eintrag=` wählt die
+  Richtung aus der Kennung (`sprungRichtung`); kein `resetQueries`, das räumte das Lagebild ohne
+  Netz. Nach einem eigenen Eintrag aus tiefem Fenster ersetzt die Seite das Fenster durch die
+  neueste Seite (`zumKopf`). Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
+  laufendes Nachladen ab (`offline/useEtbErfassung.ts`).
+- **Gemerktes Rendern** (LFH-947): `eintraege`, `chronologie`, Zufluss und Gruppen sind
+  `useMemo`, die Zeile (`EtbZeitachsenZeile`) und `components/Markdown` sind `memo`, Handler
+  laufen über eine Ref, die Gruppe wird über Stunde und Vorkommen geschlüsselt (nie über die
+  erste Zeile). Ein neuer Eintrag parst nur seinen Text (`etb/EtbZeitachse.render.test.tsx`).
+  Jede Stundengruppe trägt `.etb-stundengruppe` (`content-visibility: auto`, `index.css`).
 - Jede Zeile trägt `data-lfh="datensicht-karte"` und die Zeilenklasse (`scrolleZurZeile`,
   `?eintrag=`). Ein neuer `KARTEN_EIGENBAU` wird gegen den Plan-Modus begründet (Titel, Status,
   ≤ 3 Sekundärfelder, eine Primäraktion, optional Menü `weitere`) und setzt Marke/Klasse selbst.
 - ≥ 50 % Meldungstext im Fükw: `e2e/etb-chronologie.spec.ts`, gegen die **Contentbreite**.
+- **Kompakte Zeile** (LFH-958, `zeitachsenAufbau` in `components/instrument/Zeitachseneintrag.tsx`):
+  unter 48 px Bedienhöhe stehen Verfasser (einzeilig, Titel mit Volltext) und Weg in der
+  Kopfzeile. Ein Zeilenmenü geht über `menue`, das in `kompakt` am Ende der Kopfzeile steht;
+  `aktionen` sind Text-Knöpfe und bleiben rechts. Nachweis ≤ 56 px und ≥ 9 Einträge bei
+  1440 × 900: `e2e/etb-zeilenhoehe.spec.ts`.
 - **ETB-Entwürfe schreiben nur über `etb/entwuerfe/entwurfStore.ts`** (LFH-521): ein Neuladen
   bricht offene IndexedDB-Transaktionen ab, deshalb steht jeder Auftrag vor dem ersten `await`
   synchron im Vorlauf (`localStorage`, ein Schlüssel `lifeline-etb-entwuerfe-ausstehend:<id>` je

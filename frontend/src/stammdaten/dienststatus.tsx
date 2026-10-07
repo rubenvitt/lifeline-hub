@@ -35,6 +35,16 @@ export const DIENSTSTATUS_FEHLER = {
   fehlerFallback: 'Statuswechsel fehlgeschlagen',
 } as const;
 
+/**
+ * Knopftext je ZIELSTATUS (LFH-959): der Knopf nennt die Handlung, das Etikett daneben den
+ * Zustand (`frontend/AGENTS.md`, Bedien-Leitlinie „Aktionen“; Guard
+ * `kommunikation/wortlaut.guard.test.ts`).
+ */
+export const DIENSTSTATUS_HANDLUNG: Record<Dienststatus, string> = {
+  ausser_dienst: 'Außer Dienst nehmen',
+  in_dienst: 'Wieder in Dienst nehmen',
+};
+
 type DienststatusMutation = ReturnType<typeof useDienststatusMutation>;
 
 /** Filterwerte in der Reihenfolge des Vertrags; der Wortlaut kommt von dort, nicht von hier. */
@@ -97,14 +107,14 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
         const laeuft = mutation.isPending && mutation.variables?.id === t.id;
         const inDienst = t.dienststatus === 'in_dienst';
         if (schmal) {
-          // Dieselben zwei Handlungen wie in der Knopfreihe darunter; „Außer Dienst" bleibt rot.
+          // Dieselben zwei Handlungen wie in der Knopfreihe darunter; „Außer Dienst nehmen" bleibt rot.
           return (
             <MenueAusloeser
               eintraege={[
                 { key: 'bearbeiten', label: 'Bearbeiten' },
                 inDienst
-                  ? { key: 'dienst', label: 'Außer Dienst', gefahr: true }
-                  : { key: 'dienst', label: 'Wieder in Dienst' },
+                  ? { key: 'dienst', label: DIENSTSTATUS_HANDLUNG.ausser_dienst, gefahr: true }
+                  : { key: 'dienst', label: DIENSTSTATUS_HANDLUNG.in_dienst },
               ]}
               zugaenglicherName={`Aktionen zu ${kennung(t)}`}
               gesperrt={laeuft}
@@ -121,10 +131,10 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
             <Button disabled={laeuft} onClick={() => onBearbeiten(t)}>
               Bearbeiten
             </Button>
-            {/* KEINE Rückfrage vor „Außer Dienst" (LFH-477, Linie aus LFH-363/378): die Aktion
+            {/* KEINE Rückfrage vor „Außer Dienst nehmen" (LFH-477, Linie aus LFH-363/378): die Aktion
                 ist umkehrbar. Der Server setzt nur die Spalte `dienststatus`, keine Disposition
                 wird gelöst oder gelöscht; bestehende Einsatzzuordnungen zeigen solange ihren
-                Snapshot und nach „Wieder in Dienst" wieder die Stammdaten. Neu disponieren
+                Snapshot und nach „Wieder in Dienst nehmen" wieder die Stammdaten. Neu disponieren
                 lässt sich der Eintrag in der Zeit nicht. Der Rückweg steht im Gegenzweig
                 derselben Zelle. Seine Bedingung (409, wenn Funkrufname, Personal- oder
                 Bestandsnummer inzwischen aktiv neu vergeben ist) entsteht erst durch eine
@@ -140,7 +150,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
                   if (!laeuft) mutation.mutate({ id: t.id, inDienst: false });
                 }}
               >
-                Außer Dienst
+                {DIENSTSTATUS_HANDLUNG.ausser_dienst}
               </Button>
             ) : (
               <Button
@@ -150,7 +160,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
                   if (!laeuft) mutation.mutate({ id: t.id, inDienst: true });
                 }}
               >
-                Wieder in Dienst
+                {DIENSTSTATUS_HANDLUNG.in_dienst}
               </Button>
             )}
           </Space>

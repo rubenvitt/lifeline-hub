@@ -361,7 +361,11 @@ interface DatensichtProps<T extends object, K extends string> {
   /** Default `'auto'`. */
   form?: Darstellungsform;
   ladend?: boolean;
-  /** Tabelle: `locale.emptyText`; Karte: `Liste emptyText`. KEIN neuer Leerzustands-Knoten. */
+  /**
+   * Tabelle: `locale.emptyText`; Karte: `Liste emptyText`. KEIN neuer Leerzustands-Knoten. Gilt
+   * nur für die leere GESAMTMENGE; leert erst Suche oder Filter die Sicht, ersetzt ihn auf
+   * demselben Weg der Filter-Leerzustand (LFH-967).
+   */
   leerText?: ReactNode;
 
   // Zustand — Voreinstellung ODER kontrolliert, nie beides
@@ -816,6 +820,25 @@ export default function Datensicht<T extends object, const K extends string>(
     [daten, spalten, aktiveSortierung, suchbegriff, wirksameFilterWerte, gruppen, baum],
   );
 
+  /**
+   * DER LEERZUSTAND NENNT SEINEN GRUND (LFH-967). Leert erst eine Einschränkung die Sicht, sagt
+   * „Keine Betreuungsstellen“ das Falsche, während der Kopf „71 untergebracht“ zeigt. Dann steht
+   * der Filter-Leerzustand samt Rückweg da; der modulspezifische `leerText` bleibt der leeren
+   * Gesamtmenge. Gezählt wird, was WIRKT (`wirksameFilterWerte`): ein Filter einer verborgenen
+   * Spalte schneidet nichts und erklärt deshalb auch nichts.
+   */
+  const einschraenkungAktiv =
+    suchbegriff.trim() !== '' || Object.values(wirksameFilterWerte).some((w) => w.length > 0);
+  const leerInhalt: ReactNode =
+    einschraenkungAktiv && daten.length > 0 ? (
+      <Space direction="vertical" align="center" size={token.marginXS}>
+        <Typography.Text type="secondary">Keine Treffer für die gewählten Filter</Typography.Text>
+        <Button onClick={filterZuruecksetzen}>Filter zurücksetzen</Button>
+      </Space>
+    ) : (
+      leerText
+    );
+
   const schluessel = useCallback(
     (zeile: T) => schluesselVon(zeilenSchluessel, zeile),
     [zeilenSchluessel],
@@ -1041,7 +1064,17 @@ export default function Datensicht<T extends object, const K extends string>(
               allowClear
               maxTagCount="responsive"
               aria-label={etikettVon(spalte) ?? spalte.key}
-              placeholder={etikettVon(spalte) ?? spalte.key}
+              /*
+               * Das Etikett steht als PRÄFIX im Feld (LFH-967): nach der Wahl verschwindet der
+               * Platzhalter, und „Anlaufstelle ×“ allein sagt nicht, zu welcher Achse der Wert
+               * gehört. Der zugängliche Name trägt es schon, deshalb `aria-hidden`.
+               */
+              prefix={
+                <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
+                  {etikettVon(spalte) ?? spalte.key}:
+                </span>
+              }
+              placeholder="alle"
               value={[...(filterWerte[spalte.key] ?? [])]}
               onChange={(werte: string[]) => {
                 setFilterWerte((vorher) => ({ ...vorher, [spalte.key]: werte }));
@@ -1209,19 +1242,39 @@ export default function Datensicht<T extends object, const K extends string>(
       ? (basis(wert, zeile, index) as ReactNode)
       : zelle(ersteSpalte, zeile, index);
   };
+  const ausloeserNeben = abBreite('xl');
   const tabellenSpalten: KatalogSpalte<T>[] =
     aufklappen && antdSpalten.length > 0 && ersteSpalte
       ? [
           {
             ...antdSpalten[0],
+            // NEBENEINANDER AB xl, DARUNTER GESTAPELT (LFH-975): ab 1200 px steht der Auslöser in
+            // derselben Zeile wie die Kennung und bricht erst um, wenn der Platz fehlt. Gestapelt
+            // verdoppelte er dort die Zeilenhöhe (rund 71 px bei 1440), und nur die Hälfte der Kräfte
+            // passte auf einen Schirm. Darunter bleibt er gestapelt: die automatische
+            // Tabellenbreite rechnet Kennung UND Auslöser in die Wunschbreite der ersten Spalte, und
+            // am Handy und Tablet schob das die Zahlspalten aus dem Bild (`betreuung-stellen-schmal`).
+            // Der Ort bleibt die Kennungszelle (LFH-676, keine eigene Spalte); die Höhe des Knopfs
+            // folgt weiter der Dichte, die Trefffläche bleibt also.
             render: (wert: unknown, zeile: T, index: number) => (
               <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: token.marginXXS,
-                }}
+                data-lfh="datensicht-aufklapp-zelle"
+                style={
+                  ausloeserNeben
+                    ? {
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        columnGap: token.marginXS,
+                        rowGap: token.marginXXS,
+                      }
+                    : {
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: token.marginXXS,
+                      }
+                }
               >
                 {ersteZelle(wert, zeile, index)}
                 {aufklappAusloeser(zeile, false)}
@@ -1270,7 +1323,7 @@ export default function Datensicht<T extends object, const K extends string>(
       dataSource={[...sichtbareZeilen]}
       rowKey={(zeile) => schluessel(zeile)}
       loading={ladend}
-      locale={leerText != null ? { emptyText: leerText } : undefined}
+      locale={leerInhalt != null ? { emptyText: leerInhalt } : undefined}
       // Keine Suche und keine Blätterung von `KatalogTabelle`: die Suche steht in der Werkzeugzeile,
       // eine Seitenblätterung schnitte die Zeilenschleuse entzwei.
       pagination={false}
@@ -1539,7 +1592,7 @@ export default function Datensicht<T extends object, const K extends string>(
       kopf={kopf}
       loading={ladend}
       // `emptyText` statt eines eigenen Leerzustands-Knotens.
-      emptyText={leerText}
+      emptyText={leerInhalt}
       renderItem={(zeile, index) =>
         baum ? baumEintrag(zeile, index, 0) : kartenEintrag(zeile, index, 0)
       }

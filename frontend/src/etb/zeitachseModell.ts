@@ -70,7 +70,7 @@ interface Verweis {
   lfd_nr: number;
 }
 
-interface Berichtigungsindex {
+export interface Berichtigungsindex {
   /** Berichtigung → ihr Grundeintrag (lfd_nr nur, wenn der Grundeintrag geladen ist). */
   grundeintrag: (e: EtbEintragAnzeige) => { id: number; lfd_nr: number | null } | null;
   /** Grundeintrag → die Berichtigung(en), die ihn korrigieren (nur geladene). */
@@ -205,11 +205,15 @@ export function typSegmente(aktiv: EtbTyp | undefined): TypSegment[] {
   return aktiv === 'system' ? [...basis, 'system'] : basis;
 }
 
-/** Der Filter nach einem Segmentwechsel; „alle" nimmt `typ` heraus, der Rest bleibt. */
+/**
+ * Der Filter nach einem Segmentwechsel; „alle" nimmt `typ` heraus, der Rest bleibt. Das Segment
+ * `system` hebt den Ausschluss der Systemeinträge auf (LFH-958).
+ */
 export function filterMitTyp(filter: EtbFilterWerte, segment: TypSegment): EtbFilterWerte {
   const { typ: _alt, ...rest } = filter;
   void _alt;
-  return segment === 'alle' ? rest : { ...rest, typ: segment };
+  if (segment === 'alle') return rest;
+  return filterZusammenfuehren(rest, { typ: segment });
 }
 
 /**
@@ -228,6 +232,12 @@ export function filterZusammenfuehren(
   (Object.keys(neu) as (keyof EtbFilterWerte)[]).forEach((k) => {
     if (neu[k] === undefined || neu[k] === '') delete neu[k];
   });
+  // `typ: 'system'` und der Ausschluss heben sich auf (LFH-958): der Server wiese die
+  // Kombination mit 422 ab. Es gilt, was diese Änderung gesetzt hat.
+  if (neu.typ === 'system' && neu.ohne_system) {
+    if (teil.ohne_system) delete neu.typ;
+    else delete neu.ohne_system;
+  }
   return neu;
 }
 

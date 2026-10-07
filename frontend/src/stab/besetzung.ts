@@ -7,6 +7,7 @@ import type {
   Stabsfunktion,
 } from '../api/types';
 import type { StatusDarstellung } from '../theme/statusFarben';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 
 /** „Nicht vergeben" ist KEIN Datensatz (keine Zeile vom Server), aber eine Wahl in der Maske. */
 export type BesetzungWahl = BesetzungArt | 'nicht_vergeben';
@@ -122,12 +123,7 @@ export function besetzungAktion(
   }
 }
 
-/**
- * Grund der fehlenden Schreibberechtigung als ganzer Satz; nennt beide gesperrten Wege
- * (Besetzung und Lagebesprechung).
- */
+/** Grund der fehlenden Schreibberechtigung für Besetzung und Lagebesprechung. */
 export function besetzungRechteText(einsatzStatus: EinsatzStatus): string {
-  return einsatzStatus !== 'aktiv'
-    ? 'Der Einsatz ist abgeschlossen — Führungsorganisation und Lagebesprechungen sind nur noch lesbar.'
-    : 'Nur Einsatzleitung und Führungspersonal können die Besetzung ändern und Lagebesprechungen abschließen.';
+  return einsatzRechteGrund(einsatzStatus);
 }

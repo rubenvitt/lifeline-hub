@@ -837,7 +837,7 @@ describe('Sidebar Fehler-Slots', () => {
       />,
     );
     // Der Fehler wird gemeldet — aber als Banner, das den Stand als alt kennzeichnet.
-    expect(screen.getByText(/nicht aktualisiert werden/i)).toBeInTheDocument();
+    expect(screen.getByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
     // Die Zeile aus dem Zwischenspeicher steht weiter da …
     expect(screen.getByText(/UHS: UHS Nord/)).toBeInTheDocument();
     // … und die einzige Bedienung zum Verorten ist bedienbar geblieben.

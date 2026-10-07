@@ -1,13 +1,10 @@
-import { Tooltip } from 'antd';
 import { StatusChip } from '../components/instrument';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 
-const ERKLAERUNG = 'Quittiert = empfangen/zur Kenntnis genommen — sagt nichts über die Erledigung.';
-
 /**
  * Orthogonale Kenntnisnahme-Achse, NICHT Teil der Status-Phase: `normal` „✓ Quittiert"
- * (optional von wem/wann), sonst neutral „Quittung offen". Die Hülle (`span`) trägt den
- * Tooltip, weil `StatusChip` keine Referenz durchreicht.
+ * (optional von wem/wann), sonst neutral „Quittung offen". Ohne Tooltip (LFH-959): das Wort im
+ * Chip trägt die Aussage, „Quittieren" heißt in der Oberfläche nur Empfang bestätigt.
  */
 export default function QuittungIndikator({
   quittiert,
@@ -20,24 +17,12 @@ export default function QuittungIndikator({
 }) {
   // Quittierzeit in der Anzeigezone (LFH-692).
   const { formatZeit } = useAnzeigeKonventionen();
-  if (!quittiert) {
-    return (
-      <Tooltip title={ERKLAERUNG}>
-        <span style={{ display: 'inline-flex' }}>
-          <StatusChip ton="neutral" wort="Quittung offen" />
-        </span>
-      </Tooltip>
-    );
-  }
+  if (!quittiert) return <StatusChip ton="neutral" wort="Quittung offen" />;
   const zeit = formatZeit(am);
   return (
-    <Tooltip title={ERKLAERUNG}>
-      <span style={{ display: 'inline-flex' }}>
-        <StatusChip
-          ton="normal"
-          wort={`✓ Quittiert${von ? ` von ${von}` : ''}${zeit ? ` ${zeit}` : ''}`}
-        />
-      </span>
-    </Tooltip>
+    <StatusChip
+      ton="normal"
+      wort={`✓ Quittiert${von ? ` von ${von}` : ''}${zeit ? ` ${zeit}` : ''}`}
+    />
   );
 }

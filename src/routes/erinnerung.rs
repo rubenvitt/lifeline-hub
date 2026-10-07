@@ -31,19 +31,42 @@ fn sse(state: &AppState, einsatz_id: i64) {
 
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
-    /// `true` → nur offene Erinnerungen.
+    /// Vorgabe `true` (LFH-940): ohne Parameter nur offene. `false` liefert ausdrücklich alle.
     pub nur_offen: Option<bool>,
+    /// `offen` | `abgeschlossen` (LFH-940); `abgeschlossen` blättert. Nicht zusammen mit
+    /// `nur_offen`.
+    pub phase: Option<String>,
+    pub vor_zeit: Option<String>,
+    pub vor_id: Option<i64>,
+    pub limit: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/erinnerungen — Erinnerungen listen (Lesezugriff).
+/// GET /api/einsaetze/{id}/erinnerungen — Erinnerungen listen (Lesezugriff). Ohne Parameter nur
+/// offene; `phase=abgeschlossen` seitenweise (Spec `meldungen-blaettern`).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Erinnerungen>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<ErinnerungAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let nur_offen = params.nur_offen.unwrap_or(false);
-    let mut liste = repo::liste(&state.pool, einsatz_id, nur_offen, &jetzt()).await?;
+    let (phase, seite) = crate::kommunikation::phase_und_seite(
+        params.phase.as_deref(),
+        params.vor_zeit.as_deref(),
+        params.vor_id,
+        params.limit,
+    )?;
+    if phase.is_some() && params.nur_offen.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "phase und nur_offen schließen sich aus".into(),
+        ));
+    }
+    let mut liste = match seite {
+        Some(seite) => repo::liste_abgeschlossen(&state.pool, einsatz_id, &seite, &jetzt()).await?,
+        None => {
+            let nur_offen = params.nur_offen.unwrap_or(true);
+            repo::liste(&state.pool, einsatz_id, nur_offen, &jetzt()).await?
+        }
+    };
     anreichern_alle(
         &state.pool,
         einsatz_id,
@@ -53,6 +76,14 @@ pub async fn liste(
     )
     .await?;
     Ok(Json(liste))
+}
+
+/// GET /api/einsaetze/{id}/erinnerungen/kennzahlen — offen und abgeschlossen (LFH-940).
+pub async fn kennzahlen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Erinnerungen>,
+) -> Result<Json<crate::erinnerung::ErinnerungKennzahlen>, AppError> {
+    Ok(Json(repo::kennzahlen(&state.pool, ctx.einsatz.id).await?))
 }
 
 #[derive(Debug, Deserialize)]

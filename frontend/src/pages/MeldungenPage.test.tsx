@@ -39,15 +39,49 @@ const weiseBearbeiterZu = vi.fn();
 const markiereLagerelevant = vi.fn();
 const bestaetigeMeldung = vi.fn();
 const erteileAuftragAusMeldung = vi.fn();
-vi.mock('../api/meldungen', () => ({
-  listeMeldungen: (...a: unknown[]) => listeMeldungen(...a),
-  legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
-  setzeMeldungStatus: (...a: unknown[]) => setzeMeldungStatus(...a),
-  weiseBearbeiterZu: (...a: unknown[]) => weiseBearbeiterZu(...a),
-  markiereLagerelevant: (...a: unknown[]) => markiereLagerelevant(...a),
-  bestaetigeMeldung: (...a: unknown[]) => bestaetigeMeldung(...a),
-  erteileAuftragAusMeldung: (...a: unknown[]) => erteileAuftragAusMeldung(...a),
-}));
+// Die Seite liest offen, abgeschlossen, Kennzahlen und Einzelabruf getrennt (LFH-940). Die
+// Bestandstests geben weiter EINE Liste vor (`listeMeldungen`); die Attrappe schneidet daraus, was
+// der Server je Abruf liefern würde. Eigene Aussagen zum Blättern: `MeldungenPage.blaettern.test`.
+vi.mock('../api/meldungen', async () => {
+  const echt = await vi.importActual<typeof import('../api/meldungen')>('../api/meldungen');
+  const { meldungKennzahlen } = await vi.importActual<
+    typeof import('../meldungen/meldungKennzahlen')
+  >('../meldungen/meldungKennzahlen');
+  const liste = async (id: number, richtung?: string) =>
+    ((await listeMeldungen(id, { richtung })) ?? []) as Meldung[];
+  return {
+    MELDUNGEN_SEITE: echt.MELDUNGEN_SEITE,
+    abschlussCursor: echt.abschlussCursor,
+    listeOffeneMeldungen: async (id: number, richtung?: string) =>
+      (await liste(id, richtung)).filter((m) => m.status !== 'erledigt'),
+    listeAbgeschlosseneMeldungen: async (id: number, richtung?: string) =>
+      (await liste(id, richtung))
+        .filter((m) => m.status === 'erledigt')
+        .sort((a, b) =>
+          (b.erledigt_at ?? b.ereigniszeit).localeCompare(a.erledigt_at ?? a.ereigniszeit),
+        ),
+    ladeMeldungKennzahlen: async (id: number, richtung?: string) => {
+      const k = meldungKennzahlen(await liste(id, richtung));
+      return {
+        unbearbeitet: k.unbearbeitet,
+        in_arbeit: k.inArbeit,
+        alarmiert: k.bestaetigungUeberfaellig,
+        erledigt: k.erledigt,
+      };
+    },
+    ladeMeldung: async (id: number, mid: number) => {
+      const m = (await liste(id)).find((x) => x.id === mid);
+      if (!m) throw new Error('404');
+      return m;
+    },
+    legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
+    setzeMeldungStatus: (...a: unknown[]) => setzeMeldungStatus(...a),
+    weiseBearbeiterZu: (...a: unknown[]) => weiseBearbeiterZu(...a),
+    markiereLagerelevant: (...a: unknown[]) => markiereLagerelevant(...a),
+    bestaetigeMeldung: (...a: unknown[]) => bestaetigeMeldung(...a),
+    erteileAuftragAusMeldung: (...a: unknown[]) => erteileAuftragAusMeldung(...a),
+  };
+});
 // Auftrags-Ziele: MeldungenPage lädt sie für das Meldung→Auftrag-Formular.
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
@@ -196,7 +230,7 @@ describe('MeldungenPage', () => {
     ]);
   });
 
-  it('trennt Offen/Abgeschlossen clientseitig und zeigt Offen als Default', async () => {
+  it('trennt Offen/Abgeschlossen und zeigt Offen als Default', async () => {
     listeMeldungen.mockResolvedValue([
       meldung({ id: 1, status: 'neu', ist_offen: true }),
       meldung({ id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false }),
@@ -205,9 +239,7 @@ describe('MeldungenPage', () => {
     // Default-Ansicht „Offen": nur nicht-erledigte sichtbar.
     expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
     expect(screen.queryByText('RTW 9')).not.toBeInTheDocument();
-    // Server-Default: kein Status-Filter (Offen/Abgeschlossen rein clientseitig).
-    expect(listeMeldungen.mock.calls[0][1]).not.toHaveProperty('status');
-    // Umschalten auf „Abgeschlossen": nur erledigte sichtbar, ohne neuen Server-Call mit Status.
+    // Umschalten auf „Abgeschlossen": nur erledigte sichtbar (eigener Abruf, LFH-940).
     await userEvent.click(screen.getByText(/Abgeschlossen \(/));
     expect(await screen.findByText('RTW 9')).toBeInTheDocument();
     expect(screen.queryByText('Florian Nord 1')).not.toBeInTheDocument();
@@ -253,11 +285,13 @@ describe('MeldungenPage', () => {
   it('hält beim Filterwechsel die vorherige Liste samt Zählern, bis die neue da ist (LFH-351)', async () => {
     // Beim ersten Wechsel auf einen Richtungsfilter ist der neue Key kalt; ohne `placeholderData`
     // zeigte die Seite für die Dauer des Requests „Keine Meldungen" und „0 offen".
-    let antworte: (m: Meldung[]) => void = () => {};
+    // Offene Liste und Kennzahlen fragen je einmal (LFH-940); beide warten auf dieselbe Antwort.
+    const wartende: ((m: Meldung[]) => void)[] = [];
+    const antworte = (m: Meldung[]) => wartende.forEach((r) => r(m));
     listeMeldungen.mockImplementation((_id: number, f: { richtung?: string }) =>
       f.richtung === 'extern'
         ? new Promise<Meldung[]>((resolve) => {
-            antworte = resolve;
+            wartende.push(resolve);
           })
         : Promise.resolve([meldung()]),
     );
@@ -308,12 +342,12 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'erledigt' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    // Die Meldung ist `neu` → „Erledigt" ist der Sprung und liegt im Menü. Die Rückfrage dort ist
-    // ein Dialog, kein Popconfirm.
+    // Die Meldung ist `neu` → „Als erledigt melden" ist der Sprung und liegt im Menü. Die
+    // Rückfrage dort ist ein Dialog, kein Popconfirm.
     const menue = await oeffneAktionsmenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /Erledigt/ }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Als erledigt melden/ }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Als erledigt melden' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'erledigt'));
   });
 
@@ -413,7 +447,9 @@ describe('MeldungenPage', () => {
     );
     renderPage();
     await screen.findByText('Florian Nord 1');
-    expect(screen.getByText(/Bestätigung überfällig/)).toBeInTheDocument();
+    // Auf der Karte; dasselbe Wort steht seit LFH-959 auch als Kennzahl im Band darüber.
+    const karte = document.querySelector('[data-meldung-id="1"]') as HTMLElement;
+    expect(within(karte).getByText(/Bestätigung überfällig/)).toBeInTheDocument();
     // Link-Button „Bestätigen" öffnet Popconfirm; OK-Knopf heißt ebenfalls „Bestätigen".
     await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
     const popconfirms = await screen.findAllByRole('button', { name: 'Bestätigen' });
@@ -724,7 +760,13 @@ describe('MeldungenPage', () => {
         .querySelector('[data-lfh="kennzahl-wert"]')!.textContent;
     await waitFor(() => expect(wert('Unbearbeitet')).toBe('1'));
     expect(wert('In Arbeit')).toBe('1');
-    expect(wert('Alarmiert')).toBe('1');
+    // Derselbe Wortlaut wie Modulzähler und Lage-Dashboard (LFH-959).
+    expect(wert('Bestätigung überfällig')).toBe('1');
     expect(wert('Erledigt')).toBe('1');
+    expect(screen.queryByText(/Alarmiert/)).not.toBeInTheDocument();
+    // Auf der Karte steht dasselbe Wort im Chip, kein eigenes „Alarm" daneben.
+    const karte = document.querySelector('[data-meldung-id="2"]') as HTMLElement;
+    expect(within(karte).getByText('Bestätigung überfällig')).toBeInTheDocument();
+    expect(within(karte).queryByText(/^\s*Alarm\s*$/)).not.toBeInTheDocument();
   });
 });

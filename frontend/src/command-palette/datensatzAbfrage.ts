@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
-import { listePersonen } from '../api/einsatzPerson';
+import { listePersonenAuswahl } from '../api/einsatzPerson';
 import { listeSchaeden } from '../api/einsatzSchaden';
 import { listeUhs } from '../api/einsatzUhs';
 import { listeMeldungen } from '../api/meldungen';
@@ -45,10 +45,12 @@ export const ETB_SUCH_GC_MS = 30_000;
  * Filterargument: ein `?status=…` wäre ein eigenes Fach.
  */
 export const datensatzAbfrage = {
+  // Personen über die Auswahl ohne Freitexte (LFH-940): dasselbe Fach wie die Auswahlfelder,
+  // nicht die Vollliste der Personenseite. Die Vorschau liest das Detail.
   personen: (id: number) =>
     queryOptions({
-      queryKey: einsatzKeys.personen(id),
-      queryFn: () => listePersonen(id),
+      queryKey: einsatzKeys.personenAuswahl(id),
+      queryFn: () => listePersonenAuswahl(id),
       staleTime: FRISCH_MS,
     }),
   schaeden: (id: number) =>
