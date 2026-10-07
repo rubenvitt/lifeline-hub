@@ -457,7 +457,7 @@ export default function MitgliederAbschnitt({
           }}
           onCancel={() => setHerabstufung(null)}
         >
-          {`Mit „${ROLLEN.find((r) => r.value === herabstufung.rolle)?.label}“ fehlt das Recht, den Zugriff dieses Einsatzes zu verwalten. Zurückholen kann die Rolle dann nur eine andere Einsatzleitung oder ein Admin.`}
+          {`Mit „${ROLLEN.find((r) => r.value === herabstufung.rolle)?.label}“ endet das Recht, den Zugriff dieses Einsatzes zu verwalten.`}
         </Modal>
       )}
     </Paneel>

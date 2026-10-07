@@ -166,9 +166,7 @@ test('LFH-966 Benutzerverwaltung: eigenes Konto gesperrt, ein anderes ohne Rück
     .first();
   await expect(eigene.getByRole('button', { name: 'Deaktivieren' })).toBeDisabled();
   // Welcher der beiden Gründe gilt, hängt davon ab, ob der Lauf schon weitere Admins angelegt hat.
-  await expect(
-    eigene.getByText(/^Gesperrt: (eigenes Konto|letzter aktiver Admin)$/),
-  ).toBeVisible();
+  await expect(eigene.getByText(/^Gesperrt: (eigenes Konto|letzter aktiver Admin)$/)).toBeVisible();
 
   await suche.fill(anderes.benutzername);
   const zeile = page.locator('tr.ant-table-row').filter({ hasText: `@${anderes.benutzername}` });
