@@ -63,7 +63,9 @@ export function holeInsBild(container: HTMLElement, eintrag: HTMLElement): void 
  *   (`oben` gemessen, das Polster aus `--lfh-seiten-polsterung`);
  * · die Verwaltung ist mindestens so hoch, kurze Seiten scrollen also nicht;
  * · das Menü klebt oben, ist höchstens `rest` hoch und scrollt in sich, es trägt zur Seitenhöhe
- *   nie mehr bei als die Verwaltung selbst.
+ *   nie mehr bei als die Verwaltung selbst. Es klebt unter dem Kopf, nicht an der Fensterkante
+ *   (LFH-952, `frontend/AGENTS.md`, Rahmen); `rest` ist dort nie größer als der Platz darunter,
+ *   weil `oben` die Kopfhöhe schon enthält.
  */
 export function seitenleistenStil(oben: number): {
   verwaltung: CSSProperties;
@@ -72,7 +74,12 @@ export function seitenleistenStil(oben: number): {
   const rest = `calc(100dvh - ${Math.max(0, Math.round(oben))}px - var(--lfh-seiten-polsterung))`;
   return {
     verwaltung: { minHeight: rest },
-    menue: { position: 'sticky', top: 0, maxHeight: rest, overflowY: 'auto' },
+    menue: {
+      position: 'sticky',
+      top: 'var(--lfh-rahmen-oben, 0px)',
+      maxHeight: rest,
+      overflowY: 'auto',
+    },
   };
 }
 

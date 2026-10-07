@@ -109,6 +109,25 @@ describe('IconRail', () => {
     expect(fuss.querySelector('button')).toHaveAttribute('aria-label', 'Einstellungen');
   });
 
+  it('Kategorien und Fuß kleben als eine Spalte unter dem Rahmen (LFH-952)', () => {
+    renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Kategorien' });
+    // EINE klebende Spalte, nicht zwei klebende Teile: die überlappten bei geringer Höhe.
+    const spalte = nav.querySelector<HTMLElement>('[data-lfh="rail-spalte"]')!;
+    expect(spalte.style.position).toBe('sticky');
+    expect(spalte.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
+    expect(spalte.style.height).toBe('calc(100dvh - var(--lfh-rahmen-oben, 0px))');
+    expect(spalte.style.overflowY).toBe('auto');
+    const haupt = spalte.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
+    expect(haupt.style.position).toBe('');
+    expect(spalte.querySelector('[data-lfh="rail-fuss"]')).not.toBeNull();
+    // Fünf Kategorien in der Gruppe, „Einstellungen“ nicht: es steht im Fuß.
+    expect(haupt.querySelectorAll('button')).toHaveLength(5);
+    expect(haupt.querySelector('[aria-label="Einstellungen"]')).toBeNull();
+  });
+
   it('meldet Klick mit dem Kategorie-Key', async () => {
     const onKlick = vi.fn();
     renderMitProviders(
@@ -164,5 +183,70 @@ describe('IconRail · Dichte', () => {
     const stil = railZielStil(tokenFuer('handschuh'), { aktiv: false });
     expect(stil.minHeight).toBe(72);
     expect(stil.padding).toBe('7px 2px');
+  });
+});
+
+/**
+ * LFH-952 (D5): am Tablet quer ist das Modulmenü ohne Wahl zu. Der Griff „Menü“ im Fuß ist der
+ * sichtbare Weg zurück; der Selbstklick auf die offene Kategorie bleibt der zweite.
+ */
+describe('IconRail · Griff des Modulmenüs (LFH-952)', () => {
+  function rail(offen: boolean, onUmschalten = () => {}) {
+    return renderMitProviders(
+      <IconRail
+        kategorien={kategorien}
+        aktiveKategorie="erfassung"
+        onKategorieKlick={() => {}}
+        panel={{ offen, onUmschalten }}
+      />,
+    );
+  }
+
+  it('steht im Fuß über „Einstellungen“, mit sichtbarem Etikett „Menü“', () => {
+    rail(true);
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="rail-fuss"]')!;
+    const knoepfe = fuss.querySelectorAll('button');
+    expect(knoepfe).toHaveLength(2);
+    expect(knoepfe[0]).toHaveAccessibleName('Menü einklappen');
+    expect(knoepfe[0]).toHaveTextContent('Menü');
+    expect(knoepfe[1]).toHaveAttribute('aria-label', 'Einstellungen');
+  });
+
+  it('offen: aria-expanded true und aria-controls auf das Panel', () => {
+    rail(true);
+    const griff = screen.getByRole('button', { name: 'Menü einklappen' });
+    expect(griff).toHaveAttribute('aria-expanded', 'true');
+    expect(griff).toHaveAttribute('aria-controls', 'modul-panel');
+  });
+
+  it('zu: heißt „ausklappen“, aria-expanded false', () => {
+    rail(false);
+    const griff = screen.getByRole('button', { name: 'Menü ausklappen' });
+    expect(griff).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('meldet den Klick', async () => {
+    const onUmschalten = vi.fn();
+    rail(false, onUmschalten);
+    await userEvent.click(screen.getByRole('button', { name: 'Menü ausklappen' }));
+    expect(onUmschalten).toHaveBeenCalledTimes(1);
+  });
+
+  it('die offene Kategorie trägt aria-expanded, die anderen nicht', () => {
+    rail(false);
+    expect(screen.getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.getByRole('button', { name: 'Lage' })).not.toHaveAttribute('aria-expanded');
+  });
+
+  it('ohne `panel` (kein Panel neben der Rail) gibt es keinen Griff', () => {
+    renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie="erfassung" onKategorieKlick={() => {}} />,
+    );
+    expect(
+      screen.queryByRole('button', { name: /^Menü (ein|aus)klappen$/ }),
+    ).not.toBeInTheDocument();
   });
 });

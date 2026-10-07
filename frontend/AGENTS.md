@@ -51,6 +51,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`einsatz/IconRail.tsx`, Kurzetikett `kurz`, voller Name als `aria-label`, Einstellungen per
   `fuss: true`) · Modulpanel (`einsatz/ModulPanel.tsx`) · Sprungpalette
   (`command-palette/CommandPalette.tsx`). Maße im Entwurf.
+  - **Stehenbleiben, gestuft** (LFH-952, Spec `einsatztauglichkeit-layout`): ab `md` klebt der
+    Kopf (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter; unter
+    `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung (offline, Live `lost`).
+  - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
+    rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
+    nie gerechnet). Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
+    `components/rahmenOben.guard.test.ts`). Den Fokusabstand trägt `scroll-padding-block-start`
+    am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
+  - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
+    offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
   (`redirectZiel()`); Aufträge/Befehle unter Führung; **Meldebild** heißt sichtbar die
   Kräfteübersicht — **Schlüssel und Route bleiben `kraefteuebersicht`**.

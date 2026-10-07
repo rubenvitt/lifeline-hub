@@ -197,10 +197,16 @@ describe('AdminLayout — unter lg (Handschirm)', () => {
  * bei als die Verwaltung. Die Geometrie misst `e2e/verwaltungstabellen-schmal.spec.ts`.
  */
 describe('AdminLayout — klebende Seitenleiste', () => {
-  it('Stil: klebt oben, höchstens die Resthöhe, eigener Bildlauf; Verwaltung mindestens so hoch', () => {
+  it('Stil: klebt unter dem Kopf, höchstens die Resthöhe, eigener Bildlauf; Verwaltung mindestens so hoch', () => {
     const { verwaltung, menue } = seitenleistenStil(76);
     const rest = 'calc(100dvh - 76px - var(--lfh-seiten-polsterung))';
-    expect(menue).toEqual({ position: 'sticky', top: 0, maxHeight: rest, overflowY: 'auto' });
+    // Unter dem klebenden Kopf, nicht an der Fensterkante (LFH-952).
+    expect(menue).toEqual({
+      position: 'sticky',
+      top: 'var(--lfh-rahmen-oben, 0px)',
+      maxHeight: rest,
+      overflowY: 'auto',
+    });
     expect(verwaltung).toEqual({ minHeight: rest });
   });
 

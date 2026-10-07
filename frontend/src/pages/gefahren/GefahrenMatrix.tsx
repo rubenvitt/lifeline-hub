@@ -16,6 +16,7 @@ import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../the
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
+import { useRahmenOben } from '../../components/rahmenOben';
 import './gefahrenMatrix.css';
 
 /**
@@ -178,6 +179,7 @@ export default function GefahrenMatrix({
   // Freiraum unter der stehenden Kopfzeile beim Rückwärtstabben.
   const tabelleRef = useRef<TableRef>(null);
   useKopfFreiraum(tabelleRef);
+  const rahmenOben = useRahmenOben();
   // Freiraum neben der fixierten Spalte beim Tabben nach links.
   useSpaltenFreiraum(tabelleRef);
   /**
@@ -347,8 +349,9 @@ export default function GefahrenMatrix({
         columns={spalten}
         dataSource={zeilen}
         pagination={false}
-        // Stehende Kopfzeile — Restposten der Ausnahme in `katalogTabelle.guard.test.ts`.
-        sticky
+        // Stehende Kopfzeile — Restposten der Ausnahme in `katalogTabelle.guard.test.ts`; sie steht
+        // unter dem klebenden Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen).
+        sticky={{ offsetHeader: rahmenOben }}
         scroll={{ x: 'max-content' }}
         ref={tabelleRef}
         className="gefahren-matrix"

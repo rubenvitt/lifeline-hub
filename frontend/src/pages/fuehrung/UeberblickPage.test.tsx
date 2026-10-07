@@ -944,6 +944,29 @@ describe('UeberblickPage', () => {
   });
 
   /**
+   * LFH-952 (D6): die Abschnittszeile ist ein Raster mit Containerabfrage am Paneel
+   * (`ueberblick.css`). jsdom rechnet weder Raster noch Abfrage; hier stehen die Klassen und die
+   * DOM-Reihenfolge (der Linkname hängt an ihr), die Lage misst `e2e/rahmen-stehen-bleiben.spec.ts`.
+   */
+  it('die Abschnittszeile trägt die Rasterbereiche in fester Reihenfolge (LFH-952)', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const name = await screen.findByText('Abschnitt Nord', {
+      selector: '[data-lfh="ueberblick-abschnitt"] *',
+    });
+    const zeile = name.closest<HTMLElement>('[data-lfh="ueberblick-abschnitt"]')!;
+    expect(zeile).toHaveClass('ueberblick-abschnitt');
+    expect(zeile.style.display).toBe('grid');
+    expect(zeile.closest('ul')).toHaveClass('ueberblick-abschnitte');
+    expect(Array.from(zeile.children).map((k) => k.className)).toEqual([
+      'ueberblick-abschnitt__kante',
+      'ueberblick-abschnitt__name',
+      'ueberblick-abschnitt__auftrag',
+      'ueberblick-abschnitt__staerke',
+    ]);
+  });
+
+  /**
    * Der Überblick ist die Startseite, und jedes Ziel darauf ist eine bewusste Modulwahl: sie füllt
    * die Palettengruppe „Zuletzt besucht" (LFH-436). Jeder Test prüft zuerst, dass das Laden allein
    * nichts gemerkt hat — sonst bliebe er auch mit einem Routen-Effekt grün.

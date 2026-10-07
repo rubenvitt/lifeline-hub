@@ -8,13 +8,26 @@ import {
 } from '../pwa/appAktualisierung';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
+import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
+import { useViewport } from '../components/useViewport';
 
 /**
  * Eine globale Betriebszeile für Leitung, Einsatz-Live-Feed und App-Version.
  * Zeigt bei unterbrochener Leitung (`liveStatusStore`) und bei `navigator.onLine === false`
  * einen Hinweis, damit weder ein toter Feed noch ein lokaler Netzausfall unsichtbar bleibt.
+ *
+ * `klebend` (LFH-952, `frontend/AGENTS.md`, Rahmen): unter `md` rollt der Kopf mit, dann bleibt
+ * die Zeile am oberen Rand stehen, solange sie eine Verbindungsstörung meldet (offline oder
+ * Live-Verbindung `lost`). Ab `md` trägt die SYNC-Zelle im klebenden Kopf die Störung. Nur der
+ * Rahmen, der im Dokument rollt, setzt es; die Gerätehülle rollt in einem eigenen Bereich.
  */
-export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }) {
+export default function LiveStatusBanner({
+  benutzerId,
+  klebend = false,
+}: {
+  benutzerId?: number;
+  klebend?: boolean;
+}) {
   // Offline-Aktionen bleiben einsatzübergreifend sichtbar: gefiltert auf den Route-Einsatz
   // verschwände eine abgelehnte Aktion aus Einsatz A beim Wechsel nach B aus dem Blick.
   const queue = useOfflineQueueZaehler(benutzerId);
@@ -25,6 +38,8 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
   const [aktualisierungLaeuft, setAktualisierungLaeuft] = useState(false);
   const [aktualisierungFehlgeschlagen, setAktualisierungFehlgeschlagen] = useState(false);
   const [recoveryOffen, setRecoveryOffen] = useState(false);
+  const { abBreite } = useViewport();
+  const mittel = abBreite('md');
   const aktualisierungVerfuegbar = useSyncExternalStore(
     abonniereAppAktualisierung,
     istAppAktualisierungVerfuegbar,
@@ -66,6 +81,10 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
     hinweise.push('Aktualisierung fehlgeschlagen — bitte erneut versuchen.');
   }
 
+  const stoerung = !istOnline || status === 'lost';
+  const klebt = klebend && !mittel && stoerung;
+  const zeileRef = useRahmenObenQuelle<HTMLDivElement>(klebt);
+
   const bannerSichtbar =
     hinweise.length > 0 ||
     queue.ausstehend > 0 ||
@@ -74,7 +93,7 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
   if (!bannerSichtbar && !recoveryOffen) return null;
 
   const typ =
-    !istOnline || status === 'lost' || queue.abgelehnt > 0
+    stoerung || queue.abgelehnt > 0
       ? 'error'
       : status === 'connecting' || queue.ausstehend > 0 || queue.nicht_zugeordnet > 0
         ? 'warning'
@@ -119,24 +138,26 @@ export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }
   return (
     <>
       {bannerSichtbar && (
-        <Alert
-          type={typ}
-          showIcon
-          banner
-          title={
-            <Space size={12} wrap>
-              {hinweise.length > 0 && <span>{hinweise.join(' · ')}</span>}
-              {queueBadges}
-            </Space>
-          }
-          action={
-            aktualisierungVerfuegbar ? (
-              <Button type="link" loading={aktualisierungLaeuft} onClick={() => void neuLaden()}>
-                Jetzt neu laden
-              </Button>
-            ) : undefined
-          }
-        />
+        <div ref={zeileRef} data-lfh="betriebszeile" style={klebt ? RAHMEN_KLEBT : undefined}>
+          <Alert
+            type={typ}
+            showIcon
+            banner
+            title={
+              <Space size={12} wrap>
+                {hinweise.length > 0 && <span>{hinweise.join(' · ')}</span>}
+                {queueBadges}
+              </Space>
+            }
+            action={
+              aktualisierungVerfuegbar ? (
+                <Button type="link" loading={aktualisierungLaeuft} onClick={() => void neuLaden()}>
+                  Jetzt neu laden
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
       )}
       <OfflineRecoveryDrawer
         open={recoveryOffen}

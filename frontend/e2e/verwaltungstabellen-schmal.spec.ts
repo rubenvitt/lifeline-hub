@@ -447,7 +447,15 @@ test.describe('Seitenleiste der Verwaltung', () => {
     await page.evaluate((z) => window.scrollTo(0, z), reserve);
     const menue = page.locator('[data-lfh="verwaltung-menue"]');
     const box = (await menue.boundingBox())!;
-    expect(Math.abs(box.y), `das Menü klebt oben (y ${box.y})`).toBeLessThanOrEqual(1);
+    // Ab `md` klebt der Kopf (LFH-952); das Menü hängt sich unter ihn (`frontend/AGENTS.md`, Rahmen).
+    const rahmenOben = await page.evaluate(() =>
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben')),
+    );
+    expect(rahmenOben, 'Vorbedingung: der Kopf klebt').toBeGreaterThan(0);
+    expect(
+      Math.abs(box.y - rahmenOben),
+      `das Menü klebt unter dem Kopf (y ${box.y}, Kopf ${rahmenOben})`,
+    ).toBeLessThanOrEqual(1);
     await vollImBild(menue.getByRole('menuitem', { name: 'Fahrzeuge' }), 1440, 'Eintrag Fahrzeuge');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
+import { leseNavWahl, panelZu, schreibeNavWahl } from './navPersistenz';
 
 /**
  * Der Schlüssel wird gegen ein HANDGESCHRIEBENES Literal geprüft, sonst prüfte der Test die
@@ -40,34 +40,47 @@ function mitWerfendemSpeicher(fn: () => void): void {
 }
 
 describe('navPersistenz', () => {
-  it('liefert ohne gemerkten Zustand „nicht eingeklappt"', () => {
-    expect(leseNavEingeklappt()).toBe(false);
+  it('liefert ohne Eintrag „keine Wahl“ (die Vorgabe der Breite gilt, LFH-952)', () => {
+    expect(leseNavWahl()).toBeNull();
   });
 
-  it('merkt den eingeklappten Zustand unter dem festgelegten Schlüssel', () => {
-    schreibeNavEingeklappt(true);
+  it('merkt „zu“ und „offen“ als zwei Werte unter dem festgelegten Schlüssel', () => {
+    schreibeNavWahl('zu');
     expect(localStorage.getItem(SCHLUESSEL)).toBe('1');
-    expect(leseNavEingeklappt()).toBe(true);
+    expect(leseNavWahl()).toBe('zu');
+    schreibeNavWahl('offen');
+    expect(localStorage.getItem(SCHLUESSEL)).toBe('0');
+    expect(leseNavWahl()).toBe('offen');
   });
 
-  it('räumt den Schlüssel wieder ab, statt eine zweite Wahrheit zu hinterlassen', () => {
-    schreibeNavEingeklappt(true);
-    schreibeNavEingeklappt(false);
-    expect(localStorage.getItem(SCHLUESSEL)).toBeNull();
-    expect(leseNavEingeklappt()).toBe(false);
+  it('liest einen unbekannten Wert als „keine Wahl“', () => {
+    localStorage.setItem(SCHLUESSEL, 'ja');
+    expect(leseNavWahl()).toBeNull();
   });
 
   it('ist global, nicht je Einsatz — der Rahmen ist einsatzunabhängig', () => {
     // Kein Einsatz-Argument in der Signatur: ein je Einsatz gemerkter Rahmen
     // wäre für den Benutzer Zufall (mal auf, mal zu, je nach Einsatz).
-    expect(schreibeNavEingeklappt).toHaveLength(1);
-    expect(leseNavEingeklappt).toHaveLength(0);
+    expect(schreibeNavWahl).toHaveLength(1);
+    expect(leseNavWahl).toHaveLength(0);
   });
 
   it('wirft nicht, wenn der Speicher gesperrt ist (Privatmodus)', () => {
     mitWerfendemSpeicher(() => {
-      expect(() => schreibeNavEingeklappt(true)).not.toThrow();
-      expect(leseNavEingeklappt()).toBe(false);
+      expect(() => schreibeNavWahl('zu')).not.toThrow();
+      expect(leseNavWahl()).toBeNull();
     });
+  });
+});
+
+describe('panelZu — Vorgabe je Breite (LFH-952, D5)', () => {
+  it('ohne Wahl: zwischen lg und xl zu, ab xl offen', () => {
+    expect(panelZu(null, false)).toBe(true);
+    expect(panelZu(null, true)).toBe(false);
+  });
+
+  it('eine Wahl gilt auf jeder Breite', () => {
+    expect(panelZu('zu', true)).toBe(true);
+    expect(panelZu('offen', false)).toBe(false);
   });
 });
