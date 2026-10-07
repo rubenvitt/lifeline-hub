@@ -1,3 +1,43 @@
+## [1.0.0-alpha.91](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.90...v1.0.0-alpha.91) (2026-10-07)
+
+### Wichtige Änderungen
+
+**Verschlüsselung von Sicherungen:** Sicherungen können jetzt mit age verschlüsselt werden. Die neue Startoption `--backup-empfaenger` (oder Umgebungsvariable `LIFELINE_BACKUP_EMPFAENGER`) nimmt öffentliche X25519-Schlüssel entgegen. Automatische Sicherungen, manuelle Backups über `lifeline-hub backup` und der Download über die API liefern dann `.sqlite.age`-Dateien aus. Die Wiederherstellung entschlüsselt mit `--identitaet` (Datei oder stdin). Ohne Empfänger bleibt alles beim bisherigen Klartext; der Start warnt einmal. Die CLI bietet `--unverschluesselt` für Klartext-Backups trotz konfigurierter Verschlüsselung.
+
+**HEIC-Decoder austauschbar:** Der HEIC-Decoder (libheif, LGPL 3.0) lässt sich jetzt ohne Neubau ersetzen. Mit `--heic-decoder-verzeichnis` (oder `LIFELINE_HEIC_DECODER_VERZEICHNIS`) können Sie angepasste Versionen von Glue-Code und WASM bereitstellen. Jedes Release enthält ein Paket mit den Quellen der verwendeten Bibliotheksversionen. Der Lizenzhinweis ist über das Benutzermenü verlinkt.
+
+**Dokumentation Verschlüsselung:** Die Betriebsdokumentation weist jetzt explizit darauf hin, dass Datenträgerverschlüsselung für Mini-PC/ELW und Geräte mit Desktop-App oder Browser erforderlich ist. Die App verschlüsselt die Datenbank nicht selbst; Sicherungen auf USB-Medien gehören auf verschlüsselte Datenträger.
+
+### Druck
+
+**Einsatztagebuch:** Überlange Einträge (z. B. freigegebene Lageberichte mit vollem Text) beginnen jetzt auf der ersten Seite, statt diese leer zu lassen und auf Seite 2 zu rutschen. Kurze Einträge bleiben wie bisher ungebrochen.
+
+**Abschnittstitel:** In Firefox bleiben Abschnittstitel jetzt bei ihrem Text und stehen nicht mehr allein am Seitenende. Die Darstellung in Chromium bleibt unverändert.
+
+**Meldebild:** Das Meldebild ist im Druck auf A4 jetzt lesbar. Die Spaltenbreiten werden sinnvoll verteilt, Namen umbrechen höchstens auf zwei Zeilen, Spaltenköpfe brechen nur zwischen Wörtern. Das Ergebnis passt auf wenige Seiten statt auf über 40.
+
+### Lagekarte
+
+**Einsatzort verorten:** Das Verorten des Einsatzorts auf der Lagekarte sendet jetzt nur noch die Koordinaten und überschreibt nicht mehr versehentlich zwischenzeitlich geänderte Kopfdaten (Leitstellennummer, Stichwort, Sachverhalt).
+
+### Verwaltung
+
+**Protokollierung:** Zugangsänderungen durch Administratoren werden jetzt protokolliert: Benutzer anlegen, deaktivieren, reaktivieren, Rolle ändern, Zweitfaktor zurücksetzen, Anmeldeweg schalten. Das Protokoll hält fest: handelnde Person, Ziel, Detail, Quell-IP, Zeitpunkt. Aufbewahrung 365 Tage.
+
+### Bedienung
+
+**Modulnamen:** Alle Module tragen jetzt einen einheitlichen Namen in Überschrift, Menü, Ortspfad und Tab. Die Kurzbeschreibung steht als zweite Zeile im Modulmenü und in der Sprungpalette. Leere Lagemeldungen bieten einen Link „Zu den Meldungen".
+
+**Einsatzabschluss:** „Einsatz abschließen" steht jetzt am Ende der Einsatzdaten (statt im Einsatztagebuch), nur für die Einsatzleitung sichtbar. Die Rückfrage sagt deutlich „Einsatz endgültig abschließen".
+
+**Rückfragen:** Rote Rückfragen (löschen, stornieren, auflösen) nennen jetzt die Handlung im Text und beschreiben die Folge klar.
+
+**Erklärtexte reduziert:** Zweck-Absätze unter Titeln, Feld-Tooltips mit „Leer = …", lange Rechte-Erklärungen und ausführliche Rückfragen sind in den Einstellungen, Stammdaten, Verwaltung und Kartenquellen entfernt. Platzhalter zeigen den wirksamen Wert, Rechtegründe stehen kompakt als „Nur Ansicht · Grund", Rückfragen haben einen Satz zur Folge. Die Einsatznummer zeigt eine Vorschau ihrer Form.
+
+### Benutzermenü
+
+**Lizenzen:** Das Benutzermenü enthält jetzt einen Eintrag „Lizenzen", der den Lizenzhinweis zu Drittanbieter-Bibliotheken öffnet.
+
 ## [1.0.0-alpha.90](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.89...v1.0.0-alpha.90) (2026-10-07)
 
 ### Navigation und Orientierung
