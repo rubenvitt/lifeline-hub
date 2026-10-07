@@ -22,6 +22,13 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `window.print()` direkt**, nie aus dem Passiv-Effekt. `components/druck/useDruckModus.ts`
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
 - Ein Editor druckt nie seine `<textarea>` (`MarkdownEditor` `druckfassung`).
+- **Abschnittstitel stehen im Titelblock** (LFH-1008): Firefox setzt `break-after: avoid` nicht
+  um, ein Titel bliebe allein am Seitenende. Titel und erster Block teilen sich eine Hülle
+  `data-lfh="titelblock"`, die `druck.css` nicht brechen lässt. Überschriften im Markdown fasst
+  `components/markdownTitelbloecke.ts` zusammen; einen Abschnittstitel außerhalb des Textes gibt
+  man `Markdown` als `titel` (Lesefassung) bzw. dem Editor als `druckTitel` (Entwurf: Akkordeonkopf
+  und Feldetikett weichen auf Papier). Wirkung nur im echten Firefox-Druck sichtbar
+  (Minimalprobe `docs/superpowers/specs/2026-09-25-lfh-22-belege/lfh-813/werkzeug/`).
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
   brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur

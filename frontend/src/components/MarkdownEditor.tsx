@@ -1,7 +1,14 @@
 import { IconAuge } from '../icons';
 import { Button, Input, Tabs, Typography } from 'antd';
 import type { GetRef } from 'antd';
-import { forwardRef, useState, type KeyboardEvent, type TextareaHTMLAttributes } from 'react';
+import {
+  forwardRef,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+} from 'react';
 import Markdown, { type UnterEbene } from './Markdown';
 import { zeichenGrenze } from './zeichenGrenze';
 import './MarkdownEditor.css';
@@ -50,6 +57,13 @@ interface Props {
    */
   druckfassung?: boolean;
   /**
+   * Abschnittstitel auf Papier (LFH-1008). Steht im selben Titelblock wie der erste Block der
+   * gerenderten Fassung, damit er im Druck nicht allein am Seitenende bleibt; der Kopf des
+   * Einbauorts (Akkordeonkopf, Feldetikett) liegt außerhalb und weicht im Druck dafür
+   * (`lageberichtPrint.css`, `befehlPrint.css`). Am Bildschirm unsichtbar.
+   */
+  druckTitel?: string;
+  /**
    * Nur `toggle`: der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373); der eigene Knopf
    * unter dem Feld entfällt, die Vorschau folgt {@link vorschauOffen}. Für die ETB-Erfassung, wo
    * eine eigene Knopfzeile im Handschuh-Betrieb eine volle Steuerhöhe der angepinnten Leiste
@@ -93,6 +107,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     enterKeyHint,
     readOnly,
     druckfassung = false,
+    druckTitel,
     umschalterAussen = false,
     vorschauOffen: vorschauOffenAussen = false,
     maxLength,
@@ -119,12 +134,35 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     />
   );
 
-  const vorschau = value.trim() ? (
-    <Markdown variante={variante} unterEbene={unterEbene}>
-      {value}
-    </Markdown>
-  ) : (
-    <Typography.Text type="secondary">Noch nichts zu zeigen.</Typography.Text>
+  // Nur Papier, `aria-hidden` wie die Druckfassung: am Bildschirm nennt der Kopf des Einbauorts
+  // den Abschnitt. Gemerkt, sonst parste `Markdown` (`memo`) bei jedem Render neu.
+  const titel = useMemo(
+    () =>
+      druckTitel ? (
+        <div className="markdown-editor__titel" aria-hidden>
+          {druckTitel}
+        </div>
+      ) : undefined,
+    [druckTitel],
+  );
+
+  /** Gerenderte Fassung; ohne Text der Ersatz, mit dem Titel in einem Titelblock. */
+  const gerendert = (ersatz: ReactNode) =>
+    value.trim() ? (
+      <Markdown variante={variante} unterEbene={unterEbene} titel={titel}>
+        {value}
+      </Markdown>
+    ) : titel ? (
+      <div data-lfh="titelblock">
+        {titel}
+        {ersatz}
+      </div>
+    ) : (
+      ersatz
+    );
+
+  const vorschau = gerendert(
+    <Typography.Text type="secondary">Noch nichts zu zeigen.</Typography.Text>,
   );
 
   if (layout === 'toggle') {
@@ -146,13 +184,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
           // Nur Papier: `aria-hidden` sagt dem Zugänglichkeitsbaum dasselbe wie das
           // `display: none` am Bildschirm, auch ohne geladenes CSS (Muster Druckkopf).
           <div className="markdown-editor__druck" aria-hidden>
-            {value.trim() ? (
-              <Markdown variante={variante} unterEbene={unterEbene}>
-                {value}
-              </Markdown>
-            ) : (
-              <Typography.Paragraph>—</Typography.Paragraph>
-            )}
+            {gerendert(<Typography.Paragraph>—</Typography.Paragraph>)}
           </div>
         )}
       </div>

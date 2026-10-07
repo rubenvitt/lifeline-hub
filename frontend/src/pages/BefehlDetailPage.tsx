@@ -454,6 +454,7 @@ function BefehlDetail() {
                   {/* Unter dem Paneel „Entwurf" (h2); das Feldetikett ist keine Überschrift. */}
                   <MarkdownEditor
                     layout="split"
+                    druckTitel={a.label}
                     unterEbene={2}
                     variante="dokument"
                     autoSize={{ minRows: 8 }}
@@ -475,18 +476,24 @@ function BefehlDetail() {
               {v?.abschnitte.map((a) => {
                 const text =
                   befehl.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
+                // h3 unter dem Paneel (h2); Satz bleibt der von h5. Im Titelblock mit dem ersten
+                // Absatz, damit er im Druck nicht allein am Seitenende steht (LFH-1008).
+                const titel = (
+                  <Typography.Title level={3} style={{ fontSize: token.fontSizeHeading5 }}>
+                    {a.label}
+                  </Typography.Title>
+                );
                 return (
                   <section key={a.schluessel} style={{ marginBottom: 16 }}>
-                    {/* h3 unter dem Paneel (h2); Satz bleibt der von h5. */}
-                    <Typography.Title level={3} style={{ fontSize: token.fontSizeHeading5 }}>
-                      {a.label}
-                    </Typography.Title>
                     {text.trim() ? (
-                      <Markdown variante="dokument" unterEbene={3}>
+                      <Markdown variante="dokument" unterEbene={3} titel={titel}>
                         {text}
                       </Markdown>
                     ) : (
-                      <Typography.Paragraph>—</Typography.Paragraph>
+                      <div data-lfh="titelblock">
+                        {titel}
+                        <Typography.Paragraph>—</Typography.Paragraph>
+                      </div>
                     )}
                   </section>
                 );

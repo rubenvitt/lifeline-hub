@@ -229,6 +229,16 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     expect(sel).toContain('.ant-form-item-label');
   });
 
+  /**
+   * LFH-1008: Firefox hält `break-after: avoid` nicht ein. Der Titelblock (Titel und erster
+   * Block, `components/markdownTitelbloecke.ts`) bricht nicht — das trägt in allen Engines.
+   */
+  it('lässt den Titelblock nicht brechen', () => {
+    const r = regelFuer(`${WURZEL} [data-lfh='titelblock']`);
+    expect(r, 'keine Titelblock-Regel').toBeDefined();
+    expect(r!.koerper).toMatch(/break-inside:\s*avoid/);
+  });
+
   /** Auf Papier gibt es keinen Bildlauf: eine lange Codezeile wäre rechts abgeschnitten. */
   it('bricht Codeblöcke im Druck um, statt sie abzuschneiden', () => {
     const r = regelFuer(`${WURZEL} .markdown pre`);

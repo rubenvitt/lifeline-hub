@@ -87,12 +87,23 @@
   /* ---- Umbruchregeln ----
      An der Wurzel, damit sie im Lese- UND im Entwurfszweig gelten. Im Entwurf ist der
      Abschnittstitel keine Überschrift, sondern Akkordeonkopf (Lagebericht) bzw. Feldetikett
-     (Befehl) — beide stehen deshalb mit in der Liste. */
+     (Befehl) — beide stehen deshalb mit in der Liste. Auf Papier vertritt sie dort seit
+     LFH-1008 der Titel der Druckfassung (`MarkdownEditor druckTitel`). */
   [data-lfh='druckwurzel'] :is(h1, h2, h3, h4, h5, h6, .ant-collapse-header, .ant-form-item-label) {
     break-after: avoid;
   }
 
   [data-lfh='druckwurzel'] :is(p, ul, ol, blockquote, pre, tr, img, figure) {
+    break-inside: avoid;
+  }
+
+  /* Firefox setzt `break-after: avoid` nicht um (LFH-1008, Minimalprobe in
+     `docs/superpowers/specs/2026-09-25-lfh-22-belege/lfh-813/`): dort bliebe ein Titel allein am
+     Seitenende. Der Titelblock fasst Titel und ersten Block zu einer Box, die nicht bricht —
+     das halten alle Engines ein. Gebaut von `components/markdownTitelbloecke.ts` (Überschriften
+     im Text und der Abschnittstitel über `Markdown titel`); die Regel darüber bleibt für
+     Titel ohne Block. */
+  [data-lfh='druckwurzel'] [data-lfh='titelblock'] {
     break-inside: avoid;
   }
 
@@ -111,7 +122,9 @@
   }
 
   /* Markdown im Druck: Satz der Überschriften und Listen, Links ohne grelle Farbe. */
-  [data-lfh='druckwurzel'] .markdown :is(h1, h2, h3, h4, h5, h6) {
+  /* An den Klassen der Markdown-Überschriften: der Abschnittstitel im Titelblock behält
+     seinen eigenen Satz. */
+  [data-lfh='druckwurzel'] .markdown :is(.md-h1, .md-h2, .md-h3, .md-h4, .md-h5, .md-h6) {
     font-weight: 600;
     margin: 0.75em 0 0.3em;
     line-height: 1.3;

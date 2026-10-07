@@ -103,6 +103,41 @@ describe('Markdown', () => {
     expect(container.querySelector('.markdown--dokument')).not.toBeNull();
   });
 
+  /*
+   * LFH-1008: Firefox setzt `break-after: avoid` nicht um; Titel und erster Block teilen sich
+   * deshalb eine Hülle, die `druck/druck.css` nicht brechen lässt.
+   */
+  it('fasst eine Überschrift im Text mit dem ersten Absatz in einen Titelblock', () => {
+    const { container } = render(
+      <Markdown unterEbene={3}>{'## Eigene Lage\n\nErster Absatz\n\nZweiter Absatz'}</Markdown>,
+    );
+    const block = container.querySelector('[data-lfh="titelblock"]');
+    expect(block, 'kein Titelblock').not.toBeNull();
+    expect(block!.querySelector('h5')).toHaveTextContent('Eigene Lage');
+    expect(block!.querySelector('p')).toHaveTextContent('Erster Absatz');
+    expect(block).not.toHaveTextContent('Zweiter Absatz');
+  });
+
+  it('setzt den Abschnittstitel des Einbauorts in den ersten Titelblock', () => {
+    const { container } = render(
+      <Markdown unterEbene={3} titel={<h3>Durchführung</h3>}>
+        {'Erster Absatz\n\nZweiter Absatz'}
+      </Markdown>,
+    );
+    const block = container.querySelector('.markdown > [data-lfh="titelblock"]');
+    expect(block, 'kein Titelblock').not.toBeNull();
+    expect(block!.firstElementChild).toHaveAttribute('data-lfh', 'titelplatz');
+    expect(block!.querySelector('h3')).toHaveTextContent('Durchführung');
+    expect(block!.querySelector('p')).toHaveTextContent('Erster Absatz');
+    expect(screen.getAllByRole('heading', { name: 'Durchführung' })).toHaveLength(1);
+  });
+
+  it('rendert ohne Titel keinen Titelplatz', () => {
+    const { container } = render(<Markdown unterEbene={3}>{'Absatz'}</Markdown>);
+    expect(container.querySelector('[data-lfh="titelplatz"]')).toBeNull();
+    expect(container.querySelector('[data-lfh="titelblock"]')).toBeNull();
+  });
+
   it('rendert leeren Inhalt ohne Absturz', () => {
     const { container } = render(<Markdown unterEbene={3}>{''}</Markdown>);
     expect(container.querySelector('.markdown')).not.toBeNull();

@@ -135,7 +135,10 @@ describe('BefehlDetailPage', () => {
   it('zeigt im Entwurf editierbare Felder mit Hilfetext', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
     renderAt(7);
-    expect(await screen.findByText('Einsatzunterstützung')).toBeInTheDocument();
+    // Als Feldetikett; der Papiertitel der Vorschau (LFH-1008) trägt denselben Namen.
+    expect(
+      await screen.findByText('Einsatzunterstützung', { selector: 'label' }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/a\. Allgemeine Lage/)).toBeInTheDocument();
   });
 
