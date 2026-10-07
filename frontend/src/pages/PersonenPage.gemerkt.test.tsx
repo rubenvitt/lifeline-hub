@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
@@ -99,6 +99,11 @@ describe('PersonenPage rendert gemerkt (LFH-949)', () => {
       { route: '/einsaetze/1/personen' },
     );
     await screen.findByText(/Name10/);
+    // Erst messen, wenn die Seite steht. Kommt eine Antwort (Rechte, UHS) kurz vor der Messung,
+    // hat React den Render dafür vielleicht schon begonnen, aber noch nicht beendet: Unter Last
+    // zeichnete der Rest dieses Renders nach `mockClear` alle Zeilen, und der Test wackelte.
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    await act(async () => {});
     gezeichnet.mockClear();
     act(() => {
       client.setQueryData(
