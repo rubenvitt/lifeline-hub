@@ -1,4 +1,5 @@
 pub mod ablauf_speicher;
+pub mod admin_audit;
 pub mod audit;
 pub mod benutzername;
 pub mod bootstrap;

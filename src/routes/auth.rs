@@ -607,13 +607,33 @@ pub struct ProviderSchaltenRequest {
 }
 
 /// PUT /api/auth/providers/{id} — Provider an/aus. Admin-only. Guard gegen Aussperren.
+///
+/// Jeder erfolgreiche Aufruf steht in der Admin-Spur (LFH-1005), auch wenn der Zustand schon
+/// stimmte: protokolliert wird die Handlung des Admins.
 pub async fn provider_schalten(
     State(state): State<AppState>,
-    _admin: crate::auth::session::AdminUser,
+    crate::auth::session::AdminUser(admin): crate::auth::session::AdminUser,
+    PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<String>,
     JsonBody(req): JsonBody<ProviderSchaltenRequest>,
 ) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    use crate::auth::admin_audit::{schreibe, AdminAktion, AdminEintrag, Ziel};
     crate::auth::provider::registry::schalten(&state.pool, &id, req.aktiviert).await?;
+    schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: if req.aktiviert {
+                AdminAktion::AnmeldewegAktiviert
+            } else {
+                AdminAktion::AnmeldewegDeaktiviert
+            },
+            akteur: &admin,
+            ziel: Ziel::Anmeldeweg(&id),
+            detail: None,
+            peer_ip,
+        },
+    )
+    .await;
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     Ok(Json(liste))
 }

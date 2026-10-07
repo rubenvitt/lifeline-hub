@@ -216,6 +216,16 @@ Spec `passwort-anmeldung`, Herleitung
   Neue Passwörter höchstens 128 Zeichen (`pruefe_passwort_laenge`), sonst passen sie nicht in die
   4-KiB-Grenze des Logins.
 
+## Backend — Admin-Spur (LFH-1005)
+
+- **Eine Admin-Aktion, die den Zugang ändert, schreibt nach ihrem Commit genau einen Eintrag über
+  `auth::admin_audit::schreibe`** (Tabelle `admin_audit`, nicht `auth_audit`): Konto anlegen,
+  deaktivieren, reaktivieren, Rolle ändern, Zweitfaktor zurücksetzen, Anmeldeweg schalten. Auch
+  ein zweiter Weg zur selben Wirkung (PATCH `bearbeiten`) schreibt; eine abgewiesene Aktion nicht.
+- Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Eine neue Aktion braucht eine
+  Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
+- Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und
