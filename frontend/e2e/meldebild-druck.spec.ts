@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { SUBPIXEL, anmelden, einsatzAnlegen, seedeKraefte } from './meldebild-kern';
+import { pdfAuszug } from './pdf-kern';
 
 /**
  * Druck des Meldebilds: die Nachweise, die NUR im Browser gehen (jsdom rechnet kein Layout und
@@ -235,4 +236,183 @@ test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf �
   const danach = await kopfLage(page);
   expect(danach.halter, 'nach afterprint steht die Kopfzeile wieder (LFH-330)').toBe(true);
   expect(danach.koerperHatKopf).toBe(false);
+});
+
+/**
+ * NACHWEIS 3 — Lesbarkeit auf A4 (LFH-1007). Die Mechanik oben war grün, während die erste
+ * Spalte auf dem Blatt nur wenige Zeichen breit war: Namen brachen silbenweise, „Ohne Einheit“
+ * und Spaltenköpfe standen buchstabenweise senkrecht, 40 Kräfte füllten 21 Seiten (auf dem Stand
+ * vor dem Fix 41). Gemessen wird deshalb am Text, nicht an der Mechanik:
+ *   (a) die erste Spalte hält eine Mindestbreite,
+ *   (b) kein Kraftname läuft über mehr als zwei Zeilen, kein Einzelwort (Kürzel „Pers.“) bricht,
+ *       keine Zeile ist höher als {@link MAX_ZEILEN_JE_REIHE} Textzeilen,
+ *   (c) kein Wort eines Spaltenkopfs bricht (ein Kopf hat höchstens so viele Zeilen wie Wörter),
+ *   (d) nur Chromium: das PDF hat höchstens {@link MAX_SEITEN} Seiten, jede mit Tabellenkopf, und
+ *       keine Kraft fehlt.
+ *
+ * Gedruckt wird über den Knopf (Stub für `window.print`, wie NACHWEIS 2b): `vorbereiten` klappt
+ * alle Mittel auf, `beforeprint` nimmt die stehende Kopfzeile weg — derselbe Stand wie beim
+ * echten Druck.
+ *
+ * Eine Einheit mit langem Auftrag wirbt um Breite; ohne sie verteilte die Tabelle die Breite schon
+ * nach Inhalt passabel, und der Anteil der ersten Spalte bliebe unbelegt.
+ *
+ * Mutationsproben in `pages/kraefteuebersichtPrint.css`, Abschnitt „Spaltenbreiten auf A4“, je in
+ * Chromium, Firefox und WebKit rot: den ganzen Abschnitt streichen (erste Spalte 85 px, im PDF
+ * 41 Seiten); nur `overflow-wrap: normal` am Kopf streichen ((c): sechs Köpfe brechen im Wort);
+ * den Anteil der ersten Spalte auf `auto` (208 bzw. in WebKit 227 px). In
+ * `pages/KraefteuebersichtPage.tsx` `flexShrink: 0` am Mittelkürzel streichen → (b) rot in Chromium
+ * und Firefox („Pers“ über „.“).
+ */
+const KRAEFTE_LESBAR = 40;
+/** Mindestbreite der ersten Spalte auf A4 hoch, in CSS-Pixeln (gut ein Drittel der Nutzbreite). */
+const MIN_ERSTE_SPALTE = 260;
+/** Name (≤ 2) und Zusatz (Funktion, kleine Schrift) einer Kraft, mit Luft. */
+const MAX_ZEILEN_JE_REIHE = 5;
+/** Richtwert aus LFH-1007 für 40 Kräfte. */
+const MAX_SEITEN = 4;
+const EINHEIT_LESBAR = 'Einsatzeinheit Musterstadt-Nordwest 2';
+
+async function lesbarkeit(page: Page) {
+  return page.evaluate(() => {
+    const wurzel = document.querySelector('.kraefte-print-root')!;
+    /** Anzahl verschiedener Zeilenoberkanten eines Textknotens. */
+    const zeilenVon = (knoten: Node) => {
+      const r = document.createRange();
+      r.selectNodeContents(knoten);
+      return new Set(
+        Array.from(r.getClientRects())
+          .filter((k) => k.width > 0)
+          .map((k) => Math.round(k.top)),
+      ).size;
+    };
+    const textKnoten = (el: Element) => {
+      const gang = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const liste: Node[] = [];
+      for (let k = gang.nextNode(); k; k = gang.nextNode())
+        if (k.textContent?.trim()) liste.push(k);
+      return liste;
+    };
+    const ersteKopfzelle = wurzel.querySelector('thead th')!;
+    const zeilenhoehe = parseFloat(getComputedStyle(wurzel.querySelector('tbody td')!).lineHeight);
+    const reihen = Array.from(wurzel.querySelectorAll('tr.ant-table-row')).map((tr) => {
+      const erste = tr.querySelector('td')!;
+      const namensKnoten = textKnoten(erste).find((k) =>
+        /Kirchgassner-Wohlfahrt|Ohne Einheit|Einsatzeinheit/.test(k.textContent ?? ''),
+      );
+      return {
+        text: (namensKnoten?.textContent ?? erste.textContent ?? '').trim(),
+        nameZeilen: namensKnoten ? zeilenVon(namensKnoten) : 0,
+        // Ein Einzelwort (Kürzel „Pers.“) steht auf einer Zeile.
+        wortGebrochen: textKnoten(erste)
+          .filter((k) => !/\s/.test(k.textContent!.trim()))
+          .some((k) => zeilenVon(k) > 1),
+        hoehe: tr.getBoundingClientRect().height,
+      };
+    });
+    const koepfe = Array.from(wurzel.querySelectorAll('thead th')).map((th) => {
+      const knoten = textKnoten(th);
+      return {
+        text: knoten.map((k) => k.textContent!.trim()).join(' '),
+        // Je Textknoten: höchstens so viele Zeilen wie Wörter, sonst bricht ein Wort.
+        gebrochen: knoten.some((k) => zeilenVon(k) > k.textContent!.trim().split(/\s+/).length),
+      };
+    });
+    return {
+      ersteSpalte: ersteKopfzelle.getBoundingClientRect().width,
+      zeilenhoehe,
+      reihen,
+      koepfe,
+    };
+  });
+}
+
+test(`Lesbarkeit auf A4: ${KRAEFTE_LESBAR} Kräfte, Name höchstens zwei Zeilen, kein Kopf bricht im Wort, höchstens ${MAX_SEITEN} Seiten`, async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(120_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Meldebild lesbar ${Date.now()}`);
+  await seedeKraefte(page, einsatzId, KRAEFTE_LESBAR);
+  // Eine Einheit mit langem Auftrag: der Auftrag wirbt um Breite, die Einheitenspalte muss ihren
+  // Anteil trotzdem halten (ohne ihn verteilte die Tabelle allein nach Inhalt).
+  const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+    data: { name: EINHEIT_LESBAR },
+  });
+  expect(einheit.ok(), `Seeding Einheit: ${einheit.status()}`).toBeTruthy();
+  const einheitId = ((await einheit.json()) as { id: number }).id;
+  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+    data: {
+      auftrag_text:
+        'Verletztenablage am Deich Süd einrichten und Betroffene aus dem Pegelbereich Altstadt ' +
+        'zur Betreuungsstelle Gymnasium Nord bringen',
+      empfaenger: [{ empfaenger_typ: 'einheit', einheit_id: einheitId }],
+    },
+  });
+  expect(auftrag.ok(), `Seeding Auftrag: ${auftrag.status()} ${await auftrag.text()}`).toBeTruthy();
+  await page.setViewportSize({ width: A4_DRUCKBREITE, height: 800 });
+  await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+  const zeilen = page.locator('tr.ant-table-row');
+  await expect(zeilen).toHaveCount(2);
+  await expect(page.getByText('Verletztenablage', { exact: false })).toHaveCount(1);
+
+  await page.evaluate(() => {
+    window.print = () => {
+      window.dispatchEvent(new Event('beforeprint'));
+    };
+  });
+  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
+  await expect(zeilen, '„vorbereiten“ klappt alle Kräfte auf').toHaveCount(KRAEFTE_LESBAR + 2);
+  await page.emulateMedia({ media: 'print' });
+  await page.evaluate(() => document.fonts.ready);
+
+  const blatt = await lesbarkeit(page);
+  test.info().annotations.push({
+    type: 'messwert',
+    description:
+      `erste Spalte ${Math.round(blatt.ersteSpalte)}px, Namenszeilen max ` +
+      `${Math.max(...blatt.reihen.map((r) => r.nameZeilen))}, Reihe max ` +
+      `${Math.round(Math.max(...blatt.reihen.map((r) => r.hoehe)))}px (Zeilenhöhe ${blatt.zeilenhoehe}px)`,
+  });
+
+  // (a) Mindestbreite der ersten Spalte.
+  expect(blatt.ersteSpalte, 'erste Spalte im Druck zu schmal').toBeGreaterThanOrEqual(
+    MIN_ERSTE_SPALTE,
+  );
+  // (b) Namen und Reihenhöhe. Vorbedingung: die Namen wurden gefunden.
+  expect(blatt.reihen.filter((r) => r.nameZeilen > 0)).toHaveLength(KRAEFTE_LESBAR + 2);
+  for (const reihe of blatt.reihen) {
+    expect(reihe.nameZeilen, `„${reihe.text}“ bricht über zu viele Zeilen`).toBeLessThanOrEqual(2);
+    expect(reihe.wortGebrochen, `in „${reihe.text}“ bricht ein Einzelwort`).toBe(false);
+    expect(
+      reihe.hoehe,
+      `Reihe „${reihe.text}“ höher als ${MAX_ZEILEN_JE_REIHE} Textzeilen`,
+    ).toBeLessThanOrEqual(MAX_ZEILEN_JE_REIHE * blatt.zeilenhoehe);
+  }
+  // (c) Spaltenköpfe brechen nicht im Wort.
+  expect(blatt.koepfe.length, 'Vorbedingung: Spaltenköpfe gefunden').toBeGreaterThan(5);
+  expect(
+    blatt.koepfe.filter((k) => k.gebrochen).map((k) => k.text),
+    'Spaltenköpfe, die im Wort brechen',
+  ).toEqual([]);
+
+  // (d) Das Blatt selbst: nur Chromium erzeugt ein PDF.
+  if (browserName === 'chromium') {
+    const auszug = await pdfAuszug(await page.pdf({ format: 'A4' }));
+    test.info().annotations.push({ type: 'messwert', description: `PDF ${auszug.length} Seiten` });
+    expect(auszug.length, `${KRAEFTE_LESBAR} Kräfte auf zu vielen Seiten`).toBeLessThanOrEqual(
+      MAX_SEITEN,
+    );
+    auszug.forEach((seite, i) =>
+      expect(seite.text, `Tabellenkopf auf Seite ${i + 1}`).toMatch(/Rückmeldung/i),
+    );
+    const alles = auszug.map((s) => s.text).join(' ');
+    for (let i = 0; i < KRAEFTE_LESBAR; i += 1) {
+      expect(alles, `Kraft ${i} auf dem Blatt`).toContain(`Maximiliane ${i}`);
+    }
+  }
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await page.emulateMedia({ media: null });
 });

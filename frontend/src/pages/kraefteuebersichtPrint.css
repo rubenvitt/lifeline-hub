@@ -29,6 +29,35 @@
     display: none !important;
   }
 
+  /* ── Spaltenbreiten auf A4 (LFH-1007) ─────────────────────────────────────────
+     Am Bildschirm tragen alle Spalten außer der Einheit eine Zahlbreite (zusammen 872 px), die
+     Einheit fließt (LFH-523). Auf 680 px Papier blieb der Einheit nur der Rest: 85 px, abzüglich
+     Polster, Einzug und Aufklappsymbol ein paar Zeichen. Namen brachen silbenweise, „Ohne
+     Einheit“ stand senkrecht, 40 Kräfte füllten 41 Seiten. Im Druck gilt deshalb:
+     - die Zahlbreiten der Spalten fallen weg, die Einheit bekommt einen festen Anteil (44 %), die
+       übrigen teilen den Rest nach Inhalt;
+     - Spaltenköpfe brechen nur zwischen Wörtern (die Zellregel `overflow-wrap: anywhere` in
+       `druck/druck.css` bleibt für die Datenzellen), dafür ohne Sperrung und Großschrift;
+     - das Zellpolster ist auf Papier knapp.
+     Gemessen in `e2e/meldebild-druck.spec.ts`, NACHWEIS 3. */
+  .kraefte-print-root .ant-table col {
+    width: auto !important;
+    min-width: 0 !important;
+  }
+  .kraefte-print-root .ant-table col:first-child {
+    width: 44% !important;
+  }
+  .kraefte-print-root .ant-table th,
+  .kraefte-print-root .ant-table td {
+    padding: 3px 5px !important;
+  }
+  /* `th.ant-table-cell` hebt die Spezifität über die Zellregel in `druck.css`. */
+  .kraefte-print-root .ant-table thead th.ant-table-cell {
+    overflow-wrap: normal !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+  }
+
   /* Die Neutralisierer der Tabelle (Bildlaufcontainer, stehende Kopfzeile, fixierte Spalten,
      Werkzeugzeile des Primitivs) standen hier seit LFH-330 · B2. Seit LFH-548 gelten sie für
      jede Druckwurzel in `druck/druck.css`: der Funkplan braucht dieselben, und Mechanik gehört
