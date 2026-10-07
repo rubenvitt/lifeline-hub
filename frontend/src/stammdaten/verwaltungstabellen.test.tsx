@@ -213,7 +213,7 @@ describe.each(FAELLE)('Verwaltungstabelle $name (LFH-980)', (fall) => {
 
 /** Die Wahl im Menü wirkt wie der Knopf, und die Rückfrage nennt die Handlung. */
 describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
-  it('Fahrzeuge: „Außer Dienst“ im Menü setzt den Dienststatus', async () => {
+  it('Fahrzeuge: „Außer Dienst nehmen“ im Menü setzt den Dienststatus', async () => {
     setzeViewportBreite(390);
     const gesetzt: string[] = [];
     server.use(
@@ -226,7 +226,9 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     await screen.findByText('Florian 1');
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Fahrzeug Florian 1' }));
     await waitFor(() => expect(offenesMenue()).not.toBeNull());
-    await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: 'Außer Dienst' }));
+    await userEvent.click(
+      within(offenesMenue()).getByRole('menuitem', { name: 'Außer Dienst nehmen' }),
+    );
     await waitFor(() => expect(gesetzt).toEqual(['1 ausser-dienst']));
   });
 

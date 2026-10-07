@@ -114,7 +114,12 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
       within(menue)
         .getAllByRole('menuitem')
         .map((i) => i.textContent),
-    ).toEqual(['In Bearbeitung', 'Erledigt', 'An Lage übergeben', 'Auftrag erteilen']);
+    ).toEqual([
+      'Bearbeitung beginnen',
+      'Als erledigt melden',
+      'An Lage übergeben',
+      'Auftrag erteilen',
+    ]);
   });
 
   it('„Bestätigen" ist der Primärknopf, nicht rot — Rot bedient nichts (LFH-962)', () => {
@@ -143,23 +148,24 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     expect(cb.onStatus).toHaveBeenCalledWith(1, 'gesichtet');
   });
 
-  it('löst „In Bearbeitung" aus dem Menü aus', async () => {
+  it('löst „Bearbeitung beginnen" aus dem Menü aus', async () => {
     const cb = alleCallbacks();
     renderKarte(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} />);
     const menue = await oeffneAktionsmenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /In Bearbeitung/ }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Bearbeitung beginnen/ }));
     expect(cb.onStatus).toHaveBeenCalledWith(1, 'in_bearbeitung');
   });
 
-  it('löst „Erledigt" aus dem Menü erst nach der Rückfrage aus', async () => {
+  it('löst „Als erledigt melden" aus dem Menü erst nach der Rückfrage aus', async () => {
     const cb = alleCallbacks();
     renderKarte(<MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} />);
     const menue = await oeffneAktionsmenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /Erledigt/ }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /Als erledigt melden/ }));
     // Ohne Bestätigung passiert nichts — die Rückfrage ist kein Schmuck.
     expect(cb.onStatus).not.toHaveBeenCalled();
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    // Der Bestätigungsknopf der Rückfrage nennt die Handlung, nicht „Bestätigen" (LFH-959).
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Als erledigt melden' }));
     expect(cb.onStatus).toHaveBeenCalledWith(1, 'erledigt');
   });
 
@@ -179,17 +185,43 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     expect(cb.onAuftragErteilen).toHaveBeenCalledWith(m);
   });
 
-  it('führt bei „in_bearbeitung" „Erledigt" sichtbar — und dann NICHT mehr im Menü', async () => {
+  it('führt bei „in_bearbeitung" „Als erledigt melden" sichtbar — und dann NICHT mehr im Menü', async () => {
     const cb = alleCallbacks();
     renderKarte(
       <MeldungKarte meldung={meldung({ status: 'in_bearbeitung' })} einsatzId={7} {...cb} />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
+    expect(screen.queryByRole('button', { name: 'Erledigt' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Als erledigt melden' }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Als erledigt melden' }));
     expect(cb.onStatus).toHaveBeenCalledWith(1, 'erledigt');
     const menue = await oeffneAktionsmenue();
-    expect(within(menue).queryByRole('menuitem', { name: /Erledigt/ })).not.toBeInTheDocument();
+    expect(within(menue).queryByRole('menuitem', { name: /erledigt/i })).not.toBeInTheDocument();
+  });
+
+  it('nennt bei „gesichtet" die Handlung „Bearbeitung beginnen", nicht das Statuswort (LFH-959)', async () => {
+    const cb = alleCallbacks();
+    renderKarte(<MeldungKarte meldung={meldung({ status: 'gesichtet' })} einsatzId={7} {...cb} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung beginnen' }));
+    expect(cb.onStatus).toHaveBeenCalledWith(1, 'in_bearbeitung');
+    expect(screen.queryByRole('button', { name: 'In Bearbeitung' })).not.toBeInTheDocument();
+  });
+
+  it('trägt die Uhr im Chip „Bestätigung überfällig", kein eigenes „Alarm" (LFH-959)', () => {
+    const cb = alleCallbacks();
+    const { container } = renderKarte(
+      <MeldungKarte
+        meldung={meldung({ bestaetigung_pflicht: true, ist_ueberfaellig: true })}
+        einsatzId={7}
+        {...cb}
+      />,
+    );
+    const chip = within(container)
+      .getByText('Bestätigung überfällig')
+      .closest('[data-lfh="status-chip"]')!;
+    expect(chip).toHaveAttribute('data-ton', 'alarm');
+    expect(chip.querySelector('svg')).not.toBeNull();
+    expect(within(container).queryByText(/^\s*Alarm\s*$/)).not.toBeInTheDocument();
   });
 
   /**

@@ -35,14 +35,14 @@ describe('meldungKennzahlen', () => {
       m({ id: 4, status: 'in_bearbeitung' }),
       m({ id: 5, status: 'erledigt' }),
     ]);
-    expect(k).toEqual({ unbearbeitet: 2, inArbeit: 2, alarmiert: 1, erledigt: 1 });
+    expect(k).toEqual({ unbearbeitet: 2, inArbeit: 2, bestaetigungUeberfaellig: 1, erledigt: 1 });
   });
 
   it('liefert für eine leere Menge Nullen — eine Null ist ein Wert, kein Zustand', () => {
     expect(meldungKennzahlen([])).toEqual({
       unbearbeitet: 0,
       inArbeit: 0,
-      alarmiert: 0,
+      bestaetigungUeberfaellig: 0,
       erledigt: 0,
     });
   });

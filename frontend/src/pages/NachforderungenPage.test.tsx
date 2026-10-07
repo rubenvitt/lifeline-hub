@@ -130,7 +130,7 @@ describe('NachforderungenPage', () => {
     setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByRole('button', { name: '→ Zugesagt' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'zugesagt'));
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
@@ -139,7 +139,7 @@ describe('NachforderungenPage', () => {
     setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByRole('button', { name: '→ Zugesagt' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(1));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
