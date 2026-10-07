@@ -166,6 +166,11 @@ interface ErfassungsFormularProps<T> {
   initialValues?: FormProps<T>['initialValues'];
   /** Steuerung für äußere Dialoghüllen (Drawer-Kreuz, Maske und Escape). */
   steuerungRef?: Ref<ErfassungsFormularSteuerung>;
+  /**
+   * Die Prüfung ist gescheitert. Für Masken mit eingeklapptem Teil: ein Fehler dort bliebe
+   * sonst unsichtbar (LFH-974).
+   */
+  onPruefungGescheitert?: (fehlerFelder: string[]) => void;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -188,6 +193,7 @@ export function ErfassungsFormular<T extends object>({
   uebernahme,
   initialValues,
   steuerungRef,
+  onPruefungGescheitert,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
@@ -333,8 +339,9 @@ export function ErfassungsFormular<T extends object>({
         layout="vertical"
         initialValues={initialValues}
         onFinish={abschicken}
-        onFinishFailed={() => {
+        onFinishFailed={({ errorFields }) => {
           serienlaufRef.current = false;
+          onPruefungGescheitert?.(errorFields.map((f) => f.name.join('.')));
         }}
       >
         {children}

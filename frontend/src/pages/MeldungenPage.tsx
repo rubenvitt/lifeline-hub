@@ -42,6 +42,8 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useViewport } from '../components/useViewport';
+import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
@@ -71,6 +73,9 @@ export default function MeldungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token } = useRollen();
+  // Unter `md` Zeile statt Band und Filterknopf statt Segmentleiste (LFH-974): der Wortlaut der
+  // ersten Karte gehört in den ersten Schirm.
+  const { istSchmal } = useViewport();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -93,6 +98,7 @@ export default function MeldungenPage() {
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   const richtungsKey = richtungFilter ?? 'alle';
+  const richtungWaehlen = (v: string) => setRichtungFilter(v === 'alle' ? undefined : v);
   const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
   const [lageMeldung, setLageMeldung] = useState<Meldung | null>(null);
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
@@ -424,37 +430,43 @@ export default function MeldungenPage() {
     >
       {/* Kennzahlen der Triage aus EINER Zählung am Server über dieselben Prädikate wie die Liste
           (LFH-940, D3); „Bestätigung überfällig" quer zur Phase. */}
-      <Kennzahlenband beschriftung="Meldungen in Zahlen" style={{ marginBottom: token.margin }}>
-        <Kennzahl
-          titel="Unbearbeitet"
-          groesse="klein"
-          wert={kennzahlen?.unbearbeitet ?? 0}
-          ton={(kennzahlen?.unbearbeitet ?? 0) > 0 ? 'achtung' : 'neutral'}
-          notiz="noch nicht gesichtet"
-          zustand={kennzahlZustand}
-        />
-        <Kennzahl
-          titel="In Arbeit"
-          groesse="klein"
-          wert={kennzahlen?.in_arbeit ?? 0}
-          notiz="gesichtet oder in Bearbeitung"
-          zustand={kennzahlZustand}
-        />
-        <Kennzahl
-          titel="Bestätigung überfällig"
-          groesse="klein"
-          wert={kennzahlen?.alarmiert ?? 0}
-          ton={(kennzahlen?.alarmiert ?? 0) > 0 ? 'alarm' : 'neutral'}
-          notiz="Bestätigungsfrist verstrichen"
-          zustand={kennzahlZustand}
-        />
-        <Kennzahl
-          titel="Erledigt"
-          groesse="klein"
-          wert={kennzahlen?.erledigt ?? 0}
-          zustand={kennzahlZustand}
-        />
-      </Kennzahlenband>
+      {istSchmal ? (
+        <div style={{ marginBottom: token.margin }}>
+          <MeldungKennzahlZeile kennzahlen={kennzahlen} laedt={kennzahlZustand !== 'daten'} />
+        </div>
+      ) : (
+        <Kennzahlenband beschriftung="Meldungen in Zahlen" style={{ marginBottom: token.margin }}>
+          <Kennzahl
+            titel="Unbearbeitet"
+            groesse="klein"
+            wert={kennzahlen?.unbearbeitet ?? 0}
+            ton={(kennzahlen?.unbearbeitet ?? 0) > 0 ? 'achtung' : 'neutral'}
+            notiz="noch nicht gesichtet"
+            zustand={kennzahlZustand}
+          />
+          <Kennzahl
+            titel="In Arbeit"
+            groesse="klein"
+            wert={kennzahlen?.in_arbeit ?? 0}
+            notiz="gesichtet oder in Bearbeitung"
+            zustand={kennzahlZustand}
+          />
+          <Kennzahl
+            titel="Bestätigung überfällig"
+            groesse="klein"
+            wert={kennzahlen?.alarmiert ?? 0}
+            ton={(kennzahlen?.alarmiert ?? 0) > 0 ? 'alarm' : 'neutral'}
+            notiz="Bestätigungsfrist verstrichen"
+            zustand={kennzahlZustand}
+          />
+          <Kennzahl
+            titel="Erledigt"
+            groesse="klein"
+            wert={kennzahlen?.erledigt ?? 0}
+            zustand={kennzahlZustand}
+          />
+        </Kennzahlenband>
+      )}
 
       {darfSchreiben && formOffen && (
         <Paneel
@@ -508,16 +520,20 @@ export default function MeldungenPage() {
             { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossenZahl})` },
           ]}
         />
-        <Segmentleiste
-          beschriftung="Richtung"
-          wert={richtungsKey}
-          onWechsel={(v) => setRichtungFilter(v === 'alle' ? undefined : v)}
-          optionen={[
-            { wert: 'alle', label: 'Alle Richtungen' },
-            { wert: 'intern', label: 'Intern' },
-            { wert: 'extern', label: 'Extern' },
-          ]}
-        />
+        {istSchmal ? (
+          <RichtungFilterKnopf wert={richtungsKey} onWechsel={richtungWaehlen} />
+        ) : (
+          <Segmentleiste
+            beschriftung="Richtung"
+            wert={richtungsKey}
+            onWechsel={richtungWaehlen}
+            optionen={[
+              { wert: 'alle', label: 'Alle Richtungen' },
+              { wert: 'intern', label: 'Intern' },
+              { wert: 'extern', label: 'Extern' },
+            ]}
+          />
+        )}
       </div>
       {ansicht === 'offen' ? (
         offeneGruppen.length === 0 ? (

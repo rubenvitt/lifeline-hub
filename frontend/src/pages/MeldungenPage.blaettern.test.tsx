@@ -9,6 +9,7 @@ import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung, MeldungKennzahlen } from '../api/types';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
+import { setzeViewportBreite } from '../test/viewport';
 
 /**
  * Meldungsseite mit getrennten Abrufen (LFH-940, Spec `meldungen-blaettern`): offene, Kennzahlen
@@ -288,5 +289,47 @@ describe('MeldungenPage — getrennte Abrufe und Blättern (LFH-940)', () => {
     await client.invalidateQueries({ queryKey: ['einsatz-meldungen', 1] });
     await waitFor(() => expect(kartenRender.n).toBeGreaterThan(vorher));
     expect(kartenRender.n - vorher).toBe(1);
+  });
+});
+
+/** LFH-974 (Spec `meldungen-handy`): unter `md` Zeile statt Band, Filterknopf statt Segmentleiste. */
+describe('MeldungenPage — schmaler Schirm (LFH-974)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listeOffeneMeldungen.mockResolvedValue([meldung()]);
+    ladeMeldungKennzahlen.mockResolvedValue(KENNZAHLEN);
+    listeAbgeschlosseneMeldungen.mockResolvedValue([]);
+  });
+
+  const zeile = () => document.querySelector('[data-lfh="meldung-kennzahl-zeile"]');
+
+  it('zeigt unter md die Zahlen als eine Zeile und den Richtungsfilter hinter „Filter"', async () => {
+    setzeViewportBreite(390);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await waitFor(() =>
+      expect(zeile()?.textContent).toBe(
+        '1 unbearbeitet · 0 in Arbeit · 3 Bestätigung überfällig · 250 erledigt',
+      ),
+    );
+    expect(document.querySelector('[data-lfh="kennzahl-wert"]')).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Richtung' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Extern/ }));
+    expect(await screen.findByRole('button', { name: 'Filter (1 aktiv)' })).toBeInTheDocument();
+    await waitFor(() => expect(listeOffeneMeldungen).toHaveBeenLastCalledWith(1, 'extern'));
+  });
+
+  it('behält ab md Band und Segmentleiste', async () => {
+    setzeViewportBreite(1024);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kennzahl-wert"]')).not.toBeNull(),
+    );
+    expect(screen.getByRole('radiogroup', { name: 'Richtung' })).toBeInTheDocument();
+    expect(zeile()).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Filter/ })).not.toBeInTheDocument();
   });
 });
