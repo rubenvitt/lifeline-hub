@@ -96,10 +96,6 @@ export default function PersonensucheDialog({
       destroyOnHidden
       width={960}
     >
-      <Typography.Paragraph type="secondary">
-        Name oder Rufnummer der antragstellenden Person. Gezeigt wird nur die Kennung, nie der Name;
-        es treffen nur ganze Wörter.
-      </Typography.Paragraph>
       <Form
         form={form}
         layout="inline"
@@ -118,7 +114,7 @@ export default function PersonensucheDialog({
             },
           ]}
         >
-          <Input autoComplete="off" autoFocus />
+          <Input autoComplete="off" autoFocus placeholder="ganze Wörter, z. B. Nachname" />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit" loading={suche.isPending}>

@@ -173,8 +173,8 @@ export function useFristAenderung(
           dependencies={['unbegrenzt']}
           extra={
             unbegrenzt
-              ? 'Ohne Frist wird der abgeschlossene Einsatz nie automatisch gesperrt oder zur Löschung vorgemerkt.'
-              : 'Ab diesem Zeitpunkt ist der abgeschlossene Einsatz für alle gesperrt und wird zur Löschung vorgemerkt.'
+              ? 'Nie automatisch gesperrt.'
+              : 'Danach für alle gesperrt und zur Löschung vorgemerkt.'
           }
         >
           <ZeitpunktEingabe
@@ -207,7 +207,7 @@ export function useFristAenderung(
             </strong>{' '}
             vorverlegt.{' '}
             {liegtInDerVergangenheit(rueckfrage.neu, dayjs())
-              ? 'Der Zeitpunkt liegt in der Vergangenheit — ein abgeschlossener Einsatz ist damit sofort für alle gesperrt, auch für Sie, und wird mit dem nächsten Purge-Lauf zur Löschung vorgemerkt.'
+              ? 'Der Zeitpunkt liegt in der Vergangenheit: der abgeschlossene Einsatz ist sofort für alle gesperrt, auch für Sie, und wird zur Löschung vorgemerkt.'
               : 'Ab dann ist der abgeschlossene Einsatz für alle gesperrt und wird zur Löschung vorgemerkt.'}
           </Typography.Paragraph>
         )}
@@ -224,17 +224,22 @@ export function useFristAenderung(
   };
 }
 
-/** Anzeige der Frist: Zeitpunkt, „keine Frist" oder der Hinweis am laufenden Einsatz. */
+/** Anzeige der Frist: Zeitpunkt, „keine Frist" oder am laufenden Einsatz „ab Abschluss". */
 export function FristWert({
   einsatz,
 }: {
   einsatz: Pick<EinsatzAnzeige, 'status' | 'retention_bis'>;
 }) {
-  if (einsatz.retention_bis) return <ZeitAnzeige wert={einsatz.retention_bis} />;
-  if (einsatz.status === 'aktiv') {
-    return <>keine Frist — sie entsteht beim Abschluss aus der Aufbewahrungs-Dauer</>;
+  const aktiv = einsatz.status === 'aktiv';
+  if (einsatz.retention_bis) {
+    return (
+      <>
+        <ZeitAnzeige wert={einsatz.retention_bis} />
+        {aktiv && ' · greift ab Abschluss'}
+      </>
+    );
   }
-  return <>keine Frist</>;
+  return <>{aktiv ? 'erst ab Abschluss' : 'keine Frist'}</>;
 }
 
 interface FristPaneelProps {
@@ -259,11 +264,6 @@ export default function FristPaneel({ einsatzId, einsatz }: FristPaneelProps) {
             <FristWert einsatz={einsatz} />
           </Datenfeld>
         </Datenraster>
-        {einsatz.status === 'aktiv' && einsatz.retention_bis && (
-          <Typography.Text type="secondary">
-            Die Frist greift erst nach dem Abschluss — einen laufenden Einsatz sperrt sie nie.
-          </Typography.Text>
-        )}
         <Flex gap={token.marginSM} wrap>
           <Button disabled={!darf} onClick={aenderung.oeffnen}>
             Frist ändern

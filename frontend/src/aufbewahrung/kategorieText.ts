@@ -51,6 +51,6 @@ export const PERSONENSTAMM_TEXT =
 /** Der Satz zur Vorgabe einer Kategorie an einem aktiven Einsatz bzw. ohne eigene Dauer. */
 export function vorgabeSatz(dauerTage: number | null | undefined): string {
   if (dauerTage == null) return 'folgt der Frist des Einsatzes';
-  if (dauerTage === 0) return 'Frist entsteht beim Abschluss (sofort fällig)';
-  return `Frist entsteht beim Abschluss nach ${dauerTage} Tagen`;
+  if (dauerTage === 0) return 'fällig mit Abschluss';
+  return `${dauerTage} Tage ab Abschluss`;
 }

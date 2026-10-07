@@ -84,11 +84,9 @@ async function dialogOeffnen() {
 }
 
 describe('FristPaneel', () => {
-  it('zeigt „keine Frist" mit Hinweis am laufenden Einsatz', async () => {
+  it('zeigt „erst ab Abschluss" am laufenden Einsatz ohne Frist', async () => {
     zeige(ME_ADMIN, { status: 'aktiv' });
-    expect(
-      await screen.findByText(/keine Frist — sie entsteht beim Abschluss/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('erst ab Abschluss')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Frist aufheben' })).toBeNull();
   });
 
