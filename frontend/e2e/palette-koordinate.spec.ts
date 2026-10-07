@@ -61,25 +61,9 @@ test('eine getippte Koordinate springt auf die Lagekarte, und die Karte steht do
   const einsatzId = await einsatzAnlegen(page, `E2E Koordinate ${Date.now()}`);
 
   // Einsatzort setzen: sonst wäre „die Karte steht auf dem Ziel" von „stand schon da" nicht
-  // sicher zu trennen. Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`).
-  const e = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
-    string,
-    unknown
-  >;
+  // sicher zu trennen. Der Kopf-PATCH liest nur vorhandene Schlüssel (Teil-PATCH).
   const patch = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
-    data: {
-      bezeichnung: e.bezeichnung,
-      stichwort: e.stichwort ?? null,
-      einsatzart: e.einsatzart,
-      leitstellen_nr: e.leitstellen_nr ?? null,
-      einsatzort: 'München',
-      einsatzort_lat: ORT.lat,
-      einsatzort_lon: ORT.lon,
-      meldende_stelle: e.meldende_stelle ?? null,
-      sachverhalt: e.sachverhalt ?? null,
-      anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
-      begonnen_at: e.begonnen_at,
-    },
+    data: { einsatzort: 'München', einsatzort_lat: ORT.lat, einsatzort_lon: ORT.lon },
   });
   expect(patch.ok(), await patch.text()).toBeTruthy();
 

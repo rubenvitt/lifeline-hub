@@ -33,6 +33,12 @@ const einsatzUhsApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/einsatzUhs', () => einsatzUhsApi);
 
+// Einsatzort verorten: der Kopf geht als Teil-PATCH hinaus.
+const einsaetzeApi = vi.hoisted(() => ({
+  patcheEinsatz: vi.fn(() => Promise.resolve({ id: 1 })),
+}));
+vi.mock('../../api/einsaetze', () => einsaetzeApi);
+
 // Betroffene verorten: der Platzier-Auftrag `person` schreibt die Fundort-Koordinate.
 const einsatzPersonApi = vi.hoisted(() => ({
   aktualisierePerson: vi.fn(() => Promise.resolve({ id: 10 })),
@@ -79,7 +85,6 @@ function rendere(fehler: (e: unknown) => void = vi.fn(), erfolg: (text: string) 
     () =>
       useKartenInteraktion({
         einsatzId: 1,
-        einsatz: undefined,
         darfSchreiben: true,
         waehlbar: [],
         fehler,
@@ -274,6 +279,27 @@ describe('useKartenInteraktion — Verorten', () => {
   });
 });
 
+describe('useKartenInteraktion — Einsatzort verorten (LFH-1006)', () => {
+  it('PATCHt NUR das Koordinatenpaar, damit fremd geänderte Kopfzeilen erhalten bleiben', async () => {
+    einsaetzeApi.patcheEinsatz.mockClear();
+    const erfolg = vi.fn();
+    const { result } = rendere(vi.fn(), erfolg);
+
+    act(() => result.current.onEinsatzortPlatzieren());
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+
+    await waitFor(() => expect(einsaetzeApi.patcheEinsatz).toHaveBeenCalledTimes(1));
+    // Genau die zwei Schlüssel: jede weitere Zeile aus dem Cache (Leitstellen-Nr., Stichwort …)
+    // überschriebe die Änderung einer anderen Person mit dem alten Stand.
+    expect(einsaetzeApi.patcheEinsatz).toHaveBeenCalledWith(1, {
+      einsatzort_lat: 50.1,
+      einsatzort_lon: 8.6,
+    });
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    expect(result.current.platzierungZiel).toBeNull();
+  });
+});
+
 describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
   it('Platzier-Auftrag person: Klick PATCHt NUR die Fundort-Koordinate und invalidiert die Personen', async () => {
     einsatzPersonApi.aktualisierePerson.mockClear();
@@ -284,7 +310,6 @@ describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
       () =>
         useKartenInteraktion({
           einsatzId: 1,
-          einsatz: undefined,
           darfSchreiben: true,
           waehlbar: [],
           fehler: vi.fn(),
@@ -324,7 +349,6 @@ describe('useKartenInteraktion — Betroffene: Verortung löschen (LFH-648)', ()
       () =>
         useKartenInteraktion({
           einsatzId: 1,
-          einsatz: undefined,
           darfSchreiben: true,
           waehlbar: [],
           fehler: vi.fn(),
@@ -713,7 +737,6 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
       () =>
         useKartenInteraktion({
           einsatzId: 1,
-          einsatz: undefined,
           darfSchreiben: true,
           waehlbar: [],
           fehler: vi.fn(),
@@ -864,7 +887,6 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
       () =>
         useKartenInteraktion({
           einsatzId: 1,
-          einsatz: undefined,
           darfSchreiben: true,
           waehlbar: [],
           fehler: vi.fn(),
@@ -1128,7 +1150,6 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
       () =>
         useKartenInteraktion({
           einsatzId: 1,
-          einsatz: undefined,
           darfSchreiben: true,
           waehlbar: [],
           fehler: vi.fn(),
@@ -1152,7 +1173,6 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
       () =>
         useKartenInteraktion({
           einsatzId: 1,
-          einsatz: undefined,
           darfSchreiben: true,
           waehlbar: [],
           fehler: vi.fn(),
@@ -1256,7 +1276,6 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
       () =>
         useKartenInteraktion({
           einsatzId: 1,
-          einsatz: undefined,
           darfSchreiben: false,
           waehlbar: [],
           fehler: vi.fn(),

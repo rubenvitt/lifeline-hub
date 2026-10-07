@@ -713,7 +713,7 @@ describe('LagekartePage', () => {
     await waitFor(() => expect(patchBody).toEqual({ lat: 50.1, lon: 8.6 }));
   });
 
-  it('verschiebt den Einsatzort: Verschieben → Karten-Klick → Kopf-PATCH mit neuer Koordinate', async () => {
+  it('verschiebt den Einsatzort: Verschieben → Karten-Klick → Teil-PATCH nur mit der Koordinate', async () => {
     let patchBody: Record<string, unknown> | null = null;
     basisHandler([
       http.patch('/api/einsaetze/1', async ({ request }) => {
@@ -726,15 +726,10 @@ describe('LagekartePage', () => {
     // Einsatzort ist verortet → Knopf „Verschieben".
     await user.click(await screen.findByRole('button', { name: 'Verschieben' }));
     await user.click(await screen.findByText('karte-klick'));
-    await waitFor(() => {
-      expect(patchBody).not.toBeNull();
-      expect(patchBody!.einsatzort_lat).toBe(50.1);
-      expect(patchBody!.einsatzort_lon).toBe(8.6);
-      expect(patchBody!.bezeichnung).toBe('Test'); // andere Kopffelder bleiben erhalten (Vollersatz)
-    });
-    // Die Einsatznummer ist nicht änderbar — schon der Schlüssel (auch mit `null`) wäre beim Server
-    // 400.
-    expect(patchBody).not.toHaveProperty('einsatznummer_intern');
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    // Nur das Koordinatenpaar (LFH-1006): jede weitere Kopfzeile aus dem Seitenstand überschriebe
+    // die gleichzeitige Änderung einer anderen Person, etwa die Leitstellen-Nr.
+    expect(patchBody).toEqual({ einsatzort_lat: 50.1, einsatzort_lon: 8.6 });
   });
 
   it('Marker-Klick öffnet den Inspector mit Modul-Link', async () => {

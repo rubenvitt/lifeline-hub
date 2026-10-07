@@ -73,8 +73,8 @@ export function entferneMitglied(id: number, benutzerId: number): Promise<Mitgli
   return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder/${benutzerId}`, 'DELETE');
 }
 
-/** Editierbare Kopffelder (Vollersatz beim atomaren Speichern). */
-export interface KopfdatenUpdate {
+/** Editierbare Kopffelder; geschrieben wird nur als Teil-PATCH (`patcheEinsatz`). */
+interface Kopfdaten {
   bezeichnung: string;
   stichwort: string | null;
   einsatzart: Einsatzart;
@@ -93,15 +93,11 @@ export interface KopfdatenUpdate {
   naechste_lagebesprechung_at?: string | null;
 }
 
-export function aktualisiereEinsatz(id: number, felder: KopfdatenUpdate): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', felder);
-}
-
 /**
  * Teil der Kopfdaten (LFH-472): fehlender Schlüssel = unverändert, `null` = leeren — so liest der
  * Server den Body (`routes/einsatz.rs:KopfdatenPatch`, Tri-State seit LFH-306).
  */
-export type KopfdatenPatch = Partial<KopfdatenUpdate>;
+export type KopfdatenPatch = Partial<Kopfdaten>;
 
 /**
  * Einzelfeld-Weg der Zeilenbearbeitung (LFH-472). Er schickt nur die übergebenen Schlüssel: ein
