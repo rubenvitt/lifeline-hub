@@ -1,3 +1,68 @@
+## [1.0.0-alpha.86](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.85...v1.0.0-alpha.86) (2026-10-07)
+
+### Wichtige Änderungen
+
+- **Offline-Speicher**: Das Einsatztagebuch wird nur noch in den Hauptansichten offline verfügbar gehalten. Freie Filter- und Zeitfenstervarianten werden nach 5 Minuten aus dem Speicher entfernt, um Speicherplatz zu sparen.
+- **Browserspeicher**: Bei gesperrtem localStorage (z. B. im privaten Modus oder bei vollem Speicher) bleibt die Anwendung bedienbar. Die Anmeldung funktioniert weiterhin, auch wenn keine lokalen Einstellungen gespeichert werden können.
+
+### Einsatztagebuch
+
+- **Bedienung am Smartphone**: Beim Anlegen von Einträgen aus tief gescrollten Positionen öffnet sich der Erfassungsdialog korrekt. Sprünge zu Einträgen brechen bei Serverfehlern ab, statt endlos zu versuchen.
+- **Personenbilanz**: Die Bilanz im Einsatzbericht ist nun in drei Gruppen gegliedert (Nach Sichtung, Nach Personenstatus, Nach Verbleib) und am Smartphone lesbar dargestellt.
+- **Druckansicht**: Einsatzberichte und ETB-Drucke sind am Smartphone optimiert – Zeitangaben brechen mehrzeilig um, Tabellen scrollen in sich, Metadaten (Typ, Von/An, Erfasser) stehen platzsparend in der Inhaltszelle.
+- **Sprung zum Eintrag**: Links „Zum ETB-Eintrag" auf Lageberichten, Befehlen und Pressemitteilungen erscheinen jetzt als deutlich sichtbare Schaltflächen mit ausreichendem Abstand zu anderen Bedienelementen.
+
+### Lagekarte
+
+- **Gesperrte Kartengrundlagen**: Auf Touchgeräten wird erklärt, warum eine Grundlage nicht verfügbar ist (z. B. nicht konfiguriert). Ein Fingertipp auf ein gesperrtes Segment zeigt den Sperrgrund unter der Leiste an.
+- **Ohne Karte**: Die Grundlage „Ohne Karte" heißt jetzt verständlicher und zeigt einen Hinweis direkt auf der Karte, der die schwarze Fläche erklärt.
+- **Zeigerkoordinate**: Die Koordinate wird nur noch bei feiner Zeigersteuerung (Maus) angezeigt, nicht auf Touchgeräten.
+
+### Kräfte und Mittel
+
+- **Fahrzeuge**: Der Besetzungsstatus wird als beschriftete Karte dargestellt. „Besatzung nicht erfasst" erscheint neutral, Ist- und Soll-Besetzung sind klar beschriftet.
+- **Statusfarben**: Statusangaben werden grundsätzlich mit Text dargestellt, nicht nur mit Farbe. Rot wird ausschließlich für Gefahrensituationen verwendet, nicht für neutrale oder organisatorische Zustände.
+- **Verwaltungstabellen am Smartphone**: Benutzer-, Fahrzeug-, Personal-, Sprechgruppen- und Materialtabellen sind am Smartphone und Tablet bedienbar. Spalten lassen sich ein- und ausblenden, Status und Aktionen stehen rechts fixiert, Aktionen öffnen sich bei schmalen Bildschirmen im Menü.
+- **Besatzungsrückmeldung**: Kräfte ohne Besatzungsrückmeldung zeigen einen deutlichen Button „Zuweisen" mit zugänglichem Namen.
+
+### Betroffene
+
+- **Betreuungsstellen am Smartphone**: Spalten sind nach Wichtigkeit sortiert (Belegung zuerst), unter schmalen Bildschirmen steht „Belegung melden" direkt bei der Kennung.
+- **Datensicht-Filter**: Spaltenfilter zeigen ihre Beschriftung als Präfix auch nach der Auswahl. Leere Ergebnislisten erklären „Keine Treffer für die gewählten Filter" mit Möglichkeit zum Zurücksetzen, statt nur „Keine Daten" zu zeigen.
+- **Personenbilanz**: Einheitliche Darstellung mit Großbuchstaben, Gliederung in Gruppen, Vermerk trennt „Tot" und „Verstorben", „Personen gesamt" statt unklarer Summenzeile.
+
+### Kommunikation
+
+- **Chat am Smartphone**: Kanäle können jetzt auch am Smartphone angelegt werden – über eine neue Schaltfläche „+ Kanal" neben der Kanalliste.
+
+### Führung
+
+- **Aufträge und Befehle**: Die beiden Reiter sind klar getrennt. Der Reiter „Befehle" steht in der URL, Brotkrume und Zurück-Navigation führen korrekt dorthin. Im Reiter „Befehle" heißt alles Befehl, Schaltflächen sind eindeutig beschriftet.
+- **Erteilungszeit**: Auftrags- und Befehlskarten zeigen die Erteilungszeit sichtbar und beschriftet an.
+- **Stab am Smartphone**: Die Ansicht „Stab" und das Informationstelefon sind am Smartphone bedienbar. Aktionen stehen unter dem Inhalt, Felder sind umrandet, Texte umbrechen korrekt.
+- **Sichtungsangaben**: Sichtungsteile (z. B. „T3 · E2 · VER 1") brechen nur noch an Trennpunkten um, nicht mitten im Teil.
+
+### Verwaltung
+
+- **Seitenleiste**: Die Verwaltungs-Seitenleiste klebt ab mittleren Bildschirmen, scrollt in sich und holt den markierten Eintrag automatisch ins Sichtfeld.
+- **Gliederungsbaum**: Der Lagezustand wird wie im Überblick dargestellt, „ohne Leiter" erscheint als beschrifteter Chip statt als gelber Farbpunkt.
+- **Deaktivieren**: Das Deaktivieren von Einträgen fragt mit beschrifteter Schaltfläche nach, nicht nur mit „Bestätigen".
+
+### Betrieb und Installation
+
+- **Offline-Speicher begrenzt**: Die Offline-Warteschlange lädt gedrosselt und zählt Einträge ohne vollständige Nutzdaten. ETB-Entwürfe älter als 24 Stunden ohne Inhalt werden automatisch entfernt. Der Ortscache hält maximal 5000 Einträge für 30 Tage.
+- **Persister-Stabilität**: Das Speichern des Lagebilds erfolgt gedrosselt, mit Einzelflug-Schutz und getrennten Köpfen, um Schreiblast zu reduzieren.
+- **Serverzeit**: Die Serverzeit wird nur noch bei Abweichungen über 1 Sekunde oder nach 10 Minuten gespeichert, nicht bei jedem Tick.
+- **IndexedDB-Upgrade**: Versionsprünge der Datenbank werden vermieden. Offene Tabs mit altem Code blockieren keine Upgrades mehr – jede Datenbank gibt ihre Verbindung bei künftigen Upgrades frei.
+
+### Barrierefreiheit und Bedienbarkeit
+
+- **Touch-Ziele**: Schaltflächen und interaktive Elemente haben die empfohlene Mindesthöhe für Touchbedienung (44 px). Abstände zwischen Zielen sind ausreichend.
+- **Dialoge am Smartphone**: Erfassungsmasken (z. B. Serienerstellung, ETB-Filter) bleiben vollständig im Bildschirm. Datum- und Zeitauswahl öffnen sich als Blatt am unteren Rand, „Abbrechen" und „OK" sind immer erreichbar. Oberhalb des Blatts bleibt ein Streifen zum Wegtippen.
+- **Fokus-Sichtbarkeit**: Fokussierte Elemente hinter fixierten Spalten werden durch Scroll-Padding freigehalten (WCAG 2.4.11).
+- **Leere Rasterzellen**: Kennzahlen- und Datenraster ohne Inhalt zeigen die Hintergrundfläche statt grauer Kacheln.
+- **UHS-Grundriss**: Die Darstellung passt sich der Inhaltsbreite an, Personenmarken haben Touch-gerechte Höhe, Drag-Aktionen sind beschriftet, gesperrte Materialzustände werden erklärt.
+
 ## [1.0.0-alpha.85](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.84...v1.0.0-alpha.85) (2026-10-06)
 
 ### Betrieb und Installation
