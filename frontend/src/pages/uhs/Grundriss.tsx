@@ -145,6 +145,11 @@ interface PlatzMenueLage {
   bearbeitbar: boolean;
   /** Eine Belegung läuft: Bewegungen der Person sperren, nichts entfernen. */
   belegungLaeuft: boolean;
+  /**
+   * Weder im Wartebereich noch unter „Noch nicht aufgenommen" steht jemand: „Patient zuweisen"
+   * bleibt stehen, gesperrt, und nennt den Grund im Wort (LFH-1078: sichtbar, nicht im Tooltip).
+   */
+  niemandWartet?: boolean;
 }
 
 const VERFUEGBARKEIT_EINTRAEGE = [
@@ -173,16 +178,17 @@ const VERFUEGBARKEIT_EINTRAEGE = [
  * Teilstring.
  */
 export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps['items']> {
-  const { form, belegt, zuweisbar, wartebereich, bearbeitbar, belegungLaeuft } = lage;
+  const { form, belegt, zuweisbar, wartebereich, bearbeitbar, belegungLaeuft, niemandWartet } =
+    lage;
   const karte = form === 'karte';
   const trenner = { type: 'divider' as const };
   const zuweisen = zuweisbar
     ? [
         {
           key: 'zuweisen',
-          label: 'Patient zuweisen',
+          label: niemandWartet ? 'Patient zuweisen · niemand wartet' : 'Patient zuweisen',
           icon: <IconPersonPlus />,
-          disabled: belegungLaeuft,
+          disabled: belegungLaeuft || Boolean(niemandWartet),
         },
       ]
     : [];
@@ -399,6 +405,8 @@ interface PlatzKarteProps {
   onStorno: () => void;
   onOeffnen: (personId: number) => void;
   onZuweisen: () => void;
+  /** Niemand ist zuweisbar: „Patient zuweisen" im Menü gesperrt mit Grund. */
+  niemandWartet?: boolean;
   /** Nur gesetzt, wenn der Platz belegt ist — sonst gibt es nichts zurückzustellen. */
   onZurueckInWartebereich?: () => void;
 }
@@ -415,6 +423,7 @@ function PlatzKarte({
   onStorno,
   onOeffnen,
   onZuweisen,
+  niemandWartet,
   onZurueckInWartebereich,
 }: PlatzKarteProps) {
   // Die Platzkarte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus — Drag-Source
@@ -499,6 +508,7 @@ function PlatzKarte({
     wartebereich: Boolean(onZurueckInWartebereich),
     bearbeitbar,
     belegungLaeuft,
+    niemandWartet,
   });
   const waehle = (key: string) => {
     if (key === 'zuweisen') onZuweisen();
@@ -1476,15 +1486,14 @@ export default function Grundriss({
                   onOeffnen={setDetailPersonId}
                   onZuweisen={() => {
                     // Ohne Kandidaten gar nicht öffnen: der Dialog trüge einen Primär-Knopf, der
-                    // nichts erfasst.
+                    // nichts erfasst. Der Wurzelklick hat keinen Sperrzustand, also ein Zustandswort.
                     if (zuweisbarePersonen.length === 0) {
-                      message.info(
-                        'Niemand zuweisbar — im Wartebereich und unter „Noch nicht aufgenommen" steht derzeit niemand.',
-                      );
+                      message.info('Niemand wartet');
                       return;
                     }
                     setZuweisenPlatz(p);
                   }}
+                  niemandWartet={zuweisbarePersonen.length === 0}
                   onZurueckInWartebereich={
                     // Nur bei belegtem Platz und mit Schreibrecht. `belegMut` errechnet `art` selbst
                     // — für eine Person an dieser UHS `'wechsel'`. Nicht an `belegMut.isPending`
@@ -1499,10 +1508,10 @@ export default function Grundriss({
               );
             })}
             {uhs.plaetze.length === 0 && (
+              // Nur der Zustand (LFH-1078): der Weg steht direkt darüber im Kopf — geplant „Plätze
+              // anlegen", im Betrieb hinter „Plätze bearbeiten" (LFH-58), kein zweiter Knopf hier.
               <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
-                {schreibgeschuetzt
-                  ? 'Keine Plätze angelegt.'
-                  : 'Keine Plätze. Lege Plätze über „Plätze anlegen" an.'}
+                Keine Plätze
               </Typography.Text>
             )}
           </div>
@@ -1630,8 +1639,8 @@ export default function Grundriss({
         onFertig={() => setTransportPerson(null)}
         onAbbrechen={() => setTransportPerson(null)}
       >
-        <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel">
-          <Input />
+        <Form.Item label="Ziel" name="ziel">
+          <Input placeholder="z. B. Krankenhaus" />
         </Form.Item>
         <Form.Item label="Art" name="art" rules={[{ required: true }]}>
           <Select

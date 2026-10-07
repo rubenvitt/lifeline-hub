@@ -96,7 +96,9 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   await page.getByRole('button', { name: 'Plätze bearbeiten' }).click();
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   const paneel = page.getByRole('region', { name: 'Plan' });
-  await expect(paneel.getByText('Nur Pläne, keine Fotos von Patienten.')).toBeVisible();
+  await expect(
+    paneel.getByText('Keine Patientenfotos. Übernahme wird protokolliert.'),
+  ).toBeVisible();
   await paneel
     .locator('input[type="file"]')
     .setInputFiles({ name: 'halle.jpg', mimeType: 'image/jpeg', buffer: FOTO_JPEG });

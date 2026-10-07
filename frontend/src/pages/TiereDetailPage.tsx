@@ -139,11 +139,10 @@ export default function TiereDetailPage() {
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
-          content:
-            'Dieses Tier wurde seit dem Öffnen von jemand anderem gespeichert. „Neu laden" verwirft deine Änderungen; „Überschreiben" speichert deine Werte über die des anderen.',
+          content: 'Seit dem Öffnen von jemand anderem gespeichert.',
           okText: 'Überschreiben',
           okButtonProps: { danger: true },
-          cancelText: 'Neu laden',
+          cancelText: 'Verwerfen und neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
           onCancel: () => {
             detailQuery.refetch();
@@ -365,7 +364,7 @@ export default function TiereDetailPage() {
                 Bearbeiten
               </Button>
               <Popconfirm
-                title="Tier stornieren (Soft-Delete)?"
+                title="Tier stornieren?"
                 onConfirm={() => stornoMutation.mutate(t.id)}
                 okButtonProps={{ danger: true }}
               >
@@ -452,11 +451,8 @@ export default function TiereDetailPage() {
             }))}
           />
         </Form.Item>
-        <Form.Item
-          label="Ziel (Freitext, z. B. Tierarzt Müller, R-Nr. des Halters)"
-          name="abschluss_ziel"
-        >
-          <Input />
+        <Form.Item label="Ziel" name="abschluss_ziel">
+          <Input placeholder="z. B. Tierarzt Müller, R-Nr. des Halters" />
         </Form.Item>
       </ErfassungsModal>
     </EinsatzSeite>

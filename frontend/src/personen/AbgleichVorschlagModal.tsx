@@ -1,5 +1,5 @@
-import { Modal, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { Modal, Typography, theme } from 'antd';
+import { useEffect, useId, useState } from 'react';
 import { Select } from '../components/Select';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
@@ -24,6 +24,8 @@ export default function AbgleichVorschlagModal({
   onFinish: (gefundenId: number) => void;
 }) {
   const [gewaehlt, setGewaehlt] = useState<number | undefined>(undefined);
+  const feldId = useId();
+  const { token } = theme.useToken();
 
   // Auf die vermisste Person, nicht auf `open` gehört: sonst behielte ein Aufruf für eine ANDERE
   // Person die Auswahl des ersten und schlüge sie still am falschen Satz vor.
@@ -44,11 +46,11 @@ export default function AbgleichVorschlagModal({
       onCancel={onCancel}
       destroyOnHidden
     >
-      <Typography.Paragraph type="secondary">
-        Welche gefundene Person könnte dieselbe sein?
-      </Typography.Paragraph>
+      <label htmlFor={feldId} style={{ display: 'block', marginBlockEnd: token.marginXS }}>
+        Gefundene Person
+      </label>
       <Select<number>
-        aria-label="gefundene Person"
+        id={feldId}
         placeholder="gefundene Person …"
         style={{ width: '100%' }}
         value={gewaehlt}
@@ -61,7 +63,7 @@ export default function AbgleichVorschlagModal({
       />
       {gefundene.length === 0 && (
         <Typography.Paragraph type="secondary" style={{ marginBlockStart: 8, marginBlockEnd: 0 }}>
-          Es ist noch niemand als betroffen oder verstorben erfasst.
+          Keine gefundenen Personen
         </Typography.Paragraph>
       )}
     </Modal>

@@ -203,13 +203,13 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
         art="stelle"
         objektId={9}
         darfZuruecknehmen={false}
-        sperrHinweis="Die Stelle ist geschlossen. Zurücknehmen geht erst, wenn sie wieder in Betrieb ist."
+        sperrHinweis="Stelle geschlossen: Zurücknehmen gesperrt"
       />,
     );
     await screen.findByText('89 untergebracht');
     expect(screen.queryByRole('button', { name: /zurücknehmen$/ })).not.toBeInTheDocument();
     expect(container.querySelectorAll('[data-lfh="verlauf-sperre"]')).toHaveLength(1);
-    expect(screen.getByText(/Die Stelle ist geschlossen/)).toBeInTheDocument();
+    expect(screen.getByText('Stelle geschlossen: Zurücknehmen gesperrt')).toBeInTheDocument();
   });
 
   it('Abbrechen der Rückfrage sendet nichts', async () => {
@@ -219,7 +219,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     await screen.findByText('480 evakuiert (gezählt)');
     await userEvent.click(screen.getByRole('button', { name: /^Meldung 300 von/ }));
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('Der aktuelle Stand ändert sich dadurch nicht.');
+    expect(dialog).toHaveTextContent(/Meldung 300 evakuiert \(gezählt\) von .* zurücknehmen\?/);
+    expect(dialog).not.toHaveTextContent('Aktuell');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     expect(ids).toEqual([]);
   });
@@ -234,8 +235,9 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Meldung 480 von/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(
-      'Das ist der aktuelle Stand. Er wird danach aus den übrigen Meldungen bestimmt.',
+      /Aktuellen Stand 480 evakuiert \(gezählt\) von .* zurücknehmen\?/,
     );
+    expect(dialog).toHaveTextContent('Bleibt als „zurückgenommen“ in Verlauf und ETB.');
     const ok = within(dialog).getByRole('button', { name: 'Zurücknehmen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     await userEvent.click(ok);
@@ -251,7 +253,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     await screen.findByText('89 untergebracht');
     await userEvent.click(screen.getByRole('button', { name: /^Meldung 89 von/ }));
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('Die aktuelle Belegung ändert sich dadurch nicht.');
+    expect(dialog).toHaveTextContent(/Meldung 89 untergebracht von .* zurücknehmen\?/);
+    expect(dialog).not.toHaveTextContent('Aktuelle Belegung');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Zurücknehmen' }));
     await waitFor(() => expect(ids).toEqual(['8']));
   });

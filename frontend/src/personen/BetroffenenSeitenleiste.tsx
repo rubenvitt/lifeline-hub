@@ -189,7 +189,7 @@ export default function BetroffenenSeitenleiste({
               ? 'Keine offenen Felder bei angetroffenen Personen.'
               : `${offen.ohneVerbleib} ohne Verbleib, ${offen.ohneFundort} ohne Fundort — ${offen.datensaetze} ${
                   offen.datensaetze === 1 ? 'Datensatz' : 'Datensätze'
-                }. Die Zeilen sind markiert („offen") und über die Detailseite ergänzbar.`}
+                }`}
           </p>
           <Button
             // Umschalter: der Name bleibt, der Zustand steht in `aria-pressed` und der Füllung.

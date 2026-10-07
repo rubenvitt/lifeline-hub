@@ -15,8 +15,7 @@ import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabe
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 
 /** Steht im Ablegen-Dialog (Spec `uhs-anhaenge`, „Hinweis auf die Protokollierung“). */
-export const UHS_ABLAGE_HINWEIS =
-  'Jeder Abruf einer Datei wird mit Person und Zeitpunkt protokolliert.';
+export const UHS_ABLAGE_HINWEIS = 'Abrufe werden protokolliert.';
 
 const FASSUNG: Record<AnhangZugriff['fassung'], string> = {
   bereinigt: 'bereinigt',

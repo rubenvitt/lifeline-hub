@@ -80,7 +80,7 @@ export default function PersonenDruckPage() {
       stand={daten && { geladenAt: daten.geladenAt, anzahl: ausgewaehlt.length }}
       auswahl={personenDruckAuswahl(auswahl)}
       umfang={(n) => umfangText(n, 'Person', 'Personen')}
-      hinweis="Das Öffnen dieser Druckansicht wird im Zugriffsprotokoll vermerkt."
+      hinweis="Zugriff wird protokolliert."
     >
       <PersonenDruckTabelle
         personen={ausgewaehlt}

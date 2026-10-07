@@ -387,6 +387,21 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
   });
 });
 
+describe('Grundriss – Leerzustand ohne Plätze (LFH-1078)', () => {
+  it('geplant: „Keine Plätze", der Weg steht als „Plätze anlegen" im Kopf', async () => {
+    renderGrundriss(uhsDetail({ plaetze: [], status: 'geplant' }), []);
+    expect(await screen.findByText('Keine Plätze')).toBeInTheDocument();
+    expect(screen.queryByText(/Lege Plätze/)).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Plätze anlegen' })).toHaveLength(1);
+  });
+
+  it('schreibgeschützt: derselbe Zustand, kein Knopf', async () => {
+    renderGrundriss(uhsDetail({ plaetze: [], status: 'aktiv' }), [], true);
+    expect(await screen.findByText('Keine Plätze')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Plätze anlegen' })).toBeNull();
+  });
+});
+
 describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
   it('zeigt aus DIESER UHS abtransportierte Personen in der rechten Spalte', async () => {
     const p = person({
@@ -649,7 +664,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   it('löst beim Klick auf einen Menüeintrag NICHT zusätzlich die Platzzuweisung aus', async () => {
     // Das Dropdown rendert im Portal, sein Synthetic Event steigt aber im Komponentenbaum auf und
     // erreicht den Wurzel-onClick der Karte. Mit zuweisbarer Person rendern, sonst zeigte der
-    // Dialog „Niemand zuweisbar" und die Prüfung bliebe auch ohne Riegel grün.
+    // Hinweis „Niemand wartet" und die Prüfung bliebe auch ohne Riegel grün.
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     const uhs = uhsDetail({
       status: 'aktiv',
@@ -750,8 +765,20 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
 
-    expect(await screen.findByText(/Niemand zuweisbar/)).toBeInTheDocument();
+    expect(await screen.findByText('Niemand wartet')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('ohne Kandidaten steht „Patient zuweisen" im Menü gesperrt, mit Grund im Wort', async () => {
+    // LFH-1078: der Grund steht sichtbar am Eintrag, nicht nur im Tooltip.
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, []);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    const eintrag = within(offenesMenue())
+      .getByText('Patient zuweisen · niemand wartet')
+      .closest('[role="menuitem"]');
+    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
   });
 });
 
@@ -1279,6 +1306,18 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
       expect(folge(laufend)).toEqual(folge(frei));
       expect(gesperrt(laufend)).toEqual(['verbleib', 'wartebereich', 'zurueckweisen']);
       expect(gesperrt(frei)).toEqual([]);
+    });
+
+    it('niemand wartet: Zuweisen bleibt stehen, gesperrt, der Grund steht im Wort', () => {
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'karte',
+        zuweisbar: true,
+        niemandWartet: true,
+      });
+      expect(folge(items)).toEqual(['zuweisen', '—', ...VERF]);
+      expect(gesperrt(items)).toEqual(['zuweisen']);
+      expect((items[0] as { label?: unknown }).label).toBe('Patient zuweisen · niemand wartet');
     });
 
     it('sperrt bei laufender Belegung auch das Zuweisen eines freien Platzes', () => {

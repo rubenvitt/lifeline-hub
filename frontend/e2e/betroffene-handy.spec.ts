@@ -130,7 +130,7 @@ async function pruefeDetail(page: Page, einsatzId: string, personId: number) {
     await page.setViewportSize(viewport);
     await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
     await expect(page.getByRole('heading', { name: /Person R-\d{3}/ })).toBeVisible();
-    const verlauf = page.getByText(/Chronologischer Verlauf/);
+    const verlauf = page.getByText('Medizinischer Verlauf', { exact: true });
     const stammdaten = page.getByText('Stammdaten', { exact: true });
     await expect(verlauf).toBeVisible();
     await expect(stammdaten).toBeVisible();
@@ -189,7 +189,7 @@ test('Gegenprobe bei 1180 px: Nebenwege als Knöpfe, Detailspalten nebeneinander
   await expect(kopf(page).locator('.ant-btn-primary')).toHaveCount(1);
 
   await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
-  const verlauf = page.getByText(/Chronologischer Verlauf/);
+  const verlauf = page.getByText('Medizinischer Verlauf', { exact: true });
   const stammdaten = page.getByText('Stammdaten', { exact: true });
   await expect(verlauf).toBeVisible();
   const links = (await stammdaten.boundingBox())!;
