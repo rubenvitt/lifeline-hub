@@ -142,6 +142,8 @@ describe('DemoDatenPage — Menüeintrag (D13)', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Demo-Daten' }),
     ).toBeInTheDocument();
+    // Kein Zweck-Absatz unter dem Titel (LFH-1078).
+    expect(screen.queryByText(/Übungseinsatz/)).toBeNull();
     // Die Markierung folgt der URL auch für den Sonderfall (menuKeys).
     expect(screen.getByRole('menuitem', { name: 'Demo-Daten' })).toHaveClass(
       'ant-menu-item-selected',
@@ -334,6 +336,12 @@ describe('DemoDatenPage — importiert', () => {
     const dialog = await offenerDialog('Demo-Daten entfernen?');
     const ok = within(dialog).getByRole('button', { name: 'Endgültig entfernen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
+    // Genau EIN kurzer Satz zur Folge (LFH-1078).
+    expect(
+      within(dialog).getByText(
+        'Der Demo-Einsatz wird samt Änderungen unwiderruflich gelöscht; verwendete Stammdaten bleiben.',
+      ),
+    ).toBeInTheDocument();
     // Die Rückfrage allein sendet nichts.
     expect(z.delete).toBe(0);
     await userEvent.click(ok);
@@ -366,6 +374,9 @@ describe('DemoDatenPage — importiert', () => {
     const dialog = await offenerDialog('Demo-Daten neu importieren?');
     const ok = within(dialog).getByRole('button', { name: 'Ersetzen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(
+      within(dialog).getByText('Der Demo-Einsatz wird samt Änderungen unwiderruflich ersetzt.'),
+    ).toBeInTheDocument();
     expect(z.neu).toBe(0);
     await userEvent.click(ok);
     await waitFor(() => expect(z.neu).toBe(1));

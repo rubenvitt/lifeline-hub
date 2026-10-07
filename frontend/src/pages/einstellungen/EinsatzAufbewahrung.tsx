@@ -10,6 +10,7 @@ import {
   initialAufbewahrung,
   normalisiereAufbewahrung,
   orgHinweisWert,
+  platzhalterVorgabe,
   zuUpdate,
   type FormWerteAufbewahrung,
 } from './einsatzEinstellungenForm';
@@ -18,6 +19,7 @@ import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
 import FristPaneel from '../../aufbewahrung/FristPaneel';
+import { EINSATZ_ABGESCHLOSSEN } from '../../components/nurAnsicht';
 
 /**
  * Sektion `…/einstellungen/aufbewahrung` — die Aufbewahrungs-Dauer. Ein Feld, siebzehn mitfahrende:
@@ -64,6 +66,8 @@ export default function EinsatzAufbewahrung() {
     );
   }
 
+  const orgDauer = daten.einstellungen.org_defaults?.retention_dauer_tage;
+
   return (
     <>
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
@@ -84,21 +88,20 @@ export default function EinsatzAufbewahrung() {
         }}
         disabled={!daten.darfBearbeiten}
       >
-        <Formularpaneel
-          titel="Aufbewahrung & Archiv"
-          beschreibung="Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Beim Abschluss entsteht daraus die Aufbewahrungsfrist (oben), die nie auf den laufenden Einsatz wirkt. Nach Fristablauf wird der Einsatz zunächst gesperrt, zur Löschung vorgemerkt und nach 30 Tagen Karenz unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben erhalten). Leer = keine automatische Frist. Die Frist selbst ändert man oben — auch nach dem Abschluss; eine Verkürzung fragt vorher nach."
-        >
+        <Formularpaneel titel="Aufbewahrung & Archiv">
           <Form.Item
             label="Aufbewahrungs-Dauer (Tage)"
             name="retention_dauer_tage"
-            tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
-            extra={orgHinweisWert(daten.einstellungen.org_defaults?.retention_dauer_tage, 'Tage')}
+            // Abgeschlossen steht kein „Nur Ansicht“ im Seitenkopf (die Frist oben bleibt
+            // änderbar); der Grund der Sperre steht deshalb hier am Feld.
+            extra={daten.istAktiv ? orgHinweisWert(orgDauer, 'Tage') : EINSATZ_ABGESCHLOSSEN}
           >
             <InputNumber
               min={1}
               max={3650}
               style={{ width: '100%', maxWidth: 200 }}
-              placeholder="keine"
+              // Einsatz ?? Org (`einsatz/effektiv.rs`): der Platzhalter nennt den wirksamen Wert.
+              placeholder={platzhalterVorgabe(orgDauer, 'keine')}
             />
           </Form.Item>
         </Formularpaneel>

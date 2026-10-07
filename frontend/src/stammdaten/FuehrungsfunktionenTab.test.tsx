@@ -63,6 +63,9 @@ describe('FuehrungsfunktionenTab', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Bezeichnung S4 bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Bezeichnung S4' });
+    // Der Platzhalter nennt die Vorgabe; kein Satz unter dem Titel (LFH-1078, `bedien-begriffe`).
+    expect(feld).toHaveAttribute('placeholder', 'Versorgung (Vorgabe)');
+    expect(screen.queryByText(/FwDV 100/)).toBeNull();
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Versorgung (Logistik){Enter}');
     expect(

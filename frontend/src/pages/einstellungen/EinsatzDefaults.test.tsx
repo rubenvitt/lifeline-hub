@@ -156,7 +156,10 @@ describe('EinsatzDefaults', () => {
       // trägt weitere — `aria-labelledby` zeigte auf das falsche Element.
       const dialog = await screen.findByRole('dialog');
       expect(dialog).toHaveTextContent('Skelett-Frist bestätigen?');
+      // Genau EIN Satz zur Folge (LFH-1078): alt → neu, und was unwiderruflich geschieht.
+      expect(dialog).toHaveTextContent('unbegrenzt → 3650 Tage ab Abschluss');
       expect(dialog).toHaveTextContent('unwiderruflich');
+      expect(dialog).not.toHaveTextContent('Purge');
       expect(speichereOrgEinstellungen).not.toHaveBeenCalled();
       await userEvent.click(
         within(dialog).getByRole('button', { name: 'Skelette löschen lassen' }),
@@ -249,7 +252,7 @@ describe('EinsatzDefaults', () => {
 
     const feld = await screen.findByLabelText('Präfix Einsatznummer');
     expect(feld).toHaveValue('WF-');
-    expect(feld).toHaveAttribute('placeholder', 'E-');
+    expect(feld).toHaveAttribute('placeholder', 'E- (Vorgabe)');
     await userEvent.clear(feld);
     await userEvent.type(feld, 'OV-');
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
@@ -259,6 +262,31 @@ describe('EinsatzDefaults', () => {
         expect.objectContaining({ einsatz_nummer_praefix: 'OV-' }),
       ),
     );
+  });
+
+  // LFH-1078: eine Zeile Vorschau statt des Satzes „Steht vor Jahr und laufender Nummer … Gilt nur
+  // für neu angelegte Einsätze“. „Neue Einsätze“ trägt die Folge: bestehende Nummern bleiben.
+  it('zeigt die erste Nummer neuer Einsätze live aus dem Präfix, leer mit der Vorgabe E-', async () => {
+    const jahr = new Date().getFullYear();
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    const feld = await screen.findByLabelText('Präfix Einsatznummer');
+    expect(screen.getByText(`Neue Einsätze: WF-${jahr}-0001`)).toBeInTheDocument();
+    await userEvent.clear(feld);
+    expect(await screen.findByText(`Neue Einsätze: E-${jahr}-0001`)).toBeInTheDocument();
+    await userEvent.type(feld, ' OV- ');
+    expect(await screen.findByText(`Neue Einsätze: OV-${jahr}-0001`)).toBeInTheDocument();
+  });
+
+  it('erklärt Felder und Paneele nicht in Sätzen (LFH-1078)', async () => {
+    const { container } = renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+    await screen.findByLabelText('Präfix Einsatznummer');
+    expect(container.textContent).not.toMatch(
+      /Leer =|reine Anzeige|sofort gespeichert|Karenz|Jede Dauer|Einstellungen im Einsatz gehen/,
+    );
+    // Die leeren Felder nennen den Wert, der dann gilt.
+    expect(screen.getAllByPlaceholderText('Einsatz-Frist (Vorgabe)')).toHaveLength(3);
+    expect(screen.getByPlaceholderText('unbegrenzt (Vorgabe)')).toBeInTheDocument();
   });
 
   it('invalidiert nach einem Modul-Rollen-Default die Modulfreigaben ALLER Einsätze (LFH-669)', async () => {
@@ -322,7 +350,14 @@ describe('EinsatzDefaults', () => {
     ).toBeInTheDocument();
     // Leere Meldungsfrist heißt 5 Minuten (System), leere Auftragsfrist heißt keine Frist.
     expect(screen.getByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('keine Frist (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Vorgabe-Quittierungsfrist Aufträge (Minuten)')).toHaveAttribute(
+      'placeholder',
+      'keine Frist (Vorgabe)',
+    );
+    expect(screen.getByLabelText('Aufbewahrungs-Dauer (Tage)')).toHaveAttribute(
+      'placeholder',
+      'keine Frist (Vorgabe)',
+    );
     expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
     // Was leer gilt, sagt der Platzhalter; kein Satz erklärt das Feld (LFH-1078).
     expect(container.textContent).not.toMatch(/Leer = Vorgabe/);
@@ -418,7 +453,9 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
 
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
-    expect(await screen.findByText(/Nur Benutzer mit der Systemrolle/)).toBeInTheDocument();
+    // „Nur Ansicht · Grund“ statt eines Satzes (LFH-1078).
+    expect(await screen.findByText('nur System-Admin')).toBeInTheDocument();
+    expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 
@@ -449,7 +486,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     await screen.findByText('Aufbewahrung');
-    expect(screen.queryByText(/Nur Benutzer mit der Systemrolle/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Nur Ansicht')).not.toBeInTheDocument();
   });
 });
 

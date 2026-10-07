@@ -177,6 +177,11 @@ describe('EinsatzAufbewahrung', () => {
     rendern();
 
     expect(await screen.findByText('Vorgabe der Organisation: 365 Tage')).toBeInTheDocument();
+    // Der Platzhalter nennt den Wert, der wirklich gilt (Einsatz ?? Org), nicht „keine“.
+    expect(screen.getByLabelText('Aufbewahrungs-Dauer (Tage)')).toHaveAttribute(
+      'placeholder',
+      '365 (Vorgabe)',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
@@ -214,6 +219,8 @@ describe('EinsatzAufbewahrung', () => {
     rendern();
 
     expect(await screen.findByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
+    // Der Grund steht am gesperrten Feld; „Nur Ansicht“ wäre hier falsch, die Frist bleibt offen.
+    expect(screen.getByText('Einsatz abgeschlossen')).toBeInTheDocument();
     const aendern = screen.getByRole('button', { name: 'Frist ändern' });
     expect(aendern).toBeEnabled();
     // Das Paneel steht AUSSERHALB des Vollersatz-Formulars.

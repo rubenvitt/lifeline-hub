@@ -253,7 +253,7 @@ for (const [name, fenster] of [
  *  auf der Aufbewahrung stehen zwei (Einstellungen und Frist). */
 const HINWEIS_EINSTELLUNGEN = 'nur Einsatzleitung, Führungspersonal oder Admin';
 const HINWEIS_FRIST = 'nur Einsatzleitung oder Org-Admin';
-const HINWEIS_MODULE = 'darf die Modul-Sichtbarkeit';
+const HINWEIS_MODULE = 'nur Einsatzleitung oder Org-Admin';
 
 function rechteHinweis(p: Page, fragment: string) {
   return rechteHinweisZeile(p, fragment);

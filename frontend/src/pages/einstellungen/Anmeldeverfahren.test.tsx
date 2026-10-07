@@ -172,6 +172,17 @@ describe('Anmeldeverfahren', () => {
     expect(
       await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
     ).toBeDisabled();
+    // LFH-1078: „Nur Ansicht · Grund“ statt eines Satzes.
+    expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
+    expect(screen.getByText('nur System-Admin')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/zum Nachlesen|Nur Benutzer mit/);
+  });
+
+  it('erklärt die Seite nicht in Sätzen (LFH-1078)', async () => {
+    renderMitProviders(<Anmeldeverfahren />);
+    await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
+    expect(document.body.textContent).not.toMatch(/sofort gespeichert|Serverstart/);
+    expect(screen.queryByText('Nur Ansicht')).not.toBeInTheDocument();
   });
 });
 

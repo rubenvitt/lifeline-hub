@@ -9,6 +9,7 @@ import { quittiereModulGespeichert } from './modulQuittung';
 import { ladeModulOverrides, setzeModulOverride } from '../../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
 import { orgVorgabe } from '../../components/vorgabeText';
+import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_ORG_ADMIN } from '../../components/nurAnsicht';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
 import { darfModuleVerwalten } from '../../einsatz/schreibrecht';
@@ -25,9 +26,11 @@ function orgRollenHinweis(
   return undefined;
 }
 
-/** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Zeile. */
-const RECHTE_TEXT =
-  'Nur die Einsatzleitung oder ein System-Admin der Organisation des Einsatzes darf die Modul-Sichtbarkeit ändern — die Werte stehen hier zum Nachlesen.';
+/**
+ * Grund des `RechteHinweis`: Modul-Overrides verwalten Einsatzleitung und System-Admin der
+ * Einsatz-Org (LFH-995), nicht Führungspersonal — anders als die Formular-Sektionen.
+ */
+const RECHTE_TEXT = NUR_LEITUNG_ORG_ADMIN;
 
 /**
  * Sektion `…/einstellungen/module` — Modul-Sichtbarkeit und Rollen-Schranke je Modul.
@@ -99,10 +102,7 @@ export default function EinsatzModule() {
         rechteFehlt={daten.istAktiv && !darfVerwalten}
         rechteText={RECHTE_TEXT}
       />
-      <Formularpaneel
-        titel="Modul-Sichtbarkeit & Berechtigungen"
-        beschreibung="Module für diesen Einsatz ausblenden oder auf eine Rolle beschränken. Einsatzdaten und Einstellungen lassen sich nicht ausblenden. Änderungen werden sofort gespeichert."
-      >
+      <Formularpaneel titel="Modul-Sichtbarkeit & Berechtigungen">
         <ModulEinstellungsListe
           rollenSpalte="Benötigte Rolle"
           rolleVon={(key) => overrides[key]?.benoetigte_rolle ?? ''}
@@ -133,15 +133,8 @@ export default function EinsatzModule() {
           }}
           darfVerwalten={darfVerwalten}
           // Zwei Ursachen, zwei Wörter: ein abgeschlossener Einsatz sperrt auch die Einsatzleitung,
-          // ein Rollenwort widerspräche dann dem Seitenbanner.
-          rechteGrund={
-            daten.istAktiv
-              ? { kurz: 'nur Einsatzleitung', lang: RECHTE_TEXT }
-              : {
-                  kurz: 'Einsatz abgeschlossen',
-                  lang: 'Der Einsatz ist abgeschlossen — seine Einstellungen sind eingefroren.',
-                }
-          }
+          // ein Rollenwort widerspräche dann dem Seitenkopf.
+          rechteGrund={daten.istAktiv ? 'nur Einsatzleitung' : EINSATZ_ABGESCHLOSSEN}
           // Nur die schreibende Zeile ist gesperrt, nur die gescheiterte markiert.
           laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
           fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}

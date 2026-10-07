@@ -76,7 +76,8 @@ const felder = (
     <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
       <Input placeholder="z. B. Zug" />
     </Form.Item>
-    <Form.Item label="Soll-Stärke (vollständig oder leer lassen)" name="soll">
+    {/* „Alle drei oder keiner“ setzt `StaerkeEingabe` selbst durch (leere Felder zählen als 0). */}
+    <Form.Item label="Soll-Stärke" name="soll">
       <StaerkeEingabe />
     </Form.Item>
     <Form.Item label="Sortierung" name="sortier">

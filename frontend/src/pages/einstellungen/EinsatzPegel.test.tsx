@@ -409,9 +409,8 @@ describe('EinsatzPegel', () => {
     await waitFor(() => expect(zeilentitel()).toHaveLength(5));
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Station wählen' })).toBeDisabled();
-    expect(
-      screen.getByText('Höchstens 5 maßgebliche Pegel — zum Hinzufügen zuerst einen entfernen.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Maximum erreicht')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="pegel-zaehler"]')?.textContent).toBe('5/5');
   });
 
   it('wird die Liste bei GEWÄHLTER Station voll, sperrt „Hinzufügen“ trotzdem', async () => {
@@ -749,7 +748,7 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(1));
     await zeilenaktion('HANN. MÜNDEN', /Prognose erfassen/);
-    expect(await screen.findByText(/Vorhersage ist gerade nicht erreichbar/)).toBeInTheDocument();
+    expect(await screen.findByText('PEGELONLINE-Vorhersage nicht erreichbar')).toBeInTheDocument();
   });
 
   it('Löschen: DELETE, dann „Rückgängig" stellt den alten Wert per PUT wieder her', async () => {

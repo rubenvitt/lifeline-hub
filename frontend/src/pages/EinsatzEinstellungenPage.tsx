@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb } from 'antd';
+import { Breadcrumb } from 'antd';
 import { useId } from 'react';
 import { Segmentleiste } from '../components/instrument';
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router';
@@ -15,7 +15,8 @@ import {
   type EinstellungenSektion,
 } from '../routing/deeplinks';
 import type { EinsatzEinstellungen } from '../api/types';
-import { NUR_LEITUNG_FUEHRUNG_ADMIN } from '../components/nurAnsicht';
+import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_FUEHRUNG_ADMIN } from '../components/nurAnsicht';
+import { RechteHinweis } from '../components/SpeicherHinweis';
 
 /**
  * Datenkontext der Einstellungs-Sektionen.
@@ -121,14 +122,13 @@ export default function EinsatzEinstellungenPage() {
       }
       // Reine Formularseite: ausdrücklich die schmale Lesebreite.
       breite="schmal"
+      // Abgeschlossen ist alles eingefroren außer der Aufbewahrungsfrist: dort stünde „Nur Ansicht“
+      // falsch, die Sektion nennt den Grund am gesperrten Feld selbst.
       hinweis={
-        !daten.istAktiv && (
-          <Alert
-            type="info"
-            showIcon
-            title="Einsatz abgeschlossen — Einstellungen sind eingefroren und können nicht mehr geändert werden, außer der Aufbewahrungsfrist."
-          />
-        )
+        <RechteHinweis
+          sichtbar={!daten.istAktiv && aktiv !== 'aufbewahrung'}
+          text={EINSATZ_ABGESCHLOSSEN}
+        />
       }
     >
       {/* Die Reiter als Segmentleiste im Tablist-Modus. Die aktive Sektion kommt aus der URL;

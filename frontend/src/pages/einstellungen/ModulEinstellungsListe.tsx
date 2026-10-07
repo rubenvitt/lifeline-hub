@@ -1,4 +1,4 @@
-import { Input, Switch, Tooltip, Typography, theme } from 'antd';
+import { Input, Switch, Typography, theme } from 'antd';
 import { useId, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import SektionHeader from '../../components/SektionHeader';
@@ -71,26 +71,17 @@ export function modulSperrGrund(zeile: {
   return null;
 }
 
-/** Wortlaut eines Sperrgrunds: Kurzwort sichtbar, Begründung im Tooltip darüber. */
-interface SperrWortlaut {
-  kurz: string;
-  lang: string;
-}
-
-const MODUL_GRUND: SperrWortlaut = {
-  // Der Kurztext ist in den Tests wörtlich gepinnt.
-  kurz: 'immer sichtbar, nicht ausblendbar',
-  lang: 'Selbst-Aussperr-Schutz: Einsatzdaten und Einstellungen lassen sich weder ausblenden noch auf eine Rolle beschränken — sonst käme niemand mehr an diese Einstellungen zurück.',
-};
+/**
+ * Sperrgrund der Modul-Eigenschaft (Selbst-Aussperr-Schutz: Einsatzdaten und Einstellungen lassen
+ * sich weder ausblenden noch auf eine Rolle beschränken). In den Tests wörtlich gepinnt.
+ */
+const MODUL_GRUND = 'immer sichtbar, nicht ausblendbar';
 
 /**
  * Rückfall ohne Wortlaut vom Aufrufer — ein Wort, das in jedem Fall stimmt: auf Einsatz-Ebene
  * sperrt auch ein abgeschlossener Einsatz, „nur Verwaltung" widerspräche dort dem Seitenbanner.
  */
-const RECHTE_GRUND_RUECKFALL: SperrWortlaut = {
-  kurz: 'nur lesen',
-  lang: 'Diese Werte lassen sich hier nicht ändern — sie stehen zum Nachlesen da.',
-};
+const RECHTE_GRUND_RUECKFALL = 'nur lesen';
 
 interface SichtbarSpalte {
   /** Spaltenüberschrift, z. B. „Sichtbar". */
@@ -110,10 +101,11 @@ interface ModulEinstellungsListeProps {
   /** Darf der Benutzer hier überhaupt etwas ändern? */
   darfVerwalten: boolean;
   /**
-   * Warum `darfVerwalten` fehlt — vom Aufrufer, weil nur er die Ursache kennt (Rolle oder
-   * abgeschlossener Einsatz). Fehlt es, steht „nur lesen".
+   * Warum `darfVerwalten` fehlt, in wenigen Wörtern (`components/nurAnsicht.ts`) — vom Aufrufer,
+   * weil nur er die Ursache kennt (Rolle oder abgeschlossener Einsatz). Fehlt es, steht „nur
+   * lesen".
    */
-  rechteGrund?: SperrWortlaut;
+  rechteGrund?: string;
   /** Modul-Key der gerade mutierenden Zeile; nur diese ist gesperrt. */
   laeuftKey?: string | null;
   /** Modul-Key der zuletzt fehlgeschlagenen Zeile; nur diese wird markiert. */
@@ -142,7 +134,7 @@ interface ModulEinstellungsListeProps {
  * fällt ganz weg, und trifft der Filter nirgends, sagt die Liste das.
  *
  * Sperrgründe je Zeile (`modulSperrGrund`): Modul-Eigenschaft und fehlendes Recht tragen ein
- * gedämpftes Kurzwort, die Begründung steht im Tooltip darüber (Tablet: kein Hover). Das Kurzwort
+ * gedämpftes Kurzwort, ohne Erklär-Tooltip (LFH-1078; Tablet: kein Hover). Das Kurzwort
  * steht auch dann, wenn der `RechteHinweis` dasselbe sagt — ein grauer Schalter ohne Wort ist eine
  * Ein-Kanal-Aussage. Der Schreibvorgang zeigt sich nur als `loading` am Steuerelement; das
  * `aria-label` des Schalters schlägt das Lade-Icon.
@@ -195,7 +187,7 @@ export default function ModulEinstellungsListe({
     const gesperrt = sperrGrund !== null;
     // Nur die zwei dauerhaften Gründe tragen einen Text; der Schreibvorgang zeigt sich als
     // `loading`.
-    const wortlaut =
+    const sperrWort =
       sperrGrund === 'modul' ? MODUL_GRUND : sperrGrund === 'rechte' ? rechteGrund : null;
     const hinweis = hinweisVon?.(m.key);
     const hatFehler = fehlerKey === m.key;
@@ -214,14 +206,10 @@ export default function ModulEinstellungsListe({
     const beschriftung = (
       <>
         <span>{m.label}</span>
-        {wortlaut && (
-          // Kurzwort sichtbar, Begründung im Tooltip — an einem nicht gesperrten Element, also ohne
-          // Wrapper.
-          <Tooltip title={wortlaut.lang}>
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-              {wortlaut.kurz}
-            </Typography.Text>
-          </Tooltip>
+        {sperrWort && (
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+            {sperrWort}
+          </Typography.Text>
         )}
       </>
     );

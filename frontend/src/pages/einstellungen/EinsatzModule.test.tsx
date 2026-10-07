@@ -157,7 +157,7 @@ describe('EinsatzModule', () => {
 
     rendern();
 
-    expect(await screen.findByText(/Nur die Einsatzleitung/)).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 
@@ -174,7 +174,7 @@ describe('EinsatzModule', () => {
     rendern();
 
     expect(await screen.findByRole('switch', { name: 'Sichtbar: ETB' })).toBeEnabled();
-    expect(screen.queryByText(/Nur die Einsatzleitung/)).toBeNull();
+    expect(screen.queryByText('nur Einsatzleitung oder Org-Admin')).toBeNull();
   });
 
   it('sperrt den Admin einer fremden Org ohne Mitgliedschaft', async () => {
@@ -189,7 +189,7 @@ describe('EinsatzModule', () => {
 
     rendern();
 
-    expect(await screen.findByText(/Organisation des Einsatzes/)).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 
@@ -210,7 +210,7 @@ describe('EinsatzModule', () => {
   });
 
   // `darfEinsatzLeiten` verlangt einen aktiven Einsatz; ein abgeschlossener sperrt auch die
-  // Einsatzleitung. Ein Rollenwort widerspräche dort dem Seitenbanner.
+  // Einsatzleitung. Ein Rollenwort widerspräche dort dem Seitenkopf.
   it('nennt im abgeschlossenen Einsatz den Abschluss, nicht die Rolle', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1,

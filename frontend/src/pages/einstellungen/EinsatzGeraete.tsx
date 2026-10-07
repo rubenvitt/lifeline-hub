@@ -49,8 +49,8 @@ import {
   verlaengernVorbelegung,
 } from './geraeteKern';
 
-const RECHTE_TEXT =
-  'Geräte koppelt nur die Einsatzleitung. Ein gekoppeltes Gerät arbeitet ohne Personenkonto in diesem Einsatz.';
+/** Grund des `RechteHinweis`: der Server lässt nur die Einsatzleitung zu, auch keinen Admin. */
+const RECHTE_TEXT = 'nur Einsatzleitung';
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 
@@ -80,7 +80,7 @@ function modulName(key: string): string {
  * ist unumkehrbar und fragt deshalb zurück (LFH-363); Verlängern und Neu-Ausstellen nicht.
  *
  * Rechte: der Server lässt nur die Einsatzleitung zu (`EinsatzLeitungszugriff`), auch keinen
- * System-Admin ohne Mitgliedschaft. Ohne sie lädt die Sektion nichts und erklärt das.
+ * System-Admin ohne Mitgliedschaft. Ohne sie lädt die Sektion nichts und nennt den Grund.
  */
 export default function EinsatzGeraete() {
   const { id } = useParams();
@@ -181,7 +181,6 @@ export default function EinsatzGeraete() {
       <SeitenHinweise fehler={neuerCode.error ?? verlaengern.error} />
       <Formularpaneel
         titel="Gekoppelte Geräte"
-        beschreibung="Ein gekoppeltes Gerät arbeitet ohne Personenkonto, nur in diesem Einsatz und nur in seiner Ansicht. Ein Widerruf wirkt sofort."
         dataUpdatedAt={geraeteQ.dataUpdatedAt}
         aktion={
           darf && (
@@ -196,7 +195,7 @@ export default function EinsatzGeraete() {
           bordered
           dataSource={kopplungen}
           rowKey={(k) => k.id}
-          emptyText="Noch kein Gerät gekoppelt."
+          emptyText="Noch kein Gerät gekoppelt"
           renderItem={(k) => (
             <ListenEintrag
               actions={
@@ -315,7 +314,6 @@ export default function EinsatzGeraete() {
             { required: true, whitespace: true, message: 'Bezeichnung angeben' },
             { max: 60, message: 'Höchstens 60 Zeichen' },
           ]}
-          extra="Steht an jedem Eintrag des Geräts, etwa „Tablet 1“."
         >
           <Input placeholder="Tablet 1" maxLength={60} />
         </Form.Item>
@@ -328,10 +326,6 @@ export default function EinsatzGeraete() {
             style={{ marginBlockEnd: token.margin }}
           />
         )}
-        <Typography.Paragraph style={{ color: rollen.gedaempft }}>
-          Die Kopplung gilt 24 Stunden und lässt sich danach verlängern. Mit dem Abschluss des
-          Einsatzes endet sie.
-        </Typography.Paragraph>
         <SpeicherFehler fehler={anlegen.error} titel="Nicht gekoppelt" />
       </ErfassungsModal>
 
@@ -361,7 +355,6 @@ export default function EinsatzGeraete() {
               },
             },
           ]}
-          extra="Höchstens 72 Stunden ab jetzt."
         >
           <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
         </Form.Item>
@@ -378,10 +371,7 @@ export default function EinsatzGeraete() {
         onCancel={() => setWiderrufFuer(null)}
         destroyOnHidden
       >
-        <p>
-          Das Gerät verliert sofort jeden Zugriff und zeigt „Kopplung beendet“. Was es geschrieben
-          hat, bleibt stehen. Für eine neue Kopplung legst du das Gerät neu an.
-        </p>
+        <p>Das Gerät verliert sofort jeden Zugriff; seine Einträge bleiben.</p>
         <SpeicherFehler fehler={widerrufen.error} titel="Nicht widerrufen" />
       </Modal>
 
@@ -399,9 +389,7 @@ export default function EinsatzGeraete() {
         {anzeigeCode && (
           <div data-lfh="kopplungscode">
             <p>
-              Am Gerät die Adresse unten öffnen oder den QR-Code scannen. Der Code gilt bis{' '}
-              {formatUhrzeitMitTag(anzeigeCode.code.laeuft_ab_at, konv)} und genau einmal. Er lässt
-              sich hier nicht noch einmal anzeigen.
+              {`Gültig bis ${formatUhrzeitMitTag(anzeigeCode.code.laeuft_ab_at, konv)}, einmal einlösbar, nur jetzt sichtbar.`}
             </p>
             <div
               style={{

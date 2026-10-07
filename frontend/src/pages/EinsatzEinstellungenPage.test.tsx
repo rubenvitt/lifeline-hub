@@ -110,7 +110,7 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
     await waitFor(() => expect(screen.getByText('Sektionsinhalt Module')).toBeInTheDocument());
   });
 
-  it('blendet einen Hinweis ein, wenn der Einsatz abgeschlossen ist', async () => {
+  it('zeigt „Nur Ansicht · Einsatz abgeschlossen“, wenn der Einsatz abgeschlossen ist', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1,
       bezeichnung: 'Lage',
@@ -118,9 +118,25 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
       meine_rolle: 'einsatzleitung',
     } as never);
 
-    rendern();
+    const { container } = rendern();
 
-    expect(await screen.findByText(/eingefroren/)).toBeInTheDocument();
+    await screen.findByText('Sektionsinhalt Allgemein');
+    const hinweis = container.querySelector('[data-lfh="rechte-hinweis"]');
+    expect(hinweis?.textContent).toBe('Nur Ansicht Einsatz abgeschlossen');
+  });
+
+  it('nennt in der Aufbewahrung keine „Nur Ansicht“ — die Frist bleibt dort änderbar', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'abgeschlossen',
+      meine_rolle: 'einsatzleitung',
+    } as never);
+
+    const { container } = rendern('/einsaetze/1/einstellungen/aufbewahrung');
+
+    await screen.findByText('Sektionsinhalt Aufbewahrung');
+    expect(container.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
   });
 
   it('laesst den Kopf-Aktionen-Slot leer — der Speichern-Knopf liegt im Formular', async () => {

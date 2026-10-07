@@ -136,8 +136,8 @@ type Aenderung = { art: 'hinzufuegen'; station: PegelEingabe } | PegelOperation;
  * Löschen ist über den Rückgängig-Toast umkehrbar. Eine verstrichene Prognose steht als
  * „abgelaufen" da, bis jemand sie löscht oder erneuert.
  *
- * Ist die Fachebene `pegelonline` nicht erreichbar, sagt ein Hinweis das; die festgelegte Liste
- * bleibt bedienbar, nur das Hinzufügen wartet.
+ * Ist die Fachebene `pegelonline` nicht erreichbar, sagt ein Hinweis das (Zustand, kein Satz zur
+ * Bedienung); die festgelegte Liste bleibt bedienbar, nur das Hinzufügen wartet.
  */
 export default function EinsatzPegel() {
   const { id } = useParams();
@@ -261,7 +261,12 @@ export default function EinsatzPegel() {
       />
       <Formularpaneel
         titel="Maßgebliche Pegel"
-        beschreibung={`Welche PEGELONLINE-Stationen für diesen Einsatz zählen. Der erste ist der Leitpegel: er steht als Kennzahl auf dem Lage-Dashboard und im Überblick. Höchstens ${PEGEL_MAX}. Änderungen werden sofort gespeichert.`}
+        // Zähler statt Satz: die Grenze zeigt sich, bevor sie greift.
+        aktion={
+          <Typography.Text type="secondary" data-lfh="pegel-zaehler">
+            {`${liste.length}/${PEGEL_MAX}`}
+          </Typography.Text>
+        }
         dataUpdatedAt={pegelQ.dataUpdatedAt}
       >
         <Liste<PegelAnzeige>
@@ -270,7 +275,7 @@ export default function EinsatzPegel() {
           bordered
           dataSource={liste}
           rowKey={(p) => p.station_uuid}
-          emptyText="Noch kein Pegel festgelegt — unten eine Station wählen."
+          emptyText="Noch kein Pegel festgelegt"
           renderItem={(p, index) => (
             <ListenEintrag
               actions={
@@ -428,7 +433,7 @@ export default function EinsatzPegel() {
             data-lfh="pegel-grenze"
             style={{ marginBlockStart: token.marginXS, marginBlockEnd: 0, color: rollen.gedaempft }}
           >
-            {`Höchstens ${PEGEL_MAX} maßgebliche Pegel — zum Hinzufügen zuerst einen entfernen.`}
+            Maximum erreicht
           </Typography.Paragraph>
         )}
 
@@ -442,7 +447,6 @@ export default function EinsatzPegel() {
                 ? 'Die Stationsliste von PEGELONLINE ist gerade nicht erreichbar.'
                 : 'PEGELONLINE liefert gerade keine wählbare Station.'
             }
-            description="Neue Pegel lassen sich erst wieder hinzufügen, wenn die Liste zurück ist. Die festgelegten Pegel bleiben bedienbar: umordnen und entfernen geht weiter."
             action={<Button onClick={() => void stationenQ.refetch()}>Erneut abrufen</Button>}
           />
         )}

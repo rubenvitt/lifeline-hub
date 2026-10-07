@@ -117,6 +117,10 @@ describe('AnzeigeEinstellungen', () => {
     ).toBeInTheDocument();
     // Was leer gilt, sagt der Platzhalter; kein Satz erklärt das Feld (LFH-1078).
     expect(container.textContent).not.toMatch(/Leer = Vorgabe/);
+    // Der Datenschutz-Hinweis steht sichtbar am Feld, nicht nur im Tooltip (Touch).
+    expect(
+      screen.getByText('Die Einsatz-Koordinate wird an diesen Dienst gesendet.'),
+    ).toBeVisible();
     const platzhalter = [...container.querySelectorAll('[placeholder]')].map((e) =>
       e.getAttribute('placeholder'),
     );
@@ -177,7 +181,9 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
 
     renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
-    expect(await screen.findByText(/Nur Benutzer mit der Systemrolle/)).toBeInTheDocument();
+    // „Nur Ansicht · Grund“ statt eines Satzes (LFH-1078).
+    expect(await screen.findByText('nur System-Admin')).toBeInTheDocument();
+    expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 
@@ -186,6 +192,6 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
     renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     await screen.findByText('Anzeige-Konventionen');
-    expect(screen.queryByText(/Nur Benutzer mit der Systemrolle/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Nur Ansicht')).not.toBeInTheDocument();
   });
 });

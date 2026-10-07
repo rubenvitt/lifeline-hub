@@ -99,20 +99,21 @@ export default function EtbBausteinFormModal({
       <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
         <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }))} />
       </Form.Item>
+      {/* Die automatischen Platzhalter als Liste, kein Satz (LFH-1078): dass weitere `{…}` beim
+         Einsetzen abgefragt werden, zeigt der Platzhalter des Feldes; Klick-Chips wären eine neue
+         Funktion. Die Beschreibung steht als `title` am Code, sichtbar trägt der Name. */}
       <Form.Item
-        label="Inhalt (Platzhalter wie {einheit} erlaubt)"
+        label="Inhalt"
         name="inhalt"
         rules={[{ required: true, whitespace: true }]}
         extra={
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Vorkonfigurierte Platzhalter werden beim Einsetzen automatisch befüllt:{' '}
+            Automatisch:{' '}
             {AUTO_PLATZHALTER.map((p) => (
               <span key={p.name}>
-                <code>{`{${p.name}}`}</code> ({p.beschreibung}){' '}
+                <code title={p.beschreibung}>{`{${p.name}}`}</code>{' '}
               </span>
             ))}
-            . Beliebige weitere Platzhalter wie <code>{'{einheit}'}</code> werden beim Einsetzen
-            abgefragt. Gilt auch für die Veranlassung.
           </Typography.Text>
         }
       >

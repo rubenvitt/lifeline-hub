@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Typography, type TableColumnsType } from 'antd';
+import { Button, Popconfirm, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -130,11 +130,6 @@ export default function StichworteTab() {
     >
       {/* KEIN `aktionen`-Slot: der Anlegen-Weg ist die Schnellerfassungszeile am Inhalt. Ein zweiter
          Knopf im Kopf wären zwei Primäraktionen für dieselbe Sache. */}
-      <Typography.Paragraph type="secondary">
-        Vorschläge für die Stichwort-Combobox im Einsatzdaten-Modul. Freie Eingabe bleibt im Einsatz
-        unabhängig davon möglich.
-      </Typography.Paragraph>
-
       {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch
          keine Stichworte" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}

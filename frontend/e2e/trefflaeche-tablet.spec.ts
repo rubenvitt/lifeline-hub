@@ -468,9 +468,7 @@ for (const { dichte, soll } of STAFFEL) {
 
     // ── VORBEDINGUNGEN: der gesperrte Zweig steht.
     await expect(
-      page
-        .locator('[data-lfh="rechte-hinweis"]')
-        .filter({ hasText: 'dürfen Anmeldeverfahren umschalten' }),
+      page.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: 'nur System-Admin' }),
       'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
     ).toBeVisible();
     const zeilen = page.locator('[data-provider-zeile]');

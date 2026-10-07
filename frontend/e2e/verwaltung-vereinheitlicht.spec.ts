@@ -243,9 +243,7 @@ test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Vorgaben breit genug z
  */
 async function nurLeseZweigSteht(page: Page) {
   await expect(
-    page
-      .locator('[data-lfh="rechte-hinweis"]')
-      .filter({ hasText: 'dürfen die Org-Vorgaben ändern' }),
+    page.locator('[data-lfh="rechte-hinweis"]').filter({ hasText: 'nur System-Admin' }),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
   ).toBeVisible();
   await expect(

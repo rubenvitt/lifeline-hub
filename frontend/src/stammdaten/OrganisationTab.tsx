@@ -210,10 +210,7 @@ export default function OrganisationTab() {
         onValuesChange={schutz.geaendert}
         onFinish={absenden}
       >
-        <Formularpaneel
-          titel="Name"
-          beschreibung="Steht im Druckkopf jedes Ausdrucks und ordnet ihn der Organisation zu."
-        >
+        <Formularpaneel titel="Name">
           <Form.Item
             label="Name der Organisation"
             name="name"
@@ -246,7 +243,7 @@ export default function OrganisationTab() {
                 type="warning"
                 showIcon
                 title="Das hinterlegte Logo lässt sich nicht anzeigen."
-                description="Auf Ausdrucken fehlt es, bis es ersetzt oder entfernt ist."
+                description="Fehlt auf Ausdrucken."
               />
             ) : logo ? (
               <img
@@ -255,12 +252,10 @@ export default function OrganisationTab() {
                 style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
                 onError={() => setKaputtesLogo(logo.sha256)}
               />
-            ) : (
-              <Typography.Text type="secondary">
-                Kein Logo hinterlegt. Der Druckkopf zeigt dann nur den Namen.
-              </Typography.Text>
-            )}
-            <Typography.Text type="secondary">PNG oder JPEG, höchstens 1 MiB.</Typography.Text>
+            ) : null}
+            {/* Ohne Logo kein Satz (LFH-1078): „kein Logo“ steht im Kopf, darunter „Logo hochladen“.
+               Keine Formatzeile: `accept` filtert den Dateidialog, die Vorprüfung nennt die Grenze,
+               wenn sie verletzt ist. */}
             {vorpruefung && (
               <Alert
                 type="error"
@@ -309,10 +304,7 @@ export default function OrganisationTab() {
           </Space>
         </Paneel>
 
-        <Formularpaneel
-          titel="Taktische Zeichen"
-          beschreibung="Vorgabe für die Organisation im taktischen Zeichen (DV 102); je Objekt änderbar."
-        >
+        <Formularpaneel titel="Taktische Zeichen">
           <Form.Item label="DV-102-Organisation" name="tz_organisation" style={{ maxWidth: 480 }}>
             <Select
               options={ORG_OPTIONEN}
@@ -347,8 +339,7 @@ export default function OrganisationTab() {
            hinter seiner Maske an der Seite (Bauform `FreigabeDialog`). */}
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Typography.Paragraph style={{ margin: 0 }}>
-            Das Logo wird gelöscht und steht danach auf keinem Ausdruck mehr. Das lässt sich nicht
-            rückgängig machen; ein neues Logo muss erneut hochgeladen werden.
+            Das Logo wird unwiderruflich gelöscht.
           </Typography.Paragraph>
           <SpeicherFehler fehler={logoEntfernen.error} titel="Logo nicht entfernt" />
         </Space>

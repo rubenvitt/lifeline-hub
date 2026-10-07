@@ -281,10 +281,7 @@ describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
  * oder bloß schreibenden Zeile, und an „Einsatzdaten“ ohne Recht genau ein Grund.
  */
 describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
-  const RECHTE = {
-    kurz: 'nur Einsatzleitung',
-    lang: 'Nur die Einsatzleitung darf die Modul-Sichtbarkeit ändern.',
-  };
+  const RECHTE = 'nur Einsatzleitung';
 
   function zeileVon(label: string) {
     return screen.getByText(label).closest('[data-modul-zeile]') as HTMLElement;
@@ -353,21 +350,18 @@ describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
     );
   });
 
-  it('legt die lange Begründung in den Tooltip über dem Kurztext', async () => {
+  // LFH-1078: der Grund steht sichtbar in wenigen Wörtern; ein erklärender Tooltip-Satz darüber
+  // fiele auf dem Tablet ohnehin weg.
+  it('legt keinen Erklär-Tooltip über die Kurzwörter', async () => {
     renderMitProviders(
       <ModulEinstellungsListe {...einsatzProps()} darfVerwalten={false} rechteGrund={RECHTE} />,
     );
 
     fireEvent.mouseEnter(within(zeileVon('ETB')).getByText('nur Einsatzleitung'));
-    expect(await screen.findByText(RECHTE.lang)).toBeInTheDocument();
-  });
-
-  it('erklärt die Modul-Eigenschaft im Tooltip — vorher stand dort gar nichts', async () => {
-    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
-
     fireEvent.mouseEnter(
       within(zeileVon('Einsatzdaten')).getByText('immer sichtbar, nicht ausblendbar'),
     );
-    expect(await screen.findByText(/Selbst-Aussperr-Schutz/)).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByRole('tooltip')).toBeNull();
   });
 });

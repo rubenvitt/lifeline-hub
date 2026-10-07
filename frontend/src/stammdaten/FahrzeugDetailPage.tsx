@@ -162,7 +162,6 @@ export default function FahrzeugDetailPage() {
             {fahrzeug.ist_demo && <DemoMarke />}
           </Space>
         }
-        beschreibung="Alle Stammdaten des Fahrzeugs. In der Liste erfasst du nur vier Grundfelder, hier ergänzt du den Rest."
         hinweis={
           <SeitenHinweise
             fehler={speichern.error}
@@ -286,8 +285,9 @@ export default function FahrzeugDetailPage() {
               <Col xs={24} lg={12}>
                 {/* EIN `Form.Item` für das ganze F/UF/M-Trio — nicht drei. Das Backend prüft die Stärke gegen
                    den EFFEKTIVZUSTAND (Mehrspalten-CHECK „alle drei oder keiner"); verteilt und teilweise
-                   gesendet entstünde eine Kombination, die der CHECK ablehnt. */}
-                <Form.Item label="Soll-Stärke (alle drei oder keiner)" name="staerke">
+                   gesendet entstünde eine Kombination, die der CHECK ablehnt. Die Regel setzt
+                   `StaerkeEingabe` selbst durch (leere Felder zählen als 0), kein Satz am Label. */}
+                <Form.Item label="Soll-Stärke" name="staerke">
                   <StaerkeEingabe />
                 </Form.Item>
               </Col>

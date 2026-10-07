@@ -66,6 +66,20 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
+   * LFH-1078: am Inhalt stehen die automatischen Platzhalter als Liste, kein Satz darüber, wann
+   * sie befüllt oder abgefragt werden.
+   */
+  it('nennt am Inhalt die automatischen Platzhalter ohne Erklärsatz', async () => {
+    handler();
+    renderMitProviders(<Harness />);
+    const feld = await screen.findByLabelText('Inhalt');
+    const zeile = feld.closest('.ant-form-item') as HTMLElement;
+    expect(within(zeile).getByText('{datum}')).toBeInTheDocument();
+    expect(within(zeile).getByText('{einsatznr}')).toBeInTheDocument();
+    expect(zeile).not.toHaveTextContent(/beim Einsetzen|befüllt|abgefragt/);
+  });
+
+  /**
    * Die Vorgabewerte (`typ: 'meldung'`, `sortier: 0`) stehen als `initialValues` an der Hülle —
    * von dort holt sie jedes `resetFields` wieder. Beleg ist der Weg über einen bearbeiteten
    * Datensatz: ohne `initialValues` stünde hier dessen Sortierung 7.

@@ -115,6 +115,8 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     expect(screen.getByLabelText('Bemerkung')).toHaveValue('Springer');
     expect(screen.getByText('Führer')).toBeInTheDocument();
     expect(screen.getByLabelText('Benutzer-Konto (optional)')).toBeInTheDocument();
+    // Kein Zweck-Absatz unter dem Titel (LFH-1078).
+    expect(screen.queryByText(/Grundfelder/)).toBeNull();
     expect(abrufe).toBe(1);
   });
 

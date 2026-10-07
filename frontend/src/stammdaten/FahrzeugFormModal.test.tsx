@@ -238,7 +238,7 @@ describe('FahrzeugFormModal — Schnellerfassung (LFH-346/A7)', () => {
       'FMS-ISSI',
       'Sonder-/Wegerecht',
       'Tragenkapazität',
-      'Soll-Stärke (alle drei oder keiner)',
+      'Soll-Stärke',
       'Bemerkung',
     ]) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();

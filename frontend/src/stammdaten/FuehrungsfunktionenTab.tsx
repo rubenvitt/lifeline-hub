@@ -4,6 +4,7 @@ import AdminPage from '../components/AdminPage';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { mitVorgabe } from '../components/vorgabeText';
 import { monoStil } from '../components/instrument';
 import { useAuth } from '../auth/AuthContext';
 import { ladeFuehrungsfunktionen, setzeFuehrungsfunktion } from '../api/fuehrungsfunktionen';
@@ -74,7 +75,6 @@ export default function FuehrungsfunktionenTab() {
   return (
     <AdminPage
       titel="Führungsfunktionen"
-      beschreibung="Bezeichnungen der Führungsfunktionen in Aufträgen, Erinnerungen, Führungsstellen und im Stab. Leer gespeichert gilt die Bezeichnung nach FwDV 100."
       hinweis={
         <SeitenHinweise
           fehler={setzen.error}
@@ -134,7 +134,7 @@ export default function FuehrungsfunktionenTab() {
                         <Input
                           {...feld}
                           maxLength={60}
-                          placeholder={eintrag.standard_label}
+                          placeholder={mitVorgabe(eintrag.standard_label)}
                           value={value}
                           onChange={(e) => onChange(e.target.value)}
                         />

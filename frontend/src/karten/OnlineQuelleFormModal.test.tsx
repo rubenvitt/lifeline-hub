@@ -233,19 +233,25 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Der Proxy wird als Tooltip am Feld erklärt, nicht als Alert über dem Formular. Geprüft wird
-   * beides: Alert weg UND Erklärung am Feld.
+   * Der Proxy trägt als einziges Feld einen kurzen Tooltip (wann abschalten), kein Alert über dem
+   * Formular. Die übrigen Felder erklären sich selbst (LFH-1078): der Schlüssel steht im
+   * Platzhalter der URL, die Pflicht der Attribution zeigen Marke und Prüfung.
    */
-  it('erklärt den Proxy am Feld statt in einem Alert über dem Formular', async () => {
+  it('erklärt nur den Proxy, am Feld statt in einem Alert über dem Formular', async () => {
     handler();
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
     const dialog = await screen.findByRole('dialog');
 
     expect(dialog.querySelector('.ant-alert')).toBeNull();
+    expect(screen.getByLabelText('URL')).toHaveAttribute(
+      'placeholder',
+      'https://…/style.json?key=…',
+    );
 
     await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     const zeile = (await screen.findByLabelText('Über Server proxen')).closest('.ant-form-item');
     expect(zeile?.querySelector('.ant-form-item-tooltip')).not.toBeNull();
+    expect(dialog.querySelectorAll('.ant-form-item-tooltip')).toHaveLength(1);
   });
 });
