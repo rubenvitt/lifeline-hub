@@ -1532,11 +1532,10 @@ export default function Datensicht<T extends object, const K extends string>(
   const garniturNeu = tabellenGarnitur.neu;
   // Je Render neu gebaut wie `tabellenSpalten`: ein neues Spaltenobjekt rendert keine Zelle, das
   // entscheidet allein `shouldCellUpdate`.
-  const gemerkteSpalten = tabellenSpalten.map(
-    (s): KatalogSpalte<T> =>
-      s.shouldCellUpdate
-        ? s
-        : { ...s, shouldCellUpdate: (zeile, vorher) => zeile !== vorher || garniturNeu },
+  const gemerkteSpalten = tabellenSpalten.map((s): KatalogSpalte<T> =>
+    s.shouldCellUpdate
+      ? s
+      : { ...s, shouldCellUpdate: (zeile, vorher) => zeile !== vorher || garniturNeu },
   );
 
   const { von: fensterVon, bis: fensterBis } = ausschnitt;

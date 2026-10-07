@@ -35,7 +35,9 @@ describe('berechneAusschnitt (LFH-949)', () => {
   });
 
   it('gemessene Höhen zählen, eine Messung von 0 gilt als nicht gemessen', () => {
-    const hoehen = Array.from({ length: 1000 }, (_, i) => (i < 10 ? 100 : i === 10 ? 0 : undefined));
+    const hoehen = Array.from({ length: 1000 }, (_, i) =>
+      i < 10 ? 100 : i === 10 ? 0 : undefined,
+    );
     const a = berechneAusschnitt(basis({ hoehen, sichtVon: 1000, sichtBis: 1100, ueberhang: 0 }));
     // 10 Zeilen à 100 px = 1 000 px; Zeile 10 (Messung 0) geschätzt mit 50.
     expect(a.von).toBe(10);
