@@ -46,7 +46,7 @@ describe('KopplungBeendetPage (LFH-892)', () => {
   it('sagt „Kopplung beendet“, verweist an die Einsatzleitung und bietet keine Anmeldung', async () => {
     setup();
     expect(await screen.findByRole('heading', { name: 'Kopplung beendet' })).toBeInTheDocument();
-    expect(screen.getByText(/Melde dich bei der Einsatzleitung/)).toBeInTheDocument();
+    expect(screen.getByText('Neuen Code gibt die Einsatzleitung.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Passwort/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Anmelden/)).not.toBeInTheDocument();
   });
@@ -61,7 +61,8 @@ describe('KopplungBeendetPage (LFH-892)', () => {
     setzeOnline(false);
     setup();
     expect(await screen.findByRole('heading', { name: 'Keine Verbindung' })).toBeInTheDocument();
-    expect(screen.getByText(/erreicht den Server nicht/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut prüfen' })).toBeInTheDocument();
+    expect(screen.queryByText('Neuen Code gibt die Einsatzleitung.')).not.toBeInTheDocument();
   });
 
   it('kehrt auf die Hülle zurück, wenn die Kopplung beim erneuten Prüfen besteht', async () => {

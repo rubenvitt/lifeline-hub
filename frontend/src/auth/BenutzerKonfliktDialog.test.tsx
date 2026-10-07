@@ -69,7 +69,7 @@ describe('BenutzerKonfliktDialog (LFH-387)', () => {
     expect(within(dialog).getByText('Anderer Benutzer angemeldet')).toBeInTheDocument();
     expect(dialog).toHaveTextContent('Bruno Beispiel');
     expect(dialog).toHaveTextContent('Anna Admin');
-    expect(dialog).toHaveTextContent(/nichts mehr unter Anna Admin gespeichert/);
+    expect(dialog).toHaveTextContent(/Unter Anna Admin wird hier nichts mehr gespeichert/);
   });
 
   it('trägt genau eine Aktion und lässt sich weder per Escape noch per Kreuz schließen', async () => {

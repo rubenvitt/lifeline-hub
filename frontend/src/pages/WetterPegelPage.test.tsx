@@ -364,7 +364,7 @@ describe('WetterPegelPage (LFH-633)', () => {
         },
       });
       renderPage();
-      expect(await screen.findAllByText(/brauchen einen verorteten Einsatzort/)).toHaveLength(3);
+      expect(await screen.findAllByText('Einsatzort nicht verortet')).toHaveLength(3);
       const wege = screen.getAllByRole('button', {
         name: 'Einsatzort in den Einsatzdaten verorten',
       });

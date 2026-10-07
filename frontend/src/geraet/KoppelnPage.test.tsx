@@ -101,10 +101,8 @@ describe('KoppelnPage (LFH-892)', () => {
   it('koppelt nicht, solange eine Person angemeldet ist', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(PERSON)));
     setup('/koppeln#ABCD1234');
-    expect(
-      await screen.findByText(/In diesem Browser ist Gerda Maier angemeldet/),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abmelden' })).toBeInTheDocument();
+    expect(await screen.findByText('Angemeldet als Gerda Maier')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abmelden zum Koppeln' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Gerät koppeln' })).not.toBeInTheDocument();
   });
 
@@ -116,9 +114,7 @@ describe('KoppelnPage (LFH-892)', () => {
     );
     setup();
     expect(
-      await screen.findByText(
-        'Dieses Gerät ist schon als Tablet 1 gekoppelt. Ein neuer Code ersetzt die Kopplung.',
-      ),
+      await screen.findByText('Gekoppelt als Tablet 1. Ein neuer Code ersetzt die Kopplung.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Gerät koppeln' })).toBeInTheDocument();
   });

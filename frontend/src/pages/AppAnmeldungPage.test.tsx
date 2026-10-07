@@ -110,7 +110,9 @@ describe('AppAnmeldungPage (LFH-818)', () => {
       expect(navigiere).toHaveBeenCalledWith(`lifeline://anmeldung?code=${CODE}`),
     );
     expect(body).toEqual({ challenge: CHALLENGE });
-    expect(await screen.findByText(/Du kannst dieses Fenster schließen/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('An die Mac-App übergeben. Dieses Fenster kann zu.'),
+    ).toBeInTheDocument();
     // Der Code steht nie auf der Seite.
     expect(document.body.textContent).not.toContain(CODE);
   });

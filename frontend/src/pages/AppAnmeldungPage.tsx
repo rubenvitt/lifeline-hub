@@ -63,9 +63,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
     );
   } else if (zurueck) {
     inhalt = (
-      <Typography.Paragraph>
-        Die Mac-App übernimmt die Anmeldung. Du kannst dieses Fenster schließen.
-      </Typography.Paragraph>
+      <Typography.Paragraph>An die Mac-App übergeben. Dieses Fenster kann zu.</Typography.Paragraph>
     );
   } else {
     inhalt = (
@@ -73,10 +71,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
         <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
           In der Mac-App anmelden als {benutzer?.anzeigename}
         </Typography.Title>
-        <Typography.Paragraph type="secondary">
-          Die Mac-App wird mit diesem Konto ({benutzer?.benutzername}) angemeldet. Bist das nicht
-          du, melde dich mit deinem eigenen Konto an.
-        </Typography.Paragraph>
+        <Typography.Paragraph type="secondary">Konto {benutzer?.benutzername}</Typography.Paragraph>
         {/* Gegen untergeschobene Links: der Code geht an die Mac-App auf DIESEM Gerät, eine
             Bestätigung ohne eigenen Anstoß aus der App meldet womöglich eine fremde App an. */}
         <Alert
