@@ -1,3 +1,34 @@
+## [1.0.0-alpha.89](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.88...v1.0.0-alpha.89) (2026-10-07)
+
+### Betroffene
+
+- Die Kürzeleingabe für Betroffene erklärt nun die verwendeten Sonderzeichen (skt, sku, #, @) direkt beim Eingabefeld
+- Dialogtitel und Rückmeldungen verwenden verständliche Formulierungen statt Kürzel (z.B. „Unfallhilfsstelle auflösen?" statt des internen Kürzels)
+- Beim Auflösen von Unfallhilfsstellen wird nun die Anzahl der noch belegten Personen angezeigt
+- Gesperrte Aktionen zeigen den Grund direkt im Knopf (z.B. „Auflösen (noch n belegt)" oder „Patient zuweisen · niemand wartet")
+
+### Betreuung und Verpflegung
+
+- Betreuungsräume zeigen nach der Belegung eine aussagekräftige Rückmeldung (Handlung und betroffenes Objekt) statt nur „Erfolgreich"
+- Bei Verpflegungsdaten erscheint die Erklärung „EP = Essensportionen" direkt am ersten Eingabefeld
+- Die Zeitangabe „Stand" wird in allen Verpflegungsvorschlägen als Uhrzeit dargestellt
+- Feldhilfen nutzen nun Platzhalter; Leerzustände beschreiben klar den aktuellen Zustand ohne ausführliche Erklärtexte
+- Nur-Ansicht-Bereiche zeigen „Nur Ansicht · Grund" als kompakte Information
+
+### Unfallhilfsstellen
+
+- Rückfragen und Dialoge verwenden durchgängig verständliche Formulierungen
+- Leerzustände und gesperrte Funktionen informieren direkt über den aktuellen Zustand
+
+### Schichtverwaltung
+
+- Der Schicht-Dialog zeigt Informationen zum Rhythmus erst nach der Auswahl der Einheiten an, wenn diese Angabe tatsächlich erforderlich wird
+- Vor der Einheitenauswahl erscheint kein irreführender Hinweistext mehr
+
+### Tiere
+
+- Dialoge und Statusanzeigen verwenden kompakte Zustandsinformationen statt ausführlicher Erklärtexte
+
 ## [1.0.0-alpha.88](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.87...v1.0.0-alpha.88) (2026-10-07)
 
 ### Wichtige Änderungen
