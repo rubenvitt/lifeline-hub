@@ -10,6 +10,7 @@ use axum::{
 };
 use sqlx::SqlitePool;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Geteilter Anwendungszustand, der an alle Handler übergeben wird.
@@ -42,7 +43,7 @@ pub struct AppState {
 /// Nicht im `AppState`, weil ein Feld dort jede Test-Konstruktion bräche und kein Handler den
 /// Wert braucht. Kein prozessweiter `OnceLock`, weil der „aus“ und „an“ nicht im selben
 /// Test-Binary prüfen ließe.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RouterOptionen {
     /// Registriert die Routen unter `/api/demo-daten` (`--demo-daten`). Ohne den Schalter
     /// antworten sie wie jeder unbekannte `/api/`-Pfad mit 404, auch angemeldet.
@@ -51,6 +52,9 @@ pub struct RouterOptionen {
     /// Tests setzen es, um ohne Minuten Wartezeit zu belegen, welche Routen dem Budget entzogen
     /// sind (LFH-938).
     pub zulassungs_budget: Option<Duration>,
+    /// Austauschverzeichnis des HEIC-Decoders (`--heic-decoder-verzeichnis`, LFH-1000); `None`
+    /// = die eingebettete Fassung.
+    pub heic_decoder_verzeichnis: Option<PathBuf>,
 }
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand, mit Vorgabe-Optionen (ohne
@@ -1670,8 +1674,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             delete(routes::karte::offline_loeschen),
         );
 
+    let heic_decoder = opt.heic_decoder_verzeichnis.clone().map(Arc::new);
     router
-        .fallback(crate::static_files::serve)
+        .fallback(move |uri: axum::http::Uri, kopf: axum::http::HeaderMap| {
+            crate::static_files::serve(uri, kopf, heic_decoder.clone())
+        })
         // Axums Default-405 hat einen leeren Body und bräche den `{error}`-Vertrag. Der Fallback
         // greift
         // nur, wenn der Pfad existiert, die Methode aber nicht.

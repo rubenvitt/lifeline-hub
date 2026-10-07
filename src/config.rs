@@ -420,6 +420,15 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_OFFLINE_KATALOG_MANIFEST_URL")]
     pub offline_katalog_manifest_url: Option<String>,
 
+    /// Austauschverzeichnis für den HEIC-Decoder (LFH-1000). Liegt darin `libheif.js` oder
+    /// `libheif.wasm`, liefert der Server diese Datei unter `/bibliotheken/libheif/` statt der
+    /// eingebetteten aus; eine fehlende Datei bleibt die eingebettete. So lässt sich die
+    /// LGPL-Bibliothek ersetzen, ohne das Binary neu zu bauen (`frontend/src/heic/LIESMICH.md`).
+    /// Ohne Angabe gilt die eingebettete Fassung. Ein Pfad, der kein Verzeichnis ist, bricht
+    /// den Start ab.
+    #[arg(long, env = "LIFELINE_HEIC_DECODER_VERZEICHNIS")]
+    pub heic_decoder_verzeichnis: Option<std::path::PathBuf>,
+
     /// HTTPS statt HTTP bedienen. Ohne Flag bleibt der bestehende HTTP-Bind aktiv
     /// (Dev/localhost). Mit `--tls` wird ein Server-Cert in Präzedenz beschafft
     /// (BYO → Cache → mkcert → rcgen) und `Secure`-Cookies aktiviert.
@@ -798,6 +807,29 @@ mod tests {
         let config = parse_hermetisch(["lifeline-hub"]);
         assert_eq!(config.db_path, "lifeline.db");
         assert_eq!(config.bind, "127.0.0.1:8080");
+    }
+
+    /// LFH-1000: ohne Angabe gilt der eingebettete HEIC-Decoder; Flag und Env setzen das
+    /// Austauschverzeichnis.
+    #[test]
+    fn heic_decoder_verzeichnis() {
+        assert!(parse_hermetisch(["lifeline-hub"])
+            .heic_decoder_verzeichnis
+            .is_none());
+        let c = parse_hermetisch(["lifeline-hub", "--heic-decoder-verzeichnis", "/opt/libheif"]);
+        assert_eq!(
+            c.heic_decoder_verzeichnis.as_deref(),
+            Some(std::path::Path::new("/opt/libheif"))
+        );
+        let c = parse_mit_env(
+            "LIFELINE_HEIC_DECODER_VERZEICHNIS",
+            "/srv/libheif",
+            &["lifeline-hub"],
+        );
+        assert_eq!(
+            c.heic_decoder_verzeichnis.as_deref(),
+            Some(std::path::Path::new("/srv/libheif"))
+        );
     }
 
     #[test]

@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join, resolve } from 'node:path';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA, type ManifestOptions } from 'vite-plugin-pwa';
@@ -35,6 +36,58 @@ const gitkeepBewahren = (): Plugin => {
     },
     closeBundle() {
       writeFileSync(gitkeepPfad, '');
+    },
+  };
+};
+
+// HEIC-Decoder (LFH-1000, `src/heic/LIESMICH.md`): libheif steht unter der LGPL 3.0 und muss
+// sich ersetzen lassen. Glue und WASM gehen deshalb unverändert unter festem Pfad aus
+// (`LIBHEIF_PFAD` in `src/heic/heicDekodieren.ts`), der Worker lädt sie zur Laufzeit. Im Build
+// werden sie als eigene Dateien ausgegeben, im Dev-Server direkt aus dem Paket geliefert. Nach
+// dem Build bricht der Hook, sobald ein Chunk den Glue doch enthält: dann wäre die Bibliothek
+// still wieder mit App-Code verschmolzen.
+const LIBHEIF_DATEIEN = { 'libheif.js': 'text/javascript', 'libheif.wasm': 'application/wasm' };
+const LIBHEIF_ZIEL = 'bibliotheken/libheif';
+// Steht nur im Glue (Emscripten-Export), nie im App-Code.
+const LIBHEIF_GLUE_MERKMAL = '_heif_context_alloc';
+const libheifQuelle = (datei: string) =>
+  createRequire(import.meta.url).resolve(`libheif-js/libheif-wasm/${datei}`);
+
+const libheifBibliothek = (): Plugin => {
+  let ausgabe = '';
+  return {
+    name: 'lifeline-libheif-bibliothek',
+    configResolved(config) {
+      ausgabe = resolve(config.root, config.build.outDir);
+    },
+    configureServer(server) {
+      server.middlewares.use(`/${LIBHEIF_ZIEL}`, (req, res, weiter) => {
+        const datei = (req.url ?? '').replace(/^\//, '').split('?')[0];
+        const typ = LIBHEIF_DATEIEN[datei as keyof typeof LIBHEIF_DATEIEN];
+        if (!typ) return weiter();
+        res.setHeader('Content-Type', typ);
+        res.end(readFileSync(libheifQuelle(datei)));
+      });
+    },
+    generateBundle() {
+      for (const datei of Object.keys(LIBHEIF_DATEIEN)) {
+        this.emitFile({
+          type: 'asset',
+          fileName: `${LIBHEIF_ZIEL}/${datei}`,
+          source: readFileSync(libheifQuelle(datei)),
+        });
+      }
+    },
+    closeBundle() {
+      const assets = join(ausgabe, 'assets');
+      for (const datei of readdirSync(assets)) {
+        if (!datei.endsWith('.js')) continue;
+        if (readFileSync(join(assets, datei), 'utf8').includes(LIBHEIF_GLUE_MERKMAL)) {
+          throw new Error(
+            `assets/${datei} enthält den libheif-Glue; er muss unter /${LIBHEIF_ZIEL}/ getrennt bleiben (LFH-1000)`,
+          );
+        }
+      }
     },
   };
 };
@@ -80,6 +133,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       gitkeepBewahren(),
+      libheifBibliothek(),
       depsOhneSourcemap(env.LIFELINE_DEPS_OHNE_SOURCEMAP === '1'),
       VitePWA({
         registerType: 'prompt',
@@ -87,13 +141,16 @@ export default defineConfig(({ mode }) => {
         workbox: {
           // Der Haupt-Chunk überschreitet das 2-MiB-Precache-Limit, solange es kein Code-Splitting gibt.
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-          // Der HEIC-Decoder (LFH-759, 1,4 MB) kommt nicht in den Vorrat: ohne Netz gibt es auch
+          // Der HEIC-Decoder (LFH-759, 1,5 MB) kommt nicht in den Vorrat: ohne Netz gibt es auch
           // keine HEIC-Bytes zu dekodieren, und jeder Client lüde ihn sonst bei jedem Update vor.
-          globIgnores: ['**/libheif-*.wasm'],
+          // Ein vom Betreiber ersetzter Decoder (LFH-1000) käme sonst auch nie an.
+          globIgnores: [`${LIBHEIF_ZIEL}/**`],
           // Seitenwechsel auf /api/ MÜSSEN zum Server: der OIDC-Login ist ein Full-Page-Redirect
           // über `/api/auth/oidc/…`. Sonst antwortet der Service Worker mit dem gecachten
           // `index.html`, und der Login endet stumm wieder auf der Login-Seite.
-          navigateFallbackDenylist: [/^\/api\//],
+          // Ebenso die Lizenzhinweise (LFH-1000, Benutzermenü „Lizenzen“): sie öffnen als eigene
+          // Seite und kämen sonst als App-Hülle zurück.
+          navigateFallbackDenylist: [/^\/api\//, /^\/lizenzen\//],
         },
         manifest: pwaManifest,
       }),

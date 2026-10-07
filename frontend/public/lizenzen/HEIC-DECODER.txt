@@ -1,20 +1,31 @@
-HEIC-Decoder der Bildvorschau (LFH-759)
+HEIC-Decoder der Bildvorschau
 
 Lifeline Hub zeigt iPhone-Fotos im HEIC/HEIF-Format, indem der Browser sie auf dem Gerät
-dekodiert. Dazu liefert die Anwendung eine eigene, unveränderte WebAssembly-Datei aus
-(assets/libheif-*.wasm). Sie wird getrennt vom übrigen Programmcode geladen und lässt sich
-durch eine andere Fassung derselben Bibliothek ersetzen.
+dekodiert. Dafür enthält die Anwendung die Bibliothek libheif mit dem HEVC-Decoder libde265.
+Beide stehen unter der GNU Lesser General Public License, Version 3 (LGPL 3.0), die die
+GNU General Public License, Version 3 (GPL 3.0) ergänzt.
 
 Enthaltene Bibliotheken
-- libheif-js 1.23.2 (Emscripten-Fassung von libheif)
-  https://github.com/catdad-experiments/libheif-js
-  Lizenz: GNU LGPL 3.0, Text: libheif-js-LGPL-3.0.txt
-- libheif 1.23 (strukturag)
-  https://github.com/strukturag/libheif
-  Lizenz: GNU LGPL 3.0, Text: libheif-LGPL-3.0.txt
-- libde265 (HEVC-Decoder, strukturag), in die WebAssembly-Datei einkompiliert
-  https://github.com/strukturag/libde265
-  Lizenz: GNU LGPL 3.0, Text wie libheif-LGPL-3.0.txt
+- libheif-js 1.23.2 (Emscripten-Fassung von libheif, Lizenz LGPL 3.0)
+  https://github.com/catdad-experiments/libheif-js, Tag 1.23.2
+  gebaut von https://github.com/catdad-experiments/libheif-emscripten, Tag v1.23.2
+- libheif 1.23.2 (strukturag, Lizenz LGPL 3.0)
+  https://github.com/strukturag/libheif, Tag v1.23.2
+- libde265 1.0.15 (strukturag, Lizenz LGPL 3.0), in die WebAssembly-Datei einkompiliert
+  https://github.com/strukturag/libde265, Tag v1.0.15
 
-Den Quelltext dieser Bibliotheken gibt es unter den genannten Adressen; die verwendete Fassung
-ist die des npm-Pakets libheif-js@1.23.2.
+Lizenztexte: libheif-LGPL-3.0.txt (LGPL 3.0 und GPL 3.0) und libheif-js-LGPL-3.0.txt.
+
+Quelltext
+Jedes Release von Lifeline Hub trägt die Datei lifeline-hub-<Version>-drittanbieter.zip mit dem
+Quelltext genau dieser Stände (Ordner quellen/) und den Lizenztexten:
+https://github.com/rubenvitt/lifeline-hub/releases
+
+Austausch der Bibliothek
+Die Bibliothek liegt unverändert und getrennt vom übrigen Programmcode unter
+/bibliotheken/libheif/ (libheif.js und libheif.wasm) und wird erst zur Laufzeit geladen. Wer sie
+durch eine eigene, schnittstellengleiche Fassung ersetzen möchte, legt libheif.js und
+libheif.wasm in ein Verzeichnis und startet den Server mit
+  --heic-decoder-verzeichnis <Verzeichnis>   (Umgebung: LIFELINE_HEIC_DECODER_VERZEICHNIS)
+Der Server liefert dann diese Dateien statt der eingebauten aus. Ein Neubau des Programms ist
+dafür nicht nötig.

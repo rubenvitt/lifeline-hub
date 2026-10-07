@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   dekodiereHeicPixel,
   einmalLaden,
   HeicZuGross,
+  ladeLibheifFabrik,
   zielmasse,
   type Libheif,
 } from './heicDekodieren';
@@ -19,8 +20,20 @@ import { vi } from 'vitest';
 // jsdom setzt `import.meta.url` auf http://; Pfade deshalb ab dem Frontend-Ordner (cwd der Suite).
 const require = createRequire(join(process.cwd(), 'package.json'));
 
+/**
+ * Führt den Glue so aus wie der Worker: als eigenes Skript über `ladeLibheifFabrik` (LFH-1000).
+ * `module` und `exports` sieht er dabei als globale Namen. Unter Node erkennt er Node und
+ * braucht `require` und `__dirname`; im Browser nicht.
+ */
+const GLUE_PFAD = require.resolve('libheif-js/libheif-wasm/libheif.js');
+const GLUE = readFileSync(GLUE_PFAD, 'utf8');
+const glueAusfuehren = async (url: string) => {
+  expect(url).toBe('/bibliotheken/libheif/libheif.js');
+  new Function('require', '__dirname', GLUE)(require, dirname(GLUE_PFAD));
+};
+
 async function ladeLibheif(): Promise<Libheif> {
-  const fabrik = require('libheif-js/libheif-wasm/libheif.js') as (o: object) => Libheif;
+  const fabrik = await ladeLibheifFabrik(glueAusfuehren);
   const wasmBinary = readFileSync(require.resolve('libheif-js/libheif-wasm/libheif.wasm'));
   // Emscripten füllt das übergebene Objekt selbst zum Modul aus; der Rückruf kann noch während
   // des Aufrufs kommen.
@@ -79,6 +92,20 @@ describe('dekodiereHeicPixel (LFH-759)', () => {
       },
     } as unknown as Libheif;
     await expect(dekodiereHeicPixel(BEREINIGT, riesig)).rejects.toBeInstanceOf(HeicZuGross);
+  });
+});
+
+describe('ladeLibheifFabrik (LFH-1000)', () => {
+  it('holt die Fabrik aus dem Glue und räumt die Hilfsnamen wieder ab', async () => {
+    const fabrik = await ladeLibheifFabrik(glueAusfuehren);
+    expect(typeof fabrik).toBe('function');
+    expect('module' in globalThis).toBe(false);
+    expect('exports' in globalThis).toBe(false);
+  });
+
+  it('scheitert laut, wenn die Datei keine Fabrik ablegt', async () => {
+    await expect(ladeLibheifFabrik(async () => undefined)).rejects.toThrow('Glue ohne Fabrik');
+    expect('module' in globalThis).toBe(false);
   });
 });
 

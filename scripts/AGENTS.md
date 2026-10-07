@@ -6,7 +6,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
+`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `drittanbieter-quellen.test.sh` → `check-deps.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed).
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
@@ -61,6 +61,11 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über
   `scripts/release/ki-notizen.mjs` (Rückfall auf konventionelle Notizen, `maxTurns: 1`, Vorlage
   `KI_PROMPT` in `release.config.mjs`).
+- **Drittanbieter-Quellen** (LFH-1000): `artefakte.yml` hängt an jedes Release den Hinweis und
+  das Paket mit dem Quelltext der LGPL-Bibliotheken (`scripts/release/drittanbieter-quellen.sh`,
+  Stände gepinnt mit Commit in `drittanbieter-quellen.txt`, Selbsttest in Schritt 8). Ein neuer
+  Stand einer Bibliothek im Binary heißt: Liste nachziehen (Herleitung
+  `frontend/src/heic/LIESMICH.md`).
 - **Advisories** (`scripts/check-deps.sh`): Rust `.cargo/audit.toml` (Ignorierliste mit
   Begründung); Frontend nur `overrides` in `frontend/pnpm-workspace.yaml`, jeder `high`-Fund bricht
   (`--audit-level=high`).

@@ -4,29 +4,35 @@
  * verkleinert per `OffscreenCanvas` auf die beiden Größen der Vorschau (256 / 1600 px, wie der
  * Server). Ein JPEG-Blob ist neu kodiert und trägt keine Metadaten.
  *
- * Die `libheif.wasm` liegt als eigene, unveränderte Datei im Bündel (`?url`), getrennt vom
- * App-Code; Lizenz und Herkunft: `LIESMICH.md` hier.
+ * Glue und WASM von libheif kommen zur Laufzeit als eigene, unveränderte Dateien vom Server
+ * (`LIBHEIF_PFAD`), nie aus dem Bündel: der Betreiber muss sie ersetzen können (LGPL 3.0,
+ * LFH-1000). Lizenz und Herkunft: `LIESMICH.md` hier.
  */
-import fabrik from 'libheif-js/libheif-wasm/libheif.js';
-import wasmUrl from 'libheif-js/libheif-wasm/libheif.wasm?url';
-import { dekodiereHeicPixel, einmalLaden, zielmasse, type Libheif } from './heicDekodieren';
+import {
+  dekodiereHeicPixel,
+  einmalLaden,
+  ladeLibheifFabrik,
+  LIBHEIF_PFAD,
+  zielmasse,
+  type Libheif,
+} from './heicDekodieren';
 
 const KANTE_KLEIN = 256;
 const KANTE_GROSS = 1600;
 const JPEG_QUALITAET = 0.8;
 
-const ladeLibheif = einmalLaden(
-  () =>
-    new Promise<Libheif>((fertig, fehler) => {
-      // Emscripten füllt das übergebene Objekt selbst zum Modul aus.
-      const modul: Record<string, unknown> = {
-        locateFile: () => wasmUrl,
-        onRuntimeInitialized: () => fertig(modul as unknown as Libheif),
-        onAbort: (grund: unknown) => fehler(new Error(`libheif: ${String(grund)}`)),
-      };
-      fabrik(modul);
-    }),
-);
+const ladeLibheif = einmalLaden(async () => {
+  const fabrik = await ladeLibheifFabrik((url) => import(/* @vite-ignore */ url));
+  return new Promise<Libheif>((fertig, fehler) => {
+    // Emscripten füllt das übergebene Objekt selbst zum Modul aus.
+    const modul: Record<string, unknown> = {
+      locateFile: () => `${LIBHEIF_PFAD}libheif.wasm`,
+      onRuntimeInitialized: () => fertig(modul as unknown as Libheif),
+      onAbort: (grund: unknown) => fehler(new Error(`libheif: ${String(grund)}`)),
+    };
+    fabrik(modul);
+  });
+});
 
 /** Der Auftrag, der gerade dekodiert wird (der Client schickt einen nach dem anderen). */
 let laufend: number | null = null;

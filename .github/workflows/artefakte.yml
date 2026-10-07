@@ -235,6 +235,28 @@ jobs:
           merge-multiple: true
           path: versand
 
+      # Hinweis und Quelltext der LGPL-Bibliotheken im Binary (HEIC-Decoder, LFH-1000): neben
+      # die Binaries, damit die Quelle so lange verfügbar bleibt wie das Release. Die Stände
+      # stehen gepinnt in scripts/release/drittanbieter-quellen.txt.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+          path: quelle
+          sparse-checkout: |
+            scripts/release
+            frontend/public/lizenzen
+          persist-credentials: false
+
+      - name: Drittanbieter-Hinweis und Quellen
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: |
+          set -euo pipefail
+          quelle/scripts/release/drittanbieter-quellen.sh versand "$VERSION"
+          ( cd versand && for f in lifeline-hub-"$VERSION"-DRITTANBIETER.txt lifeline-hub-"$VERSION"-drittanbieter.zip; do
+              shasum -a 256 "$f" > "$f.sha256"
+            done )
+
       - name: Hochladen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

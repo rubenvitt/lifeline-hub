@@ -277,6 +277,21 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
              Einsatzumgebung gehört der Schalter ausgeschaltet."
         );
     }
+    // HEIC-Decoder (LFH-1000): ein ersetzter Decoder ist fremder Code im Browser jedes
+    // Clients, deshalb steht er im Log. Ein Tippfehler im Pfad bricht den Start ab, statt still
+    // die eingebettete Fassung zu liefern.
+    if let Some(verzeichnis) = &config.heic_decoder_verzeichnis {
+        if !verzeichnis.is_dir() {
+            anyhow::bail!(
+                "--heic-decoder-verzeichnis ist kein Verzeichnis: {}",
+                verzeichnis.display()
+            );
+        }
+        tracing::warn!(
+            "HEIC-Decoder: Dateien aus {} ersetzen die eingebettete libheif",
+            verzeichnis.display()
+        );
+    }
     // LFH-993: Wächter der Offline-Karten; die Vorgabe gilt, solange in der Verwaltung nichts
     // gespeichert ist.
     let auto_vorgabe = lifeline_hub::karte::auto_aktualisierung::Einstellung {
@@ -318,6 +333,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         RouterOptionen {
             demo_daten: config.demo_daten,
             zulassungs_budget: None,
+            heic_decoder_verzeichnis: config.heic_decoder_verzeichnis.clone(),
         },
     );
 

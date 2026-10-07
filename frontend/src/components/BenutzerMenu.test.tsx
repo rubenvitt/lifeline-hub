@@ -152,6 +152,16 @@ describe('BenutzerMenu — unter lg', () => {
 describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
   beforeEach(() => setzeViewportBreite(390));
 
+  it('der Lizenzhinweis steht als Link ganz unten (LFH-1000)', async () => {
+    zeige();
+    await oeffne();
+    const eintraege = await screen.findAllByRole('menuitem');
+    expect(eintraege[eintraege.length - 1]?.textContent).toBe('Lizenzen');
+    const link = screen.getByRole('link', { name: 'Lizenzen' });
+    expect(link).toHaveAttribute('href', '/lizenzen/HEIC-DECODER.txt');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
   it('Profil und Abmelden stehen vor Darstellung, Bediendichte und Helligkeit', async () => {
     zeige();
     await oeffne();

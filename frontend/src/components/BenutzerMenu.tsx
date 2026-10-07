@@ -1,4 +1,4 @@
-import { IconAbmelden, IconChevronRunter, IconPerson, type Icon } from '../icons';
+import { IconAbmelden, IconChevronRunter, IconDokument, IconPerson, type Icon } from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -30,6 +30,9 @@ function initialen(name: string): string {
 const DARSTELLUNG_PRAEFIX = 'darstellung:';
 const DICHTE_PRAEFIX = 'stufe:';
 const HELLIGKEIT_PRAEFIX = 'helligkeit:';
+
+/** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`). */
+const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
 
 /**
  * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
@@ -208,6 +211,18 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
           disabled: gesperrt,
         };
       }),
+    },
+    // Hinweis auf die LGPL-Bibliotheken (HEIC-Decoder, LFH-1000, `heic/LIESMICH.md`): ein echter
+    // Link auf die Datei im Binary, ganz unten, weil er selten gebraucht wird.
+    { type: 'divider' },
+    {
+      key: 'lizenzen',
+      icon: <IconDokument />,
+      label: (
+        <a href={LIZENZ_HINWEIS} target="_blank" rel="noopener noreferrer">
+          Lizenzen
+        </a>
+      ),
     },
   ];
 

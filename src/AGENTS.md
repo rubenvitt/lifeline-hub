@@ -160,6 +160,11 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   In einer Überlagerung ohne Bedienelemente (Palettenvorschau) `grossansicht={false}`.
   Eine künftige App-CSP muss `img-src blob:`, `worker-src 'self'` und `'wasm-unsafe-eval'`
   erlauben (HEIC-Decoder, `frontend/src/heic/`).
+- **HEIC-Decoder austauschbar halten** (LGPL 3.0, LFH-1000, `frontend/src/heic/LIESMICH.md`):
+  Glue und WASM von libheif gehen unverändert unter `/bibliotheken/libheif/` aus, nie in einen
+  Chunk unter `assets/` gebündelt (Build-Wächter in `frontend/vite.config.ts`); der Worker lädt
+  sie zur Laufzeit. `static_files.rs` liefert sie mit `no-cache` und ETag und nimmt aus
+  `--heic-decoder-verzeichnis` genau diese zwei Namen.
 
 ## Backend — Schutzköpfe (LFH-797)
 
