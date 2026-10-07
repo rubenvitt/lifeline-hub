@@ -1,6 +1,6 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Input, Modal, Spin } from 'antd';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -150,6 +150,46 @@ export default function NachforderungenPage() {
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
 
+  /*
+   * Gemerkt über den Datenstand, Handler über einen Ref-Bündel (LFH-949, D7): die Karten sind
+   * `memo`, und je Render neue Listen oder Pfeile machten jede Karte neu. Steht vor den frühen
+   * Rücksprüngen, wie jeder Hook.
+   */
+  const { offene, abgeschlossene, offeneSortiert, abgeschlosseneSortiert } = useMemo(() => {
+    const alle = nfQuery.data ?? [];
+    // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik (eingetroffen und
+    // abgelehnt zählen als „abgeschlossen").
+    const istAbg = (n: Nachforderung) =>
+      istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
+    const offene = alle.filter((n) => !istAbg(n));
+    const abgeschlossene = alle.filter(istAbg);
+    return {
+      offene,
+      abgeschlossene,
+      // Offen-Ansicht: nach Priorität (sofort→dringend→normal), dann angefordert_at absteigend.
+      offeneSortiert: [...offene].sort((a, b) => {
+        const rang = prioRang(a.prioritaet) - prioRang(b.prioritaet);
+        return rang !== 0 ? rang : b.angefordert_at.localeCompare(a.angefordert_at);
+      }),
+      // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
+      abgeschlosseneSortiert: [...abgeschlossene].sort((a, b) =>
+        abschlussZeit(b).localeCompare(abschlussZeit(a)),
+      ),
+    };
+  }, [nfQuery.data]);
+  const stand = useRef({ alle: nfQuery.data, statusMutation });
+  useLayoutEffect(() => {
+    stand.current = { alle: nfQuery.data, statusMutation };
+  });
+  const onStatus = useCallback((nfId: number, status: NachforderungStatus) => {
+    const vorher = stand.current.alle?.find((n) => n.id === nfId)?.status;
+    stand.current.statusMutation.mutate({ nfId, status, vorher });
+  }, []);
+  const onAblehnen = useCallback((nfId: number) => {
+    setAblehnenId(nfId);
+    setAblehnenGrund('');
+  }, []);
+
   const ablehnenBestaetigen = () => {
     if (ablehnenId != null) {
       ablehnenMutation.mutate({ nfId: ablehnenId, grund: ablehnenGrund.trim() || undefined });
@@ -170,36 +210,7 @@ export default function NachforderungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  const alle = nfQuery.data ?? [];
-
-  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik (eingetroffen und
-  // abgelehnt zählen als „abgeschlossen").
-  const istAbg = (n: Nachforderung) =>
-    istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
-  const offene = alle.filter((n) => !istAbg(n));
-  const abgeschlossene = alle.filter(istAbg);
-
-  // Offen-Ansicht: nach Priorität (sofort→dringend→normal), dann angefordert_at absteigend.
-  const offeneSortiert = [...offene].sort((a, b) => {
-    const rang = prioRang(a.prioritaet) - prioRang(b.prioritaet);
-    return rang !== 0 ? rang : b.angefordert_at.localeCompare(a.angefordert_at);
-  });
-  // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
-  const abgeschlosseneSortiert = [...abgeschlossene].sort((a, b) =>
-    abschlussZeit(b).localeCompare(abschlussZeit(a)),
-  );
-
-  const listenProps = {
-    darfSchreiben,
-    onStatus: (nfId: number, status: NachforderungStatus) => {
-      const vorher = alle.find((n) => n.id === nfId)?.status;
-      statusMutation.mutate({ nfId, status, vorher });
-    },
-    onAblehnen: (nfId: number) => {
-      setAblehnenId(nfId);
-      setAblehnenGrund('');
-    },
-  };
+  const listenProps = { darfSchreiben, onStatus, onAblehnen };
 
   return (
     <EinsatzSeite

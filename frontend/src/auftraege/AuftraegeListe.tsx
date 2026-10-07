@@ -2,7 +2,7 @@ import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Alert, App, Button } from 'antd';
 import { Select } from '../components/Select';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
@@ -226,34 +226,41 @@ export default function AuftraegeListe({
     onError: fehler,
   });
 
-  const alleAuftraege = auftraegeQuery.data ?? [];
+  /*
+   * Gemerkt über den Datenstand (LFH-949, D6): die Karten sind `memo`, und eine je Render neu
+   * gefilterte Liste gäbe ihnen nichts zu vergleichen. Die Aufträge selbst bleiben die Objekte aus
+   * TanStack Query; dessen `structuralSharing` hält unveränderte identisch.
+   */
+  const { offene, abgeschlossene, offeneGruppen, abgeschlosseneSortiert } = useMemo(() => {
+    const alleAuftraege = auftraegeQuery.data ?? [];
+    // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
+    const offene = alleAuftraege.filter(
+      (a) => !istAbgeschlossen(AUFTRAG_STATUS[a.bearbeitungsstatus]?.phase ?? 'offen'),
+    );
+    const abgeschlossene = alleAuftraege.filter((a) =>
+      istAbgeschlossen(AUFTRAG_STATUS[a.bearbeitungsstatus]?.phase ?? 'offen'),
+    );
 
-  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
-  const offene = alleAuftraege.filter(
-    (a) => !istAbgeschlossen(AUFTRAG_STATUS[a.bearbeitungsstatus]?.phase ?? 'offen'),
-  );
-  const abgeschlossene = alleAuftraege.filter((a) =>
-    istAbgeschlossen(AUFTRAG_STATUS[a.bearbeitungsstatus]?.phase ?? 'offen'),
-  );
+    // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach Prio dann Frist.
+    const offeneGruppen: { gruppe: FaelligGruppe; auftraege: Auftrag[] }[] = GRUPPE_ORDNUNG.map(
+      (gruppe) => ({
+        gruppe,
+        auftraege: offene
+          .filter(
+            (a) => faelligGruppe(a.frist_at, a.ist_ueberfaellig, konventionen.zeitzone) === gruppe,
+          )
+          .sort(vergleicheOffen),
+      }),
+    ).filter(({ auftraege }) => auftraege.length > 0);
 
-  // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach Prio dann Frist.
-  const offeneGruppen: { gruppe: FaelligGruppe; auftraege: Auftrag[] }[] = GRUPPE_ORDNUNG.map(
-    (gruppe) => ({
-      gruppe,
-      auftraege: offene
-        .filter(
-          (a) => faelligGruppe(a.frist_at, a.ist_ueberfaellig, konventionen.zeitzone) === gruppe,
-        )
-        .sort(vergleicheOffen),
-    }),
-  ).filter(({ auftraege }) => auftraege.length > 0);
-
-  // Abgeschlossen-Ansicht: flach, neueste zuerst (nach abgenommen_at/vollzogen_at).
-  const abgeschlosseneSortiert = [...abgeschlossene].sort((a, b) => {
-    const ka = a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at;
-    const kb = b.abgenommen_at ?? b.vollzogen_at ?? b.erstellt_at;
-    return kb.localeCompare(ka);
-  });
+    // Abgeschlossen-Ansicht: flach, neueste zuerst (nach abgenommen_at/vollzogen_at).
+    const abgeschlosseneSortiert = [...abgeschlossene].sort((a, b) => {
+      const ka = a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at;
+      const kb = b.abgenommen_at ?? b.vollzogen_at ?? b.erstellt_at;
+      return kb.localeCompare(ka);
+    });
+    return { offene, abgeschlossene, offeneGruppen, abgeschlosseneSortiert };
+  }, [auftraegeQuery.data, konventionen.zeitzone]);
 
   const abschnitte = (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }));
   const einheiten = (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }));
@@ -268,19 +275,38 @@ export default function AuftraegeListe({
     },
   ];
 
+  /*
+   * Stabile Handler über einen Ref-Bündel (LFH-949, D6): ein je Render neuer Pfeil machte jede
+   * `memo`-Karte bei jedem Render neu. Der Bündel trägt die jüngsten Mutationen.
+   */
+  const mutationen = useRef({ quittierenMutation, vollzugMutation, abnahmeMutation });
+  useLayoutEffect(() => {
+    mutationen.current = { quittierenMutation, vollzugMutation, abnahmeMutation };
+  });
+  const onQuittieren = useCallback((auftragId: number, empfaengerId: number) => {
+    const m = mutationen.current.quittierenMutation;
+    if (!m.isPending) m.mutate({ auftragId, empfaengerId });
+  }, []);
+  const onInArbeit = useCallback(
+    (auftragId: number) =>
+      mutationen.current.vollzugMutation.mutate({ auftragId, status: 'in_arbeit' as const }),
+    [],
+  );
+  const onAbnehmen = useCallback(
+    (auftragId: number) => mutationen.current.abnahmeMutation.mutate(auftragId),
+    [],
+  );
+
   const listenProps = {
     einsatzId,
     darfSchreiben,
     highlightId: highlightAuftragId,
     quittierungLaeuft: quittierenMutation.isPending,
     quittierungZiel: quittierenMutation.variables ?? null,
-    onQuittieren: (auftragId: number, empfaengerId: number) => {
-      if (!quittierenMutation.isPending) quittierenMutation.mutate({ auftragId, empfaengerId });
-    },
-    onInArbeit: (auftragId: number) =>
-      vollzugMutation.mutate({ auftragId, status: 'in_arbeit' as const }),
-    onVollzugMelden: (auftragId: number) => setVollzugFuer(auftragId),
-    onAbnehmen: (auftragId: number) => abnahmeMutation.mutate(auftragId),
+    onQuittieren,
+    onInArbeit,
+    onVollzugMelden: setVollzugFuer,
+    onAbnehmen,
   };
 
   return (
@@ -389,7 +415,12 @@ export default function AuftraegeListe({
           ))
         )
       ) : (
-        <AuftragListe auftraege={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
+        <AuftragListe
+          auftraege={abgeschlosseneSortiert}
+          ansicht="abgeschlossen"
+          fenster
+          {...listenProps}
+        />
       )}
       <VollzugMeldenModal
         offen={vollzugFuer !== null}

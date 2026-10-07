@@ -6,6 +6,7 @@ import {
   createContext,
   Fragment,
   isValidElement,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -713,6 +714,69 @@ function FensterTabelle(props: TableHTMLAttributes<HTMLTableElement>) {
 
 const FENSTER_KOMPONENTEN = { table: FensterTabelle, body: { wrapper: FensterKoerper } };
 
+// ── Gemerktes Rendern (LFH-949, D4/D5) ───────────────────────────────────────────────
+
+/**
+ * Die GARNITUR ist alles, was eine Zelle oder Karte außer ihrem Datensatz liest: Spalten,
+ * Kartenplan, Sortierung, Token, Aufklapp- und Baumzustand. Ändert sich ein Teil (nach Identität),
+ * steigt die Nummer, und `neu` ist für diesen Render wahr; dann rendert alles wie bisher.
+ *
+ * Verglichen wird gegen den zuletzt GEZEIGTEN Stand (Ref, nach dem Commit gesetzt): ein
+ * verworfener oder doppelter Render (StrictMode) sieht denselben Vergleich.
+ */
+function useGarnitur(werte: readonly unknown[]): { nummer: number; neu: boolean } {
+  const gezeigt = useRef<{ werte: readonly unknown[]; nummer: number } | null>(null);
+  const alt = gezeigt.current;
+  const gleich =
+    alt != null &&
+    alt.werte.length === werte.length &&
+    alt.werte.every((w, i) => Object.is(w, werte[i]));
+  const nummer = gleich ? alt.nummer : (alt?.nummer ?? 0) + 1;
+  useLayoutEffect(() => {
+    gezeigt.current = { werte, nummer };
+  });
+  return { nummer, neu: !gleich };
+}
+
+/**
+ * Zellen, die die Uhr lesen („1430“ heute, „161430“ sonst, `formatZeitKurz`), sähen den Tageswechsel
+ * sonst erst mit dem nächsten geänderten Datensatz. Die Viertelstunde trifft jede Tagesgrenze der
+ * Anzeigezone, auch halbstündig versetzte; der erste Render danach zeichnet alles neu.
+ */
+function viertelstunde(): number {
+  return Math.floor(Date.now() / 900_000);
+}
+
+interface GemerkteKarteProps {
+  /** Zeichnet die Karte mit dem Stand des jetzigen Renders; zählt nicht zum Vergleich. */
+  zeichne: () => ReactNode;
+  zeile: unknown;
+  index: number;
+  tiefe: number;
+  offen: boolean;
+  klasse: string | undefined;
+  garnitur: number;
+}
+
+/**
+ * Eine Karte rendert nur bei geändertem Datensatz, geänderter Lage, Aufklappzustand, Klasse oder
+ * neuer Garnitur (D5). `zeichne` ist je Render neu und wird nicht verglichen: wenn die Karte
+ * rendert, nimmt sie den jüngsten Stand, und alles, was sie außer dem Datensatz liest, steht in
+ * der Garnitur.
+ */
+const GemerkteKarte = memo(
+  function GemerkteKarte({ zeichne }: GemerkteKarteProps) {
+    return zeichne();
+  },
+  (a, b) =>
+    a.zeile === b.zeile &&
+    a.index === b.index &&
+    a.tiefe === b.tiefe &&
+    a.offen === b.offen &&
+    a.klasse === b.klasse &&
+    a.garnitur === b.garnitur,
+);
+
 // ── Die Komponente ───────────────────────────────────────────────────────────────────
 
 export default function Datensicht<T extends object, const K extends string>(
@@ -1331,6 +1395,12 @@ export default function Datensicht<T extends object, const K extends string>(
     gehe(sichtbareZeilen, 0);
     return tiefe;
   }, [baum, sichtbareZeilen, schluessel]);
+  // Für die Garnitur nach INHALT: ohne Umhängen bleibt die Tiefe jeder Zeile gleich, die Map aber
+  // ist nach jedem Datenstand neu.
+  const baumTiefenStand = useMemo(
+    () => [...baumTiefe].map(([k, t]) => `${String(k)}:${t}`).join('|'),
+    [baumTiefe],
+  );
   const baumSymbol = (zeile: T): ReactNode => {
     const klasse = `${tabellenPraefix}-row-expand-icon`;
     const kinder = zeile[baum!.kinder] as readonly T[] | undefined;
@@ -1441,6 +1511,34 @@ export default function Datensicht<T extends object, const K extends string>(
           ]
         : antdSpalten;
 
+  /**
+   * Eine Zelle rendert nur bei geändertem Datensatz oder neuer Garnitur (D4). antd ruft sonst bei
+   * jedem Render jedes `render` aller Zeilen; ein Live-Ereignis mit einer Person kostete die ganze
+   * Liste. Ein Verwender, der `shouldCellUpdate` selbst setzt, behält seinen.
+   */
+  const tabellenGarnitur = useGarnitur([
+    viertelstunde(),
+    antdSpalten,
+    aufklappen,
+    aufgeklappt,
+    baum,
+    baumTiefenStand,
+    ausloeserNeben,
+    token,
+    tabellenPraefix,
+    tabellenText,
+    schluessel,
+  ]);
+  const garniturNeu = tabellenGarnitur.neu;
+  // Je Render neu gebaut wie `tabellenSpalten`: ein neues Spaltenobjekt rendert keine Zelle, das
+  // entscheidet allein `shouldCellUpdate`.
+  const gemerkteSpalten = tabellenSpalten.map(
+    (s): KatalogSpalte<T> =>
+      s.shouldCellUpdate
+        ? s
+        : { ...s, shouldCellUpdate: (zeile, vorher) => zeile !== vorher || garniturNeu },
+  );
+
   const { von: fensterVon, bis: fensterBis } = ausschnitt;
   const tabellenZeilen = useMemo(
     () => (virtuell ? sichtbareZeilen.slice(fensterVon, fensterBis) : [...sichtbareZeilen]),
@@ -1519,7 +1617,7 @@ export default function Datensicht<T extends object, const K extends string>(
   const tabelle = (
     <FensterKontext.Provider value={fensterTraeger}>
       <KatalogTabelle<T>
-        columns={tabellenSpalten}
+        columns={gemerkteSpalten}
         dataSource={tabellenZeilen}
         components={virtuell ? FENSTER_KOMPONENTEN : undefined}
         rowKey={(zeile) => schluessel(zeile)}
@@ -1722,6 +1820,27 @@ export default function Datensicht<T extends object, const K extends string>(
     );
   };
 
+  const kartenGarnitur = useGarnitur([
+    viertelstunde(),
+    karte,
+    spalten,
+    token,
+    aufklappen,
+    schluessel,
+    idPraefix,
+  ]);
+  const karteGemerkt = (zeile: T, index: number, tiefe: number): ReactNode => (
+    <GemerkteKarte
+      zeile={zeile}
+      index={index}
+      tiefe={tiefe}
+      offen={aufklappen != null && aufgeklappt.includes(schluessel(zeile))}
+      klasse={zeilenKlasse?.(zeile)}
+      garnitur={kartenGarnitur.nummer}
+      zeichne={() => kartenEintrag(zeile, index, tiefe)}
+    />
+  );
+
   /**
    * Rekursion für den Kartenzweig mit gesetztem `baum`: der Weg, auf dem eine NICHT vergleichende
    * Baumfläche Karten bekommt. Die Einrückung wächst bis {@link TIEFE_DECKEL}.
@@ -1732,7 +1851,7 @@ export default function Datensicht<T extends object, const K extends string>(
     const offen = baum!.aufgeklappt.includes(eigener);
     return (
       <div key={eigener}>
-        {kartenEintrag(zeile, index, tiefe)}
+        {karteGemerkt(zeile, index, tiefe)}
         {kinder.length > 0 && (
           <div style={{ paddingInlineStart: token.padding * Math.min(tiefe + 1, TIEFE_DECKEL) }}>
             <Button
@@ -1768,7 +1887,7 @@ export default function Datensicht<T extends object, const K extends string>(
       renderItem={(zeile, index) => {
         const eintrag = baum
           ? baumEintrag(zeile, indexAb + index, 0)
-          : kartenEintrag(zeile, indexAb + index, 0);
+          : karteGemerkt(zeile, indexAb + index, 0);
         // Messpunkt des Ausschnitts; eine eigene Hülle, weil `karte.art === 'eigen'` frei rendert.
         return virtuell ? <div {...fensterAttribute(zeile)}>{eintrag}</div> : eintrag;
       }}

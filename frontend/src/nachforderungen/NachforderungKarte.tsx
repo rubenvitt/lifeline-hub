@@ -1,5 +1,5 @@
 import { Button, Flex, Space, Typography } from 'antd';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import {
   NACHFORDERUNG_HANDLUNG,
@@ -40,7 +40,10 @@ interface NachforderungKarteProps {
  * Nachforderungs-Karte: Kopf mit Prio + Status, Titel „Anzahl× Art → Adressat",
  * Bezeichnung/Begründung, Übergangs-Timeline.
  */
-export default function NachforderungKarte({
+export default memo(NachforderungKarte);
+
+/** `memo` (LFH-949, D7): ein Live-Ereignis mit einer geänderten Nachforderung rendert eine Karte. */
+function NachforderungKarte({
   nachforderung: n,
   ansicht = 'offen',
   darfSchreiben,
