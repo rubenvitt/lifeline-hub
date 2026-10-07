@@ -8,6 +8,7 @@ import { etbTyp } from '../theme/statusFarben';
 import { istNachgetragen } from './typFarben';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { berichtigungsindex } from './zeitachseModell';
+import { istUeberlang } from './druckUmbruch';
 import '../druck/druckansichtSchmal.css';
 
 /**
@@ -20,7 +21,9 @@ import '../druck/druckansichtSchmal.css';
  * - ein schlichtes HTML-`<table>`, weder `KatalogTabelle` noch `Datensicht`: keine
  *   Sortierung, kein Filter, kein Spaltenschalter, keine Zeilenaktion;
  * - nur eine Tabelle wiederholt ihren Kopf auf jeder Druckseite (`thead` als
- *   `table-header-group` in `druck/druck.css`), und eine Zeile bricht nicht über den Rand;
+ *   `table-header-group` in `druck/druck.css`), und eine Zeile bricht nicht über den Rand —
+ *   außer sie ist überlang (`druckUmbruch.ts`, LFH-1009: ein freigegebener Lagebericht trägt
+ *   seinen vollen Text und füllt sonst Seite 1 nicht);
  * - Ordnung AUFSTEIGEND nach `lfd_nr`, nicht nach Ereigniszeit: auf Papier beweist die
  *   lückenlose Nummernfolge die Vollständigkeit, und ein Nachtrag steht an seiner Nummer.
  * Das Typwort steht ohne Farbe: Farbe trägt auf Papier nichts, das Wort ist der zweite Kanal.
@@ -129,7 +132,7 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
           const grund = index.grundeintrag(e);
           const durch = index.berichtigtDurch(e);
           return (
-            <tr key={e.id}>
+            <tr key={e.id} data-lfh={istUeberlang(e.inhalt) ? 'druck-ueberlang' : undefined}>
               <td style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}>
                 {e.lfd_nr}
               </td>

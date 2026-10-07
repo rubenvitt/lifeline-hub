@@ -283,3 +283,98 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
       .toBeLessThanOrEqual(viewport.innerWidth);
   }
 });
+
+/**
+ * LFH-1009: Ein freigegebener Lagebericht steht mit vollem Text als Eintrag Nr. 1 im ETB. Als
+ * Zeile, die nie über den Rand bricht, rückte er auf Seite 2, Seite 1 trug nur den Druckkopf.
+ * Die überlange Zeile bricht jetzt frei (`etb/druckUmbruch.ts`), kurze Zeilen bleiben ganz.
+ * Unter Druckmedium in allen drei Engines, das Blatt nur im Chromium-PDF.
+ */
+test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, browserName }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E ETB-Druck überlang ${Date.now()}`);
+
+  const satz =
+    'Die Lage im Einsatzabschnitt hat sich seit der letzten Meldung verändert, die Kräfte vor ' +
+    'Ort melden eine Ausweitung des Schadensgebiets nach Nordosten, der Pegel steigt weiter. ';
+  const text = (abschnitt: string, ende = '') =>
+    [...Array.from({ length: 3 }, (_, i) => `${abschnitt} Absatz ${i + 1}: ${satz}${satz}`), ende]
+      .filter(Boolean)
+      .join('\n\n');
+  const neu = await mitWiederholung(() =>
+    page.request.post(`/api/einsaetze/${einsatzId}/lageberichte`, {
+      data: { vorlage: 'lagebericht', titel: 'Lagebericht überlang' },
+    }),
+  );
+  expect(neu.ok(), await neu.text()).toBe(true);
+  const lbId = (await neu.json()).id as number;
+  // Die Freigabe verlangt jeden Abschnitt der Vorlage.
+  const abschnitte = [
+    'auftrag',
+    'gefahren_schadenlage',
+    'eigene_lage',
+    'lageentwicklung',
+    'fuehrungsprobleme',
+    'antraege_vorschlaege',
+    'medienlage',
+    'zusammenfassung',
+  ];
+  const patch = await mitWiederholung(() =>
+    page.request.patch(`/api/einsaetze/${einsatzId}/lageberichte/${lbId}`, {
+      data: {
+        abschnitte: abschnitte.map((schluessel, i) => ({
+          schluessel,
+          text: text(schluessel, i === abschnitte.length - 1 ? 'ENDE-LAGEBERICHT' : ''),
+        })),
+      },
+    }),
+  );
+  expect(patch.ok(), await patch.text()).toBe(true);
+  const frei = await mitWiederholung(() =>
+    page.request.post(`/api/einsaetze/${einsatzId}/lageberichte/${lbId}/freigeben`),
+  );
+  expect(frei.ok(), await frei.text()).toBe(true);
+  const kurz = await erfasse(page, einsatzId, {
+    typ: 'meldung',
+    von: 'Florian 1',
+    an: 'ELW',
+    inhalt: 'Kurze Meldung nach dem Lagebericht',
+  });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/etb/druck`);
+  await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled({
+    timeout: 60_000,
+  });
+  // Vorbedingung: der Lagebericht ist Nr. 1 und steht vollständig im ETB.
+  await expect(zeile(page, 1)).toContainText('auftrag Absatz 1');
+  await expect(zeile(page, 1)).toContainText('ENDE-LAGEBERICHT');
+
+  await page.emulateMedia({ media: 'print' });
+  const umbruch = async (nr: number) =>
+    zeile(page, nr).evaluate((tr) => ({
+      zeile: getComputedStyle(tr).breakInside,
+      absatz: getComputedStyle(tr.querySelector('p')!).breakInside,
+    }));
+  expect(await umbruch(1), 'überlange Zeile bricht frei').toEqual({
+    zeile: 'auto',
+    absatz: 'auto',
+  });
+  expect(await umbruch(kurz.lfd_nr), 'kurze Zeile bleibt ganz').toEqual({
+    zeile: 'avoid',
+    absatz: 'avoid',
+  });
+  await page.emulateMedia({ media: null });
+
+  if (browserName === 'chromium') {
+    const auszug = await pdfAuszug(await page.pdf({ format: 'A4' }));
+    expect(auszug[0].text, 'Seite 1 trägt den Anfang von Nr. 1').toContain('auftrag Absatz 1');
+    const ende = auszug.findIndex((s) => s.text.includes('ENDE-LAGEBERICHT'));
+    expect(ende, 'Nr. 1 steht vollständig im PDF').toBeGreaterThanOrEqual(0);
+    expect(auszug[auszug.length - 1].text).toContain('Kurze Meldung nach dem Lagebericht');
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `ETB-Druck überlang: PDF ${auszug.length} Seiten, Lagebericht endet auf Seite ${ende + 1}`,
+    });
+  }
+});
