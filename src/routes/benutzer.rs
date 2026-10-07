@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel};
 use crate::auth::session::AdminUser;
 use crate::auth::{
     BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY, ROLLE_ADMIN,
@@ -6,6 +7,7 @@ use crate::auth::{
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PeerIp;
 use crate::extract::PfadParam;
 use crate::routes::support::{parse_enum, pflicht};
 use axum::extract::State;
@@ -124,10 +126,11 @@ pub async fn liste(
     Ok(Json(benutzer))
 }
 
-/// POST /api/benutzer — neuen Benutzer anlegen. Admin-only.
+/// POST /api/benutzer — neuen Benutzer anlegen. Admin-only. Steht in der Admin-Spur (LFH-1005).
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
     JsonBody(req): JsonBody<NeuerBenutzer>,
 ) -> Result<(StatusCode, Json<BenutzerAnzeige>), AppError> {
     pflicht(&req.benutzername, "Benutzername")?;
@@ -173,6 +176,18 @@ pub async fn anlegen(
         }
     }
     let id = ergebnis?.last_insert_rowid();
+
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::BenutzerAngelegt,
+            akteur: &admin,
+            ziel: Ziel::Benutzer { id, benutzername },
+            detail: Some(format!("system_rolle: {rolle}, org_rolle: {org_rolle}")),
+            peer_ip,
+        },
+    )
+    .await;
 
     let angelegt = anzeige_laden(&state.pool, id).await?;
 
@@ -231,10 +246,12 @@ async fn verweigere_admin_lockout(
 }
 
 /// POST /api/benutzer/{id}/deaktivieren — Benutzer deaktivieren + Sessions löschen.
-/// Verweigert die Deaktivierung des letzten aktiven Admins. Admin-only.
+/// Verweigert die Deaktivierung des letzten aktiven Admins. Admin-only. Steht in der Admin-Spur
+/// (LFH-1005).
 pub async fn deaktivieren(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
     let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
@@ -262,6 +279,21 @@ pub async fn deaktivieren(
         .await?;
     tx.commit().await?;
 
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::BenutzerDeaktiviert,
+            akteur: &admin,
+            ziel: Ziel::Benutzer {
+                id,
+                benutzername: &ziel.benutzername,
+            },
+            detail: None,
+            peer_ip,
+        },
+    )
+    .await;
+
     let aktualisiert = anzeige_laden(&state.pool, id).await?;
 
     Ok(Json(aktualisiert))
@@ -275,9 +307,14 @@ pub async fn deaktivieren(
 /// werden die Sessions des Nutzers gelöscht (analog `deaktivieren`); Rollen-/Aktiv-Änderungen
 /// wirken für laufende Sessions ohnehin sofort, da der Session-Extractor Rolle+`aktiv` pro
 /// Request frisch aus der DB liest.
+///
+/// **Admin-Spur (LFH-1005):** ändert der PATCH eine Rolle oder den Aktiv-Zustand, entsteht je
+/// Aktion ein Eintrag wie bei den eigenen Routen; sonst wäre die Bearbeitung ein Weg an der Spur
+/// vorbei. Eine reine Anzeigenamen-Änderung schreibt nichts.
 pub async fn bearbeiten(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
     JsonBody(req): JsonBody<PatchBenutzer>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
@@ -339,6 +376,46 @@ pub async fn bearbeiten(
     }
     tx.commit().await?;
 
+    let mut rollen = Vec::new();
+    if system_rolle != ziel.system_rolle.as_str() {
+        rollen.push(format!(
+            "system_rolle: {} → {system_rolle}",
+            ziel.system_rolle.as_str()
+        ));
+    }
+    if org_rolle != ziel.org_rolle.as_str() {
+        rollen.push(format!(
+            "org_rolle: {} → {org_rolle}",
+            ziel.org_rolle.as_str()
+        ));
+    }
+    let aktiv_aktion = match (ziel.aktiv, aktiv) {
+        (true, false) => Some(AdminAktion::BenutzerDeaktiviert),
+        (false, true) => Some(AdminAktion::BenutzerReaktiviert),
+        _ => None,
+    };
+    let rollen_aktion =
+        (!rollen.is_empty()).then(|| (AdminAktion::RolleGeaendert, Some(rollen.join(", "))));
+    for (aktion, detail) in rollen_aktion
+        .into_iter()
+        .chain(aktiv_aktion.map(|a| (a, None)))
+    {
+        admin_audit::schreibe(
+            &state.pool,
+            AdminEintrag {
+                aktion,
+                akteur: &admin,
+                ziel: Ziel::Benutzer {
+                    id,
+                    benutzername: &ziel.benutzername,
+                },
+                detail,
+                peer_ip,
+            },
+        )
+        .await;
+    }
+
     let aktualisiert = anzeige_laden(&state.pool, id).await?;
 
     Ok(Json(aktualisiert))
@@ -352,17 +429,18 @@ pub async fn bearbeiten(
 /// überleben). Alle drei Schreiboperationen laufen in EINER Transaktion.
 ///
 /// `404`, falls kein Benutzer mit `id` existiert (geprüft VOR der Transaktion, analog
-/// `deaktivieren`s Existenz-Check).
+/// `deaktivieren`s Existenz-Check). Steht in der Admin-Spur (LFH-1005).
 pub async fn totp_reset(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
-    let existiert: Option<i64> = sqlx::query_scalar("SELECT id FROM benutzer WHERE id = ?")
+    let benutzername: String = sqlx::query_scalar("SELECT benutzername FROM benutzer WHERE id = ?")
         .bind(id)
         .fetch_optional(&state.pool)
-        .await?;
-    existiert.ok_or(AppError::NotFound)?;
+        .await?
+        .ok_or(AppError::NotFound)?;
     verweigere_geraetekonto(&state.pool, id).await?;
 
     let mut tx = state.pool.begin().await?;
@@ -381,6 +459,21 @@ pub async fn totp_reset(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::ZweitfaktorZurueckgesetzt,
+            akteur: &admin,
+            ziel: Ziel::Benutzer {
+                id,
+                benutzername: &benutzername,
+            },
+            detail: None,
+            peer_ip,
+        },
+    )
+    .await;
 
     let aktualisiert = anzeige_laden(&state.pool, id).await?;
 

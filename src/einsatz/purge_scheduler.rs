@@ -18,7 +18,8 @@
 //! - **Nachlauf** (LFH-905, LFH-997): Anhänge und Bilder der Lagekarte geschwärzter Einsätze und
 //!   Kategorien löscht jede Schwärzung nach ihrem Commit einzeln, je Zeile eine Transaktion
 //!   (`schwaerzung_nachlauf::entferne_vorgesehene`); der Tick holt Reste nach.
-//! - **Phase C**: abgelaufene Einträge des Auth-Audits (eigene Frist, an keinem Einsatz).
+//! - **Phase C**: abgelaufene Einträge des Auth-Audits und der Admin-Spur (LFH-1005), je mit
+//!   eigener Frist, an keinem Einsatz.
 //! - **Phase C2** (LFH-928): abgelaufene Sitzungen (`auth::session::purge_abgelaufene`), aus
 //!   demselben Grund wie Phase C.
 //! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
@@ -241,6 +242,20 @@ pub async fn tick_mit_rueckschrieb(
             anzahl += n as usize;
         }
         Err(e) => tracing::warn!("Purge Phase C: Auth-Audit-Purge fehlgeschlagen: {e}"),
+    }
+
+    // Admin-Spur (LFH-1005): dieselbe Lage wie das Auth-Audit, eigene, längere Frist.
+    match crate::auth::admin_audit::purge_abgelaufene(pool).await {
+        Ok(0) => {}
+        Ok(n) => {
+            tracing::info!(
+                anzahl = n,
+                tage = crate::auth::admin_audit::AUFBEWAHRUNG_TAGE,
+                "Purge Phase C: abgelaufene Einträge der Admin-Spur gelöscht"
+            );
+            anzahl += n as usize;
+        }
+        Err(e) => tracing::warn!("Purge Phase C: Admin-Spur-Purge fehlgeschlagen: {e}"),
     }
 
     // --- Phase C2: abgelaufene Sitzungen (LFH-928) ---
