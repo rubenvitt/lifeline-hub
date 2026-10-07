@@ -13,7 +13,9 @@ Als Admin angemeldet die Backup-URL im Browser öffnen, z.B.
 `http://192.168.1.10:8080/api/backup` (Server-Adresse entsprechend anpassen) bzw.
 einen entsprechenden „Backup herunterladen"-Link der Oberfläche nutzen.
 Die heruntergeladene Datei `lifeline-backup-<zeitstempel>.sqlite` z.B. auf einen
-USB-Stick speichern.
+USB-Stick speichern. Die Sicherung ist **Klartext** mit allen Einsatzdaten: Der Stick muss
+verschlüsselt sein (BitLocker To Go, FileVault, LUKS), siehe
+[packaging.md](packaging.md#datenträgerverschlüsselung-ist-pflicht-lfh-1004).
 
 Der Server legt dafür eine Kopie in Datenbankgröße **neben der Datenbank** ab
 (Verzeichnis `lifeline-download-…`, LFH-926), nicht in `/tmp`, das auf Debian im
@@ -173,4 +175,5 @@ Log („Einmaliger Neuaufbau des Altbestands …“) und versucht es beim nächs
 frei, etwa beim Kürzen des Write-Ahead-Logs, beim Schrumpfen der Datenbank oder beim Löschen
 rotierter Sicherungen, bleibt ihr Inhalt bis zur Wiederverwendung auf dem Datenträger. Dazu
 kommen Journal des Dateisystems, Wear-Leveling von SSD und SD-Karte und Swap. Dagegen hilft
-eine Verschlüsselung des Datenträgers, auch des Sicherungsmediums.
+eine Verschlüsselung des Datenträgers, auch des Sicherungsmediums. Sie ist Pflicht
+(packaging.md, „Datenträgerverschlüsselung ist Pflicht“).

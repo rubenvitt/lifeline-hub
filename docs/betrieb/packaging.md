@@ -189,6 +189,33 @@ unter der neuen Adresse nicht.
 > Rust gebaut und dann als fertige Datei auf den ELW-Rechner kopiert. Auf dem
 > ELW-Rechner selbst werden weder Node.js noch eine Internetverbindung benötigt.
 
+### Datenträgerverschlüsselung ist Pflicht (LFH-1004)
+
+Ein Mini-PC oder Notebook im ELW kann verloren gehen. Die Datenbank liegt im Klartext auf der
+Platte, mit allen Einsatzdaten und den Anhängen als BLOBs. Der Rechner, auf dem der Server
+läuft, **muss** deshalb einen verschlüsselten Datenträger haben:
+
+- **Linux:** LUKS2 für das Datenverzeichnis (`--db-path`, Sicherungen, Karten) **und** für den
+  Swap. Mit TPM-Entsperrung (`systemd-cryptenroll --tpm2-device=auto`) startet der Rechner ohne
+  Eingabe, eine ausgebaute Platte bleibt trotzdem unlesbar.
+- **Windows:** BitLocker. Windows Home hat kein BitLocker, nur die „Geräteverschlüsselung“ auf
+  passender Hardware. Ohne beides ist der Rechner für den Server nicht geeignet.
+- **macOS:** FileVault.
+
+Den Wiederherstellungsschlüssel verwahrt die Organisation getrennt vom Gerät, sonst ist mit
+dem Schlüssel auch die Einsatzdokumentation verloren.
+
+Die Anwendung verschlüsselt die Datenbank **nicht selbst** (kein SQLCipher). Gegen ein
+verlorenes Gerät schützt das nicht mehr als die Datenträgerverschlüsselung mit TPM. Swap,
+Logs und Temp-Dateien erreicht es nicht, und die eingebettete SQLite fiele auf den älteren
+Stand von SQLCipher zurück. Bewertung und Messung stehen im Ticket. Neu bewertet wird, wenn
+die Desktop-App eine eigene Datenbank bekommt, ein Betrieb ohne Datenträgerverschlüsselung
+unvermeidbar wird oder der Server ohne Konsole am Gerät entsperrt werden muss.
+
+Für die Geräte im Einsatz (Laptop, Tablet, Desktop-App) gilt dasselbe, siehe
+[desktop-app.md](desktop-app.md#daten-auf-dem-gerät). Sicherungen, die das Gerät verlassen,
+gehören auf ein verschlüsseltes Medium ([backup-restore.md](backup-restore.md)).
+
 ## Lagekarte / Basemap
 
 Die Lagekarte (Modul „Lagekarte") rendert mit MapLibre GL und ist offline-fähig. Die
