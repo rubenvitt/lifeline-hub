@@ -67,3 +67,15 @@ export function vorschauZielStil(token: VorschauZielToken) {
     cursor: 'pointer',
   } as const;
 }
+
+/** Boden des Schließknopfs: der Navigationsrahmen-Boden aus der Bedien-Leitlinie. */
+const SCHLIESS_BODEN = 48;
+
+/**
+ * Kantenmaß des Schließknopfs im Palettenkopf bei grobem Zeiger (LFH-982), in Höhe UND Breite.
+ * Die 48 ist Boden, nie Deckel: in Handschuh wächst der Knopf mit der Steuerhöhe (Muster
+ * `CommandPaletteTrigger`).
+ */
+export function schliessKnopfMass(token: { controlHeight: number }): number {
+  return Math.max(SCHLIESS_BODEN, token.controlHeight);
+}

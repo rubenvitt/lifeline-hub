@@ -27,6 +27,14 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   `zuletzt:<modul>` → `modul:<modul>`). Bei aktiver Suche gilt `ohneOrdnungsdubletten`.
 - **Fußzeile** einzeilig in jeder Dichte: feste Maße (`tasteStil`), keine Dichte-Polsterung;
   Präfixe mit Kurzwort aus `PALETTE_MODI.kurz`, Langtext als `title`.
+- **Zeigerart** (LFH-982): Tasten- oder Tippwege entscheidet allein `useViewport().istBeruehrung`
+  (primärer Zeiger), nie die Breite; ein Fükw mit schmalem Fenster behält die Tastenhinweise. Bei
+  grobem Zeiger: im Kopf der Knopf „Sprungpalette schließen“ statt der Esc-Marke (Kante
+  `schliessKnopfMass`, Boden 48, wächst mit der Staffel), keine Tastenmarke (`kbd`) in Fußzeile
+  und Zeilen, in der Fußzeile der Liste die Präfixe aus `modiMitPraefix()` als Chips (antd-`Button`,
+  `aria-pressed`, Zeichen `aria-hidden`, `mousedown` abgefangen, aktiver Chip nimmt das Präfix weg),
+  in der Vorschau „Öffnen“. Die Touch-Fußzeile bricht nie um. Der Tastaturvertrag gilt auf beiden
+  Wegen unverändert.
 - **Fokuszeile** (LFH-507): „Status setzen“ öffnet das `StatusWahl`-Menü der Zeile, die den Fokus
   hat. Die Ebene hängt am Primitiv, ihre Wurzel ist die Zeile (`[data-row-key]` bzw.
   `datensicht-karte`), kein eigener Auswahlzustand. `nurMitFokus` hält zeilengebundene Aktionen aus

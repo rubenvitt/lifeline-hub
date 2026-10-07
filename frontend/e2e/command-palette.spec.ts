@@ -1,4 +1,6 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
+import { haeltStufe, ruhigeHoehe, SUBPIXEL } from './trefflaeche-kern';
 
 // e2e-Smoke der Kommandopalette: echtes Hotkey-Verhalten, Navigation und die Koexistenz des
 // Palette-Modals über einem offenen antd-Drawer — was jsdom nicht kann.
@@ -408,3 +410,70 @@ test('die Fußzeile bleibt bei 1440 px in jeder Dichte einzeilig (LFH-1055)', as
     await expect(paletteInput(page)).toBeHidden();
   }
 });
+
+/**
+ * Die Palette bei grobem Zeiger (LFH-982): `hasTouch` meldet `(pointer: coarse)`, ohne gespeicherte
+ * Wahl startet die Dichte `komfortabel` (48). Geöffnet wird wie auf dem Gerät über die Lupe.
+ *
+ * Gemessen als Admin UND als Beobachter (LFH-435): der Palette-Inhalt hängt an der Rolle. Der
+ * Rollenzweig ist Vorbedingung: unter dem Chip „Aktionen“ steht „ETB-Eintrag schreiben“ nur mit
+ * Schreibrecht.
+ */
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 820, height: 1180 },
+]) {
+  test.describe(`Berührung ${viewport.width} px (LFH-982)`, () => {
+    test.use({ hasTouch: true, viewport });
+
+    for (const rolle of ['admin', 'beobachter'] as const) {
+      test(`${rolle}: Schließknopf, Chips, keine Tastenhinweise`, async ({ page }) => {
+        await anmelden(page);
+        const id = await einsatzAnlegen(page, `E2E Palette Touch ${rolle} ${Date.now()}`);
+        if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', id);
+        await zumModul(page, id, 'etb');
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
+
+        await page.getByRole('button', { name: 'Suchen', exact: true }).tap();
+        await expect(paletteInput(page)).toBeVisible();
+        const modal = page.locator('.ant-modal');
+        const zu = page.getByRole('button', { name: 'Sprungpalette schließen' });
+        // Erst messen, wenn antds Einblend-Zoom steht: mitten im `scale` misst alles zu klein.
+        await ruhigeHoehe(zu, 'Schließknopf');
+
+        // Keine Tastenmarke, weder im Kopf noch in Fußzeile oder Zeilen.
+        await expect(modal.locator('kbd')).toHaveCount(0);
+
+        // Fußzeile: EINE Reihe Chips mit 48er-Boden plus Polsterung; zwei Reihen lägen über 100 px.
+        const fuss = page.locator('[data-lfh="palette-fuss"]');
+        const fussHoehe = (await fuss.boundingBox())!.height;
+        expect(fussHoehe, 'Höhe der Fußzeile').toBeLessThanOrEqual(70);
+        const ueberlauf = await fuss.evaluate((el) => el.scrollWidth - el.clientWidth);
+        expect(ueberlauf, 'Chips passen ohne Scrollen').toBeLessThanOrEqual(0);
+
+        // Rollenzweig als Vorbedingung, zugleich der Chip im echten Browser.
+        const aktionen = fuss.getByRole('button', { name: 'Aktionen', exact: true });
+        await haeltStufe(aktionen, 48, 'Chip „Aktionen“');
+        await aktionen.tap();
+        await expect(paletteInput(page)).toHaveValue('>');
+        await expect(paletteInput(page)).toBeFocused();
+        await expect(aktionen).toHaveAttribute('aria-pressed', 'true');
+        const schreiben = page.getByRole('option', { name: /ETB-Eintrag schreiben/ });
+        if (rolle === 'admin') await expect(schreiben).toBeVisible();
+        else await expect(schreiben).toHaveCount(0);
+        await fuss.getByRole('button', { name: 'Personen & Kräfte', exact: true }).tap();
+        await expect(paletteInput(page)).toHaveValue('@');
+
+        // Der Schließknopf: Boden 48 in beiden Achsen, ganz im Bild, und ein Tipp schließt.
+        await expect(zu).toBeInViewport({ ratio: 1 });
+        const box = (await zu.boundingBox())!;
+        expect(box.width, 'Breite des Schließknopfs').toBeGreaterThanOrEqual(48 - SUBPIXEL);
+        expect(box.height, 'Höhe des Schließknopfs').toBeGreaterThanOrEqual(48 - SUBPIXEL);
+        const vorher = page.url();
+        await zu.tap();
+        await expect(paletteInput(page)).toBeHidden();
+        expect(page.url()).toBe(vorher);
+      });
+    }
+  });
+}
