@@ -158,7 +158,6 @@ export default function FreiesZeichenInspector({
           {/* Hart gelöscht (`freies_zeichen/repo.rs`), also Rückfrage mit rotem OK. */}
           <Popconfirm
             title={`„${titel}“ löschen?`}
-            description="Das Zeichen wird endgültig von der Karte entfernt."
             okText="Löschen"
             okButtonProps={{ danger: true }}
             cancelText="Abbrechen"

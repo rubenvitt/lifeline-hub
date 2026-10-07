@@ -28,6 +28,14 @@ const STRECKE = {
 };
 
 describe('MessSteuerung (LFH-616)', () => {
+  it('„Beenden“ trägt die Esc-Kappe, kein Satz über Klicks (LFH-1083)', () => {
+    rendere();
+    const beenden = screen.getByRole('button', { name: 'Beenden' });
+    expect(beenden).toHaveAttribute('aria-keyshortcuts', 'Escape');
+    expect(beenden.querySelector('kbd')).toHaveTextContent('Esc');
+    expect(document.body).not.toHaveTextContent(/per Klick|doppelklicken|neuer Klick/);
+  });
+
   it('rendert nichts, solange nicht gemessen wird', () => {
     rendere(null);
     expect(document.querySelector('[data-lfh="mess-steuerung"]')).toBeNull();

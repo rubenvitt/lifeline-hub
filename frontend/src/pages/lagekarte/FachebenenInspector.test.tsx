@@ -224,11 +224,10 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText('in Betrieb')).toBeInTheDocument();
     // Ortsnamen sind nicht eindeutig — die Kennung ist der Schlüssel für den Abgleich mit ODL-Info.
     expect(screen.getByText('DEZ3068')).toBeInTheDocument();
-    // Ohne `bewertung` gilt der Bänder-Maßstab, und der Satz sagt, warum (Einteilung gibt sich als
-    // Projekt-Einteilung zu erkennen).
-    expect(screen.getByText(/noch kein Grundpegel vor/)).toBeInTheDocument();
-    expect(screen.getByText(/natürlichen Bereich \(0,05–0,2\s+µSv\/h\)/)).toBeInTheDocument();
-    expect(screen.getByText(/kein amtlicher Schwellenwert/)).toBeInTheDocument();
+    // Ohne `bewertung` gilt der Bänder-Maßstab; die Zeile nennt ihn und den Vorbehalt.
+    expect(screen.getByText(/Kein Grundpegel ·/)).toBeInTheDocument();
+    expect(screen.getByText(/natürlichem Bereich \(0,05–0,2 µSv\/h, BfS\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Kein amtlicher Schwellenwert/)).toBeInTheDocument();
     expect(screen.queryByText('Grundpegel')).not.toBeInTheDocument();
     expect(screen.queryByText('Faktor')).not.toBeInTheDocument();
   });
@@ -261,8 +260,8 @@ describe('FachebenenInspector', () => {
     expect(screen.getByText(/über 1,5 × erhöht, über 3 × stark erhöht/)).toBeInTheDocument();
     expect(screen.getByText(/kein amtlicher Schwellenwert/i)).toBeInTheDocument();
     // Der Bänder-Maßstab gilt für diese Sonde NICHT und wird deshalb nicht genannt.
-    expect(screen.queryByText(/natürlichen Bereich/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/noch kein Grundpegel/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/natürlichem Bereich/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Kein Grundpegel/)).not.toBeInTheDocument();
   });
 
   it('ODL: unter fremder Einheit behauptet der Inspector keinen fehlenden Grundpegel (LFH-598)', () => {
@@ -280,7 +279,7 @@ describe('FachebenenInspector', () => {
       />,
     );
     expect(screen.getByText('115,000 nSv/h')).toBeInTheDocument();
-    expect(screen.queryByText(/noch kein Grundpegel/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Kein Grundpegel/)).not.toBeInTheDocument();
   });
 
   it('ODL: ein unbekanntes Grundlagen-Wort zeigt keinen Grundpegel (LFH-598)', () => {
@@ -299,7 +298,7 @@ describe('FachebenenInspector', () => {
       />,
     );
     expect(screen.queryByText('Grundpegel')).not.toBeInTheDocument();
-    expect(screen.getByText(/natürlichen Bereich/)).toBeInTheDocument();
+    expect(screen.getByText(/natürlichem Bereich/)).toBeInTheDocument();
   });
 
   it('ODL: eine defekte Sonde sagt „kein Messwert", statt eine Zahl zu erfinden', () => {
@@ -731,7 +730,7 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.queryByRole('link', { name: /Livebild/ })).not.toBeInTheDocument();
   });
 
-  it('Autobahn/Webcam: ein nicht ladendes Standbild wird erklärt statt als kaputtes Bild gezeigt', () => {
+  it('Autobahn/Webcam: ein nicht ladendes Standbild nennt den Zustand statt eines kaputten Bildes', () => {
     render(
       <FachebenenInspector
         quelle="autobahn"
@@ -743,7 +742,7 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     fireEvent.error(bild);
     // Beide Hälften: das tote Bild ist WEG und an seiner Stelle steht der Grund.
     expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/Internetverbindung am Gerät/)).toBeInTheDocument();
+    expect(screen.getByText('Standbild nicht abrufbar')).toBeInTheDocument();
   });
 
   it('Autobahn/Baustelle: Zeilen der Quelle bleiben getrennt, kein Webcam-Zubehör', () => {
@@ -1075,9 +1074,9 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   it('bei fünf festgelegten Pegeln gesperrt, mit Grund und Weg in die Einstellungen', async () => {
     stelleBereit([0, 1, 2, 3, 4].map((i) => eintrag(`00000000-0000-4000-8000-00000000000${i}`, i)));
     inspector();
-    const grund = await screen.findByText(/Schon 5 maßgebliche Pegel festgelegt/);
+    const grund = await screen.findByText(/Höchstens 5 Pegel/);
     expect(screen.getByRole('button', { name: 'Als maßgeblichen Pegel festlegen' })).toBeDisabled();
-    expect(within(grund).getByRole('link', { name: 'Einstellungen' })).toHaveAttribute(
+    expect(within(grund).getByRole('link', { name: 'Pegel verwalten' })).toHaveAttribute(
       'href',
       '/einsaetze/1/einstellungen/pegel',
     );
@@ -1132,7 +1131,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
         screen.getByRole('button', { name: 'Als maßgeblichen Pegel festlegen' }),
       ).toBeEnabled(),
     );
-    expect(screen.queryByText(/Schon 5 maßgebliche Pegel/)).toBeNull();
+    expect(screen.queryByText(/Höchstens 5 Pegel/)).toBeNull();
   });
 });
 

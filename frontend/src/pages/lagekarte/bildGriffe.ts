@@ -144,26 +144,20 @@ export function scharfeGriffe(modus: GriffModus, punkte: GriffPunkte, kante: num
 }
 
 /**
- * Hinweis unter dem Umschalter: nennt nur die Griffe, die gerade scharf sind. Fehlen im Modus
- * „Größe" Kanten ({@link scharfeGriffe}), sagt er das und nennt den Ausweg.
+ * Zustand unter dem Umschalter: nur, wenn im Modus „Größe" Kanten fehlen ({@link scharfeGriffe}),
+ * mit dem Ausweg. Wie die Griffe zu ziehen sind, zeigen ihre Zeiger, kein Satz (LFH-1083).
  */
 export function griffHinweis(
   modus: GriffModus,
   stand: { kantenAus: KantenAus } = { kantenAus: 'keine' },
-): string {
-  switch (modus) {
-    case 'verschieben':
-      return 'Auf der Karte: Mitte ziehen zum Verschieben.';
-    case 'drehen':
-      return 'Auf der Karte: ↻ ziehen zum Drehen.';
-    case 'groesse':
-      switch (stand.kantenAus) {
-        case 'keine':
-          return 'Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken.';
-        case 'einige':
-          return 'Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken. Weitere Kanten erscheinen nach dem Heranzoomen.';
-        case 'alle':
-          return 'Auf der Karte: Ecken = Größe (Seitenverhältnis). Zum freien Strecken an den Kanten heranzoomen.';
-      }
+): string | null {
+  if (modus !== 'groesse') return null;
+  switch (stand.kantenAus) {
+    case 'keine':
+      return null;
+    case 'einige':
+      return 'Einige Kanten ausgeblendet · näher heranzoomen';
+    case 'alle':
+      return 'Kanten ausgeblendet · näher heranzoomen';
   }
 }

@@ -23,7 +23,8 @@ import {
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import FeldLabel from '../../components/FeldLabel';
 import { monoStil, Segmentleiste, useRollen } from '../../components/instrument';
 import { griffHinweis, type GriffModus, type KantenAus } from './bildGriffe';
 import { KlappPaneel, LeistenAbschnitt, usePaneelZustand } from './KlappPaneel';
@@ -234,8 +235,8 @@ export interface SidebarProps {
   /**
    * Unter `lg` steht die Bedienung der Leistenmodi (Abbrechen/Fertig, Serien-Schalter, Griffwahl)
    * im Fuß-Band `PlatzierSteuerung` über der Karte (LFH-765). Die Leiste zeigt dann an ihrer Stelle
-   * nur einen Hinweis — je Breite genau ein Knopf je Handlung. Zusatzangaben (Koordinate,
-   * Mittelpunkt numerisch) bleiben hier.
+   * nur den Zustand („wird platziert“) — je Breite genau ein Knopf je Handlung. Zusatzangaben
+   * (Koordinate, Mittelpunkt) bleiben hier.
    */
   modusBedienungImFuss?: boolean;
   onKoordinateEingeben: (lat: number, lon: number) => void;
@@ -581,6 +582,8 @@ export default function Sidebar(props: SidebarProps) {
   // von „nichts da" nicht zu unterscheiden.
   // Ungültige Eingabe ist kein Ziel (LFH-517): „Übernehmen“ nimmt nur ein gültiges Paar.
   const [koord, setKoord] = useState<KoordinatenWert>(null);
+  const platzierKoordId = useId();
+  const bildMitteId = useId();
   // Freies-Zeichen-Schnellerfassung: der Picker erscheint erst auf Klick, der Entwurf bleibt über
   // Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
@@ -628,6 +631,12 @@ export default function Sidebar(props: SidebarProps) {
     props.betreuung,
   );
   const zeigeSichtungslegende = props.layer.person && props.personen?.zugriff === 'frei';
+  const grundlagePaneelInhalt =
+    props.grundlageWahl != null ||
+    !props.onlineVerfuegbar ||
+    !props.offlineVerfuegbar ||
+    props.basemap === 'offline';
+  const bildGriffHinweis = griffHinweis(props.griffModus, { kantenAus: props.griffKantenAus });
 
   // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. Der Effekt hängt allein am
   // Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
@@ -672,18 +681,21 @@ export default function Sidebar(props: SidebarProps) {
             background: rollen.flaeche2,
           }}
         >
-          <Typography.Text type="secondary">
-            Klick auf die Karte setzt die Koordinate.{' '}
-            {props.modusBedienungImFuss ? '(Beenden über der Karte.)' : '(Abbrechen beendet.)'}
+          {/* Der Titel nennt den laufenden Modus — ab `lg` am Tablet gibt es weder Fadenkreuz noch
+              Fuß-Band (LFH-1083). Ein Tipp auf die Karte setzt die Position; hier steht der Weg
+              über die Koordinate. Abbrechen steht an der Zeile des Objekts oder im Fuß. */}
+          <Typography.Text strong style={{ display: 'block', marginBottom: token.marginXS }}>
+            {`Platzieren · ${platzierObjekt(platzierungZiel, nichtVerortet)}`}
           </Typography.Text>
-          <div style={{ marginTop: token.marginXS }}>
+          <FeldLabel text="Koordinate" htmlFor={platzierKoordId}>
             <KoordinatenEingabe
+              id={platzierKoordId}
               value={koord}
               onChange={setKoord}
               einsatzId={props.einsatzId}
               exclude={ortVorschauExclude(props.platzierungZiel, props.einsatzId)}
             />
-          </div>
+          </FeldLabel>
           <div style={{ marginTop: token.marginXS }}>
             <Button
               disabled={!istLatLon(koord)}
@@ -723,7 +735,7 @@ export default function Sidebar(props: SidebarProps) {
               color: rollen.gedaempft,
             }}
           >
-            Nichts gewählt. Ein Objekt auf der Karte oder unter „Verortet" antippen.
+            Nichts gewählt
           </p>
         )}
       </LeistenAbschnitt>
@@ -941,12 +953,8 @@ export default function Sidebar(props: SidebarProps) {
                 <Typography.Text type="secondary">Taktisches Zeichen</Typography.Text>
                 {props.zeichenPlatzieren ? (
                   <Space orientation="vertical" style={{ width: '100%' }}>
-                    <Typography.Text type="secondary">
-                      Auf Karte klicken zum Platzieren.
-                    </Typography.Text>
-                    {props.modusBedienungImFuss ? (
-                      <Typography.Text type="secondary">Bedienung über der Karte.</Typography.Text>
-                    ) : (
+                    {/* Unter `lg` steht die Bedienung im Fuß-Band über der Karte (LFH-765). */}
+                    {props.modusBedienungImFuss ? null : (
                       <>
                         {/* Serienmodus: der Schalter beschreibt den laufenden Modus und steht
                             deshalb hier, nicht im Picker. `wrap`: im Handschuh ist er 144 px breit. */}
@@ -1028,7 +1036,7 @@ export default function Sidebar(props: SidebarProps) {
         {darfSchreiben && props.ansichtDirty && (
           <Space orientation="vertical" style={{ width: '100%', marginTop: token.marginSM }}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Karten-Konfiguration weicht von der gespeicherten Ansicht ab.
+              Ungespeicherte Änderungen
             </Typography.Text>
             {/* Schreibt in die aktive Ansicht, nicht in eine einsatzweite Einstellung. */}
             <Button
@@ -1109,25 +1117,19 @@ export default function Sidebar(props: SidebarProps) {
                   {laedt ? (
                     <Spin size="small" />
                   ) : zoomHinweis ? (
-                    <Tooltip
-                      title={`${def.label}: Objekte werden erst ab einer näheren Zoomstufe geladen`}
-                    >
-                      <Typography.Text type="warning" style={{ fontSize: 11 }}>
-                        näher heranzoomen
-                      </Typography.Text>
-                    </Tooltip>
+                    <Typography.Text type="warning" style={{ fontSize: 11 }}>
+                      näher heranzoomen
+                    </Typography.Text>
                   ) : (
                     <>
                       {/* `nowrap`: sonst bricht die Marke mitten im Wort. */}
                       {sichtbar && offline && (
-                        <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
-                          <Typography.Text
-                            type="secondary"
-                            style={{ fontSize: 11, whiteSpace: 'nowrap' }}
-                          >
-                            offline
-                          </Typography.Text>
-                        </Tooltip>
+                        <Typography.Text
+                          type="secondary"
+                          style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                        >
+                          offline
+                        </Typography.Text>
                       )}
                       {sichtbar && status === 'leer' && (
                         <Typography.Text
@@ -1266,12 +1268,8 @@ export default function Sidebar(props: SidebarProps) {
                   >
                     {/* Ein Umschalter statt zehn gleichzeitig scharfer Griffe: in Fingergröße
                         lägen Ecken, Kanten, Drehung und Mitte auf einem kleinen Bild
-                        übereinander. Der Hinweis nennt nur die aktiven Griffe. */}
-                    {props.modusBedienungImFuss ? (
-                      <Typography.Text type="secondary" style={{ display: 'block' }}>
-                        Bedienung über der Karte.
-                      </Typography.Text>
-                    ) : (
+                        übereinander. Darunter steht nur, ob Kanten fehlen. */}
+                    {props.modusBedienungImFuss ? null : (
                       <Segmentleiste<GriffModus>
                         beschriftung="Griffe auf der Karte"
                         wert={props.griffModus}
@@ -1284,22 +1282,24 @@ export default function Sidebar(props: SidebarProps) {
                         style={{ marginBottom: token.marginXS }}
                       />
                     )}
-                    <Typography.Text
-                      type="secondary"
-                      style={{ fontSize: 12, display: 'block' }}
-                      data-lfh="bildgriff-hinweis"
-                    >
-                      {griffHinweis(props.griffModus, {
-                        kantenAus: props.griffKantenAus,
-                      })}{' '}
-                      Oder Mittelpunkt numerisch:
-                    </Typography.Text>
+                    {bildGriffHinweis && (
+                      <Typography.Text
+                        type="warning"
+                        style={{ fontSize: 12, display: 'block' }}
+                        data-lfh="bildgriff-hinweis"
+                      >
+                        {bildGriffHinweis}
+                      </Typography.Text>
+                    )}
                     <div style={{ marginTop: token.marginSM }}>
-                      <KoordinatenEingabe
-                        value={bildMitte ?? props.bildPlatzierZentrum}
-                        onChange={setBildMitte}
-                        einsatzId={props.einsatzId}
-                      />
+                      <FeldLabel text="Mittelpunkt" htmlFor={bildMitteId}>
+                        <KoordinatenEingabe
+                          id={bildMitteId}
+                          value={bildMitte ?? props.bildPlatzierZentrum}
+                          onChange={setBildMitte}
+                          einsatzId={props.einsatzId}
+                        />
+                      </FeldLabel>
                     </div>
                     <Space
                       style={{
@@ -1363,59 +1363,57 @@ export default function Sidebar(props: SidebarProps) {
         onCancel={() => setLoeschBildId(null)}
         destroyOnHidden
       >
-        <Typography.Paragraph>
-          Das Bild wird aus der Lagekarte entfernt. Bereits gesetzte Eckpunkte gehen dabei verloren.
-        </Typography.Paragraph>
+        <Typography.Paragraph>Gesetzte Eckpunkte gehen verloren.</Typography.Paragraph>
       </Modal>
 
-      <KlappPaneel
-        titel="Kartengrundlage"
-        kennung="grundlage"
-        offen={paneele.zustand.grundlage}
-        onUmschalten={umschalten('grundlage')}
-      >
-        <Space orientation="vertical" style={{ width: '100%' }}>
-          {props.grundlageWahl ?? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Gewählt wird die Grundlage oben links auf der Karte.
-            </Typography.Text>
-          )}
-          {/* Mit der Leiste im Paneel (Handschirm) nennt deren Sperrgrund das schon. */}
-          {!props.grundlageWahl && !props.onlineVerfuegbar && (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Online-Karte: nicht konfiguriert
-            </Typography.Text>
-          )}
-          {!props.grundlageWahl && !props.offlineVerfuegbar && (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Offline-Karte: nicht konfiguriert
-            </Typography.Text>
-          )}
-          {props.basemap === 'offline' && (
-            <div>
-              <Typography.Text
-                type="secondary"
-                style={{ fontSize: 12, display: 'block', marginBottom: token.marginXS }}
-              >
-                Karten-Design
+      {/* Ab `lg` steht die Wahl oben links auf der Karte, ein Weg je Breite. Hat das Paneel dann
+          nichts zu sagen, steht es nicht da (LFH-1083) — sonst bliebe ein leerer Klappkopf. */}
+      {grundlagePaneelInhalt && (
+        <KlappPaneel
+          titel="Kartengrundlage"
+          kennung="grundlage"
+          offen={paneele.zustand.grundlage}
+          onUmschalten={umschalten('grundlage')}
+        >
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {props.grundlageWahl}
+            {/* Mit der Leiste im Paneel (Handschirm) nennt deren Sperrgrund das schon. */}
+            {!props.grundlageWahl && !props.onlineVerfuegbar && (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Online-Karte: nicht konfiguriert
               </Typography.Text>
-              <Radio.Group
-                value={props.kartenTheme}
-                onChange={(e) => props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)}
-                optionType="button"
-                aria-label="Karten-Design"
-                name="lagekarte-karten-design"
-              >
-                <Tooltip title="folgt dem App-Design">
-                  <Radio.Button value="auto">Auto</Radio.Button>
-                </Tooltip>
-                <Radio.Button value="light">Hell</Radio.Button>
-                <Radio.Button value="dark">Dunkel</Radio.Button>
-              </Radio.Group>
-            </div>
-          )}
-        </Space>
-      </KlappPaneel>
+            )}
+            {!props.grundlageWahl && !props.offlineVerfuegbar && (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Offline-Karte: nicht konfiguriert
+              </Typography.Text>
+            )}
+            {props.basemap === 'offline' && (
+              <div>
+                <Typography.Text
+                  type="secondary"
+                  style={{ fontSize: 12, display: 'block', marginBottom: token.marginXS }}
+                >
+                  Karten-Design
+                </Typography.Text>
+                <Radio.Group
+                  value={props.kartenTheme}
+                  onChange={(e) => props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)}
+                  optionType="button"
+                  aria-label="Karten-Design"
+                  name="lagekarte-karten-design"
+                >
+                  <Tooltip title="folgt dem App-Design">
+                    <Radio.Button value="auto">Auto</Radio.Button>
+                  </Tooltip>
+                  <Radio.Button value="light">Hell</Radio.Button>
+                  <Radio.Button value="dark">Dunkel</Radio.Button>
+                </Radio.Group>
+              </div>
+            )}
+          </Space>
+        </KlappPaneel>
+      )}
     </div>
   );
 }

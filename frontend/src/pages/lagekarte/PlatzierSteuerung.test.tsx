@@ -13,11 +13,12 @@ describe('PlatzierSteuerung (LFH-765)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('Platzieren: Objekt im Titel, Hinweis, „Abbrechen" beendet', async () => {
+  it('Platzieren: Objekt im Titel, kein Bediensatz, „Abbrechen" beendet', async () => {
     const onAbbrechen = vi.fn();
     zeige({ art: 'platzieren', objekt: 'Einheit: Pumpe Ost', onAbbrechen });
     expect(screen.getByText('Platzieren · Einheit: Pumpe Ost')).toBeInTheDocument();
-    expect(screen.getByText('Tipp auf die Karte setzt die Position.')).toBeInTheDocument();
+    // Fadenkreuz und Titel zeigen den Modus; ein Satz „Tipp auf die Karte …“ fällt weg (LFH-1083).
+    expect(document.body).not.toHaveTextContent(/Tipp auf die Karte/);
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(onAbbrechen).toHaveBeenCalledTimes(1);
   });

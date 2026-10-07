@@ -1,6 +1,7 @@
 import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
 import { Button, Card, Space, Switch, Typography } from 'antd';
 import { monoStil, useRollen } from '../../components/instrument';
+import EscKappe from './EscKappe';
 import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
 import { bandStil } from './KartenFuss';
@@ -52,7 +53,7 @@ interface ZeichnenSteuerungProps {
 /**
  * Overlay im Kartenfuß, das den Zeichen-Zustand sichtbar macht und den Abschluss explizit steuert.
  * Zwei Phasen:
- * - 'zeichnen' → Hinweis + Punktzähler + „Abschließen" / „Letzten Punkt zurück" / „Abbrechen"
+ * - 'zeichnen' → Punktzähler + „Abschließen" / „Letzten Punkt zurück" / „Abbrechen"
  * - 'bestaetigen' → „Speichern" / „Verwerfen" (Entwurf bleibt auf der Karte sichtbar)
  *   Präsentationsfrei: keine Karten-/terra-draw-Kenntnis, nur Props + Callbacks.
  */
@@ -98,19 +99,19 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // „Abbrechen" verwirft nur einen Entwurf; ab der ersten gespeicherten Zone heißt Beenden
   // „Fertig", weil das Gespeicherte bleibt.
   //
-  // Der Tastaturvertrag steht einmal, hier. Er gilt in beiden Phasen: auch eine fertige,
-  // ungespeicherte Figur verwirft das erste Esc. Nur mit feinem Zeiger (`lfh-nur-feiner-zeiger`):
-  // Touch hat keine Esc-Taste, und die Zeile kostete dort Höhe, die der Fuß bei 390 px nicht hat.
-  const escHinweis = (
-    <Typography.Text type="secondary" className="lfh-nur-feiner-zeiger">
-      Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.
-    </Typography.Text>
-  );
+  // Esc ist zweistufig (LFH-712): mit Figur verwirft es nur die Figur, der Modus bleibt — dafür
+  // gibt es keinen Knopf („Verwerfen“ beendet den Modus), also keine Kappe. Ohne Figur beendet Esc
+  // wie dieser Knopf; während des Speicherns tut es nichts.
+  const escBeendet = !bestaetigen && !props.punkte && !props.speichernLaeuft;
   const beenden =
     gespeichert > 0 && props.onFertig ? (
-      <Button onClick={props.onFertig}>Fertig</Button>
+      <Button onClick={props.onFertig} aria-keyshortcuts={escBeendet ? 'Escape' : undefined}>
+        Fertig{escBeendet && <EscKappe />}
+      </Button>
     ) : (
-      <Button onClick={props.onAbbrechen}>Abbrechen</Button>
+      <Button onClick={props.onAbbrechen} aria-keyshortcuts={escBeendet ? 'Escape' : undefined}>
+        Abbrechen{escBeendet && <EscKappe />}
+      </Button>
     );
   return (
     <Card
@@ -157,8 +158,6 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         </div>
         {bestaetigen ? (
           <>
-            <Typography.Text type="secondary">Entwurf prüfen und speichern.</Typography.Text>
-            {escHinweis}
             {serienZeile}
             <Space>
               <Button
@@ -176,10 +175,6 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
           </>
         ) : (
           <>
-            <Typography.Text type="secondary">
-              Punkte per Klick setzen. Startpunkt klicken, doppelklicken oder „Abschließen".
-            </Typography.Text>
-            {escHinweis}
             {serienZeile}
             {/* Drei Knöpfe in einer Reihe, „zurück" als Symbolknopf (Name über `aria-label` und
                 `title`): mit Textetikett brach die Reihe bei Touch-Höhe um. `wrap` bleibt als

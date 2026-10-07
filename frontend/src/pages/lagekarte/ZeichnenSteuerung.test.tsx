@@ -41,10 +41,10 @@ describe('ZeichnenSteuerung', () => {
     expect(container.textContent).not.toContain('Abschließen');
   });
 
-  it('Phase zeichnen: zeigt Titel + Hinweis + Abschließen/Abbrechen', async () => {
+  it('Phase zeichnen: zeigt Titel + Abschließen/Abbrechen, keinen Bediensatz (LFH-1083)', async () => {
     const p = setup();
     expect(screen.getByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
-    expect(screen.getByText(/Punkte per Klick setzen/i)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/per Klick|doppelklicken|Esc verwirft/);
     await userEvent.click(screen.getByRole('button', { name: 'Abschließen' }));
     expect(p.onAbschliessen).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
@@ -213,22 +213,48 @@ describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', ()
     expect(screen.queryByText('3 Punkte')).not.toBeInTheDocument();
   });
 
-  it('nennt beide Esc-Stufen genau einmal, als Hinweis — nicht im Knopf', () => {
+  it('Esc steht als Kappe am Beenden, solange keine Figur liegt — nicht im Knopfnamen', () => {
     setup({ punkte: 0, punktZurueckMoeglich: false, onPunktZurueck: vi.fn() });
-    const hinweis = 'Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.';
-    expect(screen.getAllByText(hinweis)).toHaveLength(1);
-    // Nur mit feinem Zeiger sichtbar (Regel in `lagekarte.css`): Touch hat keine Esc-Taste.
-    expect(screen.getByText(hinweis)).toHaveClass('lfh-nur-feiner-zeiger');
-    for (const knopf of screen.getAllByRole('button')) {
-      expect(knopf.textContent ?? '').not.toContain('Esc');
-    }
+    const abbrechen = screen.getByRole('button', { name: 'Abbrechen' });
+    expect(abbrechen).toHaveAttribute('aria-keyshortcuts', 'Escape');
+    expect(abbrechen.querySelector('kbd')).toHaveTextContent('Esc');
+    // Nur mit feinem Zeiger sichtbar (Regel in `lagekarte.css`): die Klasse sitzt an der Hülle,
+    // weil `Tastenkuerzel` `display` inline setzt und ein Inline-Stil die Regel schlüge.
+    const huelle = abbrechen.querySelector('[data-lfh="esc-kappe"]') as HTMLElement;
+    expect(huelle).toHaveClass('lfh-nur-feiner-zeiger');
+    expect(huelle.style.display).toBe('');
+    expect(huelle).toHaveAttribute('aria-hidden', 'true');
+    expect(document.querySelectorAll('kbd')).toHaveLength(1);
   });
 
-  it('nennt die Esc-Stufen auch in der Bestätigungsphase', () => {
+  it('in der Serie trägt „Fertig“ die Kappe, solange keine Figur liegt', () => {
+    setup({ punkte: 0, serieAnzahl: 2, onFertig: vi.fn() });
+    const fertig = screen.getByRole('button', { name: 'Fertig' });
+    expect(fertig).toHaveAttribute('aria-keyshortcuts', 'Escape');
+    expect(fertig.querySelector('kbd')).toHaveTextContent('Esc');
+  });
+
+  it('mit Punkten verwirft Esc erst die Figur: keine Kappe am Beenden', () => {
+    setup({ punkte: 2 });
+    const abbrechen = screen.getByRole('button', { name: 'Abbrechen' });
+    expect(abbrechen).not.toHaveAttribute('aria-keyshortcuts');
+    expect(document.querySelector('kbd')).toBeNull();
+  });
+
+  it('Bestätigungsphase: keine Kappe — Esc verwirft dort nur die Figur, „Verwerfen“ beendet', () => {
+    // Esc ruft in der Bestätigung `onBestaetigungZurueck` (Modus bleibt), „Verwerfen“ beendet den
+    // Modus (`useKartenInteraktion`): eine Kappe dort behauptete eine Gleichheit, die es nicht gibt.
     setup({ phase: 'bestaetigen' });
-    expect(
-      screen.getByText('Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.'),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verwerfen' })).not.toHaveAttribute(
+      'aria-keyshortcuts',
+    );
+    expect(document.querySelector('kbd')).toBeNull();
+    expect(document.body).not.toHaveTextContent(/Entwurf prüfen/);
+  });
+
+  it('während des Speicherns keine Kappe: Esc tut dann nichts', () => {
+    setup({ punkte: 0, speichernLaeuft: true });
+    expect(document.querySelector('kbd')).toBeNull();
   });
 });
 

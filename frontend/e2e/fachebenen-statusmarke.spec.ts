@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { FACHEBENEN } from '../src/pages/lagekarte/fachebenen';
+import type { FachebeneQuelle } from '../src/api/fachebenen';
 
 /**
  * LFH-601: Die Statusmarke einer Fachebene („offline“, „keine Daten“) steht einzeilig, auch
@@ -22,7 +24,7 @@ const TABLET = { width: 1024, height: 768 };
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 /** Ebenen mit Geltungszeile, deren Marke nicht vom Kartenausschnitt abhängt (`fachebenen.ts`). */
-const MIT_GELTUNG = ['autobahn', 'luftqualitaet', 'odl'];
+const MIT_GELTUNG: FachebeneQuelle[] = ['autobahn', 'luftqualitaet', 'odl'];
 
 const MARKE = { offline: 'offline', leer: 'keine Daten' } as const;
 
@@ -87,8 +89,7 @@ for (const zustand of ['offline', 'leer'] as const) {
           `Vorbedingung: ${key} zeigt „${MARKE[zustand]}“`,
         ).toBeVisible();
         await expect(
-          // Jede Geltungszeile setzt ihre Einschränkung mit Gedankenstrich ab (`fachebenen.ts`).
-          zeile.locator('.ant-typography', { hasText: '—' }),
+          zeile.locator('.ant-typography', { hasText: FACHEBENEN[key].geltung }),
           `Vorbedingung: ${key} trägt eine Geltungszeile`,
         ).toBeVisible();
       }

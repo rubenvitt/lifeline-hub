@@ -110,30 +110,23 @@ describe('griffeFuerModus', () => {
     expect(gesehen.size).toBe(4);
   });
 
-  it('der Hinweis nennt nur die Griffe, die es gerade gibt', () => {
-    // Sonst behauptete der Text weiter, man könne an den Ecken ziehen.
-    expect(griffHinweis('drehen')).toMatch(/Drehen/);
-    expect(griffHinweis('drehen')).not.toMatch(/Ecken|Kanten|Mitte/);
-    expect(griffHinweis('verschieben')).not.toMatch(/Ecken|Kanten|↻/);
-    expect(griffHinweis('groesse')).not.toMatch(/↻|Mitte/);
+  it('ohne fehlende Kanten kein Satz: die Zeiger der Griffe zeigen die Bedienung (LFH-1083)', () => {
+    for (const m of ['verschieben', 'drehen', 'groesse'] as const) {
+      expect(griffHinweis(m)).toBeNull();
+      expect(griffHinweis(m, { kantenAus: 'keine' })).toBeNull();
+    }
   });
 
   it('sagt, wenn Kanten wegen Platzmangel fehlen, und nennt Heranzoomen (LFH-764)', () => {
-    const alle = griffHinweis('groesse', { kantenAus: 'alle' });
-    expect(alle).toMatch(/Ecken/);
-    expect(alle).toMatch(/heranzoomen/i);
-    // Keine Anweisung für Griffe, die es gerade nicht gibt.
-    expect(alle).not.toMatch(/Kanten = frei strecken/);
-    // Fehlen nur einige, bleiben die übrigen Kanten bedienbar — der Hinweis nennt beides.
-    const einige = griffHinweis('groesse', { kantenAus: 'einige' });
-    expect(einige).toMatch(/Kanten = frei strecken/);
-    expect(einige).toMatch(/heranzoomen/i);
-    // Mit allen Kanten bleibt der bisherige Text, und die übrigen Modi kennen den Zustand nicht.
-    expect(griffHinweis('groesse', { kantenAus: 'keine' })).toBe(griffHinweis('groesse'));
-    expect(griffHinweis('groesse')).toMatch(/Kanten = frei strecken/);
-    expect(griffHinweis('groesse')).not.toMatch(/heranzoomen/i);
+    expect(griffHinweis('groesse', { kantenAus: 'alle' })).toBe(
+      'Kanten ausgeblendet · näher heranzoomen',
+    );
+    expect(griffHinweis('groesse', { kantenAus: 'einige' })).toBe(
+      'Einige Kanten ausgeblendet · näher heranzoomen',
+    );
+    // Die übrigen Modi kennen den Zustand nicht: dort gibt es keine Kantengriffe.
     for (const m of ['verschieben', 'drehen'] as const) {
-      expect(griffHinweis(m, { kantenAus: 'alle' })).toBe(griffHinweis(m));
+      expect(griffHinweis(m, { kantenAus: 'alle' })).toBeNull();
     }
   });
 });

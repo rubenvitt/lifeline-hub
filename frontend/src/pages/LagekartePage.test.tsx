@@ -444,6 +444,19 @@ function renderSeite(route = '/einsaetze/1/lagekarte') {
 
 // URL-Sonde: spiegelt den Query-String in ein data-testid, damit Tests die
 // apply-then-clean-Bereinigung an der URL beobachten.
+/**
+ * Platzier-Modus an: die Koordinaten-Karte der Leiste steht, und die Kartenspalte trägt das
+ * Fadenkreuz (LFH-1083) — beide nur, solange `platzierungZiel` gesetzt ist.
+ */
+function platzierModusAn(): boolean {
+  const karte = document.querySelector('[data-lfh="platzieren-hinweis"]') != null;
+  const fadenkreuz =
+    document.querySelector('[data-lfh="kartenspalte"]')?.classList.contains('lfh-karte-setzen') ??
+    false;
+  if (karte !== fadenkreuz) throw new Error(`Leiste ${karte}, Fadenkreuz ${fadenkreuz}`);
+  return karte;
+}
+
 function LocationSonde() {
   const location = useLocation();
   return <div data-testid="location-search">{location.search}</div>;
@@ -927,13 +940,13 @@ describe('LagekartePage', () => {
       offline_regionen: [],
       karten_bau_verfuegbar: false,
     });
-    const user = userEvent.setup();
     renderSeite();
     await screen.findByText('marker-schaden-9');
     expect(screen.getByRole('radio', { name: 'Online' })).not.toHaveAttribute('aria-disabled');
     expect(screen.getByRole('radio', { name: 'Offline' })).not.toHaveAttribute('aria-disabled');
-    // Default-Modus ist 'online' → kein Hinweis „Ohne Karte", auch bei aufgeklapptem Paneel.
-    await user.click(screen.getByRole('button', { name: 'Kartengrundlage' }));
+    // Default-Modus ist 'online' → kein Hinweis „Ohne Karte". Ab `lg` steht die Wahl über der
+    // Karte, und das Paneel hätte nichts zu sagen: es fehlt (LFH-1083).
+    expect(screen.queryByRole('button', { name: 'Kartengrundlage' })).toBeNull();
     expect(
       screen.queryByText(/Ohne Hintergrundkarte|Keine Kartengrundlage/),
     ).not.toBeInTheDocument();
@@ -1389,7 +1402,7 @@ describe('LagekartePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
-    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+    expect(platzierModusAn()).toBe(false);
   });
 
   it('Reverse-Deeplink ?gefahrengebiet=: räumt den Param aus der URL (apply-then-clean) und die Selektion bleibt bestehen (LFH-155)', async () => {
@@ -1443,9 +1456,9 @@ describe('LagekartePage', () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=schaden:10');
 
-    // Der Modus ist an der Anweisungskarte der Sidebar ablesbar — sie steht nur, solange
-    // `platzierungZiel` gesetzt ist.
-    expect(await screen.findByText(/Klick auf die Karte setzt die Koordinate/)).toBeInTheDocument();
+    // Der Modus ist an der Koordinaten-Karte der Sidebar und am Fadenkreuz der Kartenspalte
+    // ablesbar — beide stehen nur, solange `platzierungZiel` gesetzt ist.
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
     // apply-then-clean: erst nach dem Anwenden ist der Param weg.
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
@@ -1598,13 +1611,13 @@ describe('LagekartePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
-    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+    expect(platzierModusAn()).toBe(false);
   });
 
   it('Deeplink ?platzieren=betreuungsstelle: startet den Platzier-Modus und räumt (LFH-673)', async () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
-    expect(await screen.findByText(/Klick auf die Karte setzt die Koordinate/)).toBeInTheDocument();
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
@@ -1620,13 +1633,13 @@ describe('LagekartePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
-    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+    expect(platzierModusAn()).toBe(false);
   });
 
   it('Deeplink ?platzieren=person: startet den Platzier-Modus und räumt (LFH-670)', async () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');
-    expect(await screen.findByText(/Klick auf die Karte setzt die Koordinate/)).toBeInTheDocument();
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
@@ -1644,7 +1657,7 @@ describe('LagekartePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
-    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+    expect(platzierModusAn()).toBe(false);
   });
 
   it('hebt eine Zone auf (DELETE)', async () => {

@@ -785,9 +785,10 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
         // Ecke je 42 px auseinander, in Handschuh (72) ohnehin zu nah.
         const mitKanten = dichte === 'kompakt' && f.grad === 0;
         await expect(page.locator('[data-lfh="bildgriff-kante"]')).toHaveCount(mitKanten ? 4 : 0);
-        await expect(page.locator('[data-lfh="bildgriff-hinweis"]')).toContainText(
-          mitKanten ? 'Kanten = frei strecken' : 'heranzoomen',
-        );
+        // Ohne fehlende Kanten steht kein Satz, die Griffe zeigen sich selbst (LFH-1083).
+        if (mitKanten) await expect(page.locator('[data-lfh="bildgriff-hinweis"]')).toHaveCount(0);
+        else
+          await expect(page.locator('[data-lfh="bildgriff-hinweis"]')).toContainText('heranzoomen');
 
         await page.getByRole('button', { name: /^Fertig$/ }).click();
         await expect(griffe).toHaveCount(0);

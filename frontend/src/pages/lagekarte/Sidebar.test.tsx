@@ -349,8 +349,8 @@ describe('Sidebar Bild-Hintergründe', () => {
         onBildPlatzierenFertig={onBildPlatzierenFertig}
       />,
     );
-    // Hinweistext + „Mittelpunkt setzen" (ohne Entwurf gesperrt) erscheinen nur im Platzier-Modus.
-    expect(screen.getByText(/frei strecken/i)).toBeInTheDocument();
+    // Griffwahl + „Mittelpunkt setzen" (ohne Entwurf gesperrt) erscheinen nur im Platzier-Modus.
+    expect(screen.getByRole('radiogroup', { name: 'Griffe auf der Karte' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /^Fertig$/i }));
     expect(onBildPlatzierenFertig).toHaveBeenCalled();
@@ -401,10 +401,10 @@ describe('Sidebar Bild-Hintergründe', () => {
     fireEvent.click(within(gruppe).getByRole('radio', { name: 'Drehen' }));
     expect(onGriffModus).toHaveBeenCalledWith('drehen');
 
-    // Der Hinweis folgt dem Modus — sonst behauptete er weiter, man könne an den Ecken ziehen.
+    // Wie zu ziehen ist, zeigen die Zeiger der Griffe, kein Satz (LFH-1083).
     rerender(<Sidebar {...props} griffModus="drehen" />);
-    expect(screen.getByText(/zum Drehen/i)).toBeInTheDocument();
-    expect(screen.queryByText(/frei strecken/i)).toBeNull();
+    expect(document.querySelector('[data-lfh="bildgriff-hinweis"]')).toBeNull();
+    expect(document.body).not.toHaveTextContent(/ziehen zum|frei strecken/);
   });
 
   it('sagt, wenn die Karte Kantengriffe mangels Platz ausblendet (LFH-764)', () => {
@@ -418,10 +418,9 @@ describe('Sidebar Bild-Hintergründe', () => {
       <Sidebar {...props} griffModus="groesse" griffKantenAus="alle" />,
     );
     const hinweis = () => document.querySelector('[data-lfh="bildgriff-hinweis"]')?.textContent;
-    expect(hinweis()).toMatch(/heranzoomen/i);
-    expect(hinweis()).not.toMatch(/Kanten = frei strecken/);
+    expect(hinweis()).toBe('Kanten ausgeblendet · näher heranzoomen');
     rerender(<Sidebar {...props} griffModus="groesse" griffKantenAus="keine" />);
-    expect(hinweis()).toMatch(/Kanten = frei strecken/);
+    expect(hinweis()).toBeUndefined();
   });
 
   it('zeigt den Griff-Umschalter nur im Platzier-Modus mit Schreibrecht (LFH-711)', () => {
@@ -721,7 +720,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Grundzeichen' })).not.toBeInTheDocument();
   });
 
-  it('zeigt im Platzier-Modus den Hinweis und meldet Abbrechen (LFH-170)', () => {
+  it('zeigt im Platzier-Modus „Abbrechen“ ohne Bediensatz und meldet es (LFH-170)', () => {
     const onZeichenPlatzierenAbbrechen = vi.fn();
     renderMitProviders(
       <Sidebar
@@ -730,7 +729,7 @@ describe('Sidebar Bild-Hintergründe', () => {
         onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
       />,
     );
-    expect(screen.getByText(/Auf Karte klicken zum Platzieren/i)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/Auf Karte klicken/);
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(onZeichenPlatzierenAbbrechen).toHaveBeenCalled();
   });
@@ -1289,10 +1288,11 @@ describe('Sidebar: Ebenen-Zeile als Bedienziel', () => {
 });
 
 describe('Sidebar: Paneel „Ausgewählt"', () => {
-  it('sagt ohne Auswahl, wie man etwas wählt', () => {
+  it('sagt ohne Auswahl nur „Nichts gewählt“, keine Anleitung (LFH-1083)', () => {
     renderMitProviders(<Sidebar {...basisProps} />);
     const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
     expect(paneel).toHaveTextContent(/Nichts gewählt/);
+    expect(paneel).not.toHaveTextContent(/antippen|Verortet/);
   });
 
   it('zeigt den übergebenen Inspector-Inhalt statt des Hinweises', () => {
@@ -1549,7 +1549,7 @@ describe('filtereNichtVerortet (LFH-360)', () => {
 
 /**
  * Unter `lg` trägt das Fuß-Band `PlatzierSteuerung` die Bedienung der Leistenmodi (LFH-765). Die
- * Leiste zeigt dann an deren Stelle nur einen Hinweis — je Breite genau ein Knopf je Handlung. Jedes
+ * Leiste zeigt dann an deren Stelle nur den Zustand — je Breite genau ein Knopf je Handlung. Jedes
  * „fehlt" hier hat seine Gegenprobe oben in den Bestandstests (ohne Prop stehen die Knöpfe).
  */
 describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {
@@ -1632,7 +1632,8 @@ describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {
         modusBedienungImFuss
       />,
     );
-    expect(screen.getByText('Bedienung über der Karte.')).toBeInTheDocument();
+    // Kein Satz „Bedienung über der Karte“: das Band dort ist sichtbar (LFH-1083).
+    expect(document.body).not.toHaveTextContent(/Bedienung über der Karte|Auf Karte klicken/);
     expect(screen.queryByRole('switch', { name: 'Weitere platzieren' })).not.toBeInTheDocument();
     expect(screen.queryByText('2 platziert')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Fertig' })).not.toBeInTheDocument();
@@ -1656,7 +1657,8 @@ describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Fertig$/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeInTheDocument();
-    expect(screen.getByText('Bedienung über der Karte.')).toBeInTheDocument();
+    // Kein Satz „Bedienung über der Karte“: das Band dort ist sichtbar (LFH-1083).
+    expect(document.body).not.toHaveTextContent(/Bedienung über der Karte|Auf Karte klicken/);
   });
 });
 

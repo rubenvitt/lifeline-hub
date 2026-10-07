@@ -32,8 +32,8 @@ export type PlatzierModus =
  * Bedienung der Leistenmodi (Platzieren, Taktisches Zeichen, Bild einpassen) im Kartenfuß — nur
  * unter `lg` eingehängt (LFH-765). Dort schließt ein laufender Kartenmodus die Leiste, damit Karte
  * zum Tippen bleibt; ihr „Abbrechen"/„Fertig" stand aber in der Leiste. Ab `lg` bleibt es dort,
- * und die Sidebar zeigt unter `lg` an deren Stelle nur einen Hinweis (`modusBedienungImFuss`):
- * je Breite genau ein Knopf je Handlung.
+ * und die Sidebar zeigt unter `lg` an deren Stelle nur Zustand und Zusatzangaben
+ * (`modusBedienungImFuss`): je Breite genau ein Knopf je Handlung.
  *
  * Muster und Positionierung wie `ZeichnenSteuerung`: ein Flow-Band des `KartenFuss`, nie absolut.
  * Zusatzangaben (Koordinate, Mittelpunkt numerisch) bleiben Leisteninhalt — „Leiste einblenden".
@@ -60,14 +60,7 @@ export default function PlatzierSteuerung({ modus }: { modus: PlatzierModus | nu
     >
       <Space orientation="vertical" size={8} style={{ width: '100%' }}>
         <Typography.Text strong>{titel}</Typography.Text>
-        {modus.art === 'platzieren' && (
-          <>
-            <Typography.Text type="secondary">
-              Tipp auf die Karte setzt die Position.
-            </Typography.Text>
-            <Button onClick={modus.onAbbrechen}>Abbrechen</Button>
-          </>
-        )}
+        {modus.art === 'platzieren' && <Button onClick={modus.onAbbrechen}>Abbrechen</Button>}
         {modus.art === 'zeichen' && (
           <>
             {/* Schalter, Zähler und Beenden teilen eine umbrechende Reihe: jede Zeile mehr hebt

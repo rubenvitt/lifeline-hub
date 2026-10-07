@@ -204,8 +204,29 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
     geocoder({ zustand: 'ausgelastet', treffer: [] });
     zeige();
     await userEvent.type(suchfeld(), 'Hauptstraße{Enter}');
-    expect(await screen.findByText(/^Adresssuche gerade ausgelastet/)).toBeInTheDocument();
-    expect(screen.getByText(/erneut Enter/)).toBeInTheDocument();
+    expect(await screen.findByText('Adresssuche ausgelastet')).toBeInTheDocument();
+    // Der Ausweg ist ein Knopf, kein Satz „erneut Enter drücken“ (LFH-1083).
+    expect(screen.getByRole('button', { name: 'Erneut suchen' })).toBeInTheDocument();
+    expect(screen.queryByText(/erneut Enter/)).toBeNull();
+  });
+
+  it('„Erneut suchen“ fragt nach „ausgelastet“ neu — und ein einzelner Treffer fliegt hin', async () => {
+    let runde = 0;
+    server.use(
+      http.get(PFAD, () => {
+        runde += 1;
+        return HttpResponse.json(
+          runde === 1
+            ? { zustand: 'ausgelastet', treffer: [] }
+            : { zustand: 'ok', treffer: [{ lat: 51, lon: 10, name: 'Rathaus' }] },
+        );
+      }),
+    );
+    const { onOrtWaehlen } = zeige();
+    await userEvent.type(suchfeld(), 'Rathaus{Enter}');
+    await userEvent.click(await screen.findByRole('button', { name: 'Erneut suchen' }));
+    await waitFor(() => expect(onOrtWaehlen).toHaveBeenCalledTimes(1));
+    expect(runde).toBe(2);
   });
 
   it('nach „ausgelastet“ fragt ein zweites Enter neu — und ein einzelner Treffer fliegt dann hin', async () => {
@@ -224,7 +245,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
     );
     const { onOrtWaehlen } = zeige();
     await userEvent.type(suchfeld(), 'Rathaus{Enter}');
-    expect(await screen.findByText(/^Adresssuche gerade ausgelastet/)).toBeInTheDocument();
+    expect(await screen.findByText('Adresssuche ausgelastet')).toBeInTheDocument();
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(onOrtWaehlen).toHaveBeenCalledTimes(1));
     expect(anfragen).toEqual(['Rathaus', 'Rathaus']);
@@ -242,7 +263,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
     );
     zeige();
     await userEvent.type(suchfeld(), 'Rathaus{Enter}');
-    expect(await screen.findByText(/^Adresssuche nicht erreichbar/)).toBeInTheDocument();
+    expect(await screen.findByText('Adresssuche nicht erreichbar')).toBeInTheDocument();
     await userEvent.keyboard('{Enter}');
     expect(await screen.findByText('Keine Adresse zu „Rathaus“ gefunden')).toBeInTheDocument();
   });
@@ -251,7 +272,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
     geocoder({ zustand: 'nicht_erreichbar', treffer: [] });
     zeige({ marker: [marker('uhs', 1, 'Hauptwache')] });
     await userEvent.type(suchfeld(), 'Hauptwache{Enter}');
-    expect(await screen.findByText(/^Adresssuche nicht erreichbar/)).toBeInTheDocument();
+    expect(await screen.findByText('Adresssuche nicht erreichbar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hauptwache' })).toBeInTheDocument();
   });
 
@@ -259,7 +280,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
     geocoder(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
     zeige();
     await userEvent.type(suchfeld(), 'Hauptstraße{Enter}');
-    expect(await screen.findByText(/^Adresssuche nicht erreichbar/)).toBeInTheDocument();
+    expect(await screen.findByText('Adresssuche nicht erreichbar')).toBeInTheDocument();
   });
 });
 

@@ -154,7 +154,12 @@ test('Betreuungsstelle: aus dem Modul verorten, Marker live auf einer zweiten Ka
     .click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/lagekarte`));
   await karteBereit(page);
-  await expect(page.getByText(/Klick auf die Karte setzt die Koordinate/)).toBeVisible();
+  // Platzier-Modus: Fadenkreuz an der Kartenspalte, Koordinatenfeld in der Leiste (LFH-1083).
+  await expect(page.locator('[data-lfh="kartenspalte"]')).toHaveClass(/lfh-karte-setzen/);
+  await expect(page.locator('[data-lfh="kartenspalte"] .maplibregl-canvas')).toHaveCSS(
+    'cursor',
+    'crosshair',
+  );
   // apply-then-clean: der Auftrag ist aus der Adresse verschwunden.
   await expect(page).not.toHaveURL(/platzieren=/);
   await springe(page, STELLE_ORT, 15);

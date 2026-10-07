@@ -273,9 +273,11 @@ export default function ZonenInspector({
           </>
         )}
 
+        {/* Grund in wenigen Wörtern als Lesezeile (LFH-1083): ein gesperrtes Select läse der
+            Vorleser ohne seinen Platzhalter. */}
         {istBezirksflaeche && !betreuungFrei && (
           <Typography.Text type="secondary">
-            Zuordnung zu einem Evakuierungsbezirk nur mit Zugriff auf das Modul Betreuung
+            Evakuierungsbezirk · kein Zugriff auf Betreuung
           </Typography.Text>
         )}
         {istBezirksflaeche && betreuungFrei && darfSchreiben && (
@@ -380,13 +382,11 @@ export default function ZonenInspector({
             über den Hinweis. */}
         {darfSchreiben && (
           <Popconfirm
-            title="Zone aufheben?"
+            title={`Zone „${titel}“ aufheben?`}
             description={
-              <>
-                „{titel}“ wird endgültig gelöscht.
-                {aktuellHatWarnstufen &&
-                  ' Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren.'}
-              </>
+              aktuellHatWarnstufen
+                ? 'Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren.'
+                : undefined
             }
             okText="Aufheben"
             okButtonProps={{ danger: true }}

@@ -1,6 +1,7 @@
-import { Button, Card, Space, Typography } from 'antd';
+import { Button, Card, Space } from 'antd';
 import { Segmentleiste, monoStil, useRollen } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
+import EscKappe from './EscKappe';
 import { messErgebnis, type MessForm } from './messung';
 import { useMessStand, type MessQuelle } from './messQuelle';
 
@@ -65,11 +66,6 @@ export default function MessSteuerung(props: MessSteuerungProps) {
             </span>
           )}
         </output>
-        <Typography.Text type="secondary">
-          {fertig
-            ? 'Gemessen. Ein neuer Klick beginnt eine neue Messung.'
-            : 'Punkte per Klick setzen, doppelklicken oder „Abschließen".'}
-        </Typography.Text>
         <Space>
           {fertig ? (
             <Button onClick={props.onNeu}>Neu messen</Button>
@@ -78,7 +74,11 @@ export default function MessSteuerung(props: MessSteuerungProps) {
               Abschließen
             </Button>
           )}
-          <Button onClick={props.onBeenden}>Beenden</Button>
+          {/* Esc beendet das Messen in jeder Phase (ein Esc, LFH-712). */}
+          <Button onClick={props.onBeenden} aria-keyshortcuts="Escape">
+            Beenden
+            <EscKappe />
+          </Button>
         </Space>
       </Space>
     </Card>

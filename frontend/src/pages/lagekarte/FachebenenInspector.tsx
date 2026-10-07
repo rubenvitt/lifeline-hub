@@ -268,9 +268,8 @@ function PegelFestlegen({
       </Button>
       {voll && (
         <Typography.Text type="secondary" data-lfh="pegel-grenze">
-          {`Schon ${PEGEL_MAX} maßgebliche Pegel festgelegt — zuerst einen in den `}
-          <Link to={einsatzEinstellungenPfad(einsatzId, 'pegel')}>Einstellungen</Link>
-          {' entfernen.'}
+          {`Höchstens ${PEGEL_MAX} Pegel · `}
+          <Link to={einsatzEinstellungenPfad(einsatzId, 'pegel')}>Pegel verwalten</Link>
         </Typography.Text>
       )}
     </div>
@@ -411,12 +410,18 @@ const ODL_FAKTOR = new Intl.NumberFormat('de-DE', {
 });
 
 /**
+ * Die Stufen sind eine Einteilung des Lifeline Hub (Faktor 3 nennt das BfS als Anlass zur
+ * Besorgnis), keine amtliche Grenze; Regen hebt die Werte kurzzeitig bis zum Dreifachen.
+ */
+const ODL_VORBEHALT = 'Kein amtlicher Schwellenwert · Regen kann kurzzeitig bis 3 × anheben';
+
+/**
  * ODL-Sonde des BfS: Stufe als Wort, Messwert, Messende, Betriebsstatus — und der Maßstab der
  * Stufe: der Standort-Grundpegel der Sonde (Faktor-Schwellen 1,5 × / 3 ×) oder, ohne ihn, die
  * absoluten Bänder am natürlichen Bereich. Die Stufen-Labels nennen keinen Maßstab, deshalb steht
  * er hier.
  *
- * Der Hinweissatz ist Pflicht: das BfS veröffentlicht keinen Schwellenwert für „erhöht", ohne ihn
+ * Der Vorbehalt ist Pflicht: das BfS veröffentlicht keinen Schwellenwert für „erhöht", ohne ihn
  * läse sich die Stufe wie eine amtliche Bewertung. Ohne Messwert „kein Messwert" und kein Messende.
  * Das Messende steht auch bei aktuellen Werten, weil manche Sonden Stunden hinterher hängen und es
  * keine Stufe „veraltet" gibt.
@@ -453,20 +458,17 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
       </Descriptions>
       {grundlage.art === 'standort' ? (
         <Typography.Paragraph type="secondary" style={hinweisStil}>
-          Einteilung des Lifeline Hub nach dem Grundpegel dieser Sonde (unteres Quartil der letzten
-          sieben Tage): über 1,5 × erhöht, über 3 × stark erhöht — den Faktor 3 nennt das BfS als
-          Anlass zur Besorgnis. Kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum
-          Dreifachen anheben.
+          Stufen nach Grundpegel: über 1,5 × erhöht, über 3 × stark erhöht
+          <br />
+          {ODL_VORBEHALT}
         </Typography.Paragraph>
       ) : (
         <Typography.Paragraph type="secondary" style={hinweisStil}>
           {/* Nur mit Messwert in µSv/h — unter fremder Einheit wird nicht bewertet. */}
-          {wert !== null &&
-            (s(p.einheit) ?? 'µSv/h') === 'µSv/h' &&
-            'Für diese Sonde liegt noch kein Grundpegel vor. '}
-          Einteilung des Lifeline Hub nach dem vom BfS genannten natürlichen Bereich (0,05–0,2
-          µSv/h) — kein amtlicher Schwellenwert. Regen kann Werte kurzzeitig bis zum Dreifachen
-          anheben.
+          {wert !== null && (s(p.einheit) ?? 'µSv/h') === 'µSv/h' && 'Kein Grundpegel · '}
+          Stufen nach natürlichem Bereich (0,05–0,2 µSv/h, BfS)
+          <br />
+          {ODL_VORBEHALT}
         </Typography.Paragraph>
       )}
     </>
@@ -529,9 +531,7 @@ function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
         {s(p.code) && <Descriptions.Item label="Stationscode">{s(p.code)}</Descriptions.Item>}
       </Descriptions>
       {p.unvollstaendig === true && (
-        <Typography.Text type="secondary">
-          Unvollständige Datenbasis — der Index ist aus weniger Komponenten gebildet.
-        </Typography.Text>
+        <Typography.Text type="secondary">Unvollständige Datenbasis</Typography.Text>
       )}
     </>
   );
@@ -551,8 +551,7 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
   if (fehler) {
     return (
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: token.marginSM }}>
-        Standbild nicht abrufbar — es kommt direkt vom Kamera-Betreiber und braucht eine
-        Internetverbindung am Gerät.
+        Standbild nicht abrufbar
       </Typography.Paragraph>
     );
   }

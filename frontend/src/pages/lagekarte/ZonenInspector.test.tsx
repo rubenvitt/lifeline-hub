@@ -177,7 +177,9 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
  */
 describe('ZonenInspector — Rückfrage vor dem Aufheben (LFH-710)', () => {
   it.each([
-    ['ohne Warnstufen', [gebiet], /endgültig gelöscht/],
+    // Ohne Warnstufen reichen Titel und roter Knopf; ein Satz nur zur Folge, die man nicht sieht
+    // (LFH-1083).
+    ['ohne Warnstufen', [gebiet], null],
     ['mit Warnstufen', [gebietMitWarnstufe], /Matrix verloren/],
   ])('%s: erst die Rückfrage, dann genau ein Aufheben', async (_fall, gebiete, hinweis) => {
     const { onLoeschen } = renderInspector({ gebiete });
@@ -185,8 +187,9 @@ describe('ZonenInspector — Rückfrage vor dem Aufheben (LFH-710)', () => {
 
     const rueckfrage = await offeneRueckfrage();
     expect(onLoeschen).not.toHaveBeenCalled();
-    expect(rueckfrage).toHaveTextContent('Zone aufheben?');
-    expect(rueckfrage).toHaveTextContent(hinweis);
+    expect(rueckfrage).toHaveTextContent(/Zone „.+“ aufheben\?/);
+    if (hinweis) expect(rueckfrage).toHaveTextContent(hinweis);
+    else expect(rueckfrage).not.toHaveTextContent(/Matrix|endgültig/);
     const ok = within(rueckfrage).getByRole('button', { name: 'Aufheben' });
     expect(ok).toHaveClass('ant-btn-dangerous');
 
@@ -513,7 +516,7 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
     expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).toBeNull();
     expect(screen.queryByText('Uferstraße 12–40')).toBeNull();
     expect(screen.queryByText('läuft')).toBeNull();
-    expect(screen.getByText(/nur mit Zugriff auf das Modul Betreuung/)).toBeInTheDocument();
+    expect(screen.getByText('Evakuierungsbezirk · kein Zugriff auf Betreuung')).toBeInTheDocument();
   });
 
   it('an anderen Zonentypen erscheint nichts vom Bezirk', () => {

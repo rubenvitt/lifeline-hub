@@ -196,7 +196,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // der TTL holt eine neue Stunde 20 min früher (25 statt 45 min), schneller bringt nichts.
     pollMs: 300_000,
     bboxAbhaengig: false,
-    geltung: 'Messstationen — keine Aussage zwischen den Stationen',
+    geltung: 'nur an Messstationen',
     // Der Verzug der Quelle (~2 h) zählt nicht als Veraltung.
     veraltetNachMin: 4 * 60,
     klassenfarben: {
@@ -216,7 +216,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // einen Stundentakt: schlechtester Fall 20 statt 30 min.
     pollMs: 300_000,
     bboxAbhaengig: false,
-    geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
+    geltung: 'nur ortsfeste BfS-Sonden, keine Einsatzmessungen',
     // Zwei Stundenwerte verpasst, plus Verzug der Quelle.
     veraltetNachMin: 3 * 60,
     klassenfarben: {
@@ -238,7 +238,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // `offline`. 20 s fallen nicht auf und trommeln einen gestörten Anbieter nicht — die Antwort
     // ist dann eine winzige Leer-Antwort aus dem Backend.
     aufwaermPollMs: 20_000,
-    geltung: 'nur Bundesautobahnen — keine Kreis-, Land- oder Ortsstraßen',
+    geltung: 'nur Bundesautobahnen',
     veraltetNachMin: 60,
   },
   kritis: {
@@ -252,7 +252,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     // Aufwärm-Takt erschiene der Bestand erst beim nächsten Pannen.
     aufwaermPollMs: 30_000,
     buendeln: true,
-    geltung: 'OpenStreetMap-Daten, wöchentlicher Stand — keine amtliche KRITIS-Liste',
+    geltung: 'OpenStreetMap, wöchentlich · nicht amtlich',
     // Zwei Importläufe im Vorgabe-Intervall (7 Tage) verpasst.
     veraltetNachMin: 14 * 24 * 60,
   },
