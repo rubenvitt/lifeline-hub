@@ -28,7 +28,7 @@ function stundenAlsMinuten(stunden: number | null | undefined): number | undefin
   return Math.round(stunden * 60);
 }
 
-const rhythmusFeld = (extra: string, pflicht: boolean) => (
+const rhythmusFeld = (extra: string | undefined, pflicht: boolean) => (
   <Form.Item
     name="rhythmus_stunden"
     label="Rhythmus (Stunden)"
@@ -110,12 +110,16 @@ export function SchichtBeginnenDialog({
       >
         <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
       </Form.Item>
-      {rhythmusFeld(
-        vorgabe != null
-          ? `Leer: Vorgabe des Abschnitts (${rhythmusText(vorgabe)})`
-          : 'Der Abschnitt der Einheit hat keine Vorgabe',
-        vorgabe == null,
-      )}
+      {/* Vor der Wahl der Einheit gibt es keinen Abschnitt, über den ein Satz etwas sagen
+          könnte, und keine Pflicht (LFH-948). */}
+      {einheitId == null
+        ? rhythmusFeld(undefined, false)
+        : rhythmusFeld(
+            vorgabe != null
+              ? `Leer: Vorgabe des Abschnitts (${rhythmusText(vorgabe)})`
+              : 'Der Abschnitt der Einheit hat keine Vorgabe',
+            vorgabe == null,
+          )}
       <SpeicherFehler fehler={fehler} titel="Schicht konnte nicht begonnen werden" />
     </ErfassungsModal>
   );

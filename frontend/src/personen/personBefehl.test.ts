@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Uhs } from '../api/types';
-import { loeseBefehl, loeseUhsAuf, nameAus, parsePersonBefehl } from './personBefehl';
+import {
+  SICHTUNG_BUCHSTABEN,
+  loeseBefehl,
+  loeseUhsAuf,
+  nameAus,
+  parsePersonBefehl,
+} from './personBefehl';
 
 /**
  * Der Parser der Betroffenen-Zeile. Jede Aussage über ein Kürzel steht mit ihrer Gegenhälfte,
@@ -126,6 +132,16 @@ describe('Sichtung', () => {
     const b = parsePersonBefehl(text);
     expect(b.eingabe).toEqual({ sichtung: kategorie });
     expect(b.teile).toEqual([{ art: 'sichtung', text, wert: kategorie }]);
+  });
+
+  it('der Hinweis liest die Buchstaben-Kürzel aus derselben Quelle, die der Parser erkennt (LFH-948)', () => {
+    expect(SICHTUNG_BUCHSTABEN).toEqual([
+      { kuerzel: 'skt', kategorie: 'tot' },
+      { kuerzel: 'sku', kategorie: 'unverletzt' },
+    ]);
+    for (const { kuerzel, kategorie } of SICHTUNG_BUCHSTABEN) {
+      expect(parsePersonBefehl(kuerzel).eingabe).toEqual({ sichtung: kategorie });
+    }
   });
 
   it.each(['sk5', 'skx', 'skiiii', 'sk'])('führt „%s" NICHT als Sichtung', (text) => {
