@@ -18,6 +18,7 @@ import {
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
+import { listePersonen } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
@@ -84,6 +85,17 @@ export default function UhsDetailPage() {
     queryFn: () => ladeUhs(einsatzId, uhsId),
     enabled: idGueltig,
   });
+
+  // Wer noch in dieser UHS steht, sperrt „Auflösen“ (der Server prüft dasselbe, 409). Derselbe
+  // Schlüssel und Abruf wie im Grundriss — ein Cache-Fach, kein zweiter Abruf.
+  const personenQuery = useQuery({
+    queryKey: einsatzKeys.personen(einsatzId),
+    queryFn: () => listePersonen(einsatzId),
+    enabled: idGueltig,
+  });
+  const nochBelegt = (personenQuery.data ?? []).filter(
+    (p) => p.aktuelle_uhs_id === uhsId && !p.storniert_at,
+  ).length;
 
   // Diese UHS als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier.
   // Ein Gerät kennt nur seine eine UHS und merkt sich nichts.
@@ -214,11 +226,15 @@ export default function UhsDetailPage() {
           {verwalten && uhs.status === 'aktiv' && (
             <Popconfirm
               title="UHS auflösen?"
-              description="Nur möglich, wenn keine Person mehr belegt ist."
               onConfirm={() => statusMut.mutate('aufgeloest')}
               okButtonProps={{ danger: true }}
             >
-              <Button danger>Auflösen</Button>
+              {/* Gesperrt mit Grund im Wort (LFH-1078), solange jemand in der UHS steht. */}
+              <Button danger disabled={nochBelegt > 0}>
+                {nochBelegt > 0
+                  ? `Auflösen (noch ${nochBelegt} ${nochBelegt === 1 ? 'Person' : 'Personen'})`
+                  : 'Auflösen'}
+              </Button>
             </Popconfirm>
           )}
         </Space>

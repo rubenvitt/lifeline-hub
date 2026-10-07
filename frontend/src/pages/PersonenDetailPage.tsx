@@ -358,11 +358,10 @@ export default function PersonenDetailPage() {
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
-          content:
-            'Diese Person wurde seit dem Öffnen von jemand anderem gespeichert. „Neu laden" verwirft deine Änderungen; „Überschreiben" speichert deine Werte über die des anderen.',
+          content: 'Seit dem Öffnen von jemand anderem gespeichert.',
           okText: 'Überschreiben',
           okButtonProps: { danger: true },
-          cancelText: 'Neu laden',
+          cancelText: 'Verwerfen und neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
           onCancel: () => {
             detailQuery.refetch();
@@ -512,7 +511,7 @@ export default function PersonenDetailPage() {
           <Alert
             type="warning"
             showIcon
-            title={`Sichtung „tot“ – Personenstatus ist noch „${STATUS_META[person.status].label}“. Bitte auf „verstorben“ setzen.`}
+            title={`Sichtung „tot“, Status noch „${STATUS_META[person.status].label}“`}
             action={
               <Button
                 loading={
@@ -558,7 +557,7 @@ export default function PersonenDetailPage() {
             type="secondary"
             style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
           >
-            Chronologischer Verlauf (neueste zuerst)
+            Medizinischer Verlauf
           </Typography.Text>
           <PersonVerlauf person={person} />
         </div>
@@ -948,10 +947,6 @@ export default function PersonenDetailPage() {
                     children: (
                       <>
                         {/* LFH-916 (design.md D3): Listenzeilen aus dem Erfassungsfenster. */}
-                        <Typography.Paragraph type="secondary">
-                          Export und Druck der Personenliste stehen hier, wenn die Person zu dem
-                          Zeitpunkt in der Liste stand.
-                        </Typography.Paragraph>
                         <KatalogTabelle<PersonZugriff>
                           rowKey="id"
                           pagination={false}
@@ -1150,13 +1145,12 @@ export default function PersonenDetailPage() {
         }}
         onCancel={() => setStatusDialog(null)}
       >
-        Dieser Schritt erzeugt einen Eintrag im Einsatztagebuch und wird nicht beiläufig
-        zurückgenommen.
+        Wird im ETB vermerkt.
       </Modal>
 
       <Modal
         open={stornoOffen}
-        title="Person stornieren (Soft-Delete)?"
+        title="Person stornieren?"
         okText="Stornieren"
         okButtonProps={{ danger: true }}
         confirmLoading={stornoMutation.isPending}

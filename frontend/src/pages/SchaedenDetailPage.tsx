@@ -116,11 +116,10 @@ export default function SchaedenDetailPage() {
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
-          content:
-            'Dieser Schaden wurde seit dem Öffnen von jemand anderem gespeichert. „Neu laden" verwirft deine Änderungen; „Überschreiben" speichert deine Werte über die des anderen.',
+          content: 'Seit dem Öffnen von jemand anderem gespeichert.',
           okText: 'Überschreiben',
           okButtonProps: { danger: true },
-          cancelText: 'Neu laden',
+          cancelText: 'Verwerfen und neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
           onCancel: () => {
             detailQuery.refetch();

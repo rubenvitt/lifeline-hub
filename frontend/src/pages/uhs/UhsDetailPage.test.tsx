@@ -9,10 +9,14 @@ import { AuthProvider } from '../../auth/AuthContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { freigabenFixture } from '../../test/fixtures';
 import { ladeUhs } from '../../api/einsatzUhs';
+import { listePersonen } from '../../api/einsatzPerson';
+import type { Person } from '../../api/types';
 
 // Auto-Mocks: bei ungültiger ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
 vi.mock('../../api/einsaetze');
 vi.mock('../../api/einsatzUhs');
+// Belegung der UHS für die Sperre von „Auflösen“; ohne Vorgabe ist niemand belegt.
+vi.mock('../../api/einsatzPerson', () => ({ listePersonen: vi.fn(async () => []) }));
 // Kind-Komponenten gestubbt: geprüft wird die Seiten-Komposition, nicht Grundriss/Material/
 // Bewegungen.
 vi.mock('./Grundriss', () => ({ default: () => <div>GRUNDRISS</div> }));
@@ -280,5 +284,43 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
     // Seite ist da — Grundriss ist in dieser Datei gemockt (kein „Bett" im DOM).
     expect(await screen.findByText('GRUNDRISS')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Patient aufnehmen' })).not.toBeInTheDocument();
+  });
+});
+
+describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)', () => {
+  const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
+  const uhs = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    typ: 'patientenablage',
+    status: 'aktiv',
+    standort: 'Halle 1',
+    notiz: null,
+  };
+
+  it('nennt die Zahl der Belegten sichtbar im gesperrten Knopf', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
+    vi.mocked(listePersonen).mockResolvedValueOnce([
+      { id: 1, aktuelle_uhs_id: 9, storniert_at: null },
+      { id: 2, aktuelle_uhs_id: 9, storniert_at: null },
+      // Andere UHS und stornierte Personen zählen nicht.
+      { id: 3, aktuelle_uhs_id: 4, storniert_at: null },
+      { id: 4, aktuelle_uhs_id: 9, storniert_at: '2026-10-07 10:00:00' },
+    ] as unknown as Person[]);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    const knopf = await screen.findByRole('button', { name: 'Auflösen (noch 2 Personen)' });
+    expect(knopf).toBeDisabled();
+    expect(screen.queryByText(/Nur möglich, wenn/)).not.toBeInTheDocument();
+  });
+
+  it('ohne Belegte ist „Auflösen“ bedienbar', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    expect(await screen.findByRole('button', { name: 'Auflösen' })).toBeEnabled();
   });
 });

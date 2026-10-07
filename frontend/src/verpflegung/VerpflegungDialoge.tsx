@@ -14,6 +14,7 @@ import type {
   ZeitfensterPatch,
 } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
+import { Augenbraue } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZeitpunktEingabe, ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -149,12 +150,16 @@ function eingeklappt(label: string, children: ReactNode) {
   return <Collapse ghost items={[{ key: 'weitere', label, forceRender: true, children }]} />;
 }
 
-function sonderkostFelder(hinweis: string) {
+/**
+ * Sonderkost ist eine Teilmenge der Essensportionen (bzw. der Menge), kein Zuschlag — das sagt
+ * die Gruppenbeschriftung „davon“; die Obergrenze prüft der Server (422 im Dialog).
+ */
+function sonderkostFelder() {
   return (
     <>
-      <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-        {hinweis}
-      </Typography.Paragraph>
+      <Augenbraue als="div" style={{ marginBottom: 8 }}>
+        davon Sonderkost (EP)
+      </Augenbraue>
       {KOSTFORMEN.map((k) => (
         <Form.Item key={k} name={['sonderkost', k]} label={KOSTFORM_LABEL[k]}>
           {anzahlFeld()}
@@ -281,10 +286,9 @@ export function ZeitfensterDialog({
       <Form.Item<ZeitfensterWerte>
         name="bezeichnung"
         label="Bezeichnung"
-        extra="Mahlzeit, z. B. „Mittag“ — sie steht im Einsatztagebuch."
         rules={[{ required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' }]}
       >
-        <Input />
+        <Input placeholder="z. B. Mittag" />
       </Form.Item>
       <Form.Item<ZeitfensterWerte>
         name="zeitraum"
@@ -329,9 +333,7 @@ export function ZeitfensterDialog({
           <Form.Item<ZeitfensterWerte> name="bedarf_weitere" label="Weitere Personen (EP)">
             {anzahlFeld()}
           </Form.Item>
-          {sonderkostFelder(
-            'Sonderkost ist ein Teil der Essensportionen, kein Zuschlag. Ohne Personenbezug.',
-          )}
+          {sonderkostFelder()}
         </>,
       )}
       <SpeicherFehler
@@ -394,19 +396,15 @@ export function AusgabeDialog({
       <Form.Item<AusgabeWerte> name="ort" label="Ort">
         <Input />
       </Form.Item>
-      <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt" extra="Leer: jetzt">
+      <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       {eingeklappt(
         'Weitere Angaben',
         <>
-          {sonderkostFelder('Sonderkost ist ein Teil der Menge, kein Zuschlag.')}
+          {sonderkostFelder()}
           {nachforderungen != null && (
-            <Form.Item<AusgabeWerte>
-              name="nachforderung_id"
-              label="Nachforderung"
-              extra="Die Ausgabe ändert den Status der Nachforderung nicht."
-            >
+            <Form.Item<AusgabeWerte> name="nachforderung_id" label="Nachforderung">
               <Select
                 allowClear
                 placeholder="ohne Nachforderung"
@@ -499,10 +497,7 @@ export function RuecknahmeDialog({
         {a.ort ? ` (${a.ort})` : ''} zu {zitat(zeitfenster.bezeichnung)}
         {sk ? `, ${sk}` : ''}.
       </Typography.Paragraph>
-      <Typography.Paragraph>
-        Die Rücknahme ist endgültig: Die Ausgabe bleibt als „zurückgenommen“ sichtbar und zählt
-        nicht mehr in die ausgegebene Menge.
-      </Typography.Paragraph>
+      <Typography.Paragraph>Endgültig; bleibt als „zurückgenommen“ sichtbar.</Typography.Paragraph>
     </Rueckfrage>
   );
 }
@@ -522,9 +517,7 @@ export function LoeschenDialog({
       fehlerTitel="Löschen fehlgeschlagen"
       {...rest}
     >
-      <Typography.Paragraph>
-        Das Zeitfenster und sein Bedarf werden entfernt. Das Einsatztagebuch hält die Löschung fest.
-      </Typography.Paragraph>
+      <Typography.Paragraph>Zeitfenster samt Bedarf wird gelöscht.</Typography.Paragraph>
     </Rueckfrage>
   );
 }

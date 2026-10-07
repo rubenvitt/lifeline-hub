@@ -943,7 +943,7 @@ describe('PersonenPage', () => {
 
     const offen = screen.getByRole('region', { name: 'Offene Felder' });
     expect(offen.querySelector('[data-lfh="offene-felder"]')).toHaveTextContent(
-      /^1 ohne Verbleib, 1 ohne Fundort — 2 Datensätze\./,
+      /^1 ohne Verbleib, 1 ohne Fundort — 2 Datensätze$/,
     );
     // Die Verbleib-Zelle nennt die UHS beim Namen.
     expect((await screen.findByText('R-022')).closest('tr')).toHaveTextContent('UHS Weserstadion');
@@ -1159,7 +1159,7 @@ describe('PersonenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Abgleich vorschlagen/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('R-002');
-    expect(screen.getByRole('combobox', { name: 'gefundene Person' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Gefundene Person' })).toBeInTheDocument();
   });
 
   it('navigiert beim Klick auf eine Zeile zur Detailseite', async () => {
