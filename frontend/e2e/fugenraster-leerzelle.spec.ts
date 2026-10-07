@@ -171,6 +171,12 @@ for (const rolleName of ROLLEN) {
       await page.goto(einsatzdatenPfad(id));
       const kopf = page.locator('[data-fugenraster]').filter({ hasText: 'Einsatzleitung' });
       await expect(kopf.getByText('Einsatzstichwort', { exact: true })).toBeVisible();
+      if (breite >= 992) {
+        // Zwischen `lg` und `xl` ist das Modulmenü ohne Wahl zu (LFH-952); offen bleibt der
+        // Inhalt so schmal, dass die vier Kopfangaben in drei Spalten eine Restspur lassen.
+        await page.getByRole('button', { name: 'Menü ausklappen' }).click();
+        await expect(page.getByRole('button', { name: 'Menü einklappen' })).toBeVisible();
+      }
       await pruefeRaster(page, kopf, true);
     });
   }

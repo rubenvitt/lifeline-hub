@@ -1149,6 +1149,14 @@ test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der f
     for (const dichte of ['kompakt', 'handschuh']) {
       const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
       await page.goto(`/einsaetze/${einsatzId}/gefahren`);
+      if (flaeche.width === 1024 && dichte === 'kompakt') {
+        // Bei 1024 ist das Modulmenü ohne Wahl zu (LFH-952), und die Matrix passt ganz hinein.
+        // Offen läuft sie über; die Wahl gilt danach auch für `handschuh`.
+        await page.getByRole('button', { name: 'Menü ausklappen' }).click();
+      }
+      if (flaeche.width === 1024) {
+        await expect(page.getByRole('button', { name: 'Menü einklappen' })).toBeVisible();
+      }
       await stelleDichte(page, dichte);
       const zellen = page.getByRole('button', { name: /^Bewertung / });
       await expect(zellen).toHaveCount(58);
