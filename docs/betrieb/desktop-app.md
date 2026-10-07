@@ -264,6 +264,17 @@ eine eigene Quelle nach dem Raster der Plattform. Neu erzeugen (braucht `cargo t
 scripts/marke/erzeuge-symbole.sh
 ```
 
+## Daten auf dem Gerät
+
+Die App hat keine eigene Datenbank. Was sie offline vorhält, liegt im Speicher des Webviews,
+genau wie im Browser: das Lagebild für den Betrieb ohne Netz (ETB, Meldebild, Betroffene,
+Aufträge, Lagekarte), die Offline-Warteschlange und ETB-Entwürfe. Abmelden räumt das Lagebild
+und die Entwürfe, die Warteschlange bleibt (Beweissicherung).
+
+Der Rechner **muss** deshalb einen verschlüsselten Datenträger haben: FileVault auf dem Mac,
+BitLocker oder die Geräteverschlüsselung unter Windows. Eine Verschlüsselung in der App gibt
+es nicht. Begründung in [packaging.md](packaging.md#datenträgerverschlüsselung-ist-pflicht-lfh-1004).
+
 ## Grenzen (offen)
 
 - **Signierung unter Windows:** LFH-875. Bis dahin warnt SmartScreen (siehe Installation).
