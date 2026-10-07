@@ -372,7 +372,7 @@ pub struct Config {
         long,
         env = "LIFELINE_BACKUP_EMPFAENGER",
         value_delimiter = ',',
-        value_parser = backup_empfaenger_parsen
+        value_parser = BackupEmpfaengerParser
     )]
     pub backup_empfaenger: Vec<age::x25519::Recipient>,
 
@@ -565,11 +565,44 @@ fn proxy_netz_parsen(eintrag: &str) -> Result<IpNet, String> {
 /// Ein Eintrag der Empfänger-Liste: ein öffentlicher X25519-Schlüssel von `age`. Ein leerer
 /// Eintrag (leer gesetzte Variable, Komma am Ende) ist ein Fehler, wie bei `--trusted-proxies`:
 /// sonst hielte jemand seine Sicherungen für verschlüsselt, die es nicht sind.
-fn backup_empfaenger_parsen(eintrag: &str) -> Result<age::x25519::Recipient, String> {
-    let eintrag = eintrag.trim();
-    eintrag.parse().map_err(|_| {
-        format!("'{eintrag}' ist kein öffentlicher age-Schlüssel (age1…, aus age-keygen)")
-    })
+///
+/// Ein eigener Parser statt einer Funktion, weil clap den Wert sonst in die Fehlermeldung
+/// schreibt: steht dort versehentlich der PRIVATE Schlüssel, landete er im Log.
+#[derive(Clone)]
+struct BackupEmpfaengerParser;
+
+impl clap::builder::TypedValueParser for BackupEmpfaengerParser {
+    type Value = age::x25519::Recipient;
+
+    fn parse_ref(
+        &self,
+        cmd: &clap::Command,
+        _arg: Option<&clap::Arg>,
+        wert: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        let fehler = |grund: &str| {
+            clap::Error::raw(
+                clap::error::ErrorKind::ValueValidation,
+                format!("--backup-empfaenger (LIFELINE_BACKUP_EMPFAENGER): {grund}\n"),
+            )
+            .with_cmd(cmd)
+        };
+        let eintrag = wert
+            .to_str()
+            .ok_or_else(|| fehler("kein gültiges UTF-8"))?
+            .trim();
+        if eintrag.to_ascii_uppercase().starts_with("AGE-SECRET-KEY-") {
+            return Err(fehler(
+                "ein PRIVATER age-Schlüssel gehört nicht auf den Server; hier steht der \
+                 öffentliche (age1…)",
+            ));
+        }
+        eintrag.parse().map_err(|_| {
+            fehler(&format!(
+                "'{eintrag}' ist kein öffentlicher age-Schlüssel (age1…, aus age-keygen)"
+            ))
+        })
+    }
 }
 
 impl Config {
@@ -1181,26 +1214,43 @@ mod tests {
     }
 
     /// Ein Tippfehler oder ein leerer Eintrag bricht den Start ab, statt still Klartext zu
-    /// sichern; ebenso ein privater Schlüssel an der Stelle des öffentlichen.
+    /// sichern.
     #[test]
     fn ungueltiger_backup_empfaenger_bricht_den_start_ab() {
-        let haupt = age::x25519::Identity::generate();
-        let oeffentlich = haupt.to_public().to_string();
-        let privat = {
-            use age::secrecy::ExposeSecret;
-            haupt.to_string().expose_secret().to_owned()
-        };
-        for wert in [
-            "age1kaputt".to_owned(),
-            String::new(),
-            format!("{oeffentlich},"),
-            privat,
+        let oeffentlich = age::x25519::Identity::generate().to_public().to_string();
+        for (fall, wert) in [
+            ("Tippfehler", "age1kaputt".to_owned()),
+            ("leer", String::new()),
+            ("Komma am Ende", format!("{oeffentlich},")),
         ] {
             assert!(
                 try_parse_mit_env("LIFELINE_BACKUP_EMPFAENGER", &wert, &["lifeline-hub"]).is_err(),
-                "'{wert}' muss den Start abbrechen"
+                "{fall} muss den Start abbrechen"
             );
         }
+    }
+
+    /// Ein privater Schlüssel an der Stelle des öffentlichen bricht den Start ab, ohne dass die
+    /// Fehlermeldung (und damit das Log) ihn wiederholt.
+    #[test]
+    fn privater_schluessel_als_empfaenger_steht_nicht_im_fehler() {
+        let privat = {
+            use age::secrecy::ExposeSecret;
+            age::x25519::Identity::generate()
+                .to_string()
+                .expose_secret()
+                .to_owned()
+        };
+        let fehler = try_parse_mit_env("LIFELINE_BACKUP_EMPFAENGER", &privat, &["lifeline-hub"])
+            .err()
+            .expect("ein privater Schlüssel muss den Start abbrechen")
+            .to_string();
+        let geheim_im_fehler = fehler.contains(&privat[16..]);
+        assert!(
+            !geheim_im_fehler,
+            "die Meldung darf den Schlüssel nicht nennen"
+        );
+        assert!(fehler.contains("PRIVATER"));
     }
 
     #[test]
