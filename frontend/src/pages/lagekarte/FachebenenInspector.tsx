@@ -410,22 +410,22 @@ const ODL_FAKTOR = new Intl.NumberFormat('de-DE', {
 });
 
 /**
+ * Die Stufen sind eine Einteilung des Lifeline Hub (Faktor 3 nennt das BfS als Anlass zur
+ * Besorgnis), keine amtliche Grenze; Regen hebt die Werte kurzzeitig bis zum Dreifachen.
+ */
+const ODL_VORBEHALT = 'Kein amtlicher Schwellenwert · Regen kann kurzzeitig bis 3 × anheben';
+
+/**
  * ODL-Sonde des BfS: Stufe als Wort, Messwert, Messende, Betriebsstatus — und der Maßstab der
  * Stufe: der Standort-Grundpegel der Sonde (Faktor-Schwellen 1,5 × / 3 ×) oder, ohne ihn, die
  * absoluten Bänder am natürlichen Bereich. Die Stufen-Labels nennen keinen Maßstab, deshalb steht
  * er hier.
  *
- * Der Hinweissatz ist Pflicht: das BfS veröffentlicht keinen Schwellenwert für „erhöht", ohne ihn
+ * Der Vorbehalt ist Pflicht: das BfS veröffentlicht keinen Schwellenwert für „erhöht", ohne ihn
  * läse sich die Stufe wie eine amtliche Bewertung. Ohne Messwert „kein Messwert" und kein Messende.
  * Das Messende steht auch bei aktuellen Werten, weil manche Sonden Stunden hinterher hängen und es
  * keine Stufe „veraltet" gibt.
  */
-/**
- * Die Stufen sind eine Einteilung des Lifeline Hub (Faktor 3 nennt das BfS als Anlass zur
- * Besorgnis), keine amtliche Grenze; Regen hebt die Werte kurzzeitig bis zum Dreifachen.
- */
-const ODL_VORBEHALT = 'Kein amtlicher Schwellenwert · Regen hebt kurzzeitig bis 3 ×';
-
 function OdlInhalt({ p }: { p: Record<string, unknown> }) {
   const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();

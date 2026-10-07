@@ -920,11 +920,7 @@ export default function LagekartePage() {
     imModus: leistenWahl.imModus,
   });
   const leisteSperrGrund =
-    auswahlInhalt != null
-      ? 'Auswahl schließen, um die Leiste auszublenden'
-      : leisteErzwungen
-        ? 'Platzieren beenden, um die Leiste auszublenden'
-        : null;
+    auswahlInhalt != null ? 'Auswahl offen' : leisteErzwungen ? 'Modus läuft' : null;
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte. Auf dem Handschirm bräche sie
   // mit mehreren Online-Stilen mehrzeilig um und läge über Knopfblock und Karte — dort steht sie im
   // Paneel „Kartengrundlage" der Leiste.
@@ -1144,7 +1140,7 @@ export default function LagekartePage() {
                 }`
           }
           phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
-          speichernLaeuft={zoneSpeichern}
+          speichernLaeuft={zoneSpeichern || abschnittSpeichern}
           abschliessenMoeglich={zeichenStand.bereit}
           // In der Bestätigung zählen die Stützpunkte des Entwurfs (Grenze des Servers, LFH-937).
           punkte={

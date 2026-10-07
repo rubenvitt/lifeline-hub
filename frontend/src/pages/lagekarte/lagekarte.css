@@ -69,9 +69,9 @@
 }
 
 /* Platzieren und Taktisches Zeichen (LFH-1083): ein Tipp setzt eine Position, das Fadenkreuz
-   sagt es. Die Klasse trägt die Kartenspalte (`LagekartePage`). Über einem Marker setzt
-   `Kartenflaeche` den Zeiger inline auf `pointer` und beim Verlassen zurück auf leer — dann
-   greift wieder diese Regel. */
+   sagt es. Die Klasse trägt die Kartenspalte (`LagekartePage`). `!important` schlägt den Zeiger,
+   den `Kartenflaeche` über Markern und Fachebenen-Punkten inline auf `pointer` setzt: im Modus
+   wählt ein Tipp dort nichts, er setzt die Position. */
 .lfh-karte-setzen .maplibregl-canvas {
-  cursor: crosshair;
+  cursor: crosshair !important;
 }

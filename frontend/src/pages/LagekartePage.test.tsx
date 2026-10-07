@@ -940,13 +940,13 @@ describe('LagekartePage', () => {
       offline_regionen: [],
       karten_bau_verfuegbar: false,
     });
-    const user = userEvent.setup();
     renderSeite();
     await screen.findByText('marker-schaden-9');
     expect(screen.getByRole('radio', { name: 'Online' })).not.toHaveAttribute('aria-disabled');
     expect(screen.getByRole('radio', { name: 'Offline' })).not.toHaveAttribute('aria-disabled');
-    // Default-Modus ist 'online' → kein Hinweis „Ohne Karte", auch bei aufgeklapptem Paneel.
-    await user.click(screen.getByRole('button', { name: 'Kartengrundlage' }));
+    // Default-Modus ist 'online' → kein Hinweis „Ohne Karte". Ab `lg` steht die Wahl über der
+    // Karte, und das Paneel hätte nichts zu sagen: es fehlt (LFH-1083).
+    expect(screen.queryByRole('button', { name: 'Kartengrundlage' })).toBeNull();
     expect(
       screen.queryByText(/Ohne Hintergrundkarte|Keine Kartengrundlage/),
     ).not.toBeInTheDocument();

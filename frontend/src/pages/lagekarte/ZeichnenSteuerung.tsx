@@ -1,7 +1,7 @@
 import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
 import { Button, Card, Space, Switch, Typography } from 'antd';
 import { monoStil, useRollen } from '../../components/instrument';
-import Tastenkuerzel from '../../components/Tastenkuerzel';
+import EscKappe from './EscKappe';
 import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
 import { bandStil } from './KartenFuss';
@@ -99,28 +99,18 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // „Abbrechen" verwirft nur einen Entwurf; ab der ersten gespeicherten Zone heißt Beenden
   // „Fertig", weil das Gespeicherte bleibt.
   //
-  // Esc steht als Tastenkappe an dem Knopf, den es gerade auslöst (zweistufig, LFH-712): mit Figur
-  // an „Verwerfen“, ohne Figur am Beenden. Nur mit feinem Zeiger (`lfh-nur-feiner-zeiger`): Touch
-  // hat keine Esc-Taste. Die Kappe ist `aria-hidden`, der Knopfname bleibt das Wort;
-  // `aria-keyshortcuts` sagt es dem Vorleser.
-  const escKappe = (
-    <Tastenkuerzel
-      aria-hidden="true"
-      className="lfh-nur-feiner-zeiger"
-      style={{ marginInlineStart: token.marginXS }}
-    >
-      Esc
-    </Tastenkuerzel>
-  );
-  const escBeendet = !bestaetigen && !props.punkte;
+  // Esc ist zweistufig (LFH-712): mit Figur verwirft es nur die Figur, der Modus bleibt — dafür
+  // gibt es keinen Knopf („Verwerfen“ beendet den Modus), also keine Kappe. Ohne Figur beendet Esc
+  // wie dieser Knopf; während des Speicherns tut es nichts.
+  const escBeendet = !bestaetigen && !props.punkte && !props.speichernLaeuft;
   const beenden =
     gespeichert > 0 && props.onFertig ? (
       <Button onClick={props.onFertig} aria-keyshortcuts={escBeendet ? 'Escape' : undefined}>
-        Fertig{escBeendet && escKappe}
+        Fertig{escBeendet && <EscKappe />}
       </Button>
     ) : (
       <Button onClick={props.onAbbrechen} aria-keyshortcuts={escBeendet ? 'Escape' : undefined}>
-        Abbrechen{escBeendet && escKappe}
+        Abbrechen{escBeendet && <EscKappe />}
       </Button>
     );
   return (
@@ -178,13 +168,8 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               >
                 Speichern
               </Button>
-              <Button
-                disabled={props.speichernLaeuft}
-                onClick={props.onVerwerfen}
-                aria-keyshortcuts="Escape"
-              >
+              <Button disabled={props.speichernLaeuft} onClick={props.onVerwerfen}>
                 Verwerfen
-                {escKappe}
               </Button>
             </Space>
           </>

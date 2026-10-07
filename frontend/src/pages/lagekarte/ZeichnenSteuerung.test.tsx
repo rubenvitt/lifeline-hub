@@ -217,11 +217,21 @@ describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', ()
     setup({ punkte: 0, punktZurueckMoeglich: false, onPunktZurueck: vi.fn() });
     const abbrechen = screen.getByRole('button', { name: 'Abbrechen' });
     expect(abbrechen).toHaveAttribute('aria-keyshortcuts', 'Escape');
-    const kappe = abbrechen.querySelector('kbd');
-    expect(kappe).toHaveTextContent('Esc');
-    // Nur mit feinem Zeiger sichtbar (Regel in `lagekarte.css`): Touch hat keine Esc-Taste.
-    expect(kappe).toHaveClass('lfh-nur-feiner-zeiger');
+    expect(abbrechen.querySelector('kbd')).toHaveTextContent('Esc');
+    // Nur mit feinem Zeiger sichtbar (Regel in `lagekarte.css`): die Klasse sitzt an der Hülle,
+    // weil `Tastenkuerzel` `display` inline setzt und ein Inline-Stil die Regel schlüge.
+    const huelle = abbrechen.querySelector('[data-lfh="esc-kappe"]') as HTMLElement;
+    expect(huelle).toHaveClass('lfh-nur-feiner-zeiger');
+    expect(huelle.style.display).toBe('');
+    expect(huelle).toHaveAttribute('aria-hidden', 'true');
     expect(document.querySelectorAll('kbd')).toHaveLength(1);
+  });
+
+  it('in der Serie trägt „Fertig“ die Kappe, solange keine Figur liegt', () => {
+    setup({ punkte: 0, serieAnzahl: 2, onFertig: vi.fn() });
+    const fertig = screen.getByRole('button', { name: 'Fertig' });
+    expect(fertig).toHaveAttribute('aria-keyshortcuts', 'Escape');
+    expect(fertig.querySelector('kbd')).toHaveTextContent('Esc');
   });
 
   it('mit Punkten verwirft Esc erst die Figur: keine Kappe am Beenden', () => {
@@ -231,13 +241,20 @@ describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', ()
     expect(document.querySelector('kbd')).toBeNull();
   });
 
-  it('Bestätigungsphase: Esc steht an „Verwerfen“', () => {
+  it('Bestätigungsphase: keine Kappe — Esc verwirft dort nur die Figur, „Verwerfen“ beendet', () => {
+    // Esc ruft in der Bestätigung `onBestaetigungZurueck` (Modus bleibt), „Verwerfen“ beendet den
+    // Modus (`useKartenInteraktion`): eine Kappe dort behauptete eine Gleichheit, die es nicht gibt.
     setup({ phase: 'bestaetigen' });
-    const verwerfen = screen.getByRole('button', { name: 'Verwerfen' });
-    expect(verwerfen).toHaveAttribute('aria-keyshortcuts', 'Escape');
-    expect(verwerfen.querySelector('kbd')).toHaveTextContent('Esc');
-    expect(document.querySelectorAll('kbd')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Verwerfen' })).not.toHaveAttribute(
+      'aria-keyshortcuts',
+    );
+    expect(document.querySelector('kbd')).toBeNull();
     expect(document.body).not.toHaveTextContent(/Entwurf prüfen/);
+  });
+
+  it('während des Speicherns keine Kappe: Esc tut dann nichts', () => {
+    setup({ punkte: 0, speichernLaeuft: true });
+    expect(document.querySelector('kbd')).toBeNull();
   });
 });
 

@@ -115,8 +115,9 @@ diese Zusage.
   Startweg; nach dem Modus gilt wieder der vorherige Zustand (Entscheidung 29.09.2026).
   „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Die Bedienung der
   Leistenmodi (Platzieren, Taktisches Zeichen, Bild) steht unter `lg` im Fuß-Band
-  `PlatzierSteuerung`, die Sidebar zeigt dann nur einen Hinweis (`modusBedienungImFuss`) — je
-  Breite genau ein Knopf je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
+  `PlatzierSteuerung`, die Sidebar zeigt dann nur Zustand und Zusatzangaben
+  (`modusBedienungImFuss`: „wird platziert“, Koordinate, Mittelpunkt) — je Breite genau ein Knopf
+  je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
 - **Kartengrundlage** (LFH-558, Spec `lagekarte-kartengrundlage`, Herleitung D6 in
   `openspec/changes/archive/2026-09-30-lfh-558-lagekarte-kartenpfade-fixture-basemap/design.md`):
   die Karte entsteht mit dem Blindstil, der Style der Ansicht kommt per `setStyle`. Jeder

@@ -1549,7 +1549,7 @@ describe('filtereNichtVerortet (LFH-360)', () => {
 
 /**
  * Unter `lg` trägt das Fuß-Band `PlatzierSteuerung` die Bedienung der Leistenmodi (LFH-765). Die
- * Leiste zeigt dann an deren Stelle nur einen Hinweis — je Breite genau ein Knopf je Handlung. Jedes
+ * Leiste zeigt dann an deren Stelle nur den Zustand — je Breite genau ein Knopf je Handlung. Jedes
  * „fehlt" hier hat seine Gegenprobe oben in den Bestandstests (ohne Prop stehen die Knöpfe).
  */
 describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {

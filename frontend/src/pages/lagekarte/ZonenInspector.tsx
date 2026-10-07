@@ -273,16 +273,12 @@ export default function ZonenInspector({
           </>
         )}
 
-        {/* Gesperrt mit Grund in wenigen Wörtern (LFH-1083), nie nur im Tooltip. */}
+        {/* Grund in wenigen Wörtern als Lesezeile (LFH-1083): ein gesperrtes Select läse der
+            Vorleser ohne seinen Platzhalter. */}
         {istBezirksflaeche && !betreuungFrei && (
-          <FeldLabel text="Gehört zu Evakuierungsbezirk" htmlFor={bezirkFeldId}>
-            <Select<number>
-              id={bezirkFeldId}
-              style={{ width: '100%' }}
-              disabled
-              placeholder="kein Zugriff auf Betreuung"
-            />
-          </FeldLabel>
+          <Typography.Text type="secondary">
+            Evakuierungsbezirk · kein Zugriff auf Betreuung
+          </Typography.Text>
         )}
         {istBezirksflaeche && betreuungFrei && darfSchreiben && (
           <FeldLabel text="Gehört zu Evakuierungsbezirk" htmlFor={bezirkFeldId}>

@@ -32,8 +32,8 @@ export type PlatzierModus =
  * Bedienung der Leistenmodi (Platzieren, Taktisches Zeichen, Bild einpassen) im Kartenfuß — nur
  * unter `lg` eingehängt (LFH-765). Dort schließt ein laufender Kartenmodus die Leiste, damit Karte
  * zum Tippen bleibt; ihr „Abbrechen"/„Fertig" stand aber in der Leiste. Ab `lg` bleibt es dort,
- * und die Sidebar zeigt unter `lg` an deren Stelle nur einen Hinweis (`modusBedienungImFuss`):
- * je Breite genau ein Knopf je Handlung.
+ * und die Sidebar zeigt unter `lg` an deren Stelle nur Zustand und Zusatzangaben
+ * (`modusBedienungImFuss`): je Breite genau ein Knopf je Handlung.
  *
  * Muster und Positionierung wie `ZeichnenSteuerung`: ein Flow-Band des `KartenFuss`, nie absolut.
  * Zusatzangaben (Koordinate, Mittelpunkt numerisch) bleiben Leisteninhalt — „Leiste einblenden".

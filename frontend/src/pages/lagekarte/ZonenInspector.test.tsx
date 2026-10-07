@@ -511,12 +511,12 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
     );
   });
 
-  it('ohne Modulrecht: Feld gesperrt mit Grund, keine Bezirksangaben', () => {
+  it('ohne Modulrecht: keine Auswahl, keine Bezirksangaben, nur der Grund', () => {
     mitBezirk({ betreuungFrei: false });
-    expect(screen.getByLabelText('Gehört zu Evakuierungsbezirk')).toBeDisabled();
+    expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).toBeNull();
     expect(screen.queryByText('Uferstraße 12–40')).toBeNull();
     expect(screen.queryByText('läuft')).toBeNull();
-    expect(screen.getByText('kein Zugriff auf Betreuung')).toBeInTheDocument();
+    expect(screen.getByText('Evakuierungsbezirk · kein Zugriff auf Betreuung')).toBeInTheDocument();
   });
 
   it('an anderen Zonentypen erscheint nichts vom Bezirk', () => {
