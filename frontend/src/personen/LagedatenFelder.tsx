@@ -43,12 +43,12 @@ export function KoordinateFeld() {
   );
 }
 
-export function VermisstSeitFeld({ hinweis }: { hinweis?: string }) {
+/** `platzhalter` zeigt den wirksamen Wert eines leeren Felds (LFH-1078: zeigen statt erklären). */
+export function VermisstSeitFeld({ platzhalter }: { platzhalter?: string }) {
   return (
     <Form.Item
       label="vermisst seit"
       name="vermisst_seit"
-      extra={hinweis}
       getValueProps={(wert?: string) => ({ value: alsZeitpunkt(wert) ?? null })}
       normalize={(d?: dayjs.Dayjs | null) => (d ? alsBackendZeit(d) : undefined)}
       rules={[
@@ -61,7 +61,11 @@ export function VermisstSeitFeld({ hinweis }: { hinweis?: string }) {
         },
       ]}
     >
-      <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+      <ZeitpunktEingabe
+        format="DD.MM.YYYY HH:mm"
+        placeholder={platzhalter}
+        style={{ width: '100%' }}
+      />
     </Form.Item>
   );
 }

@@ -186,8 +186,10 @@ describe('StandMeldenDialog', () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Stand melden: Uferstraße 12–40' });
     await budgetUndAufklappen(dialog, 2);
+    // Der wirksame Wert eines leeren Zeitfelds steht als Platzhalter, nicht als Erklärsatz.
+    expect(within(dialog).getByLabelText('Zeitpunkt')).toHaveAttribute('placeholder', 'jetzt');
     const knopf = pruefeFormStruktur(dialog, 'Melden');
-    await userEvent.type(within(dialog).getByLabelText('Evakuiert (Personen)'), '480');
+    await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '480');
     await userEvent.click(knopf);
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ evakuiert: 480, erhebung: 'gezaehlt' }),
@@ -209,7 +211,7 @@ describe('StandMeldenDialog', () => {
       />,
     );
     const dialog = await screen.findByRole('dialog');
-    const feld = within(dialog).getByLabelText('Evakuiert (Personen)');
+    const feld = within(dialog).getByLabelText('Evakuiert gesamt (Personen)');
     await userEvent.type(feld, '480');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalled());
@@ -245,7 +247,7 @@ describe('BelegungMeldenDialog', () => {
     });
     await budgetUndAufklappen(dialog, 1);
     const knopf = pruefeFormStruktur(dialog, 'Melden');
-    await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '89');
+    await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '89');
     await userEvent.click(knopf);
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ belegt: 89 }));
   });
@@ -266,7 +268,7 @@ describe('Obergrenze der Personenzahlen (LFH-680)', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'Belegung melden: Turnhalle Ost',
     });
-    const feld = within(dialog).getByLabelText('Belegt (Personen)');
+    const feld = within(dialog).getByLabelText('Belegt gesamt (Personen)');
     await userEvent.type(feld, '1000001');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
     expect(await within(dialog).findByText(/Höchstens 1\s000\s000 Personen/)).toBeInTheDocument();
@@ -533,6 +535,10 @@ describe('StelleAnlegenDialog', () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
     await budgetUndAufklappen(dialog, 3);
+    expect(within(dialog).getByLabelText('Kapazität (Personen)')).toHaveAttribute(
+      'placeholder',
+      'keine Angabe',
+    );
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Turnhalle Ost');
     await userEvent.click(pruefeFormStruktur(dialog, 'Anlegen'));
     await waitFor(() =>
@@ -825,7 +831,7 @@ describe('BelegungMeldenDialog — Zeitpunkt in der Anzeigezone (LFH-692)', () =
     );
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '89');
+    await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '89');
     const feld = within(dialog).getByRole('textbox', { name: 'Zeitpunkt' });
     await userEvent.click(feld);
     await userEvent.type(feld, '2026-10-01 01:00');
@@ -863,7 +869,7 @@ describe('Betreuung — „Jetzt“ auf einem nachgehenden Gerät (LFH-895)', ()
     );
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '89');
+    await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '89');
     await userEvent.click(within(dialog).getByRole('textbox', { name: 'Zeitpunkt' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Jetzt' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));

@@ -293,10 +293,7 @@ export default function BetroffeneKarte({
       <div data-lfh="betroffene-karte" {...bereichProps}>
         {hinweis}
         {standzeile}
-        <SeitenLeer
-          titel="Keine Person mit Koordinate"
-          hinweis="Eine Koordinate lässt sich in der Erfassungszeile (#52.2691/9.1342), auf der Detailseite oder über die Lagekarte setzen."
-        />
+        <SeitenLeer titel="Keine Person mit Koordinate" />
       </div>
     );
   }

@@ -79,7 +79,7 @@ describe('BetroffenenSeitenleiste — Verbleib und offene Felder (LFH-613)', () 
     ]);
     const offen = screen.getByRole('region', { name: 'Offene Felder' });
     expect(offen.querySelector('[data-lfh="offene-felder"]')).toHaveTextContent(
-      /^0 ohne Verbleib, 1 ohne Fundort — 1 Datensatz\./,
+      /^0 ohne Verbleib, 1 ohne Fundort — 1 Datensatz$/,
     );
   });
 });

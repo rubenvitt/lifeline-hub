@@ -1,4 +1,4 @@
-import { Alert, Checkbox, Collapse, Form, Input, InputNumber, Modal, Radio } from 'antd';
+import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, Radio } from 'antd';
 import { Typography } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { serverJetzt } from '../offline/serveruhr';
@@ -282,15 +282,14 @@ function personenFeld(name: string, label: string, min: number, pflicht: boolean
 
 function zeitpunktFeld() {
   return (
-    <Form.Item
-      name="zeitpunkt"
-      label="Zeitpunkt"
-      extra="Leer: jetzt. Eine nachgetragene ältere Meldung ändert den aktuellen Stand nicht."
-      rules={[zeitRegel]}
-      style={{ marginBottom: 0 }}
-    >
+    <Form.Item name="zeitpunkt" label="Zeitpunkt" rules={[zeitRegel]} style={{ marginBottom: 0 }}>
       {/* Uhrzeit und Kalendertag in der Anzeigezone (LFH-692); `zeitRegel` prüft den Zeitpunkt. */}
-      <ZeitpunktEingabe format={ZEITFORMAT} keineZukunftstage style={{ width: '100%' }} />
+      <ZeitpunktEingabe
+        format={ZEITFORMAT}
+        placeholder="jetzt"
+        keineZukunftstage
+        style={{ width: '100%' }}
+      />
     </Form.Item>
   );
 }
@@ -355,10 +354,11 @@ export function BezirkAnlegenDialog({
       <Form.Item
         name="bezeichnung"
         label="Bezeichnung"
-        extra="Straßenzug oder Bezirksnummer — keine Namen von Bewohnern. Die Bezeichnung steht im Einsatztagebuch."
+        // Datenschutz: die Bezeichnung steht im Einsatztagebuch.
+        extra="Keine Namen von Bewohnern."
         rules={[{ required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' }]}
       >
-        <Input />
+        <Input placeholder="z. B. Lindenstr. 1–20 oder Bezirk 3" />
       </Form.Item>
       {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
       {erhebungFeld('plan_erhebung', 'Erhebung')}
@@ -486,12 +486,7 @@ export function RaeumungDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
-        name="raeumung"
-        label="Räumungszustand"
-        extra="„aufgehoben“ nimmt den Bezirk aus der Kennzahl „Evakuiert“."
-        rules={[{ required: true }]}
-      >
+      <Form.Item name="raeumung" label="Räumungszustand" rules={[{ required: true }]}>
         <Radio.Group
           name="raeumung"
           optionType="button"
@@ -527,10 +522,9 @@ export function StandMeldenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Typography.Paragraph type="secondary">
-        Bisher: {evakuiertText(bezirk)}. Gemeldet wird die Gesamtzahl, nicht der Zuwachs.
-      </Typography.Paragraph>
-      {personenFeld('evakuiert', 'Evakuiert (Personen)', 0, true)}
+      <Typography.Paragraph type="secondary">Bisher: {evakuiertText(bezirk)}</Typography.Paragraph>
+      {/* „gesamt“: gemeldet wird die Gesamtzahl, nicht der Zuwachs. */}
+      {personenFeld('evakuiert', 'Evakuiert gesamt (Personen)', 0, true)}
       {erhebungFeld('erhebung', 'Erhebung')}
       {weitere(zeitpunktFeld())}
       <SpeicherFehler fehler={fehler} titel="Stand konnte nicht gemeldet werden" />
@@ -573,13 +567,9 @@ export function StelleAnlegenDialog({
       <Form.Item name="art" label="Art" rules={[{ required: true }]}>
         <Select options={ART_OPTIONEN} />
       </Form.Item>
-      <Form.Item
-        name="kapazitaet_personen"
-        label="Kapazität (Personen)"
-        extra="Leer: keine Kapazität — dann wird keine Zahl freier Plätze ausgewiesen."
-        rules={[hoechstensRegel]}
-      >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      <Form.Item name="kapazitaet_personen" label="Kapazität (Personen)" rules={[hoechstensRegel]}>
+        {/* Leer: keine Kapazität, dann auch keine Zahl freier Plätze. */}
+        <InputNumber min={1} precision={0} placeholder="keine Angabe" style={{ width: '100%' }} />
       </Form.Item>
       {weitere(
         <>
@@ -690,7 +680,6 @@ export function StelleBearbeitenDialog({
             showIcon
             style={{ marginBottom: 12 }}
             title={`Die Stelle ist mit ${personenZahl(belegt)} Personen belegt.`}
-            description="Geschlossen werden kann sie erst, wenn alle sie verlassen haben. Das wird als Belegung 0 gemeldet und steht im Einsatztagebuch."
           />
           <Form.Item
             name="leermeldung"
@@ -712,13 +701,9 @@ export function StelleBearbeitenDialog({
           </Form.Item>
         </>
       )}
-      <Form.Item
-        name="kapazitaet_personen"
-        label="Kapazität (Personen)"
-        extra="Leer: keine Kapazität — dann wird keine Zahl freier Plätze ausgewiesen."
-        rules={[hoechstensRegel]}
-      >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      <Form.Item name="kapazitaet_personen" label="Kapazität (Personen)" rules={[hoechstensRegel]}>
+        {/* Leer: keine Kapazität, dann auch keine Zahl freier Plätze. */}
+        <InputNumber min={1} precision={0} placeholder="keine Angabe" style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item name="art" label="Art" rules={[{ required: true }]}>
         <Select options={ART_OPTIONEN} />
@@ -777,9 +762,10 @@ export function BelegungMeldenDialog({
     >
       <Typography.Paragraph type="secondary">
         Bisher: {bisher}
-        {kapazitaet}. Gemeldet wird die Gesamtzahl, nicht der Zuwachs.
+        {kapazitaet}
       </Typography.Paragraph>
-      {personenFeld('belegt', 'Belegt (Personen)', 0, true)}
+      {/* „gesamt“: gemeldet wird die Gesamtzahl, nicht der Zuwachs. */}
+      {personenFeld('belegt', 'Belegt gesamt (Personen)', 0, true)}
       {weitere(zeitpunktFeld())}
       <SpeicherFehler fehler={fehler} titel="Belegung konnte nicht gemeldet werden" />
     </ErfassungsModal>
@@ -790,11 +776,13 @@ export function BelegungMeldenDialog({
 
 /**
  * Stornieren ist UNUMKEHRBAR (Fehlanlage): Rückfrage als eigenes `Modal` mit rotem Knopf, kein
- * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Zeilen.
+ * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Zeilen. `stattdessen` zeigt den
+ * umkehrbaren Weg als Link-Knopf statt als Erklärsatz (LFH-1078).
  */
 export function StornierenDialog({
   titel,
   text: beschreibung,
+  stattdessen,
   laeuft,
   fehler,
   onBestaetigen,
@@ -802,6 +790,7 @@ export function StornierenDialog({
 }: DialogBasis & {
   titel: string;
   text: string;
+  stattdessen?: { text: string; onKlick: () => void };
   onBestaetigen: () => void;
 }) {
   return (
@@ -817,6 +806,16 @@ export function StornierenDialog({
       destroyOnHidden
     >
       <Typography.Paragraph>{beschreibung}</Typography.Paragraph>
+      {stattdessen && (
+        <Button
+          type="link"
+          disabled={laeuft}
+          onClick={stattdessen.onKlick}
+          style={{ paddingInline: 0 }}
+        >
+          {stattdessen.text}
+        </Button>
+      )}
       <SpeicherFehler fehler={fehler} titel="Stornieren fehlgeschlagen" />
     </Modal>
   );

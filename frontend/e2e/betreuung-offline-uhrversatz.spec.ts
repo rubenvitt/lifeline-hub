@@ -63,9 +63,9 @@ test('vorgemerkte Standmeldung eines vorgehenden Geräts wird nach kurzem Ausfal
   await page.context().setOffline(true);
   await melden.click();
   const dialog = page.getByRole('dialog', { name: `Stand melden: ${BEZIRK}` });
-  await dialog.getByLabel('Evakuiert (Personen)').fill('200');
+  await dialog.getByLabel('Evakuiert gesamt (Personen)').fill('200');
   await dialog.getByRole('button', { name: 'Melden' }).click();
-  await expect(page.getByText(`Offline vorgemerkt — Standmeldung ${BEZIRK}`)).toBeVisible();
+  await expect(page.getByText(`Offline vorgemerkt: Standmeldung ${BEZIRK}`)).toBeVisible();
   const erfasstMs = Date.now();
 
   // Ein kurzer Ausfall: kürzer als der Vorlauf, sonst ließe auch die Geräteuhr den Zeitpunkt

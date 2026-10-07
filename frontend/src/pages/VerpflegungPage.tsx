@@ -281,9 +281,7 @@ export default function VerpflegungPage() {
     onSuccess: (ergebnis, { zf, body }) => {
       // Vorgemerkt gibt es noch keine Ausgabe auf dem Server — also kein „Rückgängig“ (D9).
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(
-          `Offline vorgemerkt — Ausgabe ${body.menge} EP zu ${zitat(zf.bezeichnung)} wird bei Verbindung gesendet`,
-        );
+        message.warning(`Offline vorgemerkt: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`);
         return;
       }
       // Die Ausgabe hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage.
@@ -413,7 +411,6 @@ export default function VerpflegungPage() {
       ) : alle.length === 0 ? (
         <SeitenLeer
           titel="Noch kein Zeitfenster"
-          hinweis="Ein Zeitfenster ist eine Mahlzeit mit ihrem Bedarf an Essensportionen, z. B. „Mittag“."
           aktion={
             darfSchreiben ? { label: 'Zeitfenster anlegen', onClick: oeffneAnlegen } : undefined
           }

@@ -301,7 +301,7 @@ export default function ZeitfensterKarte({
                 data-lfh="verpflegung-ausgabe-ausstehend"
                 zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
                 typwort="ausstehend"
-                hinweis="Offline vorgemerkt — zählt erst nach dem Senden"
+                hinweis="Offline vorgemerkt"
               >
                 <span style={{ color: rollen.text2 }}>
                   <span style={monoStil(13, 500)}>{d.menge} EP</span>

@@ -77,7 +77,7 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
   await expect(kopf).toContainText('2 Personen');
   await expect(zeilen(page, 'personen-druck-tabelle')).toHaveCount(2);
   await expect(zeilen(page, 'personen-druck-tabelle').first()).toContainText('SK I');
-  await expect(page.getByText('Zugriffsprotokoll')).toBeVisible();
+  await expect(page.getByText('Zugriff wird protokolliert.')).toBeVisible();
 
   // ── Druckbild: `beforeprint` selbst auslösen (emulateMedia feuert es nicht), dann Print-Medium.
   await page.evaluate(() => {

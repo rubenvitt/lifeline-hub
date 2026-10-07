@@ -105,7 +105,10 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
   return (
     <Paneel titel="Plan" ueberschrift="h4" koerperPolster style={{ marginBottom: 8 }}>
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-        <Typography.Text type="secondary">Nur Pläne, keine Fotos von Patienten.</Typography.Text>
+        {/* Datenschutz- und Protokollhinweis in einer Zeile (LFH-1078: erlaubt, kurz). */}
+        <Typography.Text type="secondary">
+          Keine Patientenfotos. Übernahme wird protokolliert.
+        </Typography.Text>
         <SpeicherFehler fehler={fehler} />
         <Space wrap size="middle" align="end">
           <Upload
@@ -133,7 +136,7 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
                 </span>
               }
             >
-              {plan ? 'Bild ersetzen' : 'Bild hochladen'}
+              {plan ? 'Plan ersetzen' : 'Plan hochladen'}
             </Button>
           </Upload>
           <UebernahmeAuswahl
@@ -145,9 +148,6 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
             laedt={uebernehmen.isPending}
           />
         </Space>
-        <Typography.Text type="secondary">
-          Die Übernahme wird wie ein Abruf protokolliert.
-        </Typography.Text>
         {plan && (
           <PlanEinstellungen
             plan={plan}
