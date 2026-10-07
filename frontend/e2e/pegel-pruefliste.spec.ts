@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
+import { eingeschwungen } from './kontrast-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -132,10 +133,14 @@ async function haeltStufe(ziel: Locator, soll: number, name: string): Promise<nu
 /**
  * Kontrast eines Textknotens gegen die zusammengesetzte Grundfläche; optional zusätzlich eine
  * fremde Farbe (die Kante steckt im `box-shadow`). Alpha wird gemischt, unebene Flächen werden
- * abgelehnt.
+ * abgelehnt. Gemessen wird eingeschwungen (`frontend/e2e/AGENTS.md`, „Kontrast misst
+ * eingeschwungen"): der Festlegen-Knopf steht gesperrt, bis die Pegelliste geladen ist, und
+ * blendet seine Farbe danach per Transition über — mittendrin las die Messung die gesperrte
+ * Textfarbe (1,8 bis 2,9 statt ≥ 4,5, LFH-1091).
  */
 async function kontrast(ziel: Locator, zusatz?: string) {
   await expect(ziel).toHaveCount(1);
+  await eingeschwungen(ziel);
   return ziel.evaluate((el, extra) => {
     type Farbe = [number, number, number, number];
     const canvas = document.createElement('canvas');
