@@ -1,4 +1,4 @@
-import { Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
+import { Breadcrumb, Button, Collapse, Form, Input, Space, Tag, Typography } from 'antd';
 import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -31,7 +31,6 @@ import {
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad, tiereDruckPfad } from '../routing/deeplinks';
-import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
 import {
   SPEZIES_META,
   TIERE_SICHTEN,
@@ -193,7 +192,7 @@ export default function TierePage() {
   const qc = useQueryClient();
   const [modus, setModus] = useState<{
     einsatzId: number;
-    wert: 'schnell' | 'vermisst';
+    wert: 'erfassen' | 'vermisst';
   } | null>(null);
   const aktuellerModus = modus?.einsatzId === einsatzId ? modus.wert : null;
   const [form] = Form.useForm<TierEingabe>();
@@ -221,7 +220,7 @@ export default function TierePage() {
     form.setFieldValue('antreff_ort', ort);
   }, [aktuellerModus, einsatzId, form, formular.da, formular.jeDa]);
 
-  // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Sprungpalette, LFH-506). Warten bis der
+  // Schnellaktion: ?neu=1 öffnet „Tier erfassen" (Sprungpalette, LFH-506). Warten bis der
   // Einsatz geladen ist; Param immer löschen, Maske nur bei Schreibrecht. Eine Kopie statt
   // In-place-Mutation, sonst sähe der zweite StrictMode-Durchlauf den Parameter nicht mehr.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -229,7 +228,7 @@ export default function TierePage() {
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
-    if (darfSchreibenRoh) setModus({ einsatzId, wert: 'schnell' });
+    if (darfSchreibenRoh) setModus({ einsatzId, wert: 'erfassen' });
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('neu');
     setSearchParams(naechste, { replace: true });
@@ -303,6 +302,7 @@ export default function TierePage() {
    * liegt am Primitiv (`ladend`).
    */
   const listeGescheitert = tiereQuery.isError && alle.length === 0;
+  const druckPfad = tiereDruckPfad(einsatzId, { sicht, spezies: speziesFilter });
   const standVeraltet = tiereQuery.isError && alle.length > 0;
 
   return (
@@ -325,29 +325,42 @@ export default function TierePage() {
         />
       }
       aktionen={
-        <Space wrap style={{ minWidth: 0 }}>
-          <DruckAnsichtKnopf pfad={tiereDruckPfad(einsatzId, { sicht, spezies: speziesFilter })} />
-          {darfSchreiben && (
-            <>
-              <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>
-                Schnellerfassung
-              </Button>
-              <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>
-                Vermisst melden
-              </Button>
-            </>
-          )}
-          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (`frontend/AGENTS.md`,
-              Aktionen). Ohne Schreib-Riegel: der Endpunkt verlangt nur den Lesezugriff, den schon
-              die Liste braucht. */}
-          <Button loading={csvExport.laeuft} onClick={csvExport.exportieren}>
-            CSV exportieren
-          </Button>
-        </Space>
+        // Ein Fragment, kein `Space`: die Knöpfe sind Kinder der Kopfzeile und teilen sie unter
+        // `md` mit dem Auslöser „Weitere“ (LFH-963).
+        darfSchreiben && (
+          <>
+            <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'erfassen' })}>
+              Tier erfassen
+            </Button>
+            <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>
+              Vermisst melden
+            </Button>
+          </>
+        )
       }
+      // Drucken und CSV öffnen, senden nichts ab — Nebenwege im Kopf, unter `md` hinter
+      // „Weitere" (`frontend/AGENTS.md`, Aktionen). Ohne Schreib-Riegel: beide verlangen nur den
+      // Lesezugriff, den schon die Liste braucht.
+      weitere={{
+        name: 'Weitere Aktionen zu den Tieren',
+        eintraege: [
+          {
+            key: 'druck',
+            label: 'Drucken / als PDF',
+            ziel: druckPfad,
+            onWahl: () => navigate(druckPfad),
+          },
+          {
+            key: 'csv',
+            label: 'CSV exportieren',
+            laeuft: csvExport.laeuft,
+            onWahl: csvExport.exportieren,
+          },
+        ],
+      }}
       // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
       // Rechte-Riegel wie der Knopf.
-      neueZeile={darfSchreiben ? () => setModus({ einsatzId, wert: 'schnell' }) : undefined}
+      neueZeile={darfSchreiben ? () => setModus({ einsatzId, wert: 'erfassen' }) : undefined}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (nurAnsicht || csvExport.fehler != null) && (
@@ -451,7 +464,7 @@ export default function TierePage() {
           wurde; die Ableitung sitzt in `onErfassen`. */}
       <ErfassungsModal<TierEingabe>
         offen={aktuellerModus !== null}
-        titel={aktuellerModus === 'vermisst' ? 'Vermisst melden' : 'Schnellerfassung'}
+        titel={aktuellerModus === 'vermisst' ? 'Vermisst melden' : 'Tier erfassen'}
         form={form}
         laeuft={anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId}
         initialValues={{ spezies: 'hund' }}
@@ -488,28 +501,49 @@ export default function TierePage() {
         <Form.Item label="Rufname" name="rufname">
           <Input />
         </Form.Item>
-        <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung">
-          <Input placeholder="z. B. Haflinger, Deutscher Schäferhund" />
-        </Form.Item>
         <Form.Item label="Antreffort" name="antreff_ort">
           <Input placeholder="z. B. Weide, Sammelstelle" />
         </Form.Item>
-        {aktuellerModus === 'vermisst' && (
-          <>
-            <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung">
-              <Input />
-            </Form.Item>
-            <Form.Item label="Kennzeichnung (Chip/Tätowierung/Halsband)" name="kennzeichnung">
-              <Input />
-            </Form.Item>
-            <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt">
-              <Input placeholder="meldender Halter" />
-            </Form.Item>
-          </>
-        )}
-        <Form.Item label="Notiz" name="notiz">
-          <Input.TextArea rows={2} />
-        </Form.Item>
+        {/* FELDBUDGET (LFH-963, `frontend/AGENTS.md`, Feldbudget): drei sichtbare Felder in
+            beiden Modi, der Rest eingeklappt. `forceRender` ist TRAGEND: ohne ihn fehlten die
+            eingeklappten Werte in `onFinish`, und die Feldzählung des Budgets wäre nicht prüfbar. */}
+        <Collapse
+          ghost
+          style={{ marginInline: -8 }}
+          items={[
+            {
+              key: 'weitere',
+              label: 'Weitere Angaben',
+              forceRender: true,
+              children: (
+                <>
+                  <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung">
+                    <Input placeholder="z. B. Haflinger, Deutscher Schäferhund" />
+                  </Form.Item>
+                  {aktuellerModus === 'vermisst' && (
+                    <>
+                      <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung">
+                        <Input />
+                      </Form.Item>
+                      <Form.Item
+                        label="Kennzeichnung (Chip/Tätowierung/Halsband)"
+                        name="kennzeichnung"
+                      >
+                        <Input />
+                      </Form.Item>
+                      <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt">
+                        <Input placeholder="meldender Halter" />
+                      </Form.Item>
+                    </>
+                  )}
+                  <Form.Item label="Notiz" name="notiz">
+                    <Input.TextArea rows={2} />
+                  </Form.Item>
+                </>
+              ),
+            },
+          ]}
+        />
       </ErfassungsModal>
     </EinsatzSeite>
   );

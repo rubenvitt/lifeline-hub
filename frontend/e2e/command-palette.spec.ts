@@ -164,7 +164,7 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
 });
 
-test('Schnellaktion „Person erfassen" navigiert und öffnet die Schnellerfassung (Schnellaktionen)', async ({
+test('Schnellaktion „Person erfassen" navigiert und öffnet „Betroffene erfassen“ (Schnellaktionen)', async ({
   page,
 }) => {
   await anmelden(page);
@@ -179,7 +179,7 @@ test('Schnellaktion „Person erfassen" navigiert und öffnet die Schnellerfassu
   await page.getByRole('option', { name: /^Person erfassen/ }).click();
 
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/personen`));
-  await expect(page.getByRole('dialog', { name: 'Schnellerfassung' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Betroffene erfassen' })).toBeVisible();
 });
 
 test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)', async ({

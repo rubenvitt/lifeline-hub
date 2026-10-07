@@ -8,6 +8,16 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   unbekannte Kategorie 400.
 - **Eine Erfassungsmaske ist ein Bauteil, kein Ort:** `personen/AufnahmeFelder.tsx` (ohne
   `<Form>`) für Modal und `/einsaetze/:id/personen/aufnahme`; Budget verschieben, nicht dehnen.
+- **Eine Maske „Betroffene erfassen“, ein Wort „erfasst“** (LFH-963, Spec `betroffene-erfassung`,
+  Entscheidung 9): Kopfknopf, `?neu=1` und Aufnahme-Route öffnen dieselbe Maske
+  (`AufnahmeModus` `erfassen | vermisst`), neben ihr nur „Vermisst melden“. Angelegt wird mit
+  Status `erfasst`; die Maske sagt es (`FOLGESTATUS_HINWEIS`: „mit Sichtung → betroffen“).
+  Filter, Tabelle und Dialog nennen den Status gleich („Erfasst“, nie „Neu“). Summen heißen
+  „gesamt“, weil „erfasst“ ein Status ist. Unter `xl` steht die `Sichtungszeile` über dem
+  Statusfilter (die Seitenleiste rutscht unter die Liste).
+- **Personen-Detail:** Stammdaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“,
+  kein `Descriptions`; unter `lg` die medizinische Spalte zuerst (`Col` mit `order`, ein Baum).
+  Nachweis: `e2e/betroffene-handy.spec.ts`.
 - **`SK_META`** führt Schlüssel von `sichtungsfarben` oder `null`, keine CSS-Werte.
 - **Verortungsauftrag** per `lagekartePfad(…, { platzieren })` → `?platzieren=<typ>:<id>`;
   `parsePlatzierenAuftrag` verwirft Unbrauchbares ganz; die Karte räumt den Parameter und betritt

@@ -50,12 +50,12 @@ test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Aufnahme ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await expect(page.getByRole('button', { name: 'Schnellerfassung' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Betroffene erfassen' })).toBeVisible();
 
   const vorher = page.url();
   let interaktionen = 0;
 
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   interaktionen += 1;
   await expect(sichtung(page)).toBeVisible();
 
@@ -75,7 +75,7 @@ test('AK 3: „Speichern und nächste" leert, fokussiert zurück und zählt hoch
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Serie ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   await expect(sichtung(page)).toBeVisible();
 
   await skFlaeche(page, 'SK I').click();

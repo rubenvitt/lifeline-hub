@@ -108,7 +108,8 @@ export default function BetroffenenSeitenleiste({
             <span data-lfh="summe" style={{ ...monoStil(40, 500), lineHeight: 1 }}>
               {bild.gesamt}
             </span>
-            <span style={{ fontSize: 11, color: rollen.schwach }}>erfasst</span>
+            {/* „gesamt“, nicht „erfasst“: „erfasst“ ist ein Personenstatus (LFH-963). */}
+            <span style={{ fontSize: 11, color: rollen.schwach }}>gesamt</span>
           </div>
           <Aufgliederung
             segmente={segmente}

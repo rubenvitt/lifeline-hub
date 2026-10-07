@@ -36,7 +36,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
   await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 
   // Person per Schnellerfassung anlegen (Modal: okText „Erfassen").
-  await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+  await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   // Name und Vorname liegen unter „Weitere Angaben" (Feldbudget: sichtbar sind Sichtung,
