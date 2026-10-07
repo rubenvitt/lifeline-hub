@@ -134,6 +134,23 @@ describe('MitgliederAbschnitt', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('LFH-964: der umbrechende Führungsstellen-Knopf hält die Steuerhöhe der Dichte-Staffel', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <ConfigProvider theme={{ token: { controlHeight: 61 } }}>
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />
+      </ConfigProvider>,
+    );
+    const knopf = await screen.findByRole('button', {
+      name: 'Führungsstelle für Eva Einsatz bearbeiten',
+    });
+    // `height: auto` lässt den Knopf umbrechen; ohne Boden fiele er auf die Zeilenhöhe.
+    expect(knopf).toHaveStyle({ height: 'auto', minHeight: '61px' });
+  });
+
   it('LFH-461: Leitung pflegt und leert die Führungsstelle über die Mitglieder-API', async () => {
     let stelle: string | null = null;
     const gespeichert: unknown[] = [];
