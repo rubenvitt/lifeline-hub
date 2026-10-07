@@ -159,6 +159,8 @@ describe('EinheitTypenTab', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Typ bearbeiten')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Label')).toHaveValue('Zug');
+    // Die Regel „alle drei oder keiner“ setzt die Eingabe selbst durch, kein Satz am Label.
+    expect(within(dialog).getByText('Soll-Stärke')).toBeInTheDocument();
   });
 
   /**

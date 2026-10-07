@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Popconfirm,
   Space,
 } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -38,8 +39,10 @@ import {
   ladeMitglieder,
   patcheEinsatz,
   patcheFuehrungsstelle,
+  schliesseEinsatzAb,
   type KopfdatenPatch,
 } from '../api/einsaetze';
+import { fehlerText } from '../api/client';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -540,6 +543,8 @@ export default function EinsatzdatenPage() {
     .join(', ');
 
   const darfVerwaltenMitglieder = darfEinsatzLeiten(einsatz, benutzer);
+  // Aktiver Einsatz und Einsatzleitung (oder Admin); nach dem Abschluss fällt der Abschnitt weg.
+  const darfAbschliessen = darfEinsatzLeiten(einsatz, benutzer);
 
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
 
@@ -920,6 +925,49 @@ export default function EinsatzdatenPage() {
         // mitglied_setzen fordert die Einsatzrolle, ohne System-Admin-Ausnahme.
         darfFuehrungsstelleVerwalten={darfVerwaltenMitglieder && istEinsatzLeitung(einsatz)}
       />
+
+      {/* Zuletzt und nicht im Kopf (LFH-960): Unumkehrbares für den ganzen Einsatz steht nicht im
+          Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“).
+          Während des Bearbeitens fehlt er, das Formular hat den Fokus. */}
+      {darfAbschliessen && !bearbeiten && <EinsatzAbschluss einsatzId={einsatzId} />}
     </EinsatzSeite>
+  );
+}
+
+/** Folge des Abschlusses — steht in der Rückfrage, nicht als Satz neben dem Knopf. */
+const ABSCHLIESSEN_FOLGE = 'Danach sind keine neuen Einträge oder Berichtigungen mehr möglich.';
+
+/**
+ * Einsatzabschluss (LFH-960, Spec `bedien-wortlaut`): aktiv → abgeschlossen, ohne Rückweg im
+ * Frontend. Rückfrage als `Popconfirm`, deren roter Knopf die Handlung nennt.
+ */
+function EinsatzAbschluss({ einsatzId }: { einsatzId: number }) {
+  const { token } = useRollen();
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: () => schliesseEinsatzAb(einsatzId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
+      qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
+      message.success('Einsatz abgeschlossen');
+    },
+    onError: (e) => message.error(fehlerText(e, 'Abschließen fehlgeschlagen')),
+  });
+  return (
+    <Paneel titel="Einsatzabschluss" koerperPolster style={{ marginTop: token.marginLG }}>
+      <Popconfirm
+        title="Einsatz abschließen?"
+        description={ABSCHLIESSEN_FOLGE}
+        okText="Einsatz endgültig abschließen"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true }}
+        onConfirm={() => mutation.mutate()}
+      >
+        <Button danger loading={mutation.isPending}>
+          Einsatz abschließen
+        </Button>
+      </Popconfirm>
+    </Paneel>
   );
 }

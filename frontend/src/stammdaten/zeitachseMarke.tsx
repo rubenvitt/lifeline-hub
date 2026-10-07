@@ -18,13 +18,13 @@ export const markeSpalte = {
   render: (m: ZeitachseMarke | null | undefined) => (m ? MARKE_WORT[m] : '—'),
 };
 
-/** Formularfeld; leer = keine Marke (der Vollersatz schickt dann `null`). */
+/**
+ * Formularfeld; leer = keine Marke (der Vollersatz schickt dann `null`). Die Beschriftung nennt,
+ * was der Status auslöst, der Platzhalter „keine“ den leeren Zustand — kein Satz darunter
+ * (LFH-1078).
+ */
 export const markeFeld = (
-  <Form.Item
-    label="Zeitachse (optional)"
-    name="zeitachse_marke"
-    extra="Ein Wechsel auf diesen Status schreibt das Ereignis in die Kräfte-Zeitachse."
-  >
+  <Form.Item label="Zeitachsen-Ereignis" name="zeitachse_marke">
     <Select
       allowClear
       placeholder="keine"
@@ -45,7 +45,7 @@ export function markeHinweis(eintraege: readonly { zeitachse_marke?: ZeitachseMa
       type="info"
       showIcon
       style={{ marginBottom: 12 }}
-      title="Zeitachse: keine Marke gesetzt. Alarmierung, Eintreffen und Entlassung entstehen erst, wenn ein Status eine Marke trägt (Bearbeiten → „Zeitachse (optional)“)."
+      title="Zeitachse: kein Status trägt ein Ereignis"
     />
   );
 }

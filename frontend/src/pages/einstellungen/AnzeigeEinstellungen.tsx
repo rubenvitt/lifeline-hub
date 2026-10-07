@@ -12,8 +12,8 @@ import {
   KOORDINATEN_OPTIONEN,
   ZEITFORMAT_OPTIONEN,
   ZEITZONEN_OPTIONEN,
-  ZEITZONE_HILFE,
 } from './optionen';
+import { NUR_ADMIN } from '../../components/nurAnsicht';
 import { mitVorgabe } from '../../components/vorgabeText';
 import {
   type FormWerteAnzeige,
@@ -88,12 +88,11 @@ export default function AnzeigeEinstellungen() {
     <AdminPage
       titel="Anzeige-Konventionen"
       breite="schmal"
-      beschreibung="Darstellung für alle Einsätze der Organisation."
       hinweis={
         <SeitenHinweise
           fehler={speichernMutation.error}
           rechteFehlt={!istAdmin}
-          rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen die Anzeige-Konventionen ändern — die Werte stehen hier zum Nachlesen."
+          rechteText={NUR_ADMIN}
         />
       }
     >
@@ -110,7 +109,7 @@ export default function AnzeigeEinstellungen() {
         disabled={!istAdmin}
       >
         <Formularpaneel titel="Darstellung">
-          <Form.Item label="Zeitzone" name="zeitzone" tooltip={ZEITZONE_HILFE}>
+          <Form.Item label="Zeitzone" name="zeitzone">
             <AutoComplete
               allowClear
               options={ZEITZONEN_OPTIONEN}
@@ -140,7 +139,9 @@ export default function AnzeigeEinstellungen() {
           <Form.Item
             label="Geocoder-URL"
             name="geocoder_url"
-            tooltip="Adresse eines Nominatim-kompatiblen Dienstes, der zur Koordinate den Ort nennt. Leer = öffentlicher Nominatim. Die Einsatz-Koordinate wird an diesen Dienst gesendet — für Produktivlast und Datenschutz einen eigenen Dienst hinterlegen."
+            // Datenschutz-Hinweis sichtbar am Feld, nicht im Tooltip (Touch, LFH-1078). Was leer
+            // gilt, nennt der Platzhalter.
+            extra="Die Einsatz-Koordinate wird an diesen Dienst gesendet."
           >
             <Input
               placeholder={mitVorgabe('https://nominatim.openstreetmap.org')}

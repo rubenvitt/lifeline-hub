@@ -17,11 +17,11 @@ export const ANSICHT_LABEL: Record<Funktionsansicht, string> = {
   lagemonitor: 'Lagemonitor',
 };
 
-/** Was eine Ansicht kann, ein Satz je Ansicht für die Auswahl. */
+/** Was eine Ansicht kann, in wenigen Fachwörtern für die Auswahl (kein Satz, LFH-1078). */
 export const ANSICHT_ZWECK: Record<Funktionsansicht, string> = {
-  'uhs-tablet': 'Aufnahme, Patienten und Grundriss einer UHS.',
-  'uhs-laptop': 'Wie das Tablet, dazu Plätze, Material und Meldungen der UHS.',
-  lagemonitor: 'Verdichtetes Lagebild für den Führungsraum, ohne Personendaten.',
+  'uhs-tablet': 'Aufnahme, Patienten, Grundriss einer UHS',
+  'uhs-laptop': 'Wie Tablet, dazu Plätze, Material, Meldungen',
+  lagemonitor: 'Verdichtetes Lagebild, ohne Personendaten',
 };
 
 /** Ob die Ansicht an genau eine UHS gebunden ist (Spiegel von `ist_stellengebunden`). */
@@ -43,7 +43,7 @@ export function istBeendet(k: Pick<KopplungAnzeige, 'status'>): boolean {
   return k.status === 'widerrufen';
 }
 
-/** Gesperrte Module der Ansicht, als Satz für die Kopplungsmaske; `null` ohne Sperre. */
+/** Gesperrte Module der Ansicht, als kurze Zeile für die Kopplungsmaske; `null` ohne Sperre. */
 export function sperrSatz(
   sperren: readonly AnsichtSperre[],
   ansicht: Funktionsansicht | undefined,
@@ -53,7 +53,8 @@ export function sperrSatz(
   const module = sperren.find((s) => s.ansicht === ansicht)?.gesperrte_module ?? [];
   if (module.length === 0) return null;
   const namen = module.map(modulName).join(', ');
-  return `In diesem Einsatz ${module.length === 1 ? 'ist' : 'sind'} ${namen} für einfache Mitglieder gesperrt. Ein ${ANSICHT_LABEL[ansicht]} könnte ${module.length === 1 ? 'dieses Modul' : 'diese Module'} nicht nutzen.`;
+  const fehlt = module.length === 1 ? 'fehlt' : 'fehlen';
+  return `${namen} für einfache Mitglieder gesperrt – ${fehlt} auf dem ${ANSICHT_LABEL[ansicht]}`;
 }
 
 /** Code in Vierergruppen („ABCD-1234"), wie er sich vorlesen lässt. */

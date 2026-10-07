@@ -14,7 +14,6 @@ import {
   KOORDINATEN_OPTIONEN,
   ZEITFORMAT_OPTIONEN,
   ZEITZONEN_OPTIONEN,
-  ZEITZONE_HILFE,
 } from './optionen';
 import {
   initialAllgemein,
@@ -91,8 +90,7 @@ export default function EinsatzAllgemein() {
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <SeitenHinweise
         fehler={speichern.error}
-        // Nur bei fehlender Rolle. Einen abgeschlossenen Einsatz nennt schon der Alert im
-        // Seitenkopf.
+        // Nur bei fehlender Rolle. Einen abgeschlossenen Einsatz nennt schon der Seitenkopf.
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
         rechteText={RECHTE_TEXT}
       />
@@ -108,11 +106,7 @@ export default function EinsatzAllgemein() {
         disabled={!daten.darfBearbeiten}
       >
         <Formularpaneel titel="Einstieg">
-          <Form.Item
-            label="Einstiegsmodul"
-            name="standard_modul"
-            tooltip={`Modul, das beim Öffnen des Einsatzes erscheint. Leer = ${einstiegVorgabe}.`}
-          >
+          <Form.Item label="Einstiegsmodul" name="standard_modul">
             <Select
               allowClear
               placeholder={mitVorgabe(einstiegVorgabe)}
@@ -121,16 +115,8 @@ export default function EinsatzAllgemein() {
           </Form.Item>
         </Formularpaneel>
 
-        <Formularpaneel
-          titel="Anzeige-Konventionen"
-          beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild)."
-        >
-          <Form.Item
-            label="Zeitzone"
-            name="zeitzone"
-            tooltip={ZEITZONE_HILFE}
-            extra={orgHinweisWert(orgDefaults?.zeitzone)}
-          >
+        <Formularpaneel titel="Anzeige-Konventionen">
+          <Form.Item label="Zeitzone" name="zeitzone" extra={orgHinweisWert(orgDefaults?.zeitzone)}>
             <AutoComplete
               allowClear
               options={ZEITZONEN_OPTIONEN}

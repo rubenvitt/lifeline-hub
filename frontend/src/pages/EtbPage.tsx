@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Switch, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Switch } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   useInfiniteQuery,
@@ -7,10 +7,10 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
-import { ladeEinsatz, ladeModulFreigaben, schliesseEinsatzAb } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
-import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
 import {
@@ -70,9 +70,6 @@ import {
 
 /** Breite der Seitenleiste „Bilanz" — ab `xl`. */
 const LEISTE_BREITE = 260;
-
-/** Rückfrage vor dem Abschließen — im Kopf als Blase, im Menü „Weitere“ als Dialog. */
-const ABSCHLIESSEN_FOLGE = 'Danach sind keine neuen Einträge oder Berichtigungen mehr möglich.';
 
 /**
  * Schwebende Teile der Leiste, die antd an `document.body` hängt (Typ-Auswahl, Chip-Editoren,
@@ -346,7 +343,6 @@ export default function EtbPage() {
     setVorigeFilterZahl(filterZahl);
     if (vorigeFilterZahl === 0) setFilterOffen(true);
   }
-  const [abschliessenFrage, setAbschliessenFrage] = useState(false);
   const [fokusInLeiste, setFokusInLeiste] = useState(false);
   // `?neu=1` (Schnellaktion) gilt als Fokus in der Leiste: kommt sie erst nach dem Laden der
   // Entwürfe, montiert sie damit aufgeklappt und fokussiert ihr Feld selbst (`startFokus`).
@@ -473,16 +469,6 @@ export default function EtbPage() {
     scrolleZurZeile(`eintrag-${hervorhebung.id}`);
   }, [hervorhebung]);
 
-  const abschliessenMutation = useMutation({
-    mutationFn: () => schliesseEinsatzAb(einsatzId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
-      qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
-      message.success('Einsatz abgeschlossen');
-    },
-    onError: (e) => message.error(fehlerText(e, 'Abschließen fehlgeschlagen')),
-  });
-
   const auftragMutation = useMutation({
     mutationFn: ({ eintragId, daten }: { eintragId: number; daten: NeuerAuftrag }) =>
       erteileAuftragAusEtb(einsatzId, eintragId, daten),
@@ -563,8 +549,6 @@ export default function EtbPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-
-  const darfAbschliessen = darfEinsatzLeiten(einsatz, benutzer);
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
@@ -687,12 +671,9 @@ export default function EtbPage() {
     />
   );
 
-  const weitereEintraege: MenueEintrag<'druck' | 'abschliessen'>[] = [
-    { key: 'druck', label: 'Drucken / als PDF' },
-    ...(darfAbschliessen
-      ? [{ key: 'abschliessen' as const, label: 'Einsatz abschließen', gefahr: true as const }]
-      : []),
-  ];
+  // Der Einsatzabschluss steht nicht hier, sondern auf den Einsatzdaten (LFH-960): Unumkehrbares
+  // für den ganzen Einsatz gehört nicht in den Kopf einer Arbeitsseite.
+  const weitereEintraege: MenueEintrag<'druck'>[] = [{ key: 'druck', label: 'Drucken / als PDF' }];
 
   const kopfAktionen = istSchmal ? (
     <>
@@ -704,15 +685,12 @@ export default function EtbPage() {
       >
         {filterZahl > 0 ? `Filter (${filterZahl})` : 'Filter'}
       </Button>
-      {/* Druck und Abschluss im Menü: auf dem Handschirm kosteten sie eine Kopfzeile über der
-          Zeitachse. Die Rückfrage zum Abschließen steht beim Aufrufer (`MenueAusloeser`). */}
+      {/* Druck im Menü: auf dem Handschirm kostete er eine Kopfzeile über der Zeitachse. */}
       <MenueAusloeser
         eintraege={weitereEintraege}
         zugaenglicherName="Weitere Aktionen zum Einsatztagebuch"
-        laeuft={abschliessenMutation.isPending}
         onWahl={(key) => {
           if (key === 'druck') navigate(etbDruckPfad(einsatzId, filter));
-          else setAbschliessenFrage(true);
         }}
       />
     </>
@@ -732,20 +710,6 @@ export default function EtbPage() {
         Drucken / als PDF
       </Button>
       {typleiste}
-      {darfAbschliessen && (
-        <Popconfirm
-          title="Einsatz abschließen?"
-          description={ABSCHLIESSEN_FOLGE}
-          okText="Ja"
-          cancelText="Abbrechen"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => abschliessenMutation.mutate()}
-        >
-          <Button danger loading={abschliessenMutation.isPending}>
-            Einsatz abschließen
-          </Button>
-        </Popconfirm>
-      )}
     </>
   );
 
@@ -970,23 +934,6 @@ export default function EtbPage() {
         )}
       </div>
 
-      {darfAbschliessen && (
-        <Modal
-          open={abschliessenFrage}
-          title="Einsatz abschließen?"
-          okText="Abschließen"
-          okButtonProps={{ danger: true }}
-          cancelText="Abbrechen"
-          onOk={() => {
-            setAbschliessenFrage(false);
-            abschliessenMutation.mutate();
-          }}
-          onCancel={() => setAbschliessenFrage(false)}
-          destroyOnHidden
-        >
-          <Typography.Paragraph>{ABSCHLIESSEN_FOLGE}</Typography.Paragraph>
-        </Modal>
-      )}
       {darfSchreiben && (
         <WiedervorlageModal
           einsatzId={einsatzId}

@@ -218,11 +218,14 @@ export default function BrDetailPage() {
         />
       }
       aktionen={
-        <Space>
+        // `size="middle"`: „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“
+        // (`frontend/AGENTS.md`, „Rot steht nicht bündig neben Neutralem“).
+        <Space wrap size="middle">
           {!schreibgeschuetzt && br.status === 'aktiv' && (
             <Popconfirm
               title="BR auflösen?"
               description="Nur möglich, wenn keine Kraft mehr belegt ist."
+              okText="BR auflösen"
               okButtonProps={{ danger: true }}
               onConfirm={() => statusMut.mutate('aufgeloest')}
             >
@@ -242,6 +245,7 @@ export default function BrDetailPage() {
               </Button>
               <Popconfirm
                 title="BR stornieren?"
+                okText="BR stornieren"
                 okButtonProps={{ danger: true }}
                 onConfirm={() => stornoMut.mutate()}
               >

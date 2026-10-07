@@ -340,6 +340,24 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     expect(screen.getByRole('button', { name: 'Logo entfernen' })).toBeDisabled();
   });
 
+  /**
+   * LFH-1078: keine Zweck-Absätze unter Name und Taktische Zeichen, kein Satz zum Leerzustand,
+   * keine Formatzeile — die Grenzen setzen `accept` und die Vorprüfung durch.
+   */
+  it('erklärt nichts: kein Zweck-Absatz, kein Leer-Satz, keine Formatzeile', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+    );
+    renderTab();
+    expect(await screen.findByRole('button', { name: 'Logo hochladen' })).toBeEnabled();
+    expect(screen.getByText('kein Logo')).toBeInTheDocument();
+    for (const alt of [/Druckkopf/, /DV 102\)/, /PNG oder JPEG/, /Kein Logo hinterlegt/])
+      expect(screen.queryByText(alt)).toBeNull();
+  });
+
   it('zeigt ein hinterlegtes Logo mit dem sha256 als Cache-Brecher', async () => {
     server.use(
       meHandler(admin),
@@ -364,6 +382,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     fireEvent.error(bild);
     expect(screen.queryByRole('img', { name: 'Logo von DRK' })).toBeNull();
     expect(screen.getByText(/Das hinterlegte Logo lässt sich nicht anzeigen/)).toBeInTheDocument();
+    expect(screen.getByText('Fehlt auf Ausdrucken.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Logo ersetzen' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Logo entfernen' })).toBeEnabled();
   });
@@ -434,6 +453,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Logo entfernen?' });
     const bestaetigen = within(dialog).getByRole('button', { name: 'Entfernen' });
     expect(bestaetigen).toHaveClass('ant-btn-dangerous');
+    // Genau EIN kurzer Satz zur Folge (LFH-1078).
+    expect(within(dialog).getByText('Das Logo wird unwiderruflich gelöscht.')).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     expect(geloescht).toBe(0);

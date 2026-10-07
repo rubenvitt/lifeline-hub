@@ -472,17 +472,21 @@ describe('StatusKatalogTab', () => {
     it('Hinweis nur, solange kein Status eine Marke trägt', async () => {
       const { unmount } = render(admin);
       await screen.findByText('einsatzbereit');
-      expect(screen.getByText(/Zeitachse: keine Marke gesetzt/)).toBeInTheDocument();
+      expect(screen.getByText(/Zeitachse: kein Status trägt ein Ereignis/)).toBeInTheDocument();
       unmount();
       render(admin, [{ ...status[0], zeitachse_marke: 'alarmierung' }, status[1]]);
       await screen.findByText('einsatzbereit');
-      expect(screen.queryByText(/Zeitachse: keine Marke gesetzt/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Zeitachse: kein Status trägt ein Ereignis/),
+      ).not.toBeInTheDocument();
     });
 
     it('kein Hinweis bei leerem Katalog', async () => {
       render(admin, []);
       await screen.findByText('Kein Status');
-      expect(screen.queryByText(/Zeitachse: keine Marke gesetzt/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Zeitachse: kein Status trägt ein Ereignis/),
+      ).not.toBeInTheDocument();
     });
 
     it('Leeren der Marke schickt null (Vollersatz entfernt sie)', async () => {
@@ -498,7 +502,12 @@ describe('StatusKatalogTab', () => {
       await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
       const dialog = await screen.findByRole('dialog');
       await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-      const feld = (await within(dialog).findByLabelText('Zeitachse (optional)')).closest(
+      const zeile = (await within(dialog).findByLabelText('Zeitachsen-Ereignis')).closest(
+        '.ant-form-item',
+      ) as HTMLElement;
+      // Die Beschriftung sagt, was das Feld tut; kein Satz darunter (LFH-1078).
+      expect(zeile.querySelector('.ant-form-item-extra')).toBeNull();
+      const feld = (await within(dialog).findByLabelText('Zeitachsen-Ereignis')).closest(
         '.ant-select',
       )!;
       await userEvent.hover(feld);

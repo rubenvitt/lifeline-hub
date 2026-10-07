@@ -177,6 +177,11 @@ describe('EinsatzAufbewahrung', () => {
     rendern();
 
     expect(await screen.findByText('Vorgabe der Organisation: 365 Tage')).toBeInTheDocument();
+    // Der Platzhalter nennt den Wert, der wirklich gilt (Einsatz ?? Org), nicht „keine“.
+    expect(screen.getByLabelText('Aufbewahrungs-Dauer (Tage)')).toHaveAttribute(
+      'placeholder',
+      '365 (Vorgabe)',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
@@ -185,6 +190,25 @@ describe('EinsatzAufbewahrung', () => {
         expect.objectContaining({ retention_dauer_tage: null }),
       ),
     );
+  });
+
+  it('am abgeschlossenen Einsatz: Vorgabe der Organisation UND Grund der Sperre am Feld', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'abgeschlossen',
+      meine_rolle: 'einsatzleitung',
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      ...VOLL,
+      retention_dauer_tage: null,
+      org_defaults: { org_id: 1, retention_dauer_tage: 365 },
+    } as never);
+
+    rendern();
+
+    expect(await screen.findByText('Vorgabe der Organisation: 365 Tage')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz abgeschlossen')).toBeInTheDocument();
   });
 
   it('haelt den Speichern-Knopf IM Formular (Erfassungs-Norm B4/LFH-332)', async () => {
@@ -214,6 +238,8 @@ describe('EinsatzAufbewahrung', () => {
     rendern();
 
     expect(await screen.findByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
+    // Der Grund steht am gesperrten Feld; „Nur Ansicht“ wäre hier falsch, die Frist bleibt offen.
+    expect(screen.getByText('Einsatz abgeschlossen')).toBeInTheDocument();
     const aendern = screen.getByRole('button', { name: 'Frist ändern' });
     expect(aendern).toBeEnabled();
     // Das Paneel steht AUSSERHALB des Vollersatz-Formulars.

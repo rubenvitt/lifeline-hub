@@ -132,6 +132,9 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     // keiner") — deshalb drei Eingaben, ein `Form.Item`.
     expect(screen.getByLabelText('Unterführer')).toHaveValue('1');
     expect(screen.getByLabelText('Mannschaft')).toHaveValue('8');
+    expect(screen.getByText('Soll-Stärke')).toBeInTheDocument();
+    // Kein Zweck-Absatz unter dem Titel (LFH-1078).
+    expect(screen.queryByText(/Grundfelder/)).toBeNull();
     // Die zweite Hälfte der „kein neuer Endpunkt"-Aussage: EIN Listenabruf, kein zweiter.
     expect(abrufe).toBe(1);
   });

@@ -23,20 +23,29 @@ function setzeRolle(system_rolle: SystemRolle, org_rolle: OrgRolle = 'keine') {
 describe('KartenOnlineSektion', () => {
   beforeEach(() => setzeRolle('admin'));
 
-  it('rendert Titel + Kind, kein read-only-Alert für Admin', () => {
+  it('rendert Titel + Kind, keine Rechtezeile für Admin', () => {
     renderMitProviders(<KartenOnlineSektion />);
     expect(screen.getByRole('heading', { name: 'Online-Quellen' })).toBeInTheDocument();
     expect(screen.getByText('online-kind')).toBeInTheDocument();
-    expect(screen.queryByText('Nur lesend')).not.toBeInTheDocument();
-    // Der Begriff der Spec heißt „Kartengrundlage“, nicht „Basemap“ (LFH-944).
-    expect(screen.getByText(/Wahl der Kartengrundlage/)).toBeInTheDocument();
+    expect(screen.queryByText('Nur Ansicht')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Basemap/);
   });
 
-  it('zeigt read-only-Alert für Nicht-Admin (fuehrungskraft)', () => {
+  /** LFH-1078: Titel und Liste reichen — kein Zweck-Absatz, kein Satz über den Status „aktiv“. */
+  it('erklärt nichts: keine Beschreibung, kein Absatz', () => {
+    renderMitProviders(<KartenOnlineSektion />);
+    expect(screen.queryByText(/Kartengrundlage/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/erscheinen/)).not.toBeInTheDocument();
+  });
+
+  it('Nicht-Admin: „Nur Ansicht · nur System-Admin“ statt Info-Kasten', () => {
     setzeRolle('keiner', 'fuehrungskraft');
     renderMitProviders(<KartenOnlineSektion />);
-    expect(screen.getByText('Nur lesend')).toBeInTheDocument();
+    const zeile = screen.getByRole('status');
+    expect(zeile).toHaveTextContent('Nur Ansicht');
+    expect(zeile).toHaveTextContent('nur System-Admin');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/read-only/)).not.toBeInTheDocument();
     expect(screen.getByText('online-kind')).toBeInTheDocument();
   });
 });

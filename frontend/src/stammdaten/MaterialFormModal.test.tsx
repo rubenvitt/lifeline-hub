@@ -77,6 +77,16 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Bezeichnung')));
   });
 
+  /** LFH-1078: der Platzhalter nennt das Feld knapp, keine Regel in Klammern. */
+  it('Bestandsnummer: kurzer Platzhalter ohne Regel', async () => {
+    handler();
+    renderMitProviders(<Harness />);
+    expect(await screen.findByLabelText('Bestandsnummer')).toHaveAttribute(
+      'placeholder',
+      'Inventarnr. (optional)',
+    );
+  });
+
   it('Anlegen: der Serienweg steht — Material wird am Stück erfasst', async () => {
     handler();
     renderMitProviders(<Harness />);

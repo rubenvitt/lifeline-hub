@@ -34,7 +34,7 @@ interface PegelPrognoseModalProps {
  * Führt die Station eine PEGELONLINE-Vorhersage (Reihe `WV`), steht ihr höchster künftiger Wert als
  * Vorschlag mit „Übernehmen" darüber — nie still eingesetzt: die Prognose ist eine Angabe des
  * Stabs, und eine Landes-Vorhersagezentrale kann eine andere Zahl nennen als die BfG. Ohne Reihe
- * oder ohne Quelle steht ein Satz, der Dialog bleibt bedienbar. `retry: false`: einen 502 dreimal
+ * oder ohne Quelle steht ein Zustand, der Dialog bleibt bedienbar. `retry: false`: einen 502 dreimal
  * zu wiederholen hielte den Hinweis nur länger auf „wird abgerufen".
  *
  * Fehler des PUT stehen im Dialog (`SpeicherFehler`), die Hülle lässt die Felder stehen.
@@ -76,11 +76,7 @@ export default function PegelPrognoseModal({
   const hinweis = vorhersageQ.isLoading ? (
     <Alert type="info" title="PEGELONLINE-Vorhersage wird abgerufen …" />
   ) : vorhersageQ.isError ? (
-    <Alert
-      type="warning"
-      showIcon
-      title="Die PEGELONLINE-Vorhersage ist gerade nicht erreichbar — bitte von Hand erfassen."
-    />
+    <Alert type="warning" showIcon title="PEGELONLINE-Vorhersage nicht erreichbar" />
   ) : vorhersage ? (
     <Alert
       type="info"

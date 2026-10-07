@@ -365,7 +365,8 @@ anwendbar), „nicht geprüft" ist keins.
   Kein Knopftext gleicht einem Statuswort desselben Moduls; die Texte stehen je Zielstatus in
   `kommunikation/phase.ts` (`…_HANDLUNG`) bzw. `stammdaten/dienststatus.tsx`, Guard
   `kommunikation/wortlaut.guard.test.ts`. Der Bestätigungsknopf einer Rückfrage nennt die
-  Handlung, nie nur „Ja“/„OK“. Eine fachliche Unterscheidung ist ohne Hover lesbar, ein Tooltip
+  Handlung, nie nur „Ja“/„OK“ (rote `Popconfirm`: `components/rueckfrage.guard.test.ts`, mit
+  Schuldliste, die nur schrumpft). Eine fachliche Unterscheidung ist ohne Hover lesbar, ein Tooltip
   ergänzt nur. „Quittieren“ heißt Empfang bestätigt (Meldung, Auftrag, Fernmeldeskizze), eine
   Erinnerung „erübrigt“ sich.
 - **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) hinter
@@ -493,7 +494,10 @@ anwendbar), „nicht geprüft" ist keins.
   Nachweis `e2e/dialogfuss-dichte.spec.ts`, `e2e/dokumente.spec.ts`.
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",
   „Deaktivieren", eine gelöste Zuordnung) → Abstand + `danger`, keine Rückfrage; Unumkehrbares →
-  Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}`.
+  Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}` und benanntem `okText`.
+  **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**
+  (LFH-960, Spec `bedien-wortlaut`): der Einsatzabschluss steht als letzter Abschnitt auf den
+  Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.
 - **Ein Iconsatz** (LFH-595, Spec `iconsatz`,
   `openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/design.md`): Icons8
   „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IconPaar`, heute Rail und Stern).

@@ -215,7 +215,8 @@ export default function UhsDetailPage() {
                 In Betrieb nehmen
               </Button>
               <Popconfirm
-                title="UHS stornieren?"
+                title="Unfallhilfsstelle stornieren?"
+                okText="Unfallhilfsstelle stornieren"
                 onConfirm={() => stornoMut.mutate()}
                 okButtonProps={{ danger: true }}
               >
@@ -226,6 +227,7 @@ export default function UhsDetailPage() {
           {verwalten && uhs.status === 'aktiv' && (
             <Popconfirm
               title="Unfallhilfsstelle auflösen?"
+              okText="Unfallhilfsstelle auflösen"
               onConfirm={() => statusMut.mutate('aufgeloest')}
               okButtonProps={{ danger: true }}
             >

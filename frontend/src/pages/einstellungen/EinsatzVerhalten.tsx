@@ -97,10 +97,7 @@ export default function EinsatzVerhalten() {
         }}
         disabled={!daten.darfBearbeiten}
       >
-        <Formularpaneel
-          titel="Verhalten & Automatik"
-          beschreibung="Nummernkreise (Präfix + Startwert), Fristen und automatische ETB-Einträge für diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises vergeben ist, sind Präfix und Startwert nicht mehr änderbar."
-        >
+        <Formularpaneel titel="Verhalten & Automatik">
           <div style={feldrasterStil(abBreite('lg'), token.margin)}>
             {(
               [
@@ -134,7 +131,6 @@ export default function EinsatzVerhalten() {
                   label={`Präfix ${nk.label}`}
                   name={`${nk.key}_nummer_praefix`}
                   style={{ flex: 1 }}
-                  tooltip="Wird der laufenden Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
                   extra={
                     nk.eingefroren
                       ? 'Erste Nummer bereits vergeben — nicht mehr änderbar'
@@ -149,7 +145,6 @@ export default function EinsatzVerhalten() {
                   // `flex: 0 1 160px` statt `width: 160`: eine feste Pixelbreite ragte am schmalen
                   // Schirm über den Rand (`feldbreiten.guard.test.ts`).
                   style={{ flex: '0 1 160px' }}
-                  tooltip="Erste laufende Nummer."
                 >
                   <InputNumber
                     min={1}
@@ -165,7 +160,6 @@ export default function EinsatzVerhalten() {
             <Form.Item
               label="Bestätigungsfrist Meldungen (Minuten)"
               name="meldung_bestaetigung_frist_min"
-              tooltip="Frist für die Bestätigung pflichtiger Meldungen."
               extra={orgHinweisWert(orgDefaults?.meldung_bestaetigung_frist_min, 'Min.')}
             >
               <InputNumber
@@ -178,7 +172,6 @@ export default function EinsatzVerhalten() {
             <Form.Item
               label="Quittierfrist Aufträge (Minuten)"
               name="auftrag_quittierung_frist_min"
-              tooltip="Frist für unquittierte Aufträge ohne eigene Frist."
               extra={orgHinweisWert(orgDefaults?.auftrag_quittierung_frist_min, 'Min.')}
             >
               <InputNumber
@@ -194,7 +187,6 @@ export default function EinsatzVerhalten() {
             <Form.Item
               label="Rückmeldefrist Einheiten (Minuten)"
               name="rueckmeldung_frist_min"
-              tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig."
               extra={orgHinweisWert(orgDefaults?.rueckmeldung_frist_min, 'Min.')}
             >
               <InputNumber
@@ -207,7 +199,6 @@ export default function EinsatzVerhalten() {
             <Form.Item
               label="Automatische ETB-Einträge"
               name="auto_etb_eintraege"
-              tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
               extra={orgHinweisAutoEtb(orgDefaults?.auto_etb_eintraege)}
             >
               <Select

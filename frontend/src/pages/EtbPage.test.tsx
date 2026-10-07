@@ -1442,9 +1442,9 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
 
 /**
  * Handschirm zuerst die Zeitachse (LFH-955, design.md D4): bei 390 × 844 stand beim Öffnen kein
- * Eintrag im Bild. Unter `md` liegen Druck und Abschluss im Menü „Weitere“, die Filter hinter
- * „Filter (n)“, der Typfilter rollt einzeilig, und die Erfassungsleiste startet eingeklappt. Die
- * Pixel misst `e2e/leisten-flaeche.spec.ts`.
+ * Eintrag im Bild. Unter `md` liegt der Druck im Menü „Weitere“ (der Abschluss steht seit LFH-960
+ * auf den Einsatzdaten), die Filter hinter „Filter (n)“, der Typfilter rollt einzeilig, und die
+ * Erfassungsleiste startet eingeklappt. Die Pixel misst `e2e/leisten-flaeche.spec.ts`.
  */
 describe('EtbPage — Handschirm (LFH-955)', () => {
   const kopf = () =>
@@ -1468,7 +1468,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name }));
   }
 
-  it('Druck und Abschluss stehen im Menü „Weitere“, nicht als Knöpfe im Kopf', async () => {
+  it('der Druck steht im Menü „Weitere“, kein Abschluss als Knopf im Kopf', async () => {
     setzeViewportBreite(390);
     setup('/einsaetze/7/etb?typ=meldung');
     const k = await kopf();
@@ -1479,31 +1479,9 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     await waitFor(() => expect(screen.getByTestId('ort-suche').textContent).toBe('?typ=meldung'));
   });
 
-  it('„Einsatz abschließen“ aus dem Menü fragt nach und schließt erst nach Bestätigung ab', async () => {
+  it('auch die Einsatzleitung findet im Menü nur die Druckansicht (LFH-960)', async () => {
     setzeViewportBreite(390);
-    let abgeschlossen = 0;
-    setup('/einsaetze/7/etb', [
-      http.post('/api/einsaetze/7/abschliessen', () => {
-        abgeschlossen += 1;
-        return HttpResponse.json({ ...einsatz, status: 'abgeschlossen' });
-      }),
-    ]);
-    await kopf();
-    await weitereWaehlen('Einsatz abschließen');
-    const dialog = await screen.findByRole('dialog', { name: 'Einsatz abschließen?' });
-    expect(abgeschlossen).toBe(0);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
-    await waitFor(() => expect(abgeschlossen).toBe(1));
-  });
-
-  it('ohne Leitungsrecht trägt das Menü nur die Druckansicht', async () => {
-    setzeViewportBreite(390);
-    setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7', () =>
-        HttpResponse.json({ ...einsatz, meine_rolle: 'fuehrungspersonal' }),
-      ),
-      meHandler({ ...admin, system_rolle: 'keiner' }),
-    ]);
+    setup();
     await kopf();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Weitere Aktionen zum Einsatztagebuch' }),

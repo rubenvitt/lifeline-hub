@@ -1,3 +1,47 @@
+## [1.0.0-alpha.90](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.89...v1.0.0-alpha.90) (2026-10-07)
+
+### Navigation und Orientierung
+
+Klarere Orientierung in der Anwendung:
+
+- **Seitentitel im Browser-Tab** zeigen jetzt das aktuelle Modul und den Einsatz (z. B. „Einsatztagebuch · Großlage Nord · lifeline-hub")
+- **Brotkrumenpfade (Breadcrumbs)** zeigen in allen Modulen den Weg: Im Einsatztagebuch, auf der Lagekarte, im Meldebild und in den Einstellungen wird der Einsatzname mit angezeigt
+- **Kompaktere Darstellung auf mobilen Geräten**: Der Einsatzname im Breadcrumb wird bei Platzmangel gekürzt, der vollständige Name erscheint beim Überfahren
+- **Einsatzstatus** wird nicht mehr als Chip am Seitentitel angezeigt, sondern als beschriftetes Feld „Einsatzstatus: Abgeschlossen" bei abgeschlossenen Einsätzen
+- **Einsatzwechsler** hebt den aktuellen Einsatz optisch hervor; ein Klick darauf bleibt im aktuellen Modul statt zu den Stammdaten zu springen
+- **Rückweg zur Arbeit**: Von Profil und Verwaltung führt ein „Zurück zu <Einsatz>"-Link direkt zum zuletzt geöffneten Modul des Einsatzes
+- In der Einsatzliste wird der Reiter „Aktiv" jetzt einheitlich „Offen" genannt
+
+### Lagekarte
+
+Einfacheres Platzieren von Elementen auf der Karte:
+
+- **Fadenkreuz in der Kartenmitte** zeigt während des Platzierens, wo das Element erscheinen wird
+- **Tastenkürzel-Hinweise (z. B. Esc)** werden nur noch angezeigt, wenn die Esc-Taste tatsächlich den aktuellen Schritt abbricht
+- **Statusanzeige statt Anleitungstext**: Die Karte zeigt den aktuellen Zustand (z. B. „Platzierung") statt ausführlicher Bedienhinweise
+- **Auf mobilen Geräten** (unter 768 px Breite) wird der Breadcrumb ausgeblendet, um mehr Platz für die Karte zu schaffen
+
+### Einsatztagebuch
+
+- **Kompakterer Breadcrumb**: Der Pfad zeigt „Einsätze ›" statt den vollständigen Einsatznamen, der Einsatzname steht im Einsatzwechsler – dadurch bleibt die Kopfzeile auch bei 1440 px Breite einzeilig und die Zeitachse zeigt mehr Einträge
+
+### Betroffene und Kräfte
+
+Deutlich bessere Performance bei großen Datenmengen:
+
+- **Virtualisierung großer Listen**: Ab 201 Personen oder Einheiten werden nur noch die sichtbaren Zeilen plus Puffer gerendert – Listen mit 1.000+ Einträgen scrollen flüssig
+- **Optimiertes Rendering**: Tabellenzellen, Personenkarten und Boards werden nur noch bei tatsächlichen Änderungen neu gezeichnet
+- **Deeplinks funktionieren auch bei großen Listen**: Direktlinks zu einzelnen Personen (z. B. `?person=123`) rendern die Zielzeile auch außerhalb des Sichtbereichs
+
+### Aufträge und Nachforderungen
+
+- **Flüssigeres Auftragsboard**: Optimiertes Rendering auch bei vielen Aufträgen, ab 51 abgeschlossenen Aufträgen wird virtualisiert gescrollt
+- **Deeplinks zu Aufträgen** (`?auftrag=xyz`) funktionieren zuverlässig auch bei vielen Einträgen
+
+### Suchfunktionen
+
+- Der Button „Erneut suchen" wird jetzt in normaler Schriftgröße dargestellt
+
 ## [1.0.0-alpha.89](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.88...v1.0.0-alpha.89) (2026-10-07)
 
 ### Betroffene
