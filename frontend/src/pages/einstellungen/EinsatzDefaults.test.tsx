@@ -324,7 +324,8 @@ describe('EinsatzDefaults', () => {
     expect(screen.getByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('keine Frist (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByText(/Leer = Vorgabe des Systems\./)).toBeInTheDocument();
+    // Was leer gilt, sagt der Platzhalter; kein Satz erklärt das Feld (LFH-1078).
+    expect(container.textContent).not.toMatch(/Leer = Vorgabe/);
     const platzhalter = [...container.querySelectorAll('[placeholder]')].map((e) =>
       e.getAttribute('placeholder'),
     );

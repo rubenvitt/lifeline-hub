@@ -334,8 +334,8 @@ anwendbar), „nicht geprüft" ist keins.
 
 - **Voreingestellte Werte heißen „Vorgabe“** (LFH-944, Spec `bedien-begriffe`): nie „Default“,
   „Fallback“ oder „Standard“ im sichtbaren Text. Platzhalter nennen den Wert, der leer wirklich
-  gilt. Bausteine in `components/vorgabeText.ts` („… (Vorgabe)“, „Leer = Vorgabe des Systems.“,
-  „Vorgabe der Organisation: …“), Wächter `components/vorgabe.guard.test.ts` mit Ausnahmeliste
+  gilt; kein „Leer = …“-Satz daneben (LFH-1078). Bausteine in `components/vorgabeText.ts`
+  („… (Vorgabe)“, „Vorgabe der Organisation: …“), Wächter `components/vorgabe.guard.test.ts` mit Ausnahmeliste
   für Eigennamen („Standard-Rufname“, „Standardansicht“).
 
 **Aktionen**

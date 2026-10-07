@@ -14,7 +14,7 @@ import {
   ZEITZONEN_OPTIONEN,
   ZEITZONE_HILFE,
 } from './optionen';
-import { LEER_SYSTEM_VORGABE, mitVorgabe } from '../../components/vorgabeText';
+import { mitVorgabe } from '../../components/vorgabeText';
 import {
   type FormWerteAnzeige,
   initialAnzeige,
@@ -88,7 +88,7 @@ export default function AnzeigeEinstellungen() {
     <AdminPage
       titel="Anzeige-Konventionen"
       breite="schmal"
-      beschreibung={`Darstellung für alle Einsätze der Organisation. ${LEER_SYSTEM_VORGABE}`}
+      beschreibung="Darstellung für alle Einsätze der Organisation."
       hinweis={
         <SeitenHinweise
           fehler={speichernMutation.error}

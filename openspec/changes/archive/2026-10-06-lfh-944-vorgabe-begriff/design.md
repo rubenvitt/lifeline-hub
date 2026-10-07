@@ -31,15 +31,17 @@ Gerätezeit, `anzeige/format.ts`). Der sichtbare Text benennt die Ebenen heute m
 ## Decisions
 
 **D1 Wortlaut in einer Datei.** `components/vorgabeText.ts` exportiert die Bausteine:
-`mitVorgabe(wert)` → „<wert> (Vorgabe)“, `LEER_SYSTEM_VORGABE` → „Leer = Vorgabe des
-Systems.“, `orgVorgabe(wert)` → „Vorgabe der Organisation: <wert>“. Ein Baustein „keine
+`mitVorgabe(wert)` → „<wert> (Vorgabe)“, `orgVorgabe(wert)` → „Vorgabe der Organisation:
+<wert>“. Ein Baustein „keine
 Vorgabe“ entfiel bei der Umsetzung: wo leer keine Frist gilt, sagt der Platzhalter das
 („keine Frist (Vorgabe)“). Muster ist `stammdaten/rechteText.ts`: eine abweichende Fassung fiele sonst
 niemandem auf, weil jede Seite für sich plausibel aussieht. `components/` statt
 `pages/einstellungen/`, weil auch Meldungen, Karten und Stammdaten den Wortlaut brauchen.
 
-**D2 Ebene im Text.** Org-Seiten erklären „Leer = Vorgabe des Systems.“ und setzen
-„(Vorgabe)“ hinter den System-Wert im Platzhalter. Einsatz-Seiten zeigen unter dem Feld
+**D2 Ebene im Text.** Org-Seiten setzen „(Vorgabe)“ hinter den System-Wert im Platzhalter. Ein
+Satz „Leer = Vorgabe des Systems.“ stand im ersten Stand dabei; er entfiel beim Nachziehen von
+alpha, weil die Bedien-Leitlinie „Text erklärt nie die Bedienung“ (LFH-1078) solche Sätze
+verbietet und der Platzhalter dasselbe sagt. Einsatz-Seiten zeigen unter dem Feld
 „Vorgabe der Organisation: <Wert>“ (bisher „Standard (Org): <Wert>“), solange die Organisation
 einen Wert gesetzt hat. Ihr Platzhalter nennt den Wert, der leer wirklich gilt: die Vorgabe der
 Organisation, ohne sie die des Systems (`platzhalterVorgabe` in `einsatzEinstellungenForm.ts`).
@@ -47,9 +49,9 @@ Der erste Entwurf setzte auch im Einsatz immer den System-Wert; das Review fand 
 zu Requirement 3 („5 (Vorgabe)“ über „Vorgabe der Organisation: 30 Min.“). Verworfen:
 „Org-Vorgabe“ als Kürzel; „Org“ ist selbst ein Kürzel und steht schon im Hinweis.
 
-**D3 Zeitzone.** Platzhalter „Gerätezeit (Vorgabe)“, Tooltip „Zeitzone wie Europe/Berlin.
-Leer = Gerätezeit.“ in der Verwaltung; im Einsatz „Leer = Vorgabe der Organisation, ohne sie
-Gerätezeit.“ und der Platzhalter nach D2. Das Wort „IANA“ entfällt.
+**D3 Zeitzone.** Platzhalter „Gerätezeit (Vorgabe)“ in der Verwaltung, im Einsatz nach D2;
+Tooltip in beiden „Zeitzone wie Europe/Berlin.“ Was leer gilt, sagt nur der Platzhalter (siehe D2).
+Das Wort „IANA“ entfällt.
 
 **D4 Seitennamen.** „Einsatz-Defaults“ → „Einsatz-Vorgaben“ (Menü und Titel),
 „Modul-Rollen-Default“ → „Rollen-Vorgabe je Modul“, „Benötigte Rolle (Default)“ →

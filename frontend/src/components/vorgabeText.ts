@@ -13,9 +13,6 @@ export function mitVorgabe(wert: string): string {
   return `${wert} (Vorgabe)`;
 }
 
-/** Erklärung auf den Org-Seiten: ein leeres Feld fällt auf die System-Vorgabe zurück. */
-export const LEER_SYSTEM_VORGABE = 'Leer = Vorgabe des Systems.';
-
 /** Hinweis unter einem leeren Einsatz-Feld, für das die Organisation einen Wert gesetzt hat. */
 export function orgVorgabe(wert: string): string {
   return `Vorgabe der Organisation: ${wert}`;

@@ -14,7 +14,7 @@ import {
   KOORDINATEN_OPTIONEN,
   ZEITFORMAT_OPTIONEN,
   ZEITZONEN_OPTIONEN,
-  ZEITZONE_HILFE_EINSATZ,
+  ZEITZONE_HILFE,
 } from './optionen';
 import {
   initialAllgemein,
@@ -123,12 +123,12 @@ export default function EinsatzAllgemein() {
 
         <Formularpaneel
           titel="Anzeige-Konventionen"
-          beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Vorgabe der Organisation, ohne sie die des Systems."
+          beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild)."
         >
           <Form.Item
             label="Zeitzone"
             name="zeitzone"
-            tooltip={ZEITZONE_HILFE_EINSATZ}
+            tooltip={ZEITZONE_HILFE}
             extra={orgHinweisWert(orgDefaults?.zeitzone)}
           >
             <AutoComplete

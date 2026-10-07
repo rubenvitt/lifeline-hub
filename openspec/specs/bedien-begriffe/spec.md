@@ -27,9 +27,10 @@ benannte Dinge mit eigener Spec („Standard-Rufname“, „Standardansicht“).
 
 ### Requirement: Die Ebene einer Vorgabe ist erkennbar
 Die Oberfläche SHALL unterscheiden, woher eine Vorgabe kommt. Ein leeres Feld in den
-Org-Einstellungen MUST erklären „Leer = Vorgabe des Systems“. Ein leeres Feld in den
-Einsatz-Einstellungen, für das die Organisation einen Wert gesetzt hat, MUST diesen Wert als
-„Vorgabe der Organisation: <Wert>“ zeigen.
+Org-Einstellungen MUST den Wert des Systems als Platzhalter „<Wert> (Vorgabe)“ zeigen; ein Satz
+wie „Leer = …“ MUST NOT das Feld erklären (Bedien-Leitlinie „Text erklärt nie die Bedienung“).
+Ein leeres Feld in den Einsatz-Einstellungen, für das die Organisation einen Wert gesetzt hat,
+MUST diesen Wert als „Vorgabe der Organisation: <Wert>“ zeigen.
 
 #### Scenario: Org-Vorgabe im Einsatz
 - **WHEN** die Organisation das Zeitformat „12 Stunden (AM/PM)“ vorgibt und der Einsatz keines gesetzt hat
@@ -40,12 +41,13 @@ Einsatz-Einstellungen, für das die Organisation einen Wert gesetzt hat, MUST di
 - **THEN** steht unter dem Einsatz-Feld kein Org-Hinweis
 
 ### Requirement: Der Platzhalter nennt den Wert, der wirklich gilt
-Platzhalter und Tooltip eines Feldes mit Vorgabe SHALL denselben Wert nennen, und dieser Wert
-MUST dem Verhalten bei leerem Feld entsprechen.
+Der Platzhalter eines Feldes mit Vorgabe SHALL den Wert nennen, der bei leerem Feld gilt, und
+dieser Wert MUST dem Verhalten bei leerem Feld entsprechen. Ein Tooltip MUST NOT einen anderen
+Wert nennen.
 
 #### Scenario: Zeitzone leer
 - **WHEN** das Feld „Zeitzone“ in den Anzeige-Konventionen leer ist, oder im Einsatz leer ist und die Organisation keine Zeitzone vorgibt
-- **THEN** lautet der Platzhalter „Gerätezeit (Vorgabe)“, der Tooltip nennt die Gerätezeit als Wert bei leerem Feld, und Zeiten erscheinen in der Zeitzone des Geräts
+- **THEN** lautet der Platzhalter „Gerätezeit (Vorgabe)“, und Zeiten erscheinen in der Zeitzone des Geräts
 
 #### Scenario: Frist im Einsatz mit Org-Vorgabe
 - **WHEN** die Organisation eine Bestätigungsfrist von 30 Minuten vorgibt und das Einsatz-Feld leer ist

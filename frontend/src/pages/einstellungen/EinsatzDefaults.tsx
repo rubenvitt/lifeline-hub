@@ -27,7 +27,7 @@ import {
 import type { OrgEinstellungenUpdate } from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
-import { LEER_SYSTEM_VORGABE, mitVorgabe } from '../../components/vorgabeText';
+import { mitVorgabe } from '../../components/vorgabeText';
 
 /** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Modulzeile. */
 const RECHTE_TEXT =
@@ -180,7 +180,7 @@ export default function EinsatzDefaults() {
 
         <Formularpaneel
           titel="Verhalten & Automatik"
-          beschreibung={`Nummernkreis-Präfixe und Vorgabe-Fristen für neue Einsätze. Das Präfix der Einsatznummer wird beim Anlegen fest in die Nummer übernommen; die übrigen Präfixe sind reine Anzeige. ${LEER_SYSTEM_VORGABE}`}
+          beschreibung={`Nummernkreis-Präfixe und Vorgabe-Fristen für neue Einsätze. Das Präfix der Einsatznummer wird beim Anlegen fest in die Nummer übernommen; die übrigen Präfixe sind reine Anzeige.`}
         >
           <Form.Item
             label="Präfix Einsatznummer"

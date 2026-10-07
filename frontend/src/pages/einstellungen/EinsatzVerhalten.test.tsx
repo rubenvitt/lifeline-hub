@@ -193,6 +193,8 @@ describe('EinsatzVerhalten', () => {
     expect(screen.getByPlaceholderText('keine Frist (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('60 (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByText('An (Vorgabe)')).toBeInTheDocument();
+    // Startwert der Nummernkreise: leer beginnt die Zählung bei 1.
+    expect(screen.getAllByPlaceholderText('1 (Vorgabe)').length).toBeGreaterThan(0);
   });
 
   it('laesst die fremden Sektionen als Bestandswert mitfahren (Vollersatz-PUT)', async () => {

@@ -115,7 +115,8 @@ describe('AnzeigeEinstellungen', () => {
     expect(
       screen.getByPlaceholderText('https://nominatim.openstreetmap.org (Vorgabe)'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Leer = Vorgabe des Systems\./)).toBeInTheDocument();
+    // Was leer gilt, sagt der Platzhalter; kein Satz erklärt das Feld (LFH-1078).
+    expect(container.textContent).not.toMatch(/Leer = Vorgabe/);
     const platzhalter = [...container.querySelectorAll('[placeholder]')].map((e) =>
       e.getAttribute('placeholder'),
     );
