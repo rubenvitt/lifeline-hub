@@ -712,6 +712,7 @@ mod tests {
             karten_service_token: None,
             auto_aktualisierung: auto,
             backup_download: Default::default(),
+            backup_empfaenger: Default::default(),
         }
     }
 

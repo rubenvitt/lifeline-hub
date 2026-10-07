@@ -12,6 +12,10 @@
 //! fertig bereinigt ihren Endnamen (`backup::erzeuge_sicherung`). Reste eines harten Abbruchs
 //! räumen der Start und jeder Tick weg, die Rotation zählt sie nie. Der Task endet auf ein
 //! Stoppsignal; der Server wartet begrenzt auf ihn ([`auf_ende_warten`]).
+//!
+//! **Verschlüsselt (LFH-1002):** mit `--backup-empfaenger` heißt jede Sicherung
+//! `lifeline-auto-<zeitstempel>.sqlite.age`. Die Rotation zählt `.sqlite` und `.sqlite.age`
+//! zusammen, damit alte Klartext-Sicherungen nach dem Setzen eines Empfängers herausrotieren.
 
 use crate::error::AppError;
 use futures::FutureExt;
@@ -26,6 +30,8 @@ use tokio::task::JoinHandle;
 /// damit fremde Dateien im Zielverzeichnis unangetastet bleiben.
 const DATEI_PRAEFIX: &str = "lifeline-auto-";
 const DATEI_ENDUNG: &str = ".sqlite";
+/// Endung einer verschlüsselten automatischen Sicherung (LFH-1002).
+const DATEI_ENDUNG_AGE: &str = ".sqlite.age";
 
 /// Konfiguration der automatischen Sicherung.
 #[derive(Debug, Clone)]
@@ -36,6 +42,8 @@ pub struct BackupConfig {
     pub intervall: Duration,
     /// Wie viele Sicherungen aufgehoben werden.
     pub behalten: usize,
+    /// Öffentliche Schlüssel, an die verschlüsselt wird; leer → Klartext (LFH-1002).
+    pub empfaenger: crate::backup::Empfaenger,
 }
 
 /// Erzeugt eine Sicherung im Zielverzeichnis, rotiert alte weg und liefert den Pfad.
@@ -48,6 +56,24 @@ pub async fn tick_einmal(
     behalten: usize,
     zeitstempel: &str,
 ) -> Result<PathBuf, AppError> {
+    tick_einmal_mit(
+        pool,
+        verzeichnis,
+        behalten,
+        zeitstempel,
+        &crate::backup::Empfaenger::default(),
+    )
+    .await
+}
+
+/// Wie [`tick_einmal`], mit gesetzten `empfaenger` verschlüsselt (`.sqlite.age`, LFH-1002).
+pub async fn tick_einmal_mit(
+    pool: &SqlitePool,
+    verzeichnis: &Path,
+    behalten: usize,
+    zeitstempel: &str,
+    empfaenger: &crate::backup::Empfaenger,
+) -> Result<PathBuf, AppError> {
     std::fs::create_dir_all(verzeichnis).map_err(|e| {
         AppError::Internal(format!(
             "Backup-Verzeichnis {} nicht anlegbar: {e}",
@@ -58,24 +84,31 @@ pub async fn tick_einmal(
     // Reste eines abgebrochenen Laufs belegen Platz auf dem Medium, den die neue Sicherung
     // braucht.
     raeume_teildateien(verzeichnis);
-    let ziel = verzeichnis.join(format!("{DATEI_PRAEFIX}{zeitstempel}{DATEI_ENDUNG}"));
-    crate::backup::erzeuge_sicherung(pool, &ziel).await?;
+    let ziel = verzeichnis.join(format!(
+        "{DATEI_PRAEFIX}{zeitstempel}{}",
+        empfaenger.endung()
+    ));
+    crate::backup::erzeuge_sicherung_mit(pool, &ziel, empfaenger).await?;
     rotiere(verzeichnis, behalten)?;
     Ok(ziel)
 }
 
 /// Löscht liegengebliebene Teildateien automatischer Sicherungen (`lifeline-auto-*.sqlite.part`
-/// samt Journal) aus `verzeichnis`. Liefert die Anzahl; fremde Dateien bleiben.
+/// samt Journal, `lifeline-auto-*.sqlite.age.part`) aus `verzeichnis`. Liefert die Anzahl;
+/// fremde Dateien bleiben.
 pub fn raeume_teildateien(verzeichnis: &Path) -> usize {
     let Ok(eintraege) = std::fs::read_dir(verzeichnis) else {
         return 0;
     };
     let teil = format!("{DATEI_ENDUNG}{}", crate::backup::TEIL_ENDUNG);
+    let teil_age = format!("{DATEI_ENDUNG_AGE}{}", crate::backup::TEIL_ENDUNG);
     let mut anzahl = 0;
     for pfad in eintraege.filter_map(Result::ok).map(|e| e.path()) {
         let ist_rest = pfad.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
             n.starts_with(DATEI_PRAEFIX)
-                && (n.ends_with(&teil) || n.ends_with(&format!("{teil}-journal")))
+                && (n.ends_with(&teil)
+                    || n.ends_with(&format!("{teil}-journal"))
+                    || n.ends_with(&teil_age))
         });
         if !ist_rest {
             continue;
@@ -91,9 +124,10 @@ pub fn raeume_teildateien(verzeichnis: &Path) -> usize {
     anzahl
 }
 
-/// Löscht die ältesten automatischen Sicherungen, bis `behalten` übrig sind. Der Zeitstempel
-/// im Namen sortiert lexikographisch wie chronologisch; fremde Dateien filtert das Präfix aus,
-/// Teildateien die Endung. Die jüngste bleibt immer, auch bei `behalten = 0`.
+/// Löscht die ältesten automatischen Sicherungen, bis `behalten` übrig sind; `.sqlite` und
+/// `.sqlite.age` zählen zusammen (LFH-1002). Der Zeitstempel im Namen sortiert lexikographisch
+/// wie chronologisch; fremde Dateien filtert das Präfix aus, Teildateien die Endung. Die jüngste
+/// bleibt immer, auch bei `behalten = 0`.
 fn rotiere(verzeichnis: &Path, behalten: usize) -> Result<(), AppError> {
     let behalten = behalten.max(1);
     let Ok(eintraege) = std::fs::read_dir(verzeichnis) else {
@@ -103,9 +137,10 @@ fn rotiere(verzeichnis: &Path, behalten: usize) -> Result<(), AppError> {
         .filter_map(Result::ok)
         .map(|e| e.path())
         .filter(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with(DATEI_PRAEFIX) && n.ends_with(DATEI_ENDUNG))
+            p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                n.starts_with(DATEI_PRAEFIX)
+                    && (n.ends_with(DATEI_ENDUNG) || n.ends_with(DATEI_ENDUNG_AGE))
+            })
         })
         .collect();
     sicherungen.sort();
@@ -145,6 +180,7 @@ pub fn starte_backup_scheduler(
         verzeichnis = %verzeichnis.display(),
         intervall_sekunden = config.intervall.as_secs(),
         behalten = config.behalten,
+        verschluesselt = !config.empfaenger.ist_leer(),
         "Automatische Sicherung aktiv"
     );
 
@@ -165,7 +201,15 @@ pub fn starte_backup_scheduler(
                 }
                 _ = ticker.tick() => {
                     let zeitstempel = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-                    match tick_einmal(&pool, &verzeichnis, config.behalten, &zeitstempel).await {
+                    match tick_einmal_mit(
+                        &pool,
+                        &verzeichnis,
+                        config.behalten,
+                        &zeitstempel,
+                        &config.empfaenger,
+                    )
+                    .await
+                    {
                         Ok(pfad) => tracing::info!(datei = %pfad.display(), "Sicherung erstellt"),
                         Err(e) => tracing::error!("Automatische Sicherung fehlgeschlagen: {e}"),
                     }
@@ -370,6 +414,7 @@ mod tests {
             verzeichnis: Some(dir.to_path_buf()),
             intervall,
             behalten,
+            empfaenger: Default::default(),
         }
     }
 
@@ -409,6 +454,54 @@ mod tests {
             .await
             .expect("der Task endet auf das Stoppsignal")
             .expect("ohne Absturz");
+    }
+
+    /// LFH-1002: Mit Empfänger entsteht `.sqlite.age` mit `age`-Kopf, und die Rotation zählt alte
+    /// Klartext-Sicherungen mit, sodass sie herausrotieren.
+    #[tokio::test]
+    async fn verschluesselt_mit_empfaenger_und_rotiert_klartext_mit() {
+        let pool = crate::db::test_pool().await;
+        let dir = tempfile::tempdir().unwrap();
+        tick_einmal(&pool, dir.path(), 2, "20260101T000000Z")
+            .await
+            .unwrap();
+        let (empfaenger, _) = crate::backup::verschluesselung::tests::schluesselpaar();
+
+        for stempel in ["20260102T000000Z", "20260103T000000Z"] {
+            let pfad = tick_einmal_mit(&pool, dir.path(), 2, stempel, &empfaenger)
+                .await
+                .unwrap();
+            let bytes = std::fs::read(&pfad).unwrap();
+            assert!(bytes.starts_with(crate::backup::verschluesselung::AGE_KOPF));
+            assert!(!bytes
+                .windows(b"SQLite format 3".len())
+                .any(|w| w == b"SQLite format 3"));
+        }
+
+        assert_eq!(
+            namen(dir.path()),
+            vec![
+                "lifeline-auto-20260102T000000Z.sqlite.age",
+                "lifeline-auto-20260103T000000Z.sqlite.age"
+            ]
+        );
+    }
+
+    #[test]
+    fn aufraeumen_kennt_verschluesselte_teildateien() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in [
+            "lifeline-auto-20260101T000000Z.sqlite.age",
+            "lifeline-auto-20260102T000000Z.sqlite.age.part",
+        ] {
+            std::fs::write(dir.path().join(name), b"x").unwrap();
+        }
+
+        assert_eq!(raeume_teildateien(dir.path()), 1);
+        assert_eq!(
+            namen(dir.path()),
+            vec!["lifeline-auto-20260101T000000Z.sqlite.age"]
+        );
     }
 
     #[tokio::test]

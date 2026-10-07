@@ -43,6 +43,10 @@ time = "0.3"
 ipnet = "2"
 tokio-stream = { version = "0.1", features = ["sync"] }
 tempfile = "3"
+# Verschlüsselte Sicherungen (LFH-1002, `src/backup/verschluesselung.rs`): an öffentliche
+# X25519-Empfänger, der private Schlüssel liegt offline. Reines Rust, ohne Vorgabe-Features
+# (kein SSH, keine Plugins).
+age = { version = "0.12", default-features = false }
 sha2 = "0.11"
 base64 = "0.23"
 mime_guess = "2"

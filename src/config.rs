@@ -361,6 +361,21 @@ pub struct Config {
     )]
     pub backup_behalten: usize,
 
+    /// Öffentliche `age`-Schlüssel (`age1…`, aus `age-keygen`), an die jede Sicherung
+    /// verschlüsselt wird (LFH-1002): automatische Sicherung, `backup` und der Admin-Download.
+    /// Mehrere erlaubt (Komma-Liste), etwa Haupt- und Notfallschlüssel; jeder entschlüsselt für
+    /// sich. Der private Schlüssel gehört NICHT auf den Server.
+    ///
+    /// **Ohne Angabe** bleiben Sicherungen Klartext wie bisher, und der Start warnt einmal.
+    /// Ein ungültiger Schlüssel bricht den Start ab.
+    #[arg(
+        long,
+        env = "LIFELINE_BACKUP_EMPFAENGER",
+        value_delimiter = ',',
+        value_parser = backup_empfaenger_parsen
+    )]
+    pub backup_empfaenger: Vec<age::x25519::Recipient>,
+
     /// KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt periodisch importieren (LFH-83).
     /// **Default AN** — auch im Dev-Betrieb, damit die Ebene überall bundesweit zeigt, was
     /// sie zeigen soll. Jeder Lauf lädt rund 4–5 GB (nur, wenn der Extrakt neu ist);
@@ -547,6 +562,16 @@ fn proxy_netz_parsen(eintrag: &str) -> Result<IpNet, String> {
     Ok(netz)
 }
 
+/// Ein Eintrag der Empfänger-Liste: ein öffentlicher X25519-Schlüssel von `age`. Ein leerer
+/// Eintrag (leer gesetzte Variable, Komma am Ende) ist ein Fehler, wie bei `--trusted-proxies`:
+/// sonst hielte jemand seine Sicherungen für verschlüsselt, die es nicht sind.
+fn backup_empfaenger_parsen(eintrag: &str) -> Result<age::x25519::Recipient, String> {
+    let eintrag = eintrag.trim();
+    eintrag.parse().map_err(|_| {
+        format!("'{eintrag}' ist kein öffentlicher age-Schlüssel (age1…, aus age-keygen)")
+    })
+}
+
 impl Config {
     /// Ob Cookies prozessweit `Secure` tragen (LFH-603): bei eigenem TLS oder mit
     /// `--cookie-secure`. Eine Quelle für den Serverstart, statt `Secure` am TLS-Zweig zu hängen;
@@ -560,10 +585,16 @@ impl Config {
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
     /// Konsistente Sicherung der Datenbank erstellen (auch im laufenden Betrieb).
+    ///
+    /// Mit `--backup-empfaenger` verschlüsselt (`.age` wird an `--out` angehängt, falls es
+    /// fehlt).
     Backup {
         /// Zielpfad der Sicherungsdatei (darf noch nicht existieren).
         #[arg(long)]
         out: String,
+        /// Trotz `--backup-empfaenger` eine Klartext-Sicherung schreiben (LFH-1002).
+        #[arg(long)]
+        unverschluesselt: bool,
     },
     /// Sicherung zurückspielen — ersetzt die aktuelle Datenbank.
     Restore {
@@ -581,6 +612,11 @@ pub enum Command {
         /// Diese Unterscheidung kann nur ein Mensch treffen (LFH-251/F31).
         #[arg(long)]
         server_gestoppt: bool,
+        /// `age`-Identitätsdatei mit dem privaten Schlüssel (`AGE-SECRET-KEY-1…`) für eine
+        /// verschlüsselte Sicherung; `-` liest sie von stdin. Ist die Datei selbst mit einer
+        /// Passphrase geschützt (`age -p`), wird die Passphrase von stdin gelesen (LFH-1002).
+        #[arg(long)]
+        identitaet: Option<String>,
     },
     /// Die ins Binary einkompilierte SQLite-Version ausgeben (LFH-233/G02).
     ///
@@ -1118,6 +1154,55 @@ mod tests {
         assert!(ausgabe.contains("***"));
     }
 
+    /// LFH-1002: Empfänger als Komma-Liste über Flag oder Variable; ohne Angabe leer.
+    #[test]
+    fn backup_empfaenger_als_liste_setzbar() {
+        let haupt = age::x25519::Identity::generate().to_public().to_string();
+        let notfall = age::x25519::Identity::generate().to_public().to_string();
+
+        assert!(parse_hermetisch(["lifeline-hub"])
+            .backup_empfaenger
+            .is_empty());
+
+        let c = parse_hermetisch([
+            "lifeline-hub",
+            "--backup-empfaenger",
+            &format!("{haupt},{notfall}"),
+        ]);
+        assert_eq!(c.backup_empfaenger.len(), 2);
+        assert_eq!(c.backup_empfaenger[0].to_string(), haupt);
+
+        let c = parse_mit_env(
+            "LIFELINE_BACKUP_EMPFAENGER",
+            &format!("{haupt}, {notfall}"),
+            &["lifeline-hub"],
+        );
+        assert_eq!(c.backup_empfaenger[1].to_string(), notfall);
+    }
+
+    /// Ein Tippfehler oder ein leerer Eintrag bricht den Start ab, statt still Klartext zu
+    /// sichern; ebenso ein privater Schlüssel an der Stelle des öffentlichen.
+    #[test]
+    fn ungueltiger_backup_empfaenger_bricht_den_start_ab() {
+        let haupt = age::x25519::Identity::generate();
+        let oeffentlich = haupt.to_public().to_string();
+        let privat = {
+            use age::secrecy::ExposeSecret;
+            haupt.to_string().expose_secret().to_owned()
+        };
+        for wert in [
+            "age1kaputt".to_owned(),
+            String::new(),
+            format!("{oeffentlich},"),
+            privat,
+        ] {
+            assert!(
+                try_parse_mit_env("LIFELINE_BACKUP_EMPFAENGER", &wert, &["lifeline-hub"]).is_err(),
+                "'{wert}' muss den Start abbrechen"
+            );
+        }
+    }
+
     #[test]
     fn ohne_subkommando_ist_kein_command() {
         let config = parse_hermetisch(["lifeline-hub"]);
@@ -1128,7 +1213,7 @@ mod tests {
     fn backup_subkommando_wird_geparst() {
         let config = parse_hermetisch(["lifeline-hub", "backup", "--out", "/mnt/usb/b.sqlite"]);
         match config.command {
-            Some(Command::Backup { out }) => assert_eq!(out, "/mnt/usb/b.sqlite"),
+            Some(Command::Backup { out, .. }) => assert_eq!(out, "/mnt/usb/b.sqlite"),
             andere => panic!("erwartete Backup, fand {andere:?}"),
         }
     }
@@ -1194,6 +1279,7 @@ mod tests {
                 from,
                 force,
                 server_gestoppt,
+                ..
             }) => {
                 assert_eq!(from, "/mnt/usb/b.sqlite");
                 assert!(force);

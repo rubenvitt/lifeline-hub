@@ -2606,6 +2606,7 @@ mod finalisierung_tests {
                 reqwest::Client::new(),
             ),
             backup_download: Default::default(),
+            backup_empfaenger: Default::default(),
         };
         let url = reqwest::Url::parse("https://example.test/de.mbtiles").unwrap();
 

@@ -36,6 +36,8 @@ pub struct AppState {
     pub auto_aktualisierung: crate::karte::auto_aktualisierung::AutoAktualisierung,
     /// Lässt höchstens einen Sicherungs-Download zugleich zu (LFH-926, `GET /api/backup`).
     pub backup_download: crate::backup::DownloadSperre,
+    /// Öffentliche Schlüssel, an die `GET /api/backup` verschlüsselt (LFH-1002); leer → Klartext.
+    pub backup_empfaenger: crate::backup::Empfaenger,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
