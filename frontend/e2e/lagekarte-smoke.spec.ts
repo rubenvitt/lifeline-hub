@@ -52,27 +52,10 @@ async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
 }
 
-/** Setzt die Einsatzort-Koordinate. Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`) — deshalb
- *  aus dem Bestand gebaut. */
+/** Setzt die Einsatzort-Koordinate. Der Kopf-PATCH liest nur vorhandene Schlüssel (Teil-PATCH). */
 async function einsatzortSetzen(page: Page, eid: number, ort: { lat: number; lon: number }) {
-  const e = (await (await page.request.get(`/api/einsaetze/${eid}`)).json()) as Record<
-    string,
-    unknown
-  >;
   const antwort = await page.request.patch(`/api/einsaetze/${eid}`, {
-    data: {
-      bezeichnung: e.bezeichnung,
-      stichwort: e.stichwort ?? null,
-      einsatzart: e.einsatzart,
-      leitstellen_nr: e.leitstellen_nr ?? null,
-      einsatzort: e.einsatzort ?? null,
-      einsatzort_lat: ort.lat,
-      einsatzort_lon: ort.lon,
-      meldende_stelle: e.meldende_stelle ?? null,
-      sachverhalt: e.sachverhalt ?? null,
-      anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
-      begonnen_at: e.begonnen_at,
-    },
+    data: { einsatzort_lat: ort.lat, einsatzort_lon: ort.lon },
   });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
 }

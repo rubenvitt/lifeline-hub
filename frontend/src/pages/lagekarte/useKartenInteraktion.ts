@@ -1,6 +1,6 @@
 import { useCallback, useReducer, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { aktualisiereEinsatz, type KopfdatenUpdate } from '../../api/einsaetze';
+import { patcheEinsatz } from '../../api/einsaetze';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
 import { aktualisiereSchaden } from '../../api/einsatzSchaden';
 import { verorteEinheit } from '../../api/einheiten';
@@ -17,7 +17,7 @@ import {
   verschiebeFreiesZeichen,
 } from '../../api/freieZeichen';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { EinsatzAnzeige, ZoneTyp, FreiesZeichenUpdate } from '../../api/types';
+import type { ZoneTyp, FreiesZeichenUpdate } from '../../api/types';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
 import {
@@ -30,27 +30,6 @@ import type { ZeichenModus } from './zeichnen';
 import type { MessForm } from './messung';
 import type { PlatzierenPunktTyp } from './Sidebar';
 import { merkeZuletztVerwendet } from './zuletztVerwendet';
-
-/** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
-function kopfMitKoordinate(
-  e: EinsatzAnzeige,
-  lat: number | null,
-  lon: number | null,
-): KopfdatenUpdate {
-  return {
-    bezeichnung: e.bezeichnung,
-    stichwort: e.stichwort ?? null,
-    einsatzart: e.einsatzart,
-    leitstellen_nr: e.leitstellen_nr ?? null,
-    einsatzort: e.einsatzort ?? null,
-    einsatzort_lat: lat,
-    einsatzort_lon: lon,
-    meldende_stelle: e.meldende_stelle ?? null,
-    sachverhalt: e.sachverhalt ?? null,
-    anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
-    begonnen_at: e.begonnen_at,
-  };
-}
 
 export type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
 type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
@@ -132,7 +111,6 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
 
 interface KartenInteraktionArgs {
   einsatzId: number;
-  einsatz: EinsatzAnzeige | undefined;
   darfSchreiben: boolean;
   /**
    * Alle anwählbaren Marker: `alleVerortet` plus, bei sichtbarer Ebene, die Betroffenen, die
@@ -159,7 +137,6 @@ interface KartenInteraktionArgs {
  */
 export function useKartenInteraktion({
   einsatzId,
-  einsatz,
   darfSchreiben,
   waehlbar,
   aktiveAnsichtId,
@@ -251,7 +228,7 @@ export function useKartenInteraktion({
   // (sonst Doppel-Panel neben der ZeichnenSteuerung).
   const exklusiverModusAktiv = modus.art !== 'idle';
 
-  // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
+  // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Teil-PATCH des Kopfs, dann invalidieren).
   const verortenMutation = useMutation({
     mutationFn: async (p: { lat: number | null; lon: number | null }) => {
       if (!platzierungZiel) return;
@@ -276,8 +253,10 @@ export function useKartenInteraktion({
         // Betreuungsstelle: nur das Koordinatenpaar; der PATCH ist tri-state, ein fehlender
         // Schlüssel bleibt unverändert.
         await aendereStelle(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'einsatzort' && einsatz) {
-        await aktualisiereEinsatz(einsatzId, kopfMitKoordinate(einsatz, p.lat, p.lon));
+      } else if (platzierungZiel.typ === 'einsatzort') {
+        // Einsatzort: nur das Koordinatenpaar. Ein Kopf aus dem Cache überschriebe die
+        // gleichzeitige Änderung einer anderen Person (Leitstellen-Nr., Stichwort …).
+        await patcheEinsatz(einsatzId, { einsatzort_lat: p.lat, einsatzort_lon: p.lon });
       }
       // Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, wem der PATCH galt, unabhängig
       // vom inzwischen laufenden Modus.

@@ -212,7 +212,6 @@ export default function LagekartePage() {
   // Domänen-Daten + Marker-Ableitungen. Live liegt im EinsatzLayout; eine zweite Verbindung je
   // Seite spränge das HTTP/1.1-Limit von 6.
   const {
-    einsatz,
     darfSchreiben,
     ladt,
     markerLaden,
@@ -462,7 +461,6 @@ export default function LagekartePage() {
     zoneLoeschen,
   } = useKartenInteraktion({
     einsatzId,
-    einsatz,
     darfSchreiben,
     waehlbar,
     aktiveAnsichtId,
