@@ -55,7 +55,8 @@ jobs:
           df -h /
 
       - name: System-Werkzeuge für die nativen Crates
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+        # Über das Skript: Frist und Wiederholung gegen einen hängenden Spiegel (LFH-1101).
+        run: ./scripts/apt-pakete.sh nasm
 
       - name: Rust-Toolchain (stable + llvm-tools)
         run: |

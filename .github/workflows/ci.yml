@@ -70,8 +70,10 @@ jobs:
           fi
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
+      # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
+      # zum Job-Timeout fest (LFH-1101).
       - name: System-Werkzeuge für die nativen Crates
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+        run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -131,7 +133,7 @@ jobs:
       # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
       - name: System-Werkzeuge für die nativen Crates
         run: >-
-          sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+          ./scripts/apt-pakete.sh nasm
           libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
           librsvg2-dev libayatana-appindicator3-dev
       - name: Rust-Toolchain (stable)
@@ -166,8 +168,10 @@ jobs:
           fi
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
+      # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
+      # zum Job-Timeout fest (LFH-1101).
       - name: System-Werkzeuge für die nativen Crates
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+        run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -290,9 +294,13 @@ jobs:
           fi
       # ALLE DREI in jedem Shard: welcher Shard die Firefox- und WebKit-Fälle bekommt, entscheidet
       # Playwright nach Testzahl, das steht vorher nicht fest.
+      # `--with-deps` ruft apt-get selbst: Frist und Wiederholung wie `scripts/apt-pakete.sh`
+      # (LFH-1101). 15 min je Versuch, weil ein Lauf ohne Paket-Cache am langsamen Spiegel schon
+      # 24 min brauchte (s. o.); was ein abgebrochener Versuch geladen hat, bleibt im Archiv.
       - name: Playwright-Browser (Chromium, Firefox, WebKit)
         run: |
-          mise exec -- pnpm -C frontend exec playwright install --with-deps chromium firefox webkit
+          ./scripts/wiederholen.sh 3 900 -- \
+            mise exec -- pnpm -C frontend exec playwright install --with-deps chromium firefox webkit
           # Für den Cache (s. o.): was apt-get geladen hat, liegt danach in seinem Archiv.
           if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then
             cp /var/cache/apt/archives/*.deb ~/.cache/apt-playwright/
