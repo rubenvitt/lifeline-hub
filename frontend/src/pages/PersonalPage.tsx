@@ -267,6 +267,15 @@ export default function PersonalPage() {
    * genau dort, wo sie gebraucht wird. `position` ist eine von zwei Schreib-Bedienungen, und es
    * gibt keine Detailroute als Ausweichort. Wer sie weghaben will, nimmt
    * `spaltenAusVoreinstellung`; dann steht sie im Schalter und im Zähler.
+   *
+   * ── Gemessen gegen 1180 und 1440 (LFH-975) ──
+   *
+   * `name` fließt (`mindestBreite`, LFH-523), alle übrigen tragen eine Zahlbreite; so bricht
+   * Langtext um, statt die Tabelle zu verbreitern, und „Ruhe“ und „Entfernen“ bleiben im Bild.
+   * Unter `xl` weicht `funktion`, unter `xxl` weichen `traeger`, `fahrzeug` und `einheit` — alle
+   * über den Spaltenschalter und im Zähler. Wer eine Breite ändert, misst neu
+   * (`e2e/gate1-ueberlauf.spec.ts`, „Kräfte-Listen“): neben dem Aufklapp-Auslöser braucht die
+   * Kennung bei 1440 rund 250 px, sonst rutscht „Zeitachse“ in eine zweite Zeile.
    */
   const periodenBereit = abrufZustand(periodenQuery) === 'daten';
   const dauernJePerson = new Map<number, KraftDauern>(
@@ -285,12 +294,15 @@ export default function PersonalPage() {
       title: 'Name',
       key: 'name',
       immerSichtbar: true,
+      mindestBreite: 180,
       sortWert: (ep) => ep.name,
       suchText: (ep) => ep.name,
       // Der Deeplink der Fahrzeug-/Einheitsspalte wandert nicht hierher: nur die Titelspalte dürfte
       // `titel.ziel` tragen, und `personalPfad` zeigte auf diese Seite.
+      // `wrap`: neben dem Aufklapp-Auslöser darf die Marke unter den Namen rutschen, statt die
+      // Fließspalte über ihr Maß zu drücken (LFH-975).
       render: (_, ep) => (
-        <Space>
+        <Space wrap>
           {ep.name}
           {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
           {ep.ist_demo && <DemoMarke />}
@@ -301,6 +313,8 @@ export default function PersonalPage() {
       title: 'Funktion',
       dataIndex: 'funktion',
       key: 'funktion',
+      width: 140,
+      abBreite: 'xl',
       sortWert: (ep) => ep.funktion,
       suchText: (ep) => ep.funktion,
       render: (t) => t ?? '—',
@@ -309,12 +323,16 @@ export default function PersonalPage() {
       title: 'Träger',
       dataIndex: 'traegerorganisation',
       key: 'traeger',
+      width: 160,
+      abBreite: 'xxl',
       filter: traegerFilter,
       render: (t) => t ?? '—',
     },
     {
       title: 'Fahrzeug',
       key: 'fahrzeug',
+      width: 160,
+      abBreite: 'xxl',
       render: (_, ep) => {
         const f = ep.fahrzeug_id != null ? fahrzeugById.get(ep.fahrzeug_id) : undefined;
         if (!f) return '—';
@@ -327,6 +345,8 @@ export default function PersonalPage() {
     {
       title: 'Einheit',
       key: 'einheit',
+      width: 140,
+      abBreite: 'xxl',
       render: (_, ep) => {
         const e = ep.einheit_id != null ? einheitById.get(ep.einheit_id) : undefined;
         if (!e) return '—';
@@ -338,6 +358,7 @@ export default function PersonalPage() {
     {
       title: 'Position',
       key: 'position',
+      width: 150,
       render: (_, ep) =>
         darfSchreiben ? (
           <Select
@@ -359,6 +380,7 @@ export default function PersonalPage() {
     {
       title: 'Status',
       key: 'status',
+      width: 120,
       // Gefiltert wird über die Kategorie, nicht über `status_id`: die ID kommt aus dem
       // Mandantenkatalog und passte nicht zu den Gruppen.
       filter: {
@@ -391,6 +413,7 @@ export default function PersonalPage() {
     {
       title: 'Bemerkung',
       key: 'bemerkung',
+      width: 200,
       render: (_, ep) => (
         <BemerkungZelle
           wert={ep.bemerkung}
@@ -405,6 +428,7 @@ export default function PersonalPage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
+            width: 120,
             immerSichtbar: true,
             render: (_: unknown, ep: EinsatzPersonal) => (
               <Popconfirm

@@ -4,6 +4,7 @@ import {
   App,
   Breadcrumb,
   Button,
+  ConfigProvider,
   Form,
   Input,
   Space,
@@ -39,6 +40,7 @@ import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { KennungsLink } from '../components/kennungsLink';
+import { useViewport } from '../components/useViewport';
 
 /**
  * Gliederung der Einheiten eines Einsatzes. Die Detailansicht liegt auf eigener Route
@@ -52,6 +54,10 @@ import { KennungsLink } from '../components/kennungsLink';
  * Jeder Knoten trägt einen echten `<Link>` auf die Detailroute: das ist das Tastaturziel der Zeile
  * und macht die Gliederung deeplink-fähig. Ein `onSelect` am Baum allein wäre für die Tastatur ein
  * Umweg und für „im neuen Tab öffnen" gar kein Weg.
+ *
+ * ZWEI ZEILEN STATT `Space` (LFH-975): oben Name und Typ, darunter EINE umbrechende Zeile
+ * „Ist … · Soll … · Führer“. Ein `Space` bricht jedes Kind für sich um; am Handy standen Ist und
+ * Soll dann versetzt über drei bis vier Zeilen und ließen sich keiner Einheit sicher zuordnen.
  *
  * Der Führer ist ein Icon, kein Emoji. Das Icon des Satzes ist selbst `aria-hidden` (LFH-595);
  * die Hülle bleibt als zweite Sicherung gegen ein Vorleseziel in jeder Zeile.
@@ -67,36 +73,50 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
     (kinder.get(parent) ?? []).map((e) => ({
       key: e.id,
       title: (
-        <Space size={4}>
-          <KennungsLink to={einheitDetailPfad(einsatzId, e.id)} klein>
-            {e.name}
-          </KennungsLink>
-          {e.typ_label && <Tag>{e.typ_label}</Tag>}
+        <div
+          data-testid={`einheit-knoten-${e.id}`}
+          style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
+        >
+          <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 4 }}>
+            <KennungsLink to={einheitDetailPfad(einsatzId, e.id)} klein>
+              {e.name}
+            </KennungsLink>
+            {e.typ_label && <Tag>{e.typ_label}</Tag>}
+          </span>
           {/* Stärke als Mono-Zahl, nicht als blaues Etikett: Blau ist `bedien`, eine Stärke ist
-              eine Angabe. */}
-          <span style={{ ...monoStil(12), color: sekundaerFarbe }}>
-            <StaerkeAnzeige wert={e.ist} />
+              eine Angabe. „Ist“ steht immer dran, auch ohne Soll (LFH-975). */}
+          <span style={{ color: sekundaerFarbe, fontSize: 12 }}>
+            Ist{' '}
+            <span style={monoStil(12)}>
+              <StaerkeAnzeige wert={e.ist} />
+            </span>
             {e.soll ? (
               <>
-                {' '}
-                / Soll <StaerkeAnzeige wert={e.soll} />
+                {' · '}Soll{' '}
+                <span style={monoStil(12)}>
+                  <StaerkeAnzeige wert={e.soll} />
+                </span>
               </>
             ) : null}
+            {e.fuehrer_name && (
+              <>
+                {' · '}
+                <span aria-hidden="true">
+                  <IconPerson />
+                </span>{' '}
+                {e.fuehrer_name}
+              </>
+            )}
           </span>
-          {e.fuehrer_name && (
-            <span style={{ color: sekundaerFarbe }}>
-              <span aria-hidden="true">
-                <IconPerson />
-              </span>{' '}
-              {e.fuehrer_name}
-            </span>
-          )}
-        </Space>
+        </div>
       ),
       children: baue(e.id),
     }));
   return baue(null);
 }
+
+/** Einzug je Baumebene unter md (LFH-975), siehe den Baum unten. */
+const BAUM_EINZUG_SCHMAL = 8;
 
 /** Feldsatz des „Einheit bilden"-Dialogs — bewusst zwei Felder (siehe `bilden`). */
 interface BildenWerte {
@@ -114,6 +134,7 @@ export default function EinheitenPage() {
   const [bildenOffen, setBildenOffen] = useState(false);
   const [bildenForm] = Form.useForm<BildenWerte>();
   const { rollen } = useRollen();
+  const { istSchmal } = useViewport();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -276,8 +297,18 @@ export default function EinheitenPage() {
                 <SeitenStandVeraltet onWiederholen={() => void einheitenQuery.refetch()} />
               )}
               {/* `selectable={false}`: das Bedienziel ist der Link im Knoten, nicht die
-                  Zeilenauswahl. */}
-              <Tree treeData={baumDaten} defaultExpandAll selectable={false} />
+                  Zeilenauswahl. Unter md schrumpft nur der Einzug je Ebene (LFH-975): er folgt
+                  sonst der Titelhöhe und frisst am Handy auf zwei Ebenen rund 60 px. Der
+                  Aufklappschalter behält seine Breite, er ist ein Bedienziel. */}
+              <ConfigProvider
+                theme={
+                  istSchmal
+                    ? { components: { Tree: { indentSize: BAUM_EINZUG_SCHMAL } } }
+                    : undefined
+                }
+              >
+                <Tree treeData={baumDaten} defaultExpandAll selectable={false} />
+              </ConfigProvider>
             </>
           )}
         </Paneel>

@@ -1193,3 +1193,270 @@ test.describe('Gate 1', () => {
     }
   }
 });
+
+/*
+ * KRÄFTE-LISTEN AM DESKTOP UND AM TABLET QUER (LFH-975): Personal läuft bei 1440 und 1180 nicht
+ * über, „Ruhe“ und „Entfernen“ stehen ohne Querscrollen im Bild, und der Aufklapp-Auslöser
+ * („Zeitachse“, „Besatzung“) verdoppelt die Zeilenhöhe nicht mehr.
+ *
+ * GEMESSEN WIRD DIE BILDLAUFFLÄCHE DER TABELLE, nicht `document.body.scrollWidth`: die
+ * Katalogtabelle trägt ihren eigenen Bildlauf, das Wurzelmaß oben sieht ihren Überlauf nicht.
+ *
+ * NICHT-PRIVILEGIERT (LFH-435): ohne Schreibrecht fehlt „Entfernen“ — Vorbedingung vor der
+ * Messung —, die Messung von Überlauf, „Ruhe“ und Zeilenhöhe greift trotzdem.
+ */
+const KRAFT = 'Kirchgassner-Wohlfahrt, Maximiliane';
+/** Ein gewöhnlicher Name für die Zeilenhöhe: der lange oben darf umbrechen, dieser nicht. */
+const KRAFT_KURZ = 'Meyer, Jan';
+const KRAFT_FAHRZEUG = 'Florian Musterstadt-Nordwest 46/11-1';
+
+async function seedeKraefte(page: Page): Promise<string> {
+  const neu = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Kräfte ${Date.now()}` },
+  });
+  expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+  const einsatzId = ((await neu.json()) as { id: number }).id;
+  const post = async (pfad: string, data: unknown, was: string) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const put = async (pfad: string, was: string) => {
+    const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/${pfad}`);
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+  };
+  const fahrzeug = await post(
+    'fahrzeuge',
+    { adhoc: { funkrufname: KRAFT_FAHRZEUG, kennzeichen: 'MU-NW 4611' } },
+    'Fahrzeug',
+  );
+  const einheit = await post(
+    'einheiten',
+    { name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest' },
+    'Einheit',
+  );
+  // Lange Werte in jeder Spalte: Funktion, Träger, Fahrzeug mit Kennzeichen, Einheit.
+  const kraft = await post(
+    'personal',
+    {
+      adhoc: {
+        name: KRAFT,
+        funktion: 'Abschnittsleitung Technische Hilfeleistung',
+        traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
+      },
+    },
+    'Personal',
+  );
+  await put(`fahrzeuge/${fahrzeug.id}/besatzung/${kraft.id}`, 'Besatzung');
+  await put(`einheiten/${einheit.id}/personal/${kraft.id}`, 'Einheit');
+  await post('personal', { adhoc: { name: KRAFT_KURZ } }, 'Personal (kurz)');
+  return String(einsatzId);
+}
+
+/** Überlauf der Bildlauffläche der Tabelle in px (0 = passt). */
+async function tabellenUeberlauf(region: Locator): Promise<number> {
+  return region.evaluate((el) => {
+    const flaechen = Array.from(
+      el.querySelectorAll<HTMLElement>('.ant-table-content, .ant-table-body'),
+    );
+    if (flaechen.length === 0) throw new Error('keine Bildlauffläche der Tabelle gefunden');
+    return Math.max(...flaechen.map((f) => f.scrollWidth - f.clientWidth));
+  });
+}
+
+test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
+  test.describe.configure({ mode: 'parallel' });
+
+  // Der Fükw-Desktop hat eine Maus (`kompakt`), das Tablet quer einen Finger (`komfortabel`,
+  // `theme/dichte.ts:startDichte`); dort sind Knöpfe und Polster größer.
+  for (const { name, breite, hoehe, dichte } of [
+    { name: 'Fükw-Desktop', breite: 1440, hoehe: 900, dichte: 'kompakt' },
+    { name: 'Tablet quer', breite: 1180, hoehe: 820, dichte: 'kompakt' },
+    { name: 'Tablet quer', breite: 1180, hoehe: 820, dichte: 'komfortabel' },
+  ] as const) {
+    for (const rolle of ['admin', 'beobachter'] as const) {
+      test(`${name} (${breite} px, ${dichte}) · ${rolle}: Personal ohne Tabellenüberlauf, „Ruhe“ und Aktion im Bild`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 1366, height: 768 });
+        await anmelden(page);
+        const einsatzId = await seedeKraefte(page);
+        if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+        await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+        await page.setViewportSize({ width: breite, height: hoehe });
+        await page.goto(`/einsaetze/${einsatzId}/personal`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
+        // Inhaltsanker, nie `networkidle` (LFH-385).
+        await expect(region.getByText(KRAFT)).toBeVisible();
+        const entfernen = region.getByRole('button', { name: 'Entfernen' });
+        // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
+        await expect(entfernen).toHaveCount(rolle === 'admin' ? 2 : 0);
+
+        // Was weicht, steht im Zähler des Spaltenschalters: Träger, Fahrzeug, Einheit und die
+        // voreingestellt verborgene Bemerkung, unter `xl` (1200) auch die Funktion.
+        await expect(
+          region.getByRole('button', {
+            name: `Spalten · ${breite >= 1200 ? 4 : 5} ausgeblendet`,
+          }),
+        ).toBeVisible();
+        const ueber = await tabellenUeberlauf(region);
+        test.info().annotations.push({
+          type: 'messwert',
+          description: `Personal @${breite} ${dichte} (${rolle}): ${ueber}px Tabellenüberlauf`,
+        });
+        expect(ueber, 'Personaltabelle läuft nicht über').toBeLessThanOrEqual(1);
+        await expect(
+          region.getByRole('columnheader', { name: 'Ruhe', exact: true }),
+          '„Ruhe“ ohne Querscrollen',
+        ).toBeInViewport({ ratio: 1 });
+        if (rolle === 'admin') {
+          const erstes = entfernen.first();
+          await expect(erstes, '„Entfernen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
+          // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): die Rückfrage steht.
+          await erstes.click();
+          await expect(page.getByText('Aus Einsatz entfernen?')).toBeVisible();
+        }
+      });
+    }
+  }
+
+  for (const rolle of ['admin', 'beobachter'] as const) {
+    test(`Fükw-Desktop (1440 px) · ${rolle}: Auslöser neben der Kennung, Zeile höchstens 48 px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page);
+      const einsatzId = await seedeKraefte(page);
+      if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      const messwerte: string[] = [];
+      for (const { modul, region: regionName, kennung, etikett } of [
+        {
+          modul: 'personal',
+          region: 'Personal im Einsatz',
+          kennung: KRAFT_KURZ,
+          etikett: 'Zeitachse',
+        },
+        {
+          modul: 'fahrzeuge',
+          region: 'Fahrzeuge im Einsatz',
+          kennung: KRAFT_FAHRZEUG,
+          etikett: 'Besatzung',
+        },
+      ]) {
+        await page.goto(`/einsaetze/${einsatzId}/${modul}`);
+        const region = page.getByRole('region', { name: regionName, exact: true });
+        const zeile = region.locator('tr.ant-table-row').filter({ hasText: kennung });
+        await expect(zeile).toHaveCount(1);
+        const ausloeser = zeile.getByRole('button', { name: new RegExp(etikett) });
+        await expect(ausloeser).toHaveCount(1);
+        const name = zeile.getByText(kennung, { exact: true }).first();
+        const [z, a, n] = await Promise.all([
+          zeile.boundingBox(),
+          ausloeser.boundingBox(),
+          name.boundingBox(),
+        ]);
+        messwerte.push(`${modul}: Zeile ${z!.height}px`);
+        expect(z!.height, `${modul}: Zeilenhöhe`).toBeLessThanOrEqual(48);
+        // Dieselbe Zeile: die senkrechten Mitten liegen beieinander, der Auslöser steht rechts.
+        expect(
+          Math.abs(a!.y + a!.height / 2 - (n!.y + n!.height / 2)),
+          `${modul}: Auslöser und Kennung in einer Zeile`,
+        ).toBeLessThanOrEqual(4);
+        expect(a!.x, `${modul}: Auslöser rechts der Kennung`).toBeGreaterThan(n!.x + n!.width);
+        // Bedienbar per Tastatur: Enter klappt auf.
+        await ausloeser.focus();
+        await page.keyboard.press('Enter');
+        await expect(ausloeser).toHaveAttribute('aria-expanded', 'true');
+      }
+      test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
+    });
+  }
+
+  /*
+   * EINHEITEN-GLIEDERUNG AM HANDY: jeder Knoten ist ein Block aus zwei Zeilen, „Ist … · Soll …“
+   * steht in EINER Zeile, und der Einzug je Ebene ist schmal. Zwei Ebenen (Zug → Gruppe), damit
+   * der Einzug messbar ist.
+   */
+  for (const rolle of ['admin', 'beobachter'] as const) {
+    test(`mobil (390 px) · ${rolle}: Einheiten-Knoten zweizeilig, Ist und Soll in einer Zeile`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page);
+      const neu = await page.request.post('/api/einsaetze', {
+        data: { bezeichnung: `E2E Gliederung ${Date.now()}` },
+      });
+      expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+      const einsatzId = String(((await neu.json()) as { id: number }).id);
+      const typen = (await (await page.request.get('/api/einheit-typen')).json()) as {
+        id: number;
+        label: string;
+      }[];
+      const typ = (label: string) => typen.find((t) => t.label === label)!.id;
+      const post = async (data: unknown) => {
+        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, { data });
+        expect(antwort.ok(), `Seeding Einheit: ${await antwort.text()}`).toBeTruthy();
+        return ((await antwort.json()) as { id: number }).id;
+      };
+      const zug = await post({ name: 'Sanitätszug Musterstadt', typ_id: typ('Zug') });
+      const gruppe = await post({
+        name: 'Behandlungsgruppe Musterstadt-Nordwest',
+        typ_id: typ('Gruppe'),
+        ueber_einheit_id: zug,
+      });
+      if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`/einsaetze/${einsatzId}/einheiten`);
+      const oben = page.getByTestId(`einheit-knoten-${zug}`);
+      const unten = page.getByTestId(`einheit-knoten-${gruppe}`);
+      await expect(oben).toBeVisible();
+      await expect(unten).toBeVisible();
+      // Vorbedingung: der Rollenzweig steht.
+      await expect(page.getByRole('button', { name: 'Einheit bilden' })).toHaveCount(
+        rolle === 'admin' ? 1 : 0,
+      );
+
+      const mass = async (knoten: Locator) =>
+        knoten.evaluate((el) => {
+          const [kopf, staerke] = Array.from(el.children) as HTMLElement[];
+          const r = el.getBoundingClientRect();
+          const zeilenhoehe = parseFloat(getComputedStyle(staerke).lineHeight);
+          return {
+            links: r.left,
+            rechts: r.right,
+            zeilen: el.children.length,
+            kopfText: kopf.textContent ?? '',
+            staerkeText: staerke.textContent ?? '',
+            staerkeZeilen: Math.round(staerke.getBoundingClientRect().height / zeilenhoehe),
+          };
+        });
+      const [m1, m2] = [await mass(oben), await mass(unten)];
+      test.info().annotations.push({
+        type: 'messwert',
+        description: `Einzug ${Math.round(m2.links - m1.links)}px · ${m1.staerkeText} · ${m2.staerkeText}`,
+      });
+      for (const [m, name] of [
+        [m1, 'Zug'],
+        [m2, 'Gruppe'],
+      ] as const) {
+        expect(m.zeilen, `${name}: zwei Blöcke`).toBe(2);
+        expect(m.kopfText, `${name}: oben Name und Typ`).toContain(name);
+        expect(m.staerkeText, `${name}: Ist und Soll in EINER Zeile`).toMatch(
+          /^Ist \S+ · Soll \S+$/,
+        );
+        expect(m.staerkeZeilen, `${name}: die Stärkezeile bricht nicht um`).toBe(1);
+        expect(m.rechts, `${name}: im Bild`).toBeLessThanOrEqual(390);
+      }
+      // Der Einzug je Ebene ist schmal: antds Vorgabe folgt der Titelhöhe (24–72 px).
+      expect(m2.links - m1.links, 'Einzug der zweiten Ebene').toBeLessThanOrEqual(12);
+    });
+  }
+});
