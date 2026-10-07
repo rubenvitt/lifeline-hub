@@ -35,7 +35,7 @@ interface Messung {
  * `ant-table-cell-row-hover` aus `onMouseEnter`, nicht aus `:hover`), sieht es nicht kommen: der
  * Aufrufer sichert ihn vorher als Vorbedingung zu.
  */
-async function eingeschwungen(ziel: Locator) {
+export async function eingeschwungen(ziel: Locator) {
   await ziel.evaluate(async (element) => {
     const kette = new Set<Element>();
     for (let e: Element | null = element; e; e = e.parentElement) {
