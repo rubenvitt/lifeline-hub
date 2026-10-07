@@ -37,7 +37,8 @@ export function aktivMerkerAufraeumen(
   einsaetzeMitEntwurf: ReadonlySet<number>,
 ): void {
   const praefix = `${AKTIV_PRAEFIX}${benutzerId}-`;
-  // Gesperrter Speicher liefert keine Schlüssel: dann liegt dort auch kein Merker.
+  // Über `lib/sichererSpeicher`: ist localStorage gesperrt, liefert `sicherSchluessel` nichts,
+  // und dann liegt dort auch kein Merker.
   for (const k of sicherSchluessel()) {
     if (!k.startsWith(praefix)) continue;
     const einsatzId = Number(k.slice(praefix.length));
