@@ -8,9 +8,7 @@
 use axum::http::StatusCode;
 
 mod common;
-use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, setup, setup_mit_pool,
-};
+use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, setup, setup_mit_pool};
 
 /// Legt einen Katalog-Eintrag mit ALLEN Feldern gesetzt an und liefert seine id.
 async fn katalog_anlegen(
@@ -301,7 +299,9 @@ async fn netz_und_sicherheit_anlegen_patchen_leeren() {
         "POST",
         "/api/sprechgruppen",
         &admin,
-        Some(r#"{"bezeichnung":"314_F","betriebsart":"DMO","netz":" Gateway ","sicherheit":"E2E"}"#),
+        Some(
+            r#"{"bezeichnung":"314_F","betriebsart":"DMO","netz":" Gateway ","sicherheit":"E2E"}"#,
+        ),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
@@ -310,7 +310,14 @@ async fn netz_und_sicherheit_anlegen_patchen_leeren() {
     let u = format!("/api/sprechgruppen/{}", json["id"]);
 
     // Hinweis bearbeiten lässt Netz und Sicherheit stehen.
-    let (status, json) = anfrage(&app, "PATCH", &u, &admin, Some(r#"{"hinweis":"Gesundheit"}"#)).await;
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(r#"{"hinweis":"Gesundheit"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(json["netz"], "Gateway", "nicht gesendetes Feld bleibt");
     assert_eq!(json["sicherheit"], "E2E", "nicht gesendetes Feld bleibt");
@@ -342,7 +349,9 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
         "POST",
         "/api/sprechgruppen",
         &admin,
-        Some(&format!(r#"{{"bezeichnung":"1","betriebsart":"TMO","netz":"{lang}"}}"#)),
+        Some(&format!(
+            r#"{{"bezeichnung":"1","betriebsart":"TMO","netz":"{lang}"}}"#
+        )),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
@@ -354,7 +363,9 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
         "POST",
         "/api/sprechgruppen",
         &admin,
-        Some(&format!(r#"{{"bezeichnung":"2","betriebsart":"TMO","sicherheit":"{genau}"}}"#)),
+        Some(&format!(
+            r#"{{"bezeichnung":"2","betriebsart":"TMO","sicherheit":"{genau}"}}"#
+        )),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
@@ -369,7 +380,10 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
-    assert_eq!(json["error"], "Sicherheit darf höchstens 40 Zeichen lang sein");
+    assert_eq!(
+        json["error"],
+        "Sicherheit darf höchstens 40 Zeichen lang sein"
+    );
 
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (status, json) = anfrage(
@@ -377,7 +391,9 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
         "POST",
         &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
         &admin,
-        Some(&format!(r#"{{"bezeichnung":"9","betriebsart":"DMO","netz":"{lang}"}}"#)),
+        Some(&format!(
+            r#"{{"bezeichnung":"9","betriebsart":"DMO","netz":"{lang}"}}"#
+        )),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
@@ -398,7 +414,10 @@ async fn einsatzlokale_sprechgruppe_traegt_netz_und_sicherheit() {
     .await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
     assert_eq!(json["netz"], "Repeater");
-    assert!(json.get("sicherheit").is_none(), "leer bleibt leer: {json:?}");
+    assert!(
+        json.get("sicherheit").is_none(),
+        "leer bleibt leer: {json:?}"
+    );
 
     let (status, liste) = anfrage(
         &app,

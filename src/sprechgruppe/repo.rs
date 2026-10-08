@@ -684,10 +684,16 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let lokal_woanders =
-            anlegen_einsatz_lokal(&pool, 1, anderer_einsatz, "Sonder 9", "DMO", Zusatz::default())
-                .await
-                .unwrap();
+        let lokal_woanders = anlegen_einsatz_lokal(
+            &pool,
+            1,
+            anderer_einsatz,
+            "Sonder 9",
+            "DMO",
+            Zusatz::default(),
+        )
+        .await
+        .unwrap();
         assert!(matches!(
             setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[fremd.id])
                 .await
