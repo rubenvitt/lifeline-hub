@@ -1,3 +1,9 @@
+## [1.0.0-alpha.94](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.93...v1.0.0-alpha.94) (2026-10-08)
+
+### Datensicht
+
+**Verbesserte Übersichtlichkeit bei hierarchischen Ansichten:** In Baumansichten wie dem Kommunikationsplan und Funkplan werden neu hinzugefügte, verschobene oder umsortierte Zeilen zunächst eingeklappt und durch ein Banner gekennzeichnet. Ein Klick in die Liste oder das Bewegen der Maus bzw. des Stiftes über den Bereich öffnet diese Zeilen automatisch. Dies verhindert, dass sich die Ansicht während der Arbeit unerwartet verändert und erleichtert die Orientierung bei größeren Datenmengen. Die Funktion ist in der Druckansicht nicht aktiv.
+
 ## [1.0.0-alpha.93](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.92...v1.0.0-alpha.93) (2026-10-08)
 
 ### Führung und Kommunikation
