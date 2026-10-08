@@ -117,9 +117,9 @@ for (let i = 0; i < 40; i++) {
 const etb = (d) => anfrage(`/api/einsaetze/${eid}/etb`, 'POST', d);
 const grund = await etb({ typ: 'meldung', inhalt: 'Grundmeldung Deich Nord', von: 'Florian 1', an: 'ELW' });
 for (let i = 0; i < 510; i += 15) {
-  await Promise.all(Array.from({ length: Math.min(15, 510 - i) }, (_, j) => etb({ typ: 'meldung', inhalt: `Saatmeldung ${i + j + 1}` })));
+  await Promise.all(Array.from({ length: Math.min(15, 510 - i) }, (_, j) => etb({ typ: 'meldung', von: 'ELW 1', an: 'Leitstelle', inhalt: `Saatmeldung ${i + j + 1}` })));
 }
-const nachtrag = await etb({ typ: 'meldung', inhalt: 'Nachgetragene Meldung', ereigniszeit: new Date(Date.now() - 7200e3).toISOString() });
-const berichtigung = await etb({ typ: 'berichtigung', inhalt: 'Berichtigung: Deich Süd, nicht Nord', berichtigt_eintrag_id: grund.id });
+const nachtrag = await etb({ typ: 'meldung', von: 'ELW 1', an: 'Leitstelle', inhalt: 'Nachgetragene Meldung', ereigniszeit: new Date(Date.now() - 7200e3).toISOString() });
+const berichtigung = await etb({ typ: 'berichtigung', von: 'ELW 1', an: 'Leitstelle', inhalt: 'Berichtigung: Deich Süd, nicht Nord', berichtigt_eintrag_id: grund.id });
 out.etb = { grund: grund.lfd_nr, nachtrag: nachtrag.lfd_nr, berichtigung: berichtigung.lfd_nr };
 console.log(JSON.stringify(out));
