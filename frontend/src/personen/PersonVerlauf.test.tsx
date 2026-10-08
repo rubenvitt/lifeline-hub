@@ -95,6 +95,18 @@ describe('PersonVerlauf', () => {
     expect(zeilen[2]).toContain('Beinbruch');
   });
 
+  it('nennt die am Gerät bestätigende Person (LFH-1046)', () => {
+    const { container } = renderVerlauf({
+      ...person,
+      sichtungen: [{ ...person.sichtungen[0], bestaetigt_name: 'Dr. A. Muster' }],
+      verbleib: [{ ...person.verbleib[0], bestaetigt_name: 'Dr. B. Beispiel' }],
+    });
+    const zeilen = [...container.querySelectorAll('li')].map((li) => li.textContent ?? '');
+    expect(zeilen[0]).toContain('bestätigt: Dr. B. Beispiel');
+    expect(zeilen[2]).toContain('bestätigt: Dr. A. Muster');
+    expect(renderVerlauf(person).container.textContent).not.toContain('bestätigt');
+  });
+
   it('rendert den Zeitstempel taktisch (DTG), nicht als Wire-String', () => {
     const { container } = renderVerlauf(person);
     const text = container.textContent ?? '';

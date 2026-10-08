@@ -15,6 +15,8 @@ export interface VerbleibFormWerte {
   transportmittel?: string;
   notiz?: string;
   betreuungsstelle_id?: number | null;
+  /** Nur am UHS-Gerät (LFH-1046, `geraet/BestaetigtVonFeld`). */
+  bestaetigt_personal_id?: number | null;
 }
 
 export const VERBLEIB_ART_OPTIONEN: { value: VerbleibArt; label: string }[] = [
@@ -97,5 +99,6 @@ export function verbleibBody(
   if (stelleSichtbar && w.art === 'notunterkunft' && w.betreuungsstelle_id != null) {
     body.betreuungsstelle_id = w.betreuungsstelle_id;
   }
+  if (w.bestaetigt_personal_id != null) body.bestaetigt_personal_id = w.bestaetigt_personal_id;
   return body;
 }

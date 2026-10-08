@@ -5,11 +5,14 @@ import type { Sichtungskategorie } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import { SK_META } from './personMeta';
 
 interface SichtungWerte {
   kategorie: Sichtungskategorie;
   notiz?: string;
+  /** Nur am UHS-Gerät (LFH-1046). */
+  bestaetigt_personal_id?: number;
 }
 
 interface SichtungDialogProps {
@@ -37,7 +40,7 @@ export default function SichtungDialog({
   const fehler = useFehlerMeldung();
   const sichtungMutation = useMutation({
     mutationFn: (v: SichtungWerte) =>
-      erfasseSichtung(einsatzId, personId, v.kategorie, v.notiz ?? null),
+      erfasseSichtung(einsatzId, personId, v.kategorie, v.notiz ?? null, v.bestaetigt_personal_id),
     onSuccess: onErfasst,
     onError: fehler,
   });
@@ -64,6 +67,7 @@ export default function SichtungDialog({
       <Form.Item label="Kurzbegründung (optional)" name="notiz">
         <Input />
       </Form.Item>
+      <BestaetigtVonFeld einsatzId={einsatzId} />
     </ErfassungsModal>
   );
 }

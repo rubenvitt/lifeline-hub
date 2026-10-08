@@ -89,6 +89,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "Name und Funktion ad-hoc externer Kräfte (personal_id IS NULL)",
     },
     Ausnahme {
+        datei: "src/person/mod.rs",
+        funktion: "etb_text_bestaetigt",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Wer eine Sichtung oder einen Verbleib am Gerät namentlich bestätigt",
+    },
+    Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "aktualisieren",
         spalte: "einsatz_personal.snap_name",

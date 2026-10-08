@@ -116,6 +116,8 @@ use Markierung::{Mit, Ohne};
 const O_TIER: &str = "beschreibt das Tier bzw. seinen Fund, nicht den Halter";
 const O_UEBERGABE: &str = "Empfängerin der Übergabe, nicht die geschädigte Person";
 const O_OBJEKT: &str = "beschreibt Abschnitt bzw. Einheit, nicht die führende Person";
+const O_BESTAETIGT: &str = "Name der bestätigenden Einsatzkraft, nicht der betroffenen Person";
+const O_BEHANDELT: &str = "beschreibt die betroffene Person, nicht die bestätigende Kraft";
 const KEINE: &[(&str, Markierung)] = &[];
 
 /// Alle Personenbezüge. Reihenfolge = Ausführungsreihenfolge (reihenfolgeunabhängig korrekt).
@@ -146,7 +148,7 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         art: PersonenArt::Betroffene,
         tabelle: "person_sichtung",
         bezug: Bezug::Spalte("person_id"),
-        spalten: &[("notiz", Mit)],
+        spalten: &[("notiz", Mit), ("bestaetigt_name", Ohne(O_BESTAETIGT))],
     },
     PersonenBezug {
         art: PersonenArt::Betroffene,
@@ -158,7 +160,12 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         art: PersonenArt::Betroffene,
         tabelle: "person_verbleib",
         bezug: Bezug::Spalte("person_id"),
-        spalten: &[("transportmittel", Mit), ("ziel", Mit), ("notiz", Mit)],
+        spalten: &[
+            ("transportmittel", Mit),
+            ("ziel", Mit),
+            ("notiz", Mit),
+            ("bestaetigt_name", Ohne(O_BESTAETIGT)),
+        ],
     },
     PersonenBezug {
         art: PersonenArt::Betroffene,
@@ -243,6 +250,24 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         tabelle: "einsatz_stabsfunktion",
         bezug: Bezug::Spalte("personal_id"),
         spalten: &[("snap_name", Mit), ("bezeichnung", Mit)],
+    },
+    // Namentliche Bestätigung am Gerät (LFH-1046).
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "person_sichtung",
+        bezug: Bezug::Spalte("bestaetigt_personal_id"),
+        spalten: &[("bestaetigt_name", Mit), ("notiz", Ohne(O_BEHANDELT))],
+    },
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "person_verbleib",
+        bezug: Bezug::Spalte("bestaetigt_personal_id"),
+        spalten: &[
+            ("bestaetigt_name", Mit),
+            ("transportmittel", Ohne(O_BEHANDELT)),
+            ("ziel", Ohne(O_BEHANDELT)),
+            ("notiz", Ohne(O_BEHANDELT)),
+        ],
     },
     PersonenBezug {
         art: PersonenArt::ExterneKraft,

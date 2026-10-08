@@ -7,6 +7,12 @@ import { kurzVerbleib } from './personMeta';
 
 const { useToken } = theme;
 
+/** Namentliche Bestätigung am Gerät (LFH-1046) als Zusatz einer Verlaufszeile. */
+function Bestaetigt({ name }: { name?: string | null }) {
+  if (!name) return null;
+  return <Typography.Text type="secondary"> · bestätigt: {name}</Typography.Text>;
+}
+
 /**
  * Chronologischer Verlauf einer Person (neueste zuerst) — Sichtungen, Verlaufsnotizen und
  * Verbleib in einer Spur, für Drawer und Detailseite. Die Überschrift bleibt beim Aufrufer.
@@ -23,6 +29,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
         <span>
           <SichtungsTag kategorie={s.kategorie} />
           {s.notiz && <Typography.Text type="secondary"> — {s.notiz}</Typography.Text>}
+          <Bestaetigt name={s.bestaetigt_name} />
         </span>
       ),
     })),
@@ -41,6 +48,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       node: (
         <span>
           <Tag>Verbleib</Tag> {kurzVerbleib(v)}
+          <Bestaetigt name={v.bestaetigt_name} />
         </span>
       ),
     })),
