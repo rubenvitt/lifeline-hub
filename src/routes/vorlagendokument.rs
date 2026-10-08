@@ -2,6 +2,7 @@
 //! Die Handler selbst stehen weiter in den beiden Route-Modulen und reichen nur durch; hier
 //! liegen Rechteprüfung, Validierung, Repo-Aufruf und Live-Ereignis, für beide Arten gleich.
 
+use crate::anhang;
 use crate::app::AppState;
 use crate::auth::Benutzer;
 use crate::einsatz::berechtigung::{
@@ -11,11 +12,16 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::normalisiere_zeit;
 use crate::live::LiveEvent;
-use crate::routes::support::{pflicht, pflicht_tri};
+use crate::routes::support::{anhang_antwort, pflicht, pflicht_tri, Fassung};
+use crate::vorlagendokument::anlage::{
+    self, AnlageArt, DokumentAnlageAnzeige, NeueAnlage, ERLAUBTE_MIME_ANLAGE,
+};
 use crate::vorlagendokument::repo::{self as dok_repo, Patch};
 use crate::vorlagendokument::{vorlage, Abschnittsart, Dokumentart, STATUS_ENTWURF};
 use crate::zeit::jetzt;
-use axum::http::StatusCode;
+use axum::extract::Multipart;
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::Json;
 use serde::Deserialize;
 
@@ -41,6 +47,14 @@ fn sse_nur_inhalt<T: DokumentRoute>(state: &AppState, einsatz_id: i64, id: i64) 
     state
         .live
         .publiziere_objekt_mit(einsatz_id, T::LIVE, T::LIVE_ID, id, &["nur_inhalt"]);
+}
+
+/// SSE-Notify einer Änderung an den Anlagen (LFH-1028): `anlagen` sagt anderen Tabs, dass nur
+/// die Anlagenliste dieses Dokuments abzugleichen ist; Kopf und Text bleiben.
+fn sse_anlagen<T: DokumentRoute>(state: &AppState, einsatz_id: i64, id: i64) {
+    state
+        .live
+        .publiziere_objekt_mit(einsatz_id, T::LIVE, T::LIVE_ID, id, &["anlagen"]);
 }
 
 /// Lesezugriff (inkl. Beobachter) plus Modul-Freigabe.
@@ -278,4 +292,163 @@ pub async fn fortschreiben<T: DokumentRoute>(
         dok_repo::fortschreiben::<T>(&state.pool, einsatz_id, id, benutzer.id, &zeitstand).await?;
     sse::<T>(state, einsatz_id, dok.id);
     Ok((StatusCode::CREATED, Json(dok.into())))
+}
+
+// ── Bild-Anlagen (LFH-1028, Spec `dokument-anlagen`) ──────────────────────────────────────
+
+/// Liste der lebenden Anlagen eines Dokuments. Lesezugriff wie das Detail.
+pub async fn anlagen<T: DokumentRoute>(
+    state: &AppState,
+    benutzer: &Benutzer,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<Json<Vec<DokumentAnlageAnzeige>>, AppError> {
+    fordere_lesen::<T>(state, benutzer, einsatz_id).await?;
+    Ok(Json(anlage::liste::<T>(&state.pool, einsatz_id, id).await?))
+}
+
+/// Die Felder eines Anlagen-Uploads: `datei` (genau eine), `art`, `titel`, `stand_at`. Ein
+/// unbekanntes Feld ist 400, damit ein Tippfehler im Client nicht still eine Vorgabe greift.
+struct AnlagenUpload {
+    dateiname: String,
+    daten: Vec<u8>,
+    art: AnlageArt,
+    titel: String,
+    stand_at: String,
+}
+
+async fn lies_anlagen_upload(multipart: &mut Multipart) -> Result<AnlagenUpload, AppError> {
+    let mut datei: Option<(String, Vec<u8>)> = None;
+    let (mut art, mut titel, mut stand_at) = (None, None, None);
+    while let Some(feld) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
+    {
+        let name = feld.name().unwrap_or_default().to_string();
+        if name == "datei" {
+            let Some(dateiname) = feld.file_name().map(str::to_string) else {
+                return Err(AppError::Validation(
+                    "Das Feld „datei“ trägt keine Datei".into(),
+                ));
+            };
+            if datei.is_some() {
+                return Err(AppError::Validation("Genau eine Datei je Anlage".into()));
+            }
+            // Frühe Endungsprüfung, bevor die Bytes gelesen werden.
+            anhang::ermittle_mime_aus(&dateiname, ERLAUBTE_MIME_ANLAGE)?;
+            let daten = feld
+                .bytes()
+                .await
+                .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
+            datei = Some((dateiname, daten.to_vec()));
+            continue;
+        }
+        let ziel = match name.as_str() {
+            "art" => &mut art,
+            "titel" => &mut titel,
+            "stand_at" => &mut stand_at,
+            _ => {
+                return Err(AppError::Validation(format!(
+                    "Unbekanntes Feld «{name}» im Upload"
+                )))
+            }
+        };
+        let text = feld
+            .text()
+            .await
+            .map_err(|e| AppError::Validation(format!("Feld «{name}» unlesbar: {e}")))?;
+        if ziel.replace(text).is_some() {
+            return Err(AppError::Validation(format!("Feld «{name}» doppelt")));
+        }
+    }
+    let (dateiname, daten) =
+        datei.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))?;
+    let art = art.ok_or_else(|| AppError::Validation("Art fehlt".into()))?;
+    let art = AnlageArt::parse(art.trim())
+        .ok_or_else(|| AppError::Validation(format!("Unbekannte Anlagen-Art «{art}»")))?;
+    let titel = pflicht(titel.as_deref().unwrap_or_default(), "Titel")?;
+    let stand_at = normalisiere_zeit(
+        stand_at
+            .as_deref()
+            .ok_or_else(|| AppError::Validation("Stand fehlt".into()))?,
+    )?;
+    Ok(AnlagenUpload {
+        dateiname,
+        daten,
+        art,
+        titel,
+        stand_at,
+    })
+}
+
+/// Anlage anfügen. Reihenfolge: Gate (403/409) → Felder (400) → Typ, Größe, Scan
+/// (400/422/503) → EINE Transaktion aus Statusprüfung (404/422), Höchstzahl (409), Datei und
+/// Linker. Der Scan läuft vor der Transaktion, damit kein Schreib-Lock über die Scandauer
+/// gehalten wird.
+pub async fn anlage_ablegen<T: DokumentRoute>(
+    state: &AppState,
+    benutzer: &Benutzer,
+    einsatz_id: i64,
+    id: i64,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<DokumentAnlageAnzeige>), AppError> {
+    fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
+    anlage::tabelle::<T>()?;
+    let upload = lies_anlagen_upload(&mut multipart).await?;
+    let mime =
+        anhang::pruefe_vor_persist(&upload.dateiname, &upload.daten, ERLAUBTE_MIME_ANLAGE).await?;
+    let neu = anlage::ablegen::<T>(
+        &state.pool,
+        einsatz_id,
+        id,
+        benutzer.id,
+        &NeueAnlage {
+            art: upload.art,
+            titel: &upload.titel,
+            stand_at: &upload.stand_at,
+            dateiname: &upload.dateiname,
+            mime: &mime,
+            daten: &upload.daten,
+        },
+    )
+    .await?;
+    sse_anlagen::<T>(state, einsatz_id, id);
+    Ok((StatusCode::CREATED, Json(neu)))
+}
+
+/// Download einer Anlage (ETag/304). Der Linker-Lookup IST die Zugriffsprüfung. Ein Original
+/// gibt es nicht: das PNG entsteht im Browser und trägt keine Gerätedaten (400).
+pub async fn anlage_datei<T: DokumentRoute>(
+    state: &AppState,
+    benutzer: &Benutzer,
+    einsatz_id: i64,
+    id: i64,
+    anlage_id: i64,
+    fassung: Fassung,
+    req_headers: &HeaderMap,
+) -> Result<Response, AppError> {
+    fordere_lesen::<T>(state, benutzer, einsatz_id).await?;
+    if fassung == Fassung::Original {
+        return Err(AppError::Validation(
+            "Für Anlagen gibt es keine Originalfassung".into(),
+        ));
+    }
+    let anhang_id =
+        anlage::anhang_id_fuer_download::<T>(&state.pool, einsatz_id, id, anlage_id).await?;
+    anhang_antwort(&state.pool, anhang_id, req_headers, fassung).await
+}
+
+/// Anlage entfernen, nur im Entwurf (422 sonst). Datei und Linker gehen hart.
+pub async fn anlage_entfernen<T: DokumentRoute>(
+    state: &AppState,
+    benutzer: &Benutzer,
+    einsatz_id: i64,
+    id: i64,
+    anlage_id: i64,
+) -> Result<StatusCode, AppError> {
+    fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
+    anlage::entfernen::<T>(&state.pool, einsatz_id, id, anlage_id).await?;
+    sse_anlagen::<T>(state, einsatz_id, id);
+    Ok(StatusCode::NO_CONTENT)
 }

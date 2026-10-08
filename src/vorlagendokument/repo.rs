@@ -342,7 +342,9 @@ pub async fn freigeben_tx<T: Dokumentart>(
     }
     let v = vorlage::<T>(&dok.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
     validiere_freigabe::<T>(v, &dok.abschnitte)?;
-    let render = render_snapshot(v, &dok.titel, &dok.zeitstand, &dok.abschnitte);
+    let mut render = render_snapshot(v, &dok.titel, &dok.zeitstand, &dok.abschnitte);
+    // LFH-1028: die Anlagen stehen im selben Snapshot, gelesen in derselben Transaktion.
+    render.push_str(&super::anlage::snapshot_abschnitt::<T>(&mut *conn, einsatz_id, id).await?);
     snapshot_freigeben_tx::<T>(
         &mut *conn,
         einsatz_id,
@@ -431,8 +433,9 @@ async fn snapshot_freigeben_tx<T: Dokumentart>(
 /// Legt aus einem **freigegebenen** Dokument eine neue Entwurfs-Version an
 /// (version+1, vorgaenger_id, gleiche Vorlage, **Abschnitts-Inhalte des Vorgängers
 /// übernommen** als Ausgangspunkt — die Führungskraft bearbeitet nur die Deltas;
-/// das ETB trägt jede freigegebene Version als eigenen Snapshot). `UnprocessableEntity`,
-/// wenn der Vorgänger nicht freigegeben ist.
+/// das ETB trägt jede freigegebene Version als eigenen Snapshot). Die Anlagen des Vorgängers
+/// kommen als Kopie mit (LFH-1028, [`super::anlage::kopieren_tx`]), in derselben Transaktion.
+/// `UnprocessableEntity`, wenn der Vorgänger nicht freigegeben ist.
 pub async fn fortschreiben<T: Dokumentart>(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -440,7 +443,19 @@ pub async fn fortschreiben<T: Dokumentart>(
     ersteller_id: i64,
     zeitstand: &str,
 ) -> Result<Dokument<T::Abschnitt>, AppError> {
-    let vorher = laden::<T>(pool, einsatz_id, id).await?;
+    crate::write_retry!(pool, |conn| {
+        fortschreiben_tx::<T>(conn, einsatz_id, id, ersteller_id, zeitstand).await
+    })
+}
+
+async fn fortschreiben_tx<T: Dokumentart>(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    ersteller_id: i64,
+    zeitstand: &str,
+) -> Result<Dokument<T::Abschnitt>, AppError> {
+    let vorher = laden::<T>(&mut *conn, einsatz_id, id).await?;
     if vorher.status != STATUS_FREIGEGEBEN {
         return Err(AppError::UnprocessableEntity(format!(
             "Nur freigegebene {} können fortgeschrieben werden",
@@ -464,9 +479,10 @@ pub async fn fortschreiben<T: Dokumentart>(
     .bind(vorher.version + 1)
     .bind(id)
     .bind(ersteller_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden::<T>(pool, einsatz_id, neu_id).await
+    super::anlage::kopieren_tx::<T>(&mut *conn, einsatz_id, id, neu_id).await?;
+    laden::<T>(&mut *conn, einsatz_id, neu_id).await
 }
 
 /// Die Fälle laufen je Dokumentart einmal. Was die Arten unterscheidet, steht in `Fall` als

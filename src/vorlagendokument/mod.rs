@@ -5,6 +5,7 @@
 //! ETB-Typ und -Rückverweis, Vorlagen, Wortlaut). Ihre Wire-Typen (`Abschnitt`, `…Anzeige`)
 //! bleiben je Art eigene Structs, weil sie eigene OpenAPI-Schemanamen tragen.
 
+pub mod anlage;
 pub mod repo;
 
 use crate::error::AppError;
@@ -61,6 +62,8 @@ pub trait Dokumentart: Send + Sync + 'static {
     const NOMEN_MIT_ARTIKEL: &'static str;
     /// Nomen mit Präposition im Dativ („im Bericht“, „in der Pressemitteilung“).
     const IM_NOMEN: &'static str;
+    /// Linker der Bild-Anlagen (LFH-1028); `None` = die Art trägt keine Anlagen.
+    const ANLAGEN: Option<&'static anlage::AnlagenTabelle> = None;
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

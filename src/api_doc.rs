@@ -286,6 +286,8 @@ use utoipa::OpenApi;
         crate::schaden::SchadenKennzahlen,
         crate::schaden::SchadenAuswahl,
         crate::schaden::anhang::SchadenAnhangAnzeige,
+        crate::vorlagendokument::anlage::DokumentAnlageAnzeige,
+        crate::vorlagendokument::anlage::AnlageArt,
         crate::tier::anhang::TierAnhangAnzeige,
         crate::uhs::anhang::UhsAnhangAnzeige,
         crate::uhs::plan::UhsPlanAnzeige,

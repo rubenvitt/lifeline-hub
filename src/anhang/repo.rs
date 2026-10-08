@@ -244,6 +244,18 @@ pub const MODUL_LINKER: &[ModulLinker] = &[
         loesch_meldung: "Anhang gehört zu einer Person und wird dort entfernt",
         ort: "Person",
     },
+    // LFH-1028: Bild-Anlagen an Lagebericht und Befehl. Ohne Eintrag fiele eine Anlage dem
+    // Sweep zum Opfer und wäre generisch lad- und löschbar.
+    ModulLinker {
+        tabelle: "lagebericht_anlage",
+        loesch_meldung: "Anhang ist Anlage eines Lageberichts und wird dort entfernt",
+        ort: "Lagebericht",
+    },
+    ModulLinker {
+        tabelle: "befehl_anlage",
+        loesch_meldung: "Anhang ist Anlage eines Befehls und wird dort entfernt",
+        ort: "Befehl",
+    },
 ];
 
 /// Positiver SQL-Baustein: „der Anhang `{alias}` hängt an einem modulgebundenen Linker" —

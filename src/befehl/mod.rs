@@ -4,6 +4,7 @@ use crate::vorlagendokument::{self as kern, Abschnittsart, Dokumentart};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::vorlagendokument::anlage::AnlagenTabelle;
 pub use crate::vorlagendokument::{render_snapshot, AbschnittDef, VorlageDef};
 
 /// Befehls-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `BefehlVorlageKey`).
@@ -137,6 +138,10 @@ impl Dokumentart for Befehl {
     const NOMEN_PLURAL: &'static str = "Befehle";
     const NOMEN_MIT_ARTIKEL: &'static str = "Der Befehl";
     const IM_NOMEN: &'static str = "im Befehl";
+    const ANLAGEN: Option<&'static AnlagenTabelle> = Some(&AnlagenTabelle {
+        tabelle: "befehl_anlage",
+        dokument_spalte: "befehl_id",
+    });
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

@@ -1184,6 +1184,25 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/lageberichte/{lid}/fortschreiben",
             post(routes::lagebericht::fortschreiben),
         )
+        // LFH-1028: Bild-Anlagen; Upload mit den Grenzen der Anhang-Uploads.
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}/anlagen",
+            get(routes::lagebericht::anlagen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}/anlagen",
+            post(routes::lagebericht::anlage_ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}/anlagen/{aid}",
+            delete(routes::lagebericht::anlage_entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}/anlagen/{aid}/datei",
+            get(routes::lagebericht::anlage_datei).route_layer(download_grenze()),
+        )
         .route("/api/einsaetze/{id}/befehle", get(routes::befehl::liste))
         .route("/api/einsaetze/{id}/befehle", post(routes::befehl::anlegen))
         .route(
@@ -1201,6 +1220,25 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/befehle/{bid}/fortschreiben",
             post(routes::befehl::fortschreiben),
+        )
+        // LFH-1028: Bild-Anlagen; Upload mit den Grenzen der Anhang-Uploads.
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/anlagen",
+            get(routes::befehl::anlagen),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/anlagen",
+            post(routes::befehl::anlage_ablegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/anlagen/{aid}",
+            delete(routes::befehl::anlage_entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/anlagen/{aid}/datei",
+            get(routes::befehl::anlage_datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/karten-ansichten",

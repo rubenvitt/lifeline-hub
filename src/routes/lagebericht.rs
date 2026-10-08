@@ -9,11 +9,14 @@ use crate::extract::PfadParam;
 use crate::lagebericht::repo::{LageberichtAnzeige, LageberichtKopf};
 use crate::lagebericht::{Abschnitt, Lagebericht};
 use crate::live::LiveEvent;
+use crate::routes::support::FassungParam;
 use crate::routes::vorlagendokument::{
     self as kern, AnlegenBody, DokumentRoute, FortschreibenBody, PatchBody,
 };
-use axum::extract::State;
-use axum::http::StatusCode;
+use crate::vorlagendokument::anlage::DokumentAnlageAnzeige;
+use axum::extract::{Multipart, State};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::Json;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -82,4 +85,54 @@ pub async fn fortschreiben(
     JsonBody(body): JsonBody<FortschreibenBody>,
 ) -> Result<(StatusCode, Json<LageberichtAnzeige>), AppError> {
     kern::fortschreiben::<Lagebericht>(&state, &benutzer, einsatz_id, lid, body).await
+}
+
+/// GET /api/einsaetze/{id}/lageberichte/{lid}/anlagen — Bild-Anlagen (LFH-1028). Lesezugriff.
+pub async fn anlagen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, lid)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<DokumentAnlageAnzeige>>, AppError> {
+    kern::anlagen::<Lagebericht>(&state, &benutzer, einsatz_id, lid).await
+}
+
+/// POST /api/einsaetze/{id}/lageberichte/{lid}/anlagen — Anlage anfügen (Multipart: `datei`,
+/// `art`, `titel`, `stand_at`), nur im Entwurf.
+pub async fn anlage_ablegen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, lid)): PfadParam<(i64, i64)>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<DokumentAnlageAnzeige>), AppError> {
+    kern::anlage_ablegen::<Lagebericht>(&state, &benutzer, einsatz_id, lid, multipart).await
+}
+
+/// GET /api/einsaetze/{id}/lageberichte/{lid}/anlagen/{aid}/datei — Download (`?fassung=`).
+pub async fn anlage_datei(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, lid, aid)): PfadParam<(i64, i64, i64)>,
+    param: FassungParam,
+    req_headers: HeaderMap,
+) -> Result<Response, AppError> {
+    let fassung = param.fassung()?;
+    kern::anlage_datei::<Lagebericht>(
+        &state,
+        &benutzer,
+        einsatz_id,
+        lid,
+        aid,
+        fassung,
+        &req_headers,
+    )
+    .await
+}
+
+/// DELETE /api/einsaetze/{id}/lageberichte/{lid}/anlagen/{aid} — nur im Entwurf.
+pub async fn anlage_entfernen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, lid, aid)): PfadParam<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    kern::anlage_entfernen::<Lagebericht>(&state, &benutzer, einsatz_id, lid, aid).await
 }
