@@ -369,8 +369,8 @@ anwendbar), „nicht geprüft" ist keins.
   Kein Knopftext gleicht einem Statuswort desselben Moduls; die Texte stehen je Zielstatus in
   `kommunikation/phase.ts` (`…_HANDLUNG`) bzw. `stammdaten/dienststatus.tsx`, Guard
   `kommunikation/wortlaut.guard.test.ts`. Der Bestätigungsknopf einer Rückfrage nennt die
-  Handlung, nie nur „Ja“/„OK“ (rote `Popconfirm`: `components/rueckfrage.guard.test.ts`, mit
-  Schuldliste, die nur schrumpft). Eine fachliche Unterscheidung ist ohne Hover lesbar, ein Tooltip
+  Handlung, nie nur „Ja“/„OK“ (rote `Popconfirm`: `components/rueckfrage.guard.test.ts`, ohne
+  Ausnahmen). Eine fachliche Unterscheidung ist ohne Hover lesbar, ein Tooltip
   ergänzt nur. „Quittieren“ heißt Empfang bestätigt (Meldung, Auftrag, Fernmeldeskizze), eine
   Erinnerung „erübrigt“ sich.
 - **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) hinter

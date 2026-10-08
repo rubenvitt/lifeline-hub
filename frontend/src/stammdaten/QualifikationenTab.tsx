@@ -74,6 +74,7 @@ export default function QualifikationenTab() {
       leerText="Keine Qualifikationen"
       bearbeitenTitel="Qualifikation bearbeiten"
       deaktivierenFrage="Qualifikation deaktivieren?"
+      deaktivierenKnopf="Qualifikation deaktivieren"
       felder={felder}
     />
   );

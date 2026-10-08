@@ -108,6 +108,7 @@ export default function EinheitTypenTab() {
       leerText="Kein Einheitstyp"
       bearbeitenTitel="Typ bearbeiten"
       deaktivierenFrage="Typ deaktivieren?"
+      deaktivierenKnopf="Typ deaktivieren"
       felder={felder}
     />
   );

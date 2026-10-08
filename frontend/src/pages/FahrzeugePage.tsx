@@ -591,6 +591,7 @@ export default function FahrzeugePage() {
             render: (_: unknown, ef: EinsatzFahrzeug) => (
               <Popconfirm
                 title="Aus Einsatz entfernen?"
+                okText="Aus Einsatz entfernen"
                 onConfirm={() => entfernenMutation.mutate(ef.id)}
               >
                 {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff ist die
@@ -749,6 +750,7 @@ export default function FahrzeugePage() {
                   ? {
                       etikett: 'Entfernen',
                       bestaetigung: 'Aus Einsatz entfernen?',
+                      bestaetigungKnopf: 'Aus Einsatz entfernen',
                       onKlick: (ef) => entfernenMutation.mutate(ef.id),
                     }
                   : undefined,

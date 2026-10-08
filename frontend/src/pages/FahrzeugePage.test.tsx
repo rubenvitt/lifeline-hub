@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import FahrzeugePage from './FahrzeugePage';
@@ -618,6 +619,12 @@ describe('FahrzeugePage', () => {
       expect(knopf).not.toHaveClass('ant-btn-dangerous');
       fireEvent.click(knopf);
       expect(await screen.findByText('Aus Einsatz entfernen?')).toBeInTheDocument();
+      // Der Bestätigungsknopf nennt die Handlung, nicht antds „OK“ (LFH-1090).
+      const rueckfrage = await offeneRueckfrage();
+      expect(
+        within(rueckfrage).getByRole('button', { name: 'Aus Einsatz entfernen' }),
+      ).toBeInTheDocument();
+      expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
     });
   });
 

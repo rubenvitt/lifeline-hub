@@ -357,6 +357,7 @@ export default function MaterialPage() {
             render: (_: unknown, em: EinsatzMaterial) => (
               <Popconfirm
                 title="Aus Einsatz entfernen?"
+                okText="Aus Einsatz entfernen"
                 onConfirm={() => entfernenMutation.mutate(em.id)}
               >
                 {/* Ohne `danger`: Rot ist Gefahr, nicht Bedienung. */}
@@ -452,6 +453,7 @@ export default function MaterialPage() {
                 ? {
                     etikett: 'Entfernen',
                     bestaetigung: 'Aus Einsatz entfernen?',
+                    bestaetigungKnopf: 'Aus Einsatz entfernen',
                     onKlick: (em) => entfernenMutation.mutate(em.id),
                   }
                 : undefined,

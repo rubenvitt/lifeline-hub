@@ -377,10 +377,13 @@ export default function ZonenInspector({
                 : 'nicht gespeichert'}
           </Typography.Text>
         )}
-
-        {/* Rückfrage in jedem Fall: die Zone wird hart gelöscht. Die Warnstufen entscheiden nur
-            über den Hinweis. */}
-        {darfSchreiben && (
+      </Space>
+      {/* Rückfrage in jedem Fall: die Zone wird hart gelöscht. Die Warnstufen entscheiden nur
+          über den Hinweis. Abgesetzt unter der Reihe um `token.padding` (= `size="middle"`): die
+          neutralen Knöpfe darin (Gefahrenmatrix, Sprung ins Fachmodul) sind keine Nachbarn
+          (`aktionsabstand.guard.test.ts`, `OHNE_NACHBARSCHAFT`). */}
+      {darfSchreiben && (
+        <div style={{ marginTop: token.padding }}>
           <Popconfirm
             title={`Zone „${titel}“ aufheben?`}
             description={
@@ -388,15 +391,15 @@ export default function ZonenInspector({
                 ? 'Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren.'
                 : undefined
             }
-            okText="Aufheben"
+            okText="Zone aufheben"
             okButtonProps={{ danger: true }}
             cancelText="Abbrechen"
             onConfirm={onLoeschen}
           >
             <Button danger>Zone aufheben</Button>
           </Popconfirm>
-        )}
-      </Space>
+        </div>
+      )}
     </KartenDetailCard>
   );
 }

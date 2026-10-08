@@ -134,6 +134,7 @@ export default function EtbBausteineTab() {
                 </Button>
                 <Popconfirm
                   title="Baustein deaktivieren?"
+                  okText="Baustein deaktivieren"
                   okButtonProps={{ danger: true }}
                   onConfirm={() => deaktivieren.mutate(b.id)}
                 >

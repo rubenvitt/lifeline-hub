@@ -9,8 +9,7 @@
  * ── Was geprüft wird ────────────────────────────────────────────────────────────
  * Jede `<Popconfirm>` in einer `.tsx` unter `src/` (ohne Tests), deren Kopf `danger` trägt
  * (`okButtonProps={{ danger: true }}`), MUST ein `okText` haben, das nicht „Ja“, „OK“ oder „Ok“
- * lautet. Bekannte Altstellen stehen mit ihrer Anzahl in {@link SCHULD}; die Menge schrumpft nur:
- * eine Datei mit weniger Funden als gelistet färbt den Guard ebenso rot wie eine mit mehr.
+ * lautet. Ausnahmen gibt es keine; die Altstellen sind abgebaut (LFH-1090).
  *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
  *   • `modal.confirm(…)`, `Modal.confirm(…)` und `<Modal>`-Rückfragen;
@@ -27,20 +26,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
-
-/**
- * Altstellen mit roter Rückfrage ohne Handlungstext, je Datei die Anzahl. Abbau im Folgeticket
- * LFH-1090; neue Einträge gibt es nicht.
- */
-const SCHULD: Record<string, number> = {
-  'components/Datensicht.tsx': 1,
-  'pages/EinheitDetailPage.tsx': 1,
-  'pages/EinsatzabschnittePage.tsx': 2,
-  'pages/TiereDetailPage.tsx': 1,
-  'stammdaten/EtbBausteineTab.tsx': 1,
-  'stammdaten/KatalogVerwaltung.tsx': 1,
-  'stammdaten/StichworteTab.tsx': 1,
-};
 
 /** Bestätigungstexte, die keine Handlung nennen (normalisiert: getrimmt, klein). */
 const UNBENANNT = new Set(['ja', 'ok']);
@@ -121,8 +106,8 @@ describe('Rote Rückfragen nennen die Handlung (LFH-960)', () => {
     expect(alle.filter((k) => /\bdanger\b/.test(k)).length).toBeGreaterThan(10);
   });
 
-  it('keine neue rote Rückfrage ohne Handlungstext, und die Schuld schrumpft nur', () => {
-    expect(funde(dateien)).toEqual(SCHULD);
+  it('keine rote Rückfrage ohne Handlungstext', () => {
+    expect(funde(dateien)).toEqual({});
   });
 
   // ── Selbstbeweise ─────────────────────────────────────────────────────────────

@@ -92,7 +92,7 @@ export default function StichworteTab() {
             render: (_, v: StichwortVorschlag) => (
               <Popconfirm
                 title="Stichwort löschen?"
-                okText="Ja"
+                okText="Stichwort löschen"
                 cancelText="Abbrechen"
                 okButtonProps={{ danger: true }}
                 onConfirm={() => {
