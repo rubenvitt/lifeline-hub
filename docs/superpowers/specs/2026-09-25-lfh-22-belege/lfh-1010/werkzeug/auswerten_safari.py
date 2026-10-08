@@ -1,4 +1,4 @@
-# LFH-813: Auswertung der Druck-PDFs je Browser (Text je Seite, Bilder je Seite, Papierhelligkeit).
+# LFH-1010: Safari-Fassung der Auswertung aus LFH-813 (Text je Seite, Bilder je Seite, Papierhelligkeit).
 import json, re, subprocess, sys, tempfile
 from pathlib import Path
 from PIL import Image
