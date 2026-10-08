@@ -317,6 +317,28 @@ describe('layoutFernmeldenetz · Auto-Layout aus der Führungsorganisation', () 
     expect(ko9.y).toBe(ko8.y);
   });
 
+  it('Komponenten ragen unter ihr Band, die nächste Ebene rückt tiefer (LFH-1038 D6)', () => {
+    const F314 = sg(2, 'DMO', '314_F*');
+    const n = netz({
+      fs: [F314],
+      abschnitte: [abschnitt(1, { sprechgruppen: [F314] }), abschnitt(2)],
+      einheiten: [
+        einheit(1, { abschnitt_id: 1 }),
+        einheit(2, { abschnitt_id: 2 }),
+        einheit(3, { abschnitt_id: 2 }),
+      ],
+      skizze: {
+        komponenten: [{ id: 8, art: 'repeater', bezeichnung: null, sprechgruppen: [F314] }],
+      },
+    });
+    const { plaetze } = layoutFernmeldenetz(n);
+    const ko = platz(plaetze, 'ko-8');
+    for (const [key, p] of plaetze) {
+      if (key === 'ko-8' || key === 'sg-2') continue;
+      expect(ueberlappen(ko, p), `ko-8 / ${key}`).toBe(false);
+    }
+  });
+
   it('legt Schienen ohne Teilnehmer in eine eigene Zeile unten', () => {
     const lokal = { ...sg(9, 'DMO', '999'), einsatz_lokal: true };
     const n = baueFernmeldenetz({

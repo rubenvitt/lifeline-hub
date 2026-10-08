@@ -71,10 +71,12 @@ export function trefferboden(token: { controlHeight: number }): Trefferboden {
 }
 
 /**
- * Ein Zeigerziel der Fläche: Rechteck in Skizzeneinheiten und ein Rand in Pixeln, der nicht
- * mitzoomt (eine Schiene ist eine Linie mit einem Band nach Dichte; Stellen haben keinen Rand).
+ * Ein Zeigerziel der Fläche: Rechteck in Skizzeneinheiten und ein senkrechter Rand in Pixeln, der
+ * nicht mitzoomt (eine Schiene ist eine Linie mit einem Band nach Dichte über und unter ihr, in
+ * der Waagerechten genau so lang wie die Linie; Stellen haben keinen Rand).
  */
 export interface Zeigerziel {
+  key: string;
   x: number;
   y: number;
   breite: number;
@@ -82,13 +84,23 @@ export interface Zeigerziel {
   rand: number;
 }
 
+/** Freier Abstand zweier Ziele in Pixeln beim Maßstab `s`. */
+function freierAbstand(dx: number, dy: number, rand: number, s: number): number {
+  return Math.hypot(dx * s, Math.max(0, dy * s - rand));
+}
+
 /**
  * Kleinster Maßstab, bei dem jedes Ziel den Boden der Stufe hält (LFH-1038 D1): die kurze Seite
- * jeder Stelle und, mit Abstand, der freie Raum zwischen zwei Zielen samt ihrer Ränder. Ziele, die
- * sich berühren oder überlappen (Komponente auf ihrer Schiene, übereinander geschobene Stellen),
- * zählen nicht: kein Zoom trennt sie. Gedeckelt auf {@link ZOOM_MAX}; ohne Ziele 0.
+ * jeder Stelle und, mit Abstand, der freie Raum zwischen zwei Zielen samt ihrer Bänder. Nicht
+ * zählen Paare, die sich in Einheiten berühren oder überlappen (übereinander geschobene Stellen),
+ * und Paare, die `verbunden` nennt (Stelle und Schiene einer Stichleitung: dazwischen liegt die
+ * Stichleitung selbst als Ziel). Gedeckelt auf {@link ZOOM_MAX}; ohne Ziele 0.
  */
-export function mindestMassstab(ziele: readonly Zeigerziel[], boden: Trefferboden): number {
+export function mindestMassstab(
+  ziele: readonly Zeigerziel[],
+  boden: Trefferboden,
+  verbunden: (a: string, b: string) => boolean = () => false,
+): number {
   let s = 0;
   for (const z of ziele) {
     const kurz = Math.min(z.breite, z.hoehe);
@@ -101,8 +113,19 @@ export function mindestMassstab(ziele: readonly Zeigerziel[], boden: Trefferbode
         const b = ziele[j];
         const dx = Math.max(0, a.x - (b.x + b.breite), b.x - (a.x + a.breite));
         const dy = Math.max(0, a.y - (b.y + b.hoehe), b.y - (a.y + a.hoehe));
-        const d = Math.hypot(dx, dy);
-        if (d > 0) s = Math.max(s, (boden.abstand + a.rand + b.rand) / d);
+        if ((dx === 0 && dy === 0) || verbunden(a.key, b.key)) continue;
+        const rand = a.rand + b.rand;
+        if (freierAbstand(dx, dy, rand, s) >= boden.abstand) continue;
+        if (freierAbstand(dx, dy, rand, ZOOM_MAX) < boden.abstand) return ZOOM_MAX;
+        // Der Abstand wächst mit dem Maßstab: halbieren zwischen `s` und dem Deckel.
+        let lo = s;
+        let hi = ZOOM_MAX;
+        for (let k = 0; k < 40; k++) {
+          const m = (lo + hi) / 2;
+          if (freierAbstand(dx, dy, rand, m) >= boden.abstand) hi = m;
+          else lo = m;
+        }
+        s = hi;
       }
     }
   }

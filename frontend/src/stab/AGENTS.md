@@ -42,8 +42,10 @@ Eigenes Schreiben gibt das Element frei. Nachweis am Schirm, nie nur in SVG-Koor
 Zeigerziel (`stab/skizze/ansicht.ts:mindestMassstab`, gerechnet aus den Plätzen des Layouts; Boden
 über `trefferboden` aus dem Token: 24 px, Handschuh 72 px und 16 px Abstand). Darunter ist die
 Fläche Übersicht (`data-uebersicht`): das erste Tippen zoomt um den Punkt, Tastatur, Paneel und
-Lücken-Wahl wählen immer; keine Erklärung im UI. Komponenten mindestens `KOMPONENTE_HOEHE` hoch.
-Nachweis e2e „Prüfliste 1 und 2“; e2e wählen Elemente per Zeiger über `tippe`
+Lücken-Wahl wählen immer; keine Erklärung im UI. Abstand je Achse ohne das Band der Schiene,
+Paare mit Stichleitung zählen nicht. Komponenten mindestens `KOMPONENTE_HOEHE` hoch, ihre gezeichnete
+Höhe nur über `komponentenBildHoehe`. Linienziele (Verbindung, Stichleitung) halten den Boden in der
+Breite, nicht im Abstand. Nachweis e2e „Prüfliste 1 und 2“; e2e wählen Elemente per Zeiger über `tippe`
 (`e2e/fernmeldeskizze-kern.ts`).
 **Ausstattung im Kasten** (LFH-1029): Führungsstelle und Abschnitt tragen `ausstattung`, kleine
 Zeichen mit Wort darunter, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus). Ein

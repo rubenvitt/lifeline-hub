@@ -121,8 +121,24 @@ describe('Mindestmaßstab je Dichte-Stufe (LFH-1038 D1, D2)', () => {
   const KOMPAKT = trefferboden({ controlHeight: 30 });
   const KOMFORTABEL = trefferboden({ controlHeight: 48 });
   const HANDSCHUH = trefferboden({ controlHeight: 72 });
-  /** Zwei Einheiten untereinander (144 × 88, 16 E. Abstand) und eine Schiene 40 E. darunter. */
-  const einheit = (y: number) => ({ x: 0, y, breite: 144, hoehe: 88, rand: 0 });
+  /** Eine Einheit (144 × 88) an der Stelle `y`. */
+  const einheit = (y: number, key = `eh-${y}`) => ({
+    key,
+    x: 0,
+    y,
+    breite: 144,
+    hoehe: 88,
+    rand: 0,
+  });
+  /** Eine Schiene: Linie bei `y`, Band von 72 px. */
+  const schiene = (key: string, x: number, y: number, breite = 400) => ({
+    key,
+    x,
+    y,
+    breite,
+    hoehe: 0,
+    rand: 36,
+  });
 
   it('Böden: kompakt und komfortabel 24 px ohne Abstand, Handschuh 72 px mit 16 px', () => {
     expect(KOMPAKT).toEqual({ ziel: 24, abstand: 0 });
@@ -131,7 +147,7 @@ describe('Mindestmaßstab je Dichte-Stufe (LFH-1038 D1, D2)', () => {
   });
 
   it('die kurze Seite des kleinsten Ziels hält den Boden', () => {
-    const ziele = [einheit(0), { x: 200, y: 0, breite: 96, hoehe: 56, rand: 0 }];
+    const ziele = [einheit(0), { key: 'ko-1', x: 200, y: 0, breite: 96, hoehe: 56, rand: 0 }];
     expect(mindestMassstab(ziele, KOMPAKT)).toBeCloseTo(24 / 56);
   });
 
@@ -140,29 +156,47 @@ describe('Mindestmaßstab je Dichte-Stufe (LFH-1038 D1, D2)', () => {
     expect(mindestMassstab([einheit(0), einheit(104)], HANDSCHUH)).toBeCloseTo(1);
   });
 
-  it('Handschuh: eine Schiene zählt mit ihrem Band in Pixeln', () => {
-    const schiene = { x: 0, y: 232, breite: 400, hoehe: 0, rand: 36 };
+  it('Handschuh: eine Schiene zählt mit ihrem Band in Pixeln, senkrecht', () => {
     // Einheit unten bei 192, Linie bei 232: 40 · s − 36 ≥ 16 → s ≥ 1,3.
-    expect(mindestMassstab([einheit(104), schiene], HANDSCHUH)).toBeCloseTo(52 / 40);
+    expect(mindestMassstab([einheit(104), schiene('sg-1', 0, 232)], HANDSCHUH)).toBeCloseTo(
+      52 / 40,
+    );
     // Zwei Schienenspuren 64 E. auseinander: 64 · s − 72 ≥ 16 → s ≥ 1,375.
-    const zweite = { ...schiene, y: 296 };
-    expect(mindestMassstab([schiene, zweite], HANDSCHUH)).toBeCloseTo(88 / 64);
+    expect(
+      mindestMassstab([schiene('sg-1', 0, 232), schiene('sg-2', 0, 296)], HANDSCHUH),
+    ).toBeCloseTo(88 / 64);
+  });
+
+  it('Handschuh: waagerecht trägt das Band nichts bei', () => {
+    // Zwei Schienen in einer Spur, 16 E. auseinander: 16 · s ≥ 16 → s ≥ 1.
+    expect(
+      mindestMassstab([schiene('sg-1', 0, 232), schiene('sg-2', 416, 232)], HANDSCHUH),
+    ).toBeCloseTo(1);
+    // Schräg: 16 E. waagerecht, 40 E. senkrecht unter der Linie.
+    const s = mindestMassstab(
+      [schiene('sg-1', 0, 232), { key: 'eh-x', x: 416, y: 272, breite: 144, hoehe: 88, rand: 0 }],
+      HANDSCHUH,
+    );
+    expect(Math.hypot(16 * s, Math.max(0, 40 * s - 36))).toBeCloseTo(16, 3);
   });
 
   it('kompakt verlangt keinen Abstand, auch bei dicht stehenden Zielen', () => {
     expect(mindestMassstab([einheit(0), einheit(90)], KOMPAKT)).toBeCloseTo(24 / 88);
   });
 
-  it('berührende und überlappende Ziele zählen nicht, sie lassen sich nicht auseinanderzoomen', () => {
-    const komponenteAufLinie = { x: 400, y: 216, breite: 96, hoehe: 88, rand: 0 };
-    const schiene = { x: 0, y: 232, breite: 400, hoehe: 0, rand: 36 };
-    expect(mindestMassstab([komponenteAufLinie, schiene, einheit(0), einheit(40)], HANDSCHUH)).toBe(
-      72 / 88,
-    );
+  it('überlappende und über eine Stichleitung verbundene Ziele zählen nicht', () => {
+    // Komponente 8 E. rechts vom Ende ihrer Schiene, dazwischen die Stichleitung.
+    const komponente = { key: 'ko-1', x: 408, y: 216, breite: 96, hoehe: 88, rand: 0 };
+    const ziele = [komponente, schiene('sg-1', 0, 232), einheit(0), einheit(40)];
+    const verbunden = (a: string, b: string) =>
+      [a, b].sort().join('|') === ['ko-1', 'sg-1'].sort().join('|');
+    expect(mindestMassstab(ziele, HANDSCHUH, verbunden)).toBe(72 / 88);
+    // Ohne die Verbindung verlangten die 8 E. Lücke Maßstab 2.
+    expect(mindestMassstab(ziele, HANDSCHUH)).toBeCloseTo(2);
   });
 
   it('gedeckelt auf ZOOM_MAX, leere Skizze ohne Boden', () => {
-    const winzig = { x: 0, y: 0, breite: 4, hoehe: 4, rand: 0 };
+    const winzig = { key: 'eh-1', x: 0, y: 0, breite: 4, hoehe: 4, rand: 0 };
     expect(mindestMassstab([winzig], HANDSCHUH)).toBe(ZOOM_MAX);
     expect(mindestMassstab([], HANDSCHUH)).toBe(0);
   });

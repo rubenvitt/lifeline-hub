@@ -173,7 +173,24 @@ test('Messung 1.1: 8 × 3 eingepasst bei 1366/1024/768/390 px, kein Text ragt au
           ) as SVGTextElement[]) {
             // Lücken- und Meldungszeilen stehen bewusst unter bzw. neben dem Platz (D4).
             if (t.closest('[data-teil="luecke"]')) continue;
-            const b = t.getBBox();
+            // In den Raum des Platzes: Texte in Zeichen (Piktogramme) stehen unter einer
+            // eigenen Transformation, ihr `getBBox` allein gilt im Raum des Zeichens.
+            const roh = t.getBBox();
+            const m = el.getCTM()!.inverse().multiply(t.getCTM()!);
+            const ecken = [
+              [roh.x, roh.y],
+              [roh.x + roh.width, roh.y],
+              [roh.x, roh.y + roh.height],
+              [roh.x + roh.width, roh.y + roh.height],
+            ].map(([x, y]) => new DOMPoint(x, y).matrixTransform(m));
+            const xs = ecken.map((q) => q.x);
+            const ys = ecken.map((q) => q.y);
+            const b = {
+              x: Math.min(...xs),
+              y: Math.min(...ys),
+              width: Math.max(...xs) - Math.min(...xs),
+              height: Math.max(...ys) - Math.min(...ys),
+            };
             if (
               b.x < platz.x - 0.5 ||
               b.x + b.width > platz.x + platz.width + 0.5 ||
@@ -1181,7 +1198,11 @@ test('Prüfliste 1 und 2: die große Skizze hält je Stufe ihren Boden, darunter
     await page.setViewportSize(k.groesse);
     await oeffneSkizze(page, einsatzId, anker);
     await stelleDichte(page, k.dichte);
-    await expect(anker).toBeVisible();
+    // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
+    await oeffneSkizze(page, einsatzId, anker);
+    // Externe Stellen und Komponenten kommen aus eigenen Abfragen und können nach dem Anker da sein.
+    await expect(flaeche(page).locator('[data-key^="ks-"]')).toHaveCount(2);
+    await expect(flaeche(page).locator('[data-key^="ko-"]')).toHaveCount(2);
     if (k.groesse === FUEKW) {
       await expect(page.locator('[data-lfh="modul-panel"]'), 'Panel offen am Fükw').toBeVisible();
     }

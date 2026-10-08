@@ -386,13 +386,14 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
     const ziele: Zeigerziel[] = [];
     for (const st of netz.stellen) {
       const p = layout.plaetze.get(st.key);
-      if (p) ziele.push({ x: p.x, y: p.y, breite: p.breite, hoehe: p.hoehe, rand: 0 });
+      if (p) ziele.push({ key: st.key, x: p.x, y: p.y, breite: p.breite, hoehe: p.hoehe, rand: 0 });
     }
-    // Eine Schiene trifft mit einem Band von `controlHeight` Pixeln um ihre Linie (unten).
+    // Eine Schiene trifft mit einem Band von `controlHeight` Pixeln um ihre Linie (`schienen`).
     for (const sch of netz.schienen) {
       const p = layout.plaetze.get(sch.key);
       if (p) {
         ziele.push({
+          key: sch.key,
           x: p.x,
           y: schienenLinieY(p),
           breite: p.breite,
@@ -401,7 +402,12 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
         });
       }
     }
-    return mindestMassstab(ziele, trefferboden({ controlHeight: steuerhoehe }));
+    const paare = new Set(stichleitungen(netz).map((st) => `${st.stelle}|${st.schiene}`));
+    return mindestMassstab(
+      ziele,
+      trefferboden({ controlHeight: steuerhoehe }),
+      (a, b) => paare.has(`${a}|${b}`) || paare.has(`${b}|${a}`),
+    );
   }, [netz, layout, steuerhoehe]);
   const uebersicht = !druck && effektiv.skala < mindest - 1e-6;
   const svg = useRef<SVGSVGElement | null>(null);
@@ -512,7 +518,8 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
       return;
     }
     const ziel = e.target as Element;
-    if (ziel.getAttribute('data-teil') === 'grund') {
+    // Nur die Haupttaste verschiebt und zoomt; die rechte gehört dem Kontextmenü.
+    if (e.button === 0 && ziel.getAttribute('data-teil') === 'grund') {
       geste.current = { art: 'pan', start: lokal(e), ansicht: effektiv, bewegt: false };
       ziel.setPointerCapture?.(e.pointerId);
     }
@@ -850,6 +857,8 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
         onPointerMove={druck ? undefined : aufMove}
         onPointerUp={druck ? undefined : aufUp}
         onPointerCancel={druck ? undefined : aufUp}
+        // In der Übersicht ist kein Element Ziel, also auch kein Kontextmenü des Browsers.
+        onContextMenu={uebersicht ? (e) => e.preventDefault() : undefined}
       >
         {!druck ? (
           <rect
