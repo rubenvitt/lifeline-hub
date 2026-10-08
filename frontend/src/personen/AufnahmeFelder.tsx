@@ -6,13 +6,18 @@ import type { PersonEingabe } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
 import { parseKoordinate } from './koordinate';
 import { KoordinateFeld, VermisstSeitFeld } from './LagedatenFelder';
+import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 
 /**
  * Werte der Personen-Aufnahme: `PersonEingabe` plus Erst-Sichtung — `status` leitet der
  * Aufrufer ab, `client_id` setzt der Offline-Pfad. Ein `Form.useForm<PersonEingabe>` darüber
  * verlöre `sichtung` still.
  */
-export type AufnahmeEingabe = PersonEingabe & { sichtung?: Sichtungskategorie };
+export type AufnahmeEingabe = PersonEingabe & {
+  sichtung?: Sichtungskategorie;
+  /** Wer die Erst-Sichtung am UHS-Gerät bestätigt (LFH-1046); ohne Sichtung fällt es weg. */
+  bestaetigt_personal_id?: number | null;
+};
 
 /**
  * Die FORMULARwerte: `AufnahmeEingabe` bis auf die Koordinate, die als EIN Textfeld
@@ -29,10 +34,12 @@ export type AufnahmeWerte = Omit<AufnahmeEingabe, 'antreff_lat' | 'antreff_lon'>
  * Koordinatentext erreicht diese Funktion nicht — die Feldprüfung hält vorher an.
  */
 export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
-  const { koordinate, vermisst_seit, ...rest } = werte;
+  const { koordinate, vermisst_seit, bestaetigt_personal_id, ...rest } = werte;
   const k = koordinate && koordinate.trim() !== '' ? parseKoordinate(koordinate) : null;
   return {
     ...rest,
+    // Ohne Erst-Sichtung gibt es nichts zu bestätigen (sonst 422).
+    ...(rest.sichtung && bestaetigt_personal_id != null ? { bestaetigt_personal_id } : {}),
     ...(k?.ok ? { antreff_lat: k.lat, antreff_lon: k.lon } : {}),
     ...(vermisst_seit ? { vermisst_seit } : {}),
   };
@@ -86,7 +93,14 @@ export function skFlaechenStil(token: { controlHeight: number }): CSSProperties 
  * Eine vermisste Person ist nicht angetroffen. `POST /personen` antwortet auf `vermisst` +
  * `sichtung` mit 422 — ein Feld hier könnte nur einen Fehler erzeugen.
  */
-export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
+export default function AufnahmeFelder({
+  modus,
+  einsatzId,
+}: {
+  modus: AufnahmeModus;
+  /** Für „Bestätigt von“ am UHS-Gerät (LFH-1046); ohne Kennung kein Feld. */
+  einsatzId?: number;
+}) {
   const { token } = theme.useToken();
   const flaeche = skFlaechenStil(token);
 
@@ -108,6 +122,7 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
       )}
       {modus !== 'vermisst' && (
         <>
+          {einsatzId != null && <BestaetigtVonFeld einsatzId={einsatzId} />}
           <Form.Item label="Zustand" name="zustand">
             <Input placeholder="z. B. gehfähig, unterkühlt" />
           </Form.Item>

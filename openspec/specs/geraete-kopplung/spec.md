@@ -3,7 +3,8 @@
 ## Purpose
 Ein ausgegebenes Gerät (Tablet, Laptop, Lagemonitor) arbeitet ohne Personenkonto in genau einem
 Einsatz: gekoppelt durch die Einsatzleitung, befristet, jederzeit widerrufbar und mit eigener
-Urheberschaft in ETB und Audit.
+Urheberschaft in ETB und Audit; einzelne Schritte kann eine Person aus dem Einsatzpersonal am
+Gerät namentlich bestätigen (LFH-1046).
 
 ## Requirements
 
@@ -156,3 +157,51 @@ hat, wann sie eingelöst wurde und wann das Gerät zuletzt zugegriffen hat.
 
 - **WHEN** die Einsatzleitung die Geräteübersicht öffnet
 - **THEN** sieht sie je Kopplung Ansicht, Stelle, Status, Ablauf, Anleger und letzten Zugriff
+
+### Requirement: Namentliche Bestätigung am Gerät
+
+Ein Gerät mit UHS-Ansicht SHALL bei Sichtung, Erst-Sichtung und Verbleib optional eine Person aus
+dem Personal des Einsatzes als Bestätigende angeben können. Der Server MUST prüfen, dass die
+Angabe zum Einsatz gehört, und MUST Kennung und Namen am Schritt speichern. Die Angabe MUST NOT
+eine Sitzung anlegen, die Gerätesitzung ändern oder die Rechte des Geräts erweitern.
+
+#### Scenario: Bestätigte Sichtung im ETB
+
+- **WHEN** das Tablet der UHS Nord eine Sichtung mit „bestätigt von Dr. A. Muster“ speichert
+- **THEN** nennt der System-Eintrag im ETB „UHS Nord · Tablet 1“ als Erfasser
+- **AND** sein Text nennt „bestätigt: Dr. A. Muster“
+- **AND** der Sichtungsverlauf der Person nennt die bestätigende Person
+
+#### Scenario: Ohne Bestätigung
+
+- **WHEN** das Tablet eine Sichtung ohne Angabe speichert
+- **THEN** speichert der Server sie wie bisher, nur mit dem Gerät als Erfasser
+
+#### Scenario: Personal eines anderen Einsatzes
+
+- **WHEN** das Tablet eine Personal-Kennung eines anderen Einsatzes angibt
+- **THEN** antwortet der Server mit 422
+- **AND** speichert keine Sichtung
+
+#### Scenario: Rechte wachsen nicht
+
+- **WHEN** das Tablet nach einer bestätigten Sichtung eine Route außerhalb seiner Ansicht aufruft
+- **THEN** antwortet der Server mit 403
+- **AND** eine fremde UHS bleibt 404
+- **AND** das Sitzungscookie des Geräts ist unverändert
+
+#### Scenario: Personensitzung
+
+- **WHEN** eine angemeldete Person eine Sichtung mit Bestätigungsangabe schickt
+- **THEN** antwortet der Server mit 422
+
+### Requirement: Auswahlliste der Bestätigenden
+
+Das System SHALL Geräten mit UHS-Ansicht das Personal des Einsatzes mit Kennung, Name und
+Funktion liefern, nach Name sortiert. Der Lagemonitor und Personensitzungen MUST diese Liste nicht
+erhalten.
+
+#### Scenario: Lagemonitor und Person
+
+- **WHEN** ein Lagemonitor oder eine angemeldete Person die Auswahlliste abruft
+- **THEN** antwortet der Server mit 403

@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::geraet::bestaetigung::Bestaetigung;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
@@ -14,16 +15,22 @@ pub struct SichtungAnzeige {
     pub notiz: Option<String>,
     pub gesichtet_at: String,
     pub gesichtet_von: i64,
+    /// Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bestaetigt_name: Option<String>,
 }
 
 const SELECT_SICHTUNG: &str = "\
-    SELECT id, einsatz_id, person_id, kategorie, notiz, gesichtet_at, gesichtet_von \
+    SELECT id, einsatz_id, person_id, kategorie, notiz, gesichtet_at, gesichtet_von, \
+           bestaetigt_name \
     FROM person_sichtung";
 
 /// Erfasst eine Sichtung append-only und aktualisiert den Cache, samt optionalem Heben
 /// `erfasst→betroffen`, auf der offenen Verbindung des Aufrufers (der bündelt es mit dem
 /// System-ETB in EINE `write_retry!`-Transaktion). `kategorie` ist bereits validiert. Liefert
-/// die frische Anzeige.
+/// die frische Anzeige. `bestaetigung` ist bereits über
+/// [`crate::geraet::bestaetigung::aufloesen`] geprüft.
+#[allow(clippy::too_many_arguments)]
 pub async fn erfassen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -31,6 +38,7 @@ pub async fn erfassen_tx(
     kategorie: &str,
     notiz: Option<&str>,
     gesichtet_von: i64,
+    bestaetigung: Option<&Bestaetigung>,
     hebe_auf_betroffen: bool,
 ) -> Result<SichtungAnzeige, AppError> {
     if hebe_auf_betroffen {
@@ -46,14 +54,17 @@ pub async fn erfassen_tx(
         .await?;
     }
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO person_sichtung (einsatz_id, person_id, kategorie, notiz, gesichtet_von) \
-         VALUES (?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO person_sichtung (einsatz_id, person_id, kategorie, notiz, gesichtet_von, \
+            bestaetigt_personal_id, bestaetigt_name) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
     .bind(kategorie)
     .bind(notiz)
     .bind(gesichtet_von)
+    .bind(bestaetigung.map(|b| b.personal_id))
+    .bind(bestaetigung.map(|b| b.name.as_str()))
     .fetch_one(&mut *conn)
     .await?;
     // Cache spiegelt die jüngste Sichtung; das At-Feld übernimmt exakt deren gesichtet_at.
@@ -90,6 +101,7 @@ pub async fn erfassen(
         kategorie,
         notiz,
         gesichtet_von,
+        None,
         hebe_auf_betroffen,
     )
     .await?;

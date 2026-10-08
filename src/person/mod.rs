@@ -473,6 +473,19 @@ pub fn etb_text_sichtung(registrier_nr: i64, kategorie: Sichtungskategorie) -> S
     )
 }
 
+/// Hängt eine namentliche Bestätigung am Gerät an einen System-ETB-Text (LFH-1046):
+/// «Person R-001: Sichtung SK II, bestätigt: Dr. A. Muster». Der Name ist eine Einsatzkraft
+/// (`einsatz_personal.snap_name`), kein Wert von Betroffenen (LFH-752, Gruppe Einsatzkraft).
+pub fn etb_text_bestaetigt(
+    text: String,
+    bestaetigung: Option<&crate::geraet::bestaetigung::Bestaetigung>,
+) -> String {
+    match bestaetigung {
+        Some(b) => format!("{text}, bestätigt: {}", b.name),
+        None => text,
+    }
+}
+
 /// System-ETB des UHS-Eintritts beim Anlegen (ohne Platz, also in die Inbox).
 pub fn etb_text_uhs_aufnahme(registrier_nr: i64, uhs_bezeichnung: &str) -> String {
     format!(
