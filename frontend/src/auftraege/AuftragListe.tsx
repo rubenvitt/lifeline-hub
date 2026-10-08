@@ -6,7 +6,7 @@ import {
   FENSTER_ENDE,
   useFensterAusschnitt,
 } from '../components/fensterAusschnitt';
-import type { Auftrag } from '../api/types';
+import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import AuftragKarte from './AuftragKarte';
 
 interface AuftragListeProps {
@@ -21,6 +21,8 @@ interface AuftragListeProps {
   quittierungLaeuft?: boolean;
   quittierungZiel?: { auftragId: number; empfaengerId: number } | null;
   onQuittieren?: (auftragId: number, empfaengerId: number) => void;
+  /** Welche Empfängerzeilen quittierbar sind; ohne: alle. */
+  darfQuittierenFuer?: (empfaenger: AuftragEmpfaenger) => boolean;
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
@@ -43,6 +45,7 @@ export default function AuftragListe({
   quittierungLaeuft,
   quittierungZiel,
   onQuittieren,
+  darfQuittierenFuer,
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
@@ -76,6 +79,7 @@ export default function AuftragListe({
       // Nur die betroffene Karte sieht das Ziel; die übrigen bleiben gemerkt.
       quittierungZiel={quittierungZiel?.auftragId === a.id ? quittierungZiel : null}
       onQuittieren={onQuittieren}
+      darfQuittierenFuer={darfQuittierenFuer}
       onInArbeit={onInArbeit}
       onVollzugMelden={onVollzugMelden}
       onAbnehmen={onAbnehmen}
