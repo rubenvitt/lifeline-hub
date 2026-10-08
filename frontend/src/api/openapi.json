@@ -2275,7 +2275,7 @@
       },
       "Bindungsart": {
         "type": "string",
-        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt\n`geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0158_…`).",
+        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt\n`geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0159_…`).",
         "enum": [
           "uhs",
           "betreuungsstelle",
