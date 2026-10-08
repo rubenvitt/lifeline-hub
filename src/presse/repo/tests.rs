@@ -504,9 +504,10 @@ async fn kennzahlen_gleich_der_auszaehlung_der_vollliste() {
                 "2026-09-30 12:00:00",
                 true,
             ),
+            // Mit Leerraum erfasst: dasselbe Medium wie „dpa“.
             (
                 MedienkontaktArt::Anfrage,
-                "dpa",
+                " dpa ",
                 "2026-09-30 13:00:00",
                 true,
             ),

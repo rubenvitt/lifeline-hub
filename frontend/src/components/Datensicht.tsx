@@ -1223,11 +1223,11 @@ export default function Datensicht<T extends object, const K extends string>(
           gruppen,
           aufklappen,
           onZeileKlick,
-          serverseitig: imServermodus ? serverseitig : undefined,
+          serverseitig,
         },
         bezeichnung,
       ),
-    [spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, imServermodus, bezeichnung],
+    [spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, serverseitig, bezeichnung],
   );
   const befundSchluessel = befunde.join(' | ');
   useEffect(() => {

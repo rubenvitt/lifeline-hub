@@ -88,6 +88,8 @@ und jeder Freitext des Presse-Logs (Medium, Thema, Antwort, Freigabeangabe; Lini
 werden geschwärzt, `rueckruf` und `antwort` per `PlatzhalterWennGesetzt`; die Medienlage
 (`stab/medienlage.ts`, „Aus S5 übernehmen“ im Lagevortrag, Quelle `stab/medienlageQuelle.ts` des
 Übernahme-Bausteins,
-`frontend/src/entwurf/AGENTS.md`) nimmt nie Namen, Nummern oder Thema. **Nicht offline**: die
+`frontend/src/entwurf/AGENTS.md`) nimmt nie Namen, Nummern oder Thema; ihre Kontaktzahlen und
+Medien kommen aus `…/medienkontakte/kennzahlen` über den ganzen Bestand, nicht aus der
+geladenen Liste (LFH-1075). Das Presse-Log lädt offene ganz, erledigte seitenweise. **Nicht offline**: die
 Keys fehlen in `LAGEBILD_OFFLINE` (LFH-767). Informationstelefon: Vollliste mit eigener
 Zufluss-Schleuse (`infotelefon/zufluss.ts`), Zählung aus derselben Menge (serverseitig LFH-862).
