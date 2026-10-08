@@ -5,6 +5,9 @@ use tower::ServiceExt; // stellt `oneshot` bereit
 mod common;
 use common::{anfrage, login_cookie, setup, setup_mit_pool};
 
+/// Body für `enroll/start` (LFH-1013): das aktuelle Passwort des Seed-Admins.
+const ADMIN_PASSWORT: &str = r#"{"passwort":"startpw12"}"#;
+
 /// Sendet ein Login und gibt den `Set-Cookie`-Header-Wert zurück.
 async fn login(
     app: &axum::Router,
@@ -947,7 +950,14 @@ async fn totp_enroll_start_liefert_otpauth_url_und_speichert_secret_inaktiv() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        &admin,
+        Some(ADMIN_PASSWORT),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 
     let otpauth_url = json["otpauth_url"].as_str().expect("otpauth_url erwartet");
@@ -983,7 +993,14 @@ async fn totp_enroll_finish_mit_gueltigem_code_aktiviert_mfa_und_liefert_10_reco
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        &admin,
+        Some(ADMIN_PASSWORT),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let secret = json["secret_base32"].as_str().unwrap().to_string();
 
@@ -1034,7 +1051,14 @@ async fn totp_enroll_finish_mit_falschem_code_ist_422_und_aktiviert_nicht() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        &admin,
+        Some(ADMIN_PASSWORT),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let secret = json["secret_base32"].as_str().unwrap().to_string();
 
@@ -1075,7 +1099,14 @@ async fn totp_enroll_finish_mit_falschem_code_ist_422_und_aktiviert_nicht() {
 #[tokio::test]
 async fn totp_enroll_start_ohne_session_ist_401() {
     let app = setup().await;
-    let (status, _) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", "", None).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        "",
+        Some(ADMIN_PASSWORT),
+    )
+    .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
@@ -1106,7 +1137,14 @@ async fn totp_enroll_start_bei_aktivem_totp_ist_422_und_laesst_mfa_unveraendert(
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (secret_vor, _) = totp_fuer_admin_aktivieren(&app, &admin).await;
 
-    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        &admin,
+        Some(ADMIN_PASSWORT),
+    )
+    .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(
         json.get("secret_base32").is_none(),
@@ -1165,7 +1203,14 @@ async fn totp_enroll_finish_fehler_beim_speichern_der_recovery_codes_laesst_mfa_
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        &admin,
+        Some(ADMIN_PASSWORT),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let secret = json["secret_base32"].as_str().unwrap().to_string();
 
@@ -1216,7 +1261,7 @@ async fn totp_fuer_admin_aktivieren(
         "POST",
         "/api/auth/totp/enroll/start",
         admin_cookie,
-        None,
+        Some(ADMIN_PASSWORT),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -1664,7 +1709,14 @@ async fn derselbe_gueltige_totp_code_wird_beim_zweiten_login_abgelehnt() {
 async fn der_enrollment_code_gilt_nicht_fuer_den_login() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        &admin,
+        Some(ADMIN_PASSWORT),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let secret = json["secret_base32"].as_str().unwrap().to_string();
     let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();

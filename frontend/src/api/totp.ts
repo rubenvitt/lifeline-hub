@@ -3,10 +3,11 @@ import { apiSend } from './client';
 
 /** POST /api/auth/totp/enroll/start: beginnt ein TOTP-Enrollment für den angemeldeten Nutzer
  *  (oder ein noch nicht bestätigtes neu). Liefert das frische, noch NICHT aktive Secret:
- *  `otpauth_url` für den QR-Code, `secret_base32` als Klartext-Fallback. Bei aktivem TOTP 422
- *  (LFH-794). */
-export function enrollStart(): Promise<TotpEnrollStart> {
-  return apiSend<TotpEnrollStart>('/api/auth/totp/enroll/start', 'POST');
+ *  `otpauth_url` für den QR-Code, `secret_base32` als Klartext-Fallback. Verlangt das aktuelle
+ *  Passwort (LFH-1013): falsch oder SSO-only-Konto 422, leer 400, Passwort-Provider aus 403. Bei
+ *  aktivem TOTP 422 (LFH-794). */
+export function enrollStart(passwort: string): Promise<TotpEnrollStart> {
+  return apiSend<TotpEnrollStart>('/api/auth/totp/enroll/start', 'POST', { passwort });
 }
 
 /** POST /api/auth/totp/enroll/finish: bestätigt das Enrollment mit einem gültigen Code und

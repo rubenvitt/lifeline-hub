@@ -18,11 +18,12 @@ import { fehlerText } from '../api/client';
 import { providerListe } from '../api/auth';
 import { ladeOrganisation } from '../api/organisation';
 import { globalKeys } from '../api/queryKeys';
-import { enrollFinish, enrollStart } from '../api/totp';
+import { enrollFinish } from '../api/totp';
 import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from '../api/webauthn';
-import type { AuthProvider } from '../api/types';
+import type { AuthProvider, TotpEnrollStart } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import PasswortAendernDialog from '../auth/PasswortAendernDialog';
+import TotpPasswortDialog from '../auth/TotpPasswortDialog';
 import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from '../huelle/faehigkeiten';
 
 interface TotpCodeWerte {
@@ -74,6 +75,7 @@ export default function ProfilPage() {
   const [totpEnrollment, setTotpEnrollment] = useState<TotpEnrollment | null>(null);
   const [totpFehler, setTotpFehler] = useState<string | null>(null);
   const [totpLaedt, setTotpLaedt] = useState(false);
+  const [totpDialogOffen, setTotpDialogOffen] = useState(false);
   /** Riegel gegen zwei gleichzeitige `enrollFinish` — s. `totpBestaetigen`. */
   const sendetRef = useRef(false);
   // Die Recovery-Codes gibt der Server nur einmal zurück (bei `enrollFinish`) — lokaler State,
@@ -99,7 +101,9 @@ export default function ProfilPage() {
   const passwortAktiv = provider.some((p) => p.typ === 'passwort' && p.aktiviert);
   // Ein SSO-only-Konto hat kein lokales Passwort und könnte kein „bisheriges“ nennen; der Server
   // antwortete mit 422. Kein toter Knopf (LFH-370): ohne lokales Passwort kein Abschnitt (LFH-828).
-  const passwortWechselMoeglich = passwortAktiv && (benutzer?.passwort_gesetzt ?? false);
+  // Dieselbe Bedingung gilt für die TOTP-Einrichtung (LFH-1013): sie verlangt das aktuelle
+  // Passwort, und der Zweitfaktor schützt ohnehin nur die Passwort-Anmeldung.
+  const lokalesPasswortNutzbar = passwortAktiv && (benutzer?.passwort_gesetzt ?? false);
   // WebAuthn verlangt einen Secure Context (https/localhost); ohne ihn scheiterte
   // `navigator.credentials.create`, bevor eine Ceremony beginnt. Der Knopf erscheint nur, wenn er
   // funktionieren kann.
@@ -129,20 +133,12 @@ export default function ProfilPage() {
     }
   }
 
-  // Startet ein TOTP-Enrollment. Ein erneuter Start überschreibt serverseitig nur ein noch nicht
-  // bestätigtes Secret; bei aktivem TOTP lehnt der Server ab (422, LFH-794), ein Gerätewechsel
-  // braucht den Admin-Reset.
-  async function totpEinrichtenStarten() {
+  // Ein TOTP-Enrollment startet erst nach dem aktuellen Passwort (`TotpPasswortDialog`, LFH-1013).
+  // Ein erneuter Start überschreibt serverseitig nur ein noch nicht bestätigtes Secret; bei aktivem
+  // TOTP lehnt der Server ab (422, LFH-794), ein Gerätewechsel braucht den Admin-Reset.
+  function totpGestartet(start: TotpEnrollStart) {
     setTotpFehler(null);
-    setTotpLaedt(true);
-    try {
-      const start = await enrollStart();
-      setTotpEnrollment({ otpauthUrl: start.otpauth_url, secretBase32: start.secret_base32 });
-    } catch (e) {
-      setTotpFehler(fehlerText(e, 'Einrichtung des zweiten Faktors fehlgeschlagen'));
-    } finally {
-      setTotpLaedt(false);
-    }
+    setTotpEnrollment({ otpauthUrl: start.otpauth_url, secretBase32: start.secret_base32 });
   }
 
   async function totpBestaetigen(werte: TotpCodeWerte) {
@@ -204,7 +200,7 @@ export default function ProfilPage() {
 
         <Paneel titel="Sicherheit" koerperPolster>
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
-            {passwortWechselMoeglich && (
+            {lokalesPasswortNutzbar && (
               <section style={{ maxWidth: 480 }}>
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
                   Passwort
@@ -257,120 +253,131 @@ export default function ProfilPage() {
               </section>
             )}
 
-            <section style={{ maxWidth: 480 }}>
-              <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
-                Zweiter Faktor (Code aus App)
-              </Augenbraue>
+            {/* Ohne nutzbares lokales Passwort keine Einrichtung (LFH-1013); ein schon aktiver
+                Zweitfaktor und frisch ausgegebene Codes bleiben sichtbar. */}
+            {(totpAktiv || recoveryCodes != null || lokalesPasswortNutzbar) && (
+              <section style={{ maxWidth: 480 }}>
+                <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
+                  Zweiter Faktor (Code aus App)
+                </Augenbraue>
 
-              {recoveryCodes && (
-                <Alert
-                  type="warning"
-                  showIcon
-                  style={{ marginBottom: 16 }}
-                  // `title` statt des in antd 6 abgelösten `message`.
-                  title="Wiederherstellungscodes jetzt sichern"
-                  description={
-                    <div>
-                      <Typography.Paragraph style={{ marginBottom: 8 }}>
-                        Nur jetzt sichtbar. Einziger Zugang bei Geräteverlust; jeder Code gilt
-                        einmal.
-                      </Typography.Paragraph>
-                      <pre
-                        style={{
-                          background: rollen.flaeche2,
-                          padding: 12,
-                          borderRadius: 0,
-                          ...monoStil(13),
-                          marginBottom: 8,
-                          whiteSpace: 'pre-wrap',
-                        }}
-                      >
-                        {recoveryCodes.join('\n')}
-                      </pre>
-                      {/* `block` statt Klein-Angabe: der einzige Ein-Klick-Weg zu Codes, die
+                {recoveryCodes && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    // `title` statt des in antd 6 abgelösten `message`.
+                    title="Wiederherstellungscodes jetzt sichern"
+                    description={
+                      <div>
+                        <Typography.Paragraph style={{ marginBottom: 8 }}>
+                          Nur jetzt sichtbar. Einziger Zugang bei Geräteverlust; jeder Code gilt
+                          einmal.
+                        </Typography.Paragraph>
+                        <pre
+                          style={{
+                            background: rollen.flaeche2,
+                            padding: 12,
+                            borderRadius: 0,
+                            ...monoStil(13),
+                            marginBottom: 8,
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {recoveryCodes.join('\n')}
+                        </pre>
+                        {/* `block` statt Klein-Angabe: der einzige Ein-Klick-Weg zu Codes, die
                           nur einmal angezeigt werden. Ohne Zwischenablage kein toter Knopf,
                           sondern der Zustand; das `<pre>` darüber bleibt markierbar (LFH-1078). */}
-                      {kopierenMoeglich ? (
-                        <Button block onClick={recoveryCodesKopieren}>
-                          Codes kopieren
-                        </Button>
-                      ) : (
-                        <Typography.Text type="secondary">
-                          Keine Zwischenablage auf dieser Verbindung
-                        </Typography.Text>
-                      )}
-                    </div>
-                  }
-                />
-              )}
-
-              {totpFehler && (
-                <Alert type="error" title={totpFehler} showIcon style={{ marginBottom: 12 }} />
-              )}
-
-              {totpAktiv ? (
-                <>
-                  <Alert
-                    type="success"
-                    title="Zweiter Faktor aktiv"
-                    showIcon
-                    style={{ marginBottom: 8 }}
+                        {kopierenMoeglich ? (
+                          <Button block onClick={recoveryCodesKopieren}>
+                            Codes kopieren
+                          </Button>
+                        ) : (
+                          <Typography.Text type="secondary">
+                            Keine Zwischenablage auf dieser Verbindung
+                          </Typography.Text>
+                        )}
+                      </div>
+                    }
                   />
-                  <Typography.Paragraph type="secondary">
-                    Abschalten kann nur ein Administrator.
-                  </Typography.Paragraph>
-                </>
-              ) : totpEnrollment ? (
-                <div>
-                  <Typography.Paragraph strong>QR-Code scannen</Typography.Paragraph>
-                  <div
-                    style={{
-                      // Ein QR-Code braucht hellen Grund, auch im Nachtbetrieb — Scanner lesen
-                      // dunkle Module auf hellem Feld. Grund und Ruhezone (4 Module, `marginSize`)
-                      // trägt das SVG selbst (`bgColor`-Vorgabe der Bibliothek); die Hülle nimmt
-                      // nur die Modus-Rolle.
-                      background: rollen.flaeche,
-                      width: 'fit-content',
-                      marginBottom: token.marginSM,
-                    }}
-                  >
-                    <QRCodeSVG value={totpEnrollment.otpauthUrl} size={200} marginSize={4} />
-                  </div>
-                  {/* Kopieren über einen Knopf der Dichte-Staffel statt `copyable` (LFH-763). */}
-                  <div style={{ marginBottom: token.marginSM }}>
-                    <KopierbarerText text={totpEnrollment.secretBase32} bezeichnung="Schlüssel">
-                      Schlüssel zur manuellen Eingabe: <code>{totpEnrollment.secretBase32}</code>
-                    </KopierbarerText>
-                  </div>
-                  <Form
-                    layout="vertical"
-                    form={totpForm}
-                    onFinish={totpBestaetigen}
-                    disabled={totpLaedt}
-                    requiredMark={false}
-                  >
-                    <Form.Item
-                      label="Code aus deiner Authenticator-App"
-                      name="code"
-                      rules={[{ required: true, message: 'Bitte Code eingeben' }]}
+                )}
+
+                {totpFehler && (
+                  <Alert type="error" title={totpFehler} showIcon style={{ marginBottom: 12 }} />
+                )}
+
+                {totpAktiv ? (
+                  <>
+                    <Alert
+                      type="success"
+                      title="Zweiter Faktor aktiv"
+                      showIcon
+                      style={{ marginBottom: 8 }}
+                    />
+                    <Typography.Paragraph type="secondary">
+                      Abschalten kann nur ein Administrator.
+                    </Typography.Paragraph>
+                  </>
+                ) : totpEnrollment ? (
+                  <div>
+                    <Typography.Paragraph strong>QR-Code scannen</Typography.Paragraph>
+                    <div
+                      style={{
+                        // Ein QR-Code braucht hellen Grund, auch im Nachtbetrieb — Scanner lesen
+                        // dunkle Module auf hellem Feld. Grund und Ruhezone (4 Module, `marginSize`)
+                        // trägt das SVG selbst (`bgColor`-Vorgabe der Bibliothek); die Hülle nimmt
+                        // nur die Modus-Rolle.
+                        background: rollen.flaeche,
+                        width: 'fit-content',
+                        marginBottom: token.marginSM,
+                      }}
                     >
-                      {/* Dasselbe Primitiv wie auf der Anmeldeseite (Ziffern-Tastatur,
+                      <QRCodeSVG value={totpEnrollment.otpauthUrl} size={200} marginSize={4} />
+                    </div>
+                    {/* Kopieren über einen Knopf der Dichte-Staffel statt `copyable` (LFH-763). */}
+                    <div style={{ marginBottom: token.marginSM }}>
+                      <KopierbarerText text={totpEnrollment.secretBase32} bezeichnung="Schlüssel">
+                        Schlüssel zur manuellen Eingabe: <code>{totpEnrollment.secretBase32}</code>
+                      </KopierbarerText>
+                    </div>
+                    <Form
+                      layout="vertical"
+                      form={totpForm}
+                      onFinish={totpBestaetigen}
+                      disabled={totpLaedt}
+                      requiredMark={false}
+                    >
+                      <Form.Item
+                        label="Code aus deiner Authenticator-App"
+                        name="code"
+                        rules={[{ required: true, message: 'Bitte Code eingeben' }]}
+                      >
+                        {/* Dasselbe Primitiv wie auf der Anmeldeseite (Ziffern-Tastatur,
                           Längengrenze, Ziffern-Optik). */}
-                      <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
-                    </Form.Item>
-                    <Button type="primary" htmlType="submit" loading={totpLaedt}>
-                      Bestätigen
-                    </Button>
-                  </Form>
-                </div>
-              ) : (
-                <>
-                  <Button onClick={totpEinrichtenStarten} loading={totpLaedt}>
-                    Zweiten Faktor einrichten
-                  </Button>
-                </>
-              )}
-            </section>
+                        <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
+                      </Form.Item>
+                      <Button type="primary" htmlType="submit" loading={totpLaedt}>
+                        Bestätigen
+                      </Button>
+                    </Form>
+                  </div>
+                ) : (
+                  lokalesPasswortNutzbar && (
+                    <>
+                      <Button onClick={() => setTotpDialogOffen(true)}>
+                        Zweiten Faktor einrichten
+                      </Button>
+                      <TotpPasswortDialog
+                        offen={totpDialogOffen}
+                        onGestartet={totpGestartet}
+                        onSchliessen={() => setTotpDialogOffen(false)}
+                      />
+                    </>
+                  )
+                )}
+              </section>
+            )}
           </div>
         </Paneel>
       </div>
