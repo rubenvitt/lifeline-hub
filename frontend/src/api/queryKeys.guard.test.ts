@@ -132,9 +132,13 @@ describe('queryKeys-Guard (b): jeder managed Key ist live ODER bewusst nicht-liv
 
 /** Guard (d): das `befehl`-Wire-Event ist live angebunden. */
 describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => {
-  it('befehl-Event invalidiert Befehls-Liste und -Detail', () => {
+  it('befehl-Event invalidiert Befehls-Liste, -Detail und -Anlagen', () => {
     expect(EINSATZ_STREAM_EVENTS).toHaveProperty('befehl');
-    expect(EINSATZ_STREAM_EVENTS.befehl).toEqual([EINSATZ_KEYS.befehle, EINSATZ_KEYS.befehl]);
+    expect(EINSATZ_STREAM_EVENTS.befehl).toEqual([
+      EINSATZ_KEYS.befehle,
+      EINSATZ_KEYS.befehl,
+      EINSATZ_KEYS.befehlAnlagen,
+    ]);
   });
 
   it('befehle/befehl sind nicht mehr NICHT_LIVE', () => {

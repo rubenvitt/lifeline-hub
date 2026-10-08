@@ -49,6 +49,7 @@ import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
+import DokumentAnlagen from '../entwurf/DokumentAnlagen';
 import { Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
@@ -540,6 +541,15 @@ function LageberichtDetail() {
             </div>
           </Paneel>
         )}
+        {/* Bild-Anlagen (LFH-1028): am Schirm ein Paneel, auf Papier je ein Blatt hinter dem Text. */}
+        <DokumentAnlagen
+          dokument="lageberichte"
+          einsatzId={einsatzId}
+          dokumentId={berichtId}
+          einsatzbezeichnung={einsatz.bezeichnung}
+          schreibt={schreibtEntwurf}
+          ohneDruckKlasse="lagebericht-no-print"
+        />
       </EinsatzSeite>
     </div>
   );

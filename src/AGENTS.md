@@ -130,6 +130,14 @@ nach Fassung-, Linker- und Original-Prüfung und VOR `anhang_antwort` eine Zeile
 `person_zugriff_audit`, auch bei 304, Original und den Vorschau-Fassungen; scheitert sie, keine
 Bytes. Liste ohne Audit. Die Detailseite zeigt deshalb kein Vorschaubild (`vorschau: false`).
 
+**Dokument-Anlagen (LFH-1028)**: `lagebericht_anlage` und `befehl_anlage` im Register, eine
+Umsetzung für beide Dokumentarten (`vorlagendokument::anlage`, `Dokumentart::ANLAGEN`). Nur PNG
+(`ERLAUBTE_MIME_ANLAGE`), höchstens zehn je Dokument; Ablegen und Entfernen nur im Entwurf, in der
+Transaktion geprüft (422). Entfernen löscht die Bytes (der Entwurf steht nicht im ETB); die
+Freigabe schreibt den Abschnitt „Anlagen“ in denselben ETB-Snapshot, das Fortschreiben kopiert
+Bytes und Stand in die neue Version. Keine Originalfassung (400). Die Schwärzung nimmt die Anlage
+mit der Kategorie `anhaenge`, der ETB-Wortlaut bleibt.
+
 **Auslieferung (LFH-747)** (Spec `anhang-metadaten`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-747-exif-bereinigung-auslieferung/design.md`):
 gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.

@@ -40,6 +40,13 @@ Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung o
 Zeichen der Funktionen nur über `zeichen/fachobjektZeichen.ts:funktionsZeichen`; Höhe und Plätze nur
 über `stab/fernmeldeskizzeLayout.ts:ausstattungsZeilen` (Bild und Layout rechnen dieselbe Zahl).
 
+**Skizze als Anlage** (LFH-1028): Lagebericht und Befehl fügen die Skizze als PNG an
+(`entwurf/DokumentAnlagen.tsx`). Aufgenommen wird nur über `stab/SkizzenAufnahme.tsx`: dieselben
+Quellen wie der Funkplan (`stab/useNetzQuellen.ts`, eine Weiche je Quelle; eine neue Quelle des
+Netzes kommt dorthin, nie in eine Seite), Druckform außerhalb des Sichtbereichs, hell wie Papier,
+„Stand“ im Schriftfeld ist der Zeitpunkt der Aufnahme. Gerastert wird in
+`stab/skizze/skizzeAlsBild.ts` (Stile inline aufgelöst, Schriften als Daten-URL eingebettet).
+
 **Sprechgruppen** (LFH-848 D8): dritte Darstellung des Funkplans („Tabelle | Skizze |
 Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
 `stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen` (dazu externe Stellen mit Status und

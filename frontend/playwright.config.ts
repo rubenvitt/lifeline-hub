@@ -130,7 +130,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * Teilmenge.
  */
 const DRUCK_SPECS =
-  /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck)\.spec\.ts$/;
+  /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck|dokument-anlage-druck)\.spec\.ts$/;
 
 const { backendPort, frontendPort, datenbank } = lauf;
 const backendUrl = `http://127.0.0.1:${backendPort}`;

@@ -11,7 +11,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
-  `fuehrungsorganisation-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `fuehrungsorganisation-druck`, `dokument-anlage-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in

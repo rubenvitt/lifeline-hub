@@ -27,6 +27,7 @@ import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
+import DokumentAnlagen from '../entwurf/DokumentAnlagen';
 import { Paneel, monoStil } from '../components/instrument';
 import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import './befehlPrint.css';
@@ -501,6 +502,15 @@ function BefehlDetail() {
             </div>
           )}
         </Paneel>
+        {/* Bild-Anlagen (LFH-1028): am Schirm ein Paneel, auf Papier je ein Blatt hinter dem Text. */}
+        <DokumentAnlagen
+          dokument="befehle"
+          einsatzId={einsatzId}
+          dokumentId={befehlId}
+          einsatzbezeichnung={einsatz.bezeichnung}
+          schreibt={istEntwurf && darfSchreiben}
+          ohneDruckKlasse="befehl-no-print"
+        />
 
         {/* Die verankerte Leiste steht nach dem Inhalt: `position: sticky; bottom: 0` klebt
             nur, solange der umgebende Block scrollt — und die Tabulatur führt vom letzten
