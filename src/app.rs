@@ -955,6 +955,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_schaden::marker),
         )
         .route(
+            "/api/einsaetze/{id}/schaeden/kennzahlen",
+            get(routes::einsatz_schaden::kennzahlen),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/auswahl",
+            get(routes::einsatz_schaden::auswahl),
+        )
+        .route(
             "/api/einsaetze/{id}/schaeden/{sid}",
             get(routes::einsatz_schaden::detail),
         )

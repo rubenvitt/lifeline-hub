@@ -1,4 +1,7 @@
-use super::{SchadenAnzeige, SchadenMarker};
+use super::{
+    Ausmass, SchadenAnzeige, SchadenAuswahl, SchadenKennzahlen, SchadenMarker, SchadenStatus,
+    SchadenTyp,
+};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -52,39 +55,281 @@ pub struct PatchDaten<'a> {
     pub lon: Option<Option<f64>>,
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Filter einer Schadenliste (LFH-1075). Liste und Kennzahlen lesen dieselbe Bedingung
+/// ([`filter_bedingung`]); `status` gilt nur für die Liste, die Kennzahlen zählen je Status.
+#[derive(Debug, Default, Clone)]
+pub struct SchadenFilter {
+    pub status: Option<SchadenStatus>,
+    /// Mehrere Werte: einer muss zutreffen. Leer = kein Filter.
+    pub typen: Vec<SchadenTyp>,
+    pub ausmasse: Vec<Ausmass>,
+    /// `Some(true)` nur verortete, `Some(false)` nur unverortete.
+    pub verortet: Option<bool>,
+    pub geschaedigt_person_id: Option<i64>,
+    pub inkl_storniert: bool,
+    /// Suchbegriff (getrimmt, nicht leer): Teil von Nummer, Ort, Beschreibung oder Geschädigt.
+    pub suche: Option<String>,
+}
+
+/// Sortierschlüssel der Modulseite (LFH-1075, D3). Gleichstand bricht immer die Nummer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortSpalte {
+    Nr,
+    Typ,
+    Ausmass,
+    Ort,
+    Erfasst,
+    Verortet,
+}
+
+impl SortSpalte {
+    /// SQL-Ausdruck des Schlüssels. Typ über den Wire-Wert (dieselbe Folge wie die
+    /// Beschriftung), Ausmaß über den Rang, Ort ohne Unterschied der Groß-/Kleinschreibung.
+    fn ausdruck(self) -> &'static str {
+        match self {
+            SortSpalte::Nr => "s.registrier_nr",
+            SortSpalte::Typ => "s.typ",
+            SortSpalte::Ausmass => {
+                "(CASE s.ausmass WHEN 'gering' THEN 0 WHEN 'mittel' THEN 1 \
+                 WHEN 'gross' THEN 2 ELSE 3 END)"
+            }
+            SortSpalte::Ort => "s.ort COLLATE NOCASE",
+            SortSpalte::Erfasst => "s.erfasst_at",
+            SortSpalte::Verortet => {
+                "(CASE WHEN s.lat IS NOT NULL AND s.lon IS NOT NULL THEN 1 ELSE 0 END)"
+            }
+        }
+    }
+
+    /// Ob der Cursorwert des Schlüssels eine Zahl ist (sonst Text).
+    pub fn zahl(self) -> bool {
+        matches!(
+            self,
+            SortSpalte::Nr | SortSpalte::Ausmass | SortSpalte::Verortet
+        )
+    }
+
+    /// Cursorwert einer Zeile für diesen Schlüssel.
+    pub fn wert(self, s: &SchadenAnzeige) -> CursorWert {
+        match self {
+            SortSpalte::Nr => CursorWert::Zahl(s.registrier_nr),
+            SortSpalte::Typ => CursorWert::Text(s.typ.as_str().to_string()),
+            SortSpalte::Ausmass => CursorWert::Zahl(match s.ausmass {
+                Ausmass::Gering => 0,
+                Ausmass::Mittel => 1,
+                Ausmass::Gross => 2,
+                Ausmass::Katastrophal => 3,
+            }),
+            SortSpalte::Ort => CursorWert::Text(s.ort.clone()),
+            SortSpalte::Erfasst => CursorWert::Text(s.erfasst_at.clone()),
+            SortSpalte::Verortet => CursorWert::Zahl(i64::from(s.lat.is_some() && s.lon.is_some())),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CursorWert {
+    Zahl(i64),
+    Text(String),
+}
+
+/// Cursor: Schlüsselwert und Nummer des letzten gelesenen Schadens. Bei [`SortSpalte::Nr`]
+/// ist `wert` `None`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchadenCursor {
+    pub wert: Option<CursorWert>,
+    pub nr: i64,
+}
+
+/// Eine angeforderte Seite der Schadenliste.
+#[derive(Debug, Clone)]
+pub struct SchadenSeite {
+    pub spalte: SortSpalte,
+    pub absteigend: bool,
+    pub vor: Option<SchadenCursor>,
+    pub limit: i64,
+}
+
+enum Bind {
+    Text(String),
+    Zahl(i64),
+}
+
+/// Maskiert `%`, `_` und `\` für `LIKE … ESCAPE '\'`.
+fn like_muster(begriff: &str) -> String {
+    let mut m = String::with_capacity(begriff.len() + 2);
+    m.push('%');
+    for c in begriff.chars() {
+        if matches!(c, '%' | '_' | '\\') {
+            m.push('\\');
+        }
+        m.push(c);
+    }
+    m.push('%');
+    m
+}
+
+/// WHERE-Ergänzungen (nach `s.einsatz_id = ?`) samt Bindwerten in textueller Reihenfolge.
+/// `mit_status = false` lässt den Statusfilter weg (Kennzahlen zählen je Status).
+fn filter_bedingung(f: &SchadenFilter, mit_status: bool) -> (String, Vec<Bind>) {
+    let mut sql = String::new();
+    let mut werte = Vec::new();
+    if !f.inkl_storniert {
+        sql.push_str(" AND s.storniert_at IS NULL");
+    }
+    if let (true, Some(st)) = (mit_status, f.status) {
+        sql.push_str(" AND s.status = ?");
+        werte.push(Bind::Text(st.as_str().to_string()));
+    }
+    if !f.typen.is_empty() {
+        sql.push_str(" AND s.typ IN (");
+        sql.push_str(&vec!["?"; f.typen.len()].join(", "));
+        sql.push(')');
+        werte.extend(f.typen.iter().map(|t| Bind::Text(t.as_str().to_string())));
+    }
+    if !f.ausmasse.is_empty() {
+        sql.push_str(" AND s.ausmass IN (");
+        sql.push_str(&vec!["?"; f.ausmasse.len()].join(", "));
+        sql.push(')');
+        werte.extend(
+            f.ausmasse
+                .iter()
+                .map(|a| Bind::Text(a.as_str().to_string())),
+        );
+    }
+    match f.verortet {
+        Some(true) => sql.push_str(" AND s.lat IS NOT NULL AND s.lon IS NOT NULL"),
+        Some(false) => sql.push_str(" AND (s.lat IS NULL OR s.lon IS NULL)"),
+        None => {}
+    }
+    if let Some(pid) = f.geschaedigt_person_id {
+        sql.push_str(" AND s.geschaedigt_person_id = ?");
+        werte.push(Bind::Zahl(pid));
+    }
+    if let Some(begriff) = f.suche.as_deref() {
+        // Dieselben Felder wie die Suche der Modulseite vorher im Client (`suchText` der
+        // Spalten Reg.-Nr., Ort, Geschädigt): Nummer als „S-007“, Ort, Beschreibung, Name des
+        // Personals oder der Organisation, sonst der Kontakt.
+        sql.push_str(
+            " AND (printf('S-%03d', s.registrier_nr) LIKE ? ESCAPE '\\' \
+             OR s.ort LIKE ? ESCAPE '\\' OR s.beschreibung LIKE ? ESCAPE '\\' \
+             OR COALESCE(gpe.snap_name, go.name, s.geschaedigt_kontakt, '') LIKE ? ESCAPE '\\')",
+        );
+        let m = like_muster(begriff);
+        // Vier Platzhalter, vier Bindungen (positionell, wie alle übrigen).
+        for _ in 0..4 {
+            werte.push(Bind::Text(m.clone()));
+        }
+    }
+    (sql, werte)
+}
+
+/// Listet Schäden eines Einsatzes. Ohne `seite` vollständig nach Nummer absteigend (Druck,
+/// Einsatzbericht, Lage-Snapshot); mit `seite` höchstens `limit` Zeilen ab dem Cursor
+/// (LFH-1075, D1/D3).
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
-    status: Option<&str>,
-    typ: Option<&str>,
-    ausmass: Option<&str>,
-    geschaedigt_person_id: Option<i64>,
-    inkl_storniert: bool,
+    filter: &SchadenFilter,
+    seite: Option<&SchadenSeite>,
 ) -> Result<Vec<SchadenAnzeige>, AppError> {
-    let storno_filter = if inkl_storniert {
-        ""
-    } else {
-        " AND s.storniert_at IS NULL"
-    };
-    let sql = format!(
-        "{SELECT_ALLE} WHERE s.einsatz_id = ?1{storno_filter} \
-         AND (?2 IS NULL OR s.status = ?2) \
-         AND (?3 IS NULL OR s.typ = ?3) \
-         AND (?4 IS NULL OR s.ausmass = ?4) \
-         AND (?5 IS NULL OR s.geschaedigt_person_id = ?5) \
-         ORDER BY s.registrier_nr DESC"
+    let (bedingung, mut werte) = filter_bedingung(filter, true);
+    let mut q = format!("{SELECT_ALLE} WHERE s.einsatz_id = ?{bedingung}");
+    match seite {
+        None => q.push_str(" ORDER BY s.registrier_nr DESC"),
+        Some(seite) => {
+            let schluessel = seite.spalte.ausdruck();
+            let (vgl, richtung) = if seite.absteigend {
+                ("<", "DESC")
+            } else {
+                (">", "ASC")
+            };
+            if let Some(vor) = &seite.vor {
+                match &vor.wert {
+                    Some(w) if seite.spalte != SortSpalte::Nr => {
+                        q.push_str(&format!(
+                            " AND ({schluessel} {vgl} ? OR ({schluessel} = ? \
+                             AND s.registrier_nr {vgl} ?))"
+                        ));
+                        for _ in 0..2 {
+                            werte.push(match w {
+                                CursorWert::Zahl(z) => Bind::Zahl(*z),
+                                CursorWert::Text(t) => Bind::Text(t.clone()),
+                            });
+                        }
+                    }
+                    _ => q.push_str(&format!(" AND s.registrier_nr {vgl} ?")),
+                }
+                werte.push(Bind::Zahl(vor.nr));
+            }
+            if seite.spalte == SortSpalte::Nr {
+                q.push_str(&format!(" ORDER BY s.registrier_nr {richtung} LIMIT ?"));
+            } else {
+                q.push_str(&format!(
+                    " ORDER BY {schluessel} {richtung}, s.registrier_nr {richtung} LIMIT ?"
+                ));
+            }
+            werte.push(Bind::Zahl(seite.limit));
+        }
+    }
+    let mut query = sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(&*q)).bind(einsatz_id);
+    for w in werte {
+        query = match w {
+            Bind::Text(t) => query.bind(t),
+            Bind::Zahl(z) => query.bind(z),
+        };
+    }
+    Ok(query.fetch_all(pool).await?)
+}
+
+/// Zahl der Schäden gesamt und je Status zum Filter (ohne dessen Status), in EINER
+/// gruppierten Abfrage über dieselbe Bedingung wie [`liste`] (LFH-1075, D4).
+pub async fn kennzahlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &SchadenFilter,
+) -> Result<SchadenKennzahlen, AppError> {
+    let (bedingung, werte) = filter_bedingung(filter, false);
+    let q = format!(
+        "SELECT s.status, COUNT(*) FROM einsatz_schaden s \
+         LEFT JOIN einsatz_personal gpe ON gpe.id = s.geschaedigt_personal_id \
+                                        AND gpe.einsatz_id = s.einsatz_id \
+         LEFT JOIN organisation go ON go.id = s.geschaedigt_organisation_id \
+         WHERE s.einsatz_id = ?{bedingung} GROUP BY s.status"
     );
-    Ok(
-        sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(&*sql))
-            .bind(einsatz_id)
-            .bind(status)
-            .bind(typ)
-            .bind(ausmass)
-            .bind(geschaedigt_person_id)
-            .fetch_all(pool)
-            .await?,
+    let mut query = sqlx::query_as::<_, (String, i64)>(sqlx::AssertSqlSafe(&*q)).bind(einsatz_id);
+    for w in werte {
+        query = match w {
+            Bind::Text(t) => query.bind(t),
+            Bind::Zahl(z) => query.bind(z),
+        };
+    }
+    let mut k = SchadenKennzahlen::default();
+    for (status, n) in query.fetch_all(pool).await? {
+        k.gesamt += n;
+        match SchadenStatus::parse(&status) {
+            Some(SchadenStatus::Offen) => k.offen = n,
+            Some(SchadenStatus::Uebergeben) => k.uebergeben = n,
+            Some(SchadenStatus::Abgeschlossen) => k.abgeschlossen = n,
+            None => {}
+        }
+    }
+    Ok(k)
+}
+
+/// Schadenauswahl für Auswahlfelder und Sprungpalette (LFH-1075, D5): alle nicht stornierten,
+/// nach Nummer absteigend, ohne Beschreibung und ohne Angaben zu Geschädigten.
+pub async fn auswahl(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<SchadenAuswahl>, AppError> {
+    Ok(sqlx::query_as::<_, SchadenAuswahl>(
+        "SELECT id, registrier_nr, status, typ, ausmass, ort, \
+                (geschaedigt_person_id IS NULL AND geschaedigt_personal_id IS NULL \
+                 AND geschaedigt_organisation_id IS NULL AND geschaedigt_kontakt IS NULL) AS frei \
+         FROM einsatz_schaden WHERE einsatz_id = ? AND storniert_at IS NULL \
+         ORDER BY registrier_nr DESC",
     )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
 }
 
 /// Marker aller nicht stornierten Schäden eines Einsatzes, neueste Registriernummer zuerst
@@ -514,11 +759,21 @@ mod tests {
         storniere_tx(&mut *pool.acquire().await.unwrap(), e, s.id, b)
             .await
             .unwrap();
-        let ohne = liste(&pool, e, None, None, None, None, false)
+        let ohne = liste(&pool, e, &SchadenFilter::default(), None)
             .await
             .unwrap();
         assert_eq!(ohne.len(), 0, "storniert nicht in Default-Liste");
-        let mit = liste(&pool, e, None, None, None, None, true).await.unwrap();
+        let mit = liste(
+            &pool,
+            e,
+            &SchadenFilter {
+                inkl_storniert: true,
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(mit.len(), 1, "mit inkl_storniert sichtbar");
     }
 
@@ -539,13 +794,29 @@ mod tests {
         .await
         .unwrap();
         anlegen(&pool, e, b, minimal()).await.unwrap();
-        let nur_umwelt = liste(&pool, e, None, Some("umweltschaden"), None, None, false)
-            .await
-            .unwrap();
+        let nur_umwelt = liste(
+            &pool,
+            e,
+            &SchadenFilter {
+                typen: vec![SchadenTyp::Umweltschaden],
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(nur_umwelt.len(), 1);
-        let nur_gross = liste(&pool, e, None, None, Some("gross"), None, false)
-            .await
-            .unwrap();
+        let nur_gross = liste(
+            &pool,
+            e,
+            &SchadenFilter {
+                ausmasse: vec![Ausmass::Gross],
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(nur_gross.len(), 1);
     }
 

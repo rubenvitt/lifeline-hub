@@ -13,7 +13,7 @@ use crate::routes::support::{
 };
 use crate::schaden::{
     darf_uebergehen, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
-    SchadenAnzeige, SchadenMarker, SchadenStatus, SchadenTyp,
+    SchadenAnzeige, SchadenAuswahl, SchadenKennzahlen, SchadenMarker, SchadenStatus, SchadenTyp,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -55,11 +55,166 @@ fn sse_lebenszyklus(state: &AppState, einsatz_id: i64, schaden_id: i64, etb_id: 
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     pub status: Option<String>,
+    /// Kommagetrennt, einer muss zutreffen (LFH-1075).
     pub typ: Option<String>,
+    /// Kommagetrennt, einer muss zutreffen (LFH-1075).
     pub ausmass: Option<String>,
+    /// `ja`, `nein` oder beides kommagetrennt (LFH-1075).
+    pub verortet: Option<String>,
     pub geschaedigt_person_id: Option<i64>,
     #[serde(default)]
     pub inkl_storniert: bool,
+    /// Suchbegriff (LFH-1075, D2).
+    pub q: Option<String>,
+    /// `<spalte>_<ab|auf>`, nur mit `limit` (LFH-1075, D3).
+    pub sortierung: Option<String>,
+    pub vor_wert: Option<String>,
+    pub vor_nr: Option<i64>,
+    /// Seitengröße; ohne `limit` vollständig wie bisher (LFH-1075, D1).
+    pub limit: Option<i64>,
+}
+
+/// Höchstlänge des Suchbegriffs der Schadenliste.
+const SUCHE_MAX: usize = 200;
+
+/// Liest eine kommagetrennte Wertemenge; ein unbekannter Wert ist für sich unbrauchbar → 400
+/// (LFH-305, `src/AGENTS.md` Statuscode-Konvention).
+fn werte<T>(
+    roh: Option<&str>,
+    parse: impl Fn(&str) -> Option<T>,
+    meldung: &str,
+) -> Result<Vec<T>, AppError> {
+    roh.into_iter()
+        .flat_map(|r| r.split(','))
+        .map(str::trim)
+        .filter(|w| !w.is_empty())
+        .map(|w| parse_enum(&parse, w, meldung))
+        .collect()
+}
+
+/// Filter aus den Anfrage-Parametern; Liste und Kennzahlen teilen ihn.
+#[allow(clippy::too_many_arguments)]
+fn filter_aus(
+    status: Option<&str>,
+    typ: Option<&str>,
+    ausmass: Option<&str>,
+    verortet: Option<&str>,
+    geschaedigt_person_id: Option<i64>,
+    inkl_storniert: bool,
+    q: Option<&str>,
+) -> Result<schaden_repo::SchadenFilter, AppError> {
+    // Unbekannter Enum-Wert im Query-Filter: das Feld ist für sich unbrauchbar → 400
+    // (LFH-305). Ohne diese Prechecks gäbe es hier kein 422, sondern ein 200 mit leerer
+    // Liste — der Filterwert landet nur in einer WHERE-Klausel, es gibt keinen DB-CHECK
+    // dahinter.
+    let status = parse_enum_opt(SchadenStatus::parse, status, "Unbekannter Status im Filter")?;
+    let typen = werte(typ, SchadenTyp::parse, "Unbekannter Typ im Filter")?;
+    let ausmasse = werte(ausmass, Ausmass::parse, "Unbekanntes Ausmaß im Filter")?;
+    let verortet_werte = werte(
+        verortet,
+        |w| match w {
+            "ja" => Some(true),
+            "nein" => Some(false),
+            _ => None,
+        },
+        "Unbekannte Verortung im Filter",
+    )?;
+    let verortet = match (
+        verortet_werte.contains(&true),
+        verortet_werte.contains(&false),
+    ) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    };
+    let suche = q.map(str::trim).filter(|q| !q.is_empty());
+    if let Some(q) = suche {
+        hoechstens(q, "q", SUCHE_MAX)?;
+    }
+    Ok(schaden_repo::SchadenFilter {
+        status,
+        typen,
+        ausmasse,
+        verortet,
+        geschaedigt_person_id,
+        inkl_storniert,
+        suche: suche.map(str::to_string),
+    })
+}
+
+/// Seite aus den Anfrage-Parametern (LFH-1075, D1/D3). Ohne `limit` keine Seite; Sortierung
+/// oder Cursor ohne `limit` und ein halber Cursor sind ein Zusammenhang → 422, ein
+/// unbrauchbarer Einzelwert → 400.
+fn seite_aus(p: &ListeParams) -> Result<Option<schaden_repo::SchadenSeite>, AppError> {
+    use crate::kommunikation::SEITE_MAX;
+    use schaden_repo::{CursorWert, SchadenCursor, SchadenSeite, SortSpalte};
+    let sortierung = p
+        .sortierung
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let vor_wert = p.vor_wert.as_deref();
+    let Some(limit) = p.limit else {
+        if sortierung.is_some() || vor_wert.is_some() || p.vor_nr.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Sortierung und Cursor nur mit limit".into(),
+            ));
+        }
+        return Ok(None);
+    };
+    let (spalte, absteigend) = match sortierung {
+        None => (SortSpalte::Nr, true),
+        Some(s) => {
+            let (name, richtung) = s
+                .rsplit_once('_')
+                .ok_or_else(|| AppError::Validation("Unbekannte Sortierung".into()))?;
+            let spalte = match name {
+                "nr" => SortSpalte::Nr,
+                "typ" => SortSpalte::Typ,
+                "ausmass" => SortSpalte::Ausmass,
+                "ort" => SortSpalte::Ort,
+                "erfasst" => SortSpalte::Erfasst,
+                "verortet" => SortSpalte::Verortet,
+                _ => return Err(AppError::Validation("Unbekannte Sortierung".into())),
+            };
+            let absteigend = match richtung {
+                "ab" => true,
+                "auf" => false,
+                _ => return Err(AppError::Validation("Unbekannte Sortierung".into())),
+            };
+            (spalte, absteigend)
+        }
+    };
+    let vor = match (vor_wert, p.vor_nr) {
+        (None, None) => None,
+        (None, Some(nr)) if spalte == SortSpalte::Nr => Some(SchadenCursor { wert: None, nr }),
+        (Some(w), Some(nr)) if spalte != SortSpalte::Nr => {
+            let wert = if spalte.zahl() {
+                CursorWert::Zahl(
+                    w.trim()
+                        .parse()
+                        .map_err(|_| AppError::Validation("vor_wert ist keine Zahl".into()))?,
+                )
+            } else {
+                CursorWert::Text(w.to_string())
+            };
+            Some(SchadenCursor {
+                wert: Some(wert),
+                nr,
+            })
+        }
+        _ => {
+            return Err(AppError::UnprocessableEntity(
+                "vor_wert und vor_nr passen nicht zur Sortierung".into(),
+            ))
+        }
+    };
+    Ok(Some(SchadenSeite {
+        spalte,
+        absteigend,
+        vor,
+        limit: limit.clamp(1, SEITE_MAX),
+    }))
 }
 
 pub async fn liste(
@@ -67,37 +222,62 @@ pub async fn liste(
     ctx: EinsatzLesezugriff<Schaeden>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<SchadenAnzeige>>, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    // Unbekannter Enum-Wert im Query-Filter: das Feld ist für sich unbrauchbar → 400
-    // (LFH-305). Ohne diese Prechecks gäbe es hier kein 422, sondern ein 200 mit leerer
-    // Liste — der Filterwert landet nur in einer WHERE-Klausel, es gibt keinen DB-CHECK
-    // dahinter.
-    parse_enum_opt(
-        SchadenStatus::parse,
+    let filter = filter_aus(
         params.status.as_deref(),
-        "Unbekannter Status im Filter",
-    )?;
-    parse_enum_opt(
-        SchadenTyp::parse,
         params.typ.as_deref(),
-        "Unbekannter Typ im Filter",
-    )?;
-    parse_enum_opt(
-        Ausmass::parse,
         params.ausmass.as_deref(),
-        "Unbekanntes Ausmaß im Filter",
+        params.verortet.as_deref(),
+        params.geschaedigt_person_id,
+        params.inkl_storniert,
+        params.q.as_deref(),
+    )?;
+    let seite = seite_aus(&params)?;
+    Ok(Json(
+        schaden_repo::liste(&state.pool, ctx.einsatz.id, &filter, seite.as_ref()).await?,
+    ))
+}
+
+// ---------- GET /schaeden/kennzahlen ----------
+
+#[derive(Debug, Deserialize)]
+pub struct KennzahlenParams {
+    pub typ: Option<String>,
+    pub ausmass: Option<String>,
+    pub verortet: Option<String>,
+    pub q: Option<String>,
+}
+
+/// Zahl der Schäden gesamt und je Status zu denselben Filtern wie die Liste (LFH-1075, D4).
+/// Gleiches Gate wie die Liste.
+pub async fn kennzahlen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Schaeden>,
+    Query(params): Query<KennzahlenParams>,
+) -> Result<Json<SchadenKennzahlen>, AppError> {
+    let filter = filter_aus(
+        None,
+        params.typ.as_deref(),
+        params.ausmass.as_deref(),
+        params.verortet.as_deref(),
+        None,
+        false,
+        params.q.as_deref(),
     )?;
     Ok(Json(
-        schaden_repo::liste(
-            &state.pool,
-            einsatz_id,
-            params.status.as_deref(),
-            params.typ.as_deref(),
-            params.ausmass.as_deref(),
-            params.geschaedigt_person_id,
-            params.inkl_storniert,
-        )
-        .await?,
+        schaden_repo::kennzahlen(&state.pool, ctx.einsatz.id, &filter).await?,
+    ))
+}
+
+// ---------- GET /schaeden/auswahl ----------
+
+/// Schadenauswahl für Auswahlfelder und Sprungpalette (LFH-1075, D5). Gleiches Gate wie die
+/// Liste.
+pub async fn auswahl(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Schaeden>,
+) -> Result<Json<Vec<SchadenAuswahl>>, AppError> {
+    Ok(Json(
+        schaden_repo::auswahl(&state.pool, ctx.einsatz.id).await?,
     ))
 }
 
