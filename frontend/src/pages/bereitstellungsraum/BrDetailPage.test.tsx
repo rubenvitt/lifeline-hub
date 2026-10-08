@@ -500,6 +500,31 @@ describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     await waitFor(() => expect(aufrufe).toEqual(['status aufgeloest']));
   });
 
+  it('aktiv und belegt: „Auflösen“ gesperrt, der Grund steht sichtbar daneben (LFH-1078)', async () => {
+    const aufrufe: string[] = [];
+    seiteMit(
+      brDetail({
+        status: 'aktiv',
+        einheiten: [{ id: 5, name: 'Florian 1' }],
+        fahrzeuge: [{ id: 20, funkrufname: 'Florian 1/44' }],
+      }),
+      aufrufe,
+    );
+
+    const knopf = await screen.findByRole('button', { name: 'Auflösen' });
+    expect(knopf).toBeDisabled();
+    expect(screen.getByText('noch 2 belegt')).toBeInTheDocument();
+    expect(screen.queryByText(/Nur möglich/)).not.toBeInTheDocument();
+  });
+
+  it('aktiv und leer: kein Satz in der Rückfrage, nur die Handlung', async () => {
+    seiteMit(brDetail({ status: 'aktiv' }), []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    await screen.findByRole('button', { name: 'BR auflösen' });
+    expect(screen.queryByText(/Nur möglich/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/belegt/)).not.toBeInTheDocument();
+  });
+
   it('geplant: „BR stornieren“ bestätigt rot und storniert erst dann', async () => {
     const aufrufe: string[] = [];
     seiteMit(brDetail({ status: 'geplant' }), aufrufe);

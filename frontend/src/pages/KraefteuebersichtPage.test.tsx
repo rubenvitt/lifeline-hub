@@ -298,6 +298,8 @@ describe('KraefteuebersichtPage — Seitenkopf', () => {
     // Genau eine Primäraktion im Kopf.
     expect(kopf.querySelectorAll('.ant-btn-primary')).toHaveLength(1);
     expect(knopf).toHaveClass('ant-btn-primary');
+    // Kein erklärender Tooltip (LFH-1078); ein `title` nur als Sperrgrund.
+    expect(knopf).not.toHaveAttribute('title');
     fireEvent.click(knopf);
     expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/einheiten');
     // Der Abschnitt-Filter sitzt sekundär daneben.
@@ -367,7 +369,8 @@ describe('KraefteuebersichtPage — Statusband', () => {
     const hinweis = () => container.querySelector('[data-lfh="statusband-hinweis"]');
     expect(hinweis()).toBeNull();
     fireEvent.change(screen.getByPlaceholderText('Suche...'), { target: { value: 'xyz' } });
-    await waitFor(() => expect(hinweis()).toHaveTextContent(/wirken auf die Mittel/));
+    // Eine Marke statt eines Satzes (LFH-1078): das Einheitenband ignoriert diese Filter.
+    await waitFor(() => expect(hinweis()).toHaveTextContent(/^ungefiltert$/));
     // Das Band zählt weiter die Einheit — wie die Einheitenzeile darunter.
     expect(
       container.querySelector('[aria-label="Einheiten je Status"] [data-lfh="kennzahl"]'),

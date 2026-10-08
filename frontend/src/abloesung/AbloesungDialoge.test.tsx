@@ -5,7 +5,12 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import type { Abloesung } from '../api/types';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
-import { SchichtBeginnenDialog, VollzugDialog } from './AbloesungDialoge';
+import {
+  AbloeserDialog,
+  RhythmusDialog,
+  SchichtBeginnenDialog,
+  VollzugDialog,
+} from './AbloesungDialoge';
 
 /**
  * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. Beide Zeitfelder
@@ -87,7 +92,7 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
  * LFH-948: vor der Wahl der Einheit sagt der Dialog nichts über die Vorgabe eines Abschnitts,
  * und der Rhythmus ist noch kein Pflichtfeld.
  */
-describe('Schicht beginnen — Rhythmus-Hinweis erst nach der Einheitenwahl (LFH-948)', () => {
+describe('Schicht beginnen — Rhythmus-Vorgabe erst nach der Einheitenwahl (LFH-948)', () => {
   function oeffne(vorgabeJeEinheit: Map<number, number>) {
     renderMitProviders(
       <SchichtBeginnenDialog
@@ -123,13 +128,142 @@ describe('Schicht beginnen — Rhythmus-Hinweis erst nach der Einheitenwahl (LFH
     ).not.toBeRequired();
   });
 
-  it('mit Einheit ohne Vorgabe nennt er das, und der Rhythmus wird Pflicht', async () => {
+  it('mit Einheit ohne Vorgabe: Rhythmus wird Pflicht, ohne Satz dazu (LFH-1078)', async () => {
     oeffne(new Map());
     const dialog = await screen.findByRole('dialog');
     await waehleFlorian(dialog);
-    expect(
-      await within(dialog).findByText('Der Abschnitt der Einheit hat keine Vorgabe'),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' })).toBeRequired();
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' });
+    await waitFor(() => expect(feld).toBeRequired());
+    expect(feld).not.toHaveAttribute('placeholder');
+    expect(within(dialog).queryByText(/Vorgabe/)).not.toBeInTheDocument();
+  });
+
+  it('mit Einheit mit Vorgabe: der wirksame Wert steht als Platzhalter (LFH-1078)', async () => {
+    oeffne(new Map([[5, 360]]));
+    const dialog = await screen.findByRole('dialog');
+    await waehleFlorian(dialog);
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' });
+    await waitFor(() => expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe)'));
+    expect(feld).not.toBeRequired();
+    expect(within(dialog).queryByText(/Leer/)).not.toBeInTheDocument();
+  });
+});
+
+/** LFH-1078: „Im Einsatz seit“ zeigt, was der Server ohne Eingabe nimmt. */
+describe('Schicht beginnen — Beginn als Platzhalter (LFH-1078)', () => {
+  mitProzessZone('UTC');
+
+  function oeffne(eintreffenJeEinheit: Map<number, string> | null) {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <SchichtBeginnenDialog
+          offen
+          einheiten={[{ value: 5, label: 'Florian 1' }]}
+          vorgabeJeEinheit={new Map()}
+          eintreffenJeEinheit={eintreffenJeEinheit}
+          laeuft={false}
+          fehler={null}
+          onErfassen={vi.fn()}
+          onSchliessen={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+  }
+  async function waehleFlorian(dialog: HTMLElement) {
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    const option = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>(
+        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="Florian 1"]',
+      );
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    await userEvent.click(option);
+  }
+  const beginn = (dialog: HTMLElement) =>
+    within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' });
+
+  it('mit Eintreffen: dessen Uhrzeit in der Anzeigezone', async () => {
+    oeffne(new Map([[5, '2026-09-24 04:30:00']]));
+    const dialog = await screen.findByRole('dialog');
+    // Vor der Wahl der Einheit gibt es keinen wirksamen Wert, also keinen.
+    expect(beginn(dialog).getAttribute('placeholder') ?? '').not.toMatch(/Eintreffen|jetzt/);
+    await waehleFlorian(dialog);
+    await waitFor(() =>
+      expect(beginn(dialog).getAttribute('placeholder')).toMatch(/^Eintreffen (\d{2}\. )?06:30$/),
+    );
+  });
+
+  it('ohne Eintreffen: „jetzt“', async () => {
+    oeffne(new Map());
+    const dialog = await screen.findByRole('dialog');
+    await waehleFlorian(dialog);
+    await waitFor(() => expect(beginn(dialog)).toHaveAttribute('placeholder', 'jetzt'));
+  });
+
+  it('Perioden unbekannt: kein Platzhalter, der etwas Falsches verspräche', async () => {
+    oeffne(null);
+    const dialog = await screen.findByRole('dialog');
+    await waehleFlorian(dialog);
+    expect(beginn(dialog).getAttribute('placeholder') ?? '').not.toMatch(/Eintreffen|jetzt/);
+    expect(within(dialog).queryByText(/Leer/)).not.toBeInTheDocument();
+  });
+});
+
+/** LFH-1078: der wirksame Wert steht im Feld, kein „Leer: …“-Satz darunter. */
+describe('Ablösung — Platzhalter statt Feldhilfe (LFH-1078)', () => {
+  it('Vollzug: Zeitpunkt zeigt „jetzt“, kein Erklärsatz', async () => {
+    renderMitProviders(
+      <VollzugDialog
+        schicht={{ id: 3, einheit_name: 'Florian 1' } as Abloesung}
+        einheiten={[]}
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('textbox', { name: 'Zeitpunkt' })).toHaveAttribute(
+      'placeholder',
+      'jetzt',
+    );
+    expect(within(dialog).queryByText(/Leer|Folgeschicht/)).not.toBeInTheDocument();
+  });
+
+  it('Ablöser planen: kein Erklärsatz, der Platzhalter sagt „keine geplant“', async () => {
+    renderMitProviders(
+      <AbloeserDialog
+        schicht={{ id: 3, einheit_name: 'Florian 1' } as Abloesung}
+        einheiten={[]}
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('keine geplant')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Leer/)).not.toBeInTheDocument();
+  });
+
+  it('Rhythmus: Platzhalter aus dem Aufrufer, ohne Pflicht wenn erlaubt', async () => {
+    renderMitProviders(
+      <RhythmusDialog
+        offen
+        titel="Rhythmus-Vorgabe Nord"
+        minuten={null}
+        platzhalter="keine Vorgabe"
+        leerErlaubt
+        laeuft={false}
+        fehler={null}
+        onErfassen={vi.fn()}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' });
+    expect(feld).toHaveAttribute('placeholder', 'keine Vorgabe');
+    expect(feld).not.toBeRequired();
   });
 });

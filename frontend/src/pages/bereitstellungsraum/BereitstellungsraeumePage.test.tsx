@@ -119,6 +119,9 @@ describe('BereitstellungsraeumePage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    // Leerzustand mit Knopf statt Anleitung (LFH-1078).
+    expect(screen.getByRole('button', { name: 'Ersten BR anlegen' })).toBeInTheDocument();
+    expect(screen.queryByText(/Lege einen Bereitstellungsraum an/)).not.toBeInTheDocument();
   });
 
   /**

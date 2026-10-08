@@ -264,8 +264,13 @@ describe('MitgliederAbschnitt', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     );
-    // Der Vorrang vor der Ableitung steht an der Maske (Stab-Spec, Entscheidung 13).
-    expect(screen.getByText(/Vorrang vor dem eigenen Sachgebiet/)).toBeInTheDocument();
+    // Der Vorrang vor der Ableitung steht an der Maske (Stab-Spec, Entscheidung 13), kurz und
+    // ohne „Leer lassen …“ (LFH-1078). Ein neuer ETB-Eintrag wird nicht vorbelegt (LFH-894): die
+    // Stelle ist nur der erste Vorschlag der Rufname-Abfrage.
+    expect(
+      screen.getByText('Erster Vorschlag für den ETB-Rufnamen, vor dem eigenen Sachgebiet'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Leer lassen|als Empfänger vorbelegt/)).not.toBeInTheDocument();
     await userEvent.click(stellenFeld());
     await userEvent.click(await screen.findByTitle('S2 – Lage (Müller)'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));

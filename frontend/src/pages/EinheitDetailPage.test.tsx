@@ -174,6 +174,8 @@ describe('EinheitDetailPage · die Route selbst', () => {
     rendere('/einsaetze/1/einheiten/999');
     expect(await screen.findByText(/gibt es nicht \(mehr\)/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zur Gliederung' })).toBeInTheDocument();
+    // Titel und Rückweg genügen; keine Vermutung über die Ursache als Satz (LFH-1078).
+    expect(screen.queryByText(/aufgelöst worden/)).not.toBeInTheDocument();
   });
 
   it('trägt das Stärke-Etikett in BOS-Fachsprache', async () => {
@@ -181,6 +183,8 @@ describe('EinheitDetailPage · die Route selbst', () => {
     server.use(...handlers());
     rendere();
     expect(await screen.findByText('Soll-Stärke (F/UF/M)')).toBeInTheDocument();
+    // Keine Eingaberegel als Satz: die Summe zeigt `StaerkeEingabe` live (LFH-1078).
+    expect(screen.queryByText(/alle drei Werte/)).not.toBeInTheDocument();
   });
 });
 
@@ -202,15 +206,16 @@ describe('EinheitDetailPage · die Entwirrung (Befund M26)', () => {
     expect(personZuordnen.closest('form')).toBeNull();
   });
 
-  it('jede Zuordnungssektion sagt, dass sie sofort wirkt', async () => {
-    // Die Trennung steht zusätzlich in Worten, an allen dreien.
+  it('jede Zuordnung steht in einem eigenen Paneel, ohne Erklärsatz (LFH-1078)', async () => {
+    // Die Trennung zeigt die Position; die Zeile im Paneel quittiert die Zuordnung. Kein Satz
+    // „wirken sofort — hier gibt es nichts zu speichern“ mehr.
     server.use(...handlers());
     rendere();
     await screen.findByRole('heading', { name: 'Personal', level: 2 });
     for (const titel of ['Personal', 'Fahrzeuge', 'Material']) {
       expect(screen.getByRole('heading', { name: titel, level: 2 })).toBeInTheDocument();
     }
-    expect(screen.getAllByText(/wirken sofort/)).toHaveLength(3);
+    expect(screen.queryByText(/wirken sofort|nichts zu speichern/)).not.toBeInTheDocument();
   });
 });
 

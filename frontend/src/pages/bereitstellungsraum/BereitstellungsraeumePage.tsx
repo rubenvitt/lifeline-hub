@@ -142,7 +142,6 @@ export default function BereitstellungsraeumePage() {
           {!brQuery.isLoading && sichtbar.length === 0 && (
             <SeitenLeer
               titel="Noch keine Bereitstellungsräume erfasst"
-              hinweis="Lege einen Bereitstellungsraum an, um Kräfte zu sammeln."
               aktion={
                 schreibgeschuetzt
                   ? undefined

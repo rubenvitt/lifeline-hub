@@ -27,6 +27,11 @@ vi.mock('../api/einheiten', () => ({
   ]),
 }));
 
+const listeEinheitenPerioden = vi.fn();
+vi.mock('../api/kraefteZeitachse', () => ({
+  listeEinheitenPerioden: (...a: unknown[]) => listeEinheitenPerioden(...a),
+}));
+
 const listeAbloesungen = vi.fn();
 const listeAbloesungVorgaben = vi.fn();
 const beginneSchicht = vi.fn();
@@ -112,6 +117,7 @@ describe('AbloesungPage (LFH-635)', () => {
           : [],
       ),
     );
+    listeEinheitenPerioden.mockResolvedValue([]);
     listeAbloesungVorgaben.mockResolvedValue([
       {
         abschnitt_id: 7,
@@ -265,6 +271,69 @@ describe('AbloesungPage (LFH-635)', () => {
     await userEvent.clear(within(dialog).getByLabelText('Rhythmus (Stunden)'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(setzeAbloesungVorgabe).toHaveBeenLastCalledWith(1, 7, null));
+  });
+
+  // ── LFH-1078: zeigen statt erklären ──
+  it('leer: kein Anleitungssatz, „Schicht beginnen“ steht im Kopf', async () => {
+    listeAbloesungen.mockResolvedValue([]);
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    expect(screen.queryByText(/Mit „Schicht beginnen/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Schicht beginnen' })).toBeEnabled();
+  });
+
+  it('Schicht beginnen: Beginn-Platzhalter aus dem Eintreffen der offenen Periode', async () => {
+    listeAbloesungen.mockResolvedValue([]);
+    listeEinheitenPerioden.mockResolvedValue([
+      {
+        einheit_id: 12,
+        perioden: [
+          { anker: 'alarmierung', beginn_at: inMinuten(-90), eintreffen_at: inMinuten(-60) },
+        ],
+      },
+    ]);
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    await userEvent.click(await screen.findByTitle('Florian 2'));
+    const beginn = within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' });
+    await waitFor(() => expect(beginn.getAttribute('placeholder')).toMatch(/^Eintreffen /));
+  });
+
+  it('Rhythmus einer Schicht: die Abschnittsvorgabe steht als Platzhalter, kein „Leer:“', async () => {
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 1' }));
+    const menu = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    await userEvent.click(within(menu).getByText('Rhythmus ändern'));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+    expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe)');
+    expect(within(dialog).queryByText(/Leer/)).toBeNull();
+  });
+
+  it('Rhythmus-Vorgabe am Abschnitt: Platzhalter „keine Vorgabe“, kein Erklärsatz', async () => {
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Rhythmus-Vorgabe Deichwache Nord ändern' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Rhythmus (Stunden)')).toHaveAttribute(
+      'placeholder',
+      'keine Vorgabe',
+    );
+    expect(within(dialog).queryByText(/Leer|behalten/)).toBeNull();
+  });
+
+  it('ohne Abschnitte: kurzer Zustand im Vorgaben-Paneel', async () => {
+    listeAbloesungVorgaben.mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByText('Keine Einsatzabschnitte')).toBeInTheDocument();
   });
 
   // ── Fremde Neuzugänge per Sammelbanner (LFH-647) ──

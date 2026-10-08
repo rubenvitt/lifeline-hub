@@ -1,6 +1,5 @@
 import { IconPerson } from '../icons';
 import {
-  Alert,
   App,
   Breadcrumb,
   Button,
@@ -36,6 +35,8 @@ import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routi
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ErfassungsModal } from '../components/Erfassung';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { RechteHinweis } from '../components/SpeicherHinweis';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { KennungsLink } from '../components/kennungsLink';
 import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
@@ -242,9 +243,9 @@ export default function EinheitenPage() {
         )
       }
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei.
+        darfSchreiben ? undefined : (
+          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
         )
       }
     >
@@ -276,7 +277,6 @@ export default function EinheitenPage() {
           ) : einheiten.length === 0 ? (
             <SeitenLeer
               titel="Noch keine Einheiten"
-              hinweis="Die Gliederung entsteht mit der ersten gebildeten Einheit."
               aktion={
                 darfSchreiben
                   ? // Wortlaut gleich dem Kopfknopf: es ist dieselbe Handlung.

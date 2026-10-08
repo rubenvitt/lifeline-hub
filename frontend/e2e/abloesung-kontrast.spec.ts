@@ -256,7 +256,6 @@ for (const modus of ['light', 'dark'] as const) {
       'fällig',
       'abgelöst',
       `Abgelöst durch ${FOLGE}`,
-      'Leer: jetzt',
     ])
       pruefeGesehen(tragend);
 

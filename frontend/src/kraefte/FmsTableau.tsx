@@ -13,7 +13,6 @@ import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
 import { formatUhrzeitMitTag } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StatusWahl, { type StatusBedienung } from '../components/StatusWahl';
-import Tastenkuerzel from '../components/Tastenkuerzel';
 import { monoStil, Paneel, Sammelbanner, StatusChip, useRollen } from '../components/instrument';
 import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import {
@@ -37,7 +36,9 @@ import { fahrzeugStatus } from './meldebildRaster';
  * ZIFFERN wirken auf die Kachel, IN DER der Fokus steht — per DOM-Vorfahr: ein Tastendruck im
  * Statusmenü steigt aus dem Portal hierher auf, hat im DOM aber keine Kachel über sich. Der
  * Listener hängt an der Tableau-Wurzel, nicht an `window`. Nur ein eindeutig belegter
- * `fms_anker` setzt einen Status, sonst ein Hinweis und KEIN Wechsel.
+ * `fms_anker` setzt einen Status, sonst ein Hinweis und KEIN Wechsel. Keine Tastenlegende als Satz
+ * (LFH-1078, `frontend/AGENTS.md`, „Texte: zeigen statt erklären“): der S-Code jedes Menüeintrags
+ * („S4 · Am Einsatzort“) IST die Ziffer.
  *
  * ZUFLUSS: steht der Fokus im Tableau, friert die Menge der Fahrzeuge ein; ein neues wartet
  * hinter dem Sammelbanner (WCAG 3.2.5). Ein Wechsel ins Statusmenü ist KEIN Verlassen (wie
@@ -98,7 +99,6 @@ export default function FmsTableau({
   const katalogNach = useMemo(() => new Map(katalog.map((s) => [s.id, s])), [katalog]);
   const zuordnung = useMemo(() => zifferZuordnung(katalog), [katalog]);
   const optionen = useMemo(() => fmsStatusOptionen(katalog), [katalog]);
-  const zifferBelegt = [...zuordnung.values()].some((z) => z.art === 'eindeutig');
   /** Fahrzeug, dessen Auslöser nach dem laufenden Wechsel den Fokus zurückbekommt. */
   const fokusZiel = useRef<number | null>(null);
 
@@ -187,7 +187,7 @@ export default function FmsTableau({
     if (zielStatus.art === 'mehrdeutig') {
       void message.warning({
         key: ZIFFER_HINWEIS,
-        content: `Ziffer ${ziffer} ist im Statuskatalog ${zielStatus.anzahl}-fach belegt — Status bitte über das Menü wählen`,
+        content: `Ziffer ${ziffer} ist im Statuskatalog ${zielStatus.anzahl}-fach belegt`,
       });
       return;
     }
@@ -215,26 +215,7 @@ export default function FmsTableau({
       onBlur={verlassen}
       style={{ display: 'flex', flexDirection: 'column', gap: token.margin, minWidth: 0 }}
     >
-      {(einheitenHinweis || (darfSchreiben && zifferBelegt)) && (
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            columnGap: token.margin,
-            rowGap: token.marginXXS,
-            fontSize: 12,
-          }}
-        >
-          {darfSchreiben && zifferBelegt && (
-            <span style={{ ...gedaempft, display: 'inline-flex', gap: token.marginXS }}>
-              <Tastenkuerzel>0–9</Tastenkuerzel>
-              <span>setzt den Status des gewählten Fahrzeugs (Ziffer = S-Code)</span>
-            </span>
-          )}
-          {einheitenHinweis && <span style={gedaempft}>{einheitenHinweis}</span>}
-        </div>
-      )}
+      {einheitenHinweis && <span style={{ ...gedaempft, fontSize: 12 }}>{einheitenHinweis}</span>}
 
       {zufluessig > 0 && (
         <Sammelbanner aktion={{ label: 'anzeigen', onKlick: friereEin }}>
