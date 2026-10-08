@@ -89,6 +89,17 @@ pub async fn liste(
             return Err(AppError::Validation("Ungültiges vor_zeit".into()));
         }
     }
+    // Ein Abschnittsgerät (LFH-1043) sieht nur Aufträge an seinen Bereich; der Filter steht im
+    // SQL, damit das Blättern der Abgeschlossenen volle Seiten liefert.
+    let bereich = crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref())
+        .await?
+        .map(|b| {
+            let (abschnitte_json, einheiten_json) = b.als_json();
+            repo::EmpfaengerBereich {
+                abschnitte_json,
+                einheiten_json,
+            }
+        });
     let mut liste = repo::liste_gefiltert(
         &state.pool,
         einsatz_id,
@@ -96,7 +107,7 @@ pub async fn liste(
             status: params.status.as_deref(),
             richtung,
             empfaenger: filter.as_ref(),
-            bereich: None,
+            bereich: bereich.as_ref(),
             phase,
             seite,
         },
@@ -145,6 +156,7 @@ pub async fn detail(
     PfadParam((_, aid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     let mut d = repo::laden_im_einsatz(&state.pool, ctx.einsatz.id, aid, &jetzt()).await?;
+    fordere_im_bereich(&state, &ctx, &d.empfaenger).await?;
     anreichern_alle(
         &state.pool,
         ctx.einsatz.id,
@@ -245,6 +257,25 @@ async fn gehoert_pruefen(
     Ok(ctx.einsatz.org_id)
 }
 
+/// Ein Abschnittsgerät (LFH-1043) erreicht nur Aufträge mit mindestens einem Empfänger in
+/// seinem Bereich; ein fremder ist für es nicht vorhanden (404). Für Personen wirkungslos.
+async fn fordere_im_bereich(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    empfaenger: &[crate::auftrag::AuftragEmpfaengerAnzeige],
+) -> Result<(), AppError> {
+    match crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
+        Some(b)
+            if !empfaenger
+                .iter()
+                .any(|e| b.ist_eigener_empfaenger(e.abschnitt_id, e.einheit_id)) =>
+        {
+            Err(AppError::NotFound)
+        }
+        _ => Ok(()),
+    }
+}
+
 /// POST /api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren — Quittung (Achse 1).
 pub async fn quittieren(
     State(state): State<AppState>,
@@ -255,6 +286,13 @@ pub async fn quittieren(
     if !repo::empfaenger_gehoert_zu_auftrag(&state.pool, empfaenger_id, auftrag_id).await? {
         return Err(AppError::NotFound);
     }
+    // Ein Abschnittsgerät quittiert nur Zeilen an seinen Bereich (LFH-1043).
+    let zeile: Vec<_> = repo::empfaenger_von(&state.pool, auftrag_id)
+        .await?
+        .into_iter()
+        .filter(|e| e.id == empfaenger_id)
+        .collect();
+    fordere_im_bereich(&state, &ctx, &zeile).await?;
     repo::quittiere_empfaenger(&state.pool, empfaenger_id, ctx.benutzer.id, &jetzt()).await?;
     let d = repo::laden(&state.pool, auftrag_id, &jetzt()).await?;
 
@@ -301,6 +339,12 @@ pub async fn vollzug(
     JsonBody(req): JsonBody<VollzugReq>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     let org_id = gehoert_pruefen(&state, &ctx, auftrag_id).await?;
+    fordere_im_bereich(
+        &state,
+        &ctx,
+        &repo::empfaenger_von(&state.pool, auftrag_id).await?,
+    )
+    .await?;
     let now = jetzt();
     match req.status.as_str() {
         // Rücknahme (LFH-343 · C8): nur aus `in_arbeit`. Aus `vollzogen`/`abgenommen`

@@ -6,6 +6,7 @@
 //! Server bei jeder Anfrage neu, damit ein umgehängter Unterabschnitt sofort folgt. Fremdes ist
 //! beim Lesen 404, ein fremder Absender beim Melden 403.
 
+use super::{stelle, Bindungsart, Funktionsansicht, GeraetKontext};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::collections::HashSet;
@@ -68,6 +69,10 @@ impl Abschnittsbereich {
         einheit_id: Option<i64>,
         abschnitt_id: Option<i64>,
     ) -> Result<(Option<i64>, Option<i64>), AppError> {
+        // Ohne eigenen Abschnitt (aufgelöst) gibt es keinen Absender.
+        if !self.abschnitte.contains(&self.abschnitt_id) {
+            return Err(AppError::Forbidden);
+        }
         match (einheit_id, abschnitt_id) {
             (None, None) => Ok((None, Some(self.abschnitt_id))),
             (Some(e), None) if self.einheiten.contains(&e) => Ok((Some(e), None)),
@@ -82,6 +87,27 @@ impl Abschnittsbereich {
     /// Teilbaum und Einheiten als JSON-Listen für `json_each(?)` in SQL-Filtern.
     pub fn als_json(&self) -> (String, String) {
         (json_liste(&self.abschnitte), json_liste(&self.einheiten))
+    }
+}
+
+/// Der Bereich der Sitzung, wenn sie ein Abschnittsgerät ist; für Personen und andere Geräte
+/// `None`. Ist der gebundene Abschnitt weg, ist der Bereich leer (das Gerät sieht nichts mehr).
+pub async fn bereich(
+    pool: &SqlitePool,
+    geraet: Option<&GeraetKontext>,
+) -> Result<Option<Abschnittsbereich>, AppError> {
+    let Some(g) = geraet.filter(|g| g.ansicht == Funktionsansicht::Einsatzabschnitt) else {
+        return Ok(None);
+    };
+    match stelle::eigene(Some(g), Bindungsart::Einsatzabschnitt) {
+        Some(id) => Ok(Some(
+            Abschnittsbereich::laden(pool, g.einsatz_id, id).await?,
+        )),
+        None => Ok(Some(Abschnittsbereich {
+            abschnitt_id: 0,
+            abschnitte: HashSet::new(),
+            einheiten: HashSet::new(),
+        })),
     }
 }
 
@@ -232,6 +258,15 @@ mod tests {
         assert!(matches!(
             b.meldungs_absender(Some(l.zug_nord), Some(l.nord)),
             Err(AppError::UnprocessableEntity(_))
+        ));
+
+        // Abschnitt weg: leerer Bereich, kein Absender.
+        let leer = Abschnittsbereich::laden(&pool, l.einsatz, 999_999)
+            .await
+            .unwrap();
+        assert!(matches!(
+            leer.meldungs_absender(None, None),
+            Err(AppError::Forbidden)
         ));
     }
 

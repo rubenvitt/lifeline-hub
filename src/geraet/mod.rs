@@ -142,6 +142,7 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet
                 | Funktionsansicht::UhsLaptop
                 | Funktionsansicht::Lagemonitor
+                | Funktionsansicht::Einsatzabschnitt
         )
     }
 
@@ -174,10 +175,17 @@ impl Funktionsansicht {
                 "gefahrenzonen",
                 "einsatzabschnitte",
             ],
+            Funktionsansicht::Einsatzabschnitt => &[
+                "einsatzabschnitte",
+                "einheiten",
+                "auftraege",
+                "meldungen",
+                "lagekarte",
+                "gefahrenzonen",
+            ],
             // Noch nicht verfügbar (LFH-1040): ohne Module erreicht das Gerät nichts.
             Funktionsansicht::Betreuungsstelle
             | Funktionsansicht::Bereitstellungsraum
-            | Funktionsansicht::Einsatzabschnitt
             | Funktionsansicht::Verpflegung => &[],
         }
     }
@@ -190,10 +198,10 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet => UHS_TABLET,
             Funktionsansicht::UhsLaptop => UHS_LAPTOP,
             Funktionsansicht::Lagemonitor => LAGEMONITOR,
+            Funktionsansicht::Einsatzabschnitt => EINSATZABSCHNITT,
             // Noch nicht verfügbar (LFH-1040): nur `ALLE_ANSICHTEN`.
             Funktionsansicht::Betreuungsstelle
             | Funktionsansicht::Bereitstellungsraum
-            | Funktionsansicht::Einsatzabschnitt
             | Funktionsansicht::Verpflegung => &[],
         }
     }
@@ -262,6 +270,25 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
 /// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
 /// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
 const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor")];
+/// Zusätzliche Einsatzrouten des Abschnittsgeräts (LFH-1043): den eigenen Teilbaum und seine
+/// Einheiten lesen, Aufträge an den Bereich lesen, quittieren und ihren Vollzug melden, Meldungen
+/// an die Einsatzleitung anlegen und die eigenen lesen, Gefahrenzonen lesen. Jeder Handler hier
+/// schneidet über [`abschnitt::Abschnittsbereich`] zu; Abschnitte und Einheiten ändern, Aufträge
+/// erteilen oder abnehmen, ETB, Personen und Stellen fehlen bewusst.
+const EINSATZABSCHNITT: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/abschnitte"),
+    ("GET", "/api/einsaetze/{id}/einheiten"),
+    ("GET", "/api/einsaetze/{id}/auftraege"),
+    ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+    ),
+    ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("GET", "/api/einsaetze/{id}/zonen"),
+];
 
 /// Ob eine Gerätesitzung mit dieser Ansicht die Route `(methode, pfad)` aufrufen darf. `pfad`
 /// ist die `MatchedPath` (Muster mit Platzhaltern). Ohne Treffer: verboten.
@@ -437,6 +464,48 @@ mod tests {
         );
         assert_eq!(F::Verpflegung.stellenart(), None);
         assert_eq!(F::Lagemonitor.stellenart(), None);
+    }
+
+    #[test]
+    fn abschnittsgeraet_liest_seinen_bereich_und_meldet_nur_zurueck() {
+        let a = Funktionsansicht::Einsatzabschnitt;
+        assert!(a.ist_verfuegbar());
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/abschnitte"),
+            ("GET", "/api/einsaetze/{id}/einheiten"),
+            ("GET", "/api/einsaetze/{id}/auftraege"),
+            ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+            ),
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
+            ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("GET", "/api/einsaetze/{id}/zonen"),
+        ] {
+            assert!(darf_route(a, m, p), "Abschnittsgerät darf {m} {p}");
+        }
+        for (m, p) in [
+            ("POST", "/api/einsaetze/{id}/abschnitte"),
+            ("PATCH", "/api/einsaetze/{id}/abschnitte/{aid}"),
+            ("PATCH", "/api/einsaetze/{id}/abschnitte/{aid}/flaeche"),
+            ("DELETE", "/api/einsaetze/{id}/abschnitte/{aid}"),
+            ("POST", "/api/einsaetze/{id}/einheiten"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
+            ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
+            ("POST", "/api/einsaetze/{id}/auftraege"),
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
+            ("GET", "/api/einsaetze/{id}/auftraege/kennzahlen"),
+            ("POST", "/api/einsaetze/{id}/zonen"),
+            ("GET", "/api/einsaetze/{id}/freie-zeichen"),
+            ("GET", "/api/einsaetze/{id}/personal"),
+            ("GET", "/api/einsaetze/{id}/personen"),
+            ("GET", "/api/einsaetze/{id}/uhs"),
+            ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
+            ("GET", "/api/einsaetze/{id}/lagemonitor"),
+        ] {
+            assert!(!darf_route(a, m, p), "Abschnittsgerät darf {m} {p} nicht");
+        }
     }
 
     #[test]

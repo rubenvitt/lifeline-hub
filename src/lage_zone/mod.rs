@@ -20,7 +20,20 @@ wire_enum! {
     }
     try_from = |s| format!("Ungültiger LageZoneTyp: {s}");
 }
-impl LageZoneTyp {}
+impl LageZoneTyp {
+    /// Ob die Zone eine Gefahr oder Sperre markiert (Gefahrengebiet, Absperrung, Sperrgebiet).
+    /// Nur diese sieht ein Abschnittsgerät (LFH-1043, design.md D4); Evakuierungsbezirke und
+    /// freie Skizzen nicht.
+    pub fn ist_gefahrenzone(self) -> bool {
+        matches!(
+            self,
+            LageZoneTyp::Gefahrengebiet
+                | LageZoneTyp::Absperrbereich
+                | LageZoneTyp::Absperrgrenze
+                | LageZoneTyp::Sperrgebiet
+        )
+    }
+}
 
 wire_enum! {
     #[wire(ohne_serde)]
