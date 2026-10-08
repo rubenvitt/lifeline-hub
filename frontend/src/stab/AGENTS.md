@@ -39,6 +39,11 @@ im Kasten des nächsten Abschnitts über seiner Einheit im Baum; „EAL“/„UE
 Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung ohne `rueckwaertig`.
 Zeichen der Funktionen nur über `zeichen/fachobjektZeichen.ts:funktionsZeichen`; Höhe und Plätze nur
 über `stab/fernmeldeskizzeLayout.ts:ausstattungsZeilen` (Bild und Layout rechnen dieselbe Zahl).
+**Zurücktreten** (LFH-1039): zurückgenommen (Hervorheben, Filter) ist nicht gesperrt; der Text hält
+das Ziel der Textstufen (Tag ≥ 7 : 1, Nacht ≥ 5 : 1), nicht nur den Boden 4,5. Das Bild tritt mit
+`skizze/SkizzenElemente.tsx:ZURUECK_DECKKRAFT` zurück (0,72: hell 7,36, dunkel 8,43 : 1), Lücken- und
+Meldungszeile nie (`zurueckDeckkraft`); gerechnet in `skizze/zurueckKontrast.test.ts`, gemessen in
+beiden Modi im e2e „Prüfliste 5“. Die Hervorhebung trägt die Strichstärke, nicht die Deckkraft.
 
 **Skizze als Anlage** (LFH-1028): Lagebericht und Befehl fügen die Skizze als PNG an
 (`entwurf/DokumentAnlagen.tsx`). Aufgenommen wird nur über `stab/SkizzenAufnahme.tsx`: dieselben
