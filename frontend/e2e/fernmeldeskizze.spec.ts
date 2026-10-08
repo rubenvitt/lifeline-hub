@@ -1133,12 +1133,19 @@ async function treffflaechen(page: Page, ziel: number) {
         return [{ key, x: r.x, y: r.y, b: r.width, h: r.height }];
       },
     );
+    // Stelle und ihre Schiene (per Stichleitung verbunden) zählen nicht, wie in `mindestMassstab`.
+    const verbunden = new Set(
+      Array.from(document.querySelectorAll('[data-lfh="skizze-element"]'))
+        .map((el) => el.getAttribute('data-key')!)
+        .filter((k) => k.includes('~')),
+    );
     let abstand = Number.POSITIVE_INFINITY;
     let paar = '';
     for (let i = 0; i < ziele.length; i++) {
       for (let j = i + 1; j < ziele.length; j++) {
         const a = ziele[i];
         const o = ziele[j];
+        if (verbunden.has(`${a.key}~${o.key}`) || verbunden.has(`${o.key}~${a.key}`)) continue;
         const dx = Math.max(0, a.x - (o.x + o.b), o.x - (a.x + a.b));
         const dy = Math.max(0, a.y - (o.y + o.h), o.y - (a.y + a.h));
         const d = Math.hypot(dx, dy);
@@ -1232,9 +1239,10 @@ test('Prüfliste 1 und 2: die große Skizze hält je Stufe ihren Boden, darunter
     );
     expect(m.klein, `${k.name}: kein Ziel unter ${boden.ziel} px`).toEqual([]);
     if (boden.abstand > 0) {
-      expect(m.abstand, `${k.name}: Abstand ≥ ${boden.abstand} px`).toBeGreaterThanOrEqual(
-        boden.abstand - SUBPIXEL,
-      );
+      expect(
+        m.abstand,
+        `${k.name}: Abstand ≥ ${boden.abstand} px (${m.paar})`,
+      ).toBeGreaterThanOrEqual(boden.abstand - SUBPIXEL);
     }
     if (uebersicht) {
       await anker.click();
