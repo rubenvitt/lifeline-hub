@@ -271,6 +271,74 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// Die Stammdaten-Detailseiten tragen ihren Pfad im Kopf der `AdminPage`, über denselben
+// `Ortspfad` wie der Seitenkopf (LFH-1047). Gemessen wird der Rückweg zur Liste („Fahrzeuge“,
+// „Personal“) neben „Einsätze“; der Datensatzname ist der ausgeblendete letzte Eintrag.
+for (const { liste, api, daten, pfad } of [
+  {
+    liste: 'Fahrzeuge',
+    api: '/api/fahrzeuge',
+    daten: { funkrufname: `E2E Gate3 Pfad Florian ${Date.now()}`, fahrzeugtyp: 'LF 20' },
+    pfad: (id: number) => `/admin/stammdaten/fahrzeuge/${id}`,
+  },
+  {
+    liste: 'Personal',
+    api: '/api/personal',
+    daten: { name: `E2E Gate3 Pfad Kraft ${Date.now()}` },
+    pfad: (id: number) => `/admin/stammdaten/personal/${id}`,
+  },
+]) {
+  test(`Ortspfad der ${liste}-Detailseite: „${liste}“ folgt der Dichte-Staffel 30 / 48 / 72 px, die Schrift bleibt 12 px`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize(FUEKW);
+    await anmelden(page);
+    const antwort = await page.request.post(api, { data: daten });
+    expect(antwort.ok(), `Seeding ${liste}: ${antwort.status()} ${await antwort.text()}`).toBe(
+      true,
+    );
+    const { id } = (await antwort.json()) as { id: number };
+
+    const gemessen: string[] = [];
+    const je = new Map<string, number>();
+
+    for (const [schirm, groesse] of [
+      ['Fükw', FUEKW],
+      ['Handschirm', HANDSCHIRM],
+    ] as const) {
+      await page.setViewportSize(groesse);
+      for (const { dichte, soll } of STAFFEL) {
+        await page.goto(pfad(id));
+        await stelleDichte(page, dichte);
+
+        const links = page
+          .locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad')
+          .locator('.ant-breadcrumb-item a');
+        await expect(links).toHaveCount(PFAD_LINKS);
+        await expect(links.first()).toHaveText('Einsätze');
+        await expect(links.last()).toHaveText(liste);
+        const kleinstes = await alleHaltenStufe(
+          links,
+          soll,
+          `Pfad-Link ${liste} (${schirm}, ${dichte})`,
+          PFAD_LINKS,
+        );
+        for (let i = 0; i < PFAD_LINKS; i += 1) {
+          await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT);
+        }
+
+        je.set(`${dichte} ${schirm}`, kleinstes);
+        gemessen.push(`${schirm} ${dichte} (Soll ≥ ${soll}): Pfad-Link ${kleinstes}`);
+      }
+    }
+
+    gegenprobe(je, 'Fükw');
+    gegenprobe(je, 'Handschirm');
+    test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+  });
+}
+
 // ── Einheiten-Detailroute ───────────────────────────────────────────────────────────
 // Verwaltung → Führungsfunktionen (LFH-549): das Label ist eine Inline-Angabe, ihr Bearbeiten-Knopf
 // ist das Bedienziel jeder Zeile. Gemessen wird er als Admin (nur dort ist er ein Ziel).

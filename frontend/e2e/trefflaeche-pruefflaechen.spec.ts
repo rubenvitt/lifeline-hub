@@ -27,7 +27,8 @@ import {
  *
  * ZIELE WERDEN BENANNT, NICHT GEFEGT: jede Zielsorte nennt ihre Knoten über Rolle, Name oder
  * die antd-Hülle (`.ant-select`, `.ant-input-number`, nicht deren inneres `input`) und fordert
- * eine Mindestzahl. Bewusst NICHT gemessen und in einem Folgeticket: die Brotkrume (LFH-909).
+ * eine Mindestzahl. Die Brotkrume misst `gate3-trefflaeche.spec.ts` (LFH-909, auf den
+ * Stammdaten-Detailseiten LFH-1047).
  * Kennungs-Links (LFH-908) misst C13 an der Zeitachse der Lagemeldungen, den Funkrufname-Link
  * der Katalogtabelle `verwaltung-vereinheitlicht.spec.ts`. Beschriftete Checkboxen misst LFH-907
  * am ganzen Label (`label.ant-checkbox-wrapper`), nicht an der 16-px-Box. Das Löschkreuz eines

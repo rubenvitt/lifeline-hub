@@ -1535,6 +1535,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("kategorie", G_ENUM),
             retain("frist_bis", G_ZEIT),
+            retain("frist_gesetzt_at", G_ZEIT),
             retain(
                 "rechtsgrundlage",
                 "Rechtsgrundlage der Frist (Org-Text zur Rechenschaft, kein Personenbezug)",
