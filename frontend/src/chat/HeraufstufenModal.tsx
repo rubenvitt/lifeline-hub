@@ -97,7 +97,9 @@ export default function HeraufstufenModal({
         <Form.Item
           label="Anhänge übernehmen"
           name="anhang_ids"
-          extra="Übernommene Dateien werden kopiert und sind im Tagebuch unveränderlich."
+          // EIN Folgesatz vor dem unumkehrbaren Schritt; wie kopiert wird, sagt die Seite nicht
+          // (LFH-1078).
+          extra="Kopie im ETB, unveränderlich."
           rules={[
             {
               type: 'array',

@@ -93,7 +93,7 @@ describe('ModulPanel', () => {
         onModulKlick={() => {}}
       />,
     );
-    expect(screen.getByTitle('Öffnet in der Lagekarte')).toBeInTheDocument();
+    expect(screen.getByTitle('Lagekarte')).toBeInTheDocument();
   });
 
   it('blendet ein ausgeblendetes Modul nicht in der Liste ein (LFH-132)', () => {
@@ -404,7 +404,7 @@ describe('ModulListe — Sprungmarken', () => {
     label: 'Entscheidungen',
     zielModul: 'etb',
     nach: 'auftraege',
-    hinweis: 'ETB, Typ Entscheidung',
+    hinweis: 'ETB · Entscheidung',
     pfad: () => '/einsaetze/1/etb?typ=entscheidung',
   };
   const fuehrung: ModulEintrag[] = [
@@ -430,8 +430,10 @@ describe('ModulListe — Sprungmarken', () => {
     const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
     expect(knoepfe).toEqual(['Aufträge', 'Entscheidungen', 'Stab']);
     const sprung = screen.getByRole('button', {
-      name: 'Entscheidungen, springt zu ETB, Typ Entscheidung',
+      name: 'Entscheidungen, springt zu ETB · Entscheidung',
     });
+    // Der Titel nennt nur das Ziel, kein Verb (LFH-1078); der Pfeil zeigt den Sprung.
+    expect(sprung).toHaveAttribute('title', 'ETB · Entscheidung');
     expect(sprung).not.toHaveAttribute('aria-current');
     // Das Icon ist Dekoration: kein eigenes Vorleseziel (englisches `aria-label` „export").
     expect(within(sprung).queryByRole('img')).not.toBeInTheDocument();

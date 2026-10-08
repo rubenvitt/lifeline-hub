@@ -1,4 +1,4 @@
-import { Button } from 'antd';
+import { Button, Space } from 'antd';
 import { useNavigate } from 'react-router';
 import { IconSchloss } from '../icons';
 import Paneel from '../components/instrument/Paneel';
@@ -13,6 +13,11 @@ interface Props {
   ausgeblendet: boolean;
   /** Weg in ein freies Modul (`freiesRueckwegModul`); fehlt er, steht keine Aktion da. */
   rueckweg?: PlatzhalterRueckweg;
+  /**
+   * Pfad zu Einstellungen › Module, nur wenn die Person die Freigaben verwaltet (`darfModuleVerwalten`).
+   * Ohne ihn steht nur die Sperrzeile da (LFH-1078: zeigen statt erklären).
+   */
+  freigabenPfad?: string;
 }
 
 /**
@@ -22,10 +27,11 @@ interface Props {
  * des 403-Zustands der jeweiligen Seite.
  *
  * Form wie `components/Platzhalter.tsx`: ein schmales Paneel, Info statt Rot (eine Sperre ist keine
- * Gefahr), der Rückweg als EINE Primäraktion. Anders als dort trägt der Modulname das `h1`, über dem Paneel: die
+ * Gefahr), der Rückweg als EINE Primäraktion; wer die Freigaben verwaltet, bekommt daneben den Weg
+ * in Einstellungen › Module. Anders als dort trägt der Modulname das `h1`, über dem Paneel: die
  * Modulseite, die sonst den Seitentitel stellt, wird nicht gerendert.
  */
-export default function ModulGesperrt({ modul, ausgeblendet, rueckweg }: Props) {
+export default function ModulGesperrt({ modul, ausgeblendet, rueckweg, freigabenPfad }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
   return (
@@ -55,20 +61,22 @@ export default function ModulGesperrt({ modul, ausgeblendet, rueckweg }: Props) 
       </h1>
       <Paneel titel={KEINE_BERECHTIGUNG} koerperPolster>
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+          {/* Eine Sperrzeile (LFH-1078, Spec `modul-freigabe`): Modul und Grund stehen schon in h1 und
+             Paneeltitel. Wo die Freigaben liegen, zeigt der Knopf statt eines Satzes. */}
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
-            {ausgeblendet
-              ? `„${modul.label}“ ist in diesem Einsatz ausgeblendet.`
-              : `„${modul.label}“ ist für deine Rolle in diesem Einsatz nicht freigegeben.`}
+            {ausgeblendet ? 'In diesem Einsatz ausgeblendet' : 'Für deine Rolle nicht freigegeben'}
           </p>
-          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}>
-            Freigaben legt die Einsatzleitung unter Einstellungen › Module fest.
-          </p>
-          {rueckweg && (
-            <div>
-              <Button type="primary" onClick={() => void navigate(rueckweg.pfad)}>
-                {rueckweg.label}
-              </Button>
-            </div>
+          {(rueckweg || freigabenPfad) && (
+            <Space wrap>
+              {rueckweg && (
+                <Button type="primary" onClick={() => void navigate(rueckweg.pfad)}>
+                  {rueckweg.label}
+                </Button>
+              )}
+              {freigabenPfad && (
+                <Button onClick={() => void navigate(freigabenPfad)}>Modulfreigaben öffnen</Button>
+              )}
+            </Space>
           )}
         </div>
       </Paneel>

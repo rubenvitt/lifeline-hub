@@ -73,13 +73,15 @@ export default function LiveStatusBanner({
   const hinweise: string[] = [];
   if (!istOnline) hinweise.push('Offline — keine Verbindung zum Server.');
   if (status === 'lost') {
-    hinweise.push('Live-Verbindung unterbrochen — die Anzeige kann veraltet sein.');
+    // Der Zustand ohne Folgensatz (LFH-1078): die Farbe des Banners trägt die Störung.
+    hinweise.push('Live-Verbindung unterbrochen');
   } else if (status === 'connecting') {
     hinweise.push('Live-Verbindung wird wiederhergestellt …');
   }
   if (aktualisierungVerfuegbar) hinweise.push('Neue Version verfügbar.');
   if (aktualisierungFehlgeschlagen) {
-    hinweise.push('Aktualisierung fehlgeschlagen — bitte erneut versuchen.');
+    // Ohne Bitte (LFH-1078): „Jetzt neu laden“ steht daneben und trägt den zweiten Versuch.
+    hinweise.push('Aktualisierung fehlgeschlagen');
   }
 
   const stoerung = !istOnline || status === 'lost';

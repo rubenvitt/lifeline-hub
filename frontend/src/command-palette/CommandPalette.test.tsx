@@ -357,13 +357,12 @@ describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
 
     // Die Legende steht in der Fußzeile; die Modusanzeige oben nennt nur den AKTIVEN Modus, bei
     // leerem Feld also keinen.
-    // Kurzwort in der Zeile, der Langtext als Tooltip (LFH-1055).
+    // Kurzwort in der Zeile, keine erklärende Legende als Tooltip (LFH-1055, LFH-1078).
     const fuss = document.querySelector('[data-lfh="palette-fuss"]');
     expect(fuss).toHaveTextContent('Aktionen');
     expect(fuss).toHaveTextContent('ETB');
     expect(fuss).toHaveTextContent('Personen & Kräfte');
-    expect(fuss?.querySelector('[title="zeigt nur Aktionen"]')).not.toBeNull();
-    expect(fuss?.querySelector('[title="sucht im Einsatztagebuch"]')).not.toBeNull();
+    expect(fuss?.querySelector('[title]')).toBeNull();
     expect(fuss).toHaveTextContent('öffnen');
     // Nur, was funktioniert: kein „im Panel“, und die Koordinate nur mit `koordinatenSprung`
     // (außerhalb eines Einsatzes wäre der Hinweis eine Einladung ins Leere).
@@ -522,7 +521,7 @@ describe('CommandPalette · Präfixmodi „#" und „@" (LFH-391 · C3)', () => 
 
     await u.type(screen.getByRole('combobox'), '@a');
 
-    expect(screen.getByText(/Mindestens 2 Zeichen/)).toBeInTheDocument();
+    expect(screen.getByText(/Suche ab 2 Zeichen/)).toBeInTheDocument();
     expect(screen.queryByText('Keine Treffer')).not.toBeInTheDocument();
   });
 
@@ -539,7 +538,7 @@ describe('CommandPalette · Präfixmodi „#" und „@" (LFH-391 · C3)', () => 
 
     await u.type(screen.getByRole('combobox'), '@ab');
 
-    expect(screen.queryByText(/Mindestens 2 Zeichen/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Suche ab 2 Zeichen/)).not.toBeInTheDocument();
     expect(optionsTexte()).toEqual(['Personen · R-042 · Ab']);
   });
 });
@@ -575,7 +574,7 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
     await u.keyboard('{Backspace}{Backspace}{Backspace}{Backspace}');
 
     expect(screen.queryAllByRole('option')).toEqual([]);
-    expect(screen.getByText(/Mindestens 2 Zeichen/)).toBeInTheDocument();
+    expect(screen.getByText(/Suche ab 2 Zeichen/)).toBeInTheDocument();
   });
 
   /**
@@ -634,7 +633,7 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
 
       await u.type(screen.getByRole('combobox'), praefix);
 
-      expect(screen.getByText(/Mindestens 2 Zeichen/)).toBeInTheDocument();
+      expect(screen.getByText(/Suche ab 2 Zeichen/)).toBeInTheDocument();
       expect(screen.queryByText('Keine Treffer')).not.toBeInTheDocument();
     },
   );
@@ -650,7 +649,7 @@ describe('CommandPalette · Riegel an der Anzeige (LFH-391 · C, Review)', () =>
     await u.type(screen.getByRole('combobox'), '>');
 
     expect(screen.getByText('Keine Treffer')).toBeInTheDocument();
-    expect(screen.queryByText(/Mindestens 2 Zeichen/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Suche ab 2 Zeichen/)).not.toBeInTheDocument();
   });
 });
 
@@ -683,7 +682,7 @@ describe('CommandPalette · Leerzustand als Live-Region (LFH-391 · C, Review)',
 
     await u.type(screen.getByRole('combobox'), '@a');
 
-    expect(region()).toHaveTextContent(/Mindestens 2 Zeichen/);
+    expect(region()).toHaveTextContent(/Suche ab 2 Zeichen/);
   });
 
   /** Derselbe Ort trägt die zweite Meldung, kein zweiter Zweig daneben. */
@@ -929,7 +928,7 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
     const fuss = document.querySelector('[data-lfh="palette-fuss"]');
     expect(fuss).not.toHaveTextContent('Koordinate');
     // `#` bleibt das ETB-Präfix.
-    expect(fuss?.querySelector('[title="sucht im Einsatztagebuch"]')).not.toBeNull();
+    expect(fuss).toHaveTextContent('#ETB');
     expect(fuss).not.toHaveTextContent('Panel');
   });
 });

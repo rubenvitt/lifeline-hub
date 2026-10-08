@@ -294,9 +294,8 @@ anwendbar), „nicht geprüft" ist keins.
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
   Modulbeschreibungen aus wenigen Fachwörtern.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
-  „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. `OFFEN` ist
-  eine Schuldmenge, die nur schrumpft: wer eine Datei bereinigt, verkleinert ihren Eintrag; neue
-  Einträge gibt es nicht.
+  „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
+  `OFFEN` ist seit LFH-1078 P7 leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
 
 **Tabelle und Dichte**
 

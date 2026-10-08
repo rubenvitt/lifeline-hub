@@ -224,7 +224,7 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
  * Modulzeile und das Ziel der Sprungmarke „Entscheidungen" (ETB). So steht beides ohne Klick da.
  */
 const GESPERRT_ZEILE = 'Aufträge/Befehle';
-const GESPERRT_SPRUNG = 'Entscheidungen, springt zu ETB, Typ Entscheidung';
+const GESPERRT_SPRUNG = 'Entscheidungen, springt zu ETB · Entscheidung';
 
 async function modulSperren(page: Page, einsatzId: string, modulKey: string) {
   const antwort = await page.request.put(

@@ -66,7 +66,8 @@ import { modulName } from '../einsatz/modulRegistry';
 
 const rechteText = einsatzRechteGrund;
 
-const ENTFERNEN_TEXT = 'Es verschwindet aus der Liste; der ETB-Nachweis bleibt.';
+/** EIN Folgesatz vor dem unumkehrbaren Schritt (LFH-1078). */
+const ENTFERNEN_TEXT = 'ETB-Nachweis bleibt.';
 
 function bezugText(d: Dokument): string | null {
   return (
@@ -335,7 +336,6 @@ export default function DokumentePage() {
           : undefined
       }
       titel={modulName('dokumente')}
-      beschreibung="Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos."
       breadcrumb={
         <Breadcrumb
           items={[

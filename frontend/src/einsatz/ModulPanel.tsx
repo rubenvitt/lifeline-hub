@@ -192,7 +192,7 @@ export function ModulListe({
               type="button"
               data-lfh="modul-sprungmarke"
               disabled={gesperrt}
-              title={gesperrt ? KEINE_BERECHTIGUNG : `Springt zu ${marke.hinweis}`}
+              title={gesperrt ? KEINE_BERECHTIGUNG : marke.hinweis}
               // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen", wer vorliest, soll vorher
               // wissen, dass er im ETB landet.
               aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
@@ -291,11 +291,7 @@ export function ModulListe({
               </span>
             )}
             {m.verweistAuf && (
-              <span
-                title="Öffnet in der Lagekarte"
-                aria-hidden
-                style={{ display: 'inline-flex', flexShrink: 0 }}
-              >
+              <span title="Lagekarte" aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
                 <IconExternPfeil />
               </span>
             )}

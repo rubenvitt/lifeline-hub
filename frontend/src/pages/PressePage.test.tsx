@@ -172,6 +172,29 @@ describe('PressePage (LFH-554)', () => {
     await waitFor(() => expect(felder()).toBe(6));
   });
 
+  it('Eingang: leer zeigt „jetzt“ als Platzhalter, kein Satz (LFH-1078)', async () => {
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Medienkontakt erfassen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByText('Ansprechperson und Uhrzeit'));
+    expect(within(dialog).getByRole('textbox', { name: 'Eingang' })).toHaveAttribute(
+      'placeholder',
+      'jetzt',
+    );
+    expect(within(dialog).queryByText(/Leer gelassen/)).toBeNull();
+  });
+
+  it('kein Zweck-Absatz unter dem Titel, kein Rechte-Hinweis mit Schreibrecht (LFH-1078)', async () => {
+    setup();
+    await screen.findByText('NDR 1 · Evakuierte');
+    expect(screen.queryByText(/Sachgebiet S5/)).toBeNull();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
+    // Die Datenschutz-Zusicherung der Medienlage bleibt.
+    expect(
+      within(screen.getByRole('region', { name: 'Medienlage' })).getByText('ohne Personenbezug'),
+    ).toBeInTheDocument();
+  });
+
   it('eine Ablehnung ist ohne Rückfrage und per Toast rückgängig zu machen', async () => {
     setup();
     await userEvent.click(
@@ -226,6 +249,7 @@ describe('PressePage (LFH-554)', () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
     setup();
     expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+    expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Medienkontakt erfassen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Neue Pressemitteilung' })).toBeDisabled();
     await screen.findByText('NDR 1 · Evakuierte');

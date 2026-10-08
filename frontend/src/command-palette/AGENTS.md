@@ -26,7 +26,7 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   (Kernschlüssel `kernId` in `CommandPalette.tsx`: `ausgefuehrt:<id>` → `<id>`,
   `zuletzt:<modul>` → `modul:<modul>`). Bei aktiver Suche gilt `ohneOrdnungsdubletten`.
 - **Fußzeile** einzeilig in jeder Dichte: feste Maße (`tasteStil`), keine Dichte-Polsterung;
-  Präfixe mit Kurzwort aus `PALETTE_MODI.kurz`, Langtext als `title`.
+  Präfixe mit Kurzwort aus `PALETTE_MODI.kurz`, kein erklärender `title` (LFH-1078).
 - **Zeigerart** (LFH-982): Tasten- oder Tippwege entscheidet allein `useViewport().istBeruehrung`
   (primärer Zeiger), nie die Breite; ein Fükw mit schmalem Fenster behält die Tastenhinweise. Bei
   grobem Zeiger: im Kopf der Knopf „Sprungpalette schließen“ statt der Esc-Marke (Kante

@@ -2,6 +2,7 @@ import { Button } from 'antd';
 import { useState, type CSSProperties } from 'react';
 import type { ChatKanal } from '../api/types';
 import { Liste, ListenEintrag } from '../components/Liste';
+import { SeitenLeer } from '../components/SeitenZustand';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KanalAnlegenDialog from './KanalAnlegenDialog';
@@ -45,7 +46,9 @@ export function sortiereKanaele(kanaele: ChatKanal[]): ChatKanal[] {
  *
  * Die aktive Zeile trägt die 2-px-Marke in `bedien` und `aria-current`; Ungelesenes steht als
  * Zahl UND Wort („2 ungelesen" für Vorleser), nicht bloß als Farbpunkt (WCAG 1.4.1).
- * Die Anlage läuft über `KanalAnlegenDialog`, denselben Dialog wie unter `md`.
+ * Die Anlage läuft über `KanalAnlegenDialog`, denselben Dialog wie unter `md`. Ohne Kanal steht
+ * sie als Knopf im Leerzustand statt im Kopf: EIN Weg, kein Satz, der auf den Kopf zeigt
+ * (LFH-1078).
  */
 export default function KanalListe({
   kanaele,
@@ -57,18 +60,25 @@ export default function KanalListe({
   const [offen, setOffen] = useState(false);
   const { token, rollen } = useRollen();
   const { formatZeitKurz } = useAnzeigeKonventionen();
+  const leer = kanaele.length === 0;
 
   return (
     <Paneel
       titel="Kanäle"
       meta={kanaele.length}
-      aktion={darfSchreiben ? <Button onClick={() => setOffen(true)}>Kanal anlegen</Button> : null}
+      aktion={
+        darfSchreiben && !leer ? (
+          <Button onClick={() => setOffen(true)}>Kanal anlegen</Button>
+        ) : null
+      }
     >
-      {kanaele.length === 0 ? (
-        <div style={{ padding: token.padding, color: rollen.gedaempft }}>
-          Noch keine Kanäle
-          {darfSchreiben ? ' — legen Sie den ersten über „Kanal anlegen" an.' : '.'}
-        </div>
+      {leer ? (
+        <SeitenLeer
+          titel="Noch keine Kanäle"
+          aktion={
+            darfSchreiben ? { label: 'Kanal anlegen', onClick: () => setOffen(true) } : undefined
+          }
+        />
       ) : (
         <Liste<ChatKanal>
           size="small"

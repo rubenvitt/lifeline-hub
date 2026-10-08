@@ -327,7 +327,7 @@ export default function EtbZeitachse({
             }}
             style={{ position: 'absolute', insetInline: 0, top: 0 }}
           >
-            {zuflussText(zurueckgehalten)} — oben einsortiert
+            {zuflussText(zurueckgehalten)}
           </Sammelbanner>
         )}
       </div>

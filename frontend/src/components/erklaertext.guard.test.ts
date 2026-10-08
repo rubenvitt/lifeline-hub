@@ -74,15 +74,10 @@ const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
 ];
 
 /**
- * Schuldmenge: Datei (relativ zu `src/`) → erlaubte Trefferzahl. Schrumpft nur; die Pakete
- * P1–P7 aus LFH-1078 bauen sie ab.
+ * Schuldmenge: Datei (relativ zu `src/`) → erlaubte Trefferzahl. Mit P7 aus LFH-1078 leer; ein
+ * neuer Treffer ist rot und wird umgebaut, nicht hier eingetragen.
  */
-const OFFEN: Record<string, number> = {
-  'command-palette/VorschauZustand.tsx': 1,
-  'einsatz/AlarmZentrale.tsx': 2,
-  'infotelefon/AnrufErfassung.tsx': 2,
-  'pages/PressePage.tsx': 1,
-};
+const OFFEN: Record<string, number> = {};
 
 /** Sichtbare Zeichenketten einer Quelle: Literale, Template-Teile, JSX-Text. Ohne Importpfade. */
 function texteAus(quelle: string, dateiname = 'x.tsx'): { text: string; zeile: number }[] {

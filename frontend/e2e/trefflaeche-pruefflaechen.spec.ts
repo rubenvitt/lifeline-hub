@@ -141,7 +141,7 @@ async function messeFlaechen(page: Page, flaechen: Flaeche[]) {
  * sind — deshalb erst zwei Positivanker: das Benutzermenü nennt die gewechselte Person, und auf
  * einer Einsatzroute steht die Statusmarke des Einsatzes im Kopf (sie lebt aus derselben
  * Einsatz-Abfrage wie `darfImEinsatzSchreiben`). Wo die Seite einen Rechtehinweis trägt, wird
- * sein Text verlangt (`hinweis`); die gemessenen Modulseiten nutzen `RechteHinweis` nicht.
+ * sein Text verlangt (`hinweis`).
  */
 type Rollenzweig = { hinweis?: RegExp } & (
   | { fehlt: (page: Page) => Locator; gesperrt?: never }
@@ -477,7 +477,7 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
     {
       pfad: `${R}/chat`,
       anker: (page) => inMain(page).getByText('Funkprobe').first(),
-      hinweis: /^Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten/,
+      hinweis: /nur Einsatzleitung und Führungspersonal$/,
       fehlt: knopf('Senden'),
       // Die Eingabe weicht dem Hinweis; der Zweig wird als Vorbedingung belegt, ein eigenes
       // Bedienziel bleibt im Nachrichtenbereich nicht.

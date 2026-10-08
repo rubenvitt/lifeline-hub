@@ -19,6 +19,7 @@ import {
   type ModulEintrag,
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
+import { darfModuleVerwalten } from './schreibrecht';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -50,7 +51,12 @@ import { useDokumentTitel } from '../components/useDokumentTitel';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
 import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
-import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
+import {
+  einsaetzePfad,
+  einsatzEinstellungenPfad,
+  einsatzModulPfad,
+  parseRouteId,
+} from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
@@ -446,13 +452,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       {/* Warnung, keine Sackgasse: ohne Freigaben fällt `istModulSichtbar` nach OFFEN, jedes
          ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller
          Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der
-         Gefahr vorbehalten ist. */}
+         Gefahr vorbehalten ist. Nur der Zustand und der Knopf, keine Folgenerklärung (LFH-1078). */}
       {modulFreigabenQuery.isError && (
         <Alert
           type="warning"
           showIcon
           banner
-          title="Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind."
+          title="Modulfreigaben nicht geladen"
           action={
             <Button onClick={() => void modulFreigabenQuery.refetch()}>Erneut abrufen</Button>
           }
@@ -516,6 +522,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                   einsatzId={einsatzId}
                   modul={aktuellesModul}
                   freigaben={modulFreigaben!}
+                  darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
                 />
               ) : (
                 <Outlet />
@@ -564,10 +571,13 @@ function GesperrtesModul({
   einsatzId,
   modul,
   freigaben,
+  darfFreigabenVerwalten,
 }: {
   einsatzId: number;
   modul: ModulEintrag;
   freigaben: ModulFreigaben;
+  /** `darfModuleVerwalten`: dann führt ein zweiter Knopf zu Einstellungen › Module (LFH-1078). */
+  darfFreigabenVerwalten: boolean;
 }) {
   const { data, isLoading } = useQuery({
     queryKey: einsatzKeys.einstellungen(einsatzId),
@@ -585,6 +595,9 @@ function GesperrtesModul({
               pfad: einsatzModulPfad(einsatzId, modulZielRoute(ziel)),
               label: `${ziel.label} öffnen`,
             }
+      }
+      freigabenPfad={
+        darfFreigabenVerwalten ? einsatzEinstellungenPfad(einsatzId, 'module') : undefined
       }
     />
   );

@@ -551,7 +551,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
       `Alarm-Knopf Benachrichtigung (${dichte})`,
     );
     const ton = await haeltStufe(
-      kopf.getByRole('button', { name: /Alarmton/ }),
+      kopf.getByRole('button', { name: /^Ton / }),
       BODEN.staffel[dichte],
       `Alarm-Knopf Ton (${dichte})`,
     );

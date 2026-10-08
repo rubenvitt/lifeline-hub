@@ -260,7 +260,7 @@ test('die Alarmzentrale steht ab lg sichtbar abgesetzt von den Aktionen', async 
   const kasten = (await zelle.boundingBox())!;
   expect(kasten.height, 'Zelle hat sichtbare Höhe').toBeGreaterThan(0);
 
-  const ton = (await page.getByRole('button', { name: /Alarmton/ }).boundingBox())!;
+  const ton = (await page.getByRole('button', { name: /^Ton / }).boundingBox())!;
   const suchen = (await page.getByRole('button', { name: 'Suchen' }).boundingBox())!;
   expect(ton.x, 'Alarmknopf liegt in der Alarmzelle').toBeGreaterThanOrEqual(kasten.x - 1);
   expect(ton.x + ton.width, 'Alarmknopf liegt in der Alarmzelle').toBeLessThanOrEqual(
@@ -328,9 +328,9 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
   const alarm = page.locator('header [data-lfh="kopf-alarm"]');
   // Vorbedingung VOR der Messung, mit vollem Namen statt Regex: der Name trägt den Zustand,
   // und ein Fehlschlag soll die gestörte Nachbildung nennen, nicht das Layout. Gesperrt hieße
-  // der Ton-Knopf „Alarmton blockiert – tippen zum Freischalten".
+  // der Ton-Knopf „Ton blockiert – freischalten".
   await expect(alarm.getByRole('button', { name: 'Benachrichtigungen: erlaubt' })).toBeVisible();
-  await expect(alarm.getByRole('button', { name: 'Alarmton stummschalten' })).toBeVisible();
+  await expect(alarm.getByRole('button', { name: 'Ton bereit – stummschalten' })).toBeVisible();
   // Ruhezustand ohne Wort — aber benannt: beide Ziele stehen mit Zustand im Namen da.
   await expect(alarm).toHaveText('');
   const hoehe = await page.locator('header').evaluate((h) => h.clientHeight);
