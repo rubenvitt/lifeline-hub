@@ -12,6 +12,7 @@ import {
   paneel,
   seedeGrund,
   stiche,
+  tippe,
   ziehe,
 } from './fernmeldeskizze-kern';
 import { svgTextKontrast } from './kontrast-kern';
@@ -41,8 +42,10 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
  * - RUHIGE FLÄCHE (ersetzt die Schleuse, LFH-867): unter dem Zeiger springt nichts.
  * - RECHTE: Beobachter liest (Hervorheben und Zoom gehen); Stab-Schreibrecht ohne Einheiten;
  *   390 px nur lesen.
- * - PRÜFLISTE 1 und 5: Trefffläche der eingepassten großen Skizze am Fükw, Kontrast
- *   zurückgenommener Texte (Boden 4,5 : 1).
+ * - PRÜFLISTE 1, 2 und 5: Trefffläche der großen Skizze (mit externen Stellen und Komponenten)
+ *   je Stufe bei 1366, 1024 (komfortabel, Handschuh) und 390 px; unter dem Mindestmaßstab ist
+ *   die Fläche Übersicht, das Tippen zoomt (LFH-1038). Kontrast zurückgenommener Texte (Boden
+ *   4,5 : 1).
  *
  * Druck (Format, Umbruch, Graustufen): `fernmeldeskizze-druck.spec.ts`.
  *
@@ -54,8 +57,6 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
 const FUEKW = { width: 1366, height: 768 };
 const HANDSCHIRM = { width: 390, height: 844 };
 const SUBPIXEL = 0.5;
-/** Prüfliste Kriterium 1: Ziel ≥ 24 × 24 CSS-px oder ein freier Kreis von 24 px. */
-const ZIEL_MIN = 24;
 /**
  * Prüfliste Kriterium 5: zurückgenommen ist nicht gesperrt, der Text hält das Ziel der Textstufen,
  * Tag (hell) ≥ 7 : 1, Nacht (dunkel) ≥ 5 : 1 (`frontend/AGENTS.md`, „Textboden für jede
@@ -69,7 +70,12 @@ const LANG_SG = 'BN_BOS_LANGNAME_40';
 const LANG_RUF = 'Florian Musterstadt-Nord 12/34';
 const LANG_NAME = 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest';
 
-/** Spec „Viele Abschnitte am Fükw“: acht oberste Abschnitte mit je drei Einheiten an je zwei Gruppen. */
+/**
+ * Spec „Viele Abschnitte am Fükw“: acht oberste Abschnitte mit je drei Einheiten an je zwei
+ * Gruppen; dazu zwei externe Stellen (ILS an der TMO-Gruppe, Polizei ohne) und zwei Komponenten
+ * (Repeater an der DMO-Gruppe, Antenne ohne), damit die Messung jede Art von Stelle trifft
+ * (Prüfliste O6, LFH-1038).
+ */
 async function seedeGross(page: Page, einsatzId: string) {
   const a = api(page, einsatzId);
   const tmo = (await a.post('sprechgruppen', { bezeichnung: LANG_SG, betriebsart: 'TMO' })).id;
@@ -92,6 +98,26 @@ async function seedeGross(page: Page, einsatzId: string) {
       });
     }
   }
+  const stelle = async (stellenart: string, bezeichnung: string) => {
+    const plan = await a.post<{ id: number; bezeichnung: string }[]>(
+      'stab/kommunikationsplan/stellen',
+      { stellenart, bezeichnung },
+    );
+    return plan.find((x) => x.bezeichnung === bezeichnung)!.id;
+  };
+  const ils = await stelle('leitstelle', 'ILS Musterhausen');
+  await stelle('behoerde', 'Polizei');
+  await a.put(`stab/kommunikationsplan/stellen/${ils}/sprechgruppen/${tmo}`, {
+    status: 'bestehend',
+  });
+  const repeater = (
+    await a.post('stab/fernmeldeskizze/komponenten', {
+      art: 'repeater',
+      bezeichnung: 'Repeater Nord',
+    })
+  ).id;
+  await a.put(`stab/fernmeldeskizze/komponenten/${repeater}/sprechgruppen/${dmo}`);
+  await a.post('stab/fernmeldeskizze/komponenten', { art: 'antenne', bezeichnung: null });
   return { tmo, dmo };
 }
 
@@ -1033,14 +1059,14 @@ test('Mobil 390 px: nur lesen — kein Griff, keine Palette, aber Hervorheben un
 
   await expect(page.locator('[data-lfh="skizze-palette-knopf"]')).toHaveCount(0);
   await expect(page.locator('[data-lfh="skizze-rueckgaengig"]')).toHaveCount(0);
-  await ea1.click();
+  await tippe(page, ea1);
   await expect(paneel(page).locator('[data-lfh="skizze-rechte-grund"]')).toContainText(
     'Am schmalen Bildschirm nur lesen',
   );
   await expect(page.locator('[data-lfh="skizze-griff"]')).toHaveCount(0);
   await expect(ea1).toHaveCSS('cursor', 'pointer');
 
-  await element(page, `sg-${n.f314}`).click();
+  await tippe(page, element(page, `sg-${n.f314}`));
   await expect(ea1).toHaveAttribute('data-zurueck', 'true');
   const breite = () =>
     flaeche(page).evaluate((s) => Number(s.getAttribute('viewBox')!.split(' ')[2]));
@@ -1055,12 +1081,32 @@ test('Mobil 390 px: nur lesen — kein Griff, keine Palette, aber Hervorheben un
 
 // ── Prüfliste Kriterium 1 und 5 ────────────────────────────────────────────────────────────
 
+/** Boden je Dichte-Stufe (LFH-1038 D2): kurze Achse und Abstand zweier Ziele in CSS-px. */
+const BODEN = {
+  kompakt: { ziel: 24, abstand: 0 },
+  komfortabel: { ziel: 24, abstand: 0 },
+  handschuh: { ziel: 72, abstand: 16 },
+} as const;
+const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+const TABLET = { width: 1024, height: 768 };
+
+/** Der Provider liest die gespeicherte Wahl beim Montieren, deshalb das Neuladen. */
+async function stelleDichte(page: Page, dichte: keyof typeof BODEN) {
+  await page.evaluate(([k, w]) => window.localStorage.setItem(k, w), [
+    DICHTE_SCHLUESSEL,
+    dichte,
+  ] as const);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+}
+
 /**
- * Trefffläche jedes Elements (Platz bzw. Trefferrechteck der Schiene) in CSS-px; unter 24 px
- * zählt die Abstandsausnahme (WCAG 2.5.8): ein Kreis von 24 px um die Mitte schneidet kein
- * anderes Ziel und keinen anderen solchen Kreis.
+ * Trefffläche jedes Elements (Platz bzw. Trefferrechteck der Schiene) in CSS-px: Zahl unter dem
+ * Boden, kleinstes Ziel und der kleinste freie Abstand zweier Ziele, die sich nicht berühren
+ * (Komponente auf ihrer Schiene, Schiene an der externen Spalte zählen nicht, wie in
+ * `ansicht.ts:mindestMassstab`).
  */
-async function treffflaechen(page: Page) {
+async function treffflaechen(page: Page, ziel: number) {
   return page.evaluate((min) => {
     const ziele = Array.from(document.querySelectorAll('[data-lfh="skizze-element"]')).flatMap(
       (el) => {
@@ -1070,60 +1116,114 @@ async function treffflaechen(page: Page) {
         return [{ key, x: r.x, y: r.y, b: r.width, h: r.height }];
       },
     );
-    const klein = ziele.filter((z) => z.b < min || z.h < min);
-    const kreisFrei = (z: (typeof ziele)[number]) => {
-      const cx = z.x + z.b / 2;
-      const cy = z.y + z.h / 2;
-      return ziele.every((o) => {
-        if (o === z) return true;
-        const nx = Math.max(o.x, Math.min(cx, o.x + o.b));
-        const ny = Math.max(o.y, Math.min(cy, o.y + o.h));
-        const abstand = Math.hypot(cx - nx, cy - ny);
-        if (abstand < min / 2) return false;
-        if (o.b < min || o.h < min) {
-          const d = Math.hypot(cx - (o.x + o.b / 2), cy - (o.y + o.h / 2));
-          if (d < min) return false;
+    let abstand = Number.POSITIVE_INFINITY;
+    let paar = '';
+    for (let i = 0; i < ziele.length; i++) {
+      for (let j = i + 1; j < ziele.length; j++) {
+        const a = ziele[i];
+        const o = ziele[j];
+        const dx = Math.max(0, a.x - (o.x + o.b), o.x - (a.x + a.b));
+        const dy = Math.max(0, a.y - (o.y + o.h), o.y - (a.y + a.h));
+        const d = Math.hypot(dx, dy);
+        if (d > 0.5 && d < abstand) {
+          abstand = d;
+          paar = `${a.key}/${o.key}`;
         }
-        return true;
-      });
-    };
+      }
+    }
     return {
       anzahl: ziele.length,
+      arten: [...new Set(ziele.map((z) => z.key.replace(/-.*/, '')))].sort(),
       kleinste: ziele.reduce((k, z) => (Math.min(z.b, z.h) < Math.min(k.b, k.h) ? z : k), ziele[0]),
-      ohneAusnahme: klein
-        .filter((z) => !kreisFrei(z))
-        .map((z) => `${z.key} ${Math.round(z.b)}×${Math.round(z.h)}`),
-      klein: klein.length,
+      klein: ziele.filter((z) => z.b < min - 0.5 || z.h < min - 0.5).map((z) => z.key),
+      abstand,
+      paar,
     };
-  }, ZIEL_MIN);
+  }, ziel);
 }
 
-test('Prüfliste 1: die eingepasste große Skizze hält am Fükw 24 × 24 px je Ziel; Messwert 390 px', async ({
+/**
+ * Ist irgendein Element in der Mitte seines Platzes Zeigerziel? In der Übersicht trifft dort nur
+ * der Grund (LFH-1038 D3); gezählt werden Elemente, deren Mitte in der Fläche liegt.
+ */
+async function zeigerziele(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const svg = document.querySelector('[data-lfh="skizze-flaeche"] svg')!.getBoundingClientRect();
+    return Array.from(document.querySelectorAll('[data-lfh="skizze-element"]')).filter((el) => {
+      const r = el.querySelector(':scope > rect')?.getBoundingClientRect();
+      if (!r) return false;
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      if (x < svg.left || x > svg.right || y < svg.top || y > svg.bottom) return false;
+      return document.elementFromPoint(x, y)?.closest('[data-lfh="skizze-element"]') != null;
+    }).length;
+  });
+}
+
+const PRUEFLISTE_1 = [
+  { name: 'Fükw', groesse: FUEKW, dichte: 'kompakt' },
+  { name: 'Tablet', groesse: TABLET, dichte: 'komfortabel' },
+  { name: 'Tablet Handschuh', groesse: TABLET, dichte: 'handschuh' },
+  { name: 'Handschirm', groesse: HANDSCHIRM, dichte: 'komfortabel' },
+] as const;
+
+test('Prüfliste 1 und 2: die große Skizze hält je Stufe ihren Boden, darunter ist sie Übersicht und das Tippen zoomt', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await page.setViewportSize(FUEKW);
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze Kriterium 1 ${Date.now()}`);
   await seedeGross(page, einsatzId);
-  const anker = flaeche(page).getByRole('button', { name: /^Einheit Einheit 8\.3/ });
-  await oeffneSkizze(page, einsatzId, anker);
-  await expect(page.locator('[data-lfh="modul-panel"]'), 'Panel offen am Fükw').toBeVisible();
-  const fuekw = await treffflaechen(page);
-  test.info().annotations.push({
-    type: 'messwert',
-    description: `Fükw: ${fuekw.anzahl} Ziele, kleinstes ${fuekw.kleinste.key} ${Math.round(fuekw.kleinste.b)}×${Math.round(fuekw.kleinste.h)} px, unter 24 px: ${fuekw.klein}`,
-  });
-  expect(fuekw.klein, 'am Fükw ist jedes Ziel mindestens 24 × 24 px').toBe(0);
-
-  // 390 px liest nur; das Tippen wählt. Gemessen und gemeldet, nicht als Boden gesetzt.
-  await page.setViewportSize(HANDSCHIRM);
-  await oeffneSkizze(page, einsatzId, anker);
-  const mobil = await treffflaechen(page);
-  test.info().annotations.push({
-    type: 'messwert',
-    description: `390 px: kleinstes ${mobil.kleinste.key} ${Math.round(mobil.kleinste.b)}×${Math.round(mobil.kleinste.h)} px, unter 24 px: ${mobil.klein}, davon ohne freien 24-px-Kreis: ${mobil.ohneAusnahme.length} (${mobil.ohneAusnahme.slice(0, 6).join(', ')})`,
-  });
+  const anker = flaeche(page).getByRole('button', { name: /^Einheit Einheit 4\.2/ });
+  const gemessen: string[] = [];
+  for (const k of PRUEFLISTE_1) {
+    await page.setViewportSize(k.groesse);
+    await oeffneSkizze(page, einsatzId, anker);
+    await stelleDichte(page, k.dichte);
+    await expect(anker).toBeVisible();
+    if (k.groesse === FUEKW) {
+      await expect(page.locator('[data-lfh="modul-panel"]'), 'Panel offen am Fükw').toBeVisible();
+    }
+    const boden = BODEN[k.dichte];
+    const uebersicht = (await flaeche(page).getAttribute('data-uebersicht')) === 'true';
+    if (uebersicht) {
+      expect(await zeigerziele(page), `${k.name}: in der Übersicht ist kein Element Ziel`).toBe(0);
+      await anker.click({ force: true });
+      await expect(flaeche(page), `${k.name}: Tippen zoomt`).not.toHaveAttribute(
+        'data-uebersicht',
+        'true',
+      );
+      await expect(anker, `${k.name}: das erste Tippen wählt nicht`).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    }
+    const m = await treffflaechen(page, boden.ziel);
+    gemessen.push(
+      `${k.name} (${k.dichte}, ${uebersicht ? 'Übersicht, nach Tippen' : 'eingepasst'}): ` +
+        `${m.anzahl} Ziele (${m.arten.join(', ')}), kleinstes ${m.kleinste.key} ` +
+        `${Math.round(m.kleinste.b)}×${Math.round(m.kleinste.h)} px, ` +
+        `kleinster Abstand ${Math.round(m.abstand)} px (${m.paar})`,
+    );
+    expect(m.arten, `${k.name}: jede Art von Stelle gemessen`).toEqual(
+      expect.arrayContaining(['ab', 'eh', 'fs', 'ko', 'ks', 'sg']),
+    );
+    expect(m.klein, `${k.name}: kein Ziel unter ${boden.ziel} px`).toEqual([]);
+    if (boden.abstand > 0) {
+      expect(m.abstand, `${k.name}: Abstand ≥ ${boden.abstand} px`).toBeGreaterThanOrEqual(
+        boden.abstand - SUBPIXEL,
+      );
+    }
+    if (uebersicht) {
+      await anker.click();
+      await expect(anker, `${k.name}: das zweite Tippen wählt`).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
 for (const modus of ['dark', 'light'] as const) {

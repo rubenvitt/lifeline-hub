@@ -38,6 +38,13 @@ Arbeitsplatz bewegt: auto-gelegte Plätze, gespeicherte Lagen und Bereiche
 stillem Überschreiben), den Maßstab der eingepassten Ansicht und den Ort der Fläche am Schirm
 (`stab/skizze/useAmSchirmHalten.ts`, Bildlauf gleicht aus; das Lücken-Paneel schrumpft nicht).
 Eigenes Schreiben gibt das Element frei. Nachweis am Schirm, nie nur in SVG-Koordinaten.
+**Treffläche der Fläche** (LFH-1038): Elemente sind nur über dem Mindestmaßstab der Stufe
+Zeigerziel (`stab/skizze/ansicht.ts:mindestMassstab`, gerechnet aus den Plätzen des Layouts; Boden
+über `trefferboden` aus dem Token: 24 px, Handschuh 72 px und 16 px Abstand). Darunter ist die
+Fläche Übersicht (`data-uebersicht`): das erste Tippen zoomt um den Punkt, Tastatur, Paneel und
+Lücken-Wahl wählen immer; keine Erklärung im UI. Komponenten mindestens `KOMPONENTE_HOEHE` hoch.
+Nachweis e2e „Prüfliste 1 und 2“; e2e wählen Elemente per Zeiger über `tippe`
+(`e2e/fernmeldeskizze-kern.ts`).
 **Ausstattung im Kasten** (LFH-1029): Führungsstelle und Abschnitt tragen `ausstattung`, kleine
 Zeichen mit Wort darunter, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus). Ein
 Führungsfahrzeug (Fachaufgabe `fuehrung` aus `baueTzProps`, dieselbe Regel wie die Lagekarte) steht

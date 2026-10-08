@@ -5,6 +5,7 @@ import {
   kopfFelder,
   zuordnungsKarte,
 } from './einheit-fixture';
+import { tippe } from './fernmeldeskizze-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import {
   BODEN_KARTE,
@@ -1755,7 +1756,8 @@ for (const schreibend of [true, false]) {
 // Palette (Einträge mit „Setzen“/„Zeigen“, die drei Anlegen-Knöpfe), Eigenschaftspaneel des
 // gewählten Elements, die Wahlknöpfe des Lücken-Paneels (handgebaut, `stabZeilenzielStil`) und
 // der Umschalter der Darstellung. Die Elemente AUF der Fläche skalieren mit dem Maßstab, nicht
-// mit der Dichte; ihre Trefffläche misst `fernmeldeskizze.spec.ts` (Prüfliste Kriterium 1).
+// mit der Dichte; unter dem Mindestmaßstab der Stufe ist die Fläche Übersicht, und das erste
+// Tippen zoomt (LFH-1038). Ihre Trefffläche misst `fernmeldeskizze.spec.ts` („Prüfliste 1 und 2“).
 // Seeding wie der Funkplan (Abschnitt Nord, 1. Zug, je ohne Sprechgruppe: drei Lücken mit
 // Wahlknopf) und eine einsatzlokale Sprechgruppe für die Palette.
 
@@ -1801,7 +1803,7 @@ async function messeSkizze(page: Page, soll: number, dichte: string, schreibend:
     ).toHaveCount(0);
     await expect(palette, 'Vorbedingung: ohne Schreibrecht keine Palette').toHaveCount(0);
   }
-  await zug.click();
+  await tippe(page, zug);
   const paneel = page.locator('[data-lfh="skizze-paneel"]');
   await expect(paneel.locator('[data-lfh="skizze-paneel-titel"]')).toContainText('1. Zug');
   if (!schreibend) {

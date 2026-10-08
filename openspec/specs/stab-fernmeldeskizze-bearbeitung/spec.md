@@ -209,8 +209,10 @@ schreibgeschützt sein; Hervorheben, Filtern und Zoomen MUST weiter gehen. Der S
 
 ### Requirement: Touch und mobil
 Am Führungs-Tablet SHALL jede Handlung mit dem Finger gehen: Ziehen, Zoomen mit zwei Fingern,
-Langdruck für das Kontextmenü, Trefferflächen nach der Dichte-Staffel. Mobil (unter 768 px) MUST
-die Fläche nur lesen, zoomen und hervorheben lassen.
+Langdruck für das Kontextmenü, Trefferflächen nach der Dichte-Staffel. Elemente der Fläche MUST
+nur über dem Mindestmaßstab der Stufe Zeigerziel sein; darunter wählt das erste Tippen nicht,
+sondern zoomt. Linien und Schienen MUST in der Stufe Handschuh 72 px breit treffen. Mobil (unter
+768 px) MUST die Fläche nur lesen, zoomen und hervorheben lassen.
 
 #### Scenario: Kontextmenü am Tablet
 - **WHEN** eine Person am Tablet lange auf „1. Zug“ drückt
@@ -219,6 +221,10 @@ die Fläche nur lesen, zoomen und hervorheben lassen.
 #### Scenario: Mobil
 - **WHEN** eine Person mit Schreibrecht die Skizze bei 390 px öffnet
 - **THEN** bietet die Fläche keinen Griff, aber Zoom und Hervorheben
+
+#### Scenario: Komponenten nebeneinander
+- **WHEN** zwei Komponenten an derselben Schiene sitzen
+- **THEN** ist jede so hoch wie eine Einheit, und zwischen ihnen liegen 16 Einheiten
 
 ### Requirement: Bezüge verwaisen nicht
 Wird ein Abschnitt, eine Einheit, eine externe Stelle oder eine Komponente gelöscht, SHALL die

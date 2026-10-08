@@ -80,6 +80,17 @@ export const STEIG_ABSTAND = RASTER;
 const ZEICHEN_ABSTAND = 4;
 
 /**
+ * Mindesthöhe des Platzes einer Komponente: die einer Einheit mit einzeiligem Namen (LFH-1038 D6).
+ * Gezeichnet wird nur Zeichen und Bezeichnung; der Platz ist Ziel und Wahlrahmen und hält so am
+ * Fükw eingepasst den Boden von 24 px wie eine Einheit.
+ */
+export const KOMPONENTE_HOEHE = aufRaster(
+  TZ_HOEHE + ZEICHEN_ABSTAND + NAME_ZEILE + RUFNAME_ZEILE + LUECKE_ZEILE,
+);
+/** Abstand zweier Komponenten auf einer Schiene, wie zwischen zwei Stellen einer Spalte. */
+export const KOMPONENTE_ABSTAND = STAPEL_ABSTAND;
+
+/**
  * Ausstattung im Kasten (LFH-1029): je Zeichen ein Platz mit Zeichen und Wort darunter, so
  * viele Plätze je Zeile wie die Innenbreite fasst. Gemessen im Druck (`e2e/fernmeldeskizze-
  * ausstattung.spec.ts`, „Messung“): acht Abschnitte, A4 quer 3,4 pt, A3 quer 5,1 pt, so
@@ -216,7 +227,7 @@ export function stellenMasse(s: NetzStelle): { breite: number; hoehe: number } {
         ZEICHEN_GROESSE +
         ZEICHEN_ABSTAND +
         zeilen(s.bezeichnung, NAME_SCHRIFT, KOMPONENTE_BREITE) * NAME_ZEILE;
-      return { breite: KOMPONENTE_BREITE, hoehe: aufRaster(hoehe) };
+      return { breite: KOMPONENTE_BREITE, hoehe: Math.max(KOMPONENTE_HOEHE, aufRaster(hoehe)) };
     }
   }
 }
@@ -332,7 +343,7 @@ export function layoutFernmeldenetz(
   }
   const komponentenAn = (s: NetzSchiene) =>
     s.teilnehmer.map((t) => t.element).filter((k) => ersteSchiene.get(k) === s.key);
-  const komponentenBreite = (n: number) => n * (KOMPONENTE_BREITE + RASTER);
+  const komponentenBreite = (n: number) => n * (KOMPONENTE_BREITE + KOMPONENTE_ABSTAND);
 
   const entwuerfe: Entwurf[] = [];
   const untenZeile: NetzSchiene[] = [];

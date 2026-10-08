@@ -66,6 +66,20 @@ export async function oeffneSkizze(
   await expect(anker).toBeVisible();
 }
 
+/**
+ * Wählt ein Element der Fläche per Zeiger. Unter dem Mindestmaßstab der Dichte-Stufe ist die
+ * Fläche Übersicht (LFH-1038): kein Element ist Zeigerziel, das erste Tippen zoomt um den Punkt.
+ * Deshalb dort zuerst auf die Stelle tippen (`force`, das Element selbst nimmt keinen Zeiger an),
+ * dann wählen.
+ */
+export async function tippe(page: Page, ziel: Locator) {
+  if ((await flaeche(page).getAttribute('data-uebersicht')) === 'true') {
+    await ziel.click({ force: true });
+    await expect(flaeche(page)).not.toHaveAttribute('data-uebersicht', 'true');
+  }
+  await ziel.click();
+}
+
 /** Linke obere Ecke des Platzes (erstes `rect` des Elements) in Skizzeneinheiten. */
 export async function lage(el: Locator): Promise<{ x: number; y: number }> {
   return el.evaluate((g) => {

@@ -295,6 +295,28 @@ describe('layoutFernmeldenetz · Auto-Layout aus der Führungsorganisation', () 
     }
   });
 
+  it('Komponenten: Platz so hoch wie eine Einheit, nebeneinander 16 E. Abstand (LFH-1038 D6)', () => {
+    const F314 = sg(2, 'DMO', '314_F*');
+    const n = netz({
+      abschnitte: [abschnitt(1, { sprechgruppen: [F314] })],
+      einheiten: [einheit(1, { abschnitt_id: 1, sprechgruppen: [F314] })],
+      skizze: {
+        komponenten: [
+          { id: 8, art: 'repeater', bezeichnung: null, sprechgruppen: [F314] },
+          { id: 9, art: 'gateway', bezeichnung: null, sprechgruppen: [F314] },
+        ],
+      },
+    });
+    const { plaetze } = layoutFernmeldenetz(n);
+    const eh = platz(plaetze, 'eh-1');
+    const ko8 = platz(plaetze, 'ko-8');
+    const ko9 = platz(plaetze, 'ko-9');
+    expect(ko8.hoehe).toBeGreaterThanOrEqual(eh.hoehe);
+    expect(ko9.hoehe).toBe(ko8.hoehe);
+    expect(ko9.x - rechts(ko8)).toBe(16);
+    expect(ko9.y).toBe(ko8.y);
+  });
+
   it('legt Schienen ohne Teilnehmer in eine eigene Zeile unten', () => {
     const lokal = { ...sg(9, 'DMO', '999'), einsatz_lokal: true };
     const n = baueFernmeldenetz({
