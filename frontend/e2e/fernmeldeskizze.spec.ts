@@ -56,8 +56,12 @@ const HANDSCHIRM = { width: 390, height: 844 };
 const SUBPIXEL = 0.5;
 /** Prüfliste Kriterium 1: Ziel ≥ 24 × 24 CSS-px oder ein freier Kreis von 24 px. */
 const ZIEL_MIN = 24;
-/** Prüfliste Kriterium 5: zurückgenommener Text nie unter 4,5 : 1. */
-const TEXT_BODEN = 4.5;
+/**
+ * Prüfliste Kriterium 5: zurückgenommen ist nicht gesperrt, der Text hält das Ziel der Textstufen,
+ * Tag (hell) ≥ 7 : 1, Nacht (dunkel) ≥ 5 : 1 (`frontend/AGENTS.md`, „Textboden für jede
+ * Textstufe“; Deckkraft in `skizze/SkizzenElemente.tsx`, gerechnet in `zurueckKontrast.test.ts`).
+ */
+const ZURUECK_ZIEL = { light: 7, dark: 5 } as const;
 
 // ── Messung 1.1 ────────────────────────────────────────────────────────────────────────────
 
@@ -1021,35 +1025,42 @@ test('Prüfliste 1: die eingepasste große Skizze hält am Fükw 24 × 24 px je 
   });
 });
 
-test('Prüfliste 5: zurückgenommene Texte halten 4,5 : 1 (Name, Rufname, Lückenwort, „kein Rufname“)', async ({
-  page,
-}) => {
-  await page.setViewportSize(FUEKW);
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Skizze Kriterium 5 ${Date.now()}`);
-  const n = await seedeLuecken(page, einsatzId);
-  await oeffneSkizze(page, einsatzId, element(page, `ks-${n.ils}`));
-  // Die Schiene „DMO 505“ gewählt: nur „3. Zug“ hängt daran, alles andere tritt zurück.
-  await element(page, `sg-${n.d505}`).click();
-  const zurueck = (key: string) => element(page, key);
-  await expect(zurueck(`eh-${n.ohne}`)).toHaveAttribute('data-zurueck', 'true');
-  await expect(zurueck(`eh-${n.mit}`)).toHaveAttribute('data-zurueck', 'true');
+for (const modus of ['dark', 'light'] as const) {
+  test(`Prüfliste 5: zurückgenommene Texte halten das Textziel im Modus ${modus} (Name, Rufname, Lückenwort, „kein Rufname“)`, async ({
+    page,
+  }) => {
+    const ziel = ZURUECK_ZIEL[modus];
+    await page.setViewportSize(FUEKW);
+    await anmeldenAls(page, ADMIN, ADMIN_PW);
+    const einsatzId = await einsatzAnlegen(page, `E2E Skizze Kriterium 5 ${modus} ${Date.now()}`);
+    const n = await seedeLuecken(page, einsatzId);
+    await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
+    await oeffneSkizze(page, einsatzId, element(page, `ks-${n.ils}`));
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    // Die Schiene „DMO 505“ gewählt: nur „3. Zug“ hängt daran, alles andere tritt zurück.
+    await element(page, `sg-${n.d505}`).click();
+    const zurueck = (key: string) => element(page, key);
+    await expect(zurueck(`eh-${n.ohne}`)).toHaveAttribute('data-zurueck', 'true');
+    await expect(zurueck(`eh-${n.mit}`)).toHaveAttribute('data-zurueck', 'true');
 
-  const faelle: [string, Locator][] = [
-    ['Name', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').first()],
-    ['Rufname', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').nth(1)],
-    ['kein Rufname', zurueck(`eh-${n.ohne}`).locator('[data-teil="stelle"] > text').nth(1)],
-    ['Lückenwort', zurueck(`eh-${n.ohne}`).locator('[data-teil="luecke"] > text')],
-    ['Kasten (EA 1)', zurueck(`ab-${n.ea}`).locator('[data-teil="stelle"] > text').first()],
-  ];
-  const gemessen: string[] = [];
-  const unter: string[] = [];
-  for (const [name, text] of faelle) {
-    await expect(text, `${name}: Text steht`).toHaveCount(1);
-    const m = await svgTextKontrast(text);
-    gemessen.push(`${name} ${m.verhaeltnis.toFixed(2)} (Deckkraft ${m.deckkraft})`);
-    if (m.verhaeltnis < TEXT_BODEN) unter.push(`${name}: ${m.verhaeltnis.toFixed(2)} : 1`);
-  }
-  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' · ') });
-  expect(unter, `zurückgenommen unter ${TEXT_BODEN} : 1`).toEqual([]);
-});
+    const faelle: [string, Locator][] = [
+      ['Name', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').first()],
+      ['Rufname', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').nth(1)],
+      ['kein Rufname', zurueck(`eh-${n.ohne}`).locator('[data-teil="stelle"] > text').nth(1)],
+      ['Lückenwort', zurueck(`eh-${n.ohne}`).locator('[data-teil="luecke"] > text')],
+      ['Kasten (EA 1)', zurueck(`ab-${n.ea}`).locator('[data-teil="stelle"] > text').first()],
+    ];
+    const gemessen: string[] = [];
+    const unter: string[] = [];
+    for (const [name, text] of faelle) {
+      await expect(text, `${name}: Text steht`).toHaveCount(1);
+      const m = await svgTextKontrast(text);
+      gemessen.push(`${name} ${m.verhaeltnis.toFixed(2)} (Deckkraft ${m.deckkraft})`);
+      if (m.verhaeltnis < ziel) unter.push(`${name}: ${m.verhaeltnis.toFixed(2)} : 1`);
+    }
+    test
+      .info()
+      .annotations.push({ type: 'messwert', description: `${modus}: ${gemessen.join(' · ')}` });
+    expect(unter, `zurückgenommen (${modus}) unter ${ziel} : 1`).toEqual([]);
+  });
+}
