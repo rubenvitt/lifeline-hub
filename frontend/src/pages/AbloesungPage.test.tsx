@@ -8,7 +8,8 @@ import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import AbloesungPage from './AbloesungPage';
 import { AuthProvider } from '../auth/AuthContext';
-import type { Abloesung } from '../api/types';
+import type { Abloesung, ModulFreigaben } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 
 dayjs.extend(utc);
@@ -16,8 +17,10 @@ dayjs.extend(utc);
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
 }));
+const freigaben = vi.hoisted(() => ({ wert: undefined as ModulFreigaben | undefined }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
+  ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),
 }));
 vi.mock('../api/einheiten', () => ({
   listeEinheiten: vi.fn().mockResolvedValue([
@@ -99,6 +102,7 @@ function laufendLiefert(schichten: Abloesung[]) {
 describe('AbloesungPage (LFH-635)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    freigaben.wert = freigabenFixture();
     einsatz.wert = {
       id: 1,
       bezeichnung: 'Hochwasser',
@@ -302,6 +306,21 @@ describe('AbloesungPage (LFH-635)', () => {
     await waitFor(() => expect(beginn.getAttribute('placeholder')).toMatch(/^Eintreffen /));
   });
 
+  it('Schicht beginnen: ohne Freigabe des Moduls Einheiten keine Zeitachsen-Anfrage', async () => {
+    freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    listeAbloesungen.mockResolvedValue([]);
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    await userEvent.click(await screen.findByTitle('Florian 2'));
+    // Ohne Zeitachse ist der wirksame Wert unbekannt: kein Platzhalter statt eines falschen.
+    const beginn = within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' });
+    expect(beginn.getAttribute('placeholder')).not.toMatch(/Eintreffen|jetzt/);
+    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
   it('Rhythmus einer Schicht: die Abschnittsvorgabe steht als Platzhalter, kein „Leer:“', async () => {
     renderPage();
     await screen.findAllByRole('article');
@@ -312,7 +331,7 @@ describe('AbloesungPage (LFH-635)', () => {
     await userEvent.click(within(menu).getByText('Rhythmus ändern'));
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
-    expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe)');
+    expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe Abschnitt)');
     expect(within(dialog).queryByText(/Leer/)).toBeNull();
   });
 

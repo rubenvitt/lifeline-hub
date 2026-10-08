@@ -122,6 +122,8 @@ describe('FmsTableau (LFH-642)', () => {
   it('erklärt den Tastenweg nicht in einem Satz — der S-Code im Menü ist die Ziffer (LFH-1078)', async () => {
     const { unmount } = zeige();
     expect(screen.queryByText(/setzt den Status/)).toBeNull();
+    // Hilfstechnik erfährt die Ziffern am Auslöser — nur die eindeutig belegten (3 ist doppelt).
+    expect(ausloeser('Florian 1')).toHaveAttribute('aria-keyshortcuts', '2 4');
     await userEvent.click(ausloeser('Florian 1'));
     const menue = document.querySelector<HTMLElement>('.ant-dropdown [role="menu"]')!;
     expect(within(menue).getByText(/^S4 · /)).toBeInTheDocument();

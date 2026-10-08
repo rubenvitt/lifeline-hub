@@ -732,6 +732,50 @@ describe('EinsatzabschnittePage', () => {
     expect(gesendet).toBe(false);
   });
 
+  it('Kurzbezeichnung: faltet wie SQLite NOCASE nur A–Z', async () => {
+    let gesendet = false;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        { ...funkAbschnitt, id: 5, name: 'Nord', kurzbezeichnung: 'EA-SÜD' },
+        { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1, kurzbezeichnung: 'EA-S' },
+      ]),
+      http.patch('/api/einsaetze/1/abschnitte/6', () => {
+        gesendet = true;
+        return HttpResponse.json({ ...funkAbschnitt, id: 6, name: 'Süd' });
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText('Süd'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByLabelText('Kurzbezeichnung');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'EA-Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(gesendet).toBe(true));
+    expect(screen.queryByText(/Schon vergeben/)).not.toBeInTheDocument();
+  });
+
+  it('verschwindet der bearbeitete Abschnitt, füllt das Formular keinen anderen', async () => {
+    const liste = [
+      { ...funkAbschnitt, id: 5, name: 'Nord' },
+      { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1 },
+    ];
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(liste)),
+      ...handlers('einsatzleitung', 'aktiv', []),
+    );
+    const { client } = renderPage();
+    await userEvent.click(await screen.findByText('Süd'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByLabelText('Kurzbezeichnung')).toBeInTheDocument();
+    // Ein anderer Arbeitsplatz löst „Süd“ auf.
+    liste.splice(1, 1);
+    await client.invalidateQueries();
+    await waitFor(() => expect(screen.queryByText('Süd')).not.toBeInTheDocument());
+    expect(screen.queryByLabelText('Kurzbezeichnung')).not.toBeInTheDocument();
+    expect(screen.queryByText('Abschnitt: Nord')).not.toBeInTheDocument();
+  });
+
   it('zeigt die Funk-Daten nicht doppelt (Zusammenfassung nur in der Lese-Ansicht)', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();

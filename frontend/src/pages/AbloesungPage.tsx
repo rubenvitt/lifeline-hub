@@ -12,7 +12,7 @@ import {
   setzeAbloesungVorgabe,
   vollzieheAbloesung,
 } from '../api/abloesungen';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
@@ -49,10 +49,11 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
+import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
-import { mitVorgabe } from '../components/vorgabeText';
+import { abschnittVorgabe } from '../components/vorgabeText';
 
 const { Text } = Typography;
 
@@ -132,11 +133,18 @@ export default function AbloesungPage() {
     enabled: darfSchreiben,
   });
 
-  // Nur für den Platzhalter „Im Einsatz seit“ des offenen Beginnen-Dialogs (LFH-1078).
+  // Nur für den Platzhalter „Im Einsatz seit“ des offenen Beginnen-Dialogs (LFH-1078). Die
+  // Zeitachse gehört dem Modul Einheiten: ohne dessen Freigabe keine Anfrage (Spec
+  // `modul-freigabe`), der Platzhalter bleibt dann leer.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+    enabled: darfSchreiben && beginnenOffen,
+  });
   const periodenQuery = useQuery({
     queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
     queryFn: () => listeEinheitenPerioden(einsatzId),
-    enabled: darfSchreiben && beginnenOffen,
+    enabled: darfSchreiben && beginnenOffen && istKeyFreigegeben('einheiten', freigabenQuery.data),
   });
 
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
@@ -526,7 +534,7 @@ export default function AbloesungPage() {
           leerErlaubt={rhythmusZiel.vorgabe != null}
           platzhalter={
             rhythmusZiel.vorgabe != null
-              ? mitVorgabe(rhythmusText(rhythmusZiel.vorgabe))
+              ? abschnittVorgabe(rhythmusText(rhythmusZiel.vorgabe))
               : undefined
           }
           laeuft={aendernMut.isPending}

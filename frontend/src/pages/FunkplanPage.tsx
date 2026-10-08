@@ -1046,7 +1046,7 @@ export default function FunkplanPage() {
           <Space className="funkplan-no-print" wrap style={{ marginBlockEnd: token.margin }}>
             {darfUebernehmen && (
               <Button
-                loading={uebernehmen.isPending}
+                loading={uebernehmen.isPending || quellenLaden}
                 disabled={quellenLaden}
                 onClick={() => uebernehmen.mutate()}
               >

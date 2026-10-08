@@ -150,7 +150,7 @@ export default function VorbereitungPaneel({
           <div style={{ padding: `${token.paddingSM}px ${token.padding}px` }}>
             {darfUebernehmen && (
               <Button
-                loading={uebernehmen.isPending}
+                loading={uebernehmen.isPending || laedt}
                 disabled={laedt}
                 onClick={() => uebernehmen.mutate()}
               >

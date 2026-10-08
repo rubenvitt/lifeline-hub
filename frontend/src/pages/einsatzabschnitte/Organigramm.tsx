@@ -378,7 +378,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
         </Button>
         {darfUebernehmen && (
           <Button
-            loading={uebernehmen.isPending}
+            loading={uebernehmen.isPending || quellenLaden}
             disabled={quellenLaden}
             onClick={() => uebernehmen.mutate()}
           >

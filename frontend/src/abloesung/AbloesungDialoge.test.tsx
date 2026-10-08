@@ -143,7 +143,7 @@ describe('Schicht beginnen — Rhythmus-Vorgabe erst nach der Einheitenwahl (LFH
     const dialog = await screen.findByRole('dialog');
     await waehleFlorian(dialog);
     const feld = within(dialog).getByRole('spinbutton', { name: 'Rhythmus (Stunden)' });
-    await waitFor(() => expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe)'));
+    await waitFor(() => expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe Abschnitt)'));
     expect(feld).not.toBeRequired();
     expect(within(dialog).queryByText(/Leer/)).not.toBeInTheDocument();
   });

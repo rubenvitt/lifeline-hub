@@ -527,6 +527,26 @@ describe('Fernmeldeskizze — Bearbeiten ohne Zeiger (5.3, 6.3, 6.4)', () => {
     expect(paneel().textContent).not.toContain('gepflegt im');
   });
 
+  it('externe Stelle: das Kontextmenü nennt denselben Sprung wie das Paneel', async () => {
+    bild();
+    fireEvent.contextMenu(element('ks-6')!, { clientX: 100, clientY: 100 });
+    expect(
+      await screen.findByRole('menuitem', { name: /zum Kommunikationsplan/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /zum Datensatz/ })).toBeNull();
+  });
+
+  it('die Fläche nennt Hilfstechnik ihre Tasten, auch Pfeile und Rückgängig', () => {
+    bild();
+    const kuerzel = document
+      .querySelector('[aria-roledescription="Zeichenfläche"]')!
+      .getAttribute('aria-keyshortcuts')!
+      .split(' ');
+    for (const k of ['Enter', 'V', 'Delete', 'ArrowUp', 'Shift+F10', 'Control+Z', '0']) {
+      expect(kuerzel).toContain(k);
+    }
+  });
+
   it('ohne Wahl: „Kein Element gewählt“ und ein Knopf zum Schriftfeld statt einer Anleitung', async () => {
     const user = userEvent.setup();
     bild();

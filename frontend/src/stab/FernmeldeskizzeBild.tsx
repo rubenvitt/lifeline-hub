@@ -534,7 +534,16 @@ function Skizze({
               },
             ]
           : []),
-        ...(menueStelle?.ziel ? [{ key: 'datensatz', label: 'zum Datensatz ↗' }] : []),
+        ...(menueStelle?.ziel
+          ? [
+              {
+                key: 'datensatz',
+                // Derselbe Wortlaut wie im Eigenschaftspaneel.
+                label:
+                  menueStelle.art === 'extern' ? 'zum Kommunikationsplan ↗' : 'zum Datensatz ↗',
+              },
+            ]
+          : []),
         ...(menueStich && griffGrund(angezeigt, menueStich.stelle, kontext) == null
           ? [
               {

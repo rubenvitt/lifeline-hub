@@ -791,7 +791,7 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
         aria-label="Fernmeldeskizze"
         aria-roledescription="Zeichenfläche"
         // Kürzel der Fläche (`bedienung.ts:tastenBefehl`); sichtbar stehen sie an den Menüeinträgen.
-        aria-keyshortcuts="Enter V Delete Escape = - 0"
+        aria-keyshortcuts="Enter V Delete Backspace Escape ArrowUp ArrowDown ArrowLeft ArrowRight Shift+F10 Control+Z Control+Y = - 0"
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
         width="100%"

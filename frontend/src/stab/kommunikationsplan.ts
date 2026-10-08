@@ -327,7 +327,7 @@ export function entfernText(kennung: string, u: EntfernUmfang): string {
   // Ein Satz (Folge vor einem unumkehrbaren Schritt); eine unbekannte Zahl nennt ihren Grund.
   const skizze =
     u.skizzenVerbindungen == null
-      ? ', samt ihrer Verbindungen in der Fernmeldeskizze (nicht geladen)'
+      ? ', samt etwaiger Verbindungen in der Fernmeldeskizze (nicht geladen)'
       : '';
   return `„${kennung}“ wird aus dem Kommunikationsplan entfernt${mit}${skizze}.`;
 }

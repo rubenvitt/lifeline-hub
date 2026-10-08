@@ -79,6 +79,9 @@ const ANSICHT_OPTIONEN = [
   { wert: 'organigramm', label: 'Organigramm' },
 ] as const satisfies readonly { wert: AbschnitteAnsicht; label: string }[];
 
+/** Vergleichsform der Kurzbezeichnung wie SQLite `NOCASE`: getrimmt, nur A–Z gefaltet. */
+const nocase = (s: string) => s.trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
+
 function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
   for (const a of abschnitte) {
@@ -224,9 +227,9 @@ export default function EinsatzabschnittePage() {
    */
   const aktuell = entwurf
     ? null
-    : (abschnitte.find((a) => a.id === gewaehlt) ??
-      abschnitte.find((a) => a.ueber_abschnitt_id == null) ??
-      null);
+    : gewaehlt != null
+      ? (abschnitte.find((a) => a.id === gewaehlt) ?? null)
+      : (abschnitte.find((a) => a.ueber_abschnitt_id == null) ?? null);
 
   const speichern = useMutation({
     mutationFn: (werte: AbschnittWerte) => {
@@ -266,10 +269,13 @@ export default function EinsatzabschnittePage() {
     onError: fehler,
   });
 
-  // Beim Wechsel des gewählten Abschnitts zurück in die Lese-Ansicht.
+  // Beim Wechsel des angezeigten Abschnitts zurück in die Lese-Ansicht — auch wenn die Vorwahl
+  // wechselt, weil ein anderer Arbeitsplatz den Abschnitt aufgelöst hat; sonst füllte das Formular
+  // still den nächsten und Speichern träfe ihn.
+  const aktuellId = aktuell?.id;
   useEffect(() => {
     setBearbeiten(false);
-  }, [gewaehlt]);
+  }, [aktuellId]);
 
   // Formular mit den Werten des aktuellen Abschnitts vorbelegen, sobald der Edit-Modus öffnet.
   useEffect(() => {
@@ -564,12 +570,13 @@ export default function EinsatzabschnittePage() {
                   rules={[
                     {
                       validator: (_, wert?: string) => {
-                        const kurz = wert?.trim().toLowerCase();
+                        const kurz = wert ? nocase(wert) : undefined;
                         const belegt = kurz
                           ? abschnitte.find(
                               (a) =>
                                 a.id !== aktuell?.id &&
-                                a.kurzbezeichnung?.trim().toLowerCase() === kurz,
+                                a.kurzbezeichnung != null &&
+                                nocase(a.kurzbezeichnung) === kurz,
                             )
                           : undefined;
                         return belegt

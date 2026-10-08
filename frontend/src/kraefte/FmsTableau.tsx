@@ -99,6 +99,16 @@ export default function FmsTableau({
   const katalogNach = useMemo(() => new Map(katalog.map((s) => [s.id, s])), [katalog]);
   const zuordnung = useMemo(() => zifferZuordnung(katalog), [katalog]);
   const optionen = useMemo(() => fmsStatusOptionen(katalog), [katalog]);
+  // Die eindeutig belegten Ziffern am Auslöser, für Hilfstechnik (statt der früheren Legende).
+  const ziffernKuerzel = useMemo(
+    () =>
+      [...zuordnung]
+        .filter(([, z]) => z.art === 'eindeutig')
+        .map(([ziffer]) => ziffer)
+        .sort((a, b) => a - b)
+        .join(' '),
+    [zuordnung],
+  );
   /** Fahrzeug, dessen Auslöser nach dem laufenden Wechsel den Fokus zurückbekommt. */
   const fokusZiel = useRef<number | null>(null);
 
@@ -283,6 +293,7 @@ export default function FmsTableau({
                       <StatusChip ton={status.ton} code={status.code} wort={status.wort} trenner />
                     }
                     darfSchreiben={darfSchreiben}
+                    tastenkuerzel={ziffernKuerzel}
                   />
                   {einheiten !== null && (
                     <span

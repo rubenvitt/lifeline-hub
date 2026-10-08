@@ -7,7 +7,7 @@ import type { Abloesung } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { mitVorgabe } from '../components/vorgabeText';
+import { abschnittVorgabe } from '../components/vorgabeText';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { rhythmusText } from './einstufung';
 
@@ -143,7 +143,7 @@ export function SchichtBeginnenDialog({
       {einheitId == null
         ? rhythmusFeld(undefined, false)
         : rhythmusFeld(
-            vorgabe != null ? mitVorgabe(rhythmusText(vorgabe)) : undefined,
+            vorgabe != null ? abschnittVorgabe(rhythmusText(vorgabe)) : undefined,
             vorgabe == null,
           )}
       <SpeicherFehler fehler={fehler} titel="Schicht konnte nicht begonnen werden" />
@@ -261,7 +261,7 @@ interface RhythmusProps {
   /** Vorbelegung in Minuten. */
   minuten: number | null;
   /**
-   * Was bei leerem Feld gilt, als Platzhalter: „6 h (Vorgabe)“ bzw. „keine Vorgabe“; fehlt er,
+   * Was bei leerem Feld gilt, als Platzhalter: „6 h (Vorgabe Abschnitt)“ bzw. „keine Vorgabe“; fehlt er,
    * zeigt die Pflichtmarke, dass ein Wert nötig ist.
    */
   platzhalter?: string;
