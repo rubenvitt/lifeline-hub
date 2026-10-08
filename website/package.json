@@ -1,0 +1,19 @@
+{
+  "name": "lifeline-hub-website",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Marketing-Seite für Lifeline Hub (LFH-1111). Statisch, eigenständig, nicht Teil der Anwendung.",
+  "type": "module",
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": "26.7.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "7.3.5"
+  }
+}
