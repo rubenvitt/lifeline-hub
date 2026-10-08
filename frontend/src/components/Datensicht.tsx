@@ -1291,23 +1291,18 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [schliessen]);
 
   /**
+   * ERST DIE BEWEGUNG ZÄHLT, nicht `pointerenter`: Chromium meldet das Betreten auch, wenn Inhalt
+   * unter einem ruhenden Zeiger auftaucht. Baut sich eine Seite in Stufen auf (Stellen, dann
+   * Abschnitte), hielte die Schleuse sonst die zweite Lieferung hinter dem Banner, obwohl niemand
+   * zielt. Wer zielt, bewegt den Zeiger. Die Bewegung schließt auch, wenn die Sicht beim Betreten
+   * noch leer war: die erste Lieferung steht dann schon da, die nächste rückt nicht mehr.
+   *
    * Touch zählt nicht: ein Tipp betritt und verlässt die Sicht; nach dem Tipp hält der Fokus.
-   * `pointermove` holt ein verpasstes `pointerenter` nach (die Sicht erscheint unter einem
-   * ruhenden Zeiger) und schließt auch, wenn die Sicht beim Betreten noch leer war: die erste
-   * Lieferung steht dann schon da, die zweite darf nicht mehr unter den Zeiger rücken.
    */
   const offenJetzt = useRef(true);
   useLayoutEffect(() => {
     offenJetzt.current = schleuse.art === 'offen';
   });
-  const zeigerRein = useCallback(
-    (e: ReactPointerEvent) => {
-      if (e.pointerType === 'touch') return;
-      bedingung.current.zeiger = true;
-      schliessen();
-    },
-    [schliessen],
-  );
   const zeigerBewegt = useCallback(
     (e: ReactPointerEvent) => {
       if (e.pointerType === 'touch') return;
@@ -2214,7 +2209,6 @@ export default function Datensicht<T extends object, const K extends string>(
       aria-label={bezeichnung}
       onFocus={betreten}
       onBlur={(e) => pruefeVerlassen(e.relatedTarget)}
-      onPointerEnter={zeigerRein}
       onPointerMove={zeigerBewegt}
       onPointerLeave={zeigerRaus}
     >

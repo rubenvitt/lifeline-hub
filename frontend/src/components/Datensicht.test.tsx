@@ -2289,7 +2289,7 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
 
   it('die Maus über einer flachen Liste hält neue Zeilen zurück', () => {
     const { container, rerender } = renderMitProviders(sicht(DREI));
-    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
     rerender(sicht([F(0, 'Florian 0'), ...DREI]));
     expect(zeilenZahl(container)).toBe(3);
     expect(screen.getByRole('button', { name: '1 neuer Eintrag — anzeigen' })).toBeInTheDocument();
@@ -2297,14 +2297,21 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
 
   it('geht der Zeiger, läuft der Zufluss durch', () => {
     const { container, rerender } = renderMitProviders(sicht(DREI));
-    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
     rerender(sicht([...DREI, F(4, 'Florian 4')]));
     fireEvent.pointerLeave(region(), { pointerType: 'mouse' });
     expect(zeilenZahl(container)).toBe(4);
     expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
   });
 
-  it('Touch schließt nicht; die erste Mausbewegung holt ein verpasstes Betreten nach', () => {
+  it('Betreten ohne Bewegung schließt nicht (Inhalt taucht unter dem ruhenden Zeiger auf)', () => {
+    const { container, rerender } = renderMitProviders(sicht(DREI));
+    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    rerender(sicht([...DREI, F(4, 'Florian 4')]));
+    expect(zeilenZahl(container)).toBe(4);
+  });
+
+  it('Touch schließt nicht; erst die Mausbewegung schließt', () => {
     const { container, rerender } = renderMitProviders(sicht(DREI));
     fireEvent.pointerEnter(region(), { pointerType: 'touch' });
     fireEvent.pointerMove(region(), { pointerType: 'touch' });
@@ -2331,12 +2338,12 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
         </>,
       );
     screen.getByRole('link', { name: 'Florian 1' }).focus();
-    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
     fireEvent.pointerLeave(region(), { pointerType: 'mouse' });
     mit([...DREI, F(4, 'Florian 4')]);
     expect(zeilenZahl(container), 'der Fokus hält').toBe(3);
 
-    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
     screen.getByRole('button', { name: 'draußen' }).focus();
     mit([...DREI, F(4, 'Florian 4')]);
     expect(zeilenZahl(container), 'der Zeiger hält').toBe(3);
@@ -2347,7 +2354,7 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
 
   it('eine leere Sicht friert unter dem Zeiger nicht ein', () => {
     const { container, rerender } = renderMitProviders(sicht([]));
-    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
     rerender(sicht(DREI));
     expect(zeilenZahl(container)).toBe(3);
   });
@@ -2355,7 +2362,7 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
   it('im Druck gilt die Schleuse nicht: Wartendes steht auf dem Papier', () => {
     // Wie im Gerüst: Strg+P mit dem Zeiger über der Liste darf keinen Eintrag unterschlagen.
     const { container, rerender } = renderMitProviders(sicht(DREI));
-    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
     rerender(sicht([...DREI, F(4, 'Florian 4')]));
     expect(zeilenZahl(container)).toBe(3);
     act(() => {
@@ -2371,7 +2378,7 @@ describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
 
   it('zufluss="sofort" hält auch unter dem Zeiger nicht', () => {
     const { container, rerender } = rendere({ zufluss: 'sofort' });
-    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
     rerender(
       <Datensicht<Fahrzeug, FahrzeugKey>
         bezeichnung="Fahrzeuge im Einsatz"
