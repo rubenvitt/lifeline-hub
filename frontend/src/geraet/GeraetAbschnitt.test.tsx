@@ -293,7 +293,8 @@ describe('Bausteine', () => {
     expect(
       navigationZeigt('auftraege', { ...f, auftraege: { ...f.auftraege, sichtbar: false } }),
     ).toBe(false);
-    const { auftraege: _weg, ...ohne } = f;
+    const ohne = { ...f };
+    delete ohne.auftraege;
     expect(navigationZeigt('auftraege', ohne)).toBe(false);
   });
 
