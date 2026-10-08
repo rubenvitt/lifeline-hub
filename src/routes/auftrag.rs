@@ -96,6 +96,7 @@ pub async fn liste(
             status: params.status.as_deref(),
             richtung,
             empfaenger: filter.as_ref(),
+            bereich: None,
             phase,
             seite,
         },

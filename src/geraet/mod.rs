@@ -10,6 +10,7 @@
 //! gesperrt, ohne dass jemand an sie denkt. Herleitung:
 //! `openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md` (D4, D5).
 
+pub mod abschnitt;
 pub mod code;
 pub mod repo;
 pub mod stelle;
