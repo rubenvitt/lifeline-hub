@@ -130,7 +130,9 @@ describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {
     vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    const leiste = await screen.findByRole('tablist', { name: 'Material, Kräfte, Bewegungen und Dateien' });
+    const leiste = await screen.findByRole('tablist', {
+      name: 'Material, Kräfte, Bewegungen und Dateien',
+    });
     expect(leiste).toBeInTheDocument();
     expect(screen.queryByText(/DATEIEN-TAB/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Dateien' }));
