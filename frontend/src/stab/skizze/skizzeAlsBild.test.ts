@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LANGE_KANTE,
   bildMasse,
   familienAus,
   schriftFlaechen,
+  schriftRegeln,
   serialisiereSvg,
 } from './skizzeAlsBild';
 
@@ -143,5 +144,62 @@ describe('bildMasse', () => {
   it('bringt die längere Kante auf LANGE_KANTE und hält das Seitenverhältnis', () => {
     expect(bildMasse(1200, 800)).toEqual({ breite: LANGE_KANTE, hoehe: 1600 });
     expect(bildMasse(500, 1000)).toEqual({ breite: 1200, hoehe: LANGE_KANTE });
+  });
+});
+
+describe('schriftRegeln', () => {
+  /** jsdom verwirft `src` in `@font-face`; die Blätter stehen deshalb als Attrappe da. */
+  function blaetter(regeln: Record<string, string>[]) {
+    const blatt = {
+      href: null,
+      cssRules: regeln.map((css) => ({
+        cssText: '@font-face { … }',
+        style: { getPropertyValue: (p: string) => css[p] ?? '' },
+      })),
+    };
+    vi.spyOn(document, 'styleSheets', 'get').mockReturnValue([blatt] as unknown as StyleSheetList);
+  }
+  function skizze(schrift: string) {
+    const svg = svgAus(
+      `<svg viewBox="0 0 10 10"><text style="font-family: ${schrift}">A</text></svg>`,
+    );
+    document.body.append(svg);
+    return svg;
+  }
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('bettet die Schriften der Skizze als Daten-URL ein, fremde nicht', async () => {
+    blaetter([
+      {
+        'font-family': '"LFH Archivo"',
+        src: 'url("/assets/archivo-500.woff2") format("woff2")',
+        'font-weight': '500',
+      },
+      { 'font-family': 'Fremd', src: 'url(/assets/fremd.woff2)' },
+    ]);
+    const abruf = vi.fn(async () => new Response(new Blob(['woff2'], { type: 'font/woff2' })));
+    vi.stubGlobal('fetch', abruf);
+
+    const regeln = await schriftRegeln(skizze(`'LFH Archivo', sans-serif`));
+
+    expect(abruf).toHaveBeenCalledTimes(1);
+    expect(abruf).toHaveBeenCalledWith(new URL('/assets/archivo-500.woff2', document.baseURI).href);
+    expect(regeln).toMatch(
+      /^@font-face\{font-family:"LFH Archivo";src:url\("data:[^"]*;base64,[^"]+"\);font-weight:500;font-style:normal;\}$/,
+    );
+  });
+
+  it('lässt eine Schrift weg, die sich nicht laden lässt', async () => {
+    blaetter([{ 'font-family': 'LFH Archivo', src: 'url(/weg.woff2)' }]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 404 })),
+    );
+    expect(await schriftRegeln(skizze(`'LFH Archivo'`))).toBe('');
   });
 });

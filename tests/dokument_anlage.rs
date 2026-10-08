@@ -376,3 +376,49 @@ async fn fremdes_dokument_und_fremder_einsatz_sind_404() {
     let (s, _) = anfrage(&app, "GET", &pfad(&BEFEHL, einsatz, dok), &admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+/// Live: Anfügen und Entfernen melden je genau ein Ereignis des Dokuments mit dem Kennzeichen
+/// `anlagen` (die Seite gleicht dann nur die Anlagen ab), ohne Titel oder Dateinamen.
+#[tokio::test]
+async fn anfuegen_und_entfernen_melden_je_ein_anlagen_ereignis() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &admin,
+        Some(BEFEHL.anlegen),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let dok = v["id"].as_i64().unwrap();
+
+    let feed = live_oeffnen(&app, &admin, einsatz).await;
+    let (s, a) = skizze_anfuegen(&app, &BEFEHL, einsatz, dok, &admin).await;
+    assert_eq!(s, StatusCode::CREATED, "{a}");
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/{}", pfad(&BEFEHL, einsatz, dok), a["id"]),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    let erwartet = format!(r#"{{"anlagen":true,"befehl_id":{dok},"einsatz_id":{einsatz}}}"#);
+    assert_eq!(
+        gelesen.matches(&erwartet).count(),
+        2,
+        "je ein Ereignis für Anfügen und Entfernen: {gelesen:?}"
+    );
+    for zeile in gelesen.lines().filter(|z| z.starts_with("data:")) {
+        assert!(
+            !zeile.contains("Fernmeldeskizze") && !zeile.contains(".png"),
+            "Titel oder Dateiname im Broadcast: {zeile:?}"
+        );
+    }
+}
