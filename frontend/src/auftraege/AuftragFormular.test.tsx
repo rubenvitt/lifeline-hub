@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
+import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import AuftragFormular from './AuftragFormular';
 
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
@@ -322,5 +323,40 @@ describe('AuftragFormular — Eingabegrenzen (LFH-937)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0].empfaenger).toHaveLength(50);
+  });
+});
+
+/** LFH-1031: „erteilt am“ ist nach der Serveruhr vorbelegt, eine Eingabe bleibt. */
+describe('AuftragFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
+  mitProzessZone('UTC');
+  const SERVER = Date.parse('2026-10-04T10:00:00Z');
+  mitVorgehenderGeraeteuhr(SERVER);
+
+  async function erteilen(onAnlegen: ReturnType<typeof vi.fn>) {
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    return (onAnlegen.mock.calls[0][0] as { erteilt_at?: string }).erteilt_at;
+  }
+
+  it('der aufgeklappte, unberührte Vorschlag sendet die Serverzeit', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    // Zugeklappt geht kein Wert hinaus, dann setzt der Server die Erteilzeit selbst.
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    expect(await erteilen(onAnlegen)).toBe('2026-10-04 10:00:00');
+  });
+
+  it('eine eingetragene Zeit bleibt unverändert', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    const feld = screen.getByRole('textbox', { name: 'Erteilt am (optional)' });
+    await userEvent.click(feld);
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '2026-10-04 09:30');
+    await userEvent.keyboard('{Enter}');
+    expect(await erteilen(onAnlegen)).toBe('2026-10-04 09:30:00');
   });
 });
