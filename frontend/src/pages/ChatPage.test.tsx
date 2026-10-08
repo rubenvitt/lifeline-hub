@@ -225,7 +225,7 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
-      spy('schaeden'),
+      spy('schaeden/auswahl'),
       spy('uhs'),
       spy('personen/auswahl'),
       spy('lageberichte'),
@@ -251,7 +251,7 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
-      http.get('/api/einsaetze/7/schaeden', () =>
+      http.get('/api/einsaetze/7/schaeden/auswahl', () =>
         HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }]),
       ),
       http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),

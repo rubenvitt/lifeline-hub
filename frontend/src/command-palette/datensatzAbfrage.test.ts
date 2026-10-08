@@ -9,7 +9,7 @@ describe('datensatzAbfrage (LFH-664)', () => {
   it('liefert je Quelle genau das Bestandsfach der Palette', () => {
     const erwartet: Record<keyof typeof datensatzAbfrage, readonly unknown[]> = {
       personen: ['einsatz-personen-auswahl', 5],
-      schaeden: ['einsatz-schaeden', 5],
+      schaeden: ['einsatz-schaeden', 5, 'auswahl'],
       uhs: ['einsatz-uhs', 5],
       meldungen: ['einsatz-meldungen', 5],
       auftraege: ['einsatz-auftraege', 5],

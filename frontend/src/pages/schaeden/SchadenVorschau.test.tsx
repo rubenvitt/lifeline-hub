@@ -4,7 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { server } from '../../test/server';
-import { datensatzAbfrage } from '../../command-palette/datensatzAbfrage';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { Schaden } from '../../api/types';
 import SchadenVorschau from './SchadenVorschau';
 
@@ -25,12 +25,14 @@ const schaden = (o: Partial<Schaden> = {}): Schaden =>
     ...o,
   }) as Schaden;
 
+/** Der Einzelabruf aus einem Bestand; ein fehlender Schaden antwortet 404 (LFH-1075). */
 function liefereListe(liste: Schaden[]) {
   let abrufe = 0;
   server.use(
-    http.get('/api/einsaetze/5/schaeden', () => {
+    http.get('/api/einsaetze/5/schaeden/:id', ({ params }) => {
       abrufe += 1;
-      return HttpResponse.json(liste);
+      const s = liste.find((x) => x.id === Number(params.id));
+      return s ? HttpResponse.json(s) : new HttpResponse(null, { status: 404 });
     }),
   );
   return () => abrufe;
@@ -78,9 +80,7 @@ describe('SchadenVorschau (LFH-664)', () => {
   it('liest den geladenen Stand ohne Abruf, auch mit Koordinate', async () => {
     const abrufe = liefereListe([]);
     const client = new QueryClient();
-    client.setQueryData(datensatzAbfrage.schaeden(5).queryKey, [
-      schaden({ lat: 52.52, lon: 13.405 }),
-    ]);
+    client.setQueryData(einsatzKeys.schaedenEinzeln(5, 7), schaden({ lat: 52.52, lon: 13.405 }));
     renderMitProviders(<SchadenVorschau einsatzId={5} id={7} />, { client });
 
     expect(await screen.findByText('S-004')).toBeInTheDocument();

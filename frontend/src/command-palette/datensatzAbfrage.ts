@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
 import { listePersonenAuswahl } from '../api/einsatzPerson';
-import { listeSchaeden } from '../api/einsatzSchaden';
+import { listeSchadenAuswahl } from '../api/einsatzSchaden';
 import { listeUhs } from '../api/einsatzUhs';
 import { listeMeldungen } from '../api/meldungen';
 import { listeAuftraege } from '../api/auftraege';
@@ -53,10 +53,12 @@ export const datensatzAbfrage = {
       queryFn: () => listePersonenAuswahl(id),
       staleTime: FRISCH_MS,
     }),
+  // Schäden ebenso über die Auswahl (LFH-1075): die Modulseite blättert, die Vorschau liest
+  // den Einzelabruf.
   schaeden: (id: number) =>
     queryOptions({
-      queryKey: einsatzKeys.schaeden(id),
-      queryFn: () => listeSchaeden(id),
+      queryKey: einsatzKeys.schaedenAuswahl(id),
+      queryFn: () => listeSchadenAuswahl(id),
       staleTime: FRISCH_MS,
     }),
   uhs: (id: number) =>

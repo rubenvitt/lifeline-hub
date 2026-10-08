@@ -4,7 +4,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { aktualisiereTier, listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
 import {
   aktualisiereSchaden,
-  listeSchaeden,
+  listeSchadenAuswahl,
   schadenRegistrierAnzeige,
 } from '../api/einsatzSchaden';
 import { aenderePersonBelegung } from '../api/einsatzUhs';
@@ -173,19 +173,14 @@ export function SchadenZuweisenDialog({
 }: ZuweisungsDialogProps) {
   const [form] = Form.useForm<{ schaden_id: number }>();
   const fehler = useFehlerMeldung();
+  // Die Auswahl kennt alle nicht stornierten Schäden, auch bei großem Bestand (LFH-1075).
   const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId, { inklStorniert: false }),
+    queryKey: einsatzKeys.schaedenAuswahl(einsatzId),
+    queryFn: () => listeSchadenAuswahl(einsatzId),
     enabled: offen,
   });
   const freieSchaeden = (schaedenQuery.data ?? []).filter(
-    (s) =>
-      s.geschaedigt_person_id == null &&
-      s.geschaedigt_personal_id == null &&
-      s.geschaedigt_organisation_id == null &&
-      s.geschaedigt_kontakt == null &&
-      s.storniert_at == null &&
-      s.status !== 'abgeschlossen',
+    (s) => s.frei && s.status !== 'abgeschlossen',
   );
   const zuweisenMutation = useMutation({
     mutationFn: (schadenId: number) =>

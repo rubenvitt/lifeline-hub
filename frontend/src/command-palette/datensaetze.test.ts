@@ -19,7 +19,7 @@ import type {
   EtbEintragAnzeige,
   Meldung,
   Person,
-  Schaden,
+  SchadenAuswahl,
   Uhs,
 } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
@@ -39,15 +39,17 @@ const person = (o: Partial<Person>): Person =>
     vorname: null,
     ...o,
   }) as Person;
-const schaden = (o: Partial<Schaden>): Schaden =>
+const schaden = (o: Partial<SchadenAuswahl>): SchadenAuswahl =>
   ({
     id: 1,
-    einsatz_id: 5,
     registrier_nr: 1,
+    status: 'offen',
     typ: 'sachschaden',
+    ausmass: 'gering',
     ort: 'Hauptstr',
+    frei: true,
     ...o,
-  }) as Schaden;
+  }) as SchadenAuswahl;
 const uhs = (o: Partial<Uhs>): Uhs =>
   ({ id: 1, einsatz_id: 5, bezeichnung: 'BHP 1', typ: 'behandlungsplatz', ...o }) as Uhs;
 const meldung = (o: Partial<Meldung>): Meldung =>

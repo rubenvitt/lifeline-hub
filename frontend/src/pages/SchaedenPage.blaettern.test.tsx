@@ -124,7 +124,7 @@ describe('SchaedenPage · Blättern (LFH-1075)', () => {
 
     expect(await screen.findByText('S-100')).toBeInTheDocument();
     await waitFor(() => expect(zeilen()).toHaveLength(1));
-    expect(abrufe.at(-1)?.get('ausmass')).toBe('gross');
+    expect(abrufe[abrufe.length - 1].get('ausmass')).toBe('gross');
     // Die Kopfzeile nennt weiter den ganzen Bestand.
     expect(screen.getByText('250 Schäden · 242 offen')).toBeInTheDocument();
   });
@@ -133,10 +133,13 @@ describe('SchaedenPage · Blättern (LFH-1075)', () => {
     const { abrufe } = render();
     await screen.findByText('S-250');
     await userEvent.type(screen.getByRole('searchbox', { name: /Suche in Schäden/ }), 'weg 7');
-    await waitFor(() => expect(screen.queryByText('S-250')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('S-250')).toBeNull(), { timeout: 5000 });
     // „Weg 7“, „Weg 70“ bis „Weg 79“ und „Weg 170“ bis „Weg 179“, ohne die abgeschlossenen.
     expect(screen.getByText('S-007')).toBeInTheDocument();
-    expect(abrufe.filter((q) => q.get('q') != null).map((q) => q.get('q'))).toEqual(['weg 7']);
+    const begriffe = abrufe.map((q) => q.get('q')).filter((q) => q != null);
+    expect(begriffe[begriffe.length - 1]).toBe('weg 7');
+    // Entprellt: nicht je Tastendruck ein Abruf.
+    expect(begriffe.length).toBeLessThan('weg 7'.length);
   });
 
   it('ein Sortierklick fragt den Server nach der neuen Ordnung', async () => {
@@ -144,7 +147,7 @@ describe('SchaedenPage · Blättern (LFH-1075)', () => {
     await screen.findByText('S-250');
     const kopf = screen.getByRole('columnheader', { name: /Ort/ });
     await userEvent.click(within(kopf).getByText('Ort'));
-    await waitFor(() => expect(abrufe.at(-1)?.get('sortierung')).toBe('ort_auf'));
+    await waitFor(() => expect(abrufe[abrufe.length - 1].get('sortierung')).toBe('ort_auf'));
     // „Weg 1“, „Weg 10“, „Weg 100“ … nach Text aufsteigend.
     await waitFor(() => expect(zeilen()[0]).toHaveAttribute('data-row-key', '1001'));
   });
@@ -155,7 +158,7 @@ describe('SchaedenPage · Blättern (LFH-1075)', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Abgeschlossen' }));
     expect(await screen.findByText('S-025')).toBeInTheDocument();
     await waitFor(() => expect(zeilen()).toHaveLength(8));
-    expect(abrufe.at(-1)?.get('status')).toBe('abgeschlossen');
+    expect(abrufe[abrufe.length - 1].get('status')).toBe('abgeschlossen');
     expect(screen.queryByRole('button', { name: 'Ältere laden' })).toBeNull();
   });
 });

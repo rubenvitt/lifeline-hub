@@ -49,7 +49,10 @@ export function kuerze(s: string, max = 60): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
-export function schadenLabel(s: Schaden): string {
+/** Was Label und Kurzinfo eines Schadens brauchen: die Vollzeile wie die Auswahl (LFH-1075). */
+type SchadenKopf = Pick<Schaden, 'registrier_nr' | 'typ' | 'ausmass' | 'ort'>;
+
+export function schadenLabel(s: SchadenKopf): string {
   return `${schadenRegistrierAnzeige(s.registrier_nr)} · ${s.typ} · ${s.ort}`;
 }
 
@@ -79,7 +82,7 @@ export function auftragLabel(a: Auftrag): string {
 }
 
 // Kurzinfo-Builder je Typ — speisen das Bezug-Popover aus den Listen-Objekten.
-export function schadenInfo(s: Schaden): BezugKurzinfo {
+export function schadenInfo(s: SchadenKopf): BezugKurzinfo {
   return {
     titel: schadenLabel(s),
     zeilen: [`Typ: ${s.typ}`, `Ausmaß: ${s.ausmass}`, `Ort: ${s.ort}`],
