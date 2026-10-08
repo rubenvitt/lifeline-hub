@@ -73,7 +73,7 @@ describe('VorschauZustand (LFH-664)', () => {
    * OHNE NETZ steht eine kalte Abfrage auf `pending` + `paused`; `isLoading` ist dann false. An
    * `isLoading` gehängt hieße das fälschlich „nicht mehr vorhanden“.
    */
-  it('sagt ohne Verbindung, dass nicht abgerufen werden kann — nicht „nicht mehr vorhanden"', () => {
+  it('sagt ohne Verbindung „Offline · keine Vorschau“ — nicht „nicht mehr vorhanden"', () => {
     renderMitProviders(
       <VorschauZustand
         abfrage={abfrage({ isPending: true, fetchStatus: 'paused' })}
@@ -82,7 +82,7 @@ describe('VorschauZustand (LFH-664)', () => {
         {inhalt}
       </VorschauZustand>,
     );
-    expect(screen.getByText(/Die Meldung ist ohne Verbindung nicht abrufbar/)).toBeInTheDocument();
+    expect(screen.getByText('Offline · keine Vorschau')).toBeInTheDocument();
     expect(screen.queryByText(/nicht mehr vorhanden/)).not.toBeInTheDocument();
   });
 

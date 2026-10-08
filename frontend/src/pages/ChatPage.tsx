@@ -58,6 +58,8 @@ import {
 } from '../chat/bezug';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { RechteHinweis } from '../components/SpeicherHinweis';
 import { Segmentleiste, useRollen } from '../components/instrument';
 
 /**
@@ -534,17 +536,11 @@ export default function ChatPage() {
               senden={sendenMutation.isPending}
             />
           )}
+          {/* Statt der Eingabe: „Nur Ansicht · Grund“, kein Satz (LFH-1078). */}
           {!darfSchreiben && (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginTop: token.marginSM }}
-              title={
-                einsatz.status !== 'aktiv'
-                  ? 'Schreiben ist nur bei aktivem Einsatz möglich.'
-                  : 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.'
-              }
-            />
+            <div style={{ marginTop: token.marginSM }}>
+              <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+            </div>
           )}
         </Col>
       </Row>

@@ -236,11 +236,10 @@ describe('parsePraefix', () => {
     }
   });
 
-  /** Die einzeilige Fußzeile nennt jedes Präfix mit Kurzwort, der Langtext ist Tooltip (LFH-1055). */
-  it('führt zu jedem Präfix Kurzwort und Langtext', () => {
-    for (const { praefix, kurz, legende } of modiMitPraefix()) {
+  /** Die einzeilige Fußzeile nennt jedes Präfix mit Kurzwort (LFH-1055); kein Langtext (LFH-1078). */
+  it('führt zu jedem Präfix ein Kurzwort', () => {
+    for (const { praefix, kurz } of modiMitPraefix()) {
       expect(kurz, praefix).toBeTruthy();
-      expect(legende, praefix).toBeTruthy();
     }
   });
 });

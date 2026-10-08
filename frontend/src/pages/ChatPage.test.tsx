@@ -409,7 +409,7 @@ describe('ChatPage', () => {
     );
   });
 
-  it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {
+  it('zeigt bei abgeschlossenem Einsatz „Nur Ansicht · Einsatz abgeschlossen“ statt der Eingabe', async () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () =>
@@ -425,11 +425,14 @@ describe('ChatPage', () => {
       { route: '/einsaetze/7/chat' },
     );
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    expect(screen.getByText(/nur bei aktivem Einsatz/i)).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toHaveTextContent(
+      'Nur Ansicht Einsatz abgeschlossen',
+    );
+    expect(screen.queryByText(/nur bei aktivem Einsatz/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Nachricht…')).not.toBeInTheDocument();
   });
 
-  it('zeigt ohne Führungsrolle einen Read-only-Hinweis (Einsatz aktiv)', async () => {
+  it('zeigt ohne Führungsrolle „Nur Ansicht · Grund“ (Einsatz aktiv)', async () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () =>
@@ -445,9 +448,10 @@ describe('ChatPage', () => {
       { route: '/einsaetze/7/chat' },
     );
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Einsatzleitung und dem Führungspersonal vorbehalten/i),
-    ).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toHaveTextContent(
+      'Nur Ansicht nur Einsatzleitung und Führungspersonal',
+    );
+    expect(screen.queryByText(/vorbehalten/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Nachricht…')).not.toBeInTheDocument();
   });
 
@@ -653,9 +657,7 @@ describe('ChatPage — Kanal anlegen unter md (LFH-976)', () => {
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
     expect(screen.getByTestId('kanal-leiste')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
-    // Erklärt wird es am Fuß, für Leiste und Spalte gleich (M16).
-    expect(
-      screen.getByText(/Einsatzleitung und dem Führungspersonal vorbehalten/i),
-    ).toBeInTheDocument();
+    // Der Grund steht am Fuß, für Leiste und Spalte gleich (M16).
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
   });
 });

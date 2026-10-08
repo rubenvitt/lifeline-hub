@@ -344,7 +344,7 @@ describe('CommandPalette · Fußzeile und Zeilenmarke (LFH-645)', () => {
     expect(fuss()).toHaveTextContent('neuer Tab');
     expect(fuss()).toHaveTextContent('zurück');
     // Die Präfixlegende gilt in der Vorschau nicht — sie hat dort keine Liste zu filtern.
-    expect(fuss()).not.toHaveTextContent('sucht im Einsatztagebuch');
+    expect(fuss()).not.toHaveTextContent('Personen & Kräfte');
   });
 });
 

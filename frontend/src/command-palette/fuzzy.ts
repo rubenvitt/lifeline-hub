@@ -40,18 +40,16 @@ export const UNBEWERTET = 1;
 export function modiMitPraefix(): {
   modus: PaletteModus;
   praefix: string;
-  legende: string | null;
   kurz: string | null;
 }[] {
   const mit: {
     modus: PaletteModus;
     praefix: string;
-    legende: string | null;
     kurz: string | null;
   }[] = [];
   for (const modus of Object.keys(PALETTE_MODI) as PaletteModus[]) {
-    const { praefix, legende, kurz } = PALETTE_MODI[modus];
-    if (praefix !== null) mit.push({ modus, praefix, legende, kurz });
+    const { praefix, kurz } = PALETTE_MODI[modus];
+    if (praefix !== null) mit.push({ modus, praefix, kurz });
   }
   return mit;
 }

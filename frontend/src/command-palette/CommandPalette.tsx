@@ -444,7 +444,7 @@ export function CommandPalette({
     flach.length > 0
       ? ''
       : zuKurzFuerDatensaetze
-        ? `Mindestens ${DATENSATZ_MINDESTZEICHEN} Zeichen für die Datensatzsuche`
+        ? `Suche ab ${DATENSATZ_MINDESTZEICHEN} Zeichen`
         : 'Keine Treffer';
 
   /**
@@ -832,7 +832,6 @@ export function CommandPalette({
                 <Button
                   key={m.modus}
                   aria-pressed={m.modus === modus}
-                  title={m.legende ?? undefined}
                   // Das Suchfeld behält den Fokus: sonst klappte die Bildschirmtastatur zu und auf.
                   onMouseDown={(e: MouseEvent) => e.preventDefault()}
                   onClick={() => waehleModus(m.modus, m.praefix)}
@@ -893,7 +892,7 @@ export function CommandPalette({
                 {/* Die Präfixe als eigene Gruppe rechts: sie filtern, die übrigen Tasten handeln. */}
                 <span style={{ ...hinweisStil, gap: 12, marginInlineStart: 'auto' }}>
                   {modiMitPraefix().map((m) => (
-                    <span key={m.modus} style={hinweisStil} title={m.legende ?? undefined}>
+                    <span key={m.modus} style={hinweisStil}>
                       <Tastenkuerzel style={tasteQuadrat}>{m.praefix}</Tastenkuerzel>
                       {m.kurz}
                     </span>

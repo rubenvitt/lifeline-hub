@@ -106,9 +106,10 @@ test('LFH-854: ein Rollenwechsel schaltet das Schreibrecht der betroffenen Perso
     await anmeldenAls(person, konto.benutzername, konto.passwort);
     await oeffnenMitStrom(person, `/einsaetze/${id}/chat`, id);
 
-    const hinweis = person.getByRole('alert').filter({
-      hasText: 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.',
-    });
+    // „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078).
+    const hinweis = person
+      .locator('[data-lfh="rechte-hinweis"]')
+      .filter({ hasText: 'nur Einsatzleitung und Führungspersonal' });
     const eingabe = person.getByPlaceholder('Nachricht…');
     await expect(hinweis, 'Vorbedingung: als Beobachter steht der Hinweis').toHaveCount(1);
     await expect(eingabe, 'Vorbedingung: als Beobachter keine Eingabe').toHaveCount(0);

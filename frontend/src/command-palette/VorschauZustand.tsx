@@ -49,11 +49,9 @@ export function VorschauZustand<T>({
   // `paused`; `isLoading` wäre false und sie fiele in „nicht mehr vorhanden“.
   if (abfrage.isPending) {
     if (abfrage.fetchStatus === 'paused') {
-      return (
-        <Typography.Paragraph>
-          {sorte} ist ohne Verbindung nicht abrufbar. Die Vorschau lädt, sobald das Netz zurück ist.
-        </Typography.Paragraph>
-      );
+      // Kein Satz über das Nachladen (LFH-1078): die Abfrage läuft von selbst weiter, sobald das
+      // Netz zurück ist.
+      return <Typography.Paragraph>Offline · keine Vorschau</Typography.Paragraph>;
     }
     return (
       <div aria-busy="true" aria-label={`${sorte} wird geladen`}>

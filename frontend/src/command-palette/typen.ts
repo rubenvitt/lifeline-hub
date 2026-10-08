@@ -335,8 +335,6 @@ interface ModusBeschreibung {
   quellen: readonly DatensatzQuelle[] | null;
   /** Wortlaut der Modusanzeige, solange der Modus aktiv ist. */
   hinweis: string | null;
-  /** Langer Wortlaut der Legende (Tooltip der Fußzeile). */
-  legende: string | null;
   /** Kurzwort hinter der Präfix-Marke in der einzeiligen Fußzeile. */
   kurz: string | null;
 }
@@ -349,13 +347,12 @@ interface ModusBeschreibung {
  * Datensatz-Treffer laufen nicht durch diesen Filter, sie kommen als eigene Prop in die Palette.
  */
 export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
-  alles: { praefix: null, gruppen: null, quellen: null, hinweis: null, legende: null, kurz: null },
+  alles: { praefix: null, gruppen: null, quellen: null, hinweis: null, kurz: null },
   aktionen: {
     praefix: '>',
     gruppen: ['aktionen', 'schnellaktionen'],
     quellen: [],
     hinweis: 'Nur Aktionen',
-    legende: 'zeigt nur Aktionen',
     kurz: 'Aktionen',
   },
   /**
@@ -366,7 +363,6 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
     gruppen: [],
     quellen: ['etbNummer', 'etbText', 'etbAnzahl'],
     hinweis: 'Nur Einsatztagebuch',
-    legende: 'sucht im Einsatztagebuch',
     kurz: 'ETB',
   },
   /**
@@ -379,7 +375,6 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
     gruppen: [],
     quellen: ['personen', 'fahrzeuge', 'personal', 'einheiten'],
     hinweis: 'Nur Personen und Kräfte',
-    legende: 'sucht Personen und Kräfte',
     kurz: 'Personen & Kräfte',
   },
 };
