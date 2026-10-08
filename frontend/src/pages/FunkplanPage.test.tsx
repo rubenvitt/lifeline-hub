@@ -926,7 +926,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     await userEvent.click(within(umschalter).getByRole('radio', { name: 'Sprechgruppen' }));
     expect(within(umschalter).getByRole('radio', { name: 'Sprechgruppen' })).toBeChecked();
     const kopf = [...plan().querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
-    expect(kopf).toEqual(['Sprechgruppe', 'Betriebsart', 'Hinweis', 'Herkunft', 'Teilnehmer']);
+    expect(kopf).toEqual(['Sprechgruppe', 'Bedingung', 'Hinweis', 'Herkunft', 'Teilnehmer']);
     // Die Funkplan-Tabelle ist weg, Fahrzeuge sind keine Teilnehmer.
     expect(screen.queryByRole('region', { name: 'Funkplan' })).toBeNull();
     expect(within(plan()).queryByText('Florian 1/42-1')).toBeNull();

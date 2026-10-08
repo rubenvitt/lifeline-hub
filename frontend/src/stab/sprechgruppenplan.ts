@@ -15,7 +15,7 @@ import { FUEHRUNGSSTELLE_STELLE } from './fuehrungsstelle';
 import { ZUSTAND_GRUND, type FunkplanQuellen } from './funkplan';
 import { STELLENART_LABEL } from './kommunikationsplan';
 import type { Quelle, SkizzenQuelle } from './luecken';
-import { komponentenartWort } from './skizzenZeichen';
+import { kanalBedingung, komponentenartWort } from './skizzenZeichen';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 
 /**
@@ -96,6 +96,8 @@ export interface SprechgruppenZeile {
   id: number;
   bezeichnung: string;
   betriebsart: Betriebsart;
+  /** Betriebsart, Netz und Sicherheit, z. B. „TMO · Gateway · E2E“ (LFH-1030). */
+  bedingung: string;
   /** Der Zweck des Kanals steht im `hinweis` der Sprechgruppe (design.md, Non-Goals). */
   hinweis: string | null;
   herkunft: Herkunft;
@@ -226,6 +228,7 @@ export function baueSprechgruppenplan(
     id: s.id,
     bezeichnung: s.bezeichnung,
     betriebsart: s.betriebsart,
+    bedingung: kanalBedingung(s.betriebsart, s.netz, s.sicherheit),
     hinweis: s.hinweis?.trim() ? s.hinweis : null,
     herkunft: s.einsatz_lokal ? 'einsatzlokal' : 'katalog',
     teilnehmer: angabe(teilnehmer.get(s.id) ?? []),

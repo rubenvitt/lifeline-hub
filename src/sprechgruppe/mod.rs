@@ -14,6 +14,10 @@ pub struct Sprechgruppe {
     #[sqlx(try_from = "String")]
     pub betriebsart: Betriebsart,
     pub hinweis: Option<String>,
+    /// Netz der Sprechgruppe (BBK-Anhang J.5), z. B. „Gateway“ (LFH-1030).
+    pub netz: Option<String>,
+    /// Sicherheit der Sprechgruppe (BBK-Anhang J.5), z. B. „E2E“ (LFH-1030).
+    pub sicherheit: Option<String>,
     pub aktiv: bool,
     pub sortier: i64,
     pub angelegt_at: String,
@@ -29,6 +33,8 @@ impl Sprechgruppe {
             bezeichnung: self.bezeichnung.clone(),
             betriebsart: self.betriebsart,
             hinweis: self.hinweis.clone(),
+            netz: self.netz.clone(),
+            sicherheit: self.sicherheit.clone(),
             aktiv: self.aktiv,
             sortier: self.sortier,
         }
@@ -45,9 +51,19 @@ pub struct SprechgruppeAnzeige {
     pub bezeichnung: String,
     pub betriebsart: Betriebsart,
     pub hinweis: Option<String>,
+    /// Netz (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub netz: Option<String>,
+    /// Sicherheit (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sicherheit: Option<String>,
     pub aktiv: bool,
     pub sortier: i64,
 }
+
+/// Höchstlänge von Netz und Sicherheit nach dem Trimmen (LFH-1030, `src/AGENTS.md`,
+/// „Eingabegrenzen“): eine Zeile unter dem Bedingungszeichen.
+pub const BEDINGUNG_MAX: usize = 40;
 
 /// Höchstzahl verschiedener Sprechgruppen je Ziel (Abschnitt, Einheit, Führungsstelle; LFH-937,
 /// design.md D5). Darüber ist die Liste für sich unbrauchbar → 400.
@@ -98,6 +114,8 @@ mod tests {
             bezeichnung: "412_F_DRK".into(),
             betriebsart: Betriebsart::Tmo,
             hinweis: None,
+            netz: None,
+            sicherheit: None,
             aktiv: true,
             sortier: 0,
             angelegt_at: "2026-06-21 10:00:00".into(),

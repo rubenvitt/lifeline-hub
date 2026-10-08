@@ -217,6 +217,8 @@ export interface SprechgruppeEingabe {
   bezeichnung: string;
   betriebsart: Betriebsart;
   hinweis?: string | null;
+  netz?: string | null;
+  sicherheit?: string | null;
   sortier?: number;
 }
 

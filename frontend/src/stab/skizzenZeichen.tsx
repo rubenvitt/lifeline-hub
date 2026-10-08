@@ -42,9 +42,9 @@ export const BEDINGUNGSZEICHEN_SCHRIFT = 12;
 export const BEDINGUNGSZEICHEN_HOEHE = 24;
 /** Luft zwischen Text und Spitzenansatz, je Seite. */
 export const BEDINGUNGSZEICHEN_INNENABSTAND = 4;
-/** Schriftgrad des Hinweises unter dem Bedingungszeichen. */
+/** Schriftgrad der Zeile unter dem Bedingungszeichen (Netz, Sicherheit, Hinweis). */
 export const HINWEIS_SCHRIFT = 10;
-/** Abstand zwischen Unterkante des Bedingungszeichens und Oberkante des Hinweises. */
+/** Abstand zwischen Unterkante des Bedingungszeichens und Oberkante der Zeile darunter. */
 export const HINWEIS_ABSTAND = 4;
 /** Überstand der Sammelschiene links und rechts des Bedingungszeichens. */
 export const SCHIENE_RAND = 16;
@@ -167,13 +167,59 @@ export function sammelschienenMindestbreite(betriebsart: Betriebsart, bezeichnun
   return bedingungszeichenBreite(betriebsart, bezeichnung) + 2 * SCHIENE_RAND;
 }
 
+/** Was unter dem Bedingungszeichen stehen kann (BBK-Anhang J.5, LFH-1030). */
+export interface Bedingungsangaben {
+  netz?: string | null;
+  sicherheit?: string | null;
+  hinweis?: string | null;
+}
+
+/** Leer und Leerraum zählen als nicht gesetzt. */
+function gesetzt(wert: string | null | undefined): string | null {
+  return wert?.trim() ? wert.trim() : null;
+}
+
+/**
+ * Zeile unter dem Bedingungszeichen: Netz, Sicherheit und Hinweis in dieser Reihenfolge, leere
+ * weggelassen, z. B. „Gateway · E2E · Gesundheit“; ohne Angabe `null` (keine Zeile).
+ */
+export function bedingungszeichenZusatz({
+  netz,
+  sicherheit,
+  hinweis,
+}: Bedingungsangaben): string | null {
+  const teile = [netz, sicherheit, hinweis].map(gesetzt).filter((t) => t != null);
+  return teile.length > 0 ? teile.join(' · ') : null;
+}
+
+/** Bedingung eines Kanals in einer Tabelle: Betriebsart, Netz, Sicherheit, z. B. „TMO · Gateway · E2E“. */
+export function kanalBedingung(
+  betriebsart: Betriebsart,
+  netz?: string | null,
+  sicherheit?: string | null,
+): string {
+  return [betriebsart, gesetzt(netz), gesetzt(sicherheit)].filter((t) => t != null).join(' · ');
+}
+
 function bedingungszeichenName(
   betriebsart: Betriebsart,
   bezeichnung: string,
-  hinweis?: string | null,
+  { netz, sicherheit, hinweis }: Bedingungsangaben,
 ): string {
-  const text = bedingungszeichenText(betriebsart, bezeichnung);
-  return hinweis ? `${text}, Hinweis: ${hinweis}` : text;
+  const teile = [
+    bedingungszeichenText(betriebsart, bezeichnung),
+    ...(
+      [
+        ['Netz', netz],
+        ['Sicherheit', sicherheit],
+        ['Hinweis', hinweis],
+      ] as const
+    )
+      .map(([name, wert]) => [name, gesetzt(wert)] as const)
+      .filter(([, wert]) => wert != null)
+      .map(([name, wert]) => `${name}: ${wert}`),
+  ];
+  return teile.join(', ');
 }
 
 /** Zugänglicher Name einer Leitung, z. B. „Daten, leitergebunden, geplant“. */
@@ -471,17 +517,18 @@ function Langsechseck({
   y,
   betriebsart,
   bezeichnung,
-  hinweis,
+  angaben,
   strich,
 }: {
   x: number;
   y: number;
   betriebsart: Betriebsart;
   bezeichnung: string;
-  hinweis?: string | null;
+  angaben: Bedingungsangaben;
   strich: number;
 }) {
   const breite = bedingungszeichenBreite(betriebsart, bezeichnung);
+  const zusatz = bedingungszeichenZusatz(angaben);
   const h = BEDINGUNGSZEICHEN_HOEHE / 2;
   const links = x - breite / 2;
   const rechts = x + breite / 2;
@@ -516,7 +563,7 @@ function Langsechseck({
       >
         {bedingungszeichenText(betriebsart, bezeichnung)}
       </text>
-      {hinweis ? (
+      {zusatz ? (
         <text
           x={x}
           y={y + h + HINWEIS_ABSTAND}
@@ -526,34 +573,38 @@ function Langsechseck({
           fill="currentColor"
           style={SCHRIFT_TEXT}
         >
-          {hinweis}
+          {zusatz}
         </text>
       ) : null}
     </>
   );
 }
 
-export interface BedingungszeichenProps {
+export interface BedingungszeichenProps extends Bedingungsangaben {
   /** Mitte des Zeichens. */
   x: number;
   y: number;
   betriebsart: Betriebsart;
   bezeichnung: string;
-  /** Hinweis der Sprechgruppe, steht unter dem Zeichen. */
-  hinweis?: string | null;
   className?: string;
 }
 
-/** Bedingungszeichen (J.5): Langsechseck mit Betriebsart und Bezeichnung, Hinweis darunter. */
+/**
+ * Bedingungszeichen (J.5): Langsechseck mit Betriebsart und Bezeichnung, darunter Netz,
+ * Sicherheit und Hinweis (`bedingungszeichenZusatz`); die Zeile darunter verbreitert es nie.
+ */
 export function Bedingungszeichen({
   x,
   y,
   betriebsart,
   bezeichnung,
+  netz,
+  sicherheit,
   hinweis,
   className,
 }: BedingungszeichenProps) {
-  const name = `Bedingungszeichen ${bedingungszeichenName(betriebsart, bezeichnung, hinweis)}`;
+  const angaben = { netz, sicherheit, hinweis };
+  const name = `Bedingungszeichen ${bedingungszeichenName(betriebsart, bezeichnung, angaben)}`;
   return (
     <g role="img" aria-label={name} className={className}>
       <title>{name}</title>
@@ -562,14 +613,14 @@ export function Bedingungszeichen({
         y={y}
         betriebsart={betriebsart}
         bezeichnung={bezeichnung}
-        hinweis={hinweis}
+        angaben={angaben}
         strich={STRICH}
       />
     </g>
   );
 }
 
-export interface SammelschieneProps {
+export interface SammelschieneProps extends Bedingungsangaben {
   /** Linker Anfang und Höhe der Schiene. */
   x: number;
   y: number;
@@ -577,7 +628,6 @@ export interface SammelschieneProps {
   breite: number;
   betriebsart: Betriebsart;
   bezeichnung: string;
-  hinweis?: string | null;
   /** Mitte des Bedingungszeichens auf der Schiene; Vorgabe: Mitte der Schiene. */
   zeichenX?: number;
   hervorgehoben?: boolean;
@@ -591,11 +641,14 @@ export function Sammelschiene({
   breite,
   betriebsart,
   bezeichnung,
+  netz,
+  sicherheit,
   hinweis,
   zeichenX,
   hervorgehoben = false,
   className,
 }: SammelschieneProps) {
+  const angaben = { netz, sicherheit, hinweis };
   const laenge = Math.max(breite, sammelschienenMindestbreite(betriebsart, bezeichnung));
   const halb = bedingungszeichenBreite(betriebsart, bezeichnung) / 2;
   const mitte = Math.min(
@@ -603,7 +656,7 @@ export function Sammelschiene({
     x + laenge - SCHIENE_RAND - halb,
   );
   const strich = hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
-  const name = `Sammelschiene ${bedingungszeichenName(betriebsart, bezeichnung, hinweis)}`;
+  const name = `Sammelschiene ${bedingungszeichenName(betriebsart, bezeichnung, angaben)}`;
   return (
     <g role="img" aria-label={name} className={className}>
       <title>{name}</title>
@@ -622,7 +675,7 @@ export function Sammelschiene({
         y={y}
         betriebsart={betriebsart}
         bezeichnung={bezeichnung}
-        hinweis={hinweis}
+        angaben={angaben}
         strich={strich}
       />
     </g>

@@ -5,9 +5,11 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::katalog::Betriebsart;
-use crate::routes::support::{deserialize_optional_field, parse_enum, pflicht, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, hoechstens, optional_max, parse_enum, pflicht, trimme_tri,
+};
 use crate::sprechgruppe::repo as sg_repo;
-use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
+use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige, BEDINGUNG_MAX};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -22,6 +24,8 @@ pub struct KatalogBody {
     pub bezeichnung: String,
     pub betriebsart: String,
     pub hinweis: Option<String>,
+    pub netz: Option<String>,
+    pub sicherheit: Option<String>,
     #[serde(default)]
     pub sortier: i64,
 }
@@ -31,6 +35,8 @@ pub struct EinsatzLokalBody {
     pub bezeichnung: String,
     pub betriebsart: String,
     pub hinweis: Option<String>,
+    pub netz: Option<String>,
+    pub sicherheit: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +48,8 @@ struct NormalisierterKatalog {
     bezeichnung: String,
     betriebsart: String,
     hinweis: Option<String>,
+    netz: Option<String>,
+    sicherheit: Option<String>,
     sortier: i64,
 }
 
@@ -51,6 +59,8 @@ impl NormalisierterKatalog {
             bezeichnung: &self.bezeichnung,
             betriebsart: &self.betriebsart,
             hinweis: self.hinweis.as_deref(),
+            netz: self.netz.as_deref(),
+            sicherheit: self.sicherheit.as_deref(),
             sortier: self.sortier,
         }
     }
@@ -58,7 +68,7 @@ impl NormalisierterKatalog {
 
 /// Trimmt `bezeichnung` (leer → `Validation`), prüft `betriebsart` via
 /// `Betriebsart::parse` (ungültig → `Validation`), trimmt `hinweis`
-/// (leer → `None`).
+/// (leer → `None`), `netz` und `sicherheit` dazu mit Grenze [`BEDINGUNG_MAX`] (400).
 fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppError> {
     let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     parse_enum(
@@ -77,6 +87,8 @@ fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppE
         bezeichnung,
         betriebsart: body.betriebsart,
         hinweis,
+        netz: optional_max(body.netz, "Netz", BEDINGUNG_MAX)?,
+        sicherheit: optional_max(body.sicherheit, "Sicherheit", BEDINGUNG_MAX)?,
         sortier: body.sortier,
     })
 }
@@ -97,6 +109,10 @@ pub struct PatchKatalog {
     pub betriebsart: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub hinweis: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub netz: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub sicherheit: Option<Option<String>>,
     pub sortier: Option<i64>,
 }
 
@@ -105,6 +121,8 @@ struct PatchNormalisiert {
     bezeichnung: Option<String>,
     betriebsart: Option<String>,
     hinweis: Option<Option<String>>,
+    netz: Option<Option<String>>,
+    sicherheit: Option<Option<String>>,
     sortier: Option<i64>,
 }
 
@@ -114,6 +132,8 @@ impl PatchNormalisiert {
             bezeichnung: self.bezeichnung.as_deref(),
             betriebsart: self.betriebsart.as_deref(),
             hinweis: self.hinweis.as_ref().map(|v| v.as_deref()),
+            netz: self.netz.as_ref().map(|v| v.as_deref()),
+            sicherheit: self.sicherheit.as_ref().map(|v| v.as_deref()),
             sortier: self.sortier,
         }
     }
@@ -141,8 +161,23 @@ fn normalisiere_patch_katalog(body: PatchKatalog) -> Result<PatchNormalisiert, A
         bezeichnung,
         betriebsart: body.betriebsart,
         hinweis: trimme_tri(body.hinweis),
+        netz: bedingung_tri(body.netz, "Netz")?,
+        sicherheit: bedingung_tri(body.sicherheit, "Sicherheit")?,
         sortier: body.sortier,
     })
+}
+
+/// Tri-State-Feld `netz`/`sicherheit`: getrimmt, leer ist der Leerwunsch, sonst höchstens
+/// [`BEDINGUNG_MAX`] Zeichen (400).
+fn bedingung_tri(
+    wert: Option<Option<String>>,
+    feld: &str,
+) -> Result<Option<Option<String>>, AppError> {
+    let wert = trimme_tri(wert);
+    if let Some(Some(w)) = &wert {
+        hoechstens(w, feld, BEDINGUNG_MAX)?;
+    }
+    Ok(wert)
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +188,8 @@ struct NormalisierterLokal {
     bezeichnung: String,
     betriebsart: String,
     hinweis: Option<String>,
+    netz: Option<String>,
+    sicherheit: Option<String>,
 }
 
 fn normalisiere_lokal(body: EinsatzLokalBody) -> Result<NormalisierterLokal, AppError> {
@@ -173,6 +210,8 @@ fn normalisiere_lokal(body: EinsatzLokalBody) -> Result<NormalisierterLokal, App
         bezeichnung,
         betriebsart: body.betriebsart,
         hinweis,
+        netz: optional_max(body.netz, "Netz", BEDINGUNG_MAX)?,
+        sicherheit: optional_max(body.sicherheit, "Sicherheit", BEDINGUNG_MAX)?,
     })
 }
 
@@ -267,7 +306,11 @@ pub async fn anlegen_einsatz_lokal(
         einsatz_id,
         &n.bezeichnung,
         &n.betriebsart,
-        n.hinweis.as_deref(),
+        sg_repo::Zusatz {
+            hinweis: n.hinweis.as_deref(),
+            netz: n.netz.as_deref(),
+            sicherheit: n.sicherheit.as_deref(),
+        },
     )
     .await?;
     Ok((StatusCode::CREATED, Json(sg.anzeige())))
@@ -287,6 +330,8 @@ mod tests {
             bezeichnung: "  ".into(),
             betriebsart: "TMO".into(),
             hinweis: None,
+            netz: None,
+            sicherheit: None,
             sortier: 0,
         };
         assert!(matches!(
@@ -301,6 +346,8 @@ mod tests {
             bezeichnung: "412".into(),
             betriebsart: "XX".into(),
             hinweis: None,
+            netz: None,
+            sicherheit: None,
             sortier: 0,
         };
         assert!(matches!(
@@ -315,10 +362,14 @@ mod tests {
             bezeichnung: " 412 ".into(),
             betriebsart: "TMO".into(),
             hinweis: Some("  ".into()),
+            netz: Some(" Gateway ".into()),
+            sicherheit: Some("".into()),
             sortier: 0,
         };
         let n = normalisiere_katalog(b).unwrap();
         assert_eq!(n.bezeichnung, "412");
         assert_eq!(n.hinweis, None);
+        assert_eq!(n.netz.as_deref(), Some("Gateway"));
+        assert_eq!(n.sicherheit, None);
     }
 }
