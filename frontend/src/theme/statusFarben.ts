@@ -15,6 +15,7 @@ import {
   type sichtungsfarben,
 } from './tokens';
 import type {
+  AbgleichStatus,
   AbloesungEinstufung,
   AbschnittLagezustand,
   AntragStand,
@@ -47,6 +48,7 @@ import type {
   LuftqualitaetKlasse,
   OdlStufe,
 } from '../api/fachebenen';
+import type { BauStatus, OfflineKarteStatus } from '../api/offlineKarten';
 
 /**
  * Statusfarb-Vertrag (LFH-328 · A2): EINE Quelle für „welche Bedeutung hat welche Statusfarbe“.
@@ -594,6 +596,42 @@ export function pegelZustandVon(zustand: unknown): StatusDarstellung | null {
     ? pegelZustand[zustand as PegelZustand]
     : null;
 }
+
+/**
+ * Stand eines Vermisstenabgleichs (LFH-1022). Vorher ein antd-Preset (`gold`/`green`), das den
+ * Textboden nicht hielt, und der Drahtwert als Wort („bestaetigt“). Der offene Verdacht braucht
+ * eine Entscheidung (`achtung`), der bestätigte ist erledigt (`normal`), der verworfene neutral.
+ */
+export const abgleichStatus: Record<AbgleichStatus, StatusDarstellung> = {
+  verdacht: { rolle: 'achtung', label: 'Verdacht' },
+  bestaetigt: { rolle: 'normal', label: 'bestätigt' },
+  verworfen: { rolle: 'neutral', label: 'verworfen' },
+};
+
+/**
+ * Status einer Offline-Karte auf dem Server (LFH-1022, vorher antd-Presets in
+ * `karten/OfflineKartenVerwaltung.tsx`). Ein laufender Download trägt `bedien` wie jede aktive
+ * Beziehung ({@link materialStatus}); `registriert` wartet auf nichts Eigenes und ist neutral.
+ */
+export const offlineKarteStatus: Record<OfflineKarteStatus, StatusDarstellung> = {
+  registriert: { rolle: 'neutral', label: 'registriert' },
+  laedt: { rolle: 'bedien', label: 'lädt' },
+  bereit: { rolle: 'normal', label: 'bereit' },
+  fehler: { rolle: 'alarm', label: 'Fehler' },
+};
+
+/**
+ * Phase eines Kartenbaus im zentralen karten-service (LFH-1022). Laufende Phasen `bedien` wie
+ * {@link offlineKarteStatus}, die Warteschlange neutral.
+ */
+export const kartenBauStatus: Record<BauStatus, StatusDarstellung> = {
+  queued: { rolle: 'neutral', label: 'wartet' },
+  building: { rolle: 'bedien', label: 'baut' },
+  uploading: { rolle: 'bedien', label: 'lädt hoch' },
+  publishing: { rolle: 'bedien', label: 'veröffentlicht' },
+  done: { rolle: 'normal', label: 'fertig' },
+  failed: { rolle: 'alarm', label: 'Fehler' },
+};
 
 /**
  * Die drei Rollen, die eine Kennzahl **stufen** können, als VERENGUNG von {@link Statusrolle}.

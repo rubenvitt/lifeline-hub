@@ -1,4 +1,5 @@
 import { Tag } from 'antd';
+import type { ReactNode } from 'react';
 import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
 import { useRollen } from './instrument/rollenwerte';
 import { statusFlaeche, tonVonRolle } from './instrument/statusFlaeche';
@@ -32,6 +33,8 @@ interface StatusTagProps {
    * ist — siehe Dateikopf.
    */
   darstellungsart?: 'flaeche' | 'rand';
+  /** Zeichen vor dem Wortlaut, etwa ein Ladekreis für einen laufenden Vorgang (antds `icon`). */
+  icon?: ReactNode;
 }
 
 /** Die wirksame Darstellungsart — rein, damit die Regel ohne Render prüfbar ist. */
@@ -79,6 +82,7 @@ export default function StatusTag({
   title,
   farbe: ueberschrieben,
   darstellungsart,
+  icon,
 }: StatusTagProps) {
   const { token, rollen } = useRollen();
   const mandantenfarbe = ueberschrieben?.trim();
@@ -89,6 +93,7 @@ export default function StatusTag({
   return (
     <Tag
       title={title}
+      icon={icon}
       data-rolle={darstellung.rolle}
       data-darstellung={art}
       style={

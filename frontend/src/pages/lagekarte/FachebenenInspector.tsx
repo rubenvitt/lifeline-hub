@@ -343,11 +343,7 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   const notaufnahme = s(p.notaufnahme);
   return (
     <>
-      {kategorie && (
-        <Tag color="purple" style={{ marginBottom: token.marginSM }}>
-          {kategorieLabel(kategorie)}
-        </Tag>
-      )}
+      {kategorie && <Tag style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Tag>}
       <Descriptions column={1}>
         {s(p.adresse) && <Descriptions.Item label="Adresse">{s(p.adresse)}</Descriptions.Item>}
         {s(p.betreiber) && (
@@ -670,11 +666,7 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   const titel = s(p.titel);
   return (
     <>
-      {kategorie && (
-        <Tag color="magenta" style={{ marginBottom: token.marginSM }}>
-          {kategorieLabel(kategorie)}
-        </Tag>
-      )}
+      {kategorie && <Tag style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Tag>}
       {/* Der `key` bindet den Fehlerzustand an die URL — jeder Kamerawechsel beginnt frisch. */}
       {bild && <WebcamStandbild key={bild} bild={bild} titel={titel} />}
       <Descriptions column={1}>

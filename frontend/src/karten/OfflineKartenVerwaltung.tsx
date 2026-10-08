@@ -19,7 +19,6 @@ import {
   type BauStatus,
   type KarteAktualisierung,
   type OfflineKarte,
-  type OfflineKarteStatus,
 } from '../api/offlineKarten';
 import AutoAktualisierungZeile from './AutoAktualisierungZeile';
 import { listenTakt, statusTakt } from './aktualisierungTakt';
@@ -30,25 +29,15 @@ import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
 import OfflineRegionPicker from './OfflineRegionPicker';
 import OfflineVorhandeneModal from './OfflineVorhandeneModal';
 import { globalKeys } from '../api/queryKeys';
+import StatusTag from '../components/StatusTag';
+import { kartenBauStatus, offlineKarteStatus, type StatusDarstellung } from '../theme/statusFarben';
 
 /** Bau-Status-Werte, während derer die Bau-Status-Zeile pollt (2 s) — analog Download-Polling. */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
 
-const BAU_STATUS_TAG: Record<BauStatus, { color: string; label: string }> = {
-  queued: { color: 'default', label: 'wartet' },
-  building: { color: 'processing', label: 'baut' },
-  uploading: { color: 'processing', label: 'lädt hoch' },
-  publishing: { color: 'processing', label: 'veröffentlicht' },
-  done: { color: 'green', label: 'fertig' },
-  failed: { color: 'red', label: 'Fehler' },
-};
-
-const STATUS_TAG: Record<OfflineKarteStatus, { color: string; label: string }> = {
-  registriert: { color: 'default', label: 'registriert' },
-  laedt: { color: 'processing', label: 'lädt' },
-  bereit: { color: 'green', label: 'bereit' },
-  fehler: { color: 'red', label: 'Fehler' },
-};
+/** Hinweise neben dem Kartenstatus (LFH-1022: Statusrollen statt antd-Presets). */
+const UPDATE_VERFUEGBAR: StatusDarstellung = { rolle: 'achtung', label: 'Update verfügbar' };
+const UPDATE_FEHLGESCHLAGEN: StatusDarstellung = { rolle: 'alarm', label: 'Update fehlgeschlagen' };
 
 /**
  * Etikett einer laufenden Aktualisierung vor dem Download (LFH-993). „laedt“ fehlt: dann zeigt die
@@ -191,11 +180,7 @@ export default function OfflineKartenVerwaltung() {
                     auf dem Gerät seit {seit}
                   </Typography.Text>
                 )}
-                {k.update_verfuegbar && (
-                  <Tag color="orange" style={{ marginInlineEnd: 0 }}>
-                    Update verfügbar
-                  </Tag>
-                )}
+                {k.update_verfuegbar && <StatusTag darstellung={UPDATE_VERFUEGBAR} />}
               </Space>
             )}
           </div>
@@ -229,24 +214,22 @@ export default function OfflineKartenVerwaltung() {
         const s = k.status;
         const akt = aktualisierungJe.get(k.id);
         // LFH-993: Ein fehlgeschlagenes Update steht neben dem Status, der Grund im Tooltip.
+        // Die Hülle trägt den Tooltip: `StatusTag` reicht keinen Ref durch.
         const fehler = akt?.fehler ? (
           <Tooltip title={akt.fehler}>
-            <Tag color="red" style={{ marginInlineEnd: 0 }}>
-              Update fehlgeschlagen
-            </Tag>
+            <span>
+              <StatusTag darstellung={UPDATE_FEHLGESCHLAGEN} />
+            </span>
           </Tooltip>
         ) : null;
         // Vor dem Download (Neubau, Veröffentlichung) ein Etikett mit Ladekreis.
         if (akt?.phase && akt.phase !== 'laedt' && s !== 'laedt' && k.geladen == null) {
           return (
             <Space size={8} wrap>
-              <Tag
+              <StatusTag
                 icon={<IconLadekreis drehen />}
-                color="processing"
-                style={{ marginInlineEnd: 0 }}
-              >
-                {PHASE_ETIKETT[akt.phase]}
-              </Tag>
+                darstellung={{ ...offlineKarteStatus.laedt, label: PHASE_ETIKETT[akt.phase] }}
+              />
               {fehler}
             </Space>
           );
@@ -255,12 +238,9 @@ export default function OfflineKartenVerwaltung() {
         // der Wächter lädt und die Liste den Fortschritt noch nicht trägt.
         const laeuft = s === 'laedt' || k.geladen != null || akt?.phase === 'laedt';
         if (!laeuft) {
-          const t = STATUS_TAG[s];
           return (
             <Space size={8} wrap>
-              <Tag color={t.color} style={{ marginInlineEnd: 0 }}>
-                {t.label}
-              </Tag>
+              <StatusTag darstellung={offlineKarteStatus[s]} />
               {fehler}
             </Space>
           );
@@ -272,9 +252,10 @@ export default function OfflineKartenVerwaltung() {
         const label = s === 'laedt' ? 'lädt' : 'aktualisiert';
         return (
           <Space size={8}>
-            <Tag icon={<IconLadekreis drehen />} color="processing" style={{ marginInlineEnd: 0 }}>
-              {label}
-            </Tag>
+            <StatusTag
+              icon={<IconLadekreis drehen />}
+              darstellung={{ ...offlineKarteStatus.laedt, label }}
+            />
             {prozent != null ? (
               <Progress percent={prozent} size="small" style={{ width: 120, marginBottom: 0 }} />
             ) : k.geladen != null ? (
@@ -307,10 +288,13 @@ export default function OfflineKartenVerwaltung() {
       render: (_: unknown, k: OfflineKarte) => {
         if (k.status !== 'bereit') return <Tag>—</Tag>;
         const istRaster = k.format === 'png' || k.format === 'jpg' || k.format === 'webp';
-        return istRaster ? (
-          <Tag color="green">bereit</Tag>
-        ) : (
-          <Tag color="green">wird angezeigt</Tag>
+        return (
+          <StatusTag
+            darstellung={{
+              ...offlineKarteStatus.bereit,
+              label: istRaster ? 'bereit' : 'wird angezeigt',
+            }}
+          />
         );
       },
     },
@@ -409,9 +393,13 @@ export default function OfflineKartenVerwaltung() {
       {istAdmin && bauVerfuegbar && aktiveBauten.length > 0 && (
         <Space size={6} wrap style={{ marginBottom: 12 }}>
           {aktiveBauten.map((j) => (
-            <Tag key={j.id} color={BAU_STATUS_TAG[j.status.status].color}>
-              {j.slug}: {BAU_STATUS_TAG[j.status.status].label}
-            </Tag>
+            <StatusTag
+              key={j.id}
+              darstellung={{
+                ...kartenBauStatus[j.status.status],
+                label: `${j.slug}: ${kartenBauStatus[j.status.status].label}`,
+              }}
+            />
           ))}
         </Space>
       )}

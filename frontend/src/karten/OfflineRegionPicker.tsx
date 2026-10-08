@@ -1,4 +1,4 @@
-import { App, Button, Modal, Spin, Tag, Typography } from 'antd';
+import { App, Button, Modal, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +20,8 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
+import StatusTag from '../components/StatusTag';
+import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
 
 /** Bau-Status, während derer gepollt wird (2 s). */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -226,22 +228,26 @@ export default function OfflineRegionPicker({
     if (baut) {
       const phase = job ? BAU_PHASE_LABEL[job.status.status] : 'baut';
       return (
-        <Tag icon={<Spin size="small" style={{ marginInlineEnd: 4 }} />} color="processing">
-          Baut… {phase}
-        </Tag>
+        <StatusTag
+          icon={<Spin size="small" style={{ marginInlineEnd: 4 }} />}
+          darstellung={{ ...kartenBauStatus.building, label: `Baut… ${phase}` }}
+        />
       );
     }
     // 2) Auf dem Gerät (gleicher Name, brauchbar)?
     const k = z.karte;
     if (k && k.status !== 'fehler') {
       if (k.status === 'laedt' || k.geladen != null) {
-        return <Tag color="processing">Lädt…</Tag>;
+        return <StatusTag darstellung={{ ...offlineKarteStatus.laedt, label: 'Lädt…' }} />;
       }
       // bereit
       return (
-        <Tag color="green">
-          Auf dem Gerät{k.update_verfuegbar && !istRasterKarte(k) ? ' · Update verfügbar' : ''}
-        </Tag>
+        <StatusTag
+          darstellung={{
+            ...offlineKarteStatus.bereit,
+            label: `Auf dem Gerät${k.update_verfuegbar && !istRasterKarte(k) ? ' · Update verfügbar' : ''}`,
+          }}
+        />
       );
     }
     // 3) Lieferbar (gebaut + gehostet) → direkt laden.

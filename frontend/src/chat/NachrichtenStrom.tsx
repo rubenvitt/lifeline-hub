@@ -277,7 +277,6 @@ export default function NachrichtenStrom({
                         const info = bezugInfo?.(typ, zielId) ?? null;
                         return (
                           <Tag
-                            color="cyan"
                             closable={darfSchreiben && onBezugLoeschen !== undefined}
                             onClose={(e) => {
                               e.preventDefault();
