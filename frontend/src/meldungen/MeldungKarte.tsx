@@ -285,7 +285,7 @@ function MeldungKarte({
             <Space size="middle" wrap style={{ marginLeft: 'auto', justifyContent: 'flex-end' }}>
               {kannBestaetigen && (
                 <Popconfirm
-                  title="Sofortmeldung bestätigen (Kenntnis genommen)?"
+                  title="Sofortmeldung bestätigen?"
                   okText="Bestätigen"
                   cancelText="Abbrechen"
                   onConfirm={() => onBestaetigen?.(m.id)}

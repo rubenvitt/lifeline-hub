@@ -370,7 +370,7 @@ export default function SchaedenDetailPage() {
         >
           <Select options={ABSCHLUSS_GRUENDE} />
         </Form.Item>
-        <Form.Item label="Notiz (optional, wird an Beschreibung angehängt)" name="notiz">
+        <Form.Item label="Notiz (optional)" name="notiz">
           <Input.TextArea rows={2} />
         </Form.Item>
       </ErfassungsModal>

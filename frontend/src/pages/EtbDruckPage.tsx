@@ -152,14 +152,13 @@ export default function EtbDruckPage() {
           type="info"
           showIcon
           title="Kein Zugriff auf das Einsatztagebuch"
-          description="Das Modul ist für Sie gesperrt oder die Aufbewahrungsfrist des Einsatzes ist abgelaufen. Es gibt nichts zu drucken."
+          description="Modul gesperrt oder Aufbewahrungsfrist abgelaufen"
         />
       ) : druckQuery.isError ? (
         <Alert
           type="error"
           showIcon
           title="Das Tagebuch konnte nicht vollständig geladen werden"
-          description="Drucken bleibt gesperrt, bis alle Einträge der Auswahl da sind — ein Teilausdruck ist ausgeschlossen."
           action={<Button onClick={() => void druckQuery.refetch()}>Erneut laden</Button>}
         />
       ) : !stand || druckQuery.isFetching ? (

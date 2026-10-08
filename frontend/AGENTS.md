@@ -651,8 +651,9 @@ Spec `bedien-arbeitsplatz`).
   `sendetRef` in `abschicken`.
 - **„Werte behalten"** (`uebernahme`) ist eine Einstellung: eigene Zeile über den Knöpfen,
   **Vorgabe AUS** — in `components/Erfassung.tsx` **und** `pages/EtbPage.tsx` (`useState(false)`).
-- **Der Tastaturvertrag steht einmal, nicht im Platzhalter** (Hinweiszeile unter der
-  `Schnellerfassungszeile`, `etb/Schnellerfassung.tsx`).
+- **Der Tastaturvertrag steht am Knopf, nie im Text** (LFH-1078): Tastenkappe ↵ an „Erfassen“
+  nur bei feinem Zeiger und ab `lg`, Kürzel in `aria-keyshortcuts`; keine Hinweiszeile, kein Kürzel im
+  Platzhalter (`etb/Schnellerfassung.tsx`).
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt".

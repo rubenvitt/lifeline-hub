@@ -28,7 +28,11 @@ const CHIP_MENUE_STANDARD: readonly MenueEintrag<ChipAktion>[] = [
   { key: 'bearbeiten', label: 'Nur für diesen Eintrag ändern' },
   { key: 'standard', label: 'Standard-Rufname ändern' },
 ];
-const STANDARD_TITEL = 'Standard-Rufname: gilt für jeden neuen Eintrag, ändern nur für diesen';
+/**
+ * Woher der Wert kommt, nicht wie man ihn ändert (LFH-1078): beide Wege nennt das Chip-Menü
+ * („Nur für diesen Eintrag ändern“, „Standard-Rufname ändern“).
+ */
+const STANDARD_TITEL = 'Standard-Rufname: für jeden neuen Eintrag';
 
 interface Props {
   feld: MetaFeld;

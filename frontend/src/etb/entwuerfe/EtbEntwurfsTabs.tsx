@@ -311,9 +311,7 @@ export default function EtbEntwurfsTabs({
         onCancel={() => setVerwerfenId(null)}
         destroyOnHidden
       >
-        <Typography.Paragraph>
-          Text, Felder und Anhänge dieses Entwurfs gehen verloren. Er steht noch nicht im Tagebuch.
-        </Typography.Paragraph>
+        <Typography.Paragraph>Text, Felder und Anhänge gehen verloren.</Typography.Paragraph>
       </Modal>
     </>
   );

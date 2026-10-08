@@ -66,7 +66,7 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
       const hinweis = page
         .locator('.ant-alert-info')
-        .filter({ hasText: 'Demo-Daten sind freigeschaltet und noch nicht importiert.' });
+        .filter({ hasText: 'Demo-Daten nicht importiert' });
       await expect(hinweis).toHaveCount(1);
       await randHaelt(
         hinweis.getByRole('link', { name: 'Zu den Demo-Daten' }),

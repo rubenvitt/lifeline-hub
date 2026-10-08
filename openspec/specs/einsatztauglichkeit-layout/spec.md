@@ -30,7 +30,7 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
 - Gefahrenmatrix: alle 58 Zell-Auslöser und die Gebietszeilen.
 - Kommunikation (Meldungen, Erinnerungen, Nachforderungen, Aufträge und Befehle, Chat): die
   Primäraktion des Seitenkopfs, die Aktionsknöpfe und Auswahlfelder jeder Karte, auf der Seite
-  Aufträge die Tabs „Aufträge“ und „Befehle“ und der Kopf „Befehlsdetails“, der Link einer
+  Aufträge die Tabs „Einzelaufträge“ und „Einsatzbefehle“ und der Kopf „Befehlsdetails“, der Link einer
   Befehlskarte, im Chat Eingabefeld und Senden-Knopf.
 - Einsatz-Einstellungen: die Sektionswahl, Auswahl- und Zahlfelder, der Speichern-Knopf und die
   Modulzeilen (Schalter, Rollenauswahl). Einsatzdaten: die Bearbeiten-Knöpfe und der

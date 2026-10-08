@@ -643,6 +643,9 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     setupMit([http.get('/api/einsaetze/7/etb', () => HttpResponse.json([]))]);
     expect(await screen.findByText(LEER_TITEL)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ersten Eintrag erfassen' })).toBeInTheDocument();
+    // Der Knopf zeigt den Weg; kein Satz über die Erfassungszeile (LFH-1078).
+    expect(screen.queryByText(/Erfassungszeile/)).toBeNull();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
   });
 
   it('zeigt Lesenden denselben Leertitel, aber keine Erfassungsaktion', async () => {
@@ -662,6 +665,11 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     expect(
       screen.queryByRole('button', { name: 'Ersten Eintrag erfassen' }),
     ).not.toBeInTheDocument();
+    // Statt „Sobald jemand mit Schreibrecht …“: „Nur Ansicht · Grund“ im Kopf (LFH-1078).
+    expect(screen.queryByText(/Sobald jemand/)).toBeNull();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toHaveTextContent(
+      'Nur Ansicht nur Einsatzleitung und Führungspersonal',
+    );
   });
 
   it('unterscheidet leer-mit-Filter und setzt beim Zurücksetzen auch das Eingabefeld zurück', async () => {
@@ -677,6 +685,8 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     expect(await screen.findByText('Kein Eintrag passt zum Filter')).toBeInTheDocument();
     expect(screen.queryByText(LEER_TITEL)).not.toBeInTheDocument();
 
+    // Nur der Knopf, kein Satz daneben (LFH-1078).
+    expect(screen.queryByText(/Suchbegriff/)).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
 
     // Die unterscheidende Zusicherung: ein Reset, der nur den Seitenzustand räumt, ließe die
@@ -1140,6 +1150,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     );
     // Und der gepufferte Eintrag steht als eigene Zeile in der Zeitachse.
     expect(await screen.findAllByText('Offline-Eintrag')).not.toHaveLength(0);
+    // Der Zustand in wenigen Wörtern, im Singular (LFH-1078).
+    expect(await screen.findByText('1 Eintrag offline vorgemerkt')).toBeInTheDocument();
+    expect(screen.queryByText(/sobald wieder Verbindung/)).toBeNull();
   });
 });
 

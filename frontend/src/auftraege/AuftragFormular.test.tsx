@@ -173,9 +173,9 @@ describe('AuftragFormular — Frist und Erteilung in der Anzeigezone (LFH-692)',
         </AnzeigeKonventionenProvider>,
       );
       await userEvent.click(screen.getByText(/Befehlsschema/));
-      expect(
-        await screen.findByRole('textbox', { name: 'Erteilt am (mündlich/per Funk – optional)' }),
-      ).toHaveValue('2026-09-24 10:00');
+      expect(await screen.findByRole('textbox', { name: 'Erteilt am (optional)' })).toHaveValue(
+        '2026-09-24 10:00',
+      );
       await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
       await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
       const frist = screen.getByRole('textbox', { name: 'Frist (Quittung/Vollzug)' });

@@ -88,10 +88,9 @@ async function neueEintraege(einsatzId: number, grenzeId: number | null): Promis
  */
 export const LAGEENTWICKLUNG_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus dem ETB übernehmen',
-  unterzeile: 'Neue Einträge je Typ seit der letzten Lagebesprechung, ohne Wortlaut',
+  unterzeile: 'Anzahl je Typ seit letzter Lagebesprechung',
   ersetzenTitel: 'Lageentwicklung ersetzen?',
-  ersetzenText:
-    'Der Abschnitt enthält schon Text. Er wird durch die Zahl der neuen ETB-Einträge seit der letzten Lagebesprechung ersetzt.',
+  ersetzenText: 'Vorhandener Text wird ersetzt.',
   // Ohne Stab keine Grenze, ohne ETB nichts zu zählen: beide sind nötig.
   verfuegbar: (freigaben) => {
     const fehlend = (Object.keys(MODUL) as (keyof typeof MODUL)[]).filter(

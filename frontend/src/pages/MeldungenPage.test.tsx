@@ -218,7 +218,7 @@ describe('MeldungenPage', () => {
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Offline-Lage');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
 
-    expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
+    expect(await screen.findByText('Offline vorgemerkt: Meldung von RTW 2')).toBeInTheDocument();
     expect(legeMeldungAn).not.toHaveBeenCalled();
     expect(await schreibaktionenLaden(1, 1)).toEqual([
       expect.objectContaining({

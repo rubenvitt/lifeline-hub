@@ -558,48 +558,51 @@ describe('AuftraegePage', () => {
     renderPage();
     // Default-Tab "Aufträge" ist aktiv — erst Aufträge-Tab sichtbar
     await screen.findByText('Deich sichern');
-    expect(screen.getByRole('tab', { name: 'Aufträge' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Befehle' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Einzelaufträge' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Einsatzbefehle' })).toBeInTheDocument();
     // Zum Befehle-Tab wechseln
-    await userEvent.click(screen.getByRole('tab', { name: 'Befehle' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Einsatzbefehle' }));
     // Der Knopf verspricht keine Erteilung: angelegt wird ein Entwurf (LFH-972).
     expect(await screen.findByRole('button', { name: 'Befehl entwerfen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Befehl erteilen/ })).not.toBeInTheDocument();
   });
 
   describe('Reiter in der Adresse (LFH-972)', () => {
-    it('?reiter=befehle öffnet direkt den Reiter Befehle', async () => {
+    it('?reiter=befehle öffnet direkt den Reiter Einsatzbefehle', async () => {
       renderPage('/einsaetze/1/auftraege?reiter=befehle');
       expect(await screen.findByRole('button', { name: 'Befehl entwerfen' })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: 'Befehle' })).toHaveAttribute('aria-selected', 'true');
-    });
-
-    it('ein unbekannter Reiter fällt auf „Aufträge" zurück', async () => {
-      renderPage('/einsaetze/1/auftraege?reiter=chat');
-      expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: 'Aufträge' })).toHaveAttribute(
+      expect(screen.getByRole('tab', { name: 'Einsatzbefehle' })).toHaveAttribute(
         'aria-selected',
         'true',
       );
     });
 
-    it('der Reiterwechsel schreibt die Adresse per replace, zurück auf „Aufträge" ohne Parameter', async () => {
+    it('ein unbekannter Reiter fällt auf „Einzelaufträge" zurück', async () => {
+      renderPage('/einsaetze/1/auftraege?reiter=chat');
+      expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Einzelaufträge' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    });
+
+    it('der Reiterwechsel schreibt die Adresse per replace, zurück auf „Einzelaufträge" ohne Parameter', async () => {
       renderPage();
       await screen.findByText('Deich sichern');
-      await userEvent.click(screen.getByRole('tab', { name: 'Befehle' }));
+      await userEvent.click(screen.getByRole('tab', { name: 'Einsatzbefehle' }));
       await waitFor(() =>
         expect(screen.getByTestId('loc-search')).toHaveTextContent('?reiter=befehle'),
       );
       expect(screen.getByTestId('loc-art')).toHaveTextContent('REPLACE');
-      await userEvent.click(screen.getByRole('tab', { name: 'Aufträge' }));
+      await userEvent.click(screen.getByRole('tab', { name: 'Einzelaufträge' }));
       await waitFor(() => expect(screen.getByTestId('loc-search')).toBeEmptyDOMElement());
-      expect(screen.getByRole('tab', { name: 'Aufträge' })).toHaveAttribute(
+      expect(screen.getByRole('tab', { name: 'Einzelaufträge' })).toHaveAttribute(
         'aria-selected',
         'true',
       );
     });
 
-    it('im Reiter Aufträge steht „Befehl" nur im Fachbegriff „Befehlsschema"', async () => {
+    it('im Reiter Einzelaufträge steht „Befehl" nur im Fachbegriff „Befehlsschema"', async () => {
       listeAuftraege.mockResolvedValue([auftrag({ ort: 'Deichkrone Süd' })]);
       renderPage();
       await screen.findByText('Deich sichern');
@@ -609,16 +612,12 @@ describe('AuftraegePage', () => {
       expect(reiter.textContent).not.toMatch(/Befehl(?!sschema)/);
     });
 
-    it('jeder Reiter grenzt sich in einer Zeile ab', async () => {
-      renderPage();
+    it('die Reiternamen grenzen ab, ohne Erklärsatz darunter (LFH-1078)', async () => {
+      const { container } = renderPage();
       await screen.findByText('Deich sichern');
-      expect(
-        screen.getByText('Einzelauftrag an Abschnitt oder Einheit, mit Quittung und Vollzug.'),
-      ).toBeVisible();
-      await userEvent.click(screen.getByRole('tab', { name: 'Befehle' }));
-      expect(
-        await screen.findByText('Schriftlicher Einsatzbefehl, wird freigegeben und gedruckt.'),
-      ).toBeVisible();
+      expect(screen.getByRole('tab', { name: 'Einzelaufträge' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Einsatzbefehle' })).toBeInTheDocument();
+      expect(container.querySelector('[data-lfh="reiter-abgrenzung"]')).toBeNull();
     });
   });
 });

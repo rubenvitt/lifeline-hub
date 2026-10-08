@@ -101,16 +101,15 @@ test('ohne Netz ist „Anhang" gesperrt, ein Text-Eintrag landet als ausstehend'
   await context.setOffline(true);
   try {
     await expect(page.getByRole('button', { name: 'Anhang', exact: true })).toBeDisabled();
-    await expect(
-      page.getByText('Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.'),
-    ).toBeVisible();
+    // Kurzgrund am Knopf statt eines Satzes (LFH-1078).
+    await expect(page.locator('[data-lfh="etb-anhang-grund"]')).toHaveText('offline');
 
     const feld = page.getByPlaceholder(/Inhalt/);
     await feld.fill('Funkmeldung ohne Netz');
     await feld.press('Enter');
     const ausstehend = page.locator('.etb-ausstehend');
     await expect(ausstehend).toContainText('Funkmeldung ohne Netz');
-    await expect(ausstehend).toContainText('wird gesendet');
+    await expect(ausstehend).toContainText('vorgemerkt');
   } finally {
     await context.setOffline(false);
   }

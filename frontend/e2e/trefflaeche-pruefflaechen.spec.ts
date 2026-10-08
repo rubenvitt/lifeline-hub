@@ -377,11 +377,9 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
     },
     {
       pfad: `${R}/auftraege`,
-      anker: (page) => inMain(page).getByRole('tab', { name: /Befehle/ }),
+      anker: (page) => inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }),
       vorbereiten: async (page) => {
-        await inMain(page)
-          .getByRole('tab', { name: /Befehle/ })
-          .click();
+        await inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }).click();
         await expect(inMain(page).getByText('Befehl Brücke Nord').first()).toBeVisible();
       },
       ziele: [
@@ -462,11 +460,9 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
     },
     {
       pfad: `${R}/auftraege`,
-      anker: (page) => inMain(page).getByRole('tab', { name: /Befehle/ }),
+      anker: (page) => inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }),
       vorbereiten: async (page) => {
-        await inMain(page)
-          .getByRole('tab', { name: /Befehle/ })
-          .click();
+        await inMain(page).getByRole('tab', { name: 'Einsatzbefehle' }).click();
         await expect(inMain(page).getByText('Befehl Brücke Nord').first()).toBeVisible();
       },
       fehlt: knopf('Befehl entwerfen'),

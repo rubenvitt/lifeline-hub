@@ -276,8 +276,13 @@ export default function AuftragFormular({
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="erteiltAm" label="Erteilt am (mündlich/per Funk – optional)">
-            <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+          {/* Leer setzt der Server die Erteilzeit auf jetzt (`auftrag/eingabe.rs`). */}
+          <Form.Item name="erteiltAm" label="Erteilt am (optional)">
+            <ZeitpunktEingabe
+              style={{ width: '100%' }}
+              format="YYYY-MM-DD HH:mm"
+              placeholder="jetzt"
+            />
           </Form.Item>
         </Col>
       </Row>

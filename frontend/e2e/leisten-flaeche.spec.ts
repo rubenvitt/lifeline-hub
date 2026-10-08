@@ -811,9 +811,9 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
 });
 
 /**
- * LFH-435, Nur-Lese-Zweig der Gefahrenmatrix: der Beobachter sieht über der Matrix den Hinweis
- * „Nur Lesezugriff" (`GefahrenPage.tsx`) und gesperrte Zellen. Der Hinweis kommt beim Admin
- * nicht vor — er darf die Matrix weder beim Laden noch bei einer live eintreffenden Bewertung
+ * LFH-435, Nur-Lese-Zweig der Gefahrenmatrix: der Beobachter sieht über der Matrix die Zeile
+ * „Nur Ansicht · Grund“ (`RechteHinweis` in `GefahrenPage.tsx`, LFH-1078) und gesperrte Zellen.
+ * Der Hinweis kommt beim Admin nicht vor — er darf die Matrix weder beim Laden noch bei einer live eintreffenden Bewertung
  * verschieben und die Seite nicht verbreitern. Gemessen wie in den beiden Admin-Tests oben; die
  * Fremdänderung schreibt ein Admin in einem EIGENEN Kontext, denn `page.request` ist nach dem
  * Wechsel der Beobachter.
@@ -836,23 +836,18 @@ test('Gefahrenmatrix (LFH-373): Hinweis über der Matrix — Laden ohne Sprung, 
 
     const gemessen: string[] = [];
     const tabelle = page.locator('.gefahren-matrix');
-    const hinweis = page.getByRole('alert').filter({ hasText: /Nur Lesezugriff/ });
+    const hinweis = page.locator('[data-lfh="rechte-hinweis"]');
     /** Anker und Vorbedingung, je Aufruf der Seite. */
     const nurLesenSteht = async (lauf: string) => {
       await expect(page.getByRole('button', { name: /^Bewertung / })).toHaveCount(58);
       await expect(page.getByRole('heading', { name: /Sektor Sprung 1/ })).toBeVisible();
-      await expect(
-        hinweis,
-        `${lauf}: Vorbedingung: der Hinweis „Nur Lesezugriff" steht`,
-      ).toBeVisible();
+      await expect(hinweis, `${lauf}: Vorbedingung: der Hinweis „Nur Ansicht“ steht`).toBeVisible();
       await expect(
         page.getByRole('button', { name: /^Bewertung Atemgifte × Menschen/ }),
         `${lauf}: Vorbedingung: die Zellen sind gesperrt`,
       ).toBeDisabled();
       const lage = await page.evaluate(() => {
-        const h = [...document.querySelectorAll('[role="alert"]')]
-          .find((el) => el.textContent?.includes('Nur Lesezugriff'))!
-          .getBoundingClientRect();
+        const h = document.querySelector('[data-lfh="rechte-hinweis"]')!.getBoundingClientRect();
         const t = document.querySelector('.gefahren-matrix')!.getBoundingClientRect();
         return {
           hinweisUnten: h.bottom,

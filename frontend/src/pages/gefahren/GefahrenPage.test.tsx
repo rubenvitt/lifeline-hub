@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -106,17 +106,26 @@ describe('GefahrenPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  function Kartenflaeche() {
+    const { search } = useLocation();
+    return (
+      <div>
+        Kartenfläche<span data-testid="suche">{search}</span>
+      </div>
+    );
+  }
+
   /**
    * Leerzustand: ein Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte, deshalb trägt er
    * eine Primäraktion dorthin (Ziel aus `lagekartePfad`).
    */
-  it('zeigt Leerzustand ohne Gefahrengebiete — mit dem Weg zur Lagekarte', async () => {
+  it('zeigt Leerzustand ohne Gefahrengebiete — mit dem Zeichen-Auftrag an die Lagekarte', async () => {
     server.use(...handlers([]));
     const { container } = renderMitProviders(
       <Routes>
         <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
         {/* Zielsonde: der Knopf landet wirklich auf der Lagekarten-Route. */}
-        <Route path="/einsaetze/:id/lagekarte" element={<div>Kartenfläche</div>} />
+        <Route path="/einsaetze/:id/lagekarte" element={<Kartenflaeche />} />
       </Routes>,
       { route: '/einsaetze/1/gefahren' },
     );
@@ -125,9 +134,13 @@ describe('GefahrenPage', () => {
     // Höchstens EINE Primäraktion (AK3) — und sie führt aus dem Leerzustand heraus.
     const knoepfe = screen.getAllByRole('button');
     expect(knoepfe).toHaveLength(1);
-    expect(knoepfe[0]).toHaveTextContent('Zur Lagekarte');
+    expect(knoepfe[0]).toHaveTextContent('Gefahrengebiet zeichnen');
+    // Kein Satz, der den Weg erklärt (LFH-1078): der Knopf zeigt ihn.
+    expect(screen.queryByText(/Auf der Lagekarte/)).toBeNull();
     await userEvent.click(knoepfe[0]);
     expect(await screen.findByText('Kartenfläche')).toBeInTheDocument();
+    // Der Auftrag reist mit: ohne ihn öffnete die Karte nur, statt zu zeichnen.
+    expect(screen.getByTestId('suche')).toHaveTextContent('?zeichnen=gefahrengebiet');
   });
 
   it('zeigt die höchste Warnstufe als Etikett, nicht als Flächenfarbe (LFH-368)', async () => {
@@ -227,10 +240,11 @@ describe('GefahrenPage', () => {
     );
   });
 
-  it('ohne Schreibrecht: Hinweis steht, kein „Umbenennen", der Sprung bleibt', async () => {
+  it('ohne Schreibrecht: „Nur Ansicht · Grund“, kein „Umbenennen", der Sprung bleibt', async () => {
     server.use(...handlers([gebiet], [], einsatzFixture({ meine_rolle: 'beobachter' })));
     renderPage();
-    expect(await screen.findByText(/Nur Lesezugriff/)).toBeInTheDocument();
+    expect(await screen.findByText('Nur Ansicht')).toBeInTheDocument();
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Nord');
     expect(screen.queryByRole('button', { name: 'Umbenennen' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Auf Karte zeigen' })).toBeInTheDocument();
@@ -455,12 +469,20 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
     expect(screen.queryByRole('link', { name: /Auf Karte zeigen/i })).toBeNull();
   });
 
-  it('Leerzustand ohne Aktion „Zur Lagekarte", der Hinweis bleibt', async () => {
+  it('Leerzustand ohne Aktion „Gefahrengebiet zeichnen“, wenn die Lagekarte gesperrt ist', async () => {
     server.use(...handlers([]), gesperrt);
     renderPage();
     expect(await screen.findByText(/keine Gefahrengebiete/i)).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Zur Lagekarte' })).toBeNull());
-    expect(screen.getByText('Auf der Lagekarte ein Gefahrengebiet zeichnen.')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeNull(),
+    );
+  });
+
+  it('Leerzustand ohne Aktion „Gefahrengebiet zeichnen“, ohne Schreibrecht', async () => {
+    server.use(...handlers([], [], einsatzFixture({ meine_rolle: 'beobachter' })));
+    renderPage();
+    expect(await screen.findByText(/keine Gefahrengebiete/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeNull();
   });
 
   describe('LFH-966: abgelehnte Bewertung ohne Toast', () => {

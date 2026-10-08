@@ -534,7 +534,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
               }}
             >
               {z.art === 'ausstehend' ? (
-                <StatusChip ton="achtung" wort="wird gesendet …" />
+                <StatusChip ton="achtung" wort="vorgemerkt" />
               ) : (
                 <StatusChip ton="alarm" wort="abgelehnt" />
               )}
@@ -544,9 +544,9 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
           toenung={z.art === 'abgelehnt' ? 'problem' : undefined}
           hinweis={hinweisZeile(
             [
-              z.art === 'abgelehnt'
-                ? `Vom Server abgelehnt: ${z.puffer.grund}`
-                : 'Wird gesendet, sobald wieder Verbindung besteht.',
+              // Ausstehend sagt der Chip „vorgemerkt“ in der Meta-Zeile; ein Satz darunter
+              // wiederholte ihn (LFH-1078).
+              z.art === 'abgelehnt' ? `Vom Server abgelehnt: ${z.puffer.grund}` : null,
               // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit — die Zahl macht
               // sichtbar, DASS sie mitgehen.
               anhangZahl(p.eintrag.anhang_ids),

@@ -103,10 +103,9 @@ const alsQuelle = <T>(g: Geladen<T[]>): Quelle<T> => ({ zustand: g.zustand, date
  */
 export const FUEHRUNGSPROBLEME_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus dem Führungsstand übernehmen',
-  unterzeile: 'Überfällige Aufträge, unbestätigte Meldungen und Funkplan-Lücken, ohne Freitext',
+  unterzeile: 'Aufträge · Meldungen · Funkplan',
   ersetzenTitel: 'Führungsprobleme ersetzen?',
-  ersetzenText:
-    'Der Abschnitt enthält schon Text. Er wird durch die aktuellen überfälligen Aufträge, Meldungen und Funkplan-Lücken ersetzt.',
+  ersetzenText: 'Vorhandener Text wird ersetzt.',
   verfuegbar: (freigaben) => {
     const gesperrteModule = (Object.keys(MODUL) as (keyof typeof MODUL)[]).filter(
       (m) => !frei(m, freigaben),

@@ -160,26 +160,16 @@ function EinsaetzeInhalt() {
       <Alert
         type="info"
         showIcon
-        title="Demo-Daten sind freigeschaltet und noch nicht importiert."
+        title="Demo-Daten nicht importiert"
         description={
-          <>
-            <div>
-              Ein Übungseinsatz samt Stammdaten für Vorführung und Schulung lässt sich in der
-              Verwaltung anlegen.
-            </div>
-            {/* Der Verweis ist ein eigenes Bedienziel unter dem Satz: im Satz trennte ihn nur
-                die Farbe vom Text (WCAG 1.4.1), und `minHeight` ohne Polsterung risse die
-                Textzeile in `handschuh` auf 72 px. Als antd-`Button` erbt er Höhe und
-                Polsterung vom `ConfigProvider` und trägt `colorText` auf eigener Fläche. Mit
-                `href` bleibt er ein `<a>` (Strg/⌘-Klick öffnet einen Tab);
-                `useLinkClickHandler` navigiert beim schlichten Klick in der App. Nicht der
-                `action`-Slot: dort drückte der Knopf den Text bei 390 px auf die halbe Breite. */}
-            <div style={{ marginTop: token.marginSM }}>
-              <Button href={demoPfad} onClick={zuDenDemoDaten}>
-                Zu den Demo-Daten
-              </Button>
-            </div>
-          </>
+          // Der Verweis ist ein eigenes Bedienziel unter dem Titel: als antd-`Button` erbt er Höhe
+          // und Polsterung vom `ConfigProvider` und trägt `colorText` auf eigener Fläche. Mit
+          // `href` bleibt er ein `<a>` (Strg/⌘-Klick öffnet einen Tab); `useLinkClickHandler`
+          // navigiert beim schlichten Klick in der App. Nicht der `action`-Slot: dort drückte der
+          // Knopf den Titel bei 390 px auf die halbe Breite. Kein Erklärsatz (LFH-1078).
+          <Button href={demoPfad} onClick={zuDenDemoDaten}>
+            Zu den Demo-Daten
+          </Button>
         }
       />
     ) : undefined;

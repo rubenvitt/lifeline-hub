@@ -335,7 +335,7 @@ function BefehlDetail() {
       <FreigabeDialog
         offen={freigabeWerte !== null}
         titel="Befehl freigeben?"
-        warnung="Die Freigabe ist endgültig und unveränderlich: Der Befehl wird als ETB-Eintrag gesnapshottet. Korrekturen sind danach nur per Fortschreibung möglich."
+        warnung="Endgültig: geht ins ETB, Korrektur nur per Fortschreibung."
         speicherFehler={schutz.speicherFehler}
         freigabeFehler={freigebenMutation.error}
         // `speichertGerade` deckt den Vorlauf ab, auch wenn der Klick sich an einen laufenden

@@ -138,14 +138,13 @@ export default function ListenDruckSeite({
           type="info"
           showIcon
           title={`Kein Zugriff auf ${modul}`}
-          description="Das Modul ist für Sie gesperrt oder die Aufbewahrungsfrist des Einsatzes ist abgelaufen. Es gibt nichts zu drucken."
+          description="Modul gesperrt oder Aufbewahrungsfrist abgelaufen"
         />
       ) : abfrage.isError ? (
         <Alert
           type="error"
           showIcon
           title="Die Liste konnte nicht geladen werden"
-          description="Drucken bleibt gesperrt, bis die Auswahl vollständig da ist — ein Teilausdruck ist ausgeschlossen."
           action={<Button onClick={() => void abfrage.refetch()}>Erneut laden</Button>}
         />
       ) : !stand || abfrage.isFetching ? (

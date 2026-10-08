@@ -1,4 +1,4 @@
-import { Alert, AutoComplete, Button, Checkbox, Space, Typography } from 'antd';
+import { Alert, AutoComplete, Button, Checkbox, Space } from 'antd';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { useId, useState } from 'react';
 import { useRollen } from '../components/instrument';
@@ -25,9 +25,6 @@ interface Props {
   onAbbrechen?: () => void;
 }
 
-const ERKLAERUNG =
-  'Gilt für jeden neuen Eintrag. Mit @ oder /von, /an änderst du ihn für einen einzelnen Eintrag.';
-
 /**
  * Abfrage des Standard-Rufnamens in der ETB-Erfassung (LFH-894, design.md D4): inline über der
  * Eingabezeile statt als Modal, damit die Zeitachse lesbar bleibt. Wie `SchnellAnlegen` ohne
@@ -35,6 +32,9 @@ const ERKLAERUNG =
  *
  * „Empfänger wie Absender“ ist die Vorgabe; aus, steht ein zweites Feld da. Gespeichert wird
  * immer ein Paar (`standardRufnameWert`), nie eine Seite allein.
+ *
+ * Kein Erklärsatz unter den Feldern (LFH-1078): den Weg „nur für diesen Eintrag“ zeigt das
+ * Chip-Menü (`MetaChip`), `@`, `/von`, `/an` bleiben ein Beschleuniger ohne Anleitung.
  */
 export default function RufnameAbfrage({
   optionen,
@@ -132,9 +132,6 @@ export default function RufnameAbfrage({
           </Button>
         )}
       </Space>
-      <Typography.Paragraph style={{ margin: 0, marginTop: token.marginXXS, color: rollen.text2 }}>
-        {ERKLAERUNG}
-      </Typography.Paragraph>
       {fehler && (
         <Alert type="error" showIcon style={{ marginTop: token.marginXS }} title={fehler} />
       )}

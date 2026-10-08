@@ -101,7 +101,7 @@ export default function AbschnittUebernahme({
       <Button onClick={() => void uebernehmen()} loading={laeuft}>
         {quelle.knopf}
       </Button>
-      <Typography.Text type="secondary">{quelle.unterzeile}</Typography.Text>
+      {quelle.unterzeile && <Typography.Text type="secondary">{quelle.unterzeile}</Typography.Text>}
       <Modal
         open={ersetzen != null}
         title={quelle.ersetzenTitel}

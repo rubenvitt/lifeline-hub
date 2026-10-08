@@ -112,9 +112,8 @@ for (const modus of ['light', 'dark'] as const) {
 
     await context.setOffline(true);
     try {
-      const hinweis = page.getByText(
-        'Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.',
-      );
+      // Kurzgrund am Knopf statt eines Satzes (LFH-1078).
+      const hinweis = page.locator('[data-lfh="etb-anhang-grund"]', { hasText: 'offline' });
       await kontrastMindestens(hinweis, ZIEL[modus], 'Offline-Hinweis');
       await info.attach(`offline-${modus}`, {
         body: await page.screenshot(),
