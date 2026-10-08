@@ -133,6 +133,18 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     ),
     ("POST", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei"),
+    // Bild-Anlagen an Lagebericht und Befehl (LFH-1028): dieselbe Kette wie die Anhänge. Nur POST
+    // bzw. GET — Liste und DELETE bleiben geregelt.
+    ("POST", "/api/einsaetze/{id}/lageberichte/{lid}/anlagen"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/lageberichte/{lid}/anlagen/{aid}/datei",
+    ),
+    ("POST", "/api/einsaetze/{id}/befehle/{bid}/anlagen"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/befehle/{bid}/anlagen/{aid}/datei",
+    ),
     // CSV-Vollexporte: laden ohne Limit und bauen im Speicher — Dauer wächst linear mit der
     // Betroffenen-/Tierzahl der Lage.
     ("GET", "/api/einsaetze/{id}/personen/export"),
