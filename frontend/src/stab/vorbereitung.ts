@@ -227,7 +227,7 @@ export function quellenLaden(zeilen: readonly VorbereitungsZeile[]): boolean {
 
 /**
  * Der Lagestand als Freitext für einen Lagebericht. Stand in der Kopfzeile, Quelle je Zeile,
- * fehlende Quellen mit Grund, Herkunft in der Fußzeile. Namen und Titel maskiert (`md`). Rein.
+ * fehlende Quellen mit Grund. Namen und Titel maskiert (`md`). Rein.
  */
 export function vorbereitungMarkdown(zeilen: readonly VorbereitungsZeile[], stand: string): string {
   return [
@@ -239,8 +239,6 @@ export function vorbereitungMarkdown(zeilen: readonly VorbereitungsZeile[], stan
       const notiz = z.notiz ? ` (${md(z.notiz)})` : '';
       return `- **${z.titel}:** ${md(z.wert)}${notiz} — Quelle: ${z.quelle}`;
     }),
-    '',
-    '_Zusammengestellt aus den Modulen des Einsatzes; keine Vortragsgliederung._',
     '',
   ].join('\n');
 }

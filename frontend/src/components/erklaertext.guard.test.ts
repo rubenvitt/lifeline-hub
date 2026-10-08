@@ -78,15 +78,10 @@ const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
  * P1–P7 aus LFH-1078 bauen sie ab.
  */
 const OFFEN: Record<string, number> = {
-  'abloesung/AbloesungDialoge.tsx': 5,
   'command-palette/VorschauZustand.tsx': 1,
   'einsatz/AlarmZentrale.tsx': 2,
   'infotelefon/AnrufErfassung.tsx': 2,
-  'pages/AbloesungPage.tsx': 2,
-  'pages/EinheitDetailPage.tsx': 3,
   'pages/PressePage.tsx': 1,
-  'stab/LagebesprechungModal.tsx': 1,
-  'stab/skizze/Eigenschaftspaneel.tsx': 1,
 };
 
 /** Sichtbare Zeichenketten einer Quelle: Literale, Template-Teile, JSX-Text. Ohne Importpfade. */

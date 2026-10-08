@@ -5,7 +5,7 @@
  *
  * Bausteine statt freier Sätze, nach dem Muster von `stammdaten/rechteText.ts`: eine
  * abweichende Fassung fiele niemandem auf, weil jede Seite für sich plausibel aussieht. Die Ebene
- * bleibt lesbar: System (fest im Code), Organisation (Verwaltung), Einsatz.
+ * bleibt lesbar: System (fest im Code), Organisation (Verwaltung), Einsatz, Abschnitt.
  */
 
 /** Platzhalter eines leeren Feldes: der System-Wert, der dann gilt. */
@@ -16,4 +16,9 @@ export function mitVorgabe(wert: string): string {
 /** Hinweis unter einem leeren Einsatz-Feld, für das die Organisation einen Wert gesetzt hat. */
 export function orgVorgabe(wert: string): string {
   return `Vorgabe der Organisation: ${wert}`;
+}
+
+/** Platzhalter eines leeren Feldes, dessen Wert die Vorgabe des Einsatzabschnitts liefert. */
+export function abschnittVorgabe(wert: string): string {
+  return `${wert} (Vorgabe Abschnitt)`;
 }

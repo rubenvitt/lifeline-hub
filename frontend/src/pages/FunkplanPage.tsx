@@ -855,7 +855,6 @@ export default function FunkplanPage() {
         titel="Funkplan"
         meta={umfang || undefined}
         dataUpdatedAt={datenstand}
-        beschreibung="Sachgebiet S6 · Dienststellen, Rufnamen, Sprechgruppen und Erreichbarkeit (FwDV 100 Anl. 5)"
         breadcrumb={
           <Breadcrumb
             items={[
@@ -1028,7 +1027,6 @@ export default function FunkplanPage() {
           {fehlend.length > 0 && (
             <Typography.Paragraph data-lfh="funkplan-quellen" style={{ color: rollen.gedaempft }}>
               {fehlend.map((f) => `${f.name}: ${ZUSTAND_GRUND[f.zustand]}`).join(' · ')}
-              {' — diese Angaben fehlen im Funkplan.'}
             </Typography.Paragraph>
           )}
 
@@ -1040,8 +1038,7 @@ export default function FunkplanPage() {
                 data-lfh="sprechgruppen-quelle"
                 style={{ color: rollen.gedaempft }}
               >
-                {`Sprechgruppen des Einsatzes: ${ZUSTAND_GRUND[sprechgruppen.zustand]} — `}
-                {'einsatzlokale Sprechgruppen ohne Zuordnung fehlen in dieser Darstellung.'}
+                {`Sprechgruppen des Einsatzes: ${ZUSTAND_GRUND[sprechgruppen.zustand]}`}
               </Typography.Paragraph>
             )}
 
@@ -1049,9 +1046,8 @@ export default function FunkplanPage() {
           <Space className="funkplan-no-print" wrap style={{ marginBlockEnd: token.margin }}>
             {darfUebernehmen && (
               <Button
-                loading={uebernehmen.isPending}
+                loading={uebernehmen.isPending || quellenLaden}
                 disabled={quellenLaden}
-                title={quellenLaden ? 'Erst wenn alle Angaben geladen sind' : undefined}
                 onClick={() => uebernehmen.mutate()}
               >
                 In Lagebericht übernehmen

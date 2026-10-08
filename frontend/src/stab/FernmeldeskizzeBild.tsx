@@ -41,7 +41,7 @@
  * `skizze-anlegen-komponente`, `skizze-anlegen-bereich`, `skizze-paneel`, `skizze-paneel-titel`,
  * `skizze-paneel-leer`, `skizze-rechte-grund`, `skizze-meldung`, `skizze-kanaele`,
  * `skizze-verbinden`, `skizze-verbinden-dialog`, `skizze-verbinden-ziel`, `skizze-artwahl`,
- * `skizze-kontextmenue`, `skizze-status`, `skizze-tasten`, `skizze-fehlend`, `inspector-sprung`.
+ * `skizze-kontextmenue`, `skizze-status`, `skizze-fehlend`, `inspector-sprung`.
  */
 import { DndContext, DragOverlay, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { Flex, Typography } from 'antd';
@@ -203,7 +203,6 @@ function Skizze({
   );
   const lageFrei = lageGrund(angezeigt, kontext) == null;
   const paletteId = useId();
-  const tastenId = useId();
   const wurzel = useRef<HTMLDivElement | null>(null);
   const paneelTitel = useRef<HTMLHeadingElement | null>(null);
   const api = useRef<FlaechenApi | null>(null);
@@ -520,19 +519,53 @@ function Skizze({
   const menueStich = menue ? teileStichSchluessel(menue.key) : null;
   const menueItems = menue
     ? [
-        { key: 'eigenschaften', label: 'Eigenschaften' },
+        // Das Kürzel steht am Eintrag (Bedien-Leitlinie: keine Tastenlegende als Satz).
+        {
+          key: 'eigenschaften',
+          label: 'Eigenschaften',
+          extra: <Tastenkuerzel>Enter</Tastenkuerzel>,
+        },
         ...(menueStelle && verbindenErlaubt(menueStelle.key)
-          ? [{ key: 'verbinden', label: 'Verbinden mit …' }]
+          ? [
+              {
+                key: 'verbinden',
+                label: 'Verbinden mit …',
+                extra: <Tastenkuerzel>V</Tastenkuerzel>,
+              },
+            ]
           : []),
-        ...(menueStelle?.ziel ? [{ key: 'datensatz', label: 'zum Datensatz ↗' }] : []),
+        ...(menueStelle?.ziel
+          ? [
+              {
+                key: 'datensatz',
+                // Derselbe Wortlaut wie im Eigenschaftspaneel.
+                label:
+                  menueStelle.art === 'extern' ? 'zum Kommunikationsplan ↗' : 'zum Datensatz ↗',
+              },
+            ]
+          : []),
         ...(menueStich && griffGrund(angezeigt, menueStich.stelle, kontext) == null
-          ? [{ key: 'loesen', label: 'Lösen', danger: true }]
+          ? [
+              {
+                key: 'loesen',
+                label: 'Lösen',
+                danger: true,
+                extra: <Tastenkuerzel>Entf</Tastenkuerzel>,
+              },
+            ]
           : []),
         ...(lageFrei &&
         (angezeigt.verbindungen.some((v) => v.key === menue.key) ||
           angezeigt.bereiche.some((b) => b.key === menue.key) ||
           menueStelle?.art === 'komponente')
-          ? [{ key: 'entfernen', label: 'Entfernen', danger: true }]
+          ? [
+              {
+                key: 'entfernen',
+                label: 'Entfernen',
+                danger: true,
+                extra: <Tastenkuerzel>Entf</Tastenkuerzel>,
+              },
+            ]
           : []),
       ]
     : [];
@@ -663,7 +696,6 @@ function Skizze({
               }}
               onHalten={onHalten}
               api={api}
-              beschreibungId={istSchmal ? undefined : tastenId}
             />
           </div>
           {!druck ? (
@@ -681,6 +713,7 @@ function Skizze({
                 }}
                 onVerbinden={oeffneVerbinden}
                 onEntfernenFrage={entfernenFrage}
+                onWahl={waehle}
               />
             </div>
           ) : null}
@@ -698,15 +731,6 @@ function Skizze({
           className="lfh-skizze-bedienung"
           style={{ marginBlockStart: token.marginSM, color: rollen.gedaempft }}
         >
-          {!istSchmal ? (
-            <span id={tastenId} data-lfh="skizze-tasten">
-              <Tastenkuerzel>Tab</Tastenkuerzel> wählt · <Tastenkuerzel>Pfeile</Tastenkuerzel>{' '}
-              verschieben · <Tastenkuerzel>V</Tastenkuerzel> verbinden ·{' '}
-              <Tastenkuerzel>Entf</Tastenkuerzel> löst · <Tastenkuerzel>Enter</Tastenkuerzel>{' '}
-              Eigenschaften · <Tastenkuerzel>+</Tastenkuerzel>/<Tastenkuerzel>-</Tastenkuerzel> Zoom
-              · <Tastenkuerzel>0</Tastenkuerzel> einpassen
-            </span>
-          ) : null}
           <span
             role="status"
             aria-live="polite"
@@ -788,7 +812,7 @@ function Skizze({
             return (
               <Rueckfrage
                 titel={`${k.bezeichnung} entfernen?`}
-                text="Die Komponente, ihre Kanäle und ihre Verbindungen werden entfernt. Rückgängig legt die Komponente mit ihren Kanälen neu an, die Verbindungen nicht."
+                text="Entfernt auch Kanäle und Verbindungen; die Verbindungen sind endgültig weg."
                 okText="Entfernen"
                 onOk={async () => {
                   await h.entferneKomponente(k.key, k.id, k.komponentenart, k.bezeichnung, kanaele);
@@ -802,7 +826,7 @@ function Skizze({
       {dialog?.art === 'neu-anordnen' ? (
         <Rueckfrage
           titel="Neu anordnen?"
-          text="Alle gespeicherten Lagen dieses Einsatzes werden verworfen, an allen Arbeitsplätzen; die Skizze steht danach wieder im Auto-Layout. Zuordnungen, Verbindungen, Komponenten, Bereiche und Schriftfeld bleiben. Rückgängig gibt es dafür nicht."
+          text="Alle gespeicherten Lagen gehen an allen Arbeitsplätzen verloren, ohne Rückgängig."
           okText="Neu anordnen"
           onOk={async () => {
             await h.neuAnordnen();

@@ -237,7 +237,7 @@ export default function KraftZeitachse({
       <PaneelZustand
         zustand={zustand}
         titel="Zeitachse"
-        leerText="Noch keine Ereignisse. Sie entstehen aus Statuswechseln mit Zeitachsen-Marke oder als Nachtrag."
+        leerText="Noch keine Ereignisse"
         onNeuladen={() => void query.refetch()}
       >
         <div
@@ -363,12 +363,9 @@ export default function KraftZeitachse({
       >
         <Typography.Paragraph>
           {streiche && `${ART_WORT[streiche.art]} ${zeit(streiche.zeitpunkt_at)}`} bei {kennung}{' '}
-          wird gestrichen. Das lässt sich nicht zurücknehmen; der Eintrag bleibt durchgestrichen
-          lesbar
-          {art === 'einheit'
-            ? ', und die daraus mitgeschriebenen Einträge der Personen fallen mit'
-            : ''}
-          .
+          wird endgültig gestrichen
+          {art === 'einheit' ? ', samt der Einträge ihrer Personen,' : ''} und bleibt
+          durchgestrichen sichtbar.
         </Typography.Paragraph>
         <Form.Item<StreichWerte>
           name="grund"

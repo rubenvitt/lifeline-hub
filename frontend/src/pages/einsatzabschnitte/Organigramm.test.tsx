@@ -361,7 +361,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
 
   it('legt EINEN Freitext-Bericht mit der Gliederung an und öffnet ihn', async () => {
     container();
-    const knopf = await screen.findByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/77'));
@@ -384,7 +384,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
         datenstand={new Date('2026-01-01T10:12:00Z').getTime()}
       />,
     );
-    const knopf = await screen.findByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
@@ -398,7 +398,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     container();
     const stab = await screen.findByRole('group', { name: 'Stab' });
     await within(stab).findByText('Besetzung nicht geladen');
-    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
@@ -414,7 +414,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     } as Stab);
     container();
     await screen.findByRole('group', { name: 'Stab' });
-    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
@@ -425,7 +425,11 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
 
   it('sperrt die Übernahme, solange die Einheiten laden', async () => {
     container(EINSATZ, { zustand: 'laden', daten: [] });
-    expect(await screen.findByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
+    // Der Grund steht am Knopf: er dreht, solange eine Quelle lädt (kein Tooltip, LFH-1078).
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toHaveClass(
+      'ant-btn-loading',
+    );
   });
 
   it('sperrt die Übernahme, solange die freigegebene Stabsbesetzung lädt', async () => {
@@ -433,7 +437,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     vi.mocked(ladeStab).mockReturnValue(new Promise(() => {}));
     container();
     await waitFor(() => expect(ladeStab).toHaveBeenCalled());
-    expect(screen.getByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
   });
 
   it('zeigt einen Fehler an der Seite und navigiert nicht', async () => {
@@ -441,7 +445,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
       new ApiError(422, 'Einsatz ist abgeschlossen'),
     );
     container();
-    const knopf = await screen.findByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
@@ -451,7 +455,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
   it('fehlt ohne Schreibrecht', async () => {
     container({ ...EINSATZ, meine_rolle: 'beobachter' } as EinsatzAnzeige);
     expect(await screen.findByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 
   it('fehlt, wenn das Modul Lageberichte nicht freigegeben ist', async () => {
@@ -461,7 +465,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     container();
     await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 });
 

@@ -101,7 +101,8 @@ describe('EinsatzabschnittePage', () => {
       { route: '/einsaetze/1/einsatzabschnitte' },
     );
     expect(await screen.findByText('Nord')).toBeInTheDocument();
-    expect(screen.getByText(/Leiter Nord/)).toBeInTheDocument();
+    // Im Baumknoten; das vorgewählte Detail nennt den Leiter ein zweites Mal.
+    expect(within(screen.getByRole('tree')).getByText(/Leiter Nord/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
@@ -313,6 +314,25 @@ describe('EinsatzabschnittePage', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Abschnitt anlegen' })).not.toBeInTheDocument(),
     );
+    // Der Grund steht als Zeile „Nur Ansicht · Grund“ (M16, LFH-1078).
+    const hinweis = document.querySelector('[data-lfh="rechte-hinweis"]');
+    expect(hinweis?.textContent).toBe('Nur Ansicht nur Einsatzleitung und Führungspersonal');
+  });
+
+  it('abgeschlossener Einsatz: „Nur Ansicht · Einsatz abgeschlossen“ statt Satz', async () => {
+    server.use(...handlers('einsatzleitung', 'abgeschlossen'));
+    renderPage();
+    await screen.findByText('Nord');
+    const hinweis = document.querySelector('[data-lfh="rechte-hinweis"]');
+    expect(hinweis?.textContent).toBe('Nur Ansicht Einsatz abgeschlossen');
+    expect(screen.queryByText(/nur Ansicht\./)).not.toBeInTheDocument();
+  });
+
+  it('mit Schreibrecht kein Rechtehinweis', async () => {
+    server.use(...handlers());
+    renderPage();
+    await screen.findByText('Nord');
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
   });
 
   it('zeigt SprechgruppenPicker im Edit-Formular statt Freitext-Inputs', async () => {
@@ -426,6 +446,12 @@ describe('EinsatzabschnittePage', () => {
 
     // Vorbelegung aus dem Datensatz
     expect(await screen.findByLabelText('Kurzbezeichnung')).toHaveValue('EA-N');
+    // Feldhilfen ohne Satz (LFH-1078): Platzhalter statt „Leer heißt …“.
+    expect(screen.queryByText(/Leer heißt|je Einsatz nur einmal|im ETB vermerkt/)).toBeNull();
+    expect(screen.getByLabelText('Fortschritt')).toHaveAttribute(
+      'placeholder',
+      'nicht eingeschätzt',
+    );
     await userEvent.clear(screen.getByLabelText('Abschnittsauftrag'));
     await userEvent.click(screen.getByLabelText('Lagezustand'));
     await userEvent.click(await screen.findByText('kritisch'));
@@ -494,6 +520,8 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Abschnitte')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    // Der Knopf zeigt den Weg, kein Satz (LFH-1078).
+    expect(screen.queryByText(/Gliedere die Lage/)).not.toBeInTheDocument();
   });
 
   /**
@@ -654,17 +682,98 @@ describe('EinsatzabschnittePage', () => {
   });
 
   /**
-   * Der zweite Leer-Knoten ist kein Leerzustand, sondern eine Aufforderung bei fehlender Auswahl:
-   * die Menge ist gefüllt, es fehlt nur die Wahl. Deshalb ohne Primäraktion.
+   * Ohne Wahl steht der erste Abschnitt im Detail, statt einer Aufforderung „Wähle einen
+   * Abschnitt im Baum“ (LFH-1078): die Menge ist gefüllt, es fehlt nur die Wahl.
    */
-  it('fordert bei fehlender Auswahl zur Wahl auf — ohne Aktion', async () => {
-    server.use(...handlers());
-    renderPage();
-    const karte = (await screen.findByText('Wähle einen Abschnitt im Baum')).closest(
-      '[data-lfh="paneel"]',
+  it('wählt ohne Auswahl den ersten Abschnitt vor', async () => {
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        { ...funkAbschnitt, id: 5, name: 'Nord' },
+        { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1 },
+      ]),
     );
-    expect(karte).not.toBeNull();
-    expect(within(karte as HTMLElement).queryAllByRole('button')).toHaveLength(0);
+    renderPage();
+    expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
+    expect(screen.queryByText(/Wähle einen Abschnitt/)).not.toBeInTheDocument();
+    // Eine andere Wahl gilt; die Vorwahl ist nur der Anfang.
+    await userEvent.click(screen.getByText('Süd'));
+    expect(await screen.findByText('Abschnitt: Süd')).toBeInTheDocument();
+  });
+
+  it('die Zuordnung der Einheiten ist ein Sprung, kein Satz (LFH-1078)', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
+    renderPage();
+    const sprung = await screen.findByRole('link', { name: /Zu den Einheiten/ });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/einheiten');
+    expect(screen.queryByText(/Abschnitts-Zuordnung einer Einheit/)).not.toBeInTheDocument();
+  });
+
+  it('die Kurzbezeichnung ist je Einsatz eindeutig, ohne Groß-/Kleinschreibung', async () => {
+    let gesendet = false;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        { ...funkAbschnitt, id: 5, name: 'Nord', kurzbezeichnung: 'EA-N' },
+        { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1, kurzbezeichnung: 'EA-S' },
+      ]),
+      http.patch('/api/einsaetze/1/abschnitte/6', () => {
+        gesendet = true;
+        return HttpResponse.json({});
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText('Süd'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByLabelText('Kurzbezeichnung');
+    expect(feld).toHaveAttribute('placeholder', 'z. B. EA-N');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'ea-n');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Schon vergeben (Nord)')).toBeInTheDocument();
+    expect(gesendet).toBe(false);
+  });
+
+  it('Kurzbezeichnung: faltet wie SQLite NOCASE nur A–Z', async () => {
+    let gesendet = false;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        { ...funkAbschnitt, id: 5, name: 'Nord', kurzbezeichnung: 'EA-SÜD' },
+        { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1, kurzbezeichnung: 'EA-S' },
+      ]),
+      http.patch('/api/einsaetze/1/abschnitte/6', () => {
+        gesendet = true;
+        return HttpResponse.json({ ...funkAbschnitt, id: 6, name: 'Süd' });
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText('Süd'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByLabelText('Kurzbezeichnung');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'EA-Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(gesendet).toBe(true));
+    expect(screen.queryByText(/Schon vergeben/)).not.toBeInTheDocument();
+  });
+
+  it('verschwindet der bearbeitete Abschnitt, füllt das Formular keinen anderen', async () => {
+    const liste = [
+      { ...funkAbschnitt, id: 5, name: 'Nord' },
+      { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1 },
+    ];
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(liste)),
+      ...handlers('einsatzleitung', 'aktiv', []),
+    );
+    const { client } = renderPage();
+    await userEvent.click(await screen.findByText('Süd'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByLabelText('Kurzbezeichnung')).toBeInTheDocument();
+    // Ein anderer Arbeitsplatz löst „Süd“ auf.
+    liste.splice(1, 1);
+    await client.invalidateQueries();
+    await waitFor(() => expect(screen.queryByText('Süd')).not.toBeInTheDocument());
+    expect(screen.queryByLabelText('Kurzbezeichnung')).not.toBeInTheDocument();
+    expect(screen.queryByText('Abschnitt: Nord')).not.toBeInTheDocument();
   });
 
   it('zeigt die Funk-Daten nicht doppelt (Zusammenfassung nur in der Lese-Ansicht)', async () => {
@@ -736,7 +845,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     const organigramm = await screen.findByRole('region', { name: 'Organigramm' });
     expect(within(organigramm).getByRole('link', { name: 'Nord' })).toBeInTheDocument();
     // Baum und Detail sind weg.
-    expect(screen.queryByText('Wähle einen Abschnitt im Baum')).not.toBeInTheDocument();
+    expect(screen.queryByText('Abschnitt: Nord')).not.toBeInTheDocument();
     expect(screen.queryByTestId('abschnitte-gliederung')).not.toBeInTheDocument();
   });
 
@@ -795,6 +904,25 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
     expect(await screen.findByText('Einheiten: nicht geladen')).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Abschnitte')).not.toBeInTheDocument();
+  });
+
+  it('leeres Organigramm: Leerzustand mit Knopf statt Erklärsatz (LFH-1078)', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', []), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    expect(await screen.findByText('Noch keine Abschnitte')).toBeInTheDocument();
+    expect(screen.queryByText(/Führungsorganisation entsteht/)).not.toBeInTheDocument();
+    // Kopfknopf und Leeraktion tragen denselben Wortlaut; die Leeraktion führt in den Entwurf.
+    const knoepfe = screen.getAllByRole('button', { name: 'Abschnitt anlegen' });
+    expect(knoepfe).toHaveLength(2);
+    await userEvent.click(knoepfe[1]);
+    expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+  });
+
+  it('leeres Organigramm ohne Schreibrecht: keine Leeraktion', async () => {
+    server.use(...handlers('beobachter', 'aktiv', []), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    expect(await screen.findByText('Noch keine Abschnitte')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschnitt anlegen' })).not.toBeInTheDocument();
   });
 
   it('nennt fehlende Einheiten als Grund und zeigt keine Stärke', async () => {

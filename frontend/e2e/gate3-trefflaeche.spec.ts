@@ -900,7 +900,7 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.
     const kopfAktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
     await expect(
-      kopfAktionen.getByTitle('Einheit anlegen (Einheiten-Seite)'),
+      kopfAktionen.getByRole('button', { name: 'Einheit', exact: true }),
       'Vorbedingung: ohne Schreibrecht kein Kopfknopf „Einheit"',
     ).toHaveCount(0);
     await expect(

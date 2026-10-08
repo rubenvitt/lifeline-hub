@@ -98,7 +98,9 @@ function FuehrungsstelleModal({
         label="Führungsstelle"
         // EIN Wert: eine neue Wahl ersetzt die alte, statt sich daneben zu stellen.
         getValueFromEvent={letzterWert}
-        extra="Wird beim ersten neuen ETB-Eintrag als Empfänger vorbelegt und hat Vorrang vor dem eigenen Sachgebiet aus der Stab-Besetzung. Leer lassen entfernt die Vorbelegung."
+        // Vorrangregel (Spec `fuehrungsfunktionen`): nur der erste Vorschlag der Rufname-Abfrage,
+        // kein vorbelegter Eintrag (LFH-894). Kein „Leer lassen …“ (LFH-1078).
+        extra="Erster Vorschlag für den ETB-Rufnamen, vor dem eigenen Sachgebiet"
       >
         <EinWertAuswahl
           vorschlaege={funktionen}

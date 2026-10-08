@@ -148,7 +148,6 @@ export default function StabPage() {
     <EinsatzSeite
       dataUpdatedAt={stabQuery.dataUpdatedAt}
       titel={modulName('stab')}
-      beschreibung="Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung"
       breadcrumb={
         <Breadcrumb
           items={[
@@ -273,6 +272,7 @@ export default function StabPage() {
                       }
                       description={
                         <Flex vertical gap={token.marginXXS}>
+                          {/* Fundstelle ist Quelle, keine Bedienerklärung: sichtbar, auch bei Touch. */}
                           <span>
                             {s.aufgaben}{' '}
                             <Typography.Text type="secondary">

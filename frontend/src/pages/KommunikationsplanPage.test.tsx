@@ -400,7 +400,9 @@ describe('KommunikationsplanPage — Fernmeldeskizze (LFH-893)', () => {
     );
     await userEvent.click(await screen.findByText('Stelle entfernen'));
     const rueckfrage = await screen.findByRole('dialog');
-    expect(within(rueckfrage).getByText(/nicht bekannt/)).toBeInTheDocument();
+    expect(
+      within(rueckfrage).getByText(/Verbindungen in der Fernmeldeskizze \(nicht geladen\)/),
+    ).toBeInTheDocument();
     expect(entferneKommunikationsStelle).not.toHaveBeenCalled();
   });
 });
@@ -427,9 +429,7 @@ describe('KommunikationsplanPage — Sperre des Stabs', () => {
       freigabenFixture({ stab: { sichtbar: false } }),
     );
     setup();
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(ladeKommunikationsplan).not.toHaveBeenCalled();
   });
 });

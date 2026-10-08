@@ -324,9 +324,10 @@ export function entfernText(kennung: string, u: EntfernUmfang): string {
     teile.length === 0
       ? ''
       : `, mit ${teile.length === 1 ? teile[0] : `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}`}`;
-  const satz = `„${kennung}“ wird aus dem Kommunikationsplan entfernt${mit}.`;
-  return u.skizzenVerbindungen == null
-    ? `${satz} Ob sie in der Fernmeldeskizze verbunden ist, ist nicht bekannt (Fernmeldeskizze ` +
-        'nicht geladen); ihre Verbindungen dort gehen mit.'
-    : satz;
+  // Ein Satz (Folge vor einem unumkehrbaren Schritt); eine unbekannte Zahl nennt ihren Grund.
+  const skizze =
+    u.skizzenVerbindungen == null
+      ? ', samt etwaiger Verbindungen in der Fernmeldeskizze (nicht geladen)'
+      : '';
+  return `„${kennung}“ wird aus dem Kommunikationsplan entfernt${mit}${skizze}.`;
 }

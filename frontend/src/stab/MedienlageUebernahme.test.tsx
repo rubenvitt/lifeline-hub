@@ -118,9 +118,7 @@ describe('MedienlageUebernahme (LFH-554)', () => {
     );
     renderMitProviders(<Probe />);
     expect(
-      await screen.findByText(
-        'Aus S5 übernehmen nicht verfügbar: Modul Stab ist in diesem Einsatz nicht freigegeben',
-      ),
+      await screen.findByText('Aus S5 übernehmen nicht verfügbar: Stab nicht freigegeben'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aus S5 übernehmen' })).toBeNull();
   });

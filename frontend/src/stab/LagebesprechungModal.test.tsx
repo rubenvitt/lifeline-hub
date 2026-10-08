@@ -174,6 +174,12 @@ describe('LagebesprechungModal · Feldbudget', () => {
     expect(feld(dialog, 'Zeitpunkt der Besprechung')).not.toBeVisible();
   });
 
+  it('der leere Zeitpunkt nennt seinen wirksamen Wert als Platzhalter, ohne Erklärsatz', async () => {
+    const dialog = await zeige();
+    expect(feld(dialog, 'Zeitpunkt der Besprechung').placeholder).toBe('jetzt');
+    expect(feldItem(dialog, 'Zeitpunkt der Besprechung').textContent).not.toMatch(/Leer/);
+  });
+
   it('Aufklappen erhöht die Zahl der sichtbaren Felder', async () => {
     const dialog = await zeige();
     const vorher = sichtbareFelder(dialog);

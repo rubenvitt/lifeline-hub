@@ -234,8 +234,6 @@ describe('vorbereitungMarkdown', () => {
         '- **Meldungen offen:** — (nicht freigegeben) — Quelle: Meldungen (eingehend)',
         '- **Letzter Lagebericht:** 11:30 (Entwurf · Lage \\*Nord\\* \\[2\\]) — Quelle: Lageberichte',
         '',
-        '_Zusammengestellt aus den Modulen des Einsatzes; keine Vortragsgliederung._',
-        '',
       ].join('\n'),
     );
   });

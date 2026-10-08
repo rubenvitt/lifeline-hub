@@ -674,7 +674,7 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
       }),
     );
     const p = await paneel();
-    const knopf = await within(p).findByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = await within(p).findByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() =>
@@ -700,7 +700,7 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
       ),
     );
     const p = await paneel();
-    const knopf = await within(p).findByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = await within(p).findByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     expect(await within(p).findByText('Nicht in den Lagebericht übernommen')).toBeInTheDocument();
@@ -711,13 +711,13 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
     rendere({ einsatzObj: einsatz({ meine_rolle: 'beobachter' }) });
     const p = await paneel();
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
-    expect(within(p).queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+    expect(within(p).queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 
   it('ohne Freigabe der Lageberichte fehlt die Übernahme', async () => {
     rendere({ freigaben: freigabenFixture({ lageberichte: { sichtbar: false } }) });
     const p = await paneel();
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
-    expect(within(p).queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+    expect(within(p).queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 });

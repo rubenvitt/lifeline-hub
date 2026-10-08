@@ -12,8 +12,9 @@ import {
   setzeAbloesungVorgabe,
   vollzieheAbloesung,
 } from '../api/abloesungen';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
+import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Abloesung, AbloesungVorgabe } from '../api/types';
 import AbloesungKarte from '../abloesung/AbloesungKarte';
@@ -48,9 +49,11 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
+import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { abschnittVorgabe } from '../components/vorgabeText';
 
 const { Text } = Typography;
 
@@ -130,6 +133,20 @@ export default function AbloesungPage() {
     enabled: darfSchreiben,
   });
 
+  // Nur für den Platzhalter „Im Einsatz seit“ des offenen Beginnen-Dialogs (LFH-1078). Die
+  // Zeitachse gehört dem Modul Einheiten: ohne dessen Freigabe keine Anfrage (Spec
+  // `modul-freigabe`), der Platzhalter bleibt dann leer.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+    enabled: darfSchreiben && beginnenOffen,
+  });
+  const periodenQuery = useQuery({
+    queryKey: einsatzKeys.kraefteZeitachseEinheiten(einsatzId),
+    queryFn: () => listeEinheitenPerioden(einsatzId),
+    enabled: darfSchreiben && beginnenOffen && istKeyFreigegeben('einheiten', freigabenQuery.data),
+  });
+
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
   const vorgaben = useMemo(() => vorgabenQuery.data ?? [], [vorgabenQuery.data]);
 
@@ -191,6 +208,17 @@ export default function AbloesungPage() {
     }
     return m;
   }, [einheitenQuery.data, vorgaben]);
+  // Wie `offenes_eintreffen` im Server: das Eintreffen der letzten, noch offenen Periode.
+  const eintreffenJeEinheit = useMemo(() => {
+    if (!periodenQuery.data) return null;
+    const m = new Map<number, string>();
+    for (const { einheit_id, perioden } of periodenQuery.data) {
+      const letzte = perioden[perioden.length - 1];
+      if (letzte && !letzte.ende_at && letzte.eintreffen_at)
+        m.set(einheit_id, letzte.eintreffen_at);
+    }
+    return m;
+  }, [periodenQuery.data]);
 
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.abloesungen(einsatzId) });
 
@@ -381,11 +409,6 @@ export default function AbloesungPage() {
           titel={
             ansicht === 'laufend' ? 'Keine laufenden Schichten' : 'Noch keine Ablösung vollzogen'
           }
-          hinweis={
-            ansicht === 'laufend'
-              ? 'Mit „Schicht beginnen" wird der Einsatzbeginn einer Einheit und ihr Rhythmus erfasst.'
-              : undefined
-          }
         />
       ) : (
         <section aria-label={ansicht === 'laufend' ? 'Laufende Schichten' : 'Abgelöste Schichten'}>
@@ -417,7 +440,7 @@ export default function AbloesungPage() {
       <Paneel titel="Rhythmus je Abschnitt" style={{ marginTop: token.marginLG }}>
         {vorgaben.length === 0 ? (
           <Text type="secondary" style={{ display: 'block', padding: token.paddingSM }}>
-            Noch keine Einsatzabschnitte angelegt.
+            Keine Einsatzabschnitte
           </Text>
         ) : (
           vorgaben.map((v) => (
@@ -462,6 +485,7 @@ export default function AbloesungPage() {
           offen
           einheiten={freieEinheiten}
           vorgabeJeEinheit={vorgabeJeEinheit}
+          eintreffenJeEinheit={eintreffenJeEinheit}
           laeuft={beginnenMut.isPending}
           fehler={beginnenMut.error}
           onErfassen={(body) => beginnenMut.mutateAsync(body)}
@@ -508,10 +532,10 @@ export default function AbloesungPage() {
               : rhythmusZiel.schicht.rhythmus_minuten
           }
           leerErlaubt={rhythmusZiel.vorgabe != null}
-          leerText={
+          platzhalter={
             rhythmusZiel.vorgabe != null
-              ? `Leer: Vorgabe des Abschnitts (${rhythmusText(rhythmusZiel.vorgabe)})`
-              : 'Der Abschnitt hat keine Vorgabe'
+              ? abschnittVorgabe(rhythmusText(rhythmusZiel.vorgabe))
+              : undefined
           }
           laeuft={aendernMut.isPending}
           fehler={aendernMut.error}
@@ -531,7 +555,7 @@ export default function AbloesungPage() {
           titel={`Rhythmus-Vorgabe ${rhythmusZiel.vorgabe.abschnitt_name}`}
           minuten={rhythmusZiel.vorgabe.rhythmus_minuten ?? null}
           leerErlaubt
-          leerText="Leer: Vorgabe entfernen. Laufende Schichten behalten ihren Rhythmus."
+          platzhalter="keine Vorgabe"
           laeuft={vorgabeMut.isPending}
           fehler={vorgabeMut.error}
           onErfassen={(minuten) =>
