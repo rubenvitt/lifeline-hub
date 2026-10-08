@@ -15,9 +15,19 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useRollen } from '../../components/instrument';
-import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
-import type { NetzBereich, NetzSchiene, NetzStelle, NetzVerbindung } from '../fernmeldeskizze';
+import EinsatzZeichen, { FunktionsZeichen } from '../../zeichen/EinsatzZeichen';
+import type {
+  AusstattungsZeichen,
+  NetzBereich,
+  NetzSchiene,
+  NetzStelle,
+  NetzVerbindung,
+} from '../fernmeldeskizze';
 import {
+  AUSSTATTUNG_ABSTAND,
+  AUSSTATTUNG_SCHRIFT,
+  AUSSTATTUNG_ZEICHEN,
+  AUSSTATTUNG_ZEILE,
   KASTEN_POLSTER,
   KASTEN_SCHRIFT,
   KASTEN_ZEILE,
@@ -25,6 +35,7 @@ import {
   NAME_ZEILE,
   RUFNAME_ZEILE,
   TZ_HOEHE,
+  ausstattungsZeilen,
   schienenLinieY,
   type Platz,
 } from '../fernmeldeskizzeLayout';
@@ -200,6 +211,77 @@ function Taktisch({ stelle, x, y }: { stelle: NetzStelle; x: number; y: number }
   );
 }
 
+function AusstattungsZeichenBild({ zeichen }: { zeichen: AusstattungsZeichen }) {
+  switch (zeichen.art) {
+    case 'tz':
+      return <EinsatzZeichen tz={zeichen.tz} size={AUSSTATTUNG_ZEICHEN} />;
+    case 'rolle':
+      return <FunktionsZeichen funktion={{ rolle: zeichen.rolle }} size={AUSSTATTUNG_ZEICHEN} />;
+    case 'kuerzel':
+      return (
+        <FunktionsZeichen funktion={{ kuerzel: zeichen.kuerzel }} size={AUSSTATTUNG_ZEICHEN} />
+      );
+  }
+}
+
+/**
+ * Führungsmittel und Funktionen im Kasten (LFH-1029): je Platz Zeichen und Wort darunter, auf den
+ * Plätzen aus `ausstattungsZeilen` (dieselbe Rechnung wie `stellenMasse`). `x` ist die linke
+ * Innenkante, `y` die Oberkante der Ausstattung.
+ */
+function Ausstattung({
+  stelle,
+  x,
+  y,
+  innen,
+}: {
+  stelle: NetzStelle;
+  x: number;
+  y: number;
+  innen: number;
+}) {
+  if (stelle.art !== 'fuehrungsstelle' && stelle.art !== 'abschnitt') return null;
+  const { plaetze } = ausstattungsZeilen(stelle.ausstattung, innen);
+  if (plaetze.length === 0) return null;
+  return (
+    <g data-teil="ausstattung">
+      {plaetze.map((p) => {
+        const cx = x + p.x;
+        const oben = y + p.y;
+        const wortY = oben + AUSSTATTUNG_ZEICHEN + AUSSTATTUNG_ABSTAND / 2;
+        return (
+          <g
+            key={p.ausstattung.schluessel}
+            role="img"
+            aria-label={p.ausstattung.titel}
+            data-ausstattung={p.ausstattung.schluessel}
+          >
+            <title>{p.ausstattung.titel}</title>
+            <g transform={`translate(${cx - AUSSTATTUNG_ZEICHEN / 2} ${oben})`} aria-hidden="true">
+              <AusstattungsZeichenBild zeichen={p.ausstattung.zeichen} />
+            </g>
+            <text
+              x={cx}
+              y={wortY}
+              fontSize={AUSSTATTUNG_SCHRIFT}
+              textAnchor="middle"
+              dominantBaseline="hanging"
+              fill="currentColor"
+              style={SCHRIFT_TEXT}
+            >
+              {p.worte.map((w, i) => (
+                <tspan key={i} x={cx} dy={i === 0 ? 0 : AUSSTATTUNG_ZEILE}>
+                  {w}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 /** Text der Rufnamen-Zeile; nie geraten. */
 export function rufnamenZeile(s: NetzStelle): string | null {
   if (s.art === 'komponente') return null;
@@ -268,7 +350,13 @@ export function StelleBild({
   // Ein langer Rufname bricht um wie die Bezeichnung (Messung 1.1); der Platz wächst in
   // `stellenMasse` um dieselben Zeilen mit.
   const rufZeilen = ruf ? umbrich(ruf, NAME_SCHRIFT, innen) : [];
-  const lueckeY = rufY + Math.max(1, rufZeilen.length) * RUFNAME_ZEILE;
+  // Führungsmittel und Funktionen zwischen Rufname und Lückenzeile (LFH-1029 D4).
+  const ausstattungY = rufY + Math.max(1, rufZeilen.length) * RUFNAME_ZEILE;
+  const lueckeY =
+    ausstattungY +
+    (stelle.art === 'fuehrungsstelle' || stelle.art === 'abschnitt'
+      ? ausstattungsZeilen(stelle.ausstattung, innen).hoehe
+      : 0);
   return (
     <>
       <g data-teil="stelle" opacity={deckkraft}>
@@ -327,6 +415,14 @@ export function StelleBild({
                   </tspan>
                 ))}
           </text>
+        ) : null}
+        {kasten ? (
+          <Ausstattung
+            stelle={stelle}
+            x={platz.x + KASTEN_POLSTER}
+            y={ausstattungY}
+            innen={innen}
+          />
         ) : null}
       </g>
       {luecke ? (

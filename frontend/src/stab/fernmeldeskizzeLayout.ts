@@ -1,4 +1,10 @@
-import type { Fernmeldenetz, NetzBaumKnoten, NetzSchiene, NetzStelle } from './fernmeldeskizze';
+import type {
+  Fernmeldenetz,
+  NetzBaumKnoten,
+  NetzSchiene,
+  NetzStelle,
+  SkizzenAusstattung,
+} from './fernmeldeskizze';
 import {
   SCHIENE_RAND,
   ZEICHEN_GROESSE,
@@ -71,6 +77,57 @@ export const STEIG_ABSTAND = RASTER;
 
 const ZEICHEN_ABSTAND = 4;
 
+/**
+ * Ausstattung im Kasten (LFH-1029 D4): je Zeichen ein Platz mit Zeichen und Wort darunter, so
+ * viele Plätze je Zeile wie die Innenbreite fasst. Vorläufig bis zur Messung im Druck.
+ */
+export const AUSSTATTUNG_PLATZ = 52;
+export const AUSSTATTUNG_ZEICHEN = 24;
+export const AUSSTATTUNG_SCHRIFT = 10;
+export const AUSSTATTUNG_ZEILE = 12;
+/** Abstand über der ersten Zeile und zwischen zwei Zeilen; zwischen Zeichen und Wort die Hälfte. */
+export const AUSSTATTUNG_ABSTAND = 4;
+
+export interface AusstattungsPlatz {
+  ausstattung: SkizzenAusstattung;
+  /** Mitte des Platzes, von der linken Innenkante des Kastens. */
+  x: number;
+  /** Oberkante des Zeichens, von der Oberkante der Ausstattung. */
+  y: number;
+  /** Das Wort unter dem Zeichen, umgebrochen wie im Bild. */
+  worte: string[];
+}
+
+/**
+ * Die Plätze der Ausstattung und ihre Höhe: die eine Rechnung für `stellenMasse` und das Bild
+ * (`StelleBild`). Ohne Ausstattung ist die Höhe 0, der Kasten bleibt wie ohne LFH-1029.
+ */
+export function ausstattungsZeilen(
+  ausstattung: readonly SkizzenAusstattung[],
+  innenbreite: number,
+): { plaetze: AusstattungsPlatz[]; hoehe: number } {
+  if (ausstattung.length === 0) return { plaetze: [], hoehe: 0 };
+  const jeZeile = Math.max(1, Math.floor(innenbreite / AUSSTATTUNG_PLATZ));
+  const plaetze: AusstattungsPlatz[] = [];
+  let y = AUSSTATTUNG_ABSTAND;
+  for (let i = 0; i < ausstattung.length; i += jeZeile) {
+    const zeile = ausstattung.slice(i, i + jeZeile);
+    const links = (innenbreite - zeile.length * AUSSTATTUNG_PLATZ) / 2;
+    let worteMax = 1;
+    zeile.forEach((a, j) => {
+      const worte = umbrich(a.text, AUSSTATTUNG_SCHRIFT, AUSSTATTUNG_PLATZ - AUSSTATTUNG_ABSTAND);
+      worteMax = Math.max(worteMax, worte.length);
+      plaetze.push({ ausstattung: a, x: links + (j + 0.5) * AUSSTATTUNG_PLATZ, y, worte });
+    });
+    y +=
+      AUSSTATTUNG_ZEICHEN +
+      AUSSTATTUNG_ABSTAND / 2 +
+      worteMax * AUSSTATTUNG_ZEILE +
+      AUSSTATTUNG_ABSTAND;
+  }
+  return { plaetze, hoehe: y };
+}
+
 export interface Platz {
   /** Linke obere Ecke; bei Schienen die der Spur, die Linie liegt bei `y + SCHIENE_LINIE_VERSATZ`. */
   x: number;
@@ -135,6 +192,7 @@ export function stellenMasse(s: NetzStelle): { breite: number; hoehe: number } {
         ZEICHEN_ABSTAND +
         zeilen(text, KASTEN_SCHRIFT, innen) * KASTEN_ZEILE +
         rufnamenHoehe(s, innen) +
+        ausstattungsZeilen(s.ausstattung, innen).hoehe +
         LUECKE_ZEILE;
       return { breite: KASTEN_BREITE, hoehe: aufRaster(hoehe) };
     }

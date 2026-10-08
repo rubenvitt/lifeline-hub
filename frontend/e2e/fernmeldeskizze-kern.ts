@@ -158,3 +158,15 @@ export async function seedeGrund(
     : 0;
   return { bnBos, f314, ea, zug: zugId };
 }
+
+/** Druck wie die Person: „Drucken / als PDF“ löst `beforeprint` aus (`emulateMedia` feuert es nicht). */
+export async function drucke(page: Page) {
+  await page.evaluate(() => {
+    window.print = () => {
+      window.dispatchEvent(new Event('beforeprint'));
+    };
+  });
+  await page.getByRole('button', { name: /Drucken/ }).click();
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('[data-lfh="druck-anlage"]')).toBeVisible();
+}

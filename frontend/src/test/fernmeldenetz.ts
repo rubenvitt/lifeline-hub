@@ -6,10 +6,13 @@ import type {
 } from '../api/fernmeldeskizzeVertrag';
 import type {
   Einheit,
+  EinsatzFahrzeug,
   Einsatzabschnitt,
   Fuehrungsstelle,
   KommunikationsStelle,
+  Sachgebiet,
   Sprechgruppe,
+  Stabsfunktion,
 } from '../api/types';
 import type { FernmeldenetzQuellen } from '../stab/fernmeldeskizze';
 import type { Quelle } from '../stab/luecken';
@@ -47,6 +50,33 @@ export function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     status: { quelle: 'ohne', verteilung: [] },
     ...p,
   } as Einheit;
+}
+
+export function fahrzeug(id: number, p: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug {
+  return {
+    id,
+    einsatz_id: 1,
+    funkrufname: `Fahrzeug ${id}`,
+    disponiert_at: '2026-10-08T08:00:00Z',
+    ist_adhoc: false,
+    ist_demo: false,
+    ...p,
+  };
+}
+
+export function besetzt(
+  sachgebiet: Sachgebiet,
+  besetzung_art: Stabsfunktion['besetzung_art'],
+  name: string | null = null,
+): Stabsfunktion {
+  return {
+    sachgebiet,
+    besetzung_art,
+    name,
+    gesetzt_at: '2026-10-08T08:00:00Z',
+    gesetzt_von_id: 1,
+    personal_noch_disponiert: true,
+  };
 }
 
 export function stelle(
@@ -120,6 +150,8 @@ export function quellen(
     fuehrungsstelle: { zustand: 'daten', daten: null },
     sprechgruppen: daten([]),
     stellen: daten([]),
+    fahrzeuge: daten([]),
+    besetzung: daten([]),
     skizze: { zustand: 'daten', daten: { ...LEER_SKIZZE, ...skizze } },
     ...rest,
   };

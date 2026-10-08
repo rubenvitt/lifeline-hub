@@ -44,8 +44,9 @@ eigenes Modul erscheinen. Sie MUST die Stab-Freigabe der Funkplan-Seite erben.
 Jeder Abschnitt und jede Einheit SHALL in der Skizze Bezeichnung und Rufname zeigen, mit denselben
 Werten wie die Tabelle; ihre Sprechgruppen zeigt die Skizze über die Schienen, an denen sie hängen.
 Fehlt jede Sprechgruppe, MUST „keine Sprechgruppe“ als Wort am Element stehen, nicht nur als
-Farbe. Leitung, Stärke und Erreichbarkeit MUST NOT in der Skizze erscheinen. Das
-Kommunikationsmittel SHALL im Eigenschaftspaneel des gewählten Elements stehen.
+Farbe. Namen der Leitung, Stärke und Erreichbarkeit MUST NOT in der Skizze erscheinen; dass eine
+Leitung besetzt ist, zeigt allein das Funktionszeichen im Kasten. Das Kommunikationsmittel SHALL im
+Eigenschaftspaneel des gewählten Elements stehen.
 
 #### Scenario: Gleiche Werte wie die Tabelle
 
@@ -62,6 +63,12 @@ Kommunikationsmittel SHALL im Eigenschaftspaneel des gewählten Elements stehen.
 
 - **WHEN** einer Einheit eine Erreichbarkeit erfasst ist
 - **THEN** erscheint sie in der Skizze weder am Bildschirm noch im Druck
+
+#### Scenario: Name der Abschnittsleitung bleibt in der Tabelle
+
+- **WHEN** der Abschnitt „EA 1 Gesundheit“ die Leitung „Erika Muster“ trägt
+- **THEN** zeigt sein Kasten das Zeichen „EAL“, und „Erika Muster“ erscheint weder am Bildschirm
+  noch im Druck
 
 ### Requirement: Fehlender gemeinsamer Kanal als benannte Lücke
 
@@ -89,7 +96,8 @@ mit ihrem Rufnamen zeigen, an den Schienen ihrer Sprechgruppen, nie mit ihrer Er
 sie nicht erfasst, SHALL an ihrer Stelle die benannte Lücke „Einsatzleitung: Gegenstelle nicht
 erfasst“ stehen, ohne Stichleitung, und die obersten Abschnitte tragen kein Urteil gegen sie. Die
 Skizze MUST NOT einen Rufnamen oder eine Sprechgruppe der Einsatzleitung aus anderen Daten
-ableiten. Eine Stabsstelle MUST NOT in der Skizze erscheinen.
+ableiten. Eine Stabsstelle MUST NOT als eigenes Element in der Skizze erscheinen; besetzte
+Sachgebiete stehen nur als Funktionszeichen im Kasten „Einsatzleitung“.
 
 #### Scenario: Wurzel
 
@@ -107,9 +115,10 @@ ableiten. Eine Stabsstelle MUST NOT in der Skizze erscheinen.
 ### Requirement: Fehlende Quellen werden benannt
 
 Sind die Abschnitte gesperrt oder nicht geladen, SHALL die Skizze statt der Fläche den Grund nennen
-und MUST NOT Einheiten ohne Abschnitt zeigen. Fehlen nur die Einheiten, die externen Stellen oder
-die Daten der Skizze, SHALL die Skizze das Übrige zeigen und je fehlender Quelle den Grund nennen.
-Eine fehlende Quelle MUST NOT als leerer Bestand erscheinen.
+und MUST NOT Einheiten ohne Abschnitt zeigen. Fehlen nur die Einheiten, die Fahrzeuge, die
+Stab-Besetzung, die externen Stellen oder die Daten der Skizze, SHALL die Skizze das Übrige zeigen
+und je fehlender Quelle den Grund nennen. Eine fehlende Quelle MUST NOT als leerer Bestand
+erscheinen.
 
 #### Scenario: Abschnitte gesperrt
 
@@ -127,6 +136,12 @@ Eine fehlende Quelle MUST NOT als leerer Bestand erscheinen.
 - **WHEN** der Abruf des Kommunikationsplans scheitert
 - **THEN** zeigt die Skizze Führungsstelle, Abschnitte und Einheiten und den Hinweis „Externe
   Stellen: nicht geladen“
+
+#### Scenario: Fahrzeuge gesperrt
+
+- **WHEN** das Modul Fahrzeuge für die Person gesperrt ist
+- **THEN** zeigt die Skizze alle Kästen ohne Führungsmittel und den Hinweis „Fahrzeuge: nicht
+  freigegeben“
 
 ### Requirement: Lesbar ohne waagerechtes Scrollen
 
@@ -208,18 +223,77 @@ Schienen hängen. Kanten zwischen zwei Stellen MUST NOT für Sprechgruppen gezei
 - **THEN** steht „Gesundheit“ unter ihrem Bedingungszeichen
 
 ### Requirement: Stellen als Führungsstellen-Kästen und Einheiten als Zeichen
+
 Die Skizze SHALL die eigene Führungsstelle und jeden Abschnitt als Kasten mit taktischem Zeichen,
 Bezeichnung in großer Schrift und Rufname darunter zeigen. Einheiten SHALL als taktisches Zeichen
 ohne Kasten mit Name und Funkrufname darunter erscheinen. Fehlt der Rufname, MUST „kein Rufname“
-stehen. Fahrzeuge MUST NOT als Element erscheinen.
+stehen. Fahrzeuge MUST NOT als eigenes Element erscheinen; ein Führungsfahrzeug erscheint nur als
+Führungsmittel im Kasten (Requirement „Führungsmittel und Funktionen im Kasten“).
 
 #### Scenario: Abschnitt mit Rufname
+
 - **WHEN** der Abschnitt „EA 1 Gesundheit“ die Kurzbezeichnung „EA 1“ trägt
 - **THEN** zeigt sein Kasten ein taktisches Zeichen, „EA 1 Gesundheit“ und „EA 1“
 
 #### Scenario: Einheit ohne Funkrufname
+
 - **WHEN** die Einheit „1. Zug“ keinen Funkrufnamen trägt
 - **THEN** steht unter ihrem Zeichen „1. Zug“ und „kein Rufname“
+
+#### Scenario: Löschfahrzeug ohne Element
+
+- **WHEN** der Einheit „1. Zug“ das Fahrzeug „HLF 20“ disponiert ist
+- **THEN** erscheint „HLF 20“ weder als Element noch im Kasten ihres Abschnitts
+
+### Requirement: Führungsmittel und Funktionen im Kasten
+
+Jeder Führungsstellen-Kasten SHALL die dort eingesetzten Führungsmittel und Funktionen als kleine
+taktische Zeichen zeigen, je mit einem Wort darunter, zuerst die Funktionen, dann die
+Führungsmittel.
+
+- Führungsmittel eines Abschnitts SHALL jedes disponierte Fahrzeug mit der Fachaufgabe Führung
+  sein (dieselbe Regel wie die Lagekarte, ein manuell gesetztes Zeichen gewinnt), dessen Einheit in
+  der Führungsorganisation unter diesem Abschnitt hängt und unter keinem tieferen. Das Wort ist der
+  Fahrzeugtyp, sonst der Funkrufname. Jedes Fahrzeug MUST höchstens einmal im Bild stehen.
+- Ein Abschnitt mit eingetragener Leitung SHALL das Zeichen „EAL“ tragen, ein Unterabschnitt
+  „UEAL“.
+- Der Kasten „Einsatzleitung“ SHALL je Sachgebiet S1 bis S6 ein Zeichen mit dem Kürzel tragen,
+  wenn es bei der Einsatzleitung, durch disponiertes Personal oder extern besetzt ist; ein
+  rückwärtig wahrgenommenes Sachgebiet MUST NOT im Kasten stehen.
+- Personennamen MUST NOT erscheinen. Die Zeichen sind keine Elemente: sie tragen keine
+  Stichleitung, keine Lücke und keinen eigenen Fokus.
+- Der Kasten SHALL um die Zeilen dieser Zeichen wachsen, auf dem Bildschirm, im Auto-Layout und im
+  Druck gleich; ein langes Wort MUST umbrechen und MUST NOT gekürzt werden. Ohne Führungsmittel und
+  Funktionen MUST der Kasten so hoch bleiben wie ohne diese Anforderung.
+
+#### Scenario: Abschnitt mit ELW 1 und Leitung
+
+- **WHEN** der Abschnitt „EA 1“ mit eingetragener Leitung die Einheit „FüGr EA 1“ führt, der das
+  Fahrzeug „Florian Musterstadt 11/1“ vom Typ „ELW 1“ disponiert ist
+- **THEN** zeigt der Kasten „EA 1“ das Zeichen „EAL“ und ein Fahrzeugzeichen mit „ELW 1“, und
+  „FüGr EA 1“ steht wie bisher als Einheit darunter
+
+#### Scenario: Fahrzeug im Unterabschnitt
+
+- **WHEN** ein Kommandowagen einer Einheit des Unterabschnitts „EA 1.1“ disponiert ist
+- **THEN** steht er im Kasten „EA 1.1“ und nicht im Kasten „EA 1“
+
+#### Scenario: Fahrzeug ohne Abschnitt
+
+- **WHEN** ein ELW 2 keiner Einheit oder einer Einheit ohne Abschnitt disponiert ist
+- **THEN** erscheint er in keinem Kasten
+
+#### Scenario: Stab der Einsatzleitung
+
+- **WHEN** S2 durch disponiertes Personal, S3 bei der Einsatzleitung und S6 rückwärtig besetzt ist
+- **THEN** zeigt der Kasten „Einsatzleitung“ die Zeichen „S2“ und „S3“ in dieser Folge, kein „S6“
+  und keinen Namen
+
+#### Scenario: Druck in Graustufen
+
+- **WHEN** die Skizze mit einem Abschnitt mit „EAL“ und „ELW 1“ auf A4 quer gedruckt wird
+- **THEN** stehen beide Zeichen mit ihrem Wort im Kasten, und der Kasten ist im Druck so hoch wie
+  am Bildschirm
 
 ### Requirement: Externe Stellen und Komponenten
 Die Skizze SHALL die externen Stellen des Kommunikationsplans (Leitstelle, Behörde,

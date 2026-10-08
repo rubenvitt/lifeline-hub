@@ -14,6 +14,7 @@ import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { einsatzKeys } from '../api/queryKeys';
+import { ladeStab } from '../api/stab';
 import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
@@ -624,6 +625,13 @@ export default function FunkplanPage() {
     queryFn: () => ladeFernmeldeskizze(einsatzId),
     enabled: stabFrei,
   });
+  // LFH-1029: die Stab-Besetzung für die Sachgebiete im Kasten der Einsatzleitung, live über `stab`.
+  const stabQuery = useQuery({
+    queryKey: einsatzKeys.stab(einsatzId),
+    queryFn: () => ladeStab(einsatzId),
+    enabled: stabFrei,
+    select: (stab) => stab.besetzung,
+  });
 
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
@@ -633,6 +641,7 @@ export default function FunkplanPage() {
   const fuehrungsstelle = useFuehrungsstelleQuelle(fuehrungsstelleQuery);
   const stellen = useQuelle(stellenQuery, stabFrei, ohneVerbindung);
   const skizzenDaten = useSkizzenQuelle(skizzeQuery, stabFrei, ohneVerbindung);
+  const besetzung = useQuelle(stabQuery, stabFrei, ohneVerbindung);
   const quellen: FunkplanQuellen = useMemo(
     () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle }),
     [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle],
@@ -658,6 +667,8 @@ export default function FunkplanPage() {
         einsatzId,
         abschnitte,
         einheiten,
+        fahrzeuge,
+        besetzung,
         fuehrungsstelle,
         sprechgruppen,
         stellen,
@@ -668,6 +679,8 @@ export default function FunkplanPage() {
       einsatzId,
       abschnitte,
       einheiten,
+      fahrzeuge,
+      besetzung,
       fuehrungsstelle,
       sprechgruppen,
       stellen,
@@ -786,10 +799,12 @@ export default function FunkplanPage() {
     fuehrungsstelleQuery.dataUpdatedAt,
     stellenQuery.dataUpdatedAt,
     skizzeQuery.dataUpdatedAt,
+    stabQuery.dataUpdatedAt,
   );
 
-  // Skizze und Sprechgruppen zeigen keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review
-  // LFH-625). Die Sprechgruppen zählen ihre Zeilen vorweg.
+  // Skizze und Sprechgruppen zeigen keinen Fahrzeugbestand (die Skizze nur Führungsmittel im
+  // Kasten, LFH-1029), also zählt ihr Umfang ihn auch nicht (Review LFH-625). Die Sprechgruppen
+  // zählen ihre Zeilen vorweg.
   const umfang = [
     ...(ansicht === 'sprechgruppen' ? [`${sprechgruppenplan.length} Sprechgruppen`] : []),
     ...UMFANG.filter(

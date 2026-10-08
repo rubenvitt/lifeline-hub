@@ -29,9 +29,16 @@ Verbindungen, Bereiche, Schriftfeld (`src/stab/fernmeldeskizze.rs`, Bezüge poly
 Löschpfad ruft `vergiss`). Schreibwege der Fläche nur über `stab/skizzenAktionen.ts`
 (umgesetzt in `stab/useSkizzenAktionen.ts`), Rückgängig über `stab/skizzenBefehle.ts`; Lage mit
 `version` (409 statt stillem Überschreiben). Rechte je Element nach dem Datensatz, mobil und ohne
-Schreibrecht nur lesen. Keine Erreichbarkeit, keine Rufnummern, keine Fahrzeuge, kein ETB je
-Änderung; Druck A3/A4 quer mit Funkplan-Anlage (`stab/skizze/druckformat.ts`), Übernahme nur über
+Schreibrecht nur lesen. Keine Erreichbarkeit, keine Rufnummern, keine Personennamen, kein Fahrzeug
+als Element, kein ETB je Änderung; Druck A3/A4 quer mit Funkplan-Anlage (`stab/skizze/druckformat.ts`), Übernahme nur über
 den Funkplan (Abschnitt „Kommunikationsskizze“).
+**Ausstattung im Kasten** (LFH-1029): Führungsstelle und Abschnitt tragen `ausstattung`, kleine
+Zeichen mit Wort darunter, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus). Ein
+Führungsfahrzeug (Fachaufgabe `fuehrung` aus `baueTzProps`, dieselbe Regel wie die Lagekarte) steht
+im Kasten des nächsten Abschnitts über seiner Einheit im Baum; „EAL“/„UEAL“ nur mit eingetragener
+Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung ohne `rueckwaertig`.
+Zeichen der Funktionen nur über `zeichen/fachobjektZeichen.ts:funktionsZeichen`; Höhe und Plätze nur
+über `stab/fernmeldeskizzeLayout.ts:ausstattungsZeilen` (Bild und Layout rechnen dieselbe Zahl).
 
 **Sprechgruppen** (LFH-848 D8): dritte Darstellung des Funkplans („Tabelle | Skizze |
 Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
