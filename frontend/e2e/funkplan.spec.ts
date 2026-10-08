@@ -218,6 +218,29 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
   await expect(page.getByText(ERREICHBAR)).toHaveCount(0);
 });
 
+test('Übernahme in den Befehl (LFH-1027): genau ein POST, danach der LADEF-Befehl', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Befehl ${Date.now()}`);
+  await seede(page, einsatzId);
+  await page.setViewportSize(FUEKW);
+  await oeffne(page, einsatzId);
+
+  const anfragen: string[] = [];
+  page.on('request', (r) => {
+    if (/\/befehle(\/\d+)?$/.test(new URL(r.url()).pathname) && r.method() !== 'GET') {
+      anfragen.push(`${r.method()} ${new URL(r.url()).pathname}`);
+    }
+  });
+  await page.getByRole('button', { name: 'In Befehl übernehmen' }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/auftraege/befehle/\\d+$`));
+  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/befehle`]);
+  await expect(page.getByText('Führung und Kommunikation').first()).toBeVisible();
+  await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
+  await expect(page.getByText(ERREICHBAR)).toHaveCount(0);
+});
+
 test('die Kennung einer Einheit führt auf ihre Detailseite', async ({ page }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Link ${Date.now()}`);

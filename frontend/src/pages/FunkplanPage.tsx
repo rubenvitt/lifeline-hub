@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
+import { legeBefehlAn } from '../api/befehle';
 import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -34,6 +35,7 @@ import {
   einsatzdatenPfad,
   fahrzeugePfad,
   kommunikationsplanPfad,
+  befehlDetailPfad,
   lageberichtDetailPfad,
   parseFunkplanAnsicht,
   stabPfad,
@@ -696,22 +698,42 @@ export default function FunkplanPage() {
   const aufklappbar = useMemo(() => aufklappbareSchluessel(zeilen), [zeilen]);
   const aufgeklappt = aufklappbar.filter((k) => !zugeklappt.has(k));
 
+  // Ein Wortlaut für Lagebericht und Befehl: Baum, Lücken und Kommunikationsskizze. Die
+  // Erreichbarkeit kennt das Markdown nicht.
+  const funkplanText = () => {
+    const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
+    const gueltigAbRoh = netz.schriftfeld?.gueltig_ab;
+    const gueltigAb = gueltigAbRoh ? taktischeDtgVoll(gueltigAbRoh, konventionen) : null;
+    const text = rendereFunkplanMarkdown(zeilen, stand, luecken, quellen, { netz, gueltigAb });
+    return { titel: `Funkplan ${stand}`, text };
+  };
+  // EIN Aufruf mit Startinhalt (Spec `dokument-uebernahme`): das Dokument entsteht mit Text oder
+  // gar nicht.
   const uebernehmen = useMutation({
     mutationFn: async () => {
-      const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
-      // EIN Aufruf mit Startinhalt (Spec `dokument-uebernahme`): der Bericht entsteht mit Text
-      // oder gar nicht. Die Erreichbarkeit kennt das Markdown nicht.
-      const gueltigAbRoh = netz.schriftfeld?.gueltig_ab;
-      const gueltigAb = gueltigAbRoh ? taktischeDtgVoll(gueltigAbRoh, konventionen) : null;
-      const text = rendereFunkplanMarkdown(zeilen, stand, luecken, quellen, { netz, gueltigAb });
+      const { titel, text } = funkplanText();
       const lb = await legeLageberichtAn(einsatzId, {
         vorlage: 'freitext',
-        titel: `Funkplan ${stand}`,
+        titel,
         abschnitte: [{ schluessel: 'text', text }],
       });
       return lb.id;
     },
     onSuccess: (lbId) => navigate(lageberichtDetailPfad(einsatzId, lbId)),
+  });
+  // LFH-1027: Kommunikationsunterlagen ergänzen den Befehl (DV 800 Nr. 1.5.1.1). Nur LADEF hat
+  // den Abschnitt „Führung und Kommunikation“; die übrigen bleiben leer.
+  const inBefehl = useMutation({
+    mutationFn: async () => {
+      const { titel, text } = funkplanText();
+      const b = await legeBefehlAn(einsatzId, {
+        vorlage: 'befehl_ladef',
+        titel,
+        abschnitte: [{ schluessel: 'fuehrung_kommunikation', text }],
+      });
+      return b.id;
+    },
+    onSuccess: (bId) => navigate(befehlDetailPfad(einsatzId, bId)),
   });
 
   const spalten = useMemo(() => funkplanSpalten(druckt), [druckt]);
@@ -772,6 +794,10 @@ export default function FunkplanPage() {
   const darfUebernehmen =
     darfImEinsatzSchreiben(einsatz, benutzer) &&
     istKeyFreigegeben('lageberichte', stabFreigabe.freigaben);
+  // Befehle hängen am Modul Aufträge (`src/routes/befehl.rs`, `MODUL_KEY`).
+  const darfInBefehl =
+    darfImEinsatzSchreiben(einsatz, benutzer) &&
+    istKeyFreigegeben('auftraege', stabFreigabe.freigaben);
   const quellenLaden = [...Object.values(quellen), stellen, skizzenDaten].some(
     (q) => q.zustand === 'laden',
   );
@@ -1053,6 +1079,15 @@ export default function FunkplanPage() {
                 In Lagebericht übernehmen
               </Button>
             )}
+            {darfInBefehl && (
+              <Button
+                loading={inBefehl.isPending || quellenLaden}
+                disabled={quellenLaden}
+                onClick={() => inBefehl.mutate()}
+              >
+                In Befehl übernehmen
+              </Button>
+            )}
             {/* Erst nach committetem Aufklappen drucken — `useDrucken` löst den Dialog nach dem
               Commit aus. Die Anlage der Skizze steht ohnehin ganz offen. */}
             <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
@@ -1062,6 +1097,15 @@ export default function FunkplanPage() {
               <SpeicherFehler
                 fehler={uebernehmen.error}
                 titel="Nicht in den Lagebericht übernommen"
+                fallback="Übernahme fehlgeschlagen"
+              />
+            </div>
+          )}
+          {inBefehl.error != null && (
+            <div className="funkplan-no-print" style={{ marginBlockEnd: token.margin }}>
+              <SpeicherFehler
+                fehler={inBefehl.error}
+                titel="Nicht in den Befehl übernommen"
                 fallback="Übernahme fehlgeschlagen"
               />
             </div>
