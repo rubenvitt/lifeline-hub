@@ -226,6 +226,7 @@ use utoipa::OpenApi;
         crate::routes::einsatz_bereitstellungsraum::BrFahrzeugKurz,
         crate::routes::einsatz_person::PersonDetail,
         crate::routes::einsatz_uhs::UhsDetail,
+        crate::uhs::kraefte::UhsKraft,
         crate::routes::karte::AktualisierungsPhase,
         crate::routes::karte::AktualisierungsStatus,
         crate::routes::karte::BauDienst,

@@ -275,6 +275,8 @@ export type Uhs = S['UhsAnzeige'];
 export type UhsPlatz = S['PlatzAnzeige'];
 export type UhsBelegung = S['BelegungAnzeige'];
 export type UhsDetail = S['UhsDetail'];
+/** Kraft an einer UHS (LFH-1045): Name, Funktion, Position, Einheit. */
+export type UhsKraft = S['UhsKraft'];
 
 // ============================== LFH-14 Bereitstellungsräume ==============================
 export type BrStatus = S['BrStatus'];

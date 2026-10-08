@@ -1047,6 +1047,27 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/uhs/{uid}",
             delete(routes::einsatz_uhs::stornieren),
         )
+        // Kräfte der UHS (LFH-1045, Spec `uhs-staerke`): Zuordnung aus `einsatz_personal`.
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/kraefte",
+            post(routes::einsatz_uhs_kraefte::adhoc),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/kraefte/verfuegbar",
+            get(routes::einsatz_uhs_kraefte::verfuegbar),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}",
+            put(routes::einsatz_uhs_kraefte::zuordnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}",
+            delete(routes::einsatz_uhs_kraefte::loesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/kraefte/einheit/{eid}",
+            put(routes::einsatz_uhs_kraefte::einheit_zuordnen),
+        )
         // UHS-Anhänge (LFH-758): Modul-Gate `unfallhilfsstellen`; jeder Download im Lese-Audit.
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge",

@@ -36,6 +36,8 @@ pub struct UhsDetail {
     pub plaetze: Vec<PlatzAnzeige>,
     pub belegungen: Vec<BelegungAnzeige>,
     pub material: Vec<EinsatzMaterialAnzeige>,
+    /// Kräfte an der UHS (LFH-1045); leer für das UHS-Tablet (Scope-Matrix).
+    pub kraefte: Vec<crate::uhs::kraefte::UhsKraft>,
     /// Plan als Hintergrund des Platz-Layouts (LFH-999); fehlt ohne Plan.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plan: Option<crate::uhs::plan::UhsPlanAnzeige>,
@@ -133,16 +135,25 @@ pub async fn detail(
     let uhs = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
     let plaetze = platz_repo::liste_je_uhs(&state.pool, uhs_id).await?;
     let belegungen = belegung_repo::liste_je_uhs(&state.pool, uhs_id).await?;
-    // Das Tablet liest kein Material (Scope-Matrix); der Laptop das seiner UHS.
-    let material = if ctx
+    // Das Tablet liest weder Material noch Kräfte (Scope-Matrix); der Laptop die seiner UHS.
+    let ist_tablet = ctx
         .geraet
         .as_ref()
-        .is_some_and(|g| g.ansicht == crate::geraet::Funktionsansicht::UhsTablet)
-    {
-        Vec::new()
+        .is_some_and(|g| g.ansicht == crate::geraet::Funktionsansicht::UhsTablet);
+    let (material, kraefte) = if ist_tablet {
+        (Vec::new(), Vec::new())
     } else {
-        material_repo::liste_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
-            .await?
+        (
+            material_repo::liste_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
+                .await?,
+            crate::uhs::kraefte::liste(
+                &state.pool,
+                einsatz_id,
+                Some(uhs_id),
+                ctx.einsatz.ist_aktiv(),
+            )
+            .await?,
+        )
     };
     let plan = crate::uhs::plan::repo::laden_optional(&state.pool, einsatz_id, uhs_id).await?;
     Ok(Json(UhsDetail {
@@ -150,6 +161,7 @@ pub async fn detail(
         plaetze,
         belegungen,
         material,
+        kraefte,
         plan,
     }))
 }
@@ -259,18 +271,45 @@ pub async fn status_wechsel(
     // F06/LFH-244 Tier-A: Status-UPDATE + (falls lagerelevant) System-ETB-Eintrag atomar
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Startwert nur laden, wenn ein ETB-Eintrag
     // entsteht (Übergänge ohne Spur machen keinen Zusatz-Read). SSE erst nach dem Commit.
-    let startwert = if etb_text.is_some() {
+    // LFH-1045 (design.md D6): Auflösen löst die Kräfte der UHS in derselben Tx.
+    let aufloesen = body.status == UhsStatus::Aufgeloest.as_str();
+    let startwert = if etb_text.is_some() || aufloesen {
         Some(etb_startwert(&state.pool, einsatz_id).await?)
     } else {
         None
     };
-    crate::write_retry!(&state.pool, |conn| {
+    let (etb_ids, geloest) = crate::write_retry!(&state.pool, |conn| {
         uhs_repo::setze_status_tx(conn, einsatz_id, uhs_id, &body.status, ctx.benutzer.id).await?;
+        let mut etb_ids = Vec::new();
         if let (Some(text), Some(sw)) = (etb_text.as_deref(), startwert) {
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, sw, text).await?;
+            etb_ids.push(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, sw, text).await?,
+            );
         }
-        Ok(())
+        let geloest = if aufloesen {
+            kraefte_loesen_tx(
+                conn,
+                einsatz_id,
+                ctx.benutzer.id,
+                startwert,
+                uhs_id,
+                &vorher,
+            )
+            .await?
+        } else {
+            None
+        };
+        etb_ids.extend(geloest);
+        Ok((etb_ids, geloest.is_some()))
     })?;
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
+    if geloest {
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, LiveEvent::Personal);
+    }
     sse_uhs(&state, einsatz_id, uhs_id);
     Ok(Json(
         uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?,
@@ -285,9 +324,51 @@ pub async fn stornieren(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    uhs_repo::storniere(&state.pool, einsatz_id, uhs_id, ctx.benutzer.id).await?;
+    let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    // LFH-1045 (design.md D6): Storno löst die Kräfte der UHS in derselben Tx.
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
+        uhs_repo::storniere_tx(conn, einsatz_id, uhs_id, ctx.benutzer.id).await?;
+        kraefte_loesen_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            Some(startwert),
+            uhs_id,
+            &vorher,
+        )
+        .await
+    })?;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, LiveEvent::Personal);
+    }
     sse_uhs(&state, einsatz_id, uhs_id);
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Löst die Kräfte einer UHS beim Auflösen oder Stornieren und schreibt, wenn es welche gab,
+/// einen ETB-Systemeintrag (LFH-1045, design.md D6). Liefert dessen Kennung.
+async fn kraefte_loesen_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    startwert: Option<i64>,
+    uhs_id: i64,
+    uhs: &UhsAnzeige,
+) -> Result<Option<i64>, AppError> {
+    let anzahl = crate::uhs::kraefte::alle_loesen_tx(conn, uhs_id).await?;
+    match (anzahl, startwert) {
+        (0, _) | (_, None) => Ok(None),
+        (n, Some(sw)) => {
+            let text = crate::uhs::kraefte::etb_text_alle_geloest(n, &uhs.bezeichnung);
+            Ok(Some(
+                crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, sw, &text).await?,
+            ))
+        }
+    }
 }
 
 // ============================== Platz-Routen ==============================

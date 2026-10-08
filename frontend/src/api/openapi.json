@@ -4198,6 +4198,14 @@
               "string",
               "null"
             ]
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "UHS, an der die Kraft arbeitet (LFH-1045); `None` = an keiner. Unabhängig von Einheit\nund Fahrzeug."
           }
         }
       },
@@ -7418,7 +7426,8 @@
           "typ",
           "status",
           "belegt",
-          "plaetze"
+          "plaetze",
+          "kraefte"
         ],
         "properties": {
           "belegt": {
@@ -7432,6 +7441,11 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "kraefte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gesamtstärke der zugeordneten Kräfte (LFH-1045), nur als Zahl; wie die Stärke der UHS\nzählen Kräfte ohne Position nicht."
           },
           "lat": {
             "type": [
@@ -11327,7 +11341,7 @@
       },
       "Staerke": {
         "type": "object",
-        "description": "Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.\n`gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab\nüber 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).",
+        "description": "Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.\n`gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab\nüber 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).\n`FromRow` über die Spalten `fuehrer`, `unterfuehrer`, `mannschaft`, damit eine Abfrage\ndie gezählte Stärke flach mitliefern kann (UHS, LFH-1045).",
         "required": [
           "fuehrer",
           "unterfuehrer",
@@ -11877,7 +11891,7 @@
       },
       "UhsAnzeige": {
         "type": "object",
-        "description": "Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder).",
+        "description": "Serialisierbare UHS-Anzeige (1:1 zur Tabelle plus die berechnete Stärke).",
         "required": [
           "id",
           "einsatz_id",
@@ -11887,7 +11901,8 @@
           "erfasst_at",
           "erfasst_von",
           "geaendert_at",
-          "geaendert_von"
+          "geaendert_von",
+          "staerke"
         ],
         "properties": {
           "abschnitt_id": {
@@ -11942,6 +11957,10 @@
               "null"
             ]
           },
+          "staerke": {
+            "$ref": "#/components/schemas/Staerke",
+            "description": "Stärke aus den zugeordneten Einsatzkräften (LFH-1045, Spec `uhs-staerke`), berechnet in\n`repo::SELECT_ALLE`, nie gespeichert. `0/0/0` ohne Kräfte."
+          },
           "standort": {
             "type": [
               "string",
@@ -11973,7 +11992,8 @@
             "required": [
               "plaetze",
               "belegungen",
-              "material"
+              "material",
+              "kraefte"
             ],
             "properties": {
               "belegungen": {
@@ -11981,6 +12001,13 @@
                 "items": {
                   "$ref": "#/components/schemas/BelegungAnzeige"
                 }
+              },
+              "kraefte": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/UhsKraft"
+                },
+                "description": "Kräfte an der UHS (LFH-1045); leer für das UHS-Tablet (Scope-Matrix)."
               },
               "material": {
                 "type": "array",
@@ -12009,6 +12036,59 @@
           }
         ],
         "description": "Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material."
+      },
+      "UhsKraft": {
+        "type": "object",
+        "description": "Eine Kraft an (oder für) einer UHS: nur was die UHS braucht, ohne Status, Bemerkung und\nTrägerorganisation. So sieht auch der UHS-Laptop nicht mehr als Name, Funktion, Position und\nEinheit (design.md D4).",
+        "required": [
+          "id",
+          "name",
+          "ist_adhoc"
+        ],
+        "properties": {
+          "einheit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Einheit der Kraft (Kennung und Name); fehlen ohne Einheit."
+          },
+          "funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Qualifikationen als flacher Text, wie in der Personalliste."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_personal.id`."
+          },
+          "ist_adhoc": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "staerke_position": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StaerkePosition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "UhsPlanAnzeige": {
         "type": "object",

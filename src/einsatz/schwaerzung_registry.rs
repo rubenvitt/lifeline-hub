@@ -500,6 +500,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("fahrzeug_id", G_FK),
+            retain("uhs_id", G_FK),
         ],
     },
     // ---------- Karte / freie Zeichen / Anhänge ----------

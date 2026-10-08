@@ -203,8 +203,8 @@ describe('einfache Status-Zählungen', () => {
     });
   });
 
-  it('verdichteUhs zählt nach Status', () => {
-    const u = (status: Uhs['status']): Uhs => ({
+  it('verdichteUhs zählt nach Status, Kräfte nur an aktiven UHS', () => {
+    const u = (status: Uhs['status'], mannschaft = 0): Uhs => ({
       id: 1,
       einsatz_id: 1,
       abschnitt_id: null,
@@ -220,13 +220,21 @@ describe('einfache Status-Zählungen', () => {
       geaendert_at: '2026-06-08 10:00:00',
       geaendert_von: 1,
       storniert_at: null,
+      staerke: { fuehrer: 1, unterfuehrer: 0, mannschaft },
     });
-    expect(verdichteUhs([])).toEqual({ geplant: 0, aktiv: 0, aufgeloest: 0, gesamt: 0 });
-    expect(verdichteUhs([u('aktiv'), u('aktiv'), u('geplant')])).toEqual({
+    expect(verdichteUhs([])).toEqual({
+      geplant: 0,
+      aktiv: 0,
+      aufgeloest: 0,
+      gesamt: 0,
+      kraefteAktiv: 0,
+    });
+    expect(verdichteUhs([u('aktiv', 2), u('aktiv'), u('geplant', 5)])).toEqual({
       geplant: 1,
       aktiv: 2,
       aufgeloest: 0,
       gesamt: 3,
+      kraefteAktiv: 4,
     });
   });
 

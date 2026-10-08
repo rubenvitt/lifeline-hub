@@ -230,6 +230,10 @@ export const EINSATZ_STREAM_EVENTS = {
     // Statuswechsel, Nachtrag, Streichung und Fan-out an einer Person (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
     EINSATZ_KEYS.lagemonitor,
+    // Die Stärke einer UHS zählt die Positionen ihrer Kräfte (LFH-1045): eine geänderte Position
+    // oder eine entlassene Kraft ändert Liste und Detail der UHS.
+    EINSATZ_KEYS.uhs,
+    EINSATZ_KEYS.uhsDetail,
   ],
   lagebericht: [
     EINSATZ_KEYS.lageberichte,
@@ -517,6 +521,9 @@ export const einsatzKeys = {
   personAnhaenge: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAnhaenge, einsatzId, personId] as const,
   personal: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId] as const,
+  /** Einsatzkräfte ohne UHS (LFH-1045), Auswahl beim Zuordnen; unter `personal`, weil jede
+   *  Zuordnung `personal` verteilt. */
+  personalOhneUhs: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId, 'ohne-uhs'] as const,
   fuehrungskraefte: (einsatzId: number) => [EINSATZ_KEYS.fuehrungskraefte, einsatzId] as const,
 
   // Struktur

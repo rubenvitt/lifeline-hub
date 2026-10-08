@@ -100,10 +100,13 @@ function useJetzt(taktMs: number): number {
 
 function Kachel({
   titel,
+  zusatz,
   children,
   style,
 }: {
   titel: string;
+  /** Kurzer Text rechts in der Titelzeile, ohne eigene Zeile. */
+  zusatz?: string;
   children: ReactNode;
   style?: CSSProperties;
 }) {
@@ -124,17 +127,34 @@ function Kachel({
         ...style,
       }}
     >
-      <h2
-        style={{
-          margin: 0,
-          fontSize: GROSS.titel,
-          lineHeight: 1.2,
-          fontWeight: 600,
-          color: rollen.gedaempft,
-        }}
-      >
-        {titel}
-      </h2>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, minWidth: 0 }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: GROSS.titel,
+            lineHeight: 1.2,
+            fontWeight: 600,
+            color: rollen.gedaempft,
+          }}
+        >
+          {titel}
+        </h2>
+        {zusatz && (
+          <span
+            data-lfh="monitor-zusatz"
+            style={{
+              marginLeft: 'auto',
+              fontSize: GROSS.text,
+              lineHeight: 1.2,
+              fontVariantNumeric: 'tabular-nums',
+              color: rollen.text,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {zusatz}
+          </span>
+        )}
+      </div>
       {children}
     </section>
   );
@@ -210,6 +230,7 @@ function Kacheln({ lage }: { lage: LagemonitorAnzeige }) {
     .sort((x, y) => y.belegt - x.belegt || x.bezeichnung.localeCompare(y.bezeichnung, 'de'))
     .slice(0, UHS_SICHTBAR);
   const weitere = lage.uhs.length - uhsSichtbar.length;
+  const anUhs = lage.uhs.reduce((summe, u) => summe + u.kraefte, 0);
   return (
     <>
       <Kachel titel="Betroffene">
@@ -231,7 +252,9 @@ function Kacheln({ lage }: { lage: LagemonitorAnzeige }) {
           <Zahl wert={b.ohne} bezeichnung="ungesichtet" />
         </div>
       </Kachel>
-      <Kachel titel="Kräfte">
+      {/* Die Kräfte an den UHS als eine Zahl in der Titelzeile (LFH-1045): je UHS und als
+          eigene Kennzahl fehlt bei 1920 × 1080 der Platz, ohne dass eine Kachel abschneidet. */}
+      <Kachel titel="Kräfte" zusatz={`${anUhs} an UHS`}>
         <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
           <Zahl wert={k.personal} bezeichnung="Personal" />
           <Zahl wert={k.einheiten} bezeichnung="Einheiten" />

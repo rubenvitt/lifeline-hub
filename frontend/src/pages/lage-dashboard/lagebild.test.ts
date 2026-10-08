@@ -325,7 +325,12 @@ describe('baueLagebild', () => {
 
   it('Führungsstand: Aufträge und Meldungen zählt das Lagebild nicht (LFH-550, Modulzähler)', () => {
     const { fuehrung } = baueLagebild(roh(), JETZT);
-    expect(Object.keys(fuehrung).sort()).toEqual(['bericht', 'uhsAktiv', 'uhsGeplant']);
+    expect(Object.keys(fuehrung).sort()).toEqual([
+      'bericht',
+      'uhsAktiv',
+      'uhsGeplant',
+      'uhsKraefte',
+    ]);
   });
 });
 

@@ -62,6 +62,8 @@ const uhs: UhsDetail = {
   geaendert_at: '2026-10-04 08:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  staerke: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+  kraefte: [],
   plaetze: [
     {
       id: 30,

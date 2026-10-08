@@ -14,6 +14,10 @@ use utoipa::ToSchema;
 /// Höchstzahl verschiedener Qualifikationen je Person (LFH-937, design.md D5). Darüber → 400.
 pub const QUALIFIKATIONEN_MAX: usize = 64;
 
+/// Name und Funktion einer Ad-hoc-Kraft, die an einer UHS erfasst wird (LFH-1045, Spec
+/// `eingabegrenzen`); der Text gelangt ins ETB.
+pub const ADHOC_TEXT_MAX: usize = 200;
+
 /// Qualifikations-Liste von außen: sortiert, entdoppelt, höchstens [`QUALIFIKATIONEN_MAX`]
 /// (sonst 400), vor jeder Abfrage (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
 pub fn normalisiere_qualifikation_ids(
@@ -152,6 +156,9 @@ pub struct EinsatzPersonalAnzeige {
     /// Fahrzeug, dessen Besatzung die Kraft ist (LFH-9); `None` = keinem Fahrzeug zugeteilt.
     /// Unabhängig von `einheit_id` (orthogonale Zuordnung).
     pub fahrzeug_id: Option<i64>,
+    /// UHS, an der die Kraft arbeitet (LFH-1045); `None` = an keiner. Unabhängig von Einheit
+    /// und Fahrzeug.
+    pub uhs_id: Option<i64>,
     pub ist_adhoc: bool,
     pub name: String,
     /// Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot).
