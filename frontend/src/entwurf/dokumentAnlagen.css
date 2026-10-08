@@ -1,0 +1,29 @@
+/* Bild-Anlagen an Lagebericht und Befehl (LFH-1028). Die Mechanik (Wurzel, Papierfarben, Umbruch
+   vor `druck-anlage`) liegt in `druck/druck.css`; hier nur die Eigenheiten der Anlage.
+
+   Die Druckfassung hängt immer im DOM, damit das Bild zum Druck geladen ist; am Schirm steht nur
+   das Paneel. Jede Anlage bekommt ein eigenes Blatt A4 quer über eine benannte Seite: sie erbt
+   Rand und Seitenzahl der unbenannten `@page` aus `druck.css`. */
+@media screen {
+  .dokument-anlagen-druck {
+    display: none;
+  }
+}
+
+@media print {
+  @page dokument-anlage {
+    size: A4 landscape;
+  }
+
+  .dokument-anlage-blatt {
+    page: dokument-anlage;
+  }
+
+  /* Nutzhöhe A4 quer bei 15 mm Rand: 180 mm; davon die Überschrift. Das Bild bleibt inline:
+     als Block schob Chromium es auf der benannten Seite hinter die Überschrift auf ein eigenes
+     Blatt, gleich wie klein es war (e2e `dokument-anlage-druck.spec.ts`). */
+  .dokument-anlage-blatt img {
+    max-width: 100%;
+    max-height: 150mm;
+  }
+}

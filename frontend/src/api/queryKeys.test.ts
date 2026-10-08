@@ -684,6 +684,15 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
     ]);
   });
 
+  it('eine geänderte Anlage trifft nur die Anlagen des Dokuments', () => {
+    expect(ziele('lagebericht', { einsatz_id: 7, lagebericht_id: 3, anlagen: true })).toEqual([
+      { art: 'key', key: einsatzKeys.lageberichtAnlagen(7, 3) },
+    ]);
+    expect(ziele('befehl', { einsatz_id: 7, befehl_id: 4, anlagen: true })).toEqual([
+      { art: 'key', key: einsatzKeys.befehlAnlagen(7, 4) },
+    ]);
+  });
+
   it('ein Titelwechsel oder Statuswechsel trifft auch die Kopfliste', () => {
     expect(ziele('lagebericht', { einsatz_id: 7, lagebericht_id: 3 })).toEqual([
       { art: 'key', key: einsatzKeys.lageberichte(7) },
@@ -723,8 +732,12 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
 
   it('jede gezielte Zuordnung trifft nur Keys ihres Ereignisses aus EINSATZ_STREAM_EVENTS', () => {
     const proben: Record<string, Record<string, unknown>[]> = {
-      lagebericht: [{ lagebericht_id: 1 }, { lagebericht_id: 1, nur_inhalt: true }],
-      befehl: [{ befehl_id: 1 }],
+      lagebericht: [
+        { lagebericht_id: 1 },
+        { lagebericht_id: 1, nur_inhalt: true },
+        { lagebericht_id: 1, anlagen: true },
+      ],
+      befehl: [{ befehl_id: 1 }, { befehl_id: 1, anlagen: true }],
       presse: [{ medienkontakt_id: 1 }, { pressemitteilung_id: 1 }],
       schaden: [{ schaden_id: 1 }, { schaden_id: 1, anhang: true }],
     };

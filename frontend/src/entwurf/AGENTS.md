@@ -13,6 +13,12 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
 - **Ein Klick auf „Entwurf speichern" ist EIN PATCH:** einzige Pforte `speichereJetzt`,
   `gesichertRef` (Start `-1`), `speichertGerade` speist den Blocker, **nicht** `loading` am Knopf.
 - Einstiegsfokus im ersten LEEREN Abschnitt (`entwurf/Einstiegsfokus.tsx`).
+- **Anlagen** (LFH-1028): `entwurf/DokumentAnlagen.tsx` an Lagebericht und Befehl, am Schirm ein
+  Paneel, auf Papier je Anlage ein Blatt A4 quer (`entwurf/dokumentAnlagen.css`; das Bild bleibt
+  inline, als Block schob Chromium es auf ein eigenes Blatt). Die Druckfassung hängt immer im DOM,
+  damit das Bild zum Druck geladen ist. Anfügen und Entfernen nur im Entwurf mit Schreibrecht; ohne
+  Anlage und ohne Anfügen steht nichts (Höhe der Entwurfsseite, `e2e/lagebericht-schmal.spec.ts`).
+  Live über `anlagen` am Ereignis des Dokuments, eigene Keys außerhalb des Offline-Lagebilds.
 - Lagebericht: Abschnitte als Akkordeon (`lageberichte/AbschnittsAkkordeon.tsx`, `memo`, alle
   Props identitätsstabil; Gate ist der Render-Zähler im Test, `rerender` mit neuem Element).
   Tippmessung `e2e/lagebericht-tippen.spec.ts` (Deckel nur mit `PW_LATENZ=1`).

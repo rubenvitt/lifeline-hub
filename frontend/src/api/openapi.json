@@ -443,6 +443,13 @@
           }
         }
       },
+      "AnlageArt": {
+        "type": "string",
+        "description": "Art einer Anlage. Neue Art = neue Variante plus CHECK-Rebuild der beiden Linker.",
+        "enum": [
+          "fernmeldeskizze"
+        ]
+      },
       "AnsichtSperre": {
         "type": "object",
         "description": "Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.",
@@ -2941,6 +2948,71 @@
           "in_dienst",
           "ausser_dienst"
         ]
+      },
+      "DokumentAnlageAnzeige": {
+        "type": "object",
+        "description": "Eine Anlage auf dem Wire. `id` ist die **Linker-id**; die Datei ist nur über die Route des\nDokuments ladbar. `nummer` ist die Anlagen-Nummer (1, 2, …) in der Reihenfolge des Dokuments.",
+        "required": [
+          "id",
+          "dokument_id",
+          "nummer",
+          "art",
+          "titel",
+          "stand_at",
+          "dateiname",
+          "mime",
+          "groesse",
+          "abgelegt_von_id",
+          "abgelegt_at"
+        ],
+        "properties": {
+          "abgelegt_at": {
+            "type": "string"
+          },
+          "abgelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abgelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert."
+          },
+          "art": {
+            "$ref": "#/components/schemas/AnlageArt"
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "dokument_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "nummer": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stand_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Aufnahme (SQLite-Zeit), derselbe, der im Bild als „Stand“ steht."
+          },
+          "titel": {
+            "type": "string"
+          }
+        }
       },
       "DokumentAnzeige": {
         "type": "object",

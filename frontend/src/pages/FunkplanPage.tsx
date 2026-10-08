@@ -4,19 +4,12 @@ import { useEffect, useMemo, useState, type Key, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
+import type { AbrufZustand } from '../api/abrufZustand';
 import { legeBefehlAn } from '../api/befehle';
-import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
-import { listeEinheiten } from '../api/einheiten';
-import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
+import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
-import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
-import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeStab } from '../api/stab';
-import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -63,8 +56,7 @@ import {
   type FunkplanQuellen,
   type FunkplanZeile,
 } from '../stab/funkplan';
-import type { FuehrungsstelleQuelle } from '../stab/fuehrungsstelle';
-import type { Luecke, Quelle, SkizzenQuelle, Verbindung } from '../stab/luecken';
+import type { Luecke, Verbindung } from '../stab/luecken';
 import type { SkizzenAktionen } from '../stab/skizzenAktionen';
 import {
   HERKUNFT_LABEL,
@@ -76,6 +68,7 @@ import {
 } from '../stab/sprechgruppenplan';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { skizzenRechte, useSkizzenAktionen } from '../stab/useSkizzenAktionen';
+import { useNetzQuellen, useQuelle } from '../stab/useNetzQuellen';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import './funkplanPrint.css';
 
@@ -116,46 +109,6 @@ import './funkplanPrint.css';
 
 type SpalteKey =
   'stelle' | 'rufname' | 'leitung' | 'tmo' | 'dmo' | 'kommunikation' | 'erreichbarkeit';
-
-/**
- * Eine Liste als Quelle des Funkplans, identitätsstabil je Daten und Zustand. Ein Fehler MIT
- * Daten ist ein Stand, kein Ausfall (der Datenstand im Kopf zeigt sein Alter). Ohne Freigabe ihres
- * Moduls (`frei: false`) ist sie `gesperrt` wie bei einem 403 und trägt keine Daten, auch keinen
- * Altstand aus dem Cache (LFH-669).
- */
-function useQuelle<T>(
-  q: {
-    data: T[] | undefined;
-    error: unknown;
-    isError: boolean;
-    isPending: boolean;
-  },
-  frei = true,
-  ohneVerbindung = false,
-): Quelle<T> {
-  // `ohneVerbindung`: ein ohne Netz pausierter Abruf ohne Stand ist „nicht geladen“, nicht „lädt“.
-  const zustand: AbrufZustand = !frei
-    ? 'gesperrt'
-    : q.data != null
-      ? 'daten'
-      : ohneVerbindung
-        ? 'fehler'
-        : abrufZustand(q);
-  const data = frei ? q.data : undefined;
-  return useMemo(() => ({ zustand, daten: data ?? [] }), [zustand, data]);
-}
-
-/** Die eigene Führungsstelle als Quelle (LFH-849), mit derselben Weiche wie die Listen. */
-function useFuehrungsstelleQuelle(q: {
-  data: FuehrungsstelleQuelle['daten'] | undefined;
-  error: unknown;
-  isError: boolean;
-  isPending: boolean;
-}): FuehrungsstelleQuelle {
-  const zustand: AbrufZustand = q.data != null ? 'daten' : abrufZustand(q);
-  const data = q.data ?? null;
-  return useMemo(() => ({ zustand, daten: data }), [zustand, data]);
-}
 
 function Mono({ children }: { children: ReactNode }) {
   return <span style={monoStil(12)}>{children}</span>;
@@ -533,30 +486,6 @@ function SkizzenBereich({
   );
 }
 
-/** Die Quelle „Daten der Skizze“: wie eine Liste, aber eine Angabe (`stab/luecken.ts`). */
-function useSkizzenQuelle(
-  q: {
-    data: SkizzenQuelle['daten'] | undefined;
-    error: unknown;
-    isError: boolean;
-    isPending: boolean;
-  },
-  frei: boolean,
-  ohneVerbindung: boolean,
-): SkizzenQuelle {
-  // Ohne Netz pausiert der Abruf und stünde für immer „lädt“: die Skizze ist nicht offline
-  // (`LAGEBILD_OFFLINE`), also „nicht geladen“ — wie auf dem Kommunikationsplan.
-  const zustand: AbrufZustand = !frei
-    ? 'gesperrt'
-    : q.data != null
-      ? 'daten'
-      : ohneVerbindung
-        ? 'fehler'
-        : abrufZustand(q);
-  const data = frei ? (q.data ?? null) : null;
-  return useMemo(() => ({ zustand, daten: data }), [zustand, data]);
-}
-
 export default function FunkplanPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -574,76 +503,30 @@ export default function FunkplanPage() {
   // kein Endpunkt dieser Seite prüft den Stab. Fail-closed über `useStabFreigabe`.
   const stabFreigabe = useStabFreigabe(einsatzId);
   // Modulgrenze (LFH-669): eine Liste läuft erst, wenn der Stab frei ist (sonst zeigt die Seite
-  // ohnehin nichts) UND der Server ihr Modul freigibt. Keys nach `PFAD_KEY`.
+  // ohnehin nichts) UND der Server ihr Modul freigibt. Keys nach `PFAD_KEY`. Die Quellen des
+  // Netzes teilt die Seite mit der Skizze als Anlage (`stab/useNetzQuellen.ts`).
+  const ohneVerbindung = useOhneVerbindung();
+  const netzQuellen = useNetzQuellen(einsatzId, stabFreigabe, ohneVerbindung);
+  const {
+    abschnitte,
+    einheiten,
+    fahrzeuge,
+    besetzung,
+    sprechgruppen,
+    fuehrungsstelle,
+    stellen,
+    freigaben,
+  } = netzQuellen;
+  const skizzenDaten = netzQuellen.skizze;
   const frei = (key: string) =>
     stabFreigabe.zustand === 'frei' && istKeyFreigegeben(key, stabFreigabe.freigaben);
-  const abschnitteFrei = frei('einsatzabschnitte');
-  const einheitenFrei = frei('einheiten');
-  const fahrzeugeFrei = frei('fahrzeuge');
   const personalFrei = frei('personal');
-  const abschnitteQuery = useQuery({
-    queryKey: einsatzKeys.abschnitte(einsatzId),
-    queryFn: () => listeAbschnitte(einsatzId),
-    enabled: abschnitteFrei,
-  });
-  const einheitenQuery = useQuery({
-    queryKey: einsatzKeys.einheiten(einsatzId),
-    queryFn: () => listeEinheiten(einsatzId),
-    enabled: einheitenFrei,
-  });
-  const fahrzeugeQuery = useQuery({
-    queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
-    enabled: fahrzeugeFrei,
-  });
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
     enabled: personalFrei,
   });
-  // Nicht live (`NICHT_LIVE_KEYS`): eine fremd angelegte lokale Sprechgruppe erscheint erst beim
-  // nächsten Abruf. Die Zuordnungen selbst kommen live über Abschnitte und Einheiten (D10).
-  const sprechgruppenQuery = useQuery({
-    queryKey: einsatzKeys.sprechgruppen(einsatzId),
-    queryFn: () => listeEinsatzSprechgruppen(einsatzId),
-  });
-  // Die eigene Führungsstelle (LFH-849): Teil der Kopfdaten, kein Modul; live über `einsatz`.
-  const fuehrungsstelleQuery = useQuery({
-    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
-    queryFn: () => ladeFuehrungsstelle(einsatzId),
-  });
-  // LFH-893: die Stellen des Kommunikationsplans (offline lesbar) und die Daten der Skizze (nicht
-  // offline), beide am Stab, live über `stab`. Eigene Weiche je Quelle.
-  const stabFrei = stabFreigabe.zustand === 'frei';
-  const freigaben = stabFrei ? stabFreigabe.freigaben : undefined;
-  const ohneVerbindung = useOhneVerbindung();
-  const stellenQuery = useQuery({
-    queryKey: einsatzKeys.stabKommunikationsplan(einsatzId),
-    queryFn: () => ladeKommunikationsplan(einsatzId),
-    enabled: stabFrei,
-  });
-  const skizzeQuery = useQuery({
-    queryKey: einsatzKeys.stabFernmeldeskizze(einsatzId),
-    queryFn: () => ladeFernmeldeskizze(einsatzId),
-    enabled: stabFrei,
-  });
-  // LFH-1029: die Stab-Besetzung für die Sachgebiete im Kasten der Einsatzleitung, live über `stab`.
-  const stabQuery = useQuery({
-    queryKey: einsatzKeys.stab(einsatzId),
-    queryFn: () => ladeStab(einsatzId),
-    enabled: stabFrei,
-    select: (stab) => stab.besetzung,
-  });
-
-  const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
-  const einheiten = useQuelle(einheitenQuery, einheitenFrei);
-  const fahrzeuge = useQuelle(fahrzeugeQuery, fahrzeugeFrei);
   const personal = useQuelle(personalQuery, personalFrei);
-  const sprechgruppen = useQuelle(sprechgruppenQuery);
-  const fuehrungsstelle = useFuehrungsstelleQuelle(fuehrungsstelleQuery);
-  const stellen = useQuelle(stellenQuery, stabFrei, ohneVerbindung);
-  const skizzenDaten = useSkizzenQuelle(skizzeQuery, stabFrei, ohneVerbindung);
-  const besetzung = useQuelle(stabQuery, stabFrei, ohneVerbindung);
   const quellen: FunkplanQuellen = useMemo(
     () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle }),
     [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle],
@@ -817,15 +700,8 @@ export default function FunkplanPage() {
 
   // Ein gesperrtes Modul zählt nicht zum Stand: sein Cache-Zeitstempel gehört zu nichts Gezeigtem.
   const datenstand = gemeinsamerDatenstand(
-    abschnitteFrei ? abschnitteQuery.dataUpdatedAt : undefined,
-    einheitenFrei ? einheitenQuery.dataUpdatedAt : undefined,
-    fahrzeugeFrei ? fahrzeugeQuery.dataUpdatedAt : undefined,
+    ...netzQuellen.zeitstempel,
     personalFrei ? personalQuery.dataUpdatedAt : undefined,
-    sprechgruppenQuery.dataUpdatedAt,
-    fuehrungsstelleQuery.dataUpdatedAt,
-    stellenQuery.dataUpdatedAt,
-    skizzeQuery.dataUpdatedAt,
-    stabQuery.dataUpdatedAt,
   );
 
   // Skizze und Sprechgruppen zeigen keinen Fahrzeugbestand (die Skizze nur Führungsmittel im

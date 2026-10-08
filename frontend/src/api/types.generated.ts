@@ -176,6 +176,11 @@ export interface components {
             id: number;
             zugriff_at: string;
         };
+        /**
+         * @description Art einer Anlage. Neue Art = neue Variante plus CHECK-Rebuild der beiden Linker.
+         * @enum {string}
+         */
+        AnlageArt: "fernmeldeskizze";
         /** @description Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind. */
         AnsichtSperre: {
             ansicht: components["schemas"]["Funktionsansicht"];
@@ -1113,6 +1118,31 @@ export interface components {
          * @enum {string}
          */
         Dienststatus: "in_dienst" | "ausser_dienst";
+        /**
+         * @description Eine Anlage auf dem Wire. `id` ist die **Linker-id**; die Datei ist nur über die Route des
+         *     Dokuments ladbar. `nummer` ist die Anlagen-Nummer (1, 2, …) in der Reihenfolge des Dokuments.
+         */
+        DokumentAnlageAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            /** @description Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert. */
+            abgelegt_von_name?: string | null;
+            art: components["schemas"]["AnlageArt"];
+            dateiname: string;
+            /** Format: int64 */
+            dokument_id: number;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            mime: string;
+            /** Format: int64 */
+            nummer: number;
+            /** @description Zeitpunkt der Aufnahme (SQLite-Zeit), derselbe, der im Bild als „Stand“ steht. */
+            stand_at: string;
+            titel: string;
+        };
         /** @description Öffentliche Darstellung eines Dokuments (ohne Bytes). */
         DokumentAnzeige: {
             abgelegt_at: string;

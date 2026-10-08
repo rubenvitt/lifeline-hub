@@ -403,6 +403,10 @@ export type BefehlAnzeige = S['BefehlAnzeige'];
 /** LFH-931: Listenzeile ohne Abschnitte. */
 export type BefehlKopf = S['BefehlKopf'];
 
+// ============================== LFH-1028 Dokument-Anlagen ==============================
+export type DokumentAnlage = S['DokumentAnlageAnzeige'];
+export type AnlageArt = S['AnlageArt'];
+
 // ============================== LFH-606 Pegel-Kennzahl ==============================
 export type PegelAnzeige = S['PegelAnzeige'];
 export type PegelPrognose = S['PegelPrognose'];

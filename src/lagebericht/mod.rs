@@ -4,6 +4,7 @@ use crate::vorlagendokument::{self as kern, Abschnittsart, Dokumentart};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::vorlagendokument::anlage::AnlagenTabelle;
 pub use crate::vorlagendokument::{render_snapshot, AbschnittDef, VorlageDef};
 
 /// Lagebericht-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `LageberichtVorlageKey`).
@@ -131,6 +132,10 @@ impl Dokumentart for Lagebericht {
     const NOMEN_PLURAL: &'static str = "Berichte";
     const NOMEN_MIT_ARTIKEL: &'static str = "Der Bericht";
     const IM_NOMEN: &'static str = "im Bericht";
+    const ANLAGEN: Option<&'static AnlagenTabelle> = Some(&AnlagenTabelle {
+        tabelle: "lagebericht_anlage",
+        dokument_spalte: "lagebericht_id",
+    });
 }
 
 /// Liefert die Vorlagendefinition zu einem Schlüssel, `None` bei Unbekanntem.

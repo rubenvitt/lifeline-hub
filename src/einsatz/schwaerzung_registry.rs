@@ -602,8 +602,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         // Ganze Zeile löschen: `daten` sind Fotos/Dateien Betroffener, kein Kartografie-Skelett.
         // Einzeln im Nachlauf (LFH-905, `Strategie::ZeileEinzelnLoeschen`): der atomare Vorgang
         // löscht die Linker chat_nachricht_anhang, einsatz_dokument, etb_eintrag_anhang,
-        // einsatz_schaden_anhang, einsatz_tier_anhang, uhs_anhang (LFH-758) und
-        // einsatz_person_anhang (LFH-757), die Zeile selbst danach der Nachlauf.
+        // einsatz_schaden_anhang, einsatz_tier_anhang, uhs_anhang (LFH-758),
+        // einsatz_person_anhang (LFH-757), lagebericht_anlage und befehl_anlage (LFH-1028), die
+        // Zeile selbst danach der Nachlauf.
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -731,6 +732,48 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
             scrub("geloescht_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
             scrub("geloescht_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+        ],
+    },
+    TabellenRegel {
+        // LFH-1028, Bild-Anlage: ganze Zeile löschen wie bei einsatz_schaden_anhang — die
+        // `anhang`-Regel davor löscht den Linker schon mit, die Datei der Nachlauf (LFH-905).
+        // Titel und Stand der Anlage stehen weiter im Freigabe-Snapshot des ETB (G_ETB).
+        tabelle: "lagebericht_anlage",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("lagebericht_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("anhang_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("art", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("titel", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("stand_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("reihenfolge", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+        ],
+    },
+    TabellenRegel {
+        // LFH-1028, Bild-Anlage: ganze Zeile löschen wie bei einsatz_schaden_anhang — die
+        // `anhang`-Regel davor löscht den Linker schon mit, die Datei der Nachlauf (LFH-905).
+        // Titel und Stand der Anlage stehen weiter im Freigabe-Snapshot des ETB (G_ETB).
+        tabelle: "befehl_anlage",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("befehl_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("anhang_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("art", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("titel", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("stand_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("reihenfolge", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
@@ -3041,6 +3084,8 @@ mod tests {
             "einsatz_tier_anhang",
             "uhs_anhang",
             "einsatz_person_anhang",
+            "lagebericht_anlage",
+            "befehl_anlage",
             "karte_hintergrundbild",
             "karte_hintergrundbild_daten",
         ] {

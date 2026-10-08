@@ -46,6 +46,8 @@ export const EINSATZ_KEYS = {
   personenAuswahl: 'einsatz-personen-auswahl',
   lageberichte: 'einsatz-lageberichte',
   lagebericht: 'einsatz-lagebericht',
+  // Bild-Anlagen (LFH-1028): eigener Prefix, live über `lagebericht` mit `anlagen`.
+  lageberichtAnlagen: 'einsatz-lagebericht-anlagen',
   chatKanaele: 'einsatz-chat-kanaele',
   chatNachrichten: 'einsatz-chat-nachrichten',
   erinnerungen: 'einsatz-erinnerungen',
@@ -59,6 +61,7 @@ export const EINSATZ_KEYS = {
   etb: 'etb',
   befehle: 'einsatz-befehle',
   befehl: 'einsatz-befehl',
+  befehlAnlagen: 'einsatz-befehl-anlagen',
   kartenAnsicht: 'einsatz-karten-ansicht',
   lageSnapshot: 'einsatz-lage-snapshot',
   stab: 'einsatz-stab',
@@ -225,7 +228,11 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.kraefteZeitachse,
     EINSATZ_KEYS.lagemonitor,
   ],
-  lagebericht: [EINSATZ_KEYS.lageberichte, EINSATZ_KEYS.lagebericht],
+  lagebericht: [
+    EINSATZ_KEYS.lageberichte,
+    EINSATZ_KEYS.lagebericht,
+    EINSATZ_KEYS.lageberichtAnlagen,
+  ],
   chat: [EINSATZ_KEYS.chatKanaele, EINSATZ_KEYS.chatNachrichten, EINSATZ_KEYS.modulZaehler],
   erinnerung: [EINSATZ_KEYS.erinnerungen, EINSATZ_KEYS.modulZaehler],
   auftrag: [EINSATZ_KEYS.auftraege, EINSATZ_KEYS.modulZaehler],
@@ -237,7 +244,7 @@ export const EINSATZ_STREAM_EVENTS = {
   // Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
   etb: [EINSATZ_KEYS.etb, EINSATZ_KEYS.modulZaehler],
   // Invalidiert Befehls-Liste UND -Detail (Prefix-Match trifft alle befehlIds).
-  befehl: [EINSATZ_KEYS.befehle, EINSATZ_KEYS.befehl],
+  befehl: [EINSATZ_KEYS.befehle, EINSATZ_KEYS.befehl, EINSATZ_KEYS.befehlAnlagen],
   // „Für den Einsatz speichern“ aktualisiert den Ansichts-Switcher aller Betrachter.
   karten_ansicht: [EINSATZ_KEYS.kartenAnsicht],
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
@@ -297,10 +304,17 @@ const key = (k: readonly unknown[]): LiveAbgleich => ({ art: 'key', key: k });
 /** Dokument mit Kopfliste (LFH-931, design.md D2): `nur_inhalt` heißt, der PATCH hat nur
  *  Abschnitte geändert; dann bleibt die Kopfliste, und nur das Detail dieser Kennung gleicht ab. */
 const dokument =
-  (feld: string, liste: readonly unknown[], detail: (id: number) => readonly unknown[]) =>
+  (
+    feld: string,
+    liste: readonly unknown[],
+    detail: (id: number) => readonly unknown[],
+    anlagen?: (id: number) => readonly unknown[],
+  ) =>
   (p: LivePayload): readonly LiveAbgleich[] | null => {
     const id = kennung(p, feld);
     if (id === null) return null;
+    // `anlagen` (LFH-1028): nur die Anlagen dieses Dokuments; Kopf und Text bleiben.
+    if (p.anlagen === true && anlagen) return [key(anlagen(id))];
     return p.nur_inhalt === true ? [key(detail(id))] : [key(liste), key(detail(id))];
   };
 
@@ -314,11 +328,19 @@ export const EINSATZ_STREAM_ZIELE: Partial<
   Record<EinsatzStreamEvent, (p: LivePayload, einsatzId: number) => readonly LiveAbgleich[] | null>
 > = {
   lagebericht: (p, e) =>
-    dokument('lagebericht_id', einsatzKeys.lageberichte(e), (id) => einsatzKeys.lagebericht(e, id))(
-      p,
-    ),
+    dokument(
+      'lagebericht_id',
+      einsatzKeys.lageberichte(e),
+      (id) => einsatzKeys.lagebericht(e, id),
+      (id) => einsatzKeys.lageberichtAnlagen(e, id),
+    )(p),
   befehl: (p, e) =>
-    dokument('befehl_id', einsatzKeys.befehle(e), (id) => einsatzKeys.befehl(e, id))(p),
+    dokument(
+      'befehl_id',
+      einsatzKeys.befehle(e),
+      (id) => einsatzKeys.befehl(e, id),
+      (id) => einsatzKeys.befehlAnlagen(e, id),
+    )(p),
   // Ein Ereignis teilt sich der Name mit den Pressemitteilungen: Medienkontakte gleichen
   // zeilenweise ab, Mitteilungen wie ein Dokument. Keines von beiden trifft das andere.
   presse: (p, e) => {
@@ -556,6 +578,8 @@ export const einsatzKeys = {
   lageberichte: (einsatzId: number) => [EINSATZ_KEYS.lageberichte, einsatzId] as const,
   lagebericht: (einsatzId: number, berichtId: number) =>
     [EINSATZ_KEYS.lagebericht, einsatzId, berichtId] as const,
+  lageberichtAnlagen: (einsatzId: number, berichtId: number) =>
+    [EINSATZ_KEYS.lageberichtAnlagen, einsatzId, berichtId] as const,
   kartenbilder: (einsatzId: number) => [EINSATZ_KEYS.kartenbilder, einsatzId] as const,
   // Maßgebliche Pegel, NICHT live (siehe NICHT_LIVE_KEYS).
   pegel: (einsatzId: number) => [EINSATZ_KEYS.pegel, einsatzId] as const,
@@ -667,6 +691,8 @@ export const einsatzKeys = {
   befehle: (einsatzId: number) => [EINSATZ_KEYS.befehle, einsatzId] as const,
   befehl: (einsatzId: number, befehlId: number) =>
     [EINSATZ_KEYS.befehl, einsatzId, befehlId] as const,
+  befehlAnlagen: (einsatzId: number, befehlId: number) =>
+    [EINSATZ_KEYS.befehlAnlagen, einsatzId, befehlId] as const,
 
   // Kommunikation
   chatKanaele: (einsatzId: number) => [EINSATZ_KEYS.chatKanaele, einsatzId] as const,
@@ -996,7 +1022,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
  * LFH-554 design.md D8, offen mit LFH-767), die Daten der Fernmeldeskizze (LFH-893: bearbeitet
- * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“).
+ * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an
+ * Lagebericht und Befehl (LFH-1028: ohne Netz lädt kein Bild).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {
