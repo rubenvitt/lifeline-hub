@@ -10,6 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import SchaedenPage from './SchaedenPage';
 import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { schaedenAttrappe } from '../test/schaedenAttrappe';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -90,7 +91,7 @@ function render(
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json(schaeden)),
+    ...schaedenAttrappe(1, () => schaeden).handler,
     // Quellen der Geschädigt-Combobox (mounten beim Öffnen der Formulare):
     http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json(personal)),
@@ -115,7 +116,7 @@ function renderSchaedenPage(route: string) {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    ...schaedenAttrappe(1, () => []).handler,
     http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
@@ -132,7 +133,7 @@ function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    ...schaedenAttrappe(1, () => []).handler,
     http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
@@ -239,9 +240,12 @@ describe('SchaedenPage', () => {
     ]);
     await screen.findByText('S-001');
     await userEvent.type(screen.getByPlaceholderText('S-Nr., Ort, Beschreibung'), 'Ölspur');
-    expect(await screen.findByText('S-002')).toBeInTheDocument();
+    // Die Suche wirkt am Server (LFH-1075): entprellt, dann die Antwort.
     // Die Gegenhälfte: ohne sie wäre der Fall auch grün, wenn die Suche nichts filterte.
-    expect(screen.queryByText('S-001')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('S-002')).toBeInTheDocument();
+      expect(screen.queryByText('S-001')).not.toBeInTheDocument();
+    });
   });
 
   /**
@@ -616,11 +620,9 @@ describe('SchaedenPage', () => {
     });
     render(einsatzAktiv, []);
     server.use(
-      http.get('/api/einsaetze/1/schaeden', () =>
-        HttpResponse.json(
-          postBeantwortet ? [basisSchaden({ id: 99, ort: 'Abbruchort Schaden' })] : [],
-        ),
-      ),
+      ...schaedenAttrappe(1, () =>
+        postBeantwortet ? [basisSchaden({ id: 99, ort: 'Abbruchort Schaden' })] : [],
+      ).handler,
       http.post('/api/einsaetze/1/schaeden', async () => {
         postGestartet();
         await antwortGate;
@@ -657,7 +659,8 @@ describe('SchaedenPage', () => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Lage ${id}` });
       }),
-      http.get('/api/einsaetze/:einsatzId/schaeden', () => HttpResponse.json([])),
+      ...schaedenAttrappe(1, () => []).handler,
+      ...schaedenAttrappe(2, () => []).handler,
       http.get('/api/einsaetze/:einsatzId/personen/auswahl', ({ params }) =>
         HttpResponse.json(params.einsatzId === '1' ? [einePerson] : []),
       ),
@@ -861,6 +864,7 @@ describe('SchaedenPage', () => {
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/schaeden', () => new HttpResponse(null, { status: 500 })),
+      ...schaedenAttrappe(1, () => []).handler,
       http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     );

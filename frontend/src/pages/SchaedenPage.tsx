@@ -1,28 +1,42 @@
 import { IconOrtsmarke } from '../icons';
 import StatusTag from '../components/StatusTag';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
-import { Alert, Breadcrumb, Button, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Button, Tag, Typography, theme } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
+import {
+  ladeSchadenKennzahlen,
+  listeSchaedenSeite,
+  SCHADEN_SORTIERUNG_VORGABE,
+  schadenCursor,
+  SCHAEDEN_SEITE,
+  schadenRegistrierAnzeige,
+  type SchaedenFilter,
+  type SchadenCursor,
+  type SchadenSortierung,
+  type SchadenSortSpalte,
+} from '../api/einsatzSchaden';
 import type { Ausmass, Schaden, SchadenTyp } from '../api/types';
 import {
   AUSMASS_META,
   STATUS_META,
   TYP_LABEL,
-  filterSchaeden,
   geschaedigtAnzeige,
   SCHAEDEN_SICHTEN,
   type SchaedenSicht,
 } from './schaeden/schadenHelfer';
 import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
-import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, {
+  spaltenFuer,
+  type DatensichtSortierung,
+  type Kartenplan,
+} from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -159,6 +173,40 @@ const schaedenSpalten = (einsatzId: number) =>
 
 type SchadenSpaltenKey = ReturnType<typeof schaedenSpalten>[number]['key'];
 
+/** Sortierbare Spalten und ihr Schlüssel am Server (`SortSpalte`, LFH-1075). */
+const SERVER_SPALTE: Partial<Record<SchadenSpaltenKey, SchadenSortSpalte>> = {
+  reg: 'nr',
+  typ: 'typ',
+  ausmass: 'ausmass',
+  ort: 'ort',
+  seit: 'erfasst',
+  verortet: 'verortet',
+};
+
+/** Keine Sortierung heißt Serverordnung: jüngste Nummer zuerst. */
+function serverSortierung(s: DatensichtSortierung<SchadenSpaltenKey>): SchadenSortierung {
+  const spalte = s && SERVER_SPALTE[s.spalte];
+  return spalte && s ? { spalte, richtung: s.richtung } : SCHADEN_SORTIERUNG_VORGABE;
+}
+
+/**
+ * Filter der Modulseite für den Server. Leere Felder fehlen, damit gleiche Sichten denselben
+ * Query-Key tragen.
+ */
+function serverFilter(
+  sicht: SchaedenSicht,
+  suche: string,
+  spaltenFilter: Readonly<Record<string, readonly string[]>>,
+): SchaedenFilter {
+  const f: SchaedenFilter = {};
+  if (sicht !== 'alle') f.status = sicht;
+  if (spaltenFilter.typ?.length) f.typen = spaltenFilter.typ as SchadenTyp[];
+  if (spaltenFilter.ausmass?.length) f.ausmasse = spaltenFilter.ausmass as Ausmass[];
+  if (spaltenFilter.verortet?.length) f.verortet = spaltenFilter.verortet as ('ja' | 'nein')[];
+  if (suche) f.q = suche;
+  return f;
+}
+
 const schadenKarte = (einsatzId: number): Kartenplan<Schaden, SchadenSpaltenKey> => ({
   art: 'plan',
   titel: { spalte: 'reg', ziel: (s) => schadenDetailPfad(einsatzId, s.id) },
@@ -172,19 +220,66 @@ export default function SchaedenPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const { token } = theme.useToken();
   const [sicht, setSicht] = useState<SchaedenSicht>('offen');
+  // Suche, Spaltenfilter und Sortierung wirken am Server (LFH-1075); `Datensicht` meldet sie.
+  const [suche, setSuche] = useState('');
+  const [spaltenFilter, setSpaltenFilter] = useState<Readonly<Record<string, readonly string[]>>>(
+    {},
+  );
+  const [sortierung, setSortierung] = useState<DatensichtSortierung<SchadenSpaltenKey>>({
+    spalte: 'reg',
+    richtung: 'ab',
+  });
+  const wechsleSicht = useCallback((s: SchaedenSicht) => {
+    // Die Sicht baut `Datensicht` neu auf (Schlüssel), Suche und Spaltenfilter beginnen leer.
+    setSicht(s);
+    setSuche('');
+    setSpaltenFilter({});
+  }, []);
 
   const [erfassenOffen, setErfassenOffen] = useState(false);
 
-  // Die Schaden-Liste hält der Einsatz-Live-Stream im EinsatzLayout aktuell (`schaden` →
-  // 'einsatz-schaeden').
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId),
+
+  /**
+   * Die Liste lädt seitenweise (LFH-1075, Spec `schaden-liste-blaettern`). Der Einsatz-Live-Stream
+   * im EinsatzLayout hält die geladenen Seiten per Zeilenabgleich aktuell und die Kennzahlen per
+   * Abgleich (`live/zeilenAbgleich.ts`).
+   */
+  const filter = useMemo(
+    () => serverFilter(sicht, suche, spaltenFilter),
+    [sicht, suche, spaltenFilter],
+  );
+  const sortierungAmServer = useMemo(() => serverSortierung(sortierung), [sortierung]);
+  const seitenKey = einsatzKeys.schaedenSeiten(einsatzId, filter, sortierungAmServer);
+  const schaedenQuery = useInfiniteQuery({
+    queryKey: seitenKey,
+    queryFn: ({ pageParam }) =>
+      listeSchaedenSeite(einsatzId, filter, sortierungAmServer, pageParam),
+    initialPageParam: undefined as SchadenCursor | undefined,
+    getNextPageParam: (letzte) =>
+      letzte.length < SCHAEDEN_SEITE
+        ? undefined
+        : schadenCursor(letzte[letzte.length - 1], sortierungAmServer.spalte),
+    // Bis die Antwort auf Suche, Filter oder Sortierung da ist, bleiben die alten Zeilen stehen.
+    placeholderData: keepPreviousData,
+  });
+  const filterOhneStatus = useMemo(
+    () => serverFilter('alle', suche, spaltenFilter),
+    [suche, spaltenFilter],
+  );
+  // Kopfzeile: der ganze Bestand. Ausschnitt: dieselben Filter wie die Liste, ohne den Status.
+  const bestandQuery = useQuery({
+    queryKey: einsatzKeys.schaedenKennzahlen(einsatzId, {}),
+    queryFn: () => ladeSchadenKennzahlen(einsatzId, {}),
+  });
+  const ausschnittQuery = useQuery({
+    queryKey: einsatzKeys.schaedenKennzahlen(einsatzId, filterOhneStatus),
+    queryFn: () => ladeSchadenKennzahlen(einsatzId, filterOhneStatus),
   });
 
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
@@ -220,21 +315,21 @@ export default function SchaedenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const alle = schaedenQuery.data ?? [];
-  const sichtbar = filterSchaeden(alle, { sicht });
+  const geladen = schaedenQuery.data?.pages.flat() ?? [];
+  const ausschnitt = ausschnittQuery.data;
+  const ausschnittZahl = ausschnitt && (sicht === 'alle' ? ausschnitt.gesamt : ausschnitt[sicht]);
 
   /**
    * Listenzustand — an der Stelle der Liste entschieden, nie als Frühausstieg.
    *
-   * Gemessen an `alle`, nicht an `sichtbar`: die gefilterte Menge ist bei Reiter, Spaltenfilter
-   * oder Suche regelmäßig leer, während Zeilen im Zwischenspeicher stehen.
+   * Gemessen an den geladenen Zeilen der jetzigen Sicht.
    *
    * Ohne Zeilen tritt der Fehler an die Stelle der Liste, sonst behauptete „Keine Schäden in dieser
    * Sicht" eine leere Menge. Mit Zeilen bleiben sie stehen und bekommen ein Banner. Der Ladezweig
    * liegt am Primitiv (`ladend`).
    */
-  const listeGescheitert = schaedenQuery.isError && alle.length === 0;
-  const standVeraltet = schaedenQuery.isError && alle.length > 0;
+  const listeGescheitert = schaedenQuery.isError && geladen.length === 0;
+  const standVeraltet = schaedenQuery.isError && geladen.length > 0;
 
   const orgId = einsatz.org_id ?? 0;
 
@@ -242,8 +337,8 @@ export default function SchaedenPage() {
     <EinsatzSeite
       dataUpdatedAt={schaedenQuery.dataUpdatedAt}
       meta={
-        schaedenQuery.isSuccess
-          ? `${alle.length} Schäden · ${alle.filter((s) => s.status === 'offen').length} offen`
+        bestandQuery.data
+          ? `${bestandQuery.data.gesamt} Schäden · ${bestandQuery.data.offen} offen`
           : undefined
       }
       titel={modulName('schaeden')}
@@ -291,7 +386,7 @@ export default function SchaedenPage() {
       <Segmentleiste
         beschriftung="Schäden nach Status filtern"
         wert={sicht}
-        onWechsel={setSicht}
+        onWechsel={wechsleSicht}
         optionen={SCHAEDEN_SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
         style={{ marginBottom: 12 }}
       />
@@ -319,17 +414,39 @@ export default function SchaedenPage() {
             key={sicht}
             bezeichnung="Schäden im Einsatz"
             spalten={spalten}
-            daten={sichtbar}
+            daten={geladen}
             zeilenSchluessel="id"
             ladend={schaedenQuery.isLoading}
             leerText="Keine Schäden in dieser Sicht"
             suche={{ platzhalter: 'S-Nr., Ort, Beschreibung' }}
-            // Spiegelt die Backend-Ordnung (`ORDER BY registrier_nr DESC`): der jüngste Schaden
-            // oben. Die Sortierung liegt im Client, der Sortierpfeil dreht sie ohne Nachladen um.
-            standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
+            // Vorgabe wie die Serverordnung: der jüngste Schaden oben. Ein Sortierklick lädt neu.
+            sortierung={sortierung}
+            onSortierung={setSortierung}
+            serverseitig={{
+              // Die alten Zeilen bis zur Antwort sind kein eigener Stand.
+              stand: schaedenQuery.isPlaceholderData ? 'vorläufig' : JSON.stringify(seitenKey),
+              onSuche: setSuche,
+              onFilter: setSpaltenFilter,
+            }}
             onZeileKlick={(s) => navigate(schadenDetailPfad(einsatzId, s.id))}
             karte={schadenKarte(einsatzId)}
           />
+          {schaedenQuery.hasNextPage &&
+            (ausschnittZahl == null || geladen.length < ausschnittZahl) && (
+              <div style={{ textAlign: 'center', marginTop: token.margin }}>
+                <Button
+                  onClick={() => void schaedenQuery.fetchNextPage()}
+                  loading={schaedenQuery.isFetchingNextPage}
+                >
+                  Ältere laden
+                </Button>
+                {ausschnittZahl != null && (
+                  <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
+                    {geladen.length} von {ausschnittZahl} geladen
+                  </div>
+                )}
+              </div>
+            )}
         </>
       )}
 

@@ -281,6 +281,8 @@ export type Kartenplan<T, K extends string> =
 // ── Sortierung, Gruppierung, Baum, Zufluss ───────────────────────────────────────────
 /** `null` = Reihenfolge wie geliefert (Serverordnung unangetastet). */
 type Sortierung<K extends string> = { spalte: K; richtung: 'auf' | 'ab' } | null;
+/** Für Seiten, die die Sortierung kontrolliert führen (Servermodus). */
+export type DatensichtSortierung<K extends string> = Sortierung<K>;
 
 /**
  * Gruppenachse; beide Zweige nutzen dieselben Schlüssel und Zähler, nicht dieselbe Form:
@@ -348,6 +350,28 @@ interface BaumSicht<T> {
  */
 type Zufluss = 'sammelbanner' | 'sofort';
 
+/** Wartezeit nach dem letzten Tastendruck, bevor der Servermodus den Suchbegriff meldet. */
+export const SERVER_SUCHE_ENTPRELLUNG_MS = 300;
+
+/**
+ * Servermodus (LFH-1075, Spec `schaden-liste-blaettern`): Suche, Spaltenfilter und Sortierung
+ * wirken am Server, `daten` ist schon seine Antwort. Die Sicht meldet Suchbegriff (entprellt,
+ * getrimmt) und wirksame Spaltenfilter und zeigt `daten` in der gelieferten Folge, ohne zweite
+ * Filterung oder Sortierung. Die Sortierung läuft kontrolliert über `sortierung`/`onSortierung`;
+ * `filter.trifft` und `sortWert` bleiben Pflicht, sie tragen nur nichts zur Zeilenmenge bei.
+ */
+export interface ServerSicht {
+  /**
+   * Kennung der Abfrage, aus der `daten` stammen (Suche, Filter, Sortierung). Wechselt sie, ist die
+   * neue Menge die Antwort auf eine Benutzeraktion: sie erscheint sofort, nicht als Zufluss hinter
+   * dem Sammelbanner.
+   */
+  stand: string;
+  onSuche: (begriff: string) => void;
+  /** Nur Spalten mit gewähltem Wert; eine leere Auswahl fehlt im Objekt. */
+  onFilter: (werte: Readonly<Record<string, readonly string[]>>) => void;
+}
+
 // ── Props ────────────────────────────────────────────────────────────────────────────
 interface DatensichtProps<T extends object, K extends string> {
   /**
@@ -384,6 +408,8 @@ interface DatensichtProps<T extends object, K extends string> {
   baum?: BaumSicht<T>;
   /** Default `'sammelbanner'`. */
   zufluss?: Zufluss;
+  /** Servermodus, siehe {@link ServerSicht}. Schließt `gruppen` und `baum` aus. */
+  serverseitig?: ServerSicht;
 
   // Spaltensichtbarkeit — Voreinstellung ODER kontrolliert
   spaltenAusVoreinstellung?: readonly NoInfer<K>[];
@@ -579,11 +605,18 @@ export function scrolleZurZeile(schluessel: Key): void {
 export function pruefeKartenplan<T extends object, K extends string>(
   props: Pick<
     DatensichtProps<T, K>,
-    'spalten' | 'karte' | 'suche' | 'baum' | 'gruppen' | 'aufklappen' | 'onZeileKlick'
+    | 'spalten'
+    | 'karte'
+    | 'suche'
+    | 'baum'
+    | 'gruppen'
+    | 'aufklappen'
+    | 'onZeileKlick'
+    | 'serverseitig'
   >,
   bezeichnung: string,
 ): string[] {
-  const { spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick } = props;
+  const { spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, serverseitig } = props;
   const befunde: string[] = [];
   const bekannt = new Map<string, DatensichtSpalte<T, K>>();
   for (const spalte of spalten) {
@@ -632,6 +665,9 @@ export function pruefeKartenplan<T extends object, K extends string>(
     // Wirkung auf demselben Klick.
     if (onZeileKlick) befunde.push('onZeileKlick und baum schließen sich aus.');
   }
+  // Die Gruppenachse sortiert im Client; über eine geblätterte Servermenge zählte sie nur das Fenster.
+  if (serverseitig && gruppen) befunde.push('serverseitig und gruppen schließen sich aus.');
+  if (serverseitig && baum) befunde.push('serverseitig und baum schließen sich aus.');
   // Ein Eigenbau gibt `karte.render(...)` roh zurück: Auslöser und Bereich entstehen nur im
   // Plan-Modus. Ein Opt-in, das still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
   if (aufklappen && karte.art === 'eigen') {
@@ -798,6 +834,7 @@ export default function Datensicht<T extends object, const K extends string>(
     gruppen,
     baum,
     zufluss = 'sammelbanner',
+    serverseitig,
     spaltenAusVoreinstellung,
     spaltenAus,
     onSpaltenAus,
@@ -943,19 +980,68 @@ export default function Datensicht<T extends object, const K extends string>(
     return Object.fromEntries(Object.entries(filterWerte).filter(([k]) => sichtbar.has(k)));
   }, [filterWerte, gezeigteSpalten]);
 
+  // ── Servermodus: Werte melden statt anwenden (LFH-1075) ─────────────────────────────
+  const server = useRef(serverseitig);
+  useLayoutEffect(() => {
+    server.current = serverseitig;
+  });
+  const imServermodus = serverseitig != null;
+
+  // Der erste Wert geht sofort hinaus, damit die Seite nach einem Neuaufbau der Sicht nicht mit
+  // einem alten Begriff weiterliest; jeder weitere erst nach der Entprellung.
+  const gemeldeteSuche = useRef<string | null>(null);
+  useEffect(() => {
+    if (!imServermodus) return;
+    const begriff = suchbegriff.trim();
+    if (begriff === gemeldeteSuche.current) return;
+    const melden = () => {
+      gemeldeteSuche.current = begriff;
+      server.current?.onSuche(begriff);
+    };
+    if (gemeldeteSuche.current === null) {
+      melden();
+      return;
+    }
+    const frist = setTimeout(melden, SERVER_SUCHE_ENTPRELLUNG_MS);
+    return () => clearTimeout(frist);
+  }, [imServermodus, suchbegriff]);
+
+  const gemeldeteFilter = useRef<string | null>(null);
+  useEffect(() => {
+    if (!imServermodus) return;
+    const gewaehlt = Object.fromEntries(
+      Object.entries(wirksameFilterWerte).filter(([, w]) => w.length > 0),
+    );
+    const kennung = JSON.stringify(gewaehlt);
+    if (kennung === gemeldeteFilter.current) return;
+    gemeldeteFilter.current = kennung;
+    server.current?.onFilter(gewaehlt);
+  }, [imServermodus, wirksameFilterWerte]);
+
   // ── Die Zeilenmenge ───────────────────────────────────────────────────────────────
   const zeilen = useMemo(
     () =>
-      effektiveDaten({
-        daten,
-        spalten,
-        sortierung: aktiveSortierung,
-        suchbegriff,
-        filterWerte: wirksameFilterWerte,
-        gruppen,
-        baum: baum != null,
-      }),
-    [daten, spalten, aktiveSortierung, suchbegriff, wirksameFilterWerte, gruppen, baum],
+      imServermodus
+        ? daten
+        : effektiveDaten({
+            daten,
+            spalten,
+            sortierung: aktiveSortierung,
+            suchbegriff,
+            filterWerte: wirksameFilterWerte,
+            gruppen,
+            baum: baum != null,
+          }),
+    [
+      imServermodus,
+      daten,
+      spalten,
+      aktiveSortierung,
+      suchbegriff,
+      wirksameFilterWerte,
+      gruppen,
+      baum,
+    ],
   );
 
   /**
@@ -968,7 +1054,8 @@ export default function Datensicht<T extends object, const K extends string>(
   const einschraenkungAktiv =
     suchbegriff.trim() !== '' || Object.values(wirksameFilterWerte).some((w) => w.length > 0);
   const leerInhalt: ReactNode =
-    einschraenkungAktiv && daten.length > 0 ? (
+    // Im Servermodus IST `daten` schon die eingeschränkte Menge.
+    einschraenkungAktiv && (daten.length > 0 || imServermodus) ? (
       <Space direction="vertical" align="center" size={token.marginXS}>
         <Typography.Text type="secondary">Keine Treffer für die gewählten Filter</Typography.Text>
         <Button onClick={filterZuruecksetzen}>Filter zurücksetzen</Button>
@@ -1062,6 +1149,19 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [schleuse, standJetzt]);
 
   /**
+   * Im Servermodus kommt die Antwort auf Suche, Filter oder Sortierklick erst nach der
+   * Benutzeraktion an; ihr Eintreffen (neuer `stand`) ist deshalb selbst der Auftrag, neu
+   * einzufrieren. Live-Zeilen im selben Stand bleiben Zufluss.
+   */
+  const serverStand = serverseitig?.stand;
+  const letzterServerStand = useRef(serverStand);
+  useLayoutEffect(() => {
+    if (letzterServerStand.current === serverStand) return;
+    letzterServerStand.current = serverStand;
+    nachBenutzeraktion();
+  }, [serverStand, nachBenutzeraktion]);
+
+  /**
    * DIE LEERE LADEANSICHT FRIERT NICHT EIN: wer den Fokus vor der ersten Antwort ins Suchfeld setzt,
    * fröre eine LEERE Folge ein, und die erste Lieferung landete hinter dem Sammelbanner. Ohne
    * gerenderte Zeile kann nichts unter dem Cursor wegrutschen.
@@ -1115,10 +1215,19 @@ export default function Datensicht<T extends object, const K extends string>(
   const befunde = useMemo(
     () =>
       pruefeKartenplan(
-        { spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick },
+        {
+          spalten,
+          karte,
+          suche,
+          baum,
+          gruppen,
+          aufklappen,
+          onZeileKlick,
+          serverseitig: imServermodus ? serverseitig : undefined,
+        },
         bezeichnung,
       ),
-    [spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, bezeichnung],
+    [spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, imServermodus, bezeichnung],
   );
   const befundSchluessel = befunde.join(' | ');
   useEffect(() => {
