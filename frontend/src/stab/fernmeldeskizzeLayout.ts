@@ -31,7 +31,9 @@ import {
  *   **Komponenten** sitzen auf der Linie ihrer ersten Schiene, rechts neben dem Bedingungszeichen;
  *   ohne Schiene unter den externen Stellen.
  * - **Vorrang:** gespeicherte Lage (`netz.lage`) vor gehaltener (`gehalten`, „ruhige Fläche“ unter
- *   Zeiger und Fokus) vor Auto-Layout. Mit `gehalten` ist jedes Element, das dort fehlt, `neu`.
+ *   Zeiger und Fokus) vor Auto-Layout. Mit `gehalten` ist jedes Element, das dort fehlt, `neu`, auch
+ *   mit gespeicherter Lage. Dass eine fremde Lage beim Halten wartet, regelt das Netz
+ *   (`skizze/ruhigeFlaeche.ts`, LFH-1037).
  *
  * Maße und Abstände sind benannte Konstanten, die die Darstellung teilt; Textbreiten schätzt
  * `stab/skizzenZeichen.tsx` (`schaetzeTextbreite`), damit Layout und Bild dieselbe Zahl rechnen.
@@ -249,6 +251,7 @@ export function layoutFernmeldenetz(
   /** Vorrang: gespeicherte Lage, dann gehaltene, dann Auto-Layout. */
   const setze = (key: string, p: Roh) => {
     const lage = netz.lage.get(key);
+    const neu = gehalten != null && !gehalten.has(key);
     if (lage) {
       plaetze.set(key, {
         x: lage.x,
@@ -256,7 +259,7 @@ export function layoutFernmeldenetz(
         breite: lage.breite ?? p.breite,
         hoehe: p.hoehe,
         quelle: 'gespeichert',
-        neu: false,
+        neu,
         steigX: null,
         zeichenX: null,
       });
@@ -266,7 +269,7 @@ export function layoutFernmeldenetz(
         key,
         halt
           ? { ...halt, quelle: 'gehalten', neu: false }
-          : { ...p, x: rastere(p.x), y: rastere(p.y), quelle: 'auto', neu: gehalten != null },
+          : { ...p, x: rastere(p.x), y: rastere(p.y), quelle: 'auto', neu },
       );
     }
     return plaetze.get(key)!;
