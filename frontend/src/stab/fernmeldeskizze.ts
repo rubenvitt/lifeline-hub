@@ -193,6 +193,9 @@ export interface NetzSchiene {
   bezeichnung: string;
   /** Inhalt des Bedingungszeichens, z. B. „TMO BN_BOS“ (`stab/skizzenZeichen.tsx`). */
   zeichen: string;
+  /** Stehen mit dem Hinweis unter dem Bedingungszeichen (D12, LFH-1030). */
+  netz: string | null;
+  sicherheit: string | null;
   /** Steht unter dem Bedingungszeichen (D12). */
   hinweis: string | null;
   herkunft: Herkunft;
@@ -573,6 +576,8 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
       betriebsart: s.betriebsart,
       bezeichnung: s.bezeichnung,
       zeichen: bedingungszeichenText(s.betriebsart, s.bezeichnung),
+      netz: s.netz?.trim() ? s.netz : null,
+      sicherheit: s.sicherheit?.trim() ? s.sicherheit : null,
       hinweis: s.hinweis?.trim() ? s.hinweis : null,
       herkunft: s.einsatz_lokal ? 'einsatzlokal' : 'katalog',
       teilnehmer: teilnehmer.filter((t) => stelleJeKey.has(t.element)),

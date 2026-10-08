@@ -5,7 +5,8 @@ use std::collections::HashMap;
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Sprechgruppe` (FromRow).
 const SPALTEN: &str =
-    "id, org_id, einsatz_id, bezeichnung, betriebsart, hinweis, aktiv, sortier, angelegt_at";
+    "id, org_id, einsatz_id, bezeichnung, betriebsart, hinweis, netz, sicherheit, aktiv, sortier, \
+     angelegt_at";
 
 /// Editierbare Katalog-Felder einer Sprechgruppe.
 #[derive(Debug)]
@@ -13,6 +14,8 @@ pub struct KatalogDaten<'a> {
     pub bezeichnung: &'a str,
     pub betriebsart: &'a str,
     pub hinweis: Option<&'a str>,
+    pub netz: Option<&'a str>,
+    pub sicherheit: Option<&'a str>,
     pub sortier: i64,
 }
 
@@ -75,13 +78,16 @@ pub async fn anlegen_katalog(
     daten: KatalogDaten<'_>,
 ) -> Result<Sprechgruppe, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart, hinweis, sortier) \
-         VALUES (?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO sprechgruppe \
+             (org_id, bezeichnung, betriebsart, hinweis, netz, sicherheit, sortier) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(daten.bezeichnung)
     .bind(daten.betriebsart)
     .bind(daten.hinweis)
+    .bind(daten.netz)
+    .bind(daten.sicherheit)
     .bind(daten.sortier)
     .fetch_one(pool)
     .await;
@@ -93,13 +99,15 @@ pub async fn anlegen_katalog(
     laden(pool, org_id, id).await
 }
 
-/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei der nullable Spalte `hinweis`
-/// setzt `Some(None)` NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei den nullable Spalten `hinweis`,
+/// `netz` und `sicherheit` setzt `Some(None)` NULL.
 #[derive(Debug, Default)]
 pub struct KatalogPatch<'a> {
     pub bezeichnung: Option<&'a str>,
     pub betriebsart: Option<&'a str>,
     pub hinweis: Option<Option<&'a str>>,
+    pub netz: Option<Option<&'a str>>,
+    pub sicherheit: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
 }
 
@@ -121,8 +129,10 @@ pub async fn patche_katalog(
             bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
             betriebsart = CASE WHEN ?3 IS NULL THEN betriebsart ELSE ?4 END, \
             hinweis = CASE WHEN ?5 IS NULL THEN hinweis ELSE ?6 END, \
-            sortier = CASE WHEN ?7 IS NULL THEN sortier ELSE ?8 END \
-         WHERE id = ?9 AND org_id = ?10 AND einsatz_id IS NULL",
+            sortier = CASE WHEN ?7 IS NULL THEN sortier ELSE ?8 END, \
+            netz = CASE WHEN ?9 IS NULL THEN netz ELSE ?10 END, \
+            sicherheit = CASE WHEN ?11 IS NULL THEN sicherheit ELSE ?12 END \
+         WHERE id = ?13 AND org_id = ?14 AND einsatz_id IS NULL",
     )
     .bind(patch.bezeichnung.map(|_| 1_i64))
     .bind(patch.bezeichnung)
@@ -132,6 +142,10 @@ pub async fn patche_katalog(
     .bind(patch.hinweis.and_then(|v| v))
     .bind(patch.sortier.map(|_| 1_i64))
     .bind(patch.sortier)
+    .bind(patch.netz.map(|_| 1_i64))
+    .bind(patch.netz.and_then(|v| v))
+    .bind(patch.sicherheit.map(|_| 1_i64))
+    .bind(patch.sicherheit.and_then(|v| v))
     .bind(id)
     .bind(org_id)
     .execute(pool)
@@ -147,6 +161,14 @@ pub async fn patche_katalog(
     laden(pool, org_id, id).await
 }
 
+/// Freie Angaben einer einsatz-lokalen Sprechgruppe neben Bezeichnung und Betriebsart.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Zusatz<'a> {
+    pub hinweis: Option<&'a str>,
+    pub netz: Option<&'a str>,
+    pub sicherheit: Option<&'a str>,
+}
+
 /// Legt eine einsatz-lokale Sprechgruppe an, idempotent: trifft die Zeile den Unique-Index
 /// `(einsatz_id, betriebsart, bezeichnung)`, kommt der vorhandene Eintrag zurück.
 pub async fn anlegen_einsatz_lokal(
@@ -155,17 +177,20 @@ pub async fn anlegen_einsatz_lokal(
     einsatz_id: i64,
     bezeichnung: &str,
     betriebsart: &str,
-    hinweis: Option<&str>,
+    zusatz: Zusatz<'_>,
 ) -> Result<Sprechgruppe, AppError> {
     sqlx::query(
-        "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart, hinweis) \
-         VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+        "INSERT INTO sprechgruppe \
+             (org_id, einsatz_id, bezeichnung, betriebsart, hinweis, netz, sicherheit) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
     )
     .bind(org_id)
     .bind(einsatz_id)
     .bind(bezeichnung)
     .bind(betriebsart)
-    .bind(hinweis)
+    .bind(zusatz.hinweis)
+    .bind(zusatz.netz)
+    .bind(zusatz.sicherheit)
     .execute(pool)
     .await?;
 
@@ -417,7 +442,7 @@ pub async fn lade_abschnitt_sprechgruppen(
 ) -> Result<Vec<Sprechgruppe>, AppError> {
     sqlx::query_as::<_, Sprechgruppe>(
         "SELECT sg.id, sg.org_id, sg.einsatz_id, sg.bezeichnung, sg.betriebsart, \
-                sg.hinweis, sg.aktiv, sg.sortier, sg.angelegt_at \
+                sg.hinweis, sg.netz, sg.sicherheit, sg.aktiv, sg.sortier, sg.angelegt_at \
          FROM sprechgruppe sg \
          JOIN einsatzabschnitt_sprechgruppe eas ON eas.sprechgruppe_id = sg.id \
          WHERE eas.abschnitt_id = ? \
@@ -463,7 +488,7 @@ pub async fn lade_einheit_sprechgruppen(
 ) -> Result<Vec<Sprechgruppe>, AppError> {
     sqlx::query_as::<_, Sprechgruppe>(
         "SELECT sg.id, sg.org_id, sg.einsatz_id, sg.bezeichnung, sg.betriebsart, \
-                sg.hinweis, sg.aktiv, sg.sortier, sg.angelegt_at \
+                sg.hinweis, sg.netz, sg.sicherheit, sg.aktiv, sg.sortier, sg.angelegt_at \
          FROM sprechgruppe sg \
          JOIN einsatz_einheit_sprechgruppe ees ON ees.sprechgruppe_id = sg.id \
          WHERE ees.einheit_id = ? \
@@ -486,7 +511,7 @@ pub async fn lade_einheit_sprechgruppen_map(
         "SELECT ees.einheit_id AS bezug_id, \
                 sg.id AS id, sg.org_id AS org_id, sg.einsatz_id AS einsatz_id, \
                 sg.bezeichnung AS bezeichnung, sg.betriebsart AS betriebsart, \
-                sg.hinweis AS hinweis, sg.aktiv AS aktiv, sg.sortier AS sortier, \
+                sg.hinweis AS hinweis, sg.netz AS netz, sg.sicherheit AS sicherheit, sg.aktiv AS aktiv, sg.sortier AS sortier, \
                 sg.angelegt_at AS angelegt_at \
          FROM sprechgruppe sg \
          JOIN einsatz_einheit_sprechgruppe ees ON ees.sprechgruppe_id = sg.id \
@@ -510,7 +535,7 @@ pub async fn lade_abschnitt_sprechgruppen_map(
         "SELECT eas.abschnitt_id AS bezug_id, \
                 sg.id AS id, sg.org_id AS org_id, sg.einsatz_id AS einsatz_id, \
                 sg.bezeichnung AS bezeichnung, sg.betriebsart AS betriebsart, \
-                sg.hinweis AS hinweis, sg.aktiv AS aktiv, sg.sortier AS sortier, \
+                sg.hinweis AS hinweis, sg.netz AS netz, sg.sicherheit AS sicherheit, sg.aktiv AS aktiv, sg.sortier AS sortier, \
                 sg.angelegt_at AS angelegt_at \
          FROM sprechgruppe sg \
          JOIN einsatzabschnitt_sprechgruppe eas ON eas.sprechgruppe_id = sg.id \
@@ -569,6 +594,8 @@ mod tests {
             bezeichnung: bez,
             betriebsart: ba,
             hinweis: None,
+            netz: None,
+            sicherheit: None,
             sortier: 0,
         }
     }
@@ -604,12 +631,14 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )
         .await
         .unwrap();
-        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", Zusatz::default())
             .await
             .unwrap();
         setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id, lokal.id])
@@ -642,6 +671,8 @@ mod tests {
                 bezeichnung: "X",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )
@@ -654,7 +685,7 @@ mod tests {
         .await
         .unwrap();
         let lokal_woanders =
-            anlegen_einsatz_lokal(&pool, 1, anderer_einsatz, "Sonder 9", "DMO", None)
+            anlegen_einsatz_lokal(&pool, 1, anderer_einsatz, "Sonder 9", "DMO", Zusatz::default())
                 .await
                 .unwrap();
         assert!(matches!(
@@ -681,6 +712,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )
@@ -720,6 +753,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )
@@ -776,6 +811,8 @@ mod tests {
                         bezeichnung: bez,
                         betriebsart: art,
                         hinweis: None,
+                        netz: None,
+                        sicherheit: None,
                         sortier,
                     },
                 )
@@ -944,6 +981,8 @@ mod tests {
                 bezeichnung: Some("490_F_DRK"),
                 betriebsart: Some("TMO"),
                 hinweis: Some(Some("Marschkanal")),
+                netz: None,
+                sicherheit: None,
                 sortier: Some(5),
             },
         )
@@ -975,6 +1014,8 @@ mod tests {
                 bezeichnung: Some("490_F_DRK"),
                 betriebsart: Some("DMO"),
                 hinweis: Some(Some("Marschkanal")),
+                netz: None,
+                sicherheit: None,
                 sortier: Some(7),
             },
         )
@@ -998,6 +1039,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: Some("Marschkanal"),
+                netz: None,
+                sicherheit: None,
                 sortier: 5,
             },
         )
@@ -1039,6 +1082,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: Some("Marschkanal"),
+                netz: None,
+                sicherheit: None,
                 sortier: 5,
             },
         )
@@ -1058,6 +1103,59 @@ mod tests {
         assert_eq!(g.hinweis, None);
         assert_eq!(g.bezeichnung, "412_F_DRK", "Nachbarfeld unberührt");
         assert_eq!(g.sortier, 5, "Nachbarfeld unberührt");
+    }
+
+    /// Netz und Sicherheit (LFH-1030): angelegt, einzeln gepatcht, absent bleibt, `Some(None)`
+    /// leert; jede Angabe landet in ihrer eigenen Spalte.
+    #[tokio::test]
+    async fn patche_katalog_netz_und_sicherheit() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let sg = anlegen_katalog(
+            &pool,
+            1,
+            KatalogDaten {
+                bezeichnung: "314_F",
+                betriebsart: "DMO",
+                hinweis: Some("Gesundheit"),
+                netz: Some("Gateway"),
+                sicherheit: Some("E2E"),
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(sg.netz.as_deref(), Some("Gateway"));
+        assert_eq!(sg.sicherheit.as_deref(), Some("E2E"));
+
+        let g = patche_katalog(
+            &pool,
+            1,
+            sg.id,
+            KatalogPatch {
+                netz: Some(Some("Repeater")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.netz.as_deref(), Some("Repeater"));
+        assert_eq!(g.sicherheit.as_deref(), Some("E2E"), "absent bleibt");
+        assert_eq!(g.hinweis.as_deref(), Some("Gesundheit"), "absent bleibt");
+
+        let g = patche_katalog(
+            &pool,
+            1,
+            sg.id,
+            KatalogPatch {
+                sicherheit: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.sicherheit, None);
+        assert_eq!(g.netz.as_deref(), Some("Repeater"), "Nachbarfeld unberührt");
     }
 
     /// Die Conflict-Zusage des Unique-Index gilt auch am Teil-Patch.
@@ -1161,10 +1259,10 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let a = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+        let a = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", Zusatz::default())
             .await
             .unwrap();
-        let b = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+        let b = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", Zusatz::default())
             .await
             .unwrap();
         assert_eq!(a.id, b.id, "kein Duplikat, gleicher Eintrag");
@@ -1190,6 +1288,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )
@@ -1205,6 +1305,8 @@ mod tests {
                     bezeichnung: "alt",
                     betriebsart: "TMO",
                     hinweis: None,
+                    netz: None,
+                    sicherheit: None,
                     sortier: 0,
                 },
             )
@@ -1214,7 +1316,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", Zusatz::default())
             .await
             .unwrap();
         let ids: Vec<i64> = liste_fuer_einsatz(&pool, 1, e)

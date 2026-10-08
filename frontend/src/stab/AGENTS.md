@@ -39,6 +39,11 @@ im Kasten des nächsten Abschnitts über seiner Einheit im Baum; „EAL“/„UE
 Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung ohne `rueckwaertig`.
 Zeichen der Funktionen nur über `zeichen/fachobjektZeichen.ts:funktionsZeichen`; Höhe und Plätze nur
 über `stab/fernmeldeskizzeLayout.ts:ausstattungsZeilen` (Bild und Layout rechnen dieselbe Zahl).
+**Netz und Sicherheit** (LFH-1030, J.5): kurzer Freitext an der Sprechgruppe (Katalog und
+einsatzlokal, `SPRECHGRUPPE_BEDINGUNG_MAX`). Das Langsechseck bleibt „Betriebsart Bezeichnung“;
+Netz, Sicherheit und Hinweis stehen in dieser Reihenfolge in der Zeile darunter, nur über
+`skizzenZeichen.tsx:bedingungszeichenZusatz`, und verbreitern Zeichen und Schiene nie. In Tabellen
+heißt dieselbe Angabe „Bedingung“ (`kanalBedingung`, „TMO · Gateway · E2E“).
 
 **Skizze als Anlage** (LFH-1028): Lagebericht und Befehl fügen die Skizze als PNG an
 (`entwurf/DokumentAnlagen.tsx`). Aufgenommen wird nur über `stab/SkizzenAufnahme.tsx`: dieselben
@@ -51,7 +56,8 @@ Netzes kommt dorthin, nie in eine Seite), Druckform außerhalb des Sichtbereichs
 Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
 `stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen` (dazu externe Stellen mit Status und
 Komponenten der Skizze, LFH-893): zugeordnete plus einsatzlokale
-Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Die eigene Führungsstelle ist erster Teilnehmer
+Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Spalte „Bedingung“ statt „Betriebsart“
+(LFH-1030), Summe der festen Breiten bleibt 630. Die eigene Führungsstelle ist erster Teilnehmer
 ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, steht „—“ bzw.
 „unvollständig“ mit Grund, nie „keine“. Eigene `key` je `Datensicht` (zwei Sichten in einer Datei).
 

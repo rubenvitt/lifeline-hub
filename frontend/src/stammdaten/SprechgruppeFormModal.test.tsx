@@ -79,4 +79,60 @@ describe('SprechgruppeFormModal — Hülle (LFH-346/A6)', () => {
     expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');
     expect(screen.getByLabelText('Hinweis')).toHaveValue('');
   });
+
+  it('öffnet Netz und Sicherheit beim Bearbeiten und trägt sie mit (LFH-1030)', async () => {
+    let body: unknown = null;
+    server.use(
+      http.patch('/api/sprechgruppen/4', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(sprechgruppe);
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(
+      <Harness bestand={{ ...sprechgruppe, netz: 'Gateway', sicherheit: 'E2E' }} />,
+    );
+    // Trägt die Sprechgruppe Netz oder Sicherheit, steht der Bereich offen.
+    expect(await screen.findByLabelText('Netz')).toHaveValue('Gateway');
+    expect(screen.getByLabelText('Sicherheit')).toHaveValue('E2E');
+
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(body).toEqual({
+        bezeichnung: '412_F_DRK',
+        betriebsart: 'TMO',
+        hinweis: 'Führungskanal',
+        netz: 'Gateway',
+        sicherheit: 'E2E',
+      }),
+    );
+  });
+
+  it('legt ohne Netz und Sicherheit mit beiden leer an; der Bereich ist zu', async () => {
+    let body: unknown = null;
+    server.use(
+      http.post('/api/sprechgruppen', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ ...sprechgruppe, id: 9 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    await nutzer.type(await screen.findByLabelText('Bezeichnung'), '311');
+    await nutzer.click(screen.getByLabelText('Betriebsart'));
+    await nutzer.click(await screen.findByText('TMO – Trunked Mode'));
+    expect(screen.queryByLabelText('Netz')).toBeNull();
+    expect(screen.getByRole('button', { name: /Netz und Sicherheit/ })).toBeInTheDocument();
+
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(body).toEqual({
+        bezeichnung: '311',
+        betriebsart: 'TMO',
+        hinweis: null,
+        netz: null,
+        sicherheit: null,
+      }),
+    );
+  });
 });

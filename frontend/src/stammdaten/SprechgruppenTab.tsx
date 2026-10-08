@@ -81,6 +81,21 @@ export default function SprechgruppenTab() {
       // TMO und DMO Bedeutungen andichtete (blau = Bedienung, orange = Achtung).
       render: (ba: string) => <span style={monoStil(12, 500)}>{ba}</span>,
     },
+    // Netz und Sicherheit (LFH-1030): kurze Kennzeichnungen wie die Betriebsart, deshalb Mono.
+    {
+      title: 'Netz',
+      dataIndex: 'netz',
+      key: 'netz',
+      abBreite: 'lg',
+      render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
+    },
+    {
+      title: 'Sicherheit',
+      dataIndex: 'sicherheit',
+      key: 'sicherheit',
+      abBreite: 'lg',
+      render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
+    },
     {
       title: 'Hinweis',
       dataIndex: 'hinweis',
@@ -209,7 +224,7 @@ export default function SprechgruppenTab() {
           dataSource={sprechgruppenQuery.data ?? []}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Sprechgruppen' }}
-          suche={{ platzhalter: 'Bezeichnung, Betriebsart oder Hinweis' }}
+          suche={{ platzhalter: 'Bezeichnung, Betriebsart, Netz oder Hinweis' }}
           spaltenSchalter={{ bezeichnung: 'Sprechgruppen' }}
         />
       )}

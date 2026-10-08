@@ -1664,6 +1664,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("bezeichnung", G_OP_LABEL),
             retain("betriebsart", G_ENUM),
             scrub("hinweis", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
+            // Netz/Sicherheit (LFH-1030): kurze technische Kennzeichnung des Kanals wie
+            // `bezeichnung`, kein Lagetext und kein Personenbezug.
+            retain("netz", G_OP_LABEL),
+            retain("sicherheit", G_OP_LABEL),
             retain("aktiv", G_KONFIG),
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),

@@ -463,6 +463,8 @@ export function SchieneBild({
           breite={platz.breite}
           betriebsart={schiene.betriebsart}
           bezeichnung={schiene.bezeichnung}
+          netz={schiene.netz}
+          sicherheit={schiene.sicherheit}
           hinweis={schiene.hinweis}
           zeichenX={platz.zeichenX ?? undefined}
           hervorgehoben={zustand.hervorgehoben}

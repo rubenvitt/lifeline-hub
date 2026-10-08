@@ -157,6 +157,7 @@ describe('baueSprechgruppenplan — Menge', () => {
     );
     expect(zeile(zeilen, 'TMO 311')).toMatchObject({
       betriebsart: 'TMO',
+      bedingung: 'TMO',
       hinweis: 'Führungskanal EA Nord',
       herkunft: 'katalog',
     });
@@ -166,6 +167,17 @@ describe('baueSprechgruppenplan — Menge', () => {
       herkunft: 'einsatzlokal',
     });
     expect(HERKUNFT_LABEL).toEqual({ katalog: 'Katalog', einsatzlokal: 'einsatzlokal' });
+  });
+
+  it('nennt Netz und Sicherheit in der Bedingung (LFH-1030)', () => {
+    const gw = sg(6, 'DMO', '314_F*', { netz: 'Gateway', sicherheit: 'E2E' });
+    const nurNetz = sg(7, 'TMO', '311', { netz: 'BOS', sicherheit: '  ' });
+    const zeilen = baueSprechgruppenplan(
+      quellen({ abschnitte: daten([abschnitt(1, { sprechgruppen: [gw, nurNetz] })]) }),
+      1,
+    );
+    expect(zeile(zeilen, '314_F*').bedingung).toBe('DMO · Gateway · E2E');
+    expect(zeile(zeilen, '311').bedingung).toBe('TMO · BOS');
   });
 
   it('macht aus einem leeren Hinweis keinen Hinweis', () => {
