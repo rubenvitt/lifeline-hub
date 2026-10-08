@@ -525,6 +525,7 @@ export default function EinheitDetailPage() {
                   <Popconfirm
                     title="Einheit auflösen?"
                     description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
+                    okText="Einheit auflösen"
                     okButtonProps={{ danger: true }}
                     onConfirm={() => aufloesen.mutate()}
                   >

@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
@@ -487,6 +488,18 @@ describe('EinsatzabschnittePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     expect(await screen.findByLabelText('Erreichbarkeit / Nummer')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+  });
+
+  it('die Rückfrage vor dem Auflösen nennt die Handlung im roten Knopf (LFH-1090)', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    const rueckfrage = await offeneRueckfrage();
+    expect(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' })).toHaveClass(
+      'ant-btn-dangerous',
+    );
+    expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
   });
 
   it('Nur-Lese-Nutzer sehen weder Bearbeiten-Button noch Inputs, aber die Funk-Zusammenfassung', async () => {

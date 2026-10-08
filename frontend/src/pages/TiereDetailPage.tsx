@@ -366,6 +366,7 @@ export default function TiereDetailPage() {
               <Popconfirm
                 title="Tier stornieren?"
                 onConfirm={() => stornoMutation.mutate(t.id)}
+                okText="Tier stornieren"
                 okButtonProps={{ danger: true }}
               >
                 <Button danger>Stornieren</Button>

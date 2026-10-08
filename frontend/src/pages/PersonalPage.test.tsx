@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import PersonalPage from './PersonalPage';
@@ -286,6 +287,17 @@ describe('PersonalPage', () => {
     expect(screen.getByRole('button', { name: 'Person disponieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Entfernen' })).toBeInTheDocument();
+  });
+
+  it('die Rückfrage vor dem Entfernen nennt die Handlung, nicht „OK“ (LFH-1090)', async () => {
+    render(einsatz());
+    await screen.findByText('Thomas Müller');
+    await userEvent.click(screen.getByRole('button', { name: 'Entfernen' }));
+    const rueckfrage = await offeneRueckfrage();
+    expect(
+      within(rueckfrage).getByRole('button', { name: 'Aus Einsatz entfernen' }),
+    ).toBeInTheDocument();
+    expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
   });
 
   it('Beobachter / abgeschlossen: reine Ansicht', async () => {

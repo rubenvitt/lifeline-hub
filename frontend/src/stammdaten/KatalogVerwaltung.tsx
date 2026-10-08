@@ -39,6 +39,8 @@ export interface KatalogVerwaltungProps<T extends KatalogEintrag, W extends obje
   leerText: string;
   bearbeitenTitel: string;
   deaktivierenFrage: string;
+  /** Bestätigungsknopf der Rückfrage, mit Verb und Objekt („Typ deaktivieren“), nie „OK“. */
+  deaktivierenKnopf: string;
   /** Die `Form.Item`s des Bearbeiten-Dialogs. */
   felder: ReactNode;
   /** Optionaler Hinweis über der Tabelle, abgeleitet aus dem geladenen Katalog (erst nach dem
@@ -60,6 +62,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
   leerText,
   bearbeitenTitel,
   deaktivierenFrage,
+  deaktivierenKnopf,
   felder,
   vorTabelle,
 }: KatalogVerwaltungProps<T, W>) {
@@ -130,6 +133,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
               <Button onClick={() => setBearbeite(eintrag)}>Bearbeiten</Button>
               <Popconfirm
                 title={deaktivierenFrage}
+                okText={deaktivierenKnopf}
                 okButtonProps={{ danger: true }}
                 onConfirm={() => {
                   schnellAnlegen.reset();

@@ -670,6 +670,7 @@ export default function EinsatzabschnittePage() {
                       description={
                         'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'
                       }
+                      okText="Abschnitt auflösen"
                       okButtonProps={{ danger: true }}
                       onConfirm={() => aufloesen.mutate(aktuell.id)}
                     >
@@ -692,6 +693,7 @@ export default function EinsatzabschnittePage() {
                       description={
                         'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'
                       }
+                      okText="Abschnitt auflösen"
                       okButtonProps={{ danger: true }}
                       onConfirm={() => aufloesen.mutate(aktuell.id)}
                     >

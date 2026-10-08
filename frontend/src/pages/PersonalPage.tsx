@@ -436,6 +436,7 @@ export default function PersonalPage() {
             render: (_: unknown, ep: EinsatzPersonal) => (
               <Popconfirm
                 title="Aus Einsatz entfernen?"
+                okText="Aus Einsatz entfernen"
                 onConfirm={() => entfernenMutation.mutate(ep.id)}
               >
                 {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff ist die
@@ -565,6 +566,7 @@ export default function PersonalPage() {
                 ? {
                     etikett: 'Entfernen',
                     bestaetigung: 'Aus Einsatz entfernen?',
+                    bestaetigungKnopf: 'Aus Einsatz entfernen',
                     onKlick: (ep) => entfernenMutation.mutate(ep.id),
                   }
                 : undefined,

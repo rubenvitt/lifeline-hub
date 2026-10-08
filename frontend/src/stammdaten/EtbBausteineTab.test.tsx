@@ -218,12 +218,16 @@ describe('EtbBausteineTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
     await screen.findByText('Lage unverändert');
 
     await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Baustein deaktivieren' }),
+    );
     const hinweis = await stehenderFehler('Baustein wird gerade bearbeitet');
     expect(hinweis).toHaveTextContent('Nicht deaktiviert');
 
     await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Baustein deaktivieren' }),
+    );
     await keinStehenderFehler('Baustein wird gerade bearbeitet');
     expect(versuch).toBe(2);
   });

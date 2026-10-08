@@ -77,7 +77,7 @@ describe('StichworteTab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
     expect(geloescht).toBeNull();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Stichwort löschen' }));
     await waitFor(() => expect(geloescht).toBe(1));
   });
 
@@ -85,8 +85,8 @@ describe('StichworteTab', () => {
    * Der Ladezustand gehört GENAU der gelöschten Zeile (LFH-346) — ein Spinner an jeder Zeile
    * behauptete einen Fortschritt an fremden Datensätzen.
    *
-   * Die zweite Zeile ist die eigentliche Aussage. Die Rückfrage trägt hier `okText="Ja"`
-   * (anders als in Fahrzeuge/Material/Personal mit antds „OK").
+   * Die zweite Zeile ist die eigentliche Aussage. Der Bestätigungsknopf nennt die Handlung
+   * („Stichwort löschen“, LFH-1090).
    */
   it('zeigt den Ladezustand NUR an der gelöschten Zeile', async () => {
     const { container } = renderTab(admin, [
@@ -99,7 +99,7 @@ describe('StichworteTab', () => {
     const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
 
     await userEvent.click(within(erste).getByRole('button', { name: 'Löschen' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Stichwort löschen' }));
 
     await waitFor(() =>
       expect(within(erste).getByRole('button', { name: /Löschen/ })).toHaveClass('ant-btn-loading'),
@@ -213,12 +213,16 @@ describe('StichworteTab — Fehlschläge als stehender Hinweis (LFH-473)', () =>
     await screen.findByText('H1');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Löschen' })[0]);
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'Ja' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Stichwort löschen' }),
+    );
     const hinweis = await stehenderFehler('Stichwort wird gerade verwendet');
     expect(hinweis).toHaveTextContent('Nicht gelöscht');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Löschen' })[0]);
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'Ja' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Stichwort löschen' }),
+    );
     await keinStehenderFehler('Stichwort wird gerade verwendet');
     expect(versuch).toBe(2);
   });
@@ -239,7 +243,9 @@ describe('StichworteTab — Fehlschläge als stehender Hinweis (LFH-473)', () =>
     expect(screen.getByLabelText('Neues Stichwort')).toHaveValue('H1');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Löschen' })[0]);
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'Ja' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Stichwort löschen' }),
+    );
     await keinStehenderFehler('Stichwort gibt es schon');
   });
 });

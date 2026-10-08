@@ -171,6 +171,7 @@ export default function StatusKatalogTab() {
       leerText="Kein Status"
       bearbeitenTitel="Status bearbeiten"
       deaktivierenFrage="Status deaktivieren?"
+      deaktivierenKnopf="Status deaktivieren"
       felder={felder}
       vorTabelle={markeHinweis}
     />
