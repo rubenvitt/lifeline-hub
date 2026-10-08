@@ -7,9 +7,16 @@ import { IconHausHerz, IconKachelraster, IconPersonPlus, IconPersonen, type Icon
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
-import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
+import {
+  EinsatzPfadeProvider,
+  GERAET_BETREUUNG_PFADE,
+  GERAET_PFADE,
+} from '../routing/EinsatzPfade';
 import {
   geraetAufnahmePfad,
+  geraetBetreuungPfad,
+  geraetBetroffenAufnahmePfad,
+  geraetBetroffenePfad,
   geraetMonitorPfad,
   geraetPatientenPfad,
   geraetStellePfad,
@@ -31,9 +38,9 @@ export function istUhsAnsicht(ansicht: Funktionsansicht): boolean {
 }
 
 /**
- * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, der
- * Lagemonitor mit seinem Großbild. Eine Ansicht ohne eigene Seiten (noch nicht freigeschaltet,
- * LFH-1040) hat keine: `null`.
+ * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, die
+ * Betreuungsstelle mit ihren Betroffenen, der Lagemonitor mit seinem Großbild. Eine Ansicht ohne
+ * eigene Seiten (noch nicht freigeschaltet, LFH-1040) hat keine: `null`.
  */
 export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
   switch (geraet.ansicht) {
@@ -43,6 +50,7 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
     case 'uhs-laptop':
       return geraetPatientenPfad(geraet.einsatz_id);
     case 'betreuungsstelle':
+      return geraetBetroffenePfad(geraet.einsatz_id);
     case 'bereitstellungsraum':
     case 'einsatzabschnitt':
     case 'verpflegung':
@@ -75,6 +83,13 @@ export function GeraetUhsRahmen() {
   return <Outlet />;
 }
 
+/** Die Seiten der Betreuungsstelle (LFH-1041); jede andere Ansicht landet auf ihrer Startseite. */
+export function GeraetBetreuungRahmen() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'betreuungsstelle') return <GeraetStart />;
+  return <Outlet />;
+}
+
 /** Großbild nur für den Lagemonitor. */
 export function GeraetMonitor() {
   const { geraet } = useAuth();
@@ -89,6 +104,20 @@ export function GeraetAufnahme() {
   if (!geraet || geraet.uhs_id == null) return <GeraetStart />;
   if (parseRouteId(suche.get('uhs') ?? undefined) !== geraet.uhs_id) {
     return <Navigate to={geraetAufnahmePfad(geraet.einsatz_id, { uhs: geraet.uhs_id })} replace />;
+  }
+  return <AufnahmePage />;
+}
+
+/**
+ * Aufnahme in die eigene Betreuungsstelle: ohne UHS-Auftrag, die Stelle bucht der Server mit der
+ * Person (LFH-1041). Ein mitgebrachtes `?uhs` fällt weg.
+ */
+export function GeraetBetroffenAufnahme() {
+  const { geraet } = useAuth();
+  const [suche] = useSearchParams();
+  if (!geraet) return <GeraetStart />;
+  if (suche.has('uhs')) {
+    return <Navigate to={geraetBetroffenAufnahmePfad(geraet.einsatz_id)} replace />;
   }
   return <AufnahmePage />;
 }
@@ -112,11 +141,22 @@ export function GeraetStelle() {
   return <GeraetStellePage />;
 }
 
-function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: ReactNode }) {
+function NavZiel({
+  zu,
+  Icon,
+  end,
+  children,
+}: {
+  zu: string;
+  Icon: Icon;
+  end?: boolean;
+  children: ReactNode;
+}) {
   const { token } = theme.useToken();
   return (
     <NavLink
       to={zu}
+      end={end}
       style={({ isActive }) => ({
         flex: '1 1 0',
         display: 'flex',
@@ -142,22 +182,36 @@ function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: Rea
 
 /**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
- * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen.
+ * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen. Die
+ * Betreuungsstelle: Betroffene, Aufnahme und „Stelle“ mit Belegung und Meldungen.
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   const eid = geraet.einsatz_id;
   const uhsId = geraet.uhs_id;
+  const stil = {
+    display: 'flex',
+    background: rahmenFarben.grund,
+    borderTop: `1px solid ${rahmenFarben.linie}`,
+    paddingBottom: 'env(safe-area-inset-bottom)',
+  };
+  if (geraet.ansicht === 'betreuungsstelle') {
+    return (
+      <nav aria-label="Gerätenavigation" data-lfh="geraet-navigation" style={stil}>
+        {/* `end`: die Aufnahme liegt unter den Betroffenen und markiert sonst beide Ziele. */}
+        <NavZiel zu={geraetBetroffenePfad(eid)} Icon={IconPersonen} end>
+          Betroffene
+        </NavZiel>
+        <NavZiel zu={geraetBetroffenAufnahmePfad(eid)} Icon={IconPersonPlus}>
+          Aufnahme
+        </NavZiel>
+        <NavZiel zu={geraetBetreuungPfad(eid)} Icon={IconHausHerz}>
+          Stelle
+        </NavZiel>
+      </nav>
+    );
+  }
   return (
-    <nav
-      aria-label="Gerätenavigation"
-      data-lfh="geraet-navigation"
-      style={{
-        display: 'flex',
-        background: rahmenFarben.grund,
-        borderTop: `1px solid ${rahmenFarben.linie}`,
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
-    >
+    <nav aria-label="Gerätenavigation" data-lfh="geraet-navigation" style={stil}>
       <NavZiel zu={geraetPatientenPfad(eid)} Icon={IconPersonen}>
         Patienten
       </NavZiel>
@@ -202,8 +256,9 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   useEinsatzLiveStream(geraet.einsatz_id);
   // Die Warteschlange bleibt an: eine Aufnahme ohne Netz geht nicht verloren (design.md D8).
   useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
+  const pfade = geraet.ansicht === 'betreuungsstelle' ? GERAET_BETREUUNG_PFADE : GERAET_PFADE;
   return (
-    <EinsatzPfadeProvider pfade={GERAET_PFADE}>
+    <EinsatzPfadeProvider pfade={pfade}>
       <div
         className="geraet-huelle"
         style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}

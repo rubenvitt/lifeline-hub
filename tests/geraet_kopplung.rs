@@ -2115,6 +2115,7 @@ async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
     assert_eq!(s, StatusCode::CREATED, "{v}");
 
     let aufgenommen = person_in(&app, &geraet, einsatz, None).await;
+    assert_eq!(aufgenommen["status"], "betroffen", "{aufgenommen}");
     assert_eq!(aufgenommen["aktuelle_verbleib_art"], "notunterkunft");
     assert_eq!(aufgenommen["aktuelle_verbleib_betreuungsstelle_id"], nord);
     let aufgenommen = aufgenommen["id"].as_i64().unwrap();

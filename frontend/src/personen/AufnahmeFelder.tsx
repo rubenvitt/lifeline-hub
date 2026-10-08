@@ -86,7 +86,14 @@ export function skFlaechenStil(token: { controlHeight: number }): CSSProperties 
  * Eine vermisste Person ist nicht angetroffen. `POST /personen` antwortet auf `vermisst` +
  * `sichtung` mit 422 — ein Feld hier könnte nur einen Fehler erzeugen.
  */
-export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
+export default function AufnahmeFelder({
+  modus,
+  ohneSichtung = false,
+}: {
+  modus: AufnahmeModus;
+  /** Ohne Sichtung und ohne ihren Folgestatus, etwa am Gerät einer Betreuungsstelle (LFH-1041). */
+  ohneSichtung?: boolean;
+}) {
   const { token } = theme.useToken();
   const flaeche = skFlaechenStil(token);
 
@@ -124,12 +131,12 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
     <>
       {/* Text, kein Feld: das Budget von vier sichtbaren Feldern bleibt. Er sagt, was die Maske
           anlegt, damit niemand zwischen zwei Knöpfen raten muss (LFH-963). */}
-      {modus === 'erfassen' && (
+      {modus === 'erfassen' && !ohneSichtung && (
         <Typography.Paragraph data-lfh="folgestatus" type="secondary">
           {FOLGESTATUS_HINWEIS}
         </Typography.Paragraph>
       )}
-      {modus !== 'vermisst' && (
+      {modus !== 'vermisst' && !ohneSichtung && (
         <Form.Item label="Sichtungskategorie" name="sichtung">
           {/* Dieselbe fachliche Kennzeichnung wie in Liste und Verlauf; die Beschriftung trägt den
              Textkontrast unabhängig von SK-Farbe und Radio-Zustand. */}

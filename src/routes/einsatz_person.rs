@@ -232,7 +232,13 @@ pub async fn anlegen(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("erfasst")
+        // Wer an einer Betreuungsstelle aufgenommen wird, ist betroffen (LFH-1041); eine Sichtung,
+        // die sonst `erfasst → betroffen` hebt, gibt es dort nicht.
+        .unwrap_or(if betreuungsstelle.is_some() {
+            "betroffen"
+        } else {
+            "erfasst"
+        })
         .to_owned();
     let Some(status_enum) = PersonStatus::parse(&status) else {
         return Err(AppError::Validation(

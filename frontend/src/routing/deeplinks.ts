@@ -992,5 +992,24 @@ export function geraetStellePfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/stelle`;
 }
 
+/** Betroffene der eigenen Betreuungsstelle, Startseite ihres Geräts (LFH-1041). */
+export function geraetBetroffenePfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/betroffene`;
+}
+
+export function geraetBetroffenerPfad(einsatzId: number, personId: number): string {
+  return `${geraetBetroffenePfad(einsatzId)}/${personId}`;
+}
+
+/** Aufnahme in die eigene Betreuungsstelle; die Stelle setzt der Server. */
+export function geraetBetroffenAufnahmePfad(einsatzId: number): string {
+  return `${geraetBetroffenePfad(einsatzId)}/aufnahme`;
+}
+
+/** Bereich „Stelle“ der Betreuungsstelle: Belegung, Meldeverlauf, Meldungen. */
+export function geraetBetreuungPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/betreuung`;
+}
+
 /** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
 export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';

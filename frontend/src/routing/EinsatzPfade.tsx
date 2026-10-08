@@ -1,6 +1,9 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import {
   geraetAufnahmePfad,
+  geraetBetroffenAufnahmePfad,
+  geraetBetroffenePfad,
+  geraetBetroffenerPfad,
   geraetPatientenPfad,
   geraetPersonPfad,
   geraetUhsPfad,
@@ -35,6 +38,17 @@ export const GERAET_PFADE: EinsatzPfade = {
   personenListe: geraetPatientenPfad,
   uhsDetail: geraetUhsPfad,
   aufnahme: geraetAufnahmePfad,
+};
+
+/**
+ * Gerät einer Betreuungsstelle (LFH-1041): Personen heißen Betroffene und stehen unter eigenem
+ * Pfad; eine UHS gibt es dort nicht, der Weg dorthin führt auf die Betroffenen.
+ */
+export const GERAET_BETREUUNG_PFADE: EinsatzPfade = {
+  personDetail: geraetBetroffenerPfad,
+  personenListe: geraetBetroffenePfad,
+  uhsDetail: (einsatzId) => geraetBetroffenePfad(einsatzId),
+  aufnahme: (einsatzId) => geraetBetroffenAufnahmePfad(einsatzId),
 };
 
 const PfadeKontext = createContext<EinsatzPfade>(STAB_PFADE);

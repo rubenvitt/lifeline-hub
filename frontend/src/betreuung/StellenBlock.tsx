@@ -65,7 +65,7 @@ export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
  * „geschlossen und belegt“ da, der Server lehnt mit 422 ab). Steht EINMAL im Verlauf statt n
  * gesperrter Knöpfe.
  */
-const GESCHLOSSEN_HINWEIS = 'Stelle geschlossen: Zurücknehmen gesperrt';
+export const GESCHLOSSEN_HINWEIS = 'Stelle geschlossen: Zurücknehmen gesperrt';
 
 const MENUE: readonly MenueEintrag<StelleAktion>[] = [
   { key: 'bearbeiten', label: 'Bearbeiten (Status, Kapazität)' },

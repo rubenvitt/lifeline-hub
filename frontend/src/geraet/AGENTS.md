@@ -23,6 +23,12 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   setzen, wenn Routenliste, Stellenfilter, Server-Test und Hülle stehen. Vorher ist das Koppeln
   422, und die Kopplungsmaske bietet nur, was `GeraeteUebersicht.ansichten` nennt;
   `geraetStartPfad` gibt für sie `null`.
+- **Betreuungsstelle** (LFH-1041): Personen sind, wer je mit Verbleib „Notunterkunft“ an der
+  eigenen Stelle war. Die Aufnahme bucht diesen Verbleib im selben Schritt (Status `betroffen`,
+  keine Sichtung, `geraetDarf('person-sichtung')`); sie ändert die Mengenmeldung nicht, nur
+  „davon namentlich“. Eine Notunterkunft nur an der eigenen Stelle (sonst 403). Eigene Pfade
+  (`GERAET_BETREUUNG_PFADE`, `geraetBetroffene*Pfad`), Meldungen über `geraet/GeraetMeldungen.tsx`
+  wie am UHS-Laptop; der Betreuungszähler fehlt wie Personen- und Meldungszähler.
 - **Eigene Hülle** (`geraet/GeraeteLayout.tsx`): keine Modulleiste, kein Benutzermenü, keine
   Sprungpalette (`CommandPaletteProvider` öffnet bei `geraet` nicht), kein Org-Strom (`/api/live`
   steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/einstellungen`, 403). Der

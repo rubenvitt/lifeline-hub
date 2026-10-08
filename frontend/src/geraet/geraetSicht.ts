@@ -18,6 +18,8 @@ export type GeraetFaehigkeit =
   | 'uhs-anhaenge'
   /** Personenstatus und Storno. */
   | 'person-status'
+  /** Sichten und Re-Sichten; an der Betreuungsstelle nicht (LFH-1041). */
+  | 'person-sichtung'
   /** Tiere und Schäden einer Person. */
   | 'person-zuordnungen'
   /** Fotos und Dateien einer Person. */
@@ -33,6 +35,8 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'uhs-material':
     case 'uhs-anhaenge':
       return geraet.ansicht === 'uhs-laptop';
+    case 'person-sichtung':
+      return geraet.ansicht === 'uhs-tablet' || geraet.ansicht === 'uhs-laptop';
     case 'uhs-verwalten':
     case 'person-status':
     case 'person-zuordnungen':
