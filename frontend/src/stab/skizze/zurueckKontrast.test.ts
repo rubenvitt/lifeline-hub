@@ -5,8 +5,9 @@ import { ZURUECK_DECKKRAFT, zurueckDeckkraft } from './SkizzenElemente';
 
 /**
  * Zurückgenommene Elemente (Hervorheben, Filter) bleiben lesbar (Prüfliste Kriterium 5): der Text
- * in `currentColor` (`rollen.text`) hält mit der Deckkraft auf der Fläche den Boden 4,5 : 1 in
- * beiden Modi. Die Hervorhebung selbst trägt die Strichstärke, nicht die Deckkraft. Lückenwort,
+ * in `currentColor` (`rollen.text`) hält mit der Deckkraft auf der Fläche das Ziel der Textstufen,
+ * Tag ≥ 7 : 1, Nacht ≥ 5 : 1 (`frontend/AGENTS.md`, „Textboden für jede Textstufe“): zurückgenommen
+ * ist nicht gesperrt. Die Hervorhebung selbst trägt die Strichstärke, nicht die Deckkraft. Lückenwort,
  * Meldung und ihre Marke (`achtungText`) halten ihn mit der Deckkraft, mit der sie an einem
  * zurückgenommenen Element stehen (Prüfliste O1: mit 0,6 hell nur 3,20 : 1).
  */
@@ -20,12 +21,12 @@ function gemischt(vorne: string, hinten: string, deckkraft: number): string {
 
 describe('Deckkraft zurückgenommener Elemente', () => {
   it.each([
-    ['hell', farbenHell],
-    ['dunkel', farbenDunkel],
-  ] as const)('hält im Modus %s den Textboden 4,5 : 1 auf der Fläche', (_modus, farben) => {
+    ['hell', farbenHell, 7],
+    ['dunkel', farbenDunkel, 5],
+  ] as const)('hält im Modus %s das Textziel %d : 1 auf der Fläche', (_modus, farben, ziel) => {
     expect(farben.text).toMatch(/^#[0-9a-f]{6}$/i);
     const text = gemischt(farben.text, farben.flaeche, ZURUECK_DECKKRAFT);
-    expect(kontrast(text, farben.flaeche)).toBeGreaterThanOrEqual(4.5);
+    expect(kontrast(text, farben.flaeche)).toBeGreaterThanOrEqual(ziel);
   });
 
   it.each([
@@ -42,7 +43,7 @@ describe('Deckkraft zurückgenommener Elemente', () => {
   );
 
   it('tritt dennoch sichtbar zurück', () => {
-    expect(ZURUECK_DECKKRAFT).toBeLessThanOrEqual(0.7);
+    expect(ZURUECK_DECKKRAFT).toBeLessThanOrEqual(0.75);
     expect(zurueckDeckkraft(true, 'bild')).toBe(ZURUECK_DECKKRAFT);
     expect(zurueckDeckkraft(false, 'bild')).toBeUndefined();
   });

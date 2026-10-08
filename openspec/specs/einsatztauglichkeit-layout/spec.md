@@ -45,7 +45,8 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
   Bericht“ und der Link einer Berichtskarte, die Filtersegmente und das Suchfeld der Seite
   „Lagemeldungen“.
 - Seitenkopf: jeder Link im Ortspfad (Brotkrume) jeder Seite, die den gemeinsamen Seitenkopf
-  trägt. Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um Fläche über und
+  trägt, auch im Kopf der Verwaltungsseiten (etwa „Fahrzeuge“ bzw. „Personal“ über der
+  Fahrzeug- und der Personal-Detailseite der Stammdaten). Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um Fläche über und
   unter dem Text, nicht über die Schrift. Der Ortspfad MUST den Seitenkopf in `kompakt` am
   Fükw-Schirm nicht über seine 44 px heben.
 
@@ -76,6 +77,10 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 #### Scenario: Brotkrume in kompakt
 - **WHEN** dieselbe Seite in `kompakt` am Fükw-Schirm steht
 - **THEN** misst jeder Link im Ortspfad mindestens 30 px in der Höhe, und der Seitenkopf ist 44 px hoch
+
+#### Scenario: Brotkrume der Stammdaten-Detailseiten
+- **WHEN** die Fahrzeug- oder die Personal-Detailseite der Stammdaten am Fükw-Schirm und auf dem Handschirm steht
+- **THEN** misst der Link „Fahrzeuge“ bzw. „Personal“ im Ortspfad in `handschuh` mindestens 72 px und in `kompakt` mindestens 30 px in der Höhe, und seine Schrift ist in jeder Stufe 12 px groß
 
 ### Requirement: Abstand zwischen klickbaren Kennzahlen
 
