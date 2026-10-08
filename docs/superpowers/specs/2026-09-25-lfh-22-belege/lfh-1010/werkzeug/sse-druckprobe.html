@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><title>SSE start</title>
+<button onclick="go('OHNE')">OHNE</button>
+<button onclick="es=new EventSource('/api/live');es.onopen=()=>t('offen');t('sse-auf')">SSEAUF</button>
+<button onclick="go('MIT')">MITSSE</button>
+<button onclick="es&&es.close();t('sse-zu')">SSEZU</button>
+<script>
+let es=null;const L=[];function t(m){L.push(m);document.title='SSE '+L.join(' ');}
+addEventListener('beforeprint',()=>t('beforeprint'));addEventListener('afterprint',()=>t('afterprint'));
+function go(n){t(n);window.print();t(n+'-zurueck');}
+</script>
