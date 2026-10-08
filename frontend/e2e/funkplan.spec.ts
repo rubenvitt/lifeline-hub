@@ -44,6 +44,9 @@ import { wechsleZuRolle } from './rollen-kern';
  * in Firefox und WebKit (`DRUCK_SPECS`, LFH-915). Hier bleibt nur der Druckschritt der
  * Führungsstelle: er hängt an der Erfassung auf den Einsatzdaten und an der Übernahme.
  *
+ * - ZEILENSCHLEUSE IM BAUM (LFH-1020): Fokus oder Zeiger in der Tabelle, eine Einheit kommt live
+ *   dazu: keine Zeile rückt, der Sammelbanner nennt sie.
+ *
  * Mutationsprobe (LFH-977): mit dem `Datensicht` von vor LFH-977 wird der Einzug rot.
  */
 
@@ -370,6 +373,55 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   await tmo.getByRole('link', { name: EINHEIT, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einheiten/${einheit}$`));
 });
+
+// ── Zeilenschleuse im Baum (LFH-1020, Spec `datensicht-zufluss`) ────────────────────────────────
+//
+// Gemessen wird die Zeile UNTER der Einfügestelle, relativ zur Tabelle: das Fahrzeug ohne Einheit
+// steht im Sammelknoten am Ende, eine neue Einheit im Abschnitt schöbe es ohne Schleuse sofort nach
+// unten. Relativ, weil das Lücken-Paneel ÜBER der Tabelle mit seinem Inhalt wächst (eine neue Lücke
+// ist eine Zeile mehr); das ist nicht die Datensicht. Die neue Einheit bekommt deshalb eine
+// Erreichbarkeit.
+// Mutationsproben: das Gerippe der Schleuse nicht mehr halten (`gerippe: null` in `standJetzt`)
+// → beide Fälle rot (die Zeile rückt, kein Banner); die Zeigerhandler am `<section>` entfernt →
+// der Zeigerfall rot.
+
+const SAMMEL_FAHRZEUG = 'Florian ELW 1';
+const NEUE_EINHEIT = 'Wasserrettungszug Musterstadt-Nord';
+
+for (const art of ['Fokus', 'Zeiger'] as const) {
+  test(`Schleuse, ${art}: eine live angelegte Einheit schiebt keine Zeile`, async ({ page }) => {
+    await page.setViewportSize(FUEKW);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Schleuse ${art} ${Date.now()}`);
+    const { abschnitt } = await seede(page, einsatzId);
+    await oeffne(page, einsatzId);
+
+    const zeile = tabelle(page).locator('tr.ant-table-row', { hasText: SAMMEL_FAHRZEUG });
+    const lage = async () => {
+      const [z, t] = await Promise.all([zeile.boundingBox(), tabelle(page).boundingBox()]);
+      expect(z && t, 'Zeile und Tabelle sichtbar').toBeTruthy();
+      return z!.y - t!.y;
+    };
+    if (art === 'Fokus') await tabelle(page).getByRole('link', { name: EINHEIT }).focus();
+    else await zeile.hover();
+    const vorher = await lage();
+
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+      data: { name: NEUE_EINHEIT, abschnitt_id: abschnitt, erreichbarkeit: '+49 171 7777777' },
+    });
+    expect(antwort.ok(), `Einheit: ${await antwort.text()}`).toBeTruthy();
+
+    const banner = tabelle(page).getByRole('button', { name: '1 neuer Eintrag — anzeigen' });
+    await expect(banner).toBeVisible();
+    await expect(tabelle(page).getByText(NEUE_EINHEIT)).toHaveCount(0);
+    expect(await lage(), 'keine Zeile rückt').toBe(vorher);
+
+    await banner.click();
+    await expect(tabelle(page).getByText(NEUE_EINHEIT)).toBeVisible();
+    await expect(banner).toHaveCount(0);
+    expect(await lage()).toBeGreaterThan(vorher);
+  });
+}
 
 // ── Führungsstelle als Teilnehmer (LFH-1018) ──────────────────────────────────────────────
 //

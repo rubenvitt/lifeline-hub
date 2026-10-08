@@ -155,6 +155,11 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Entfallenes bleibt als Platzhalter ohne Link, der Kopf steht still; Banner in der Standzeile
   fester Höhe; im Druck gilt sie nicht. Kein Nutzer baut eine eigene.
 - `Datensicht` bricht fest bei `md`; die Prop `tabelleAb` hält `datensicht.guard.test.ts` fern.
+- **Zufluss der `Datensicht`** (LFH-1020, Spec `datensicht-zufluss`): Fokus ODER Maus-/Stiftzeiger
+  (nicht Touch) in der Sicht hält Menge und Folge der Zeilen, im Baum auf jeder Ebene über
+  `organigramm/baumSchleuse.ts` (keine zweite Baumlogik); Inhalt fließt, Entfallenes fällt sofort
+  weg, der Sammelbanner nennt Neues, Umgehängtes und Umsortiertes. `zufluss="sofort"` nur für
+  Flächen ohne Bedienziel in den Zeilen.
 - **Eine geblätterte Liste nimmt den Servermodus der `Datensicht`** (LFH-1075, Prop
   `serverseitig`): Suche (entprellt) und Spaltenfilter gehen an den Server, die Sortierung
   kontrolliert; die Sicht filtert und sortiert nicht noch einmal. `stand` ist die Abfrage der

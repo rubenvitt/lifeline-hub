@@ -11,6 +11,8 @@ import { expect, test, type Page } from '@playwright/test';
  * - 390 px: Tabelle, nicht Karten; die Kennung bleibt fixiert.
  * - ANLEGEN über die Masken, LIVE in einer zweiten Seite ohne Neuladen; die Lücke schließt sich.
  * - DRUCKPFAD bei A4-Breite (680 px): keine Aktionsspalte, keine Knöpfe, nichts ragt heraus.
+ * - ZEILENSCHLEUSE IM BAUM (LFH-1020): Fokus oder Zeiger in der Tabelle, eine Stelle kommt live
+ *   dazu: keine Zeile rückt, der Sammelbanner nennt sie.
  *
  * Mutationsprobe (Prüfliste): `mindestBreite` der Verbindungen auf 700 → Überhang am Fükw rot.
  */
@@ -255,3 +257,38 @@ test('Druckpfad bei A4-Breite: ohne Aktionen und Knöpfe, nichts ragt heraus', a
   ).toBeLessThanOrEqual(lage.wurzelRechts + SUBPIXEL);
   await page.emulateMedia({ media: null });
 });
+
+// ── Zeilenschleuse im Baum (LFH-1020, Spec `datensicht-zufluss`) ────────────────────────────────
+//
+// Eine neue Funktion landet in der Gruppe der Funktionen, oberhalb von Behörde und Abschnitt;
+// gemessen wird die Abschnittszeile darunter. Mutationsproben wie in `funkplan.spec.ts`.
+
+for (const art of ['Fokus', 'Zeiger'] as const) {
+  test(`Schleuse, ${art}: eine live angelegte Stelle schiebt keine Zeile`, async ({ page }) => {
+    await page.setViewportSize(FUEKW);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Kommunikationsplan Schleuse ${Date.now()}`);
+    await seede(page, einsatzId);
+    await oeffne(page, einsatzId);
+
+    const zeile = tabelle(page).locator('tr.ant-table-row', { hasText: ABSCHNITT });
+    if (art === 'Fokus') await tabelle(page).getByRole('link', { name: NUMMER }).focus();
+    else await zeile.hover();
+    const vorher = await zeile.boundingBox();
+    expect(vorher, 'Zeile sichtbar').not.toBeNull();
+
+    const antwort = await page.request.post(
+      `/api/einsaetze/${einsatzId}/stab/kommunikationsplan/stellen`,
+      { data: { stellenart: 'funktion', funktion: 's3' } },
+    );
+    expect(antwort.status(), `Stelle: ${await antwort.text()}`).toBe(201);
+
+    const banner = tabelle(page).getByRole('button', { name: '1 neuer Eintrag — anzeigen' });
+    await expect(banner).toBeVisible();
+    expect(await zeile.boundingBox(), 'keine Zeile rückt').toEqual(vorher);
+
+    await banner.click();
+    await expect(banner).toHaveCount(0);
+    expect((await zeile.boundingBox())!.y).toBeGreaterThan(vorher!.y);
+  });
+}

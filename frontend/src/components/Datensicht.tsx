@@ -1,6 +1,12 @@
 import { IconChevronRechts, IconChevronRunter } from '../icons';
 import { Button, ConfigProvider, Popconfirm, Space, Typography, theme } from 'antd';
-import type { HTMLAttributes, Key, ReactNode, TableHTMLAttributes } from 'react';
+import type {
+  HTMLAttributes,
+  Key,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  TableHTMLAttributes,
+} from 'react';
 import type { TableColumnType } from 'antd';
 import {
   createContext,
@@ -42,6 +48,7 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { kennungsLinkStil } from './kennungsLink';
 import { useDruckModus } from './druck/useDruckModus';
 import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAusschnitt';
+import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleuse';
 
 /**
  * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2): EINE Spaltendefinition je Modul, zwei
@@ -80,9 +87,10 @@ import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAu
  * 4. **Das Tastaturziel der Zeile ist die Titelzelle.** Bei gesetztem `titel.ziel` rendert sie
  *    in BEIDEN Zweigen einen echten `<Link>` mit Höhe aus `controlHeight`; `ListenEintrag` legt
  *    `onClick` auf ein nacktes `<div>` ohne Rolle und Tastaturbedienung.
- * 5. **Zeilen springen nicht unter dem Cursor.** Solange der Fokus in der Sicht liegt, sind
- *    Zeilenmenge und -reihenfolge eingefroren, Zellinhalte laufen weiter; Zufluss erscheint als
- *    Banner (WCAG 3.2.5, CLS ≤ 0,1). Die Werkzeugzeile steht IMMER, auch leer.
+ * 5. **Zeilen springen nicht unter dem Cursor.** Solange der Fokus in der Sicht liegt oder ein
+ *    Maus- bzw. Stiftzeiger über ihr (LFH-1020), sind Zeilenmenge und -reihenfolge eingefroren,
+ *    im Baum auf jeder Ebene; Zellinhalte laufen weiter; Zufluss erscheint als Banner (WCAG 3.2.5,
+ *    CLS ≤ 0,1). Die Werkzeugzeile steht IMMER, auch leer.
  *
  * ── VIER FALLEN ──
  *
@@ -349,9 +357,10 @@ interface BaumSicht<T> {
 /**
  * Verhalten bei nachfließenden Daten (Kriterium 12, WCAG 3.2.5, CLS ≤ 0,1).
  *
- * `'sammelbanner'` (Default): solange der Fokus INNERHALB der Sicht liegt, bleiben Zeilenmenge und
- *   -reihenfolge eingefroren; Zellinhalte aktualisieren weiter. Neue Zeilen erscheinen als Banner
- *   („7 neue Einträge — anzeigen“).
+ * `'sammelbanner'` (Default): solange der Fokus INNERHALB der Sicht liegt oder ein Maus- bzw.
+ *   Stiftzeiger über ihr (nicht Touch), bleiben Zeilenmenge und -reihenfolge eingefroren, im Baum
+ *   auch Elternzeile und Folge der Kinder ({@link baumZufluss}); Zellinhalte aktualisieren weiter.
+ *   Neue Zeilen erscheinen als Banner („7 neue Einträge — anzeigen“, im Baum auch „· 1 umgehängt“).
  * `'sofort'`: kein Einfrieren, nur für Flächen ohne fokussierbare Zeileninhalte.
  */
 type Zufluss = 'sammelbanner' | 'sofort';
@@ -496,6 +505,61 @@ function vergleiche(
   const faktor = richtung === 'auf' ? 1 : -1;
   if (typeof a === 'number' && typeof b === 'number') return (a - b) * faktor;
   return KOLLATOR.compare(String(a), String(b)) * faktor;
+}
+
+/**
+ * DIE SCHLEUSE IM BAUM (LFH-1020, Spec `datensicht-zufluss`): dieselbe reine Logik wie das Gerüst
+ * `HaengenderBaum` (`organigramm/baumSchleuse.ts`), über einen Adapter. Gehalten werden Menge,
+ * Elternzeile und Folge auf JEDER Ebene; der Inhalt kommt je Schlüssel frisch, ein umgehängter
+ * Knoten steht mit gehaltenem Inhalt am alten Ort.
+ *
+ * Anders als im Gerüst fällt Entfallenes sofort weg (wie flach): eine Tabellenzeile stützt kein
+ * Spalten-Grid, ein Platzhalter wäre eine eigene Darstellung. Deshalb zählt `wartend.entfallen`
+ * hier nicht.
+ *
+ * Eine Zeile, deren gezeigte Kinder dieselben Objekte sind wie ihre eigenen, kommt REFERENZGLEICH
+ * zurück: die gemerkten Zeilen (LFH-949) rendern sonst bei jedem Datenstand neu.
+ */
+export function baumZufluss<T extends object>(args: {
+  gehalten: readonly T[];
+  frisch: readonly T[];
+  kinder: KinderFeld<T>;
+  schluessel: (zeile: T) => Key;
+}): { zeilen: readonly T[]; wartend: Omit<Wartend, 'entfallen'> } {
+  const { gehalten, frisch, kinder, schluessel } = args;
+  interface Knoten {
+    key: string;
+    kinder: readonly Knoten[];
+    zeile: T;
+  }
+  const kinderVon = (z: T) => (z[kinder] as readonly T[] | undefined) ?? [];
+  const knoten = (z: T): Knoten => ({
+    key: String(schluessel(z)),
+    kinder: kinderVon(z).map(knoten),
+    zeile: z,
+  });
+  const stand = baumSchleuse(gehalten.map(knoten), frisch.map(knoten));
+  const zurueck = (ks: readonly Knoten[]): T[] =>
+    ks
+      .filter((k) => !stand.entfallen.has(k.key))
+      .map((k) => {
+        const gezeigt = zurueck(k.kinder);
+        const eigene = kinderVon(k.zeile);
+        const gleich = gezeigt.length === eigene.length && gezeigt.every((z, i) => z === eigene[i]);
+        return gleich ? k.zeile : ({ ...k.zeile, [kinder]: gezeigt } as T);
+      });
+  const { neu, umgehaengt, umsortiert } = stand.wartend;
+  return { zeilen: zurueck(stand.gezeigt), wartend: { neu, umgehaengt, umsortiert } };
+}
+
+/** Wortlaut des Sammelbanners (Spec `datensicht-zufluss`); ohne Wartendes `null`. */
+export function bannerText(w: Omit<Wartend, 'entfallen'>): string | null {
+  const teile = [
+    w.neu === 1 ? '1 neuer Eintrag' : w.neu > 1 ? `${w.neu} neue Einträge` : null,
+    w.umgehaengt > 0 ? `${w.umgehaengt} umgehängt` : null,
+    w.umsortiert > 0 ? `${w.umsortiert} umsortiert` : null,
+  ].filter((t): t is string => t !== null);
+  return teile.length > 0 ? `${teile.join(' · ')} — anzeigen` : null;
 }
 
 /**
@@ -876,10 +940,17 @@ export default function Datensicht<T extends object, const K extends string>(
   type Schleuse =
     | { art: 'offen' }
     | { art: 'neu' }
-    | { art: 'gefroren'; folge: readonly Key[]; gruppeVon: ReadonlyMap<Key, string> };
+    | {
+        art: 'gefroren';
+        folge: readonly Key[];
+        gruppeVon: ReadonlyMap<Key, string>;
+        /** Im Baum die gezeigten Wurzelzeilen MIT ihren Kindern (LFH-1020); flach `null`. */
+        gerippe: readonly T[] | null;
+      };
   const [schleuse, setSchleuse] = useState<Schleuse>({ art: 'offen' });
   const gefroren = schleuse.art === 'gefroren' ? schleuse.folge : null;
   const gefroreneGruppeVon = schleuse.art === 'gefroren' ? schleuse.gruppeVon : null;
+  const gefrorenesGerippe = schleuse.art === 'gefroren' ? schleuse.gerippe : null;
 
   const nachBenutzeraktion = useCallback(() => {
     setSchleuse((vorher) => (vorher.art === 'offen' ? vorher : { art: 'neu' }));
@@ -1117,18 +1188,34 @@ export default function Datensicht<T extends object, const K extends string>(
     );
   };
 
-  const { sichtbareZeilen, zufluessig } = useMemo(() => {
-    if (!gefroren) return { sichtbareZeilen: zeilen, zufluessig: 0 };
+  const baumKinder = baum?.kinder;
+  /**
+   * IM DRUCK GILT DIE SCHLEUSE NICHT (wie im Gerüst): Strg+P mit Fokus oder Zeiger in der Sicht
+   * unterschlüge sonst, was hinter dem Banner wartet. Danach hält sie wieder den alten Stand.
+   */
+  const druckt = useDruckModus();
+  const { sichtbareZeilen, banner } = useMemo(() => {
+    if (!gefroren || druckt) return { sichtbareZeilen: zeilen, banner: null };
+    if (gefrorenesGerippe && baumKinder) {
+      const z = baumZufluss({
+        gehalten: gefrorenesGerippe,
+        frisch: zeilen,
+        kinder: baumKinder,
+        schluessel,
+      });
+      return { sichtbareZeilen: z.zeilen, banner: bannerText(z.wartend) };
+    }
     const nachSchluessel = new Map(zeilen.map((z) => [schluessel(z), z]));
     const gefrorenMenge = new Set(gefroren);
+    const neu = zeilen.filter((z) => !gefrorenMenge.has(schluessel(z))).length;
     return {
       // Entfallene Schlüssel fallen sofort weg; die Schleuse hält nur Zuwachs zurück.
       sichtbareZeilen: gefroren
         .map((k) => nachSchluessel.get(k))
         .filter((z): z is T => z !== undefined),
-      zufluessig: zeilen.filter((z) => !gefrorenMenge.has(schluessel(z))).length,
+      banner: bannerText({ neu, umgehaengt: 0, umsortiert: 0 }),
     };
-  }, [gefroren, zeilen, schluessel]);
+  }, [gefroren, druckt, gefrorenesGerippe, baumKinder, zeilen, schluessel]);
 
   /**
    * Erfüllt den `'neu'`-Auftrag mit `useLayoutEffect`: ein nachgelagerter Effekt ließe genau EINEN
@@ -1140,13 +1227,18 @@ export default function Datensicht<T extends object, const K extends string>(
    * und {@link betreten}) gehen hierdurch, damit keine die Gruppen vergisst.
    */
   const standJetzt = useCallback(
-    (): { folge: readonly Key[]; gruppeVon: ReadonlyMap<Key, string> } => ({
+    (): {
+      folge: readonly Key[];
+      gruppeVon: ReadonlyMap<Key, string>;
+      gerippe: readonly T[] | null;
+    } => ({
       folge: zeilen.map(schluessel),
       gruppeVon: new Map(
         gruppen ? zeilen.map((z) => [schluessel(z), gruppen.schluessel(z)] as const) : [],
       ),
+      gerippe: baumKinder ? zeilen : null,
     }),
-    [zeilen, schluessel, gruppen],
+    [zeilen, schluessel, gruppen, baumKinder],
   );
 
   useLayoutEffect(() => {
@@ -1180,7 +1272,7 @@ export default function Datensicht<T extends object, const K extends string>(
    * nächsten Fokuseintritt (`focusin` bubbelt, der Sprung Suchfeld → Zeilenlink genügt). Ein
    * Einfrieren beim ersten Datenstand fröre ausgerechnet die erwartete Lieferung ein.
    */
-  const betreten = useCallback(() => {
+  const schliessen = useCallback(() => {
     if (zufluss !== 'sammelbanner') return;
     if (zeilen.length === 0) return;
     // SYNCHRON im Handler: die jetzt sichtbare Folge ist die richtige.
@@ -1190,28 +1282,80 @@ export default function Datensicht<T extends object, const K extends string>(
   }, [zufluss, zeilen.length, standJetzt]);
 
   /**
+   * ZWEI BEDINGUNGEN, wie im Gerüst `HaengenderBaum` (LFH-1020, Spec `datensicht-zufluss`): Fokus
+   * ODER ein Maus- bzw. Stiftzeiger über der Sicht schließt; offen erst, wenn keine mehr gilt. Wer
+   * mit der Maus auf eine Zeile zielt, hat oft noch nicht geklickt.
+   */
+  const bedingung = useRef({ zeiger: false, fokus: false });
+  const pruefeOffen = useCallback(() => {
+    if (!bedingung.current.zeiger && !bedingung.current.fokus) setSchleuse({ art: 'offen' });
+  }, []);
+
+  const betreten = useCallback(() => {
+    bedingung.current.fokus = true;
+    schliessen();
+  }, [schliessen]);
+
+  /**
+   * ERST DIE BEWEGUNG ZÄHLT, nicht `pointerenter`: Chromium meldet das Betreten auch, wenn Inhalt
+   * unter einem ruhenden Zeiger auftaucht. Baut sich eine Seite in Stufen auf (Stellen, dann
+   * Abschnitte), hielte die Schleuse sonst die zweite Lieferung hinter dem Banner, obwohl niemand
+   * zielt. Wer zielt, bewegt den Zeiger. Die Bewegung schließt auch, wenn die Sicht beim Betreten
+   * noch leer war: die erste Lieferung steht dann schon da, die nächste rückt nicht mehr.
+   *
+   * Touch zählt nicht: ein Tipp betritt und verlässt die Sicht; nach dem Tipp hält der Fokus.
+   */
+  const offenJetzt = useRef(true);
+  useLayoutEffect(() => {
+    offenJetzt.current = schleuse.art === 'offen';
+  });
+  const zeigerBewegt = useCallback(
+    (e: ReactPointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      if (bedingung.current.zeiger && !offenJetzt.current) return;
+      bedingung.current.zeiger = true;
+      schliessen();
+    },
+    [schliessen],
+  );
+  const zeigerRaus = useCallback(
+    (e: ReactPointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      bedingung.current.zeiger = false;
+      pruefeOffen();
+    },
+    [pruefeOffen],
+  );
+
+  /**
    * `focusout` feuert auch beim Sprung von der Titelzelle zum Aktionsknopf derselben Sicht; ohne
    * `contains`-Prüfung taute die Schleuse genau beim Bedienen auf.
    */
-  const pruefeVerlassen = useCallback((ziel: EventTarget | null) => {
-    if (ziel != null && wurzel.current?.contains(ziel as Node)) return;
-    /**
-     * EIN ÜBERLAGERNDES MENÜ IST KEIN VERLASSEN. Menüs (Statuswahl, `weitere`) liegen in einem PORTAL
-     * an `document.body`, und antds `autoFocus` schiebt den Fokus dorthin; ohne diesen Zweig taute
-     * die Schleuse, während jemand das Menü offen hält.
-     *
-     * In jsdom bleibt der Fokus beim Öffnen auf dem Auslöser: ein Test, der nur ein Menü öffnet, ist
-     * auch ohne diesen Zweig grün. Geprüft wird der Handler direkt, mit `relatedTarget` im Portal.
-     * Erkennung über antds Overlay-Klassen, weil die Overlays keinem Knoten dieser Sicht gehören.
-     */
-    if (
-      ziel instanceof Node &&
-      (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')
-    ) {
-      return;
-    }
-    setSchleuse({ art: 'offen' });
-  }, []);
+  const pruefeVerlassen = useCallback(
+    (ziel: EventTarget | null) => {
+      if (ziel != null && wurzel.current?.contains(ziel as Node)) return;
+      /**
+       * EIN ÜBERLAGERNDES MENÜ IST KEIN VERLASSEN. Menüs (Statuswahl, `weitere`) liegen in einem
+       * PORTAL an `document.body`, und antds `autoFocus` schiebt den Fokus dorthin; ohne diesen Zweig
+       * taute die Schleuse, während jemand das Menü offen hält.
+       *
+       * In jsdom bleibt der Fokus beim Öffnen auf dem Auslöser: ein Test, der nur ein Menü öffnet,
+       * ist auch ohne diesen Zweig grün. Geprüft wird der Handler direkt, mit `relatedTarget` im
+       * Portal. Erkennung über antds Overlay-Klassen, weil die Overlays keinem Knoten dieser Sicht
+       * gehören. (Für den Zeiger gilt das von selbst: Reacts `pointerleave` folgt dem React-Baum,
+       * das Portal unter der Zeile liegt darin.)
+       */
+      if (
+        ziel instanceof Node &&
+        (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')
+      ) {
+        return;
+      }
+      bedingung.current.fokus = false;
+      pruefeOffen();
+    },
+    [pruefeOffen],
+  );
 
   // ── DEV-Diagnose ──────────────────────────────────────────────────────────────────
   /**
@@ -1276,7 +1420,6 @@ export default function Datensicht<T extends object, const K extends string>(
    * Die FOLGE ist die Reihenfolge auf dem Schirm: im gruppierten Kartenzweig nach Gruppen, sonst
    * `sichtbareZeilen`. Im Baum zählt nur die oberste Ebene; Kinder zählen zur Höhe ihres Knotens.
    */
-  const druckt = useDruckModus();
   const virtuell = !druckt && sichtbareZeilen.length > DATENSICHT_SCHWELLE;
   const kartenGruppiert = !alsTabelle && gruppen != null && !baum;
   const folge = useMemo(
@@ -1408,10 +1551,10 @@ export default function Datensicht<T extends object, const K extends string>(
             ))}
           </Typography.Text>
         )}
-        {zufluessig > 0 && (
+        {banner != null && (
           // Sammelbanner statt eingeschobener Zeilen (WCAG 3.2.5). Kein `danger`: Rot bedient nichts.
           <Button type="primary" onClick={nachBenutzeraktion}>
-            {zufluessig === 1 ? '1 neuer Eintrag' : `${zufluessig} neue Einträge`} — anzeigen
+            {banner}
           </Button>
         )}
       </div>
@@ -2073,6 +2216,8 @@ export default function Datensicht<T extends object, const K extends string>(
       aria-label={bezeichnung}
       onFocus={betreten}
       onBlur={(e) => pruefeVerlassen(e.relatedTarget)}
+      onPointerMove={zeigerBewegt}
+      onPointerLeave={zeigerRaus}
     >
       {werkzeugzeile}
       {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}

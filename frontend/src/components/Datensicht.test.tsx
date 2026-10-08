@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { createPortal } from 'react-dom';
@@ -2160,5 +2160,243 @@ describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
     await userEvent.click(symbol);
     expect(onAufgeklappt).toHaveBeenCalledTimes(1);
     expect(onAufgeklappt).toHaveBeenLastCalledWith([]);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────────────
+// S9 · Schleuse im Baum und unter dem Zeiger (LFH-1020, Kriterium 12)
+// ────────────────────────────────────────────────────────────────────────────────────
+
+describe('Datensicht · Zeilenschleuse im Baum (LFH-1020)', () => {
+  interface Knoten {
+    key: string;
+    name: string;
+    kinder?: Knoten[];
+  }
+  const kn = (key: string, name: string, kinder?: Knoten[]): Knoten => ({ key, name, kinder });
+  const START: Knoten[] = [
+    kn('a', 'Abschnitt Nord', [kn('e', '1. Zug'), kn('g', '2. Zug')]),
+    kn('s', 'Abschnitt Süd', [kn('f', 'Florian ELW')]),
+  ];
+  const knotenSpalten = spaltenFuer<Knoten>()([
+    { title: 'Stelle', key: 'stelle', dataIndex: 'name', immerSichtbar: true },
+  ]);
+  const sicht = (daten: Knoten[]) => (
+    <Datensicht<Knoten, 'stelle'>
+      bezeichnung="Funkplan"
+      form="tabelle"
+      spalten={knotenSpalten}
+      daten={daten}
+      zeilenSchluessel="key"
+      // Alle Knoten offen: sonst stünden Kinder gar nicht im DOM.
+      baum={{ kinder: 'kinder', aufgeklappt: ['a', 's', 'n'], onAufgeklappt: () => {} }}
+      karte={{
+        art: 'plan',
+        titel: { spalte: 'stelle', ziel: (k) => `/ziel/${k.key}` },
+        sekundaer: [],
+      }}
+    />
+  );
+  const folge = (c: HTMLElement) =>
+    [...c.querySelectorAll('tr.ant-table-row')].map((z) => z.getAttribute('data-row-key'));
+
+  it('ein neues KIND unter einem gezeigten Knoten wartet hinter dem Banner', async () => {
+    const { container, rerender } = renderMitProviders(sicht(START));
+    expect(folge(container)).toEqual(['a', 'e', 'g', 's', 'f']);
+
+    screen.getByRole('link', { name: '2. Zug' }).focus();
+    rerender(
+      sicht([kn('a', 'Abschnitt Nord', [kn('n', '0. Zug'), ...START[0].kinder!]), START[1]]),
+    );
+    expect(folge(container), 'keine Zeile rückt').toEqual(['a', 'e', 'g', 's', 'f']);
+    const banner = screen.getByRole('button', { name: '1 neuer Eintrag — anzeigen' });
+
+    await userEvent.click(banner);
+    expect(folge(container)).toEqual(['a', 'n', 'e', 'g', 's', 'f']);
+    expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
+  });
+
+  it('der Inhalt eines gehaltenen Kindes fließt weiter', () => {
+    const { container, rerender } = renderMitProviders(sicht(START));
+    screen.getByRole('link', { name: '2. Zug' }).focus();
+    rerender(
+      sicht([kn('a', 'Abschnitt Nord', [kn('e', '1. Zug (Pause)'), kn('g', '2. Zug')]), START[1]]),
+    );
+    expect(screen.getByRole('link', { name: '1. Zug (Pause)' })).toBeInTheDocument();
+    expect(folge(container)).toEqual(['a', 'e', 'g', 's', 'f']);
+  });
+
+  it('ein umgehängtes Kind bleibt am alten Ort, der Banner nennt den Umzug', async () => {
+    const { container, rerender } = renderMitProviders(sicht(START));
+    screen.getByRole('link', { name: '2. Zug' }).focus();
+    rerender(
+      sicht([
+        kn('a', 'Abschnitt Nord', [kn('g', '2. Zug')]),
+        kn('s', 'Abschnitt Süd', [kn('e', '1. Zug'), kn('f', 'Florian ELW')]),
+      ]),
+    );
+    expect(folge(container)).toEqual(['a', 'e', 'g', 's', 'f']);
+    await userEvent.click(screen.getByRole('button', { name: '1 umgehängt — anzeigen' }));
+    expect(folge(container)).toEqual(['a', 'g', 's', 'e', 'f']);
+  });
+
+  it('eine Umsortierung unter denselben Geschwistern wartet ebenfalls', () => {
+    const { container, rerender } = renderMitProviders(sicht(START));
+    screen.getByRole('link', { name: '2. Zug' }).focus();
+    rerender(sicht([kn('a', 'Abschnitt Nord', [kn('g', '2. Zug'), kn('e', '1. Zug')]), START[1]]));
+    expect(folge(container)).toEqual(['a', 'e', 'g', 's', 'f']);
+    expect(screen.getByRole('button', { name: '2 umsortiert — anzeigen' })).toBeInTheDocument();
+  });
+
+  it('neu und umgehängt zugleich stehen in EINEM Banner', () => {
+    const { rerender } = renderMitProviders(sicht(START));
+    screen.getByRole('link', { name: '2. Zug' }).focus();
+    rerender(
+      sicht([
+        kn('a', 'Abschnitt Nord', [kn('e', '1. Zug')]),
+        kn('s', 'Abschnitt Süd', [kn('f', 'Florian ELW'), kn('g', '2. Zug'), kn('n', 'Neu')]),
+      ]),
+    );
+    expect(
+      screen.getByRole('button', { name: '1 neuer Eintrag · 1 umgehängt — anzeigen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('ein entfallenes Kind fällt sofort weg, ohne Banner', () => {
+    const { container, rerender } = renderMitProviders(sicht(START));
+    screen.getByRole('link', { name: '2. Zug' }).focus();
+    rerender(sicht([kn('a', 'Abschnitt Nord', [kn('g', '2. Zug')]), START[1]]));
+    expect(folge(container)).toEqual(['a', 'g', 's', 'f']);
+    expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
+  });
+
+  it('nach „anzeigen“ hält die Schleuse ab dem neuen Stand weiter', async () => {
+    const { container, rerender } = renderMitProviders(sicht(START));
+    screen.getByRole('link', { name: '2. Zug' }).focus();
+    const mitN = [kn('a', 'Abschnitt Nord', [...START[0].kinder!, kn('n', '3. Zug')]), START[1]];
+    rerender(sicht(mitN));
+    await userEvent.click(screen.getByRole('button', { name: /anzeigen/ }));
+    rerender(sicht([mitN[0], kn('s', 'Abschnitt Süd', [kn('f', 'Florian ELW'), kn('x', 'X')])]));
+    expect(folge(container)).toEqual(['a', 'e', 'g', 'n', 's', 'f']);
+    expect(screen.getByRole('button', { name: '1 neuer Eintrag — anzeigen' })).toBeInTheDocument();
+  });
+});
+
+describe('Datensicht · Zeiger schließt die Schleuse (LFH-1020)', () => {
+  const zeilenZahl = (c: HTMLElement) => c.querySelectorAll('tr.ant-table-row').length;
+  const sicht = (daten: Fahrzeug[]) => (
+    <Datensicht<Fahrzeug, FahrzeugKey>
+      bezeichnung="Fahrzeuge im Einsatz"
+      spalten={spalten}
+      daten={daten}
+      zeilenSchluessel="id"
+      karte={karte}
+    />
+  );
+  const region = () => screen.getByRole('region', { name: 'Fahrzeuge im Einsatz' });
+
+  it('die Maus über einer flachen Liste hält neue Zeilen zurück', () => {
+    const { container, rerender } = renderMitProviders(sicht(DREI));
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    rerender(sicht([F(0, 'Florian 0'), ...DREI]));
+    expect(zeilenZahl(container)).toBe(3);
+    expect(screen.getByRole('button', { name: '1 neuer Eintrag — anzeigen' })).toBeInTheDocument();
+  });
+
+  it('geht der Zeiger, läuft der Zufluss durch', () => {
+    const { container, rerender } = renderMitProviders(sicht(DREI));
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    rerender(sicht([...DREI, F(4, 'Florian 4')]));
+    fireEvent.pointerLeave(region(), { pointerType: 'mouse' });
+    expect(zeilenZahl(container)).toBe(4);
+    expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
+  });
+
+  it('Betreten ohne Bewegung schließt nicht (Inhalt taucht unter dem ruhenden Zeiger auf)', () => {
+    const { container, rerender } = renderMitProviders(sicht(DREI));
+    fireEvent.pointerEnter(region(), { pointerType: 'mouse' });
+    rerender(sicht([...DREI, F(4, 'Florian 4')]));
+    expect(zeilenZahl(container)).toBe(4);
+  });
+
+  it('Touch schließt nicht; erst die Mausbewegung schließt', () => {
+    const { container, rerender } = renderMitProviders(sicht(DREI));
+    fireEvent.pointerEnter(region(), { pointerType: 'touch' });
+    fireEvent.pointerMove(region(), { pointerType: 'touch' });
+    rerender(sicht([...DREI, F(4, 'Florian 4')]));
+    expect(zeilenZahl(container)).toBe(4);
+
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    rerender(sicht([...DREI, F(4, 'Florian 4'), F(5, 'Florian 5')]));
+    expect(zeilenZahl(container)).toBe(4);
+  });
+
+  it('Zeiger raus bei Fokus drinnen hält weiter, Fokus raus bei Zeiger drinnen ebenso', () => {
+    const { container, rerender } = renderMitProviders(
+      <>
+        <button type="button">draußen</button>
+        {sicht(DREI)}
+      </>,
+    );
+    const mit = (daten: Fahrzeug[]) =>
+      rerender(
+        <>
+          <button type="button">draußen</button>
+          {sicht(daten)}
+        </>,
+      );
+    screen.getByRole('link', { name: 'Florian 1' }).focus();
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    fireEvent.pointerLeave(region(), { pointerType: 'mouse' });
+    mit([...DREI, F(4, 'Florian 4')]);
+    expect(zeilenZahl(container), 'der Fokus hält').toBe(3);
+
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    screen.getByRole('button', { name: 'draußen' }).focus();
+    mit([...DREI, F(4, 'Florian 4')]);
+    expect(zeilenZahl(container), 'der Zeiger hält').toBe(3);
+
+    fireEvent.pointerLeave(region(), { pointerType: 'mouse' });
+    expect(zeilenZahl(container), 'beides weg: offen').toBe(4);
+  });
+
+  it('eine leere Sicht friert unter dem Zeiger nicht ein', () => {
+    const { container, rerender } = renderMitProviders(sicht([]));
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    rerender(sicht(DREI));
+    expect(zeilenZahl(container)).toBe(3);
+  });
+
+  it('im Druck gilt die Schleuse nicht: Wartendes steht auf dem Papier', () => {
+    // Wie im Gerüst: Strg+P mit dem Zeiger über der Liste darf keinen Eintrag unterschlagen.
+    const { container, rerender } = renderMitProviders(sicht(DREI));
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    rerender(sicht([...DREI, F(4, 'Florian 4')]));
+    expect(zeilenZahl(container)).toBe(3);
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect(zeilenZahl(container)).toBe(4);
+    expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
+    expect(zeilenZahl(container), 'nach dem Druck hält sie wieder').toBe(3);
+  });
+
+  it('zufluss="sofort" hält auch unter dem Zeiger nicht', () => {
+    const { container, rerender } = rendere({ zufluss: 'sofort' });
+    fireEvent.pointerMove(region(), { pointerType: 'mouse' });
+    rerender(
+      <Datensicht<Fahrzeug, FahrzeugKey>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={spalten}
+        daten={[...DREI, F(4, 'Florian 4')]}
+        zeilenSchluessel="id"
+        karte={karte}
+        zufluss="sofort"
+      />,
+    );
+    expect(zeilenZahl(container)).toBe(4);
   });
 });
