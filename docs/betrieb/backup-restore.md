@@ -240,6 +240,9 @@ nachträglich geschwärzt:
   Frist; ein Einsatz, dessen Frist plus Karenz in der Zeit verstrichen ist, wird beim ersten
   Purge-Lauf nach dem Start geschwärzt. Nur eine Frist, die jemand bewusst in die
   Vergangenheit gesetzt hat, behält die volle Karenz ab dem Setzen.
+- **Fristen je Datenkategorie** (LFH-1049): Für die Frist einer Datenkategorie (Behandlung,
+  Personenauskunft, Anhänge) gilt bei Restore und Stillstand dasselbe. Die Kategorie wird mit
+  dem Ablauf ihrer Frist als Zeitpunkt vorgemerkt, und ihre Karenz beginnt nicht neu.
 - **Endgültig gelöschte Skelette** (LFH-750, nur mit einer Skelett-Frist der Organisation):
   Eine Sicherung von vor der Löschung bringt das Skelett samt ETB zurück. Der nächste
   Purge-Lauf löscht es erneut, denn die Frist ergibt sich aus Abschluss und Org-Einstellung.
