@@ -152,11 +152,6 @@ impl ReaderCache {
         }
     }
 
-    /// Verwirft alle Pools (Sonderfälle).
-    pub fn leeren(&self) {
-        self.map().clear();
-    }
-
     #[cfg(test)]
     fn anzahl(&self) -> usize {
         self.map().len()
@@ -165,6 +160,11 @@ impl ReaderCache {
 
 /// Prozessweiter Reader-Cache der Offline-Kachelauslieferung, gekeyt über den Pfad, unter dem die
 /// Karte registriert ist (`karten_dir` + relativer Pfad).
+///
+/// Bewusst ohne „alles verwerfen“ (LFH-1036): Tests eines Binaries teilen diesen Cache und laufen
+/// parallel. Ein globales Leeren aus einem Routentest verwarf früher mitten in einem anderen Test
+/// dessen Pool, der dann die schon ersetzte Datei las. Verworfen wird nur je Pfad; Tests des
+/// Caches selbst bauen ihren eigenen [`ReaderCache`].
 static READER: LazyLock<ReaderCache> = LazyLock::new(ReaderCache::new);
 
 /// Der prozessweite [`ReaderCache`].
@@ -175,11 +175,6 @@ pub fn reader() -> &'static ReaderCache {
 /// Verwirft den gecachten Pool für `pfad`, s. [`ReaderCache::verwerfen`].
 pub fn invalidate_reader_fuer(pfad: &Path) {
     READER.verwerfen(pfad);
-}
-
-/// Verwirft alle gecachten Pools, s. [`ReaderCache::leeren`].
-pub fn invalidate_reader() {
-    READER.leeren();
 }
 
 #[cfg(test)]
@@ -331,7 +326,10 @@ mod tests {
         std::fs::remove_file(&a).unwrap();
         schreibe_datei_fixture(&a, &[0xCC]).await;
 
-        // Ohne Invalidierung liefert der gecachte Pool weiterhin den alten Inhalt.
+        // Ohne Invalidierung liefert der gecachte Pool weiterhin den alten Inhalt. Das hält nur,
+        // weil vor dem Tausch keine Abfrage auf `a` lief (LFH-1036): eine Verbindung, deren
+        // Rückgabe an den Pool noch aussteht, zwingt den Pool zu einer neuen, und die öffnet
+        // schon die neue Datei (`neue_verbindung_sieht_die_ersetzte_datei`).
         let noch_alt = cache
             .reader_fuer(&a, &a, || oeffne_gezaehlt(&a, &oeffnungen))
             .await
@@ -352,9 +350,25 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(oeffnungen.load(Ordering::SeqCst), 3, "nur a neu geöffnet");
+    }
 
-        cache.leeren();
-        assert_eq!(cache.anzahl(), 0);
+    // Warum der Test oben vor dem Tausch nicht liest (LFH-1036): solange die erste Verbindung
+    // belegt ist, öffnet der Pool eine zweite, und die sieht die ersetzte Datei. Ein Pool hält die
+    // alte Datei also nur über die Verbindungen, die er schon offen hat; verlässlich ist erst das
+    // Verwerfen.
+    #[tokio::test]
+    async fn neue_verbindung_sieht_die_ersetzte_datei() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("karte-1.mbtiles");
+        schreibe_datei_fixture(&a, &[0xAA]).await;
+        let pool = oeffne_readonly(&a).await.unwrap();
+        let belegt = pool.acquire().await.unwrap();
+
+        std::fs::remove_file(&a).unwrap();
+        schreibe_datei_fixture(&a, &[0xCC]).await;
+
+        assert_eq!(lies_tile(&pool, 1, 0, 0).await.unwrap(), Some(vec![0xCC]));
+        drop(belegt);
     }
 
     // Zeigt derselbe Pfad auf ein anderes reales Ziel (Symlink umgebogen), öffnet der Cache neu

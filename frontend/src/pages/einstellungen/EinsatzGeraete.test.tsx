@@ -40,7 +40,15 @@ interface Aufbau {
   rolle?: string;
   kopplungen?: unknown[];
   sperren?: unknown[];
+  ansichten?: unknown[];
 }
+
+/** Die heute koppelbaren Ansichten, wie der Server sie anbietet (LFH-1040). */
+const ANSICHTEN = [
+  { ansicht: 'uhs-tablet', stellenart: 'uhs' },
+  { ansicht: 'uhs-laptop', stellenart: 'uhs' },
+  { ansicht: 'lagemonitor', stellenart: null },
+];
 
 function stelleBereit(a: Aufbau = {}) {
   const aufrufe: { pfad: string; body: unknown }[] = [];
@@ -55,9 +63,24 @@ function stelleBereit(a: Aufbau = {}) {
       return HttpResponse.json({
         kopplungen: a.kopplungen ?? [kopplung(1, 'aktiv')],
         sperren: a.sperren ?? [],
+        ansichten: a.ansichten ?? ANSICHTEN,
       });
     }),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
+    http.get('/api/einsaetze/1/betreuung', () =>
+      HttpResponse.json({
+        bezirke: [],
+        stellen: [
+          { id: 7, bezeichnung: 'Turnhalle Ost', status: 'geschlossen' },
+          {
+            id: 8,
+            bezeichnung: 'Schule',
+            status: 'in_betrieb',
+            storniert_at: '2026-10-04 10:00:00',
+          },
+        ],
+      }),
+    ),
     http.post('/api/einsaetze/1/geraete', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: 'anlegen', body });
@@ -175,7 +198,11 @@ describe('EinsatzGeraete (LFH-892)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
 
     await waitFor(() => expect(aufrufe).toHaveLength(1));
-    expect(aufrufe[0].body).toEqual({ ansicht: 'uhs-tablet', uhs_id: 2, bezeichnung: 'Tablet 5' });
+    expect(aufrufe[0].body).toEqual({
+      ansicht: 'uhs-tablet',
+      stelle_id: 2,
+      bezeichnung: 'Tablet 5',
+    });
     const code = await screen.findByText('ABCD-1234');
     expect(code).toBeInTheDocument();
     const dialog = code.closest<HTMLElement>('[data-lfh="kopplungscode"]')!;
@@ -195,8 +222,49 @@ describe('EinsatzGeraete (LFH-892)', () => {
     await waitFor(() => expect(aufrufe).toHaveLength(1));
     expect(aufrufe[0].body).toEqual({
       ansicht: 'lagemonitor',
-      uhs_id: null,
+      stelle_id: null,
       bezeichnung: 'Monitor 1',
+    });
+  });
+
+  it('bietet nur die Ansichten an, die der Server freigibt', async () => {
+    stelleBereit({ kopplungen: [] });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Ansicht' }));
+    await waitFor(() =>
+      expect(optionenVon('Ansicht').map((k) => k.getAttribute('title'))).toEqual([
+        'UHS-Tablet',
+        'UHS-Laptop',
+        'Lagemonitor',
+      ]),
+    );
+  });
+
+  it('fragt nach der Stelle der Art, die die Ansicht braucht', async () => {
+    const { aufrufe } = stelleBereit({
+      kopplungen: [],
+      ansichten: [...ANSICHTEN, { ansicht: 'betreuungsstelle', stellenart: 'betreuungsstelle' }],
+    });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
+    await waehle('Ansicht', 'Betreuungsstelle');
+    expect(screen.queryByRole('combobox', { name: 'Unfallhilfsstelle' })).not.toBeInTheDocument();
+    // Eine geschlossene Stelle nimmt eine Kopplung, eine stornierte nicht.
+    await userEvent.click(screen.getByRole('combobox', { name: 'Betreuungsstelle' }));
+    await waitFor(() =>
+      expect(optionenVon('Betreuungsstelle').map((k) => k.getAttribute('title'))).toEqual([
+        'Turnhalle Ost',
+      ]),
+    );
+    await userEvent.click(optionenVon('Betreuungsstelle')[0]);
+    await userEvent.type(screen.getByLabelText('Gerätebezeichnung'), 'Tablet BS');
+    await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
+    await waitFor(() => expect(aufrufe).toHaveLength(1));
+    expect(aufrufe[0].body).toEqual({
+      ansicht: 'betreuungsstelle',
+      stelle_id: 7,
+      bezeichnung: 'Tablet BS',
     });
   });
 

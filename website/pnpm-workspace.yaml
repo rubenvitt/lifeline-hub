@@ -1,0 +1,6 @@
+# Eigenständiges Paket (LFH-1111): diese Datei hält pnpm davon ab, eine Wurzel weiter oben zu
+# suchen. esbuild braucht sein Installationsskript; sharp bleibt aus, weil die Seite keine
+# Bilder verarbeitet.
+allowBuilds:
+  esbuild: true
+  sharp: false

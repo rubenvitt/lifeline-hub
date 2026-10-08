@@ -1,0 +1,255 @@
+---
+/**
+ * Grundriss der Marketing-Seite: Kopfleiste wie der Rahmen der App (52 px, in beiden Modi
+ * dunkel, Markenzelle 60 px, Wortmarke Mono, Uhr Mono), Inhalt, Fuß.
+ * Nachtbetrieb ist Vorgabe; das Skript im <head> setzt den Modus vor dem ersten Paint.
+ */
+import '../styles/rollen.css';
+import '../styles/seite.css';
+import Bildmarke from '../components/Bildmarke.astro';
+
+interface Props {
+  titel: string;
+  beschreibung: string;
+}
+const { titel, beschreibung } = Astro.props;
+const repo = 'https://github.com/rubenvitt/lifeline-hub';
+---
+
+<!doctype html>
+<html lang="de" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titel}</title>
+    <meta name="description" content={beschreibung} />
+    <meta name="theme-color" content="#0c0e11" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/schriften/archivo-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/schriften/archivo-600.woff2" as="font" type="font/woff2" crossorigin />
+    <link
+      rel="preload"
+      href="/schriften/jetbrains-mono-500.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <script is:inline>
+      try {
+        if (localStorage.getItem('lfh-website-modus') === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (_) {}
+    </script>
+  </head>
+  <body>
+    <a class="sprung" href="#inhalt">Zum Inhalt</a>
+    <header class="kopfleiste">
+      <a class="markenzelle" href="/" aria-label="Lifeline Hub, Startseite">
+        <Bildmarke groesse={22} />
+      </a>
+      <span class="wortmarke">lifeline-hub</span>
+      <nav class="navigation" aria-label="Abschnitte">
+        <a href="#funktionen">Module</a>
+        <a href="#etb">ETB</a>
+        <a href="#einsatz">Einsatztauglich</a>
+        <a href="#stand">Stand</a>
+      </nav>
+      <div class="rechts">
+        <div class="modus" role="group" aria-label="Darstellung">
+          <button type="button" data-modus="dark" aria-pressed="true">Nacht</button>
+          <button type="button" data-modus="light" aria-pressed="false">Tag</button>
+        </div>
+        <time class="uhr" data-uhr aria-hidden="true">--:--:--</time>
+      </div>
+    </header>
+
+    <main id="inhalt">
+      <slot />
+    </main>
+
+    <footer class="fuss">
+      <div class="fuss-innen">
+        <div class="fuss-marke">
+          <Bildmarke groesse={18} />
+          <span class="wortmarke">lifeline-hub</span>
+        </div>
+        <p>Alle Rechte vorbehalten. Quelltext einsehbar, keine Open-Source-Lizenz.</p>
+        <p>
+          Schriften Archivo und JetBrains Mono unter SIL Open Font License 1.1:
+          <a href="/schriften/lizenzen/OFL-Archivo.txt">Archivo</a> ·
+          <a href="/schriften/lizenzen/OFL-Archivo-Narrow.txt">Archivo Narrow</a> ·
+          <a href="/schriften/lizenzen/OFL-JetBrains-Mono.txt">JetBrains Mono</a>
+        </p>
+        <p><a href={repo} target="_blank" rel="noopener noreferrer">GitHub ↗</a></p>
+      </div>
+    </footer>
+
+    <script>
+      const wurzel = document.documentElement;
+      const knoepfe = document.querySelectorAll<HTMLButtonElement>('[data-modus]');
+
+      function zeigeModus(modus: string) {
+        wurzel.setAttribute('data-theme', modus);
+        knoepfe.forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.modus === modus)));
+      }
+
+      zeigeModus(wurzel.getAttribute('data-theme') ?? 'dark');
+      knoepfe.forEach((knopf) =>
+        knopf.addEventListener('click', () => {
+          const modus = knopf.dataset.modus ?? 'dark';
+          zeigeModus(modus);
+          try {
+            localStorage.setItem('lfh-website-modus', modus);
+          } catch {
+            /* ohne Speicher gilt die Wahl nur für diesen Besuch */
+          }
+        }),
+      );
+
+      const uhr = document.querySelector<HTMLTimeElement>('[data-uhr]');
+      const format = new Intl.DateTimeFormat('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      function ticke() {
+        if (uhr) uhr.textContent = format.format(new Date());
+      }
+      ticke();
+      setInterval(ticke, 1000);
+    </script>
+  </body>
+</html>
+
+<style>
+  .sprung {
+    position: absolute;
+    left: -9999px;
+    top: 8px;
+    z-index: 20;
+    padding: 8px 12px;
+    background: var(--lfh-bedien);
+    color: var(--lfh-auf-bedien);
+  }
+  .sprung:focus {
+    left: 8px;
+  }
+
+  .kopfleiste {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    height: 52px;
+    padding-right: 12px;
+    background: var(--lfh-rahmen-grund);
+    border-bottom: 1px solid var(--lfh-rahmen-linie);
+    color: var(--lfh-rahmen-text);
+  }
+  .markenzelle {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 100%;
+    color: var(--lfh-rahmen-text);
+    border-right: 1px solid var(--lfh-rahmen-linie);
+  }
+  .wortmarke {
+    padding: 0 16px;
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .navigation {
+    display: none;
+    height: 100%;
+  }
+  .navigation a {
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 13px;
+    color: var(--lfh-rahmen-gedaempft);
+    text-decoration: none;
+    border-left: 1px solid var(--lfh-rahmen-linie);
+  }
+  .navigation a:last-child {
+    border-right: 1px solid var(--lfh-rahmen-linie);
+  }
+  .navigation a:hover {
+    color: var(--lfh-rahmen-text);
+    background: var(--lfh-rahmen-aktiv);
+  }
+  .rechts {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+  }
+  .modus {
+    display: flex;
+    gap: 1px;
+    background: var(--lfh-rahmen-linie);
+    border: 1px solid var(--lfh-rahmen-linie);
+  }
+  .modus button {
+    min-height: 30px;
+    padding: 0 12px;
+    border: 0;
+    background: var(--lfh-rahmen-grund);
+    color: var(--lfh-rahmen-gedaempft);
+    font: 500 12px var(--lfh-schrift-text);
+    cursor: pointer;
+  }
+  .modus button[aria-pressed='true'] {
+    background: var(--lfh-rahmen-aktiv);
+    color: var(--lfh-rahmen-text);
+  }
+  .uhr {
+    display: none;
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: var(--lfh-rahmen-text);
+  }
+
+  .fuss {
+    border-top: 1px solid var(--lfh-linie);
+    background: var(--lfh-paneel);
+  }
+  .fuss-innen {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: var(--seite-breite);
+    margin: 0 auto;
+    padding: 32px var(--seite-rinne) 40px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--lfh-gedaempft);
+  }
+  .fuss-innen p {
+    margin: 0;
+  }
+  .fuss-marke {
+    display: flex;
+    align-items: center;
+    color: var(--lfh-text);
+  }
+  .fuss-marke .wortmarke {
+    padding: 0 10px;
+  }
+
+  @media (min-width: 640px) {
+    .uhr {
+      display: block;
+    }
+  }
+  @media (min-width: 960px) {
+    .navigation {
+      display: flex;
+    }
+  }
+</style>

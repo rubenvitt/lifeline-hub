@@ -13,7 +13,8 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PeerIp, PfadParam};
 use crate::geraet::repo::{self, KopplungAnzeige, NeueKopplung};
 use crate::geraet::{
-    code, Funktionsansicht, GeraetAnzeige, BEZEICHNUNG_MAX, PROVIDER, STANDARD_STUNDEN,
+    code, Bindungsart, Funktionsansicht, GeraetAnzeige, Stelle, BEZEICHNUNG_MAX, PROVIDER,
+    STANDARD_STUNDEN,
 };
 use crate::uhs::UhsStatus;
 use axum::extract::State;
@@ -21,6 +22,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use axum_extra::extract::cookie::CookieJar;
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.
@@ -31,11 +33,22 @@ pub struct AnsichtSperre {
     pub gesperrte_module: Vec<String>,
 }
 
+/// Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AnsichtAuswahl {
+    pub ansicht: Funktionsansicht,
+    /// Art der Stelle, die die Kopplung braucht (`stelle_id`); fehlt ohne Stellenbindung.
+    pub stellenart: Option<Bindungsart>,
+}
+
 /// Geräteübersicht der Einsatzleitung.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct GeraeteUebersicht {
     pub kopplungen: Vec<KopplungAnzeige>,
     pub sperren: Vec<AnsichtSperre>,
+    /// Die koppelbaren Ansichten in Bedienreihenfolge (LFH-1040): eine Ansicht steht hier erst,
+    /// wenn sie verfügbar ist.
+    pub ansichten: Vec<AnsichtAuswahl>,
 }
 
 /// Ein frisch ausgestellter Kopplungscode. Der Klartext verlässt den Server nur hier, einmal.
@@ -74,16 +87,28 @@ pub async fn liste(
             gesperrte_module: gesperrt.into_iter().map(str::to_string).collect(),
         });
     }
+    let ansichten = Funktionsansicht::ALLE
+        .into_iter()
+        .filter(|a| a.ist_verfuegbar())
+        .map(|ansicht| AnsichtAuswahl {
+            ansicht,
+            stellenart: ansicht.stellenart(),
+        })
+        .collect();
     Ok(Json(GeraeteUebersicht {
         kopplungen,
         sperren,
+        ansichten,
     }))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct NeueKopplungBody {
     pub ansicht: String,
-    pub uhs_id: Option<i64>,
+    /// Stelle der stellengebundenen Ansichten, gleich welcher Art (LFH-1040). `uhs_id` gilt als
+    /// derselbe Wert, wie vor der Verallgemeinerung.
+    #[serde(alias = "uhs_id")]
+    pub stelle_id: Option<i64>,
     pub bezeichnung: String,
     /// Ende der Kopplung (UTC, `YYYY-MM-DD HH:MM[:SS]`). Ohne Angabe [`STANDARD_STUNDEN`].
     pub laeuft_ab_at: Option<String>,
@@ -101,6 +126,54 @@ fn ende_aus(eingabe: Option<&str>) -> Result<String, AppError> {
     Ok(ende)
 }
 
+/// Prüft die Stelle einer neuen Kopplung und liefert ihre Bezeichnung. Eine Stelle eines anderen
+/// Einsatzes ist 404. Eine UHS oder ein Bereitstellungsraum, storniert oder aufgelöst, ist 422;
+/// eine stornierte Betreuungsstelle 409, eine geschlossene ist zulässig (wie beim Verweis aus dem
+/// Verbleib). Ein Einsatzabschnitt muss nur bestehen.
+async fn stelle_pruefen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    art: Bindungsart,
+    id: i64,
+) -> Result<String, AppError> {
+    match art {
+        Bindungsart::Uhs => {
+            let uhs = crate::uhs::repo::laden(pool, einsatz_id, id).await?;
+            if uhs.storniert_at.is_some() || uhs.status == UhsStatus::Aufgeloest {
+                return Err(AppError::UnprocessableEntity(
+                    "Die UHS ist storniert oder aufgelöst".into(),
+                ));
+            }
+            Ok(uhs.bezeichnung)
+        }
+        Bindungsart::Betreuungsstelle => {
+            let stelle = crate::betreuung::repo::stelle_laden(pool, einsatz_id, id).await?;
+            if stelle.storniert_at.is_some() {
+                return Err(AppError::Conflict(
+                    "Die Betreuungsstelle ist storniert".into(),
+                ));
+            }
+            Ok(stelle.bezeichnung)
+        }
+        Bindungsart::Bereitstellungsraum => {
+            let br = crate::bereitstellungsraum::repo::laden(pool, einsatz_id, id).await?;
+            if br.storniert_at.is_some()
+                || br.status == crate::bereitstellungsraum::BrStatus::Aufgeloest
+            {
+                return Err(AppError::UnprocessableEntity(
+                    "Der Bereitstellungsraum ist storniert oder aufgelöst".into(),
+                ));
+            }
+            Ok(br.bezeichnung)
+        }
+        Bindungsart::Einsatzabschnitt => {
+            Ok(crate::einsatzabschnitt::repo::laden(pool, einsatz_id, id)
+                .await?
+                .name)
+        }
+    }
+}
+
 /// POST /api/einsaetze/{id}/geraete — Kopplung anlegen und ersten Code ausstellen. Nur die
 /// Einsatzleitung eines aktiven Einsatzes. Schreibt einen System-Eintrag ins ETB.
 pub async fn anlegen(
@@ -116,36 +189,37 @@ pub async fn anlegen(
             "bezeichnung darf höchstens {BEZEICHNUNG_MAX} Zeichen haben"
         )));
     }
+    if !ansicht.ist_verfuegbar() {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Die Ansicht {} ist noch nicht verfügbar",
+            ansicht.label()
+        )));
+    }
     let einsatz_id = ctx.einsatz.id;
-    let stelle = match (ansicht.ist_stellengebunden(), body.uhs_id) {
-        (true, None) => {
+    let (stelle, stelle_name) = match (ansicht.stellenart(), body.stelle_id) {
+        (Some(_), None) => {
             return Err(AppError::Validation(format!(
-                "{} braucht eine UHS (uhs_id)",
+                "{} braucht eine Stelle (stelle_id)",
                 ansicht.label()
             )))
         }
-        (false, Some(_)) => {
+        (None, Some(_)) => {
             return Err(AppError::Validation(format!(
-                "{} ist an keine UHS gebunden",
+                "{} ist an keine Stelle gebunden",
                 ansicht.label()
             )))
         }
-        (false, None) => None,
-        (true, Some(uhs_id)) => {
-            let uhs = crate::uhs::repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404
-            if uhs.storniert_at.is_some() || uhs.status == UhsStatus::Aufgeloest {
-                return Err(AppError::UnprocessableEntity(
-                    "Die UHS ist storniert oder aufgelöst".into(),
-                ));
-            }
-            Some(uhs.bezeichnung)
+        (None, None) => (None, None),
+        (Some(art), Some(id)) => {
+            let name = stelle_pruefen(&state.pool, einsatz_id, art, id).await?;
+            (Some(Stelle { art, id }), Some(name))
         }
     };
     let laeuft_ab_at = ende_aus(body.laeuft_ab_at.as_deref())?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let etb_text = format!(
         "Gerät „{}“ als {} angelegt, Kopplung bis {} UTC.",
-        repo::anzeigename(stelle.as_deref(), &bezeichnung),
+        repo::anzeigename(stelle_name.as_deref(), &bezeichnung),
         ansicht.label(),
         laeuft_ab_at
     );
@@ -157,8 +231,8 @@ pub async fn anlegen(
                 einsatz_id,
                 org_id: ctx.einsatz.org_id,
                 ansicht,
-                uhs_id: body.uhs_id,
-                stelle: stelle.as_deref(),
+                stelle,
+                stelle_name: stelle_name.as_deref(),
                 bezeichnung: &bezeichnung,
                 laeuft_ab_at: &laeuft_ab_at,
                 von,
@@ -375,6 +449,7 @@ pub fn geraet_anzeige(k: &KopplungAnzeige, einsatz_id: i64, kopplung_id: i64) ->
         einsatz_id,
         ansicht: k.ansicht,
         uhs_id: k.uhs_id,
+        stelle_id: k.stelle_id,
         stelle: k.stelle.clone(),
         bezeichnung: k.bezeichnung.clone(),
         laeuft_ab_at: k.laeuft_ab_at.clone(),

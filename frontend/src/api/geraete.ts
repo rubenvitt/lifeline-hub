@@ -14,11 +14,12 @@ export function ladeGeraete(einsatzId: number): Promise<GeraeteUebersicht> {
   return apiGet<GeraeteUebersicht>(`/api/einsaetze/${einsatzId}/geraete`);
 }
 
-/** Anlegefelder einer Kopplung. `uhs_id` genau bei den stellengebundenen Ansichten. Ohne
- *  `laeuft_ab_at` gilt die Vorgabe des Servers (24 Stunden). */
+/** Anlegefelder einer Kopplung. `stelle_id` genau bei den stellengebundenen Ansichten, die Art
+ *  der Stelle folgt aus der Ansicht (LFH-1040). Ohne `laeuft_ab_at` gilt die Vorgabe des Servers
+ *  (24 Stunden). */
 export interface NeueKopplung {
   ansicht: Funktionsansicht;
-  uhs_id: number | null;
+  stelle_id: number | null;
   bezeichnung: string;
   /** UTC ohne Zone (`alsBackendZeit`). */
   laeuft_ab_at?: string;

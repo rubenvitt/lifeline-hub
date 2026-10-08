@@ -162,6 +162,10 @@ draußen gelassen werden.
   `dayjs()`, damit „Chip öffnen, OK“ und „Chip weglassen“ dieselbe Zeit ergeben. Eine
   Zukunftsprüfung im Client an einer Zeiteingabe misst an derselben Uhr, sonst fällt „Jetzt“ auf
   einem nachgehenden Gerät durch. Eine eingetragene Zeit geht unverändert hinaus. Der Server
-  begrenzt ETB- und Meldungs-Ereigniszeiten bewusst nicht. Weitere Vorbelegungen aus `dayjs()`
-  sind offen (LFH-1031). Herleitung:
+  begrenzt ETB- und Meldungs-Ereigniszeiten bewusst nicht. Herleitung:
   `openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`.
+- **Dasselbe gilt für jede gesendete Vorbelegung „jetzt“** (LFH-1031): Auftrag „erteilt am“,
+  Alarmzeit beim Anlegen eines Einsatzes, Fälligkeit einer Erinnerung, Zeitpunkt, Schnellwahl
+  und Terminprüfung beim Abschluss einer Lagebesprechung, Vorgabe und Schnellwahl der
+  Wiedervorlage. Laufende Anzeigen und ihre Timer (Uhren, „vor 3 min“, „überfällig“, der Chip
+  „Nächste Lagebesprechung“) bleiben bei der Geräteuhr. Tests: `test/vorgehendeUhr.ts`.

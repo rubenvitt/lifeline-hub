@@ -873,6 +873,25 @@ export function antdKaestchen(dichte: Dichte): NonNullable<ConfigProviderProps['
   return { styles: ({ props }) => (props.children == null ? {} : { root: boden }) };
 }
 
+/**
+ * Der Boden des beschrifteten Optionsknopfs für JEDES `Radio` (LFH-1048): dasselbe Maß wie
+ * {@link antdKaestchen}, 24 / 48 / 72, dazu Kreis und Text senkrecht mittig.
+ *
+ * antd baut `label.ant-radio-wrapper` wie das Kästchen-Label (`inline-flex`, Ausrichtung
+ * `baseline`) und kennt für dessen Höhe ebenfalls kein Komponenten-Token: ohne Boden gemessen
+ * 21,5 / 23 / 23 px (Kartenansicht löschen, `e2e/trefflaeche-optionsknopf.spec.ts`). Ohne Text
+ * bleibt der Optionsknopf frei, wie die Auswahlspalte einer Tabelle ihn baut.
+ *
+ * `Radio.Button` und die Gruppe mit `optionType="button"` laufen durch dieselbe Stilfunktion, und
+ * die Props verraten den Knopf nicht (antd liest ihn aus dem Gruppenkontext). Der Boden ist dort
+ * wirkungslos: der Knopf ist `inline-block` (kein `alignItems`) und `controlHeight` bzw.
+ * `controlHeightSM` hoch, beide nie unter `kleineZeilenhoehe` (`tokens.test.ts`).
+ */
+export function antdOptionsknopf(dichte: Dichte): NonNullable<ConfigProviderProps['radio']> {
+  const boden = { minHeight: dichten[dichte].kleineZeilenhoehe, alignItems: 'center' } as const;
+  return { styles: ({ props }) => (props.children == null ? {} : { root: boden }) };
+}
+
 /** Eine deckende Rollenfarbe `#rrggbb` als `rgba(…)` mit Deckkraft. */
 function mitDeckkraft(hex: string, deckkraft: number): string {
   const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));

@@ -1,0 +1,673 @@
+---
+import Grundriss from '../layouts/Grundriss.astro';
+import Augenbraue from '../components/Augenbraue.astro';
+import Knopf from '../components/Knopf.astro';
+import Paneel from '../components/Paneel.astro';
+import Kennzahl from '../components/Kennzahl.astro';
+import StatusChip from '../components/StatusChip.astro';
+import Zeitachseneintrag from '../components/Zeitachseneintrag.astro';
+import { bereiche, modulAnzahl } from '../daten/module';
+
+const repo = 'https://github.com/rubenvitt/lifeline-hub';
+
+const leitsaetze = [
+  {
+    titel: 'Ohne Netz',
+    kennung: 'OFFLINE',
+    text: 'Die Lagekarte liest ihre Kacheln aus einer lokalen Datei. ETB, Meldebild, Betroffene und Aufträge bleiben lesbar, neue Einträge werden vorgemerkt und nachgereicht.',
+  },
+  {
+    titel: 'Eine Datei',
+    kennung: 'BINARY',
+    text: 'Backend, Oberfläche, SQLite und OpenSSL stecken in einer ausführbaren Datei. Auf dem Zielrechner wird nichts installiert: kopieren, starten.',
+  },
+  {
+    titel: 'Bedienbar unter Stress',
+    kennung: 'HANDSCHUH',
+    text: 'Drei Dichten bis 72 px je Zeile, Nachtbetrieb als Vorgabe, Helligkeit stufenlos. Zahlen, Zeiten und Funkrufnamen stehen immer in Mono.',
+  },
+  {
+    titel: 'Geräte koppeln',
+    kennung: 'TABLET · GROSSBILD',
+    text: 'Ein Tablet bedient genau eine Unfallhilfsstelle oder die Aufnahme. Der Lagemonitor zeigt das Lagebild auf dem Großbild, ohne Namen.',
+  },
+  {
+    titel: 'Auf Papier',
+    kennung: 'DRUCK',
+    text: 'ETB, Meldebild, Funkplan, Fernmeldeskizze und Führungsorganisation drucken mit Kopf und Seitenzählung, direkt aus dem Browser.',
+  },
+  {
+    titel: 'Zugriff geschützt',
+    kennung: 'PASSKEY · TOTP · OIDC',
+    text: 'Anmeldung mit Passkey, zweitem Faktor oder dem Verzeichnis der Organisation. Rechte je Modul, Verwaltungszugriffe werden protokolliert.',
+  },
+];
+
+const meldebild = [
+  { ruf: 'Florian Nord 1-44-1', einheit: 'HLF 20', code: '4', wort: 'am Einsatzort', ton: 'bedien', seit: '13:42' },
+  { ruf: 'Florian Nord 1-19-1', einheit: 'TLF 3000', code: '3', wort: 'Anfahrt', ton: 'achtung', seit: '14:01' },
+  { ruf: 'Rotkreuz Nord 71-83-1', einheit: 'RTW', code: '2', wort: 'einsatzbereit', ton: 'normal', seit: '12:55' },
+  { ruf: 'Heros Nord 23-52-1', einheit: 'GW-San', code: '6', wort: 'nicht einsatzbereit', ton: 'alarm', seit: '13:18' },
+] as const;
+---
+
+<Grundriss
+  titel="Lifeline Hub · Führungsunterstützung für Einsatzlagen"
+  beschreibung="Einsatztagebuch, Lagekarte, Meldebild, Betroffene und Aufträge in einer Anwendung, die im Einsatzleitwagen ohne Internet läuft."
+>
+  <!-- ── Einstieg ────────────────────────────────────────────────────────── -->
+  <section class="einstieg" aria-labelledby="titel">
+    <div class="einstieg-innen">
+      <div class="einstieg-text">
+        <Augenbraue ton="marke" mono>Führungsunterstützung · Bevölkerungsschutz</Augenbraue>
+        <h1 id="titel">Die Lage im Blick. Auch wenn das Netz fehlt.</h1>
+        <p class="einleitung">
+          Lifeline Hub bündelt Einsatztagebuch, Lagekarte, Meldebild, Betroffenen- und
+          Schadenserfassung, Meldungen und Aufträge in einer Anwendung. Sie läuft als eine Datei
+          im Einsatzleitwagen oder auf einem Mini-PC, ohne Internetverbindung.
+        </p>
+        <div class="aktionen">
+          <Knopf href="#funktionen">Module ansehen</Knopf>
+          <Knopf href={repo} art="sekundaer" extern>Quelltext</Knopf>
+        </div>
+        <p class="stand mono">Frühe Alpha · noch kein Release</p>
+      </div>
+
+      <div class="tafel" aria-label="Beispiel einer Überblicksseite">
+        <div class="tafel-kopf">
+          <span class="punkt" aria-hidden="true"></span>
+          <span class="mono">Ü-2026-014</span>
+          <span class="tafel-name">Übung Hochwasser Nord</span>
+          <span class="tafel-beispiel">Beispiel</span>
+        </div>
+        <div class="fugenraster tafel-zahlen">
+          <Kennzahl augenbraue="Einheiten" zahl="14" notiz="Stärke 2/6/31/39" />
+          <Kennzahl augenbraue="Aufträge offen" zahl="7" ton="alarm" notiz="davon 2 überfällig" />
+          <Kennzahl augenbraue="Betroffene" zahl="48" notiz="SK I 2 · II 5 · III 12" />
+          <Kennzahl augenbraue="Pegel" zahl="6,42" einheit="m" ton="achtung" notiz="steigend · Höchststand 6,90 m erwartet" />
+        </div>
+        <ol class="tafel-etb">
+          <Zeitachseneintrag zeit="14:06" nr="0142" typ="anordnung" weg="ELW 1 → EA Nord · Funk">
+            Abschnitt Nord verlegt zwei Trupps zur Deichkrone km 4,2.
+          </Zeitachseneintrag>
+          <Zeitachseneintrag zeit="14:02" nr="0141" typ="meldung" weg="EA Nord → ELW 1 · Funk">
+            Sickerstelle am Deichfuß, Sandsäcke angefordert.
+          </Zeitachseneintrag>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Eckdaten ───────────────────────────────────────────────────────── -->
+  <section class="abschnitt eckdaten-abschnitt" aria-label="Eckdaten">
+    <div class="fugenraster eckdaten">
+      <Kennzahl augenbraue="Datei" zahl="1" gross notiz="Backend, Oberfläche, SQLite und OpenSSL in einem Binary" />
+      <Kennzahl augenbraue="Dienste" zahl="0" gross notiz="Kein Node.js, kein Webserver, keine Datenbank auf dem Zielrechner" />
+      <Kennzahl augenbraue="Module" zahl={String(modulAnzahl)} gross notiz="In fünf Bereichen von Führung bis Kommunikation" />
+      <Kennzahl augenbraue="Dichten" zahl="3" gross notiz="Kompakt, komfortabel, Handschuh" />
+    </div>
+  </section>
+
+  <!-- ── Module ─────────────────────────────────────────────────────────── -->
+  <section class="abschnitt" id="funktionen" aria-labelledby="funktionen-titel">
+    <div class="abschnitt-kopf">
+      <Augenbraue ton="marke" mono>Module</Augenbraue>
+      <h2 class="ueberschrift" id="funktionen-titel">Was die Einsatzleitung führt, an einem Ort.</h2>
+      <p class="lauftext">
+        Jedes Modul lässt sich je Einsatz zu- und abschalten. Was nicht gebraucht wird, steht
+        nicht im Weg.
+      </p>
+    </div>
+    <div class="bereiche">
+      {
+        bereiche.map((bereich) => (
+          <Paneel titel={bereich.name} meta={`${bereich.module.length} Module`} als="h3">
+            <ul class="modulliste">
+              {bereich.module.map((modul) => (
+                <li>
+                  <span class="modul-name">{modul.name}</span>
+                  <span class="modul-beschreibung">{modul.beschreibung}</span>
+                </li>
+              ))}
+            </ul>
+          </Paneel>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- ── ETB ────────────────────────────────────────────────────────────── -->
+  <section class="abschnitt zweispaltig" id="etb" aria-labelledby="etb-titel">
+    <div class="abschnitt-kopf">
+      <Augenbraue ton="marke" mono>Einsatztagebuch</Augenbraue>
+      <h2 class="ueberschrift" id="etb-titel">Der Verlauf als Zeitachse.</h2>
+      <p class="lauftext">
+        Jeder Eintrag trägt Zeit, Nummer, Von und An. Meldung, Anordnung, Entscheidung, Lage
+        und Berichtigung haben ihre eigene Farbkante, damit der Verlauf auf einen Blick lesbar
+        bleibt. Eine Berichtigung überschreibt nichts, sie steht als eigener Eintrag daneben.
+      </p>
+      <p class="lauftext">
+        Erfasst wird in einer Zeile. Fehlt das Netz, wird der Eintrag vorgemerkt und
+        nachgereicht, sobald die Verbindung wieder steht.
+      </p>
+    </div>
+    <Paneel titel="ETB" meta="Beispiel">
+      <ol class="etb-liste">
+        <Zeitachseneintrag zeit="14:11" nr="0144" typ="berichtigung" weg="ELW 1 · berichtigt 0141">
+          Sickerstelle am Deichfuß km 4,3, nicht km 4,2.
+        </Zeitachseneintrag>
+        <Zeitachseneintrag zeit="14:09" nr="0143" typ="entscheidung" weg="EL · Lagebesprechung">
+          Evakuierung Bezirk Nord-Ost vorbereiten, Auslösung bei 6,80 m.
+        </Zeitachseneintrag>
+        <Zeitachseneintrag zeit="14:06" nr="0142" typ="anordnung" weg="ELW 1 → EA Nord · Funk">
+          Abschnitt Nord verlegt zwei Trupps zur Deichkrone.
+        </Zeitachseneintrag>
+        <Zeitachseneintrag zeit="13:58" nr="0140" typ="lage" weg="S2" nachgetragen>
+          Pegel 6,42 m, steigend. Höchststand 6,90 m gegen 18 Uhr erwartet.
+        </Zeitachseneintrag>
+      </ol>
+      <div class="erfassung" aria-hidden="true">
+        <div class="erfassung-feld mono">
+          <span class="befehl">/meldung</span>
+          <span class="erfassung-text">@EA Nord Sandsäcke an Deichkrone eingetroffen</span>
+          <span class="schreibmarke"></span>
+        </div>
+      </div>
+    </Paneel>
+  </section>
+
+  <!-- ── Einsatztauglich ────────────────────────────────────────────────── -->
+  <section class="abschnitt" id="einsatz" aria-labelledby="einsatz-titel">
+    <div class="abschnitt-kopf">
+      <Augenbraue ton="marke" mono>Einsatztauglich</Augenbraue>
+      <h2 class="ueberschrift" id="einsatz-titel">Gebaut für Orte, an denen nichts vorausgesetzt werden darf.</h2>
+      <p class="lauftext">
+        Einsatzführung findet im Einsatzleitwagen statt, auf dem Tablet im Regen und nachts
+        unter Rotlicht. Die tragenden Entscheidungen folgen daraus.
+      </p>
+    </div>
+    <div class="fugenraster leitsaetze">
+      {
+        leitsaetze.map((satz) => (
+          <article class="leitsatz">
+            <span class="leitsatz-kennung mono">{satz.kennung}</span>
+            <h3>{satz.titel}</h3>
+            <p>{satz.text}</p>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- ── Dichte ─────────────────────────────────────────────────────────── -->
+  <section class="abschnitt zweispaltig" id="dichte" aria-labelledby="dichte-titel">
+    <div class="abschnitt-kopf">
+      <Augenbraue ton="marke" mono>Dichte</Augenbraue>
+      <h2 class="ueberschrift" id="dichte-titel">Eine Oberfläche, drei Dichten.</h2>
+      <p class="lauftext">
+        Am Schreibtisch kompakt, am Führungstablet komfortabel, mit Handschuhen 72 Pixel je
+        Zeile. Die Inhalte bleiben gleich, nur die Trefflächen wachsen.
+      </p>
+      <div class="segmentleiste" role="group" aria-label="Dichte der Vorschau">
+        <button type="button" data-dichte-wahl="kompakt" aria-pressed="true">
+          Kompakt <span class="mono">30</span>
+        </button>
+        <button type="button" data-dichte-wahl="komfortabel" aria-pressed="false">
+          Komfortabel <span class="mono">48</span>
+        </button>
+        <button type="button" data-dichte-wahl="handschuh" aria-pressed="false">
+          Handschuh <span class="mono">72</span>
+        </button>
+      </div>
+    </div>
+    <div data-dichte-vorschau data-dichte="kompakt">
+      <Paneel titel="Meldebild" meta="Beispiel">
+        <ul class="meldebild">
+          {
+            meldebild.map((zeile) => (
+              <li>
+                <span class="ruf mono">{zeile.ruf}</span>
+                <span class="einheit">{zeile.einheit}</span>
+                <StatusChip ton={zeile.ton} code={zeile.code} wort={zeile.wort} />
+                <span class="seit mono">{zeile.seit}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </Paneel>
+    </div>
+  </section>
+
+  <!-- ── Stand ──────────────────────────────────────────────────────────── -->
+  <section class="abschnitt" id="stand" aria-labelledby="stand-titel">
+    <div class="banner">
+      <span class="banner-pfeil mono" aria-hidden="true">→</span>
+      <div class="banner-text">
+        <h2 id="stand-titel">Frühe Alpha</h2>
+        <p>
+          Es gibt noch kein Release. Schnittstellen, Datenmodell und Bedienung ändern sich
+          laufend. Wer Lifeline Hub in einer echten Lage einsetzt, tut das auf eigenes Risiko.
+        </p>
+      </div>
+    </div>
+    <div class="fugenraster stand-raster">
+      <div class="stand-zelle">
+        <Augenbraue als="h3">Lizenz</Augenbraue>
+        <p>
+          Alle Rechte vorbehalten. Der Quelltext ist einsehbar, damit die Arbeitsweise
+          nachvollziehbar ist. Wer Lifeline Hub einsetzen oder darauf aufbauen möchte, fragt vorher an.
+        </p>
+      </div>
+      <div class="stand-zelle">
+        <Augenbraue als="h3">Mitwirken</Augenbraue>
+        <p>Beiträge von außen werden derzeit nicht angenommen. Fehlerberichte sind willkommen.</p>
+        <div><Knopf href={repo} art="sekundaer" extern>Zum Repository</Knopf></div>
+      </div>
+    </div>
+  </section>
+</Grundriss>
+
+<script>
+  const vorschau = document.querySelector<HTMLElement>('[data-dichte-vorschau]');
+  const wahl = document.querySelectorAll<HTMLButtonElement>('[data-dichte-wahl]');
+  wahl.forEach((knopf) =>
+    knopf.addEventListener('click', () => {
+      const stufe = knopf.dataset.dichteWahl ?? 'kompakt';
+      vorschau?.setAttribute('data-dichte', stufe);
+      wahl.forEach((k) => k.setAttribute('aria-pressed', String(k === knopf)));
+    }),
+  );
+</script>
+
+<style>
+  /* ── Einstieg ── */
+  .einstieg {
+    border-bottom: 1px solid var(--lfh-linie);
+    background-color: var(--lfh-grund);
+    background-image:
+      linear-gradient(var(--lfh-raster-linie) 1px, transparent 1px),
+      linear-gradient(90deg, var(--lfh-raster-linie) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .einstieg-innen {
+    display: grid;
+    gap: 48px;
+    max-width: var(--seite-breite);
+    margin: 0 auto;
+    padding: 56px var(--seite-rinne) 72px;
+  }
+  .einstieg-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+  .einleitung {
+    margin: 0;
+    max-width: 560px;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--lfh-gedaempft);
+    text-wrap: pretty;
+  }
+  .aktionen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .stand {
+    margin: 0;
+    font-size: var(--lfh-typo-meta-groesse);
+    color: var(--lfh-schwach);
+  }
+
+  .tafel {
+    align-self: start;
+    min-width: 0;
+    background: var(--lfh-paneel);
+    border: 1px solid var(--lfh-linie);
+  }
+  .tafel-kopf {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--lfh-linie);
+    font-size: 13px;
+  }
+  .tafel-kopf .mono {
+    font-size: 12px;
+    color: var(--lfh-gedaempft);
+  }
+  .punkt {
+    width: 8px;
+    height: 8px;
+    background: var(--lfh-normal);
+    flex: none;
+  }
+  .tafel-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tafel-beispiel {
+    margin-left: auto;
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--lfh-schwach);
+  }
+  .tafel-zahlen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-width: 0 0 1px;
+  }
+  .tafel-etb {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* ── Eckdaten ── */
+  .eckdaten-abschnitt {
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+  .eckdaten {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* ── Module ── */
+  .bereiche {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .modulliste {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .modulliste li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--lfh-flaeche-3);
+  }
+  .modulliste li:last-child {
+    border-bottom: 0;
+  }
+  .modul-name {
+    font-size: 14px;
+    color: var(--lfh-text);
+  }
+  .modul-beschreibung {
+    font-size: 12px;
+    color: var(--lfh-gedaempft);
+  }
+
+  /* ── Zweispaltige Abschnitte ── */
+  .zweispaltig {
+    display: grid;
+    gap: 8px 48px;
+    align-items: start;
+  }
+  .zweispaltig .abschnitt-kopf {
+    margin-bottom: 28px;
+  }
+
+  /* ── ETB ── */
+  .etb-liste {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .erfassung {
+    padding: 12px 14px 14px;
+    border-top: 1px solid var(--lfh-linie);
+    background: var(--lfh-kopf);
+  }
+  .erfassung-feld {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--lfh-bedien);
+    background: var(--lfh-flaeche-2);
+    font-size: 13px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .befehl {
+    color: var(--lfh-bedien-text);
+  }
+  .erfassung-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--lfh-text);
+  }
+  .schreibmarke {
+    width: 1px;
+    height: 16px;
+    background: var(--lfh-text);
+    flex: none;
+    animation: blinken 1.1s steps(1) infinite;
+  }
+  @keyframes blinken {
+    50% {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .schreibmarke {
+      animation: none;
+    }
+  }
+
+  /* ── Leitsätze ── */
+  .leitsaetze {
+    grid-template-columns: 1fr;
+  }
+  .leitsatz {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 22px 20px 24px;
+    background: var(--lfh-flaeche);
+  }
+  .leitsatz-kennung {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--lfh-bedien-text);
+  }
+  .leitsatz h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .leitsatz p {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--lfh-gedaempft);
+  }
+
+  /* ── Dichte ── */
+  .segmentleiste {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    align-self: flex-start;
+    margin-top: 8px;
+    background: var(--lfh-linie);
+    border: 1px solid var(--lfh-linie);
+  }
+  .segmentleiste button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 0;
+    background: var(--lfh-flaeche);
+    color: var(--lfh-gedaempft);
+    font: 500 13px var(--lfh-schrift-text);
+    cursor: pointer;
+  }
+  .segmentleiste button .mono {
+    font-size: 11px;
+    color: var(--lfh-schwach);
+  }
+  .segmentleiste button[aria-pressed='true'] {
+    background: var(--lfh-flaeche-2);
+    color: var(--lfh-text);
+    box-shadow: inset 0 -2px 0 var(--lfh-bedien);
+  }
+  .meldebild {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .meldebild li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'ruf seit'
+      'einheit chip';
+    align-items: center;
+    gap: 4px 12px;
+    min-height: var(--zeile);
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--lfh-flaeche-3);
+    transition: min-height var(--lfh-uebergang);
+  }
+  .meldebild li:last-child {
+    border-bottom: 0;
+  }
+  .ruf {
+    grid-area: ruf;
+    font-size: 13px;
+    color: var(--lfh-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .einheit {
+    grid-area: einheit;
+    font-size: 12px;
+    color: var(--lfh-gedaempft);
+  }
+  .meldebild :global(.chip) {
+    grid-area: chip;
+    justify-self: end;
+  }
+  .seit {
+    grid-area: seit;
+    justify-self: end;
+    font-size: 12px;
+    color: var(--lfh-gedaempft);
+  }
+  [data-dichte='kompakt'] {
+    --zeile: var(--lfh-zeile-kompakt);
+  }
+  [data-dichte='komfortabel'] {
+    --zeile: var(--lfh-zeile-komfortabel);
+  }
+  [data-dichte='handschuh'] {
+    --zeile: var(--lfh-zeile-handschuh);
+  }
+  [data-dichte='handschuh'] .ruf {
+    font-size: 15px;
+  }
+
+  /* ── Stand ── */
+  .banner {
+    display: flex;
+    gap: 14px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    background: var(--lfh-banner-grund);
+    border: 1px solid var(--lfh-banner-linie);
+  }
+  .banner-pfeil {
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--lfh-bedien-text);
+  }
+  .banner-text h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .banner-text p {
+    margin: 0;
+    color: var(--lfh-text-2);
+    line-height: 1.55;
+  }
+  .stand-raster {
+    grid-template-columns: 1fr;
+  }
+  .stand-zelle {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    background: var(--lfh-flaeche);
+  }
+  .stand-zelle p {
+    margin: 0;
+    color: var(--lfh-gedaempft);
+    line-height: 1.55;
+  }
+
+  @media (min-width: 640px) {
+    .leitsaetze,
+    .stand-raster {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .meldebild li {
+      grid-template-columns: minmax(0, 1fr) 72px 150px 44px;
+      grid-template-areas: 'ruf einheit chip seit';
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+  }
+
+  @media (min-width: 768px) {
+    h1 {
+      font-size: 48px;
+    }
+    .eckdaten {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .einstieg-innen {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
+      align-items: center;
+      padding-top: 88px;
+      padding-bottom: 96px;
+    }
+    .zweispaltig {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    }
+    .leitsaetze {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

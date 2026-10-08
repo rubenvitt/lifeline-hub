@@ -310,11 +310,26 @@ pub async fn aufloesen(
     // `vorher` (Name unverändert). SSE erst nach dem Commit (Reinheits-Kontrakt).
     let text = format!("Abschnitt «{}» aufgelöst", vorher.name);
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let von = ctx.benutzer.id;
+    // Ein an den Abschnitt gekoppeltes Gerät (LFH-1040) hätte keine Stelle mehr: es endet mit
+    // dem Abschnitt, wie bei einem Widerruf durch die Einsatzleitung.
+    let widerrufen = crate::write_retry!(&state.pool, |conn| {
+        let geraete =
+            crate::geraet::repo::widerrufe_am_abschnitt(conn, einsatz_id, aid, von).await?;
         abschnitt_repo::loese_auf_tx(conn, einsatz_id, aid).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(())
+        crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?;
+        for (_, anzeigename) in &geraete {
+            let geraet_text = format!(
+                "Gerät „{anzeigename}“ (Einsatzabschnitt) widerrufen: Abschnitt «{}» aufgelöst.",
+                vorher.name
+            );
+            crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &geraet_text).await?;
+        }
+        Ok(geraete)
     })?;
+    for (kopplung_id, _) in &widerrufen {
+        state.live.melde_kopplung_ende(*kopplung_id);
+    }
     sse_abschnitt(&state, einsatz_id, aid);
     Ok(StatusCode::NO_CONTENT)
 }

@@ -109,9 +109,9 @@ pub async fn liste(
         "Unbekannter Status im Filter",
     )?;
     let mut liste = repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?;
-    // Stellenbindung (LFH-892): ein UHS-Gerät sieht, wer je in seiner UHS belegt war.
-    if let Some(eigene) = stelle::stelle(ctx.geraet.as_ref()) {
-        let sichtbar = stelle::personen_der_uhs(&state.pool, eigene).await?;
+    // Stellenbindung (LFH-892): ein Gerät sieht die Personen seiner Stelle, ein UHS-Gerät etwa,
+    // wer je in seiner UHS belegt war.
+    if let Some(sichtbar) = stelle::sichtbare_personen(&state.pool, ctx.geraet.as_ref()).await? {
         liste.retain(|p| sichtbar.contains(&p.id));
     }
     Ok(Json(liste))
@@ -125,8 +125,7 @@ pub async fn auswahl(
     ctx: EinsatzLesezugriff<Personen>,
 ) -> Result<Json<Vec<crate::person::PersonAuswahl>>, AppError> {
     let mut liste = repo::auswahl(&state.pool, ctx.einsatz.id).await?;
-    if let Some(eigene) = stelle::stelle(ctx.geraet.as_ref()) {
-        let sichtbar = stelle::personen_der_uhs(&state.pool, eigene).await?;
+    if let Some(sichtbar) = stelle::sichtbare_personen(&state.pool, ctx.geraet.as_ref()).await? {
         liste.retain(|p| sichtbar.contains(&p.id));
     }
     Ok(Json(liste))
@@ -186,6 +185,9 @@ pub async fn anlegen(
             return Err(AppError::Forbidden);
         }
         body.uhs_id = Some(eigene);
+    } else if ctx.geraet.is_some() && body.uhs_id.is_some() {
+        // Ein Gerät ohne UHS bucht in keine (LFH-1040).
+        return Err(AppError::Forbidden);
     }
     if body.uhs_id.is_some() {
         ctx.fordere_modul_zugriff(&state.pool, "unfallhilfsstellen")

@@ -8,10 +8,21 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
 
 - **Die Schranke steht beim Server, die Oberfläche verengt nur.** Je Ansicht eine Routenliste in
   `src/geraet/mod.rs` (was fehlt, ist verboten; anderer Einsatz 404), die Stellenbindung in
-  `src/geraet/stelle.rs` (fremde UHS oder Person 404, Buchung in eine fremde UHS 403). Im Client
-  blendet `geraetDarf`/`useGeraetDarf` (`geraet/geraetSicht.ts`) nur aus, was der Server
+  `src/geraet/stelle.rs` (fremde Stelle oder Person 404, Buchung in eine fremde Stelle 403). Im
+  Client blendet `geraetDarf`/`useGeraetDarf` (`geraet/geraetSicht.ts`) nur aus, was der Server
   ablehnt. Eine neue Fähigkeit beginnt mit Listeneintrag und Test in `tests/geraet_kopplung.rs`,
   erst dann `geraetDarf`.
+- **Stellenbindung je Art** (LFH-1040): UHS, Betreuungsstelle, Bereitstellungsraum und
+  Einsatzabschnitt haben je eine Spalte in `geraet_kopplung` (Migration 0159, höchstens eine
+  gesetzt); `Funktionsansicht::stellenart` nennt die Art, `GeraetKontext.stelle` die Stelle. Die
+  Helfer in `stelle.rs` gelten streng: ein Gerät, das nicht an eine Stelle genau dieser Art
+  gebunden ist, sieht keine (`sicht` → `Keine`), Personen nur über `sichtbare_personen` /
+  `fordere_person` seiner Art. Wer eine Route mehreren Ansichten öffnet, filtert über diese
+  Helfer, nie über `ctx.geraet.is_none()`. Ein aufgelöster Abschnitt widerruft seine Kopplungen.
+- **Eine Ansicht wird verfügbar, wenn sie fertig ist:** `Funktionsansicht::ist_verfuegbar` erst
+  setzen, wenn Routenliste, Stellenfilter, Server-Test und Hülle stehen. Vorher ist das Koppeln
+  422, und die Kopplungsmaske bietet nur, was `GeraeteUebersicht.ansichten` nennt;
+  `geraetStartPfad` gibt für sie `null`.
 - **Eigene Hülle** (`geraet/GeraeteLayout.tsx`): keine Modulleiste, kein Benutzermenü, keine
   Sprungpalette (`CommandPaletteProvider` öffnet bei `geraet` nicht), kein Org-Strom (`/api/live`
   steht in keiner Liste), kein `EinsatzAnzeigeProvider` (lädt `/einstellungen`, 403). Der

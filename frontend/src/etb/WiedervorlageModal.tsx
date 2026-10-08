@@ -9,6 +9,7 @@ import { legeErinnerungAn } from '../api/erinnerungen';
 import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { ErfassungsModal } from '../components/Erfassung';
+import { serverJetzt } from '../offline/serveruhr';
 import { SCHNELLWAHL_TERMIN, schnellwahlTermin } from '../components/terminSchnellwahl';
 import { abstand } from '../theme/tokens';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -30,8 +31,8 @@ interface FormWerte {
 }
 
 /**
- * Vorgabe der Fälligkeit: `dayjs()` meint niemand, eine Wiedervorlage auf „jetzt" ist beim
- * Anlegen schon fällig. Die Schnellwahl darüber deckt den Rest des üblichen Bandes ab.
+ * Vorgabe der Fälligkeit: „jetzt" meint niemand, eine Wiedervorlage darauf ist beim Anlegen
+ * schon fällig. Die Schnellwahl darüber deckt den Rest des üblichen Bandes ab.
  */
 const VORGABE_MINUTEN = 30;
 
@@ -115,7 +116,7 @@ export default function WiedervorlageModal({
         eintrag
           ? {
               titel: titelAusEintrag(eintrag.inhalt),
-              faellig: dayjs().add(VORGABE_MINUTEN, 'minute'),
+              faellig: serverJetzt().add(VORGABE_MINUTEN, 'minute'),
             }
           : undefined
       }
@@ -138,7 +139,9 @@ export default function WiedervorlageModal({
           {SCHNELLWAHL.map((s) => (
             <Button
               key={s.label}
-              onClick={() => form.setFieldValue('faellig', schnellwahlTermin(dayjs(), s.minuten))}
+              onClick={() =>
+                form.setFieldValue('faellig', schnellwahlTermin(serverJetzt(), s.minuten))
+              }
             >
               {s.label}
             </Button>

@@ -26,6 +26,11 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   ein Übergang braucht keine eigene Wartezeit, ein Wert unter dem Boden ist in jedem Lauf rot.
   Einen Zustand, den erst JavaScript setzt (antds Zeilen-Hover: `td.ant-table-cell-row-hover`),
   sichert der Test vor der Messung als Vorbedingung zu.
+- **Ein ausgehängtes Ziel misst neu, nie leer** (LFH-1035): `locator.evaluate` löst und wertet in
+  zwei Schritten aus; hängt die Seite das Element dazwischen neu ein, liefert `getComputedStyle`
+  leere Werte. Der Kern prüft `isConnected` und liest neu (`amEingehaengten`), nur bei diesem
+  Fehler. Ein sichtbarer Hinweis ist kein stehender: der erste Abgleich des Org-Stroms ruft eine
+  Liste ohne Daten neu ab, und ihr Fehlerzweig wird ersetzt und neu eingehängt.
 - **Der Admin schreibt mit dem Standard-Rufnamen „ELW 1“** (LFH-894): `e2e/globale-vorbereitung.ts`
   setzt ihn einmal je Lauf (je Shard eigenes Backend). Ohne ihn hielte die Von/An-Pflicht jeden
   Eintrag über die Oberfläche auf. Wer die Rufname-Abfrage prüft, nimmt eine frisch angelegte

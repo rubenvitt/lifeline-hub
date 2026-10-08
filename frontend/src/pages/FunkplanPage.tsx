@@ -1,6 +1,6 @@
 import { Breadcrumb, Button, Flex, Space, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type Key, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Key, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -455,6 +455,7 @@ function SkizzenBereich({
   onDruckFormat,
   druckt,
   befehle,
+  onHalten,
 }: {
   abschnitte: AbrufZustand;
   netz: Fernmeldenetz;
@@ -466,6 +467,7 @@ function SkizzenBereich({
   onDruckFormat: (f: Druckformat) => void;
   druckt: boolean;
   befehle: Befehlsstapel;
+  onHalten: (halten: boolean) => void;
 }) {
   const { rollen } = useRollen();
   if (abschnitte === 'laden') return <SeitenSkeleton />;
@@ -487,6 +489,7 @@ function SkizzenBereich({
       onDruckFormat={onDruckFormat}
       druckt={druckt}
       befehle={befehle}
+      onHalten={onHalten}
     />
   );
 }
@@ -596,6 +599,16 @@ export default function FunkplanPage() {
   // Zugeklappt statt aufgeklappt gemerkt: der Plan wird gelesen, also startet er offen, und eine
   // live hinzukommende Einheit steht ebenfalls offen da.
   const [zugeklappt, setZugeklappt] = useState<ReadonlySet<Key>>(new Set());
+
+  // Ruhige Fläche (LFH-1037 D2): solange die Skizze hält, schrumpft das Lücken-Paneel nicht. Was
+  // wächst, gleicht die Skizze per Bildlauf aus; ein Schrumpfen ganz oben auf der Seite nicht.
+  const blatt = useRef<HTMLDivElement | null>(null);
+  const [lueckenHoehe, setLueckenHoehe] = useState<number | null>(null);
+  const onSkizzeHaelt = useCallback((halten: boolean) => {
+    const p = blatt.current?.querySelector(':scope > [data-lfh="paneel"]');
+    setLueckenHoehe(halten && p ? p.getBoundingClientRect().height : null);
+  }, []);
+
   const aufklappbar = useMemo(() => aufklappbareSchluessel(zeilen), [zeilen]);
   const aufgeklappt = aufklappbar.filter((k) => !zugeklappt.has(k));
 
@@ -800,6 +813,7 @@ export default function FunkplanPage() {
         {/* Das Blatt: Druckkopf, Lücken und Darstellung. In der Skizze trägt es die Klasse des
             Papierformats (A3/A4 quer, `stab/skizze/skizzeDruck.css`); die Anlage steht dahinter. */}
         <div
+          ref={blatt}
           data-lfh="funkplan-blatt"
           className={ansicht === 'skizze' ? skizzenDruckKlasse(druckFormat) : undefined}
         >
@@ -822,7 +836,14 @@ export default function FunkplanPage() {
 
           {/* ── Lücken ── im ersten Bild (1366 × 768, Panel offen). Jede Zahl aus denselben
             Listen wie die Tabelle; ohne Daten „—" mit Grund, nie „0". */}
-          <Paneel titel="Lücken" style={{ marginBlockEnd: token.margin }}>
+          <Paneel
+            titel="Lücken"
+            style={{
+              marginBlockEnd: token.margin,
+              // Nur in der Skizze: wechselt die Darstellung beim Halten, meldet niemand dessen Ende.
+              minHeight: (ansicht === 'skizze' ? lueckenHoehe : null) ?? undefined,
+            }}
+          >
             <LueckenZeile
               titel="Abschnitte ohne Sprechgruppe"
               luecke={luecken.abschnitteOhneSprechgruppe}
@@ -1019,6 +1040,7 @@ export default function FunkplanPage() {
               onDruckFormat={setDruckFormat}
               druckt={druckt}
               befehle={befehle}
+              onHalten={onSkizzeHaelt}
             />
           ) : ansicht === 'sprechgruppen' ? (
             // Flach und schreibgeschützt, Vergleichsfläche wie die Tabelle („wer funkt auf 311?“).
