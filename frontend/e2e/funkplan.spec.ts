@@ -370,3 +370,57 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   await tmo.getByRole('link', { name: EINHEIT, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einheiten/${einheit}$`));
 });
+
+// ── Führungsstelle als Teilnehmer (LFH-1018) ──────────────────────────────────────────────
+//
+// Eine Sprechgruppe, die nur die eigene Führungsstelle nutzt, nennt sie als Teilnehmer statt
+// „keine“, und der Verweis führt (geklickt) auf die Einsatzdaten. Wird die Führungsstelle
+// abgelehnt, behauptet die Zelle keine Vollständigkeit.
+//
+// Mutationsprobe: ohne die Führungsstellen-Schleife in `baueSprechgruppenplan` steht „keine“, der
+// erste Teil wird rot; ohne ihren Strukturzustand wird der zweite rot.
+
+const NUR_FS = 'DMO 777 Führung';
+
+test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollständigkeit', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Sprechgruppen FS ${Date.now()}`);
+  await seedeSprechgruppen(page, einsatzId);
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const sg = await page.request.post(`${basis}/sprechgruppen`, {
+    data: { bezeichnung: NUR_FS, betriebsart: 'DMO' },
+  });
+  expect(sg.ok(), `Seeding Sprechgruppe: ${sg.status()}`).toBeTruthy();
+  const fs = await page.request.patch(`${basis}/fuehrungsstelle`, {
+    data: {
+      rufname: 'Florian Musterstadt 10/1',
+      sprechgruppe_ids: [((await sg.json()) as { id: number }).id],
+    },
+  });
+  expect(fs.ok(), `Seeding Führungsstelle: ${fs.status()}`).toBeTruthy();
+
+  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=sprechgruppen`);
+  const zeile = sgZeile(page, NUR_FS);
+  await expect(zeile.getByRole('link', { name: 'Führungsstelle' })).toBeVisible();
+  await expect(zeile).toContainText('Florian Musterstadt 10/1');
+  await expect(zeile).not.toContainText('keine');
+  // Die übrige lokale ohne Zuordnung bleibt „keine“: die Führungsstelle ist geladen.
+  await expect(sgZeile(page, LOKAL)).toContainText('keine');
+
+  await zeile.getByRole('link', { name: 'Führungsstelle' }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einsatzdaten$`));
+
+  // Führungsstelle abgelehnt: weder ihre noch die übrige lokale Sprechgruppe heißt „keine“.
+  await page.route(`**${basis}/fuehrungsstelle`, (route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ status: 403, json: { error: 'verboten' } })
+      : route.continue(),
+  );
+  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=sprechgruppen`);
+  await expect(sgZeile(page, LOKAL)).toContainText('Führungsstelle nicht freigegeben');
+  await expect(sgZeile(page, LOKAL)).not.toContainText('keine');
+  await expect(sgZeile(page, NUR_FS)).toContainText('Führungsstelle nicht freigegeben');
+});

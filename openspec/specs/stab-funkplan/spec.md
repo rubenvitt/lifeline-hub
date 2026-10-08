@@ -293,12 +293,14 @@ Lagebericht (Vorlage Freitext) mit dem Titel „Funkplan <DTG>“ übernehmen k�
 
 ### Requirement: Darstellung „Sprechgruppen“
 Der Funkplan SHALL eine dritte Darstellung „Sprechgruppen“ haben: eine Zeile je Sprechgruppe des
-Einsatzes, also jede einem Abschnitt oder einer Einheit zugeordnete und jede einsatzlokale. Teilnehmer sind
-auch die externen Stellen des Kommunikationsplans mit ihrem Status und die Komponenten der
-Fernmeldeskizze. Spalten:
+Einsatzes, also jede der eigenen Führungsstelle, einem Abschnitt oder einer Einheit zugeordnete und
+jede einsatzlokale. Teilnehmer sind die eigene Führungsstelle (zuerst, mit Rufname, Ziel
+Einsatzdaten), die Abschnitte und Einheiten, die externen Stellen des Kommunikationsplans mit ihrem
+Status und die Komponenten der Fernmeldeskizze. Spalten:
 Sprechgruppe (fixiert, Festbreitenschrift), Betriebsart, Hinweis, Herkunft (Katalog oder
 einsatzlokal) und Teilnehmer. Zuerst TMO, dann DMO, je in der Sortierung der Sprechgruppen. Sie ist
-schreibgeschützt und aus denselben Quellen abgeleitet wie die Tabelle.
+schreibgeschützt und aus denselben Quellen abgeleitet wie die Tabelle. Fehlt eine dieser Quellen,
+auch die Führungsstelle, MUST die Zelle „unvollständig“ bzw. den Grund tragen, nie „keine“.
 
 #### Scenario: Teilnehmer einer Sprechgruppe
 - **WHEN** „TMO 311“ dem Abschnitt „EA Nord“ (Kurzbezeichnung „EA N“) und der Einheit „1. Zug“
@@ -311,9 +313,24 @@ schreibgeschützt und aus denselben Quellen abgeleitet wie die Tabelle.
 - **THEN** steht sie mit Herkunft „einsatzlokal“ und dem Teilnehmer „keine“ in der Darstellung
 
 #### Scenario: Katalog-Sprechgruppe ohne Zuordnung
-- **WHEN** eine Sprechgruppe des Organisationskatalogs keinem Abschnitt und keiner Einheit des
-  Einsatzes zugeordnet ist
+- **WHEN** eine Sprechgruppe des Organisationskatalogs weder der eigenen Führungsstelle noch einem
+  Abschnitt oder einer Einheit des Einsatzes zugeordnet ist
 - **THEN** erscheint sie nicht
+
+#### Scenario: Führungsstelle als Teilnehmer
+- **WHEN** der eigenen Führungsstelle (Rufname „Florian Musterstadt 10/1“) die einsatzlokale
+  „DMO 999“ zugeordnet ist und sonst niemand
+- **THEN** nennt die Zeile „DMO 999“ die Führungsstelle mit Rufname als Teilnehmer statt „keine“,
+  und sie führt zu den Einsatzdaten
+
+#### Scenario: Katalog-Sprechgruppe nur an der Führungsstelle
+- **WHEN** eine Sprechgruppe des Organisationskatalogs nur der eigenen Führungsstelle zugeordnet ist
+- **THEN** erscheint sie mit Herkunft „Katalog“ und der Führungsstelle als Teilnehmer
+
+#### Scenario: Führungsstelle nicht geladen
+- **WHEN** die Führungsstelle nicht geladen werden kann und eine einsatzlokale Sprechgruppe
+  nirgends sonst zugeordnet ist
+- **THEN** steht in ihrer Teilnehmerzelle „Führungsstelle nicht geladen“ statt „keine“
 
 #### Scenario: Einheiten gesperrt
 - **WHEN** die Einheitenliste mit 403 abgelehnt wird

@@ -3,6 +3,7 @@ import type {
   Einheit,
   Einsatzabschnitt,
   Fernmeldeskizze,
+  Fuehrungsstelle,
   KommunikationsStelle,
   Sprechgruppe,
 } from '../api/types';
@@ -50,6 +51,10 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
 
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const ohne = <T>(zustand: 'gesperrt' | 'fehler' | 'laden'): Quelle<T> => ({ zustand, daten: [] });
+const fs = (p: Partial<Fuehrungsstelle> = {}): FunkplanQuellen['fuehrungsstelle'] => ({
+  zustand: 'daten',
+  daten: { sprechgruppen: [], ...p },
+});
 
 function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {
   return {
@@ -311,6 +316,86 @@ describe('fehlendText und Leertext', () => {
     ).toBe(
       'Keine Zeilen darstellbar — Abschnitte: nicht freigegeben · Sprechgruppen: nicht geladen',
     );
+  });
+});
+
+// ── LFH-1018: die eigene Führungsstelle als Teilnehmer ──────────────────────────────────────
+
+describe('baueSprechgruppenplan — eigene Führungsstelle (LFH-1018)', () => {
+  it('nennt die Führungsstelle als ersten Teilnehmer, mit Rufname und Ziel Einsatzdaten', () => {
+    const zeilen = baueSprechgruppenplan(
+      quellen({
+        abschnitte: daten([EA_NORD]),
+        fuehrungsstelle: fs({ rufname: 'Florian Musterstadt 10/1', sprechgruppen: [TMO311] }),
+      }),
+      7,
+    );
+    const t = zeile(zeilen, 'TMO 311').teilnehmer;
+    expect(t.art).toBe('vollstaendig');
+    expect((t as { teilnehmer: SprechgruppenTeilnehmer[] }).teilnehmer.map((x) => x.key)).toEqual([
+      'fs',
+      'ab-1',
+    ]);
+    expect((t as { teilnehmer: SprechgruppenTeilnehmer[] }).teilnehmer[0]).toEqual({
+      art: 'fuehrungsstelle',
+      key: 'fs',
+      id: null,
+      name: 'Führungsstelle',
+      rufname: 'Florian Musterstadt 10/1',
+      ziel: '/einsaetze/7/einsatzdaten',
+    });
+  });
+
+  it('eine lokale Sprechgruppe nur an der Führungsstelle hat sie als Teilnehmer statt „keine“', () => {
+    const zeilen = baueSprechgruppenplan(
+      quellen({ sprechgruppen: daten([DMO999]), fuehrungsstelle: fs({ sprechgruppen: [DMO999] }) }),
+      1,
+    );
+    expect(zeile(zeilen, 'DMO 999').teilnehmer).toMatchObject({
+      art: 'vollstaendig',
+      teilnehmer: [{ key: 'fs', rufname: null }],
+    });
+  });
+
+  it('eine Katalog-Sprechgruppe nur an der Führungsstelle gehört zum Einsatz', () => {
+    const zeilen = baueSprechgruppenplan(
+      quellen({
+        sprechgruppen: daten([TMO400]),
+        fuehrungsstelle: fs({ sprechgruppen: [TMO400] }),
+      }),
+      1,
+    );
+    expect(zeile(zeilen, 'TMO 400')).toMatchObject({
+      herkunft: 'katalog',
+      teilnehmer: { art: 'vollstaendig', teilnehmer: [{ key: 'fs' }] },
+    });
+  });
+
+  it.each(['fehler', 'laden', 'gesperrt'] as const)(
+    'Führungsstelle %s: keine Zelle behauptet Vollständigkeit',
+    (zustand) => {
+      const zeilen = baueSprechgruppenplan(
+        quellen({
+          abschnitte: daten([EA_NORD]),
+          sprechgruppen: daten([DMO999]),
+          fuehrungsstelle: { zustand, daten: null },
+        }),
+        1,
+      );
+      const fehlend = [{ quelle: 'fuehrungsstelle', name: 'Führungsstelle', zustand }];
+      expect(zeile(zeilen, 'TMO 311').teilnehmer).toMatchObject({
+        art: 'unvollstaendig',
+        teilnehmer: [{ key: 'ab-1' }],
+        fehlend,
+      });
+      expect(zeile(zeilen, 'DMO 999').teilnehmer).toEqual({ art: 'unbekannt', fehlend });
+    },
+  );
+
+  it('der Leertext behauptet „keine Sprechgruppe“ nicht ohne Führungsstelle', () => {
+    expect(
+      sprechgruppenplanLeerText(quellen({ fuehrungsstelle: { zustand: 'fehler', daten: null } })),
+    ).toBe('Keine Zeilen darstellbar — Führungsstelle: nicht geladen');
   });
 });
 

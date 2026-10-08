@@ -37,7 +37,8 @@ den Funkplan (Abschnitt „Kommunikationsskizze“).
 Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
 `stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen` (dazu externe Stellen mit Status und
 Komponenten der Skizze, LFH-893): zugeordnete plus einsatzlokale
-Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Fehlt eine Strukturquelle, steht „—“ bzw.
+Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Die eigene Führungsstelle ist erster Teilnehmer
+ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, steht „—“ bzw.
 „unvollständig“ mit Grund, nie „keine“. Eigene `key` je `Datensicht` (zwei Sichten in einer Datei).
 
 **Kommunikationsplan S6** (LFH-848,
