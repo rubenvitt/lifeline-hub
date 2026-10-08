@@ -710,6 +710,7 @@ describe('rendereFunkplanMarkdown · Kommunikationsskizze', () => {
     const netz = baueFernmeldenetz({
       ...q,
       einsatzId: 1,
+      besetzung: daten([]),
       stellen: p.stellen ?? daten([leitstelle]),
       skizze: p.skizze ?? {
         zustand: 'daten',

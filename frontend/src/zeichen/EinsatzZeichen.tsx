@@ -1,7 +1,11 @@
 import { Einsatzzeichen } from '@einsatzzeichen/react';
 import { useId, type CSSProperties } from 'react';
 import type { TzProps } from '../pages/lagekarte/taktischesZeichen';
-import { fachobjektZeichen } from './fachobjektZeichen';
+import {
+  fachobjektZeichen,
+  funktionsZeichen,
+  type FunktionsZeichenEingabe,
+} from './fachobjektZeichen';
 
 /**
  * Das taktische Zeichen eines Fachobjekts als Inline-SVG über @einsatzzeichen (LFH-835). Übersetzt
@@ -24,4 +28,19 @@ export default function EinsatzZeichen({
   const zeichen = fachobjektZeichen(tz);
   if (!zeichen) return null;
   return <Einsatzzeichen drawing={zeichen.drawing} size={size} idPrefix={idPrefix} style={style} />;
+}
+
+/** Ein Funktionszeichen (LFH-1029, `funktionsZeichen`), sonst wie {@link EinsatzZeichen}. */
+export function FunktionsZeichen({
+  funktion,
+  size,
+}: {
+  funktion: FunktionsZeichenEingabe;
+  /** Kantenlänge in px, ganzzahlig. */
+  size: number;
+}) {
+  const idPrefix = `ez${useId()}`;
+  const zeichen = funktionsZeichen(funktion);
+  if (!zeichen) return null;
+  return <Einsatzzeichen drawing={zeichen.drawing} size={size} idPrefix={idPrefix} />;
 }

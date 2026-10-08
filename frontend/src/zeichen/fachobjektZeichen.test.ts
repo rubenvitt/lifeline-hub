@@ -11,7 +11,7 @@ import {
   type TzProps,
 } from '../pages/lagekarte/taktischesZeichen';
 import type { Ausmass, UhsTyp } from '../api/types';
-import { fachobjektZeichen } from './fachobjektZeichen';
+import { fachobjektZeichen, funktionsZeichen } from './fachobjektZeichen';
 
 // Pins der fachlichen Abbildung Hub-Vokabular → @einsatzzeichen (LFH-835, design.md D2). Jeder Fall
 // zeichnet echt über `drawSymbol`: ein Bibliotheks-Update, das eine Abbildung bricht, wird hier rot
@@ -463,5 +463,26 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
       'abwehr-wassergefahren',
       'warnen',
     ]);
+  });
+});
+
+describe('funktionsZeichen — Funktionen im Kasten der Fernmeldeskizze (LFH-1029)', () => {
+  const svg = (z: ReturnType<typeof funktionsZeichen>) => {
+    expect(z).not.toBeNull();
+    return renderSvg(z!.drawing);
+  };
+
+  it('zeichnet EAL und UEAL aus den vermessenen Funktionsfassungen', () => {
+    const eal = funktionsZeichen({ rolle: 'incident-section-commander' });
+    expect(eal!.spec).toMatchObject({ kind: 'person', functionRole: 'incident-section-commander' });
+    expect(eal!.drawing.derivations ?? []).toEqual([]);
+    expect(svg(eal)).toContain('>EAL<');
+    expect(svg(funktionsZeichen({ rolle: 'incident-subsection-commander' }))).toContain('>UEAL<');
+  });
+
+  it('zeichnet ein Sachgebiet als Person der Führung mit Kürzel', () => {
+    const s2 = funktionsZeichen({ kuerzel: 'S2' });
+    expect(s2!.spec).toMatchObject({ kind: 'person', organization: 'fuehrung-leitung' });
+    expect(svg(s2)).toContain('>S2<');
   });
 });

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   api,
+  drucke,
   einsatzAnlegen,
   element,
   oeffneSkizze,
@@ -83,18 +84,6 @@ async function seedeDruck(page: Page, einsatzId: string): Promise<Druckseed> {
     'bestehend',
   );
   return { ...n, geplant, bestehend };
-}
-
-/** Druck wie die Person: „Drucken / als PDF“ löst `beforeprint` aus (`emulateMedia` feuert es nicht). */
-async function drucke(page: Page) {
-  await page.evaluate(() => {
-    window.print = () => {
-      window.dispatchEvent(new Event('beforeprint'));
-    };
-  });
-  await page.getByRole('button', { name: /Drucken/ }).click();
-  await page.emulateMedia({ media: 'print' });
-  await expect(page.locator('[data-lfh="druck-anlage"]')).toBeVisible();
 }
 
 function erzeugtPdf(page: Page): boolean {
