@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { ueberstaende } from './ueberstand-kern';
 
 /**
  * Die Lagekarten-Leiste trägt den mitwachsenden Kippschalter (im Handschuh 72 × 144 px, siehe
@@ -87,25 +88,10 @@ for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
     // Vorbedingung: ohne Zeilen wäre die Überstandsliste leer und der Test grün.
     await expect(schalter.first()).toBeVisible();
     expect(await schalter.count(), 'mindestens die neun Bestandsebenen').toBeGreaterThanOrEqual(9);
-    /**
-     * STRUKTURUNABHÄNGIG gemessen: jedes Element im Paneel, das rechts hinausragt. Ein Griff
-     * nach dem Namensteil als Geschwister des Schalters hinge an der heutigen Zeilenstruktur.
-     */
-    const ueberstand = await fachebenen.evaluate((paneel, toleranz) => {
-      const rand = paneel.getBoundingClientRect().right + toleranz;
-      return [...paneel.querySelectorAll<HTMLElement>('*')]
-        .filter((el) => {
-          const k = el.getBoundingClientRect();
-          return k.width > 0 && k.right > rand;
-        })
-        .map(
-          (el) =>
-            `${el.innerText.split('\n')[0] || el.tagName} (+${Math.round(el.getBoundingClientRect().right - rand)} px)`,
-        );
-    }, SUBPIXEL);
-    expect(ueberstand, `Elemente ragen aus der Leiste (${dichte})`).toEqual([]);
+    // Strukturunabhängig, Elemente und Textzeilen (`ueberstand-kern.ts`).
+    expect(await ueberstaende(fachebenen), `Elemente ragen aus der Leiste (${dichte})`).toEqual([]);
 
-    // ── Bild-Hintergründe: der Name bleibt lesbar ───────────────────────────────────
+    // ── Bild-Hintergründe: der Name bleibt lesbar, nichts ragt hinaus ───────────────
     const bilder = page.locator('section[data-paneel="bilder"]');
     const name = bilder.locator('.ant-typography', { hasText: /Lageplan/ }).first();
     await expect(name).toBeVisible();
@@ -114,27 +100,12 @@ for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
       breite,
       `Bildname sichtbar breit (${dichte}, gemessen ${breite}px)`,
     ).toBeGreaterThanOrEqual(NAMENSBODEN);
+    expect(await ueberstaende(bilder), `Bildzeile ragt aus der Leiste (${dichte})`).toEqual([]);
     test.info().annotations.push({
       type: 'messwert',
       description: `Bildname in ${dichte}: ${Math.round(breite)}px breit`,
     });
   });
-}
-
-/** Elemente eines Paneels, die rechts aus ihm ragen — strukturunabhängig (s. o.). */
-function ueberstaende(paneel: Locator) {
-  return paneel.evaluate((el, toleranz) => {
-    const rand = el.getBoundingClientRect().right + toleranz;
-    return [...el.querySelectorAll<HTMLElement>('*')]
-      .filter((kind) => {
-        const k = kind.getBoundingClientRect();
-        return k.width > 0 && k.right > rand;
-      })
-      .map(
-        (kind) =>
-          `${kind.innerText.split('\n')[0] || kind.tagName} (+${Math.round(kind.getBoundingClientRect().right - rand)} px)`,
-      );
-  }, SUBPIXEL);
 }
 
 const SOLL = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
