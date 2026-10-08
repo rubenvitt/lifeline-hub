@@ -248,6 +248,8 @@ use utoipa::OpenApi;
         crate::pegel::PegelVerlauf,
         crate::pegel::PegelVerlaufPunkt,
         crate::presse::MedienkontaktAnzeige,
+        crate::presse::MedienkontaktKennzahlen,
+        crate::presse::MedienkontaktJeArt,
         crate::presse::MedienkontaktArt,
         crate::presse::MedienkontaktStatus,
         crate::presse::mitteilung::Abschnitt,

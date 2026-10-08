@@ -14,7 +14,7 @@
 
 use sqlx::{SqliteConnection, SqlitePool};
 
-use super::{MedienkontaktAnzeige, MedienkontaktArt, MedienkontaktStatus};
+use super::{MedienkontaktAnzeige, MedienkontaktArt, MedienkontaktKennzahlen, MedienkontaktStatus};
 use crate::error::AppError;
 use crate::routes::support::{hoechstens, pflicht_max};
 
@@ -131,6 +131,93 @@ pub async fn liste(
     .into_iter()
     .map(TryInto::try_into)
     .collect()
+}
+
+/// Medienkontakte einer Phase (LFH-1075, D8): `Offen` alle offenen, `Abgeschlossen` die übrigen
+/// seitenweise ab dem Cursor ([`crate::kommunikation::Seite`]). Beide nach Eingang absteigend,
+/// Gleichstand über die Kennung, wie [`liste`] innerhalb einer Phase.
+pub async fn liste_phase(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    phase: crate::kommunikation::ListenPhase,
+    seite: Option<&crate::kommunikation::Seite>,
+) -> Result<Vec<MedienkontaktAnzeige>, AppError> {
+    use crate::kommunikation::ListenPhase;
+    let mut q = String::from(kontakt_select!());
+    q.push_str("WHERE m.einsatz_id = ?");
+    q.push_str(match phase {
+        ListenPhase::Offen => " AND m.status = 'offen'",
+        ListenPhase::Abgeschlossen => " AND m.status <> 'offen'",
+    });
+    let seite = seite.filter(|_| phase == ListenPhase::Abgeschlossen);
+    if seite.is_some_and(|s| s.vor.is_some()) {
+        q.push_str(" AND (m.eingang_at < ? OR (m.eingang_at = ? AND m.id < ?))");
+    }
+    q.push_str(" ORDER BY m.eingang_at DESC, m.id DESC");
+    if seite.is_some() {
+        q.push_str(" LIMIT ?");
+    }
+    let mut query = sqlx::query_as::<_, Zeile>(sqlx::AssertSqlSafe(&*q)).bind(einsatz_id);
+    if let Some(seite) = seite {
+        if let Some(vor) = &seite.vor {
+            query = query
+                .bind(vor.zeit.clone())
+                .bind(vor.zeit.clone())
+                .bind(vor.id);
+        }
+        query = query.bind(seite.limit);
+    }
+    query
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect()
+}
+
+/// Kennzahlen über den ganzen Bestand (LFH-1075, D9). `medien` jedes einmal in der Folge der
+/// ersten Nennung in [`liste`] — derselben, in der die Medienlage sie vorher aus der Liste las.
+pub async fn kennzahlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<MedienkontaktKennzahlen, AppError> {
+    let mut k = MedienkontaktKennzahlen::default();
+    let gruppen: Vec<(String, String, i64)> = sqlx::query_as(
+        "SELECT art, status, COUNT(*) FROM medienkontakt WHERE einsatz_id = ? \
+         GROUP BY art, status",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    for (art, status, n) in gruppen {
+        k.gesamt += n;
+        let offen = status == MedienkontaktStatus::Offen.as_str();
+        if offen {
+            k.offen += n;
+        }
+        match MedienkontaktArt::parse(&art) {
+            Some(MedienkontaktArt::Anfrage) => {
+                k.je_art.anfrage += n;
+                if offen {
+                    k.offene_anfragen += n;
+                }
+            }
+            Some(MedienkontaktArt::Abstimmung) => k.je_art.abstimmung += n,
+            Some(MedienkontaktArt::Termin) => k.je_art.termin += n,
+            None => return Err(AppError::Internal(format!("Unbekannte Art: {art}"))),
+        }
+    }
+    k.medien = sqlx::query_scalar(
+        "SELECT medium FROM ( \
+           SELECT medium, ROW_NUMBER() OVER ( \
+             ORDER BY (status = 'offen') DESC, eingang_at DESC, id DESC) AS rang \
+           FROM medienkontakt WHERE einsatz_id = ? AND trim(medium) <> '') \
+         GROUP BY medium ORDER BY MIN(rang)",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(k)
 }
 
 /// Lädt einen Medienkontakt. `NotFound`, wenn er nicht zum Einsatz gehört.

@@ -370,3 +370,219 @@ async fn migration_traegt_medienlage_in_offene_entwuerfe_nach() {
     assert_eq!(schluessel(ids[1]).await, ["auftrag=A", "zusammenfassung=Z"]);
     assert_eq!(schluessel(ids[2]).await, ["medienlage=M"]);
 }
+
+// ── Phasen, Seiten und Kennzahlen (LFH-1075) ────────────────────────────────────────────────
+
+/// Legt Kontakte mit gegebenen (Art, Medium, Eingang, erledigt?) an; liefert die Kennungen.
+async fn bestand(w: &Welt, kontakte: &[(MedienkontaktArt, &str, &str, bool)]) -> Vec<i64> {
+    let mut ids = Vec::new();
+    for (art, medium, eingang, erledigt) in kontakte {
+        let mut k = eingabe(*art);
+        k.medium = (*medium).into();
+        k.eingang_at = (*eingang).into();
+        let id = anlegen(w, w.e, k).await.unwrap();
+        if *erledigt {
+            let ziel = if *art == MedienkontaktArt::Anfrage {
+                wechsel(MedienkontaktStatus::Beantwortet, Some("Auskunft"))
+            } else {
+                wechsel(MedienkontaktStatus::Erledigt, None)
+            };
+            status(w, w.e, id, ziel).await.unwrap();
+        }
+        ids.push(id);
+    }
+    ids
+}
+
+fn seite(vor: Option<&MedienkontaktAnzeige>, limit: i64) -> crate::kommunikation::Seite {
+    crate::kommunikation::Seite {
+        vor: vor.map(|k| crate::kommunikation::ZeitCursor {
+            zeit: k.eingang_at.clone(),
+            id: k.id,
+        }),
+        limit,
+    }
+}
+
+#[tokio::test]
+async fn phasen_teilen_die_liste_und_blaettern_ohne_luecke() {
+    use crate::kommunikation::ListenPhase;
+    let w = welt().await;
+    // Fünf erledigte mit DEMSELBEN Eingang (Gleichstand), zwei offene, einer im anderen Einsatz.
+    let mut spec = vec![(
+        MedienkontaktArt::Anfrage,
+        "NDR",
+        "2026-09-30 09:00:00",
+        false,
+    )];
+    for _ in 0..5 {
+        spec.push((MedienkontaktArt::Termin, "RTL", "2026-09-30 08:00:00", true));
+    }
+    spec.push((
+        MedienkontaktArt::Abstimmung,
+        "Polizei",
+        "2026-09-30 10:00:00",
+        false,
+    ));
+    spec.push((
+        MedienkontaktArt::Anfrage,
+        "dpa",
+        "2026-09-30 07:00:00",
+        true,
+    ));
+    bestand(&w, &spec).await;
+    anlegen(&w, w.e2, eingabe(MedienkontaktArt::Anfrage))
+        .await
+        .unwrap();
+
+    let voll = liste(&w.pool, w.e).await.unwrap();
+    let offen = liste_phase(&w.pool, w.e, ListenPhase::Offen, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        offen,
+        voll[..2].to_vec(),
+        "offene vollständig, wie in der Liste"
+    );
+
+    let mut gelesen = Vec::new();
+    let mut vor: Option<MedienkontaktAnzeige> = None;
+    loop {
+        let s = seite(vor.as_ref(), 2);
+        let teil = liste_phase(&w.pool, w.e, ListenPhase::Abgeschlossen, Some(&s))
+            .await
+            .unwrap();
+        assert!(teil.len() <= 2);
+        let fertig = teil.len() < 2;
+        vor = teil.last().cloned();
+        gelesen.extend(teil);
+        if fertig {
+            break;
+        }
+        assert!(gelesen.len() <= voll.len(), "Cursor kommt nicht voran");
+    }
+    assert_eq!(
+        gelesen,
+        voll[2..].to_vec(),
+        "erledigte seitenweise wie in der Liste"
+    );
+}
+
+#[tokio::test]
+async fn kennzahlen_gleich_der_auszaehlung_der_vollliste() {
+    let w = welt().await;
+    bestand(
+        &w,
+        &[
+            (
+                MedienkontaktArt::Anfrage,
+                "NDR 1",
+                "2026-09-30 08:00:00",
+                true,
+            ),
+            (
+                MedienkontaktArt::Anfrage,
+                "dpa",
+                "2026-09-30 09:00:00",
+                false,
+            ),
+            (
+                MedienkontaktArt::Termin,
+                "NDR 1",
+                "2026-09-30 10:00:00",
+                false,
+            ),
+            (
+                MedienkontaktArt::Abstimmung,
+                "Polizei",
+                "2026-09-30 11:00:00",
+                true,
+            ),
+            (
+                MedienkontaktArt::Anfrage,
+                "RTL",
+                "2026-09-30 12:00:00",
+                true,
+            ),
+            (
+                MedienkontaktArt::Anfrage,
+                "dpa",
+                "2026-09-30 13:00:00",
+                true,
+            ),
+        ],
+    )
+    .await;
+    anlegen(&w, w.e2, eingabe(MedienkontaktArt::Anfrage))
+        .await
+        .unwrap();
+
+    let k = kennzahlen(&w.pool, w.e).await.unwrap();
+    // Spiegel der Ableitung, die die Medienlage vorher im Client aus der Vollliste rechnete.
+    let voll = liste(&w.pool, w.e).await.unwrap();
+    let mut medien: Vec<String> = Vec::new();
+    for m in voll.iter().map(|k| k.medium.trim().to_string()) {
+        if !m.is_empty() && !medien.contains(&m) {
+            medien.push(m);
+        }
+    }
+    let zaehle =
+        |p: &dyn Fn(&MedienkontaktAnzeige) -> bool| voll.iter().filter(|k| p(k)).count() as i64;
+    assert_eq!(k.gesamt, voll.len() as i64);
+    assert_eq!(k.offen, zaehle(&|k| k.status == MedienkontaktStatus::Offen));
+    assert_eq!(
+        k.offene_anfragen,
+        zaehle(&|k| k.status == MedienkontaktStatus::Offen && k.art == MedienkontaktArt::Anfrage)
+    );
+    assert_eq!(
+        k.je_art.anfrage,
+        zaehle(&|k| k.art == MedienkontaktArt::Anfrage)
+    );
+    assert_eq!(
+        k.je_art.termin,
+        zaehle(&|k| k.art == MedienkontaktArt::Termin)
+    );
+    assert_eq!(
+        k.je_art.abstimmung,
+        zaehle(&|k| k.art == MedienkontaktArt::Abstimmung)
+    );
+    assert_eq!(k.medien, medien);
+    // Konkret: offene zuerst (NDR 1 10:00, dpa 09:00), dann erledigte nach Eingang.
+    assert_eq!(k.medien, vec!["NDR 1", "dpa", "RTL", "Polizei"]);
+    assert_eq!((k.gesamt, k.offen, k.offene_anfragen), (6, 2, 1));
+}
+
+#[tokio::test]
+async fn ruecknahme_wechselt_die_phase() {
+    use crate::kommunikation::ListenPhase;
+    let w = welt().await;
+    let id = bestand(
+        &w,
+        &[(
+            MedienkontaktArt::Anfrage,
+            "NDR",
+            "2026-09-30 08:00:00",
+            true,
+        )],
+    )
+    .await[0];
+    let erledigt = |w: &Welt| {
+        let pool = w.pool.clone();
+        let e = w.e;
+        async move {
+            liste_phase(&pool, e, ListenPhase::Abgeschlossen, Some(&seite(None, 10)))
+                .await
+                .unwrap()
+                .len()
+        }
+    };
+    assert_eq!(erledigt(&w).await, 1);
+    status(&w, w.e, id, wechsel(MedienkontaktStatus::Offen, None))
+        .await
+        .unwrap();
+    assert_eq!(erledigt(&w).await, 0);
+    let offen = liste_phase(&w.pool, w.e, ListenPhase::Offen, None)
+        .await
+        .unwrap();
+    assert_eq!(offen.iter().map(|k| k.id).collect::<Vec<_>>(), vec![id]);
+}

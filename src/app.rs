@@ -546,6 +546,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::presse::medienkontakte_liste).post(routes::presse::medienkontakt_anlegen),
         )
         .route(
+            "/api/einsaetze/{id}/stab/medienkontakte/kennzahlen",
+            get(routes::presse::medienkontakte_kennzahlen),
+        )
+        .route(
             "/api/einsaetze/{id}/stab/medienkontakte/{kid}",
             get(routes::presse::medienkontakt_detail).patch(routes::presse::medienkontakt_aendern),
         )
