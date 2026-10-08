@@ -1,6 +1,7 @@
 import { App, Col, Collapse, Form, Input, Row, type FormInstance } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { serverJetzt } from '../offline/serveruhr';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
@@ -378,7 +379,7 @@ export default function AuftragFormular({
         prioritaet: 'normal',
         richtung: 'intern',
         frist: null,
-        erteiltAm: dayjs(),
+        erteiltAm: serverJetzt(),
       }}
       onErfassen={absenden}
       // Das Inline-Formular schließt nach dem Senden NICHT; in den Modal-Einbettungen schließt der

@@ -1,8 +1,9 @@
 import { Col, Input, InputNumber, Form, Row } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { serverJetzt } from '../offline/serveruhr';
 import { Paneel } from '../components/instrument';
-import dayjs, { type Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import { ErfassungsFormular } from '../components/Erfassung';
 import type { NeueErinnerung } from '../api/types';
 import { EinWertAuswahl, letzterWert } from '../fuehrung/EinWertAuswahl';
@@ -73,7 +74,7 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true, ein
       initialValues={{
         titel: '',
         beschreibung: '',
-        faellig: dayjs(),
+        faellig: serverJetzt(),
         intervall: null,
         empfaenger: [],
       }}
