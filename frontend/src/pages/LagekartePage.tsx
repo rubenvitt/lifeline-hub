@@ -534,6 +534,7 @@ export default function LagekartePage() {
     bilderFehlerUrsache,
     bilderNeuLaden,
     onBildUpload,
+    bildUpload,
     onBildToggle,
     onBildOpazitaet,
     onBildLoeschen,
@@ -1327,6 +1328,7 @@ export default function LagekartePage() {
         fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}
         onBildUpload={onBildUpload}
+        bildUpload={bildUpload}
         onBildToggle={onBildToggle}
         onBildOpazitaet={onBildOpazitaet}
         onBildPlatzieren={onBildPlatzieren}

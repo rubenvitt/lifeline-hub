@@ -379,7 +379,7 @@ describe('EinheitDetailPage · Auflösen', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
     const blase = await screen.findByRole('tooltip');
-    await userEvent.click(within(blase).getByRole('button', { name: 'OK' }));
+    await userEvent.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
 
     await waitFor(() => expect(geloest).toBe(true));
     expect(await screen.findByText('Gliederung')).toBeInTheDocument();

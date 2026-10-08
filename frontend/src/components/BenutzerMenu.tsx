@@ -89,7 +89,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
   const rollenTags = [];
   if (benutzer.system_rolle === 'admin') {
     rollenTags.push(
-      <Tag key="admin" color="gold" style={{ marginInlineEnd: 0 }}>
+      <Tag key="admin" style={{ marginInlineEnd: 0 }}>
         Admin
       </Tag>,
     );

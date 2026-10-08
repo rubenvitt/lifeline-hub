@@ -183,22 +183,24 @@ describe('ZonenInspector — Rückfrage vor dem Aufheben (LFH-710)', () => {
     ['mit Warnstufen', [gebietMitWarnstufe], /Matrix verloren/],
   ])('%s: erst die Rückfrage, dann genau ein Aufheben', async (_fall, gebiete, hinweis) => {
     const { onLoeschen } = renderInspector({ gebiete });
-    await userEvent.click(screen.getByRole('button', { name: 'Zone aufheben' }));
+    // Auslöser und Bestätigungsknopf heißen gleich: den Auslöser vor dem Öffnen greifen.
+    const ausloeser = screen.getByRole('button', { name: 'Zone aufheben' });
+    await userEvent.click(ausloeser);
 
     const rueckfrage = await offeneRueckfrage();
     expect(onLoeschen).not.toHaveBeenCalled();
     expect(rueckfrage).toHaveTextContent(/Zone „.+“ aufheben\?/);
     if (hinweis) expect(rueckfrage).toHaveTextContent(hinweis);
     else expect(rueckfrage).not.toHaveTextContent(/Matrix|endgültig/);
-    const ok = within(rueckfrage).getByRole('button', { name: 'Aufheben' });
+    const ok = within(rueckfrage).getByRole('button', { name: 'Zone aufheben' });
     expect(ok).toHaveClass('ant-btn-dangerous');
 
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abbrechen' }));
     expect(onLoeschen).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Zone aufheben' }));
+    await userEvent.click(ausloeser);
     await userEvent.click(
-      within(await offeneRueckfrage()).getByRole('button', { name: 'Aufheben' }),
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Zone aufheben' }),
     );
     expect(onLoeschen).toHaveBeenCalledTimes(1);
   });

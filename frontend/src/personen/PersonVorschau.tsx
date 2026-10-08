@@ -42,13 +42,13 @@ export default function PersonVorschau({
         <Space orientation="vertical" style={{ width: '100%' }} size="large">
           <Space wrap>
             <StatusTag darstellung={STATUS_META[p.status]} />
-            {istPatient(p) && <Tag color="geekblue">Patient</Tag>}
+            {istPatient(p) && <Tag>Patient</Tag>}
             {p.aktuelle_sichtung ? (
               <SichtungsTag kategorie={p.aktuelle_sichtung} />
             ) : (
               <Tag>ungesichtet</Tag>
             )}
-            {p.aktueller_verbleib && <Tag color="purple">{p.aktueller_verbleib}</Tag>}
+            {p.aktueller_verbleib && <Tag>{p.aktueller_verbleib}</Tag>}
             {p.storniert_at && <Tag color="default">storniert</Tag>}
           </Space>
 

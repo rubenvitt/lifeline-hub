@@ -330,8 +330,16 @@ async fn ungueltige_org_rolle_ist_400() {
 /// (`/api/auth/totp/enroll/start` + `/finish`) — funktioniert für JEDEN angemeldeten Nutzer
 /// (nicht nur Admins), da beide Endpunkte `CurrentUser`-gegated sind. Liefert die zehn
 /// Klartext-Recovery-Codes.
-async fn totp_aktivieren(app: &axum::Router, cookie: &str) -> Vec<String> {
-    let (status, json) = anfrage(app, "POST", "/api/auth/totp/enroll/start", cookie, None).await;
+async fn totp_aktivieren(app: &axum::Router, cookie: &str, passwort: &str) -> Vec<String> {
+    let body = format!(r#"{{"passwort":"{passwort}"}}"#);
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        cookie,
+        Some(&body),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let secret = json["secret_base32"].as_str().unwrap().to_string();
 
@@ -368,7 +376,7 @@ async fn admin_totp_reset_loescht_secret_aktiviert_recovery_codes_und_sessions()
     // Erika aktiviert TOTP für sich selbst und meldet sich an — eine laufende Session UND ein
     // aktiver zweiter Faktor sind die Ausgangslage vor dem Admin-Reset.
     let erika_cookie = login_cookie(&app, "erika", "erikapw1").await;
-    let recovery_codes = totp_aktivieren(&app, &erika_cookie).await;
+    let recovery_codes = totp_aktivieren(&app, &erika_cookie, "erikapw1").await;
     assert_eq!(recovery_codes.len(), 10);
 
     let (aktiviert_vor, secret_vor): (i64, Option<String>) =

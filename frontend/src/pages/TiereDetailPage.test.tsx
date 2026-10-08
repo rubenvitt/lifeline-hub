@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
@@ -291,7 +292,9 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'OK' })); // Popconfirm bestätigen
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Tier stornieren' }),
+    );
     await waitFor(() => expect(geloescht).toBe(true));
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
   });

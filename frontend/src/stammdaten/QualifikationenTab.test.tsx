@@ -232,12 +232,16 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
     await screen.findByText('Sanitäter');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Deaktivieren' })[0]);
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Qualifikation deaktivieren' }),
+    );
     const hinweis = await stehenderFehler('Qualifikation ist Personal zugeordnet');
     expect(hinweis).toHaveTextContent('Nicht deaktiviert');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Deaktivieren' })[0]);
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Qualifikation deaktivieren' }),
+    );
     await keinStehenderFehler('Qualifikation ist Personal zugeordnet');
     expect(versuch).toBe(2);
   });
@@ -258,7 +262,9 @@ describe('QualifikationenTab — Fehlschläge als stehender Hinweis (LFH-473)', 
     expect(screen.getByLabelText('Neue Qualifikation')).toHaveValue('Sanitäter');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Deaktivieren' })[0]);
-    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Qualifikation deaktivieren' }),
+    );
     await keinStehenderFehler('Label bereits vergeben');
   });
 });

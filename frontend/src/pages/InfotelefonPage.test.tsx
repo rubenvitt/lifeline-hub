@@ -6,6 +6,7 @@ import { renderMitProviders } from '../test/utils';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { erfasseAnruf, ladeAnrufe, setzeAnrufStatus } from '../api/infotelefon';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, InfotelefonAnruf } from '../api/types';
 import InfotelefonPage from './InfotelefonPage';
 import { freigabenFixture } from '../test/fixtures';
@@ -145,10 +146,33 @@ describe('InfotelefonPage (LFH-554)', () => {
     await waitFor(() => expect(setzeAnrufStatus).toHaveBeenCalledWith(1, 2, 'erledigt'));
   });
 
+  it('kein Zweck-Absatz unter dem Titel, kein Rechte-Hinweis mit Schreibrecht (LFH-1078)', async () => {
+    setup();
+    await screen.findByText('Sperrung B 3');
+    expect(screen.queryByText(/Sachgebiet S5/)).toBeNull();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
+  });
+
+  it('zählt zurückgehaltene Anrufe ohne Erklärsatz, solange der Fokus in der Liste steht', async () => {
+    const { client } = setup();
+    const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    (await within(liste).findAllByRole('button', { name: /^Status von Anruf / }))[0].focus();
+    vi.mocked(ladeAnrufe).mockResolvedValue([
+      anruf({ id: 3, angelegt_von_id: 9, notiz: 'Keller voll' }),
+      ...ANRUFE,
+    ]);
+    await client.invalidateQueries({ queryKey: einsatzKeys.infotelefon(1) });
+    const banner = await screen.findByText('1 neuer Anruf');
+    expect(banner.textContent).toBe('1 neuer Anruf');
+    expect(screen.queryByText(/oben einsortiert/)).toBeNull();
+    expect(screen.queryByText('Keller voll')).toBeNull();
+  });
+
   it('Beobachtung liest, die Erfassung fehlt, und der Grund steht da', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
     setup();
     expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+    expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
     await screen.findByText('Sperrung B 3');
     expect(screen.queryByRole('button', { name: 'Erfassen' })).toBeNull();
   });

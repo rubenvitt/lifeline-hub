@@ -242,6 +242,8 @@ export interface FuehrungsstellePatch {
 
 // ============================== E‑2 Personen ==============================
 export type PersonStatus = S['PersonStatus'];
+/** Stand eines Vermisstenabgleichs (Farbe: `theme/statusFarben.ts:abgleichStatus`). */
+export type AbgleichStatus = S['AbgleichStatus'];
 export type Person = S['PersonAnzeige'];
 /** Personenauswahl ohne Freitexte (LFH-940): Zeile je nicht stornierter Person für Picker,
  *  Sprungpalette und Chat-Bezug. */

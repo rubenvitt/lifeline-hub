@@ -180,9 +180,11 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 - **Sichtung ist eine eigene Achse nach BBK** und die Ausnahme vom Neuentwurf:
   `SichtungsTag`/`sichtungsfarben`, umrandetes Farbfeld, SK I rot, II gelb, III grün, IV blau,
   Tote schwarz, „unverletzt" ohne Farbe; die Umrandung macht Gelb auf hellem und Schwarz auf
-  dunklem Grund sichtbar. Nie `color="black"` an antds `Tag`; nie `color="blue"` (LFH-891, Spec
-  `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): eine Kennzeichnung
-  ohne Status (ad-hoc, Rolle, Kennung) ist neutral wie die Demo-Marke, Blau bedient.
+  dunklem Grund sichtbar. **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
+  Spec `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): kein Preset hält
+  den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
+  Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
+  Demo-Marke, Blau bedient.
   Übergabe, Geschädigt-Bezug, UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind
   unabhängig.
 - **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)
@@ -299,9 +301,8 @@ anwendbar), „nicht geprüft" ist keins.
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
   Modulbeschreibungen aus wenigen Fachwörtern.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
-  „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. `OFFEN` ist
-  eine Schuldmenge, die nur schrumpft: wer eine Datei bereinigt, verkleinert ihren Eintrag; neue
-  Einträge gibt es nicht.
+  „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
+  `OFFEN` ist seit LFH-1078 P7 leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
 
 **Tabelle und Dichte**
 
@@ -375,8 +376,8 @@ anwendbar), „nicht geprüft" ist keins.
   Kein Knopftext gleicht einem Statuswort desselben Moduls; die Texte stehen je Zielstatus in
   `kommunikation/phase.ts` (`…_HANDLUNG`) bzw. `stammdaten/dienststatus.tsx`, Guard
   `kommunikation/wortlaut.guard.test.ts`. Der Bestätigungsknopf einer Rückfrage nennt die
-  Handlung, nie nur „Ja“/„OK“ (rote `Popconfirm`: `components/rueckfrage.guard.test.ts`, mit
-  Schuldliste, die nur schrumpft). Eine fachliche Unterscheidung ist ohne Hover lesbar, ein Tooltip
+  Handlung, nie nur „Ja“/„OK“ (rote `Popconfirm`: `components/rueckfrage.guard.test.ts`, ohne
+  Ausnahmen). Eine fachliche Unterscheidung ist ohne Hover lesbar, ein Tooltip
   ergänzt nur. „Quittieren“ heißt Empfang bestätigt (Meldung, Auftrag, Fernmeldeskizze), eine
   Erinnerung „erübrigt“ sich.
 - **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) hinter
@@ -452,7 +453,7 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 33 am 06.10.2026, LFH-962); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 36 am 08.10.2026, LFH-1022); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4,

@@ -70,16 +70,13 @@ export default function BezugDialog({
           onChange={() => form.setFieldsValue({ ziel_id: undefined })}
         />
       </Form.Item>
+      {/* Ohne Typ gesperrt: das zeigt die Reihenfolge, kein Satz (LFH-1078). */}
       <Form.Item
         label="Objekt"
         name="ziel_id"
         rules={[{ required: true, message: 'Objekt wählen' }]}
       >
-        <Select
-          options={objektOptionen}
-          disabled={!typ}
-          notFoundContent={typ ? 'Keine Objekte' : 'Zuerst Typ wählen'}
-        />
+        <Select options={objektOptionen} disabled={!typ} notFoundContent="Keine Objekte" />
       </Form.Item>
     </ErfassungsModal>
   );

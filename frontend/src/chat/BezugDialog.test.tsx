@@ -58,6 +58,25 @@ describe('BezugDialog', () => {
     expect(onBestaetigen).toHaveBeenCalledWith('schaden', 3);
   });
 
+  it('sperrt das Objekt-Feld, bis ein Typ gewählt ist, statt es zu erklären (LFH-1078)', async () => {
+    renderMitProviders(
+      <BezugDialog
+        offen
+        nachricht={nachricht}
+        optionen={optionen}
+        senden={false}
+        onAbbrechen={vi.fn()}
+        onBestaetigen={vi.fn()}
+      />,
+    );
+    const comboboxen = screen.getAllByRole('combobox');
+    expect(comboboxen[1]).toBeDisabled();
+    await userEvent.click(comboboxen[0]);
+    await userEvent.click(await screen.findByText('Schaden'));
+    expect(comboboxen[1]).toBeEnabled();
+    expect(screen.queryByText(/Zuerst Typ/)).not.toBeInTheDocument();
+  });
+
   it('setzt die Objekt-Auswahl bei Typ-Wechsel zurück', async () => {
     const mehr: BezugOptionen = {
       ...optionen,

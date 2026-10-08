@@ -1684,7 +1684,7 @@ describe('LagekartePage', () => {
     // Rückfrage vor dem harten Löschen: ohne Bestätigung geht kein DELETE raus.
     const rueckfrage = await offeneRueckfrage();
     expect(geloescht).toBe(false);
-    await user.click(within(rueckfrage).getByRole('button', { name: 'Aufheben' }));
+    await user.click(within(rueckfrage).getByRole('button', { name: 'Zone aufheben' }));
     await waitFor(() => expect(geloescht).toBe(true));
   });
 

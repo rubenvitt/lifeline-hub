@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
@@ -302,6 +303,18 @@ describe('MaterialPage', () => {
     expect(entfernen).not.toHaveClass('ant-btn-sm');
     // Rot bedient nichts: der Entfernen-Knopf trägt keinen Gefahren-Anstrich.
     expect(entfernen).not.toHaveClass('ant-btn-dangerous');
+  });
+
+  it('die Rückfrage vor dem Entfernen nennt die Handlung, nicht „OK“ (LFH-1090)', async () => {
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await userEvent.click(within(zeile).getByRole('button', { name: 'Entfernen' }));
+    const rueckfrage = await offeneRueckfrage();
+    expect(
+      within(rueckfrage).getByRole('button', { name: 'Aus Einsatz entfernen' }),
+    ).toBeInTheDocument();
+    expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
   });
 });
 

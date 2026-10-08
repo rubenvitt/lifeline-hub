@@ -160,10 +160,10 @@ describe('CommandPalette · grober Zeiger (LFH-982)', () => {
     expect(chip('#')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('nennt am Chip die Legende als Titel und das Kurzwort als Text', () => {
+  it('nennt am Chip das Kurzwort als Text, ohne erklärenden Titel (LFH-1078)', () => {
     setzeZeigerGrob(true);
     palette();
-    expect(chip('>')).toHaveAttribute('title', 'zeigt nur Aktionen');
+    expect(chip('>')).not.toHaveAttribute('title');
     expect(chip('>')).toHaveTextContent('Aktionen');
   });
 

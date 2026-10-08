@@ -214,9 +214,9 @@ for (const { dichte, soll } of STAFFEL) {
     const blase = page.locator('.ant-popconfirm:not(.ant-popover-hidden)');
     await expect(blase, 'genau eine offene Bestätigungsblase').toHaveCount(1);
 
-    // Per `getByRole(..., { name })`: `getByText` träfe auch `sr-only`/`aria-hidden`. „OK" und
-    // „Abbrechen" liefert antds `de_DE`.
-    for (const etikett of ['OK', 'Abbrechen']) {
+    // Per `getByRole(..., { name })`: `getByText` träfe auch `sr-only`/`aria-hidden`. Der
+    // Bestätigungsknopf nennt die Handlung (LFH-1090), „Abbrechen" liefert antds `de_DE`.
+    for (const etikett of ['Aus Einsatz entfernen', 'Abbrechen']) {
       const knopf = blase.getByRole('button', { name: etikett, exact: true });
       const breite = await haeltTreffflaeche(knopf, soll, `Bestätigungsknopf „${etikett}"`);
 
@@ -237,8 +237,8 @@ for (const { dichte, soll } of STAFFEL) {
       });
     }
 
-    // Über „Abbrechen" schließen (OK löschte die geseedete Kraft); der Klick belegt nebenbei
-    // die Bedienbarkeit.
+    // Über „Abbrechen" schließen (Bestätigen entfernte die geseedete Kraft); der Klick belegt
+    // nebenbei die Bedienbarkeit.
     await blase.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(blase).toHaveCount(0);
   });

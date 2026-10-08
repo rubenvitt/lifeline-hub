@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
+import { legeBefehlAn } from '../api/befehle';
 import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -14,6 +15,7 @@ import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { einsatzKeys } from '../api/queryKeys';
+import { ladeStab } from '../api/stab';
 import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
@@ -34,6 +36,7 @@ import {
   einsatzdatenPfad,
   fahrzeugePfad,
   kommunikationsplanPfad,
+  befehlDetailPfad,
   lageberichtDetailPfad,
   parseFunkplanAnsicht,
   stabPfad,
@@ -624,6 +627,13 @@ export default function FunkplanPage() {
     queryFn: () => ladeFernmeldeskizze(einsatzId),
     enabled: stabFrei,
   });
+  // LFH-1029: die Stab-Besetzung für die Sachgebiete im Kasten der Einsatzleitung, live über `stab`.
+  const stabQuery = useQuery({
+    queryKey: einsatzKeys.stab(einsatzId),
+    queryFn: () => ladeStab(einsatzId),
+    enabled: stabFrei,
+    select: (stab) => stab.besetzung,
+  });
 
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
@@ -633,6 +643,7 @@ export default function FunkplanPage() {
   const fuehrungsstelle = useFuehrungsstelleQuelle(fuehrungsstelleQuery);
   const stellen = useQuelle(stellenQuery, stabFrei, ohneVerbindung);
   const skizzenDaten = useSkizzenQuelle(skizzeQuery, stabFrei, ohneVerbindung);
+  const besetzung = useQuelle(stabQuery, stabFrei, ohneVerbindung);
   const quellen: FunkplanQuellen = useMemo(
     () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle }),
     [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle],
@@ -658,6 +669,8 @@ export default function FunkplanPage() {
         einsatzId,
         abschnitte,
         einheiten,
+        fahrzeuge,
+        besetzung,
         fuehrungsstelle,
         sprechgruppen,
         stellen,
@@ -668,6 +681,8 @@ export default function FunkplanPage() {
       einsatzId,
       abschnitte,
       einheiten,
+      fahrzeuge,
+      besetzung,
       fuehrungsstelle,
       sprechgruppen,
       stellen,
@@ -696,22 +711,42 @@ export default function FunkplanPage() {
   const aufklappbar = useMemo(() => aufklappbareSchluessel(zeilen), [zeilen]);
   const aufgeklappt = aufklappbar.filter((k) => !zugeklappt.has(k));
 
+  // Ein Wortlaut für Lagebericht und Befehl: Baum, Lücken und Kommunikationsskizze. Die
+  // Erreichbarkeit kennt das Markdown nicht.
+  const funkplanText = () => {
+    const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
+    const gueltigAbRoh = netz.schriftfeld?.gueltig_ab;
+    const gueltigAb = gueltigAbRoh ? taktischeDtgVoll(gueltigAbRoh, konventionen) : null;
+    const text = rendereFunkplanMarkdown(zeilen, stand, luecken, quellen, { netz, gueltigAb });
+    return { titel: `Funkplan ${stand}`, text };
+  };
+  // EIN Aufruf mit Startinhalt (Spec `dokument-uebernahme`): das Dokument entsteht mit Text oder
+  // gar nicht.
   const uebernehmen = useMutation({
     mutationFn: async () => {
-      const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
-      // EIN Aufruf mit Startinhalt (Spec `dokument-uebernahme`): der Bericht entsteht mit Text
-      // oder gar nicht. Die Erreichbarkeit kennt das Markdown nicht.
-      const gueltigAbRoh = netz.schriftfeld?.gueltig_ab;
-      const gueltigAb = gueltigAbRoh ? taktischeDtgVoll(gueltigAbRoh, konventionen) : null;
-      const text = rendereFunkplanMarkdown(zeilen, stand, luecken, quellen, { netz, gueltigAb });
+      const { titel, text } = funkplanText();
       const lb = await legeLageberichtAn(einsatzId, {
         vorlage: 'freitext',
-        titel: `Funkplan ${stand}`,
+        titel,
         abschnitte: [{ schluessel: 'text', text }],
       });
       return lb.id;
     },
     onSuccess: (lbId) => navigate(lageberichtDetailPfad(einsatzId, lbId)),
+  });
+  // LFH-1027: Kommunikationsunterlagen ergänzen den Befehl (DV 800 Nr. 1.5.1.1). Nur LADEF hat
+  // den Abschnitt „Führung und Kommunikation“; die übrigen bleiben leer.
+  const inBefehl = useMutation({
+    mutationFn: async () => {
+      const { titel, text } = funkplanText();
+      const b = await legeBefehlAn(einsatzId, {
+        vorlage: 'befehl_ladef',
+        titel,
+        abschnitte: [{ schluessel: 'fuehrung_kommunikation', text }],
+      });
+      return b.id;
+    },
+    onSuccess: (bId) => navigate(befehlDetailPfad(einsatzId, bId)),
   });
 
   const spalten = useMemo(() => funkplanSpalten(druckt), [druckt]);
@@ -772,6 +807,10 @@ export default function FunkplanPage() {
   const darfUebernehmen =
     darfImEinsatzSchreiben(einsatz, benutzer) &&
     istKeyFreigegeben('lageberichte', stabFreigabe.freigaben);
+  // Befehle hängen am Modul Aufträge (`src/routes/befehl.rs`, `MODUL_KEY`).
+  const darfInBefehl =
+    darfImEinsatzSchreiben(einsatz, benutzer) &&
+    istKeyFreigegeben('auftraege', stabFreigabe.freigaben);
   const quellenLaden = [...Object.values(quellen), stellen, skizzenDaten].some(
     (q) => q.zustand === 'laden',
   );
@@ -786,10 +825,12 @@ export default function FunkplanPage() {
     fuehrungsstelleQuery.dataUpdatedAt,
     stellenQuery.dataUpdatedAt,
     skizzeQuery.dataUpdatedAt,
+    stabQuery.dataUpdatedAt,
   );
 
-  // Skizze und Sprechgruppen zeigen keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review
-  // LFH-625). Die Sprechgruppen zählen ihre Zeilen vorweg.
+  // Skizze und Sprechgruppen zeigen keinen Fahrzeugbestand (die Skizze nur Führungsmittel im
+  // Kasten, LFH-1029), also zählt ihr Umfang ihn auch nicht (Review LFH-625). Die Sprechgruppen
+  // zählen ihre Zeilen vorweg.
   const umfang = [
     ...(ansicht === 'sprechgruppen' ? [`${sprechgruppenplan.length} Sprechgruppen`] : []),
     ...UMFANG.filter(
@@ -1053,6 +1094,15 @@ export default function FunkplanPage() {
                 In Lagebericht übernehmen
               </Button>
             )}
+            {darfInBefehl && (
+              <Button
+                loading={inBefehl.isPending || quellenLaden}
+                disabled={quellenLaden}
+                onClick={() => inBefehl.mutate()}
+              >
+                In Befehl übernehmen
+              </Button>
+            )}
             {/* Erst nach committetem Aufklappen drucken — `useDrucken` löst den Dialog nach dem
               Commit aus. Die Anlage der Skizze steht ohnehin ganz offen. */}
             <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
@@ -1062,6 +1112,15 @@ export default function FunkplanPage() {
               <SpeicherFehler
                 fehler={uebernehmen.error}
                 titel="Nicht in den Lagebericht übernommen"
+                fallback="Übernahme fehlgeschlagen"
+              />
+            </div>
+          )}
+          {inBefehl.error != null && (
+            <div className="funkplan-no-print" style={{ marginBlockEnd: token.margin }}>
+              <SpeicherFehler
+                fehler={inBefehl.error}
+                titel="Nicht in den Befehl übernommen"
                 fallback="Übernahme fehlgeschlagen"
               />
             </div>

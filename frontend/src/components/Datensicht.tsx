@@ -204,6 +204,12 @@ export interface PrimaerAktion<T> {
   /** Rückfragetitel. Gesetzt ⇒ Rückfrage vor dem Auslösen; der Auslöser bleibt neutral. */
   bestaetigung?: string;
   /**
+   * Nur mit `bestaetigung`: Bestätigungsknopf der Rückfrage, mit Verb und Objekt („Aus Einsatz
+   * entfernen“). Fehlt ⇒ `etikett`, nie antds „OK“ (`frontend/AGENTS.md`, „Knöpfe nennen die
+   * Handlung“).
+   */
+  bestaetigungKnopf?: string;
+  /**
    * Nur mit `bestaetigung`: färbt den OK-Knopf der Rückfrage rot — für unumkehrbare
    * Aktionen. Der Auslöser bleibt davon unberührt.
    */
@@ -1958,6 +1964,7 @@ export default function Datensicht<T extends object, const K extends string>(
         <Popconfirm
           key="aktion"
           title={aktion!.bestaetigung}
+          okText={aktion!.bestaetigungKnopf ?? aktion!.etikett}
           onConfirm={() => aktion!.onKlick(zeile)}
           okButtonProps={aktion!.bestaetigungGefahr ? { danger: true } : undefined}
         >

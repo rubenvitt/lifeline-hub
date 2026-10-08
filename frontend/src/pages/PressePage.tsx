@@ -46,11 +46,11 @@ import { Select } from '../components/Select';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { kettenKoepfe } from '../lageberichte/ketten';
 import { ART_REIHENFOLGE, MEDIENKONTAKT_ART_LABEL } from '../presse/labels';
-import { presseRechteText } from '../presse/rechteText';
 import { VORLAGEN, mitteilungVorlage } from '../presse/vorlagen';
 import { pressemitteilungPfad, stabPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
@@ -330,7 +330,6 @@ export default function PressePage() {
       titel="Pressearbeit"
       meta={`${kennzahlen?.gesamt ?? '—'} Medienkontakte · ${mitteilungen.length} Pressemitteilungen`}
       dataUpdatedAt={offeneQuery.dataUpdatedAt}
-      beschreibung="Sachgebiet S5 · Presse-/Medienlage, Presseinformationen, Pressetermine (FwDV 100 Anl. 2)"
       breadcrumb={
         <Breadcrumb
           items={[
@@ -366,7 +365,11 @@ export default function PressePage() {
           </Button>
         </Space>
       }
-      hinweis={<RechteHinweis sichtbar={!darfSchreiben} text={presseRechteText(einsatz.status)} />}
+      hinweis={
+        darfSchreiben ? undefined : (
+          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+        )
+      }
     >
       <Flex vertical gap={token.margin}>
         {/* Die Arbeitsliste steht oben: was darunter live wächst (Pressemitteilungen, Medienlage),
@@ -561,8 +564,13 @@ export default function PressePage() {
                   <Form.Item label="Erreichbarkeit" name="kontakt_erreichbarkeit">
                     <Input placeholder="Telefon oder E-Mail" maxLength={PRESSE_THEMA_MAX} />
                   </Form.Item>
-                  <Form.Item label="Eingang" name="eingang" extra="Leer gelassen: jetzt">
-                    <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                  {/* Leer setzt der Server jetzt (`routes/presse.rs`, `zeit_oder_jetzt`). */}
+                  <Form.Item label="Eingang" name="eingang">
+                    <ZeitpunktEingabe
+                      format="DD.MM.YYYY HH:mm"
+                      placeholder="jetzt"
+                      style={{ width: '100%' }}
+                    />
                   </Form.Item>
                 </>
               ),

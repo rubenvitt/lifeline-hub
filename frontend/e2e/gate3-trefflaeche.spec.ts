@@ -300,12 +300,17 @@ test('Profil: die Kopieraktion des Schlüssels zum zweiten Faktor hält 30 / 48 
 }) => {
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  await wechsleZu(page, await benutzerAnlegen(page, 'fuehrungskraft'));
+  const konto = await benutzerAnlegen(page, 'fuehrungskraft');
+  await wechsleZu(page, konto);
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
     await page.goto('/profil');
     await stelleDichte(page, dichte);
     await page.getByRole('button', { name: 'Zweiten Faktor einrichten' }).click();
+    // Die Einrichtung verlangt das aktuelle Passwort (LFH-1013).
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Aktuelles Passwort').fill(konto.passwort);
+    await dialog.getByRole('button', { name: /Weiter/ }).click();
     const knopf = page.getByRole('button', { name: 'Schlüssel kopieren', exact: true });
     const hoehe = await haeltStufe(knopf, soll, `Schlüssel kopieren (${dichte})`);
     const breite = (await knopf.boundingBox())!.width;
@@ -546,7 +551,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
       `Alarm-Knopf Benachrichtigung (${dichte})`,
     );
     const ton = await haeltStufe(
-      kopf.getByRole('button', { name: /Alarmton/ }),
+      kopf.getByRole('button', { name: /^Ton / }),
       BODEN.staffel[dichte],
       `Alarm-Knopf Ton (${dichte})`,
     );
@@ -1522,6 +1527,11 @@ test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dic
       soll,
       `Übernahme (${dichte})`,
     );
+    const befehl = await haeltStufe(
+      page.getByRole('button', { name: 'In Befehl übernehmen', exact: true }),
+      soll,
+      `Übernahme Befehl (${dichte})`,
+    );
     const druck = await haeltStufe(
       page.getByRole('button', { name: /Drucken/ }),
       soll,
@@ -1529,7 +1539,7 @@ test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dic
     );
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Lücken-Verweis ${verweise}, ` +
-        `Übernahme ${uebernahme}, Drucken ${druck}`,
+        `Übernahme ${uebernahme}, Übernahme Befehl ${befehl}, Drucken ${druck}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

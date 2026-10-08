@@ -53,6 +53,10 @@ import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import { istLatLon, type KoordinatenWert } from '../../anzeige/koordinatenWert';
 import type { Hintergrundbild } from '../../api/kartenbilder';
+import type { UploadFortschritt } from '../../api/client';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import UploadFortschrittAnzeige from '../../components/UploadFortschritt';
+import { ablageFehlerKopf } from '../../components/useUploadFortschritt';
 import type { KartenAnsicht } from '../../api/types';
 import AnsichtSwitcher from './AnsichtSwitcher';
 import AnsichtZuordnung from './AnsichtZuordnung';
@@ -192,6 +196,15 @@ export interface SidebarSektionFehler {
   ansichten?: SektionFehler;
 }
 
+/** Stand des Bild-Uploads aus `useKartenbilder` (LFH-1021). */
+export interface BildUploadZustand {
+  laeuft: boolean;
+  /** Nur während der Übertragung gesetzt. */
+  stand: UploadFortschritt | null;
+  /** `mutation.error`, bis zum nächsten Upload. */
+  fehler: unknown;
+}
+
 export interface SidebarProps {
   einsatzId: number;
   nichtVerortet: NichtVerortet[];
@@ -294,6 +307,8 @@ export interface SidebarProps {
   /** Bild-Hintergründe */
   bilder: Hintergrundbild[];
   onBildUpload: (datei: File) => void;
+  /** Laufender oder gescheiterter Bild-Upload (LFH-1021); fehlt im Historien-Modus. */
+  bildUpload?: BildUploadZustand;
   onBildToggle: (id: number, sichtbar: boolean) => void;
   onBildOpazitaet: (id: number, opazitaet: number) => void;
   onBildPlatzieren: (id: number) => void;
@@ -1331,16 +1346,26 @@ export default function Sidebar(props: SidebarProps) {
             );
           })}
           {darfSchreiben && (
-            <Upload
-              accept="image/png,image/jpeg"
-              showUploadList={false}
-              beforeUpload={(datei) => {
-                props.onBildUpload(datei as File);
-                return false;
-              }}
-            >
-              <Button icon={<IconHochladen />}>Bild hochladen</Button>
-            </Upload>
+            <>
+              <SpeicherFehler
+                fehler={props.bildUpload?.fehler}
+                {...ablageFehlerKopf(props.bildUpload?.fehler)}
+              />
+              <UploadFortschrittAnzeige stand={props.bildUpload?.stand ?? null} />
+              <Upload
+                accept="image/png,image/jpeg"
+                showUploadList={false}
+                disabled={props.bildUpload?.laeuft}
+                beforeUpload={(datei) => {
+                  props.onBildUpload(datei as File);
+                  return false;
+                }}
+              >
+                <Button icon={<IconHochladen />} loading={props.bildUpload?.laeuft}>
+                  Bild hochladen
+                </Button>
+              </Upload>
+            </>
           )}
         </Space>
       </KlappPaneel>

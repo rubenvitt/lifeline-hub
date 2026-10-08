@@ -113,7 +113,14 @@ const BEWERTET_OHNE_SCANNER_DECKUNG = ['nachforderungen/NachforderungKarte.tsx']
  * ein später danebengestellter Knopf auffällt, und gepinnt, damit „findet keine Reihe" eine
  * Aussage bleibt und nicht der Zustand eines kaputten Scanners.
  */
-const OHNE_NACHBARSCHAFT = ['stammdaten/StichworteTab.tsx', 'pages/MitgliederAbschnitt.tsx'];
+const OHNE_NACHBARSCHAFT = [
+  'stammdaten/StichworteTab.tsx',
+  'pages/MitgliederAbschnitt.tsx',
+  // „Zone aufheben“ (`danger`) steht allein in der äußeren Reihe des Inspectors, abgesetzt unter
+  // den Feldern; die neutralen Knöpfe (Gefahrenmatrix, Sprung ins Fachmodul) stehen in der
+  // inneren.
+  'pages/lagekarte/ZonenInspector.tsx',
+];
 
 const BEREICH = [...MIT_NACHBARSCHAFT, ...OHNE_NACHBARSCHAFT];
 

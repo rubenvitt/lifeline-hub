@@ -1,5 +1,6 @@
-import { apiGet, apiSend, apiUpload } from './client';
+import { apiGet, apiSend, apiUploadMitFortschritt, type UploadFortschritt } from './client';
 import type { Anhang, BezugTyp, ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
+import { UPLOAD_TIMEOUT_MS } from './upload';
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
   return apiGet<ChatKanal[]>(`/api/einsaetze/${einsatzId}/chat/kanaele`);
@@ -37,11 +38,18 @@ export function listeNachrichten(
 
 /** Lädt Dateien hoch und liefert die Anhang-Metadaten zurück (LFH-102). Der
  *  Upload ist von der Nachricht entkoppelt: erst hochladen, dann beim Senden die
- *  `anhang_ids` mitgeben. */
-export function ladeAnhaengeHoch(einsatzId: number, dateien: File[]): Promise<Anhang[]> {
+ *  `anhang_ids` mitgeben. Meldet den Stand der Übertragung (je Datei bis 25 MiB). */
+export function ladeAnhaengeHoch(
+  einsatzId: number,
+  dateien: File[],
+  onFortschritt?: (stand: UploadFortschritt) => void,
+): Promise<Anhang[]> {
   const formData = new FormData();
   for (const datei of dateien) formData.append('datei', datei);
-  return apiUpload<Anhang[]>(`/api/einsaetze/${einsatzId}/anhaenge`, formData);
+  return apiUploadMitFortschritt<Anhang[]>(`/api/einsaetze/${einsatzId}/anhaenge`, formData, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+    onFortschritt,
+  });
 }
 
 export function sendeNachricht(

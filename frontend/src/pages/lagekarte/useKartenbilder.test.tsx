@@ -4,7 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createRef, type ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { Hintergrundbild } from '../../api/kartenbilder';
+import { listeHintergrundbilder, type Hintergrundbild } from '../../api/kartenbilder';
+import { AusgangUnbekannt, type UploadFortschritt } from '../../api/client';
 import type { KartenHandle } from './Kartenflaeche';
 import { useKartenbilder } from './useKartenbilder';
 
@@ -21,6 +22,11 @@ const api = vi.hoisted(() => ({
     aufloesen: (url: string) => void;
     ablehnen: (e: unknown) => void;
   }[],
+  uploads: [] as {
+    onFortschritt: (stand: UploadFortschritt) => void;
+    aufloesen: (bild: unknown) => void;
+    ablehnen: (e: unknown) => void;
+  }[],
 }));
 
 vi.mock('../../api/kartenbilder', () => ({
@@ -32,7 +38,19 @@ vi.mock('../../api/kartenbilder', () => ({
       }),
   ),
   aktualisiereHintergrundbild: vi.fn(),
-  ladeHintergrundbildHoch: vi.fn(),
+  ladeHintergrundbildHoch: vi.fn(
+    (
+      _einsatzId: number,
+      _datei: File,
+      _ecken: unknown,
+      _name?: string,
+      _ansichtId?: number | null,
+      onFortschritt?: (stand: UploadFortschritt) => void,
+    ) =>
+      new Promise((aufloesen, ablehnen) => {
+        api.uploads.push({ onFortschritt: onFortschritt!, aufloesen, ablehnen });
+      }),
+  ),
   loescheHintergrundbild: vi.fn(),
 }));
 
@@ -54,10 +72,12 @@ let revoke: { mock: { calls: unknown[][] } };
 beforeEach(() => {
   api.liste.clear();
   api.downloads.length = 0;
+  api.uploads.length = 0;
   revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 /** Freigegebene URLs (`forEach(URL.revokeObjectURL)` reicht Index und Array mit). */
 const freigegeben = () => revoke.mock.calls.map((aufruf) => aufruf[0]);
@@ -207,5 +227,67 @@ describe('useKartenbilder im Rückblick', () => {
     await waitFor(() => expect(result.current.bildOverlays.map((o) => o.id)).toEqual([1]));
     expect(fehler).toHaveBeenCalledTimes(1);
     expect(String(fehler.mock.calls[0][0])).toMatch(/404/);
+  });
+});
+
+describe('useKartenbilder: Upload (LFH-1021)', () => {
+  /** jsdom lädt keine Bilder: das Seitenverhältnis fällt auf den Ersatz zurück. */
+  function ohneBildDekodierung() {
+    vi.stubGlobal(
+      'Image',
+      class {
+        onerror: (() => void) | null = null;
+        set src(_url: string) {
+          queueMicrotask(() => this.onerror?.());
+        }
+      },
+    );
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:vorschau');
+    vi.mocked(listeHintergrundbilder).mockClear();
+  }
+  const datei = () => new File(['x'], 'grundriss.png', { type: 'image/png' });
+
+  it('meldet den Fortschritt, sperrt einen zweiten Upload und räumt nach Erfolg', async () => {
+    ohneBildDekodierung();
+    const { hook } = aufbau();
+    await waitFor(() => expect(listeHintergrundbilder).toHaveBeenCalledTimes(1));
+    expect(hook.result.current.bildUpload).toEqual({ laeuft: false, stand: null, fehler: null });
+
+    act(() => hook.result.current.onBildUpload(datei()));
+    await waitFor(() => expect(api.uploads).toHaveLength(1));
+    expect(hook.result.current.bildUpload.laeuft).toBe(true);
+    expect(hook.result.current.bildUpload.stand).toEqual({ phase: 'senden', anteil: null });
+
+    act(() => api.uploads[0].onFortschritt({ phase: 'senden', anteil: 0.5 }));
+    expect(hook.result.current.bildUpload.stand).toEqual({ phase: 'senden', anteil: 0.5 });
+    act(() => api.uploads[0].onFortschritt({ phase: 'pruefen' }));
+    expect(hook.result.current.bildUpload.stand).toEqual({ phase: 'pruefen' });
+
+    act(() => hook.result.current.onBildUpload(datei()));
+    await act(async () => api.uploads[0].aufloesen(bild(9)));
+    await waitFor(() => expect(hook.result.current.bildUpload.laeuft).toBe(false));
+    expect(api.uploads).toHaveLength(1);
+    expect(hook.result.current.bildUpload.stand).toBeNull();
+    await waitFor(() => expect(listeHintergrundbilder).toHaveBeenCalledTimes(2));
+  });
+
+  it('unklarer Ausgang: Fehler an der Liste statt im Toast, und die Liste wird neu geholt', async () => {
+    ohneBildDekodierung();
+    const { hook, fehler } = aufbau();
+    await waitFor(() => expect(listeHintergrundbilder).toHaveBeenCalledTimes(1));
+
+    act(() => hook.result.current.onBildUpload(datei()));
+    await waitFor(() => expect(api.uploads).toHaveLength(1));
+    const unklar = new AusgangUnbekannt();
+    await act(async () => api.uploads[0].ablehnen(unklar));
+
+    await waitFor(() => expect(hook.result.current.bildUpload.fehler).toBe(unklar));
+    expect(hook.result.current.bildUpload.stand).toBeNull();
+    expect(fehler).not.toHaveBeenCalled();
+    await waitFor(() => expect(listeHintergrundbilder).toHaveBeenCalledTimes(2));
+
+    // Der nächste Upload räumt den alten Fehler.
+    act(() => hook.result.current.onBildUpload(datei()));
+    await waitFor(() => expect(hook.result.current.bildUpload.fehler).toBeNull());
   });
 });

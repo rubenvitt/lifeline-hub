@@ -72,6 +72,20 @@ describe('KanalListe', () => {
     expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
   });
 
+  it('zeigt den Leerzustand ohne Schreibrecht ohne Anlage-Knopf (LFH-1078)', () => {
+    renderMitProviders(
+      <KanalListe
+        kanaele={[]}
+        aktiverKanalId={null}
+        onWechsel={vi.fn()}
+        darfSchreiben={false}
+        onKanalAnlegen={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Noch keine Kanäle')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
+  });
+
   it('zeigt die Zahl der Ungelesenen (Zahl + Wort) und die letzte Nachrichtenzeit', () => {
     const letzte = new Date().toISOString().slice(0, 10) + ' 10:42:00';
     const { container } = renderMitProviders(
@@ -139,8 +153,11 @@ describe('KanalListe', () => {
         onKanalAnlegen={onKanalAnlegen}
       />,
     );
-    // Leerzustand nennt den Weg; die Anlage öffnet aus dem Kopf.
-    expect(screen.getByText(/Noch keine Kanäle/)).toBeInTheDocument();
+    // Leerzustand trägt die Anlage als einzigen Knopf, statt einen Satz auf den Kopf zu zeigen
+    // (LFH-1078).
+    expect(screen.getByText('Noch keine Kanäle')).toBeInTheDocument();
+    expect(screen.queryByText(/legen Sie/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Kanal anlegen' })).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
     const name = await screen.findByLabelText('Name');
     await user.type(name, '  Abschnitt Nord  {Enter}');

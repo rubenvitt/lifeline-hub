@@ -78,9 +78,9 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     const hinweis = page.getByRole('heading', { level: 1, name: 'Lagemeldungen' });
     await expect(hinweis).toBeVisible();
     await expect(page.getByText('Keine Berechtigung', { exact: true }).first()).toBeVisible();
-    await expect(
-      page.getByText(/für deine Rolle in diesem Einsatz nicht freigegeben/),
-    ).toBeVisible();
+    await expect(page.getByText('Für deine Rolle nicht freigegeben')).toBeVisible();
+    // Der Beobachter verwaltet keine Freigaben: kein Weg in die Einstellungen (LFH-1078).
+    await expect(page.getByRole('button', { name: 'Modulfreigaben öffnen' })).toHaveCount(0);
     expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/lage/meldungen`);
 
     const rueckweg = page.getByRole('button', { name: / öffnen$/ });

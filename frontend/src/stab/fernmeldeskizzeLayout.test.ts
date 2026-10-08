@@ -4,17 +4,21 @@ import type {
   KommunikationsStelleMitKanaelen,
   SkizzenLage,
 } from '../api/fernmeldeskizzeVertrag';
-import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import type { Einheit, EinsatzFahrzeug, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import { fahrzeug } from '../test/fernmeldenetz';
 import {
   baueFernmeldenetz,
   type Fernmeldenetz,
   type FernmeldenetzQuellen,
 } from './fernmeldeskizze';
 import {
+  AUSSTATTUNG_PLATZ,
   KASTEN_BREITE,
+  KASTEN_POLSTER,
   RASTER,
   SCHIENE_LINIE_VERSATZ,
   SPUR_HOEHE,
+  ausstattungsZeilen,
   layoutFernmeldenetz,
   stellenMasse,
   type Platz,
@@ -72,6 +76,7 @@ function netz(
     einheiten?: Einheit[];
     fs?: Sprechgruppe[] | null;
     stellen?: KommunikationsStelleMitKanaelen[];
+    fahrzeuge?: EinsatzFahrzeug[];
     skizze?: Partial<Fernmeldeskizze>;
   } = {},
 ): Fernmeldenetz {
@@ -88,6 +93,8 @@ function netz(
     },
     sprechgruppen: daten([]),
     stellen: daten(p.stellen ?? []),
+    fahrzeuge: daten(p.fahrzeuge ?? []),
+    besetzung: daten([]),
     skizze: { zustand: 'daten', daten: { ...LEER_SKIZZE, ...p.skizze } },
   };
   return baueFernmeldenetz(q);
@@ -297,6 +304,8 @@ describe('layoutFernmeldenetz · Auto-Layout aus der Führungsorganisation', () 
       fuehrungsstelle: { zustand: 'daten', daten: null },
       sprechgruppen: daten([lokal]),
       stellen: daten([]),
+      fahrzeuge: daten([]),
+      besetzung: daten([]),
       skizze: { zustand: 'daten', daten: LEER_SKIZZE },
     });
     const { plaetze } = layoutFernmeldenetz(n);
@@ -406,5 +415,59 @@ describe('stellenMasse', () => {
     const zwei = mit('X'.repeat(40));
     const drei = mit(`${'A'.repeat(18)} ${'B'.repeat(18)} Cc`);
     expect(stellenMasse(drei).hoehe).toBeGreaterThan(stellenMasse(zwei).hoehe);
+  });
+});
+
+describe('Ausstattung im Kasten (LFH-1029)', () => {
+  /** Abschnitt 1 mit Leitung und `n` Führungsfahrzeugen der Einheit 10. */
+  const kasten = (typen: string[], leitung = true) => {
+    const s = netz({
+      abschnitte: [abschnitt(1, { name: 'EA 1', leiter_id: leitung ? 5 : null })],
+      einheiten: [einheit(10, { abschnitt_id: 1 })],
+      fahrzeuge: typen.map((t, i) => fahrzeug(100 + i, { einheit_id: 10, fahrzeugtyp: t })),
+    }).stellen.find((x) => x.key === 'ab-1');
+    if (s?.art !== 'abschnitt') throw new Error('Kasten ab-1 fehlt');
+    return s;
+  };
+  const innen = KASTEN_BREITE - 2 * KASTEN_POLSTER;
+
+  it('ohne Ausstattung bleibt der Kasten so hoch wie vorher', () => {
+    // 2 · Polster 8 + Zeichen 32 + Abstand 4 + Bezeichnung 18 + Rufname 16 + Lücke 16 = 102 → 104.
+    expect(stellenMasse(kasten([], false)).hoehe).toBe(104);
+    expect(ausstattungsZeilen([], innen).hoehe).toBe(0);
+  });
+
+  it('wächst um eine Zeile für bis zu drei Zeichen und um eine zweite für das vierte', () => {
+    const ohne = stellenMasse(kasten([], false)).hoehe;
+    const eins = stellenMasse(kasten([])).hoehe;
+    const drei = stellenMasse(kasten(['ELW 1', 'KdoW'])).hoehe;
+    const vier = stellenMasse(kasten(['ELW 1', 'KdoW', 'ELW 2'])).hoehe;
+    expect(eins).toBeGreaterThan(ohne);
+    expect(drei).toBe(eins);
+    expect(vier).toBeGreaterThan(drei);
+    expect(vier % RASTER).toBe(0);
+  });
+
+  it('bricht ein langes Wort um und lässt die Zeile wachsen, statt zu kürzen', () => {
+    const kurz = ausstattungsZeilen(kasten(['ELW 1'], false).ausstattung, innen);
+    const lang = ausstattungsZeilen(
+      kasten(['ELW 2 Großraum Landkreis Muster'], false).ausstattung,
+      innen,
+    );
+    expect(lang.hoehe).toBeGreaterThan(kurz.hoehe);
+    // Nichts geht verloren: dieselben Zeichen, nur auf Zeilen verteilt.
+    expect(lang.plaetze[0].worte.join('').replace(/\s/g, '')).toBe('ELW2GroßraumLandkreisMuster');
+  });
+
+  it('setzt die Plätze innerhalb der Innenbreite, Funktionen zuerst', () => {
+    const s = kasten(['ELW 1', 'KdoW', 'ELW 2']);
+    const { plaetze } = ausstattungsZeilen(s.ausstattung, innen);
+    expect(plaetze.map((p) => p.ausstattung.text)).toEqual(['EAL', 'ELW 1', 'ELW 2', 'KdoW']);
+    for (const p of plaetze) {
+      expect(p.x - AUSSTATTUNG_PLATZ / 2).toBeGreaterThanOrEqual(0);
+      expect(p.x + AUSSTATTUNG_PLATZ / 2).toBeLessThanOrEqual(innen);
+    }
+    expect(new Set(plaetze.slice(0, 3).map((p) => p.y)).size).toBe(1);
+    expect(plaetze[3].y).toBeGreaterThan(plaetze[0].y);
   });
 });

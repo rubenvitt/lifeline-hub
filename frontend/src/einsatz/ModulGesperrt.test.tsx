@@ -13,7 +13,7 @@ function PfadAnzeige() {
   return <span data-testid="pfad">{useLocation().pathname}</span>;
 }
 
-function rendern(ausgeblendet: boolean) {
+function rendern(ausgeblendet: boolean, freigabenPfad?: string) {
   return renderMitProviders(
     <Routes>
       <Route
@@ -24,6 +24,7 @@ function rendern(ausgeblendet: boolean) {
               modul={lagemeldungen}
               ausgeblendet={ausgeblendet}
               rueckweg={{ pfad: '/einsaetze/7/ueberblick', label: 'Überblick öffnen' }}
+              freigabenPfad={freigabenPfad}
             />
             <PfadAnzeige />
           </>
@@ -39,10 +40,10 @@ describe('ModulGesperrt (LFH-888)', () => {
     rendern(false);
     expect(screen.getByRole('heading', { level: 1, name: /Lagemeldungen/ })).toBeInTheDocument();
     expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
-    expect(
-      screen.getByText(/für deine Rolle in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    // Eine kurze Sperrzeile, kein Satz über die Einstellungen (LFH-1078).
+    expect(screen.getByText('Für deine Rolle nicht freigegeben')).toBeInTheDocument();
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Einstellungen › Module/)).not.toBeInTheDocument();
   });
 
   it('Gliederung: das h1 steht vor der Paneel-Überschrift (h2)', () => {
@@ -53,7 +54,7 @@ describe('ModulGesperrt (LFH-888)', () => {
 
   it('ein ausgeblendetes Modul heißt „ausgeblendet“, nicht „nicht freigegeben“', () => {
     rendern(true);
-    expect(screen.getByText(/in diesem Einsatz ausgeblendet/)).toBeInTheDocument();
+    expect(screen.getByText('In diesem Einsatz ausgeblendet')).toBeInTheDocument();
     expect(screen.queryByText(/nicht freigegeben/)).not.toBeInTheDocument();
   });
 
@@ -63,5 +64,15 @@ describe('ModulGesperrt (LFH-888)', () => {
     expect(knoepfe).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Überblick öffnen' }));
     expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/7/ueberblick');
+  });
+
+  it('wer die Freigaben verwaltet, bekommt „Modulfreigaben öffnen“ als zweite Aktion (LFH-1078)', async () => {
+    rendern(true, '/einsaetze/7/einstellungen/module');
+    const knopf = screen.getByRole('button', { name: 'Modulfreigaben öffnen' });
+    // Der Rückweg bleibt die eine Primäraktion.
+    expect(knopf).not.toHaveClass('ant-btn-primary');
+    expect(screen.getByRole('button', { name: 'Überblick öffnen' })).toHaveClass('ant-btn-primary');
+    await userEvent.click(knopf);
+    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/7/einstellungen/module');
   });
 });

@@ -5,6 +5,7 @@ import type { ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import Datensicht, {
   MAX_SEKUNDAER,
@@ -816,9 +817,13 @@ describe('Datensicht · Kartenzweig', () => {
 
     await userEvent.click(knoepfe[0]);
     expect(onKlick).not.toHaveBeenCalled();
-    // Ohne Opt-in bleibt auch der OK-Knopf neutral (Gegenhälfte zu `bestaetigungGefahr`).
-    expect(await screen.findByRole('button', { name: 'OK' })).not.toHaveClass('ant-btn-dangerous');
-    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    // Ohne Opt-in bleibt auch der Bestätigungsknopf neutral (Gegenhälfte zu `bestaetigungGefahr`).
+    // Ohne `bestaetigungKnopf` trägt er das Etikett, nie antds „OK“ (LFH-1090).
+    const rueckfrage = await offeneRueckfrage();
+    expect(within(rueckfrage).queryByRole('button', { name: 'OK' })).toBeNull();
+    const bestaetigen = within(rueckfrage).getByRole('button', { name: 'Entfernen' });
+    expect(bestaetigen).not.toHaveClass('ant-btn-dangerous');
+    await userEvent.click(bestaetigen);
     expect(onKlick).toHaveBeenCalledWith(DREI[0]);
   });
 
@@ -832,6 +837,7 @@ describe('Datensicht · Kartenzweig', () => {
         aktion: {
           etikett: 'Entfernen',
           bestaetigung: 'Wirklich?',
+          bestaetigungKnopf: 'Aus Einsatz entfernen',
           bestaetigungGefahr: true,
           zugaenglicherName: (f) => `${f.funkrufname} entfernen`,
           onKlick,
@@ -845,7 +851,9 @@ describe('Datensicht · Kartenzweig', () => {
       container.querySelectorAll('[data-lfh="datensicht-karte"] button[aria-label$=" entfernen"]'),
     ).toHaveLength(3);
     await userEvent.click(ausloeser);
-    const ok = await screen.findByRole('button', { name: 'OK' });
+    const ok = within(await offeneRueckfrage()).getByRole('button', {
+      name: 'Aus Einsatz entfernen',
+    });
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(onKlick).not.toHaveBeenCalled();
     await userEvent.click(ok);

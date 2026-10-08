@@ -1,11 +1,13 @@
 import type { AbrufZustand } from '../api/abrufZustand';
 import type {
   Betriebsart,
+  EinsatzFahrzeug,
   Komponentenart,
   Schriftfeld,
   SkizzenBezug,
   SkizzenLage,
   Sprechgruppe,
+  Stabsfunktion,
   Stellenart,
   Verbindungsart,
   Verbindungsmedium,
@@ -28,6 +30,7 @@ import { fuehrungsstelleErfasst } from './fuehrungsstelle';
 import { ZUSTAND_GRUND } from './funkplan';
 import { STELLENART_LABEL } from './kommunikationsplan';
 import {
+  type Quelle,
   abschnitteOhneSprechgruppe,
   einheitenOhneSprechgruppe,
   kanalbelegung,
@@ -39,6 +42,7 @@ import {
   type KanalTeilnehmer,
   type Luecke,
 } from './luecken';
+import { SACHGEBIETE } from './sachgebiete';
 import { bedingungszeichenText, komponentenartWort, leitungsBeschreibung } from './skizzenZeichen';
 import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 import type { Herkunft } from './sprechgruppenplan';
@@ -57,13 +61,16 @@ import type { Herkunft } from './sprechgruppenplan';
  * - **Verbindungen** `vb-<id>` und **Bereiche** `be-<id>` aus den Skizzendaten (D3).
  * - **Lücken je Element** ausschließlich über `stab/luecken.ts` (D11): das Bild zählt dieselben
  *   Treffer wie das Paneel.
+ * - **Ausstattung je Kasten** (LFH-1029): Führungsmittel und Funktionen als kleine Zeichen in
+ *   Führungsstelle und Abschnitt, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus).
  *
  * Die Führungsorganisation (`baueFuehrungsorganisation`) ist nur noch Vorlage für Auto-Layout und
  * Fokusfolge (`baum`). Verwaiste Bezüge (Verbindung, Lagezeile auf ein fehlendes Element) fallen
  * weg; eine fehlende Quelle wird benannt und ist nie eine leere. Erreichbarkeit und Rufnummern
- * kommen nicht ins Modell.
+ * kommen nicht ins Modell, Personennamen auch nicht.
  *
- * Herleitung: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D2, D7, D8, D11).
+ * Herleitung: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D2, D7, D8, D11);
+ * Ausstattung: Spec `stab-fernmeldeskizze`, „Führungsmittel und Funktionen im Kasten“ (LFH-1029).
  */
 
 /** Wie die eigene Führungsstelle in der Skizze heißt (Spec „Einsatzleitung ohne erfundene
@@ -99,6 +106,30 @@ export interface ElementLuecke {
   gegenstelle?: string;
 }
 
+/** Wie ein Ausstattungszeichen gezeichnet wird (`stab/skizze/SkizzenElemente.tsx:AusstattungsZeichenBild`). */
+export type AusstattungsZeichen =
+  /** Führungsfahrzeug: Zeichen aus `baueTzProps`, Einstufung wie auf der Lagekarte. */
+  | { art: 'tz'; tz: TzProps }
+  /** Funktionsfassung aus BBK Anhang D. */
+  | { art: 'rolle'; rolle: 'incident-section-commander' | 'incident-subsection-commander' }
+  /** Person der Führung mit Kürzel; der Katalog hat für S1–S6 keine Fassung. */
+  | { art: 'kuerzel'; kuerzel: string };
+
+/**
+ * Ein kleines Zeichen im Führungsstellen-Kasten (LFH-1029): Funktion oder Führungsmittel. Kein
+ * Element; nie ein Personenname.
+ */
+export interface SkizzenAusstattung {
+  art: 'funktion' | 'fuehrungsmittel';
+  /** Eindeutig im Kasten: `eal`, `ueal`, `s1`…`s6`, `fz-<id>`. */
+  schluessel: string;
+  /** Steht unter dem Zeichen; die Bedeutung hängt nie am Zeichen allein. */
+  text: string;
+  /** Ausgeschrieben, für `<title>`. */
+  titel: string;
+  zeichen: AusstattungsZeichen;
+}
+
 interface NetzStelleBasis {
   /** `fs` | `ab-<id>` | `eh-<id>` | `ks-<id>` | `ko-<id>`. */
   key: string;
@@ -124,9 +155,19 @@ export type NetzStelle =
       hinweis: string | null;
       tz: TzProps;
       kommunikationsmittel: string | null;
+      ausstattung: SkizzenAusstattung[];
     })
   | (NetzStelleBasis & {
-      art: 'abschnitt' | 'einheit';
+      art: 'abschnitt';
+      id: number;
+      tz: TzProps;
+      /** Die übergeordnete Stelle im Baum: `fs` oder `ab-<id>`. */
+      oben: string | null;
+      kommunikationsmittel: string | null;
+      ausstattung: SkizzenAusstattung[];
+    })
+  | (NetzStelleBasis & {
+      art: 'einheit';
       id: number;
       tz: TzProps;
       /** Die übergeordnete Stelle im Baum: `fs`, `ab-<id>`, `eh-<id>`; `null` = ohne Abschnitt. */
@@ -195,11 +236,20 @@ export interface NetzBaumKnoten {
 }
 
 type NetzQuelle =
-  'abschnitte' | 'einheiten' | 'fuehrungsstelle' | 'sprechgruppen' | 'stellen' | 'skizze';
+  | 'abschnitte'
+  | 'einheiten'
+  | 'fahrzeuge'
+  | 'besetzung'
+  | 'fuehrungsstelle'
+  | 'sprechgruppen'
+  | 'stellen'
+  | 'skizze';
 
 export const NETZ_QUELLEN_NAME: Record<NetzQuelle, string> = {
   abschnitte: 'Abschnitte',
   einheiten: 'Einheiten',
+  fahrzeuge: 'Fahrzeuge',
+  besetzung: 'Stab-Besetzung',
   fuehrungsstelle: 'Führungsstelle',
   sprechgruppen: 'Sprechgruppen',
   stellen: 'Externe Stellen',
@@ -245,6 +295,10 @@ export interface Fernmeldenetz {
 
 export interface FernmeldenetzQuellen extends KanalQuellen {
   einsatzId: number;
+  /** Disponierte Fahrzeuge: die Führungsfahrzeuge stehen im Kasten (LFH-1029). */
+  fahrzeuge: Quelle<EinsatzFahrzeug>;
+  /** Stab-Besetzung: die besetzten Sachgebiete stehen im Kasten der Einsatzleitung (LFH-1029). */
+  besetzung: Quelle<Stabsfunktion>;
   /** Fehlt es, ist die Skizze schreibgeschützt. */
   rechte?: NetzRechte;
 }
@@ -260,6 +314,74 @@ const BEZUG_PRAEFIX: Record<Exclude<SkizzenBezug['art'], 'fuehrungsstelle'>, str
 export function bezugSchluessel(b: SkizzenBezug): string | null {
   if (b.art === 'fuehrungsstelle') return 'fs';
   return b.id == null ? null : `${BEZUG_PRAEFIX[b.art]}-${b.id}`;
+}
+
+const vergleiche = (a: string, b: string) =>
+  a.localeCompare(b, 'de', { numeric: true, sensitivity: 'base' });
+
+/**
+ * Ein disponiertes Fahrzeug ist Führungsmittel, wenn sein Zeichen die Fachaufgabe Führung trägt:
+ * dieselbe Regel wie die Lagekarte (`baueTzProps`), ein manuelles `tz_fachaufgabe` gewinnt.
+ */
+function fuehrungsmittel(f: EinsatzFahrzeug): SkizzenAusstattung | null {
+  const tz = baueTzProps({
+    objekttyp: 'fahrzeug',
+    fachaufgabe: f.tz_fachaufgabe,
+    organisation: f.tz_organisation,
+    fahrzeugtyp: f.fahrzeugtyp,
+    opta: f.opta,
+    traegerorganisation: f.traegerorganisation,
+  });
+  if (tz.fachaufgabe !== 'fuehrung') return null;
+  const typ = f.fahrzeugtyp?.trim() || null;
+  return {
+    art: 'fuehrungsmittel',
+    schluessel: `fz-${f.id}`,
+    text: typ ?? f.funkrufname,
+    titel: typ ? `${typ} · ${f.funkrufname}` : f.funkrufname,
+    zeichen: { art: 'tz', tz },
+  };
+}
+
+/**
+ * Die Sachgebiete, die an der Führungsstelle wahrgenommen werden, in S-Folge: bei der
+ * Einsatzleitung, durch disponiertes Personal oder extern besetzt (Spec `stab-fernmeldeskizze`,
+ * „Führungsmittel und Funktionen im Kasten“). Rückwärtig und eine nicht mehr disponierte Person
+ * zählen nicht.
+ */
+function stabAusstattung(besetzung: readonly Stabsfunktion[]): SkizzenAusstattung[] {
+  return SACHGEBIETE.flatMap(({ sachgebiet, kuerzel }) => {
+    const zeile = besetzung.find((b) => b.sachgebiet === sachgebiet);
+    if (!zeile || zeile.besetzung_art === 'rueckwaertig') return [];
+    if (zeile.besetzung_art === 'personal' && !zeile.personal_noch_disponiert) return [];
+    return [
+      {
+        art: 'funktion' as const,
+        schluessel: sachgebiet,
+        text: kuerzel,
+        titel: `Sachgebiet ${kuerzel}`,
+        zeichen: { art: 'kuerzel' as const, kuerzel },
+      },
+    ];
+  });
+}
+
+function leitungAusstattung(unterabschnitt: boolean): SkizzenAusstattung {
+  return unterabschnitt
+    ? {
+        art: 'funktion',
+        schluessel: 'ueal',
+        text: 'UEAL',
+        titel: 'Untereinsatzabschnittsleitung',
+        zeichen: { art: 'rolle', rolle: 'incident-subsection-commander' },
+      }
+    : {
+        art: 'funktion',
+        schluessel: 'eal',
+        text: 'EAL',
+        titel: 'Einsatzabschnittsleitung',
+        zeichen: { art: 'rolle', rolle: 'incident-section-commander' },
+      };
 }
 
 function baumAus(k: OrgKnoten): NetzBaumKnoten {
@@ -339,15 +461,32 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
     kommunikationsmittel: fsErfasst
       ? kommunikationsmittelLabel(fsDaten?.kommunikationsmittel)
       : null,
+    // Die Besetzung ist eine eigene Angabe: sie steht auch ohne erfasste Gegenstelle.
+    ausstattung: q.besetzung.zustand === 'daten' ? stabAusstattung(q.besetzung.daten) : [],
   });
 
-  const besuche = (k: OrgKnoten, oben: string | null) => {
+  // Führungsmittel je Kasten: das Fahrzeug steht beim nächsten Abschnitt über seiner Einheit.
+  const fahrzeugeJeEinheit = new Map<number, SkizzenAusstattung[]>();
+  for (const f of q.fahrzeuge.zustand === 'daten' ? q.fahrzeuge.daten : []) {
+    const mittel = f.einheit_id != null ? fuehrungsmittel(f) : null;
+    if (!mittel) continue;
+    fahrzeugeJeEinheit.set(f.einheit_id!, [
+      ...(fahrzeugeJeEinheit.get(f.einheit_id!) ?? []),
+      mittel,
+    ]);
+  }
+  const mittelJeAbschnitt = new Map<string, SkizzenAusstattung[]>();
+
+  const besuche = (k: OrgKnoten, oben: string | null, abschnittOben: string | null) => {
     if (k.art === 'sammel') {
-      for (const c of k.kinder) besuche(c, null);
+      for (const c of k.kinder) besuche(c, null, null);
       return;
     }
     if (k.art === 'abschnitt') {
       const a = abschnittJeId.get(k.id)!;
+      const ausstattung: SkizzenAusstattung[] =
+        a.leiter_id != null ? [leitungAusstattung(abschnittOben != null)] : [];
+      mittelJeAbschnitt.set(k.key, ausstattung);
       stellen.push({
         art: 'abschnitt',
         key: k.key,
@@ -361,9 +500,12 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
         tz: k.tz,
         oben,
         kommunikationsmittel: kommunikationsmittelLabel(a.kommunikationsmittel),
+        ausstattung,
       });
     } else {
       const e = einheitJeId.get(k.id)!;
+      if (abschnittOben)
+        mittelJeAbschnitt.get(abschnittOben)!.push(...(fahrzeugeJeEinheit.get(e.id) ?? []));
       stellen.push({
         art: 'einheit',
         key: k.key,
@@ -379,9 +521,17 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
         kommunikationsmittel: kommunikationsmittelLabel(e.kommunikationsmittel),
       });
     }
-    for (const c of k.kinder) besuche(c, k.key);
+    for (const c of k.kinder) besuche(c, k.key, k.art === 'abschnitt' ? k.key : abschnittOben);
   };
-  for (const w of org.wurzeln) besuche(w, 'fs');
+  for (const w of org.wurzeln) besuche(w, 'fs', null);
+  // Funktionen vor Führungsmitteln; Führungsmittel nach Wort, dann Funkrufname (D4).
+  for (const liste of mittelJeAbschnitt.values()) {
+    const funktionen = liste.filter((x) => x.art === 'funktion');
+    const mittel = liste
+      .filter((x) => x.art === 'fuehrungsmittel')
+      .sort((a, b) => vergleiche(a.text, b.text) || vergleiche(a.titel, b.titel));
+    liste.splice(0, liste.length, ...funktionen, ...mittel);
+  }
 
   for (const st of q.stellen.zustand === 'daten' ? q.stellen.daten : []) {
     if (st.stellenart === 'funktion') continue;

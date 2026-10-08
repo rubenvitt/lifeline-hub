@@ -13,6 +13,7 @@ import Sidebar, {
   platzierObjekt,
 } from './Sidebar';
 import type { NichtVerortet } from './marker';
+import { AusgangUnbekannt, NetzFehler } from '../../api/client';
 import type { SidebarProps } from './Sidebar';
 import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
@@ -167,6 +168,50 @@ describe('Sidebar Bild-Hintergründe', () => {
     const sw = screen.getByRole('switch', { name: /Lageplan/i });
     fireEvent.click(sw);
     expect(onBildToggle).toHaveBeenCalledWith(1, false);
+  });
+
+  it('zeigt den Upload-Fortschritt und sperrt den Knopf, solange er läuft (LFH-1021)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[]}
+        bildUpload={{ laeuft: true, stand: { phase: 'senden', anteil: 0.4 }, fehler: null }}
+      />,
+    );
+    const balken = screen.getByRole('progressbar', { name: 'Wird hochgeladen · 40 %' });
+    expect(balken).toHaveAttribute('aria-valuenow', '40');
+    expect(screen.getByRole('button', { name: /Bild hochladen/ })).toHaveClass('ant-btn-loading');
+  });
+
+  it('Zeitlimit nach dem letzten Byte: „Ablage unklar“, nicht „nicht abgeschickt“ (LFH-1021)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[]}
+        bildUpload={{ laeuft: false, stand: null, fehler: new AusgangUnbekannt() }}
+      />,
+    );
+    const alarm = screen.getByRole('alert');
+    expect(alarm).toHaveTextContent('Ablage unklar');
+    expect(alarm).toHaveTextContent(/Liste prüfen/);
+    expect(alarm).not.toHaveTextContent(/NICHT abgeschickt/);
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('Abbruch vor dem letzten Byte: „Nicht abgelegt“ (LFH-1021)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[]}
+        bildUpload={{ laeuft: false, stand: null, fehler: new NetzFehler() }}
+      />,
+    );
+    const alarm = screen.getByRole('alert');
+    expect(alarm).toHaveTextContent('Nicht abgelegt');
+    expect(alarm).toHaveTextContent('NICHT abgeschickt');
   });
 
   it('ohne Schreibrecht kein Upload-Button', () => {

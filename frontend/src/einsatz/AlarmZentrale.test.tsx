@@ -151,6 +151,10 @@ describe('AlarmZentrale', () => {
       window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 3 } }));
     });
     await waitFor(() => expect(screen.getByText('Sofortmeldung eingegangen')).toBeInTheDocument());
+    // LFH-1078: der Zustand statt der Bitte; der Bestätigungsweg bleibt „Öffnen“.
+    expect(screen.getByText('Bestätigung ausstehend')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
+    expect(screen.queryByText(/bitte sichten/i)).not.toBeInTheDocument();
   });
 
   it('zeigt einen Erinnerungs-Toast bei lfh:erinnerung-alarm ohne Bezug', async () => {
@@ -163,6 +167,12 @@ describe('AlarmZentrale', () => {
       );
     });
     await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
+    // LFH-1078: der Titel sagt alles, kein Bittsatz darunter.
+    const toast = screen
+      .getByText('Erinnerung fällig')
+      .closest<HTMLElement>('.ant-notification-notice')!;
+    expect(toast.querySelector('.ant-notification-notice-description')).toBeNull();
+    expect(within(toast).getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
   });
 
   it('zeigt einen Auftrags-Toast bei lfh:erinnerung-alarm mit bezug_typ=auftrag', async () => {
@@ -175,6 +185,8 @@ describe('AlarmZentrale', () => {
       );
     });
     await waitFor(() => expect(screen.getByText('Auftrag überfällig')).toBeInTheDocument());
+    expect(screen.getByText('Quittierfrist überschritten')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
   });
 
   it('globaler Mute-Toggle persistiert in localStorage', async () => {
@@ -182,10 +194,10 @@ describe('AlarmZentrale', () => {
     renderAlarm();
     expect(await screen.findByText('Ton bereit')).toBeInTheDocument();
     expect(istAlarmGemutet()).toBe(false);
-    await userEvent.click(screen.getByRole('button', { name: 'Alarmton stummschalten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ton bereit – stummschalten' }));
     expect(istAlarmGemutet()).toBe(true);
     expect(screen.getByText('Ton stumm')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Alarmton einschalten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ton stumm – einschalten' }));
     expect(istAlarmGemutet()).toBe(false);
   });
 
@@ -220,6 +232,11 @@ describe('AlarmZentrale', () => {
     });
 
     expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
+    // LFH-1078: Zahl und Art im Titel, das Ziel am Knopf — kein Bittsatz darunter.
+    const sammel = screen
+      .getByText('3 weitere Sofortmeldungen')
+      .closest<HTMLElement>('.ant-notification-notice')!;
+    expect(sammel.querySelector('.ant-notification-notice-description')).toBeNull();
     await waitFor(() => {
       expect(document.querySelectorAll('.ant-notification-notice').length).toBeLessThanOrEqual(3);
     });
@@ -282,7 +299,7 @@ describe('AlarmZentrale', () => {
       }
     });
 
-    expect(await screen.findByText('3 weitere Aufträge')).toBeInTheDocument();
+    expect(await screen.findByText('3 weitere überfällige Aufträge')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Erinnerungen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Aufträgen' }));
@@ -301,7 +318,7 @@ describe('AlarmZentrale', () => {
       }
     });
 
-    expect(await screen.findByText('3 weitere Erinnerungen')).toBeInTheDocument();
+    expect(await screen.findByText('3 weitere fällige Erinnerungen')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Aufträgen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Erinnerungen' }));
@@ -504,7 +521,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(screen.queryByRole('button', { name: 'Benachrichtigungen: blockiert' })).toBeNull();
     // Über ein MUSTER über alle drei Wortlaute: `tonStatus` dreht erst einen Microtask später auf
     // `bereit`, ein Literal träfe den Knopf in diesem Moment nicht und die Zeile belegte nichts.
-    expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Ton / })).toBeNull();
 
     // An ihrer Stelle steht genau EINES, das den Zustand benennt. `findBy…`, weil das Muster schon
     // greift, bevor die Tonprüfung durch ist.
@@ -632,16 +649,18 @@ describe('AlarmZentrale: Ton-Icon ohne Marker im Ruhezustand (LFH-513)', () => {
       stubNotification('default');
       renderAlarm();
 
-      const bereit = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
+      const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
       await waitFor(() => expect(bereit).toHaveAttribute('aria-pressed', 'false'));
       expect(marker(bereit)).toHaveLength(0);
       const formBereit = icon(bereit);
 
       await userEvent.click(bereit);
-      const stumm = screen.getByRole('button', { name: 'Alarmton einschalten' });
+      const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
       // Zwei Kanäle ohne Farbe: die Form wechselt, das Wort steht auf jeder Breite.
       expect(icon(stumm)).not.toBe(formBereit);
       expect(stumm).toHaveTextContent('Ton stumm');
+      // Das sichtbare Wort steht vorn im Namen: Spracheingabe trifft den Knopf (WCAG 2.5.3).
+      expect(stumm.getAttribute('aria-label')).toMatch(new RegExp(`^${stumm.textContent} – `));
       expect(marker(stumm)).toHaveLength(0);
     },
   );
@@ -677,7 +696,7 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     stubAudioReady();
     stubNotification('default');
     renderAlarm();
-    const ton = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
+    const ton = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
     await waitFor(() => expect(ton).toHaveAttribute('aria-pressed', 'false'));
     expect(ton).not.toHaveTextContent('Ton bereit');
     const desktop = screen.getByRole('button', { name: 'Benachrichtigungen: aus' });
@@ -692,8 +711,10 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     expect(screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' })).toHaveTextContent(
       'Benachrichtigung blockiert',
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'Alarmton stummschalten' }));
-    expect(screen.getByRole('button', { name: 'Alarmton einschalten' })).toHaveTextContent(
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ton bereit – stummschalten' }),
+    );
+    expect(screen.getByRole('button', { name: 'Ton stumm – einschalten' })).toHaveTextContent(
       'Ton stumm',
     );
   });
@@ -747,7 +768,7 @@ describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
       stubNotification('default');
       renderAlarm();
 
-      expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Ton / })).toBeNull();
       const ziel = await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' });
       // Ruhezustand ohne Wort, wie die breite Bauform zwischen md und xl (LFH-637).
       expect(ziel).toHaveTextContent(/^$/);
@@ -776,7 +797,7 @@ describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
     stubAudioReady();
     stubNotification('default');
     renderAlarm();
-    expect(await screen.findByRole('button', { name: /^Alarmton / })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Ton / })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
 
@@ -786,7 +807,7 @@ describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
     stubAudioReady();
     stubNotification('default');
     renderAlarm();
-    expect(await screen.findByRole('button', { name: /^Alarmton / })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Ton / })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
 });
@@ -841,6 +862,8 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
  */
 describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
   type Meldung = {
+    titel: string;
+    body: string | undefined;
     tag: string;
     onclose: (() => void) | null;
     onclick: (() => void) | null;
@@ -849,8 +872,10 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
 
   function stubMeldungen() {
     const meldungen: Meldung[] = [];
-    const Ctor = vi.fn(function (_titel: string, opts?: NotificationOptions) {
+    const Ctor = vi.fn(function (titel: string, opts?: NotificationOptions) {
       const m: Meldung = {
+        titel,
+        body: opts?.body,
         tag: opts?.tag ?? '',
         onclose: null,
         onclick: null,
@@ -888,7 +913,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     renderAlarm();
     sofortmeldung(3);
     expect(Ctor).toHaveBeenCalledWith('Sofortmeldung eingegangen', {
-      body: 'Bitte sichten und bestätigen.',
+      body: 'Bestätigung ausstehend',
       tag: '1-sofort-3',
     });
     expect(offeneDesktopAlarme()).toBe(1);
@@ -945,6 +970,14 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
       '1-auftrag-12',
       '1-abloesung-9-vorwarnung',
       '1-unwetter-sturm-2',
+    ]);
+
+    // LFH-1078: die OS-Meldung nennt Gegenstand und Zustand, keine Bitte.
+    expect(meldungen.map((m) => [m.titel, m.body])).toEqual([
+      ['Erinnerung fällig', undefined],
+      ['Auftrag überfällig', 'Quittierfrist überschritten'],
+      ['Ablösung in 30 min', 'Ablösung bald fällig: Florian 1'],
+      ['Unwetterwarnung', 'Unwetterwarnung für den Einsatzort'],
     ]);
   });
 

@@ -249,8 +249,8 @@ const OHNE_BODY = new Set([204, 205, 304]);
  * Upload-Fortschritt, ein Stream-Body (`duplex: 'half'`) fehlt in Safari/iOS. Köpfe, Cookie und
  * Fehlerformat wie {@link apiUpload} — eine Nicht-2xx-Antwort läuft durch dasselbe
  * `fehlerWerfen`. Darüber laden Dokumentenablage, ETB- und Erfassungs-Anhänge (Schaden, Tier,
- * UHS, Person; LFH-878); `apiUpload` tragen nur noch Organisationslogo, Kartenhintergründe und
- * Chat-Anhänge.
+ * UHS, Person; LFH-878), Kartenhintergründe und Chat-Anhänge (LFH-1021); `apiUpload` trägt nur
+ * noch das kleine Organisationslogo.
  *
  * Bricht die Leitung ab oder läuft das Zeitlimit ab, entscheidet die Phase: vor dem letzten Byte
  * {@link NetzFehler} („nicht abgeschickt“), danach {@link AusgangUnbekannt}.

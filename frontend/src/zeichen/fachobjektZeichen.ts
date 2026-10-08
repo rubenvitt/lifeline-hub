@@ -28,6 +28,7 @@ import {
   type CapabilityId,
   type ColorToken,
   type Drawing,
+  type FunctionRoleId,
   type OrganizationId,
   type SymbolSpec,
   type TechnicalBodyMarkId,
@@ -292,5 +293,28 @@ export function fachobjektZeichen(tz: TzProps): FachobjektZeichen | null {
     if (ergebnis) break;
   }
   CACHE.set(key, ergebnis);
+  return ergebnis;
+}
+
+/**
+ * Eine Funktion im Führungsstellen-Kasten der Fernmeldeskizze (LFH-1029): die vermessene
+ * Funktionsfassung aus Anhang D (EAL, UEAL) oder, wo der Katalog keine hat (S1–S6), eine Person
+ * der Führung und Leitung mit dem Kürzel in der Mitte.
+ */
+export type FunktionsZeichenEingabe = { rolle: FunctionRoleId } | { kuerzel: string };
+
+const FUNKTION_CACHE = new Map<string, FachobjektZeichen | null>();
+
+/** Wie `fachobjektZeichen`: gecacht, wirft nie; im Notfall die Person ohne Kürzel. */
+export function funktionsZeichen(e: FunktionsZeichenEingabe): FachobjektZeichen | null {
+  const key = JSON.stringify(e);
+  if (FUNKTION_CACHE.has(key)) return FUNKTION_CACHE.get(key)!;
+  const person: SymbolSpec = { kind: 'person', organization: 'fuehrung-leitung' };
+  const spec: SymbolSpec =
+    'rolle' in e
+      ? { ...person, functionRole: e.rolle }
+      : { ...person, labels: { center: e.kuerzel } };
+  const ergebnis = waehle([spec]) ?? waehle([person]);
+  FUNKTION_CACHE.set(key, ergebnis);
   return ergebnis;
 }

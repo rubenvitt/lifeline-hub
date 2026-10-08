@@ -8,6 +8,7 @@ import {
   abschnitt,
   daten,
   einheit,
+  fahrzeug,
   fs,
   quellen,
   sg,
@@ -420,6 +421,43 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
     // Unsichtbare Trefferflächen gehören nicht in den Druck: Firefox zählt den Strich in die
     // Box eines Elements, eine breite Trefferlinie ragte so aus dem Blatt.
     expect(svg().querySelectorAll('[stroke="transparent"], [fill="transparent"]').length).toBe(0);
+  });
+
+  // LFH-1029: Führungsmittel und Funktionen stehen im Kasten, mit Wort und Titel, am Schirm wie
+  // im Druck, und der Kasten fasst sie.
+  const mitAusstattung = () =>
+    baueFernmeldenetz({
+      ...quellen({
+        abschnitte: daten([abschnitt(1, { name: 'EA 1', leiter_id: 5, leiter_name: 'Erika' })]),
+        einheiten: daten([einheit(10, { name: '1. Zug', abschnitt_id: 1 })]),
+        fahrzeuge: daten([fahrzeug(100, { einheit_id: 10, fahrzeugtyp: 'ELW 1' })]),
+      }),
+      rechte: ALLE,
+    });
+
+  it('Ausstattung im Kasten: Zeichen mit Wort und Titel, innerhalb des Kastens, ohne Namen', () => {
+    bild(mitAusstattung());
+    const kasten = element('ab-1')!.querySelector('[data-teil="kasten"]')!;
+    const unten = Number(kasten.getAttribute('y')) + Number(kasten.getAttribute('height'));
+    for (const [schluessel, wort, titel] of [
+      ['eal', 'EAL', 'Einsatzabschnittsleitung'],
+      ['fz-100', 'ELW 1', 'ELW 1 · Fahrzeug 100'],
+    ]) {
+      const g = element('ab-1')!.querySelector(`[data-ausstattung="${schluessel}"]`)!;
+      expect(g, schluessel).not.toBeNull();
+      expect(g.querySelector('title')?.textContent).toBe(titel);
+      const text = g.querySelector(':scope > text')!;
+      expect(text.textContent).toBe(wort);
+      expect(Number(text.getAttribute('y'))).toBeLessThan(unten);
+      expect(g.querySelector('svg'), `${schluessel}: Zeichen`).not.toBeNull();
+    }
+    expect(element('ab-1')!.textContent).not.toContain('Erika');
+  });
+
+  it('Ausstattung im Druck: dieselben Zeichen ohne Bedienung', () => {
+    bild(mitAusstattung(), aktionenAttrappe(), { druckt: true });
+    expect(document.querySelector('[data-ausstattung="eal"]')).not.toBeNull();
+    expect(document.querySelector('[data-ausstattung="fz-100"]')?.textContent).toContain('ELW 1');
   });
 
   it('ohne Abschnitte keine Fläche, nur der Grund', () => {

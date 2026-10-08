@@ -20,6 +20,7 @@ import {
   type FernmeldenetzQuellen,
   type NetzStelle,
 } from './fernmeldeskizze';
+import { besetzt, fahrzeug } from '../test/fernmeldenetz';
 import {
   abschnitteOhneSprechgruppe,
   einheitenOhneSprechgruppe,
@@ -137,6 +138,8 @@ function quellen(
     fuehrungsstelle: { zustand: 'daten', daten: null },
     sprechgruppen: daten([]),
     stellen: daten([]),
+    fahrzeuge: daten([]),
+    besetzung: daten([]),
     skizze: { zustand: 'daten', daten: { ...LEER_SKIZZE, ...skizze } },
     ...rest,
   };
@@ -738,5 +741,161 @@ describe('baueFernmeldenetz · Angaben für die Fläche (LFH-893 2.5)', () => {
     const netz = baueFernmeldenetz(quellen({ sprechgruppen: { zustand: 'fehler', daten: [] } }));
     expect(netz.sprechgruppen).toEqual([]);
     expect(netz.rechte).toEqual({});
+  });
+});
+
+describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-1029)', () => {
+  const ausstattung = (netz: ReturnType<typeof baueFernmeldenetz>, key: string) => {
+    const s = stelleMit(netz, key);
+    return s.art === 'fuehrungsstelle' || s.art === 'abschnitt'
+      ? s.ausstattung.map((a) => a.text)
+      : null;
+  };
+
+  it('Abschnitt mit ELW 1 und Leitung: „EAL“ vor „ELW 1“, kein Name, Einheit bleibt Element', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        abschnitte: daten([abschnitt(1, { leiter_id: 5, leiter_name: 'Erika Muster' })]),
+        einheiten: daten([einheit(10, { abschnitt_id: 1, name: 'FüGr EA 1' })]),
+        fahrzeuge: daten([
+          fahrzeug(100, {
+            einheit_id: 10,
+            fahrzeugtyp: 'ELW 1',
+            funkrufname: 'Florian Musterstadt 11/1',
+          }),
+        ]),
+      }),
+    );
+    expect(ausstattung(netz, 'ab-1')).toEqual(['EAL', 'ELW 1']);
+    const ab = stelleMit(netz, 'ab-1');
+    expect(JSON.stringify(ab)).not.toContain('Erika Muster');
+    expect(netz.stellen.map((s) => s.key)).toEqual(['fs', 'ab-1', 'eh-10']);
+    const elw = ab.art === 'abschnitt' ? ab.ausstattung[1] : null;
+    expect(elw).toMatchObject({
+      art: 'fuehrungsmittel',
+      titel: 'ELW 1 · Florian Musterstadt 11/1',
+      zeichen: { art: 'tz', tz: { fachaufgabe: 'fuehrung' } },
+    });
+  });
+
+  it('nur Führungsfahrzeuge; ein manuell gesetztes Zeichen gewinnt über den Typ', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        abschnitte: daten([abschnitt(1)]),
+        einheiten: daten([einheit(10, { abschnitt_id: 1 })]),
+        fahrzeuge: daten([
+          fahrzeug(100, { einheit_id: 10, fahrzeugtyp: 'HLF 20' }),
+          fahrzeug(101, { einheit_id: 10, fahrzeugtyp: 'MTW', tz_fachaufgabe: 'fuehrung' }),
+          fahrzeug(102, { einheit_id: 10, fahrzeugtyp: 'KdoW', tz_fachaufgabe: 'logistik' }),
+          fahrzeug(103, { einheit_id: 10, funkrufname: 'Kater 10/1', tz_fachaufgabe: 'fuehrung' }),
+        ]),
+      }),
+    );
+    // Folge nach Fahrzeugtyp, dann Funkrufname; ohne Typ steht der Funkrufname.
+    expect(ausstattung(netz, 'ab-1')).toEqual(['Kater 10/1', 'MTW']);
+  });
+
+  it('steht im Kasten des nächsten Abschnitts über der Einheit, auch für Untereinheiten', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        abschnitte: daten([
+          abschnitt(1, { leiter_id: 5 }),
+          abschnitt(2, { ueber_abschnitt_id: 1, leiter_id: 6 }),
+        ]),
+        einheiten: daten([
+          einheit(10, { abschnitt_id: 1 }),
+          // Ohne eigenen Abschnitt: der Baum hängt sie unter ihre Einheit, also in „ab-1“.
+          einheit(11, { ueber_einheit_id: 10 }),
+          einheit(20, { abschnitt_id: 2 }),
+        ]),
+        fahrzeuge: daten([
+          fahrzeug(100, { einheit_id: 11, fahrzeugtyp: 'ELW 1' }),
+          fahrzeug(200, { einheit_id: 20, fahrzeugtyp: 'KdoW' }),
+        ]),
+      }),
+    );
+    expect(ausstattung(netz, 'ab-1')).toEqual(['EAL', 'ELW 1']);
+    expect(ausstattung(netz, 'ab-2')).toEqual(['UEAL', 'KdoW']);
+    const alle = netz.stellen.flatMap((s) =>
+      s.art === 'abschnitt' || s.art === 'fuehrungsstelle' ? s.ausstattung : [],
+    );
+    expect(alle.filter((a) => a.art === 'fuehrungsmittel')).toHaveLength(2);
+  });
+
+  it('Fahrzeug ohne Einheit oder in einer Einheit ohne Abschnitt erscheint in keinem Kasten', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        abschnitte: daten([abschnitt(1)]),
+        einheiten: daten([einheit(10)]),
+        fahrzeuge: daten([
+          fahrzeug(100, { fahrzeugtyp: 'ELW 2' }),
+          fahrzeug(101, { einheit_id: 10, fahrzeugtyp: 'ELW 2' }),
+          fahrzeug(102, { einheit_id: 99, fahrzeugtyp: 'ELW 2' }),
+        ]),
+      }),
+    );
+    expect(ausstattung(netz, 'fs')).toEqual([]);
+    expect(ausstattung(netz, 'ab-1')).toEqual([]);
+  });
+
+  it('Stab der Einsatzleitung: S-Folge, ohne rückwärtig, ohne Namen, auch ohne erfasste Stelle', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        besetzung: daten([
+          besetzt('s6', 'rueckwaertig', 'ILS Musterhausen'),
+          besetzt('s3', 'einsatzleitung'),
+          besetzt('s2', 'personal', 'Max Muster'),
+          besetzt('s5', 'extern', 'Pressestelle Kreis'),
+        ]),
+      }),
+    );
+    expect(ausstattung(netz, 'fs')).toEqual(['S2', 'S3', 'S5']);
+    const fsStelle = stelleMit(netz, 'fs');
+    expect(JSON.stringify(fsStelle)).not.toMatch(/Max Muster|Pressestelle|ILS/);
+    expect(fsStelle.art === 'fuehrungsstelle' && fsStelle.ausstattung[0]).toMatchObject({
+      art: 'funktion',
+      titel: 'Sachgebiet S2',
+      zeichen: { art: 'kuerzel', kuerzel: 'S2' },
+    });
+  });
+
+  it('ein Sachgebiet, dessen Person nicht mehr disponiert ist, steht nicht im Kasten', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        besetzung: daten([
+          besetzt('s1', 'personal', 'Max Muster'),
+          { ...besetzt('s4', 'personal', 'Eva Weg'), personal_noch_disponiert: false },
+        ]),
+      }),
+    );
+    expect(ausstattung(netz, 'fs')).toEqual(['S1']);
+  });
+
+  it('Abschnitt ohne Leitung trägt keine Funktion', () => {
+    const netz = baueFernmeldenetz(quellen({ abschnitte: daten([abschnitt(1)]) }));
+    expect(ausstattung(netz, 'ab-1')).toEqual([]);
+  });
+
+  it('fehlende Fahrzeuge und Besetzung werden benannt und zeigen keine Zeichen', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        abschnitte: daten([abschnitt(1, { leiter_id: 5 })]),
+        einheiten: daten([einheit(10, { abschnitt_id: 1 })]),
+        // Was eine Quelle ohne Freigabe oder mit Fehler noch trägt, gilt nicht.
+        fahrzeuge: {
+          zustand: 'gesperrt',
+          daten: [fahrzeug(100, { einheit_id: 10, fahrzeugtyp: 'ELW 1' })],
+        },
+        besetzung: { zustand: 'fehler', daten: [besetzt('s2', 'einsatzleitung')] },
+      }),
+    );
+    expect(netz.fehlend.map((f) => `${f.name}: ${f.zustand}`)).toEqual([
+      'Fahrzeuge: gesperrt',
+      'Stab-Besetzung: fehler',
+    ]);
+    expect(netz.darstellbar).toBe(true);
+    // Die Leitung kommt aus dem Abschnitt selbst und bleibt.
+    expect(ausstattung(netz, 'ab-1')).toEqual(['EAL']);
+    expect(ausstattung(netz, 'fs')).toEqual([]);
   });
 });

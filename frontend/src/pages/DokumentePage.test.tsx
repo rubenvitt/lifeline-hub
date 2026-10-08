@@ -274,6 +274,9 @@ describe('DokumentePage', () => {
     const rueckfrage = (await screen.findByText('Dokument entfernen?')).closest<HTMLElement>(
       '.ant-popover',
     )!;
+    // EIN kurzer Folgesatz (LFH-1078).
+    expect(rueckfrage).toHaveTextContent('ETB-Nachweis bleibt.');
+    expect(rueckfrage).not.toHaveTextContent(/verschwindet/);
     const ok = within(rueckfrage).getByRole('button', { name: 'Entfernen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(loeschAufrufe).toEqual([]);
@@ -314,7 +317,7 @@ describe('DokumentePage', () => {
     const rueckfrage = (await screen.findByText('Dokument entfernen?')).closest<HTMLElement>(
       '.ant-modal',
     )!;
-    expect(rueckfrage).toHaveTextContent('Lageplan Nord');
+    expect(rueckfrage).toHaveTextContent('„Lageplan Nord“: ETB-Nachweis bleibt.');
     const ok = within(rueckfrage).getByRole('button', { name: 'Entfernen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(loeschAufrufe).toEqual([]);
@@ -520,6 +523,12 @@ describe('DokumentePage', () => {
     expect(
       within(zeile).getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
     ).not.toHaveClass('ant-btn-loading');
+  });
+
+  it('trägt keinen Zweck-Absatz unter dem Titel (LFH-1078)', async () => {
+    rendere(einsatzAktiv, [dokument()]);
+    expect(await screen.findByText('1 Dokument')).toBeInTheDocument();
+    expect(screen.queryByText(/Abgelegte Dateien des Einsatzes/)).not.toBeInTheDocument();
   });
 
   it('meta zählt im Singular und Plural richtig', async () => {

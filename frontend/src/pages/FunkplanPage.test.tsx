@@ -13,9 +13,11 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
+import { legeBefehlAn } from '../api/befehle';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
+import { ladeStab } from '../api/stab';
 import { ApiError } from '../api/client';
 import { freigabenFixture } from '../test/fixtures';
 import type {
@@ -44,8 +46,15 @@ vi.mock('../api/sprechgruppen', () => ({ listeEinsatzSprechgruppen: vi.fn() }));
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 77 })),
 }));
+vi.mock('../api/befehle', () => ({
+  legeBefehlAn: vi.fn(() => Promise.resolve({ id: 88 })),
+}));
 vi.mock('../api/kommunikationsplan', () => ({ ladeKommunikationsplan: vi.fn() }));
 vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
+vi.mock('../api/stab', async (orig) => ({
+  ...(await orig<typeof import('../api/stab')>()),
+  ladeStab: vi.fn(),
+}));
 
 /**
  * Die Zeichenfläche (LFH-893, `stab/FernmeldeskizzeBild.tsx`) hat eigene Tests. Hier zählt, was
@@ -171,6 +180,7 @@ const SPRECHGRUPPEN = [
 beforeEach(() => {
   navigiere.mockReset();
   vi.mocked(legeLageberichtAn).mockClear();
+  vi.mocked(legeBefehlAn).mockClear();
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(listeAbschnitte).mockResolvedValue(ABSCHNITTE);
@@ -181,6 +191,7 @@ beforeEach(() => {
   vi.mocked(ladeFuehrungsstelle).mockResolvedValue({ sprechgruppen: [] });
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
+  vi.mocked(ladeStab).mockResolvedValue({ besetzung: [], anzahl_lagebesprechungen: 0 });
   bild.props = null;
 });
 
@@ -392,6 +403,85 @@ describe('FunkplanPage — Übernahme in den Lagebericht', () => {
     await screen.findByText('Florian 1/42-1');
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
     expect(screen.getByRole('button', { name: /Drucken/ })).toBeInTheDocument();
+  });
+});
+
+describe('FunkplanPage — Übernahme in den Befehl (LFH-1027)', () => {
+  it('legt EINEN LADEF-Befehl mit dem Funkplan unter „Führung und Kommunikation“ an und öffnet ihn', async () => {
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    const knopf = screen.getByRole('button', { name: /In Befehl übernehmen/ });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    fireEvent.click(knopf);
+    await waitFor(() =>
+      expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/auftraege/befehle/88'),
+    );
+    expect(vi.mocked(legeBefehlAn)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(legeLageberichtAn)).not.toHaveBeenCalled();
+    const [einsatzId, daten] = vi.mocked(legeBefehlAn).mock.calls[0];
+    expect(einsatzId).toBe(1);
+    expect(daten.vorlage).toBe('befehl_ladef');
+    expect(daten.titel).toMatch(/^Funkplan /);
+    expect(daten.abschnitte).toHaveLength(1);
+    expect(daten.abschnitte![0].schluessel).toBe('fuehrung_kommunikation');
+    const text = daten.abschnitte![0].text;
+    // Baum und Kommunikationsskizze, derselbe Wortlaut wie im Lagebericht.
+    expect(text).toContain('## Gliederung');
+    expect(text).toContain('**Abschnitt Nord**');
+    expect(text).toContain('## Kommunikationsskizze');
+    expect(text).not.toContain('GEHEIM');
+    expect(text).not.toContain('0171 111');
+  });
+
+  it('zeigt einen Fehler an der Seite und navigiert nicht', async () => {
+    vi.mocked(legeBefehlAn).mockRejectedValueOnce(new ApiError(422, 'Einsatz ist abgeschlossen'));
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    const knopf = screen.getByRole('button', { name: /In Befehl übernehmen/ });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    fireEvent.click(knopf);
+    expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
+    expect(screen.getByText('Nicht in den Befehl übernommen')).toBeInTheDocument();
+    expect(vi.mocked(legeBefehlAn)).toHaveBeenCalledTimes(1);
+    expect(navigiere).not.toHaveBeenCalled();
+  });
+
+  it('steht in jeder Darstellung', async () => {
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/stab/funkplan?ansicht=skizze' },
+    );
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    expect(screen.getByRole('button', { name: /In Befehl übernehmen/ })).toBeInTheDocument();
+  });
+
+  it('sperrt die Übernahme, solange eine Quelle noch lädt', async () => {
+    vi.mocked(listeEinsatzSprechgruppen).mockReturnValue(new Promise(() => {}));
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.getByRole('button', { name: /In Befehl übernehmen/ })).toBeDisabled();
+  });
+
+  it('fehlt ohne Schreibrecht', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      ...EINSATZ,
+      meine_rolle: 'beobachter',
+    } as EinsatzAnzeige);
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.queryByRole('button', { name: /In Befehl übernehmen/ })).toBeNull();
+  });
+
+  it('fehlt, wenn das Modul Aufträge nicht freigegeben ist; die Lagebericht-Übernahme bleibt', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ auftraege: { sichtbar: false } }),
+    );
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.queryByRole('button', { name: /In Befehl übernehmen/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeInTheDocument();
   });
 });
 
@@ -1313,5 +1403,70 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     await screen.findByText(/Modul Stab nicht freigegeben/);
     expect(vi.mocked(ladeKommunikationsplan)).not.toHaveBeenCalled();
     expect(vi.mocked(ladeFernmeldeskizze)).not.toHaveBeenCalled();
+  });
+});
+
+/** Führungsmittel und Funktionen im Kasten (LFH-1029): die Seite reicht Fahrzeuge und Besetzung. */
+describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
+  function rendereMit(route: string) {
+    return renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+      </Routes>,
+      { route },
+    );
+  }
+  const ausstattung = (key: string) => {
+    const s = bild.props?.netz.stellen.find((x) => x.key === key);
+    return s && (s.art === 'abschnitt' || s.art === 'fuehrungsstelle')
+      ? s.ausstattung.map((a) => a.text)
+      : null;
+  };
+
+  it('zeigt Führungsfahrzeug, Leitung und besetzte Sachgebiete, ohne Namen', async () => {
+    vi.mocked(listeAbschnitte).mockResolvedValue([
+      { ...ABSCHNITTE[0], leiter_id: 1 },
+      ABSCHNITTE[1],
+    ]);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      ...FAHRZEUGE,
+      { ...FAHRZEUGE[0], id: 102, fahrzeugtyp: 'ELW 1', funkrufname: 'Florian 1/11-1' },
+    ]);
+    vi.mocked(ladeStab).mockResolvedValue({
+      anzahl_lagebesprechungen: 0,
+      besetzung: [
+        {
+          sachgebiet: 's2',
+          besetzung_art: 'personal',
+          name: 'Clara Führerin',
+          personal_id: 1,
+          personal_noch_disponiert: true,
+          gesetzt_at: '2026-09-30T10:00:00',
+          gesetzt_von_id: 1,
+        },
+      ],
+    });
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    await waitFor(() => expect(ausstattung('fs')).toEqual(['S2']));
+    await waitFor(() => expect(ausstattung('ab-1')).toEqual(['EAL', 'ELW 1']));
+    expect(JSON.stringify(bild.props?.netz.stellen)).not.toMatch(/Clara|Anna Leiter/);
+  });
+
+  it('nennt gesperrte Fahrzeuge an der Skizze und zeigt die Kästen ohne Führungsmittel', async () => {
+    vi.mocked(listeAbschnitte).mockResolvedValue([
+      { ...ABSCHNITTE[0], leiter_id: 1 },
+      ABSCHNITTE[1],
+    ]);
+    vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new ApiError(403, 'verboten'));
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    await waitFor(() =>
+      expect(bild.props?.netz.fehlend).toContainEqual(
+        expect.objectContaining({ name: 'Fahrzeuge' }),
+      ),
+    );
+    // Der Kasten steht mit seiner Leitung, nur die Führungsmittel fehlen.
+    await waitFor(() => expect(ausstattung('ab-1')).toEqual(['EAL']));
   });
 });

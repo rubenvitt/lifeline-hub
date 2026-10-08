@@ -40,7 +40,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: v.zeitpunkt_at,
       node: (
         <span>
-          <Tag color="purple">Verbleib</Tag> {kurzVerbleib(v)}
+          <Tag>Verbleib</Tag> {kurzVerbleib(v)}
         </span>
       ),
     })),

@@ -137,6 +137,7 @@ export default function PersonalStatusTab() {
       leerText="Kein Status"
       bearbeitenTitel="Status bearbeiten"
       deaktivierenFrage="Status deaktivieren?"
+      deaktivierenKnopf="Status deaktivieren"
       felder={felder}
       vorTabelle={markeHinweis}
     />

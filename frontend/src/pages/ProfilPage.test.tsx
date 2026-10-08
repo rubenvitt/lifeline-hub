@@ -10,6 +10,10 @@ import ProfilPage from './ProfilPage';
 const { startRegistrationMock } = vi.hoisted(() => ({ startRegistrationMock: vi.fn() }));
 vi.mock('@simplewebauthn/browser', () => ({ startRegistration: startRegistrationMock }));
 
+const passwortProvider = [
+  { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+];
+
 const webauthnProvider = [
   { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
 ];
@@ -45,6 +49,15 @@ function setup(totpAktiviert = false, providerListe: unknown[] = [], passwortGes
     ),
   );
   return renderMitProviders(<ProfilPage />);
+}
+
+/** Startet die TOTP-Einrichtung über den Passwortschritt (LFH-1013): Knopf, aktuelles Passwort,
+ *  „Weiter". */
+async function einrichtungMitPasswort(passwort = 'startpw12') {
+  await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
+  const dialog = await screen.findByRole('dialog');
+  await userEvent.type(within(dialog).getByLabelText('Aktuelles Passwort'), passwort);
+  await userEvent.click(within(dialog).getByRole('button', { name: /Weiter/ }));
 }
 
 /**
@@ -100,7 +113,7 @@ describe('ProfilPage — Kopfdaten (LFH-345)', () => {
   it('endet nicht mehr im Baustellen-Platzhalter', async () => {
     setup();
 
-    await screen.findByText('Zweiter Faktor (Code aus App)');
+    await screen.findByText('Rita Beispiel');
     expect(screen.queryByText('Eigener Account und app-weite Einstellungen.')).toBeNull();
   });
 
@@ -221,9 +234,10 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
   it('zeigt den Hinweis nicht ohne aktiven webauthn-Provider', async () => {
     setzeSecureContext(true);
     starteMacHuelle();
-    setup(false, []);
+    setup(false, passwortProvider);
 
-    await screen.findByText('Zweiter Faktor (Code aus App)');
+    // Anker: die Provider-Liste ist geladen.
+    await screen.findByRole('button', { name: 'Passwort ändern' });
     await waitFor(() => expect(screen.queryByText(/Nur im Browser/)).not.toBeInTheDocument());
   });
 
@@ -242,7 +256,7 @@ describe('ProfilPage — macOS-Hülle ohne Passkey (LFH-817)', () => {
  */
 describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
   it('zeigt „Zweiten Faktor einrichten", wenn totp_aktiviert=false, und durchläuft enroll/start → QR/Schlüssel → enroll/finish → Wiederherstellungscodes', async () => {
-    setup(false);
+    setup(false, passwortProvider);
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
@@ -256,8 +270,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       ),
     );
 
-    const startKnopf = await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' });
-    await userEvent.click(startKnopf);
+    await einrichtungMitPasswort();
 
     expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
     // Ein Wort für die Sache, kein Entwicklerjargon (LFH-944).
@@ -286,7 +299,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
   // Der Rückfallweg: der Knopf trägt einen unvollständigen Code, den das Auto-Absenden nicht
   // anfasst.
   it('sendet einen unvollstaendigen Code weiterhin ueber den Bestaetigen-Knopf', async () => {
-    setup(false);
+    setup(false, passwortProvider);
     const gesendet: string[] = [];
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
@@ -302,7 +315,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       }),
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
+    await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '12345');
     expect(gesendet).toEqual([]);
@@ -321,7 +334,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
    * `totpFinish` stehen bleibt.
    */
   it('schickt den Code nach dem Auto-Absenden genau einmal — und laesst keinen zweiten Weg stehen', async () => {
-    setup(false);
+    setup(false, passwortProvider);
     let aufrufe = 0;
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
@@ -340,7 +353,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       }),
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
+    await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
     const feld = screen.getByLabelText('Code aus deiner Authenticator-App');
@@ -354,7 +367,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
   });
 
   it('zeigt eine Fehlermeldung, wenn der Bestätigungscode ungültig ist', async () => {
-    setup(false);
+    setup(false, passwortProvider);
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
@@ -368,8 +381,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       ),
     );
 
-    const startKnopf = await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' });
-    await userEvent.click(startKnopf);
+    await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '000000');
@@ -378,7 +390,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
   });
 
   it('behält die Wiederherstellungscodes sichtbar, wenn der Status-Refresh nach enrollFinish auf „Zweiter Faktor aktiv" dreht (Regressionsschutz)', async () => {
-    setup(false);
+    setup(false, passwortProvider);
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
@@ -392,8 +404,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
       ),
     );
 
-    const startKnopf = await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' });
-    await userEvent.click(startKnopf);
+    await einrichtungMitPasswort();
 
     expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
 
@@ -412,6 +423,107 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 });
 
 /**
+ * Die Einrichtung verlangt das aktuelle Passwort (LFH-1013): sonst richtete jemand mit einer
+ * fremden Sitzung seinen eigenen Zweitfaktor ein. Ohne nutzbares lokales Passwort gibt es keine
+ * Einrichtung, denn der Zweitfaktor schützt nur die Passwort-Anmeldung.
+ */
+describe('ProfilPage — TOTP-Einrichtung nur mit Passwort (LFH-1013)', () => {
+  const startAntwort = {
+    otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+    secret_base32: 'JBSWY3DPEHPK3PXP',
+  };
+
+  it('fragt vor dem QR-Code das aktuelle Passwort ab und schickt es mit', async () => {
+    setup(false, passwortProvider);
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/auth/totp/enroll/start', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json(startAntwort);
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByText('JBSWY3DPEHPK3PXP')).toBeNull();
+    expect(gesendet).toEqual([]);
+
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Aktuelles Passwort'), 'startpw12');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weiter/ }));
+
+    expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
+    expect(gesendet).toEqual([{ passwort: 'startpw12' }]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('zeigt ein falsches Passwort im Dialog und keinen QR-Code', async () => {
+    setup(false, passwortProvider);
+    server.use(
+      http.post('/api/auth/totp/enroll/start', () =>
+        HttpResponse.json({ error: 'Das Passwort stimmt nicht.' }, { status: 422 }),
+      ),
+    );
+
+    await einrichtungMitPasswort('falsch123');
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/Das Passwort stimmt nicht/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Aktuelles Passwort')).toHaveValue('falsch123');
+    expect(screen.queryByText('JBSWY3DPEHPK3PXP')).toBeNull();
+  });
+
+  it('sendet ohne Passwort nicht', async () => {
+    setup(false, passwortProvider);
+    let aufrufe = 0;
+    server.use(
+      http.post('/api/auth/totp/enroll/start', () => {
+        aufrufe += 1;
+        return HttpResponse.json(startAntwort);
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weiter/ }));
+
+    expect(
+      await within(dialog).findByText('Bitte das aktuelle Passwort eingeben'),
+    ).toBeInTheDocument();
+    expect(aufrufe).toBe(0);
+  });
+
+  // Anker wie beim Passwortwechsel: der Passkey-Knopf belegt die geladene Provider-Liste, der
+  // Anzeigename den geladenen Benutzer. Erst dann trägt die Abwesenheit etwas.
+  it('bietet einem SSO-only-Konto keine Einrichtung an', async () => {
+    setzeSecureContext(true);
+    setup(false, [...passwortProvider, ...webauthnProvider], false);
+    await screen.findByRole('button', { name: 'Passkey registrieren' });
+    await screen.findByText('Rita Beispiel');
+    expect(
+      screen.queryByRole('button', { name: 'Zweiten Faktor einrichten' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Zweiter Faktor (Code aus App)')).toBeNull();
+  });
+
+  it('bietet ohne aktiven Passwort-Provider keine Einrichtung an', async () => {
+    setzeSecureContext(true);
+    setup(false, [{ ...passwortProvider[0], aktiviert: false }, ...webauthnProvider]);
+    await screen.findByRole('button', { name: 'Passkey registrieren' });
+    await screen.findByText('Rita Beispiel');
+    expect(
+      screen.queryByRole('button', { name: 'Zweiten Faktor einrichten' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('zeigt einen schon aktiven Zweitfaktor auch ohne lokales Passwort', async () => {
+    setup(true, passwortProvider, false);
+
+    expect(await screen.findByText('Zweiter Faktor aktiv')).toBeInTheDocument();
+  });
+});
+
+/**
  * Der Ein-Klick-Weg zu Codes, die nur einmal angezeigt werden. Im Nicht-Secure-Context war er
  * vorher ein stiller No-Op (`navigator.clipboard?.writeText(...).catch(() => {})`).
  *
@@ -422,7 +534,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
   /** Fährt den Enroll-Weg bis zur Anzeige der Codes. */
   async function bisZuDenCodes() {
-    setup(false);
+    setup(false, passwortProvider);
     server.use(
       http.post('/api/auth/totp/enroll/start', () =>
         HttpResponse.json({
@@ -435,7 +547,7 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
         HttpResponse.json({ recovery_codes: ['aaaa-1111', 'bbbb-2222'] }),
       ),
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'Zweiten Faktor einrichten' }));
+    await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
     await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
     await screen.findByText('Wiederherstellungscodes jetzt sichern');
@@ -493,10 +605,6 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
  * immer erscheint, bestünde sie auch).
  */
 describe('ProfilPage — Passwort ändern (LFH-471)', () => {
-  const passwortProvider = [
-    { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
-  ];
-
   /** Öffnet den Dialog und liefert ihn. */
   async function dialogOeffnen() {
     await userEvent.click(await screen.findByRole('button', { name: 'Passwort ändern' }));
@@ -515,9 +623,10 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
   });
 
   it('erscheint NICHT ohne aktiven Passwort-Provider', async () => {
+    setzeSecureContext(true);
     setup(false, webauthnProvider);
     // Anker: die Seite ist fertig geladen, erst dann trägt die Abwesenheit etwas.
-    await screen.findByText('Zweiter Faktor (Code aus App)');
+    await screen.findByRole('button', { name: 'Passkey registrieren' });
     await waitFor(() => expect(screen.queryByText('Passwort')).toBeNull());
     expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
   });
@@ -544,8 +653,10 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
   });
 
   it('erscheint NICHT, wenn der Passwort-Provider als deaktiviert geliefert wird', async () => {
-    setup(false, [{ ...passwortProvider[0], aktiviert: false }]);
-    await screen.findByText('Zweiter Faktor (Code aus App)');
+    setzeSecureContext(true);
+    setup(false, [{ ...passwortProvider[0], aktiviert: false }, ...webauthnProvider]);
+    // Anker: die Provider-Liste ist geladen.
+    await screen.findByRole('button', { name: 'Passkey registrieren' });
     expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
   });
 
