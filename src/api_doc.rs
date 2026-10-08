@@ -26,6 +26,7 @@ use utoipa::OpenApi;
         crate::auftrag::AuftragBearbeitungsstatus,
         crate::auftrag::AuftragDetail,
         crate::auftrag::AuftragEmpfaengerAnzeige,
+        crate::auftrag::AuftragKennzahlen,
         crate::auftrag::EmpfaengerTyp,
         crate::auth::BenutzerAnzeige,
         crate::routes::auth::MeAntwort,

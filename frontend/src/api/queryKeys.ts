@@ -655,9 +655,17 @@ export const einsatzKeys = {
   meldungenRueckmeldungen: (einsatzId: number) =>
     [EINSATZ_KEYS.meldungen, einsatzId, RUECKMELDUNGEN_SUBKEY] as const,
   lagemeldungen: (einsatzId: number) => [EINSATZ_KEYS.lagemeldungen, einsatzId] as const,
+  /** Vollliste ohne Phase: Überblick, Sprungpalette, Chat, Übernahme. */
   auftraege: (einsatzId: number) => [EINSATZ_KEYS.auftraege, einsatzId] as const,
-  auftraegeListe: (einsatzId: number, richtung: string, empfaenger: string) =>
-    [EINSATZ_KEYS.auftraege, einsatzId, richtung, empfaenger] as const,
+  /** Auftragsboard nach Phase, Richtung und Empfänger (LFH-1071); `abgeschlossen` ist eine
+   *  Seitenkette. Das Meldebild liest die ungefilterte offene Liste mit. */
+  auftraegePhase: (einsatzId: number, phase: ListenPhase, richtung: string, empfaenger: string) =>
+    [EINSATZ_KEYS.auftraege, einsatzId, phase, richtung, empfaenger] as const,
+  auftragKennzahlen: (einsatzId: number, richtung: string, empfaenger: string) =>
+    [EINSATZ_KEYS.auftraege, einsatzId, 'kennzahlen', richtung, empfaenger] as const,
+  /** Einzelabruf für einen Deeplink auf einen nicht geladenen Auftrag. */
+  auftragEinzeln: (einsatzId: number, auftragId: number) =>
+    [EINSATZ_KEYS.auftraege, einsatzId, 'einzeln', auftragId] as const,
   nachforderungen: (einsatzId: number) => [EINSATZ_KEYS.nachforderungen, einsatzId] as const,
 
   // ETB

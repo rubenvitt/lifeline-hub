@@ -259,6 +259,16 @@ pub struct AuftragEmpfaengerAnzeige {
     pub quittiert_von_id: Option<i64>,
 }
 
+/// Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und
+/// „Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AuftragKennzahlen {
+    /// Offen oder in Bearbeitung.
+    pub offen: i64,
+    /// Vollzogen oder abgenommen.
+    pub abgeschlossen: i64,
+}
+
 /// Auftrag + seine Empfänger (Detail-/Anlege-/Mutations-Antwort).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AuftragDetail {

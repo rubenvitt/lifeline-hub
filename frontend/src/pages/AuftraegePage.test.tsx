@@ -31,8 +31,11 @@ const legeAuftragAn = vi.fn();
 const quittiereEmpfaenger = vi.fn();
 const setzeVollzug = vi.fn();
 const nimmAb = vi.fn();
-vi.mock('../api/auftraege', () => ({
-  listeAuftraege: (...a: unknown[]) => listeAuftraege(...a),
+// Phase, Seiten und Kennzahlen leitet die Attrappe aus der Vollliste ab (LFH-1071).
+vi.mock('../api/auftraege', async () => ({
+  ...(await import('../test/auftraegeAttrappe')).auftraegeLeseAttrappe((...a) =>
+    listeAuftraege(...a),
+  ),
   legeAuftragAn: (...a: unknown[]) => legeAuftragAn(...a),
   quittiereEmpfaenger: (...a: unknown[]) => quittiereEmpfaenger(...a),
   setzeVollzug: (...a: unknown[]) => setzeVollzug(...a),
@@ -247,7 +250,7 @@ describe('AuftraegePage', () => {
     );
     const { client } = renderPage();
     await screen.findByText('Deich sichern');
-    const zweiterKey = einsatzKeys.auftraegeListe(1, 'extern', 'alle');
+    const zweiterKey = einsatzKeys.auftraegePhase(1, 'offen', 'extern', 'alle');
     client.setQueryData<Auftrag[]>(zweiterKey, [
       auftrag(),
       auftrag({ id: 2, auftrag_text: 'Unabhängiger Auftrag' }),

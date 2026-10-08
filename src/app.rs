@@ -385,6 +385,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route("/api/einsaetze/{id}/auftraege", get(routes::auftrag::liste))
         .route(
+            "/api/einsaetze/{id}/auftraege/kennzahlen",
+            get(routes::auftrag::kennzahlen),
+        )
+        .route(
+            "/api/einsaetze/{id}/auftraege/{aid}",
+            get(routes::auftrag::detail),
+        )
+        .route(
             "/api/einsaetze/{id}/auftraege",
             post(routes::auftrag::anlegen),
         )
