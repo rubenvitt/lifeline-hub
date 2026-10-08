@@ -140,6 +140,10 @@ Wegen), bewertet vorher ein Workflow oder eine Handvoll Subagents konkurrierende
 beides landet in `design.md`. Zwischen Panel und Proposal hältst du **nicht** an. Die Wahl
 trifft der Mensch am Freigabe-Checkpoint, und will er einen anderen Weg, läuft `/opsx:update`.
 
+**Größere UI:** Trägt ein Task eine neue Seite, ein neues Modul oder einen Rahmenumbau, bietest
+du am Checkpoint einen Entwurf in Claude Design an, samt Prompt (Regel: `frontend/AGENTS.md`,
+„Größere UI-Entwürfe über Claude Design“).
+
 **Checkpoint — Pflicht (LFH-588).** Nach den `/opsx:propose`-Läufen hältst du an und legst
 **alle Changes des Laufs gesammelt** vor, samt offenen Optionen und Empfehlung. Die Tasks
 bleiben auf `in design`. Erst die Freigabe des Menschen führt auf `ready for development`, und
