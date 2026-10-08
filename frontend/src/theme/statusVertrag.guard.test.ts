@@ -9,11 +9,14 @@
  * gelesener Vertragsname). Dafür ist `components/StatusTag.tsx` da: antd 6 rechnet für einen
  * Nicht-Preset ein statisches Farbpaar, das den Modus nicht mehr sieht.
  *
- * Guard 3 (LFH-891, Spec `farbrollen-kontrast`): kein `<Tag>` mit dem Preset `blue`, auch nicht
- * in einem Ausdruck. Blau bedient, und antds Preset hält den Textboden nicht (Tag 5,50, Nacht
- * 4,91 an „ad-hoc“); eine Kennzeichnung ohne Status ist ein `Tag` ohne `color` wie
- * `components/DemoMarke.tsx`. Er teilt den Tag-Scan mit Guard 2 ({@link farbigeTags}) und damit
- * die Blindflecken unten.
+ * Guard 3 (LFH-891, LFH-1022, Spec `farbrollen-kontrast`): kein `<Tag>` mit einer Farbe über
+ * `color`, außer `"default"`. antds Presets kommen aus antds Palette, nicht aus den Rollen in
+ * `theme/tokens.ts`, und halten den Textboden nicht (Blau Tag 5,50, Nacht 4,91 an „ad-hoc“; die
+ * übrigen Presets im Browser gemessen in LFH-1022). Ein Status steht in `components/StatusTag.tsx`
+ * (Rolle aus dem Vertrag), eine Kennzeichnung ohne Status ist ein `Tag` ohne `color` wie
+ * `components/DemoMarke.tsx`. Verboten ist jeder andere Ausdruck, nicht nur ein Presetname: eine
+ * lokale Karte (`color={KARTE[s].color}`) trüge das Preset sonst unsichtbar herein. Er teilt den
+ * Tag-Scan mit Guard 2 ({@link farbigeTags}) und damit die Blindflecken unten.
  *
  * Guards statt ESLint-Regel wie bei `components/dichte.guard.test.ts`. Es gibt bewusst keine
  * Schuldmenge: ein leerer Ausnahmetopf „für später“ sichert nichts zu.
@@ -860,16 +863,21 @@ export function tagBefunde(dateien: Record<string, string>): string[] {
   return verstoesse;
 }
 
+/** `color="default"` (auch `{'default'}`) ist antds neutrale Marke und bleibt erlaubt. */
+function istNeutraleFarbe(farbe: string): boolean {
+  return /^(["'`])default\1$/.test(farbe.replace(/^\{\s*|\s*\}$/g, '').trim());
+}
+
 /**
- * Guard 3 (LFH-891): jedes `<Tag>`, dessen `color`-Ausdruck das Preset `blue` als Literal
- * trägt, auch in einem Ausdruck. Gilt im ganzen Baum, die Vertragsdatei eingeschlossen.
+ * Guard 3 (LFH-891, LFH-1022): jedes `<Tag>` mit einer `color`-Prop außer `"default"`, als
+ * Literal wie als Ausdruck. Gilt im ganzen Baum, die Vertragsdatei eingeschlossen.
  */
-export function blauBefunde(dateien: Record<string, string>): string[] {
+export function farbBefunde(dateien: Record<string, string>): string[] {
   const verstoesse: string[] = [];
   for (const [pfad, roh] of Object.entries(dateien)) {
     const inhalt = ohneKommentare(roh).join('\n');
     for (const { zeile, tag, farbe } of farbigeTags(inhalt)) {
-      if (!literalInhalte(farbe).includes('blue')) continue;
+      if (istNeutraleFarbe(farbe)) continue;
       verstoesse.push(`${pfad}:${zeile}  ${tag.replace(/\s+/g, ' ').slice(0, 110)}`);
     }
   }
@@ -1565,46 +1573,57 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
   });
 });
 
-describe('Kein Preset `blue` an `Tag` (LFH-891, Spec `farbrollen-kontrast`)', () => {
-  it('findet keine blaue Marke im Baum', () => {
-    const verstoesse = blauBefunde(lieseQuellen(SRC));
+describe('Keine Farbe über `color` an `Tag` (LFH-891, LFH-1022, Spec `farbrollen-kontrast`)', () => {
+  it('findet keine farbige Marke im Baum', () => {
+    const verstoesse = farbBefunde(lieseQuellen(SRC));
     expect(
       verstoesse,
-      'Blau bedient (`frontend/AGENTS.md`, „Farbe und Zeichen“), und antds Preset `blue` hält ' +
-        'den Textboden nicht (Tag 5,50, Nacht 4,91). Eine Kennzeichnung ohne Status ist ein ' +
-        `\`Tag\` ohne \`color\` wie \`components/DemoMarke.tsx\`:\n${verstoesse.join('\n')}`,
+      'antds Presets halten den Textboden nicht (Tag ≥ 7, Nacht ≥ 5), und Blau bedient ' +
+        '(`frontend/AGENTS.md`, „Farbe und Zeichen“). Ein Status gehört in `StatusTag` mit einer ' +
+        'Rolle aus `theme/statusFarben.ts`, eine Kennzeichnung ohne Status ist ein `Tag` ohne ' +
+        `\`color\` wie \`components/DemoMarke.tsx\`:\n${verstoesse.join('\n')}`,
     ).toEqual([]);
   });
 
-  it('wird rot am Literal und im Ausdruck', () => {
-    expect(blauBefunde({ '/src/pages/A.tsx': '<Tag color="blue">ad-hoc</Tag>' })).toHaveLength(1);
+  it('wird rot an jedem Preset, im Ausdruck und an einer lokalen Karte', () => {
+    for (const preset of ['blue', 'green', 'red', 'gold', 'purple', 'processing', 'success']) {
+      expect(
+        farbBefunde({ '/src/pages/A.tsx': `<Tag color="${preset}">x</Tag>` }),
+        preset,
+      ).toHaveLength(1);
+    }
     expect(
-      blauBefunde({ '/src/pages/B.tsx': "<Tag color={x ? 'blue' : 'default'}>{y}</Tag>" }),
+      farbBefunde({ '/src/pages/B.tsx': "<Tag color={x ? 'green' : 'default'}>{y}</Tag>" }),
     ).toHaveLength(1);
     expect(
-      blauBefunde({
+      farbBefunde({ '/src/pages/K.tsx': '<Tag color={KARTE[s].color}>{KARTE[s].label}</Tag>' }),
+    ).toHaveLength(1);
+    expect(
+      farbBefunde({
         '/src/pages/C.tsx': [
           "import { Tag as Marke } from 'antd';",
           '<Marke',
-          '  color="blue"',
+          '  color="purple"',
           '>',
         ].join('\n'),
       }),
     ).toHaveLength(1);
     // Auch die Vertragsdatei ist nicht ausgenommen.
-    expect(blauBefunde({ '/src/theme/statusFarben.ts': '<Tag color="blue">x</Tag>' })).toHaveLength(
+    expect(farbBefunde({ '/src/theme/statusFarben.ts': '<Tag color="blue">x</Tag>' })).toHaveLength(
       1,
     );
   });
 
-  it('meldet keine Nachbar-Prop, keinen Kommentar, keine Zeichenkette und kein anderes Preset', () => {
+  it('meldet keine Nachbar-Prop, keinen Kommentar, keine Zeichenkette und kein `default`', () => {
     expect(
-      blauBefunde({
+      farbBefunde({
         '/src/pages/D.tsx': [
           '<Tag icon={<Icon color="blue" />}>{y}</Tag>',
+          '<Tag style={{ color: rollen.text }}>{y}</Tag>',
           '// <Tag color="blue">alt</Tag>',
-          'const text = \'<Tag color="blue">\';',
-          '<Tag color="geekblue">DMO</Tag>',
+          'const text = \'<Tag color="green">\';',
+          '<Tag color="default">storniert</Tag>',
+          "<Tag color={'default'}>storniert</Tag>",
           '<Tag>ad-hoc</Tag>',
         ].join('\n'),
       }),

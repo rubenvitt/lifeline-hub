@@ -2,7 +2,7 @@ import { useRollen } from '../components/instrument/rollenwerte';
 import { Datenfeld, Datenraster } from '../components/instrument';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
-import { bezugsDarstellung } from '../theme/statusFarben';
+import { abgleichStatus, bezugsDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import {
@@ -496,13 +496,13 @@ export default function PersonenDetailPage() {
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
         <Space wrap>
-          {istPatient(person) && <Tag color="geekblue">Patient</Tag>}
+          {istPatient(person) && <Tag>Patient</Tag>}
           {person.aktuelle_sichtung ? (
             <SichtungsTag kategorie={person.aktuelle_sichtung} />
           ) : (
             <Tag>ungesichtet</Tag>
           )}
-          {person.aktueller_verbleib && <Tag color="purple">{person.aktueller_verbleib}</Tag>}
+          {person.aktueller_verbleib && <Tag>{person.aktueller_verbleib}</Tag>}
         </Space>
         {/* „Re-Sichten" und „Verbleib erfassen" stehen in der Kopfleiste (eine als
             Primäraktion, die andere im Menü); zwei Wege zu derselben Aktion wären ein
@@ -572,17 +572,7 @@ export default function PersonenDetailPage() {
             <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
               {person.abgleiche.map((a) => (
                 <li key={a.id} style={{ padding: '4px 0' }}>
-                  <Tag
-                    color={
-                      a.status === 'bestaetigt'
-                        ? 'green'
-                        : a.status === 'verworfen'
-                          ? 'default'
-                          : 'gold'
-                    }
-                  >
-                    {a.status}
-                  </Tag>
+                  <StatusTag darstellung={abgleichStatus[a.status]} />
                   <Typography.Text>
                     {registrierNummer(
                       'R',
@@ -830,7 +820,6 @@ export default function PersonenDetailPage() {
                         {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
                           <Space key={t.id} size={4}>
                             <Tag
-                              color="cyan"
                               style={{ cursor: 'pointer' }}
                               onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
                             >
@@ -870,7 +859,7 @@ export default function PersonenDetailPage() {
                         {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
                           <Space key={sch.id} size={4}>
                             <KennungsLink to={schadenDetailPfad(einsatzId, sch.id)}>
-                              <Tag color="orange" style={{ cursor: 'pointer' }}>
+                              <Tag style={{ cursor: 'pointer' }}>
                                 {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} (
                                 {sch.ausmass}) — {sch.status}
                               </Tag>

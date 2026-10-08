@@ -570,11 +570,7 @@ export default function EinheitDetailPage() {
                     · als Führer gezählt, noch nicht als Einheitsführer gesetzt
                   </span>
                 )}
-                {m.ist_fuehrer && (
-                  <Tag color="gold" style={{ marginLeft: token.marginXXS }}>
-                    Einheitsführer
-                  </Tag>
-                )}
+                {m.ist_fuehrer && <Tag style={{ marginLeft: token.marginXXS }}>Einheitsführer</Tag>}
               </span>,
               darfSchreiben && (
                 <Space size="middle" wrap>

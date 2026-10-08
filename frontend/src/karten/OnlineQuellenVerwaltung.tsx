@@ -10,6 +10,12 @@ import { invalidiereKarte } from './invalidiereKarte';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
 import AusKatalogModal from './AusKatalogModal';
 import { globalKeys } from '../api/queryKeys';
+import StatusTag from '../components/StatusTag';
+import type { StatusDarstellung } from '../theme/statusFarben';
+
+/** Schalter einer Quelle (LFH-1022: Statusrolle statt antd-Preset `green`). */
+const QUELLE_AKTIV: StatusDarstellung = { rolle: 'normal', label: 'aktiv' };
+const QUELLE_INAKTIV: StatusDarstellung = { rolle: 'neutral', label: 'inaktiv' };
 
 /**
  * Verwaltungstabelle der Online-Basemap-Quellen. Lesen für alle Admin-Bereichs-Berechtigten;
@@ -120,7 +126,7 @@ export default function OnlineQuellenVerwaltung() {
         { text: 'inaktiv', value: false },
       ],
       onFilter: (wert, q) => q.aktiv === wert,
-      render: (_, q) => (q.aktiv ? <Tag color="green">aktiv</Tag> : <Tag>inaktiv</Tag>),
+      render: (_, q) => <StatusTag darstellung={q.aktiv ? QUELLE_AKTIV : QUELLE_INAKTIV} />,
     },
     ...(istAdmin
       ? ([

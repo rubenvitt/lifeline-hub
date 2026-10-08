@@ -193,9 +193,7 @@ function BesatzungsBlock({
                 {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
               </span>
               {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
-                <Tag color="orange" style={{ margin: 0 }}>
-                  andere Einheit
-                </Tag>
+                <Tag style={{ margin: 0 }}>andere Einheit</Tag>
               )}
             </Space>
             {darfSchreiben && (
