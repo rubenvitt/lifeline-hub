@@ -102,12 +102,15 @@ type AlarmToast = {
   key: string;
   art: 'warning' | 'info';
   titel: string;
-  beschreibung: string;
+  beschreibung?: string;
   aktion: ReactNode;
   ziel: AlarmZiel;
 };
 
 const MAX_SICHTBARE_TOASTS = 3;
+
+/** Zustand einer Sofortmeldung in Toast und OS-Meldung (LFH-1078: Zustand statt Bitte). */
+const SOFORT_ZUSTAND = 'Bestätigung ausstehend';
 
 type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen' | 'abloesung' | 'wetter-pegel';
 
@@ -267,22 +270,13 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     const nurAuftraege = ziele.size === 1 && ziele.has('auftraege');
     const nurErinnerungen = ziele.size === 1 && ziele.has('erinnerungen');
     const nurAbloesungen = ziele.size === 1 && ziele.has('abloesung');
+    // Zahl und Art im Titel, das Ziel am Knopf (LFH-1078): kein Bittsatz darunter. Die Art trägt
+    // den Zustand mit, den sonst die Beschreibung nannte („überfällig“, „fällig“).
     let titel = `${anzahl} weitere Alarme`;
-    let beschreibung =
-      'Weitere Ereignisse sind eingegangen. Bitte in den betroffenen Modulen sichten.';
-    if (nurSofortmeldungen) {
-      titel = `${anzahl} weitere Sofortmeldungen`;
-      beschreibung = 'Weitere Ereignisse sind eingegangen. Bitte die Meldungen gesammelt sichten.';
-    } else if (nurAuftraege) {
-      titel = `${anzahl} weitere Aufträge`;
-      beschreibung = 'Weitere Aufträge sind überfällig. Bitte gesammelt sichten.';
-    } else if (nurErinnerungen) {
-      titel = `${anzahl} weitere Erinnerungen`;
-      beschreibung = 'Weitere Erinnerungen sind fällig. Bitte gesammelt sichten.';
-    } else if (nurAbloesungen) {
-      titel = `${anzahl} weitere Ablösungen`;
-      beschreibung = 'Weitere Ablösungen sind fällig oder stehen an. Bitte gesammelt sichten.';
-    }
+    if (nurSofortmeldungen) titel = `${anzahl} weitere Sofortmeldungen`;
+    else if (nurAuftraege) titel = `${anzahl} weitere überfällige Aufträge`;
+    else if (nurErinnerungen) titel = `${anzahl} weitere fällige Erinnerungen`;
+    else if (nurAbloesungen) titel = `${anzahl} weitere Ablösungen`;
     const zielKonfiguration: Array<{ ziel: AlarmZiel; text: string }> = [
       { ziel: 'meldungen', text: 'Zu Meldungen' },
       { ziel: 'auftraege', text: 'Zu Aufträgen' },
@@ -295,7 +289,6 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     notification.warning({
       key: alarmScope.sammelKey,
       title: titel,
-      description: beschreibung,
       duration: 0,
       actions: (
         <>
@@ -453,7 +446,9 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         key,
         art: 'warning',
         titel: 'Sofortmeldung eingegangen',
-        beschreibung: 'Eine Sofortmeldung erfordert Aufmerksamkeit — bitte sichten und bestätigen.',
+        // Der Zustand, nicht die Bitte (LFH-1078); bestätigt wird über „Öffnen“ in den Meldungen.
+        // Den Betreff trägt das Live-Ereignis nicht (nur `meldung_id`).
+        beschreibung: SOFORT_ZUSTAND,
         aktion: (
           <Button type="primary" onClick={oeffnen}>
             Öffnen
@@ -462,7 +457,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         ziel: 'meldungen',
       });
       const desktop = zeigeDesktopAlarm('Sofortmeldung eingegangen', {
-        koerper: 'Bitte sichten und bestätigen.',
+        koerper: SOFORT_ZUSTAND,
         tag: desktopTag,
         beiKlick: () => {
           if (alarmScope.aktiv) navigate(meldungenPfad(einsatzId));
@@ -493,9 +488,8 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           ? `${einsatzId}-${istAuftrag ? 'auftrag' : 'erinnerung'}-${fachId}`
           : undefined;
       const titel = istAuftrag ? 'Auftrag überfällig' : 'Erinnerung fällig';
-      const beschreibung = istAuftrag
-        ? 'Ein Auftrag ist über seine Quittierfrist — bitte prüfen und quittieren.'
-        : 'Eine Erinnerung ist fällig — bitte sichten.';
+      // Den Titel des Auftrags bzw. der Erinnerung trägt das Live-Ereignis nicht (nur Kennungen).
+      const beschreibung = istAuftrag ? 'Quittierfrist überschritten' : undefined;
       const ziel =
         istAuftrag && detail.bezug_id != null
           ? auftraegePfad(einsatzId, { auftrag: detail.bezug_id })
@@ -725,14 +719,15 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         ? 'Ton wird geprüft'
         : 'Ton blockiert';
   // Name und Tooltip des Knopfs: die Handlung. In `prueft`/`blockiert` mit Zustand, denn die
-  // Handlung („freischalten") erklärt sich erst durch ihn.
+  // Handlung („freischalten") erklärt sich erst durch ihn, und das sichtbare Wort („Ton blockiert")
+  // gehört in den Namen (WCAG 2.5.3). Keine Geste im Text (LFH-1078): Maus und Tastatur tippen nicht.
   const tonHinweis = gemutet
     ? 'Alarmton einschalten'
     : tonStatus === 'bereit'
       ? 'Alarmton stummschalten'
       : tonStatus === 'prueft'
-        ? 'Alarmton wird geprüft – tippen zum Freischalten'
-        : 'Alarmton blockiert – tippen zum Freischalten';
+        ? 'Alarmton wird geprüft – freischalten'
+        : 'Alarmton blockiert – freischalten';
   // Menüeintrag: Zustand UND Handlung als ein Satz — dort steht kein Tooltip daneben.
   const tonSatz = gemutet
     ? 'Alarmton ist stumm – einschalten'

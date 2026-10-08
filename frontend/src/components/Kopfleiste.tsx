@@ -264,7 +264,7 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
   },
   getrennt: {
     wort: 'GETRENNT',
-    satz: () => 'Live-Verbindung unterbrochen — die Anzeige kann veraltet sein',
+    satz: () => 'Live-Verbindung unterbrochen',
     farbe: rahmenFarben.alarm,
     getrennt: true,
   },

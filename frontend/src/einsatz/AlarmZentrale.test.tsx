@@ -151,6 +151,10 @@ describe('AlarmZentrale', () => {
       window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 3 } }));
     });
     await waitFor(() => expect(screen.getByText('Sofortmeldung eingegangen')).toBeInTheDocument());
+    // LFH-1078: der Zustand statt der Bitte; der Bestätigungsweg bleibt „Öffnen“.
+    expect(screen.getByText('Bestätigung ausstehend')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
+    expect(screen.queryByText(/bitte sichten/i)).not.toBeInTheDocument();
   });
 
   it('zeigt einen Erinnerungs-Toast bei lfh:erinnerung-alarm ohne Bezug', async () => {
@@ -163,6 +167,12 @@ describe('AlarmZentrale', () => {
       );
     });
     await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
+    // LFH-1078: der Titel sagt alles, kein Bittsatz darunter.
+    const toast = screen
+      .getByText('Erinnerung fällig')
+      .closest<HTMLElement>('.ant-notification-notice')!;
+    expect(toast.querySelector('.ant-notification-notice-description')).toBeNull();
+    expect(within(toast).getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
   });
 
   it('zeigt einen Auftrags-Toast bei lfh:erinnerung-alarm mit bezug_typ=auftrag', async () => {
@@ -175,6 +185,8 @@ describe('AlarmZentrale', () => {
       );
     });
     await waitFor(() => expect(screen.getByText('Auftrag überfällig')).toBeInTheDocument());
+    expect(screen.getByText('Quittierfrist überschritten')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
   });
 
   it('globaler Mute-Toggle persistiert in localStorage', async () => {
@@ -220,6 +232,11 @@ describe('AlarmZentrale', () => {
     });
 
     expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
+    // LFH-1078: Zahl und Art im Titel, das Ziel am Knopf — kein Bittsatz darunter.
+    const sammel = screen
+      .getByText('3 weitere Sofortmeldungen')
+      .closest<HTMLElement>('.ant-notification-notice')!;
+    expect(sammel.querySelector('.ant-notification-notice-description')).toBeNull();
     await waitFor(() => {
       expect(document.querySelectorAll('.ant-notification-notice').length).toBeLessThanOrEqual(3);
     });
@@ -282,7 +299,7 @@ describe('AlarmZentrale', () => {
       }
     });
 
-    expect(await screen.findByText('3 weitere Aufträge')).toBeInTheDocument();
+    expect(await screen.findByText('3 weitere überfällige Aufträge')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Erinnerungen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Aufträgen' }));
@@ -301,7 +318,7 @@ describe('AlarmZentrale', () => {
       }
     });
 
-    expect(await screen.findByText('3 weitere Erinnerungen')).toBeInTheDocument();
+    expect(await screen.findByText('3 weitere fällige Erinnerungen')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zu Aufträgen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Erinnerungen' }));
@@ -841,6 +858,8 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
  */
 describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
   type Meldung = {
+    titel: string;
+    body: string | undefined;
     tag: string;
     onclose: (() => void) | null;
     onclick: (() => void) | null;
@@ -849,8 +868,10 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
 
   function stubMeldungen() {
     const meldungen: Meldung[] = [];
-    const Ctor = vi.fn(function (_titel: string, opts?: NotificationOptions) {
+    const Ctor = vi.fn(function (titel: string, opts?: NotificationOptions) {
       const m: Meldung = {
+        titel,
+        body: opts?.body,
         tag: opts?.tag ?? '',
         onclose: null,
         onclick: null,
@@ -888,7 +909,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     renderAlarm();
     sofortmeldung(3);
     expect(Ctor).toHaveBeenCalledWith('Sofortmeldung eingegangen', {
-      body: 'Bitte sichten und bestätigen.',
+      body: 'Bestätigung ausstehend',
       tag: '1-sofort-3',
     });
     expect(offeneDesktopAlarme()).toBe(1);
@@ -945,6 +966,14 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
       '1-auftrag-12',
       '1-abloesung-9-vorwarnung',
       '1-unwetter-sturm-2',
+    ]);
+
+    // LFH-1078: die OS-Meldung nennt Gegenstand und Zustand, keine Bitte.
+    expect(meldungen.map((m) => [m.titel, m.body])).toEqual([
+      ['Erinnerung fällig', undefined],
+      ['Auftrag überfällig', 'Quittierfrist überschritten'],
+      ['Ablösung in 30 min', 'Ablösung bald fällig: Florian 1'],
+      ['Unwetterwarnung', 'Für den Einsatzort liegt eine Unwetterwarnung vor.'],
     ]);
   });
 

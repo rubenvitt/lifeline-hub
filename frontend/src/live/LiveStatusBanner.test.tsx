@@ -53,7 +53,9 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
   it('zeigt einen Fehler-Banner bei lost', () => {
     renderBanner();
     melde('lost');
-    expect(screen.getByText(/unterbrochen/i)).toBeInTheDocument();
+    // Der Zustand ohne Nachsatz (LFH-1078).
+    expect(screen.getByText('Live-Verbindung unterbrochen')).toBeInTheDocument();
+    expect(screen.queryByText(/veraltet/)).not.toBeInTheDocument();
   });
 
   it('zeigt bei connecting einen Hinweis und blendet ihn bei open wieder aus', () => {
@@ -94,6 +96,18 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
 
     expect(aktualisierer).toHaveBeenCalledWith(true);
     expect(screen.queryByText(/Neue Version verfügbar/)).not.toBeInTheDocument();
+  });
+
+  it('eine gescheiterte Aktualisierung nennt den Zustand, der Knopf daneben die Handlung', async () => {
+    setzeAppAktualisierer(vi.fn().mockRejectedValue(new Error('kaputt')));
+    meldeAppAktualisierungVerfuegbar();
+    renderBanner();
+    await userEvent.click(screen.getByRole('button', { name: 'Jetzt neu laden' }));
+    expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
+    expect(screen.queryByText(/bitte erneut versuchen/)).not.toBeInTheDocument();
+    // LFH-1078: kein Bittsatz — der Knopf bleibt stehen und trägt den zweiten Versuch (Regex: in
+    // jsdom endet die Ausblendung des Lade-Icons nie, sein „loading“ hängt am Namen).
+    expect(screen.getByRole('button', { name: /Jetzt neu laden$/ })).toBeEnabled();
   });
 
   it('zeigt Offline-Writes als Badge in derselben Betriebszeile', async () => {

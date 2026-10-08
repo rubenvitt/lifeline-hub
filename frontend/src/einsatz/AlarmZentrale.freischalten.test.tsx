@@ -89,7 +89,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     stubGesperrtesAudio();
     renderAlarm();
     const ton = await screen.findByRole('button', {
-      name: 'Alarmton blockiert – tippen zum Freischalten',
+      name: 'Alarmton blockiert – freischalten',
     });
     expect(ton).toHaveTextContent('Ton blockiert');
 
@@ -112,7 +112,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     stubGesperrtesAudio();
     renderAlarm();
     const ton = await screen.findByRole('button', {
-      name: 'Alarmton blockiert – tippen zum Freischalten',
+      name: 'Alarmton blockiert – freischalten',
     });
     geste.erlaubt = true;
     act(() => {
@@ -130,7 +130,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     stubGesperrtesAudio();
     renderAlarm();
     const ton = await screen.findByRole('button', {
-      name: 'Alarmton blockiert – tippen zum Freischalten',
+      name: 'Alarmton blockiert – freischalten',
     });
     geste.erlaubt = true;
     await userEvent.dblClick(ton);
@@ -196,7 +196,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
         px < 768
           ? await screen.findByRole('button', { name: 'Alarmzentrale: Ton blockiert' })
           : await screen.findByRole('button', {
-              name: 'Alarmton blockiert – tippen zum Freischalten',
+              name: 'Alarmton blockiert – freischalten',
             });
       expect(ziel).toHaveTextContent('Ton blockiert');
       expect(ziel).toHaveStyle({ color: farbenDunkel.achtung });

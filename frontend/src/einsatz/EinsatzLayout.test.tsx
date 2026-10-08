@@ -16,8 +16,8 @@ import { leseLetztenOrt } from './letzterOrt';
 import { useEinsatzRahmen } from './EinsatzRahmenKontext';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
-import { adminFixture, freigabenFixture } from '../test/fixtures';
-import type { ModulFreigaben } from '../api/types';
+import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixtures';
+import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
@@ -336,11 +336,7 @@ describe('EinsatzLayout', () => {
     setup(freigabenFixture(), { freigaben: true });
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     // Der Banner folgt dem Freigaben-Abruf, nicht dem Einsatz: abwarten (LFH-788).
-    expect(
-      await screen.findByText(
-        'Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind.',
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Modulfreigaben nicht geladen')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
   });
 
@@ -349,11 +345,7 @@ describe('EinsatzLayout', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     // Erst wenn der Abruf entschieden ist, ist die Abwesenheit eine Aussage (LFH-788).
     await freigabenAngekommen();
-    expect(
-      screen.queryByText(
-        'Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind.',
-      ),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Modulfreigaben nicht geladen')).not.toBeInTheDocument();
   });
 
   // Gegenprobe zum Schmal-Block: sonst wäre der Schmal-Test auch grün, wenn der Hamburger bei
@@ -650,7 +642,7 @@ describe('EinsatzLayout', () => {
       // Die Einzelknöpfe der breiten Bauform stehen hier NICHT — sonst erfüllten auch drei Ziele
       // „ein Ziel".
       expect(
-        screen.queryByRole('button', { name: 'Alarmton blockiert – tippen zum Freischalten' }),
+        screen.queryByRole('button', { name: 'Alarmton blockiert – freischalten' }),
       ).toBeNull();
     });
 
@@ -714,7 +706,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Vermisste, springt zu Personen, Filter Vermisst' }),
+      screen.getByRole('button', { name: 'Vermisste, springt zu Personen · Vermisst' }),
     );
 
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
@@ -951,11 +943,16 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     route: string,
     freigaben: ModulFreigaben | 'laden' | 'fehler',
     einstellungen: Record<string, unknown> = {},
+    {
+      benutzer = admin,
+      rolle = einsatz.meine_rolle,
+    }: { benutzer?: BenutzerAnzeige; rolle?: string } = {},
   ) {
+    const meinEinsatz = { ...einsatz, meine_rolle: rolle };
     server.use(
-      meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      meHandler(benutzer),
+      http.get('/api/einsaetze', () => HttpResponse.json([meinEinsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(meinEinsatz)),
       http.get('/api/einsaetze/7/modul-freigaben', async () => {
         if (freigaben === 'laden') await new Promise(() => {});
         if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
@@ -989,9 +986,30 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: /Lagemeldungen/ }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/für deine Rolle in diesem Einsatz nicht freigegeben/)).toBeVisible();
+    expect(screen.getByText('Für deine Rolle nicht freigegeben')).toBeVisible();
     expect(screen.queryByText('Lagemeldungen-Inhalt')).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
+  });
+
+  it('Einsatzleitung: „Modulfreigaben öffnen“ führt zu Einstellungen › Module (LFH-1078)', async () => {
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { zugriff: false } }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Modulfreigaben öffnen' }));
+    expect(pfad()).toBe('/einsaetze/7/einstellungen/module');
+  });
+
+  it('ohne Verwaltungsrecht steht nur die Sperrzeile, kein Weg in die Modulfreigaben', async () => {
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { zugriff: false } }),
+      {},
+      { benutzer: benutzerFixture({ anzeigename: 'Helfer' }), rolle: 'fuehrungspersonal' },
+    );
+    expect(await screen.findByText('Für deine Rolle nicht freigegeben')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Überblick öffnen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Modulfreigaben öffnen' })).not.toBeInTheDocument();
   });
 
   it('Rückweg: das freie Standardmodul, sonst der Überblick', async () => {
@@ -1016,7 +1034,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
       '/einsaetze/7/lagemeldungen',
       freigabenFixture({ lagemeldungen: { sichtbar: false, zugriff: false } }),
     );
-    expect(await screen.findByText(/in diesem Einsatz ausgeblendet/)).toBeInTheDocument();
+    expect(await screen.findByText('In diesem Einsatz ausgeblendet')).toBeInTheDocument();
   });
 
   it('System-Admin im ausgeblendeten Modul (`zugriff: true`): die Seite rendert', async () => {
@@ -1047,9 +1065,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
 
   it('Freigaben gescheitert: die Seite rendert, ihr eigener 403-Zustand bleibt das Netz', async () => {
     setupWaechter('/einsaetze/7/lagemeldungen', 'fehler');
-    expect(
-      await screen.findByText(/Modulfreigaben konnten nicht geladen werden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Modulfreigaben nicht geladen')).toBeInTheDocument();
     expect(screen.getByText('Lagemeldungen-Inhalt')).toBeInTheDocument();
   });
 

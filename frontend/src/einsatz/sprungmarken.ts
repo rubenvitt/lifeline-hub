@@ -30,7 +30,10 @@ export interface Sprungmarke {
    * Zuschnitt), steht die Marke am Ende ihrer Kategorie.
    */
   nach: string;
-  /** Was der Sprung zeigt — zugänglicher Name und Titel („springt zu …"). */
+  /**
+   * Was der Sprung zeigt, als Ziel ohne Verb („ETB · Entscheidung“, LFH-1078): der Titel; der
+   * zugängliche Name stellt „springt zu“ davor, weil der Pfeil daneben nur Dekoration ist.
+   */
   hinweis: string;
   pfad: (einsatzId: number) => string;
 }
@@ -42,7 +45,7 @@ export const sprungmarken: Sprungmarke[] = [
     label: 'Entscheidungen',
     zielModul: 'etb',
     nach: 'auftraege',
-    hinweis: 'ETB, Typ Entscheidung',
+    hinweis: 'ETB · Entscheidung',
     pfad: (einsatzId) => etbPfad(einsatzId, { typ: 'entscheidung' }),
   },
   {
@@ -53,7 +56,7 @@ export const sprungmarken: Sprungmarke[] = [
     label: 'Patienten',
     zielModul: 'personen',
     nach: 'personen',
-    hinweis: 'Personen, Sichtungsraster',
+    hinweis: 'Personen · Sichtungsraster',
     pfad: (einsatzId) => personenPfad(einsatzId, { ansicht: 'raster', filter: 'alle' }),
   },
   {
@@ -62,7 +65,7 @@ export const sprungmarken: Sprungmarke[] = [
     label: 'Vermisste',
     zielModul: 'personen',
     nach: 'patienten',
-    hinweis: 'Personen, Filter Vermisst',
+    hinweis: 'Personen · Vermisst',
     pfad: (einsatzId) => personenPfad(einsatzId, { ansicht: 'zeilen', filter: 'vermisst' }),
   },
   {
@@ -73,7 +76,7 @@ export const sprungmarken: Sprungmarke[] = [
     label: 'FMS-Tableau',
     zielModul: 'fahrzeuge',
     nach: 'fahrzeuge',
-    hinweis: 'Fahrzeuge, FMS-Tableau',
+    hinweis: 'Fahrzeuge · FMS-Tableau',
     pfad: (einsatzId) => fahrzeugePfad(einsatzId, { ansicht: 'tableau' }),
   },
 ];

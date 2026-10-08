@@ -125,7 +125,7 @@ test('Fükw 1440: ohne Geste „Ton blockiert", ein Klick irgendwo schaltet frei
   const tab = await frischerTab(page, einsatzId, 1440);
 
   const alarm = tab.locator('header [data-lfh="kopf-alarm"]');
-  const ton = alarm.getByRole('button', { name: 'Alarmton blockiert – tippen zum Freischalten' });
+  const ton = alarm.getByRole('button', { name: 'Alarmton blockiert – freischalten' });
   await expect(ton).toHaveText('Ton blockiert', { timeout: NACH_DER_FRIST });
 
   // Irgendwo, nicht auf die Glocke: die erste Geste genügt.
@@ -147,7 +147,7 @@ test('Fükw 1440: ein Klick auf die gesperrte Glocke schaltet frei und nicht stu
 
   const alarm = tab.locator('header [data-lfh="kopf-alarm"]');
   await alarm
-    .getByRole('button', { name: 'Alarmton blockiert – tippen zum Freischalten' })
+    .getByRole('button', { name: 'Alarmton blockiert – freischalten' })
     .click({ timeout: NACH_DER_FRIST });
   const bereit = alarm.getByRole('button', { name: 'Alarmton stummschalten' });
   await expect(bereit).toHaveText('Ton bereit');
@@ -180,7 +180,7 @@ test.describe('Führungs-Tablet mit Finger', () => {
     await ziel.tap();
     const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
     await expect(menue.getByRole('menuitem').nth(1)).toHaveText(
-      /^Alarmton (blockiert – tippen zum Freischalten|ist bereit – stummschalten)$/,
+      /^Alarmton (blockiert – freischalten|ist bereit – stummschalten)$/,
     );
     // Der Tipp war eine Geste: der Ton ist frei. Die Marke nennt jetzt die verbleibende Störung,
     // der Menüeintrag die Handlung zum freien Ton.
@@ -242,7 +242,7 @@ test.describe('Fükw mit Maus: die längsten Zustandswörter in einer Kopfzeile'
         const tab = await frischerTab(page, einsatzId, breite);
         const alarm = tab.locator('header [data-lfh="kopf-alarm"]');
         await expect(
-          alarm.getByRole('button', { name: 'Alarmton blockiert – tippen zum Freischalten' }),
+          alarm.getByRole('button', { name: 'Alarmton blockiert – freischalten' }),
         ).toHaveText('Ton blockiert', { timeout: NACH_DER_FRIST });
         await expect(
           alarm.getByRole('button', { name: `Benachrichtigungen: ${benachrichtigung}` }),

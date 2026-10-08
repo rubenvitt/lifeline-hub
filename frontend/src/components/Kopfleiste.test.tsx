@@ -55,6 +55,8 @@ describe('syncZustand — Rangfolge der SYNC-Anzeige', () => {
     expect(SYNC_DARSTELLUNG.verbinde.farbe).toBe(farbenDunkel.achtung);
     expect(SYNC_DARSTELLUNG.getrennt.farbe).toBe(rahmenFarben.alarm);
     expect(SYNC_DARSTELLUNG.offline.wort).toBe('OFFLINE');
+    // Der Zustand, ohne Nachsatz über die Folge (LFH-1078): GETRENNT und die Farbe tragen sie.
+    expect(SYNC_DARSTELLUNG.getrennt.satz(LEER)).toBe('Live-Verbindung unterbrochen');
   });
 
   it('meldet ausstehende Offline-Aktionen auf Deutsch, mit Zähler und richtiger Einzahl (LFH-944)', () => {
