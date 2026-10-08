@@ -1,0 +1,47 @@
+---
+/** Status-Chip: getönte Fläche, getönter Code, Wort Pflicht (zweiter Kanal). */
+interface Props {
+  ton: 'normal' | 'achtung' | 'alarm' | 'bedien';
+  code?: string;
+  wort: string;
+}
+const { ton, code, wort } = Astro.props;
+---
+
+<span class:list={['chip', ton]}>
+  {code && <span class="code">{code}</span>}
+  <span class="wort">{wort}</span>
+</span>
+
+<style>
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .code {
+    font-family: var(--lfh-schrift-zahl);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .normal {
+    background: var(--lfh-normal-flaeche);
+    color: var(--lfh-normal-text);
+  }
+  .achtung {
+    background: var(--lfh-achtung-flaeche);
+    color: var(--lfh-achtung-text);
+  }
+  .alarm {
+    background: var(--lfh-alarm-flaeche);
+    color: var(--lfh-alarm-text);
+  }
+  .bedien {
+    background: var(--lfh-bedien-flaeche);
+    color: var(--lfh-bedien-text);
+  }
+</style>

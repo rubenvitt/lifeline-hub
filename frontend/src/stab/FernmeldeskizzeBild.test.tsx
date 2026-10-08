@@ -302,7 +302,7 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
 
   // Prüfliste Kriterium 5 (e2e `fernmeldeskizze.spec.ts`): zurückgenommen (Deckkraft 0,6) hielt
   // „kein Rufname“ in `gedaempft` nur 3,35 : 1. Das Wort trägt die Unterscheidung, die Farbe ist
-  // die des Textes, der mit der Deckkraft den Boden 4,5 : 1 hält (`zurueckKontrast.test.ts`).
+  // die des Textes, der mit der Deckkraft das Ziel der Textstufen hält (`zurueckKontrast.test.ts`).
   it('„kein Rufname“ steht in Textfarbe, damit es zurückgenommen lesbar bleibt', () => {
     const n = netz();
     bild({

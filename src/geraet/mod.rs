@@ -11,6 +11,7 @@
 //! `openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md` (D4, D5).
 
 pub mod abschnitt;
+pub mod bestaetigung;
 pub mod code;
 pub mod repo;
 pub mod stelle;
@@ -209,7 +210,7 @@ impl Funktionsansicht {
 
 /// Zusätzliche Einsatzrouten des UHS-Tablets: die eigene UHS lesen, Belegung und
 /// Platzverfügbarkeit, Personen der eigenen UHS mit Aufnahme, Stammdaten, Sichtung, Verbleib und
-/// Notizen. Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
+/// Notizen, dazu die Auswahl „Bestätigt von“ (LFH-1046). Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
 /// Material, Status, Storno, Export, Druck, Abgleich und Anhänge fehlen bewusst.
 const UHS_TABLET: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/uhs"),
@@ -225,6 +226,7 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
@@ -260,6 +262,7 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),

@@ -24,6 +24,16 @@
  *   Skizze samt Schriftfeld.
  * - `befehle?` — der Befehlsstapel für Rückgängig/Wiederholen; Vorgabe ein eigener je Montage.
  *   Die Seite reicht einen, wenn er einen Wechsel der Darstellung überleben soll.
+ * - `onHalten?` — meldet, ob die Fläche gerade hält (ruhige Fläche, LFH-1037): die Seite hält dann
+ *   die Höhe dessen, was über der Fläche steht (Lücken-Paneel).
+ *
+ * ── Ruhige Fläche (LFH-893 D4, LFH-1037) ─────────────────────────────────────────────────────
+ * Solange Zeiger (ohne Touch) oder Fokus in der Fläche liegen, ändert nichts, was ein anderer
+ * Arbeitsplatz tut, den Ort eines Elements am Schirm: auto-gelegte Plätze sind eingefroren
+ * (`gehalten`), gespeicherte Lagen und Bereiche warten (`skizze/ruhigeFlaeche.ts`), der Maßstab
+ * der eingepassten Ansicht steht, und der Bildlauf gleicht aus, was darüber wächst
+ * (`skizze/useAmSchirmHalten.ts`). Eigenes gilt sofort; nach dem eigenen Schreiben folgt das
+ * Element dem Stand.
  *
  * ── Druck (Schnittstelle zur Seite) ──────────────────────────────────────────────────────────
  * Die Seite setzt `skizzenDruckKlasse(druckFormat)` (`stab/skizze/druckformat.ts`) an das Element
@@ -107,6 +117,8 @@ import {
 import SkizzenFlaeche, { FLAECHE_VORGABE, type FlaechenApi } from './skizze/SkizzenFlaeche';
 import SkizzenPalette from './skizze/SkizzenPalette';
 import SkizzenWerkzeugleiste from './skizze/SkizzenWerkzeugleiste';
+import { gehaltenesNetz, gibFrei, halteAn, type Halt } from './skizze/ruhigeFlaeche';
+import { useAmSchirmHalten } from './skizze/useAmSchirmHalten';
 import { useSkizzenHandlungen } from './skizze/useSkizzenHandlungen';
 import {
   ablageWirkung,
@@ -127,6 +139,7 @@ export interface FernmeldeskizzeBildProps {
   onDruckFormat?: (format: Druckformat) => void;
   druckt?: boolean;
   befehle?: Befehlsstapel;
+  onHalten?: (halten: boolean) => void;
 }
 
 /** Größe eines neuen Bereichs in Skizzeneinheiten. */
@@ -187,6 +200,7 @@ function Skizze({
   onDruckFormat,
   druckt: druckVonAussen,
   befehle: befehleVonAussen,
+  onHalten: onHaltenVonAussen,
 }: FernmeldeskizzeBildProps) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
@@ -195,7 +209,19 @@ function Skizze({
   const druck = druckVonAussen ?? druckModus;
   const navigate = useNavigate();
   const [eigenerStapel] = useState(() => new Befehlsstapel());
-  const h = useSkizzenHandlungen(netz, aktionen, befehleVonAussen ?? eigenerStapel);
+  // Ruhige Fläche, Teil Netz (LFH-1037 D1): Fremdes wartet, eigenes Schreiben gibt frei.
+  const [halt, setHalt] = useState<Halt | null>(null);
+  const gibEigenesFrei = useCallback(
+    (key: string) => setHalt((alt) => (alt ? gibFrei(alt, key) : alt)),
+    [],
+  );
+  const gezeigt = useMemo(() => gehaltenesNetz(netz, halt), [netz, halt]);
+  const h = useSkizzenHandlungen(
+    gezeigt,
+    aktionen,
+    befehleVonAussen ?? eigenerStapel,
+    gibEigenesFrei,
+  );
   const angezeigt = h.angezeigt;
   const kontext: Bedienkontext = useMemo(
     () => ({ aktionen: aktionen != null, mobil: istSchmal }),
@@ -206,6 +232,7 @@ function Skizze({
   const wurzel = useRef<HTMLDivElement | null>(null);
   const paneelTitel = useRef<HTMLHeadingElement | null>(null);
   const api = useRef<FlaechenApi | null>(null);
+  const flaechenHuelle = useRef<HTMLDivElement | null>(null);
 
   // ── Wahl, Fokus, Zeiger ───────────────────────────────────────────────────────────────────
   const gesteuert = gewaehltVonAussen !== undefined;
@@ -239,8 +266,18 @@ function Skizze({
   useLayoutEffect(() => {
     layoutRef.current = layout;
   }, [layout]);
+  const netzRef = useRef(netz);
+  const effektivRef = useRef<Ansicht | null>(null);
+  const haltenVonAussen = useRef(onHaltenVonAussen);
+  useLayoutEffect(() => {
+    netzRef.current = netz;
+    haltenVonAussen.current = onHaltenVonAussen;
+  }, [netz, onHaltenVonAussen]);
   const onHalten = useCallback((halten: boolean) => {
     setGehalten((alt) => (halten ? (alt ?? layoutRef.current.plaetze) : null));
+    setHalt((alt) => (halten ? (alt ?? halteAn(netzRef.current)) : null));
+    setGehalteneAnsicht((alt) => (halten ? (alt ?? effektivRef.current) : null));
+    haltenVonAussen.current?.(halten);
   }, []);
 
   // ── Schriftfeld und Ausdehnung ────────────────────────────────────────────────────────────
@@ -262,7 +299,16 @@ function Skizze({
   // ── Ansicht ───────────────────────────────────────────────────────────────────────────────
   const [flaeche, setFlaeche] = useState<Groesse>(FLAECHE_VORGABE);
   const [ansicht, setAnsicht] = useState<Ansicht | null>(null);
-  const effektiv = ansicht ?? eingepasst(inhalt, flaeche);
+  // LFH-1037 D3: beim Halten steht der Maßstab, auch wenn die Ausdehnung wächst.
+  const [gehalteneAnsicht, setGehalteneAnsicht] = useState<Ansicht | null>(null);
+  const effektiv = ansicht ?? gehalteneAnsicht ?? eingepasst(inhalt, flaeche);
+  useLayoutEffect(() => {
+    effektivRef.current = effektiv;
+  }, [effektiv]);
+  const einpassen = () => {
+    setAnsicht(null);
+    setGehalteneAnsicht((alt) => (alt ? eingepasst(inhalt, flaeche) : null));
+  };
   const onFlaeche = useCallback((g: Groesse) => {
     setFlaeche((alt) => (alt.breite === g.breite && alt.hoehe === g.hoehe ? alt : g));
   }, []);
@@ -582,6 +628,9 @@ function Skizze({
     }
   };
 
+  // LFH-1037 D2: beim Halten bleibt die Fläche am Schirm, was darüber wächst, gleicht der Bildlauf aus.
+  useAmSchirmHalten(flaechenHuelle, halt != null && !druck);
+
   const flaechenHoehe = druck ? undefined : istSchmal ? '60vh' : 'clamp(360px, 68vh, 960px)';
   const spalten = [
     paletteZeigen ? 'auto' : null,
@@ -611,7 +660,7 @@ function Skizze({
               : null
           }
           onZoom={zoom}
-          onEinpassen={() => setAnsicht(null)}
+          onEinpassen={einpassen}
           eingepasst={ansicht == null}
           filter={filter}
           onFilter={setFilter}
@@ -663,7 +712,7 @@ function Skizze({
               />
             </div>
           ) : null}
-          <div style={{ height: flaechenHoehe, minWidth: 0 }}>
+          <div ref={flaechenHuelle} style={{ height: flaechenHoehe, minWidth: 0 }}>
             <SkizzenFlaeche
               netz={angezeigt}
               layout={layout}
@@ -831,6 +880,8 @@ function Skizze({
           onOk={async () => {
             await h.neuAnordnen();
             setGehalten(null);
+            setHalt(null);
+            setGehalteneAnsicht(null);
             setAnsicht(null);
           }}
           onSchliessen={() => setDialog(null)}

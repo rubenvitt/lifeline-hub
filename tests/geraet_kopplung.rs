@@ -2314,3 +2314,341 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
     }
 }
+
+// ---------- Bediener am Gerät (LFH-1046) ----------
+
+/// Ad-hoc-Kraft im Einsatz; liefert die Kennung in `einsatz_personal`.
+async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&json!({"adhoc": {"name": name, "funktion": "Notärztin"}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// POST mit Geräte-Cookie; liefert Status, Body und ob die Antwort ein Cookie setzt.
+async fn post_roh(
+    app: &axum::Router,
+    cookie: &str,
+    uri: &str,
+    body: Value,
+) -> (StatusCode, Value, bool) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(header::COOKIE, cookie)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    let status = resp.status();
+    let setzt_cookie = resp.headers().contains_key(header::SET_COOKIE);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        setzt_cookie,
+    )
+}
+
+/// System-Einträge des ETB als `(inhalt, erfasser_name)`.
+async fn system_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<(String, String)> {
+    let (_, etb) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    etb.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "system")
+        .map(|e| {
+            (
+                e["inhalt"].as_str().unwrap().to_string(),
+                e["erfasser_name"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn bestaetigte_sichtung_nennt_geraet_stelle_und_person() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let p = person_in(&app, &geraet, einsatz, None).await;
+    let pid = p["id"].as_i64().unwrap();
+
+    let (s, v, setzt_cookie) = post_roh(
+        &app,
+        &geraet,
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bestaetigt_name"], "Dr. A. Muster");
+    assert!(!setzt_cookie, "Die Bestätigung legt keine Sitzung an");
+
+    let etb = system_etb(&app, &admin, einsatz).await;
+    let eintrag = etb
+        .iter()
+        .find(|(t, _)| t.contains("Sichtung SK II"))
+        .unwrap_or_else(|| panic!("{etb:?}"));
+    assert!(
+        eintrag.0.ends_with(", bestätigt: Dr. A. Muster"),
+        "{eintrag:?}"
+    );
+    assert_eq!(eintrag.1, "UHS Nord · Tablet 1", "Erfasser ist das Gerät");
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["sichtungen"][0]["bestaetigt_name"], "Dr. A. Muster");
+}
+
+#[tokio::test]
+async fn bestaetigter_verbleib_und_erst_sichtung() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+
+    let (s, p) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"sichtung": "sk1", "bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    let pid = p["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &geraet,
+        Some(&json!({"art": "transport", "bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bestaetigt_name"], "Dr. A. Muster");
+
+    let etb = system_etb(&app, &admin, einsatz).await;
+    for wort in ["Sichtung SK I", "abtransportiert"] {
+        let eintrag = etb
+            .iter()
+            .find(|(t, _)| t.contains(wort))
+            .unwrap_or_else(|| panic!("{wort}: {etb:?}"));
+        assert!(
+            eintrag.0.ends_with(", bestätigt: Dr. A. Muster"),
+            "{eintrag:?}"
+        );
+        assert_eq!(eintrag.1, "UHS Nord · Tablet 1");
+    }
+
+    let (_, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(v["sichtungen"][0]["bestaetigt_name"], "Dr. A. Muster");
+    assert_eq!(v["verbleib"][0]["bestaetigt_name"], "Dr. A. Muster");
+
+    // Ohne Erst-Sichtung gibt es nichts zu bestätigen.
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn sichtung_ohne_bestaetigung_bleibt_wie_bisher() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let pid = person_in(&app, &geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({"kategorie": "sk3"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert!(v.get("bestaetigt_name").is_none(), "{v}");
+    let etb = system_etb(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|(t, e)| t.ends_with("Sichtung SK III") && e == "UHS Nord · Tablet 1"),
+        "{etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn bestaetigung_prueft_einsatz_und_sitzungsart() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let fremde_kraft = kraft(&app, &admin, anderer, "Fremd").await;
+    let eigene_kraft = kraft(&app, &admin, einsatz, "Eigen").await;
+    let pid = person_in(&app, &geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    let anzahl = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM person_sichtung WHERE person_id = ?")
+            .bind(pid)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": fremde_kraft})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Personal eines anderen Einsatzes"
+    );
+    assert_eq!(anzahl().await, 0, "keine Sichtung gespeichert");
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &admin,
+        Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": eigene_kraft})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Personensitzung");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &admin,
+        Some(&json!({"art": "vor_ort", "bestaetigt_personal_id": eigene_kraft})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Personensitzung, Verbleib"
+    );
+    assert_eq!(anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn bestaetigung_erweitert_die_rechte_des_geraets_nicht() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let pid = person_in(&app, &geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    let (s, _, _) = post_roh(
+        &app,
+        &geraet,
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    // Außerhalb der Ansicht weiter 403, die fremde UHS weiter 404, das Gerät bleibt das Gerät.
+    for (methode, pfad) in [
+        ("GET", format!("/api/einsaetze/{einsatz}/etb")),
+        ("GET", format!("/api/einsaetze/{einsatz}/personal")),
+        ("GET", format!("/api/einsaetze/{einsatz}/personen/export")),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),
+        ),
+    ] {
+        let (s, v) = anfrage(&app, methode, &pfad, &geraet, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{methode} {pfad}: {v}");
+    }
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{sued}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, v) = me(&app, &geraet).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!v["geraet"].is_null(), "weiter eine Gerätesitzung: {v}");
+}
+
+#[tokio::test]
+async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    kraft(&app, &admin, einsatz, "Zander").await;
+    kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/personen/bestaetiger");
+
+    let (s, v) = anfrage(&app, "GET", &pfad, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let namen: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, ["Dr. A. Muster", "Zander"]);
+    assert_eq!(v[0]["funktion"], "Notärztin");
+
+    let (s, _) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Personensitzung");
+
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Wand"}),
+    )
+    .await;
+    let monitor = koppeln(&app, &code, None).await.cookie.unwrap();
+    let (s, _) = anfrage(&app, "GET", &pfad, &monitor, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Lagemonitor");
+}

@@ -1,0 +1,110 @@
+/* Grundlagen der Seite: Radius 0, Haarlinien, Fugenraster, Rinne 16 → 24 px ab md. */
+
+:root {
+  --seite-breite: 1200px;
+  --seite-rinne: 16px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --seite-rinne: 24px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 68px;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--lfh-grund);
+  color: var(--lfh-text);
+  font-family: var(--lfh-schrift-text);
+  font-size: var(--lfh-typo-text-groesse);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--lfh-bedien-text);
+}
+a:hover {
+  color: var(--lfh-bedien-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: 2px;
+}
+
+/* ── Abschnitte ──────────────────────────────────────────────────────────── */
+
+.abschnitt {
+  max-width: var(--seite-breite);
+  margin: 0 auto;
+  padding: 72px var(--seite-rinne);
+}
+
+.abschnitt + .abschnitt {
+  border-top: 1px solid var(--lfh-linie);
+}
+
+.abschnitt-kopf {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  margin-bottom: 36px;
+}
+
+.ueberschrift {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+@media (min-width: 768px) {
+  .ueberschrift {
+    font-size: var(--lfh-typo-ueberschrift-groesse);
+  }
+}
+
+.lauftext {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--lfh-gedaempft);
+  text-wrap: pretty;
+}
+
+/* Fugenraster: Zellen mit 1 px Abstand auf Linienfarbe, die Fuge zeichnet die Zelle. */
+.fugenraster {
+  display: grid;
+  gap: 1px;
+  background: var(--lfh-linie);
+  border: 1px solid var(--lfh-linie);
+}
+
+.mono {
+  font-family: var(--lfh-schrift-zahl);
+  font-variant-numeric: tabular-nums;
+}

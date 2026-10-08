@@ -383,6 +383,22 @@ describe('layoutFernmeldenetz · gespeicherte und gehaltene Lage', () => {
     // Ohne `gehalten` ist nichts neu.
     expect([...layoutFernmeldenetz(nachher).plaetze.values()].some((p) => p.neu)).toBe(false);
   });
+
+  it('Ruhige Fläche: ein neues Element mit gespeicherter Lage steht dort und ist neu', () => {
+    const vorher = netz({ abschnitte: [abschnitt(1)] });
+    const gehalten = layoutFernmeldenetz(vorher).plaetze;
+    const nachher = netz({
+      abschnitte: [abschnitt(1)],
+      einheiten: [einheit(11, { abschnitt_id: 1 })],
+      skizze: { lage: [lage('eh-11', 1600, 800)] },
+    });
+    expect(platz(layoutFernmeldenetz(nachher, { gehalten }).plaetze, 'eh-11')).toMatchObject({
+      x: 1600,
+      y: 800,
+      quelle: 'gespeichert',
+      neu: true,
+    });
+  });
 });
 
 describe('stellenMasse', () => {

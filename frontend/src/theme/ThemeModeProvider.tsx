@@ -8,6 +8,7 @@ import {
   antdKlappkopf,
   antdKnopf,
   antdKomponenten,
+  antdOptionsknopf,
   antdToken,
   farbenDunkel,
   farbenHell,
@@ -168,6 +169,7 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
   const knopf = useMemo(() => antdKnopf(dichte), [dichte]);
   const klappkopf = useMemo(() => antdKlappkopf(dichte), [dichte]);
   const kaestchen = useMemo(() => antdKaestchen(dichte), [dichte]);
+  const optionsknopf = useMemo(() => antdOptionsknopf(dichte), [dichte]);
 
   const wert = useMemo<ThemeModeWert>(
     () => ({
@@ -209,6 +211,8 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
         // Boden des beschrifteten Kästchens (LFH-907): antd hat für die Höhe des Labels kein
         // Komponenten-Token, es wäre nur so hoch wie seine Schrift.
         checkbox={kaestchen}
+        // Boden des beschrifteten Optionsknopfs (LFH-1048): gebaut wie das Kästchen-Label.
+        radio={optionsknopf}
         theme={{
           // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
           // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine

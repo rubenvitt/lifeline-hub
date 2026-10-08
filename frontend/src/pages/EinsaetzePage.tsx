@@ -1,6 +1,6 @@
 import { IconOrtsmarke, IconPlus } from '../icons';
 import { Alert, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
-import dayjs, { type Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { serverJetzt } from '../offline/serveruhr';
 import { EINSATZ_ROLLE_LABELS } from '../einsatz/einsatzRolle';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -418,7 +419,7 @@ function EinsaetzeInhalt() {
         form={form}
         erfassenText="Anlegen"
         laeuft={anlegen.isPending}
-        initialValues={{ einsatzart: 'realeinsatz' as Einsatzart, begonnen_at: dayjs() }}
+        initialValues={{ einsatzart: 'realeinsatz' as Einsatzart, begonnen_at: serverJetzt() }}
         onErfassen={async (w) => {
           await anlegen.mutateAsync(w);
         }}

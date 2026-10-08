@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::geraet::bestaetigung::Bestaetigung;
 use crate::person::{VerbleibArt, VerbleibStatus};
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -21,6 +22,9 @@ pub struct VerbleibAnzeige {
     /// liest, wer das Modul Betreuung sehen darf, aus dessen Übersicht.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub betreuungsstelle_id: Option<i64>,
+    /// Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bestaetigt_name: Option<String>,
 }
 
 /// Eingabedaten beim Erfassen; Strings bereits getrimmt (Handler). `art`/`status`
@@ -34,11 +38,13 @@ pub struct VerbleibDaten<'a> {
     pub notiz: Option<&'a str>,
     /// Nur bei `notunterkunft`; Art, Rechte und Einsatzzugehörigkeit prüft der Handler.
     pub betreuungsstelle_id: Option<i64>,
+    /// Bereits über [`crate::geraet::bestaetigung::aufloesen`] geprüft (LFH-1046).
+    pub bestaetigung: Option<&'a Bestaetigung>,
 }
 
 const SELECT_VERBLEIB: &str = "\
     SELECT id, einsatz_id, person_id, art, transportmittel, ziel, status, notiz, \
-           zeitpunkt_at, erfasst_von, betreuungsstelle_id \
+           zeitpunkt_at, erfasst_von, betreuungsstelle_id, bestaetigt_name \
     FROM person_verbleib";
 
 /// Erfasst ein Verbleib-Ereignis append-only und aktualisiert in DERSELBEN Transaktion den
@@ -57,8 +63,8 @@ pub async fn erfassen(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO person_verbleib \
             (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von, \
-             betreuungsstelle_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             betreuungsstelle_id, bestaetigt_personal_id, bestaetigt_name) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
@@ -69,6 +75,8 @@ pub async fn erfassen(
     .bind(daten.notiz)
     .bind(erfasst_von)
     .bind(daten.betreuungsstelle_id)
+    .bind(daten.bestaetigung.map(|b| b.personal_id))
+    .bind(daten.bestaetigung.map(|b| b.name.as_str()))
     .fetch_one(&mut *tx)
     .await?;
     sqlx::query(
@@ -164,6 +172,7 @@ mod tests {
             status: None,
             notiz: None,
             betreuungsstelle_id: None,
+            bestaetigung: None,
         }
     }
 
@@ -202,6 +211,7 @@ mod tests {
             p,
             VerbleibDaten {
                 betreuungsstelle_id: Some(stelle),
+                bestaetigung: None,
                 ..daten("notunterkunft", Some("NU Turnhalle Nord"))
             },
             "Notunterkunft → NU Turnhalle Nord",

@@ -1,0 +1,118 @@
+---
+/**
+ * Zeitachsen-Eintrag des ETB: Zeit Mono (+ Nr.) · 2-px-Typkante · Typwort Mono Versalien in
+ * Typfarbe · Text · Von/An. Der Typ ist Kante + Wort, kein Etikett.
+ */
+export type EtbTyp = 'meldung' | 'anordnung' | 'entscheidung' | 'lage' | 'berichtigung';
+
+interface Props {
+  zeit: string;
+  nr: string;
+  typ: EtbTyp;
+  weg: string;
+  nachgetragen?: boolean;
+}
+const { zeit, nr, typ, weg, nachgetragen = false } = Astro.props;
+const typwort: Record<EtbTyp, string> = {
+  meldung: 'Meldung',
+  anordnung: 'Anordnung',
+  entscheidung: 'Entscheidung',
+  lage: 'Lage',
+  berichtigung: 'Berichtigung',
+};
+---
+
+<li class:list={['eintrag', typ]}>
+  <div class="zeit">
+    <span>{zeit}</span>
+    <span class="nr">{nr}</span>
+  </div>
+  <div class="kante" aria-hidden="true"></div>
+  <div class="koerper">
+    <div class="typ">
+      {typwort[typ]}
+      {nachgetragen && <span class="glyphe" title="nachgetragen">⧖</span>}
+    </div>
+    <p class="text"><slot /></p>
+    <div class="weg">{weg}</div>
+  </div>
+</li>
+
+<style>
+  .eintrag {
+    display: grid;
+    grid-template-columns: 52px 2px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--lfh-flaeche-3);
+  }
+  .eintrag:last-child {
+    border-bottom: 0;
+  }
+  .zeit {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 12px;
+    color: var(--lfh-text-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .nr {
+    font-size: 10px;
+    color: var(--lfh-schwach);
+  }
+  .kante {
+    background: var(--kante);
+  }
+  .koerper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .typ {
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--wort);
+  }
+  .glyphe {
+    margin-left: 6px;
+    color: var(--lfh-gedaempft);
+    letter-spacing: 0;
+  }
+  .text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--lfh-text-2);
+  }
+  .weg {
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 10px;
+    color: var(--lfh-schwach);
+  }
+  .meldung {
+    --kante: var(--lfh-etb-meldung-kante);
+    --wort: var(--lfh-etb-meldung-wort);
+  }
+  .anordnung {
+    --kante: var(--lfh-etb-anordnung-kante);
+    --wort: var(--lfh-etb-anordnung-wort);
+  }
+  .entscheidung {
+    --kante: var(--lfh-etb-entscheidung-kante);
+    --wort: var(--lfh-etb-entscheidung-wort);
+  }
+  .lage {
+    --kante: var(--lfh-etb-lage-kante);
+    --wort: var(--lfh-etb-lage-wort);
+  }
+  .berichtigung {
+    --kante: var(--lfh-etb-berichtigung-kante);
+    --wort: var(--lfh-etb-berichtigung-wort);
+  }
+</style>

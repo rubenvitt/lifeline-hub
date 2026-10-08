@@ -1,0 +1,72 @@
+---
+/** Kennzahl: Augenbraue · Zahl Mono groß · Einheit Mono klein · Notiz. Die Zahl führt. */
+import Augenbraue from './Augenbraue.astro';
+
+interface Props {
+  augenbraue: string;
+  zahl: string;
+  einheit?: string;
+  notiz?: string;
+  ton?: 'text' | 'alarm' | 'achtung' | 'normal';
+  gross?: boolean;
+}
+const { augenbraue, zahl, einheit, notiz, ton = 'text', gross = false } = Astro.props;
+---
+
+<div class="kennzahl">
+  <Augenbraue>{augenbraue}</Augenbraue>
+  <div class="wert">
+    <span class:list={['zahl', `ton-${ton}`, { gross }]}>{zahl}</span>
+    {einheit && <span class="einheit">{einheit}</span>}
+  </div>
+  {notiz && <p class="notiz">{notiz}</p>}
+  <slot />
+</div>
+
+<style>
+  .kennzahl {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding: 18px;
+    background: var(--lfh-flaeche);
+  }
+  .wert {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .zahl {
+    font-family: var(--lfh-schrift-zahl);
+    font-size: var(--lfh-typo-datenwert-groesse);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--lfh-text);
+  }
+  .zahl.gross {
+    font-size: var(--lfh-typo-datenwert-gross-groesse);
+  }
+  .ton-alarm {
+    color: var(--lfh-alarm-text);
+  }
+  .ton-achtung {
+    color: var(--lfh-achtung-text);
+  }
+  .ton-normal {
+    color: var(--lfh-normal-text);
+  }
+  .einheit {
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 12px;
+    color: var(--lfh-gedaempft);
+  }
+  .notiz {
+    margin: 0;
+    font-size: var(--lfh-typo-text-klein-groesse);
+    line-height: 1.5;
+    color: var(--lfh-gedaempft);
+  }
+</style>
