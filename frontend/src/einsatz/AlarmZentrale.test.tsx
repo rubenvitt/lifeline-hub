@@ -194,10 +194,10 @@ describe('AlarmZentrale', () => {
     renderAlarm();
     expect(await screen.findByText('Ton bereit')).toBeInTheDocument();
     expect(istAlarmGemutet()).toBe(false);
-    await userEvent.click(screen.getByRole('button', { name: 'Alarmton stummschalten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ton bereit – stummschalten' }));
     expect(istAlarmGemutet()).toBe(true);
     expect(screen.getByText('Ton stumm')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Alarmton einschalten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ton stumm – einschalten' }));
     expect(istAlarmGemutet()).toBe(false);
   });
 
@@ -521,7 +521,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(screen.queryByRole('button', { name: 'Benachrichtigungen: blockiert' })).toBeNull();
     // Über ein MUSTER über alle drei Wortlaute: `tonStatus` dreht erst einen Microtask später auf
     // `bereit`, ein Literal träfe den Knopf in diesem Moment nicht und die Zeile belegte nichts.
-    expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Ton / })).toBeNull();
 
     // An ihrer Stelle steht genau EINES, das den Zustand benennt. `findBy…`, weil das Muster schon
     // greift, bevor die Tonprüfung durch ist.
@@ -649,16 +649,18 @@ describe('AlarmZentrale: Ton-Icon ohne Marker im Ruhezustand (LFH-513)', () => {
       stubNotification('default');
       renderAlarm();
 
-      const bereit = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
+      const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
       await waitFor(() => expect(bereit).toHaveAttribute('aria-pressed', 'false'));
       expect(marker(bereit)).toHaveLength(0);
       const formBereit = icon(bereit);
 
       await userEvent.click(bereit);
-      const stumm = screen.getByRole('button', { name: 'Alarmton einschalten' });
+      const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
       // Zwei Kanäle ohne Farbe: die Form wechselt, das Wort steht auf jeder Breite.
       expect(icon(stumm)).not.toBe(formBereit);
       expect(stumm).toHaveTextContent('Ton stumm');
+      // Das sichtbare Wort steht vorn im Namen: Spracheingabe trifft den Knopf (WCAG 2.5.3).
+      expect(stumm.getAttribute('aria-label')).toMatch(new RegExp(`^${stumm.textContent} – `));
       expect(marker(stumm)).toHaveLength(0);
     },
   );
@@ -694,7 +696,7 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     stubAudioReady();
     stubNotification('default');
     renderAlarm();
-    const ton = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
+    const ton = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
     await waitFor(() => expect(ton).toHaveAttribute('aria-pressed', 'false'));
     expect(ton).not.toHaveTextContent('Ton bereit');
     const desktop = screen.getByRole('button', { name: 'Benachrichtigungen: aus' });
@@ -709,8 +711,10 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     expect(screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' })).toHaveTextContent(
       'Benachrichtigung blockiert',
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'Alarmton stummschalten' }));
-    expect(screen.getByRole('button', { name: 'Alarmton einschalten' })).toHaveTextContent(
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ton bereit – stummschalten' }),
+    );
+    expect(screen.getByRole('button', { name: 'Ton stumm – einschalten' })).toHaveTextContent(
       'Ton stumm',
     );
   });
@@ -764,7 +768,7 @@ describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
       stubNotification('default');
       renderAlarm();
 
-      expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Ton / })).toBeNull();
       const ziel = await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' });
       // Ruhezustand ohne Wort, wie die breite Bauform zwischen md und xl (LFH-637).
       expect(ziel).toHaveTextContent(/^$/);
@@ -793,7 +797,7 @@ describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
     stubAudioReady();
     stubNotification('default');
     renderAlarm();
-    expect(await screen.findByRole('button', { name: /^Alarmton / })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Ton / })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
 
@@ -803,7 +807,7 @@ describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
     stubAudioReady();
     stubNotification('default');
     renderAlarm();
-    expect(await screen.findByRole('button', { name: /^Alarmton / })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Ton / })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
 });

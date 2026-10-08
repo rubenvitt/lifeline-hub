@@ -89,9 +89,11 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     stubGesperrtesAudio();
     renderAlarm();
     const ton = await screen.findByRole('button', {
-      name: 'Alarmton blockiert – freischalten',
+      name: 'Ton blockiert – freischalten',
     });
     expect(ton).toHaveTextContent('Ton blockiert');
+    // Das sichtbare Wort steht vorn im Namen (WCAG 2.5.3, LFH-1102).
+    expect(ton.getAttribute('aria-label')).toMatch(new RegExp(`^${ton.textContent} – `));
 
     // Die Geste ist echt: der Browser hebt die Sperre schon beim Drücken auf, der Zuhörer auf
     // `pointerdown` schaltet frei, BEVOR der Klick die Glocke erreicht.
@@ -100,7 +102,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
 
     await waitFor(() => expect(screen.getByText('Ton bereit')).toBeInTheDocument());
     expect(istAlarmGemutet()).toBe(false);
-    expect(screen.getByRole('button', { name: 'Alarmton stummschalten' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Ton bereit – stummschalten' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
@@ -112,7 +114,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     stubGesperrtesAudio();
     renderAlarm();
     const ton = await screen.findByRole('button', {
-      name: 'Alarmton blockiert – freischalten',
+      name: 'Ton blockiert – freischalten',
     });
     geste.erlaubt = true;
     act(() => {
@@ -121,7 +123,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     await waitFor(() => expect(ton).toHaveTextContent('Ton bereit'));
     fireEvent.pointerUp(ton);
     fireEvent.click(ton);
-    await waitFor(() => expect(ton).toHaveAccessibleName('Alarmton stummschalten'));
+    await waitFor(() => expect(ton).toHaveAccessibleName('Ton bereit – stummschalten'));
     expect(istAlarmGemutet()).toBe(false);
   });
 
@@ -130,7 +132,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     stubGesperrtesAudio();
     renderAlarm();
     const ton = await screen.findByRole('button', {
-      name: 'Alarmton blockiert – freischalten',
+      name: 'Ton blockiert – freischalten',
     });
     geste.erlaubt = true;
     await userEvent.dblClick(ton);
@@ -196,7 +198,7 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
         px < 768
           ? await screen.findByRole('button', { name: 'Alarmzentrale: Ton blockiert' })
           : await screen.findByRole('button', {
-              name: 'Alarmton blockiert – freischalten',
+              name: 'Ton blockiert – freischalten',
             });
       expect(ziel).toHaveTextContent('Ton blockiert');
       expect(ziel).toHaveStyle({ color: farbenDunkel.achtung });

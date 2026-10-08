@@ -411,7 +411,7 @@ describe('EinsatzLayout', () => {
     const kopf = screen.getByRole('banner');
     const zelle = kopf.querySelector<HTMLElement>('[data-lfh="kopf-alarm"]')!;
     expect(zelle).not.toBeNull();
-    expect(zelle).toContainElement(within(kopf).getByRole('button', { name: /Alarmton/ }));
+    expect(zelle).toContainElement(within(kopf).getByRole('button', { name: /^Ton / }));
     expect(zelle).not.toContainElement(within(kopf).getByRole('button', { name: 'Suchen' }));
     expect(zelle).not.toContainElement(within(kopf).getByRole('button', { name: 'Benutzermenü' }));
     // Kein Trenner-Element mehr — die Zelle trägt die Linie.
@@ -641,9 +641,7 @@ describe('EinsatzLayout', () => {
       expect(alarm).toHaveTextContent('Ton blockiert');
       // Die Einzelknöpfe der breiten Bauform stehen hier NICHT — sonst erfüllten auch drei Ziele
       // „ein Ziel".
-      expect(
-        screen.queryByRole('button', { name: 'Alarmton blockiert – freischalten' }),
-      ).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Ton blockiert – freischalten' })).toBeNull();
     });
 
     it('zeigt unter lg die Suche als Icon und keine Wortmarke', async () => {
