@@ -19,6 +19,14 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   gebunden ist, sieht keine (`sicht` → `Keine`), Personen nur über `sichtbare_personen` /
   `fordere_person` seiner Art. Wer eine Route mehreren Ansichten öffnet, filtert über diese
   Helfer, nie über `ctx.geraet.is_none()`. Ein aufgelöster Abschnitt widerruft seine Kopplungen.
+- **Abschnittsansicht** (LFH-1043): der Bereich ist der Teilbaum des gebundenen Abschnitts samt
+  seiner Einheiten (`src/geraet/abschnitt.rs`, je Anfrage neu berechnet). Listen filtern über
+  `abschnitt::bereich`, Aufträge im SQL (`AuftragFilter.bereich`, sonst stimmt das Blättern
+  nicht); Fremdes ist 404, ein fremder Meldungsabsender 403, ohne Angabe meldet der Abschnitt.
+  Quittiert wird nur die eigene Empfängerzeile (`darfQuittierenFuer` an `AuftragKarte`).
+  Gefahrenzonen zeigt das Gerät einsatzweit, Bezirke und Skizzen nicht. Einsatzweite Zähler
+  (`modul_zaehler.rs`) bekommt es nicht. Die Karte kommt ohne gespeicherte Kartenansicht aus,
+  die steht in keiner Routenliste.
 - **Eine Ansicht wird verfügbar, wenn sie fertig ist:** `Funktionsansicht::ist_verfuegbar` erst
   setzen, wenn Routenliste, Stellenfilter, Server-Test und Hülle stehen. Vorher ist das Koppeln
   422, und die Kopplungsmaske bietet nur, was `GeraeteUebersicht.ansichten` nennt;

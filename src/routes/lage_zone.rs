@@ -69,9 +69,17 @@ pub async fn liste(
     Query(filter): Query<AnsichtFilter>,
 ) -> Result<Json<Vec<LageZoneAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    Ok(Json(
-        zone_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?,
-    ))
+    let mut liste = zone_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?;
+    // Ein Abschnittsgerät (LFH-1043, design.md D4) sieht nur die Gefahrenzonen, einsatzweit;
+    // Evakuierungsbezirke und freie Skizzen fehlen auch in der Antwort.
+    if ctx
+        .geraet
+        .as_ref()
+        .is_some_and(|g| g.ansicht == crate::geraet::Funktionsansicht::Einsatzabschnitt)
+    {
+        liste.retain(|z| z.typ.ist_gefahrenzone());
+    }
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,15 +1,32 @@
 import type { ReactNode } from 'react';
 import { theme } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { Navigate, NavLink, Outlet, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import type { Funktionsansicht, GeraetAnzeige } from '../api/types';
-import { IconHausHerz, IconKachelraster, IconPersonPlus, IconPersonen, type Icon } from '../icons';
+import { ladeModulFreigaben } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
+import type { Funktionsansicht, GeraetAnzeige, ModulFreigaben } from '../api/types';
+import {
+  IconHausHerz,
+  IconKachelraster,
+  IconKarte,
+  IconKlemmbrettListe,
+  IconOrganigramm,
+  IconPapierflieger,
+  IconPersonPlus,
+  IconPersonen,
+  type Icon,
+} from '../icons';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
 import {
+  geraetAbschnittPfad,
   geraetAufnahmePfad,
+  geraetAuftraegePfad,
+  geraetKartePfad,
+  geraetMeldenPfad,
   geraetMonitorPfad,
   geraetPatientenPfad,
   geraetStellePfad,
@@ -42,9 +59,10 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
     case 'uhs-tablet':
     case 'uhs-laptop':
       return geraetPatientenPfad(geraet.einsatz_id);
+    case 'einsatzabschnitt':
+      return geraetAbschnittPfad(geraet.einsatz_id);
     case 'betreuungsstelle':
     case 'bereitstellungsraum':
-    case 'einsatzabschnitt':
     case 'verpflegung':
       return null;
   }
@@ -72,6 +90,13 @@ export function GeraetEinsatzRahmen() {
 export function GeraetUhsRahmen() {
   const { geraet } = useAuth();
   if (!geraet || !istUhsAnsicht(geraet.ansicht)) return <GeraetStart />;
+  return <Outlet />;
+}
+
+/** Die Seiten der Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */
+export function GeraetAbschnittRahmen() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'einsatzabschnitt') return <GeraetStart />;
   return <Outlet />;
 }
 
@@ -141,8 +166,48 @@ function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: Rea
 }
 
 /**
+ * Ob die Navigation ein Modul anbietet: nur, wenn der Server es nicht sperrt oder ausblendet.
+ * Solange die Freigaben unbekannt sind, steht es da (wie die Modulleiste, `istModulGesperrt`).
+ */
+export function navigationZeigt(key: string, freigaben: ModulFreigaben | undefined): boolean {
+  const f = freigaben?.[key];
+  return f == null ? freigaben == null : f.sichtbar && f.zugriff;
+}
+
+/** Abschnitt, Aufträge, Melden und Karte des Abschnittsgeräts (LFH-1043). */
+function AbschnittNavigation({ eid }: { eid: number }) {
+  const { data: freigaben } = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(eid),
+    queryFn: () => ladeModulFreigaben(eid),
+  });
+  return (
+    <>
+      <NavZiel zu={geraetAbschnittPfad(eid)} Icon={IconOrganigramm}>
+        Abschnitt
+      </NavZiel>
+      {navigationZeigt('auftraege', freigaben) && (
+        <NavZiel zu={geraetAuftraegePfad(eid)} Icon={IconKlemmbrettListe}>
+          Aufträge
+        </NavZiel>
+      )}
+      {navigationZeigt('meldungen', freigaben) && (
+        <NavZiel zu={geraetMeldenPfad(eid)} Icon={IconPapierflieger}>
+          Melden
+        </NavZiel>
+      )}
+      {navigationZeigt('lagekarte', freigaben) && (
+        <NavZiel zu={geraetKartePfad(eid)} Icon={IconKarte}>
+          Karte
+        </NavZiel>
+      )}
+    </>
+  );
+}
+
+/**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
- * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen.
+ * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen. Das
+ * Abschnittsgerät hat eigene Ziele ({@link AbschnittNavigation}).
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   const eid = geraet.einsatz_id;
@@ -158,21 +223,27 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <NavZiel zu={geraetPatientenPfad(eid)} Icon={IconPersonen}>
-        Patienten
-      </NavZiel>
-      {uhsId != null && (
+      {geraet.ansicht === 'einsatzabschnitt' ? (
+        <AbschnittNavigation eid={eid} />
+      ) : (
         <>
-          <NavZiel zu={geraetAufnahmePfad(eid, { uhs: uhsId })} Icon={IconPersonPlus}>
-            Aufnahme
+          <NavZiel zu={geraetPatientenPfad(eid)} Icon={IconPersonen}>
+            Patienten
           </NavZiel>
-          <NavZiel zu={geraetUhsPfad(eid, uhsId)} Icon={IconKachelraster}>
-            Grundriss
-          </NavZiel>
-          {geraetDarf(geraet, 'uhs-material') && (
-            <NavZiel zu={geraetStellePfad(eid)} Icon={IconHausHerz}>
-              UHS
-            </NavZiel>
+          {uhsId != null && (
+            <>
+              <NavZiel zu={geraetAufnahmePfad(eid, { uhs: uhsId })} Icon={IconPersonPlus}>
+                Aufnahme
+              </NavZiel>
+              <NavZiel zu={geraetUhsPfad(eid, uhsId)} Icon={IconKachelraster}>
+                Grundriss
+              </NavZiel>
+              {geraetDarf(geraet, 'uhs-material') && (
+                <NavZiel zu={geraetStellePfad(eid)} Icon={IconHausHerz}>
+                  UHS
+                </NavZiel>
+              )}
+            </>
           )}
         </>
       )}

@@ -29,6 +29,11 @@ pub async fn liste(
         if crate::geraet::stelle::ist_gebunden(Some(g)) {
             erlaubt.remove("personen");
             erlaubt.remove("meldungen");
+            // Ein Abschnittsgerät sieht nur seinen Teilbaum (LFH-1043); die einsatzweiten
+            // Zähler dieser Module verrieten den Rest des Einsatzes.
+            erlaubt.remove("einsatzabschnitte");
+            erlaubt.remove("einheiten");
+            erlaubt.remove("auftraege");
         }
     }
     let jetzt = crate::zeit::jetzt();

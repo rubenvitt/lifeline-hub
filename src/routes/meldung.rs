@@ -344,8 +344,15 @@ pub async fn anlegen(
     if !crate::meldung::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
+    // Ein Abschnittsgerät (LFH-1043) meldet als sein Abschnitt; ein fremder Absender ist 403.
     let (einheit_id, abschnitt_id) =
-        absender_bezug_aufloesen(&state, einsatz_id, req.einheit_id, req.abschnitt_id).await?;
+        match crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
+            Some(b) => b.meldungs_absender(req.einheit_id, req.abschnitt_id)?,
+            None => {
+                absender_bezug_aufloesen(&state, einsatz_id, req.einheit_id, req.abschnitt_id)
+                    .await?
+            }
+        };
     // Ereigniszeit normalisieren (ISO-8601/SQLite → SQLite-Format), wie ETB.
     let ereigniszeit = crate::etb::normalisiere_zeit(req.ereigniszeit.trim())?;
     let eingang = jetzt();

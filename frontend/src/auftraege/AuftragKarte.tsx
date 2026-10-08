@@ -1,7 +1,7 @@
 import { IconUhr } from '../icons';
 import { Button, Collapse, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
 import { memo, useMemo, type ReactNode } from 'react';
-import type { Auftrag } from '../api/types';
+import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
@@ -50,6 +50,8 @@ interface AuftragKarteProps {
   quittierungLaeuft?: boolean;
   quittierungZiel?: { auftragId: number; empfaengerId: number } | null;
   onQuittieren?: (auftragId: number, empfaengerId: number) => void;
+  /** Welche Empfängerzeilen quittierbar sind; ohne: alle (ein Abschnittsgerät nur seine). */
+  darfQuittierenFuer?: (empfaenger: AuftragEmpfaenger) => boolean;
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
@@ -70,6 +72,7 @@ function AuftragKarte({
   quittierungLaeuft,
   quittierungZiel,
   onQuittieren,
+  darfQuittierenFuer,
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
@@ -236,7 +239,7 @@ function AuftragKarte({
               <Text style={{ fontSize: 13 }}>
                 {mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung)}
               </Text>
-              {darfQuittieren && (
+              {darfQuittieren && (darfQuittierenFuer?.(e) ?? true) && (
                 <Popconfirm
                   title="Empfang/Kenntnis quittieren?"
                   okText="Empfang quittieren"
