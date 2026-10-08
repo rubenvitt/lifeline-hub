@@ -50,7 +50,7 @@ function oeffne(n: ChatNachricht) {
   return onHeraufstufen;
 }
 
-const HINWEIS = 'Im ETB unveränderlich.';
+const HINWEIS = 'Kopie im ETB, unveränderlich.';
 
 describe('HeraufstufenModal', () => {
   it('übernimmt den Nachrichtentext und bestätigt mit Typ + Text', async () => {

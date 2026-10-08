@@ -598,8 +598,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       }
       alarmScope.unwetterTag = desktopTag;
       const titel = detail.titel ?? 'Unwetterwarnung';
-      const beschreibung =
-        detail.beschreibung ?? 'Für den Einsatzort liegt eine Unwetterwarnung vor.';
+      const beschreibung = detail.beschreibung ?? 'Unwetterwarnung für den Einsatzort';
       const ziel = wetterPegelPfad(einsatzId);
       const oeffnen = () => {
         if (!alarmScope.aktiv) return;
@@ -719,8 +718,8 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         ? 'Ton wird geprüft'
         : 'Ton blockiert';
   // Name und Tooltip des Knopfs: die Handlung. In `prueft`/`blockiert` mit Zustand, denn die
-  // Handlung („freischalten") erklärt sich erst durch ihn, und das sichtbare Wort („Ton blockiert")
-  // gehört in den Namen (WCAG 2.5.3). Keine Geste im Text (LFH-1078): Maus und Tastatur tippen nicht.
+  // Handlung („freischalten") erklärt sich erst durch ihn. Keine Geste im Text (LFH-1078): Maus und
+  // Tastatur tippen nicht. Offen: das sichtbare „Ton …“ steht nicht wortgleich im Namen (WCAG 2.5.3).
   const tonHinweis = gemutet
     ? 'Alarmton einschalten'
     : tonStatus === 'bereit'

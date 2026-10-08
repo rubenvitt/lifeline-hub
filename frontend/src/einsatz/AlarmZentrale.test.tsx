@@ -973,7 +973,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
       ['Erinnerung fällig', undefined],
       ['Auftrag überfällig', 'Quittierfrist überschritten'],
       ['Ablösung in 30 min', 'Ablösung bald fällig: Florian 1'],
-      ['Unwetterwarnung', 'Für den Einsatzort liegt eine Unwetterwarnung vor.'],
+      ['Unwetterwarnung', 'Unwetterwarnung für den Einsatzort'],
     ]);
   });
 

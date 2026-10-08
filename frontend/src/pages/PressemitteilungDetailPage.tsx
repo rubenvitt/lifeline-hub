@@ -41,7 +41,7 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
 import { pressemitteilungStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
-import { FREIGABE_NUR_LEITUNG } from '../presse/rechteText';
+import { NUR_LEITUNG } from '../components/nurAnsicht';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 // Dieselben Druck-Eigenheiten wie der Lagebericht: Akkordeon-Entwurf, Bedienung ausgeblendet.
 import './lageberichtPrint.css';
@@ -313,10 +313,11 @@ function PressemitteilungDetail() {
                   <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
                     Entwurf speichern
                   </Button>
-                  {/* Kein „Nur Ansicht“: der Entwurf bleibt schreibbar, nur die Freigabe fehlt. */}
+                  {/* Kein „Nur Ansicht“: der Entwurf bleibt schreibbar, nur die Freigabe fehlt. Sichtbar am
+                      Knopf, nicht nur im Tooltip (Touch, LFH-554/LFH-1078). */}
                   {!darfFreigeben && (
                     <Typography.Text type="secondary" id={FREIGABE_GRUND_ID}>
-                      {FREIGABE_NUR_LEITUNG}
+                      {NUR_LEITUNG}
                     </Typography.Text>
                   )}
                   <Button

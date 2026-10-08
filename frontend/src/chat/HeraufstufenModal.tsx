@@ -99,7 +99,7 @@ export default function HeraufstufenModal({
           name="anhang_ids"
           // EIN Folgesatz vor dem unumkehrbaren Schritt; wie kopiert wird, sagt die Seite nicht
           // (LFH-1078).
-          extra="Im ETB unveränderlich."
+          extra="Kopie im ETB, unveränderlich."
           rules={[
             {
               type: 'array',

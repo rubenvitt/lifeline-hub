@@ -1000,6 +1000,18 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(pfad()).toBe('/einsaetze/7/einstellungen/module');
   });
 
+  it('auch ohne Admin-Recht: die Einsatzleitung bekommt „Modulfreigaben öffnen“', async () => {
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { zugriff: false } }),
+      {},
+      { benutzer: benutzerFixture({ anzeigename: 'Leitung' }), rolle: 'einsatzleitung' },
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Modulfreigaben öffnen' }),
+    ).toBeInTheDocument();
+  });
+
   it('ohne Verwaltungsrecht steht nur die Sperrzeile, kein Weg in die Modulfreigaben', async () => {
     setupWaechter(
       '/einsaetze/7/lagemeldungen',
