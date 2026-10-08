@@ -1,5 +1,6 @@
 import type { FachebeneQuelle } from './fachebenen';
 import type { EtbTyp } from './types';
+import type { SchaedenFilter, SchadenSortierung } from './einsatzSchaden';
 
 /**
  * Query-Key-Registry (LFH-122/307) mit zwei Hälften: `einsatzKeys` für alles unter einer
@@ -322,7 +323,12 @@ export const EINSATZ_STREAM_ZIELE: Partial<
   // zeilenweise ab, Mitteilungen wie ein Dokument. Keines von beiden trifft das andere.
   presse: (p, e) => {
     const kid = kennung(p, 'medienkontakt_id');
-    if (kid !== null) return [{ art: 'zeile', ziel: 'medienkontakte', id: kid }];
+    // Die Kennzahlen zählen den ganzen Bestand; sie gleichen bei jeder Änderung ab (LFH-1075).
+    if (kid !== null)
+      return [
+        { art: 'zeile', ziel: 'medienkontakte', id: kid },
+        key(einsatzKeys.medienkontaktKennzahlen(e)),
+      ];
     return dokument('pressemitteilung_id', einsatzKeys.pressemitteilungen(e), (id) =>
       einsatzKeys.pressemitteilung(e, id),
     )(p);
@@ -335,6 +341,7 @@ export const EINSATZ_STREAM_ZIELE: Partial<
     return [
       { art: 'zeile', ziel: 'schaeden', id: sid },
       key(einsatzKeys.schaedenGeschaedigtAlle(e)),
+      key(einsatzKeys.schaedenKennzahlenAlle(e)),
     ];
   },
 };
@@ -506,6 +513,24 @@ export const einsatzKeys = {
   /** Prefix aller {@link einsatzKeys.schaedenGeschaedigt}-Listen eines Einsatzes. */
   schaedenGeschaedigtAlle: (einsatzId: number) =>
     [EINSATZ_KEYS.schaeden, einsatzId, 'geschaedigt'] as const,
+  /** Modulseite (LFH-1075): eine Seitenkette je Sicht und Sortierung. */
+  schaedenSeiten: (einsatzId: number, sicht: SchaedenFilter, sortierung: SchadenSortierung) =>
+    [EINSATZ_KEYS.schaeden, einsatzId, 'seiten', { sicht, sortierung }] as const,
+  /** Prefix aller {@link einsatzKeys.schaedenSeiten} eines Einsatzes (Zeilenabgleich). */
+  schaedenSeitenAlle: (einsatzId: number) => [EINSATZ_KEYS.schaeden, einsatzId, 'seiten'] as const,
+  /** Zahlen der Modulseite zu einer Sicht ohne Status (LFH-1075). */
+  schaedenKennzahlen: (einsatzId: number, sicht: Omit<SchaedenFilter, 'status'>) =>
+    [EINSATZ_KEYS.schaeden, einsatzId, 'kennzahlen', sicht] as const,
+  schaedenKennzahlenAlle: (einsatzId: number) =>
+    [EINSATZ_KEYS.schaeden, einsatzId, 'kennzahlen'] as const,
+  /** Auswahl ohne Freitext: Chat-Bezug, Zuweisung, Sprungpalette (LFH-1075). */
+  schaedenAuswahl: (einsatzId: number) => [EINSATZ_KEYS.schaeden, einsatzId, 'auswahl'] as const,
+  /** Ein Schaden unter dem Listen-Prefix, live (Palettenvorschau, LFH-1075); anders als das
+   *  Detailfach {@link einsatzKeys.schaden} der Detailseite. */
+  schaedenEinzeln: (einsatzId: number, schadenId: number) =>
+    [EINSATZ_KEYS.schaeden, einsatzId, 'einzeln', schadenId] as const,
+  schaedenEinzelnAlle: (einsatzId: number) =>
+    [EINSATZ_KEYS.schaeden, einsatzId, 'einzeln'] as const,
   schadenMarker: (einsatzId: number) => [EINSATZ_KEYS.schadenMarker, einsatzId] as const,
   schaden: (einsatzId: number, schadenId: number) =>
     [EINSATZ_KEYS.schaden, einsatzId, schadenId] as const,
@@ -592,6 +617,20 @@ export const einsatzKeys = {
   presse: (einsatzId: number) => [EINSATZ_KEYS.presse, einsatzId] as const,
   medienkontakte: (einsatzId: number) =>
     [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte'] as const,
+  /** Alle offenen Medienkontakte (LFH-1075). */
+  medienkontakteOffen: (einsatzId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'offen'] as const,
+  /** Seitenkette der erledigten Medienkontakte (LFH-1075). */
+  medienkontakteErledigt: (einsatzId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'abgeschlossen'] as const,
+  /** Zahlen und Medien über den ganzen Bestand, Grundlage der Medienlage (LFH-1075). */
+  medienkontaktKennzahlen: (einsatzId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'kennzahlen'] as const,
+  /** Ein Medienkontakt für den Deeplink auf eine nicht geladene Zeile (LFH-1075). */
+  medienkontaktEinzeln: (einsatzId: number, kontaktId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'einzeln', kontaktId] as const,
+  medienkontaktEinzelnAlle: (einsatzId: number) =>
+    [EINSATZ_KEYS.presse, einsatzId, 'medienkontakte', 'einzeln'] as const,
   pressemitteilungen: (einsatzId: number) =>
     [EINSATZ_KEYS.presse, einsatzId, 'mitteilungen'] as const,
   pressemitteilung: (einsatzId: number, mitteilungId: number) =>

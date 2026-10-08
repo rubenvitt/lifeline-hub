@@ -1,13 +1,15 @@
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 import type {
   Medienkontakt,
   MedienkontaktArt,
+  MedienkontaktKennzahlen,
   MedienkontaktStatus,
   Pressemitteilung,
   PressemitteilungAbschnitt,
   PressemitteilungKopf,
   PressemitteilungVorlageKey,
 } from './types';
+import type { AbschlussCursor } from './meldungen';
 
 /**
  * Presse- und Medienarbeit S5 (LFH-554): Presse-Log und Pressemitteilungen unter dem Stab.
@@ -21,6 +23,47 @@ const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/stab`;
 /** Offene zuerst, dann jüngster Eingang zuerst (Ordnung vom Server, {@link vergleicheMedienkontakte}). */
 export function ladeMedienkontakte(einsatzId: number): Promise<Medienkontakt[]> {
   return apiGet<Medienkontakt[]>(`${basis(einsatzId)}/medienkontakte`);
+}
+
+/** Seitengröße der erledigten Medienkontakte; der Server klemmt auf `[1, 500]` (LFH-1075). */
+export const MEDIENKONTAKTE_SEITE = 100;
+
+/** Position hinter dem letzten geladenen erledigten Kontakt: Eingang und Kennung
+ *  (`vor_zeit`, `vor_id` wie bei den Meldungen). */
+export function eingangCursor(k: Medienkontakt): AbschlussCursor {
+  return { zeit: k.eingang_at, id: k.id };
+}
+
+/** Alle offenen Medienkontakte, jüngster Eingang zuerst, ungeblättert (LFH-1075). */
+export function ladeOffeneMedienkontakte(einsatzId: number): Promise<Medienkontakt[]> {
+  return apiGet<Medienkontakt[]>(`${basis(einsatzId)}/medienkontakte?phase=offen`);
+}
+
+/** Eine Seite erledigter Medienkontakte, jüngster Eingang zuerst (LFH-1075). */
+export function ladeErledigteMedienkontakte(
+  einsatzId: number,
+  vor?: AbschlussCursor,
+  limit: number = MEDIENKONTAKTE_SEITE,
+): Promise<Medienkontakt[]> {
+  return apiGet<Medienkontakt[]>(
+    mitParametern(`${basis(einsatzId)}/medienkontakte`, {
+      phase: 'abgeschlossen',
+      vor_zeit: vor?.zeit,
+      vor_id: vor?.id,
+      limit,
+    }),
+  );
+}
+
+/** Zahlen und Medien des Presse-Logs über den ganzen Bestand, Grundlage der Medienlage. */
+export function ladeMedienkontaktKennzahlen(einsatzId: number): Promise<MedienkontaktKennzahlen> {
+  return apiGet<MedienkontaktKennzahlen>(`${basis(einsatzId)}/medienkontakte/kennzahlen`);
+}
+
+/** Ordnung innerhalb einer Phase wie im SQL: `eingang_at`, dann `id`, beides absteigend. */
+export function vergleicheNachEingang(a: Medienkontakt, b: Medienkontakt): number {
+  if (a.eingang_at !== b.eingang_at) return a.eingang_at < b.eingang_at ? 1 : -1;
+  return b.id - a.id;
 }
 
 /** Ein Medienkontakt (LFH-931): auf ein `presse`-Ereignis lädt der Tab nur diese Zeile nach. */

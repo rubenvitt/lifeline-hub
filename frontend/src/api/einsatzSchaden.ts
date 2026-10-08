@@ -1,6 +1,8 @@
 import type {
   Schaden,
   SchadenAnhang,
+  SchadenAuswahl,
+  SchadenKennzahlen,
   SchadenMarker,
   SchadenStatus,
   SchadenTyp,
@@ -47,7 +49,7 @@ export interface SchadenPatch {
   lon?: number | null;
 }
 
-interface SchaedenFilter {
+interface SchaedenListenFilter {
   status?: SchadenStatus;
   typ?: SchadenTyp;
   ausmass?: Ausmass;
@@ -55,7 +57,11 @@ interface SchaedenFilter {
   inklStorniert?: boolean;
 }
 
-export function listeSchaeden(einsatzId: number, filter: SchaedenFilter = {}): Promise<Schaden[]> {
+/** Vollständige Liste, neueste Nummer zuerst: Druck, Einsatzbericht, Schäden je Person. */
+export function listeSchaeden(
+  einsatzId: number,
+  filter: SchaedenListenFilter = {},
+): Promise<Schaden[]> {
   return apiGet<Schaden[]>(
     mitParametern(`/api/einsaetze/${einsatzId}/schaeden`, {
       status: filter.status,
@@ -65,6 +71,162 @@ export function listeSchaeden(einsatzId: number, filter: SchaedenFilter = {}): P
       inkl_storniert: filter.inklStorniert,
     }),
   );
+}
+
+// ── Modulseite: seitenweise, Filter, Suche und Sortierung am Server (LFH-1075) ─────────────
+
+/** Seitengröße der Modulseite; der Server klemmt auf `[1, 500]`. */
+export const SCHAEDEN_SEITE = 100;
+
+export type SchadenSortSpalte = 'nr' | 'typ' | 'ausmass' | 'ort' | 'erfasst' | 'verortet';
+export interface SchadenSortierung {
+  spalte: SchadenSortSpalte;
+  richtung: 'ab' | 'auf';
+}
+export const SCHADEN_SORTIERUNG_VORGABE: SchadenSortierung = { spalte: 'nr', richtung: 'ab' };
+
+/** Filter der Modulseite. Ein leeres Feld filtert nicht; mehrere Werte: einer muss zutreffen. */
+export interface SchaedenFilter {
+  status?: SchadenStatus;
+  typen?: readonly SchadenTyp[];
+  ausmasse?: readonly Ausmass[];
+  verortet?: readonly ('ja' | 'nein')[];
+  /** Suchbegriff, getrimmt; trifft als Teil Nummer, Ort, Beschreibung oder Geschädigten. */
+  q?: string;
+}
+
+/** Position hinter dem letzten geladenen Schaden: Schlüsselwert (außer bei `nr`) und Nummer. */
+export interface SchadenCursor {
+  vor_wert?: string;
+  vor_nr: number;
+}
+
+const AUSMASS_RANG: Record<Ausmass, number> = { gering: 0, mittel: 1, gross: 2, katastrophal: 3 };
+
+const verortetWert = (s: { lat?: number | null; lon?: number | null }) =>
+  s.lat != null && s.lon != null ? 1 : 0;
+
+/** Groß-/Kleinschreibung nur für A–Z ohne Unterschied, wie SQLite `COLLATE NOCASE`. */
+const nocase = (t: string) => t.replace(/[A-Z]/g, (c) => c.toLowerCase());
+
+/** Schlüsselwert einer Zeile, wie der Server sortiert (`SortSpalte::ausdruck`). */
+function schluessel(s: Schaden, spalte: SchadenSortSpalte): number | string {
+  switch (spalte) {
+    case 'nr':
+      return s.registrier_nr;
+    case 'typ':
+      return s.typ;
+    case 'ausmass':
+      return AUSMASS_RANG[s.ausmass];
+    case 'ort':
+      return nocase(s.ort);
+    case 'erfasst':
+      return s.erfasst_at;
+    case 'verortet':
+      return verortetWert(s);
+  }
+}
+
+/** Ordnung der Modulseite wie im SQL: Schlüssel, dann Nummer, beides in der Richtung. */
+export function vergleicheSchaedenNach(
+  sortierung: SchadenSortierung,
+): (a: Schaden, b: Schaden) => number {
+  const faktor = sortierung.richtung === 'ab' ? -1 : 1;
+  return (a, b) => {
+    const ka = schluessel(a, sortierung.spalte);
+    const kb = schluessel(b, sortierung.spalte);
+    if (ka !== kb) return (ka < kb ? -1 : 1) * faktor;
+    return (a.registrier_nr - b.registrier_nr) * faktor;
+  };
+}
+
+/** Cursor hinter der Zeile `s` in der Sortierung `spalte`. */
+export function schadenCursor(s: Schaden, spalte: SchadenSortSpalte): SchadenCursor {
+  if (spalte === 'nr') return { vor_nr: s.registrier_nr };
+  // Der Ort geht roh an den Server; er vergleicht selbst ohne Unterschied der Schreibung.
+  const wert = spalte === 'ort' ? s.ort : String(schluessel(s, spalte));
+  return { vor_wert: wert, vor_nr: s.registrier_nr };
+}
+
+function sichtParameter(sicht: SchaedenFilter) {
+  return {
+    typ: sicht.typen?.join(','),
+    ausmass: sicht.ausmasse?.join(','),
+    verortet: sicht.verortet?.join(','),
+    q: sicht.q?.trim(),
+  };
+}
+
+/** Eine Seite der Modulseite. */
+export function listeSchaedenSeite(
+  einsatzId: number,
+  sicht: SchaedenFilter,
+  sortierung: SchadenSortierung,
+  vor?: SchadenCursor,
+  limit: number = SCHAEDEN_SEITE,
+): Promise<Schaden[]> {
+  return apiGet<Schaden[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/schaeden`, {
+      status: sicht.status,
+      ...sichtParameter(sicht),
+      sortierung: `${sortierung.spalte}_${sortierung.richtung}`,
+      vor_wert: vor?.vor_wert,
+      vor_nr: vor?.vor_nr,
+      limit,
+    }),
+  );
+}
+
+/** Zahl der Schäden gesamt und je Status zu derselben Sicht, ohne deren Status. */
+export function ladeSchadenKennzahlen(
+  einsatzId: number,
+  sicht: Omit<SchaedenFilter, 'status'>,
+): Promise<SchadenKennzahlen> {
+  return apiGet<SchadenKennzahlen>(
+    mitParametern(`/api/einsaetze/${einsatzId}/schaeden/kennzahlen`, sichtParameter(sicht)),
+  );
+}
+
+/**
+ * Ob ein Schaden zur Sicht gehört, so wie der Server filtert. `null`, wenn ein Suchbegriff
+ * gesetzt ist: dessen Treffer entscheidet nur der Server.
+ */
+export function passtZurSicht(s: Schaden, sicht: SchaedenFilter): boolean | null {
+  if (sicht.q?.trim()) return null;
+  if (s.storniert_at != null) return false;
+  if (sicht.status && s.status !== sicht.status) return false;
+  if (sicht.typen?.length && !sicht.typen.includes(s.typ)) return false;
+  if (sicht.ausmasse?.length && !sicht.ausmasse.includes(s.ausmass)) return false;
+  if (sicht.verortet?.length === 1) {
+    if ((verortetWert(s) === 1) !== (sicht.verortet[0] === 'ja')) return false;
+  }
+  return true;
+}
+
+/**
+ * Schadenauswahl für Auswahlfelder und Sprungpalette (LFH-1075): alle nicht stornierten, neueste
+ * Nummer zuerst, ohne Beschreibung und ohne Geschädigten-Angaben; `frei` = kein Geschädigter.
+ */
+export function listeSchadenAuswahl(einsatzId: number): Promise<SchadenAuswahl[]> {
+  return apiGet<SchadenAuswahl[]>(`/api/einsaetze/${einsatzId}/schaeden/auswahl`);
+}
+
+/** Die Auswahlzeile einer vollen Zeile; `null`, wenn sie nicht in die Auswahl gehört. */
+export function alsSchadenAuswahl(s: Schaden): SchadenAuswahl | null {
+  if (s.storniert_at != null) return null;
+  return {
+    id: s.id,
+    registrier_nr: s.registrier_nr,
+    status: s.status,
+    typ: s.typ,
+    ausmass: s.ausmass,
+    ort: s.ort,
+    frei:
+      s.geschaedigt_person_id == null &&
+      s.geschaedigt_personal_id == null &&
+      s.geschaedigt_organisation_id == null &&
+      s.geschaedigt_kontakt == null,
+  };
 }
 
 /**

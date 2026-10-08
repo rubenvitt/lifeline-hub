@@ -700,6 +700,7 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
   it('ein Medienkontakt gleicht seine Zeile ab, eine Pressemitteilung nie das Presse-Log', () => {
     expect(ziele('presse', { einsatz_id: 7, medienkontakt_id: 12 })).toEqual([
       { art: 'zeile', ziel: 'medienkontakte', id: 12 },
+      { art: 'key', key: einsatzKeys.medienkontaktKennzahlen(7) },
     ]);
     const mitteilung = ziele('presse', { einsatz_id: 7, pressemitteilung_id: 5 });
     expect(mitteilung).toEqual([
@@ -716,6 +717,7 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
     expect(ziele('schaden', { einsatz_id: 7, schaden_id: 9 })).toEqual([
       { art: 'zeile', ziel: 'schaeden', id: 9 },
       { art: 'key', key: einsatzKeys.schaedenGeschaedigtAlle(7) },
+      { art: 'key', key: einsatzKeys.schaedenKennzahlenAlle(7) },
     ]);
   });
 

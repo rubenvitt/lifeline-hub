@@ -46,6 +46,12 @@ const AUSNAHMEN: Record<string, string> = {
   'meldungen.ts#AbschlussCursor':
     'Blätter-Position der abgeschlossenen Meldungen und Erinnerungen (LFH-940); geht als ' +
     'Query-Parameter `vor_zeit`/`vor_id` hinaus, kein Body und keine Antwort.',
+  'einsatzSchaden.ts#SchadenSortierung':
+    'Sortierung der Schaden-Modulseite (LFH-1075); geht als Query-Parameter `sortierung` ' +
+    'hinaus, kein Body und keine Antwort.',
+  'einsatzSchaden.ts#SchadenCursor':
+    'Blätter-Position der Schaden-Modulseite (LFH-1075); geht als Query-Parameter ' +
+    '`vor_wert`/`vor_nr` hinaus, kein Body und keine Antwort.',
   'lagezonen.ts#ZoneNeu': 'POST-Body einer Lage-Zone (Wortstellung „Neu" hinten statt vorn).',
   'dokumente.ts#DokumentAblage':
     'Multipart-Eingabe-DTO fürs Ablegen eines Dokuments (Datei + Metadaten, LFH-632) — der ' +
