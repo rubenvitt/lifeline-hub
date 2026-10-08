@@ -50,8 +50,8 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
  * Druck (Format, Umbruch, Graustufen): `fernmeldeskizze-druck.spec.ts`.
  *
  * Mutationsproben (Prüfliste): `rufnamenHoehe` in `stab/fernmeldeskizzeLayout.ts` auf eine
- * feste Zeile → die Messung wird rot (Text unter dem Platz); `STRICHMUSTER_GEPLANT` weg → der
- * Geplant-Test wird rot; `istSchmal` in der Rechteweiche weg → der 390-px-Test wird rot.
+ * feste Zeile → die Messung wird rot (Text unter dem Platz); `status` in `Leitungsbild`
+ * (`stab/skizzenZeichen.tsx`) fest auf „bestehend“ → der Geplant-Test wird rot; `istSchmal` in der Rechteweiche weg → der 390-px-Test wird rot.
  */
 
 const FUEKW = { width: 1366, height: 768 };
@@ -252,13 +252,17 @@ test('Sammelschiene: eine Linie je Sprechgruppe, vier Stellen hängen per Stichl
   // Jede Stichleitung endet auf der Linie der Schiene, keine Kante je Eltern-Kind-Paar.
   const linieY = Number(await schiene.locator('line[data-teil="schiene"]').getAttribute('y1'));
   for (const key of anSchiene) {
-    const punkte = await element(page, key)
-      .locator('[data-teil="stich-linie"]')
-      .getAttribute('points');
-    const ys = punkte!
-      .trim()
-      .split(/\s+/)
-      .map((p) => Number(p.split(',')[1]));
+    const ys = await element(page, key)
+      .locator('[data-teil="stich-linie"] polyline')
+      .evaluateAll((striche) =>
+        striche.flatMap((s) =>
+          s
+            .getAttribute('points')!
+            .trim()
+            .split(/\s+/)
+            .map((p) => Number(p.split(',')[1])),
+        ),
+      );
     expect(ys, `${key} endet auf der Schiene`).toContain(linieY);
   }
   await expect(page.locator('[data-lfh="skizze-kante"]')).toHaveCount(0);
@@ -449,7 +453,7 @@ test('Leitstelle: anlegen, in den rückwärtigen Bereich ziehen, über „TMO SL
   const bereich = flaeche(page).getByRole('button', { name: 'Bereich Rückwärtiger Bereich' });
   await expect(bereich).toBeVisible();
   await flaecheInsBild(page);
-  const b = (await bereich.locator('rect[stroke-dasharray]').boundingBox())!;
+  const b = (await bereich.locator('[data-teil="grenze"]').boundingBox())!;
   const verschoben = page.waitForResponse(
     (r) => r.url().includes(`/lage/${ksKey}`) && r.request().method() === 'PUT',
   );
@@ -472,7 +476,7 @@ test('Leitstelle: anlegen, in den rückwärtigen Bereich ziehen, über „TMO SL
   expect((await verschoben).ok(), 'Lage gespeichert').toBe(true);
   await expect(async () => {
     const r = (await platz.boundingBox())!;
-    const g = (await bereich.locator('rect[stroke-dasharray]').boundingBox())!;
+    const g = (await bereich.locator('[data-teil="grenze"]').boundingBox())!;
     expect(r.x).toBeGreaterThanOrEqual(g.x - SUBPIXEL);
     expect(r.y).toBeGreaterThanOrEqual(g.y - SUBPIXEL);
     expect(r.x + r.width).toBeLessThanOrEqual(g.x + g.width + SUBPIXEL);
@@ -550,25 +554,32 @@ test('Geplant: Verbindung und Stichleitung gestrichelt mit dem Wort „geplant�
   ).id;
 
   const pruefe = async (wo: string, sel: (key: string) => Locator) => {
+    // Gestrichelt heißt: die Linie besteht aus einzelnen Strichen (`commsLink` des Pakets).
+    const striche = (teil: Locator) => teil.locator('polyline').count();
     const vg = sel(`vb-${geplant}`);
-    await expect(vg.locator('[data-teil="linie"]'), `${wo}: geplant gestrichelt`).toHaveAttribute(
-      'stroke-dasharray',
-      '8 5',
-    );
+    expect(
+      await striche(vg.locator('[data-teil="linie"]')),
+      `${wo}: geplant gestrichelt`,
+    ).toBeGreaterThan(1);
     await expect(vg.locator('[data-teil="geplant"]'), `${wo}: Wort „geplant“`).toHaveText(
       'geplant',
     );
     const vb = sel(`vb-${bestehend}`);
-    await expect(vb.locator('[data-teil="linie"]')).not.toHaveAttribute('stroke-dasharray');
+    expect(await striche(vb.locator('[data-teil="linie"]')), `${wo}: bestehend durchgezogen`).toBe(
+      1,
+    );
     await expect(vb.locator('[data-teil="geplant"]')).toHaveCount(0);
     const stich = sel(`sg-${slAs}~ks-${polizei}`);
-    await expect(stich.locator('[data-teil="stich-linie"]')).toHaveAttribute(
-      'stroke-dasharray',
-      '8 5',
-    );
+    expect(
+      await striche(stich.locator('[data-teil="stich-linie"]')),
+      `${wo}: Stich gestrichelt`,
+    ).toBeGreaterThan(1);
     await expect(stich.locator('[data-teil="geplant"]')).toHaveText('geplant');
     const fest = sel(`sg-${slAs}~ks-${ils}`);
-    await expect(fest.locator('[data-teil="stich-linie"]')).not.toHaveAttribute('stroke-dasharray');
+    expect(
+      await striche(fest.locator('[data-teil="stich-linie"]')),
+      `${wo}: Stich durchgezogen`,
+    ).toBe(1);
   };
 
   await oeffneSkizze(page, einsatzId, element(page, `vb-${geplant}`));

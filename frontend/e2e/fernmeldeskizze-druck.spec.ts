@@ -26,7 +26,8 @@ import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
  *   und das Wort „geplant“ steht mit Textkontrast da.
  *
  * Mutationsproben: `page: fernmeldeskizze-a3` in `skizzeDruck.css` weg → Seite 1 ist A4 hoch,
- * rot; `STRICHMUSTER_GEPLANT` weg → keine Wechsel entlang der Linie, rot.
+ * rot; `status` in `Leitungsbild` (`stab/skizzenZeichen.tsx`) fest auf „bestehend“ → keine
+ * Wechsel entlang der Linie, rot.
  */
 
 const FUEKW = { width: 1366, height: 768 };
@@ -242,16 +243,21 @@ test.describe('Graustufen', () => {
     const strecken = await page.evaluate(
       (keys) =>
         keys.map((key) => {
-          const linie = document.querySelector(
-            `[data-lfh="skizze-flaeche"] g[data-key="${key}"] [data-teil="linie"]`,
-          ) as SVGLineElement;
-          const m = linie.getScreenCTM()!;
-          const punkt = (x: number, y: number) => {
-            const p = new DOMPoint(x, y).matrixTransform(m);
-            return { x: p.x, y: p.y };
+          // Die Linie ist ein Polyzug, gestrichelt einer je Strich: vom ersten Punkt des ersten
+          // bis zum letzten Punkt des letzten.
+          const striche = [
+            ...document.querySelectorAll<SVGPolylineElement>(
+              `[data-lfh="skizze-flaeche"] g[data-key="${key}"] [data-teil="linie"] polyline`,
+            ),
+          ];
+          const erster = striche[0];
+          const letzter = striche[striche.length - 1];
+          const punkt = (el: SVGPolylineElement, p: DOMPoint) => {
+            const q = new DOMPoint(p.x, p.y).matrixTransform(el.getScreenCTM()!);
+            return { x: q.x, y: q.y };
           };
-          const a = punkt(linie.x1.baseVal.value, linie.y1.baseVal.value);
-          const b = punkt(linie.x2.baseVal.value, linie.y2.baseVal.value);
+          const a = punkt(erster, erster.points.getItem(0));
+          const b = punkt(letzter, letzter.points.getItem(letzter.points.numberOfItems - 1));
           return { key, a, b };
         }),
       [`vb-${n.geplant}`, `vb-${n.bestehend}`],

@@ -21,7 +21,9 @@ baueFernmeldenetz` (Stellen `fs`/`ab-`/`eh-`/`ks-`/`ko-`, Schienen `sg-` aus
 Druck und Übernahme; Lücken nur über `stab/luecken.ts` (Bild zählt wie das Paneel). Je
 Sprechgruppe **eine Sammelschiene**, keine Kante je Eltern-Kind-Paar; die Führungsorganisation ist
 nur Vorlage für Auto-Layout (`stab/fernmeldeskizzeLayout.ts`) und Fokusfolge. Zeichen nur aus
-`stab/skizzenZeichen.tsx` (Katalog `@einsatzzeichen` J.1–J.4, Rest in `SELBST_GEZEICHNET`),
+`stab/skizzenZeichen.tsx`, und dort nur aus `@einsatzzeichen/core` (Katalog J.1–J.4 und
+Kommunikationsskizze `sketch.*`, LFH-1033), keine eigene Geometrie; 1 mm des Pakets sind
+`SKIZZE_EINHEITEN_JE_MM` = 3 Einheiten, Text in den Zeichen in Arimo aus dem Paket.
 „geplant“ immer Strichmuster **und** Wort. **Eine Wahrheit:** Zuordnungen schreibt die Fläche über
 die Einzel-Endpunkte in die Datensätze (Abschnitt, Einheit, Führungsstelle, Kommunikationsstelle),
 externe Stellen sind die des Kommunikationsplans; die Skizze speichert nur Lage, Komponenten,

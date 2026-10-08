@@ -2,16 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import {
+  busBarMinLength,
+  conditionSign,
+  conditionSignWidth,
+  sketchPictogram,
+} from '@einsatzzeichen/core';
+import {
   BEDINGUNGSZEICHEN_HOEHE,
-  BEDINGUNGSZEICHEN_SCHRIFT,
   BereichsRahmen,
   Bedingungszeichen,
   KOMPONENTENARTEN,
   KomponentenZeichen,
   Leitung,
-  SELBST_GEZEICHNET,
-  STRICHMUSTER_BEREICH,
-  STRICHMUSTER_GEPLANT,
+  SKIZZE_EINHEITEN_JE_MM,
+  STRICH,
+  STRICH_HERVORGEHOBEN,
   Sammelschiene,
   VERBINDUNGSARTEN,
   VerbindungsartZeichen,
@@ -25,6 +30,7 @@ import {
   sammelschienenMindestbreite,
   schaetzeTextbreite,
   verbindungsartPiktogramm,
+  zeichenPrimitive,
 } from './skizzenZeichen';
 
 /** Die Bausteine sind SVG-Inhalt; im Test sitzen sie wie in der Skizze in einem `<svg>`. */
@@ -39,6 +45,23 @@ function zeichne(element: ReactElement) {
  */
 function farbliterale(container: HTMLElement): string[] {
   return container.innerHTML.match(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(/gi) ?? [];
+}
+
+/** Die Polyzüge einer Linie: einer bei durchgezogen, einer je Strich bei gestrichelt. */
+function linienStriche(wurzel: Element, teil = 'linie'): SVGPolylineElement[] {
+  return [...wurzel.querySelectorAll<SVGPolylineElement>(`[data-teil="${teil}"] polyline`)];
+}
+
+function letzter<T>(liste: readonly T[]): T {
+  return liste[liste.length - 1];
+}
+
+function punkte(el: Element): [number, number][] {
+  return el
+    .getAttribute('points')!
+    .trim()
+    .split(/\s+/)
+    .map((p) => p.split(',').map(Number) as [number, number]);
 }
 
 function striche(container: HTMLElement): string[] {
@@ -75,11 +98,33 @@ describe('Bedingungszeichen', () => {
     const kurz = bedingungszeichenBreite('TMO', '311');
     const lang = bedingungszeichenBreite('TMO', 'BN_BOS Großschadenslage Nord');
     expect(lang).toBeGreaterThan(kurz);
-    // Text plus beide Spitzen passt hinein.
-    expect(lang).toBeGreaterThanOrEqual(
-      schaetzeTextbreite('TMO BN_BOS Großschadenslage Nord', BEDINGUNGSZEICHEN_SCHRIFT) +
-        BEDINGUNGSZEICHEN_HOEHE,
+  });
+
+  it('nimmt Breite und Höhe aus dem Paket, gemessen an Arimo', () => {
+    const text = 'TMO BN_BOS Großschadenslage Nord';
+    expect(bedingungszeichenBreite('TMO', 'BN_BOS Großschadenslage Nord')).toBeCloseTo(
+      conditionSignWidth(text) * SKIZZE_EINHEITEN_JE_MM,
+      5,
     );
+    expect(BEDINGUNGSZEICHEN_HOEHE).toBe(24);
+    expect(sammelschienenMindestbreite('TMO', 'BN_BOS Großschadenslage Nord')).toBeCloseTo(
+      busBarMinLength(text) * SKIZZE_EINHEITEN_JE_MM,
+      5,
+    );
+  });
+
+  it('zeichnet das Langsechseck des Pakets', () => {
+    zeichne(<Bedingungszeichen x={300} y={90} betriebsart="TMO" bezeichnung="BN_BOS" />);
+    const sechseck = screen
+      .getByRole('img', { name: 'Bedingungszeichen TMO BN_BOS' })
+      .querySelector('polygon')!;
+    const paket = conditionSign({ text: 'TMO BN_BOS', center: [100, 30] }).outline[0];
+    if (paket.type !== 'polyline') throw new Error('Umriss ist ein Polyzug');
+    const erwartet = paket.points.map(([x, y]) => [x * 3, y * 3]);
+    punkte(sechseck).forEach(([x, y], i) => {
+      expect(x).toBeCloseTo(erwartet[i][0], 5);
+      expect(y).toBeCloseTo(erwartet[i][1], 5);
+    });
   });
 
   it('zeichnet ein Langsechseck mit Betriebsart, Bezeichnung und Hinweis darunter', () => {
@@ -103,7 +148,11 @@ describe('Bedingungszeichen', () => {
     // Der Hinweis steht unter dem Zeichen.
     const [haupt, hinweis] = [...zeichen.querySelectorAll('text')];
     expect(Number(hinweis.getAttribute('y'))).toBeGreaterThan(100 + BEDINGUNGSZEICHEN_HOEHE / 2);
-    expect(Number(haupt.getAttribute('y'))).toBe(100);
+    // Grundlinie unter der Mitte, Text in der Schrift des Pakets.
+    expect(Number(haupt.getAttribute('y'))).toBeGreaterThan(100);
+    expect(Number(haupt.getAttribute('y'))).toBeLessThan(100 + BEDINGUNGSZEICHEN_HOEHE / 2);
+    expect(haupt.getAttribute('text-anchor')).toBe('middle');
+    expect(haupt.getAttribute('style')).toContain('Arimo');
     expect(zeichen.querySelector('title')?.textContent).toBe(
       'Bedingungszeichen DMO 314_F*, Hinweis: Gesundheit',
     );
@@ -195,9 +244,14 @@ describe('Leitung', () => {
       />,
     );
     const leitung = screen.getByRole('img', { name: 'Daten, leitergebunden, geplant' });
-    const linie = leitung.querySelector('[data-teil="linie"]')!;
-    expect(linie.getAttribute('stroke-dasharray')).toBe(STRICHMUSTER_GEPLANT);
+    const strichs = linienStriche(leitung);
+    expect(strichs.length).toBeGreaterThan(10);
+    // Die Striche beginnen und enden an den Stellen der Leitung.
+    expect(punkte(strichs[0])[0]).toEqual([10, 10]);
+    expect(letzter(punkte(strichs[strichs.length - 1]))).toEqual([210, 10]);
     expect(screen.getByText('geplant')).toBeInTheDocument();
+    // Das Wort steht unter der Linie und unter dem Zeichen der Verbindungsart.
+    expect(Number(screen.getByText('geplant').getAttribute('y'))).toBeGreaterThan(10 + 16);
     expect(leitung.querySelector('[data-teil="art"]')).not.toBeNull();
     expect(farbliterale(container)).toEqual([]);
   });
@@ -212,9 +266,12 @@ describe('Leitung', () => {
       />,
     );
     const leitung = screen.getByRole('img', { name: 'Leitergebunden, bestehend' });
-    expect(leitung.querySelector('[data-teil="linie"]')!.hasAttribute('stroke-dasharray')).toBe(
-      false,
-    );
+    const strichs = linienStriche(leitung);
+    expect(strichs).toHaveLength(1);
+    expect(punkte(strichs[0])).toEqual([
+      [10, 10],
+      [210, 10],
+    ]);
     expect(screen.queryByText('geplant')).toBeNull();
   });
 
@@ -258,13 +315,18 @@ describe('Leitung', () => {
           hervorgehoben={hervorgehoben}
         />,
       );
-      const wert = Number(
-        container.querySelector('[data-teil="linie"]')!.getAttribute('stroke-width'),
-      );
+      const wert = Number(linienStriche(container)[0].getAttribute('stroke-width'));
       unmount();
       return wert;
     };
-    expect(staerke(true)).toBeGreaterThan(staerke(false));
+    expect(staerke(false)).toBe(STRICH);
+    expect(staerke(true)).toBe(STRICH_HERVORGEHOBEN);
+  });
+
+  it('zeichnet nichts, solange beide Enden auf einem Punkt liegen', () => {
+    zeichne(<Leitung von={{ x: 5, y: 5 }} nach={{ x: 5, y: 5 }} medium="funk" status="geplant" />);
+    const leitung = screen.getByRole('img', { name: 'Funk, geplant' });
+    expect(leitung.querySelectorAll('polyline, polygon, text')).toHaveLength(0);
   });
 });
 
@@ -309,8 +371,28 @@ describe('VerbindungsartZeichen', () => {
       id: 'comms.data-transmission',
       variante: 'alternative',
     });
-    expect(verbindungsartPiktogramm('melder', 'funk').quelle).toBe('eigen');
-    expect(verbindungsartPiktogramm('sonstige', 'leitung').quelle).toBe('eigen');
+  });
+
+  it('nimmt Melder, sonstige und Satellit aus der Kommunikationsskizze des Pakets', () => {
+    expect(verbindungsartPiktogramm('melder', 'funk')).toEqual({
+      quelle: 'skizze',
+      id: 'sketch.messenger',
+      variante: 'primary',
+    });
+    expect(verbindungsartPiktogramm('sonstige', 'leitung')).toEqual({
+      quelle: 'skizze',
+      id: 'sketch.other',
+      variante: 'alternative',
+    });
+    // Satellit kennt nur die Schale, ohne Unterscheidung des Mediums.
+    expect(verbindungsartPiktogramm('satellit', 'leitung')).toEqual({
+      quelle: 'skizze',
+      id: 'sketch.satellite',
+      variante: 'primary',
+    });
+    expect(zeichenPrimitive(verbindungsartPiktogramm('melder', 'leitung'))).toEqual(
+      sketchPictogram('sketch.messenger', 'alternative').primitives,
+    );
   });
 });
 
@@ -339,17 +421,41 @@ describe('BereichsRahmen', () => {
       <BereichsRahmen x={10} y={20} breite={300} hoehe={200} bezeichnung="Rückwärtiger Bereich" />,
     );
     const bereich = screen.getByRole('img', { name: 'Bereich: Rückwärtiger Bereich' });
-    const rahmen = bereich.querySelector('rect')!;
-    expect(rahmen.getAttribute('stroke-dasharray')).toBe(STRICHMUSTER_BEREICH);
-    // Strich-Punkt: langer Strich, Lücke, kurzer Strich (Punkt), Lücke.
-    expect(STRICHMUSTER_BEREICH.split(' ')).toHaveLength(4);
-    expect(rahmen.getAttribute('fill')).toBe('none');
+    const grenze = linienStriche(bereich, 'grenze');
+    // Strich-Punkt: lange Striche und kurze Punkte wechseln sich ab.
+    const laengen = grenze.map((g) => {
+      const [[ax, ay], [bx, by]] = [punkte(g)[0], letzter(punkte(g))];
+      return Math.hypot(bx - ax, by - ay);
+    });
+    expect(Math.max(...laengen)).toBeGreaterThan(3 * Math.min(...laengen));
+    for (const g of grenze) expect(g.getAttribute('fill')).toBe('none');
+    // Die Grenze läuft genau auf dem Rechteck.
+    const alle = grenze.flatMap(punkte);
+    expect(Math.min(...alle.map(([x]) => x))).toBeCloseTo(10, 5);
+    expect(Math.max(...alle.map(([x]) => x))).toBeCloseTo(310, 5);
+    expect(Math.min(...alle.map(([, y]) => y))).toBeCloseTo(20, 5);
+    expect(Math.max(...alle.map(([, y]) => y))).toBeCloseTo(220, 5);
     expect(screen.getByText('Rückwärtiger Bereich')).toBeInTheDocument();
     expect(farbliterale(container)).toEqual([]);
   });
 
   it('unterscheidet sich im Strichmuster von einer geplanten Leitung', () => {
-    expect(STRICHMUSTER_BEREICH).not.toBe(STRICHMUSTER_GEPLANT);
+    const muster = (el: ReactElement, teil: string) => {
+      const { container, unmount } = zeichne(el);
+      const [erster] = linienStriche(container, teil);
+      const [[ax, ay], [bx, by]] = [punkte(erster)[0], letzter(punkte(erster))];
+      unmount();
+      return Math.hypot(bx - ax, by - ay);
+    };
+    expect(
+      muster(<BereichsRahmen x={0} y={0} breite={300} hoehe={200} bezeichnung="B" />, 'grenze'),
+    ).not.toBeCloseTo(
+      muster(
+        <Leitung von={{ x: 0, y: 0 }} nach={{ x: 300, y: 0 }} medium="leitung" status="geplant" />,
+        'linie',
+      ),
+      0,
+    );
   });
 });
 
@@ -410,17 +516,12 @@ describe('Sammelschiene', () => {
   });
 });
 
-describe('Selbst gezeichnete Zeichen', () => {
-  it('führt jedes Zeichen, das die Bibliotheken nicht haben (Folgeticket @einsatzzeichen)', () => {
-    const eigene = new Set(SELBST_GEZEICHNET.map((z) => z.zeichen));
+describe('Zeichen aus dem Paket', () => {
+  it('hat für jede Verbindungsart und jedes Medium ein Zeichen aus @einsatzzeichen', () => {
     for (const art of VERBINDUNGSARTEN) {
       for (const medium of ['funk', 'leitung'] as const) {
-        if (verbindungsartPiktogramm(art, medium).quelle === 'eigen') {
-          expect(eigene).toContain(`verbindungsart.${art}`);
-        }
+        expect(zeichenPrimitive(verbindungsartPiktogramm(art, medium)).length).toBeGreaterThan(0);
       }
     }
-    expect(eigene).toContain('bedingungszeichen');
-    expect(eigene).toContain('bereich');
   });
 });

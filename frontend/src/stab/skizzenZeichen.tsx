@@ -4,21 +4,42 @@
  * im Bevölkerungsschutz“, Anhang J).
  *
  * Reine SVG-Inhalte: jeder Baustein ist eine `<g>`, die in ein `<svg>` mit Benutzerkoordinaten
- * gesetzt wird; die Lage kommt über Props. Kein DOM-Messen — Textbreiten schätzt
- * `schaetzeTextbreite` (Monoschrift, feste Zeichenbreite), damit Layout und Bild dieselbe Zahl
- * rechnen.
+ * gesetzt wird; die Lage kommt über Props. Kein DOM-Messen: Die Breite des Bedingungszeichens
+ * misst das Paket an den Metriken seiner Schrift (Arimo 500), sonstige Texte schätzt
+ * `schaetzeTextbreite` (Monoschrift, feste Zeichenbreite) — Layout und Bild rechnen so dieselbe
+ * Zahl.
  *
  * Farbe (`frontend/AGENTS.md`, Farbe und Zeichen): Striche und Schrift stehen in `currentColor`,
  * Flächen auf dem Skizzengrund (`GRUND`). Jede Unterscheidung trägt Form, Strichmuster oder Wort
  * (WCAG 1.4.1, Druck in Graustufen, D13): Funk = Zickzack, leitergebunden = glatt, geplant =
  * gestrichelt **und** das Wort „geplant“, Bereich = Strich-Punkt, Hervorhebung = Strichstärke.
  *
- * Zeichen der Verbindungsarten (J.1) und Komponenten (J.3) kommen aus dem Katalog von
- * `@einsatzzeichen/core` (`pictogram`), umgefärbt auf `currentColor`. Was der Katalog nicht hat,
- * steht in `SELBST_GEZEICHNET` (Folgeticket an `@einsatzzeichen`).
+ * Alle Zeichen kommen aus `@einsatzzeichen/core`, umgefärbt auf `currentColor`: Verbindungsarten
+ * (J.1) und Komponenten (J.3) aus dem Katalog (`pictogram`), Bedingungszeichen, Sammelschiene,
+ * Leitung, Bereich und die Verbindungsarten Melder, sonstige und Satellit aus der
+ * Kommunikationsskizze (`sketch.*`, LFH-1033). Die Skizze zeichnet in Millimetern des Pakets mal
+ * `SKIZZE_EINHEITEN_JE_MM`.
  */
-import { pictogram } from '@einsatzzeichen/core';
-import type { DepictionVariant, PictogramId, Primitive, Style } from '@einsatzzeichen/schema';
+import {
+  SKETCH_BUS_BAR_MARGIN_MM,
+  SKETCH_CONDITION_SIGN_HEIGHT_MM,
+  busBar,
+  busBarMinLength,
+  commsArea,
+  commsLink,
+  conditionSign,
+  conditionSignWidth,
+  pictogram,
+  sketchPictogram,
+  type SketchPictogramId,
+} from '@einsatzzeichen/core';
+import type {
+  DepictionVariant,
+  PictogramId,
+  Point,
+  Primitive,
+  Style,
+} from '@einsatzzeichen/schema';
 import type { CSSProperties, ReactElement } from 'react';
 import type {
   Komponentenart,
@@ -34,20 +55,18 @@ export type Betriebsart = Sprechgruppe['betriebsart'];
 
 // ── Maße (Benutzereinheiten der Skizze, Raster 8 nach D4) ──────────────────────────────────
 
+/** Benutzereinheiten der Skizze je Millimeter des Pakets: Strich 0,5 mm = 1,5. */
+export const SKIZZE_EINHEITEN_JE_MM = 3;
 /** Breite eines Zeichens der Monoschrift in em (JetBrains Mono: 600/1000). */
 export const ZEICHENBREITE_EM = 0.6;
-/** Schriftgrad im Bedingungszeichen. */
-export const BEDINGUNGSZEICHEN_SCHRIFT = 12;
 /** Höhe des Langsechsecks; die Spitzen sind je eine halbe Höhe breit. */
-export const BEDINGUNGSZEICHEN_HOEHE = 24;
-/** Luft zwischen Text und Spitzenansatz, je Seite. */
-export const BEDINGUNGSZEICHEN_INNENABSTAND = 4;
+export const BEDINGUNGSZEICHEN_HOEHE = SKETCH_CONDITION_SIGN_HEIGHT_MM * SKIZZE_EINHEITEN_JE_MM;
 /** Schriftgrad der Zeile unter dem Bedingungszeichen (Netz, Sicherheit, Hinweis). */
 export const HINWEIS_SCHRIFT = 10;
 /** Abstand zwischen Unterkante des Bedingungszeichens und Oberkante der Zeile darunter. */
 export const HINWEIS_ABSTAND = 4;
 /** Überstand der Sammelschiene links und rechts des Bedingungszeichens. */
-export const SCHIENE_RAND = 16;
+export const SCHIENE_RAND = SKETCH_BUS_BAR_MARGIN_MM * SKIZZE_EINHEITEN_JE_MM;
 /** Linienstärke in Ruhe und hervorgehoben (Hervorhebung über Strich, nicht über Farbe). */
 export const STRICH = 1.5;
 export const STRICH_HERVORGEHOBEN = 3;
@@ -55,26 +74,22 @@ export const STRICH_HERVORGEHOBEN = 3;
 export const STRICH_ZEICHEN_MIN = 1.25;
 /** Kantenlänge der Zeichen für Verbindungsart und Komponente. */
 export const ZEICHEN_GROESSE = 32;
-/** Zickzack-Marke einer Funkverbindung: Länge entlang der Linie und Ausschlag. */
-export const ZICKZACK_LAENGE = 24;
-export const ZICKZACK_HOEHE = 8;
-/** Schriftgrad und Abstand des Wortes „geplant“ an einer Leitung. */
-export const GEPLANT_SCHRIFT = 10;
-export const GEPLANT_ABSTAND = 4;
-/** Schriftgrad der Bezeichnung unter einem Komponentenzeichen und am Bereich. */
+/** Abstand der Bezeichnung unter einem Komponentenzeichen. */
+export const BESCHRIFTUNG_ABSTAND = 4;
+/** Schriftgrad der Bezeichnung unter einem Komponentenzeichen. */
 export const BESCHRIFTUNG_SCHRIFT = 10;
-/** Strichmuster „geplant“ (gestrichelt). */
-export const STRICHMUSTER_GEPLANT = '8 5';
-/** Strichmuster der Bereichsgrenze (Strich-Punkt): Strich, Lücke, Punkt, Lücke. */
-export const STRICHMUSTER_BEREICH = '14 4 2 4';
 
 /**
  * Fläche hinter Zeichen und Text. Die Skizzenfläche setzt `--lfh-skizze-grund`, wenn ihr Grund
  * nicht `--lfh-flaeche` ist; im Druck gilt die Papierfarbe der Druckwurzel.
  */
 export const GRUND = 'var(--lfh-skizze-grund, var(--lfh-flaeche))';
-const SCHRIFT_MONO: CSSProperties = { fontFamily: 'var(--lfh-schrift-zahl)' };
 const SCHRIFT_TEXT: CSSProperties = { fontFamily: 'var(--lfh-schrift-text)' };
+/**
+ * Schrift der Paketzeichen: Arimo, an deren Metriken das Paket Breiten misst (`theme/schriften.css`
+ * bindet den Schnitt 500 aus `@einsatzzeichen/core/fonts` ein).
+ */
+const SCHRIFT_ZEICHEN: CSSProperties = { fontFamily: "'Arimo', var(--lfh-schrift-text)" };
 
 // ── Wortlaute ──────────────────────────────────────────────────────────────────────────────
 
@@ -153,18 +168,30 @@ export function bedingungszeichenText(betriebsart: Betriebsart, bezeichnung: str
   return mitBetriebsart(betriebsart, bezeichnung).trim();
 }
 
+/** Millimeter des Pakets in Benutzereinheiten der Skizze. */
+function inEinheiten(mm: number): number {
+  // Gerundet, damit eine Lage auf dem Raster nach dem Hin und Her über Millimeter wieder genau
+  // auf dem Raster liegt (Stichleitungen enden auf der Linie der Schiene).
+  return Math.round(mm * SKIZZE_EINHEITEN_JE_MM * 1e6) / 1e6;
+}
+
+/** Benutzereinheiten der Skizze in Millimetern des Pakets. */
+function inMm(einheiten: number): number {
+  return einheiten / SKIZZE_EINHEITEN_JE_MM;
+}
+
+function punktInMm({ x, y }: Punkt): Point {
+  return [inMm(x), inMm(y)];
+}
+
 /** Breite des Langsechsecks samt Spitzen; wächst mit dem Text, nie gekürzt. */
 export function bedingungszeichenBreite(betriebsart: Betriebsart, bezeichnung: string): number {
-  const text = schaetzeTextbreite(
-    bedingungszeichenText(betriebsart, bezeichnung),
-    BEDINGUNGSZEICHEN_SCHRIFT,
-  );
-  return text + 2 * BEDINGUNGSZEICHEN_INNENABSTAND + BEDINGUNGSZEICHEN_HOEHE;
+  return inEinheiten(conditionSignWidth(bedingungszeichenText(betriebsart, bezeichnung)));
 }
 
 /** Kleinste Länge einer Sammelschiene: ihr Bedingungszeichen und beidseitig `SCHIENE_RAND`. */
 export function sammelschienenMindestbreite(betriebsart: Betriebsart, bezeichnung: string): number {
-  return bedingungszeichenBreite(betriebsart, bezeichnung) + 2 * SCHIENE_RAND;
+  return inEinheiten(busBarMinLength(bedingungszeichenText(betriebsart, bezeichnung)));
 }
 
 /** Was unter dem Bedingungszeichen stehen kann (BBK-Anhang J.5, LFH-1030). */
@@ -247,36 +274,44 @@ function grossAnfang(wort: string): string {
 
 // ── Zeichenquellen ─────────────────────────────────────────────────────────────────────────
 
-/** Woher ein Zeichen kommt: aus dem Katalog von @einsatzzeichen oder selbst gezeichnet. */
+/**
+ * Woher ein Zeichen kommt: aus dem Katalog von @einsatzzeichen (J.1–J.4) oder aus dessen
+ * Kommunikationsskizze (`sketch.*`, Zeichen ohne Referenzdatei, LFH-1033).
+ */
 export type Zeichenquelle =
   | { quelle: 'einsatzzeichen'; id: PictogramId; variante: DepictionVariant }
-  | { quelle: 'eigen'; zeichen: string };
+  | { quelle: 'skizze'; id: SketchPictogramId; variante: DepictionVariant };
 
 /**
  * J.1 kennt je Übertragung eine drahtlose (`primary`, mit Zickzack) und eine leitergebundene
- * Fassung (`alternative`). Richtfunk gibt es nur drahtlos.
+ * Fassung (`alternative`). Richtfunk gibt es nur drahtlos, Satellit nur als Schale.
  */
-const VERBINDUNGSART_KATALOG: Partial<Record<Verbindungsart, { id: PictogramId; paar: boolean }>> =
-  {
-    telefon: { id: 'comms.voice', paar: true },
-    fax: { id: 'comms.fax-transmission', paar: true },
-    daten: { id: 'comms.data-transmission', paar: true },
-    bild: { id: 'comms.image-transmission', paar: true },
-    livestream: { id: 'comms.livestream-transmission', paar: true },
-    richtfunk: { id: 'comms.directional-radio', paar: false },
-  };
+const VERBINDUNGSART_ZEICHEN: Record<
+  Verbindungsart,
+  | { quelle: 'einsatzzeichen'; id: PictogramId; paar: boolean }
+  | {
+      quelle: 'skizze';
+      id: SketchPictogramId;
+      paar: boolean;
+    }
+> = {
+  telefon: { quelle: 'einsatzzeichen', id: 'comms.voice', paar: true },
+  fax: { quelle: 'einsatzzeichen', id: 'comms.fax-transmission', paar: true },
+  daten: { quelle: 'einsatzzeichen', id: 'comms.data-transmission', paar: true },
+  bild: { quelle: 'einsatzzeichen', id: 'comms.image-transmission', paar: true },
+  livestream: { quelle: 'einsatzzeichen', id: 'comms.livestream-transmission', paar: true },
+  richtfunk: { quelle: 'einsatzzeichen', id: 'comms.directional-radio', paar: false },
+  melder: { quelle: 'skizze', id: 'sketch.messenger', paar: true },
+  sonstige: { quelle: 'skizze', id: 'sketch.other', paar: true },
+  satellit: { quelle: 'skizze', id: 'sketch.satellite', paar: false },
+};
 
 export function verbindungsartPiktogramm(
   art: Verbindungsart,
   medium: Verbindungsmedium,
 ): Zeichenquelle {
-  const katalog = VERBINDUNGSART_KATALOG[art];
-  if (!katalog) return { quelle: 'eigen', zeichen: `verbindungsart.${art}` };
-  return {
-    quelle: 'einsatzzeichen',
-    id: katalog.id,
-    variante: katalog.paar && medium === 'leitung' ? 'alternative' : 'primary',
-  };
+  const { paar, ...quelle } = VERBINDUNGSART_ZEICHEN[art];
+  return { ...quelle, variante: paar && medium === 'leitung' ? 'alternative' : 'primary' };
 }
 
 const KOMPONENTEN_KATALOG: Record<Komponentenart, PictogramId> = {
@@ -292,111 +327,54 @@ export function komponentenPiktogramm(art: Komponentenart): Zeichenquelle {
   return { quelle: 'einsatzzeichen', id: KOMPONENTEN_KATALOG[art], variante: 'primary' };
 }
 
-/**
- * Was @einsatzzeichen (Stand 4.1.0) und taktische-zeichen-react nicht haben und hier gezeichnet wird —
- * Vorlage für das Folgeticket an `@einsatzzeichen`.
- */
-export const SELBST_GEZEICHNET: readonly { zeichen: string; vorlage: string; grund: string }[] = [
-  {
-    zeichen: 'bedingungszeichen',
-    vorlage: 'J.5 Musterskizze',
-    grund: 'Langsechseck mit Betriebsart und Bezeichnung auf der Linie, wächst mit dem Text',
-  },
-  {
-    zeichen: 'sammelschiene',
-    vorlage: 'J.5 Musterskizze',
-    grund: 'waagerechte Schiene mit eingesetztem Bedingungszeichen und Stichleitungen',
-  },
-  {
-    zeichen: 'leitung.funk',
-    vorlage: 'J.1 / J.3.12 Funk',
-    grund: 'Zickzack-Marke auf einer beliebig langen, gedrehten Linie (Katalog: festes 32-mm-Feld)',
-  },
-  {
-    zeichen: 'leitung.geplant',
-    vorlage: 'J.5 Musterskizze',
-    grund: 'Status „geplant“: gestrichelte Linie mit dem Wort',
-  },
-  {
-    zeichen: 'bereich',
-    vorlage: 'J.5 Musterskizze',
-    grund: 'Rückwärtiger Bereich: Rechteck mit Strich-Punkt-Grenze',
-  },
-  {
-    zeichen: 'verbindungsart.melder',
-    vorlage: 'J.1 (Formsprache)',
-    grund: 'keine Verbindungsart „Melder“ in J.1; Balken mit Kürzel, Zickzack bei Funk',
-  },
-  {
-    zeichen: 'verbindungsart.satellit',
-    vorlage: 'J.1.12/J.1.13',
-    grund:
-      'Katalog kennt nur Satellit Sprache bzw. Daten; der Vertrag nur „satellit“ (Schale allein)',
-  },
-  {
-    zeichen: 'verbindungsart.sonstige',
-    vorlage: 'J.1 (Formsprache)',
-    grund: 'keine Verbindungsart „sonstige“ in J.1; Balken mit Kürzel, Zickzack bei Funk',
-  },
-];
-
-// ── Selbst gezeichnete Zeichen im Katalogformat (32 × 32 mm, Strich 0,5 mm) ────────────────
-
-const STRICH_REFERENZ: Style = { fill: 'none', stroke: 'schwarz', strokeWidth: 0.5 };
-
-function drahtlosZickzack(obenMm: number): Primitive {
-  const unten = obenMm + 4;
-  return {
-    type: 'polyline',
-    points: [
-      [4, obenMm],
-      [8, unten],
-      [12, obenMm],
-      [16, unten],
-      [20, obenMm],
-      [24, unten],
-      [28, obenMm],
-    ],
-    style: STRICH_REFERENZ,
-  };
-}
-
-/** Balken mit Kürzel darüber; drahtlos mit Zickzack darunter (Formsprache J.1.8–J.1.11). */
-function kuerzelUebertragung(kuerzel: string, medium: Verbindungsmedium): Primitive[] {
-  const balkenY = medium === 'funk' ? 16 : 19;
-  return [
-    {
-      type: 'text',
-      content: kuerzel,
-      x: 16,
-      y: balkenY - 2.5,
-      sizeMm: 7.1,
-      anchor: 'middle',
-      baseline: 'alphabetic',
-      boxMm: { xMm: 2, yMm: balkenY - 8, widthMm: 28, heightMm: 5 },
-      fontWeight: 500,
-    },
-    { type: 'line', x1: 3, y1: balkenY, x2: 29, y2: balkenY, style: STRICH_REFERENZ },
-    ...(medium === 'funk' ? [drahtlosZickzack(balkenY + 3)] : []),
-  ];
-}
-
-/** Satellitenschale ohne Angabe, was übertragen wird (Geometrie wie J.1.12/J.1.13). */
-const SATELLITENSCHALE: Primitive[] = [
-  { type: 'path', d: 'M 1 3 C 1 17.35 12.65 29 27 29', style: STRICH_REFERENZ },
-  { type: 'line', x1: 27, y1: 3, x2: 8.8, y2: 21.2, style: STRICH_REFERENZ },
-];
-
-function eigeneVerbindungsart(art: Verbindungsart, medium: Verbindungsmedium): Primitive[] {
-  if (art === 'satellit') return SATELLITENSCHALE;
-  if (art === 'melder') return kuerzelUebertragung('Melder', medium);
-  return kuerzelUebertragung('sonst.', medium);
-}
-
-function primitiveFuer(quelle: Zeichenquelle, eigen: () => Primitive[]): readonly Primitive[] {
+/** Die Primitive eines 32 × 32-mm-Zeichens aus dem Paket. */
+export function zeichenPrimitive(quelle: Zeichenquelle): readonly Primitive[] {
   return quelle.quelle === 'einsatzzeichen'
     ? pictogram(quelle.id, quelle.variante).primitives
-    : eigen();
+    : (sketchPictogram(quelle.id, quelle.variante).primitives as readonly Primitive[]);
+}
+
+/**
+ * Ein Teil eines Skizzenbausteins aus dem Paket (Millimeter) in Benutzereinheiten der Skizze.
+ * Die Bausteine liefern nur Linien, Polyzüge und Textläufe.
+ */
+function inSkizze(p: Primitive): Primitive {
+  const style = p.style?.strokeWidth
+    ? { ...p.style, strokeWidth: inEinheiten(p.style.strokeWidth) }
+    : p.style;
+  switch (p.type) {
+    case 'line':
+      return {
+        ...p,
+        style,
+        x1: inEinheiten(p.x1),
+        y1: inEinheiten(p.y1),
+        x2: inEinheiten(p.x2),
+        y2: inEinheiten(p.y2),
+      };
+    case 'polyline':
+      return {
+        ...p,
+        style,
+        points: p.points.map(([x, y]) => [inEinheiten(x), inEinheiten(y)] as const),
+      };
+    case 'text':
+      return {
+        ...p,
+        style,
+        x: inEinheiten(p.x),
+        y: inEinheiten(p.y),
+        sizeMm: inEinheiten(p.sizeMm),
+        boxMm: {
+          xMm: inEinheiten(p.boxMm.xMm),
+          yMm: inEinheiten(p.boxMm.yMm),
+          widthMm: inEinheiten(p.boxMm.widthMm),
+          heightMm: inEinheiten(p.boxMm.heightMm),
+        },
+      };
+    default:
+      throw new Error(`Skizzenbaustein mit unerwartetem Teil ${p.type}`);
+  }
 }
 
 // ── Darstellung der Katalog-Primitive in currentColor ──────────────────────────────────────
@@ -407,7 +385,21 @@ function farbe(token: Style['fill'] | Style['stroke']): { attr: string; stil?: s
   return { attr: 'currentColor' };
 }
 
-function Primitiv({ p, minStrich }: { p: Primitive; minStrich: number }): ReactElement {
+/**
+ * Ein Primitiv des Pakets als SVG. `strich` ersetzt die Strichstärke jedes gezeichneten Strichs
+ * (Hervorhebung an Skizzenbausteinen); ohne gilt die des Pakets, mindestens `minStrich`.
+ */
+function Primitiv({
+  p,
+  minStrich = 0,
+  strich,
+  teil,
+}: {
+  p: Primitive;
+  minStrich?: number;
+  strich?: number;
+  teil?: string;
+}): ReactElement {
   const stroke = farbe(p.style?.stroke);
   const fill = farbe(p.type === 'text' ? (p.style?.fill ?? 'schwarz') : p.style?.fill);
   const stil: CSSProperties = {};
@@ -427,11 +419,12 @@ function Primitiv({ p, minStrich }: { p: Primitive; minStrich: number }): ReactE
     strokeWidth:
       stroke.attr === 'none' && !stroke.stil
         ? undefined
-        : Math.max(p.style?.strokeWidth ?? 0.5, minStrich),
+        : (strich ?? Math.max(p.style?.strokeWidth ?? 0.5, minStrich)),
     fillRule: p.style?.fillRule,
     strokeLinejoin: p.style?.strokeLinejoin,
     transform: transform || undefined,
     style: Object.keys(stil).length ? stil : undefined,
+    'data-teil': teil,
   };
   switch (p.type) {
     case 'rect':
@@ -462,7 +455,8 @@ function Primitiv({ p, minStrich }: { p: Primitive; minStrich: number }): ReactE
           dominantBaseline={p.baseline === 'alphabetic' ? undefined : p.baseline}
           fill={fill.attr}
           transform={gemeinsam.transform}
-          style={{ ...SCHRIFT_TEXT, ...gemeinsam.style }}
+          style={{ ...SCHRIFT_ZEICHEN, ...gemeinsam.style }}
+          data-teil={teil}
         >
           {p.content}
         </text>
@@ -471,7 +465,7 @@ function Primitiv({ p, minStrich }: { p: Primitive; minStrich: number }): ReactE
       return (
         <g transform={gemeinsam.transform}>
           {p.children.map((kind, i) => (
-            <Primitiv key={i} p={kind} minStrich={minStrich} />
+            <Primitiv key={i} p={kind} minStrich={minStrich} strich={strich} />
           ))}
         </g>
       );
@@ -512,6 +506,25 @@ export interface Punkt {
   y: number;
 }
 
+/** Teile eines Skizzenbausteins in Benutzereinheiten, Striche in `strich`. */
+function Teile({
+  teile,
+  strich,
+  teil,
+}: {
+  teile: readonly Primitive[];
+  strich?: number;
+  teil?: string;
+}) {
+  return (
+    <>
+      {teile.map((p, i) => (
+        <Primitiv key={i} p={inSkizze(p)} strich={strich} teil={teil} />
+      ))}
+    </>
+  );
+}
+
 function Langsechseck({
   x,
   y,
@@ -527,46 +540,19 @@ function Langsechseck({
   angaben: Bedingungsangaben;
   strich: number;
 }) {
-  const breite = bedingungszeichenBreite(betriebsart, bezeichnung);
+  const zeichen = conditionSign({
+    text: bedingungszeichenText(betriebsart, bezeichnung),
+    center: punktInMm({ x, y }),
+  });
   const zusatz = bedingungszeichenZusatz(angaben);
-  const h = BEDINGUNGSZEICHEN_HOEHE / 2;
-  const links = x - breite / 2;
-  const rechts = x + breite / 2;
-  const punkte = [
-    [links, y],
-    [links + h, y - h],
-    [rechts - h, y - h],
-    [rechts, y],
-    [rechts - h, y + h],
-    [links + h, y + h],
-  ]
-    .map(([px, py]) => `${px},${py}`)
-    .join(' ');
   return (
     <>
-      <polygon
-        points={punkte}
-        fill="none"
-        style={{ fill: GRUND }}
-        stroke="currentColor"
-        strokeWidth={strich}
-        strokeLinejoin="round"
-      />
-      <text
-        x={x}
-        y={y}
-        fontSize={BEDINGUNGSZEICHEN_SCHRIFT}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="currentColor"
-        style={SCHRIFT_MONO}
-      >
-        {bedingungszeichenText(betriebsart, bezeichnung)}
-      </text>
+      <Teile teile={zeichen.outline} strich={strich} />
+      <Teile teile={zeichen.label} />
       {zusatz ? (
         <text
           x={x}
-          y={y + h + HINWEIS_ABSTAND}
+          y={y + BEDINGUNGSZEICHEN_HOEHE / 2 + HINWEIS_ABSTAND}
           fontSize={HINWEIS_SCHRIFT}
           textAnchor="middle"
           dominantBaseline="hanging"
@@ -649,36 +635,111 @@ export function Sammelschiene({
   className,
 }: SammelschieneProps) {
   const angaben = { netz, sicherheit, hinweis };
-  const laenge = Math.max(breite, sammelschienenMindestbreite(betriebsart, bezeichnung));
-  const halb = bedingungszeichenBreite(betriebsart, bezeichnung) / 2;
-  const mitte = Math.min(
-    Math.max(zeichenX ?? x + laenge / 2, x + SCHIENE_RAND + halb),
-    x + laenge - SCHIENE_RAND - halb,
-  );
+  const schiene = busBar({
+    start: punktInMm({ x, y }),
+    length: inMm(breite),
+    text: bedingungszeichenText(betriebsart, bezeichnung),
+    signCenterX: zeichenX === undefined ? undefined : inMm(zeichenX),
+  });
   const strich = hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
   const name = `Sammelschiene ${bedingungszeichenName(betriebsart, bezeichnung, angaben)}`;
+  const [schienenLinie] = schiene.rail;
+  if (schienenLinie?.type !== 'line') throw new Error('Die Schiene des Pakets ist eine Linie.');
+  const zusatz = bedingungszeichenZusatz(angaben);
   return (
     <g role="img" aria-label={name} className={className}>
       <title>{name}</title>
       <line
         data-teil="schiene"
-        x1={x}
-        y1={y}
-        x2={x + laenge}
-        y2={y}
+        x1={inEinheiten(schienenLinie.x1)}
+        y1={inEinheiten(schienenLinie.y1)}
+        x2={inEinheiten(schienenLinie.x2)}
+        y2={inEinheiten(schienenLinie.y2)}
         stroke="currentColor"
         strokeWidth={strich}
         strokeLinecap="square"
       />
-      <Langsechseck
-        x={mitte}
-        y={y}
-        betriebsart={betriebsart}
-        bezeichnung={bezeichnung}
-        angaben={angaben}
-        strich={strich}
-      />
+      <Teile teile={schiene.sign.outline} strich={strich} />
+      <Teile teile={schiene.sign.label} />
+      {zusatz ? (
+        <text
+          x={inEinheiten(schiene.sign.center[0])}
+          y={y + BEDINGUNGSZEICHEN_HOEHE / 2 + HINWEIS_ABSTAND}
+          fontSize={HINWEIS_SCHRIFT}
+          textAnchor="middle"
+          dominantBaseline="hanging"
+          fill="currentColor"
+          style={SCHRIFT_TEXT}
+        >
+          {zusatz}
+        </text>
+      ) : null}
     </g>
+  );
+}
+
+/** Stützpunkte ohne aufeinanderfolgende Doppel; `null`, wenn kein Abschnitt mit Länge bleibt. */
+function verlauf(punkte: readonly Punkt[]): Point[] | null {
+  const ohneDoppel = punkte.filter(
+    (p, i) => i === 0 || p.x !== punkte[i - 1].x || p.y !== punkte[i - 1].y,
+  );
+  return ohneDoppel.length >= 2 ? ohneDoppel.map(punktInMm) : null;
+}
+
+/**
+ * Linie, Marke und Wort einer Leitung auf einem Linienzug (`commsLink`): glatt oder mit
+ * Zickzack-Marke, durchgezogen oder gestrichelt mit dem Wort „geplant“. Sitzt ein Zeichen der
+ * Verbindungsart in der Mitte, trägt es die Marke, und das Wort hält dessen halbe Größe Abstand.
+ */
+export function Leitungsbild({
+  punkte,
+  medium,
+  status,
+  art,
+  strich,
+  linienTeil = 'linie',
+}: {
+  punkte: readonly Punkt[];
+  medium: Verbindungsmedium;
+  status: Verbindungsstatus;
+  art?: Verbindungsart | null;
+  strich: number;
+  /** `data-teil` der Linie. */
+  linienTeil?: string;
+}) {
+  const pfad = verlauf(punkte);
+  if (!pfad) return null;
+  const leitung = commsLink({
+    path: pfad,
+    medium: medium === 'funk' ? 'radio' : 'wire',
+    status: status === 'geplant' ? 'planned' : 'existing',
+    mark: !art,
+    clearanceMm: art ? inMm(ZEICHEN_GROESSE / 2) : undefined,
+  });
+  const { point, angleDeg } = leitung.anchor;
+  return (
+    <>
+      <g data-teil={linienTeil}>
+        <Teile teile={leitung.line} strich={strich} />
+      </g>
+      {art ? (
+        <g data-teil="art">
+          <Piktogramm
+            primitive={zeichenPrimitive(verbindungsartPiktogramm(art, medium))}
+            x={inEinheiten(point[0])}
+            y={inEinheiten(point[1])}
+            groesse={ZEICHEN_GROESSE}
+            winkel={angleDeg}
+          />
+        </g>
+      ) : leitung.mark.length > 0 ? (
+        // Der Grund unterbricht die Linie, damit die Marke auch in Graustufen allein steht.
+        <g data-teil="funk" aria-hidden="true">
+          <Teile teile={leitung.mark} strich={strich} />
+        </g>
+      ) : null}
+      <Teile teile={leitung.word} teil="geplant" />
+    </>
   );
 }
 
@@ -695,14 +756,6 @@ export interface LeitungProps {
   className?: string;
 }
 
-/** Linienwinkel in Grad, auf (−90°, 90°] gelegt, damit Zeichen nie kopfstehen. */
-function lesbarerWinkel(dx: number, dy: number): number {
-  let w = (Math.atan2(dy, dx) * 180) / Math.PI;
-  if (w > 90) w -= 180;
-  if (w <= -90) w += 180;
-  return w;
-}
-
 /**
  * Leitung zwischen zwei Punkten: glatt (leitergebunden) oder mit Zickzack-Marke (Funk),
  * durchgezogen (bestehend) oder gestrichelt mit dem Wort „geplant“ (D7).
@@ -717,100 +770,17 @@ export function Leitung({
   hervorgehoben = false,
   className,
 }: LeitungProps) {
-  const dx = nach.x - von.x;
-  const dy = nach.y - von.y;
-  const laenge = Math.hypot(dx, dy);
-  const mx = (von.x + nach.x) / 2;
-  const my = (von.y + nach.y) / 2;
-  const winkel = laenge > 0 ? lesbarerWinkel(dx, dy) : 0;
-  // Normale nach unten bzw. rechts: dort steht das Wort „geplant“.
-  let nx = laenge > 0 ? -dy / laenge : 0;
-  let ny = laenge > 0 ? dx / laenge : 1;
-  if (ny < 0 || (ny === 0 && nx < 0)) {
-    nx = -nx;
-    ny = -ny;
-  }
-  const strich = hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
-  const geplant = status === 'geplant';
   const name = leitungsBeschreibung({ art, medium, status, bezug });
-
-  const markeHalb = art ? ZEICHEN_GROESSE / 2 : medium === 'funk' ? ZICKZACK_HOEHE / 2 : 0;
-  const wortAbstand = markeHalb + GEPLANT_ABSTAND + strich;
-  const seitlich = Math.abs(nx) > 0.5;
-
-  let marke: ReactElement | null = null;
-  if (art) {
-    marke = (
-      <g data-teil="art">
-        <Piktogramm
-          primitive={primitiveFuer(verbindungsartPiktogramm(art, medium), () =>
-            eigeneVerbindungsart(art, medium),
-          )}
-          x={mx}
-          y={my}
-          groesse={ZEICHEN_GROESSE}
-          winkel={winkel}
-        />
-      </g>
-    );
-  } else if (medium === 'funk') {
-    const l = ZICKZACK_LAENGE / 2;
-    const a = ZICKZACK_HOEHE / 2;
-    // Sechs Schenkel: Enden auf der Linie, dazwischen abwechselnd oben und unten.
-    const zacken = Array.from({ length: 7 }, (_, i) => {
-      const zy = i === 0 || i === 6 ? 0 : i % 2 === 1 ? -a : a;
-      return `${-l + (i * ZICKZACK_LAENGE) / 6},${zy}`;
-    });
-    marke = (
-      <g data-teil="funk" transform={`translate(${mx} ${my}) rotate(${winkel})`} aria-hidden="true">
-        {/* Der Grund unterbricht die Linie, damit die Marke auch in Graustufen allein steht. */}
-        <rect
-          x={-l - 2}
-          y={-a - 2}
-          width={ZICKZACK_LAENGE + 4}
-          height={ZICKZACK_HOEHE + 4}
-          fill="none"
-          style={{ fill: GRUND }}
-        />
-        <polyline
-          points={zacken.join(' ')}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strich}
-          strokeLinejoin="miter"
-        />
-      </g>
-    );
-  }
-
   return (
     <g role="img" aria-label={name} className={className}>
       <title>{name}</title>
-      <line
-        data-teil="linie"
-        x1={von.x}
-        y1={von.y}
-        x2={nach.x}
-        y2={nach.y}
-        stroke="currentColor"
-        strokeWidth={strich}
-        strokeDasharray={geplant ? STRICHMUSTER_GEPLANT : undefined}
+      <Leitungsbild
+        punkte={[von, nach]}
+        medium={medium}
+        status={status}
+        art={art}
+        strich={hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH}
       />
-      {marke}
-      {geplant ? (
-        <text
-          data-teil="geplant"
-          x={mx + nx * wortAbstand}
-          y={my + ny * wortAbstand}
-          fontSize={GEPLANT_SCHRIFT}
-          textAnchor={seitlich ? 'start' : 'middle'}
-          dominantBaseline={seitlich ? 'central' : 'hanging'}
-          fill="currentColor"
-          style={SCHRIFT_TEXT}
-        >
-          geplant
-        </text>
-      ) : null}
     </g>
   );
 }
@@ -842,9 +812,7 @@ export function VerbindungsartZeichen({
     <g role="img" aria-label={name} className={className}>
       <title>{name}</title>
       <Piktogramm
-        primitive={primitiveFuer(verbindungsartPiktogramm(art, medium), () =>
-          eigeneVerbindungsart(art, medium),
-        )}
+        primitive={zeichenPrimitive(verbindungsartPiktogramm(art, medium))}
         x={x}
         y={y}
         groesse={groesse}
@@ -880,7 +848,7 @@ export function KomponentenZeichen({
     <g role="img" aria-label={name} className={className}>
       <title>{name}</title>
       <Piktogramm
-        primitive={primitiveFuer(komponentenPiktogramm(art), () => [])}
+        primitive={zeichenPrimitive(komponentenPiktogramm(art))}
         x={x}
         y={y}
         groesse={groesse}
@@ -888,7 +856,7 @@ export function KomponentenZeichen({
       {bezeichnung ? (
         <text
           x={x}
-          y={y + groesse / 2 + GEPLANT_ABSTAND}
+          y={y + groesse / 2 + BESCHRIFTUNG_ABSTAND}
           fontSize={BESCHRIFTUNG_SCHRIFT}
           textAnchor="middle"
           dominantBaseline="hanging"
@@ -924,30 +892,30 @@ export function BereichsRahmen({
   className,
 }: BereichsRahmenProps) {
   const name = `Bereich: ${bezeichnung}`;
-  const strich = hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
+  const bereich =
+    breite > 0 && hoehe > 0
+      ? commsArea({
+          x: inMm(x),
+          y: inMm(y),
+          width: inMm(breite),
+          height: inMm(hoehe),
+          label: bezeichnung,
+        })
+      : null;
   return (
     <g role="img" aria-label={name} className={className}>
       <title>{name}</title>
-      <rect
-        x={x}
-        y={y}
-        width={breite}
-        height={hoehe}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strich}
-        strokeDasharray={STRICHMUSTER_BEREICH}
-      />
-      <text
-        x={x + 8}
-        y={y + 8}
-        fontSize={BESCHRIFTUNG_SCHRIFT}
-        dominantBaseline="hanging"
-        fill="currentColor"
-        style={SCHRIFT_TEXT}
-      >
-        {bezeichnung}
-      </text>
+      {bereich ? (
+        <>
+          <g data-teil="grenze">
+            <Teile
+              teile={bereich.boundary}
+              strich={hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH}
+            />
+          </g>
+          <Teile teile={bereich.label} />
+        </>
+      ) : null}
     </g>
   );
 }
