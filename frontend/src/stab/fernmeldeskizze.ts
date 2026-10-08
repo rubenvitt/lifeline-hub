@@ -106,9 +106,9 @@ export interface ElementLuecke {
   gegenstelle?: string;
 }
 
-/** Wie ein Ausstattungszeichen gezeichnet wird (`stab/skizzenZeichen.tsx:AusstattungsZeichenBild`). */
+/** Wie ein Ausstattungszeichen gezeichnet wird (`stab/skizze/SkizzenElemente.tsx:AusstattungsZeichenBild`). */
 export type AusstattungsZeichen =
-  /** Führungsfahrzeug: dasselbe Zeichen wie auf der Lagekarte. */
+  /** Führungsfahrzeug: Zeichen aus `baueTzProps`, Einstufung wie auf der Lagekarte. */
   | { art: 'tz'; tz: TzProps }
   /** Funktionsfassung aus BBK Anhang D. */
   | { art: 'rolle'; rolle: 'incident-section-commander' | 'incident-subsection-commander' }
@@ -343,11 +343,17 @@ function fuehrungsmittel(f: EinsatzFahrzeug): SkizzenAusstattung | null {
   };
 }
 
-/** Die Sachgebiete, die an der Führungsstelle wahrgenommen werden, in S-Folge (LFH-1029 D3). */
+/**
+ * Die Sachgebiete, die an der Führungsstelle wahrgenommen werden, in S-Folge: bei der
+ * Einsatzleitung, durch disponiertes Personal oder extern besetzt (Spec `stab-fernmeldeskizze`,
+ * „Führungsmittel und Funktionen im Kasten“). Rückwärtig und eine nicht mehr disponierte Person
+ * zählen nicht.
+ */
 function stabAusstattung(besetzung: readonly Stabsfunktion[]): SkizzenAusstattung[] {
   return SACHGEBIETE.flatMap(({ sachgebiet, kuerzel }) => {
     const zeile = besetzung.find((b) => b.sachgebiet === sachgebiet);
     if (!zeile || zeile.besetzung_art === 'rueckwaertig') return [];
+    if (zeile.besetzung_art === 'personal' && !zeile.personal_noch_disponiert) return [];
     return [
       {
         art: 'funktion' as const,

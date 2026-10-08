@@ -18,7 +18,7 @@ import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
  * - KASTEN: „EAL“ und „ELW 1“ stehen im Kasten des Abschnitts, „S2“ und „S3“ im Kasten
  *   „Einsatzleitung“, das rückwärtige „S6“ nicht; kein Personenname. Jedes Wort liegt im Kasten,
  *   am Schirm und im Druck A4 quer.
- * - MESSUNG (Aufgabe 2.3): Höhe der Wörter im Druck A4 und A3 quer bei acht obersten Abschnitten,
+ * - MESSUNG: Höhe der Wörter im Druck A4 und A3 quer bei acht obersten Abschnitten,
  *   als Annotation, gegen den Rufnamen desselben Kastens.
  *
  * Mutationsprobe: `ausstattungsZeilen(...).hoehe` in `stellenMasse` weg → der Kasten wächst nicht,
@@ -65,7 +65,7 @@ async function ausstattungImKasten(page: Page, key: string) {
       const rufGrad = nameSchrift * (ruf?.getScreenCTM()?.a ?? 0);
       return Array.from(g.querySelectorAll('[data-ausstattung]')).map((a) => {
         const r = a.getBoundingClientRect();
-        const wort = a.querySelector(':scope > text')!;
+        const wort = a.querySelector<SVGTextElement>(':scope > text')!;
         return {
           schluessel: a.getAttribute('data-ausstattung'),
           wort: wort.textContent,
@@ -117,7 +117,7 @@ test('Kasten: EAL und ELW 1 am Abschnitt, S2 und S3 an der Einsatzleitung, kein 
   await page.emulateMedia({ media: null });
 });
 
-test('Messung 2.3: Wörter der Ausstattung im Druck A4 quer bei acht obersten Abschnitten', async ({
+test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht obersten Abschnitten', async ({
   page,
 }) => {
   test.setTimeout(120_000);

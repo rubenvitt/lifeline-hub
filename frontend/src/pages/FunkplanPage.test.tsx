@@ -1370,6 +1370,10 @@ describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
   });
 
   it('nennt gesperrte Fahrzeuge an der Skizze und zeigt die Kästen ohne Führungsmittel', async () => {
+    vi.mocked(listeAbschnitte).mockResolvedValue([
+      { ...ABSCHNITTE[0], leiter_id: 1 },
+      ABSCHNITTE[1],
+    ]);
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new ApiError(403, 'verboten'));
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
@@ -1378,6 +1382,7 @@ describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
         expect.objectContaining({ name: 'Fahrzeuge' }),
       ),
     );
-    expect(ausstattung('ab-1')).toEqual([]);
+    // Der Kasten steht mit seiner Leitung, nur die Führungsmittel fehlen.
+    await waitFor(() => expect(ausstattung('ab-1')).toEqual(['EAL']));
   });
 });

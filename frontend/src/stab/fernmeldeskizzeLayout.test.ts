@@ -418,7 +418,7 @@ describe('stellenMasse', () => {
   });
 });
 
-describe('Ausstattung im Kasten (LFH-1029 D4)', () => {
+describe('Ausstattung im Kasten (LFH-1029)', () => {
   /** Abschnitt 1 mit Leitung und `n` Führungsfahrzeugen der Einheit 10. */
   const kasten = (typen: string[], leitung = true) => {
     const s = netz({

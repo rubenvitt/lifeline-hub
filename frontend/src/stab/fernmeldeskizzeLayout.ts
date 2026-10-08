@@ -78,8 +78,10 @@ export const STEIG_ABSTAND = RASTER;
 const ZEICHEN_ABSTAND = 4;
 
 /**
- * Ausstattung im Kasten (LFH-1029 D4): je Zeichen ein Platz mit Zeichen und Wort darunter, so
- * viele Plätze je Zeile wie die Innenbreite fasst. Vorläufig bis zur Messung im Druck.
+ * Ausstattung im Kasten (LFH-1029): je Zeichen ein Platz mit Zeichen und Wort darunter, so
+ * viele Plätze je Zeile wie die Innenbreite fasst. Gemessen im Druck (`e2e/fernmeldeskizze-
+ * ausstattung.spec.ts`, „Messung“): acht Abschnitte, A4 quer 3,4 pt, A3 quer 5,1 pt, so
+ * klein wie der Rufname im Verhältnis 10 : 12, nie kleiner.
  */
 export const AUSSTATTUNG_PLATZ = 52;
 export const AUSSTATTUNG_ZEICHEN = 24;

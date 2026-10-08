@@ -350,7 +350,7 @@ export function StelleBild({
   // Ein langer Rufname bricht um wie die Bezeichnung (Messung 1.1); der Platz wächst in
   // `stellenMasse` um dieselben Zeilen mit.
   const rufZeilen = ruf ? umbrich(ruf, NAME_SCHRIFT, innen) : [];
-  // Führungsmittel und Funktionen zwischen Rufname und Lückenzeile (LFH-1029 D4).
+  // Führungsmittel und Funktionen zwischen Rufname und Lückenzeile (LFH-1029).
   const ausstattungY = rufY + Math.max(1, rufZeilen.length) * RUFNAME_ZEILE;
   const lueckeY =
     ausstattungY +

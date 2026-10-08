@@ -859,6 +859,18 @@ describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-102
     });
   });
 
+  it('ein Sachgebiet, dessen Person nicht mehr disponiert ist, steht nicht im Kasten', () => {
+    const netz = baueFernmeldenetz(
+      quellen({
+        besetzung: daten([
+          besetzt('s1', 'personal', 'Max Muster'),
+          { ...besetzt('s4', 'personal', 'Eva Weg'), personal_noch_disponiert: false },
+        ]),
+      }),
+    );
+    expect(ausstattung(netz, 'fs')).toEqual(['S1']);
+  });
+
   it('Abschnitt ohne Leitung trägt keine Funktion', () => {
     const netz = baueFernmeldenetz(quellen({ abschnitte: daten([abschnitt(1)]) }));
     expect(ausstattung(netz, 'ab-1')).toEqual([]);
@@ -868,8 +880,13 @@ describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-102
     const netz = baueFernmeldenetz(
       quellen({
         abschnitte: daten([abschnitt(1, { leiter_id: 5 })]),
-        fahrzeuge: { zustand: 'gesperrt', daten: [] },
-        besetzung: { zustand: 'fehler', daten: [] },
+        einheiten: daten([einheit(10, { abschnitt_id: 1 })]),
+        // Was eine Quelle ohne Freigabe oder mit Fehler noch trägt, gilt nicht.
+        fahrzeuge: {
+          zustand: 'gesperrt',
+          daten: [fahrzeug(100, { einheit_id: 10, fahrzeugtyp: 'ELW 1' })],
+        },
+        besetzung: { zustand: 'fehler', daten: [besetzt('s2', 'einsatzleitung')] },
       }),
     );
     expect(netz.fehlend.map((f) => `${f.name}: ${f.zustand}`)).toEqual([
