@@ -7,6 +7,10 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   Eigenes `package.json`, Lockfile und `pnpm-workspace.yaml`; nichts aus `frontend/` wird
   importiert, damit die Seite ohne die App baut. Kein Deployment, kein Schritt in
   `scripts/check-all.sh`.
+- **CI:** Ein PR, der nur `website/` ändert, fährt nur die Schnellprüfungen; Rust-, Frontend-
+  und e2e-Suite laufen leer und grün durch (Job `aenderungen`, Mechanik im Kopf von
+  `.github/workflows/ci.yml`). Eine Datei außerhalb von `website/` im selben PR schaltet
+  alles wieder ein.
 - **Kopien statt zweiter Quelle:** `src/styles/rollen.css` (aus `frontend/src/theme/rollen.css`),
   `src/daten/module.ts` (aus `frontend/src/einsatz/modulRegistry.ts`, Name und Beschreibung
   wörtlich), `src/components/Bildmarke.astro` (aus `frontend/src/marke/bildmarkeGeometrie.ts`)
