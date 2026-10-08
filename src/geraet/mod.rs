@@ -141,6 +141,7 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet
                 | Funktionsansicht::UhsLaptop
                 | Funktionsansicht::Lagemonitor
+                | Funktionsansicht::Bereitstellungsraum
         )
     }
 
@@ -173,9 +174,15 @@ impl Funktionsansicht {
                 "gefahrenzonen",
                 "einsatzabschnitte",
             ],
+            // LFH-1042: der eigene Raum, die Kräfte des Einsatzes und die eigenen Meldungen.
+            Funktionsansicht::Bereitstellungsraum => &[
+                "bereitstellungsraeume",
+                "einheiten",
+                "fahrzeuge",
+                "meldungen",
+            ],
             // Noch nicht verfügbar (LFH-1040): ohne Module erreicht das Gerät nichts.
             Funktionsansicht::Betreuungsstelle
-            | Funktionsansicht::Bereitstellungsraum
             | Funktionsansicht::Einsatzabschnitt
             | Funktionsansicht::Verpflegung => &[],
         }
@@ -189,9 +196,9 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet => UHS_TABLET,
             Funktionsansicht::UhsLaptop => UHS_LAPTOP,
             Funktionsansicht::Lagemonitor => LAGEMONITOR,
+            Funktionsansicht::Bereitstellungsraum => BEREITSTELLUNGSRAUM,
             // Noch nicht verfügbar (LFH-1040): nur `ALLE_ANSICHTEN`.
             Funktionsansicht::Betreuungsstelle
-            | Funktionsansicht::Bereitstellungsraum
             | Funktionsansicht::Einsatzabschnitt
             | Funktionsansicht::Verpflegung => &[],
         }
@@ -261,6 +268,29 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
 /// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
 /// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
 const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor")];
+
+/// Zusätzliche Einsatzrouten des Bereitstellungsraums (LFH-1042): den eigenen Raum lesen, Kräfte
+/// in ihm an- und abmelden (Eintritt, Wechsel herein, Austritt; `{bid}` ist immer der eigene) und
+/// ihn in Betrieb nehmen; die Einheiten- und Fahrzeugliste des Einsatzes lesen; Meldungen an die
+/// Einsatzleitung anlegen und die eigenen lesen. Jeder BR-Handler hier prüft die Stelle über
+/// [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Anlegen, Stammdaten, Auflösen,
+/// Stornieren und jede Änderung an Einheiten und Fahrzeugen (auch das Abrufen) fehlen bewusst.
+const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
+    ("GET", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
+    ),
+    ("GET", "/api/einsaetze/{id}/einheiten"),
+    ("GET", "/api/einsaetze/{id}/fahrzeuge"),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+];
 
 /// Ob eine Gerätesitzung mit dieser Ansicht die Route `(methode, pfad)` aufrufen darf. `pfad`
 /// ist die `MatchedPath` (Muster mit Platzhaltern). Ohne Treffer: verboten.
@@ -436,6 +466,39 @@ mod tests {
         );
         assert_eq!(F::Verpflegung.stellenart(), None);
         assert_eq!(F::Lagemonitor.stellenart(), None);
+    }
+
+    #[test]
+    fn bereitstellungsraum_verwaltet_den_raum_nicht() {
+        let b = Funktionsansicht::Bereitstellungsraum;
+        assert!(b.ist_verfuegbar());
+        assert!(b.rolle().darf_schreiben());
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
+            ),
+            (
+                "POST",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
+            ),
+            ("GET", "/api/einsaetze/{id}/einheiten"),
+            ("POST", "/api/einsaetze/{id}/meldungen"),
+        ] {
+            assert!(darf_route(b, m, p), "BR-Gerät darf {m} {p}");
+        }
+        for (m, p) in [
+            ("POST", "/api/einsaetze/{id}/bereitstellungsraeume"),
+            ("PATCH", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+            ("DELETE", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}/position"),
+            ("GET", "/api/einsaetze/{id}/personen"),
+            ("GET", "/api/einsaetze/{id}/uhs"),
+        ] {
+            assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
+        }
     }
 
     #[test]

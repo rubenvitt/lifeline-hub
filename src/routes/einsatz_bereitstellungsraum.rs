@@ -8,6 +8,7 @@ use crate::einsatz::modul::Bereitstellungsraeume;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::geraet::{stelle, Bindungsart};
 use crate::live::LiveEvent;
 use crate::routes::support::{
     deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme,
@@ -95,15 +96,18 @@ pub async fn liste(
         params.status.as_deref(),
         "Unbekannter BR-Status im Filter",
     )?;
-    Ok(Json(
-        br_repo::liste(
-            &state.pool,
-            einsatz_id,
-            params.status.as_deref(),
-            params.abschnitt_id,
-        )
-        .await?,
-    ))
+    let mut liste = br_repo::liste(
+        &state.pool,
+        einsatz_id,
+        params.status.as_deref(),
+        params.abschnitt_id,
+    )
+    .await?;
+    // Stellenbindung (LFH-1042): ein BR-Gerät kennt nur seinen eigenen Raum, jedes andere Gerät
+    // keinen.
+    let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum);
+    liste.retain(|b| sicht.sieht(b.id));
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]
@@ -148,6 +152,7 @@ pub async fn detail(
     ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
     PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<BrDetail>, AppError> {
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
     let einsatz_id = ctx.einsatz.id;
     Ok(Json(lade_detail(&state, einsatz_id, br_id).await?))
 }
@@ -218,7 +223,13 @@ pub async fn status_wechsel(
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<BrAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    parse_enum(BrStatus::parse, &body.status, "Unbekannter Status")?;
+    let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum);
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    let status = parse_enum(BrStatus::parse, &body.status, "Unbekannter Status")?;
+    // Ein BR-Gerät nimmt seinen Raum nur in Betrieb (LFH-1042); Auflösen bleibt bei der Leitung.
+    if sicht != stelle::Sicht::Alle && status != BrStatus::Aktiv {
+        return Err(AppError::Forbidden);
+    }
     let vorher = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -274,6 +285,9 @@ pub async fn belegung(
     PfadParam((_eid, br_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<BelegungBody>,
 ) -> Result<(StatusCode, Json<BrBelegungAnzeige>), AppError> {
+    // `{bid}` ist bei jeder Art der eigene Raum des Geräts (Ziel von Eintritt und Wechsel, Quelle
+    // des Austritts); ein Wechsel hinaus trägt den fremden Raum und ist damit 404 (LFH-1042).
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
     let einsatz_id = ctx.einsatz.id;
     let notiz = trimme(body.notiz);
 

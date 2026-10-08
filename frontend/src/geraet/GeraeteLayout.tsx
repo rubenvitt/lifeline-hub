@@ -3,13 +3,23 @@ import { theme } from 'antd';
 import { Navigate, NavLink, Outlet, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import type { Funktionsansicht, GeraetAnzeige } from '../api/types';
-import { IconHausHerz, IconKachelraster, IconPersonPlus, IconPersonen, type Icon } from '../icons';
+import {
+  IconHausHerz,
+  IconKachelraster,
+  IconLagerhalle,
+  IconPersonPlus,
+  IconPersonen,
+  IconPosteingang,
+  type Icon,
+} from '../icons';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
 import {
   geraetAufnahmePfad,
+  geraetBrPfad,
+  geraetMeldungenPfad,
   geraetMonitorPfad,
   geraetPatientenPfad,
   geraetStellePfad,
@@ -19,7 +29,9 @@ import {
 import { rahmenFarben } from '../theme/tokens';
 import { SeitenLeer } from '../components/SeitenZustand';
 import AufnahmePage from '../pages/personen/AufnahmePage';
+import BrDetailPage from '../pages/bereitstellungsraum/BrDetailPage';
 import UhsDetailPage from '../pages/uhs/UhsDetailPage';
+import GeraetMeldungenPage from './GeraetMeldungenPage';
 import GeraetStellePage from './GeraetStellePage';
 import LagemonitorPage from './LagemonitorPage';
 import { GeraeteKopf } from './GeraeteKopf';
@@ -32,8 +44,8 @@ export function istUhsAnsicht(ansicht: Funktionsansicht): boolean {
 
 /**
  * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, der
- * Lagemonitor mit seinem Großbild. Eine Ansicht ohne eigene Seiten (noch nicht freigeschaltet,
- * LFH-1040) hat keine: `null`.
+ * Lagemonitor mit seinem Großbild, der Bereitstellungsraum mit seinem Raum (LFH-1042). Eine
+ * Ansicht ohne eigene Seiten (noch nicht freigeschaltet, LFH-1040) hat keine: `null`.
  */
 export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
   switch (geraet.ansicht) {
@@ -42,8 +54,9 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
     case 'uhs-tablet':
     case 'uhs-laptop':
       return geraetPatientenPfad(geraet.einsatz_id);
-    case 'betreuungsstelle':
     case 'bereitstellungsraum':
+      return geraet.stelle_id == null ? null : geraetBrPfad(geraet.einsatz_id, geraet.stelle_id);
+    case 'betreuungsstelle':
     case 'einsatzabschnitt':
     case 'verpflegung':
       return null;
@@ -103,6 +116,28 @@ export function GeraetUhs() {
   return <UhsDetailPage />;
 }
 
+/** Der eigene Bereitstellungsraum (LFH-1042); jede andere Kennung führt zur Startseite. */
+export function GeraetBr() {
+  const { geraet } = useAuth();
+  const { brId } = useParams();
+  if (
+    !geraet ||
+    geraet.ansicht !== 'bereitstellungsraum' ||
+    geraet.stelle_id == null ||
+    parseRouteId(brId) !== geraet.stelle_id
+  ) {
+    return <GeraetStart />;
+  }
+  return <BrDetailPage />;
+}
+
+/** Meldungen an die Einsatzleitung für Ansichten ohne eigenen Stellenbereich (Bereitstellungsraum). */
+export function GeraetMeldungen() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'bereitstellungsraum') return <GeraetStart />;
+  return <GeraetMeldungenPage />;
+}
+
 /** Bereich „UHS“ nur für die Ansicht, die Material und Dateien ihrer UHS führt (UHS-Laptop). */
 export function GeraetStelle() {
   const { geraet } = useAuth();
@@ -140,9 +175,27 @@ function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: Rea
   );
 }
 
+/** Ziele des Bereitstellungsraums (LFH-1042): der eigene Raum und die Meldungen. */
+function BrNavigationsziele({ geraet }: { geraet: GeraetAnzeige }) {
+  const eid = geraet.einsatz_id;
+  return (
+    <>
+      {geraet.stelle_id != null && (
+        <NavZiel zu={geraetBrPfad(eid, geraet.stelle_id)} Icon={IconLagerhalle}>
+          Raum
+        </NavZiel>
+      )}
+      <NavZiel zu={geraetMeldungenPfad(eid)} Icon={IconPosteingang}>
+        Meldungen
+      </NavZiel>
+    </>
+  );
+}
+
 /**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
- * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen.
+ * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen. Der
+ * Bereitstellungsraum führt Raum und Meldungen.
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   const eid = geraet.einsatz_id;
@@ -158,9 +211,13 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <NavZiel zu={geraetPatientenPfad(eid)} Icon={IconPersonen}>
-        Patienten
-      </NavZiel>
+      {geraet.ansicht === 'bereitstellungsraum' ? (
+        <BrNavigationsziele geraet={geraet} />
+      ) : (
+        <NavZiel zu={geraetPatientenPfad(eid)} Icon={IconPersonen}>
+          Patienten
+        </NavZiel>
+      )}
       {uhsId != null && (
         <>
           <NavZiel zu={geraetAufnahmePfad(eid, { uhs: uhsId })} Icon={IconPersonPlus}>

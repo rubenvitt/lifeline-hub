@@ -53,3 +53,7 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   nur für diese Ansicht); Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren
   Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`).
+- **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte
+  `BrDetailPage` unter `/geraet/:id/br/:brId` (`GeraetBr` hält die Kennung beim eigenen); ohne
+  `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Meldungen an
+  die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop und Bereitstellungsraum).

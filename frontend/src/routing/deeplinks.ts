@@ -992,5 +992,15 @@ export function geraetStellePfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/stelle`;
 }
 
+/** Eigener Bereitstellungsraum eines BR-Geräts (LFH-1042), Startseite der Ansicht. */
+export function geraetBrPfad(einsatzId: number, brId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/br/${brId}`;
+}
+
+/** Meldungen an die Einsatzleitung eines stellengebundenen Geräts ohne eigenen Stellenbereich. */
+export function geraetMeldungenPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/meldungen`;
+}
+
 /** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
 export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';
