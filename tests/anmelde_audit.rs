@@ -156,7 +156,14 @@ fn jetzt_unix() -> u64 {
 /// Aktiviert TOTP für den admin über den regulären Enroll-Flow; liefert das Secret.
 async fn totp_fuer_admin(app: &axum::Router) -> String {
     let admin = login_cookie(app, "admin", "startpw12").await;
-    let (status, json) = anfrage(app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        "/api/auth/totp/enroll/start",
+        &admin,
+        Some(r#"{"passwort":"startpw12"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let secret = json["secret_base32"].as_str().unwrap().to_string();
     let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();

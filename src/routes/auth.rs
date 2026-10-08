@@ -440,6 +440,63 @@ pub struct PasswortWechsel {
     pub neues_passwort: String,
 }
 
+/// 403, wenn der Passwort-Provider abgeschaltet ist: ohne Passwort-Anmeldung gibt es weder
+/// Passwortwechsel noch TOTP-Einrichtung, dieselbe Durchsetzung wie beim Login.
+async fn passwort_provider_aktiv(pool: &SqlitePool) -> Result<(), AppError> {
+    let liste = crate::auth::provider::registry::liste(pool).await?;
+    if liste
+        .iter()
+        .any(|p| p.id == crate::auth::provider::ID_PASSWORT && p.aktiviert)
+    {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden)
+    }
+}
+
+/// Ausgang von [`pruefe_eigenes_passwort`]. `Falsch` trennt der Aufrufer ab, weil Meldung, Spur und
+/// Audit je Endpunkt verschieden sind.
+enum PasswortPruefung {
+    Falsch,
+    Fehler(AppError),
+}
+
+/// Prüft in einer gültigen Sitzung das eigene Passwort des Benutzers (Passwortwechsel LFH-471,
+/// TOTP-Einrichtung LFH-1013). Derselbe gedrosselte Weg wie beim Login
+/// (`provider::password::anmelden`: KDF-Gate, angeglichene Antwortzeit); eine gesperrte Quelle
+/// bekommt 429 vor der Prüfung, ein Fehlversuch zählt in dieselbe Sperre je Quelle, ein Erfolg
+/// räumt sie. Sonst wäre jeder dieser Endpunkte ein ungebremster Rateweg für jeden, der ein
+/// Cookie hat. Ein SSO-only-Konto (Sentinel-Hash) ist hier `Falsch`.
+async fn pruefe_eigenes_passwort(
+    pool: &SqlitePool,
+    benutzer: &Benutzer,
+    peer_ip: Option<std::net::IpAddr>,
+    passwort: &str,
+) -> Result<(), PasswortPruefung> {
+    if let Some(ip) = peer_ip {
+        if crate::auth::rate_limit::ist_gesperrt(ip) {
+            return Err(PasswortPruefung::Fehler(AppError::TooManyRequests(
+                "Zu viele fehlgeschlagene Versuche. Bitte kurz warten.".to_string(),
+            )));
+        }
+    }
+    match crate::auth::provider::password::anmelden(pool, &benutzer.benutzername, passwort).await {
+        Ok(_) => {
+            if let Some(ip) = peer_ip {
+                crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
+            }
+            Ok(())
+        }
+        Err(AppError::Unauthorized) => {
+            if let Some(ip) = peer_ip {
+                crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
+            }
+            Err(PasswortPruefung::Falsch)
+        }
+        Err(e) => Err(PasswortPruefung::Fehler(e)),
+    }
+}
+
 /// POST /api/auth/passwort — der angemeldete Benutzer wechselt sein eigenes Passwort (LFH-471).
 ///
 /// **Das alte Passwort ist Pflicht.** Ohne diese Prüfung machte ein übernommenes Session-Cookie
@@ -471,13 +528,7 @@ pub async fn passwort_aendern(
     jar: CookieJar,
     JsonBody(req): JsonBody<PasswortWechsel>,
 ) -> Result<StatusCode, AppError> {
-    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
-    let passwort_aktiv = liste
-        .iter()
-        .any(|p| p.id == crate::auth::provider::ID_PASSWORT && p.aktiviert);
-    if !passwort_aktiv {
-        return Err(AppError::Forbidden);
-    }
+    passwort_provider_aktiv(&state.pool).await?;
 
     // Kein `pflicht`: ein Passwort wird nicht getrimmt.
     if req.altes_passwort.is_empty() {
@@ -487,26 +538,9 @@ pub async fn passwort_aendern(
     }
     crate::routes::benutzer::pruefe_passwort_laenge(&req.neues_passwort)?;
 
-    if let Some(ip) = peer_ip {
-        if crate::auth::rate_limit::ist_gesperrt(ip) {
-            return Err(AppError::TooManyRequests(
-                "Zu viele fehlgeschlagene Versuche. Bitte kurz warten.".to_string(),
-            ));
-        }
-    }
-
-    match crate::auth::provider::password::anmelden(
-        &state.pool,
-        &benutzer.benutzername,
-        &req.altes_passwort,
-    )
-    .await
-    {
-        Ok(_) => {}
-        Err(AppError::Unauthorized) => {
-            if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
-            }
+    match pruefe_eigenes_passwort(&state.pool, &benutzer, peer_ip, &req.altes_passwort).await {
+        Ok(()) => {}
+        Err(PasswortPruefung::Falsch) => {
             tracing::warn!(
                 benutzer_id = benutzer.id,
                 peer_ip = ?peer_ip,
@@ -527,10 +561,7 @@ pub async fn passwort_aendern(
                 "Das bisherige Passwort stimmt nicht.".to_string(),
             ));
         }
-        Err(e) => return Err(e),
-    }
-    if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
+        Err(PasswortPruefung::Fehler(e)) => return Err(e),
     }
 
     // Argon2 unter dem KDF-Gate und auf dem Blocking-Pool (LFH-921).
@@ -1494,6 +1525,13 @@ pub struct TotpEnrollStart {
     pub secret_base32: String,
 }
 
+/// Body von `POST /api/auth/totp/enroll/start` (Request-DTO, handgepflegt, nicht im Codegen):
+/// das aktuelle Passwort (LFH-1013).
+#[derive(Debug, Deserialize)]
+pub struct TotpEnrollStartRequest {
+    pub passwort: String,
+}
+
 /// Body von `POST /api/auth/totp/enroll/finish` (Request-DTO, handgepflegt, nicht im Codegen).
 #[derive(Debug, Deserialize)]
 pub struct TotpEnrollFinishRequest {
@@ -1532,10 +1570,43 @@ const TOTP_BEREITS_AKTIV: &str =
 /// tauschte ihn gegen seinen eigenen. Neu einrichten geht nur nach dem Admin-Reset
 /// (`routes::benutzer`), wie es die Profilseite sagt. Bedingung und Schreiben stehen in EINEM
 /// `UPDATE`, damit kein paralleler Abschluss dazwischenfällt.
+///
+/// **Das aktuelle Passwort ist Pflicht (LFH-1013).** Ohne diese Prüfung richtete dieselbe fremde
+/// Session auf einem Konto OHNE TOTP ihren eigenen Authenticator ein: der Eigentümer wäre bis zum
+/// Admin-Reset ausgesperrt, und die Recovery-Codes lägen beim Angreifer. Geprüft wird wie beim
+/// Passwortwechsel ([`pruefe_eigenes_passwort`]), erst danach entsteht ein Secret; `enroll/finish`
+/// braucht dieses Secret und prüft deshalb nicht noch einmal. Statuscodes wie dort: Provider aus
+/// 403, leer 400, gesperrte Quelle 429, falsch 422 (nicht 401, die Sitzung ist gültig). Ein
+/// SSO-only-Konto kann kein Passwort nennen und landet bei 422; TOTP schützt ohnehin nur den
+/// Passwort-Login.
 pub async fn totp_enroll_start(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
+    PeerIp(peer_ip): PeerIp,
+    JsonBody(req): JsonBody<TotpEnrollStartRequest>,
 ) -> Result<Json<TotpEnrollStart>, AppError> {
+    passwort_provider_aktiv(&state.pool).await?;
+    // Kein `pflicht`: ein Passwort wird nicht getrimmt.
+    if req.passwort.is_empty() {
+        return Err(AppError::Validation(
+            "Passwort darf nicht leer sein".to_string(),
+        ));
+    }
+    match pruefe_eigenes_passwort(&state.pool, &benutzer, peer_ip, &req.passwort).await {
+        Ok(()) => {}
+        Err(PasswortPruefung::Falsch) => {
+            tracing::warn!(
+                benutzer_id = benutzer.id,
+                peer_ip = ?peer_ip,
+                "TOTP-Einrichtung abgewiesen: Passwort falsch"
+            );
+            return Err(AppError::UnprocessableEntity(
+                "Das Passwort stimmt nicht.".to_string(),
+            ));
+        }
+        Err(PasswortPruefung::Fehler(e)) => return Err(e),
+    }
+
     let secret = crate::auth::totp::neues_secret();
 
     // Ein neues Secret beginnt ohne verbrauchten Zeitschritt (LFH-791).
