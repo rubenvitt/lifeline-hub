@@ -1522,6 +1522,11 @@ test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dic
       soll,
       `Übernahme (${dichte})`,
     );
+    const befehl = await haeltStufe(
+      page.getByRole('button', { name: 'In Befehl übernehmen', exact: true }),
+      soll,
+      `Übernahme Befehl (${dichte})`,
+    );
     const druck = await haeltStufe(
       page.getByRole('button', { name: /Drucken/ }),
       soll,
@@ -1529,7 +1534,7 @@ test('Funkplan: Titel-Links, Lücken-Verweise und Werkzeugknöpfe folgen der Dic
     );
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Titel-Link ${titel}, Lücken-Verweis ${verweise}, ` +
-        `Übernahme ${uebernahme}, Drucken ${druck}`,
+        `Übernahme ${uebernahme}, Übernahme Befehl ${befehl}, Drucken ${druck}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

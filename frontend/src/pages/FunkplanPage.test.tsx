@@ -13,6 +13,7 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
+import { legeBefehlAn } from '../api/befehle';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
@@ -43,6 +44,9 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/sprechgruppen', () => ({ listeEinsatzSprechgruppen: vi.fn() }));
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 77 })),
+}));
+vi.mock('../api/befehle', () => ({
+  legeBefehlAn: vi.fn(() => Promise.resolve({ id: 88 })),
 }));
 vi.mock('../api/kommunikationsplan', () => ({ ladeKommunikationsplan: vi.fn() }));
 vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
@@ -171,6 +175,7 @@ const SPRECHGRUPPEN = [
 beforeEach(() => {
   navigiere.mockReset();
   vi.mocked(legeLageberichtAn).mockClear();
+  vi.mocked(legeBefehlAn).mockClear();
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(listeAbschnitte).mockResolvedValue(ABSCHNITTE);
@@ -392,6 +397,85 @@ describe('FunkplanPage — Übernahme in den Lagebericht', () => {
     await screen.findByText('Florian 1/42-1');
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
     expect(screen.getByRole('button', { name: /Drucken/ })).toBeInTheDocument();
+  });
+});
+
+describe('FunkplanPage — Übernahme in den Befehl (LFH-1027)', () => {
+  it('legt EINEN LADEF-Befehl mit dem Funkplan unter „Führung und Kommunikation“ an und öffnet ihn', async () => {
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    const knopf = screen.getByRole('button', { name: /In Befehl übernehmen/ });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    fireEvent.click(knopf);
+    await waitFor(() =>
+      expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/auftraege/befehle/88'),
+    );
+    expect(vi.mocked(legeBefehlAn)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(legeLageberichtAn)).not.toHaveBeenCalled();
+    const [einsatzId, daten] = vi.mocked(legeBefehlAn).mock.calls[0];
+    expect(einsatzId).toBe(1);
+    expect(daten.vorlage).toBe('befehl_ladef');
+    expect(daten.titel).toMatch(/^Funkplan /);
+    expect(daten.abschnitte).toHaveLength(1);
+    expect(daten.abschnitte![0].schluessel).toBe('fuehrung_kommunikation');
+    const text = daten.abschnitte![0].text;
+    // Baum und Kommunikationsskizze, derselbe Wortlaut wie im Lagebericht.
+    expect(text).toContain('## Gliederung');
+    expect(text).toContain('**Abschnitt Nord**');
+    expect(text).toContain('## Kommunikationsskizze');
+    expect(text).not.toContain('GEHEIM');
+    expect(text).not.toContain('0171 111');
+  });
+
+  it('zeigt einen Fehler an der Seite und navigiert nicht', async () => {
+    vi.mocked(legeBefehlAn).mockRejectedValueOnce(new ApiError(422, 'Einsatz ist abgeschlossen'));
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    const knopf = screen.getByRole('button', { name: /In Befehl übernehmen/ });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    fireEvent.click(knopf);
+    expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
+    expect(screen.getByText('Nicht in den Befehl übernommen')).toBeInTheDocument();
+    expect(vi.mocked(legeBefehlAn)).toHaveBeenCalledTimes(1);
+    expect(navigiere).not.toHaveBeenCalled();
+  });
+
+  it('steht in jeder Darstellung', async () => {
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/stab/funkplan?ansicht=skizze' },
+    );
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    expect(screen.getByRole('button', { name: /In Befehl übernehmen/ })).toBeInTheDocument();
+  });
+
+  it('sperrt die Übernahme, solange eine Quelle noch lädt', async () => {
+    vi.mocked(listeEinsatzSprechgruppen).mockReturnValue(new Promise(() => {}));
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.getByRole('button', { name: /In Befehl übernehmen/ })).toBeDisabled();
+  });
+
+  it('fehlt ohne Schreibrecht', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      ...EINSATZ,
+      meine_rolle: 'beobachter',
+    } as EinsatzAnzeige);
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.queryByRole('button', { name: /In Befehl übernehmen/ })).toBeNull();
+  });
+
+  it('fehlt, wenn das Modul Aufträge nicht freigegeben ist; die Lagebericht-Übernahme bleibt', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ auftraege: { sichtbar: false } }),
+    );
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.queryByRole('button', { name: /In Befehl übernehmen/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeInTheDocument();
   });
 });
 
