@@ -1,3 +1,45 @@
+## [1.0.0-alpha.93](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.92...v1.0.0-alpha.93) (2026-10-08)
+
+### Führung und Kommunikation
+
+**Funkplan in Befehle übernehmen**: Der Funkplan kann jetzt direkt in einen neuen Befehl übernommen werden. Dabei werden Baum und Kommunikationsskizze als Text im Abschnitt „Führung und Kommunikation" eingefügt. Die Funktion steht neben „In Lagebericht übernehmen" zur Verfügung, sofern das Modul Aufträge freigegeben ist und Schreibrechte vorliegen.
+
+**Sprechgruppen zeigen Führungsstelle als Teilnehmer**: In der Sprechgruppen-Ansicht erscheint die eigene Führungsstelle nun als erster Teilnehmer jeder Sprechgruppe mit Rufname und Verweis auf die Einsatzdaten. Kann die Führungsstelle nicht geladen werden, wird dies entsprechend angezeigt.
+
+**Fernmeldeskizze zeigt Führungsmittel und Funktionen**: Die Kästen in der Fernmeldeskizze zeigen nun Führungsmittel (EAL/UEAL bei eingetragener Leitung) und Führungsfahrzeuge der Einheiten mit taktischen Zeichen. Der Kasten „Einsatzleitung" zeigt besetzte Sachgebiete S1–S6. Fehlen Informationen zu Fahrzeugen oder Stab-Besetzung, wird die Quelle genannt.
+
+### Bedienung und Barrierefreiheit
+
+**Alarmton-Knopf mit klarerem Zustand**: Der Alarmton-Knopf zeigt den aktuellen Zustand nun deutlicher an („Ton bereit – stummschalten", „Ton stumm – einschalten", „Ton wird geprüft – freischalten", „Ton blockiert – freischalten"). Dies verbessert die Barrierefreiheit.
+
+**Rückfragen mit aussagekräftigen Handlungstexten**: Rote Bestätigungsdialoge zeigen nun klare Handlungsanweisungen wie „Einheit auflösen", „Abschnitt auflösen", „Tier stornieren" oder „Stichwort löschen" statt eines allgemeinen „OK".
+
+**Erklärtexte entfernt**: In den Bereichen Rahmen, Alarm, Sprungpalette, Chat, Dokumentenverwaltung, Presse und Infotelefon wurden überflüssige Erklärtexte entfernt, um die Oberfläche aufgeräumter zu gestalten.
+
+**Verbesserte Farbkontraste bei Status-Kennzeichnungen**: Status-Kennzeichnungen (z.B. bei Kartenhintergründen, Offline-Karten) verwenden nun definierte Statusrollen, die sowohl bei Tag als auch bei Nacht ausreichenden Kontrast bieten.
+
+### Lagekarte
+
+**Zuverlässigere Uploads großer Dateien**: Das Hochladen von Kartenhintergründen und Chat-Anhängen zeigt nun einen Fortschritt an und nutzt ein verlängertes Zeitlimit von 120 Sekunden. Dies verhindert Abbrüche bei größeren Dateien über langsame Verbindungen. Fehlermeldungen erscheinen direkt an der Upload-Stelle statt in einem Toast.
+
+### Sicherheit
+
+**TOTP-Einrichtung nur mit aktuellem Passwort**: Die Einrichtung der Zwei-Faktor-Authentifizierung erfordert nun die Eingabe des aktuellen Passworts. Dies verhindert, dass jemand mit Zugriff auf eine fremde Sitzung den Kontoinhaber aussperren kann.
+
+### Wetterinformationen
+
+**Stabile Unwetterhinweis-Darstellung**: Die Anzeige von Unwetterhinweisen arbeitet nun zeitzonenunabhängig zuverlässig.
+
+### Druckfunktionen
+
+**Safari-Druckprüfung dokumentiert**: Die Druckausgaben wurden in Safari 27.0.1 geprüft und dokumentiert. Erkannte Abweichungen sind als separate Aufgaben vermerkt.
+
+### Betrieb und Dokumentation
+
+**Webcam-Dienst der Autobahn-API**: Der leere Webcam-Dienst der Autobahn-API wurde als nicht verfügbar abgeschlossen. Weitere Prüfungen sind nicht vorgesehen.
+
+**Richtlinie für UI-Entwürfe**: Größere Gestaltungsänderungen (neue Seiten, Module, Rahmenumbauten) werden künftig mit Entwürfen über Claude Design dokumentiert.
+
 ## [1.0.0-alpha.92](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.91...v1.0.0-alpha.92) (2026-10-08)
 
 ### Wichtige Änderungen
