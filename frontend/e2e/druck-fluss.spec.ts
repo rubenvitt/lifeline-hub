@@ -52,6 +52,10 @@ async function anmelden(page: Page) {
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  // Erst klicken, wenn der Dialog steht: unter Last (170+ Kacheln, WebKit) fiel der Klick auf
+  // „Anlegen" mitten in den Zoom und erreichte den Knopf nie — kein POST, Dialog blieb offen.
+  await expect(page.getByRole('dialog', { name: 'Neuen Einsatz anlegen' })).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
   await page.getByLabel('Bezeichnung').fill(name);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

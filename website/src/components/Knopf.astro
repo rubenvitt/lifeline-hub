@@ -1,0 +1,57 @@
+---
+/** Knopf als Verweis: primär blau gefüllt, sekundär umrandet. Rot bedient nichts. */
+interface Props {
+  href: string;
+  art?: 'primaer' | 'sekundaer';
+  extern?: boolean;
+}
+const { href, art = 'primaer', extern = false } = Astro.props;
+---
+
+<a
+  class:list={['knopf', art]}
+  href={href}
+  target={extern ? '_blank' : undefined}
+  rel={extern ? 'noopener noreferrer' : undefined}
+>
+  <slot />{extern && <span class="glyphe" aria-hidden="true">↗</span>}
+</a>
+
+<style>
+  .knopf {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid transparent;
+    font-family: var(--lfh-schrift-text);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition:
+      background var(--lfh-uebergang),
+      border-color var(--lfh-uebergang),
+      color var(--lfh-uebergang);
+  }
+  .primaer {
+    background: var(--lfh-bedien);
+    color: var(--lfh-auf-bedien);
+  }
+  .primaer:hover {
+    background: var(--lfh-bedien-hover);
+  }
+  .sekundaer {
+    border-color: var(--lfh-steuer-rahmen);
+    color: var(--lfh-text);
+    background: transparent;
+  }
+  .sekundaer:hover {
+    border-color: var(--lfh-bedien);
+    color: var(--lfh-bedien-text);
+  }
+  .glyphe {
+    font-family: var(--lfh-schrift-zahl);
+    font-weight: 400;
+  }
+</style>

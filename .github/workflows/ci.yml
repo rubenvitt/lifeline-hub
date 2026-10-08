@@ -12,6 +12,16 @@
 # LFH-729): ein roter Druckfall in Firefox oder WebKit sperrt so den PR über die gepinnten
 # Pflicht-Checks, ohne eigenen Job, der erst im Ruleset eingetragen werden müsste.
 #
+# NUR `website/` GEÄNDERT (LFH-1111): Der Job `aenderungen` stellt fest, ob ein PR ausschließlich
+# die Marketing-Seite ändert. Dann laufen Rust-Suite, e2e-Binary, Frontend- und e2e-Suite leer
+# durch; die Schnellprüfungen bleiben. Leer heißt GRÜN, nicht fehlend: die Shard-Namen sind
+# Required Checks im Ruleset 17017911, und ein per Job-`if` übersprungener Matrix-Job meldet sich
+# unter seinem unexpandierten Namen („Frontend-Suite ${{ matrix.shard }}/4"), die Pflicht-Checks
+# hingen auf „Expected". Deshalb tragen die Matrix-Jobs die Bedingung an jedem Schritt, die
+# übrigen am Job (ein übersprungener Job ohne Matrix erfüllt seinen Check).
+# Im Zweifel wird geprüft: Nur ein ausdrückliches `pruefen=false` spart, ein roter `aenderungen`-
+# Job lässt alles laufen. Push-Läufe auf Kanal-Branches prüfen immer voll.
+#
 # Coverage steht in coverage.yml: dieser Lauf wird auf einem Kanal-Branch nicht abgebrochen,
 # ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
 #
@@ -50,6 +60,41 @@ env:
   TZ: Europe/Berlin
 
 jobs:
+  # ── Welche Suiten braucht dieser Lauf? (LFH-1111, s. Kopf) ──────────────────────────
+  aenderungen:
+    name: Geänderte Bereiche
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      pruefen: ${{ steps.bereiche.outputs.pruefen }}
+    steps:
+      # Bei `pull_request` ist HEAD der Merge-Commit, HEAD^1 die Spitze des Ziel-Branches: zwei
+      # Commits Tiefe reichen für den Vergleich.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+      - name: Nur website/ geändert?
+        id: bereiche
+        env:
+          EREIGNIS: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          pruefen=true
+          if [ "$EREIGNIS" = pull_request ]; then
+            dateien="$(git diff --name-only HEAD^1 HEAD)"
+            printf '%s\n' "$dateien"
+            if [ -n "$dateien" ] && ! printf '%s\n' "$dateien" | grep -qv '^website/'; then
+              pruefen=false
+            fi
+          fi
+          echo "pruefen=$pruefen" >> "$GITHUB_OUTPUT"
+          if [ "$pruefen" = true ]; then
+            echo "Schwere Suiten laufen." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Nur website/ geändert: Rust-, Frontend- und e2e-Suite entfallen." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # ── Die billigen Prüfungen, in einem Job und zuerst ──────────────────────────────────
   # Damit ein Formatierungsfehler nicht erst nach einer Viertelstunde Testlauf auffällt.
   schnell:
@@ -114,6 +159,8 @@ jobs:
   # einziger den geteilten Cargo-Cache (save-if: true, die Vorgabe).
   rust:
     name: Rust-Suite
+    needs: aenderungen
+    if: ${{ !cancelled() && needs.aenderungen.outputs.pruefen != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -153,6 +200,8 @@ jobs:
   # Eigener Job: so starten die e2e-Shards nach dem Build statt nach Build PLUS Rust-Tests.
   binaer:
     name: e2e-Binary
+    needs: aenderungen
+    if: ${{ !cancelled() && needs.aenderungen.outputs.pruefen != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -190,6 +239,11 @@ jobs:
   # ── Frontend-Suite, auf vier Runner geteilt ─────────────────────────────────────────
   frontend:
     name: Frontend-Suite ${{ matrix.shard }}/4
+    needs: aenderungen
+    # Am Job nur `!cancelled()`, die Bedingung `PRUEFEN` steht an jedem Schritt (s. Kopf).
+    if: ${{ !cancelled() }}
+    env:
+      PRUEFEN: ${{ needs.aenderungen.outputs.pruefen }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -203,29 +257,35 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.PRUEFEN != 'false'
       # Kein Rust, kein Chromium, kein Plattenplatz-Schritt — dieser Job braucht nur Node.
       - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        if: env.PRUEFEN != 'false'
         with:
           version: 2026.9.1
           cache: true
       - name: pnpm-Store-Pfad ermitteln
+        if: env.PRUEFEN != 'false'
         id: pnpm
         run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: env.PRUEFEN != 'false'
         with:
           path: ${{ steps.pnpm.outputs.store }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
       - name: Frontend-Abhängigkeiten
+        if: env.PRUEFEN != 'false'
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
       - name: Frontend-Suite (Anteil ${{ matrix.shard }}/4)
+        if: env.PRUEFEN != 'false'
         env:
           VITEST_SHARD: ${{ matrix.shard }}/4
         run: ./scripts/check-all.sh --nur frontend
       # Vitest legt die Blobs unter frontend/.vitest/blob/ ab. include-hidden-files ist
       # Pflicht, weil das Verzeichnis mit einem Punkt beginnt.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.PRUEFEN != 'false' }}
         with:
           name: vitest-blob-${{ matrix.shard }}
           path: frontend/.vitest/blob/*
@@ -235,7 +295,12 @@ jobs:
   # ── e2e-Suite, auf vier Runner geteilt ──────────────────────────────────────────────
   e2e:
     name: e2e ${{ matrix.shard }}/4
-    needs: binaer
+    needs: [aenderungen, binaer]
+    # Läuft auch bei übersprungenem e2e-Binary an (nur website/ geändert); die Bedingung
+    # `PRUEFEN` steht an jedem Schritt (s. Kopf). Ein ROTES Binary lässt die Shards wie bisher aus.
+    if: ${{ !cancelled() && (needs.binaer.result == 'success' || needs.binaer.result == 'skipped') }}
+    env:
+      PRUEFEN: ${{ needs.aenderungen.outputs.pruefen }}
     runs-on: ubuntu-latest
     # 60 statt 40 min: die Tests brauchen je Shard rund 11 min. Den Rest der Frist frisst im
     # schlechtesten Fall die Installation der Firefox/WebKit-Systempakete, solange der apt-Cache
@@ -248,23 +313,29 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.PRUEFEN != 'false'
       - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        if: env.PRUEFEN != 'false'
         with:
           version: 2026.9.1
           cache: true
       - name: pnpm-Store-Pfad ermitteln
+        if: env.PRUEFEN != 'false'
         id: pnpm
         run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: env.PRUEFEN != 'false'
         with:
           path: ${{ steps.pnpm.outputs.store }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
       - name: Frontend-Abhängigkeiten
+        if: env.PRUEFEN != 'false'
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
       # Die Browserliste steht im Schlüssel: ein Eintrag aus der Zeit, als nur Chromium installiert
       # wurde, darf nicht als Treffer für alle drei gelten.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: env.PRUEFEN != 'false'
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
@@ -280,12 +351,14 @@ jobs:
       # erst am Ende eines GRÜNEN Jobs — ein roter oder abgebrochener Shard hinterließe nichts, und
       # der nächste Lauf stünde wieder am langsamen Mirror.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: env.PRUEFEN != 'false'
         id: apt-cache
         with:
           path: ~/.cache/apt-playwright
           key: apt-playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: apt-playwright-${{ runner.os }}-${{ runner.arch }}-
       - name: Systempakete aus dem Cache bereitlegen
+        if: env.PRUEFEN != 'false'
         run: |
           mkdir -p ~/.cache/apt-playwright
           if compgen -G "$HOME/.cache/apt-playwright/*.deb" > /dev/null; then
@@ -298,6 +371,7 @@ jobs:
       # (LFH-1101). 15 min je Versuch, weil ein Lauf ohne Paket-Cache am langsamen Spiegel schon
       # 24 min brauchte (s. o.); was ein abgebrochener Versuch geladen hat, bleibt im Archiv.
       - name: Playwright-Browser (Chromium, Firefox, WebKit)
+        if: env.PRUEFEN != 'false'
         run: |
           ./scripts/wiederholen.sh 3 900 -- \
             mise exec -- pnpm -C frontend exec playwright install --with-deps chromium firefox webkit
@@ -308,19 +382,22 @@ jobs:
       # Gleich nach der Installation, nicht erst am Jobende (s. o.). Nur ohne exakten Treffer: ein
       # bestehender Schlüssel lässt sich nicht überschreiben.
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.apt-cache.outputs.cache-hit != 'true'
+        if: env.PRUEFEN != 'false' && steps.apt-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/apt-playwright
           key: ${{ steps.apt-cache.outputs.cache-primary-key }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: env.PRUEFEN != 'false'
         with:
           name: lifeline-hub-debug
           path: bin
       # PFLICHT: upload-artifact zippt ohne Dateirechte, alles kommt als 644 zurück.
       # check-all.sh prüft das Bit und bräche sonst mit klarer Meldung ab.
       - name: Ausführbar machen
+        if: env.PRUEFEN != 'false'
         run: chmod +x bin/lifeline-hub
       - name: e2e-Suite (Anteil ${{ matrix.shard }}/4)
+        if: env.PRUEFEN != 'false'
         env:
           PW_SHARD: ${{ matrix.shard }}/4
           # Erspart die Rust-Toolchain: ohne die Variable fragte die Playwright-Config
@@ -328,7 +405,7 @@ jobs:
           PW_BINAER: ${{ github.workspace }}/bin/lifeline-hub
         run: ./scripts/check-all.sh --nur e2e
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.PRUEFEN != 'false' }}
         with:
           name: playwright-blob-${{ matrix.shard }}
           path: frontend/blob-report
@@ -340,8 +417,8 @@ jobs:
   # `!cancelled()`, weil man den Bericht gerade bei Rot braucht.
   berichte:
     name: Testberichte zusammenführen
-    needs: [frontend, e2e]
-    if: ${{ !cancelled() }}
+    needs: [aenderungen, frontend, e2e]
+    if: ${{ !cancelled() && needs.aenderungen.outputs.pruefen != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
