@@ -24,9 +24,9 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
  * Reine Ableitung aus denselben `FunkplanQuellen`, keine neuen Daten.
  *
  * - **Menge:** jede an der eigenen Führungsstelle, einem Abschnitt oder einer Einheit zugeordnete
- *   Sprechgruppe plus jede einsatzlokale, nach `id` entdoppelt (ein lokaler und ein Katalog-Eintrag können dieselbe
- *   Bezeichnung tragen, wie in `verbindungsurteil`). Ein Katalog-Eintrag ohne Zuordnung ist keine
- *   Sprechgruppe DIESES Einsatzes und fehlt.
+ *   Sprechgruppe plus jede einsatzlokale, nach `id` entdoppelt (ein lokaler und ein
+ *   Katalog-Eintrag können dieselbe Bezeichnung tragen, wie in `verbindungsurteil`). Ein
+ *   Katalog-Eintrag ohne Zuordnung ist keine Sprechgruppe DIESES Einsatzes und fehlt.
  * - **Ordnung:** TMO vor DMO, sonst wie die Quelle (`stab/sprechgruppenOrdnung.ts`).
  * - **Teilnehmer:** zuerst die eigene Führungsstelle (Rufname, Ziel Einsatzdaten wie Tabelle und
  *   Skizze, LFH-1018), dann Abschnitte (Name, Kurzbezeichnung), dann Einheiten (Name,
