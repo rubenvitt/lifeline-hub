@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { mitProzessZone } from '../test/prozessZone';
+import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -230,5 +231,44 @@ describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
     expect(faelligFeld()).toHaveValue('2026-08-21 15:17');
     await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
+  });
+});
+
+/** LFH-1031: Vorgabe und Schnellwahl rechnen ab „jetzt“ nach der Serveruhr. */
+describe('WiedervorlageModal — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
+  mitVorgehenderGeraeteuhr(JETZT.getTime());
+
+  function sendetNach(): () => Record<string, unknown> | undefined {
+    let gesendet: Record<string, unknown> | undefined;
+    server.use(
+      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
+    return () => gesendet;
+  }
+
+  it('die Vorgabe +30 min gilt ab der Serverzeit', async () => {
+    const gesendet = sendetNach();
+    zeige();
+    await userEvent.type(screen.getByLabelText('Titel'), '{Enter}');
+    await waitFor(() =>
+      expect(gesendet()?.faellig_at).toBe(
+        dayjs(JETZT).add(30, 'minute').utc().format('YYYY-MM-DD HH:mm:ss'),
+      ),
+    );
+  });
+
+  it('die Schnellwahl „+2 h“ gilt ab der Serverzeit', async () => {
+    const gesendet = sendetNach();
+    zeige();
+    await userEvent.click(screen.getByRole('button', { name: '+2 h' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(gesendet()?.faellig_at).toBe(
+        dayjs(JETZT).add(2, 'hour').utc().format('YYYY-MM-DD HH:mm:ss'),
+      ),
+    );
   });
 });

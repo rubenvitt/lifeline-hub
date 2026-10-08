@@ -36,6 +36,12 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   hält ein Gerät dort; `GeraetEinsatzRahmen`, `GeraetUhs` und `GeraetAufnahme` führen fremde
   Einsatz- oder UHS-Kennungen auf die Startseite. Ein 401 führt über die Marke
   `geraet/geraetMarke.ts` (in `GERAETESPEICHER`) auf „Kopplung beendet“, nie auf die Anmeldung.
+- **Bediener am Gerät** (LFH-1046, Spec `geraete-kopplung`): Sichtung, Erst-Sichtung und Verbleib
+  nehmen am UHS-Gerät optional `bestaetigt_personal_id` aus dem Einsatzpersonal an
+  (`src/geraet/bestaetigung.rs`). Die Angabe ist ein Datenfeld, keine Anmeldung: keine Sitzung,
+  keine Rechte über die Ansicht hinaus; eine Person schickt sie nie (422). Im Client nur über
+  `geraet/BestaetigtVonFeld.tsx`, ohne Vorauswahl. ETB-Text und Verlauf nennen „bestätigt: Name“,
+  Erfasser bleibt das Gerät.
 - **Nichts auf der Platte** (design.md D8): kein Lagebild (`offline/lagebildSitzung.ts`
   überspringt Geräte), keine gemerkte UHS; die Schreib-Warteschlange bleibt an
   (`useOfflineSync` in der Hülle).

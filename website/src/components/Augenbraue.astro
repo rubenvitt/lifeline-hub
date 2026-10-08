@@ -1,0 +1,44 @@
+---
+/** Augenbraue: 10 px, 600, Versalien, Sperrung .14em, Farbe schwach (Schriftskala). */
+interface Props {
+  als?: 'div' | 'p' | 'h2' | 'h3' | 'h4' | 'span';
+  ton?: 'schwach' | 'marke';
+  mono?: boolean;
+}
+const { als: Tag = 'div', ton = 'schwach', mono = false } = Astro.props;
+---
+
+<Tag class:list={['augenbraue', `ton-${ton}`, { mono }]}><slot /></Tag>
+
+<style>
+  .augenbraue {
+    margin: 0;
+    font-family: var(--lfh-schrift-text);
+    font-size: var(--lfh-typo-augenbraue-groesse);
+    font-weight: 600;
+    letter-spacing: var(--lfh-typo-augenbraue-sperrung);
+    text-transform: uppercase;
+    line-height: 1.4;
+    color: var(--lfh-schwach);
+  }
+  .mono {
+    font-family: var(--lfh-schrift-zahl);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+  }
+  /* Rot ist Akzent, nicht Schrift: das Quadrat der Bildmarke steht vor dem Wort. */
+  .ton-marke {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--lfh-gedaempft);
+  }
+  .ton-marke::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    background: var(--lfh-marke);
+    flex: none;
+  }
+</style>

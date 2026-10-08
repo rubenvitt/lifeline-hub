@@ -1,0 +1,51 @@
+---
+/** Paneel: Rahmen linie, Grund paneel, Kopf mit Augenbraue links und Mono-Meta rechts. */
+import Augenbraue from './Augenbraue.astro';
+
+interface Props {
+  titel: string;
+  meta?: string;
+  als?: 'h2' | 'h3' | 'div';
+}
+const { titel, meta, als = 'div' } = Astro.props;
+---
+
+<section class="paneel">
+  <header class="kopf">
+    <Augenbraue als={als}>{titel}</Augenbraue>
+    {meta && <span class="meta">{meta}</span>}
+    <slot name="kopf" />
+  </header>
+  <div class="inhalt"><slot /></div>
+</section>
+
+<style>
+  .paneel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--lfh-paneel);
+    border: 1px solid var(--lfh-linie);
+  }
+  .kopf {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 38px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--lfh-linie);
+  }
+  .meta {
+    font-family: var(--lfh-schrift-zahl);
+    font-size: var(--lfh-typo-meta-groesse);
+    color: var(--lfh-gedaempft);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .inhalt {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+</style>

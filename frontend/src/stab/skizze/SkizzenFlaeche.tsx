@@ -11,7 +11,8 @@
  * - **Tastatur:** Tab/Umschalt+Tab wandern in der Fokusfolge (`bedienung.ts`) und verlassen die
  *   Fläche an den Enden; alle übrigen Tasten gibt die Fläche als `TastenBefehl` nach oben.
  * - **Ruhige Fläche** (D4): solange Zeiger (ohne Touch) oder Fokus in der Fläche liegen, meldet
- *   sie `onHalten(true)`; die Seite hält dann die auto-gelegten Plätze fest.
+ *   sie `onHalten(true)`; das Bild hält dann, was ein anderer Arbeitsplatz bewegt, und die Fläche
+ *   am Schirm (LFH-1037, `FernmeldeskizzeBild.tsx`).
  * - **Druck:** ohne Bedienelemente, Hervorhebung, Filter, Wahl und Meldungen am Element,
  *   eingepasst über die ganze Ausdehnung (D13, Prüfliste O4).
  */

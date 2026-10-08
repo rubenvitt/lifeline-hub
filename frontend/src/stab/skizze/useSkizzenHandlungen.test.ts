@@ -92,9 +92,13 @@ function aktionenAttrappe() {
   } satisfies SkizzenAktionen;
 }
 
-function haken(start: Fernmeldenetz, aktionen = aktionenAttrappe()) {
+function haken(
+  start: Fernmeldenetz,
+  aktionen = aktionenAttrappe(),
+  onEigenes?: (element: string) => void,
+) {
   const befehle = new Befehlsstapel();
-  const r = renderHook(({ n }) => useSkizzenHandlungen(n, aktionen, befehle), {
+  const r = renderHook(({ n }) => useSkizzenHandlungen(n, aktionen, befehle, onEigenes), {
     initialProps: { n: start },
   });
   return { ...r, aktionen, befehle, netz: (n: Fernmeldenetz) => r.rerender({ n }) };
@@ -226,5 +230,28 @@ describe('useSkizzenHandlungen — externe Stelle anlegen (Review S4)', () => {
     await act(() => h.result.current.wiederholen());
     await act(() => h.result.current.rueckgaengig());
     expect(h.aktionen.entferneExterneStelle).toHaveBeenLastCalledWith(43);
+  });
+});
+
+describe('useSkizzenHandlungen — ruhige Fläche (LFH-1037 D1)', () => {
+  it('meldet das Element nach dem eigenen Schreiben, gelungen oder mit 409', async () => {
+    const aktionen = aktionenAttrappe();
+    const eigenes = vi.fn();
+    const h = haken(netz(), aktionen, eigenes);
+    let fertig = false;
+    const laeuft = act(async () => {
+      await h.result.current.verschieben('ab-1', ZIEL, VORHER);
+      fertig = true;
+    });
+    // Solange die Anfrage läuft, hält die Fläche noch: die gehaltene Version geht hinaus.
+    expect(fertig).toBe(false);
+    expect(eigenes).not.toHaveBeenCalled();
+    await laeuft;
+    expect(eigenes).toHaveBeenLastCalledWith('ab-1');
+
+    aktionen.verschiebe.mockRejectedValueOnce(konflikt());
+    eigenes.mockClear();
+    await act(() => h.result.current.verschieben('ab-1', VORHER, ZIEL).catch(() => {}));
+    expect(eigenes).toHaveBeenLastCalledWith('ab-1');
   });
 });

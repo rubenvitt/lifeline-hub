@@ -134,6 +134,35 @@ for (const modus of ['light', 'dark'] as const) {
     });
     expect(v.ok(), `Vollzug: ${v.status()} ${await v.text()}`).toBeTruthy();
 
+    // Die überfällige Schicht meldet der Erinnerungs-Scheduler im nächsten Takt (30 s) als
+    // stehende Benachrichtigung oben rechts (AlarmZentrale, `duration: 0`). Ob die Seite dann
+    // schon offen ist, entscheidet der Takt; steht sie, liegt sie bei 1366 px ganz über
+    // „Schicht beginnen" im Seitenkopf (LFH-1034). Der Test quittiert sie wie ein Mensch über
+    // „Schließen", sobald sie vor einer Aktion oder Zusicherung steht, und nimmt den Zeiger
+    // danach aus dem Kopf, sonst mäße er den Hover des Kopfknopfs. Gemessen wird sie nicht: sie
+    // liegt außerhalb von Kopf und Inhalt.
+    // Eine geschlossene trägt bis zum Ende ihres Ausblendens `-fade-leave` und zählt nicht mehr.
+    // Jede wird vor dem Klick markiert: ein Locator auf „die erste offene" könnte zwischen
+    // Auflösen und Klick auf eine gerade ausblendende zeigen und dann ins Leere warten.
+    const offen = page.locator('.ant-notification-notice:not(.ant-notification-fade-leave)');
+    let quittung = 0;
+    await page.addLocatorHandler(offen.first(), async () => {
+      for (;;) {
+        const marke = await page.evaluate((m) => {
+          const notiz = document.querySelector(
+            '.ant-notification-notice:not(.ant-notification-fade-leave):not([data-quittung])',
+          );
+          notiz?.setAttribute('data-quittung', m);
+          return notiz ? m : null;
+        }, String(++quittung));
+        if (marke === null) break;
+        const notiz = page.locator(`[data-quittung="${marke}"]`);
+        await notiz.getByRole('button', { name: 'Schließen', exact: true }).click();
+        await expect(notiz.and(offen)).toHaveCount(0);
+      }
+      await page.mouse.move(0, 0);
+    });
+
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await page.goto(`/einsaetze/${einsatzId}/abloesung`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);

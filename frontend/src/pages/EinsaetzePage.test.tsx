@@ -7,6 +7,7 @@ import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
+import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import { formatZeitKurz, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
@@ -877,5 +878,30 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Neuer Einsatz' }));
     await screen.findByLabelText('Bezeichnung');
     expect(screen.queryByText('Bezeichnung bereits vergeben')).toBeNull();
+  });
+});
+
+/** LFH-1031: die Alarmzeit ist nach der Serveruhr vorbelegt. */
+describe('EinsaetzePage — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
+  mitProzessZone('UTC');
+  const SERVER = Date.parse('2026-10-04T10:00:00Z');
+  mitVorgehenderGeraeteuhr(SERVER);
+
+  it('ohne Eingabe geht die Serverzeit als Alarmzeit hinaus', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.post('/api/einsaetze', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
+      }),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf!.begonnen_at).toBe('2026-10-04 10:00:00');
   });
 });

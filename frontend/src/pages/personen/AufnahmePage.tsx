@@ -193,7 +193,7 @@ export default function AufnahmePage() {
             )
           }
         >
-          <AufnahmeFelder modus="erfassen" />
+          <AufnahmeFelder modus="erfassen" einsatzId={einsatzId} />
         </ErfassungsFormular>
       )}
     </EinsatzSeite>

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Lagebesprechung, Stab } from '../api/types';
 import { server } from '../test/server';
 import { mitProzessZone } from '../test/prozessZone';
+import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
 import LagebesprechungModal from './LagebesprechungModal';
@@ -423,5 +424,37 @@ describe('LagebesprechungModal · Anzeigezone (LFH-692)', () => {
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('2026-09-13 13:00');
     await absenden(dialog);
     expect(gesendet[0]).toMatchObject({ naechste_at: '2026-09-13 11:00:00' });
+  });
+});
+
+/** LFH-1031: Zeitpunkt, Schnellwahl und Spiegel des 422 nehmen „jetzt“ nach der Serveruhr. */
+describe('LagebesprechungModal · Gerät mit 5 min Vorlauf (LFH-1031)', () => {
+  mitVorgehenderGeraeteuhr(JETZT.getTime());
+
+  it('ein leerer Zeitpunkt und „+1 h“ gelten ab der Serverzeit', async () => {
+    const dialog = await zeige();
+    await userEvent.click(within(dialog).getByRole('button', { name: '+1 h' }));
+    await absenden(dialog);
+    expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(0), naechste_at: wireAb(60) });
+  });
+
+  it('ein Termin 3 min nach der Serverzeit ist zulässig, obwohl die Geräteuhr schon weiter ist', async () => {
+    const dialog = await zeige();
+    const termin = feld(dialog, 'Nächste Lagebesprechung');
+    await userEvent.click(termin);
+    await userEvent.type(termin, `${dayjs(JETZT).add(3, 'minute').format(ZEITFORMAT)}{Enter}`);
+    await absenden(dialog);
+    expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(0), naechste_at: wireAb(3) });
+  });
+
+  it('ein eingetragener Zeitpunkt geht unverändert hinaus', async () => {
+    const dialog = await zeige();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    const eingabe = feld(dialog, 'Zeitpunkt der Besprechung');
+    await userEvent.click(eingabe);
+    await userEvent.clear(eingabe);
+    await userEvent.type(eingabe, `${dayjs(JETZT).add(-20, 'minute').format(ZEITFORMAT)}{Enter}`);
+    await absenden(dialog);
+    expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(-20) });
   });
 });

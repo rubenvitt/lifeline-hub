@@ -1,4 +1,5 @@
 import type {
+  Bestaetiger,
   Person,
   PersonAnhang,
   PersonAuswahl,
@@ -67,6 +68,9 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
    * `status: 'vermisst'` ist das 422.
    */
   sichtung?: Sichtungskategorie;
+  /** Wer die Erst-Sichtung am Gerät namentlich bestätigt (LFH-1046): Kennung im Einsatzpersonal.
+   * Nur mit `sichtung` und nur an einem gekoppelten Gerät, sonst 422. */
+  bestaetigt_personal_id?: number | null;
   /** Wartebereich-Eintritt in derselben Transaktion wie die Anlage (bleibt beim Offline-Replay an
    * der client_id); `vermisst` + UHS ist 422. */
   uhs_id?: number | null;
@@ -162,17 +166,26 @@ export function registrierAnzeige(nr: number): string {
   return registrierNummer('R', nr);
 }
 
-/** Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. */
+/** Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. `bestaetigtPersonalId`
+ * nennt am Gerät die bestätigende Person (LFH-1046); eine Person schickt es nie (422). */
 export function erfasseSichtung(
   einsatzId: number,
   personId: number,
   kategorie: Sichtungskategorie,
   notiz?: string | null,
+  bestaetigtPersonalId?: number | null,
 ): Promise<Sichtung> {
   return apiSend<Sichtung>(`/api/einsaetze/${einsatzId}/personen/${personId}/sichtung`, 'POST', {
     kategorie,
     notiz: notiz ?? null,
+    ...(bestaetigtPersonalId != null ? { bestaetigt_personal_id: bestaetigtPersonalId } : {}),
   });
+}
+
+/** Auswahl „Bestätigt von“ am UHS-Gerät (LFH-1046): das Personal des Einsatzes. Eine Person und
+ * der Lagemonitor bekommen 403. */
+export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
+  return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/personen/bestaetiger`);
 }
 
 export interface VerbleibEingabe {
@@ -186,6 +199,8 @@ export interface VerbleibEingabe {
    * Modul Betreuung (sonst 403). Der Server kopiert keinen Namen ins Ziel.
    */
   betreuungsstelle_id?: number | null;
+  /** Wer den Verbleib am Gerät namentlich bestätigt (LFH-1046); eine Person schickt es nie. */
+  bestaetigt_personal_id?: number | null;
 }
 export function erfasseVerbleib(
   einsatzId: number,

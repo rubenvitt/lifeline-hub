@@ -30,6 +30,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Schutzköpfe, Org-Ereignisse, Demo-Daten, Aufbewahrung, ClamAV |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
+| `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
 | `scripts/AGENTS.md` | Sammel-Gate im Detail, Werkzeugversionen, Bauziel, Advisories, Release |
 
 - **Eine Regel steht genau einmal**, in der Datei des Bereichs, der sie trägt; eine neue

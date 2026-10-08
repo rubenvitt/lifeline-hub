@@ -1,0 +1,177 @@
+/* Farbrollen, Schriften und Schriftskala der Gestaltungssprache „Instrumententafel“.
+   ============================================================================
+   KOPIE, KEINE ZWEITE QUELLE: Die Werte stammen aus `frontend/src/theme/rollen.css`
+   (Stand 08.10.2026). Die Marketing-Seite bindet nichts aus `frontend/` ein, damit sie ohne
+   die App baut. Wer dort eine Rolle ändert, zieht sie hier nach (website/AGENTS.md).
+   Übernommen ist nur, was die Seite braucht; die Namen sind dieselben.
+
+   Nachtbetrieb ist Vorgabe (`data-theme="dark"` am <html>, gesetzt vor dem ersten Paint).
+   Rot ist Marke und Gefahr, Blau bedient. Rot bedient nichts. */
+
+@font-face {
+  font-family: 'LFH Archivo';
+  src: url('/schriften/archivo-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Archivo';
+  src: url('/schriften/archivo-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Archivo';
+  src: url('/schriften/archivo-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Archivo Narrow';
+  src: url('/schriften/archivo-narrow-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH JetBrains Mono';
+  src: url('/schriften/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH JetBrains Mono';
+  src: url('/schriften/jetbrains-mono-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+:root {
+  /* ── Farbrollen · Tagmodus ─────────────────────────────────────────────── */
+  --lfh-grund: #e9ebee;
+  --lfh-flaeche: #ffffff;
+  --lfh-flaeche-2: #f5f6f8;
+  --lfh-flaeche-3: #e1e4e8;
+  --lfh-kopf: #eef0f2;
+  --lfh-paneel: #f4f5f7;
+  --lfh-linie: #d4d8dd;
+  --lfh-linie-stark: #b9bfc6;
+  --lfh-steuer-rahmen: #79818a;
+  --lfh-text: #111418;
+  --lfh-text-2: #2b3138;
+  --lfh-gedaempft: #363d45;
+  --lfh-schwach: #424a53;
+  --lfh-bedien: #154e84;
+  --lfh-bedien-hover: #185895;
+  --lfh-bedien-text: #144779;
+  --lfh-auf-bedien: #ffffff;
+  --lfh-marke: #a8071a;
+  --lfh-normal: #1c6640;
+  --lfh-normal-text: #155234;
+  --lfh-achtung-text: #604200;
+  --lfh-alarm-text: #8f1c12;
+  --lfh-normal-flaeche: #e3f1e8;
+  --lfh-achtung-flaeche: #f7efd5;
+  --lfh-alarm-flaeche: #f9e3e3;
+  --lfh-bedien-flaeche: #e4edf7;
+  --lfh-banner-grund: #e6eef8;
+  --lfh-banner-linie: #9dbbe0;
+  --lfh-raster-linie: rgba(26, 95, 160, 0.07);
+
+  --lfh-etb-meldung-kante: #1677ff;
+  --lfh-etb-meldung-wort: #0a47a6;
+  --lfh-etb-anordnung-kante: #b35600;
+  --lfh-etb-anordnung-wort: #7a3700;
+  --lfh-etb-entscheidung-kante: #722ed1;
+  --lfh-etb-entscheidung-wort: #5b1fae;
+  --lfh-etb-lage-kante: #0e8c90;
+  --lfh-etb-lage-wort: #005357;
+  --lfh-etb-berichtigung-kante: #cf1322;
+  --lfh-etb-berichtigung-wort: #8f1c12;
+
+  --lfh-warnstufe-niedrig: #9e7f00;
+  --lfh-warnstufe-mittel: #b35600;
+  --lfh-warnstufe-hoch: #cf1322;
+  --lfh-warnstufe-akut: #a8071a;
+
+  /* ── Rahmen · modusunabhängig („chrome stays dark“) ────────────────────── */
+  --lfh-rahmen-grund: #0c0e11;
+  --lfh-rahmen-aktiv: #16191d;
+  --lfh-rahmen-linie: #22262b;
+  --lfh-rahmen-text: #e8ebee;
+  --lfh-rahmen-gedaempft: #a0a8b1;
+  --lfh-rahmen-marke: #a8071a;
+
+  /* ── Schriftrollen ─────────────────────────────────────────────────────── */
+  --lfh-schrift-text: 'LFH Archivo', system-ui, -apple-system, sans-serif;
+  --lfh-schrift-display: 'LFH Archivo Narrow', 'LFH Archivo', system-ui, sans-serif;
+  --lfh-schrift-zahl: 'LFH JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ── Schriftskala ──────────────────────────────────────────────────────── */
+  --lfh-typo-ueberschrift-groesse: 30px;
+  --lfh-typo-seitentitel-groesse: 14px;
+  --lfh-typo-text-groesse: 14px;
+  --lfh-typo-text-klein-groesse: 12px;
+  --lfh-typo-augenbraue-groesse: 10px;
+  --lfh-typo-augenbraue-sperrung: 0.14em;
+  --lfh-typo-meta-groesse: 11px;
+  --lfh-typo-datenwert-klein-groesse: 22px;
+  --lfh-typo-datenwert-groesse: 32px;
+  --lfh-typo-datenwert-gross-groesse: 40px;
+
+  /* ── Dichte-Staffel (nur für die Vorführung der drei Stufen) ───────────── */
+  --lfh-zeile-kompakt: 30px;
+  --lfh-zeile-komfortabel: 48px;
+  --lfh-zeile-handschuh: 72px;
+
+  --lfh-uebergang: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-theme='dark'] {
+  --lfh-grund: #08090b;
+  --lfh-flaeche: #0f1215;
+  --lfh-flaeche-2: #14171b;
+  --lfh-flaeche-3: #16191d;
+  --lfh-kopf: #0c0e11;
+  --lfh-paneel: #0a0c0e;
+  --lfh-linie: #22262b;
+  --lfh-linie-stark: #2e343a;
+  --lfh-steuer-rahmen: #626a73;
+  --lfh-text: #e8ebee;
+  --lfh-text-2: #c6ccd2;
+  --lfh-gedaempft: #9aa2ab;
+  --lfh-schwach: #838b94;
+  --lfh-bedien: #4d94d6;
+  --lfh-bedien-hover: #7db3e8;
+  --lfh-bedien-text: #8ec2f0;
+  --lfh-auf-bedien: #08090b;
+  --lfh-marke: #a8071a;
+  --lfh-normal: #52c41a;
+  --lfh-normal-text: #7ddc4a;
+  --lfh-achtung-text: #e8cc3a;
+  --lfh-alarm-text: #ff6b6b;
+  --lfh-normal-flaeche: #0d1a0a;
+  --lfh-achtung-flaeche: #1c1705;
+  --lfh-alarm-flaeche: #1c0a0d;
+  --lfh-bedien-flaeche: #0d1620;
+  --lfh-banner-grund: #0d1520;
+  --lfh-banner-linie: #1d3a5c;
+  --lfh-raster-linie: rgba(77, 148, 214, 0.055);
+
+  --lfh-etb-meldung-kante: #1677ff;
+  --lfh-etb-meldung-wort: #5c9dff;
+  --lfh-etb-anordnung-kante: #d46b08;
+  --lfh-etb-anordnung-wort: #e8852a;
+  --lfh-etb-entscheidung-kante: #722ed1;
+  --lfh-etb-entscheidung-wort: #a57ff0;
+  --lfh-etb-lage-kante: #13c2c2;
+  --lfh-etb-lage-wort: #13c2c2;
+  --lfh-etb-berichtigung-kante: #cf1322;
+  --lfh-etb-berichtigung-wort: #ff6b6b;
+
+  --lfh-warnstufe-niedrig: #d4b106;
+  --lfh-warnstufe-mittel: #d46b08;
+  --lfh-warnstufe-hoch: #cf1322;
+  --lfh-warnstufe-akut: #a8071a;
+
+  color-scheme: dark;
+}
