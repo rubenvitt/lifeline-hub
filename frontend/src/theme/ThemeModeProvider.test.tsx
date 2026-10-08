@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button, Checkbox, Collapse, Popconfirm, Switch, theme } from 'antd';
+import { Button, Checkbox, Collapse, Popconfirm, Radio, Switch, theme } from 'antd';
 import { ThemeModeProvider, useDichte, useThemeMode } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { sendeZeigerAenderung, setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
@@ -392,6 +392,45 @@ describe('Beschriftetes Kästchen folgt der Staffel über den Kontext (LFH-907)'
       </ThemeModeProvider>,
     );
     const label = container.querySelector<HTMLElement>('label.ant-checkbox-wrapper')!;
+    expect(label.style.minHeight).toBe('');
+  });
+});
+
+/**
+ * Beschrifteter Optionsknopf am Kontext (LFH-1048): gebaut wie das Kästchen-Label, ohne
+ * Komponenten-Token für seine Höhe. Geprüft wird die Verdrahtung am gerenderten Label; die
+ * Rechnung prüft `tokens.test.ts`, die gemessene Höhe `e2e/trefflaeche-optionsknopf.spec.ts`.
+ */
+describe('Beschrifteter Optionsknopf folgt der Staffel über den Kontext (LFH-1048)', () => {
+  for (const [stufe, soll] of [
+    ['kompakt', '24px'],
+    ['komfortabel', '48px'],
+    ['handschuh', '72px'],
+  ] as const) {
+    it(`auf ${stufe} trägt das Label min-height ${soll} und steht mittig`, () => {
+      localStorage.setItem(SPEICHER_SCHLUESSEL, stufe);
+      const { container } = render(
+        <ThemeModeProvider>
+          <Radio.Group value="freigeben">
+            <Radio value="freigeben">Auf allen Ansichten sichtbar machen</Radio>
+          </Radio.Group>
+        </ThemeModeProvider>,
+      );
+      const label = container.querySelector<HTMLElement>('label.ant-radio-wrapper');
+      expect(label, 'Optionsknopf-Label im Baum').not.toBeNull();
+      expect(label!.style.minHeight).toBe(soll);
+      expect(label!.style.alignItems).toBe('center');
+    });
+  }
+
+  it('ein Optionsknopf ohne Text bleibt ohne Boden (Auswahlspalte der Tabelle)', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    const { container } = render(
+      <ThemeModeProvider>
+        <Radio aria-label="Zeile wählen" />
+      </ThemeModeProvider>,
+    );
+    const label = container.querySelector<HTMLElement>('label.ant-radio-wrapper')!;
     expect(label.style.minHeight).toBe('');
   });
 });
