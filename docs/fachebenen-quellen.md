@@ -353,7 +353,8 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 
     Weil nie echte Webcam-Daten ankamen, ist der Weg bis zur Karte nur gegen die Spec
     belegt, nicht gegen die Quelle. Das betrifft auch `coordinate`, das im Spec-Beispiel als
-    String steht (`autobahn_zahl` nimmt Zahl und String). Nächste Prüfung: LFH-1017.
+    String steht (`autobahn_zahl` nimmt Zahl und String). Am 08.10.2026 ist der Dienst als
+    nicht verfügbar abgeschlossen worden; eine weitere Prüfung ist nicht vorgesehen.
   * Das **Webcam-Standbild lädt der Browser direkt beim Betreiber** (die Quelle liefert nur
     die URL, nicht das Bild) — anders als alle übrigen Fachebenen-Daten läuft es also NICHT
     über den Backend-Proxy. Ohne Internet am Gerät lädt es nicht; das Detailpanel blendet
