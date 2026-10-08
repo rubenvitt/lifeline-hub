@@ -649,3 +649,73 @@ async fn pressemitteilungen_liste_ohne_abschnitte() {
     assert_eq!(zeile["titel"], "Hochwasser Musterstadt");
     assert!(!zeile.contains_key("abschnitte"), "{zeile:?}");
 }
+
+/// Spec `stab-presse-log`, „Erledigte Medienkontakte geblättert“: Statuscodes der Parameter.
+#[tokio::test]
+async fn phasenliste_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    kontakt(&app, &admin, e, ANFRAGE).await;
+    let b = kontakte(e);
+    for (q, code) in [
+        ("phase=offen", StatusCode::OK),
+        ("phase=abgeschlossen&limit=5", StatusCode::OK),
+        (
+            "phase=abgeschlossen&vor_zeit=2026-09-30%2008:00:00&vor_id=3",
+            StatusCode::OK,
+        ),
+        ("phase=erledigt", StatusCode::BAD_REQUEST),
+        (
+            "phase=abgeschlossen&vor_id=3",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        ("phase=offen&limit=5", StatusCode::UNPROCESSABLE_ENTITY),
+        (
+            "vor_zeit=2026-09-30%2008:00:00&vor_id=3",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let (s, j) = anfrage(&app, "GET", &format!("{b}?{q}"), &admin, None).await;
+        assert_eq!(s, code, "{q}: {j:?}");
+    }
+    let (_, j) = anfrage(&app, "GET", &format!("{b}?phase=offen"), &admin, None).await;
+    assert_eq!(j.as_array().unwrap().len(), 1);
+    let (_, j) = anfrage(
+        &app,
+        "GET",
+        &format!("{b}?phase=abgeschlossen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(j.as_array().unwrap().len(), 0);
+}
+
+/// Spec `stab-presse-log`, „Kennzahlen des Presse-Logs“: hinter denselben Rechten wie die Liste.
+#[tokio::test]
+async fn kennzahlen_hinter_der_stab_sperre() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungspersonal(&app, &admin, e).await;
+    kontakt(&app, &admin, e, ANFRAGE).await;
+    let uri = format!("{}/kennzahlen", kontakte(e));
+    let (s, j) = anfrage(&app, "GET", &uri, &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["gesamt"], 1);
+    assert_eq!(j["offene_anfragen"], 1);
+    assert_eq!(j["medien"], serde_json::json!(["NDR 1"]));
+    assert!(j.get("kontakt_name").is_none() && !j.to_string().contains("Beispiel"));
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/stab"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let (s, _) = anfrage(&app, "GET", &uri, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}

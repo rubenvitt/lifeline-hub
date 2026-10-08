@@ -293,6 +293,8 @@ export type SchadenAbschlussGrund = S['SchadenAbschlussGrund'];
 export type Schaden = S['SchadenAnzeige'];
 /** LFH-931: Schadenmarker für Lagekarte und Lage-Dashboard, ohne Freitexte. */
 export type SchadenMarker = S['SchadenMarker'];
+export type SchadenKennzahlen = S['SchadenKennzahlen'];
+export type SchadenAuswahl = S['SchadenAuswahl'];
 /** LFH-21: Foto/Datei an einem Schaden; `id` ist die Linker-id, nicht `anhang.id`. */
 export type SchadenAnhang = S['SchadenAnhangAnzeige'];
 export type TierAnhang = S['TierAnhangAnzeige'];
@@ -911,6 +913,7 @@ export interface KategorieFristBody {
 export type MedienkontaktArt = S['MedienkontaktArt'];
 export type MedienkontaktStatus = S['MedienkontaktStatus'];
 export type Medienkontakt = S['MedienkontaktAnzeige'];
+export type MedienkontaktKennzahlen = S['MedienkontaktKennzahlen'];
 export type PressemitteilungVorlageKey = S['PressemitteilungVorlage'];
 export type PressemitteilungStatus = S['PressemitteilungStatus'];
 export type PressemitteilungAbschnitt = S['PressemitteilungAbschnitt'];

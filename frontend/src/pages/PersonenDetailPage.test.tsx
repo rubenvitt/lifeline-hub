@@ -12,6 +12,11 @@ import { erzeugeQueryClient } from '../api/queryClient';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { STATUS_META } from '../personen/personMeta';
+import { alsSchadenAuswahl } from '../api/einsatzSchaden';
+
+/** Die Schadenauswahl, wie der Server sie aus den Vollzeilen ableitet (LFH-1075). */
+const auswahlAus = (liste: readonly object[]) =>
+  liste.map((s) => alsSchadenAuswahl(s as Parameters<typeof alsSchadenAuswahl>[0]));
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
@@ -1228,6 +1233,9 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
   it('weist der Person einen freien Schaden als Geschädigte zu (XOR-Leerung)', async () => {
     let patch: Record<string, unknown> | null = null;
     render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/schaeden/auswahl', () =>
+        HttpResponse.json(auswahlAus([freierSchaden])),
+      ),
       http.get('/api/einsaetze/1/schaeden', ({ request }) => {
         const url = new URL(request.url);
         if (url.searchParams.get('geschaedigt_person_id') === '10') return HttpResponse.json([]);
@@ -1291,26 +1299,27 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
 
   it('bietet im Schaden-Picker nur freie, nicht-abgeschlossene Schäden an', async () => {
     render(einsatzAktiv, detail, [
-      http.get('/api/einsaetze/1/schaeden', ({ request }) => {
-        const url = new URL(request.url);
-        if (url.searchParams.get('geschaedigt_person_id') === '10') return HttpResponse.json([]);
-        return HttpResponse.json([
-          freierSchaden, // S-009, frei + offen → im Picker
-          {
-            ...freierSchaden,
-            id: 51,
-            registrier_nr: 10,
-            typ: 'brandschaden',
-            geschaedigt_person_id: 99,
-          }, // belegt → raus
-          {
-            ...freierSchaden,
-            id: 52,
-            registrier_nr: 11,
-            typ: 'wasserschaden',
-            status: 'abgeschlossen',
-          }, // abgeschlossen → raus
-        ]);
+      // Der Picker liest die Schadenauswahl (LFH-1075).
+      http.get('/api/einsaetze/1/schaeden/auswahl', () => {
+        return HttpResponse.json(
+          auswahlAus([
+            freierSchaden, // S-009, frei + offen → im Picker
+            {
+              ...freierSchaden,
+              id: 51,
+              registrier_nr: 10,
+              typ: 'brandschaden',
+              geschaedigt_person_id: 99,
+            }, // belegt → raus
+            {
+              ...freierSchaden,
+              id: 52,
+              registrier_nr: 11,
+              typ: 'wasserschaden',
+              status: 'abgeschlossen',
+            }, // abgeschlossen → raus
+          ]),
+        );
       }),
     ]);
     await klappeZuordnungenAuf();

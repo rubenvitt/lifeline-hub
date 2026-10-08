@@ -1,6 +1,21 @@
-import type { QueryClient, QueryKey } from '@tanstack/react-query';
-import { alsSchadenMarker, ladeSchaden, vergleicheSchaeden } from '../api/einsatzSchaden';
-import { ladeMedienkontakt, vergleicheMedienkontakte } from '../api/presse';
+import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
+import {
+  alsSchadenAuswahl,
+  alsSchadenMarker,
+  ladeSchaden,
+  passtZurSicht,
+  SCHAEDEN_SEITE,
+  vergleicheSchaeden,
+  vergleicheSchaedenNach,
+  type SchaedenFilter,
+  type SchadenSortierung,
+} from '../api/einsatzSchaden';
+import {
+  ladeMedienkontakt,
+  MEDIENKONTAKTE_SEITE,
+  vergleicheMedienkontakte,
+  vergleicheNachEingang,
+} from '../api/presse';
 import { einsatzKeys, type ZeilenZiel } from '../api/queryKeys';
 import type { Medienkontakt, Schaden, SchadenMarker } from '../api/types';
 import { LIVE_SAMMELFENSTER_MS, type LiveSammler } from './liveInvalidierung';
@@ -11,15 +26,21 @@ import { LIVE_SAMMELFENSTER_MS, type LiveSammler } from './liveInvalidierung';
  */
 export const ZEILEN_GRENZE = 10;
 
+/** `einsetzen` kann die Zeile nicht sicher einsetzen: der Eintrag geht an den Sammler. */
+export const AN_SAMMLER = Symbol('an Sammler');
+
 /** Eine Liste, in die eine nachgeladene Zeile einsortiert wird. */
 interface ZeilenListe<Z> {
+  /** Exakter Key, bei `praefix` der Prefix aller Einträge; der Sammler gleicht ihn ab. */
   key: (einsatzId: number) => QueryKey;
-  einsetzen: (alt: readonly unknown[], id: number, zeile: Z) => readonly unknown[];
+  /** Alle Einträge unter `key`: Seitenketten je Sicht, Einzelabrufe (LFH-1075). */
+  praefix?: boolean;
+  einsetzen: (alt: unknown, id: number, zeile: Z, cacheKey: QueryKey) => unknown;
 }
 
 /**
- * `form` bringt die Zeile in die Form der Liste; `null` heißt, sie gehört nicht (mehr) hinein
- * (stornierter Schaden).
+ * Flache Liste. `form` bringt die Zeile in die Form der Liste; `null` heißt, sie gehört nicht
+ * (mehr) hinein (stornierter Schaden, erledigter Kontakt in der offenen Liste).
  */
 function liste<Z, L extends { id: number }>(
   key: (einsatzId: number) => QueryKey,
@@ -32,16 +53,51 @@ function liste<Z, L extends { id: number }>(
   };
 }
 
+/** Einzelabrufe unter einem Prefix, deren letztes Key-Glied die Kennung ist. */
+function einzeln<Z>(key: (einsatzId: number) => QueryKey): ZeilenListe<Z> {
+  return {
+    key,
+    praefix: true,
+    einsetzen: (alt, id, zeile, cacheKey) => (cacheKey[cacheKey.length - 1] === id ? zeile : alt),
+  };
+}
+
+/**
+ * Seitenkette (`useInfiniteQuery`). `einordnen` sagt je Eintrag, wie die Zeile hineingehört:
+ * mit Vergleich und Seitengröße, `null` (gehört nicht hinein) oder {@link AN_SAMMLER}.
+ */
+function fenster<Z, L extends { id: number }>(
+  key: (einsatzId: number) => QueryKey,
+  praefix: boolean,
+  einordnen: (
+    zeile: Z,
+    cacheKey: QueryKey,
+  ) => { zeile: L | null; vergleich: (a: L, b: L) => number; seite: number } | typeof AN_SAMMLER,
+): ZeilenListe<Z> {
+  return {
+    key,
+    praefix,
+    einsetzen: (alt, id, zeile, cacheKey) => {
+      const o = einordnen(zeile, cacheKey);
+      if (o === AN_SAMMLER) return AN_SAMMLER;
+      return fensterEinsortieren(alt as InfiniteData<L[]>, id, o.zeile, o.vergleich, o.seite);
+    },
+  };
+}
+
 interface Ziel {
   laden: (einsatzId: number, id: number) => Promise<unknown>;
   listen: readonly ZeilenListe<unknown>[];
+  /** Die Prefixe, mit denen der Sammler alle Listen des Ziels auf einmal abgleicht. */
+  sammeln: (einsatzId: number) => readonly QueryKey[];
 }
 
 function ziel<Z>(
   laden: (einsatzId: number, id: number) => Promise<Z>,
+  sammeln: (einsatzId: number) => readonly QueryKey[],
   listen: readonly ZeilenListe<Z>[],
 ): Ziel {
-  return { laden, listen: listen as readonly ZeilenListe<unknown>[] };
+  return { laden, sammeln, listen: listen as readonly ZeilenListe<unknown>[] };
 }
 
 // Die Schadenliste ohne Filter führt keine stornierten (Server-Vorgabe `inkl_storniert=false`),
@@ -49,20 +105,55 @@ function ziel<Z>(
 const ungestorniert = (s: Schaden): Schaden | null => (s.storniert_at == null ? s : null);
 
 const ZIELE: Record<ZeilenZiel, Ziel> = {
-  medienkontakte: ziel<Medienkontakt>(ladeMedienkontakt, [
+  // Alle Listen der Medienkontakte liegen unter `medienkontakte(e)`.
+  medienkontakte: ziel<Medienkontakt>(ladeMedienkontakt, (e) => [einsatzKeys.medienkontakte(e)], [
+    // Vollliste ohne Phase (Altbestand der Abrufer); die Presseseite liest die Phasen.
     liste(einsatzKeys.medienkontakte, (k: Medienkontakt) => k, vergleicheMedienkontakte),
-  ]),
-  schaeden: ziel<Schaden>(ladeSchaden, [
-    liste(einsatzKeys.schaeden, ungestorniert, vergleicheSchaeden),
     liste(
-      einsatzKeys.schadenMarker,
-      (s: Schaden): SchadenMarker | null => {
-        const z = ungestorniert(s);
-        return z && alsSchadenMarker(z);
-      },
-      vergleicheSchaeden,
+      einsatzKeys.medienkontakteOffen,
+      (k: Medienkontakt) => (k.status === 'offen' ? k : null),
+      vergleicheNachEingang,
     ),
+    fenster(einsatzKeys.medienkontakteErledigt, false, (k: Medienkontakt) => ({
+      zeile: k.status === 'offen' ? null : k,
+      vergleich: vergleicheNachEingang,
+      seite: MEDIENKONTAKTE_SEITE,
+    })),
+    einzeln<Medienkontakt>(einsatzKeys.medienkontaktEinzelnAlle),
   ]),
+  // Auswahl, Seitenketten und Einzelabrufe liegen unter `schaeden(e)`, die Marker daneben.
+  schaeden: ziel<Schaden>(
+    ladeSchaden,
+    (e) => [einsatzKeys.schaeden(e), einsatzKeys.schadenMarker(e)],
+    [
+      liste(einsatzKeys.schaeden, ungestorniert, vergleicheSchaeden),
+      liste(
+        einsatzKeys.schadenMarker,
+        (s: Schaden): SchadenMarker | null => {
+          const z = ungestorniert(s);
+          return z && alsSchadenMarker(z);
+        },
+        vergleicheSchaeden,
+      ),
+      liste(einsatzKeys.schaedenAuswahl, alsSchadenAuswahl, vergleicheSchaeden),
+      // Modulseite (LFH-1075): je Sicht und Sortierung eine Seitenkette. Ob ein Schaden zu einer
+      // Sicht mit Suchbegriff gehört, weiß nur der Server.
+      fenster(einsatzKeys.schaedenSeitenAlle, true, (s: Schaden, cacheKey) => {
+        const { sicht, sortierung } = cacheKey[3] as {
+          sicht: SchaedenFilter;
+          sortierung: SchadenSortierung;
+        };
+        const passt = passtZurSicht(s, sicht);
+        if (passt === null) return AN_SAMMLER;
+        return {
+          zeile: passt ? s : null,
+          vergleich: vergleicheSchaedenNach(sortierung),
+          seite: SCHAEDEN_SEITE,
+        };
+      }),
+      einzeln<Schaden>(einsatzKeys.schaedenEinzelnAlle),
+    ],
+  ),
 };
 
 /** Ersetzt, ergänzt oder entfernt die Zeile `id` und sortiert wie der Server. */
@@ -75,6 +166,38 @@ export function einsortieren<T extends { id: number }>(
   const ohne = liste.filter((z) => z.id !== id);
   if (zeile === null) return ohne;
   return [...ohne, zeile].sort(vergleich);
+}
+
+/**
+ * Ersetzt, ergänzt oder entfernt die Zeile `id` in einer Seitenkette (LFH-1075, Spec
+ * `schaden-liste-blaettern`). Eine Zeile, die hinter die letzte geladene fiele, während der
+ * Server noch weitere Seiten hätte, liegt außerhalb des Fensters und wird nicht einsortiert;
+ * stand sie im Fenster, fällt sie heraus. Sonst kommt sie an ihren Platz in der Seite, in die sie
+ * nach der Ordnung gehört. Die Seiten dürfen dabei länger oder kürzer werden; der Cursor der
+ * nächsten Seite hängt nur an der letzten Zeile der letzten Seite.
+ */
+export function fensterEinsortieren<T extends { id: number }>(
+  alt: InfiniteData<T[]>,
+  id: number,
+  zeile: T | null,
+  vergleich: (a: T, b: T) => number,
+  seitenGroesse: number,
+): InfiniteData<T[]> {
+  const seiten = alt.pages.map((p) => p.filter((z) => z.id !== id));
+  const entfernt = seiten.some((p, i) => p.length !== alt.pages[i].length);
+  if (zeile === null || seiten.length === 0) {
+    return entfernt ? { ...alt, pages: seiten } : alt;
+  }
+  const letzteSeite = alt.pages[alt.pages.length - 1];
+  const weitere = letzteSeite.length >= seitenGroesse;
+  const letzte = letzteSeite[letzteSeite.length - 1] as T | undefined;
+  if (weitere && letzte && letzte.id !== id && vergleich(zeile, letzte) > 0) {
+    return entfernt ? { ...alt, pages: seiten } : alt;
+  }
+  let ziel = seiten.findIndex((p) => p.length > 0 && vergleich(zeile, p[p.length - 1]) < 0);
+  if (ziel === -1) ziel = seiten.length - 1;
+  seiten[ziel] = [...seiten[ziel], zeile].sort(vergleich);
+  return { ...alt, pages: seiten };
 }
 
 export interface ZeilenSammler {
@@ -111,7 +234,18 @@ export function erzeugeZeilenSammler(
   const aktuell = (key: QueryKey) => qc.getQueryState(key)?.isInvalidated === false;
 
   const listenAnSammler = (ziel: ZeilenZiel) =>
-    ZIELE[ziel].listen.forEach((l) => sammler.vormerken(l.key(einsatzId)));
+    ZIELE[ziel].sammeln(einsatzId).forEach((key) => sammler.vormerken(key));
+
+  // Die Einträge einer Liste im Cache: der exakte Key, oder bei einem Prefix jeder geladene
+  // Eintrag darunter.
+  const eintraege = (l: ZeilenListe<unknown>): QueryKey[] =>
+    l.praefix
+      ? qc
+          .getQueryCache()
+          .findAll({ queryKey: l.key(einsatzId) })
+          .filter((q) => q.state.data !== undefined)
+          .map((q) => q.queryKey)
+      : [l.key(einsatzId)];
 
   const planen = () => {
     if (!beendet && vorgemerkt.size > 0) timer ??= setTimeout(abgleichen, LIVE_SAMMELFENSTER_MS);
@@ -133,19 +267,22 @@ export function erzeugeZeilenSammler(
       listenAnSammler(ziel);
     } else {
       for (const l of def.listen) {
-        const key = l.key(einsatzId);
-        if (qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
-          if (qc.getQueryData(key) !== undefined) sammler.vormerken(key);
-          continue;
+        for (const key of eintraege(l)) {
+          if (qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
+            if (qc.getQueryData(key) !== undefined) sammler.vormerken(key);
+            continue;
+          }
+          const alt = qc.getQueryData(key);
+          if (alt === undefined) continue;
+          let neu: unknown = alt;
+          for (const [i, e] of ergebnisse.entries()) {
+            if (e.status !== 'fulfilled') continue;
+            neu = l.einsetzen(neu, ids[i], e.value, key);
+            if (neu === AN_SAMMLER) break;
+          }
+          if (neu === AN_SAMMLER) sammler.vormerken(key);
+          else if (neu !== alt) qc.setQueryData(key, neu);
         }
-        qc.setQueryData<readonly unknown[]>(key, (alt) => {
-          if (alt === undefined) return alt;
-          let neu = alt;
-          ergebnisse.forEach((e, i) => {
-            if (e.status === 'fulfilled') neu = l.einsetzen(neu, ids[i], e.value);
-          });
-          return neu;
-        });
       }
     }
     planen();
@@ -157,7 +294,7 @@ export function erzeugeZeilenSammler(
     vorgemerkt.clear();
     const verdeckt = document.visibilityState === 'hidden';
     for (const [ziel, ids] of faellig) {
-      const listen = ZIELE[ziel].listen.map((l) => l.key(einsatzId));
+      const listen = ZIELE[ziel].listen.flatMap(eintraege);
       const geladen = listen.filter((key) => qc.getQueryData(key) !== undefined);
       if (verdeckt || !geladen.some(aktuell) || ids.size > ZEILEN_GRENZE) {
         listenAnSammler(ziel);

@@ -15,7 +15,7 @@
 //! **Live:** Medienkontakte und Pressemitteilungen publizieren `LiveEvent::Presse`, nur mit
 //! Kennungen. Die Freigabe publiziert zusätzlich die ETB-id des Snapshots.
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -30,7 +30,9 @@ use crate::presse::mitteilung::{
     Abschnitt, Pressemitteilung, PressemitteilungAnzeige, PressemitteilungKopf,
 };
 use crate::presse::repo::{self, KontaktAenderung, KontaktEingabe, StatusWechsel};
-use crate::presse::{MedienkontaktAnzeige, MedienkontaktArt, MedienkontaktStatus};
+use crate::presse::{
+    MedienkontaktAnzeige, MedienkontaktArt, MedienkontaktKennzahlen, MedienkontaktStatus,
+};
 use crate::routes::support;
 use crate::routes::vorlagendokument::{
     self as kern, AnlegenBody, DokumentRoute, FortschreibenBody, PatchBody,
@@ -74,12 +76,44 @@ fn status(roh: &str) -> Result<MedienkontaktStatus, AppError> {
 
 // ── Presse-Log ──────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/stab/medienkontakte — offene zuerst, dann jüngster Eingang.
+#[derive(Debug, Deserialize)]
+pub struct KontakteParams {
+    phase: Option<String>,
+    vor_zeit: Option<String>,
+    vor_id: Option<i64>,
+    limit: Option<i64>,
+}
+
+/// GET /api/einsaetze/{id}/stab/medienkontakte — ohne `phase` alle, offene zuerst, dann jüngster
+/// Eingang. `phase=offen` alle offenen, `phase=abgeschlossen` die übrigen seitenweise
+/// (`vor_zeit` = Eingang, `vor_id`, `limit`; LFH-1075, D8, Regeln über
+/// [`crate::kommunikation::phase_und_seite`]).
 pub async fn medienkontakte_liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Stab>,
+    Query(p): Query<KontakteParams>,
 ) -> Result<Json<Vec<MedienkontaktAnzeige>>, AppError> {
-    Ok(Json(repo::liste(&state.pool, ctx.einsatz.id).await?))
+    let (phase, seite) = crate::kommunikation::phase_und_seite(
+        p.phase.as_deref(),
+        p.vor_zeit.as_deref(),
+        p.vor_id,
+        p.limit,
+    )?;
+    Ok(Json(match phase {
+        None => repo::liste(&state.pool, ctx.einsatz.id).await?,
+        Some(phase) => {
+            repo::liste_phase(&state.pool, ctx.einsatz.id, phase, seite.as_ref()).await?
+        }
+    }))
+}
+
+/// GET /api/einsaetze/{id}/stab/medienkontakte/kennzahlen — Zahlen und Medien über den ganzen
+/// Bestand, Grundlage der Medienlage (LFH-1075, D9). Gleiches Gate wie die Liste.
+pub async fn medienkontakte_kennzahlen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Stab>,
+) -> Result<Json<MedienkontaktKennzahlen>, AppError> {
+    Ok(Json(repo::kennzahlen(&state.pool, ctx.einsatz.id).await?))
 }
 
 /// GET /api/einsaetze/{id}/stab/medienkontakte/{kid} — ein Kontakt, 404 bei fremdem Einsatz.

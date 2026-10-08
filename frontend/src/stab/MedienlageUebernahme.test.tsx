@@ -12,7 +12,15 @@ import MedienlageUebernahme from './MedienlageUebernahme';
 import { freigabenFixture } from '../test/fixtures';
 
 vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
-vi.mock('../api/presse', () => ({ ladeMedienkontakte: vi.fn(), ladePressemitteilungen: vi.fn() }));
+vi.mock('../api/presse', async () => {
+  const { presseLeseAttrappe } = await import('../test/presseAttrappe');
+  const ladeMedienkontakte = vi.fn();
+  return {
+    ladeMedienkontakte,
+    ...presseLeseAttrappe((e) => ladeMedienkontakte(e)),
+    ladePressemitteilungen: vi.fn(),
+  };
+});
 vi.mock('../api/infotelefon', () => ({ ladeAnrufe: vi.fn() }));
 
 const KONTAKT = {

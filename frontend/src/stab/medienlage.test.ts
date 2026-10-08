@@ -1,46 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import type { InfotelefonAnruf, Medienkontakt, Pressemitteilung } from '../api/types';
+import type { InfotelefonAnruf, MedienkontaktKennzahlen, Pressemitteilung } from '../api/types';
 import { baueMedienlage, rendereMedienlageMarkdown, type MedienlageQuellen } from './medienlage';
 
-/** Volle DTOs MIT Personenbezug: die Ableitung darf davon nichts weitertragen. */
-const KONTAKTE: Medienkontakt[] = [
-  {
-    id: 1,
-    einsatz_id: 7,
-    art: 'anfrage',
-    medium: 'NDR 1',
-    thema: 'Familie Meyer evakuiert?',
-    kontakt_name: 'Maria Beispiel',
-    kontakt_erreichbarkeit: '+49 511 1234567',
-    eingang_at: '2026-09-30 10:00:00',
-    status: 'offen',
-    angelegt_von_id: 1,
-    angelegt_at: '2026-09-30 10:00:00',
-  },
-  {
-    id: 2,
-    einsatz_id: 7,
-    art: 'anfrage',
-    medium: 'NDR 1',
-    thema: 'Pegel',
-    eingang_at: '2026-09-30 11:00:00',
-    status: 'beantwortet',
-    antwort: 'Pegel steigt',
-    angelegt_von_id: 1,
-    angelegt_at: '2026-09-30 11:00:00',
-  },
-  {
-    id: 3,
-    einsatz_id: 7,
-    art: 'termin',
-    medium: 'RTL',
-    thema: 'Dreh am Deich',
-    eingang_at: '2026-09-30 12:00:00',
-    status: 'erledigt',
-    angelegt_von_id: 1,
-    angelegt_at: '2026-09-30 12:00:00',
-  },
-];
+/**
+ * Kennzahlen des Presse-Logs, wie der Server sie über den ganzen Bestand rechnet (LFH-1075): drei
+ * Kontakte, zwei Anfragen (eine offen) und ein Termin bei NDR 1 und RTL. Dazu Felder mit
+ * Personenbezug, die ein Aufrufer versehentlich mitgeben könnte: die Ableitung darf sie nie
+ * weitertragen.
+ */
+const KENNZAHLEN = {
+  gesamt: 3,
+  offen: 1,
+  offene_anfragen: 1,
+  je_art: { anfrage: 2, abstimmung: 0, termin: 1 },
+  medien: ['NDR 1', 'RTL'],
+  thema: 'Familie Meyer evakuiert?',
+  kontakt_name: 'Maria Beispiel',
+  kontakt_erreichbarkeit: '+49 511 1234567',
+} as MedienkontaktKennzahlen;
 
 const ANRUFE: InfotelefonAnruf[] = [
   {
@@ -76,7 +53,7 @@ const PM = {
 
 function quellen(teil: Partial<MedienlageQuellen> = {}): MedienlageQuellen {
   return {
-    kontakte: { zustand: 'daten', daten: KONTAKTE },
+    kontakte: { zustand: 'daten', daten: KENNZAHLEN },
     mitteilungen: { zustand: 'daten', daten: [PM, { ...PM, id: 5, status: 'entwurf' }] },
     anrufe: { zustand: 'daten', daten: ANRUFE },
     ...teil,
@@ -118,8 +95,7 @@ describe('Medienlage (LFH-554)', () => {
       '7654321',
       'sucht Vater',
       'Familie',
-      'Dreh am Deich',
-      'Pegel steigt',
+      'evakuiert',
     ]) {
       expect(text, pii).not.toContain(pii);
     }
@@ -135,7 +111,7 @@ describe('Medienlage (LFH-554)', () => {
       baueMedienlage(
         quellen({
           anrufe: { zustand: 'gesperrt', daten: [] },
-          kontakte: { zustand: 'fehler', daten: [] },
+          kontakte: { zustand: 'fehler', daten: null },
         }),
       ),
       zeit,
@@ -146,11 +122,20 @@ describe('Medienlage (LFH-554)', () => {
     expect(text).toContain('Hochwasser Musterstadt');
   });
 
+  it('nennt ein Medium, das nur im Leerraum abweicht, einmal', () => {
+    const m = baueMedienlage(
+      quellen({
+        kontakte: { zustand: 'daten', daten: { ...KENNZAHLEN, medien: ['NDR 1', ' NDR 1 ', ' '] } },
+      }),
+    );
+    expect(m.kontakte.zustand === 'daten' && m.kontakte.werte.medien).toEqual(['NDR 1']);
+  });
+
   it('entschärft Markdown in Medien und Titeln', () => {
     const text = rendereMedienlageMarkdown(
       baueMedienlage(
         quellen({
-          kontakte: { zustand: 'daten', daten: [{ ...KONTAKTE[0], medium: '*Radio* #1' }] },
+          kontakte: { zustand: 'daten', daten: { ...KENNZAHLEN, medien: ['*Radio* #1'] } },
         }),
       ),
       zeit,

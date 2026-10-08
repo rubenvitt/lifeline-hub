@@ -232,6 +232,28 @@ pub struct SchadenMarker {
     pub lon: Option<f64>,
 }
 
+/// Zahl der Schäden gesamt und je Status zu einem Filter (LFH-1075, `schaden-liste-blaettern`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct SchadenKennzahlen {
+    pub gesamt: i64,
+    pub offen: i64,
+    pub uebergeben: i64,
+    pub abgeschlossen: i64,
+}
+
+/// Schadenauswahl für Auswahlfelder und Sprungpalette (LFH-1075, `listen-projektion`): ohne
+/// Beschreibung und ohne Angaben zu Geschädigten; `frei` sagt, ob kein Geschädigter gesetzt ist.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct SchadenAuswahl {
+    pub id: i64,
+    pub registrier_nr: i64,
+    pub status: SchadenStatus,
+    pub typ: SchadenTyp,
+    pub ausmass: Ausmass,
+    pub ort: String,
+    pub frei: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

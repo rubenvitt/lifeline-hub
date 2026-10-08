@@ -546,6 +546,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::presse::medienkontakte_liste).post(routes::presse::medienkontakt_anlegen),
         )
         .route(
+            "/api/einsaetze/{id}/stab/medienkontakte/kennzahlen",
+            get(routes::presse::medienkontakte_kennzahlen),
+        )
+        .route(
             "/api/einsaetze/{id}/stab/medienkontakte/{kid}",
             get(routes::presse::medienkontakt_detail).patch(routes::presse::medienkontakt_aendern),
         )
@@ -953,6 +957,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/schaeden/marker",
             get(routes::einsatz_schaden::marker),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/kennzahlen",
+            get(routes::einsatz_schaden::kennzahlen),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/auswahl",
+            get(routes::einsatz_schaden::auswahl),
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}",

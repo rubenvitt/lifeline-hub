@@ -1,8 +1,9 @@
+import type { AbrufZustand } from '../api/abrufZustand';
 import type {
   InfotelefonAnliegen,
   InfotelefonStatus,
   MedienkontaktArt,
-  MedienkontaktStatus,
+  MedienkontaktKennzahlen,
   PressemitteilungStatus,
 } from '../api/types';
 import { ZUSTAND_GRUND } from './funkplan';
@@ -21,7 +22,9 @@ import {
  * Lagevortrags (DRK RLP, Punkt III).
  *
  * **Datenschutz strukturell:** `baueMedienlage` kopiert aus jeder Quelle NUR die freigegebenen
- * Felder (Art, Status, Medium; Titel, Version, Freigabezeit; Anliegen, Status). Ansprechperson,
+ * Felder (Zahlen und Medien der Kontakte; Titel, Version, Freigabezeit; Anliegen, Status). Die
+ * Kontakte kommen seit LFH-1075 als Kennzahlen vom Server, über den ganzen Bestand, auch wenn
+ * die Presseseite die erledigten nur seitenweise lädt. Ansprechperson,
  * Erreichbarkeit, Anrufername, Rückrufnummer, Notiz und Thema erreichen die Ableitung nie — auch
  * dann nicht, wenn der Aufrufer das volle DTO übergibt. Der Test pinnt ihre Abwesenheit.
  *
@@ -29,10 +32,10 @@ import {
  * „—“ mit Grund, nie „0“.
  */
 
+/** Die Kennzahlen des Presse-Logs (`…/medienkontakte/kennzahlen`); `null` ohne Antwort. */
 interface KontaktEingang {
-  art: MedienkontaktArt;
-  status: MedienkontaktStatus;
-  medium: string;
+  zustand: AbrufZustand;
+  daten: Pick<MedienkontaktKennzahlen, 'gesamt' | 'offen' | 'je_art' | 'medien'> | null;
 }
 interface MitteilungEingang {
   titel: string;
@@ -46,7 +49,7 @@ interface AnrufEingang {
 }
 
 export interface MedienlageQuellen {
-  kontakte: Quelle<KontaktEingang>;
+  kontakte: KontaktEingang;
   mitteilungen: Quelle<MitteilungEingang>;
   anrufe: Quelle<AnrufEingang>;
 }
@@ -59,7 +62,7 @@ export interface Medienlage {
     gesamt: number;
     offen: number;
     jeArt: Record<MedienkontaktArt, number>;
-    /** Die Namen der Medien (Redaktionen, keine Personen), jedes einmal, in Eingangsfolge. */
+    /** Die Namen der Medien (Redaktionen, keine Personen), jedes einmal, in der Folge des Presse-Logs (offene zuerst, dann jüngster Eingang). */
     medien: string[];
   }>;
   mitteilungen: Teil<{ freigegeben: { titel: string; version: number; freigegebenAt: string }[] }>;
@@ -79,20 +82,23 @@ function teil<E, W>(q: Quelle<E>, rechne: (daten: readonly E[]) => W): Teil<W> {
   return { zustand: 'daten', werte: rechne(q.daten) };
 }
 
+function kontakteTeil(q: KontaktEingang): Medienlage['kontakte'] {
+  if (q.zustand !== 'daten') return { zustand: q.zustand };
+  if (!q.daten) return { zustand: 'fehler' };
+  const k = q.daten;
+  const jeArt = nullen(ART_REIHENFOLGE);
+  for (const art of ART_REIHENFOLGE) jeArt[art] = k.je_art[art];
+  const medien: string[] = [];
+  for (const m of k.medien) {
+    const medium = m.trim();
+    if (medium && !medien.includes(medium)) medien.push(medium);
+  }
+  return { zustand: 'daten', werte: { gesamt: k.gesamt, offen: k.offen, jeArt, medien } };
+}
+
 export function baueMedienlage(q: MedienlageQuellen): Medienlage {
   return {
-    kontakte: teil(q.kontakte, (daten) => {
-      const jeArt = nullen(ART_REIHENFOLGE);
-      const medien: string[] = [];
-      let offen = 0;
-      for (const k of daten) {
-        jeArt[k.art] += 1;
-        if (k.status === 'offen') offen += 1;
-        const medium = k.medium.trim();
-        if (medium && !medien.includes(medium)) medien.push(medium);
-      }
-      return { gesamt: daten.length, offen, jeArt, medien };
-    }),
+    kontakte: kontakteTeil(q.kontakte),
     mitteilungen: teil(q.mitteilungen, (daten) => ({
       freigegeben: daten
         .filter((m) => m.status === 'freigegeben' && m.freigegeben_at)

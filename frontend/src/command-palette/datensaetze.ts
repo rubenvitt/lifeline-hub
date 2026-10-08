@@ -48,7 +48,7 @@ import type {
   Meldung,
   ModulFreigaben,
   PersonAuswahl,
-  Schaden,
+  SchadenAuswahl,
   Uhs,
 } from '../api/types';
 
@@ -68,7 +68,7 @@ type Nummernsorte = 'person' | 'schaden';
 
 export interface DatensatzQuellen {
   personen?: PersonAuswahl[];
-  schaeden?: Schaden[];
+  schaeden?: SchadenAuswahl[];
   uhs?: Uhs[];
   meldungen?: Meldung[];
   auftraege?: Auftrag[];

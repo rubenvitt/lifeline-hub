@@ -106,6 +106,26 @@ pub struct MedienkontaktAnzeige {
     pub angelegt_at: String,
 }
 
+/// Zahl der Medienkontakte je Art (LFH-1075).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct MedienkontaktJeArt {
+    pub anfrage: i64,
+    pub abstimmung: i64,
+    pub termin: i64,
+}
+
+/// Kennzahlen des Presse-Logs über den ganzen Bestand (LFH-1075, Spec `stab-presse-log`): die
+/// Grundlage der Medienlage und der Zahlen über der Liste. `medien` sind die Namen der Medien
+/// (Redaktionen, keine Personen), jedes einmal, in der Folge der Liste.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct MedienkontaktKennzahlen {
+    pub gesamt: i64,
+    pub offen: i64,
+    pub offene_anfragen: i64,
+    pub je_art: MedienkontaktJeArt,
+    pub medien: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

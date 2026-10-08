@@ -7587,6 +7587,63 @@
           "termin"
         ]
       },
+      "MedienkontaktJeArt": {
+        "type": "object",
+        "description": "Zahl der Medienkontakte je Art (LFH-1075).",
+        "required": [
+          "anfrage",
+          "abstimmung",
+          "termin"
+        ],
+        "properties": {
+          "abstimmung": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "anfrage": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "termin": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "MedienkontaktKennzahlen": {
+        "type": "object",
+        "description": "Kennzahlen des Presse-Logs über den ganzen Bestand (LFH-1075, Spec `stab-presse-log`): die\nGrundlage der Medienlage und der Zahlen über der Liste. `medien` sind die Namen der Medien\n(Redaktionen, keine Personen), jedes einmal, in der Folge der Liste.",
+        "required": [
+          "gesamt",
+          "offen",
+          "offene_anfragen",
+          "je_art",
+          "medien"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "je_art": {
+            "$ref": "#/components/schemas/MedienkontaktJeArt"
+          },
+          "medien": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offene_anfragen": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "MedienkontaktStatus": {
         "type": "string",
         "description": "Status eines Medienkontakts. Wire == `as_str()`.",
@@ -10375,6 +10432,72 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "SchadenAuswahl": {
+        "type": "object",
+        "description": "Schadenauswahl für Auswahlfelder und Sprungpalette (LFH-1075, `listen-projektion`): ohne\nBeschreibung und ohne Angaben zu Geschädigten; `frei` sagt, ob kein Geschädigter gesetzt ist.",
+        "required": [
+          "id",
+          "registrier_nr",
+          "status",
+          "typ",
+          "ausmass",
+          "ort",
+          "frei"
+        ],
+        "properties": {
+          "ausmass": {
+            "$ref": "#/components/schemas/Ausmass"
+          },
+          "frei": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ort": {
+            "type": "string"
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SchadenStatus"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/SchadenTyp"
+          }
+        }
+      },
+      "SchadenKennzahlen": {
+        "type": "object",
+        "description": "Zahl der Schäden gesamt und je Status zu einem Filter (LFH-1075, `schaden-liste-blaettern`).",
+        "required": [
+          "gesamt",
+          "offen",
+          "uebergeben",
+          "abgeschlossen"
+        ],
+        "properties": {
+          "abgeschlossen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uebergeben": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

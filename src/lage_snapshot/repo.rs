@@ -258,8 +258,13 @@ pub async fn erzeuge(
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
         // Der Stand spiegelt das sichtbare Lagebild, ohne stornierte Schäden.
-        schaeden: crate::schaden::repo::liste(pool, einsatz_id, None, None, None, None, false)
-            .await?,
+        schaeden: crate::schaden::repo::liste(
+            pool,
+            einsatz_id,
+            &crate::schaden::repo::SchadenFilter::default(),
+            None,
+        )
+        .await?,
         einheiten: crate::einheit::repo::liste(pool, einsatz_id).await?,
         // Fahrzeuge aus der einsatz-scoped Disposition, nicht aus dem org-weiten Fuhrpark.
         fahrzeuge: crate::fahrzeug::disposition_repo::liste(pool, einsatz_id, einsatz_aktiv)

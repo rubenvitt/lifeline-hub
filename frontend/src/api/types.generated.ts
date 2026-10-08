@@ -2816,6 +2816,30 @@ export interface components {
          * @enum {string}
          */
         MedienkontaktArt: "anfrage" | "abstimmung" | "termin";
+        /** @description Zahl der Medienkontakte je Art (LFH-1075). */
+        MedienkontaktJeArt: {
+            /** Format: int64 */
+            abstimmung: number;
+            /** Format: int64 */
+            anfrage: number;
+            /** Format: int64 */
+            termin: number;
+        };
+        /**
+         * @description Kennzahlen des Presse-Logs über den ganzen Bestand (LFH-1075, Spec `stab-presse-log`): die
+         *     Grundlage der Medienlage und der Zahlen über der Liste. `medien` sind die Namen der Medien
+         *     (Redaktionen, keine Personen), jedes einmal, in der Folge der Liste.
+         */
+        MedienkontaktKennzahlen: {
+            /** Format: int64 */
+            gesamt: number;
+            je_art: components["schemas"]["MedienkontaktJeArt"];
+            medien: string[];
+            /** Format: int64 */
+            offen: number;
+            /** Format: int64 */
+            offene_anfragen: number;
+        };
         /**
          * @description Status eines Medienkontakts. Wire == `as_str()`.
          * @enum {string}
@@ -3896,6 +3920,32 @@ export interface components {
             typ: components["schemas"]["SchadenTyp"];
             uebergeben_an?: string | null;
             uebergeben_at?: string | null;
+        };
+        /**
+         * @description Schadenauswahl für Auswahlfelder und Sprungpalette (LFH-1075, `listen-projektion`): ohne
+         *     Beschreibung und ohne Angaben zu Geschädigten; `frei` sagt, ob kein Geschädigter gesetzt ist.
+         */
+        SchadenAuswahl: {
+            ausmass: components["schemas"]["Ausmass"];
+            frei: boolean;
+            /** Format: int64 */
+            id: number;
+            ort: string;
+            /** Format: int64 */
+            registrier_nr: number;
+            status: components["schemas"]["SchadenStatus"];
+            typ: components["schemas"]["SchadenTyp"];
+        };
+        /** @description Zahl der Schäden gesamt und je Status zu einem Filter (LFH-1075, `schaden-liste-blaettern`). */
+        SchadenKennzahlen: {
+            /** Format: int64 */
+            abgeschlossen: number;
+            /** Format: int64 */
+            gesamt: number;
+            /** Format: int64 */
+            offen: number;
+            /** Format: int64 */
+            uebergeben: number;
         };
         /**
          * @description Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931, `listen-projektion`): nur, was

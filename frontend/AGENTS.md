@@ -145,6 +145,11 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Entfallenes bleibt als Platzhalter ohne Link, der Kopf steht still; Banner in der Standzeile
   fester Höhe; im Druck gilt sie nicht. Kein Nutzer baut eine eigene.
 - `Datensicht` bricht fest bei `md`; die Prop `tabelleAb` hält `datensicht.guard.test.ts` fern.
+- **Eine geblätterte Liste nimmt den Servermodus der `Datensicht`** (LFH-1075, Prop
+  `serverseitig`): Suche (entprellt) und Spaltenfilter gehen an den Server, die Sortierung
+  kontrolliert; die Sicht filtert und sortiert nicht noch einmal. `stand` ist die Abfrage der
+  gezeigten Zeilen, ihr Wechsel kein Zufluss. Nachladen per „Ältere laden“ unter der Sicht,
+  Zahlen aus `…/kennzahlen` (Vorbild `pages/SchaedenPage.tsx`).
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
   (`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`).
 - **Fließende Spalte** (LFH-523): trägt genau EINE Spalte `mindestBreite` und alle übrigen eine
@@ -727,7 +732,10 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   Fenster, sonst und bei verdecktem Tab, Fehler oder fehlender Liste der Sammler). Ohne Kennung
   gelten die Prefixe aus `EINSATZ_STREAM_EVENTS`, `lagged` gleicht weiter alles ab. Jeder gezielte
   Key liegt unter den Prefixen seines Ereignisses (`queryKeys.test.ts`); eine zeilenweise
-  abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher).
+  abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher). Eine
+  Seitenkette (`useInfiniteQuery`) bekommt eine Zeile nur innerhalb des geladenen Fensters
+  (`fensterEinsortieren`, LFH-1075); entscheidet über die Zugehörigkeit nur der Server
+  (Suchbegriff), geht die Kette an den Sammler. Kennzahlen gleicht immer der Sammler ab.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

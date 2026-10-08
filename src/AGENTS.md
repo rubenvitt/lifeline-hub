@@ -194,8 +194,16 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 - **In einer geblätterten Liste steht jede Einschränkung, die Zeilen ausblendet**
   (Gerätebindung), im SQL vor dem `LIMIT`. Ein `retain` danach machte Seiten kurz und den
   Cursor falsch.
-- **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/personen/auswahl`), nicht die
-  Vollliste.
+- **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/personen/auswahl`,
+  `…/schaeden/auswahl`), nicht die Vollliste.
+- **Das Presse-Log trennt nach Phase wie die Meldungen** (LFH-1075), Ordnung und Cursor über
+  `eingang_at`; offen ist nur `offen`. `…/medienkontakte/kennzahlen` trägt Zahlen und Namen der
+  Medien, nie Personenbezug.
+- **Eine Liste mit wählbarer Sortierung blättert über Schlüssel und Nummer** (LFH-1075,
+  `schaden::repo::SortSpalte`): `sortierung=<spalte>_<ab|auf>`, Cursor `vor_wert` + `vor_nr`,
+  Gleichstand über die Registriernummer in derselben Richtung; Sortierung oder Cursor ohne
+  `limit` 422. Suche per `LIKE … ESCAPE '\'` mit maskiertem `%`/`_` über dasselbe WHERE-Fragment
+  wie die Kennzahlen. Ohne `limit` bleibt die Vollliste (Druck, Bericht, Snapshot).
 
 ## Backend — Benutzername und KDF (LFH-921, LFH-981)
 

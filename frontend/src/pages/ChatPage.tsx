@@ -20,7 +20,7 @@ import {
 } from '../api/chat';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import { listeSchaeden } from '../api/einsatzSchaden';
+import { listeSchadenAuswahl } from '../api/einsatzSchaden';
 import { listeUhs } from '../api/einsatzUhs';
 import { listePersonenAuswahl } from '../api/einsatzPerson';
 import { listeLageberichte } from '../api/lageberichte';
@@ -222,9 +222,10 @@ export default function ChatPage() {
   }
   const typAktiv = (t: BezugTyp) => bezugDialogOffen || referenzierteTypen.has(t);
 
+  // Auswahl ohne Freitexte und ohne Geschädigten-Angaben (LFH-1075).
   const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId),
+    queryKey: einsatzKeys.schaedenAuswahl(einsatzId),
+    queryFn: () => listeSchadenAuswahl(einsatzId),
     enabled: typAktiv('schaden'),
   });
   const uhsQuery = useQuery({

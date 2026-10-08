@@ -18,13 +18,22 @@ import PressePage, { statusOptionen } from './PressePage';
 import { freigabenFixture } from '../test/fixtures';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
-vi.mock('../api/presse', () => ({
-  ladeMedienkontakte: vi.fn(),
-  ladePressemitteilungen: vi.fn(),
-  legeMedienkontaktAn: vi.fn(),
-  legePressemitteilungAn: vi.fn(),
-  setzeMedienkontaktStatus: vi.fn(),
-}));
+// Die Lesewege des Presse-Logs leitet die Attrappe aus der Vollliste ab (LFH-1075).
+vi.mock('../api/presse', async (orig) => {
+  const echt = await orig<typeof import('../api/presse')>();
+  const { presseLeseAttrappe } = await import('../test/presseAttrappe');
+  const ladeMedienkontakte = vi.fn();
+  return {
+    MEDIENKONTAKTE_SEITE: echt.MEDIENKONTAKTE_SEITE,
+    eingangCursor: echt.eingangCursor,
+    ladeMedienkontakte,
+    ...presseLeseAttrappe((e) => ladeMedienkontakte(e)),
+    ladePressemitteilungen: vi.fn(),
+    legeMedienkontaktAn: vi.fn(),
+    legePressemitteilungAn: vi.fn(),
+    setzeMedienkontaktStatus: vi.fn(),
+  };
+});
 vi.mock('../api/infotelefon', () => ({ ladeAnrufe: vi.fn() }));
 
 const EINSATZ = {
