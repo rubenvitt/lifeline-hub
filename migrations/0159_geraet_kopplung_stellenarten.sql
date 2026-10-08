@@ -19,7 +19,7 @@
 -- (`Funktionsansicht::stellenart`). UHS, Betreuungsstelle und Bereitstellungsraum werden nur
 -- storniert, nie gelöscht. Ein Einsatzabschnitt wird beim Auflösen gelöscht; der Handler
 -- widerruft vorher jede offene Kopplung an ihm, ON DELETE SET NULL hält die widerrufenen Zeilen.
--- Abgesichert von db::tests::migration_0158_*.
+-- Abgesichert von db::tests::migration_0159_*.
 
 PRAGMA foreign_keys = OFF;
 

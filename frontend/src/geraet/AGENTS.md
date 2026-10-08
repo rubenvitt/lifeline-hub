@@ -13,7 +13,7 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   ablehnt. Eine neue Fähigkeit beginnt mit Listeneintrag und Test in `tests/geraet_kopplung.rs`,
   erst dann `geraetDarf`.
 - **Stellenbindung je Art** (LFH-1040): UHS, Betreuungsstelle, Bereitstellungsraum und
-  Einsatzabschnitt haben je eine Spalte in `geraet_kopplung` (Migration 0158, höchstens eine
+  Einsatzabschnitt haben je eine Spalte in `geraet_kopplung` (Migration 0159, höchstens eine
   gesetzt); `Funktionsansicht::stellenart` nennt die Art, `GeraetKontext.stelle` die Stelle. Die
   Helfer in `stelle.rs` gelten streng: ein Gerät, das nicht an eine Stelle genau dieser Art
   gebunden ist, sieht keine (`sicht` → `Keine`), Personen nur über `sichtbare_personen` /

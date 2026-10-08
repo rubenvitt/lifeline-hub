@@ -4505,14 +4505,14 @@ mod tests {
         assert_eq!(daten, vec![3u8; GROESSE]);
     }
 
-    // --- Migration 0158: Gerätekopplung für weitere Stellen (LFH-1040) ---
+    // --- Migration 0159: Gerätekopplung für weitere Stellen (LFH-1040) ---
 
     /// Der Rebuild von `geraet_kopplung` hält Codes, Ereignisse und Gerätesitzungen (alle drei
     /// hängen per CASCADE an der Tabelle), nimmt die neuen Ansichten, bindet höchstens eine
     /// Stelle und hält eine Kopplung über das Löschen ihres Abschnitts.
     #[tokio::test]
-    async fn migration_0158_erhaelt_kinder_und_bindet_hoechstens_eine_stelle() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 157).await;
+    async fn migration_0159_erhaelt_kinder_und_bindet_hoechstens_eine_stelle() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 158).await;
         let (e, b) = bild_grundlage(&pool).await;
         let g: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
@@ -4581,7 +4581,7 @@ mod tests {
             }
         };
 
-        migriere_bis(&pool, 158).await;
+        migriere_bis(&pool, 159).await;
 
         for t in [
             "geraet_kopplung",
