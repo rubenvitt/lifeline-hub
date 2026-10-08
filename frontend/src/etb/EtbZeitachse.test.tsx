@@ -335,7 +335,7 @@ describe('EtbZeitachse – gepufferte Einträge', () => {
     });
     const z = zeileVon(container, 'ausstehend-1');
     expect(z).toHaveTextContent('Noch nicht gesendet');
-    expect(z).toHaveTextContent('wird gesendet …');
+    expect(z).toHaveTextContent('vorgemerkt');
     expect(z).not.toHaveTextContent('Nr.');
     expect(within(z).queryByRole('button')).toBeNull();
     // Und sie steht VOR den gesendeten — sie ist der jüngste Eintrag.

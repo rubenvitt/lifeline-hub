@@ -139,12 +139,12 @@ export default function EtbBilanz({
           <Augenbraue als="h3">Berichtigungen</Augenbraue>
           {ausschnitt && !unbestimmt && (
             <span data-lfh="bilanz-ausschnitt" style={{ fontSize: 11, color: rollen.gedaempft }}>
-              Im geladenen Ausschnitt, nicht die jüngsten.
+              Ausschnitt, nicht die jüngsten
             </span>
           )}
           {berichtigungen.length === 0 ? (
             <span style={{ fontSize: 11, color: rollen.gedaempft }}>
-              {unbestimmt ? '—' : 'Keine in den geladenen Einträgen.'}
+              {unbestimmt ? '—' : ausschnitt ? 'Keine im Ausschnitt' : 'Keine'}
             </span>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>

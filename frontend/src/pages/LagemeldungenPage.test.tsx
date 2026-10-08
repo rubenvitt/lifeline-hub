@@ -168,6 +168,8 @@ describe('LagemeldungenPage', () => {
     const { container } = renderPage();
     expect(await screen.findByText('Noch keine Lagemeldungen')).toBeInTheDocument();
     expect(container.querySelector('.ant-empty')).toBeNull();
+    // Kein Satz, der den Weg erklärt (LFH-1078).
+    expect(screen.queryByText(/Meldungsliste/)).toBeNull();
     // Ohne Menge keine Filterleiste: sie filterte nichts.
     expect(screen.queryByRole('search', { name: 'Lagemeldungen filtern' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Zu den Meldungen' }));

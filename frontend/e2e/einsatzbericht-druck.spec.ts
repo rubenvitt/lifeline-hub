@@ -261,7 +261,7 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
   });
   await wechsleZu(page, beobachter);
   await page.goto(`/einsaetze/${einsatzId}/einsatzdaten/bericht`);
-  await expect(page.getByText('Für den Einsatzbericht fehlen Rechte an: Betroffene.')).toBeVisible({
+  await expect(page.getByText('Kein Zugriff: Betroffene', { exact: true })).toBeVisible({
     timeout: 30_000,
   });
   await expect(drucken).toHaveCount(0);

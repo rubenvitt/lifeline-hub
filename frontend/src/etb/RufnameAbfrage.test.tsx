@@ -29,6 +29,8 @@ describe('RufnameAbfrage', () => {
     expect(screen.getByRole('checkbox', { name: 'Empfänger wie Absender' })).toBeChecked();
     // Die erste Abfrage hat keinen Ausweg ohne Wert.
     expect(screen.queryByRole('button', { name: 'Abbrechen' })).toBeNull();
+    // Kein Erklärsatz unter den Feldern (LFH-1078): den Weg für einen Eintrag zeigt das Chip-Menü.
+    expect(screen.queryByText(/Gilt für jeden neuen Eintrag|einzelnen Eintrag/)).toBeNull();
 
     await userEvent.clear(feld);
     await userEvent.type(feld, 'ELW 1');

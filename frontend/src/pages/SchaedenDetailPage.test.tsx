@@ -449,6 +449,13 @@ describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', ()
     await userEvent.type(feld, 'Bauhof{Enter}');
     await waitFor(() => expect(body.uebergeben_an).toBe('Bauhof'));
   });
+
+  it('Abschließen: Notiz ohne Erklärung im Etikett (LFH-1078)', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    expect(within(dialog).getByLabelText('Notiz (optional)')).toBeInTheDocument();
+  });
 });
 
 describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {

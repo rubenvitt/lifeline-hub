@@ -85,6 +85,13 @@ function feld(): HTMLElement {
   return screen.getByPlaceholderText(/Inhalt/);
 }
 
+/** Kurzgrund bzw. Zähler neben „Anhang“ (LFH-1078). */
+function grund(): HTMLElement {
+  const el = document.querySelector<HTMLElement>('[data-lfh="etb-anhang-grund"]');
+  if (!el) throw new Error('Grund am Anhang-Knopf fehlt');
+  return el;
+}
+
 function setzeOnline(online: boolean) {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
   act(() => {
@@ -122,20 +129,23 @@ describe('Schnellerfassung – Anhang wählen (LFH-117)', () => {
     expect(within(liste()).getByText('klein.jpg · 3 B')).toBeInTheDocument();
   });
 
-  it('nimmt höchstens 10 Anhänge an, sagt warum und sperrt „Anhang" an der Grenze', async () => {
+  it('nimmt höchstens 10 Anhänge an, sagt warum und sperrt „Anhang" an der Grenze (Zähler)', async () => {
     const { container } = renderMitProviders(<Schnellerfassung {...props()} />);
     const elf = Array.from({ length: 11 }, (_, i) => datei(`f${i + 1}.jpg`));
     await waehle(container, ...elf);
     expect(within(liste()).getAllByRole('listitem')).toHaveLength(10);
     expect(within(liste()).queryByText(/f11\.jpg/)).toBeNull();
     expect(screen.getByText(/f11\.jpg: höchstens 10 Anhänge je Eintrag/)).toBeInTheDocument();
-    // Zweiter Kanal neben dem Grau: der Grund steht als Satz am Knopf.
-    expect(screen.getByRole('button', { name: 'Anhang' })).toBeDisabled();
-    expect(screen.getByText('Höchstens 10 Anhänge je Eintrag.')).toBeInTheDocument();
+    // Zweiter Kanal neben dem Grau: der Zähler am Knopf zeigt die Grenze, kein Satz (LFH-1078).
+    const knopf = screen.getByRole('button', { name: 'Anhang' });
+    expect(knopf).toBeDisabled();
+    expect(grund()).toHaveTextContent('10/10');
+    expect(knopf).toHaveAttribute('aria-describedby', grund().id);
+    expect(screen.queryByText(/Höchstens 10 Anhänge je Eintrag/)).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Anhang f1.jpg entfernen' }));
     expect(screen.getByRole('button', { name: 'Anhang' })).toBeEnabled();
-    expect(screen.queryByText('Höchstens 10 Anhänge je Eintrag.')).toBeNull();
+    expect(grund()).toHaveTextContent('9/10');
   });
 
   it('nimmt dieselbe Datei nur einmal — Name, Größe und Änderungszeit entscheiden', async () => {
@@ -158,10 +168,11 @@ describe('Schnellerfassung – Anhang wählen (LFH-117)', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
-    expect(screen.getByRole('button', { name: 'Anhang' })).toBeDisabled();
-    expect(
-      screen.getByText('Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.'),
-    ).toBeVisible();
+    const knopf = screen.getByRole('button', { name: 'Anhang' });
+    expect(knopf).toBeDisabled();
+    expect(grund()).toHaveTextContent(/^offline$/);
+    expect(grund()).toBeVisible();
+    expect(knopf).toHaveAttribute('aria-describedby', grund().id);
 
     await userEvent.type(feld(), 'Lage ruhig{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
@@ -169,13 +180,10 @@ describe('Schnellerfassung – Anhang wählen (LFH-117)', () => {
     expect(hochladen).not.toHaveBeenCalled();
   });
 
-  it('lässt die Hinweiszeile unverändert — kein neues Tastenkürzel', () => {
+  it('ohne gewählte Datei und mit Netz steht kein Grund und kein Zähler am Knopf', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
-    const hinweis = screen.getByText(/^Enter sendet/);
-    expect(hinweis).toHaveTextContent(
-      'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden',
-    );
-    expect(hinweis.parentElement).not.toHaveTextContent(/Anhang/);
+    expect(document.querySelector('[data-lfh="etb-anhang-grund"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Anhang' })).not.toHaveAttribute('aria-describedby');
   });
 });
 
@@ -381,12 +389,33 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
     setzeOnline(false);
     await userEvent.type(feld(), 'Foto{Enter}');
 
-    expect(
-      await screen.findByText(/Ohne Verbindung lassen sich keine Anhänge senden/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Offline – Anhänge nicht sendbar')).toBeInTheDocument();
     expect(hochladen).not.toHaveBeenCalled();
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(feld()).toHaveValue('Foto');
+    expect(within(liste()).getByText('a.jpg · 3 B')).toBeInTheDocument();
+
+    // Der Ausweg ist ein Knopf, kein Satz: die Dateien gehen, der Text bleibt und geht danach.
+    await userEvent.click(screen.getByRole('button', { name: 'Anhänge entfernen' }));
+    expect(screen.queryByRole('list', { name: 'Gewählte Anhänge' })).toBeNull();
+    expect(screen.queryByText('Offline – Anhänge nicht sendbar')).toBeNull();
+    expect(feld()).toHaveValue('Foto');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(p.erfassen).mock.calls[0][0].anhang_ids).toBeUndefined();
+  });
+
+  it('nimmt den Offline-Hinweis samt „Anhänge entfernen" zurück, sobald das Netz wieder da ist', async () => {
+    const p = props();
+    const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waehle(container, datei('a.jpg'));
+    setzeOnline(false);
+    await userEvent.type(feld(), 'Foto{Enter}');
+    expect(await screen.findByText('Offline – Anhänge nicht sendbar')).toBeInTheDocument();
+
+    setzeOnline(true);
+    expect(screen.queryByText('Offline – Anhänge nicht sendbar')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Anhänge entfernen' })).toBeNull();
     expect(within(liste()).getByText('a.jpg · 3 B')).toBeInTheDocument();
   });
 
@@ -550,9 +579,7 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     const p = props({ dateien: elf, onDateienChange: vi.fn() });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(feld(), 'Fotos{Enter}');
-    expect(
-      await screen.findByText('Höchstens 10 Anhänge je Eintrag. Entferne 1.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Zu viele Anhänge: 11/10')).toBeInTheDocument();
     expect(hochladen).not.toHaveBeenCalled();
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(feld()).toHaveValue('Fotos');

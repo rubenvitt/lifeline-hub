@@ -40,7 +40,7 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   });
   await feld.fill(inhalt);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
-  await expect(page.getByText('Von fehlt: Rufname oben festlegen oder /von setzen.')).toBeVisible();
+  await expect(page.locator('[data-lfh="etb-pflicht-hinweis"]')).toContainText('Von fehlt');
   expect(gesendet).toEqual([]);
   await expect(feld).toHaveValue(inhalt);
 

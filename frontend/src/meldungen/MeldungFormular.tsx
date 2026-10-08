@@ -304,11 +304,7 @@ export default function MeldungFormular({
                 <Row gutter={16}>
                   {vonOptionen.length > 0 && (
                     <Col xs={24} sm={12}>
-                      <Form.Item
-                        name="von"
-                        label="Von Einheit / Abschnitt"
-                        tooltip="Bindet die Meldung an die Einheit. Sie zählt dann als deren Rückmeldung im Meldebild."
-                      >
+                      <Form.Item name="von" label="Von Einheit / Abschnitt">
                         <Select<string>
                           aria-label="Von Einheit / Abschnitt"
                           allowClear

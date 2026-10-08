@@ -180,10 +180,8 @@ function pegelZeilen(pegel: readonly PegelAnzeige[], jetzt: number, dtg: (iso: s
  */
 export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus dem Lagebild übernehmen',
-  unterzeile: 'Betroffene, Schäden, Warnstufe, Wetter und Pegel, nur Zahlen',
   ersetzenTitel: 'Gefahren-/Schadenlage ersetzen?',
-  ersetzenText:
-    'Der Abschnitt enthält schon Text. Er wird durch die aktuellen Zahlen aus Lagebild, Wetter und Pegeln ersetzt.',
+  ersetzenText: 'Vorhandener Text wird ersetzt.',
   verfuegbar: (freigaben) => {
     const gesperrteModule = (Object.keys(MODUL) as (keyof typeof MODUL)[]).filter(
       (m) => !frei(m, freigaben),

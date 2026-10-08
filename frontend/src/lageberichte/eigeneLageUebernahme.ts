@@ -64,10 +64,8 @@ const teilFehlt = (titel: string, zustaende: [Liste, AbrufZustand][]) =>
  */
 export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus Meldebild und Führungsorganisation übernehmen',
-  unterzeile: 'Kräftemeldebild und Führungsorganisation des ganzen Einsatzes',
   ersetzenTitel: 'Eigene Lage ersetzen?',
-  ersetzenText:
-    'Der Abschnitt enthält schon Text. Er wird durch das aktuelle Kräftemeldebild und die Führungsorganisation ersetzt.',
+  ersetzenText: 'Vorhandener Text wird ersetzt.',
   verfuegbar: (freigaben) => {
     const meldebild = nichtFrei(MELDEBILD, freigaben);
     const organisation = nichtFrei(ORGANISATION, freigaben);

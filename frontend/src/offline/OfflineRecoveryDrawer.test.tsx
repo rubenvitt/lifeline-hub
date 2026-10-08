@@ -35,9 +35,9 @@ describe('OfflineRecoveryDrawer: nicht attribuierbare Legacy-Daten', () => {
       </App>,
     );
 
-    // Einzahl richtig, Klartext statt „attribuierbar“ (LFH-944).
+    // Einzahl richtig, Klartext statt „attribuierbar“ (LFH-944); der Inhalt bleibt verborgen.
     expect(
-      await screen.findByText(/1 lokale Offline-Aktion aus einer früheren App-Version ist/),
+      await screen.findByText('1 Offline-Aktion · Inhalt nicht einsehbar, nicht übernehmbar'),
     ).toBeInTheDocument();
     expect(screen.getByText('Alte Offline-Daten ohne Zuordnung')).toBeInTheDocument();
     expect(screen.queryByText(/Geheimer Inhalt/)).not.toBeInTheDocument();
@@ -123,13 +123,13 @@ describe('OfflineRecoveryDrawer: ETB-Eintrag mit weggeräumten Anhängen (LFH-74
     );
 
     expect(await screen.findByText('Abgelehnter ETB-Eintrag')).toBeInTheDocument();
-    expect(
-      screen.getByText('2 Dateien, gehen beim Senden ohne Anhänge nicht mit'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('2 Dateien')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Ohne Anhänge senden' }));
     expect(await screen.findByText('Ohne Anhänge senden?')).toBeInTheDocument();
-    expect(screen.getByText(/Die 2 angehängten Dateien gehen nicht mit/)).toBeInTheDocument();
+    expect(
+      screen.getByText('2 Dateien fehlen dann, nachreichen nur per Berichtigung.'),
+    ).toBeInTheDocument();
     // Vor der Bestätigung bleibt alles, wie es ist.
     expect(await abgelehntLaden(11, 7)).toHaveLength(1);
     expect(await queueLaden(11, 7)).toHaveLength(0);

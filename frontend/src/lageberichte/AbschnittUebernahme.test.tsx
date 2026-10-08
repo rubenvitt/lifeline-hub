@@ -19,7 +19,7 @@ const PROBE_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus Probe übernehmen',
   unterzeile: 'Probedaten',
   ersetzenTitel: 'Probe ersetzen?',
-  ersetzenText: 'Der Abschnitt enthält schon Text.',
+  ersetzenText: 'Vorhandener Text wird ersetzt.',
   verfuegbar: (freigaben) =>
     freigaben.etb?.zugriff ? { frei: true } : { frei: false, grund: 'ETB nicht freigegeben' },
   erzeuge,
@@ -74,10 +74,17 @@ describe('AbschnittUebernahme (LFH-870)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('ohne Unterzeile steht nur der Knopf (LFH-1078)', async () => {
+    renderMitProviders(<Probe quelle={{ ...PROBE_QUELLE, unterzeile: undefined }} />);
+    const knopf = await screen.findByRole('button', { name: 'Aus Probe übernehmen' });
+    expect(knopf.parentElement?.textContent).toBe('Aus Probe übernehmen');
+  });
+
   it('ersetzt einen gefüllten Abschnitt erst nach Rückfrage', async () => {
     renderMitProviders(<Probe start="Eigener Text" />);
     await userEvent.click(await screen.findByRole('button', { name: 'Aus Probe übernehmen' }));
     const dialog = await screen.findByRole('dialog', { name: 'Probe ersetzen?' });
+    expect(within(dialog).getByText('Vorhandener Text wird ersetzt.')).toBeInTheDocument();
     expect(feld().value).toBe('Eigener Text');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ersetzen' }));
     await waitFor(() => expect(feld().value).toBe('# Übernommen'));

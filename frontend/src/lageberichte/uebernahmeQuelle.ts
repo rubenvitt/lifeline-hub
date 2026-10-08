@@ -11,8 +11,11 @@ import type { ModulFreigaben } from '../api/types';
 export interface UebernahmeQuelle {
   /** Beschriftung des Knopfes, z. B. „Aus S5 übernehmen“. */
   knopf: string;
-  /** Was übernommen wird, neben dem Knopf. */
-  unterzeile: string;
+  /**
+   * Eingrenzung neben dem Knopf in wenigen Wörtern, nur wo die Beschriftung sie nicht schon trägt
+   * (LFH-1078: kein Satz, der den Inhalt beschreibt — den zeigt der übernommene Text).
+   */
+  unterzeile?: string;
   ersetzenTitel: string;
   ersetzenText: string;
   /** Aus den Modulfreigaben der Person. Ist nichts frei, steht statt des Knopfes der Grund. */

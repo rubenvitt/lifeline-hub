@@ -15,7 +15,13 @@ import Bloecke from '../druck/einsatzbericht/Bloecke';
 import { auswahlSchluessel, umfangZeilen } from '../druck/einsatzbericht/auswahl';
 import { useBerichtAuswahl } from '../druck/einsatzbericht/useBerichtAuswahl';
 import { berichtZustand, ladeEinsatzbericht } from '../druck/einsatzbericht/abruf';
-import { berichtFreigabe } from '../druck/einsatzbericht/quellen';
+import {
+  BLOECKE,
+  QUELLEN,
+  berichtFreigabe,
+  modulLabel,
+  type BlockSchluessel,
+} from '../druck/einsatzbericht/quellen';
 import { verdichteEinsatzbericht } from '../druck/einsatzbericht/verdichtung';
 import { einsatzdatenPfad } from '../routing/deeplinks';
 
@@ -60,6 +66,25 @@ export default function EinsatzberichtDruckPage() {
     [freigabenQuery.data, auswahl],
   );
   const gesperrt = freigabe != null && freigabe.gesperrteModule.length > 0;
+  // Je Block die gesperrten Module über ALLE Blöcke, auch abgewählte: die Leiste zeigt vor der
+  // Wahl, welcher Block nicht geht (LFH-1078).
+  const ohneZugriff = useMemo(() => {
+    if (!freigabenQuery.data) return {};
+    const alle = berichtFreigabe(
+      freigabenQuery.data,
+      BLOECKE.map((b) => b.schluessel),
+    );
+    const je: Partial<Record<BlockSchluessel, string[]>> = {};
+    for (const q of QUELLEN) {
+      if (alle.je[q.schluessel] !== 'gesperrt') continue;
+      for (const b of q.bloecke) {
+        const module = (je[b] ??= []);
+        const label = modulLabel(q.modul);
+        if (!module.includes(label)) module.push(label);
+      }
+    }
+    return je;
+  }, [freigabenQuery.data]);
 
   const berichtQuery = useQuery({
     queryKey: einsatzKeys.einsatzberichtDruck(einsatzId, auswahlSchluessel(auswahl)),
@@ -94,7 +119,7 @@ export default function EinsatzberichtDruckPage() {
     return (
       <SeitenSackgasse
         titel="Einsatzbericht nicht verfügbar"
-        hinweis="Der Einsatz ist nicht lesbar: kein Zugriff, oder die Aufbewahrungsfrist ist abgelaufen. Der Einsatzbericht kann nicht erzeugt werden."
+        hinweis="Kein Zugriff oder Aufbewahrungsfrist abgelaufen"
         rueckweg={{ pfad: '/einsaetze', label: 'Zur Einsatzliste' }}
       />
     );
@@ -122,7 +147,7 @@ export default function EinsatzberichtDruckPage() {
   if (freigabenQuery.isError) {
     inhalt = (
       <SeitenFehler
-        text="Freigaben des Einsatzes nicht ermittelbar — der Bericht bleibt verborgen"
+        text="Freigaben des Einsatzes nicht ermittelbar"
         ursache={freigabenQuery.error}
         onWiederholen={() => void freigabenQuery.refetch()}
       />
@@ -133,7 +158,7 @@ export default function EinsatzberichtDruckPage() {
     inhalt = (
       <SeitenSackgasse
         titel="Einsatzbericht nicht verfügbar"
-        hinweis={`Für den Einsatzbericht fehlen Rechte an: ${freigabe.gesperrteModule.join(', ')}. Blöcke, die daraus schöpfen, lassen sich oben abwählen.`}
+        hinweis={`Kein Zugriff: ${freigabe.gesperrteModule.join(', ')}`}
         rueckweg={{ pfad: zurueck, label: 'Zu den Einsatzdaten' }}
       />
     );
@@ -160,7 +185,7 @@ export default function EinsatzberichtDruckPage() {
         type="info"
         showIcon
         title="Kein Zugriff auf den Einsatzbericht"
-        description={`Der Server verweigert den Zugriff auf: ${zustand.module.join(', ')}. Ohne diese Teile wird nicht gedruckt.`}
+        description={`Gesperrt: ${zustand.module.join(', ')}`}
       />
     );
   } else if (zustand?.art === 'fehler') {
@@ -169,7 +194,7 @@ export default function EinsatzberichtDruckPage() {
         type="error"
         showIcon
         title="Der Einsatzbericht konnte nicht vollständig geladen werden"
-        description={`Nicht geladen: ${zustand.module.join(', ')}. Drucken bleibt gesperrt, bis alles da ist — ein Teilausdruck ist ausgeschlossen.`}
+        description={`Nicht geladen: ${zustand.module.join(', ')}`}
         action={<Button onClick={() => void berichtQuery.refetch()}>Erneut laden</Button>}
       />
     );
@@ -232,7 +257,7 @@ export default function EinsatzberichtDruckPage() {
         </>
       }
     >
-      <Auswahlleiste auswahl={auswahl} onAendern={setzeAuswahl} />
+      <Auswahlleiste auswahl={auswahl} onAendern={setzeAuswahl} ohneZugriff={ohneZugriff} />
       {inhalt}
     </EinsatzSeite>
   );

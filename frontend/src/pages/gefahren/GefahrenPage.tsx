@@ -28,7 +28,8 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
 import { InlineAngabe } from '../../components/InlineAngabe';
 import { KennungsLink } from '../../components/kennungsLink';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { einsatzRechteGrund } from '../../components/nurAnsicht';
+import { RechteHinweis, SpeicherFehler } from '../../components/SpeicherHinweis';
 
 /**
  * Trefflächenboden der Gebietszeile. Sie ist ein handgebautes Bedienziel (`ListenEintrag` legt
@@ -180,15 +181,21 @@ export default function GefahrenPage() {
   if (gebiete.length === 0) {
     /**
      * Ein Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte — deshalb trägt dieser
-     * Leerzustand eine Primäraktion dorthin (Ziel aus `routing/deeplinks.ts`).
+     * Leerzustand die Primäraktion dorthin, als Zeichen-Auftrag (LFH-825, `routing/deeplinks.ts`):
+     * die Karte beginnt sofort zu zeichnen. Der Knopf zeigt den Weg, kein Satz (LFH-1078). Ohne
+     * Schreibrecht zeichnet die Karte nicht; dann steht kein Knopf, der es verspräche.
      */
     return seite(
       <div style={{ marginTop: 64, textAlign: 'center' }}>
         <SeitenLeer
           titel="Noch keine Gefahrengebiete"
-          hinweis="Auf der Lagekarte ein Gefahrengebiet zeichnen."
           aktion={
-            karteGesperrt ? undefined : { label: 'Zur Lagekarte', pfad: lagekartePfad(einsatzId) }
+            karteGesperrt || !darfSchreiben
+              ? undefined
+              : {
+                  label: 'Gefahrengebiet zeichnen',
+                  pfad: lagekartePfad(einsatzId, { zeichnen: { typ: 'gefahrengebiet' } }),
+                }
           }
         />
       </div>,
@@ -337,12 +344,9 @@ export default function GefahrenPage() {
           </div>
         )}
         {!darfSchreiben && (
-          <Alert
-            type="info"
-            showIcon
-            title="Nur Lesezugriff – Bewertungen können nicht geändert werden."
-            style={{ marginBottom: 12 }}
-          />
+          <div style={{ marginBottom: 12 }}>
+            <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+          </div>
         )}
         {setzen.isError && (
           <div data-fehler style={{ marginBottom: 12 }}>

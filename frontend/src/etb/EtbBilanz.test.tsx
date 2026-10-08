@@ -113,7 +113,19 @@ describe('EtbBilanz', () => {
 
   it('nennt es, wenn unter den geladenen keine Berichtigung ist', () => {
     rendere({ eintraege: [e({})] });
-    expect(screen.getByText('Keine in den geladenen Einträgen.')).toBeVisible();
+    expect(screen.getByText('Keine')).toBeVisible();
+  });
+
+  it('sagt im Ausschnitt, dass nur die geladenen Einträge zählen', () => {
+    rendere({ eintraege: [e({})], ausschnitt: true });
+    expect(screen.getByText('Keine im Ausschnitt')).toBeVisible();
+  });
+
+  it('sagt in wenigen Wörtern, wenn das Fenster nicht am neuesten Eintrag steht', () => {
+    rendere({ eintraege: [e({})], ausschnitt: true });
+    expect(document.querySelector('[data-lfh="bilanz-ausschnitt"]')).toHaveTextContent(
+      /^Ausschnitt, nicht die jüngsten$/,
+    );
   });
 
   it('Puffer „übertragen": Häkchen plus Wort', () => {

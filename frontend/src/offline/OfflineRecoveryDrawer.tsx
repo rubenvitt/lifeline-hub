@@ -69,10 +69,9 @@ function vollstaendigerInhalt(daten: unknown): ReactNode {
 
 const dateien = (anzahl: number) => (anzahl === 1 ? '1 Datei' : `${anzahl} Dateien`);
 
+/** Folge vor dem unumkehrbaren Schritt in einem Satz (LFH-1078): nachreichen nur per Berichtigung. */
 function ohneAnhaengeHinweis(anzahl: number): string {
-  const fehlt =
-    anzahl === 1 ? 'Die angehängte Datei geht' : `Die ${anzahl} angehängten Dateien gehen`;
-  return `${fehlt} nicht mit. Der Eintrag entsteht nur mit seinem Text und lässt sich danach nur per Berichtigung ergänzen.`;
+  return `${dateien(anzahl)} ${anzahl === 1 ? 'fehlt' : 'fehlen'} dann, nachreichen nur per Berichtigung.`;
 }
 
 function RecoveryCard({
@@ -111,7 +110,7 @@ function RecoveryCard({
                 {
                   key: 'anhaenge',
                   label: 'Anhänge',
-                  children: `${dateien(anhaenge)}, gehen beim Senden ohne Anhänge nicht mit`,
+                  children: dateien(anhaenge),
                 },
               ]
             : []),
@@ -230,7 +229,6 @@ export default function OfflineRecoveryDrawer({
       )}
       <Popconfirm
         title="Offline-Aktion endgültig verwerfen?"
-        description="Der lokal gespeicherte Inhalt kann danach nicht wiederhergestellt werden."
         okText="Endgültig verwerfen"
         cancelText="Abbrechen"
         okButtonProps={{ danger: true }}
@@ -274,18 +272,11 @@ export default function OfflineRecoveryDrawer({
             description={
               <Space orientation="vertical" size="small">
                 <Typography.Text>
-                  {anzahl(
-                    sichtbareNichtZugeordnet,
-                    'lokale Offline-Aktion',
-                    'lokale Offline-Aktionen',
-                  )}{' '}
-                  aus einer früheren App-Version {sichtbareNichtZugeordnet === 1 ? 'ist' : 'sind'}{' '}
-                  keinem Benutzer sicher zuordenbar. Inhalt, Einsatz und weitere Metadaten werden
-                  nicht angezeigt und können nicht übernommen werden.
+                  {`${anzahl(sichtbareNichtZugeordnet, 'Offline-Aktion', 'Offline-Aktionen')} · Inhalt nicht einsehbar, nicht übernehmbar`}
                 </Typography.Text>
                 <Popconfirm
                   title="Alle alten Offline-Daten ohne Zuordnung endgültig verwerfen?"
-                  description="Die lokal gespeicherten Inhalte werden unwiderruflich gelöscht. Daten mit bekannter Benutzerzuordnung bleiben erhalten."
+                  description="Zugeordnete Offline-Daten bleiben erhalten."
                   okText="Alle alten Offline-Daten endgültig verwerfen"
                   cancelText="Abbrechen"
                   okButtonProps={{ danger: true }}

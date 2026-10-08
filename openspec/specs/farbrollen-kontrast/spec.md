@@ -112,8 +112,7 @@ Erfolg), SHALL im Tag- und im Nachtmodus gegen diese Hinweisfläche mindestens 3
 Kontrastnachweis MUST diesen Rand unter einer Ausnahme mit niedrigerer Schranke führen.
 
 #### Scenario: Knopf auf einem Info-Hinweis am Tag
-- **WHEN** im Tagmodus die Einsatzliste den Hinweis „Demo-Daten sind freigeschaltet und noch
-  nicht importiert.“ mit dem Knopf „Zu den Demo-Daten“ zeigt
+- **WHEN** im Tagmodus die Einsatzliste den Hinweis „Demo-Daten nicht importiert“ mit dem Knopf „Zu den Demo-Daten“ zeigt
 - **THEN** misst der Knopfrand gegen die Hinweisfläche mindestens 3 : 1
 - **AND** gegen die Knopffläche mindestens 3 : 1
 

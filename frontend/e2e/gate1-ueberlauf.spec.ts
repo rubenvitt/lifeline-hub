@@ -796,9 +796,9 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
     {
       pfad: `/einsaetze/${einsatzId}/auftraege`,
       // Ohne `forceRender` ist die Befehlsliste nach `goto` nicht im Baum (Standardreiter
-      // „Aufträge"); der Reiterwechsel läuft deshalb je Breite erneut.
+      // „Einzelaufträge"); der Reiterwechsel läuft deshalb je Breite erneut.
       vorbereiten: async (p: Page) => {
-        const reiter = p.getByRole('tab', { name: 'Befehle' });
+        const reiter = p.getByRole('tab', { name: 'Einsatzbefehle' });
         // antd klappt Reiter bei Enge in ein Mehr-Menü; ohne Zählung wäre der Klick ein
         // irreführender Timeout.
         await expect(reiter).toHaveCount(1);

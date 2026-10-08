@@ -8,7 +8,7 @@ import '../../theme/sprache.css';
  *
  * Rahmen `bedien` 1 px, Grund `flaeche2`, Höhe ≥ 40; links eine Präfix-Zelle Mono 14 in `bedien`
  * mit Trennlinie (`/anordnung`, `/person`), in der Mitte das Feld des Aufrufers, rechts ein
- * Mono-Hinweis 11 (`↵ eintragen`), darunter optional eine Hinweiszeile Mono 11.
+ * Mono-Hinweis 11 (etwa ein Zeichenzähler), darunter optional eine Hinweiszeile Mono 11.
  *
  * WAS SIE NICHT IST: kein Formular. Die Erfassungs-Norm (LFH-332/B4) bleibt beim Konsumenten,
  * der seine Felder in `ErfassungsFormular` oder `SchnellAnlegen` hält. Ein `<form>` HIER wäre
@@ -82,9 +82,9 @@ interface SchnellerfassungszeileProps {
   praefix?: ReactNode;
   /** Das Eingabefeld (bzw. mehrere) des Konsumenten. */
   children: ReactNode;
-  /** Mono-Hinweis rechts in der Zeile (`↵ eintragen`). */
+  /** Mono-Hinweis rechts in der Zeile (etwa ein Zeichenzähler; der Tastaturvertrag steht am Knopf). */
   hinweis?: ReactNode;
-  /** Hinweiszeile darunter (Befehle, Kürzel, „Zuletzt: …"). */
+  /** Hinweiszeile darunter (Zeichenzähler, „Werte behalten", „Zuletzt: …"). */
   hinweiszeile?: ReactNode;
   /**
    * Feld auf eigener Zeile, Präfix und Hinweis darunter (LFH-373). Opt-in: der Aufrufer

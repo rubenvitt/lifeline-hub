@@ -2,8 +2,8 @@
 
 ## Purpose
 Tastaturvertrag der ETB-Schnellerfassung je Zeigerart: wann Enter einen Eintrag sendet und wann
-es eine neue Zeile beginnt, welche Taste die Bildschirmtastatur anzeigt, und welche Texte
-(Hinweiszeile, Platzhalter) diesen Vertrag nennen.
+es eine neue Zeile beginnt, welche Taste die Bildschirmtastatur anzeigt, und wo der Vertrag
+sichtbar wird (Tastenkappe am Knopf, kein erklärender Text; LFH-1078).
 
 ## Requirements
 
@@ -28,17 +28,21 @@ mehrzeiligen Text.
 - **WHEN** bei feinem Zeiger ein einzeiliger Text getippt und Enter gedrückt wird
 - **THEN** wird der Eintrag gesendet
 
-### Requirement: Hinweis und Platzhalter nennen nur, was das Gerät kann
+### Requirement: Der Vertrag steht am Knopf, nicht im Text
 
-Die Hinweiszeile der ETB-Schnellerfassung MUST bei grobem Zeiger keine Tastenkombination nennen
-(weder „Shift+Enter“ noch „Cmd/Strg+Enter“) und SHALL sagen, dass Return eine neue Zeile
-beginnt und „Erfassen“ sendet. Bei feinem Zeiger SHALL sie den Tastaturvertrag nennen, genau
-einmal. Kein Platzhalter der ETB-Schnellerfassung MUST das Wort „Befehle“ enthalten.
+Die ETB-Schnellerfassung MUST den Tastaturvertrag nicht in einer Hinweiszeile oder im Platzhalter
+erklären (Bedien-Leitlinie „Text erklärt nie die Bedienung“, LFH-1078). Bei feinem Zeiger SHALL
+der Knopf „Erfassen“ ab Breite `lg` eine Tastenkappe ↵ tragen; schmaler entfällt sie, damit das
+Textfeld seinen Anteil an der Zeile behält. Bei grobem Zeiger MUST keine Tastenkappe und keine
+Tastenkombination sichtbar sein. Der Knopf SHALL die gültigen Kürzel auf jeder Breite in
+`aria-keyshortcuts` nennen.
+Kein Platzhalter der ETB-Schnellerfassung MUST eine Taste, ein Kürzel oder das Wort „Befehle“
+enthalten.
 
 #### Scenario: Touch-Tablet quer
 - **WHEN** die Erfassung bei 1180 px Breite und grobem Zeiger steht
-- **THEN** nennt die Hinweiszeile „Return neue Zeile“ und „Erfassen“ und keine Tastenkombination
+- **THEN** steht unter dem Feld keine Hinweiszeile zur Tastatur, und der Knopf „Erfassen“ trägt keine Tastenkappe
 
-#### Scenario: Kurzplatzhalter auf dem Handschirm
+#### Scenario: Platzhalter auf dem Handschirm
 - **WHEN** die Erfassung bei 390 px Breite leer steht
-- **THEN** lautet der Platzhalter „Inhalt … ( / für Typ & Felder · @ für Einheit )“
+- **THEN** lautet der Platzhalter „Inhalt …“

@@ -10,13 +10,19 @@ import type { BlockDef, BlockSchluessel } from './auswahl';
  *
  * Jede Zeile ist als Ganzes Bedienziel (Höhe aus `controlHeight`, wächst mit der Dichte-Staffel bis
  * Handschuh). Der zuletzt gewählte Block ist gesperrt: ein Bericht ohne Block gibt es nicht.
+ *
+ * Ein Block, dessen Quelle der Person gesperrt ist, nennt das Modul an seiner Zeile (LFH-1078):
+ * das Abwählen ist der Ausweg aus der Sackgasse, ohne Satz „lässt sich oben abwählen“.
  */
 export default function Auswahlleiste({
   auswahl,
   onAendern,
+  ohneZugriff = {},
 }: {
   auswahl: readonly BlockSchluessel[];
   onAendern: (neu: BlockSchluessel[]) => void;
+  /** Je Block die Anzeigenamen der gesperrten Module, aus denen er schöpft. */
+  ohneZugriff?: Partial<Record<BlockSchluessel, readonly string[]>>;
 }) {
   const { token } = theme.useToken();
   const umschalten = (b: BlockSchluessel, an: boolean) =>
@@ -35,6 +41,14 @@ export default function Auswahlleiste({
             style={haekchenStil(token)}
           >
             {b.titel}
+            {ohneZugriff[b.schluessel]?.length ? (
+              <>
+                {' '}
+                <Typography.Text type="secondary">
+                  – kein Zugriff: {ohneZugriff[b.schluessel]!.join(', ')}
+                </Typography.Text>
+              </>
+            ) : null}
             {b.schluessel === 'personal-kopf' && (
               <Typography.Text type="secondary">
                 {' '}

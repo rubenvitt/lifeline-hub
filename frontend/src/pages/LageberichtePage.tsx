@@ -298,8 +298,13 @@ export default function LageberichtePage() {
         <Form.Item label="Vorlage" name="vorlage" rules={[{ required: true }]}>
           <Select options={VORLAGEN.map((v) => ({ value: v.schluessel, label: v.label }))} />
         </Form.Item>
-        <Form.Item label="Zeitstand" name="zeitstand" extra="Leer gelassen: jetzt">
-          <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+        {/* Leer setzt der Server jetzt (`routes/vorlagendokument.rs`). */}
+        <Form.Item label="Zeitstand" name="zeitstand">
+          <ZeitpunktEingabe
+            format="DD.MM.YYYY HH:mm"
+            placeholder="jetzt"
+            style={{ width: '100%' }}
+          />
         </Form.Item>
       </ErfassungsModal>
     </EinsatzSeite>

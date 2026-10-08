@@ -247,9 +247,9 @@ export default function MeldungenPage() {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);
     },
-    onSuccess: (ergebnis) => {
+    onSuccess: (ergebnis, d) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning('Offline vorgemerkt — Meldung wird bei Verbindung gesendet');
+        message.warning(`Offline vorgemerkt: Meldung von ${d.absender}`);
         return;
       }
       const meldung = ergebnis.daten;

@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, Modal, Space, Typography } from 'antd';
+import { Button, Form, Input, Modal, Space } from 'antd';
 import { useEffect } from 'react';
 import type { Meldung } from '../api/types';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
@@ -63,15 +63,12 @@ export default function LagerelevantModal({
         <Form.Item name="text" label="Lage-Text">
           <Input.TextArea rows={3} placeholder="Kurzbeschreibung für die Lage" />
         </Form.Item>
-        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-          Optional verorten — Koordinate setzt die Meldung als Marker auf die Lagekarte.
-        </Typography.Text>
-        <KoordinatenFeld name="koord" label="Verortung (optional)" einsatzId={einsatzId} />
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          title="Die Verortung kann nur beim Übergeben gesetzt werden."
+        {/* Die Folge sichtbar am Feld (LFH-1078): verortet wird nur hier, die Karte ändert es nicht. */}
+        <KoordinatenFeld
+          name="koord"
+          label="Verortung (optional)"
+          extra="Später nicht änderbar"
+          einsatzId={einsatzId}
         />
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button onClick={onAbbrechen}>Abbrechen</Button>

@@ -27,6 +27,8 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
+import { RechteHinweis } from '../components/SpeicherHinweis';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
@@ -557,28 +559,23 @@ export default function EtbPage() {
    * Fehler unterdrücken diesen Knoten in `EtbZeitachse`.
    *
    * Die Rechte-Weiche ist nötig: ohne Schreibrecht wird die Erfassungsleiste nicht gerendert, ein
-   * Sprung dorthin zeigte ins Leere. Deshalb derselbe Titel, aber ein anderer Hinweis und keine
-   * Aktion.
+   * Sprung dorthin zeigte ins Leere. Deshalb derselbe Titel, aber keine Aktion; den Grund nennt
+   * „Nur Ansicht · Grund“ im Kopf. Kein Hinweissatz (LFH-1078): den Weg zeigt der Knopf.
    */
   const leerInhalt = filterAktiv ? (
     <SeitenLeer
       titel="Kein Eintrag passt zum Filter"
-      hinweis="Zeitraum, Typ, Einheit oder Suchbegriff einschränken — oder den Filter zurücksetzen."
       aktion={{ label: 'Filter zurücksetzen', onClick: filterZuruecksetzen }}
     />
   ) : darfSchreiben ? (
     <SeitenLeer
       titel="Noch keine Einträge."
-      hinweis="Die Erfassungszeile am Fuß der Seite nimmt den ersten Eintrag auf."
       // Ziel aus der Deeplink-Registry: `?neu=1` rollt die Erfassungszeile ins Bild und fokussiert
       // sie (Effekt oben).
       aktion={{ label: 'Ersten Eintrag erfassen', pfad: etbPfad(einsatzId, { neu: true }) }}
     />
   ) : (
-    <SeitenLeer
-      titel="Noch keine Einträge."
-      hinweis="Sobald jemand mit Schreibrecht etwas einträgt, erscheint es hier."
-    />
+    <SeitenLeer titel="Noch keine Einträge." />
   );
 
   /**
@@ -727,6 +724,12 @@ export default function EtbPage() {
       meta={kopfMeta({ gesamt: zaehlerQuery.data?.gesamt, filterAktiv })}
       dataUpdatedAt={etbQuery.dataUpdatedAt}
       aktionen={kopfAktionen}
+      // Nur mit Inhalt gesetzt: ein leerer Slot hielte Abstand (LFH-1078, Erfahrung aus P1).
+      hinweis={
+        darfSchreiben ? undefined : (
+          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+        )
+      }
       fuss={erfassung}
     >
       <div
@@ -810,7 +813,7 @@ export default function EtbPage() {
               type="error"
               showIcon
               style={{ marginBottom: token.marginSM }}
-              title={`${abgelehnt.length} gepufferte(r) Eintrag/Einträge wurde(n) vom Server abgelehnt und NICHT gespeichert`}
+              title={`${abgelehnt.length === 1 ? '1 gepufferter Eintrag' : `${abgelehnt.length} gepufferte Einträge`} abgelehnt und NICHT gespeichert`}
               description={
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
                   {abgelehnt.map((a) => (
@@ -832,7 +835,7 @@ export default function EtbPage() {
               type="info"
               showIcon
               style={{ marginBottom: token.marginSM }}
-              title={`${ausstehend.length} Eintrag/Einträge werden gesendet, sobald wieder Verbindung besteht`}
+              title={`${ausstehend.length === 1 ? '1 Eintrag' : `${ausstehend.length} Einträge`} offline vorgemerkt`}
               description={
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
                   {ausstehend.map((a) => (

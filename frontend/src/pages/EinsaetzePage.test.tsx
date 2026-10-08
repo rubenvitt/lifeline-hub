@@ -699,20 +699,22 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
   });
 
   /**
-   * Der Verweis ist ein eigenes Bedienziel in Knopfform außerhalb des Satzes: im Satz trennte ihn
-   * nur die Farbe vom Text (WCAG 1.4.1), und sein `minHeight` risse die Textzeile in `handschuh`
-   * auf 72 px. Höhe und Polsterung erbt er vom `ConfigProvider`, ohne punktuelles `size`.
+   * Der Verweis ist ein eigenes Bedienziel in Knopfform außerhalb des Titels: im Text trennte ihn
+   * nur die Farbe (WCAG 1.4.1), und sein `minHeight` risse die Textzeile in `handschuh` auf 72 px.
+   * Höhe und Polsterung erbt er vom `ConfigProvider`, ohne punktuelles `size`.
    */
-  it('der Verweis steht als eigenes Bedienziel außerhalb des Satzes, ohne punktuelle Größe', async () => {
+  it('der Verweis steht als eigenes Bedienziel außerhalb des Titels, ohne punktuelle Größe', async () => {
     demoStatus({ importiert: false });
     rendern(admin);
     const link = await screen.findByRole('link', { name: 'Zu den Demo-Daten' });
     expect(link).toHaveClass('ant-btn');
     expect(link).not.toHaveClass('ant-btn-sm');
     expect(link).not.toHaveClass('ant-btn-lg');
-    const satz = screen.getByText(/Übungseinsatz samt Stammdaten/);
-    expect(satz.contains(link)).toBe(false);
-    expect(link.contains(satz)).toBe(false);
+    const titel = screen.getByText('Demo-Daten nicht importiert');
+    expect(titel.contains(link)).toBe(false);
+    expect(link.contains(titel)).toBe(false);
+    // Kein Erklärsatz neben Titel und Knopf (LFH-1078).
+    expect(screen.queryByText(/Übungseinsatz/)).toBeNull();
   });
 
   it('ein Klick auf den Verweis navigiert in der App, ohne Seitenwechsel des Browsers', async () => {

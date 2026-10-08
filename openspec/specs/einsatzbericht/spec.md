@@ -136,7 +136,8 @@ System keine Daten abrufen.
 
 - **WHEN** das Modul Personen im Einsatz sichtbar, aber für die Rolle der Person gesperrt ist
 - **AND** der Block Bilanz gewählt ist
-- **THEN** zeigt die Ansicht „Für den Einsatzbericht fehlen Rechte an: Personen“
+- **THEN** zeigt die Ansicht „Kein Zugriff: Betroffene“
+- **AND** die Auswahlleiste nennt am Block „– kein Zugriff: Betroffene“
 - **AND** sie bietet kein Drucken an
 
 #### Scenario: Gesperrtes Modul abgewählt
@@ -144,6 +145,7 @@ System keine Daten abrufen.
 - **WHEN** das Modul Personen für die Rolle der Person gesperrt ist
 - **AND** sie den Block Bilanz abwählt und alle übrigen Module lesen darf
 - **THEN** ist der Bericht ohne Bilanz druckbar
+- **AND** die Auswahlleiste nennt am abgewählten Block weiter „– kein Zugriff: Betroffene“
 - **AND** das System ruft keine Personen ab
 
 #### Scenario: Abruf scheitert

@@ -3749,7 +3749,7 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
     await expect(page.getByRole('heading', { level: 3, name: gebiete[0] })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Bewertung / })).toHaveCount(58);
     // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
-    await expect(page.getByText(/Nur Lesezugriff/)).toHaveCount(1);
+    await expect(page.locator('[data-lfh="rechte-hinweis"]')).toHaveCount(1);
     await expect(
       page.getByRole('button', { name: 'Umbenennen', exact: true }),
       'Vorbedingung: ohne Schreibrecht kein „Umbenennen"',

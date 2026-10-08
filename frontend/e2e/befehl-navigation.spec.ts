@@ -63,7 +63,7 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
   const { api, liste, befehle, detail } = await vorbereiten(page);
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.goto(liste);
-  await page.getByRole('tab', { name: /Befehle/ }).click();
+  await page.getByRole('tab', { name: 'Einsatzbefehle' }).click();
   await page.getByRole('link', { name: 'Befehl Navigation', exact: true }).click();
   await expect(page).toHaveURL(detail);
   // Ein abgelehnter PATCH hält die Fassung reproduzierbar offen; keine Zeitannahme.
@@ -115,7 +115,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
   test(`Rückweg aus dem Befehl landet auf dem Reiter Befehle (${rolle})`, async ({ page }) => {
     const { einsatzId, liste, befehle, detail } = await vorbereiten(page);
     if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
-    const reiterBefehle = page.getByRole('tab', { name: 'Befehle' });
+    const reiterBefehle = page.getByRole('tab', { name: 'Einsatzbefehle' });
 
     await page.goto(liste);
     await reiterBefehle.click();

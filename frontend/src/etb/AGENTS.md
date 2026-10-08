@@ -16,7 +16,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `fokus-verdeckung.spec.ts`). Fokusabstand per `scroll-margin-block-end`
   (`--lfh-etb-fokusabstand`, `components/fokusabstandUnten.ts`), **nicht** `scroll-padding`.
   Unter `md`: Feld eigene Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst), Feldzeile
-  rollt waagerecht, „Werte behalten" in der Hinweiszeile, Kurzplatzhalter, Fokus per
+  rollt waagerecht, „Werte behalten" in der Hinweiszeile, Platzhalter „Inhalt …“, Fokus per
   `preventScroll` (`MetaChip`, nicht `autoFocus`).
 - **Erfassung, Tastatur und Fläche** (LFH-955, Specs `etb-schnellerfassung-tastatur`,
   `einsatztauglichkeit-layout`; Herleitung D1–D5, auf die Code-Kommentare verweisen:
@@ -24,8 +24,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   - **Enter weicht nach der Zeigerart, nicht nach der Breite** (`useViewport().istBeruehrung`):
     mit grobem Zeiger bricht Return um und sendet nie, gesendet wird über „Erfassen“ oder
     Strg/⌘+Enter; das Feld trägt `enterKeyHint="enter"`. Mit feinem Zeiger gilt LFH-335 (Enter
-    sendet einen Einzeiler). Hinweiszeile und Platzhalter nennen auf Touch keine Tastenkombination
-    und sagen „Typ & Felder“, nie „Befehle“.
+    sendet einen Einzeiler). Den Vertrag zeigt die Tastenkappe ↵ an „Erfassen“ (nur feiner
+    Zeiger und ab `lg`, sonst fiele das Feld unter 60 %, LFH-1078); Hinweiszeile und Platzhalter nennen keine Taste und nie „Befehle“.
   - **Feldbreite per Opt-in:** `Schnellerfassungszeile feldFuellt` streckt das Kind der Feldzelle
     (`.lfh-schnellerfassung__feld--fuellt`); das ETB setzt es immer, ab `md` ≥ 60 % der Zeile.
     Keine pauschale Regel: eine Zelle mit mehreren Feldern (Infotelefon) bleibt ungestreckt.

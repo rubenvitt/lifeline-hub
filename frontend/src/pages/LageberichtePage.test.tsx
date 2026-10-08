@@ -812,8 +812,10 @@ describe('LageberichtePage', () => {
     const knopf = screen.getByRole('button', { name: 'Anlegen' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
-    // Drittes, optionales Feld: der Zeitstand.
-    expect(screen.getByLabelText('Zeitstand')).toBeInTheDocument();
+    // Drittes, optionales Feld: der Zeitstand. Leer gilt jetzt — als Platzhalter, nicht als Satz
+    // (LFH-1078).
+    expect(screen.getByLabelText('Zeitstand')).toHaveAttribute('placeholder', 'jetzt');
+    expect(screen.queryByText(/Leer gelassen/)).toBeNull();
   });
 
   it('trägt beim zweiten Öffnen einen frischen Titelvorschlag, nicht den Speicher des ersten', async () => {

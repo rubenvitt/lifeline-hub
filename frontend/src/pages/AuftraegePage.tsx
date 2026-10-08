@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Spin, Tabs, Typography } from 'antd';
+import { Alert, Breadcrumb, Spin, Tabs } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -8,33 +8,15 @@ import { einsatzKeys } from '../api/queryKeys';
 import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { parseAuftraegeReiter, type AuftraegeReiter } from '../routing/deeplinks';
+import { parseAuftraegeReiter } from '../routing/deeplinks';
 import { modulName } from '../einsatz/modulRegistry';
-
-/**
- * Abgrenzung der zwei Objekte dieser Seite (LFH-972): ein Auftrag geht einzeln an einen Empfänger
- * und wird quittiert und vollzogen; ein Befehl ist ein Dokument mit Fassungen und Freigabe. Ohne
- * diese Zeile wählte ein Helfer, der „einem Zug einen Befehl geben" will, den falschen Reiter.
- */
-const ABGRENZUNG: Record<AuftraegeReiter, string> = {
-  auftraege: 'Einzelauftrag an Abschnitt oder Einheit, mit Quittung und Vollzug.',
-  befehle: 'Schriftlicher Einsatzbefehl, wird freigegeben und gedruckt.',
-};
-
-function Abgrenzung({ reiter }: { reiter: AuftraegeReiter }) {
-  return (
-    <Typography.Paragraph type="secondary" data-lfh="reiter-abgrenzung">
-      {ABGRENZUNG[reiter]}
-    </Typography.Paragraph>
-  );
-}
 
 export default function AuftraegePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   // Der Reiter ist Zustand der Adresse (`auftraegePfad`, `reiter`): Brotkrume und Browser-Zurück
-  // aus einem Befehl landen so auf „Befehle", nicht auf der Vorgabe.
+  // aus einem Befehl landen so auf „Einsatzbefehle", nicht auf der Vorgabe.
   const [searchParams, setSearchParams] = useSearchParams();
   const reiter = parseAuftraegeReiter(searchParams);
   const reiterWechseln = (neu: string) =>
@@ -72,7 +54,6 @@ export default function AuftraegePage() {
     // gehören dem jeweiligen Reiter (`Bereichskopf`) — die zwei Bereiche zählen Verschiedenes.
     <EinsatzSeite
       titel={modulName('auftraege')}
-
       breadcrumb={
         <Breadcrumb
           items={[
@@ -87,25 +68,18 @@ export default function AuftraegePage() {
         activeKey={reiter}
         onChange={reiterWechseln}
         items={[
+          // Die Reiternamen grenzen die zwei Objekte ab (LFH-972, LFH-1078): ein Einzelauftrag geht
+          // an einen Empfänger und wird quittiert und vollzogen, ein Einsatzbefehl ist ein Dokument
+          // mit Fassungen und Freigabe. Kein Erklärsatz darunter.
           {
             key: 'auftraege',
-            label: 'Aufträge',
-            children: (
-              <>
-                <Abgrenzung reiter="auftraege" />
-                <AuftraegeListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />
-              </>
-            ),
+            label: 'Einzelaufträge',
+            children: <AuftraegeListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />,
           },
           {
             key: 'befehle',
-            label: 'Befehle',
-            children: (
-              <>
-                <Abgrenzung reiter="befehle" />
-                <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />
-              </>
-            ),
+            label: 'Einsatzbefehle',
+            children: <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />,
           },
         ]}
       />

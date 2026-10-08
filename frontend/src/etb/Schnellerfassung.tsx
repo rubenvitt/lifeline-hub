@@ -1,8 +1,9 @@
 import { IconAuge, IconBueroklammer, IconKreuz, IconPlus, IconWarndreieck } from '../icons';
-import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
+import { Alert, Button, Checkbox, Dropdown, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -27,11 +28,12 @@ import { ERFASSBARE_TYPEN } from './typFarben';
 import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
-import { Zeichenzaehler } from '../components/zeichenGrenze';
+import { Zeichenzaehler, zaehlerText, zeichenZahl } from '../components/zeichenGrenze';
+import Tastenkuerzel from '../components/Tastenkuerzel';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { weiter } from '../components/useUploadFortschritt';
-import { Schnellerfassungszeile, useRollen } from '../components/instrument';
+import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import MetaChip from './MetaChip';
 import { useFunkrufnamen } from './funkrufnamen';
@@ -51,7 +53,6 @@ import {
   erkenneTypBefehl,
   filterAtEintraege,
   METADATEN_FELDER,
-  TYP_BEFEHLE,
   type MetadatenWerte,
   type MetaFeld,
   type SlashEintrag,
@@ -137,9 +138,12 @@ export const VERSAND_RUHE: Versand = { sendet: false, fortschritt: null, hinweis
  */
 const hochgeladeneIds = new WeakMap<File, number>();
 
-const ANHANG_OFFLINE = 'Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.';
 const ANHANG_ZU_GROSS = `ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
-const ANHANG_GRENZE = `Höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag.`;
+/**
+ * Absenden ohne Netz mit Dateien in der Liste (LFH-1078): Zustand statt Anleitung; den Ausweg
+ * trägt der Knopf „Anhänge entfernen“ am Hinweis, nicht ein Satz.
+ */
+const ANHANG_OFFLINE_SENDEN = 'Offline – Anhänge nicht sendbar';
 
 /**
  * Dieselbe Datei, neu gewählt: jede Dateiwahl liefert NEUE `File`-Objekte, ein
@@ -174,37 +178,21 @@ function uploadFehlerHinweis(datei: File, e: unknown): string {
 }
 
 const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
-const ENTER_HINWEIS =
-  'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
-/**
- * Kurzform für den Handschirm: nur der Tastaturvertrag, der genau einmal steht
- * (Erfassungs-Norm). Cmd/Strg+Enter entfällt, die Taste gibt es dort nicht.
- */
-const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
-/**
- * Mit grobem Zeiger (Finger, Handschuh) sendet Return nicht (LFH-955, design.md D1): die
- * Bildschirmtastatur liefert Return als `Enter`, schon das erste brach einen Mehrzeiler ab. Der
- * Hinweis nennt deshalb keine Tastenkombination, auf jeder Breite.
- */
-const ENTER_HINWEIS_BERUEHRUNG = 'Return neue Zeile · „Erfassen“ sendet';
 
 /**
- * Platzhalter: sagt, WAS in das Feld gehört (der Tastaturvertrag steht in der Hinweiszeile).
- * Unter `md` die Kurzform: der volle Wortlaut brach bei 390 px um, das mitwachsende Feld misst
- * den Platzhalter mit, und die angepinnte Leiste riss den 50-%-Deckel (LFH-373).
+ * Platzhalter: nur, WAS in das Feld gehört (LFH-1078, `frontend/AGENTS.md`, „Texte: zeigen statt
+ * erklären“). Typ und Felder zeigen der Präfix-Knopf und „Feld“, die Sendetaste die Kappe an
+ * „Erfassen“; ein Tastenweg im Platzhalter wäre ein Erklärsatz. Eine Form für jede Breite: kurz
+ * genug, dass das mitwachsende Feld bei 390 px nicht umbricht (LFH-373).
  */
-const PLATZHALTER = 'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )';
-// „Befehl“ ist im Einsatz ein Fachobjekt (Aufträge/Befehle), nicht der Slash (LFH-955).
-const PLATZHALTER_KURZ = 'Inhalt … ( / für Typ & Felder · @ für Einheit )';
+const PLATZHALTER = 'Inhalt …';
 
 /**
- * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen Knopf
- * „Speichern und nächste" — im ETB erfasst jedes Absenden in Serie. Genannt werden die
- * Felder, die `nurUebernahme` kennt.
+ * Tastenkürzel von „Erfassen“ (LFH-955, design.md D1): mit grobem Zeiger sendet Return nicht,
+ * dort gilt nur Strg/⌘+Enter der Hardware-Tastatur am Tablet.
  */
-const UEBERNAHME_ERKLAERUNG =
-  'Von, An und Meldeweg bleiben nach dem Erfassen für den nächsten Eintrag stehen. ' +
-  'Inhalt, Veranlassung und Ereigniszeit werden immer geleert.';
+const KUERZEL_FEIN = 'Enter Control+Enter Meta+Enter';
+const KUERZEL_GROB = 'Control+Enter Meta+Enter';
 
 /**
  * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
@@ -277,7 +265,7 @@ export default function Schnellerfassung({
   // Unter `md` steht das Feld auf eigener Zeile: zwischen Typ-Präfix und „Erfassen" bliebe es
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
   // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
-  const { istSchmal, istBeruehrung, screens } = useViewport();
+  const { istSchmal, istBeruehrung, screens, abBreite } = useViewport();
   const [vorschauOffen, setVorschauOffen] = useState(false);
   const chipZeileRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<TextAreaRef>(null);
@@ -289,13 +277,18 @@ export default function Schnellerfassung({
     else setEigeneDateien(neu);
   }
   const [eigenerVersand, setEigenerVersand] = useState<Versand>(VERSAND_RUHE);
-  const { sendet, fortschritt, hinweis: anhangHinweis } = versandVonAussen ?? eigenerVersand;
+  const { sendet, fortschritt, hinweis: versandHinweis } = versandVonAussen ?? eigenerVersand;
   /** Funktional gemergt: der laufende Versand schreibt aus einer alten Closure heraus. */
   function aendereVersand(aenderung: Partial<Versand>) {
     if (onVersandChange) onVersandChange(aenderung);
     else setEigenerVersand((v) => ({ ...v, ...aenderung }));
   }
   const setAnhangHinweis = (hinweis: string | null) => aendereVersand({ hinweis });
+  /**
+   * Der Offline-Hinweis gilt nur, solange das Netz fehlt: kommt es zurück, bietet er nicht
+   * weiter an, alle Anhänge zu verwerfen (LFH-1078). Abgeleitet im Rendern, kein Effekt.
+   */
+  const anhangHinweis = versandHinweis === ANHANG_OFFLINE_SENDEN && online ? null : versandHinweis;
   const setFortschritt = (f: Versand['fortschritt']) => aendereVersand({ fortschritt: f });
   /** Eigener Schlüssel ohne Aufrufer-id: stabil über Fehlversuche, neu nach jedem Erfolg. */
   const eigeneClientId = useRef<string>(neueClientId());
@@ -314,7 +307,9 @@ export default function Schnellerfassung({
   /** Abfragezeile zum Ändern eines gesetzten Standards offen (ohne Standard steht sie immer). */
   const [rufnameAendern, setRufnameAendern] = useState(false);
   /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
-  const [pflichtHinweis, setPflichtHinweis] = useState<string | null>(null);
+  const [pflichtHinweis, setPflichtHinweis] = useState<'von' | 'an' | null>(null);
+  /** Kennung des Kurzgrunds neben „Anhang“ (`aria-describedby`, LFH-1078). */
+  const anhangGrundId = useId();
   /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
   const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
@@ -598,15 +593,10 @@ export default function Schnellerfassung({
   async function absenden() {
     if (sendet || inhalt.trim() === '') return;
     // Von/An-Pflicht (LFH-894, D7): VOR Upload und Warteschlange. Text, Felder und Anhänge
-    // bleiben stehen; ohne Standard steht die Abfrage ohnehin über der Zeile.
+    // bleiben stehen. Der Hinweis nennt den Zustand und trägt den Weg als Knopf (LFH-1078).
     const fehlt = fehlendeSeite(wirksam);
     if (fehlt) {
-      setPflichtHinweis(
-        `${fehlt === 'von' ? 'Von' : 'An'} fehlt: ` +
-          (rufname.standard == null
-            ? 'Rufname oben festlegen oder ' + `/${fehlt} setzen.`
-            : `/${fehlt} setzen.`),
-      );
+      setPflichtHinweis(fehlt);
       return;
     }
     setPflichtHinweis(null);
@@ -622,14 +612,11 @@ export default function Schnellerfassung({
     // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte mit 400, und die
     // Dateien lägen bis zum Aufräumlauf verwaist oben.
     if (dateien.length > ETB_ANHAENGE_MAX) {
-      setAnhangHinweis(`${ANHANG_GRENZE} Entferne ${dateien.length - ETB_ANHAENGE_MAX}.`);
+      setAnhangHinweis(`Zu viele Anhänge: ${dateien.length}/${ETB_ANHAENGE_MAX}`);
       return;
     }
     if (dateien.length > 0 && !online) {
-      setAnhangHinweis(
-        'Ohne Verbindung lassen sich keine Anhänge senden. ' +
-          'Entferne sie, um den Text jetzt zu erfassen.',
-      );
+      setAnhangHinweis(ANHANG_OFFLINE_SENDEN);
       return;
     }
     // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein langer
@@ -733,39 +720,33 @@ export default function Schnellerfassung({
   );
 
   /*
-   * DIE HINWEISZEILE trägt den Tastaturvertrag — EINMAL: nicht im Platzhalter, nicht zusätzlich
-   * als „↵ eintragen". Genannt wird nur, was es gibt: `# Koordinate` des Entwurfs hat keinen Weg
-   * in den Eintrag; „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt.
+   * DIE HINWEISZEILE trägt keinen Tastaturvertrag und keine Befehlsliste mehr (LFH-1078): die
+   * Sendetaste steht als Kappe an „Erfassen“, Typ und Felder zeigen Präfix-Knopf und „Feld“. Sie
+   * bleibt für Zeichengrenze und, unter `md`, „Werte behalten“ — und entfällt, wenn beides fehlt.
    */
   // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile — in der
   // einzeilig rollenden Chip-Zeile läge er sonst hinter dem Bildlauf. In der Hinweiszeile OHNE den
   // Kästchen-Boden (`antdKaestchen`, LFH-907): im Handschuh-Betrieb höbe er die Zeile von 36 auf
   // 72 px, und die angepinnte Leiste risse auf dem Handschirm den Deckel der halben Fensterhöhe
   // (`e2e/leisten-flaeche.spec.ts`, 451 statt höchstens 422 px). Benannte Ausnahme.
+  // Kein Tooltip-Satz (LFH-1078): was stehen bleibt, sieht man nach dem Erfassen an den Chips.
   const schalter = zeigeSchalter ? (
-    <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-      {/* Gesperrt beim Senden: der laufende Versand hat die Übernahme schon gelesen. */}
-      <Checkbox
-        checked={werteBehalten}
-        disabled={sendet}
-        onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
-        style={istSchmal ? { minHeight: 0 } : undefined}
-      >
-        <Typography.Text type="secondary">Werte behalten</Typography.Text>
-      </Checkbox>
-    </Tooltip>
+    // Gesperrt beim Senden: der laufende Versand hat die Übernahme schon gelesen.
+    <Checkbox
+      checked={werteBehalten}
+      disabled={sendet}
+      onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
+      style={istSchmal ? { minHeight: 0 } : undefined}
+    >
+      <Typography.Text type="secondary">Werte behalten</Typography.Text>
+    </Checkbox>
   ) : null;
 
-  // Unter `md` die Kurzform: die volle Zeile bräche auf dem Handschirm dreizeilig um. Der
-  // Tastaturvertrag folgt der Zeigerart, nicht der Breite (LFH-955).
-  const enterHinweis = istBeruehrung
-    ? ENTER_HINWEIS_BERUEHRUNG
-    : istSchmal
-      ? ENTER_HINWEIS_KURZ
-      : ENTER_HINWEIS;
   // Zeichengrenze (LFH-937, D8): Zähler und Hinweis stehen in der Hinweiszeile, nicht unter dem
   // Feld — eine weitere Zeile risse das Höhenbudget der angepinnten Leiste. Der Zähler erscheint
   // erst ab 80 % der Grenze; der Hinweis trägt neben der Farbe ein Zeichen und Worte (WCAG 1.4.1).
+  const grenzSichtbar =
+    laengenHinweis != null || zaehlerText(zeichenZahl(inhalt), ETB_INHALT_MAX) != null;
   const grenzTeil = (
     <>
       {laengenHinweis && (
@@ -786,23 +767,14 @@ export default function Schnellerfassung({
       <Zeichenzaehler wert={inhalt} max={ETB_INHALT_MAX} />
     </>
   );
-  const hinweiszeile = istSchmal ? (
-    <>
-      {grenzTeil}
-      <span>{enterHinweis}</span>
-      {schalter && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
-    </>
-  ) : (
-    <>
-      {grenzTeil}
-      {!berichtigungZu && (
-        <span style={{ color: rollen.gedaempft }}>{TYP_BEFEHLE.map((t) => `/${t}`).join(' ')}</span>
-      )}
-      {!berichtigungZu && <span>@ Einheit</span>}
-      <span>/zeit ⧖ Nachtrag</span>
-      <span>{enterHinweis}</span>
-    </>
-  );
+  const schalterInZeile = istSchmal && schalter != null;
+  const hinweiszeile =
+    grenzSichtbar || schalterInZeile ? (
+      <>
+        {grenzTeil}
+        {schalterInZeile && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
+      </>
+    ) : undefined;
 
   const einheitenTreffer =
     menuModus === 'at' ? filterAtEintraege(menuFilter, funkrufnamen, typ) : null;
@@ -831,6 +803,14 @@ export default function Schnellerfassung({
 
   // „Anhang" steht bei „Feld": ab `md` hinter den Chips, darunter vorn.
   const anGrenze = dateien.length >= ETB_ANHAENGE_MAX;
+  // Zweiter Kanal neben dem Grau (WCAG 1.4.1), in wenigen Wörtern statt eines Satzes (LFH-1078):
+  // ohne Netz „offline“, sonst der Zähler „3/10“, sobald Dateien gewählt sind — an der Grenze ist
+  // er der Grund der Sperre.
+  const anhangGrund = !online
+    ? 'offline'
+    : dateien.length > 0
+      ? `${dateien.length}/${ETB_ANHAENGE_MAX}`
+      : null;
   const anhangTeil = (
     <>
       {/* „Anhang": ein antd-Knopf plus unsichtbare Dateieingabe statt antds `Upload` — der wickelte
@@ -839,6 +819,7 @@ export default function Schnellerfassung({
       <Button
         type="dashed"
         disabled={!online || sendet || anGrenze}
+        aria-describedby={anhangGrund != null ? anhangGrundId : undefined}
         icon={
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
             <IconBueroklammer />
@@ -858,11 +839,17 @@ export default function Schnellerfassung({
         data-lfh="etb-anhang-eingabe"
         onChange={(e) => dateienGewaehlt(e.target.files)}
       />
-      {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. In `text2`,
-         nicht `Typography` „secondary": der hält am Tag den 7 : 1-Boden auf dem Grund der
-         Erfassung nicht (e2e `etb-anhang-pruefliste`). */}
-      {!online && <span style={{ color: rollen.text2 }}>{ANHANG_OFFLINE}</span>}
-      {online && anGrenze && <span style={{ color: rollen.text2 }}>{ANHANG_GRENZE}</span>}
+      {/* In `text2`, nicht `Typography` „secondary": der hält am Tag den 7 : 1-Boden auf dem Grund
+         der Erfassung nicht (e2e `etb-anhang-pruefliste`). */}
+      {anhangGrund != null && (
+        <span
+          id={anhangGrundId}
+          data-lfh="etb-anhang-grund"
+          style={{ ...(online ? monoStil(12) : {}), color: rollen.text2, whiteSpace: 'nowrap' }}
+        >
+          {anhangGrund}
+        </span>
+      )}
     </>
   );
 
@@ -926,8 +913,22 @@ export default function Schnellerfassung({
               >
                 Vorschau
               </Button>
-              <Button type="primary" loading={sendet} onClick={() => void absenden()}>
+              {/* Die Sendetaste als Kappe statt als Satz (LFH-1078), nur mit feinem Zeiger: mit grobem
+                 sendet Return nicht (LFH-955, D1). Erst ab `lg`: darunter kostete die Kappe dem
+                 Textfeld seinen Anteil an der Zeile (LFH-955, D2). Die Kappe ist `aria-hidden`, der
+                 Knopfname bleibt das Wort; die Kürzel nennt `aria-keyshortcuts` auf jeder Breite. */}
+              <Button
+                type="primary"
+                loading={sendet}
+                aria-keyshortcuts={istBeruehrung ? KUERZEL_GROB : KUERZEL_FEIN}
+                onClick={() => void absenden()}
+              >
                 {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : 'Erfassen'}
+                {!istBeruehrung && !fortschritt && abBreite('lg') && (
+                  <Tastenkuerzel aria-hidden style={{ marginInlineStart: token.marginXS }}>
+                    ↵
+                  </Tastenkuerzel>
+                )}
               </Button>
             </div>
           }
@@ -939,7 +940,7 @@ export default function Schnellerfassung({
             unterEbene={1}
             layout="toggle"
             variante="kompakt"
-            placeholder={istSchmal ? PLATZHALTER_KURZ : PLATZHALTER}
+            placeholder={PLATZHALTER}
             autoSize={{ minRows: 1, maxRows: 4 }}
             umschalterAussen
             vorschauOffen={vorschauOffen}
@@ -1096,7 +1097,26 @@ export default function Schnellerfassung({
         </div>
       )}
       {anhangHinweis && (
-        <Alert type="error" showIcon style={{ marginTop: token.marginXS }} title={anhangHinweis} />
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginTop: token.marginXS }}
+          title={anhangHinweis}
+          action={
+            anhangHinweis === ANHANG_OFFLINE_SENDEN && dateien.length > 0 ? (
+              <Button
+                disabled={sendet}
+                onClick={() => {
+                  setzeDateien([]);
+                  setAnhangHinweis(null);
+                  fokusInsFeld();
+                }}
+              >
+                Anhänge entfernen
+              </Button>
+            ) : undefined
+          }
+        />
       )}
       {pflichtHinweis && (
         <Alert
@@ -1104,7 +1124,18 @@ export default function Schnellerfassung({
           showIcon
           data-lfh="etb-pflicht-hinweis"
           style={{ marginTop: token.marginXS }}
-          title={pflichtHinweis}
+          title={`${pflichtHinweis === 'von' ? 'Von' : 'An'} fehlt`}
+          action={
+            <Button
+              disabled={sendet}
+              onClick={() => {
+                setEditFeld(pflichtHinweis);
+                setPflichtHinweis(null);
+              }}
+            >
+              {pflichtHinweis === 'von' ? 'Von' : 'An'} setzen
+            </Button>
+          }
         />
       )}
 

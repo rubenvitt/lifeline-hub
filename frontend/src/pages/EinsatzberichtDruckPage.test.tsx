@@ -174,9 +174,7 @@ describe('EinsatzberichtDruckPage', () => {
     const aufrufe = quellen();
     freigaben({ personen: { zugriff: false } });
     rendere();
-    expect(
-      await screen.findByText(/^Für den Einsatzbericht fehlen Rechte an: Betroffene\./),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Kein Zugriff: Betroffene')).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
     expect(aufrufe.get('/personen')).toBeUndefined();
     expect(document.querySelector('[data-lfh="druckwurzel"]')).toBeNull();
@@ -192,6 +190,10 @@ describe('EinsatzberichtDruckPage', () => {
     ) as HTMLElement;
     expect(within(bilanz).getAllByText('In diesem Einsatz nicht genutzt')).toHaveLength(1);
     expect(aufrufe.get('/betreuung')).toBeUndefined();
+    // Ausgeblendet ist nicht gesperrt: die Leiste trägt keinen Zusatz „kein Zugriff“.
+    expect(
+      within(screen.getByRole('region', { name: 'Blöcke' })).queryByText(/kein Zugriff/),
+    ).toBeNull();
   });
 
   it('ein gescheiterter Abruf sperrt das Drucken und bietet einen neuen Versuch an', async () => {
@@ -224,7 +226,7 @@ describe('EinsatzberichtDruckPage', () => {
     );
     rendere();
     expect(await screen.findByText('Kein Zugriff auf den Einsatzbericht')).toBeInTheDocument();
-    expect(screen.getByText(/Schäden/)).toBeInTheDocument();
+    expect(screen.getByText('Gesperrt: Schäden')).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
   });
 
@@ -237,7 +239,9 @@ describe('EinsatzberichtDruckPage', () => {
       ),
     );
     rendere();
-    expect(await screen.findByText(/die Aufbewahrungsfrist ist abgelaufen/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('Kein Zugriff oder Aufbewahrungsfrist abgelaufen'),
+    ).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
@@ -393,14 +397,20 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     const aufrufe = quellen();
     freigaben({ personen: { zugriff: false } });
     rendere();
-    expect(
-      await screen.findByText(/Für den Einsatzbericht fehlen Rechte an: Betroffene\./),
-    ).toBeInTheDocument();
-    // Die Leiste bleibt in der Sackgasse: dort liegt der Ausweg.
-    await userEvent.click(within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' }));
+    expect(await screen.findByText('Kein Zugriff: Betroffene')).toBeInTheDocument();
+    // Die Leiste bleibt in der Sackgasse: dort liegt der Ausweg, der Block nennt sein Modul.
+    const bilanz = within(auswahlleiste()).getByRole('checkbox', {
+      name: 'Bilanz – kein Zugriff: Betroffene',
+    });
+    await userEvent.click(bilanz);
     await fertig();
     expect(blockTitel()).not.toContain('Bilanz');
     expect(aufrufe.get('/personen')).toBeUndefined();
+    // Auch abgewählt nennt der Block sein gesperrtes Modul: wer ihn wieder wählt, weiß vorher, warum
+    // das Drucken dann sperrt.
+    expect(
+      within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz – kein Zugriff: Betroffene' }),
+    ).not.toBeChecked();
   });
 
   it('Personal-Anlage: Namen der Einsatzkräfte im Blatt, der Kopf vermerkt den Personenbezug', async () => {

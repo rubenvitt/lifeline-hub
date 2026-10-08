@@ -268,40 +268,34 @@ describe('Schnellerfassung', () => {
   });
 
   /**
-   * Der Wortlaut steht GENAU EINMAL, und zwar in der Steuerzeile.
-   *
-   * Die zweite Hälfte macht die Aussage widerlegbar: ohne sie bliebe der Test grün, wenn der
-   * Hinweis dem Platzhalter wieder vorangestellt würde (LFH-335).
+   * Die Taste steht als Kappe am Knopf, nicht als Satz (LFH-1078): kein „Enter sendet …“ in der
+   * Leiste, kein Tastenweg im Platzhalter. Der Knopfname bleibt das Wort.
    */
-  it('erklärt den Enter-Vertrag genau einmal — sichtbar, nicht im Platzhalter', () => {
+  it('zeigt die Sendetaste als Kappe an „Erfassen“ — kein Tastensatz, Platzhalter „Inhalt …“', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
-    const hinweis = 'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
-    expect(screen.getAllByText(hinweis)).toHaveLength(1);
-    expect(screen.getByText(hinweis)).toBeVisible();
-    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveAttribute(
-      'placeholder',
-      'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )',
-    );
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Enter Control+Enter Meta+Enter');
+    expect(knopf.querySelector('kbd')).toHaveTextContent('↵');
+    const leiste = document.querySelector('[data-lfh="etb-erfassung"]')!;
+    expect(leiste.textContent).not.toMatch(/Enter sendet|Shift\+Enter|Strg\+Enter|neue Zeile/);
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveAttribute('placeholder', 'Inhalt …');
   });
 
-  /**
-   * Unter `md` wird die Hinweiszeile zur einzeiligen Kurzform mit dem Tastaturvertrag — genau
-   * einmal; sonst belegte die angepinnte Leiste im Handschuh-Betrieb über die Hälfte des
-   * Fensters (LFH-373).
-   */
-  it('unter md: Kurzform des Enter-Vertrags, einmal, ohne Befehlsliste', () => {
+  it('unter md: kein Tastensatz, derselbe Platzhalter', () => {
     setzeViewportBreite(390);
     renderMitProviders(<Schnellerfassung {...props()} />);
-    expect(screen.getAllByText('Enter sendet · Shift+Enter neue Zeile')).toHaveLength(1);
-    expect(screen.queryByText(/Mehrzeiler mit Cmd\/Strg\+Enter/)).toBeNull();
-    // Der Platzhalter hat unter `md` ebenfalls eine Kurzform: der volle Wortlaut brach bei 390 px
-    // um und trieb die Leiste über den 50-%-Deckel. „Inhalt …" steht weiter vorn, beide Auslöser
-    // bleiben.
-    expect(screen.getByPlaceholderText(/^Inhalt …/)).toHaveAttribute(
-      'placeholder',
-      'Inhalt … ( / für Typ & Felder · @ für Einheit )',
-    );
+    const leiste = document.querySelector('[data-lfh="etb-erfassung"]')!;
+    expect(leiste.textContent).not.toMatch(/Enter sendet|Shift\+Enter|neue Zeile/);
+    expect(screen.getByPlaceholderText(/^Inhalt …/)).toHaveAttribute('placeholder', 'Inhalt …');
     expect(screen.queryByText('@ Einheit')).toBeNull();
+  });
+
+  it('unter lg: keine Kappe, die Zeile gehört dem Textfeld — die Kürzel bleiben am Knopf', () => {
+    setzeViewportBreite(820);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    expect(knopf.querySelector('kbd')).toBeNull();
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Enter Control+Enter Meta+Enter');
   });
 
   /**
@@ -705,26 +699,22 @@ describe('Schnellerfassung — Tastatur nach Zeigerart (LFH-955)', () => {
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveAttribute('enterkeyhint', 'enter');
   });
 
-  it.each([1180, 390])(
-    'grober Zeiger bei %i px: der Hinweis nennt keine Tastenkombination',
-    (breite) => {
-      setzeViewportBreite(breite);
-      setzeZeigerGrob(true);
-      renderMitProviders(<Schnellerfassung {...props()} />);
-      expect(screen.getAllByText('Return neue Zeile · „Erfassen“ sendet')).toHaveLength(1);
-      const leiste = document.querySelector('[data-lfh="etb-erfassung"]')!;
-      expect(leiste.textContent).not.toMatch(/Shift\+Enter|Strg\+Enter|Enter sendet/);
-    },
-  );
+  it.each([1180, 390])('grober Zeiger bei %i px: keine Tastenkappe, kein Tastensatz', (breite) => {
+    setzeViewportBreite(breite);
+    setzeZeigerGrob(true);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    expect(knopf.querySelector('kbd')).toBeNull();
+    // Return sendet hier nicht; nur die Hardware-Tastatur am Tablet hat die Kombination.
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter');
+    const leiste = document.querySelector('[data-lfh="etb-erfassung"]')!;
+    expect(leiste.textContent).not.toMatch(/Shift\+Enter|Strg\+Enter|Enter sendet|Return/);
+  });
 
   it('feiner Zeiger: der bisherige Vertrag bleibt', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
-    expect(
-      screen.getByText(
-        'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erfassen' }).querySelector('kbd')).not.toBeNull();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Einzeiler{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
@@ -951,14 +941,16 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     });
   });
 
-  it('nennt die Typbefehle, @ und den Nachtrag-Weg in der Hinweiszeile', () => {
+  /**
+   * Keine Befehlsliste unter dem Feld (LFH-1078): Typ und Felder zeigen der Präfix-Knopf und
+   * „Feld“; ab `md` steht ohne Zeichengrenze gar keine Hinweiszeile.
+   */
+  it('listet keine Befehle unter dem Feld', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     const zeile = document.querySelector('[data-lfh="schnellerfassung"]')!;
-    expect(zeile).toHaveTextContent('/meldung /anordnung /entscheidung /lage');
-    expect(zeile).toHaveTextContent('@ Einheit');
-    expect(zeile).toHaveTextContent('/zeit ⧖ Nachtrag');
-    // Kein „# Koordinate": dafür gibt es keinen Weg in den Eintrag.
-    expect(zeile).not.toHaveTextContent('Koordinate');
+    expect(zeile).not.toHaveTextContent('/anordnung /entscheidung');
+    expect(zeile).not.toHaveTextContent('@ Einheit');
+    expect(zeile).not.toHaveTextContent('Nachtrag');
   });
 });
 
@@ -1022,9 +1014,7 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     ).toBeInTheDocument();
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Pegel steigt{Enter}');
-    expect(
-      await screen.findByText('Von fehlt: Rufname oben festlegen oder /von setzen.'),
-    ).toBeVisible();
+    expect(await screen.findByText('Von fehlt')).toBeVisible();
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(feld).toHaveValue('Pegel steigt');
   });
@@ -1038,6 +1028,11 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
     expect(await screen.findByText(/^An fehlt/)).toBeInTheDocument();
     expect(p.erfassen).not.toHaveBeenCalled();
+
+    // Der Weg steht am Hinweis als Knopf, nicht als Satz (LFH-1078): er öffnet den Feld-Editor.
+    await userEvent.click(screen.getByRole('button', { name: 'An setzen' }));
+    expect(await screen.findByLabelText('An')).toBeInTheDocument();
+    expect(screen.queryByText(/^An fehlt/)).toBeNull();
   });
 
   it('übernimmt den Rufnamen aus der Abfrage über den Zugriff', async () => {
