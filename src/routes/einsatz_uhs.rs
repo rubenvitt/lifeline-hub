@@ -6,7 +6,7 @@ use crate::einsatz::modul::Unfallhilfsstellen;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::geraet::stelle;
+use crate::geraet::{stelle, Bindungsart};
 use crate::live::LiveEvent;
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
@@ -76,10 +76,10 @@ pub async fn liste(
         params.abschnitt_id,
     )
     .await?;
-    // Stellenbindung (LFH-892): ein UHS-Gerät kennt nur seine eigene UHS.
-    if let Some(eigene) = stelle::stelle(ctx.geraet.as_ref()) {
-        liste.retain(|u| u.id == eigene);
-    }
+    // Stellenbindung (LFH-892): ein UHS-Gerät kennt nur seine eigene UHS, jedes andere Gerät
+    // keine.
+    let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Uhs);
+    liste.retain(|u| sicht.sieht(u.id));
     Ok(Json(liste))
 }
 

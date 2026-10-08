@@ -1,6 +1,6 @@
 //! Datenzugriff der Gerätekopplung (LFH-892, design.md D1/D3).
 
-use super::{code, Funktionsansicht, GeraetKontext, HOECHSTENS_STUNDEN};
+use super::{code, Bindungsart, Funktionsansicht, GeraetKontext, Stelle, HOECHSTENS_STUNDEN};
 use crate::auth::PASSWORT_HASH_SSO_ONLY;
 use crate::error::AppError;
 use crate::wire_enum::wire_enum;
@@ -44,8 +44,11 @@ pub enum KopplungStatus {
 pub struct KopplungAnzeige {
     pub id: i64,
     pub ansicht: Funktionsansicht,
+    /// UHS der UHS-Ansichten (Spiegel von `stelle_id`).
     pub uhs_id: Option<i64>,
-    /// Bezeichnung der UHS, falls stellengebunden.
+    /// Kennung der Stelle, gleich welcher Art; die Art folgt aus der Ansicht.
+    pub stelle_id: Option<i64>,
+    /// Bezeichnung der Stelle, falls stellengebunden.
     pub stelle: Option<String>,
     pub bezeichnung: String,
     /// Anzeigename des Gerätekontos, so wie er an Einträgen steht.
@@ -65,6 +68,7 @@ struct KopplungZeile {
     id: i64,
     ansicht: String,
     uhs_id: Option<i64>,
+    stelle_id: Option<i64>,
     stelle: Option<String>,
     bezeichnung: String,
     anzeigename: String,
@@ -94,6 +98,7 @@ impl KopplungZeile {
             ansicht: Funktionsansicht::parse(&self.ansicht)
                 .ok_or_else(|| AppError::Internal(format!("Ansicht {}", self.ansicht)))?,
             uhs_id: self.uhs_id,
+            stelle_id: self.stelle_id,
             stelle: self.stelle,
             bezeichnung: self.bezeichnung,
             anzeigename: self.anzeigename,
@@ -109,7 +114,19 @@ impl KopplungZeile {
     }
 }
 
-const ANZEIGE_SELECT: &str = "SELECT k.id, k.ansicht, k.uhs_id, u.bezeichnung AS stelle, \
+/// Kennung der Stelle über alle Arten (Alias `k` für `geraet_kopplung`); die Migration erlaubt
+/// höchstens eine gesetzte Spalte.
+macro_rules! stelle_id {
+    () => {
+        "COALESCE(k.uhs_id, k.betreuungsstelle_id, k.bereitstellungsraum_id, k.abschnitt_id)"
+    };
+}
+
+const ANZEIGE_SELECT: &str = concat!(
+    "SELECT k.id, k.ansicht, k.uhs_id, ",
+    stelle_id!(),
+    " AS stelle_id, \
+        COALESCE(u.bezeichnung, bs.bezeichnung, br.bezeichnung, ea.name) AS stelle, \
         k.bezeichnung, g.anzeigename, k.erstellt_at, e.anzeigename AS erstellt_von_name, \
         k.laeuft_ab_at, k.gekoppelt_at, k.letzter_zugriff_at, k.widerrufen_at, \
         w.anzeigename AS widerrufen_von_name, (k.laeuft_ab_at <= datetime('now')) AS abgelaufen \
@@ -117,7 +134,11 @@ const ANZEIGE_SELECT: &str = "SELECT k.id, k.ansicht, k.uhs_id, u.bezeichnung AS
      JOIN benutzer g ON g.id = k.benutzer_id \
      JOIN benutzer e ON e.id = k.erstellt_von \
      LEFT JOIN benutzer w ON w.id = k.widerrufen_von \
-     LEFT JOIN uhs u ON u.id = k.uhs_id";
+     LEFT JOIN uhs u ON u.id = k.uhs_id \
+     LEFT JOIN betreuungsstelle bs ON bs.id = k.betreuungsstelle_id \
+     LEFT JOIN bereitstellungsraum br ON br.id = k.bereitstellungsraum_id \
+     LEFT JOIN einsatzabschnitt ea ON ea.id = k.abschnitt_id"
+);
 
 /// Alle Kopplungen eines Einsatzes, neueste zuerst.
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<KopplungAnzeige>, AppError> {
@@ -151,9 +172,10 @@ pub struct NeueKopplung<'a> {
     pub einsatz_id: i64,
     pub org_id: i64,
     pub ansicht: Funktionsansicht,
-    pub uhs_id: Option<i64>,
-    /// Bezeichnung der UHS für den Anzeigenamen des Gerätekontos.
-    pub stelle: Option<&'a str>,
+    /// Stelle der stellengebundenen Ansichten, schon gegen den Einsatz geprüft.
+    pub stelle: Option<Stelle>,
+    /// Bezeichnung der Stelle für den Anzeigenamen des Gerätekontos.
+    pub stelle_name: Option<&'a str>,
     pub bezeichnung: &'a str,
     pub laeuft_ab_at: &'a str,
     pub von: i64,
@@ -175,20 +197,25 @@ pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Resu
          VALUES (?, ?, ?, ?, 'keiner', 'keine') RETURNING id",
     )
     .bind(neu.org_id)
-    .bind(anzeigename(neu.stelle, neu.bezeichnung))
+    .bind(anzeigename(neu.stelle_name, neu.bezeichnung))
     .bind(&benutzername)
     .bind(PASSWORT_HASH_SSO_ONLY)
     .fetch_one(&mut *conn)
     .await?;
+    let spalte = |art: Bindungsart| neu.stelle.filter(|s| s.art == art).map(|s| s.id);
     let kopplung_id: i64 = sqlx::query_scalar(
         "INSERT INTO geraet_kopplung \
-           (einsatz_id, benutzer_id, ansicht, uhs_id, bezeichnung, erstellt_von, laeuft_ab_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+           (einsatz_id, benutzer_id, ansicht, uhs_id, betreuungsstelle_id, bereitstellungsraum_id, \
+            abschnitt_id, bezeichnung, erstellt_von, laeuft_ab_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(neu.einsatz_id)
     .bind(benutzer_id)
     .bind(neu.ansicht.as_str())
-    .bind(neu.uhs_id)
+    .bind(spalte(Bindungsart::Uhs))
+    .bind(spalte(Bindungsart::Betreuungsstelle))
+    .bind(spalte(Bindungsart::Bereitstellungsraum))
+    .bind(spalte(Bindungsart::Einsatzabschnitt))
     .bind(neu.bezeichnung)
     .bind(neu.von)
     .bind(neu.laeuft_ab_at)
@@ -420,6 +447,29 @@ pub async fn widerrufen(
     Ok(true)
 }
 
+/// Widerruft alle offenen Kopplungen, die an den Abschnitt gebunden sind, bevor er aufgelöst wird
+/// (LFH-1040): ein Gerät ohne Stelle hätte nichts mehr zu tun. Liefert Kennung und Anzeigename
+/// jeder widerrufenen Kopplung, damit der Aufrufer sie im ETB nennt und dem Live-Kanal meldet.
+pub async fn widerrufe_am_abschnitt(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    abschnitt_id: i64,
+    von: i64,
+) -> Result<Vec<(i64, String)>, AppError> {
+    let offene: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT k.id, g.anzeigename FROM geraet_kopplung k JOIN benutzer g ON g.id = k.benutzer_id \
+         WHERE k.einsatz_id = ? AND k.abschnitt_id = ? AND k.widerrufen_at IS NULL ORDER BY k.id",
+    )
+    .bind(einsatz_id)
+    .bind(abschnitt_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (id, _) in &offene {
+        widerrufen(&mut *conn, *id, von).await?;
+    }
+    Ok(offene)
+}
+
 /// IDs aller nicht widerrufenen Kopplungen eines Einsatzes (für das Ende beim Abschluss).
 pub async fn offene_ids(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<i64>, AppError> {
     Ok(sqlx::query_scalar(
@@ -436,16 +486,19 @@ pub async fn kontext_wenn_gueltig(
     pool: &SqlitePool,
     kopplung_id: i64,
 ) -> Result<Option<GeraetKontext>, AppError> {
-    let zeile: Option<(i64, i64, String, Option<i64>, String, String)> = sqlx::query_as(
-        "SELECT k.id, k.einsatz_id, k.ansicht, k.uhs_id, k.bezeichnung, k.laeuft_ab_at \
+    let zeile: Option<(i64, i64, String, Option<i64>, String, String)> = sqlx::query_as(concat!(
+        "SELECT k.id, k.einsatz_id, k.ansicht, ",
+        stelle_id!(),
+        ", k.bezeichnung, k.laeuft_ab_at \
          FROM geraet_kopplung k JOIN einsatz e ON e.id = k.einsatz_id \
          WHERE k.id = ? AND k.widerrufen_at IS NULL AND k.laeuft_ab_at > datetime('now') \
-           AND e.status = 'aktiv' AND e.geloescht_at IS NULL",
-    )
+           AND e.status = 'aktiv' AND e.geloescht_at IS NULL"
+    ))
     .bind(kopplung_id)
     .fetch_optional(pool)
     .await?;
-    let Some((kopplung_id, einsatz_id, ansicht, uhs_id, bezeichnung, laeuft_ab_at)) = zeile else {
+    let Some((kopplung_id, einsatz_id, ansicht, stelle_id, bezeichnung, laeuft_ab_at)) = zeile
+    else {
         return Ok(None);
     };
     let ansicht = Funktionsansicht::parse(&ansicht)
@@ -462,7 +515,11 @@ pub async fn kontext_wenn_gueltig(
         kopplung_id,
         einsatz_id,
         ansicht,
-        uhs_id,
+        // Die Art folgt aus der Ansicht; eine Stelle ohne passende Art gibt es nicht.
+        stelle: ansicht
+            .stellenart()
+            .zip(stelle_id)
+            .map(|(art, id)| Stelle { art, id }),
         bezeichnung,
         laeuft_ab_at,
     }))

@@ -26,6 +26,9 @@ import {
   type NeueKopplung,
 } from '../../api/geraete';
 import { listeUhs } from '../../api/einsatzUhs';
+import { ladeBetreuung } from '../../api/betreuung';
+import { listeBr } from '../../api/einsatzBereitstellungsraum';
+import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
   Funktionsansicht,
@@ -44,8 +47,10 @@ import {
   codeGruppiert,
   endeFehler,
   istBeendet,
-  istStellengebunden,
   sperrSatz,
+  STELLENART_FELD,
+  stellenartVon,
+  stellenOptionen,
   verlaengernVorbelegung,
 } from './geraeteKern';
 
@@ -59,7 +64,7 @@ const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 
 interface AnlegenWerte {
   ansicht?: Funktionsansicht;
-  uhs_id?: number;
+  stelle_id?: number;
   bezeichnung?: string;
 }
 
@@ -109,10 +114,27 @@ export default function EinsatzGeraete() {
     queryFn: () => ladeGeraete(einsatzId),
     enabled: leitung,
   });
+  // Die Stellen lädt die Maske erst, wenn eine Ansicht ihrer Art gewählt ist (LFH-1040).
+  const stellenart = stellenartVon(geraeteQ.data?.ansichten ?? [], gewaehlteAnsicht);
   const uhsQ = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: darf,
+    enabled: darf && stellenart === 'uhs',
+  });
+  const betreuungQ = useQuery({
+    queryKey: einsatzKeys.betreuung(einsatzId),
+    queryFn: () => ladeBetreuung(einsatzId),
+    enabled: darf && stellenart === 'betreuungsstelle',
+  });
+  const brQ = useQuery({
+    queryKey: einsatzKeys.br(einsatzId),
+    queryFn: () => listeBr(einsatzId),
+    enabled: darf && stellenart === 'bereitstellungsraum',
+  });
+  const abschnitteQ = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled: darf && stellenart === 'einsatzabschnitt',
   });
 
   /** Übernimmt eine geänderte Kopplung in die geladene Übersicht. */
@@ -173,10 +195,21 @@ export default function EinsatzGeraete() {
     );
   }
 
-  const { kopplungen, sperren } = geraeteQ.data;
+  const { kopplungen, sperren, ansichten } = geraeteQ.data;
   const laeuft = neuerCode.isPending || verlaengern.isPending || widerrufen.isPending;
-  // Wie der Server: eine stornierte oder aufgelöste UHS nimmt keine Kopplung (422).
-  const uhsAuswahl = (uhsQ.data ?? []).filter((u) => u.status !== 'aufgeloest' && !u.storniert_at);
+  const stellenAuswahl = stellenart
+    ? stellenOptionen(
+        {
+          uhs: uhsQ.data,
+          betreuungsstellen: betreuungQ.data?.stellen,
+          bereitstellungsraeume: brQ.data,
+          abschnitte: abschnitteQ.data,
+        },
+        stellenart,
+      )
+    : [];
+  const stellenLaedt =
+    uhsQ.isLoading || betreuungQ.isLoading || brQ.isLoading || abschnitteQ.isLoading;
   const sperre = sperrSatz(sperren, gewaehlteAnsicht, modulName);
 
   return (
@@ -272,7 +305,7 @@ export default function EinsatzGeraete() {
         onErfassen={(w) =>
           anlegen.mutateAsync({
             ansicht: w.ansicht as Funktionsansicht,
-            uhs_id: w.ansicht && istStellengebunden(w.ansicht) ? (w.uhs_id ?? null) : null,
+            stelle_id: stellenartVon(ansichten, w.ansicht) ? (w.stelle_id ?? null) : null,
             bezeichnung: (w.bezeichnung ?? '').trim(),
           })
         }
@@ -290,23 +323,26 @@ export default function EinsatzGeraete() {
         >
           <Select<Funktionsansicht>
             placeholder="Ansicht wählen"
-            options={(Object.keys(ANSICHT_LABEL) as Funktionsansicht[]).map((a) => ({
-              value: a,
-              label: ANSICHT_LABEL[a],
+            options={ansichten.map(({ ansicht }) => ({
+              value: ansicht,
+              label: ANSICHT_LABEL[ansicht],
             }))}
           />
         </Form.Item>
-        {gewaehlteAnsicht && istStellengebunden(gewaehlteAnsicht) && (
+        {stellenart && (
           <Form.Item
-            label="Unfallhilfsstelle"
-            name="uhs_id"
-            rules={[{ required: true, message: 'UHS wählen' }]}
+            // Je Art ein eigenes Feld: ein Wechsel der Ansicht verwirft die gewählte Stelle.
+            key={stellenart}
+            preserve={false}
+            label={STELLENART_FELD[stellenart].label}
+            name="stelle_id"
+            rules={[{ required: true, message: STELLENART_FELD[stellenart].platzhalter }]}
           >
             <Select<number>
-              placeholder="UHS wählen"
-              loading={uhsQ.isLoading}
-              options={uhsAuswahl.map((u) => ({ value: u.id, label: u.bezeichnung }))}
-              notFoundContent="Keine UHS in diesem Einsatz"
+              placeholder={STELLENART_FELD[stellenart].platzhalter}
+              loading={stellenLaedt}
+              options={stellenAuswahl}
+              notFoundContent={STELLENART_FELD[stellenart].leer}
             />
           </Form.Item>
         )}

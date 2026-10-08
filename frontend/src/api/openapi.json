@@ -450,6 +450,29 @@
           "fernmeldeskizze"
         ]
       },
+      "AnsichtAuswahl": {
+        "type": "object",
+        "description": "Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle.",
+        "required": [
+          "ansicht"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/Funktionsansicht"
+          },
+          "stellenart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Bindungsart",
+                "description": "Art der Stelle, die die Kopplung braucht (`stelle_id`); fehlt ohne Stellenbindung."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "AnsichtSperre": {
         "type": "object",
         "description": "Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.",
@@ -2248,6 +2271,16 @@
           "lagebericht",
           "meldung",
           "auftrag"
+        ]
+      },
+      "Bindungsart": {
+        "type": "string",
+        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt\n`geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0159_…`).",
+        "enum": [
+          "uhs",
+          "betreuungsstelle",
+          "bereitstellungsraum",
+          "einsatzabschnitt"
         ]
       },
       "BrAnzeige": {
@@ -5733,11 +5766,15 @@
       },
       "Funktionsansicht": {
         "type": "string",
-        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0147_geraet_kopplung.sql`.",
+        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0159_geraet_kopplung_stellenarten.sql`.",
         "enum": [
           "uhs-tablet",
           "uhs-laptop",
-          "lagemonitor"
+          "lagemonitor",
+          "betreuungsstelle",
+          "bereitstellungsraum",
+          "einsatzabschnitt",
+          "verpflegung"
         ]
       },
       "GefahrBewertungAnzeige": {
@@ -5946,14 +5983,23 @@
               "string",
               "null"
             ],
-            "description": "Bezeichnung der UHS, falls stellengebunden."
+            "description": "Bezeichnung der Stelle, falls stellengebunden."
+          },
+          "stelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Kennung der Stelle, gleich welcher Art; die Art folgt aus der Ansicht."
           },
           "uhs_id": {
             "type": [
               "integer",
               "null"
             ],
-            "format": "int64"
+            "format": "int64",
+            "description": "UHS der UHS-Ansichten (Spiegel von `stelle_id`, für die UHS-Seiten)."
           }
         }
       },
@@ -5962,9 +6008,17 @@
         "description": "Geräteübersicht der Einsatzleitung.",
         "required": [
           "kopplungen",
-          "sperren"
+          "sperren",
+          "ansichten"
         ],
         "properties": {
+          "ansichten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnsichtAuswahl"
+            },
+            "description": "Die koppelbaren Ansichten in Bedienreihenfolge (LFH-1040): eine Ansicht steht hier erst,\nwenn sie verfügbar ist."
+          },
           "kopplungen": {
             "type": "array",
             "items": {
@@ -6620,14 +6674,23 @@
               "string",
               "null"
             ],
-            "description": "Bezeichnung der UHS, falls stellengebunden."
+            "description": "Bezeichnung der Stelle, falls stellengebunden."
+          },
+          "stelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Kennung der Stelle, gleich welcher Art; die Art folgt aus der Ansicht."
           },
           "uhs_id": {
             "type": [
               "integer",
               "null"
             ],
-            "format": "int64"
+            "format": "int64",
+            "description": "UHS der UHS-Ansichten (Spiegel von `stelle_id`)."
           },
           "widerrufen_at": {
             "type": [
