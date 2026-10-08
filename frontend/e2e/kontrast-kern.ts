@@ -71,11 +71,40 @@ export async function eingeschwungen(ziel: Locator) {
   });
 }
 
+/** Im Browser wörtlich wiederholt: eine `evaluate`-Funktion sieht keine Modulkonstanten. */
+const AUSGEHAENGT = 'Ziel ausgehängt';
+
+/**
+ * Liest erneut, wenn das Ziel zwischen Auflösen und Auswerten ausgehängt wurde (LFH-1035).
+ * `locator.evaluate` löst das Element und wertet es in zwei Schritten aus; montiert die Seite es
+ * dazwischen neu, läuft die Auswertung am ausgehängten Knoten, und `getComputedStyle` liefert
+ * dort leere Werte (`NaN` als Randbreite, leere Deckkraft am Vorfahren). Beobachtet an der
+ * Einsatzliste: der erste Abgleich des Org-Stroms ruft die Liste 300 ms nach dem Öffnen neu ab,
+ * ohne Daten steht die Abfrage dabei wieder auf `pending`, und der Ladefehler wird ersetzt und
+ * neu eingehängt. Die Lesungen in `messe` und `randKontrast` prüfen deshalb `isConnected` und
+ * werfen {@link AUSGEHAENGT}; nur dieser Fehler wird wiederholt, jeder andere bleibt ein Befund.
+ */
+async function amEingehaengten<T>(lesen: () => Promise<T>, fristMs = 10_000): Promise<T> {
+  const ende = Date.now() + fristMs;
+  for (;;) {
+    try {
+      return await lesen();
+    } catch (e) {
+      if (!(e instanceof Error && e.message.includes(AUSGEHAENGT)) || Date.now() > ende) throw e;
+    }
+  }
+}
+
 // Echte Text-/Hintergrundpaare inklusive transparenter Vorfahren. Keine Farbwerte aus dem
 // Produkt importieren: eine schlechte Palette muss rot werden.
-async function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
+function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
+  return amEingehaengten(() => messeEinmal(ziel, auftrag));
+}
+
+async function messeEinmal(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
   await eingeschwungen(ziel);
   return ziel.evaluate((element, { vordergrund, grund: grundAb }) => {
+    if (!element.isConnected) throw new Error('Ziel ausgehängt');
     type F = [number, number, number, number];
     function rgb(wert: string): F {
       const m = /^rgba?\(([^)]+)\)$/.exec(wert);
@@ -146,9 +175,11 @@ export async function kontrast(tag: Locator) {
  * den Kontrast seiner Farbe, die niemand sieht.
  */
 export async function randKontrast(ziel: Locator, seite: 'left' | 'top' = 'left') {
-  const breite = await ziel.evaluate(
-    (el, s) => parseFloat(getComputedStyle(el).getPropertyValue(`border-${s}-width`)),
-    seite,
+  const breite = await amEingehaengten(() =>
+    ziel.evaluate((el, s) => {
+      if (!el.isConnected) throw new Error('Ziel ausgehängt');
+      return parseFloat(getComputedStyle(el).getPropertyValue(`border-${s}-width`));
+    }, seite),
   );
   if (!(breite > 0)) throw new Error(`Rand ${seite} hat keine Breite (${breite})`);
   const vordergrund = `border-${seite}-color`;
