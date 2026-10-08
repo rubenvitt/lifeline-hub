@@ -836,6 +836,107 @@ test('Ruhige Fläche: eine aufgelöste Einheit lässt die Einheit unter dem Zeig
     .not.toEqual(vorher);
 });
 
+/** Rechteck eines Knotens am Schirm. */
+async function amSchirm(ziel: Locator) {
+  const k = (await ziel.boundingBox())!;
+  return { x: k.x, y: k.y, breite: k.width, hoehe: k.height };
+}
+
+/**
+ * Steht das Rechteck noch dort? Der Bildlauf rastet auf ganze Pixel, das Paneel wächst um
+ * Bruchteile: bis zu einem halben Pixel bleibt (`SUBPIXEL`).
+ */
+function steht(jetzt: Awaited<ReturnType<typeof amSchirm>>, vorher: typeof jetzt, was: string) {
+  for (const k of ['x', 'y', 'breite', 'hoehe'] as const) {
+    expect(
+      Math.abs(jetzt[k] - vorher[k]),
+      `${was}: ${k} ${vorher[k]} → ${jetzt[k]}`,
+    ).toBeLessThanOrEqual(SUBPIXEL);
+  }
+}
+
+test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde Lage bewegen nichts unter dem Zeiger', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmeldenAls(page, ADMIN, ADMIN_PW);
+  const einsatzId = await einsatzAnlegen(page, `E2E Skizze ruhig am Schirm ${Date.now()}`);
+  const a = api(page, einsatzId);
+  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
+  await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea, sprechgruppe_ids: [bnBos] });
+  const zugB = (
+    await a.post('einheiten', { name: 'Zug B', abschnitt_id: ea, sprechgruppe_ids: [bnBos] })
+  ).id;
+  const key = `eh-${zugB}`;
+  const ziel = element(page, key);
+  await oeffneSkizze(page, einsatzId, ziel);
+  await flaecheInsBild(page);
+  const m = await mitte(ziel);
+  await page.mouse.move(m.x, m.y, { steps: 4 });
+  const vorher = await amSchirm(ziel);
+  const flaecheVorher = await amSchirm(flaeche(page));
+  const lageVorher = await lage(ziel);
+
+  // An einem anderen Arbeitsplatz entsteht eine Lücke: eine Einheit ohne Sprechgruppe.
+  await a.post('einheiten', { name: 'Zug Ohne', abschnitt_id: ea });
+  // Vorbedingung: das Ereignis ist angekommen — das Paneel nennt die Lücke.
+  await expect(
+    page.locator('[data-lfh="funkplan-luecke"]', { hasText: 'Einheiten ohne Sprechgruppe' }),
+  ).toContainText('Zug Ohne');
+  steht(await amSchirm(flaeche(page)), flaecheVorher, 'die Fläche bleibt am Schirm stehen');
+  steht(await amSchirm(ziel), vorher, 'unter dem Zeiger springt nichts');
+
+  // Ein anderer Arbeitsplatz verschiebt genau das Element unter dem Zeiger.
+  const neu = { x: lageVorher.x + 160, y: lageVorher.y + 80 };
+  const abruf = page.waitForResponse(
+    (r) =>
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/stab/fernmeldeskizze`) &&
+      r.request().method() === 'GET',
+  );
+  await a.put(`stab/fernmeldeskizze/lage/${key}`, { ...neu, version: null });
+  // Vorbedingung: der neue Stand ist geladen und gezeichnet.
+  await abruf;
+  await page.evaluate(() => new Promise((fertig) => requestAnimationFrame(() => fertig(null))));
+  steht(await amSchirm(flaeche(page)), flaecheVorher, 'die Fläche bleibt am Schirm stehen');
+  steht(await amSchirm(ziel), vorher, 'die fremde Lage wartet, bis der Zeiger geht');
+
+  await page.mouse.move(0, 0);
+  await expect
+    .poll(() => lage(ziel), { message: 'ohne Zeiger gilt die gespeicherte Lage' })
+    .toEqual(neu);
+});
+
+test('Ruhige Fläche am Schirm (1366 × 768): schließt sich eine Lücke ganz oben auf der Seite, rückt die Fläche nicht nach', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmeldenAls(page, ADMIN, ADMIN_PW);
+  const einsatzId = await einsatzAnlegen(page, `E2E Skizze ruhig oben ${Date.now()}`);
+  const a = api(page, einsatzId);
+  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
+  const ohne = (await a.post('einheiten', { name: 'Zug Ohne', abschnitt_id: ea })).id;
+  const lueckeOhne = page.locator('[data-lfh="funkplan-luecke"]', {
+    hasText: 'Einheiten ohne Sprechgruppe',
+  });
+  await oeffneSkizze(page, einsatzId, element(page, `eh-${ohne}`));
+  await expect(lueckeOhne).toContainText('Zug Ohne');
+  // Ganz oben: der Bildlauf kann ein Schrumpfen darüber nicht ausgleichen.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const oben = await amSchirm(flaeche(page));
+  expect(oben.y, 'Vorbedingung: die Fläche beginnt im Fenster').toBeLessThan(FUEKW.height - 40);
+  await page.mouse.move(oben.x + oben.breite / 2, FUEKW.height - 20, { steps: 4 });
+
+  // An einem anderen Arbeitsplatz bekommt „Zug Ohne“ seine Sprechgruppe: die Zeile verliert ihren
+  // Betroffenen, das Paneel würde schrumpfen.
+  await a.put(`einheiten/${ohne}/sprechgruppen/${bnBos}`);
+  await expect(lueckeOhne).not.toContainText('Zug Ohne');
+  steht(await amSchirm(flaeche(page)), oben, 'die Fläche bleibt am Schirm stehen');
+});
+
 // ── Rechte ─────────────────────────────────────────────────────────────────────────────────
 
 test('Rechte: der Beobachter liest — kein Griff, nichts verschiebt, aber Hervorheben und Zoom gehen', async ({
