@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::person::{VerbleibArt, VerbleibStatus};
 use serde::Serialize;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
 /// Ein Verbleib-Ereignis (1:1 zu `person_verbleib`).
@@ -54,6 +54,21 @@ pub async fn erfassen(
     erfasst_von: i64,
 ) -> Result<VerbleibAnzeige, AppError> {
     let mut tx = pool.begin().await?;
+    let id = erfassen_tx(&mut tx, einsatz_id, person_id, daten, kurzform, erfasst_von).await?;
+    tx.commit().await?;
+    laden(pool, einsatz_id, id).await
+}
+
+/// [`erfassen`] in einer laufenden Transaktion, etwa bei der Aufnahme an einer Betreuungsstelle
+/// (LFH-1041); liefert die Kennung des Ereignisses.
+pub async fn erfassen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    daten: VerbleibDaten<'_>,
+    kurzform: &str,
+    erfasst_von: i64,
+) -> Result<i64, AppError> {
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO person_verbleib \
             (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von, \
@@ -69,7 +84,7 @@ pub async fn erfassen(
     .bind(daten.notiz)
     .bind(erfasst_von)
     .bind(daten.betreuungsstelle_id)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await?;
     sqlx::query(
         "UPDATE einsatz_person SET aktueller_verbleib = ?1, aktuelle_verbleib_art = ?2, \
@@ -84,10 +99,9 @@ pub async fn erfassen(
     .bind(daten.betreuungsstelle_id)
     .bind(person_id)
     .bind(einsatz_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
-    tx.commit().await?;
-    laden(pool, einsatz_id, id).await
+    Ok(id)
 }
 
 /// Lädt ein Verbleib-Ereignis; `NotFound`, falls nicht zum Einsatz.

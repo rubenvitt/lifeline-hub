@@ -141,6 +141,7 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet
                 | Funktionsansicht::UhsLaptop
                 | Funktionsansicht::Lagemonitor
+                | Funktionsansicht::Betreuungsstelle
         )
     }
 
@@ -173,9 +174,9 @@ impl Funktionsansicht {
                 "gefahrenzonen",
                 "einsatzabschnitte",
             ],
+            Funktionsansicht::Betreuungsstelle => &["betreuung", "personen", "meldungen"],
             // Noch nicht verfügbar (LFH-1040): ohne Module erreicht das Gerät nichts.
-            Funktionsansicht::Betreuungsstelle
-            | Funktionsansicht::Bereitstellungsraum
+            Funktionsansicht::Bereitstellungsraum
             | Funktionsansicht::Einsatzabschnitt
             | Funktionsansicht::Verpflegung => &[],
         }
@@ -189,9 +190,9 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet => UHS_TABLET,
             Funktionsansicht::UhsLaptop => UHS_LAPTOP,
             Funktionsansicht::Lagemonitor => LAGEMONITOR,
+            Funktionsansicht::Betreuungsstelle => BETREUUNGSSTELLE,
             // Noch nicht verfügbar (LFH-1040): nur `ALLE_ANSICHTEN`.
-            Funktionsansicht::Betreuungsstelle
-            | Funktionsansicht::Bereitstellungsraum
+            Funktionsansicht::Bereitstellungsraum
             | Funktionsansicht::Einsatzabschnitt
             | Funktionsansicht::Verpflegung => &[],
         }
@@ -261,6 +262,35 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
 /// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
 /// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
 const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor")];
+/// Zusätzliche Einsatzrouten der Betreuungsstelle (LFH-1041): die eigene Stelle in der
+/// Betreuungsübersicht, ihre Belegung melden und zurücknehmen samt Meldeverlauf, Personen der
+/// eigenen Stelle mit Aufnahme, Stammdaten, Verbleib und Notizen, Meldungen anlegen und die
+/// eigenen lesen. Bezirke, Kopfzahl, Stammdaten und Status der Stelle, Sichtung, UHS-Belegung,
+/// Export, Druck, Abgleich und Anhänge fehlen bewusst; jeder Handler hier prüft die Stelle über
+/// [`stelle`].
+const BETREUUNGSSTELLE: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/betreuung"),
+    (
+        "GET",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
+    ),
+    ("GET", "/api/einsaetze/{id}/personen"),
+    ("POST", "/api/einsaetze/{id}/personen"),
+    ("GET", "/api/einsaetze/{id}/personen/{pid}"),
+    ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+];
 
 /// Ob eine Gerätesitzung mit dieser Ansicht die Route `(methode, pfad)` aufrufen darf. `pfad`
 /// ist die `MatchedPath` (Muster mit Platzhaltern). Ohne Treffer: verboten.
@@ -446,6 +476,47 @@ mod tests {
             }
             assert!(a.routen().is_empty(), "{a:?} hat Routen, ist aber gesperrt");
             assert!(a.lese_module().is_empty(), "{a:?} liest Module");
+        }
+    }
+
+    #[test]
+    fn betreuungsstelle_meldet_nur_ihre_belegung() {
+        let b = Funktionsansicht::Betreuungsstelle;
+        assert!(b.ist_verfuegbar());
+        assert!(b.rolle().darf_schreiben());
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/betreuung"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
+            ),
+            ("POST", "/api/einsaetze/{id}/personen"),
+            ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
+            ("POST", "/api/einsaetze/{id}/meldungen"),
+        ] {
+            assert!(darf_route(b, m, p), "Betreuungsstelle darf {m} {p}");
+        }
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/betreuung/belegung"),
+            ("POST", "/api/einsaetze/{id}/betreuung/stellen"),
+            ("PATCH", "/api/einsaetze/{id}/betreuung/stellen/{sid}"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/betreuung/stellen/{sid}/stornieren",
+            ),
+            ("POST", "/api/einsaetze/{id}/betreuung/bezirke"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/betreuung/bezirke/{bid}/staende",
+            ),
+            ("GET", "/api/einsaetze/{id}/betreuung/bezirke/{bid}/staende"),
+            ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
+            ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
+            ("GET", "/api/einsaetze/{id}/uhs"),
+            ("GET", "/api/einsaetze/{id}/personen/export"),
+            ("GET", "/api/einsaetze/{id}/etb"),
+        ] {
+            assert!(!darf_route(b, m, p), "Betreuungsstelle darf {m} {p} nicht");
         }
     }
 }
