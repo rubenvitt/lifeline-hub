@@ -6,16 +6,22 @@ import { IconPlus } from '../icons';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { taktischeDtgVoll } from '../anzeige/format';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { abrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeAnrufe } from '../api/infotelefon';
+import type { AbschlussCursor } from '../api/meldungen';
 import {
-  ladeMedienkontakte,
+  eingangCursor,
+  ladeErledigteMedienkontakte,
+  ladeMedienkontakt,
+  ladeMedienkontaktKennzahlen,
+  ladeOffeneMedienkontakte,
   ladePressemitteilungen,
+  MEDIENKONTAKTE_SEITE,
   legeMedienkontaktAn,
   legePressemitteilungAn,
   setzeMedienkontaktStatus,
@@ -65,9 +71,11 @@ import { medienkontaktStatus, pressemitteilungStatus } from '../theme/statusFarb
  *   verlangt. Jede Rücknahme nach „offen“ ist möglich, deshalb keine Rückfrage, sondern ein
  *   Rückgängig-Toast (LFH-343).
  * - **Pressemitteilungen:** Kettenköpfe wie beim Lagebericht; der Titel führt auf die Detailseite.
- * - **Medienlage:** unten, abgeleitet aus denselben Listen wie die Paneele darüber, ohne
- *   Personenbezug (`stab/medienlage.ts`, D7). Sie wächst live, deshalb steht sie unter der
- *   Arbeitsliste und nicht darüber.
+ * - **Medienlage:** unten, aus den Kennzahlen des Presse-Logs und denselben Listen wie die
+ *   Paneele darüber, ohne Personenbezug (`stab/medienlage.ts`, D7). Sie wächst live, deshalb
+ *   steht sie unter der Arbeitsliste und nicht darüber.
+ * - **Blättern (LFH-1075):** offene Kontakte vollständig, erledigte seitenweise mit „Ältere
+ *   laden“; Kopfzeile und Medienlage zählen über den ganzen Bestand (Kennzahlen).
  */
 
 type Sicht = 'alle' | 'offen';
@@ -164,9 +172,22 @@ export default function PressePage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const kontakteQuery = useQuery({
-    queryKey: einsatzKeys.medienkontakte(einsatzId),
-    queryFn: () => ladeMedienkontakte(einsatzId),
+  const offeneQuery = useQuery({
+    queryKey: einsatzKeys.medienkontakteOffen(einsatzId),
+    queryFn: () => ladeOffeneMedienkontakte(einsatzId),
+    enabled: frei,
+  });
+  const erledigteQuery = useInfiniteQuery({
+    queryKey: einsatzKeys.medienkontakteErledigt(einsatzId),
+    queryFn: ({ pageParam }) => ladeErledigteMedienkontakte(einsatzId, pageParam),
+    initialPageParam: undefined as AbschlussCursor | undefined,
+    getNextPageParam: (letzte) =>
+      letzte.length < MEDIENKONTAKTE_SEITE ? undefined : eingangCursor(letzte[letzte.length - 1]),
+    enabled: frei,
+  });
+  const kennzahlenQuery = useQuery({
+    queryKey: einsatzKeys.medienkontaktKennzahlen(einsatzId),
+    queryFn: () => ladeMedienkontaktKennzahlen(einsatzId),
     enabled: frei,
   });
   const mitteilungenQuery = useQuery({
@@ -181,14 +202,40 @@ export default function PressePage() {
     enabled: frei,
   });
 
-  useQueryParamSelektion('kontakt', kontakteQuery.isSuccess, (kid) => {
-    if (!(kontakteQuery.data ?? []).some((k) => k.id === kid)) return;
+  const offene = offeneQuery.data;
+  const erledigte = useMemo(() => {
+    const gesehen = new Set<number>();
+    return (erledigteQuery.data?.pages ?? []).flat().filter((k) => {
+      if (gesehen.has(k.id)) return false;
+      gesehen.add(k.id);
+      return true;
+    });
+  }, [erledigteQuery.data]);
+
+  // Deeplink ?kontakt=<id>: steht der Kontakt in keiner geladenen Liste (ein älterer erledigter),
+  // holt die Seite ihn einzeln und hängt ihn hinten an, bis er in einer geladenen Seite auftaucht.
+  const [verlinkteId, setVerlinkteId] = useState<number | null>(null);
+  useQueryParamSelektion('kontakt', offeneQuery.isSuccess && erledigteQuery.isSuccess, (kid) => {
     setSicht('alle');
     setHervorgehoben(kid);
+    const geladen = [...(offene ?? []), ...erledigte].some((k) => k.id === kid);
+    setVerlinkteId(geladen ? null : kid);
   });
+  const verlinkteQuery = useQuery({
+    queryKey: einsatzKeys.medienkontaktEinzeln(einsatzId, verlinkteId ?? 0),
+    queryFn: () => ladeMedienkontakt(einsatzId, verlinkteId ?? 0),
+    enabled: frei && verlinkteId != null,
+  });
+  const verlinkte =
+    verlinkteId != null && verlinkteQuery.data?.id === verlinkteId ? verlinkteQuery.data : null;
+  const kontakte = useMemo(() => {
+    const alle = [...(offene ?? []), ...erledigte];
+    return verlinkte && !alle.some((k) => k.id === verlinkte.id) ? [...alle, verlinkte] : alle;
+  }, [offene, erledigte, verlinkte]);
+  const hervorgehobenGeladen = kontakte.some((k) => k.id === hervorgehoben);
   useEffect(() => {
-    if (hervorgehoben != null) scrolleZurZeile(hervorgehoben);
-  }, [hervorgehoben]);
+    if (hervorgehoben != null && hervorgehobenGeladen) scrolleZurZeile(hervorgehoben);
+  }, [hervorgehoben, hervorgehobenGeladen]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.presse(einsatzId) });
 
@@ -247,15 +294,17 @@ export default function PressePage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  const kontakte = kontakteQuery.data ?? [];
-  const sichtbar = sicht === 'offen' ? kontakte.filter((k) => k.status === 'offen') : kontakte;
-  const offeneAnfragen = kontakte.filter((k) => k.art === 'anfrage' && k.status === 'offen').length;
+  const sichtbar = sicht === 'offen' ? (offene ?? []) : kontakte;
+  // Die offenen sind vollständig geladen: die Zahl stimmt ohne Kennzahlen.
+  const offeneAnfragen = (offene ?? []).filter((k) => k.art === 'anfrage').length;
+  const kennzahlen = kennzahlenQuery.data;
+  const listeGescheitert = offeneQuery.isError || (erledigteQuery.isError && !erledigteQuery.data);
   const mitteilungen = mitteilungenQuery.data ?? [];
   const ketten = kettenKoepfe(mitteilungen);
   const freigegeben = mitteilungen.filter((m) => m.status === 'freigegeben');
 
   const medienlage = baueMedienlage({
-    kontakte: { zustand: abrufZustand(kontakteQuery), daten: kontakte },
+    kontakte: { zustand: abrufZustand(kennzahlenQuery), daten: kennzahlen ?? null },
     mitteilungen: { zustand: abrufZustand(mitteilungenQuery), daten: mitteilungen },
     anrufe: { zustand: abrufZustand(anrufeQuery), daten: anrufeQuery.data ?? [] },
   });
@@ -279,8 +328,8 @@ export default function PressePage() {
   return (
     <EinsatzSeite
       titel="Pressearbeit"
-      meta={`${kontakte.length} Medienkontakte · ${mitteilungen.length} Pressemitteilungen`}
-      dataUpdatedAt={kontakteQuery.dataUpdatedAt}
+      meta={`${kennzahlen?.gesamt ?? '—'} Medienkontakte · ${mitteilungen.length} Pressemitteilungen`}
+      dataUpdatedAt={offeneQuery.dataUpdatedAt}
       beschreibung="Sachgebiet S5 · Presse-/Medienlage, Presseinformationen, Pressetermine (FwDV 100 Anl. 2)"
       breadcrumb={
         <Breadcrumb
@@ -327,9 +376,7 @@ export default function PressePage() {
             <Kennzahl
               titel="offene Anfragen"
               wert={offeneAnfragen}
-              zustand={
-                kontakteQuery.isPending ? 'laden' : kontakteQuery.isError ? 'fehler' : 'daten'
-              }
+              zustand={offeneQuery.isPending ? 'laden' : offeneQuery.isError ? 'fehler' : 'daten'}
               ton={offeneAnfragen > 0 ? 'achtung' : 'neutral'}
               groesse="klein"
             />
@@ -342,11 +389,14 @@ export default function PressePage() {
                 { wert: 'offen', label: 'offen' },
               ]}
             />
-            {kontakteQuery.isError ? (
+            {listeGescheitert ? (
               <SeitenFehler
                 text="Presse-Log konnte nicht geladen werden"
-                ursache={kontakteQuery.error}
-                onWiederholen={() => void kontakteQuery.refetch()}
+                ursache={offeneQuery.error ?? erledigteQuery.error}
+                onWiederholen={() => {
+                  void offeneQuery.refetch();
+                  void erledigteQuery.refetch();
+                }}
               />
             ) : (
               <Datensicht
@@ -355,7 +405,7 @@ export default function PressePage() {
                 spalten={spalten}
                 daten={sichtbar}
                 zeilenSchluessel={(k) => k.id}
-                ladend={kontakteQuery.isLoading}
+                ladend={offeneQuery.isLoading || (sicht === 'alle' && erledigteQuery.isLoading)}
                 leerText={
                   sicht === 'offen' ? 'Keine offenen Medienkontakte' : 'Noch keine Medienkontakte'
                 }
@@ -391,6 +441,24 @@ export default function PressePage() {
                 }}
               />
             )}
+            {sicht === 'alle' &&
+              !listeGescheitert &&
+              erledigteQuery.hasNextPage &&
+              (kennzahlen == null || erledigte.length < kennzahlen.gesamt - kennzahlen.offen) && (
+                <Flex vertical align="center" gap={token.marginXS}>
+                  <Button
+                    onClick={() => void erledigteQuery.fetchNextPage()}
+                    loading={erledigteQuery.isFetchingNextPage}
+                  >
+                    Ältere laden
+                  </Button>
+                  {kennzahlen && (
+                    <span style={{ color: token.colorTextSecondary }}>
+                      {(offene?.length ?? 0) + erledigte.length} von {kennzahlen.gesamt} geladen
+                    </span>
+                  )}
+                </Flex>
+              )}
             {statusMutation.error != null && <SpeicherFehler fehler={statusMutation.error} />}
           </Flex>
         </Paneel>

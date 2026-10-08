@@ -20,7 +20,11 @@ const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/stab`;
 
 // ── Presse-Log ──────────────────────────────────────────────────────────────────────────────
 
-/** Offene zuerst, dann jüngster Eingang zuerst (Ordnung vom Server, {@link vergleicheMedienkontakte}). */
+/**
+ * Vollliste: offene zuerst, dann jüngster Eingang zuerst (Ordnung vom Server,
+ * {@link vergleicheMedienkontakte}). Die Presseseite liest seit LFH-1075 die Phasen und die
+ * Kennzahlen; der Weg ohne Phase bleibt für Abrufer, die den ganzen Bestand brauchen.
+ */
 export function ladeMedienkontakte(einsatzId: number): Promise<Medienkontakt[]> {
   return apiGet<Medienkontakt[]>(`${basis(einsatzId)}/medienkontakte`);
 }

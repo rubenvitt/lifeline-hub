@@ -1,5 +1,5 @@
 import { ladeAnrufe } from '../api/infotelefon';
-import { ladeMedienkontakte, ladePressemitteilungen } from '../api/presse';
+import { ladeMedienkontaktKennzahlen, ladePressemitteilungen } from '../api/presse';
 import { einsatzKeys } from '../api/queryKeys';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { ladeListe, type UebernahmeQuelle } from '../lageberichte/uebernahmeQuelle';
@@ -7,8 +7,9 @@ import { baueMedienlage, rendereMedienlageMarkdown } from './medienlage';
 
 /**
  * „Aus S5 übernehmen“ im Abschnitt „Medienlage“ (LFH-554, Spec `stab-medienlage`, D7; seit
- * LFH-870 eine Quelle des Übernahme-Bausteins). Frei nur mit Freigabe des Stabs; die drei Listen
- * kommen über dieselben Keys wie die Presseseite. Scheitert eine, trägt der Text „—“ mit Grund.
+ * LFH-870 eine Quelle des Übernahme-Bausteins). Frei nur mit Freigabe des Stabs; die Quellen
+ * kommen über dieselben Keys wie die Presseseite, die Medienkontakte als Kennzahlen über den
+ * ganzen Bestand (LFH-1075). Scheitert eine, trägt der Text „—“ mit Grund.
  */
 export const MEDIENLAGE_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus S5 übernehmen',
@@ -22,7 +23,12 @@ export const MEDIENLAGE_QUELLE: UebernahmeQuelle = {
       : { frei: false, grund: 'Modul Stab ist in diesem Einsatz nicht freigegeben' },
   erzeuge: async ({ qc, einsatzId, dtg }) => {
     const [kontakte, mitteilungen, anrufe] = await Promise.all([
-      ladeListe(qc, einsatzKeys.medienkontakte(einsatzId), () => ladeMedienkontakte(einsatzId), []),
+      ladeListe(
+        qc,
+        einsatzKeys.medienkontaktKennzahlen(einsatzId),
+        () => ladeMedienkontaktKennzahlen(einsatzId),
+        null,
+      ),
       ladeListe(
         qc,
         einsatzKeys.pressemitteilungen(einsatzId),
