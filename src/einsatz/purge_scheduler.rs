@@ -11,7 +11,8 @@
 //! - **Phase A2** (IRREVERSIBEL, LFH-751): fällige Schwärzungsanträge (Löschersuchen nach
 //!   Art. 17) werden vollzogen (`aufbewahrung::antrag::vollziehe_faellige`).
 //! - **Phasen K1/K2** (LFH-749): dasselbe je Datenkategorie — Vormerkung nach Ablauf der
-//!   Kategorie-Frist, Schwärzung nur ihrer Daten nach der Karenz. Der Einsatz bleibt lesbar.
+//!   Kategorie-Frist (`vorgemerkt_at` = Karenz-Start wie in Phase A, LFH-1049), Schwärzung nur
+//!   ihrer Daten nach der Karenz. Der Einsatz bleibt lesbar.
 //! - **Phase B** (IRREVERSIBEL): nach Ablauf der Karenz (`KARENZ_TAGE`) werden die
 //!   Personendaten gescrubbt (`repo::schwaerze_einsatz`), das operative Skelett
 //!   (Einsatz, ETB, Zähler) bleibt erhalten. `geschwaerzt_at`-Tombstone = Idempotenz.
@@ -112,7 +113,8 @@ pub async fn tick_mit_rueckschrieb(
     anzahl += vollzogen;
     geschwaerzt += vollzogen;
 
-    // --- Phase K1: Vormerkung fälliger Datenkategorien (LFH-749, reversibel) ---
+    // --- Phase K1: Vormerkung fälliger Datenkategorien (LFH-749, reversibel, Karenz-Start ab
+    // Fristablauf wie Phase A, LFH-1049) ---
     // Auch an einem gesperrten Einsatz: eine Kategorie bleibt nicht liegen, nur weil der Einsatz
     // vorgemerkt wurde (Spec `aufbewahrung-kategorien`, „Zusammenspiel mit der Einsatz-Frist“).
     match kategorie::faellige_vormerkung(pool, &jetzt_s).await {
@@ -2001,6 +2003,187 @@ mod tests {
         );
     }
 
+    // ---------- LFH-1049: Kategorie-Karenz ab Fristablauf ----------
+
+    /// Setzt den Zeitpunkt, zu dem die Kategorie-Frist gesetzt wurde (sonst NULL = unbekannt).
+    async fn kategorie_frist_gesetzt_am(pool: &SqlitePool, e: i64, k: &str, gesetzt_at: &str) {
+        sqlx::query(
+            "UPDATE einsatz_aufbewahrung_kategorie SET frist_gesetzt_at = ? \
+             WHERE einsatz_id = ? AND kategorie = ?",
+        )
+        .bind(gesetzt_at)
+        .bind(e)
+        .bind(k)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn kategorie_vormerkungs_audit(pool: &SqlitePool, e: i64) -> String {
+        sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' \
+             AND inhalt LIKE '%zur Löschung vorgemerkt%' AND inhalt LIKE '%Datenkategorie%'",
+        )
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Spec `aufbewahrung-kategorien`, „Erster Lauf lange nach dem Fristablauf“: die Frist der
+    /// Kategorie lief am 01.06. ab, der erste Lauf kommt zehn Tage später. Die Karenz rechnet ab
+    /// dem 01.06., und das ETB nennt diesen Beginn.
+    #[tokio::test]
+    async fn kategorie_erster_lauf_lange_nach_fristablauf_rechnet_karenz_ab_fristablauf() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        person_mit_adresse(&pool, e).await;
+        kategorie_mit_frist(&pool, e, "personenauskunft", "2026-06-01 00:00:00").await;
+        kategorie_frist_gesetzt_am(&pool, e, "personenauskunft", "2026-01-01 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-11 12:00:00")).await,
+            1
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft").await,
+            (Some("2026-06-01 00:00:00".into()), None)
+        );
+        let audit = kategorie_vormerkungs_audit(&pool, e).await;
+        assert!(audit.contains("seit 2026-06-01 00:00:00"), "{audit}");
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 23:59:59")).await,
+            0,
+            "Karenz läuft bis 30 Tage nach dem Fristablauf"
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-01 00:00:00")).await,
+            1
+        );
+        assert_eq!(adresse_und_name(&pool, e).await.0, None);
+    }
+
+    /// Fällt der Lauf genau auf den Fristablauf, nennt das ETB keinen früheren Beginn.
+    #[tokio::test]
+    async fn kategorie_lauf_zur_fristablauf_minute_nennt_keinen_frueheren_beginn() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        kategorie_mit_frist(&pool, e, "anhaenge", "2026-06-01 00:00:00").await;
+        kategorie_frist_gesetzt_am(&pool, e, "anhaenge", "2026-01-01 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 00:00:00")).await,
+            1
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "anhaenge")
+                .await
+                .0
+                .as_deref(),
+            Some("2026-06-01 00:00:00")
+        );
+        let audit = kategorie_vormerkungs_audit(&pool, e).await;
+        assert!(!audit.contains("seit"), "{audit}");
+    }
+
+    /// Spec `aufbewahrung-kategorien`, „Frist in die Vergangenheit gesetzt“ (Akzeptanzkriterium
+    /// LFH-1049): die Einsatzleitung setzt die Frist am 01.06. bestätigt auf den 02.04. Die
+    /// Karenz beginnt mit dem Setzen und hält volle 30 Tage.
+    #[tokio::test]
+    async fn kategorie_frist_in_die_vergangenheit_behaelt_volle_karenz_ab_dem_setzen() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        kategorie_mit_frist(&pool, e, "personenauskunft", "2026-09-01 00:00:00").await;
+        let leit: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        kategorie::frist_setzen(
+            &pool,
+            e,
+            leit,
+            kategorie::FristAenderung {
+                kategorie: super::super::retention::Datenkategorie::Personenauskunft,
+                neue_frist: Some("2026-04-02 12:00:00"),
+                rechtsgrundlage: None,
+                bestaetigt: true,
+            },
+            t("2026-06-01 12:00:00"),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 12:10:00")).await,
+            1
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft").await,
+            (Some("2026-06-01 12:00:00".into()), None)
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-01 11:59:59")).await,
+            0
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-01 12:00:00")).await,
+            1
+        );
+    }
+
+    /// Lief die Frist ab, während der Einsatz wieder aktiv war, beginnt die Karenz mit dem
+    /// erneuten Abschluss (design.md D1), nicht mit dem Fristablauf.
+    #[tokio::test]
+    async fn kategorie_frist_vor_dem_abschluss_beginnt_karenz_beim_abschluss() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET abgeschlossen_at = '2026-07-20 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        kategorie_mit_frist(&pool, e, "behandlung", "2026-06-01 00:00:00").await;
+        kategorie_frist_gesetzt_am(&pool, e, "behandlung", "2026-01-01 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-20 00:10:00")).await,
+            1
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "behandlung").await,
+            (Some("2026-07-20 00:00:00".into()), None)
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-08-18 23:59:59")).await,
+            0
+        );
+    }
+
+    /// Liegt der Karenz-Beginn 30 Tage oder mehr zurück, merkt derselbe Lauf vor und schwärzt.
+    #[tokio::test]
+    async fn kategorie_vormerkung_mit_abgelaufener_karenz_schwaerzt_im_selben_lauf() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        person_mit_adresse(&pool, e).await;
+        kategorie_mit_frist(&pool, e, "personenauskunft", "2026-05-01 00:00:00").await;
+        kategorie_frist_gesetzt_am(&pool, e, "personenauskunft", "2026-01-01 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-10 00:00:00")).await,
+            2,
+            "Vormerkung und Schwärzung"
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft").await,
+            (
+                Some("2026-05-01 00:00:00".into()),
+                Some("2026-06-10 00:00:00".into())
+            )
+        );
+        assert_eq!(adresse_und_name(&pool, e).await.0, None);
+    }
+
     /// Spec „Einsatz-Frist kürzer als Kategorie-Frist“: die Einsatz-Schwärzung nimmt die
     /// Kategorie mit und setzt ihren Tombstone.
     #[tokio::test]
@@ -3074,6 +3257,133 @@ mod tests {
             Some("2026-01-31 00:00:00")
         );
         assert_eq!(tombstones(&pool, zweiter).await, (None, None));
+    }
+
+    /// Spec `aufbewahrung-kategorien`, „Restore von vor der Kategorie-Vormerkung“
+    /// (Akzeptanzkriterium LFH-1049): die Sicherung stammt aus der Zeit vor der Vormerkung der
+    /// Kategorie. Im ursprünglichen Verlauf ist sie am 31.01. geschwärzt; nach dem Restore am
+    /// 01.03. schwärzt der nächste Lauf sie sofort, statt die Karenz neu zu beginnen.
+    #[tokio::test]
+    async fn restore_von_vor_der_kategorie_vormerkung_rechnet_karenz_ab_fristablauf() {
+        let (dir, pfad, pool) = produktions_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        person_mit_adresse(&pool, e).await;
+        kategorie_mit_frist(&pool, e, "personenauskunft", "2026-01-01 00:00:00").await;
+        kategorie_frist_gesetzt_am(&pool, e, "personenauskunft", "2025-12-01 00:00:00").await;
+        let sicherung = dir.path().join("vor_der_kategorie_vormerkung.sqlite");
+        crate::backup::erzeuge_sicherung(&pool, &sicherung)
+            .await
+            .unwrap();
+
+        // Ursprünglicher Verlauf: Vormerkung zum Fristablauf, Schwärzung 30 Tage danach.
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-01 00:10:00")).await,
+            1
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-31 00:10:00")).await,
+            1
+        );
+        assert_eq!(adresse_und_name(&pool, e).await.0, None);
+        pool.close().await;
+
+        crate::backup::restore::restore_aus_datei(&sicherung, &pfad, true)
+            .await
+            .unwrap();
+        let pool = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft").await,
+            (None, None),
+            "Vorbedingung: die Sicherung trägt die Kategorie weder vorgemerkt noch geschwärzt"
+        );
+        assert_eq!(
+            adresse_und_name(&pool, e).await.0.as_deref(),
+            Some("Hauptstr. 5")
+        );
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            2,
+            "Vormerkung und Schwärzung im selben Lauf"
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft").await,
+            (
+                Some("2026-01-01 00:00:00".into()),
+                Some("2026-03-01 12:00:00".into())
+            ),
+            "Karenz ab dem Fristablauf, nicht ab dem Restore"
+        );
+        assert_eq!(adresse_und_name(&pool, e).await.0, None);
+    }
+
+    /// Spec `aufbewahrung-kategorien`, Restore zehn Tage nach dem Fristablauf der Kategorie
+    /// (Stand ohne das Rückspielen selbst, das belegt der Test daneben): beide Kategorien sind
+    /// mit dem Fristablauf vorgemerkt. Eine künftige Frist stellt die eine in der Restkarenz
+    /// wieder her; die andere ist 20 Tage später geschwärzt.
+    #[tokio::test]
+    async fn restore_von_vor_der_kategorie_vormerkung_laesst_nur_die_restkarenz() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        for k in ["personenauskunft", "anhaenge"] {
+            kategorie_mit_frist(&pool, e, k, "2026-01-01 00:00:00").await;
+            kategorie_frist_gesetzt_am(&pool, e, k, "2025-12-01 00:00:00").await;
+        }
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-11 00:00:00")).await,
+            2
+        );
+        for k in ["personenauskunft", "anhaenge"] {
+            assert_eq!(
+                kategorie_tombstones(&pool, e, k).await,
+                (Some("2026-01-01 00:00:00".into()), None)
+            );
+        }
+
+        let leit: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        kategorie::frist_setzen(
+            &pool,
+            e,
+            leit,
+            kategorie::FristAenderung {
+                kategorie: super::super::retention::Datenkategorie::Personenauskunft,
+                neue_frist: Some("2027-01-01 00:00:00"),
+                rechtsgrundlage: None,
+                bestaetigt: false,
+            },
+            t("2026-01-11 00:10:00"),
+        )
+        .await
+        .expect("Wiederherstellen in der Restkarenz");
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft").await,
+            (None, None)
+        );
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-30 23:59:59")).await,
+            0
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-31 00:00:00")).await,
+            1
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "anhaenge")
+                .await
+                .1
+                .as_deref(),
+            Some("2026-01-31 00:00:00")
+        );
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft").await,
+            (None, None)
+        );
     }
 
     // ---------- LFH-750: endgültige Löschung des Skeletts (Phase D) ----------

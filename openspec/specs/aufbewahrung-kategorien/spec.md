@@ -136,14 +136,38 @@ schreiben. Bei aktivem oder geschwärztem Einsatz MUST 409 folgen, bei vorgemerk
 ### Requirement: Kategorie-Vormerkung und Wiederherstellen
 
 Das System SHALL eine Kategorie eines abgeschlossenen Einsatzes vormerken, sobald ihre Frist
-abgelaufen ist, idempotent und mit System-Eintrag im ETB. Ein aktiver Einsatz MUST nie
-betroffen sein. Während der 30-tägigen Karenz MUST eine neue, künftige Frist die Vormerkung
-aufheben. Nach der Karenz oder nach der Schwärzung der Kategorie MUST eine Friständerung 409
-liefern. Die Daten der Kategorie MUST während der Karenz lesbar bleiben.
+abgelaufen ist, idempotent und mit System-Eintrag im ETB. Als Zeitpunkt der Vormerkung MUST
+nicht der Purge-Lauf gelten, der sie setzt, sondern der späteste dieser Zeitpunkte, höchstens
+der Lauf selbst: der Ablauf der Frist der Kategorie, das Setzen dieser Frist (bei einer Frist in
+die Vergangenheit) und der Abschluss des Einsatzes. Ist nicht bekannt, wann die Frist gesetzt
+wurde, MUST der Purge-Lauf selbst gelten. Die Vormerkung beginnt die Karenz der Kategorie; liegt
+ihr Zeitpunkt 30 Tage oder mehr zurück, MUST derselbe Purge-Lauf die Kategorie schwärzen. Ein
+aktiver Einsatz MUST nie betroffen sein. Während der 30-tägigen Karenz MUST eine neue, künftige
+Frist die Vormerkung aufheben. Nach der Karenz oder nach der Schwärzung der Kategorie MUST eine
+Friständerung 409 liefern. Die Daten der Kategorie MUST während der Karenz lesbar bleiben.
 
 #### Scenario: Fällig
 - **WHEN** der Purge-Lauf nach Ablauf der Frist von `personenauskunft` läuft
 - **THEN** ist die Kategorie vorgemerkt, das ETB nennt die Vormerkung, und der Einsatz bleibt lesbar
+
+#### Scenario: Erster Lauf lange nach dem Fristablauf
+- **WHEN** die Frist einer Kategorie beim Abschluss gesetzt wurde und der erste Purge-Lauf zehn Tage nach ihrem Ablauf läuft, etwa nach einem Stillstand des Servers
+- **THEN** ist die Kategorie mit dem Ablauf ihrer Frist als Zeitpunkt vorgemerkt
+- **AND** nennt der ETB-Eintrag zur Vormerkung diesen Zeitpunkt als Beginn der Karenz
+
+#### Scenario: Frist in die Vergangenheit gesetzt
+- **WHEN** die Einsatzleitung die Frist einer Kategorie bestätigt auf einen Zeitpunkt vor 60 Tagen setzt und danach der Purge-Lauf läuft
+- **THEN** ist die Kategorie mit dem Zeitpunkt des Setzens vorgemerkt
+- **AND** ist sie erst 30 Tage danach geschwärzt
+
+#### Scenario: Restore von vor der Kategorie-Vormerkung
+- **WHEN** eine Sicherung zurückgespielt wird, in der eine Kategorie noch nicht vorgemerkt ist und ihre Frist seit mehr als 30 Tagen abgelaufen ist
+- **THEN** ist die Kategorie nach dem nächsten Purge-Lauf geschwärzt
+
+#### Scenario: Restore von vor der Kategorie-Vormerkung, Karenz läuft noch
+- **WHEN** eine Sicherung zurückgespielt wird, in der eine Kategorie noch nicht vorgemerkt ist und ihre Frist seit 10 Tagen abgelaufen ist
+- **THEN** ist die Kategorie nach dem nächsten Purge-Lauf mit dem Ablauf ihrer Frist als Zeitpunkt vorgemerkt
+- **AND** ist sie 20 Tage danach geschwärzt, sofern bis dahin niemand eine künftige Frist setzt
 
 #### Scenario: Wiederherstellen in der Karenz
 - **WHEN** die Einsatzleitung 5 Tage nach der Vormerkung eine Frist in 60 Tagen setzt
