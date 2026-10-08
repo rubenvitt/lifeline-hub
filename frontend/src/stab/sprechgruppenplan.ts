@@ -8,8 +8,10 @@ import type {
 import {
   einheitDetailPfad,
   einsatzabschnittePfad,
+  einsatzdatenPfad,
   kommunikationsplanPfad,
 } from '../routing/deeplinks';
+import { FUEHRUNGSSTELLE_STELLE } from './fuehrungsstelle';
 import { ZUSTAND_GRUND, type FunkplanQuellen } from './funkplan';
 import { STELLENART_LABEL } from './kommunikationsplan';
 import type { Quelle, SkizzenQuelle } from './luecken';
@@ -21,13 +23,15 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
  * Stellen, die auf ihr arbeiten — die dritte Darstellung „Sprechgruppen“ neben Tabelle und Skizze.
  * Reine Ableitung aus denselben `FunkplanQuellen`, keine neuen Daten.
  *
- * - **Menge:** jede an einem Abschnitt oder einer Einheit zugeordnete Sprechgruppe plus jede
- *   einsatzlokale, nach `id` entdoppelt (ein lokaler und ein Katalog-Eintrag können dieselbe
- *   Bezeichnung tragen, wie in `verbindungsurteil`). Ein Katalog-Eintrag ohne Zuordnung ist keine
- *   Sprechgruppe DIESES Einsatzes und fehlt.
+ * - **Menge:** jede an der eigenen Führungsstelle, einem Abschnitt oder einer Einheit zugeordnete
+ *   Sprechgruppe plus jede einsatzlokale, nach `id` entdoppelt (ein lokaler und ein
+ *   Katalog-Eintrag können dieselbe Bezeichnung tragen, wie in `verbindungsurteil`). Ein
+ *   Katalog-Eintrag ohne Zuordnung ist keine Sprechgruppe DIESES Einsatzes und fehlt.
  * - **Ordnung:** TMO vor DMO, sonst wie die Quelle (`stab/sprechgruppenOrdnung.ts`).
- * - **Teilnehmer:** Abschnitte (Name, Kurzbezeichnung), dann Einheiten (Name, Funkrufname), je in
- *   der Reihenfolge ihrer Liste, mit Ziel wie im Funkplan. Fehlt eine Strukturquelle, ist „keine
+ * - **Teilnehmer:** zuerst die eigene Führungsstelle (Rufname, Ziel Einsatzdaten wie Tabelle und
+ *   Skizze, LFH-1018), dann Abschnitte (Name, Kurzbezeichnung), dann Einheiten (Name,
+ *   Funkrufname), je in der Reihenfolge ihrer Liste, mit Ziel wie im Funkplan. Auch die
+ *   Führungsstelle ist Strukturquelle. Fehlt eine Strukturquelle, ist „keine
  *   Teilnehmer“ nicht belegbar: die Zelle trägt dann den Grund, bei schon bekannten Teilnehmern
  *   die bekannten plus „unvollständig“.
  * - **Netz (LFH-893):** reicht der Aufrufer Stellen und Skizzendaten mit, tragen auch externe
@@ -36,7 +40,8 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
  *   Führungsfunktion ist nie Teilnehmer (wie `kanalbelegung` in `stab/luecken.ts`).
  *
  * Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D8),
- * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`.
+ * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`; Spec
+ * `stab-funkplan`, Anforderung „Darstellung „Sprechgruppen““.
  */
 
 export type Herkunft = 'katalog' | 'einsatzlokal';
@@ -47,13 +52,13 @@ export const HERKUNFT_LABEL: Record<Herkunft, string> = {
 };
 
 export interface SprechgruppenTeilnehmer {
-  art: 'abschnitt' | 'einheit' | 'extern' | 'komponente';
-  /** `ab-<id>`, `eh-<id>`, `ks-<id>` bzw. `ko-<id>`, wie im Funkplan und in der Skizze. */
+  art: 'fuehrungsstelle' | 'abschnitt' | 'einheit' | 'extern' | 'komponente';
+  /** `fs`, `ab-<id>`, `eh-<id>`, `ks-<id>` bzw. `ko-<id>`, wie im Funkplan und in der Skizze. */
   key: string;
-  /** Datenbank-ID — nur für Deeplinks, nie für die Anzeige. */
-  id: number;
+  /** Datenbank-ID — nur für Deeplinks, nie für die Anzeige; die Führungsstelle hat keine. */
+  id: number | null;
   name: string;
-  /** Abschnitt: Kurzbezeichnung · Einheit: Funkrufname. Nie geraten. */
+  /** Führungsstelle: Rufname · Abschnitt: Kurzbezeichnung · Einheit: Funkrufname. Nie geraten. */
   rufname: string | null;
   /** Pflegeort der Stelle; eine Komponente hat keinen außerhalb der Skizze. */
   ziel: string | null;
@@ -67,7 +72,7 @@ export interface NetzTeilnehmerQuellen {
   skizze: SkizzenQuelle;
 }
 
-type Strukturquelle = 'abschnitte' | 'einheiten' | 'stellen' | 'skizze';
+type Strukturquelle = 'fuehrungsstelle' | 'abschnitte' | 'einheiten' | 'stellen' | 'skizze';
 
 export interface FehlendeStruktur {
   quelle: Strukturquelle;
@@ -98,6 +103,7 @@ export interface SprechgruppenZeile {
 }
 
 const STRUKTUR_NAME: Record<Strukturquelle, string> = {
+  fuehrungsstelle: FUEHRUNGSSTELLE_STELLE,
   abschnitte: 'Abschnitte',
   einheiten: 'Einheiten',
   stellen: 'Externe Stellen',
@@ -114,6 +120,7 @@ export function baueSprechgruppenplan(
   const abschnitte = q.abschnitte.zustand === 'daten' ? q.abschnitte.daten : [];
   const einheiten = q.einheiten.zustand === 'daten' ? q.einheiten.daten : [];
   const zustandJe: Partial<Record<Strukturquelle, AbrufZustand>> = {
+    fuehrungsstelle: q.fuehrungsstelle.zustand,
     abschnitte: q.abschnitte.zustand,
     einheiten: q.einheiten.zustand,
     ...(netz ? { stellen: netz.stellen.zustand, skizze: netz.skizze.zustand } : {}),
@@ -134,6 +141,19 @@ export function baueSprechgruppenplan(
     else teilnehmer.set(s.id, [t]);
   };
 
+  if (q.fuehrungsstelle.zustand === 'daten' && q.fuehrungsstelle.daten) {
+    const fs = q.fuehrungsstelle.daten;
+    // Wer Sprechgruppen hat, ist erfasst (`fuehrungsstelleErfasst`): keine eigene Prüfung.
+    const t: SprechgruppenTeilnehmer = {
+      art: 'fuehrungsstelle',
+      key: 'fs',
+      id: null,
+      name: FUEHRUNGSSTELLE_STELLE,
+      rufname: fs.rufname?.trim() || null,
+      ziel: einsatzdatenPfad(einsatzId),
+    };
+    for (const s of fs.sprechgruppen) trage(s, t);
+  }
   for (const a of abschnitte) {
     const t: SprechgruppenTeilnehmer = {
       art: 'abschnitt',
@@ -221,10 +241,11 @@ const LEER_QUELLEN = [
   { quelle: 'abschnitte', name: 'Abschnitte' },
   { quelle: 'einheiten', name: 'Einheiten' },
   { quelle: 'sprechgruppen', name: 'Sprechgruppen' },
+  { quelle: 'fuehrungsstelle', name: FUEHRUNGSSTELLE_STELLE },
 ] as const;
 
 /**
- * Leertext der Darstellung: „keine Sprechgruppe“ nur, wenn alle drei Quellen der Menge geladen
+ * Leertext der Darstellung: „keine Sprechgruppe“ nur, wenn alle vier Quellen der Menge geladen
  * sind. Sonst der Grund, gruppiert wie beim Leertext der Tabelle.
  */
 export function sprechgruppenplanLeerText(q: FunkplanQuellen): string {
