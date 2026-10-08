@@ -1,5 +1,6 @@
-import { apiGet, apiSend, apiUpload } from './client';
+import { apiGet, apiSend, apiUploadMitFortschritt, type UploadFortschritt } from './client';
 import type { components } from './types.generated';
+import { UPLOAD_TIMEOUT_MS } from './upload';
 
 // `Hintergrundbild` ist ein Re-Export des generierten Schemas; `BildPatch` bleibt als Eingabe-DTO
 // handgepflegt. `Ecke`/`Ecken` sind FE-lokale Tupel für den `ecken`-Multipart-Teil.
@@ -26,12 +27,14 @@ export function listeHintergrundbilder(einsatzId: number): Promise<Hintergrundbi
   return apiGet<Hintergrundbild[]>(basis(einsatzId));
 }
 
+/** Lädt hoch und meldet den Stand der Übertragung (bis 25 MiB, `MAX_GROESSE` des Servers). */
 export function ladeHintergrundbildHoch(
   einsatzId: number,
   datei: File,
   ecken: Ecken,
   name?: string,
   ansichtId?: number | null,
+  onFortschritt?: (stand: UploadFortschritt) => void,
 ): Promise<Hintergrundbild> {
   const fd = new FormData();
   fd.append('datei', datei);
@@ -39,7 +42,10 @@ export function ladeHintergrundbildHoch(
   if (name !== undefined) fd.append('name', name);
   // Ansichts-Zugehörigkeit (LFH-320) als Multipart-Feld — es gibt keinen JSON-Body.
   if (ansichtId != null) fd.append('ansicht_id', String(ansichtId));
-  return apiUpload<Hintergrundbild>(basis(einsatzId), fd);
+  return apiUploadMitFortschritt<Hintergrundbild>(basis(einsatzId), fd, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+    onFortschritt,
+  });
 }
 
 export function aktualisiereHintergrundbild(

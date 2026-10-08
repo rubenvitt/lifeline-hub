@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   listeHintergrundbilder,
   aktualisiereHintergrundbild,
@@ -10,8 +10,10 @@ import {
 } from '../../api/kartenbilder';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
+import { useUploadFortschritt } from '../../components/useUploadFortschritt';
 import { eckenAusBounds, zentroid, verschiebeEcken } from './bildGeometrie';
 import type { BildOverlay } from './bildLayer';
+import type { BildUploadZustand } from './Sidebar';
 import type { KartenHandle } from './Kartenflaeche';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 
@@ -184,14 +186,32 @@ export function useKartenbilder({
     [sichtbareBilder, blobUrls],
   );
 
-  const onBildUpload = async (datei: File) => {
-    // Bild-Seitenverhältnis lesen → mittig im aktuellen Viewport platzieren, unverzerrt.
-    // Fallback (Karte noch nicht bereit): kleines achsenparalleles Rechteck.
-    const ar = await leseBildSeitenverhaeltnis(datei);
-    const ecken: Ecken =
-      kartenRef.current?.initialeEckenFuerBild(ar) ?? eckenAusBounds(9, 49.95, 9.1, 50);
-    await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name, aktiveAnsichtId ?? null);
-    invalidiereBilder();
+  // Bis 25 MiB über Mobilfunk (LFH-1021): mit Fortschritt, und der Fehler steht an der Liste statt
+  // im Toast — nach einem Abbruch vor dem letzten Byte „Nicht abgelegt“, danach „Ablage unklar“.
+  const fortschritt = useUploadFortschritt();
+  const uploadMutation = useMutation({
+    mutationFn: async (datei: File) => {
+      // Bild-Seitenverhältnis lesen → mittig im aktuellen Viewport platzieren, unverzerrt.
+      // Fallback (Karte noch nicht bereit): kleines achsenparalleles Rechteck.
+      const ar = await leseBildSeitenverhaeltnis(datei);
+      const ecken: Ecken =
+        kartenRef.current?.initialeEckenFuerBild(ar) ?? eckenAusBounds(9, 49.95, 9.1, 50);
+      return fortschritt.begleite((onFortschritt) =>
+        ladeHintergrundbildHoch(
+          einsatzId,
+          datei,
+          ecken,
+          datei.name,
+          aktiveAnsichtId ?? null,
+          onFortschritt,
+        ),
+      );
+    },
+    // Auch nach einem unklaren Ausgang: die Liste zeigt, ob das Bild angekommen ist.
+    onSettled: () => void invalidiereBilder(),
+  });
+  const onBildUpload = (datei: File) => {
+    if (!uploadMutation.isPending) uploadMutation.mutate(datei);
   };
   const onBildToggle = async (id: number, sichtbar: boolean) => {
     await aktualisiereHintergrundbild(einsatzId, id, { sichtbar });
@@ -266,6 +286,11 @@ export function useKartenbilder({
     aktivesPlatzierBild,
     bildPlatzierZentrum,
     onBildUpload,
+    bildUpload: {
+      laeuft: uploadMutation.isPending,
+      stand: uploadMutation.isPending ? fortschritt.stand : null,
+      fehler: uploadMutation.error,
+    } satisfies BildUploadZustand,
     onBildToggle,
     onBildOpazitaet,
     onBildLoeschen,
