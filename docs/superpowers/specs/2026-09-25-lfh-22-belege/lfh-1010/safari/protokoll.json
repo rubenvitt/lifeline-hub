@@ -1,0 +1,408 @@
+{
+ "ticket": "LFH-1010",
+ "datum": "2026-10-08",
+ "browser": "Safari 27.0.1 (22625.1.29.11.28)",
+ "system": "macOS 27.0.1 (26A434)",
+ "stand": "origin/alpha d25696ab7 (1.0.0-alpha.92), Daten aus lfh-813/werkzeug/saeen.mjs (mit von/an, aa0ff208e)",
+ "weg": "Echter Druckpfad: Safari-Druckdialog (Cmd+P) → PDF → „Als PDF sichern …“, gesteuert über osascript/System Events (Bedienungshilfen). safaridriver verworfen: Safaris Automation-Protokoll kennt kein Drucken.",
+ "einstellungen": {
+  "papier": "DIN A4 210 x 297 mm",
+  "ausrichtung": "Hochformat",
+  "skalierung": "100 %",
+  "kopf_und_fusszeilen": "aus (Safari-Vorgabe war an, vor jedem Druck abgeschaltet)",
+  "hintergrund_drucken": "aus (Vorgabe)",
+  "app_thema": "Nachtbetrieb (Vorgabe, frischer Safari-Speicher)",
+  "autor_metadaten": "im Sichern-Dialog geleert"
+ },
+ "befunde": [
+  "App-Knopf „Drucken / als PDF“ öffnet in Safari keinen Druckdialog: window.print() wird aufgerufen (Klick isTrusted, Aufruf kehrt sofort zurück), aber kein beforeprint, kein Dialog. Ursache gemessen mit werkzeug/sse-druckprobe.html: solange eine EventSource offen ist, stellt WebKit window.print() zurück; nach es.close() kommt der Druck nach (Titelprotokoll „MIT MIT-zurueck beforeprint sse-zu afterprint“), ohne Nutzergeste ggf. mit Safari-Overlay „Drucken gesperrt“. Die App hält auf jeder Seite einen Live-Strom offen. Alle Druckstücke deshalb über Cmd+P gedruckt.",
+  "Abgeschnittene Druckstücke: lagebericht-entwurf-vorgabe, lagebericht-entwurf-split, befehl-lesend, meldebild, etb, etb-gefiltert enden vor dem Inhaltsende (Endmarke bzw. letzte Einträge fehlen); die letzte Seite endet mit freiem Platz, eine weitere Seite wird nicht gedruckt. Zweiter ETB-Lauf nach minutenlanger Wartezeit identisch (84 S., bis Nr. 410). Gegenversuch Fensterbreite 800 statt 1271 px: befehl-lesend und etb-gefiltert unverändert (6 S. ohne ENDE-BEFEHL, 28 S. bis Nr. 538) – die Fensterbreite ist nicht die Ursache. Gegenprobe langtest.pdf (statische Tabelle, 4000 Zeilen): vollständig, 95 S. – kein Seitenlimit der Engine, die Ursache liegt in der App-Seite. Ursache offen.",
+  "Tabellenkopf nur auf Seite 1 (Meldebild, ETB): WebKit wiederholt <thead> im Druck nicht; auch langtest.pdf hat den Kopf nur auf S. 1 von 95. Engine-Grenze.",
+  "Meldebild: Namensspalte nur wenige Zeichen breit, Namen brechen silbenweise (Bild, das LFH-1007 für Firefox/Chromium behoben hat). Gedruckt nach Aufklappen der Mittel durch den Seitenknopf (dessen vorbereiten lief, der Dialog kam nicht) und Cmd+P.",
+  "Minimalprobe break-after: avoid: Safari lässt den Titel in 4 von 9 Lagen (840–900 px) allein am Seitenende stehen, Blockfluss und Tabellenzelle gleich – wie Firefox (dort 7 Lagen), anders als Chromium. In den App-Druckstücken steht kein Abschnittstitel allein am Seitenende (Titelblock aus LFH-1008 hält).",
+  "Kopf auf Seite 1 (Org, Dokumentart+Titel, Einsatz+E-2026-0001, Gedruckt von/am) und Logo 160×64 auf Seite 1 in allen Druckstücken; keine Leerseiten; keine App-Rahmenreste im Text."
+ ],
+ "gegenversuche": {
+  "befehl-lesend-fenster800": "Fenster 800 px breit",
+  "etb-gefiltert-fenster800": "Fenster 800 px breit",
+  "langtest": "statische Tabelle mit 4000 Zeilen und <thead> (file://), erzeugt per Python-Einzeiler"
+ },
+ "dateien": {
+  "befehl-entwurf": {
+   "seiten": 7,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.034,
+   "endmarke_seite": 7,
+   "endmarke_auf_letzter_seite": true,
+   "titel_vorkommen": {
+    "Lage": 1,
+    "Auftrag": 1,
+    "Durchführung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "befehl-lesend-fenster800": {
+   "seiten": 6,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.028,
+   "endmarke_seite": null,
+   "titel_vorkommen": {
+    "Lage": 1,
+    "Auftrag": 1,
+    "Durchführung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "befehl-lesend": {
+   "seiten": 6,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.028,
+   "endmarke_seite": null,
+   "titel_vorkommen": {
+    "Lage": 1,
+    "Auftrag": 1,
+    "Durchführung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "etb-gefiltert-fenster800": {
+   "seiten": 28,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.047,
+   "titel_am_seitenende": [],
+   "kopf_je_seite": 1,
+   "nummern": {
+    "anzahl": 496,
+    "erste": [
+     43,
+     44,
+     45
+    ],
+    "letzte": [
+     536,
+     537,
+     538
+    ],
+    "aufsteigend": true,
+    "lueckenlos": true
+   },
+   "nachtrag": false,
+   "berichtigt_nr": 0,
+   "berichtigt_durch": 1,
+   "auswahl_kopf": "Typ: Meldung",
+   "letzte_zeile_letzte_seite": "an Leitstelle                     EL",
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "etb-gefiltert": {
+   "seiten": 28,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.047,
+   "titel_am_seitenende": [],
+   "kopf_je_seite": 1,
+   "nummern": {
+    "anzahl": 496,
+    "erste": [
+     43,
+     44,
+     45
+    ],
+    "letzte": [
+     536,
+     537,
+     538
+    ],
+    "aufsteigend": true,
+    "lueckenlos": true
+   },
+   "nachtrag": false,
+   "berichtigt_nr": 0,
+   "berichtigt_durch": 1,
+   "auswahl_kopf": "Typ: Meldung",
+   "letzte_zeile_letzte_seite": "an Leitstelle                     EL",
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "etb": {
+   "seiten": 84,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.017,
+   "endmarke_auf_letzter_seite": false,
+   "titel_am_seitenende": [],
+   "kopf_je_seite": 1,
+   "nummern": {
+    "anzahl": 410,
+    "erste": [
+     1,
+     2,
+     3
+    ],
+    "letzte": [
+     408,
+     409,
+     410
+    ],
+    "aufsteigend": true,
+    "lueckenlos": true
+   },
+   "nachtrag": false,
+   "berichtigt_nr": 0,
+   "berichtigt_durch": 1,
+   "auswahl_kopf": "vollständiges Tagebuch",
+   "letzte_zeile_letzte_seite": "1                         EL",
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "lagebericht-entwurf-split": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.007,
+   "endmarke_seite": null,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 0,
+    "Zusammenfassung": 0
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 1,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "lagebericht-entwurf-vorgabe": {
+   "seiten": 8,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.007,
+   "endmarke_seite": null,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 0
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 1,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "lagebericht-lesend": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.028,
+   "endmarke_seite": 9,
+   "endmarke_auf_letzter_seite": true,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "langtest": {
+   "seiten": 95,
+   "bilder": {},
+   "kopf_s1_fehlt": [
+    "DRK KV Musterstadt",
+    "E-2026-0001",
+    "Gedruckt von",
+    "Administrator",
+    "Gedruckt am"
+   ],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.023,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "meldebild": {
+   "seiten": 6,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "kopf_s1_fehlt": [],
+   "rahmen_gefunden": [],
+   "leerseiten": [],
+   "letzte_seite_leer": false,
+   "dunkelanteil_s1": 0.016,
+   "kopf_je_seite": 1,
+   "kraefte": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext",
+    "seitenformat": "595.276 x 841.89 pts (A4)"
+   }
+  },
+  "minimalprobe": {
+   "seiten": 36,
+   "erzeuger": {
+    "creator": "Safari",
+    "producer": "macOS Version 27.0.1 (Build 26A434) Quartz PDFContext"
+   },
+   "ergebnis": {
+    "block": [
+     "840:TITEL-ALLEIN",
+     "860:TITEL-ALLEIN",
+     "880:TITEL-ALLEIN",
+     "900:TITEL-ALLEIN",
+     "920:titel-S2",
+     "940:titel-S2",
+     "960:titel-S2",
+     "980:titel-S2",
+     "1000:titel-S2"
+    ],
+    "tabellenzelle": [
+     "840:TITEL-ALLEIN",
+     "860:TITEL-ALLEIN",
+     "880:TITEL-ALLEIN",
+     "900:TITEL-ALLEIN",
+     "920:titel-S2",
+     "940:titel-S2",
+     "960:titel-S2",
+     "980:titel-S2",
+     "1000:titel-S2"
+    ]
+   }
+  }
+ }
+}
