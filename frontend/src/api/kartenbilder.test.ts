@@ -1,15 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
+import { installiereXhrAttrappe } from '../test/xhrAttrappe';
+import { AusgangUnbekannt, type UploadFortschritt } from './client';
 import {
   bildDownloadPfad,
   ladeBildBlobUrl,
   ladeHintergrundbildHoch,
   listeHintergrundbilder,
+  type Ecken,
 } from './kartenbilder';
+
+const ECKEN: Ecken = [
+  [9, 50],
+  [9.1, 50],
+  [9.1, 49.9],
+  [9, 49.9],
+];
 
 describe('kartenbilder API', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   it('liste ruft den richtigen Pfad', async () => {
     const fetchMock = vi
@@ -98,20 +109,43 @@ describe('kartenbilder API', () => {
   });
 
   it('upload hängt datei + ecken als FormData an', async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response('{"id":1}', { status: 201 }));
+    const anfragen = installiereXhrAttrappe();
     const datei = new File([new Uint8Array([0x89])], 'plan.png', { type: 'image/png' });
-    await ladeHintergrundbildHoch(7, datei, [
-      [9, 50],
-      [9.1, 50],
-      [9.1, 49.9],
-      [9, 49.9],
-    ]);
-    const [, init] = fetchMock.mock.calls[0];
-    expect(init?.body).toBeInstanceOf(FormData);
-    const fd = init!.body as FormData;
-    expect(fd.get('datei')).toBeInstanceOf(File);
+    const ergebnis = ladeHintergrundbildHoch(7, datei, ECKEN, 'Plan', 4);
+    const [xhr] = anfragen;
+    expect(xhr.methode).toBe('POST');
+    expect(xhr.url).toBe('/api/einsaetze/7/karte/hintergrundbilder');
+    const fd = xhr.body as FormData;
+    expect(fd.get('datei')).toBe(datei);
     expect(fd.get('ecken')).toBe('[[9,50],[9.1,50],[9.1,49.9],[9,49.9]]');
+    expect(fd.get('name')).toBe('Plan');
+    expect(fd.get('ansicht_id')).toBe('4');
+    xhr.antworten(201, { id: 1 });
+    await expect(ergebnis).resolves.toEqual({ id: 1 });
+  });
+
+  it('upload nutzt das 120-s-Upload-Timeout, nicht das 15-s-Standard-Timeout (LFH-1021)', () => {
+    const anfragen = installiereXhrAttrappe();
+    void ladeHintergrundbildHoch(7, new File(['x'], 'plan.png'), ECKEN);
+    expect(anfragen[0].timeout).toBe(120_000);
+  });
+
+  it('upload meldet den Fortschritt an den Aufrufer (LFH-1021)', () => {
+    const anfragen = installiereXhrAttrappe();
+    const meldungen: UploadFortschritt[] = [];
+    void ladeHintergrundbildHoch(7, new File(['x'], 'plan.png'), ECKEN, undefined, null, (f) =>
+      meldungen.push(f),
+    );
+    anfragen[0].fortschritt(1, 4);
+    anfragen[0].uebertragen();
+    expect(meldungen).toEqual([{ phase: 'senden', anteil: 0.25 }, { phase: 'pruefen' }]);
+  });
+
+  it('Zeitlimit nach dem letzten Byte: Ausgang unklar, nicht „nicht abgeschickt“ (LFH-1021)', async () => {
+    const anfragen = installiereXhrAttrappe();
+    const ergebnis = ladeHintergrundbildHoch(7, new File(['x'], 'plan.png'), ECKEN);
+    anfragen[0].uebertragen();
+    anfragen[0].zeitlimit();
+    await expect(ergebnis).rejects.toBeInstanceOf(AusgangUnbekannt);
   });
 });

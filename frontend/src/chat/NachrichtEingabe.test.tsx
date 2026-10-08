@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
-import NachrichtEingabe from './NachrichtEingabe';
+import NachrichtEingabe, { sendeFehlerKopf } from './NachrichtEingabe';
+import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
 
 describe('NachrichtEingabe', () => {
   it('sendet getrimmten Text und leert das Feld', async () => {
@@ -126,5 +127,44 @@ describe('NachrichtEingabe — Eingabegrenze (LFH-937)', () => {
     fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13 });
     expect(onSenden).not.toHaveBeenCalled();
     expect(feld).toHaveValue('n'.repeat(20_001));
+  });
+
+  it('zeigt den Stand der Anhang-Übertragung (LFH-1021)', () => {
+    renderMitProviders(
+      <NachrichtEingabe
+        onSenden={vi.fn()}
+        senden
+        fortschritt={{ phase: 'senden', anteil: 0.62 }}
+      />,
+    );
+    expect(
+      screen.getByRole('progressbar', { name: 'Wird hochgeladen · 62 %' }),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne Übertragung und ohne Fehler weder Balken noch Alarm', () => {
+    renderMitProviders(<NachrichtEingabe onSenden={vi.fn()} senden={false} />);
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('sendeFehlerKopf (LFH-1021)', () => {
+  it('nach dem letzten Byte ohne Antwort: unklar, nicht „nicht gesendet“', () => {
+    expect(sendeFehlerKopf(new AusgangUnbekannt())).toEqual({
+      titel: 'Senden unklar',
+      fallback: expect.stringMatching(/unklar/),
+    });
+  });
+
+  it('vor dem letzten Byte: nicht gesendet, nicht abgeschickt', () => {
+    expect(sendeFehlerKopf(new NetzFehler())).toEqual({
+      titel: 'Nicht gesendet',
+      fallback: expect.stringMatching(/NICHT abgeschickt/),
+    });
+  });
+
+  it('eine Ablehnung des Servers trägt dessen Meldung', () => {
+    expect(sendeFehlerKopf(new ApiError(413, 'Zu groß'))).toEqual({ titel: 'Nicht gesendet' });
   });
 });

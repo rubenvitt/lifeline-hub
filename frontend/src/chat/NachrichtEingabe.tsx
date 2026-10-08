@@ -4,6 +4,21 @@ import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { istZuLang, zeichenGrenze, Zeichenzaehler } from '../components/zeichenGrenze';
 import type { UploadFile } from 'antd';
 import { useRef, useState } from 'react';
+import { AusgangUnbekannt, NetzFehler, fehlerText, type UploadFortschritt } from '../api/client';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
+import UploadFortschrittAnzeige from '../components/UploadFortschritt';
+
+/**
+ * Überschrift eines Sende-Fehlers nach der Phase des Abbruchs (LFH-1021, wie `ablageFehlerKopf`):
+ * ohne Antwort nach dem letzten Byte ist der Ausgang unbekannt, nicht „nicht gesendet“.
+ */
+export function sendeFehlerKopf(fehler: unknown): { titel: string; fallback?: string } {
+  if (fehler instanceof AusgangUnbekannt)
+    return { titel: 'Senden unklar', fallback: fehlerText(fehler) };
+  if (fehler instanceof NetzFehler)
+    return { titel: 'Nicht gesendet', fallback: fehlerText(fehler) };
+  return { titel: 'Nicht gesendet' };
+}
 
 interface Props {
   /**
@@ -13,9 +28,13 @@ interface Props {
   onSenden: (text: string, dateien: File[]) => Promise<unknown>;
   /** true, solange Upload/Sende-Mutation läuft. */
   senden: boolean;
+  /** Stand der Anhang-Übertragung, nur während sie läuft (LFH-1021). */
+  fortschritt?: UploadFortschritt | null;
+  /** `mutation.error` des letzten Sendens; geht beim nächsten Absenden. */
+  fehler?: unknown;
 }
 
-export default function NachrichtEingabe({ onSenden, senden }: Props) {
+export default function NachrichtEingabe({ onSenden, senden, fortschritt, fehler }: Props) {
   const [text, setText] = useState('');
   const [dateien, setDateien] = useState<UploadFile[]>([]);
   // Riegel gegen ein zweites Enter, solange gesendet wird: der Text steht bis zum Erfolg noch im
@@ -53,6 +72,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
 
   return (
     <div style={{ marginTop: 12 }}>
+      <SpeicherFehler fehler={fehler} {...sendeFehlerKopf(fehler)} />
       <Space.Compact style={{ width: '100%' }}>
         <Input.TextArea
           value={text}
@@ -75,6 +95,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
         </Button>
       </Space.Compact>
       <Zeichenzaehler wert={text} max={ETB_INHALT_MAX} />
+      <UploadFortschrittAnzeige stand={fortschritt ?? null} />
       <Upload
         multiple
         beforeUpload={() => false}

@@ -9,6 +9,7 @@ import ChatPage from './ChatPage';
 import type { ChatKanal, ChatNachricht } from '../api/types';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
+import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -111,6 +112,16 @@ describe('ChatPage', () => {
       expect(screen.getByRole('button', { name: 'Senden' })).not.toHaveClass('ant-btn-loading'),
     );
     expect(feld).toHaveValue('Geht verloren?');
+    // Der Fehler steht an der Eingabe, nicht im Toast, und geht beim nächsten Absenden.
+    const alarm = await screen.findByRole('alert');
+    expect(alarm).toHaveTextContent('Nicht gesendet');
+    expect(alarm).toHaveTextContent('Zu groß');
+    expect(document.querySelector('.ant-message')).toBeNull();
+    server.use(
+      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => new Promise(() => undefined)),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
   it('behält Name und Beschreibung, wenn der Server die Kanalanlage ablehnt (LFH-795)', async () => {
@@ -455,7 +466,9 @@ describe('ChatPage', () => {
     expect(screen.queryByPlaceholderText('Nachricht…')).not.toBeInTheDocument();
   });
 
-  it('lädt einen Anhang hoch und sendet die Nachricht mit anhang_ids', async () => {
+  /** Chat mit einem Kanal, Senden ins Leere protokolliert; der Anhang geht über die XHR-Attrappe. */
+  function anhangSetup() {
+    const anfragen = installiereXhrAttrappe();
     let gesendet: { inhalt: string; anhang_ids: number[] } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
     server.use(
@@ -463,22 +476,6 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
-      http.post('/api/einsaetze/7/anhaenge', () =>
-        HttpResponse.json(
-          [
-            {
-              id: 99,
-              einsatz_id: 7,
-              dateiname: 'lage.pdf',
-              mime: 'application/pdf',
-              groesse: 3,
-              hochgeladen_von: 1,
-              erstellt_at: '2026-06-10 10:00:00',
-            },
-          ],
-          { status: 201 },
-        ),
-      ),
       http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
         gesendet = (await request.json()) as { inhalt: string; anhang_ids: number[] };
         const neu: ChatNachricht = { ...nachricht, id: 6, inhalt: gesendet.inhalt };
@@ -492,15 +489,90 @@ describe('ChatPage', () => {
       </Routes>,
       { route: '/einsaetze/7/chat' },
     );
+    return { anfragen, gesendet: () => gesendet };
+  }
 
+  async function sendeMitAnhang(text = 'Foto vom Dach') {
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText('Nachricht…'), text);
     const datei = new File(['PDF'], 'lage.pdf', { type: 'application/pdf' });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await userEvent.upload(input, datei);
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+  }
 
-    await waitFor(() => expect(gesendet).not.toBeNull());
-    expect(gesendet!.anhang_ids).toEqual([99]);
+  describe('Anhänge (LFH-1021)', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('lädt einen Anhang hoch und sendet die Nachricht mit anhang_ids', async () => {
+      const { anfragen, gesendet } = anhangSetup();
+      await sendeMitAnhang();
+      await waitFor(() => expect(anfragen).toHaveLength(1));
+      expect(anfragen[0].url).toBe('/api/einsaetze/7/anhaenge');
+      expect(anfragen[0].timeout).toBe(120_000);
+      act(() =>
+        anfragen[0].antworten(201, [
+          {
+            id: 99,
+            einsatz_id: 7,
+            dateiname: 'lage.pdf',
+            mime: 'application/pdf',
+            groesse: 3,
+            hochgeladen_von: 1,
+            erstellt_at: '2026-06-10 10:00:00',
+          },
+        ]),
+      );
+
+      await waitFor(() => expect(gesendet()).not.toBeNull());
+      expect(gesendet()!.anhang_ids).toEqual([99]);
+      await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+    });
+
+    it('zeigt Prozent während der Übertragung, danach „Datei wird geprüft“', async () => {
+      const { anfragen } = anhangSetup();
+      await sendeMitAnhang();
+      await waitFor(() => expect(anfragen).toHaveLength(1));
+      act(() => anfragen[0].fortschritt(1, 4));
+      expect(
+        await screen.findByRole('progressbar', { name: 'Wird hochgeladen · 25 %' }),
+      ).toBeInTheDocument();
+      act(() => anfragen[0].uebertragen());
+      expect(
+        await screen.findByRole('progressbar', { name: 'Datei wird geprüft' }),
+      ).toBeInTheDocument();
+    });
+
+    it('Zeitlimit nach dem letzten Byte: „unklar“, nicht „nicht abgeschickt“; Text bleibt', async () => {
+      const { anfragen, gesendet } = anhangSetup();
+      await sendeMitAnhang('Foto vom Dach');
+      await waitFor(() => expect(anfragen).toHaveLength(1));
+      act(() => {
+        anfragen[0].uebertragen();
+        anfragen[0].zeitlimit();
+      });
+
+      const alarm = await screen.findByRole('alert');
+      expect(alarm).toHaveTextContent('Senden unklar');
+      expect(alarm).toHaveTextContent(/unklar/);
+      expect(alarm).not.toHaveTextContent(/NICHT abgeschickt/);
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Nachricht…')).toHaveValue('Foto vom Dach');
+      expect(gesendet()).toBeNull();
+    });
+
+    it('Abbruch vor dem letzten Byte: „Nicht gesendet“, nicht abgeschickt', async () => {
+      const { anfragen } = anhangSetup();
+      await sendeMitAnhang();
+      await waitFor(() => expect(anfragen).toHaveLength(1));
+      act(() => {
+        anfragen[0].fortschritt(1, 2);
+        anfragen[0].netzfehler();
+      });
+      const alarm = await screen.findByRole('alert');
+      expect(alarm).toHaveTextContent('Nicht gesendet');
+      expect(alarm).toHaveTextContent('NICHT abgeschickt');
+    });
   });
 
   it('verwendet nach einem Einsatzwechsel ausschließlich einen Kanal des neuen Einsatzes', async () => {

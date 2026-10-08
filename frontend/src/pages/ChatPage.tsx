@@ -70,6 +70,7 @@ import { Segmentleiste, useRollen } from '../components/instrument';
 const CHAT_MINDESTHOEHE = 320;
 import { useViewport } from '../components/useViewport';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useUploadFortschritt } from '../components/useUploadFortschritt';
 import { anzahl } from '../anzeige/anzahl';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -261,11 +262,17 @@ export default function ChatPage() {
   const invalidiereNachrichten = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.chatNachrichten(einsatzId) });
 
+  const anhangFortschritt = useUploadFortschritt();
   const sendenMutation = useMutation({
-    // Zweistufig: erst Anhänge hochladen (falls vorhanden), dann Nachricht mit den
-    // resultierenden anhang_ids senden.
+    // Zweistufig: erst Anhänge hochladen (falls vorhanden, mit Fortschritt; LFH-1021), dann
+    // Nachricht mit den resultierenden anhang_ids senden.
     mutationFn: async ({ text, dateien }: { text: string; dateien: File[] }) => {
-      const anhaenge = dateien.length > 0 ? await ladeAnhaengeHoch(einsatzId, dateien) : [];
+      const anhaenge =
+        dateien.length > 0
+          ? await anhangFortschritt.begleite((onFortschritt) =>
+              ladeAnhaengeHoch(einsatzId, dateien, onFortschritt),
+            )
+          : [];
       return sendeNachricht(
         einsatzId,
         kanalId as number,
@@ -280,7 +287,7 @@ export default function ChatPage() {
       // Autor: sonst führte jede fremde Nachricht desselben Kontos zum Sprung.
       setEigeneSendungen((n) => n + 1);
     },
-    onError: fehler,
+    // Kein Toast: der Fehler steht an der Eingabe (`NachrichtEingabe`), bis zum nächsten Senden.
   });
   const bearbeitenMutation = useMutation({
     mutationFn: ({ id: nid, text }: { id: number; text: string }) =>
@@ -534,6 +541,8 @@ export default function ChatPage() {
             <NachrichtEingabe
               onSenden={(t, d) => sendenMutation.mutateAsync({ text: t, dateien: d })}
               senden={sendenMutation.isPending}
+              fortschritt={sendenMutation.isPending ? anhangFortschritt.stand : null}
+              fehler={sendenMutation.error}
             />
           )}
           {/* Statt der Eingabe: „Nur Ansicht · Grund“, kein Satz (LFH-1078). */}
