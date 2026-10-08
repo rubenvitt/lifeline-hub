@@ -1304,7 +1304,7 @@ fn pfad_match_ist_token_genau() {
 }
 
 /// LFH-892/LFH-1040: Gerätekopplung. Die Ansichten stehen als CHECK in
-/// `migrations/0158_geraet_kopplung_stellenarten.sql`; das Frontend wählt nach ihnen Hülle und
+/// `migrations/0159_geraet_kopplung_stellenarten.sql`; das Frontend wählt nach ihnen Hülle und
 /// Startseite, nach der Bindungsart die Stellenauswahl der Kopplungsmaske.
 #[test]
 fn geraet_kopplung_wire() {

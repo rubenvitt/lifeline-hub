@@ -3031,6 +3031,109 @@ mod tests {
         assert_eq!(gesetzt(ohne_frist).await, None);
     }
 
+    // --- Migration 0158: Zeitpunkt des Setzens einer Kategorie-Frist (LFH-1049) ---
+    //
+    // Befüllung wie 0149: eine künftige Kategorie-Frist gilt als jetzt gesetzt, eine abgelaufene
+    // als vor ihrem Ablauf gesetzt; eine vorgemerkte, eine geschwärzte und eine aufgehobene
+    // bleiben NULL.
+    #[tokio::test]
+    async fn migration_0158_befuellt_kategorie_frist_gesetzt_at() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        let bis = |version: i64| Migrator {
+            migrations: Cow::Owned(
+                alle.iter()
+                    .filter(|m| m.version <= version)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        };
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        bis(157).run(&pool).await.expect("Migrationen bis 0157");
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1, 'Lage', 'abgeschlossen') \
+             RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        for (k, frist, vorgemerkt, geschwaerzt) in [
+            ("behandlung", Some("2999-01-01 00:00:00"), None, None),
+            ("personenauskunft", Some("2020-01-01 00:00:00"), None, None),
+            (
+                "anhaenge",
+                Some("2020-01-01 00:00:00"),
+                Some("2020-01-02 00:00:00"),
+                None,
+            ),
+            (
+                "x_geschwaerzt",
+                Some("2020-01-01 00:00:00"),
+                None,
+                Some("2020-03-01 00:00:00"),
+            ),
+            ("x_aufgehoben", None, None, None),
+        ] {
+            sqlx::query(
+                "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
+                    rechtsgrundlage, vorgemerkt_at, geschwaerzt_at) VALUES (?, ?, ?, 'RG', ?, ?)",
+            )
+            .bind(einsatz)
+            .bind(k)
+            .bind(frist)
+            .bind(vorgemerkt)
+            .bind(geschwaerzt)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        bis(158).run(&pool).await.expect("Migration 0158");
+
+        let gesetzt = |k: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, Option<String>>(
+                    "SELECT frist_gesetzt_at FROM einsatz_aufbewahrung_kategorie \
+                     WHERE einsatz_id = ? AND kategorie = ?",
+                )
+                .bind(einsatz)
+                .bind(k)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let jetzt = gesetzt("behandlung").await.expect("künftige Frist befüllt");
+        assert!(
+            jetzt.as_str() < "2999-01-01 00:00:00" && crate::zeit::parse_utc(&jetzt).is_some(),
+            "künftige Frist gilt als jetzt gesetzt, im kanonischen Format: {jetzt}"
+        );
+        assert_eq!(
+            gesetzt("personenauskunft").await.as_deref(),
+            Some("2020-01-01 00:00:00"),
+            "abgelaufene Frist gilt als vor ihrem Ablauf gesetzt"
+        );
+        assert_eq!(gesetzt("anhaenge").await, None);
+        assert_eq!(gesetzt("x_geschwaerzt").await, None);
+        assert_eq!(gesetzt("x_aufgehoben").await, None);
+    }
+
     // --- Migration 0150: Giftzeilen des Erinnerungs-Planers (LFH-924) ---
     //
     // Alt-DB mit allem, was vor den Eingabegrenzen durchkam: unplausible Intervalle werden
@@ -4402,14 +4505,14 @@ mod tests {
         assert_eq!(daten, vec![3u8; GROESSE]);
     }
 
-    // --- Migration 0158: Gerätekopplung für weitere Stellen (LFH-1040) ---
+    // --- Migration 0159: Gerätekopplung für weitere Stellen (LFH-1040) ---
 
     /// Der Rebuild von `geraet_kopplung` hält Codes, Ereignisse und Gerätesitzungen (alle drei
     /// hängen per CASCADE an der Tabelle), nimmt die neuen Ansichten, bindet höchstens eine
     /// Stelle und hält eine Kopplung über das Löschen ihres Abschnitts.
     #[tokio::test]
-    async fn migration_0158_erhaelt_kinder_und_bindet_hoechstens_eine_stelle() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 157).await;
+    async fn migration_0159_erhaelt_kinder_und_bindet_hoechstens_eine_stelle() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 158).await;
         let (e, b) = bild_grundlage(&pool).await;
         let g: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
@@ -4478,7 +4581,7 @@ mod tests {
             }
         };
 
-        migriere_bis(&pool, 158).await;
+        migriere_bis(&pool, 159).await;
 
         for t in [
             "geraet_kopplung",

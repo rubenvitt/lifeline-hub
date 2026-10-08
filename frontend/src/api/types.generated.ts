@@ -2160,7 +2160,7 @@ export interface components {
         FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
          * @description Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-         *     `migrations/0158_geraet_kopplung_stellenarten.sql`.
+         *     `migrations/0159_geraet_kopplung_stellenarten.sql`.
          * @enum {string}
          */
         Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
