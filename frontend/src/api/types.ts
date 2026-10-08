@@ -35,6 +35,8 @@ export type KopplungMitCode = S['KopplungMitCode'];
 export type KopplungsCode = S['KopplungsCode'];
 export type GeraeteUebersicht = S['GeraeteUebersicht'];
 export type AnsichtSperre = S['AnsichtSperre'];
+export type AnsichtAuswahl = S['AnsichtAuswahl'];
+export type Bindungsart = S['Bindungsart'];
 
 // ============================== Benutzer / Einsatz ==============================
 export type SystemRolle = S['SystemRolle'];

@@ -4401,4 +4401,198 @@ mod tests {
             .unwrap();
         assert_eq!(daten, vec![3u8; GROESSE]);
     }
+
+    // --- Migration 0158: Gerätekopplung für weitere Stellen (LFH-1040) ---
+
+    /// Der Rebuild von `geraet_kopplung` hält Codes, Ereignisse und Gerätesitzungen (alle drei
+    /// hängen per CASCADE an der Tabelle), nimmt die neuen Ansichten, bindet höchstens eine
+    /// Stelle und hält eine Kopplung über das Löschen ihres Abschnitts.
+    #[tokio::test]
+    async fn migration_0158_erhaelt_kinder_und_bindet_hoechstens_eine_stelle() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 157).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let g: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'UHS 1 · Tablet', 'geraet-1', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'sonstige', 'UHS 1', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let k: i64 = sqlx::query_scalar(
+            "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, uhs_id, bezeichnung, \
+                erstellt_von, laeuft_ab_at) \
+             VALUES (?, ?, 'uhs-tablet', ?, 'Tablet', ?, '2099-01-01 00:00:00') RETURNING id",
+        )
+        .bind(e)
+        .bind(g)
+        .bind(uhs)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO geraet_kopplungscode (kopplung_id, code_hash, laeuft_ab_at) \
+             VALUES (?, 'hash', '2099-01-01 00:00:00')",
+        )
+        .bind(k)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO geraet_kopplung_ereignis (kopplung_id, ereignis, von) \
+             VALUES (?, 'angelegt', ?)",
+        )
+        .bind(k)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id) \
+             VALUES ('s1', ?, '2099-01-01 00:00:00', ?)",
+        )
+        .bind(g)
+        .bind(k)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let zaehle = |tabelle: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
+                    "SELECT COUNT(*) FROM {tabelle}"
+                )))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+
+        migriere_bis(&pool, 158).await;
+
+        for t in [
+            "geraet_kopplung",
+            "geraet_kopplungscode",
+            "geraet_kopplung_ereignis",
+            "session",
+        ] {
+            assert_eq!(zaehle(t).await, 1, "{t} überlebt den Umbau");
+        }
+        let (ansicht, uhs_nachher): (String, Option<i64>) =
+            sqlx::query_as("SELECT ansicht, uhs_id FROM geraet_kopplung WHERE id = ?")
+                .bind(k)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((ansicht.as_str(), uhs_nachher), ("uhs-tablet", Some(uhs)));
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'geraet_kopplung_neu'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+
+        // Die Kaskade wirkt weiter auf die umgebaute Tabelle.
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let neu =
+            |benutzer: &'static str, ansicht: &'static str, uhs: Option<i64>, ab: Option<i64>| {
+                let pool = pool.clone();
+                async move {
+                    let g: i64 = sqlx::query_scalar(
+                        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+                     VALUES (1, ?, ?, 'h') RETURNING id",
+                    )
+                    .bind(benutzer)
+                    .bind(benutzer)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+                    sqlx::query_scalar::<_, i64>(
+                        "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, uhs_id, \
+                        abschnitt_id, bezeichnung, erstellt_von, laeuft_ab_at) \
+                     VALUES (?, ?, ?, ?, ?, 'Gerät', ?, '2099-01-01 00:00:00') RETURNING id",
+                    )
+                    .bind(e)
+                    .bind(g)
+                    .bind(ansicht)
+                    .bind(uhs)
+                    .bind(ab)
+                    .bind(b)
+                    .fetch_one(&pool)
+                    .await
+                }
+            };
+        let am_abschnitt = neu("a", "einsatzabschnitt", None, Some(abschnitt))
+            .await
+            .expect("der neue CHECK nimmt 'einsatzabschnitt'");
+        for a in ["betreuungsstelle", "bereitstellungsraum", "verpflegung"] {
+            neu(a, a, None, None)
+                .await
+                .unwrap_or_else(|f| panic!("der CHECK nimmt {a}: {f}"));
+        }
+        assert!(
+            neu("x", "teleport", None, None).await.is_err(),
+            "unbekannte Ansicht abgelehnt"
+        );
+        assert!(
+            neu("y", "einsatzabschnitt", Some(uhs), Some(abschnitt))
+                .await
+                .is_err(),
+            "höchstens eine Stelle"
+        );
+
+        // Ein gelöschter Abschnitt hält die (vorher widerrufene) Kopplung: SET NULL.
+        sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ?")
+            .bind(abschnitt)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Abschnitts scheitert nicht am Verweis");
+        let ab_nachher: Option<i64> =
+            sqlx::query_scalar("SELECT abschnitt_id FROM geraet_kopplung WHERE id = ?")
+                .bind(am_abschnitt)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ab_nachher, None);
+
+        sqlx::query("DELETE FROM geraet_kopplung WHERE id = ?")
+            .bind(k)
+            .execute(&pool)
+            .await
+            .unwrap();
+        for t in [
+            "geraet_kopplungscode",
+            "geraet_kopplung_ereignis",
+            "session",
+        ] {
+            assert_eq!(
+                zaehle(t).await,
+                0,
+                "{t} hängt weiter per CASCADE an der Kopplung"
+            );
+        }
+    }
 }

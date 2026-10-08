@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { theme } from 'antd';
 import { Navigate, NavLink, Outlet, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import type { GeraetAnzeige } from '../api/types';
+import type { Funktionsansicht, GeraetAnzeige } from '../api/types';
 import { IconHausHerz, IconKachelraster, IconPersonPlus, IconPersonen, type Icon } from '../icons';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
@@ -17,6 +17,7 @@ import {
   parseRouteId,
 } from '../routing/deeplinks';
 import { rahmenFarben } from '../theme/tokens';
+import { SeitenLeer } from '../components/SeitenZustand';
 import AufnahmePage from '../pages/personen/AufnahmePage';
 import UhsDetailPage from '../pages/uhs/UhsDetailPage';
 import GeraetStellePage from './GeraetStellePage';
@@ -24,21 +25,39 @@ import LagemonitorPage from './LagemonitorPage';
 import { GeraeteKopf } from './GeraeteKopf';
 import { geraetDarf } from './geraetSicht';
 
+/** Ob die Ansicht eine der UHS-Ansichten ist, die die Seiten unter {@link GeraetUhsRahmen} nutzen. */
+export function istUhsAnsicht(ansicht: Funktionsansicht): boolean {
+  return ansicht === 'uhs-tablet' || ansicht === 'uhs-laptop';
+}
+
 /**
  * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, der
- * Lagemonitor mit seinem Großbild.
+ * Lagemonitor mit seinem Großbild. Eine Ansicht ohne eigene Seiten (noch nicht freigeschaltet,
+ * LFH-1040) hat keine: `null`.
  */
-export function geraetStartPfad(geraet: GeraetAnzeige): string {
-  return geraet.ansicht === 'lagemonitor'
-    ? geraetMonitorPfad(geraet.einsatz_id)
-    : geraetPatientenPfad(geraet.einsatz_id);
+export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
+  switch (geraet.ansicht) {
+    case 'lagemonitor':
+      return geraetMonitorPfad(geraet.einsatz_id);
+    case 'uhs-tablet':
+    case 'uhs-laptop':
+      return geraetPatientenPfad(geraet.einsatz_id);
+    case 'betreuungsstelle':
+    case 'bereitstellungsraum':
+    case 'einsatzabschnitt':
+    case 'verpflegung':
+      return null;
+  }
 }
 
 /** Leitet auf die Startseite der Ansicht (Index und jede fremde Adresse). */
 export function GeraetStart() {
   const { geraet } = useAuth();
   if (!geraet) return <Navigate to="/einsaetze" replace />;
-  return <Navigate to={geraetStartPfad(geraet)} replace />;
+  const pfad = geraetStartPfad(geraet);
+  // Ohne Startseite kein Umleiten: jede Seite führte wieder hierher.
+  if (!pfad) return <SeitenLeer titel="Ansicht nicht verfügbar" />;
+  return <Navigate to={pfad} replace />;
 }
 
 /** Hält `:id` beim eigenen Einsatz; eine fremde Einsatz-ID führt zur Startseite. */
@@ -49,10 +68,10 @@ export function GeraetEinsatzRahmen() {
   return <Outlet />;
 }
 
-/** Die Seiten der UHS-Ansichten; ein Lagemonitor hat keine und landet auf seinem Großbild. */
+/** Die Seiten der UHS-Ansichten; jede andere Ansicht landet auf ihrer Startseite. */
 export function GeraetUhsRahmen() {
   const { geraet } = useAuth();
-  if (!geraet || geraet.ansicht === 'lagemonitor') return <GeraetStart />;
+  if (!geraet || !istUhsAnsicht(geraet.ansicht)) return <GeraetStart />;
   return <Outlet />;
 }
 

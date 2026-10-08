@@ -181,6 +181,11 @@ export interface components {
          * @enum {string}
          */
         AnlageArt: "fernmeldeskizze";
+        /** @description Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle. */
+        AnsichtAuswahl: {
+            ansicht: components["schemas"]["Funktionsansicht"];
+            stellenart?: components["schemas"]["Bindungsart"] | null;
+        };
         /** @description Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind. */
         AnsichtSperre: {
             ansicht: components["schemas"]["Funktionsansicht"];
@@ -855,6 +860,12 @@ export interface components {
          * @enum {string}
          */
         BezugTyp: "schaden" | "uhs" | "person" | "lagebericht" | "meldung" | "auftrag";
+        /**
+         * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt
+         *     `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0158_…`).
+         * @enum {string}
+         */
+        Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt";
         /** @description Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`). */
         BrAnzeige: {
             /** Format: int64 */
@@ -2149,10 +2160,10 @@ export interface components {
         FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
          * @description Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-         *     `migrations/0147_geraet_kopplung.sql`.
+         *     `migrations/0158_geraet_kopplung_stellenarten.sql`.
          * @enum {string}
          */
-        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor";
+        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
          *     `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
@@ -2227,13 +2238,26 @@ export interface components {
             /** Format: int64 */
             kopplung_id: number;
             laeuft_ab_at: string;
-            /** @description Bezeichnung der UHS, falls stellengebunden. */
+            /** @description Bezeichnung der Stelle, falls stellengebunden. */
             stelle?: string | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Kennung der Stelle, gleich welcher Art; die Art folgt aus der Ansicht.
+             */
+            stelle_id?: number | null;
+            /**
+             * Format: int64
+             * @description UHS der UHS-Ansichten (Spiegel von `stelle_id`, für die UHS-Seiten).
+             */
             uhs_id?: number | null;
         };
         /** @description Geräteübersicht der Einsatzleitung. */
         GeraeteUebersicht: {
+            /**
+             * @description Die koppelbaren Ansichten in Bedienreihenfolge (LFH-1040): eine Ansicht steht hier erst,
+             *     wenn sie verfügbar ist.
+             */
+            ansichten: components["schemas"]["AnsichtAuswahl"][];
             kopplungen: components["schemas"]["KopplungAnzeige"][];
             sperren: components["schemas"]["AnsichtSperre"][];
         };
@@ -2462,9 +2486,17 @@ export interface components {
             laeuft_ab_at: string;
             letzter_zugriff_at?: string | null;
             status: components["schemas"]["KopplungStatus"];
-            /** @description Bezeichnung der UHS, falls stellengebunden. */
+            /** @description Bezeichnung der Stelle, falls stellengebunden. */
             stelle?: string | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Kennung der Stelle, gleich welcher Art; die Art folgt aus der Ansicht.
+             */
+            stelle_id?: number | null;
+            /**
+             * Format: int64
+             * @description UHS der UHS-Ansichten (Spiegel von `stelle_id`).
+             */
             uhs_id?: number | null;
             widerrufen_at?: string | null;
             widerrufen_von_name?: string | null;

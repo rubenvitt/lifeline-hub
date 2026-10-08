@@ -1,8 +1,8 @@
 //! Gerätekopplung und Funktionsansichten (LFH-892).
 //!
-//! Ein ausgegebenes Gerät (UHS-Tablet, UHS-Laptop, Lagemonitor) arbeitet ohne Personenkonto in
-//! genau einem Einsatz, einer [`Funktionsansicht`] und ggf. einer UHS. Es schreibt unter einem
-//! eigenen Gerätekonto (`benutzer`-Zeile, verknüpft über `geraet_kopplung.benutzer_id`).
+//! Ein ausgegebenes Gerät (UHS-Tablet, UHS-Laptop, Lagemonitor, …) arbeitet ohne Personenkonto in
+//! genau einem Einsatz, einer [`Funktionsansicht`] und ggf. einer [`Stelle`]. Es schreibt unter
+//! einem eigenen Gerätekonto (`benutzer`-Zeile, verknüpft über `geraet_kopplung.benutzer_id`).
 //!
 //! **Die Schranke steht in [`crate::auth::session::CurrentUser`]:** jede authentifizierte Route
 //! zieht ihn. Für eine Gerätesitzung prüft er `(Methode, MatchedPath)` gegen
@@ -34,14 +34,37 @@ pub const BEZEICHNUNG_MAX: usize = 60;
 
 wire_enum! {
     /// Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-    /// `migrations/0147_geraet_kopplung.sql`.
+    /// `migrations/0158_geraet_kopplung_stellenarten.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Funktionsansicht {
         UhsTablet => "uhs-tablet",
         UhsLaptop => "uhs-laptop",
         Lagemonitor => "lagemonitor",
+        Betreuungsstelle => "betreuungsstelle",
+        Bereitstellungsraum => "bereitstellungsraum",
+        Einsatzabschnitt => "einsatzabschnitt",
+        Verpflegung => "verpflegung",
     }
     try_from = |s| format!("Ungültige Funktionsansicht: {s}");
+}
+
+wire_enum! {
+    /// Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt
+    /// `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0158_…`).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
+    pub enum Bindungsart {
+        Uhs => "uhs",
+        Betreuungsstelle => "betreuungsstelle",
+        Bereitstellungsraum => "bereitstellungsraum",
+        Einsatzabschnitt => "einsatzabschnitt",
+    }
+}
+
+/// Die Stelle einer stellengebundenen Kopplung: Art und Kennung.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Stelle {
+    pub art: Bindungsart,
+    pub id: i64,
 }
 
 /// Routen, die jede Gerätesitzung erreicht, gleich welche Ansicht: Anmeldestatus, Abmelden,
@@ -86,14 +109,39 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet => "UHS-Tablet",
             Funktionsansicht::UhsLaptop => "UHS-Laptop",
             Funktionsansicht::Lagemonitor => "Lagemonitor",
+            Funktionsansicht::Betreuungsstelle => "Betreuungsstelle",
+            Funktionsansicht::Bereitstellungsraum => "Bereitstellungsraum",
+            Funktionsansicht::Einsatzabschnitt => "Einsatzabschnitt",
+            Funktionsansicht::Verpflegung => "Verpflegung",
         }
     }
 
-    /// Ob die Ansicht an genau eine UHS gebunden ist.
+    /// Die Art der Stelle, an die die Ansicht gebunden ist; `None` für Ansichten ohne Stelle
+    /// (Lagemonitor, Verpflegung).
+    pub fn stellenart(self) -> Option<Bindungsart> {
+        match self {
+            Funktionsansicht::UhsTablet | Funktionsansicht::UhsLaptop => Some(Bindungsart::Uhs),
+            Funktionsansicht::Betreuungsstelle => Some(Bindungsart::Betreuungsstelle),
+            Funktionsansicht::Bereitstellungsraum => Some(Bindungsart::Bereitstellungsraum),
+            Funktionsansicht::Einsatzabschnitt => Some(Bindungsart::Einsatzabschnitt),
+            Funktionsansicht::Lagemonitor | Funktionsansicht::Verpflegung => None,
+        }
+    }
+
+    /// Ob die Ansicht an genau eine Stelle gebunden ist.
     pub fn ist_stellengebunden(self) -> bool {
+        self.stellenart().is_some()
+    }
+
+    /// Ob die Einsatzleitung ein Gerät mit dieser Ansicht koppeln kann. Eine Ansicht wird erst
+    /// verfügbar, wenn ihre Routenliste, Stellenfilter, Tests und Hülle stehen (LFH-1040:
+    /// Katalog und Bindung kommen vorab, jede Ansicht schaltet sich in ihrem Task frei).
+    pub fn ist_verfuegbar(self) -> bool {
         matches!(
             self,
-            Funktionsansicht::UhsTablet | Funktionsansicht::UhsLaptop
+            Funktionsansicht::UhsTablet
+                | Funktionsansicht::UhsLaptop
+                | Funktionsansicht::Lagemonitor
         )
     }
 
@@ -105,6 +153,11 @@ impl Funktionsansicht {
                 EinsatzRolle::Fuehrungspersonal
             }
             Funktionsansicht::Lagemonitor => EinsatzRolle::Beobachter,
+            // Alle vier schreiben an ihrer Stelle; die Routenliste verengt die Rolle.
+            Funktionsansicht::Betreuungsstelle
+            | Funktionsansicht::Bereitstellungsraum
+            | Funktionsansicht::Einsatzabschnitt
+            | Funktionsansicht::Verpflegung => EinsatzRolle::Fuehrungspersonal,
         }
     }
 
@@ -121,6 +174,11 @@ impl Funktionsansicht {
                 "gefahrenzonen",
                 "einsatzabschnitte",
             ],
+            // Noch nicht verfügbar (LFH-1040): ohne Module erreicht das Gerät nichts.
+            Funktionsansicht::Betreuungsstelle
+            | Funktionsansicht::Bereitstellungsraum
+            | Funktionsansicht::Einsatzabschnitt
+            | Funktionsansicht::Verpflegung => &[],
         }
     }
 
@@ -132,6 +190,11 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet => UHS_TABLET,
             Funktionsansicht::UhsLaptop => UHS_LAPTOP,
             Funktionsansicht::Lagemonitor => LAGEMONITOR,
+            // Noch nicht verfügbar (LFH-1040): nur `ALLE_ANSICHTEN`.
+            Funktionsansicht::Betreuungsstelle
+            | Funktionsansicht::Bereitstellungsraum
+            | Funktionsansicht::Einsatzabschnitt
+            | Funktionsansicht::Verpflegung => &[],
         }
     }
 }
@@ -214,8 +277,10 @@ pub struct GeraetKontext {
     pub kopplung_id: i64,
     pub einsatz_id: i64,
     pub ansicht: Funktionsansicht,
-    /// UHS der stellengebundenen Ansichten.
-    pub uhs_id: Option<i64>,
+    /// Stelle der stellengebundenen Ansichten. `None` bei einer gebundenen Ansicht heißt: die
+    /// Stelle ist weg (Abschnitt aufgelöst); das Gerät sieht dann keine Stelle mehr
+    /// ([`stelle::eigene`]).
+    pub stelle: Option<Stelle>,
     pub bezeichnung: String,
     pub laeuft_ab_at: String,
 }
@@ -257,8 +322,11 @@ pub struct GeraetAnzeige {
     pub kopplung_id: i64,
     pub einsatz_id: i64,
     pub ansicht: Funktionsansicht,
+    /// UHS der UHS-Ansichten (Spiegel von `stelle_id`, für die UHS-Seiten).
     pub uhs_id: Option<i64>,
-    /// Bezeichnung der UHS, falls stellengebunden.
+    /// Kennung der Stelle, gleich welcher Art; die Art folgt aus der Ansicht.
+    pub stelle_id: Option<i64>,
+    /// Bezeichnung der Stelle, falls stellengebunden.
     pub stelle: Option<String>,
     pub bezeichnung: String,
     pub laeuft_ab_at: String,
@@ -348,5 +416,37 @@ mod tests {
         assert!(Funktionsansicht::UhsTablet.rolle().darf_schreiben());
         assert!(Funktionsansicht::UhsLaptop.ist_stellengebunden());
         assert!(!Funktionsansicht::Lagemonitor.ist_stellengebunden());
+    }
+
+    #[test]
+    fn stellenarten_der_ansichten() {
+        use Funktionsansicht as F;
+        assert_eq!(F::UhsTablet.stellenart(), Some(Bindungsart::Uhs));
+        assert_eq!(F::UhsLaptop.stellenart(), Some(Bindungsart::Uhs));
+        assert_eq!(
+            F::Betreuungsstelle.stellenart(),
+            Some(Bindungsart::Betreuungsstelle)
+        );
+        assert_eq!(
+            F::Bereitstellungsraum.stellenart(),
+            Some(Bindungsart::Bereitstellungsraum)
+        );
+        assert_eq!(
+            F::Einsatzabschnitt.stellenart(),
+            Some(Bindungsart::Einsatzabschnitt)
+        );
+        assert_eq!(F::Verpflegung.stellenart(), None);
+        assert_eq!(F::Lagemonitor.stellenart(), None);
+    }
+
+    #[test]
+    fn nicht_verfuegbare_ansicht_erreicht_nur_den_einsatzkopf() {
+        for a in Funktionsansicht::ALLE {
+            if a.ist_verfuegbar() {
+                continue;
+            }
+            assert!(a.routen().is_empty(), "{a:?} hat Routen, ist aber gesperrt");
+            assert!(a.lese_module().is_empty(), "{a:?} liest Module");
+        }
     }
 }
