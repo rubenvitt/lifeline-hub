@@ -2244,3 +2244,39 @@ async fn widerrufenes_br_geraet_verliert_den_raum() {
     let (s, _) = anfrage(&app, "GET", &raum, &geraet, None).await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
+
+/// Der Live-Kanal des BR-Geräts trägt die Änderungen am Raum, aber kein ETB: eine Anmeldung durch
+/// die Einsatzleitung erreicht das Tablet, ihr ETB-Eintrag nicht.
+#[tokio::test]
+async fn live_kanal_des_br_geraets_traegt_den_raum_ohne_etb() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+
+    let mut br_strom = live_geraet(&app, &geraet, einsatz).await;
+    let mut admin_strom = live_geraet(&app, &admin, einsatz).await;
+    let (s, v) = belegen(&app, &admin, einsatz, sportplatz, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let mut beim_admin = Vec::new();
+    strom_lesen(
+        &mut admin_strom,
+        &mut beim_admin,
+        Duration::from_millis(500),
+    )
+    .await;
+    assert!(
+        beim_admin.iter().any(|e| e == "etb"),
+        "Gegenprobe: {beim_admin:?}"
+    );
+    let mut beim_br = Vec::new();
+    strom_lesen(&mut br_strom, &mut beim_br, Duration::from_millis(500)).await;
+    assert!(
+        beim_br.iter().any(|e| e == "bereitstellungsraum"),
+        "{beim_br:?}"
+    );
+    assert!(!beim_br.iter().any(|e| e == "etb"), "{beim_br:?}");
+}
