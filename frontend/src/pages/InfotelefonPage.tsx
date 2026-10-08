@@ -30,10 +30,10 @@ import StatusWahl from '../components/StatusWahl';
 import StatusTag from '../components/StatusTag';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import AnrufErfassung from '../infotelefon/AnrufErfassung';
 import { einfrieren, teileZufluss, zuflussText, type Einfrierstand } from '../infotelefon/zufluss';
 import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
-import { infotelefonRechteText } from '../presse/rechteText';
 import { personenPfad, stabPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
@@ -172,7 +172,6 @@ export default function InfotelefonPage() {
       titel="Informationstelefon"
       meta={zustand === 'daten' ? `${anrufe.length} Anrufe` : undefined}
       dataUpdatedAt={anrufeQuery.dataUpdatedAt}
-      beschreibung="Sachgebiet S5 · Anrufe aus der Bevölkerung, offene Rückrufe"
       breadcrumb={
         <Breadcrumb
           items={[
@@ -184,7 +183,9 @@ export default function InfotelefonPage() {
         />
       }
       hinweis={
-        <RechteHinweis sichtbar={!darfSchreiben} text={infotelefonRechteText(einsatz.status)} />
+        darfSchreiben ? undefined : (
+          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+        )
       }
       fuss={
         darfSchreiben ? (
@@ -262,7 +263,7 @@ export default function InfotelefonPage() {
                   aktion={{ label: 'anzeigen', onKlick: () => setGefroren(einfrieren(gefiltert)) }}
                   style={{ position: 'absolute', insetInline: 0, top: 0 }}
                 >
-                  {zuflussText(zurueckgehalten)} — oben einsortiert
+                  {zuflussText(zurueckgehalten)}
                 </Sammelbanner>
               )}
             </div>

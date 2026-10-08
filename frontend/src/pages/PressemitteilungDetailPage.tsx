@@ -57,12 +57,15 @@ import './lageberichtPrint.css';
  *
  * Abweichungen vom Lagebericht:
  * - **Freigeben** nur mit `darfEinsatzLeiten`. Führungspersonal sieht den Knopf gesperrt und
- *   den Grund darüber (M16); der Server antwortet ohnehin 403.
+ *   den Grund daneben, als Beschreibung des Knopfs (M16, LFH-1078); der Server antwortet ohnehin
+ *   403.
  * - **Ort:** Unterroute des Stabs, die Seite prüft die Stab-Freigabe selbst.
  */
 type FormWerte = { titel: string; zeitstand?: Dayjs } & Record<string, string | Dayjs | undefined>;
 
 const SEITE = { titel: 'Pressemitteilung', mitArtikel: 'die Pressemitteilung' };
+/** Eine Mitteilung je Seite: die Kennung des Freigabe-Grunds ist eindeutig. */
+const FREIGABE_GRUND_ID = 'pressemitteilung-freigabe-grund';
 
 export default function PressemitteilungDetailPage() {
   const { mitteilungId } = useParams();
@@ -240,7 +243,7 @@ function PressemitteilungDetail() {
       <FreigabeDialog
         offen={freigabeWerte !== null}
         titel="Pressemitteilung freigeben?"
-        warnung="Die Freigabe ist endgültig: Die Mitteilung wird als ETB-Eintrag festgehalten und gilt als veröffentlicht. Korrekturen sind danach nur als Folgemeldung möglich."
+        warnung="Endgültig: geht ins ETB, Korrektur nur per Folgemeldung."
         speicherFehler={schutz.speicherFehler}
         freigabeFehler={freigebenMutation.error}
         laeuft={schutz.speichertGerade || freigebenMutation.isPending}
@@ -310,11 +313,18 @@ function PressemitteilungDetail() {
                   <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
                     Entwurf speichern
                   </Button>
+                  {/* Kein „Nur Ansicht“: der Entwurf bleibt schreibbar, nur die Freigabe fehlt. */}
+                  {!darfFreigeben && (
+                    <Typography.Text type="secondary" id={FREIGABE_GRUND_ID}>
+                      {FREIGABE_NUR_LEITUNG}
+                    </Typography.Text>
+                  )}
                   <Button
                     type="primary"
                     onClick={freigabeBestaetigen}
                     loading={freigebenMutation.isPending}
                     disabled={!darfFreigeben}
+                    aria-describedby={darfFreigeben ? undefined : FREIGABE_GRUND_ID}
                   >
                     Freigeben
                   </Button>
@@ -324,12 +334,6 @@ function PressemitteilungDetail() {
           </div>
         }
       >
-        {istEntwurf && darfSchreiben && !darfFreigeben && (
-          <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
-            {/* Kein „Nur Ansicht“: der Entwurf bleibt schreibbar, nur die Freigabe fehlt. */}
-            <Typography.Text type="secondary">{FREIGABE_NUR_LEITUNG}</Typography.Text>
-          </div>
-        )}
         {schutz.speicherFehler != null && (
           <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
             <SpeicherFehler fehler={schutz.speicherFehler} />

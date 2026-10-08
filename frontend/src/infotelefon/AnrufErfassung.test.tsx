@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import AnrufErfassung from './AnrufErfassung';
 
 /** Anliegen wählen: das antd-Select öffnet per Klick, die Option ist ein `option`-Element. */
@@ -115,5 +116,42 @@ describe('AnrufErfassung — Eingabegrenzen (LFH-937)', () => {
     renderMitProviders(<AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />);
     expect(screen.getByLabelText('Name')).toHaveAttribute('maxlength', '200');
     expect(screen.getByLabelText('Rückrufnummer')).toHaveAttribute('maxlength', '200');
+  });
+});
+
+/**
+ * Zeigen statt erklären (LFH-1078): keine Tastenlegende als Satz, kein „Leer gelassen: jetzt“.
+ * Enter sendet, weil der Knopf im `<form>` steht; das nennt `aria-keyshortcuts`, sichtbar nur eine
+ * Kappe ab `lg` mit feinem Zeiger (Muster `etb/Schnellerfassung.tsx`).
+ */
+describe('AnrufErfassung — Kürzel und Uhrzeit ohne Erklärsatz (LFH-1078)', () => {
+  it('nennt Enter am Knopf statt in einer Hinweiszeile', () => {
+    renderMitProviders(<AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />);
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Enter');
+    expect(knopf.querySelector('kbd')).toHaveTextContent('↵');
+    const zeile = document.querySelector('[data-lfh="schnellerfassung"]')!;
+    expect(zeile.textContent).not.toMatch(/Enter speichert|Tab wechselt/);
+  });
+
+  it('unter lg und mit grobem Zeiger keine Kappe; das Kürzel bleibt am Knopf', () => {
+    setzeViewportBreite(820);
+    const { unmount } = renderMitProviders(
+      <AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />,
+    );
+    expect(screen.getByRole('button', { name: 'Erfassen' }).querySelector('kbd')).toBeNull();
+    unmount();
+    setzeViewportBreite(1280);
+    setzeZeigerGrob(true);
+    renderMitProviders(<AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />);
+    const knopf = screen.getByRole('button', { name: 'Erfassen' });
+    expect(knopf.querySelector('kbd')).toBeNull();
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Enter');
+  });
+
+  it('die leere Uhrzeit zeigt „jetzt“ als Platzhalter, nicht als Satz', () => {
+    renderMitProviders(<AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />);
+    expect(screen.getByLabelText('Uhrzeit')).toHaveAttribute('placeholder', 'jetzt');
+    expect(screen.queryByText(/Leer gelassen/)).toBeNull();
   });
 });

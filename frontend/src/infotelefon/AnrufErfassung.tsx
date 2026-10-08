@@ -10,6 +10,7 @@ import type { AnrufEingabe } from '../api/infotelefon';
 import { Schnellerfassungszeile, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
@@ -24,6 +25,9 @@ import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
  * - Absende-Knopf im `<form>`, deshalb sendet Enter. Nach dem Speichern sind die Felder leer und
  *   der Fokus steht wieder im Anliegen (`requestAnimationFrame`). „Werte behalten“ gibt es nicht:
  *   jeder Anruf ist ein neuer.
+ * - Die Taste steht am Knopf, nicht als Satz darunter (LFH-1078): `aria-keyshortcuts` immer, die
+ *   ↵-Kappe nur ab `lg` mit feinem Zeiger (Muster `etb/Schnellerfassung.tsx`).
+ * - Leere Uhrzeit: der Server setzt jetzt (`routes/infotelefon.rs`), daher der Platzhalter.
  * - Scheitert das Speichern, bleiben die Felder stehen und der Grund steht darüber.
  */
 interface Werte {
@@ -34,8 +38,6 @@ interface Werte {
   rueckruf?: string;
   eingang?: Dayjs;
 }
-
-export const TASTATURVERTRAG = 'Enter speichert · Tab wechselt das Feld';
 
 export default function AnrufErfassung({
   onErfassen,
@@ -48,7 +50,7 @@ export default function AnrufErfassung({
 }) {
   const [form] = Form.useForm<Werte>();
   const { token } = useRollen();
-  const { istSchmal } = useViewport();
+  const { istSchmal, istBeruehrung, abBreite } = useViewport();
   const anliegenRef = useRef<RefSelectProps>(null);
   const sendetRef = useRef(false);
   const [gespeichert, setGespeichert] = useState(0);
@@ -99,7 +101,6 @@ export default function AnrufErfassung({
           // Notiz rahmenlos neben dem umrandeten Anliegen (LFH-978).
           felderUmrandet
           hinweis={gespeichert > 0 ? `${gespeichert} erfasst` : undefined}
-          hinweiszeile={<span>{TASTATURVERTRAG}</span>}
         >
           <Flex wrap gap={token.marginXS} style={{ width: '100%', padding: token.paddingXS }}>
             <Form.Item
@@ -133,8 +134,13 @@ export default function AnrufErfassung({
             >
               <Checkbox>Rückruf nötig</Checkbox>
             </Form.Item>
-            <Button type="primary" htmlType="submit" loading={laeuft}>
+            <Button type="primary" htmlType="submit" loading={laeuft} aria-keyshortcuts="Enter">
               Erfassen
+              {!istBeruehrung && abBreite('lg') && (
+                <Tastenkuerzel aria-hidden style={{ marginInlineStart: token.marginXS }}>
+                  ↵
+                </Tastenkuerzel>
+              )}
             </Button>
           </Flex>
         </Schnellerfassungszeile>
@@ -159,10 +165,13 @@ export default function AnrufErfassung({
                   <Form.Item
                     label="Uhrzeit"
                     name="eingang"
-                    extra="Leer gelassen: jetzt"
                     style={{ marginBottom: 0, flex: '1 1 200px' }}
                   >
-                    <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                    <ZeitpunktEingabe
+                      format="DD.MM.YYYY HH:mm"
+                      placeholder="jetzt"
+                      style={{ width: '100%' }}
+                    />
                   </Form.Item>
                 </Flex>
               ),

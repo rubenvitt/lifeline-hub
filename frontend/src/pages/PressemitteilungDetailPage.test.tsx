@@ -91,7 +91,10 @@ describe('PressemitteilungDetailPage (LFH-554)', () => {
     setup();
     const knopf = await screen.findByRole('button', { name: 'Freigeben' });
     expect(knopf).toBeDisabled();
-    expect(screen.getByText('Freigabe nur durch die Einsatzleitung')).toBeInTheDocument();
+    // Der Grund steht sichtbar am Knopf (Touch: kein Tooltip) und beschreibt ihn (LFH-1078).
+    expect(screen.getByText('nur Einsatzleitung')).toBeVisible();
+    expect(knopf).toHaveAccessibleDescription('nur Einsatzleitung');
+    expect(screen.queryByText('Nur Ansicht')).toBeNull();
     // Schreiben darf sie trotzdem.
     expect(screen.getByRole('button', { name: 'Entwurf speichern' })).toBeEnabled();
   });
@@ -101,6 +104,11 @@ describe('PressemitteilungDetailPage (LFH-554)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Freigeben' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/Pressemitteilung freigeben\?/)).toBeInTheDocument();
+    // Genau ein Folgesatz vor dem unumkehrbaren Schritt (LFH-1078).
+    expect(
+      within(dialog).getByText('Endgültig: geht ins ETB, Korrektur nur per Folgemeldung.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('nur Einsatzleitung')).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Freigeben' }));
     await waitFor(() => expect(gibPressemitteilungFrei).toHaveBeenCalledWith(1, 4));
     expect(aktualisierePressemitteilung).toHaveBeenCalled();
