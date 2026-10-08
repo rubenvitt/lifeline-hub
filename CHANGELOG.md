@@ -1,3 +1,65 @@
+## [1.0.0-alpha.92](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.91...v1.0.0-alpha.92) (2026-10-08)
+
+### Wichtige Änderungen
+
+Keine Breaking Changes in diesem Release.
+
+### Schäden
+
+- Die Schadenliste lädt große Bestände jetzt seitenweise nach – beim Scrollen erscheint ein „Ältere laden"-Knopf
+- Suche, Spaltenfilter und Sortierung der Schadenliste werden jetzt serverseitig verarbeitet, was die Performance bei vielen Einträgen deutlich verbessert
+- Die Kopfzeile zeigt „x von N geladen", wenn noch nicht alle Schäden geladen sind
+- Auswahlfelder für Schäden (z.B. bei Chat-Bezügen oder Auftrags-Zuweisungen) laden eine schlanke Auswahlliste statt aller Details
+
+### Presse und Öffentlichkeitsarbeit
+
+- Das Presse-Log trennt jetzt offene und erledigte Medienkontakte
+- Offene Medienkontakte werden vollständig angezeigt, erledigte können seitenweise mit „Ältere laden" nachgeladen werden
+- Die Medienlage und Zähler in der Kopfzeile berücksichtigen den gesamten Bestand, auch nicht geladene erledigte Kontakte
+- Deeplinks auf noch nicht geladene Medienkontakte holen diese automatisch einzeln nach
+
+### Aufträge und Befehle
+
+- Die Auftragsliste lädt abgeschlossene Aufträge jetzt erst auf Anforderung und seitenweise
+- Offene Aufträge werden sofort geladen, abgeschlossene erscheinen beim Öffnen des Bereichs mit „Ältere laden"-Funktion
+- Die Zähler für offene und abgeschlossene Aufträge basieren jetzt auf serverseitigen Kennzahlen
+- Deeplinks auf noch nicht geladene Aufträge holen diese automatisch einzeln nach
+- Die Reiter heißen jetzt „Einzelaufträge" und „Einsatzbefehle" statt nur „Einzelauftrag" und „Einsatzbefehl"
+
+### Einsatztagebuch
+
+- Der „Erfassen"-Knopf zeigt ab mittleren Bildschirmen die Tastenkombination als Symbol
+- Der Anhang-Knopf zeigt den Kurzgrund direkt am Knopf statt in einer separaten Zeile
+- Die Hinweise zu „Anhänge entfernen" und „Von/An setzen" erscheinen direkt am jeweiligen Knopf
+- Überflüssige Hinweiszeilen in der Erfassungsmaske wurden entfernt
+
+### Meldungen und Lageberichte
+
+- Der Knopf „In Lagebericht übernehmen" zeigt während des Ladens eine Ladeanzeige statt nur eines Tooltips
+- Erklärtexte wurden durch direkt sichtbare Informationen ersetzt
+
+### Lagekarte
+
+- Der Leerzustand bei Gefahren zeigt jetzt „Gefahrengebiet zeichnen" als Handlungsaufforderung
+- Die Skizzenfläche unterstützt jetzt Tastatur-Shortcuts (aria-keyshortcuts)
+
+### Kräfte und Mittel
+
+- Überflüssige Erklärtexte bei Einheiten, Abschnitten, Kräften und Stab wurden entfernt
+- Die Kurzbezeichnung faltet jetzt ohne Berücksichtigung von Groß-/Kleinschreibung
+- Die Zeitachsen-Abfrage erscheint nur noch, wenn die Freigabe für Einheiten aktiviert ist
+- Vorausgewählte Werte bleiben auch dann sichtbar, wenn die ursprüngliche Auswahl nicht mehr verfügbar ist
+- FMS-Status-Ziffern können jetzt per Tastatur-Shortcuts gesetzt werden (aria-keyshortcuts)
+
+### Druck und Export
+
+- Druckvorschau zeigt bei fehlenden Zugriffsrechten jetzt „Kein Zugriff: …" auch an abgewählten Blöcken
+- Vollständige Listen (für Druck, Einsatzbericht, Lage-Snapshot) werden weiterhin ohne Blätterung geladen
+
+### Betrieb und Installation
+
+- Die CI-Pipeline ist jetzt robuster gegen langsame oder hängende Paketquellen: apt-Schritte haben Zeitlimits und werden bei Bedarf wiederholt
+
 ## [1.0.0-alpha.91](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.90...v1.0.0-alpha.91) (2026-10-07)
 
 ### Wichtige Änderungen
