@@ -113,7 +113,6 @@ export function AnlegenDialog({
             : []),
           { max: 100, message: 'Höchstens 100 Zeichen' },
         ]}
-        extra={art === 'extern' ? 'Die Stelle steht danach auch im Kommunikationsplan.' : undefined}
       >
         <Input />
       </Form.Item>

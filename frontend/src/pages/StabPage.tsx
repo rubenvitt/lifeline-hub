@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Flex, Skeleton, Space, Typography, theme } from 'antd';
+import { App, Breadcrumb, Button, Flex, Skeleton, Space, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -148,7 +148,6 @@ export default function StabPage() {
     <EinsatzSeite
       dataUpdatedAt={stabQuery.dataUpdatedAt}
       titel={modulName('stab')}
-      beschreibung="Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung"
       breadcrumb={
         <Breadcrumb
           items={[
@@ -273,12 +272,8 @@ export default function StabPage() {
                       }
                       description={
                         <Flex vertical gap={token.marginXXS}>
-                          <span>
-                            {s.aufgaben}{' '}
-                            <Typography.Text type="secondary">
-                              (FwDV 100 Anl. 2, S. {s.seite})
-                            </Typography.Text>
-                          </span>
+                          {/* Fachinhalt nach FwDV 100; die Fundstelle nur als Quelle am Text. */}
+                          <span title={`FwDV 100 Anl. 2, S. ${s.seite}`}>{s.aufgaben}</span>
                           {(werkzeuge.length > 0 || unterseiten.length > 0) && (
                             <Flex wrap role="group" aria-label={`Werkzeuge ${s.kuerzel}`}>
                               {unterseiten.map((u) => (

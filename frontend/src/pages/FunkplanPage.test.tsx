@@ -414,9 +414,7 @@ describe('FunkplanPage — Sperre des Stabs', () => {
       freigabenFixture({ stab: { sichtbar: false } }),
     );
     const { container } = setup();
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Lücken' })).toBeNull();
   });
@@ -427,9 +425,7 @@ describe('FunkplanPage — Sperre des Stabs', () => {
       freigabenFixture({ stab: { sichtbar: true, zugriff: false } }),
     );
     const { container } = setup();
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
   });
 
@@ -573,7 +569,7 @@ describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
   it('fragt keine Liste an, wenn der Stab gesperrt ist', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
     setup();
-    await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/);
+    await screen.findByText(/Modul Stab nicht freigegeben/);
     for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
   });
 
@@ -648,9 +644,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
       freigabenFixture({ stab: { sichtbar: false } }),
     );
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
   });
 
@@ -773,7 +767,10 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
         expect.objectContaining({ name: 'Einheiten', zustand: 'fehler' }),
       ),
     );
-    expect(screen.queryByText('Einheiten: nicht geladen')).toBeNull();
+    // Genau eine Nennung: der Quellenhinweis der Seite, keine zweite Zeile über der Fläche.
+    expect(
+      screen.getAllByText('Einheiten: nicht geladen').map((e) => e.getAttribute('data-lfh')),
+    ).toEqual(['funkplan-quellen']);
   });
 });
 
@@ -953,9 +950,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
       freigabenFixture({ stab: { sichtbar: false } }),
     );
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Sprechgruppen' })).toBeNull();
   });
 });
@@ -1311,7 +1306,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     vi.mocked(ladeFernmeldeskizze).mockClear();
     vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
     rendereMit();
-    await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/);
+    await screen.findByText(/Modul Stab nicht freigegeben/);
     expect(vi.mocked(ladeKommunikationsplan)).not.toHaveBeenCalled();
     expect(vi.mocked(ladeFernmeldeskizze)).not.toHaveBeenCalled();
   });

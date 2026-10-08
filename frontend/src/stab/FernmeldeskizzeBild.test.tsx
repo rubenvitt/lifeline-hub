@@ -515,6 +515,28 @@ describe('Fernmeldeskizze — Bearbeiten ohne Zeiger (5.3, 6.3, 6.4)', () => {
     );
   });
 
+  it('externe Stelle: der Weg zum Pflegeort ist ein Sprung, kein Hinweissatz', async () => {
+    const user = userEvent.setup();
+    bild();
+    act(() => element('ks-6')!.focus());
+    await user.keyboard('{Enter}');
+    expect(within(paneel()).getByRole('link', { name: /zum Kommunikationsplan/ })).toHaveAttribute(
+      'data-lfh',
+      'inspector-sprung',
+    );
+    expect(paneel().textContent).not.toContain('gepflegt im');
+  });
+
+  it('ohne Wahl: „Kein Element gewählt“ und ein Knopf zum Schriftfeld statt einer Anleitung', async () => {
+    const user = userEvent.setup();
+    bild();
+    const leer = paneel().querySelector<HTMLElement>('[data-lfh="skizze-paneel-leer"]')!;
+    expect(leer).toHaveTextContent(/^Kein Element gewählt/);
+    expect(leer.textContent).not.toMatch(/Klick|Tippen|Tab/);
+    await user.click(within(paneel()).getByRole('button', { name: 'Schriftfeld wählen' }));
+    expect(within(paneel()).getByRole('heading', { name: 'Schriftfeld' })).toBeInTheDocument();
+  });
+
   it('„zum Datensatz“ trägt die Trefffläche der Stab-Ziele (Gate 3: sonst 15 px hoch)', async () => {
     const user = userEvent.setup();
     bild();
@@ -609,7 +631,7 @@ describe('Fernmeldeskizze — Bearbeiten ohne Zeiger (5.3, 6.3, 6.4)', () => {
     act(() => element('ko-3')!.focus());
     await user.keyboard('{Delete}');
     const frage = await screen.findByRole('dialog', { name: 'Repeater Nord entfernen?' });
-    expect(within(frage).getByText(/die Verbindungen nicht/)).toBeInTheDocument();
+    expect(within(frage).getByText(/Verbindungen sind endgültig weg/)).toBeInTheDocument();
     expect(aktionen!.entferneKomponente).not.toHaveBeenCalled();
     await user.click(within(frage).getByRole('button', { name: 'Entfernen' }));
     await waitFor(() => expect(aktionen!.entferneKomponente).toHaveBeenCalledWith(3));
@@ -657,6 +679,16 @@ describe('Fernmeldeskizze — Bearbeiten ohne Zeiger (5.3, 6.3, 6.4)', () => {
     fireEvent.contextMenu(element('eh-10')!, { clientX: 100, clientY: 100 });
     expect(await screen.findByRole('menuitem', { name: /Verbinden mit/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /zum Datensatz/ })).toBeInTheDocument();
+  });
+
+  it('Tastenkürzel stehen am Menüeintrag, nicht als Legende unter dem Bild', async () => {
+    const { container } = bild();
+    expect(container.querySelector('[data-lfh="skizze-tasten"]')).toBeNull();
+    expect(container.textContent).not.toMatch(/Tab wählt|verschieben ·/);
+    fireEvent.contextMenu(element('eh-10')!, { clientX: 100, clientY: 100 });
+    const verbinden = await screen.findByRole('menuitem', { name: /Verbinden mit/ });
+    expect(verbinden).toHaveTextContent('V');
+    expect(screen.getByRole('menuitem', { name: /Eigenschaften/ })).toHaveTextContent('Enter');
   });
 
   it('Langdruck am Tablet öffnet das Kontextmenü', async () => {

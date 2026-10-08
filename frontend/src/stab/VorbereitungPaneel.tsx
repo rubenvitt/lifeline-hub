@@ -152,7 +152,6 @@ export default function VorbereitungPaneel({
               <Button
                 loading={uebernehmen.isPending}
                 disabled={laedt}
-                title={laedt ? 'Erst wenn alle Angaben geladen sind' : undefined}
                 onClick={() => uebernehmen.mutate()}
               >
                 In Lagebericht übernehmen

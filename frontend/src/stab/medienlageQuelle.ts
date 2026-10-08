@@ -12,14 +12,14 @@ import { baueMedienlage, rendereMedienlageMarkdown } from './medienlage';
  */
 export const MEDIENLAGE_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus S5 übernehmen',
-  unterzeile: 'Presse-Log, Pressemitteilungen und Informationstelefon, ohne Personenbezug',
+  // Quellen wie die übrigen Übernahmen; „ohne Personenbezug“ ist ein Datenschutz-Hinweis.
+  unterzeile: 'Presse-Log · Pressemitteilungen · Infotelefon, ohne Personenbezug',
   ersetzenTitel: 'Medienlage ersetzen?',
-  ersetzenText:
-    'Der Abschnitt enthält schon Text. Er wird durch die aktuelle Medienlage aus S5 ersetzt.',
+  ersetzenText: 'Vorhandener Text wird ersetzt.',
   verfuegbar: (freigaben) =>
     istKeyFreigegeben('stab', freigaben)
       ? { frei: true }
-      : { frei: false, grund: 'Modul Stab ist in diesem Einsatz nicht freigegeben' },
+      : { frei: false, grund: 'Stab nicht freigegeben' },
   erzeuge: async ({ qc, einsatzId, dtg }) => {
     const [kontakte, mitteilungen, anrufe] = await Promise.all([
       ladeListe(qc, einsatzKeys.medienkontakte(einsatzId), () => ladeMedienkontakte(einsatzId), []),

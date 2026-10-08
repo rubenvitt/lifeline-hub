@@ -434,9 +434,8 @@ describe('entfernUmfang / entfernText (LFH-893)', () => {
     expect(u.skizzenVerbindungen).toBeNull();
     expect(brauchtRueckfrage(u)).toBe(true);
     expect(entfernText('Polizei', u)).toBe(
-      '„Polizei“ wird aus dem Kommunikationsplan entfernt. Ob sie in der Fernmeldeskizze ' +
-        'verbunden ist, ist nicht bekannt (Fernmeldeskizze nicht geladen); ihre Verbindungen ' +
-        'dort gehen mit.',
+      '„Polizei“ wird aus dem Kommunikationsplan entfernt, samt ihrer Verbindungen in der ' +
+        'Fernmeldeskizze (nicht geladen).',
     );
   });
 

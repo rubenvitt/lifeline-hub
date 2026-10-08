@@ -78,7 +78,7 @@ export function stabFreigabeAnzeige(
       return (
         <SeitenSackgasse
           titel={`${seite.titel} nicht verfügbar`}
-          hinweis={`Das Modul Stab ist in diesem Einsatz nicht freigegeben; ${seite.mitArtikel} gehört dazu.`}
+          hinweis="Modul Stab nicht freigegeben"
           rueckweg={{
             pfad: einsatzModulPfad(einsatzId, modulZielRoute(ziel)),
             label: `${ziel.label} öffnen`,

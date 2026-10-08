@@ -380,7 +380,6 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
           <Button
             loading={uebernehmen.isPending}
             disabled={quellenLaden}
-            title={quellenLaden ? 'Erst wenn alle Angaben geladen sind' : undefined}
             onClick={() => uebernehmen.mutate()}
           >
             In Lagebericht übernehmen
