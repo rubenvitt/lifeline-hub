@@ -167,6 +167,8 @@ const KONSUMENTEN = [
   // Tabelle), je mit eigener Formbegründung und eigenem Spaltenregister.
   '/src/betreuung/EvakuierungBlock.tsx',
   '/src/betreuung/StellenBlock.tsx',
+  // Die Betroffenen einer Betreuungsstelle (LFH-1041): Register der eigenen Stelle.
+  '/src/geraet/GeraetBetroffenePage.tsx',
   // Die Patientenliste eines UHS-Geräts (LFH-892): Register der eigenen UHS plus Spalte „Ort“.
   '/src/geraet/GeraetPatientenPage.tsx',
   // Die Dokumentenablage: Titel als nativer Download-Anker aus dem Spalten-`render` (kein
