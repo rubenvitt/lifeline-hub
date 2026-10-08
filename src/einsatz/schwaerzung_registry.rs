@@ -288,6 +288,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("notiz", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("gesichtet_at", G_ZEIT),
             retain("gesichtet_von", G_FK),
+            // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
         ],
     },
     TabellenRegel {
@@ -326,6 +329,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_von", G_FK),
             // Kennung der Betreuungsstelle eines Notunterkunft-Verbleibs.
             retain("betreuungsstelle_id", G_FK),
+            // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
         ],
     },
     TabellenRegel {

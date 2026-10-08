@@ -148,6 +148,14 @@ describe('aufnahmeZuEingabe', () => {
     expect(e).not.toHaveProperty('antreff_lat');
   });
 
+  it('schickt die Bestätigung am Gerät nur mit einer Erst-Sichtung (LFH-1046, sonst 422)', () => {
+    expect(aufnahmeZuEingabe({ sichtung: 'sk1', bestaetigt_personal_id: 5 })).toEqual({
+      sichtung: 'sk1',
+      bestaetigt_personal_id: 5,
+    });
+    expect(aufnahmeZuEingabe({ bestaetigt_personal_id: 5 })).toEqual({});
+  });
+
   it('reicht „vermisst seit" als Wire-String durch', () => {
     expect(aufnahmeZuEingabe({ vermisst_seit: '2026-09-22 06:00:00' })).toEqual({
       vermisst_seit: '2026-09-22 06:00:00',

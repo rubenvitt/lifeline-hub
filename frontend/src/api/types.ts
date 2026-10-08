@@ -254,6 +254,7 @@ export type VerbleibStatus = S['VerbleibStatus'];
 export type Sichtung = S['SichtungAnzeige'];
 export type Verlaufsnotiz = S['NotizAnzeige'];
 export type Verbleib = S['VerbleibAnzeige'];
+export type Bestaetiger = S['Bestaetiger'];
 export type Abgleich = S['AbgleichAnzeige'];
 export type PersonDetail = S['PersonDetail'];
 export type PersonZugriff = S['ZugriffAnzeige'];

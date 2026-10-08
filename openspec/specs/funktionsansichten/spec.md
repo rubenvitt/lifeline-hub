@@ -37,7 +37,7 @@ Kopplung.
 | `unfallhilfsstellen`: Plätze anlegen, ändern, stornieren; Stammdaten der eigenen UHS; Anhänge der eigenen UHS | — | L/S | — |
 | `unfallhilfsstellen`: UHS anlegen, Status wechseln, stornieren | — | — | — |
 | `personen`: Personen der eigenen UHS | L | L | — |
-| `personen`: Aufnahme in die eigene UHS, Stammdaten, Sichtung, Verbleib, Notizen | S | S | — |
+| `personen`: Aufnahme in die eigene UHS, Stammdaten, Sichtung, Verbleib, Notizen, Auswahl „Bestätigt von“ | S | S | — |
 | `personen`: Export, Druck, Abgleich, Anhänge | — | — | — |
 | `material`: Material der eigenen UHS | — | L | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | — | L/S | — |

@@ -206,6 +206,7 @@ use utoipa::OpenApi;
         crate::person::anhang::PersonAnhangAnzeige,
         crate::person::sichtung_repo::SichtungAnzeige,
         crate::person::verbleib_repo::VerbleibAnzeige,
+        crate::geraet::bestaetigung::Bestaetiger,
         crate::person::verlaufsnotiz_repo::NotizAnzeige,
         crate::personal::EinsatzPersonalAnzeige,
         crate::personal::FuehrungskraftKarte,

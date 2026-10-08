@@ -125,6 +125,13 @@ describe('verbleibBody', () => {
     });
   });
 
+  it('schickt die Bestätigung am Gerät nur, wenn gewählt (LFH-1046)', () => {
+    expect(verbleibBody({ art: 'transport', bestaetigt_personal_id: 5 }, false)).toMatchObject({
+      bestaetigt_personal_id: 5,
+    });
+    expect(verbleibBody({ art: 'transport' }, false)).not.toHaveProperty('bestaetigt_personal_id');
+  });
+
   it('lässt eine liegengebliebene Stelle nach einem Artwechsel weg (sonst 422)', () => {
     const body = verbleibBody(
       { art: 'transport', betreuungsstelle_id: 7, ziel: 'KH Mitte' },

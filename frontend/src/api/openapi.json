@@ -2057,6 +2057,30 @@
           "rueckwaertig"
         ]
       },
+      "Bestaetiger": {
+        "type": "object",
+        "description": "Ein Eintrag der Auswahlliste „Bestätigt von“.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "funktion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kennung in `einsatz_personal`."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "BetreuungUebersicht": {
         "type": "object",
         "description": "Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke\nund Stellen eines Einsatzes.",
@@ -10773,6 +10797,13 @@
           "gesichtet_von"
         ],
         "properties": {
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
@@ -12051,6 +12082,13 @@
         "properties": {
           "art": {
             "$ref": "#/components/schemas/VerbleibArt"
+          },
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person."
           },
           "betreuungsstelle_id": {
             "type": [

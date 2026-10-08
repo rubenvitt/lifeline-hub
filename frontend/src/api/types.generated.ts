@@ -770,6 +770,16 @@ export interface components {
          * @enum {string}
          */
         BesetzungsZustand: "nicht_vergeben" | "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
+        /** @description Ein Eintrag der Auswahlliste „Bestätigt von“. */
+        Bestaetiger: {
+            funktion?: string | null;
+            /**
+             * Format: int64
+             * @description Kennung in `einsatz_personal`.
+             */
+            id: number;
+            name: string;
+        };
         /**
          * @description Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke
          *     und Stellen eines Einsatzes.
@@ -4044,6 +4054,8 @@ export interface components {
         };
         /** @description Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`). */
         SichtungAnzeige: {
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
+            bestaetigt_name?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             gesichtet_at: string;
@@ -4546,6 +4558,8 @@ export interface components {
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
+            bestaetigt_name?: string | null;
             /**
              * Format: int64
              * @description Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen
