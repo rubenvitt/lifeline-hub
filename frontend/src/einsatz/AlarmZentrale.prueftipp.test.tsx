@@ -44,7 +44,7 @@ it('ein Tipp in „wird geprüft" ruft die Freischaltung und schaltet nicht stum
     </AntApp>,
   );
   const ton = screen.getByRole('button', {
-    name: 'Alarmton wird geprüft – freischalten',
+    name: 'Ton wird geprüft – freischalten',
   });
   expect(ton).toHaveTextContent('Ton wird geprüft');
   const vorher = resume.mock.calls.length;

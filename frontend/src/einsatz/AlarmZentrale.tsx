@@ -717,22 +717,24 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       : tonStatus === 'prueft'
         ? 'Ton wird geprüft'
         : 'Ton blockiert';
-  // Name und Tooltip des Knopfs: die Handlung. In `prueft`/`blockiert` mit Zustand, denn die
-  // Handlung („freischalten") erklärt sich erst durch ihn. Keine Geste im Text (LFH-1078): Maus und
-  // Tastatur tippen nicht. Offen: das sichtbare „Ton …“ steht nicht wortgleich im Namen (WCAG 2.5.3).
-  const tonHinweis = gemutet
-    ? 'Alarmton einschalten'
+  const tonHandlung = gemutet
+    ? 'einschalten'
     : tonStatus === 'bereit'
-      ? 'Alarmton stummschalten'
-      : tonStatus === 'prueft'
-        ? 'Alarmton wird geprüft – freischalten'
-        : 'Alarmton blockiert – freischalten';
-  // Menüeintrag: Zustand UND Handlung als ein Satz — dort steht kein Tooltip daneben.
+      ? 'stummschalten'
+      : 'freischalten';
+  // Name und Tooltip des Knopfs: der sichtbare Zustand wortgleich vorn, dann die Handlung
+  // (WCAG 2.5.3, LFH-1102): Spracheingabe mit „Ton blockiert“ trifft den Knopf. Keine Geste im
+  // Text (LFH-1078): Maus und Tastatur tippen nicht.
+  const tonHinweis = `${tonText} – ${tonHandlung}`;
+  // Menüeintrag: Zustand UND Handlung als ein Satz — dort steht kein Tooltip daneben, und der
+  // sichtbare Text ist der Name.
   const tonSatz = gemutet
     ? 'Alarmton ist stumm – einschalten'
     : tonStatus === 'bereit'
       ? 'Alarmton ist bereit – stummschalten'
-      : tonHinweis;
+      : tonStatus === 'prueft'
+        ? 'Alarmton wird geprüft – freischalten'
+        : 'Alarmton blockiert – freischalten';
 
   // Einmal abgeleitet, von BEIDEN Bauformen benutzt, damit dasselbe Zeichen an zwei Orten dasselbe
   // heißt. `aria-hidden` bleibt als zweite Sicherung, obwohl das Icon des Satzes selbst
@@ -832,7 +834,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           {desktopWort}
         </Button>
       </Tooltip>
-      <Tooltip title={tonWort ? tonHinweis : `${tonText} — ${tonHinweis}`}>
+      <Tooltip title={tonHinweis}>
         <Button
           type="text"
           aria-label={tonHinweis}

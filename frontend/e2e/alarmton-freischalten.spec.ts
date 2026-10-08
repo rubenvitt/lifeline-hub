@@ -125,7 +125,7 @@ test('Fükw 1440: ohne Geste „Ton blockiert", ein Klick irgendwo schaltet frei
   const tab = await frischerTab(page, einsatzId, 1440);
 
   const alarm = tab.locator('header [data-lfh="kopf-alarm"]');
-  const ton = alarm.getByRole('button', { name: 'Alarmton blockiert – freischalten' });
+  const ton = alarm.getByRole('button', { name: 'Ton blockiert – freischalten' });
   await expect(ton).toHaveText('Ton blockiert', { timeout: NACH_DER_FRIST });
 
   // Irgendwo, nicht auf die Glocke: die erste Geste genügt.
@@ -133,7 +133,7 @@ test('Fükw 1440: ohne Geste „Ton blockiert", ein Klick irgendwo schaltet frei
     .locator('main')
     .first()
     .click({ position: { x: 5, y: 5 } });
-  const bereit = alarm.getByRole('button', { name: 'Alarmton stummschalten' });
+  const bereit = alarm.getByRole('button', { name: 'Ton bereit – stummschalten' });
   await expect(bereit).toHaveText('Ton bereit');
   await expect(bereit).toHaveAttribute('aria-pressed', 'false');
 });
@@ -147,9 +147,9 @@ test('Fükw 1440: ein Klick auf die gesperrte Glocke schaltet frei und nicht stu
 
   const alarm = tab.locator('header [data-lfh="kopf-alarm"]');
   await alarm
-    .getByRole('button', { name: 'Alarmton blockiert – freischalten' })
+    .getByRole('button', { name: 'Ton blockiert – freischalten' })
     .click({ timeout: NACH_DER_FRIST });
-  const bereit = alarm.getByRole('button', { name: 'Alarmton stummschalten' });
+  const bereit = alarm.getByRole('button', { name: 'Ton bereit – stummschalten' });
   await expect(bereit).toHaveText('Ton bereit');
   await expect(bereit).toHaveAttribute('aria-pressed', 'false');
   expect(await tab.evaluate(() => localStorage.getItem('lfh:alarm:mute'))).not.toBe('1');
@@ -173,7 +173,7 @@ test.describe('Führungs-Tablet mit Finger', () => {
     // EIN Ziel, das die Störung benennt — die Einzelknöpfe der Maus-Bauform stehen nicht.
     const ziel = alarm.getByRole('button', { name: 'Alarmzentrale: Ton blockiert' });
     await expect(ziel).toHaveText('Ton blockiert', { timeout: NACH_DER_FRIST });
-    await expect(alarm.getByRole('button', { name: /^Alarmton / })).toHaveCount(0);
+    await expect(alarm.getByRole('button', { name: /^Ton / })).toHaveCount(0);
     await kopfIstEinzeilig(page, `${kontext}, Ton blockiert`);
 
     // Der Tipp öffnet das Menü; Handlung und Zustand stehen dort als Satz, ohne Tooltip.
@@ -242,7 +242,7 @@ test.describe('Fükw mit Maus: die längsten Zustandswörter in einer Kopfzeile'
         const tab = await frischerTab(page, einsatzId, breite);
         const alarm = tab.locator('header [data-lfh="kopf-alarm"]');
         await expect(
-          alarm.getByRole('button', { name: 'Alarmton blockiert – freischalten' }),
+          alarm.getByRole('button', { name: 'Ton blockiert – freischalten' }),
         ).toHaveText('Ton blockiert', { timeout: NACH_DER_FRIST });
         await expect(
           alarm.getByRole('button', { name: `Benachrichtigungen: ${benachrichtigung}` }),

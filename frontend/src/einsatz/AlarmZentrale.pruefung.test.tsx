@@ -117,7 +117,7 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     expect(ton).toHaveTextContent(/^$/);
     expect(ton).toHaveStyle({ color: rahmenFarben.gedaempft });
     // Ein Tipp schaltet frei, nie stumm (LFH-950) — der Name sagt es.
-    expect(ton).toHaveAccessibleName('Alarmton wird geprüft – freischalten');
+    expect(ton).toHaveAccessibleName('Ton wird geprüft – freischalten');
     tablet.unmount();
 
     // Breite Bauform: das Wort steht, aber es nennt die Prüfung, nicht eine Störung.
@@ -125,6 +125,7 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     const breit = renderAlarm();
     ton = tonKnopf();
     expect(ton).toHaveTextContent('Ton wird geprüft');
+    expect(ton).toHaveAccessibleName('Ton wird geprüft – freischalten');
     expect(ton).toHaveStyle({ color: rahmenFarben.gedaempft });
     breit.unmount();
 
@@ -159,6 +160,6 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     await pruefungEndet('suspended');
     await waitFor(() => expect(tonKnopf()).toHaveTextContent('Ton blockiert'));
     expect(tonKnopf()).toHaveStyle({ color: farbenDunkel.achtung });
-    expect(tonKnopf()).toHaveAccessibleName('Alarmton blockiert – freischalten');
+    expect(tonKnopf()).toHaveAccessibleName('Ton blockiert – freischalten');
   });
 });
