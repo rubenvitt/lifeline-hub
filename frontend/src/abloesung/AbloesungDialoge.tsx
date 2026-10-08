@@ -1,10 +1,13 @@
 import { Form, InputNumber } from 'antd';
 import type { Dayjs } from 'dayjs';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { formatUhrzeitMitTag } from '../anzeige/format';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { Abloesung } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { abschnittVorgabe } from '../components/vorgabeText';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { rhythmusText } from './einstufung';
 
@@ -13,6 +16,10 @@ import { rhythmusText } from './einstufung';
  * Der Rhythmus wird in STUNDEN erfasst (0,5er-Schritte) und als Minuten gesendet — die Lage
  * spricht in „6-Stunden-Rhythmus", nicht in 360 Minuten. Zeiten stehen in der Anzeigezone
  * (`ZeitpunktEingabe`, LFH-692).
+ *
+ * Kein „Leer: …“ unter den Feldern (LFH-1078, `frontend/AGENTS.md`, „Texte: zeigen statt
+ * erklären“): was ein leeres Feld bewirkt, steht als Platzhalter im Feld — der Wert, den der
+ * Server dann nimmt, und nur, wenn er bekannt ist.
  */
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
@@ -28,14 +35,19 @@ function stundenAlsMinuten(stunden: number | null | undefined): number | undefin
   return Math.round(stunden * 60);
 }
 
-const rhythmusFeld = (extra: string | undefined, pflicht: boolean) => (
+const rhythmusFeld = (platzhalter: string | undefined, pflicht: boolean) => (
   <Form.Item
     name="rhythmus_stunden"
     label="Rhythmus (Stunden)"
-    extra={extra}
     rules={pflicht ? [{ required: true, message: 'Bitte einen Rhythmus angeben' }] : []}
   >
-    <InputNumber min={0.5} max={168} step={0.5} style={{ width: '100%' }} />
+    <InputNumber
+      min={0.5}
+      max={168}
+      step={0.5}
+      placeholder={platzhalter}
+      style={{ width: '100%' }}
+    />
   </Form.Item>
 );
 
@@ -53,6 +65,11 @@ interface SchichtBeginnenProps {
   einheiten: EinheitOption[];
   /** Einheit → Vorgabe ihres Abschnitts in Minuten (fehlt = keine Vorgabe). */
   vorgabeJeEinheit: Map<number, number>;
+  /**
+   * Einheit → Eintreffen ihrer offenen Einsatzperiode (fehlt = keins, der Server nimmt „jetzt“);
+   * `null`, solange die Perioden nicht bekannt sind — dann verspricht der Platzhalter nichts.
+   */
+  eintreffenJeEinheit?: Map<number, string> | null;
   laeuft: boolean;
   fehler: unknown;
   onErfassen: (body: {
@@ -67,14 +84,25 @@ export function SchichtBeginnenDialog({
   offen,
   einheiten,
   vorgabeJeEinheit,
+  eintreffenJeEinheit = null,
   laeuft,
   fehler,
   onErfassen,
   onSchliessen,
 }: SchichtBeginnenProps) {
   const [form] = Form.useForm<BeginnWerte>();
+  const { konventionen } = useAnzeigeKonventionen();
   const einheitId = Form.useWatch('einheit_id', form);
   const vorgabe = einheitId != null ? vorgabeJeEinheit.get(einheitId) : undefined;
+  // Wie der Server (`abloesung/repo.rs`, `offenes_eintreffen_tx`): das Eintreffen der offenen
+  // Periode, ohne eins „jetzt“.
+  const eintreffen = einheitId != null ? eintreffenJeEinheit?.get(einheitId) : undefined;
+  const beginnPlatzhalter =
+    einheitId == null || eintreffenJeEinheit == null
+      ? undefined
+      : eintreffen != null
+        ? `Eintreffen ${formatUhrzeitMitTag(eintreffen, konventionen)}`
+        : 'jetzt';
   return (
     <ErfassungsModal<BeginnWerte>
       offen={offen}
@@ -103,21 +131,19 @@ export function SchichtBeginnenDialog({
           notFoundContent="Alle Einheiten haben bereits eine laufende Schicht"
         />
       </Form.Item>
-      <Form.Item<BeginnWerte>
-        name="beginn"
-        label="Im Einsatz seit"
-        extra="Leer: Eintreffen laut Kräfte-Zeitachse, sonst jetzt"
-      >
-        <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
+      <Form.Item<BeginnWerte> name="beginn" label="Im Einsatz seit">
+        <ZeitpunktEingabe
+          format={ZEITFORMAT}
+          placeholder={beginnPlatzhalter}
+          style={{ width: '100%' }}
+        />
       </Form.Item>
-      {/* Vor der Wahl der Einheit gibt es keinen Abschnitt, über den ein Satz etwas sagen
-          könnte, und keine Pflicht (LFH-948). */}
+      {/* Vor der Wahl der Einheit gibt es keinen Abschnitt, dessen Vorgabe gälte, und keine
+          Pflicht (LFH-948). Ohne Vorgabe zeigt die Pflichtmarke, dass ein Wert fehlt. */}
       {einheitId == null
         ? rhythmusFeld(undefined, false)
         : rhythmusFeld(
-            vorgabe != null
-              ? `Leer: Vorgabe des Abschnitts (${rhythmusText(vorgabe)})`
-              : 'Der Abschnitt der Einheit hat keine Vorgabe',
+            vorgabe != null ? abschnittVorgabe(rhythmusText(vorgabe)) : undefined,
             vorgabe == null,
           )}
       <SpeicherFehler fehler={fehler} titel="Schicht konnte nicht begonnen werden" />
@@ -168,15 +194,11 @@ export function VollzugDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<VollzugWerte>
-        name="abloesende_einheit_id"
-        label="Ablösende Einheit"
-        extra="Für sie beginnt die Folgeschicht mit demselben Rhythmus. Leer: ohne Ablöser."
-      >
+      <Form.Item<VollzugWerte> name="abloesende_einheit_id" label="Ablösende Einheit">
         <Select allowClear placeholder="ohne ablösende Einheit" options={einheiten} />
       </Form.Item>
-      <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt" extra="Leer: jetzt">
-        <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
+      <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt">
+        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       <SpeicherFehler fehler={fehler} titel="Ablösung konnte nicht vollzogen werden" />
     </ErfassungsModal>
@@ -219,11 +241,7 @@ export function AbloeserDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<AbloeserWerte>
-        name="abloesende_einheit_id"
-        label="Ablösende Einheit"
-        extra="Leer: Planung aufheben"
-      >
+      <Form.Item<AbloeserWerte> name="abloesende_einheit_id" label="Ablösende Einheit">
         <Select allowClear placeholder="keine geplant" options={einheiten} />
       </Form.Item>
       <SpeicherFehler fehler={fehler} titel="Planung konnte nicht gespeichert werden" />
@@ -242,8 +260,11 @@ interface RhythmusProps {
   titel: string;
   /** Vorbelegung in Minuten. */
   minuten: number | null;
-  /** Was ein leeres Feld bedeutet — „Vorgabe des Abschnitts" bzw. „Vorgabe entfernen". */
-  leerText: string;
+  /**
+   * Was bei leerem Feld gilt, als Platzhalter: „6 h (Vorgabe Abschnitt)“ bzw. „keine Vorgabe“; fehlt er,
+   * zeigt die Pflichtmarke, dass ein Wert nötig ist.
+   */
+  platzhalter?: string;
   /** Darf das Feld leer bleiben? */
   leerErlaubt: boolean;
   laeuft: boolean;
@@ -257,7 +278,7 @@ export function RhythmusDialog({
   offen,
   titel,
   minuten,
-  leerText,
+  platzhalter,
   leerErlaubt,
   laeuft,
   fehler,
@@ -277,7 +298,7 @@ export function RhythmusDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      {rhythmusFeld(leerText, !leerErlaubt)}
+      {rhythmusFeld(platzhalter, !leerErlaubt)}
       <SpeicherFehler fehler={fehler} titel="Rhythmus konnte nicht gespeichert werden" />
     </ErfassungsModal>
   );

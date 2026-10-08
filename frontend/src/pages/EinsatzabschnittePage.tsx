@@ -1,5 +1,4 @@
 import {
-  Alert,
   App,
   Breadcrumb,
   Button,
@@ -52,7 +51,15 @@ import AbschnittDaten from './einsatzabschnitte/AbschnittDaten';
 import { abschnittLagezustand } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { abrufZustand } from '../api/abrufZustand';
-import { parseAbschnitteAnsicht, type AbschnitteAnsicht } from '../routing/deeplinks';
+import {
+  einheitenPfad,
+  parseAbschnitteAnsicht,
+  type AbschnitteAnsicht,
+} from '../routing/deeplinks';
+import { RechteHinweis } from '../components/SpeicherHinweis';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { SprungKnopf } from '../components/Sprung';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import type { Quelle } from '../stab/luecken';
 import Organigramm from './einsatzabschnitte/Organigramm';
 import { modulName } from '../einsatz/modulRegistry';
@@ -71,6 +78,9 @@ const ANSICHT_OPTIONEN = [
   { wert: 'gliederung', label: 'Gliederung' },
   { wert: 'organigramm', label: 'Organigramm' },
 ] as const satisfies readonly { wert: AbschnitteAnsicht; label: string }[];
+
+/** Vergleichsform der Kurzbezeichnung wie SQLite `NOCASE`: getrimmt, nur A–Z gefaltet. */
+const nocase = (s: string) => s.trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
 
 function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -202,6 +212,7 @@ export default function EinsatzabschnittePage() {
   const fehler = useFehlerMeldung();
 
   const abschnitte = useMemo(() => abschnitteQuery.data ?? [], [abschnitteQuery.data]);
+  const istGesperrt = useSprungSperre(einsatzId);
   // Für das Organigramm: eine fehlende Liste ist kein leerer Bestand (Stärke „—“ mit Grund).
   const einheitenZustand =
     einheitenQuery.data != null ? ('daten' as const) : abrufZustand(einheitenQuery);
@@ -209,7 +220,16 @@ export default function EinsatzabschnittePage() {
     () => ({ zustand: einheitenZustand, daten: einheitenQuery.data ?? [] }),
     [einheitenZustand, einheitenQuery.data],
   );
-  const aktuell = abschnitte.find((a) => a.id === gewaehlt) ?? null;
+  /**
+   * Ohne Wahl steht der erste Abschnitt der Gliederung im Detail (LFH-1078): statt einer
+   * Aufforderung „Wähle einen Abschnitt im Baum“ zeigt die Seite gleich einen. Ein offener Entwurf
+   * hat keinen. `gewaehlt` bleibt die Wahl der Person; die Vorwahl ist nur ihr Rückfall.
+   */
+  const aktuell = entwurf
+    ? null
+    : gewaehlt != null
+      ? (abschnitte.find((a) => a.id === gewaehlt) ?? null)
+      : (abschnitte.find((a) => a.ueber_abschnitt_id == null) ?? null);
 
   const speichern = useMutation({
     mutationFn: (werte: AbschnittWerte) => {
@@ -249,10 +269,13 @@ export default function EinsatzabschnittePage() {
     onError: fehler,
   });
 
-  // Beim Wechsel des gewählten Abschnitts zurück in die Lese-Ansicht.
+  // Beim Wechsel des angezeigten Abschnitts zurück in die Lese-Ansicht — auch wenn die Vorwahl
+  // wechselt, weil ein anderer Arbeitsplatz den Abschnitt aufgelöst hat; sonst füllte das Formular
+  // still den nächsten und Speichern träfe ihn.
+  const aktuellId = aktuell?.id;
   useEffect(() => {
     setBearbeiten(false);
-  }, [gewaehlt]);
+  }, [aktuellId]);
 
   // Formular mit den Werten des aktuellen Abschnitts vorbelegen, sobald der Edit-Modus öffnet.
   useEffect(() => {
@@ -363,9 +386,13 @@ export default function EinsatzabschnittePage() {
           </ListenEintrag>
         )}
       />
-      <span style={{ fontSize: 12, color: rollen.gedaempft }}>
-        Die Abschnitts-Zuordnung einer Einheit wird auf der Einheiten-Seite gesetzt.
-      </span>
+      {/* Die Zuordnung setzt die Einheit (Feld „Abschnitt“ ihrer Detailseite): ein Sprung
+          dorthin statt eines Satzes (LFH-1078). */}
+      <div style={{ marginTop: token.marginXS }}>
+        <SprungKnopf to={einheitenPfad(einsatzId)} gesperrt={istGesperrt('einheiten')}>
+          Zu den Einheiten
+        </SprungKnopf>
+      </div>
     </>
   );
 
@@ -404,16 +431,13 @@ export default function EinsatzabschnittePage() {
           )}
         </Space>
       }
+      hinweis={
+        // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei.
+        darfSchreiben ? undefined : (
+          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+        )
+      }
     >
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert
-          style={{ marginBottom: token.marginSM }}
-          type="info"
-          showIcon
-          title="Einsatz ist abgeschlossen — nur Ansicht."
-        />
-      )}
-
       {ansicht === 'organigramm' ? (
         abschnitteQuery.isLoading ? (
           <SeitenSkeleton />
@@ -430,7 +454,9 @@ export default function EinsatzabschnittePage() {
           // Aussage über eine Lage, die niemand geprüft hat.
           <SeitenLeer
             titel="Noch keine Abschnitte"
-            hinweis="Die Führungsorganisation entsteht aus der Gliederung in Abschnitte."
+            aktion={
+              darfSchreiben ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen } : undefined
+            }
           />
         ) : (
           <>
@@ -486,7 +512,6 @@ export default function EinsatzabschnittePage() {
               ) : abschnitte.length === 0 && !entwurf ? (
                 <SeitenLeer
                   titel="Noch keine Abschnitte"
-                  hinweis="Gliedere die Lage in Abschnitte, um Einheiten und Führung zuzuordnen."
                   /* Derselbe Wortlaut wie der Kopfknopf. Ohne Schreibrecht keine Aktion — ein
                    Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
                   aktion={
@@ -502,7 +527,7 @@ export default function EinsatzabschnittePage() {
                   )}
                   <Tree
                     treeData={baumDaten}
-                    selectedKeys={entwurf ? ['entwurf'] : gewaehlt != null ? [gewaehlt] : []}
+                    selectedKeys={entwurf ? ['entwurf'] : aktuell ? [aktuell.id] : []}
                     defaultExpandAll
                     onSelect={(keys) => {
                       setEntwurf(false);
@@ -525,11 +550,9 @@ export default function EinsatzabschnittePage() {
                   : 'Kein Abschnitt gewählt'
             }
           >
-            {/* Kein Leerzustand, sondern eine Aufforderung bei fehlender Auswahl; deshalb ohne
-              Aktion. */}
-            {!aktuell && !entwurf ? (
-              <SeitenLeer titel="Wähle einen Abschnitt im Baum" />
-            ) : entwurf || bearbeiten ? (
+            {/* Ohne Abschnitt (leere Gliederung, Ladefehler) trägt der Titel den Zustand; den
+                Weg hinaus zeigt der Leerzustand der Gliederung. */}
+            {!aktuell && !entwurf ? null : entwurf || bearbeiten ? (
               <Form<AbschnittWerte>
                 form={form}
                 layout="vertical"
@@ -538,12 +561,32 @@ export default function EinsatzabschnittePage() {
                 <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
                   <Input autoFocus />
                 </Form.Item>
+                {/* Eindeutig je Einsatz ohne Groß-/Kleinschreibung wie der Index
+                    `einsatzabschnitt_kurzbezeichnung_eindeutig` (NOCASE): als Prüfung am Feld,
+                    nicht als Satz (LFH-1078). Der Server bleibt die Wahrheit. */}
                 <Form.Item
                   label="Kurzbezeichnung"
                   name="kurzbezeichnung"
-                  extra="Rufname im Einsatz, z. B. „EA-N“ — je Einsatz nur einmal vergeben."
+                  rules={[
+                    {
+                      validator: (_, wert?: string) => {
+                        const kurz = wert ? nocase(wert) : undefined;
+                        const belegt = kurz
+                          ? abschnitte.find(
+                              (a) =>
+                                a.id !== aktuell?.id &&
+                                a.kurzbezeichnung != null &&
+                                nocase(a.kurzbezeichnung) === kurz,
+                            )
+                          : undefined;
+                        return belegt
+                          ? Promise.reject(new Error(`Schon vergeben (${belegt.name})`))
+                          : Promise.resolve();
+                      },
+                    },
+                  ]}
                 >
-                  <Input maxLength={20} allowClear />
+                  <Input maxLength={20} allowClear placeholder="z. B. EA-N" />
                 </Form.Item>
                 <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
                   <TreeSelect
@@ -566,22 +609,20 @@ export default function EinsatzabschnittePage() {
                 >
                   Lage
                 </Augenbraue>
-                <Form.Item
-                  label="Lagezustand"
-                  name="lagezustand"
-                  extra="Leer heißt „nicht beurteilt“. Jeder Wechsel wird im ETB vermerkt."
-                >
+                <Form.Item label="Lagezustand" name="lagezustand">
                   <Select allowClear placeholder="nicht beurteilt" options={LAGEZUSTAND_OPTIONEN} />
                 </Form.Item>
                 <Form.Item label="Abschnittsauftrag" name="abschnittsauftrag">
                   <Input.TextArea rows={2} placeholder="Fester Auftrag des Abschnitts" />
                 </Form.Item>
-                <Form.Item
-                  label="Fortschritt"
-                  name="fortschritt"
-                  extra="Eigene Einschätzung in Prozent. Leer heißt „nicht eingeschätzt“, nicht 0 %."
-                >
-                  <InputNumber min={0} max={100} precision={0} suffix="%" />
+                <Form.Item label="Fortschritt" name="fortschritt">
+                  <InputNumber
+                    min={0}
+                    max={100}
+                    precision={0}
+                    suffix="%"
+                    placeholder="nicht eingeschätzt"
+                  />
                 </Form.Item>
 
                 <Augenbraue

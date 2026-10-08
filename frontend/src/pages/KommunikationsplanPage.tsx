@@ -206,6 +206,9 @@ function menueFuer(z: KommunikationsZeile & { art: 'gepflegt' }): MenueEintrag<M
   ];
 }
 
+/** Grund am gesperrten Knopf ohne Netz; dass die Seite offline ist, zeigt der Datenstand im Kopf. */
+const OFFLINE_GRUND = 'Offline';
+
 /**
  * Spalten. Gewählt gegen die Fläche des Funkplans (LFH-548 D4: 1050 px Contentbreite am Fükw mit
  * offenem Panel): Σ Zahlbreiten 600 + `mindestBreite` 300 = 900 px. EINE fließende Spalte
@@ -218,7 +221,7 @@ function planSpalten(
   onVerbindung: (z: KommunikationsZeile & { art: 'gepflegt' }) => void,
   onMenue: (aktion: MenueAktion, z: KommunikationsZeile & { art: 'gepflegt' }) => void,
 ) {
-  const sperrGrund = gesperrt ? 'Ohne Verbindung zum Server nicht änderbar' : undefined;
+  const sperrGrund = gesperrt ? OFFLINE_GRUND : undefined;
   return spaltenFuer<PlanZeile>()([
     {
       title: 'Stelle',
@@ -497,7 +500,7 @@ export default function KommunikationsplanPage() {
     stellen.zustand === 'daten'
       ? `${stellen.daten.length} ${stellen.daten.length === 1 ? 'gepflegte Stelle' : 'gepflegte Stellen'}`
       : undefined;
-  const sperrGrund = ohneVerbindung ? 'Ohne Verbindung zum Server nicht änderbar' : undefined;
+  const sperrGrund = ohneVerbindung ? OFFLINE_GRUND : undefined;
   const entfernFehler = stelleEntfernen.error ?? verbindungEntfernen.error;
 
   return (
@@ -508,7 +511,6 @@ export default function KommunikationsplanPage() {
         titel="Kommunikationsplan"
         meta={umfang}
         dataUpdatedAt={datenstand}
-        beschreibung="Sachgebiet S6 · Verbindungen außerhalb des Funks: Telefon, Fax, E-Mail, Melder"
         breadcrumb={
           <Breadcrumb
             items={[

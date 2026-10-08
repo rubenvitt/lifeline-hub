@@ -358,7 +358,7 @@ describe('FunkplanPage — Übernahme in den Lagebericht', () => {
   it('legt EINEN Freitext-Bericht mit dem Funkplan an, ohne Erreichbarkeit, und öffnet ihn', async () => {
     setup();
     await screen.findByText('Florian 1/42-1');
-    fireEvent.click(screen.getByRole('button', { name: 'In Lagebericht übernehmen' }));
+    fireEvent.click(screen.getByRole('button', { name: /In Lagebericht übernehmen/ }));
     await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/77'));
     expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1);
     const [einsatzId, daten] = vi.mocked(legeLageberichtAn).mock.calls[0];
@@ -378,7 +378,7 @@ describe('FunkplanPage — Übernahme in den Lagebericht', () => {
     );
     setup();
     await screen.findByText('Florian 1/42-1');
-    fireEvent.click(screen.getByRole('button', { name: 'In Lagebericht übernehmen' }));
+    fireEvent.click(screen.getByRole('button', { name: /In Lagebericht übernehmen/ }));
     expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
     expect(navigiere).not.toHaveBeenCalled();
   });
@@ -390,7 +390,7 @@ describe('FunkplanPage — Übernahme in den Lagebericht', () => {
     } as EinsatzAnzeige);
     setup();
     await screen.findByText('Florian 1/42-1');
-    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
     expect(screen.getByRole('button', { name: /Drucken/ })).toBeInTheDocument();
   });
 });
@@ -414,9 +414,7 @@ describe('FunkplanPage — Sperre des Stabs', () => {
       freigabenFixture({ stab: { sichtbar: false } }),
     );
     const { container } = setup();
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Lücken' })).toBeNull();
   });
@@ -427,9 +425,7 @@ describe('FunkplanPage — Sperre des Stabs', () => {
       freigabenFixture({ stab: { sichtbar: true, zugriff: false } }),
     );
     const { container } = setup();
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
   });
 
@@ -459,7 +455,7 @@ describe('FunkplanPage — Sperre des Stabs', () => {
     const { container } = setup();
     expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 });
 
@@ -482,7 +478,11 @@ describe('FunkplanPage — nichts wird als leerer Bestand behauptet', () => {
     vi.mocked(listeEinsatzSprechgruppen).mockReturnValue(new Promise(() => {}));
     setup();
     await screen.findByText('Florian 1/42-1');
-    expect(screen.getByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
+    // Der Grund steht am Knopf: er dreht, solange eine Quelle lädt (kein Tooltip, LFH-1078).
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toHaveClass(
+      'ant-btn-loading',
+    );
   });
 
   it('bietet keine Übernahme an, wenn das Modul Lageberichte nicht freigegeben ist', async () => {
@@ -491,14 +491,14 @@ describe('FunkplanPage — nichts wird als leerer Bestand behauptet', () => {
     );
     setup();
     await screen.findByText('Florian 1/42-1');
-    expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 
   it('schreibt fehlende Quellen in den Lagebericht, statt sie zu verschweigen', async () => {
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new ApiError(403, 'verboten'));
     setup();
     await screen.findByText('1. Zug', { selector: 'a' });
-    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     fireEvent.click(knopf);
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
@@ -573,7 +573,7 @@ describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
   it('fragt keine Liste an, wenn der Stab gesperrt ist', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
     setup();
-    await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/);
+    await screen.findByText(/Modul Stab nicht freigegeben/);
     for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
   });
 
@@ -648,9 +648,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
       freigabenFixture({ stab: { sichtbar: false } }),
     );
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
   });
 
@@ -705,7 +703,7 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   it('übernimmt auch aus der Skizze den Funkplan mit genau einem Aufruf', async () => {
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
     await screen.findByRole('region', { name: 'Fernmeldeskizze' });
-    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/77'));
@@ -773,7 +771,10 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
         expect.objectContaining({ name: 'Einheiten', zustand: 'fehler' }),
       ),
     );
-    expect(screen.queryByText('Einheiten: nicht geladen')).toBeNull();
+    // Genau eine Nennung: der Quellenhinweis der Seite, keine zweite Zeile über der Fläche.
+    expect(
+      screen.getAllByText('Einheiten: nicht geladen').map((e) => e.getAttribute('data-lfh')),
+    ).toEqual(['funkplan-quellen']);
   });
 });
 
@@ -940,7 +941,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
   it('übernimmt auch aus dieser Darstellung den Funkplan mit genau einem Aufruf', async () => {
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
     await screen.findByRole('region', { name: 'Sprechgruppen' });
-    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/77'));
@@ -953,9 +954,7 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
       freigabenFixture({ stab: { sichtbar: false } }),
     );
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
-    expect(
-      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Modul Stab nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Sprechgruppen' })).toBeNull();
   });
 });
@@ -1027,7 +1026,7 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     vi.mocked(ladeFuehrungsstelle).mockReturnValue(new Promise(() => {}));
     setup();
     await screen.findByText('Florian 1/42-1');
-    expect(screen.getByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
   });
 
   it('zählt die Verbindung Führungsstelle → oberster Abschnitt und verweist auf den Abschnitt', async () => {
@@ -1048,7 +1047,7 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue(FS);
     setup();
     await screen.findByText('Florian Stadt 10/1');
-    await userEvent.click(screen.getByRole('button', { name: 'In Lagebericht übernehmen' }));
+    await userEvent.click(screen.getByRole('button', { name: /In Lagebericht übernehmen/ }));
     await waitFor(() => expect(legeLageberichtAn).toHaveBeenCalledTimes(1));
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text as string;
     expect(text).toContain(
@@ -1288,7 +1287,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     );
     rendereMit();
     await screen.findByText('Florian 1/42-1');
-    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
     await waitFor(() => expect(knopf).toBeEnabled());
     await userEvent.click(knopf);
     await waitFor(() => expect(legeLageberichtAn).toHaveBeenCalledTimes(1));
@@ -1303,7 +1302,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     vi.mocked(ladeKommunikationsplan).mockReturnValue(new Promise(() => {}));
     rendereMit();
     await screen.findByText('Florian 1/42-1');
-    expect(screen.getByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/ })).toBeDisabled();
   });
 
   it('fragt Kommunikationsplan und Skizze nicht an, wenn der Stab gesperrt ist', async () => {
@@ -1311,7 +1310,7 @@ describe('FunkplanPage — Fernmeldenetz (LFH-893)', () => {
     vi.mocked(ladeFernmeldeskizze).mockClear();
     vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
     rendereMit();
-    await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/);
+    await screen.findByText(/Modul Stab nicht freigegeben/);
     expect(vi.mocked(ladeKommunikationsplan)).not.toHaveBeenCalled();
     expect(vi.mocked(ladeFernmeldeskizze)).not.toHaveBeenCalled();
   });

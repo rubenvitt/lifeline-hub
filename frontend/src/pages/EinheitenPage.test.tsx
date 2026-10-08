@@ -339,6 +339,23 @@ describe('EinheitenPage', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Einheit bilden' })).not.toBeInTheDocument(),
     );
+    // Der Grund steht als Zeile „Nur Ansicht · Grund“, nicht stumm weggeschaltet (M16, LFH-1078).
+    const hinweis = document.querySelector('[data-lfh="rechte-hinweis"]');
+    expect(hinweis?.textContent).toBe('Nur Ansicht nur Einsatzleitung und Führungspersonal');
+  });
+
+  it('abgeschlossener Einsatz: „Nur Ansicht · Einsatz abgeschlossen“ statt Satz', async () => {
+    server.use(...handlers('einsatzleitung', 'abgeschlossen'));
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+    await screen.findByText('1. Zug');
+    const hinweis = document.querySelector('[data-lfh="rechte-hinweis"]');
+    expect(hinweis?.textContent).toBe('Nur Ansicht Einsatz abgeschlossen');
+    expect(screen.queryByText(/nur Ansicht\./)).not.toBeInTheDocument();
   });
 });
 
@@ -377,6 +394,8 @@ describe('EinheitenPage · Datenzustände', () => {
     );
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    // Der Knopf zeigt den Weg; kein Satz, wie die Gliederung entsteht (LFH-1078).
+    expect(screen.queryByText(/Gliederung entsteht/)).not.toBeInTheDocument();
     /**
      * Der Knopf heißt genau wie der im Seitenkopf — es ist dieselbe Handlung. Gezählt wird deshalb
      * im Gliederungs-Paneel. „Genau eine Primäraktion" hält hier nur, weil `SeitenLeer` keine

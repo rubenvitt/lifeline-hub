@@ -994,7 +994,7 @@ export default function KraefteuebersichtPage() {
                   </span>
                 }
                 disabled={einheitenGesperrt}
-                title={einheitenGesperrt ? KEINE_BERECHTIGUNG : 'Einheit anlegen (Einheiten-Seite)'}
+                title={einheitenGesperrt ? KEINE_BERECHTIGUNG : undefined}
                 onClick={() => navigate(einheitenPfad(einsatzId))}
               >
                 Einheit
@@ -1028,9 +1028,13 @@ export default function KraefteuebersichtPage() {
         <div style={{ marginBlock: token.marginLG }}>
           <Statusband
             einheiten={band.einheiten}
+            // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel,
+            // das Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts).
             einheitenHinweis={
               filter.traeger || filter.kategorie || filter.suche.trim()
-                ? 'alle Einheiten des Abschnitts — Träger-, Status- und Suchfilter wirken auf die Mittel'
+                ? filter.abschnittId != null
+                  ? 'nur nach Abschnitt gefiltert'
+                  : 'ungefiltert'
                 : null
             }
             personal={band.personal}

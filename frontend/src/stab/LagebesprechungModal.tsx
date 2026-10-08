@@ -148,10 +148,14 @@ export default function LagebesprechungModal({
               <Form.Item
                 label="Zeitpunkt der Besprechung"
                 name="abgehalten"
-                extra="Leer: Zeitpunkt des Abschließens"
                 style={{ marginBottom: 0 }}
               >
-                <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
+                {/* Leer gilt der Zeitpunkt des Abschließens (`abschlussBody`). */}
+                <ZeitpunktEingabe
+                  format={ZEITFORMAT}
+                  placeholder="jetzt"
+                  style={{ width: '100%' }}
+                />
               </Form.Item>
             ),
           },

@@ -150,9 +150,8 @@ export default function VorbereitungPaneel({
           <div style={{ padding: `${token.paddingSM}px ${token.padding}px` }}>
             {darfUebernehmen && (
               <Button
-                loading={uebernehmen.isPending}
+                loading={uebernehmen.isPending || laedt}
                 disabled={laedt}
-                title={laedt ? 'Erst wenn alle Angaben geladen sind' : undefined}
                 onClick={() => uebernehmen.mutate()}
               >
                 In Lagebericht übernehmen

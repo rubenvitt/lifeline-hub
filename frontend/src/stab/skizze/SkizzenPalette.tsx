@@ -52,7 +52,6 @@ function Eintrag({
       <span
         ref={setNodeRef}
         {...listeners}
-        title="Auf die Fläche ziehen"
         style={{
           flex: 1,
           minWidth: 0,

@@ -137,6 +137,8 @@ interface StatusWahlProps<W> {
    * (WCAG 1.4.1) liegt dann beim Aufrufer.
    */
   etikett?: ReactNode;
+  /** Tasten, die am Auslöser direkt einen Status setzen (`aria-keyshortcuts`), etwa „0 1 2“. */
+  tastenkuerzel?: string;
 }
 
 /** Kein Status gesetzt: derselbe Gedankenstrich wie im Lesezweig von `BemerkungZelle`. */
@@ -153,6 +155,7 @@ export default function StatusWahl<W extends string | number>({
   gesperrt = false,
   darfSchreiben,
   etikett: eigenesEtikett,
+  tastenkuerzel,
 }: StatusWahlProps<W>): ReactElement {
   const { token } = theme.useToken();
 
@@ -247,6 +250,7 @@ export default function StatusWahl<W extends string | number>({
         ref={merkeZeile}
         type="text"
         aria-label={`Status von ${kennung} ändern`}
+        aria-keyshortcuts={tastenkuerzel || undefined}
         loading={laeuft}
         disabled={laeuft || gesperrt}
         style={{ paddingInline: token.paddingXXS }}

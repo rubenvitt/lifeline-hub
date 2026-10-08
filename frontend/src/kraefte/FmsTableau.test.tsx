@@ -119,12 +119,16 @@ describe('FmsTableau (LFH-642)', () => {
     expect(within(kachel).getByText('Zug 1')).toBeInTheDocument();
   });
 
-  it('nennt den Tastenweg nur mit Schreibrecht', () => {
+  it('erklärt den Tastenweg nicht in einem Satz — der S-Code im Menü ist die Ziffer (LFH-1078)', async () => {
     const { unmount } = zeige();
-    expect(screen.getByText(/setzt den Status des gewählten Fahrzeugs/)).toBeInTheDocument();
+    expect(screen.queryByText(/setzt den Status/)).toBeNull();
+    // Hilfstechnik erfährt die Ziffern am Auslöser — nur die eindeutig belegten (3 ist doppelt).
+    expect(ausloeser('Florian 1')).toHaveAttribute('aria-keyshortcuts', '2 4');
+    await userEvent.click(ausloeser('Florian 1'));
+    const menue = document.querySelector<HTMLElement>('.ant-dropdown [role="menu"]')!;
+    expect(within(menue).getByText(/^S4 · /)).toBeInTheDocument();
     unmount();
     zeige({ darfSchreiben: false });
-    expect(screen.queryByText(/setzt den Status des gewählten Fahrzeugs/)).toBeNull();
     // Ohne Schreibrecht kein Auslöser — nur das Etikett.
     expect(screen.queryByRole('button', { name: /Status von/ })).toBeNull();
     expect(screen.getByText('S3')).toBeInTheDocument();
@@ -153,7 +157,7 @@ describe('FmsTableau (LFH-642)', () => {
       tippe(ausloeser('Florian 1'), '3');
       expect(onWaehlen).not.toHaveBeenCalled();
       expect(
-        await screen.findByText(/Ziffer 3 ist im Statuskatalog 2-fach belegt/),
+        await screen.findByText('Ziffer 3 ist im Statuskatalog 2-fach belegt'),
       ).toBeInTheDocument();
     });
 

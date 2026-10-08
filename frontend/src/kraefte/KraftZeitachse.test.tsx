@@ -121,7 +121,10 @@ describe('KraftZeitachse (LFH-552)', () => {
 
   it('Leerzustand ohne Ereignisse — kein Dauerwert', async () => {
     rendere(true, { ereignisse: [], perioden: [] });
-    expect(await screen.findByText(/Noch keine Ereignisse/)).toBeInTheDocument();
+    // Nur der Zustand, keine Anleitung (LFH-1078) — „Nachtragen“ steht daneben.
+    expect(await screen.findByText('Noch keine Ereignisse')).toBeInTheDocument();
+    expect(screen.queryByText(/Sie entstehen/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Nachtragen' })).toBeEnabled();
     expect(document.querySelector('[data-lfh="kraft-dauer"]')).toBeNull();
   });
 
@@ -216,7 +219,10 @@ describe('KraftZeitachse (LFH-552)', () => {
     await waitFor(() => expect(eintraege()).toHaveLength(3));
     await userEvent.click(screen.getByRole('button', { name: /^Alarmierung .* streichen$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Ereignis streichen' });
-    expect(dialog).toHaveTextContent('lässt sich nicht zurücknehmen');
+    // Ein Satz zur Folge, kein Absatz (LFH-1078).
+    expect(dialog).toHaveTextContent(
+      /Alarmierung .* bei Anna wird endgültig gestrichen und bleibt durchgestrichen sichtbar\./,
+    );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Streichen' }));
     expect(await within(dialog).findByText('Bitte einen Grund angeben')).toBeInTheDocument();
     expect(rumpf).toBeNull();

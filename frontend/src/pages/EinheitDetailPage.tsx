@@ -84,9 +84,10 @@ function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) 
  * `PersonenDetailPage`.
  *
  * Die drei Zuordnungen (Personal, Fahrzeuge, Material) wirken sofort — jeder Klick schreibt. Sie
- * liegen deshalb außerhalb des Formulars, je in einem Paneel mit dem Hinweis „wirkt sofort", nicht
- * unter einem Speichern-Knopf, der sie nicht betrifft. Das Formular endet mit einer sticky
- * Aktionsleiste, sonst wäre der Knopf bei neun Feldern aus dem Bild gescrollt.
+ * liegen deshalb außerhalb des Formulars, je in einem eigenen Paneel, nicht unter einem
+ * Speichern-Knopf, der sie nicht betrifft; die zugeordnete Zeile erscheint sofort im Paneel (kein
+ * Erklärsatz, LFH-1078). Das Formular endet mit einer sticky Aktionsleiste, sonst wäre der Knopf
+ * bei neun Feldern aus dem Bild gescrollt.
  *
  * Der Führer-Wechsel bleibt bei den Mitgliedern und nicht im Formular: er baut seinen PATCH-Body
  * aus dem Server-Stand, ungespeicherte Kopf-Edits gehen nicht mit (Vollersatz-Vertrag der Route).
@@ -316,7 +317,6 @@ export default function EinheitDetailPage() {
     return (
       <SeitenLeer
         titel="Diese Einheit gibt es nicht (mehr)"
-        hinweis="Sie kann aufgelöst worden sein, oder die Adresse zeigt auf eine fremde Kennung."
         aktion={{ label: 'Zur Gliederung', onClick: () => void navigate(einheitenPfad(einsatzId)) }}
       />
     );
@@ -455,12 +455,9 @@ export default function EinheitDetailPage() {
             </Form.Item>
 
             {/* BOS-Fachsprache: die Größe heißt Soll-Stärke (Führer / Unterführer /
-                Mannschaft). Die Eingaberegel steht als Hilfszeile, nicht in Klammern im
-                Etikett. */}
-            <Form.Item
-              label="Soll-Stärke (F/UF/M)"
-              extra="Entweder alle drei Werte angeben oder alle leer lassen — teilweise gefüllt wird nicht übernommen."
-            >
+                Mannschaft). Keine Eingaberegel als Satz (LFH-1078): `StaerkeEingabe` zählt ein
+                leeres Teilfeld als 0, sobald eines gefüllt ist, und zeigt die Summe live. */}
+            <Form.Item label="Soll-Stärke (F/UF/M)">
               <Space align="end" wrap>
                 <Form.Item name="soll" noStyle>
                   <StaerkeEingabe />
@@ -475,11 +472,7 @@ export default function EinheitDetailPage() {
             <SektionHeader titel="Funk / Kommunikation" ueberschrift="h3" />
             {/* Der Rufname der Einheit, nicht eines ihrer Fahrzeuge. Leer gelassen zeigt das
                 Meldebild höchstens den Rufnamen des einzigen Fahrzeugs. */}
-            <Form.Item
-              label="Funkrufname"
-              name="funkrufname"
-              extra="Leer lassen, wenn die Einheit keinen eigenen Rufnamen führt."
-            >
+            <Form.Item label="Funkrufname" name="funkrufname">
               <Input placeholder="z. B. Florian HM 12/44" allowClear />
             </Form.Item>
             <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
@@ -547,9 +540,8 @@ export default function EinheitDetailPage() {
 
         {/* ── Die drei Zuordnungen liegen außerhalb des Formulars ──
 
-            Jede Handlung hier wirkt sofort, es gibt nichts zu speichern. Der Hinweis in jedem
-            Paneel sagt es zusätzlich in Worten, weil die Trennung allein durch Position eine
-            Vermutung bliebe. */}
+            Jede Handlung hier wirkt sofort, es gibt nichts zu speichern: die Zeile erscheint
+            bzw. verschwindet im Paneel, das quittiert ohne Satz (LFH-1078). */}
         {/* Kräfte-Zeitachse (LFH-552): Einsatzdauer und Ereignisse der Einheit; ein Nachtrag
             gilt per Fan-out auch für ihre Personen. */}
         <Paneel titel="Zeitachse" koerperPolster>
@@ -563,9 +555,6 @@ export default function EinheitDetailPage() {
         </Paneel>
 
         <Paneel titel="Personal" meta={aktuell.personal_mitglieder.length} koerperPolster>
-          <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
-            Zuordnungen wirken sofort — hier gibt es nichts zu speichern.
-          </p>
           {aktuell.personal_mitglieder.map((m) =>
             zuordnungsZeile(
               m.ep_id,
@@ -614,9 +603,6 @@ export default function EinheitDetailPage() {
         </Paneel>
 
         <Paneel titel="Fahrzeuge" meta={aktuell.fahrzeug_mitglieder.length} koerperPolster>
-          <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
-            Zuordnungen wirken sofort — hier gibt es nichts zu speichern.
-          </p>
           {aktuell.fahrzeug_mitglieder.map((m) =>
             zuordnungsZeile(
               m.ef_id,
@@ -644,9 +630,6 @@ export default function EinheitDetailPage() {
         </Paneel>
 
         <Paneel titel="Material" meta={aktuell.material_mitglieder.length} koerperPolster>
-          <p style={{ margin: 0, marginBottom: token.marginXS, color: rollen.gedaempft }}>
-            Zuordnungen wirken sofort — hier gibt es nichts zu speichern.
-          </p>
           {aktuell.material_mitglieder.map((m) =>
             zuordnungsZeile(
               m.em_id,

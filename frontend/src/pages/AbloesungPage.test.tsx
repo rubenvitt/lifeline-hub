@@ -8,7 +8,8 @@ import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import AbloesungPage from './AbloesungPage';
 import { AuthProvider } from '../auth/AuthContext';
-import type { Abloesung } from '../api/types';
+import type { Abloesung, ModulFreigaben } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 
 dayjs.extend(utc);
@@ -16,8 +17,10 @@ dayjs.extend(utc);
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
 }));
+const freigaben = vi.hoisted(() => ({ wert: undefined as ModulFreigaben | undefined }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
+  ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),
 }));
 vi.mock('../api/einheiten', () => ({
   listeEinheiten: vi.fn().mockResolvedValue([
@@ -25,6 +28,11 @@ vi.mock('../api/einheiten', () => ({
     { id: 12, name: 'Florian 2', abschnitt_id: null },
     { id: 13, name: 'Florian 3', abschnitt_id: 7 },
   ]),
+}));
+
+const listeEinheitenPerioden = vi.fn();
+vi.mock('../api/kraefteZeitachse', () => ({
+  listeEinheitenPerioden: (...a: unknown[]) => listeEinheitenPerioden(...a),
 }));
 
 const listeAbloesungen = vi.fn();
@@ -94,6 +102,7 @@ function laufendLiefert(schichten: Abloesung[]) {
 describe('AbloesungPage (LFH-635)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    freigaben.wert = freigabenFixture();
     einsatz.wert = {
       id: 1,
       bezeichnung: 'Hochwasser',
@@ -112,6 +121,7 @@ describe('AbloesungPage (LFH-635)', () => {
           : [],
       ),
     );
+    listeEinheitenPerioden.mockResolvedValue([]);
     listeAbloesungVorgaben.mockResolvedValue([
       {
         abschnitt_id: 7,
@@ -265,6 +275,84 @@ describe('AbloesungPage (LFH-635)', () => {
     await userEvent.clear(within(dialog).getByLabelText('Rhythmus (Stunden)'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(setzeAbloesungVorgabe).toHaveBeenLastCalledWith(1, 7, null));
+  });
+
+  // ── LFH-1078: zeigen statt erklären ──
+  it('leer: kein Anleitungssatz, „Schicht beginnen“ steht im Kopf', async () => {
+    listeAbloesungen.mockResolvedValue([]);
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    expect(screen.queryByText(/Mit „Schicht beginnen/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Schicht beginnen' })).toBeEnabled();
+  });
+
+  it('Schicht beginnen: Beginn-Platzhalter aus dem Eintreffen der offenen Periode', async () => {
+    listeAbloesungen.mockResolvedValue([]);
+    listeEinheitenPerioden.mockResolvedValue([
+      {
+        einheit_id: 12,
+        perioden: [
+          { anker: 'alarmierung', beginn_at: inMinuten(-90), eintreffen_at: inMinuten(-60) },
+        ],
+      },
+    ]);
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    await userEvent.click(await screen.findByTitle('Florian 2'));
+    const beginn = within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' });
+    await waitFor(() => expect(beginn.getAttribute('placeholder')).toMatch(/^Eintreffen /));
+  });
+
+  it('Schicht beginnen: ohne Freigabe des Moduls Einheiten keine Zeitachsen-Anfrage', async () => {
+    freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    listeAbloesungen.mockResolvedValue([]);
+    renderPage();
+    await screen.findByText('Keine laufenden Schichten');
+    await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+    await userEvent.click(await screen.findByTitle('Florian 2'));
+    // Ohne Zeitachse ist der wirksame Wert unbekannt: kein Platzhalter statt eines falschen.
+    const beginn = within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' });
+    expect(beginn.getAttribute('placeholder')).not.toMatch(/Eintreffen|jetzt/);
+    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('Rhythmus einer Schicht: die Abschnittsvorgabe steht als Platzhalter, kein „Leer:“', async () => {
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 1' }));
+    const menu = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    await userEvent.click(within(menu).getByText('Rhythmus ändern'));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+    expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe Abschnitt)');
+    expect(within(dialog).queryByText(/Leer/)).toBeNull();
+  });
+
+  it('Rhythmus-Vorgabe am Abschnitt: Platzhalter „keine Vorgabe“, kein Erklärsatz', async () => {
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Rhythmus-Vorgabe Deichwache Nord ändern' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Rhythmus (Stunden)')).toHaveAttribute(
+      'placeholder',
+      'keine Vorgabe',
+    );
+    expect(within(dialog).queryByText(/Leer|behalten/)).toBeNull();
+  });
+
+  it('ohne Abschnitte: kurzer Zustand im Vorgaben-Paneel', async () => {
+    listeAbloesungVorgaben.mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByText('Keine Einsatzabschnitte')).toBeInTheDocument();
   });
 
   // ── Fremde Neuzugänge per Sammelbanner (LFH-647) ──

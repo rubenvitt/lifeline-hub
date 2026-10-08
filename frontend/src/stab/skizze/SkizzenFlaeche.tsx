@@ -104,7 +104,6 @@ export interface SkizzenFlaecheProps {
   onKontext: (key: string, px: Punkt) => void;
   onHalten: (halten: boolean) => void;
   api: { current: FlaechenApi | null };
-  beschreibungId?: string;
 }
 
 function zustandVon(
@@ -791,7 +790,8 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
         role="group"
         aria-label="Fernmeldeskizze"
         aria-roledescription="Zeichenfläche"
-        aria-describedby={props.beschreibungId}
+        // Kürzel der Fläche (`bedienung.ts:tastenBefehl`); sichtbar stehen sie an den Menüeinträgen.
+        aria-keyshortcuts="Enter V Delete Backspace Escape ArrowUp ArrowDown ArrowLeft ArrowRight Shift+F10 Control+Z Control+Y = - 0"
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
         width="100%"

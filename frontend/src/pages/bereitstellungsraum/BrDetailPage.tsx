@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
 import { useEffect } from 'react';
@@ -196,6 +196,8 @@ export default function BrDetailPage() {
     ? null
     : summiereStaerke(bereitgestellt, einheitenQuery.data ?? bereitgestellt);
   const fahrzeugZahl = br.fahrzeuge.length;
+  // Wie `aktive_belegungen_tx` im Server: belegte Einheiten und Fahrzeuge.
+  const belegt = br.einheiten.length + fahrzeugZahl;
 
   return (
     <EinsatzSeite
@@ -221,10 +223,19 @@ export default function BrDetailPage() {
         // `size="middle"`: „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“
         // (`frontend/AGENTS.md`, „Rot steht nicht bündig neben Neutralem“).
         <Space wrap size="middle">
-          {!schreibgeschuetzt && br.status === 'aktiv' && (
+          {/* Belegt, lehnt der Server das Auflösen ab (409): der Knopf ist dann gesperrt, der
+              Grund steht in wenigen Wörtern daneben, nicht als Satz in der Rückfrage (LFH-1078). */}
+          {!schreibgeschuetzt && br.status === 'aktiv' && belegt > 0 && (
+            <>
+              <Button danger disabled>
+                Auflösen
+              </Button>
+              <Typography.Text type="secondary">noch {belegt} belegt</Typography.Text>
+            </>
+          )}
+          {!schreibgeschuetzt && br.status === 'aktiv' && belegt === 0 && (
             <Popconfirm
               title="BR auflösen?"
-              description="Nur möglich, wenn keine Kraft mehr belegt ist."
               okText="BR auflösen"
               okButtonProps={{ danger: true }}
               onConfirm={() => statusMut.mutate('aufgeloest')}

@@ -236,6 +236,8 @@ export interface EigenschaftspaneelProps {
   onVerbinden: (stelle: string) => void;
   /** Rückfrage vor Unumkehrbarem (Komponente, Bereich entfernen). */
   onEntfernenFrage: (key: string) => void;
+  /** Wählt ein Element der Fläche (Leerzustand: das Schriftfeld). */
+  onWahl: (key: string) => void;
 }
 
 /** Das Paneel; die Überschrift ist das Ziel von Enter auf der Fläche (`ref`). */
@@ -250,6 +252,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
       onQuittieren,
       onVerbinden,
       onEntfernenFrage,
+      onWahl,
     } = props;
     const { token, rollen } = useRollen();
     const stiche = stichleitungen(netz);
@@ -320,10 +323,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
             {stelle.art === 'extern' ? (
               <>
                 <Datenfeld label="Stellenart">{STELLENART_LABEL[stelle.stellenart]}</Datenfeld>
-                <Datenfeld label="Bezeichnung">
-                  {stelle.bezeichnung}
-                  <div style={{ color: rollen.gedaempft }}>gepflegt im Kommunikationsplan</div>
-                </Datenfeld>
+                <Datenfeld label="Bezeichnung">{stelle.bezeichnung}</Datenfeld>
               </>
             ) : null}
             {stelle.art === 'komponente' ? (
@@ -467,7 +467,10 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
           </Flex>
           {stelle.ziel ? (
             <div style={{ marginBlockStart: token.marginSM }}>
-              <Sprung ziel={stelle.ziel}>zum Datensatz</Sprung>
+              {/* Externe Stellen pflegt der Kommunikationsplan (eine Wahrheit, LFH-893). */}
+              <Sprung ziel={stelle.ziel}>
+                {stelle.art === 'extern' ? 'zum Kommunikationsplan' : 'zum Datensatz'}
+              </Sprung>
             </div>
           ) : null}
         </>
@@ -755,10 +758,10 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
       );
     } else {
       inhalt = (
-        <div style={{ color: rollen.gedaempft }} data-lfh="skizze-paneel-leer">
-          Kein Element gewählt. Klick, Tippen oder Tab wählt ein Element; das Schriftfeld steht
-          unten rechts im Bild.
-        </div>
+        <Flex vertical align="start" gap={token.marginSM} data-lfh="skizze-paneel-leer">
+          <span style={{ color: rollen.gedaempft }}>Kein Element gewählt</span>
+          <Button onClick={() => onWahl(SCHRIFTFELD)}>Schriftfeld wählen</Button>
+        </Flex>
       );
     }
 

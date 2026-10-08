@@ -33,7 +33,7 @@ describe('useStabFreigabe', () => {
     );
     renderMitProviders(<Probe />);
     expect(await screen.findByText('Informationstelefon nicht verfügbar')).toBeInTheDocument();
-    expect(screen.getByText(/das Informationstelefon gehört dazu/)).toBeInTheDocument();
+    expect(screen.getByText('Modul Stab nicht freigegeben')).toBeInTheDocument();
     expect(screen.queryByText('Inhalt der Seite')).toBeNull();
   });
 
