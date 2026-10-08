@@ -15,7 +15,7 @@ Lauf vom 03.10.2026. Die Verdikte stehen in
 - Nicht über den Dialog gedruckt: Druckränder, Kopf- und Fußzeilen des Browsers stammen aus
   der Vorgabe (A4, `@page`-Rand der App), nicht aus Einstellungen von Hand.
 - **Safari ist nicht geprüft.** In der Linux-Umgebung gibt es kein Safari, und Playwrights
-  WebKit teilt nur die Engine, nicht den Druckpfad. Nachzug: LFH-1010.
+  WebKit teilt nur die Engine, nicht den Druckpfad. Nachgeholt in LFH-1010 (`../lfh-1010/`).
 
 ## Daten
 

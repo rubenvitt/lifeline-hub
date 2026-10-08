@@ -1152,11 +1152,12 @@ export default function FunkplanPage() {
               ladend={
                 quellen.abschnitte.zustand === 'laden' ||
                 quellen.einheiten.zustand === 'laden' ||
-                quellen.sprechgruppen.zustand === 'laden'
+                quellen.sprechgruppen.zustand === 'laden' ||
+                quellen.fuehrungsstelle.zustand === 'laden'
               }
               leerText={sprechgruppenplanLeerText(quellen)}
-              // Die Sprechgruppe hat keine eigene Seite: zugeordnet wird an Abschnitt und Einheit,
-              // dorthin führen die Teilnehmer.
+              // Die Sprechgruppe hat keine eigene Seite: zugeordnet wird an Führungsstelle,
+              // Abschnitt und Einheit, dorthin führen die Teilnehmer.
               karte={{
                 art: 'plan',
                 titel: { spalte: 'sprechgruppe' },
