@@ -21,7 +21,7 @@ import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
 import StatusTag from '../components/StatusTag';
-import { offlineKarteStatus } from '../theme/statusFarben';
+import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
 
 /** Bau-Status, während derer gepollt wird (2 s). */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -230,7 +230,7 @@ export default function OfflineRegionPicker({
       return (
         <StatusTag
           icon={<Spin size="small" style={{ marginInlineEnd: 4 }} />}
-          darstellung={{ ...offlineKarteStatus.laedt, label: `Baut… ${phase}` }}
+          darstellung={{ ...kartenBauStatus.building, label: `Baut… ${phase}` }}
         />
       );
     }
