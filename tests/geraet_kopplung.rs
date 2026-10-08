@@ -234,6 +234,170 @@ async fn uhs_eines_anderen_einsatzes_ist_404() {
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
+// ---------- Weitere Stellen (LFH-1040) ----------
+
+/// Die vier neuen Ansichten stehen im Katalog, sind aber erst koppelbar, wenn ihr Task sie
+/// freischaltet; die Übersicht bietet nur die verfügbaren an, mit der Art ihrer Stelle.
+#[tokio::test]
+async fn neue_ansichten_sind_noch_nicht_koppelbar() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    for ansicht in [
+        "betreuungsstelle",
+        "bereitstellungsraum",
+        "einsatzabschnitt",
+        "verpflegung",
+    ] {
+        let (s, v) = anlegen(
+            &app,
+            &admin,
+            einsatz,
+            json!({"ansicht": ansicht, "stelle_id": 1, "bezeichnung": "Gerät"}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{ansicht} → {v}");
+    }
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v["ansichten"],
+        json!([
+            {"ansicht": "uhs-tablet", "stellenart": "uhs"},
+            {"ansicht": "uhs-laptop", "stellenart": "uhs"},
+            {"ansicht": "lagemonitor", "stellenart": null},
+        ])
+    );
+}
+
+/// `stelle_id` bindet wie das bisherige `uhs_id`; Übersicht und Selbstsicht tragen beides.
+#[tokio::test]
+async fn stelle_id_bindet_wie_uhs_id() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "uhs-laptop", "stelle_id": uhs, "bezeichnung": "Laptop"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["kopplung"]["uhs_id"], uhs);
+    assert_eq!(v["kopplung"]["stelle_id"], uhs);
+    assert_eq!(v["kopplung"]["stelle"], "UHS Nord");
+
+    let a = koppeln(&app, v["code"]["code"].as_str().unwrap(), None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    let (s, ich) = me(&app, &a.cookie.unwrap()).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(ich["geraet"]["stelle_id"], uhs);
+    assert_eq!(ich["geraet"]["uhs_id"], uhs);
+}
+
+/// Wird der Abschnitt eines Abschnittsgeräts aufgelöst, endet die Kopplung wie bei einem
+/// Widerruf: die nächste Anfrage ist 401, das ETB nennt das Gerät. Die Ansicht ist noch nicht
+/// koppelbar; die Kopplung entsteht deshalb direkt im Repository.
+#[tokio::test]
+async fn aufgeloester_abschnitt_beendet_seine_kopplung() {
+    use lifeline_hub::geraet::repo::{self, NeueKopplung};
+    use lifeline_hub::geraet::{Bindungsart, Funktionsansicht, Stelle};
+
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(r#"{"name":"EA Nord"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let abschnitt = v["id"].as_i64().unwrap();
+    let (admin_id, org_id): (i64, i64) =
+        sqlx::query_as("SELECT id, org_id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    let mut conn = pool.acquire().await.unwrap();
+    let kopplung_id = repo::anlegen(
+        &mut conn,
+        NeueKopplung {
+            einsatz_id: einsatz,
+            org_id,
+            ansicht: Funktionsansicht::Einsatzabschnitt,
+            stelle: Some(Stelle {
+                art: Bindungsart::Einsatzabschnitt,
+                id: abschnitt,
+            }),
+            stelle_name: Some("EA Nord"),
+            bezeichnung: "Tablet EA",
+            laeuft_ab_at: "2099-01-01 00:00:00",
+            von: admin_id,
+        },
+    )
+    .await
+    .unwrap();
+    let (code, _) = repo::code_ausstellen(&mut conn, kopplung_id, admin_id)
+        .await
+        .unwrap();
+    drop(conn);
+    let a = koppeln(&app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    let geraet = a.cookie.unwrap();
+    let (s, ich) = me(&app, &geraet).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(ich["geraet"]["stelle_id"], abschnitt);
+    assert_eq!(ich["geraet"]["stelle"], "EA Nord");
+    assert_eq!(ich["geraet"]["uhs_id"], Value::Null);
+
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/abschnitte/{abschnitt}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+
+    let (s, _) = me(&app, &geraet).await;
+    assert_eq!(
+        s,
+        StatusCode::UNAUTHORIZED,
+        "das Gerät verliert sofort jeden Zugriff"
+    );
+    let widerrufen: Option<String> =
+        sqlx::query_scalar("SELECT widerrufen_at FROM geraet_kopplung WHERE id = ?")
+            .bind(kopplung_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(widerrufen.is_some(), "Kopplung widerrufen");
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter().any(|t| t.contains("EA Nord · Tablet EA")
+            && t.contains("widerrufen")
+            && t.contains("aufgelöst")),
+        "ETB nennt das Gerät: {etb:?}"
+    );
+}
+
 #[tokio::test]
 async fn kein_koppeln_am_abgeschlossenen_einsatz() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
