@@ -678,12 +678,15 @@ export function Sammelschiene({
   );
 }
 
-/** Stützpunkte ohne aufeinanderfolgende Doppel; `null`, wenn kein Abschnitt mit Länge bleibt. */
+/**
+ * Stützpunkte in Millimetern ohne aufeinanderfolgende Doppel; `null`, wenn kein Abschnitt mit
+ * Länge bleibt. Verglichen wird nach der Umrechnung, weil zwei Punkte, die in Einheiten eben
+ * noch verschieden sind, in Millimetern zusammenfallen können (das Paket lehnt sie dann ab).
+ */
 function verlauf(punkte: readonly Punkt[]): Point[] | null {
-  const ohneDoppel = punkte.filter(
-    (p, i) => i === 0 || p.x !== punkte[i - 1].x || p.y !== punkte[i - 1].y,
-  );
-  return ohneDoppel.length >= 2 ? ohneDoppel.map(punktInMm) : null;
+  const mm = punkte.map(punktInMm);
+  const ohneDoppel = mm.filter(([x, y], i) => i === 0 || x !== mm[i - 1][0] || y !== mm[i - 1][1]);
+  return ohneDoppel.length >= 2 ? ohneDoppel : null;
 }
 
 /**
