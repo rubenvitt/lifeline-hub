@@ -34,7 +34,7 @@ pub const BEZEICHNUNG_MAX: usize = 60;
 
 wire_enum! {
     /// Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-    /// `migrations/0158_geraet_kopplung_stellenarten.sql`.
+    /// `migrations/0159_geraet_kopplung_stellenarten.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Funktionsansicht {
         UhsTablet => "uhs-tablet",
@@ -50,7 +50,7 @@ wire_enum! {
 
 wire_enum! {
     /// Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt
-    /// `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0158_…`).
+    /// `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0159_…`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum Bindungsart {
         Uhs => "uhs",
