@@ -862,7 +862,7 @@ export interface components {
         BezugTyp: "schaden" | "uhs" | "person" | "lagebericht" | "meldung" | "auftrag";
         /**
          * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt
-         *     `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0158_…`).
+         *     `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0159_…`).
          * @enum {string}
          */
         Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt";
