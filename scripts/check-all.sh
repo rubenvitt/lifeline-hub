@@ -278,7 +278,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel (LFH-386/518/520)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung (LFH-386/518/520/1101)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -288,6 +288,9 @@ schritt_11() {
   # Die Vorbedingung von Schritt 3, 4, 7 und 15: das Build-Ziel je Checkout (LFH-520). Sie irrt
   # ebenfalls still — ein geteiltes Ziel färbt kein Ergebnis rot, nur das falsche grün.
   "$ROOT/scripts/bauziel.test.sh"
+  # Frist und Wiederholung der Netz-Schritte in den Workflows (LFH-1101): bricht die Frist einen
+  # hängenden Versuch nicht ab, steht der Job wieder bis zu seinem Timeout.
+  "$ROOT/scripts/wiederholen.test.sh"
 }
 
 schritt_12() {

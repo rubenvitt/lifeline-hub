@@ -96,11 +96,12 @@ jobs:
 
       - name: System-Werkzeuge (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y nasm
+        # Über das Skript: Frist und Wiederholung gegen einen hängenden Spiegel (LFH-1101).
+        run: ./scripts/apt-pakete.sh nasm
 
       - name: MinGW-Toolchain für den Windows-Cross-Build
         if: matrix.mingw
-        run: sudo apt-get install --no-install-recommends -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
+        run: ./scripts/apt-pakete.sh gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64
 
       - name: System-Werkzeuge (macOS)
         if: runner.os == 'macOS'
