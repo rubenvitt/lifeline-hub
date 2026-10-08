@@ -4,8 +4,9 @@ import type { BaumKnoten } from './baum';
  * Die Zufluss-Schleuse des hängenden Gerüsts (LFH-867, Herleitung
  * `openspec/changes/archive/2026-10-04-lfh-867-organigramm-zufluss-schleuse/design.md`, D1/D3) —
  * rein, ohne React.
- * Gegenstück der Zeilenschleuse in `components/Datensicht.tsx` und der Kartenschleuse in
- * `personen/kartenSchleuse.ts`.
+ * Gegenstück der Kartenschleuse in `personen/kartenSchleuse.ts`. Die Baumsicht der
+ * `components/Datensicht.tsx` nutzt dieselbe Funktion über `baumZufluss` (LFH-1020) und lässt dort
+ * Entfallenes sofort fallen.
  *
  * - **Gehalten** wird die Struktur: welche Knoten, unter welchem Elternknoten, in welcher Folge.
  * - **Der Inhalt fließt**: je Schlüssel steht der frische Knoten da, nur mit den gehaltenen

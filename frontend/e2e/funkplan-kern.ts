@@ -80,7 +80,7 @@ export async function seede(page: Page, einsatzId: string) {
   const besatzung = await page.request.put(`${basis}/fahrzeuge/${fahrzeug}/besatzung/${fuehrer}`);
   expect(besatzung.ok(), `Besatzung: ${await besatzung.text()}`).toBeTruthy();
   await post('fahrzeuge', { adhoc: { funkrufname: 'Florian ELW 1' } });
-  return { einheit };
+  return { einheit, abschnitt };
 }
 
 export const tabelle = (page: Page) => page.getByRole('region', { name: 'Funkplan' });
