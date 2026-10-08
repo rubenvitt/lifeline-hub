@@ -2250,7 +2250,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("vollzogen_at", G_ZEIT),
         ],
     },
-    // ---------- Gerätekopplung (LFH-892, migrations/0147) ----------
+    // ---------- Gerätekopplung (LFH-892, migrations/0147; Stellen LFH-1040, 0158) ----------
     TabellenRegel {
         tabelle: "geraet_kopplung",
         scoping: Scoping::EinsatzId,
@@ -2273,6 +2273,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("letzter_zugriff_at", G_ZEIT),
             retain("widerrufen_at", G_ZEIT),
             retain("widerrufen_von", G_FK),
+            retain("betreuungsstelle_id", G_FK),
+            retain("bereitstellungsraum_id", G_FK),
+            retain("abschnitt_id", G_FK),
         ],
     },
     TabellenRegel {
