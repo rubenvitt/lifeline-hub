@@ -12,7 +12,8 @@ import {
 } from './schreibrecht';
 
 // Wahrheitstabelle für die zentrale Schreibrecht-Regel (LFH-234). Pinnt die beiden bewussten
-// Verhaltensentscheidungen: (a) Admin-global-WRITE, (b) Null-Rolle ohne Schreibrecht.
+// Verhaltensentscheidungen: (a) Modul-Schreibwege nur mit Einsatzrolle, die System-Rolle Admin
+// zählt dort nicht (LFH-1118, wie der Server), (b) Null-Rolle ohne Schreibrecht.
 
 const aktiv = { status: 'aktiv' as const };
 const zu = { status: 'abgeschlossen' as const };
@@ -28,36 +29,41 @@ describe('darfImEinsatzSchreiben', () => {
     expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: 'fuehrungspersonal' })).toBe(true);
   });
 
-  it('erlaubt System-Admin im aktiven Einsatz unabhängig von der Einsatz-Rolle (admin-global)', () => {
-    expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: 'beobachter' }, admin)).toBe(true);
-    expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: null }, admin)).toBe(true);
+  it('verweigert Beobachter', () => {
+    expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: 'beobachter' })).toBe(false);
   });
 
-  it('verweigert Beobachter ohne Admin', () => {
-    expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: 'beobachter' }, keiner)).toBe(false);
-  });
-
-  it('verweigert fehlende Einsatz-Rolle ohne Admin (Null-Leak-Tightening ggü. alter B/C-Semantik)', () => {
+  it('verweigert fehlende Einsatz-Rolle (Null-Leak-Tightening ggü. alter B/C-Semantik)', () => {
     expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: null })).toBe(false);
-    expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: null }, keiner)).toBe(false);
   });
 
-  it('verweigert im abgeschlossenen Einsatz auch für Einsatzleitung und Admin (aktiv bleibt vorausgesetzt)', () => {
+  it('kennt keinen Admin-Zweig: der Server lehnt den Admin ohne Schreibrolle mit 403 ab (LFH-1118)', () => {
+    // Die Regel nimmt nur den Einsatz; ein Benutzer-Argument (und damit ein Admin-Zweig) passt
+    // nicht in die Signatur.
+    expect(darfImEinsatzSchreiben).toHaveLength(1);
+    // @ts-expect-error — kein Benutzer-Parameter
+    expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: null }, admin)).toBe(false);
+  });
+
+  it('verweigert im abgeschlossenen Einsatz auch der Einsatzleitung (aktiv bleibt vorausgesetzt)', () => {
     expect(darfImEinsatzSchreiben({ ...zu, meine_rolle: 'einsatzleitung' })).toBe(false);
-    expect(darfImEinsatzSchreiben({ ...zu, meine_rolle: 'beobachter' }, admin)).toBe(false);
   });
 
   it('ist fail-closed bei fehlendem Einsatz', () => {
     expect(darfImEinsatzSchreiben(undefined)).toBe(false);
     expect(darfImEinsatzSchreiben(null)).toBe(false);
-    expect(darfImEinsatzSchreiben(undefined, admin)).toBe(false);
   });
 });
 
 describe('darfEinsatzLeiten', () => {
-  it('erlaubt Einsatzleitung und Admin im aktiven Einsatz', () => {
+  it('erlaubt die Einsatzleitung im aktiven Einsatz', () => {
     expect(darfEinsatzLeiten({ ...aktiv, meine_rolle: 'einsatzleitung' })).toBe(true);
-    expect(darfEinsatzLeiten({ ...aktiv, meine_rolle: 'beobachter' }, admin)).toBe(true);
+  });
+
+  it('kennt keinen Admin-Zweig: der Server lehnt den Admin ohne Einsatzleitung mit 403 ab (LFH-1118)', () => {
+    expect(darfEinsatzLeiten).toHaveLength(1);
+    // @ts-expect-error — kein Benutzer-Parameter
+    expect(darfEinsatzLeiten({ ...aktiv, meine_rolle: 'fuehrungspersonal' }, admin)).toBe(false);
   });
 
   it('verweigert Führungspersonal und Beobachter', () => {
@@ -67,7 +73,6 @@ describe('darfEinsatzLeiten', () => {
 
   it('verweigert im abgeschlossenen Einsatz', () => {
     expect(darfEinsatzLeiten({ ...zu, meine_rolle: 'einsatzleitung' })).toBe(false);
-    expect(darfEinsatzLeiten({ ...zu, meine_rolle: 'einsatzleitung' }, admin)).toBe(false);
   });
 
   it('ist fail-closed bei fehlendem Einsatz', () => {

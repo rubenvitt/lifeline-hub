@@ -32,7 +32,9 @@ import {
   trendText,
   wasserstandMeter,
 } from '../../pegel/pegelKennzahl';
-import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import { NUR_LEITUNG_FUEHRUNG } from '../../components/nurAnsicht';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import PegelPrognoseModal from './PegelPrognoseModal';
 import { wiederherstellBody } from './pegelPrognoseKern';
 
@@ -125,8 +127,10 @@ type Aenderung = { art: 'hinzufuegen'; station: PegelEingabe } | PegelOperation;
  * Liste gesperrt (jede Handlung schreibt die ganze Liste). Kein optimistisches Update; der Grund
  * einer gescheiterten Änderung steht als `SpeicherFehler` über der Liste.
  *
- * Rechte: dieselbe Achse wie die Formular-Sektionen (`darfImEinsatzSchreiben`). Ohne Recht:
- * `RechteHinweis`, Auswahl und „Hinzufügen" gesperrt, die Zeilenaktionen entfallen.
+ * Rechte: anders als die Formular-Sektionen nicht die Verwaltungsachse, sondern
+ * `darfImEinsatzSchreiben` — die Pegel-Routen ziehen `EinsatzSchreibzugriff`, der Admin ohne
+ * Schreibrolle bekäme 403 (LFH-1118). Ohne Recht: `RechteHinweis`, Auswahl und „Hinzufügen"
+ * gesperrt, die Zeilenaktionen entfallen.
  *
  * Zeilenaktionen (Nach oben, Nach unten, Entfernen, Prognose) gebündelt im Menü. An den Enden ist
  * „Nach oben"/„Nach unten" gesperrt statt weggelassen, sonst wechselte die Bedienform je Zeile.
@@ -230,7 +234,7 @@ export default function EinsatzPegel() {
   }
 
   const liste = pegelQ.data;
-  const darf = daten.darfBearbeiten;
+  const darf = darfImEinsatzSchreiben(daten.einsatz);
   const laeuft =
     aendern.isPending || prognoseLoeschen.isPending || prognoseWiederherstellen.isPending;
   const voll = liste.length >= PEGEL_MAX;
@@ -257,7 +261,7 @@ export default function EinsatzPegel() {
       <SeitenHinweise
         fehler={aendern.error ?? prognoseLoeschen.error ?? prognoseWiederherstellen.error}
         rechteFehlt={daten.istAktiv && !darf}
-        rechteText={RECHTE_TEXT}
+        rechteText={NUR_LEITUNG_FUEHRUNG}
       />
       <Formularpaneel
         titel="Maßgebliche Pegel"

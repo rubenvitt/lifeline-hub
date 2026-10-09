@@ -27,7 +27,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { listeMaterial } from '../api/material';
 import {
   aktualisiereDisposition,
@@ -109,7 +108,6 @@ interface StammDisposition {
 export default function MaterialPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
@@ -213,7 +211,7 @@ export default function MaterialPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const ems = emQuery.data ?? [];
 

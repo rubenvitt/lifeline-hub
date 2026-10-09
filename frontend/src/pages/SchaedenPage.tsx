@@ -9,7 +9,6 @@ import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import {
   ladeSchadenKennzahlen,
   listeSchaedenSeite,
@@ -216,7 +215,6 @@ const schadenKarte = (einsatzId: number): Kartenplan<Schaden, SchadenSpaltenKey>
 export default function SchaedenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -282,7 +280,7 @@ export default function SchaedenPage() {
     queryFn: () => ladeSchadenKennzahlen(einsatzId, filterOhneStatus),
   });
 
-  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   const spalten = useMemo(() => schaedenSpalten(einsatzId), [einsatzId]);
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette). Warten bis der Einsatz geladen
@@ -313,7 +311,7 @@ export default function SchaedenPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const geladen = schaedenQuery.data?.pages.flat() ?? [];
   const ausschnitt = ausschnittQuery.data;

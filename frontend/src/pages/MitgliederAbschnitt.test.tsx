@@ -533,6 +533,23 @@ describe('MitgliederAbschnitt', () => {
       );
     });
 
+    it('fragt auch den System-Admin bei der eigenen Herabstufung (LFH-1118)', async () => {
+      server.use(
+        // Ohne Leitung bliebe auch ihm kein Rückweg: der Server fragt allein die Einsatzrolle.
+        meHandler(benutzerFixture({ id: 1, anzeigename: 'Lea', system_rolle: 'admin' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([leitung(1, 'Lea'), leitung(3, 'Leo')]),
+        ),
+        http.get('/api/benutzer', () => HttpResponse.json([])),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await zeile('Lea');
+      await userEvent.click(await rollenOption('Lea', 'Beobachter'));
+      expect(await rueckfrage()).toBeInTheDocument();
+    });
+
     it('fremde Zeilen und das Hochstufen fragen nicht nach', async () => {
       const gesendet: string[] = [];
       server.use(

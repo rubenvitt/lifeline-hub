@@ -368,7 +368,7 @@ export default function ChatPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const nachrichten = [...(nachrichtenQuery.data?.pages.flat() ?? [])].sort((a, b) => a.id - b.id);
 

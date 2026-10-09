@@ -277,7 +277,7 @@ export default function DokumentePage() {
   });
   const { mutate: entfernen } = entfernenMutation;
 
-  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   const darfOriginal = darfOriginalLaden(einsatzQuery.data, benutzer);
   const spalten = useMemo(
     () =>
@@ -320,7 +320,7 @@ export default function DokumentePage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   // Listenzustand — an der Stelle der Liste, gemessen an der Vollmenge.
   const alle = dokumenteQuery.data ?? [];

@@ -18,7 +18,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
@@ -231,7 +230,6 @@ const ANSICHT_OPTIONEN = [
 export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
@@ -374,7 +372,7 @@ export default function FahrzeugePage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const efs = efQuery.data ?? [];
 

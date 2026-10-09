@@ -19,7 +19,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import KraftZeitachse from '../kraefte/KraftZeitachse';
-import { useAuth } from '../auth/AuthContext';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -131,7 +130,6 @@ export default function EinheitDetailPage() {
   const einsatzId = Number(id);
   const einheitId = Number(einheitIdParam);
   const idGueltig = parseRouteId(einheitIdParam) != null;
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { message } = App.useApp();
@@ -307,7 +305,7 @@ export default function EinheitDetailPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   /**
    * Die Liste kam an, die Einheit ist nicht darin (aufgelöst oder erfundene ID). Ein anderer Fall

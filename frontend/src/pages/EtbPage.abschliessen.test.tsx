@@ -8,8 +8,8 @@ import EtbPage from './EtbPage';
 import { benutzerFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 
-// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; admin-global deckt
-// schreibrecht.test.ts ab.
+// Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; dass die Systemrolle
+// fürs Schreiben nicht zählt, deckt schreibrecht.test.ts ab.
 const nutzer = benutzerFixture();
 function einsatz(status: string) {
   return {

@@ -19,7 +19,7 @@ import GeraetMeldungen from './GeraetMeldungen';
  * der Adresse räumen (`replace`): ein stehengebliebener Auftrag füllte bei jedem Neuladen.
  */
 export default function GeraetMeldungenPage() {
-  const { geraet, benutzer } = useAuth();
+  const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const [suche, setSuche] = useSearchParams();
   const [vorbelegung, setVorbelegung] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export default function GeraetMeldungenPage() {
       <GeraetMeldungen
         einsatzId={einsatzId}
         absender={absender}
-        schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data, benutzer)}
+        schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data)}
         vorbelegung={vorbelegung}
       />
     </EinsatzSeite>

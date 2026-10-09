@@ -349,12 +349,17 @@ describe('skizzenRechte (D5, D8)', () => {
     });
   });
 
-  it('gibt dem Admin einer fremden Org nur die Modul-Schreibwege, nicht die Führungsstelle (LFH-1066)', () => {
+  it('gibt dem Admin ohne Rolle nur in der eigenen Org die Führungsstelle frei, Module nie (LFH-1066, LFH-1118)', () => {
     const ohneRolle = { status: 'aktiv', meine_rolle: null, org_id: 1 } as EinsatzAnzeige;
     const fremd = { system_rolle: 'admin', org_id: 2 } as BenutzerAnzeige;
     expect(skizzenRechte(ohneRolle, fremd, freigabenFixture()).verwaltung).toBe(false);
     const eigen = { system_rolle: 'admin', org_id: 1 } as BenutzerAnzeige;
-    expect(skizzenRechte(ohneRolle, eigen, freigabenFixture()).verwaltung).toBe(true);
+    expect(skizzenRechte(ohneRolle, eigen, freigabenFixture())).toEqual({
+      einsatzabschnitte: false,
+      einheiten: false,
+      verwaltung: true,
+      stab: false,
+    });
   });
 
   it('gibt ohne Schreibrecht im Einsatz nichts frei', () => {

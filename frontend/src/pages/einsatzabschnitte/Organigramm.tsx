@@ -8,7 +8,6 @@ import { ladeModulFreigaben } from '../../api/einsaetze';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { ladeStab } from '../../api/stab';
 import { einsatzKeys } from '../../api/queryKeys';
-import { useAuth } from '../../auth/AuthContext';
 import DruckKnopf from '../../components/druck/DruckKnopf';
 import Druckkopf from '../../components/druck/Druckkopf';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -268,7 +267,6 @@ interface Props {
  */
 export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand }: Props) {
   const { token, rollen } = useRollen();
-  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { konventionen } = useAnzeigeKonventionen();
   const org = useMemo(
@@ -302,8 +300,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
     queryFn: () => ladeModulFreigaben(einsatz.id),
   });
   const darfUebernehmen =
-    darfImEinsatzSchreiben(einsatz, benutzer) &&
-    istKeyFreigegeben('lageberichte', freigabenQuery.data);
+    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('lageberichte', freigabenQuery.data);
   // Solange eine Quelle lädt, stünde „lädt“ im unveränderlichen Bericht.
   const quellenLaden = einheiten.zustand === 'laden' || (stabFrei && stabQuery.isPending);
 

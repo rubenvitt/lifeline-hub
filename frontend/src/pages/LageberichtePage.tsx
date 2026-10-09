@@ -9,7 +9,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte } from '../api/lageberichte';
 import type { LageberichtKopf, LageberichtVorlageKey } from '../api/types';
@@ -132,7 +131,6 @@ function titelVorschlag(jetzt: Dayjs, formatiere: (d: Dayjs, format: string) => 
 export default function LageberichtePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [form] = Form.useForm<AnlegenWerte>();
@@ -199,7 +197,7 @@ export default function LageberichtePage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const berichte = berichteQuery.data ?? [];
   const koepfe = kettenKoepfe(berichte);

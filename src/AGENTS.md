@@ -255,6 +255,10 @@ Spec `passwort-anmeldung`, Herleitung
 - Der Client spiegelt das über `BenutzerAnzeige.org_id` (`darfEinsatzVerwalten`,
   `darfModuleVerwalten` in `frontend/src/einsatz/schreibrecht.ts`). Nachweis
   `tests/einsatz_verwaltungsrecht.rs`.
+- **Modul-Schreibwege nur mit Einsatzrolle, auch für den Admin** (LFH-1118):
+  `EinsatzSchreibzugriff`, `EinsatzLeitungszugriff` und `fordere_schreibrecht` fragen allein die
+  Rolle. Ihr Client-Spiegel `darfImEinsatzSchreiben`/`darfEinsatzLeiten` nimmt darum keinen
+  Benutzer; eine Admin-Ausnahme gehört in eine Verwaltungsprüfung, nie in diese beiden.
 
 ## Backend — Org-Ereignisse (LFH-734)
 

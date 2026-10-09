@@ -22,7 +22,6 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import {
   aktualisiereTier,
   ladeTier,
@@ -79,7 +78,6 @@ function halterAnzeige(t: Tier): React.ReactNode {
 export default function TiereDetailPage() {
   const { id, tierId: tierIdParam } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const tierId = Number(tierIdParam);
   const idGueltig = parseRouteId(tierIdParam) != null;
   const navigate = useNavigate();
@@ -211,7 +209,7 @@ export default function TiereDetailPage() {
   }
   const t = detailQuery.data;
 
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item mit Input, sonst die Anzeige — dasselbe
   // Datenraster bleibt stehen.

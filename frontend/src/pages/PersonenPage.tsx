@@ -506,7 +506,7 @@ export default function PersonenPage() {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
     const e = einsatzQuery.data;
-    const darfSchr = darfImEinsatzSchreiben(e, benutzer);
+    const darfSchr = darfImEinsatzSchreiben(e);
     if (darfSchr) setModusFuer(einsatzId, 'erfassen');
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
@@ -539,7 +539,7 @@ export default function PersonenPage() {
    * `person`-Ereignis alle Zeilen. Steht vor dem Frühausstieg, wie jeder Hook; das Schreibrecht
    * ist ohne Einsatz `false`, wie unten.
    */
-  const darfSchreibenListe = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreibenListe = darfImEinsatzSchreiben(einsatzQuery.data);
   const darfAbgleichenListe = darfSchreibenListe && sicht.filter === 'vermisst';
   // Nur im Abgleich gebraucht; dort entsteht die Liste je Datenstand neu, die Menge ist klein.
   const gefundeneListe = darfAbgleichenListe
@@ -600,7 +600,7 @@ export default function PersonenPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
 
   const alle = frischErfasst.alle;

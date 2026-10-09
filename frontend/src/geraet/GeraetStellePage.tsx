@@ -98,7 +98,7 @@ function PlaetzeBereich({ einsatzId, uhs }: { einsatzId: number; uhs: UhsDetail 
  * selbst bleibt der eigene Bereich.
  */
 export default function GeraetStellePage() {
-  const { geraet, benutzer } = useAuth();
+  const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const uhsId = geraet?.uhs_id ?? null;
   const [bereich, setBereich] = useState<Bereich>('plaetze');
@@ -115,7 +115,7 @@ export default function GeraetStellePage() {
     enabled: geraet != null && uhsId != null,
   });
   const uhs = uhsQuery.data;
-  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data);
 
   return (
     <EinsatzSeite

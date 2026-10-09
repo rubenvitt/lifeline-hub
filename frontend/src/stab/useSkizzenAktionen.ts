@@ -67,7 +67,7 @@ export function skizzenRechte(
   benutzer: BenutzerOrgKontext,
   freigaben: ModulFreigaben | undefined,
 ): NetzRechte {
-  const schreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const schreiben = darfImEinsatzSchreiben(einsatz);
   const frei = (key: string) => schreiben && istKeyFreigegeben(key, freigaben);
   return {
     einsatzabschnitte: frei('einsatzabschnitte'),
