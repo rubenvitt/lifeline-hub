@@ -469,6 +469,7 @@ fn serde_wire_gleich_as_str() {
         Logout,
         PasswortGeaendert,
         PasswortWechselAbgewiesen,
+        SitzungBeendet,
     });
     enum_wire_as_str!(lifeline_hub::auth::admin_audit::AdminAktion {
         BenutzerAngelegt,
@@ -478,6 +479,7 @@ fn serde_wire_gleich_as_str() {
         ZweitfaktorZurueckgesetzt,
         AnmeldewegAktiviert,
         AnmeldewegDeaktiviert,
+        SitzungBeendet,
     });
 }
 

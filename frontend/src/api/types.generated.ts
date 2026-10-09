@@ -114,12 +114,12 @@ export interface components {
         AbschnittLagezustand: "planmaessig" | "angespannt" | "kritisch";
         /**
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
-         *     `migrations/0156_admin_audit.sql` — beide Seiten müssen zusammenpassen (Test
-         *     `jede_aktion_passiert_den_db_check`). Zugleich Schema-Anker der Union in
-         *     [`ZugangsaenderungAnzeige`] (LFH-120).
+         *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` —
+         *     beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
+         *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -1784,12 +1784,13 @@ export interface components {
         EmpfaengerTyp: "abschnitt" | "einheit" | "funktion" | "person" | "fahrzeug" | "extern";
         /**
          * @description Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
-         *     `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` —
-         *     beide Seiten müssen zusammenpassen (Test `jede_variante_passiert_den_db_check`). Zugleich
-         *     Schema-Anker der Union in [`AnmeldeEintragAnzeige`] (LFH-120).
+         *     `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und
+         *     `0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test
+         *     `jede_variante_passiert_den_db_check`). Zugleich Schema-Anker der Union in
+         *     [`AnmeldeEintragAnzeige`] (LFH-120).
          * @enum {string}
          */
-        Ereignis: "login_ok" | "login_fehlgeschlagen" | "logout" | "passwort_geaendert" | "passwort_wechsel_abgewiesen";
+        Ereignis: "login_ok" | "login_fehlgeschlagen" | "logout" | "passwort_geaendert" | "passwort_wechsel_abgewiesen" | "sitzung_beendet";
         /**
          * @description Erhebungsart einer Zahl (Plangröße oder Stand). Wire == `as_str()`.
          * @enum {string}

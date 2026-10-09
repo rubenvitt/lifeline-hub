@@ -280,7 +280,7 @@
       },
       "AdminAktion": {
         "type": "string",
-        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql` — beide Seiten müssen zusammenpassen (Test\n`jede_aktion_passiert_den_db_check`). Zugleich Schema-Anker der Union in\n[`ZugangsaenderungAnzeige`] (LFH-120).",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` —\nbeide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
         "enum": [
           "benutzer_angelegt",
           "benutzer_deaktiviert",
@@ -288,7 +288,8 @@
           "rolle_geaendert",
           "zweitfaktor_zurueckgesetzt",
           "anmeldeweg_aktiviert",
-          "anmeldeweg_deaktiviert"
+          "anmeldeweg_deaktiviert",
+          "sitzung_beendet"
         ]
       },
       "AdressatKategorie": {
@@ -4791,13 +4792,14 @@
       },
       "Ereignis": {
         "type": "string",
-        "description": "Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in\n`migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` —\nbeide Seiten müssen zusammenpassen (Test `jede_variante_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`AnmeldeEintragAnzeige`] (LFH-120).",
+        "description": "Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in\n`migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und\n`0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test\n`jede_variante_passiert_den_db_check`). Zugleich Schema-Anker der Union in\n[`AnmeldeEintragAnzeige`] (LFH-120).",
         "enum": [
           "login_ok",
           "login_fehlgeschlagen",
           "logout",
           "passwort_geaendert",
-          "passwort_wechsel_abgewiesen"
+          "passwort_wechsel_abgewiesen",
+          "sitzung_beendet"
         ]
       },
       "Erhebung": {

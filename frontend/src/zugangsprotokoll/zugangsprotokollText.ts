@@ -12,6 +12,7 @@ export const EREIGNIS_TEXT: Record<AnmeldeEreignis, string> = {
   logout: 'Abmeldung',
   passwort_geaendert: 'Passwort geändert',
   passwort_wechsel_abgewiesen: 'Passwortwechsel abgewiesen',
+  sitzung_beendet: 'Sitzung beendet',
 };
 
 export const AKTION_TEXT: Record<AdminAktion, string> = {
@@ -22,6 +23,7 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   zweitfaktor_zurueckgesetzt: 'Zweitfaktor zurückgesetzt',
   anmeldeweg_aktiviert: 'Anmeldeweg aktiviert',
   anmeldeweg_deaktiviert: 'Anmeldeweg deaktiviert',
+  sitzung_beendet: 'Sitzung beendet',
 };
 
 /** Anmeldewege nach ihrer id (`auth::provider::ID_*`); Unbekanntes steht als id. */
