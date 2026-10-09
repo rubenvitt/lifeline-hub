@@ -1194,3 +1194,53 @@ describe('Schnellerfassung — eingeklappt (LFH-955)', () => {
     expect(screen.queryByLabelText('An')).toBeNull();
   });
 });
+
+/**
+ * Startfokus beim Mount (LFH-1089). Die Leiste montiert erst, wenn die Entwürfe geladen sind —
+ * wer bis dahin schon in einem anderen Feld tippt (Volltextsuche), behält seinen Fokus, sonst
+ * landeten die übrigen Zeichen im Entwurf.
+ */
+describe('Schnellerfassung – Startfokus', () => {
+  /** Ein Feld außerhalb der Leiste, das vor ihrem Mount den Fokus hält. */
+  function fokussiertVorab(element: HTMLElement): () => void {
+    document.body.appendChild(element);
+    element.focus();
+    return () => element.remove();
+  }
+
+  /** Lässt den Startfokus-Effekt laufen, auch wenn er erst nach dem ersten Bild greift. */
+  async function effekteAuslaufen() {
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+  }
+
+  it('fokussiert das Inhaltsfeld, wenn kein anderes Feld den Fokus hält', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+  });
+
+  it('nimmt einem Eingabefeld außerhalb der Leiste den Fokus nicht', async () => {
+    const suche = document.createElement('input');
+    suche.setAttribute('aria-label', 'Volltextsuche');
+    const aufraeumen = fokussiertVorab(suche);
+    try {
+      renderMitProviders(<Schnellerfassung {...props()} />);
+      await effekteAuslaufen();
+      expect(suche).toHaveFocus();
+      expect(screen.getByPlaceholderText(/Inhalt/)).not.toHaveFocus();
+    } finally {
+      aufraeumen();
+    }
+  });
+
+  it('fokussiert trotzdem, wenn nur ein Knopf den Fokus hält (Sprung über Navigation, Reiter)', async () => {
+    const knopf = document.createElement('button');
+    knopf.textContent = 'ETB';
+    const aufraeumen = fokussiertVorab(knopf);
+    try {
+      renderMitProviders(<Schnellerfassung {...props()} />);
+      await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+    } finally {
+      aufraeumen();
+    }
+  });
+});

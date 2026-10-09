@@ -1,7 +1,7 @@
 import { http, HttpResponse, type RequestHandler } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import { act, type ReactElement } from 'react';
 import { meHandler, server } from '../test/server';
@@ -15,6 +15,22 @@ import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
 import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
+
+/**
+ * Sperre vor dem Laden der Entwürfe: offen, bis ein Test sie schließt. Damit montiert die
+ * Erfassung nachweislich erst nach dem ersten getippten Zeichen (LFH-1089), statt je nach Last.
+ */
+const entwurfSperre = vi.hoisted(() => ({ offen: Promise.resolve() }));
+vi.mock('../etb/entwuerfe/entwurfStore', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('../etb/entwuerfe/entwurfStore')>();
+  return {
+    ...echt,
+    entwuerfeLaden: async (...args: Parameters<typeof echt.entwuerfeLaden>) => {
+      await entwurfSperre.offen;
+      return echt.entwuerfeLaden(...args);
+    },
+  };
+});
 
 function renderMitProviders(
   ui: ReactElement,
@@ -33,6 +49,7 @@ function renderMitProviders(
 }
 
 beforeEach(async () => {
+  entwurfSperre.offen = Promise.resolve();
   await entwuerfeLeerenFuerTests();
   await queueLeerenFuerTests();
   localStorage.clear();
@@ -757,6 +774,32 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
 
     expect(ereignis.defaultPrevented).toBe(false);
     expect(suche).toHaveValue('zzz');
+  });
+
+  it('lässt die spät montierte Erfassung der Suche nicht den Fokus nehmen (LFH-1089)', async () => {
+    let freigeben = () => {};
+    entwurfSperre.offen = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setupMit([
+      http.get('/api/einsaetze/7/etb', ({ request }) =>
+        HttpResponse.json(new URL(request.url).searchParams.has('q') ? [] : [eintrag]),
+      ),
+    ]);
+    await screen.findByText('Erste Meldung');
+    const user = userEvent.setup();
+    const suche = screen.getByPlaceholderText('Volltextsuche');
+    await user.type(suche, 'z');
+
+    // Die Entwürfe treffen erst jetzt ein; die Erfassung montiert, während weiter getippt wird.
+    freigeben();
+    const inhalt = await screen.findByPlaceholderText(/Inhalt/);
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    await user.keyboard('zz');
+
+    expect(suche).toHaveFocus();
+    expect(suche).toHaveValue('zzz');
+    expect(inhalt).toHaveValue('');
   });
 
   /** Der Filter steht in der URL: er überlebt einen Reload und ist teilbar. */
