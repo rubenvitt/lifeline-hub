@@ -29,6 +29,10 @@ pub struct FuehrungsstellePatchBody {
     /// unverändert.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub sprechgruppe_ids: Option<Option<Vec<i64>>>,
+    /// Dispositionszeilen, die die Führungsstelle tragen (LFH-1106); ersetzt wie
+    /// `sprechgruppe_ids`.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub fahrzeug_ids: Option<Option<Vec<i64>>>,
 }
 
 /// GET /api/einsaetze/{id}/fuehrungsstelle — ohne erfasste Angaben alles leer (200).
@@ -55,12 +59,22 @@ pub async fn aendern(
         .map(Option::unwrap_or_default)
         .map(crate::sprechgruppe::normalisiere_ids)
         .transpose()?;
+    let fahrzeug_ids: Option<Vec<i64>> = body
+        .fahrzeug_ids
+        .map(Option::unwrap_or_default)
+        .map(fuehrungsstelle::normalisiere_fahrzeug_ids)
+        .transpose()?;
     let rufname = trimme_tri(body.rufname);
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
-    if rufname.is_none() && mittel.is_none() && erreichbarkeit.is_none() && ids.is_none() {
+    if rufname.is_none()
+        && mittel.is_none()
+        && erreichbarkeit.is_none()
+        && ids.is_none()
+        && fahrzeug_ids.is_none()
+    {
         return Ok(Json(fuehrungsstelle::laden(&state.pool, einsatz_id).await?));
     }
     if let Some(ids) = &ids {
@@ -72,11 +86,15 @@ pub async fn aendern(
         )
         .await?;
     }
+    if let Some(ids) = &fahrzeug_ids {
+        fuehrungsstelle::pruefe_fahrzeuge(&state.pool, einsatz_id, ids).await?;
+    }
     let patch = FuehrungsstellePatch {
         rufname: rufname.as_ref().map(|v| v.as_deref()),
         kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
         erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
         sprechgruppe_ids: ids.as_deref(),
+        fahrzeug_ids: fahrzeug_ids.as_deref(),
     };
     let anzeige = crate::write_retry!(&state.pool, |conn| {
         fuehrungsstelle::patchen_tx(conn, einsatz_id, &patch).await

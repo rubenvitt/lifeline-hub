@@ -138,7 +138,17 @@ export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
   const fahrzeugeDa = q.fahrzeuge.zustand === 'daten';
   const abschnitte = abschnitteDa ? q.abschnitte.daten : [];
   const einheiten = einheitenDa ? q.einheiten.daten : [];
-  const fahrzeuge = fahrzeugeDa ? q.fahrzeuge.daten : [];
+  // Fahrzeuge der Führungsstelle stehen unter ihrer Zeile und nirgends sonst (LFH-1106); ohne
+  // Zeile bleiben sie, wo sie ohne Zuordnung stünden.
+  const fsBasis = fuehrungsstelleZeile(q.fuehrungsstelle);
+  const fsIds = new Set(
+    fsBasis && q.fuehrungsstelle.zustand === 'daten'
+      ? (q.fuehrungsstelle.daten?.fahrzeug_ids ?? [])
+      : [],
+  );
+  const alleFahrzeuge = fahrzeugeDa ? q.fahrzeuge.daten : [];
+  const fsFahrzeuge = alleFahrzeuge.filter((f) => fsIds.has(f.id));
+  const fahrzeuge = alleFahrzeuge.filter((f) => !fsIds.has(f.id));
 
   // ── Fahrzeugführer: Besatzung mit Position „Führer“ (Migration 0072) ─────────────────────────
   const fuehrerJeFahrzeug = gruppiere(
@@ -268,7 +278,7 @@ export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
   }
   // Die Führungsstelle steht VOR den Wurzeln, nicht über ihnen: der Baum bleibt gleich dem
   // Organigramm, die Verbindung zu den obersten Abschnitten urteilt die Lücke (D5).
-  const fs = fuehrungsstelleZeile(q.fuehrungsstelle);
+  const fs = fsBasis && mitKindern(fsBasis, fsFahrzeuge.map(fahrzeugZeile));
   return fs ? [fs, ...wurzeln] : wurzeln;
 }
 

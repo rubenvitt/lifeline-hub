@@ -1,8 +1,10 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): die Gegenstelle des Funkplans (ELW,
-//! Einsatzleitung) mit Rufname, Sprechgruppen, Kommunikationsmittel und Erreichbarkeit.
+//! Einsatzleitung) mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und den
+//! Fahrzeugen, die sie tragen (LFH-1106).
 //!
 //! Eine Zeile je Einsatz (Migration 0145), lazy beim ersten Schreiben; fehlt sie, gilt die
-//! Führungsstelle als nicht erfasst und der Abruf liefert alle Angaben leer. Nicht zu verwechseln
+//! Führungsstelle als nicht erfasst und der Abruf liefert alle Angaben leer. Sprechgruppen (0145)
+//! und Fahrzeuge (0171) hängen in eigenen Zuordnungstabellen. Nicht zu verwechseln
 //! mit `einsatz_mitgliedschaft.fuehrungsstelle` (Freitext je Person, LFH-461).
 //!
 //! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2).
@@ -28,6 +30,72 @@ pub struct FuehrungsstelleAnzeige {
     /// Personenbezogen: wird geschwärzt und steht nie im Lagebericht.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub erreichbarkeit: Option<String>,
+    /// Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
+    /// Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
+    /// Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
+    pub fahrzeug_ids: Vec<i64>,
+}
+
+/// Höchstzahl der Fahrzeuge einer Führungsstelle (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+pub const FAHRZEUGE_JE_FUEHRUNGSSTELLE_MAX: usize = 16;
+
+/// Fahrzeug-Liste von außen: sortiert, entdoppelt, höchstens
+/// [`FAHRZEUGE_JE_FUEHRUNGSSTELLE_MAX`] (sonst 400), vor jedem Schreiben.
+pub fn normalisiere_fahrzeug_ids(mut ids: Vec<i64>) -> Result<Vec<i64>, AppError> {
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() > FAHRZEUGE_JE_FUEHRUNGSSTELLE_MAX {
+        return Err(AppError::Validation(format!(
+            "Höchstens {FAHRZEUGE_JE_FUEHRUNGSSTELLE_MAX} Fahrzeuge je Führungsstelle"
+        )));
+    }
+    Ok(ids)
+}
+
+/// Prüft, dass jede ID eine Dispositionszeile dieses Einsatzes ist; sonst 422 (Zusammenhang,
+/// `src/AGENTS.md`, Statuscode-Konvention). Eine Abfrage für die ganze Liste.
+pub async fn pruefe_fahrzeuge(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let disponiert: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_fahrzeug \
+         WHERE id IN (SELECT value FROM json_each(?)) AND einsatz_id = ?",
+    )
+    .bind(ids_json(ids)?)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    if let Some(id) = ids.iter().find(|id| !disponiert.contains(id)) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Fahrzeug {id} ist diesem Einsatz nicht disponiert"
+        )));
+    }
+    Ok(())
+}
+
+/// Trägt die Dispositionszeile die Führungsstelle? Wer sie löscht, fragt vorher: die Kaskade
+/// (Migration 0171) löst die Zuordnung still, das Ereignis `einsatz` muss der Aufrufer melden.
+pub async fn traegt_fahrzeug_tx(
+    conn: &mut SqliteConnection,
+    einsatz_fahrzeug_id: i64,
+) -> Result<bool, AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_fuehrungsstelle_fahrzeug WHERE einsatz_fahrzeug_id = ?",
+    )
+    .bind(einsatz_fahrzeug_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(treffer.is_some())
+}
+
+fn ids_json(ids: &[i64]) -> Result<String, AppError> {
+    serde_json::to_string(ids)
+        .map_err(|e| AppError::Internal(format!("Fahrzeug-ids serialisieren: {e}")))
 }
 
 /// Teiländerung: `None` = unverändert, `Some(None)` = leeren. Werte sind bereits getrimmt und
@@ -40,6 +108,9 @@ pub struct FuehrungsstellePatch<'a> {
     /// Ersetzt die Zuordnung vollständig. Die IDs prüft der Aufrufer vorher
     /// (`sprechgruppe::repo::pruefe_zuordenbar`).
     pub sprechgruppe_ids: Option<&'a [i64]>,
+    /// Ersetzt die Fahrzeuge vollständig. Die IDs prüft der Aufrufer vorher
+    /// ([`pruefe_fahrzeuge`]).
+    pub fahrzeug_ids: Option<&'a [i64]>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -77,6 +148,13 @@ async fn laden_tx(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
+    let fahrzeug_ids = sqlx::query_scalar::<_, i64>(
+        "SELECT einsatz_fahrzeug_id FROM einsatz_fuehrungsstelle_fahrzeug \
+         WHERE einsatz_id = ? ORDER BY einsatz_fahrzeug_id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
     let (rufname, kommunikationsmittel, erreichbarkeit) = match zeile {
         Some(z) => (z.rufname, z.kommunikationsmittel, z.erreichbarkeit),
         None => (None, None, None),
@@ -86,6 +164,7 @@ async fn laden_tx(
         sprechgruppen: sprechgruppen.iter().map(Sprechgruppe::anzeige).collect(),
         kommunikationsmittel,
         erreichbarkeit,
+        fahrzeug_ids,
     })
 }
 
@@ -121,6 +200,27 @@ pub async fn patchen_tx(
             crate::sprechgruppe::repo::Zuordnungsziel::Fuehrungsstelle(einsatz_id),
             ids,
         )
+        .await?;
+    }
+    if let Some(ids) = patch.fahrzeug_ids {
+        // Zwei Anweisungen, unabhängig von der Länge der Liste (Muster
+        // `sprechgruppe::repo::ersetzen_tx`).
+        let ids = ids_json(ids)?;
+        sqlx::query(
+            "DELETE FROM einsatz_fuehrungsstelle_fahrzeug WHERE einsatz_id = ? \
+               AND einsatz_fahrzeug_id NOT IN (SELECT value FROM json_each(?))",
+        )
+        .bind(einsatz_id)
+        .bind(&ids)
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "INSERT OR IGNORE INTO einsatz_fuehrungsstelle_fahrzeug \
+               (einsatz_id, einsatz_fahrzeug_id) SELECT ?, value FROM json_each(?)",
+        )
+        .bind(einsatz_id)
+        .bind(&ids)
+        .execute(&mut *conn)
         .await?;
     }
     laden_tx(conn, einsatz_id).await

@@ -63,6 +63,7 @@ import type { Herkunft } from './sprechgruppenplan';
  *   Treffer wie das Paneel.
  * - **Ausstattung je Kasten** (LFH-1029): Führungsmittel und Funktionen als kleine Zeichen in
  *   Führungsstelle und Abschnitt, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus).
+ *   Die der Führungsstelle zugeordneten Fahrzeuge stehen in ihrem Kasten (LFH-1106).
  *
  * Die Führungsorganisation (`baueFuehrungsorganisation`) ist nur noch Vorlage für Auto-Layout und
  * Fokusfolge (`baum`). Verwaiste Bezüge (Verbindung, Lagezeile auf ein fehlendes Element) fallen
@@ -322,11 +323,17 @@ export function bezugSchluessel(b: SkizzenBezug): string | null {
 const vergleiche = (a: string, b: string) =>
   a.localeCompare(b, 'de', { numeric: true, sensitivity: 'base' });
 
+/** Führungsmittel im Kasten: nach Wort, dann Funkrufname (D4). */
+const vergleicheMittel = (a: SkizzenAusstattung, b: SkizzenAusstattung) =>
+  vergleiche(a.text, b.text) || vergleiche(a.titel, b.titel);
+
 /**
- * Ein disponiertes Fahrzeug ist Führungsmittel, wenn sein Zeichen die Fachaufgabe Führung trägt:
- * dieselbe Regel wie die Lagekarte (`baueTzProps`), ein manuelles `tz_fachaufgabe` gewinnt.
+ * Ein disponiertes Fahrzeug ist Führungsmittel eines Abschnitts, wenn sein Zeichen die Fachaufgabe
+ * Führung trägt: dieselbe Regel wie die Lagekarte (`baueTzProps`), ein manuelles
+ * `tz_fachaufgabe` gewinnt. Ein der eigenen Führungsstelle zugeordnetes Fahrzeug ist es ohne diese
+ * Bedingung (`nurFuehrung = false`, LFH-1106): die Zuordnung ist selbst die Aussage.
  */
-function fuehrungsmittel(f: EinsatzFahrzeug): SkizzenAusstattung | null {
+function fuehrungsmittel(f: EinsatzFahrzeug, nurFuehrung = true): SkizzenAusstattung | null {
   const tz = baueTzProps({
     objekttyp: 'fahrzeug',
     fachaufgabe: f.tz_fachaufgabe,
@@ -335,7 +342,7 @@ function fuehrungsmittel(f: EinsatzFahrzeug): SkizzenAusstattung | null {
     opta: f.opta,
     traegerorganisation: f.traegerorganisation,
   });
-  if (tz.fachaufgabe !== 'fuehrung') return null;
+  if (nurFuehrung && tz.fachaufgabe !== 'fuehrung') return null;
   const typ = f.fahrzeugtyp?.trim() || null;
   return {
     art: 'fuehrungsmittel',
@@ -443,6 +450,14 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
   const stellen: NetzStelle[] = [];
   const fsDaten = q.fuehrungsstelle.zustand === 'daten' ? q.fuehrungsstelle.daten : null;
   const fsErfasst = fuehrungsstelleErfasst(fsDaten);
+  // Die Fahrzeuge der Führungsstelle stehen in ihrem Kasten und in keinem Abschnittskasten
+  // (LFH-1106); eine ID ohne geladenes Fahrzeug fällt still weg.
+  const fahrzeuge = q.fahrzeuge.zustand === 'daten' ? q.fahrzeuge.daten : [];
+  const fsFahrzeugIds = new Set(fsDaten?.fahrzeug_ids ?? []);
+  const fsMittel = fahrzeuge
+    .filter((f) => fsFahrzeugIds.has(f.id))
+    .map((f) => fuehrungsmittel(f, false)!)
+    .sort(vergleicheMittel);
   stellen.push({
     art: 'fuehrungsstelle',
     key: 'fs',
@@ -465,13 +480,16 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
       ? kommunikationsmittelLabel(fsDaten?.kommunikationsmittel)
       : null,
     // Die Besetzung ist eine eigene Angabe: sie steht auch ohne erfasste Gegenstelle.
-    ausstattung: q.besetzung.zustand === 'daten' ? stabAusstattung(q.besetzung.daten) : [],
+    ausstattung: [
+      ...(q.besetzung.zustand === 'daten' ? stabAusstattung(q.besetzung.daten) : []),
+      ...fsMittel,
+    ],
   });
 
   // Führungsmittel je Kasten: das Fahrzeug steht beim nächsten Abschnitt über seiner Einheit.
   const fahrzeugeJeEinheit = new Map<number, SkizzenAusstattung[]>();
-  for (const f of q.fahrzeuge.zustand === 'daten' ? q.fahrzeuge.daten : []) {
-    const mittel = f.einheit_id != null ? fuehrungsmittel(f) : null;
+  for (const f of fahrzeuge) {
+    const mittel = f.einheit_id != null && !fsFahrzeugIds.has(f.id) ? fuehrungsmittel(f) : null;
     if (!mittel) continue;
     fahrzeugeJeEinheit.set(f.einheit_id!, [
       ...(fahrzeugeJeEinheit.get(f.einheit_id!) ?? []),
@@ -530,9 +548,7 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
   // Funktionen vor Führungsmitteln; Führungsmittel nach Wort, dann Funkrufname (D4).
   for (const liste of mittelJeAbschnitt.values()) {
     const funktionen = liste.filter((x) => x.art === 'funktion');
-    const mittel = liste
-      .filter((x) => x.art === 'fuehrungsmittel')
-      .sort((a, b) => vergleiche(a.text, b.text) || vergleiche(a.titel, b.titel));
+    const mittel = liste.filter((x) => x.art === 'fuehrungsmittel').sort(vergleicheMittel);
     liste.splice(0, liste.length, ...funktionen, ...mittel);
   }
 

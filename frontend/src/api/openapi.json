@@ -5753,7 +5753,8 @@
         "type": "object",
         "description": "Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON.",
         "required": [
-          "sprechgruppen"
+          "sprechgruppen",
+          "fahrzeug_ids"
         ],
         "properties": {
           "erreichbarkeit": {
@@ -5762,6 +5763,14 @@
               "null"
             ],
             "description": "Personenbezogen: wird geschwärzt und steht nie im Lagebericht."
+          },
+          "fahrzeug_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.\nNur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul\nFahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“)."
           },
           "kommunikationsmittel": {
             "type": [

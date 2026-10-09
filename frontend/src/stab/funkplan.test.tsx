@@ -108,7 +108,7 @@ function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {
 }
 
 function fs(p: Partial<Fuehrungsstelle> = {}): FunkplanQuellen['fuehrungsstelle'] {
-  return { zustand: 'daten', daten: { sprechgruppen: [], ...p } };
+  return { zustand: 'daten', daten: { sprechgruppen: [], fahrzeug_ids: [], ...p } };
 }
 
 function alleSchluessel(zeilen: FunkplanZeile[]): string[] {
@@ -568,17 +568,26 @@ describe('md (LFH-868)', () => {
 describe('fuehrungsstelleErfasst', () => {
   it('ist ohne Daten und mit leeren Angaben nicht erfasst', () => {
     expect(fuehrungsstelleErfasst(null)).toBe(false);
-    expect(fuehrungsstelleErfasst({ sprechgruppen: [] })).toBe(false);
-    expect(fuehrungsstelleErfasst({ sprechgruppen: [], rufname: '  ', erreichbarkeit: null })).toBe(
-      false,
-    );
+    expect(fuehrungsstelleErfasst({ sprechgruppen: [], fahrzeug_ids: [] })).toBe(false);
+    expect(
+      fuehrungsstelleErfasst({
+        sprechgruppen: [],
+        fahrzeug_ids: [],
+        rufname: '  ',
+        erreichbarkeit: null,
+      }),
+    ).toBe(false);
   });
 
   it.each<[string, Fuehrungsstelle]>([
-    ['Rufname', { sprechgruppen: [], rufname: 'Florian Stadt 10/1' }],
-    ['Kommunikationsmittel', { sprechgruppen: [], kommunikationsmittel: 'digitalfunk' }],
-    ['Erreichbarkeit', { sprechgruppen: [], erreichbarkeit: '0171 1234567' }],
-    ['Sprechgruppe', { sprechgruppen: [sg(1, 'TMO', '311')] }],
+    ['Rufname', { sprechgruppen: [], fahrzeug_ids: [], rufname: 'Florian Stadt 10/1' }],
+    [
+      'Kommunikationsmittel',
+      { sprechgruppen: [], fahrzeug_ids: [], kommunikationsmittel: 'digitalfunk' },
+    ],
+    ['Erreichbarkeit', { sprechgruppen: [], fahrzeug_ids: [], erreichbarkeit: '0171 1234567' }],
+    ['Sprechgruppe', { sprechgruppen: [sg(1, 'TMO', '311')], fahrzeug_ids: [] }],
+    ['Fahrzeug', { sprechgruppen: [], fahrzeug_ids: [41] }],
   ])('ist mit %s allein erfasst', (_, daten) => {
     expect(fuehrungsstelleErfasst(daten)).toBe(true);
   });
@@ -623,6 +632,33 @@ describe('baueFunkplan · eigene Führungsstelle', () => {
       erreichbarkeit: '0171 GEHEIM',
     });
     expect(aufklappbareSchluessel(zeilen)).toEqual([]);
+  });
+
+  it('trägt die zugeordneten Fahrzeuge als Kinder; sie fehlen unter Einheit und Sammelknoten (LFH-1106)', () => {
+    const q = quellen({
+      abschnitte: daten([abschnitt(1)]),
+      einheiten: daten([einheit(10, { abschnitt_id: 1 })]),
+      fahrzeuge: daten([
+        fahrzeug(100, { einheit_id: 10, fahrzeugtyp: 'ELW 2' }),
+        fahrzeug(101, { einheit_id: 10 }),
+        fahrzeug(102),
+      ]),
+      fuehrungsstelle: fs({ fahrzeug_ids: [100, 102] }),
+    });
+    const zeilen = baueFunkplan(q);
+    expect(zeilen[0].key).toBe('fs');
+    expect(zeilen[0].children?.map((z) => z.key)).toEqual(['fz-100', 'fz-102']);
+    expect(zeilen[0].children?.[0]).toMatchObject({ stelleZusatz: 'ELW 2' });
+    expect(alleSchluessel(zeilen)).toEqual(['fs', 'fz-100', 'fz-102', 'ab-1', 'eh-10', 'fz-101']);
+  });
+
+  it('ohne Zeile der Führungsstelle bleiben ihre Fahrzeuge, wo sie ohne Zuordnung stünden', () => {
+    const q = quellen({
+      einheiten: daten([einheit(10)]),
+      fahrzeuge: daten([fahrzeug(100, { einheit_id: 10 })]),
+      fuehrungsstelle: { zustand: 'gesperrt', daten: null },
+    });
+    expect(alleSchluessel(baueFunkplan(q))).toContain('fz-100');
   });
 
   it('beginnt die Gliederung im Bericht mit der Führungsstelle, ohne ihre Erreichbarkeit', () => {

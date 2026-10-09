@@ -41,6 +41,9 @@ Einsatz zeigen. Die Zeilen bilden einen Baum:
 - Unterabschnitte stehen unter ihrem Abschnitt.
 - Einheiten stehen unter dem Abschnitt, in dem sie wirken, Untereinheiten unter ihrer Einheit.
 - Fahrzeuge stehen unter ihrer Einheit.
+- Fahrzeuge, die der eigenen Führungsstelle zugeordnet sind, stehen unter der Zeile der
+  Führungsstelle und MUST NOT zugleich unter ihrer Einheit oder im Sammelknoten stehen (LFH-1106).
+  Steht keine Zeile der Führungsstelle da, bleiben sie, wo sie ohne Zuordnung stünden.
 
 Einheiten ohne Abschnitt und Fahrzeuge ohne Einheit MUST in einem eigenen, benannten Sammelknoten
 stehen und MUST NOT wegfallen. Die Reihenfolge MUST der Sortierung der Quelllisten folgen. Die
@@ -54,6 +57,11 @@ Tabelle MUST NOT sortierbar, filterbar oder durchsuchbar sein.
 #### Scenario: Fahrzeug ohne Einheit
 - **WHEN** ein disponiertes Fahrzeug keiner Einheit angehört
 - **THEN** erscheint es im Sammelknoten für nicht zugeordnete Kräfte und nicht in einem Abschnitt
+
+#### Scenario: ELW 2 unter der Führungsstelle
+- **WHEN** der ELW 2 „Florian Musterstadt 10/1“ der Führungsstelle zugeordnet ist und der Einheit
+  „FüGr EL“ angehört
+- **THEN** steht seine Zeile unter „Führungsstelle“ und nicht unter „FüGr EL“
 
 ### Requirement: Spalten mit fixierter menschenlesbarer Kennung
 Die Tabelle SHALL diese Spalten führen: Stelle, Rufname/OPTA, Leiter/Führer, TMO-Sprechgruppen,

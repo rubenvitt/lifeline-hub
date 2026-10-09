@@ -9,6 +9,7 @@ import {
 } from './fernmeldeskizze-kern';
 import { NAME_SCHRIFT } from '../src/stab/fernmeldeskizzeLayout';
 import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
+import { einsatzdatenPfad } from '../src/routing/deeplinks';
 
 /**
  * Führungsmittel und Funktionen im Führungsstellen-Kasten (LFH-1029, Spec `stab-fernmeldeskizze`,
@@ -18,6 +19,8 @@ import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
  * - KASTEN: „EAL“ und „ELW 1“ stehen im Kasten des Abschnitts, „S2“ und „S3“ im Kasten
  *   „Einsatzleitung“, das rückwärtige „S6“ nicht; kein Personenname. Jedes Wort liegt im Kasten,
  *   am Schirm und im Druck A4 quer.
+ * - FÜHRUNGSSTELLE (LFH-1106): ein auf Einsatzdaten der Führungsstelle zugeordneter ELW 2 steht
+ *   im Kasten „Einsatzleitung“ und nicht im Kasten seines Abschnitts.
  * - MESSUNG: Höhe der Wörter im Druck A4 und A3 quer bei acht obersten Abschnitten,
  *   als Annotation, gegen den Rufnamen desselben Kastens.
  *
@@ -120,6 +123,49 @@ test('Kasten: EAL und ELW 1 am Abschnitt, S2 und S3 an der Einsatzleitung, kein 
   expect(imDruck.map((x) => x.wort)).toEqual(['EAL', 'ELW 1']);
   for (const x of imDruck) expect(x.innen, `Druck: ${x.schluessel} im Kasten`).toBe(true);
   await page.emulateMedia({ media: null });
+});
+
+test('Führungsstelle: der auf Einsatzdaten zugeordnete ELW 2 steht im Kasten „Einsatzleitung“, nicht im Abschnitt', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmeldenAls(page, ADMIN, ADMIN_PW);
+  const einsatzId = await einsatzAnlegen(page, `E2E Skizze Führungsstelle ${Date.now()}`);
+  const n = await seedeAusstattung(page, einsatzId);
+  const a = api(page, einsatzId);
+  // Am Zug des Abschnitts: ohne Zuordnung stünde er im Kasten des Abschnitts.
+  const elw2 = (
+    await a.post('fahrzeuge', {
+      adhoc: { funkrufname: 'Florian Musterstadt 10/1', fahrzeugtyp: 'ELW 2' },
+    })
+  ).id;
+  await a.put(`einheiten/${n.zug}/fahrzeug/${elw2}`);
+
+  await page.goto(einsatzdatenPfad(Number(einsatzId)));
+  const paneel = page.getByRole('region', { name: 'Eigene Führungsstelle' });
+  await paneel.getByRole('button', { name: 'Fahrzeuge eintragen' }).click();
+  await paneel.getByRole('combobox', { name: 'Fahrzeuge' }).click();
+  // Erst die stehende Liste wählen: während des Einblendens geht ein Klick verloren.
+  const liste = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  await expect(liste).toBeVisible();
+  await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
+  await liste.getByTitle('Florian Musterstadt 10/1 (ELW 2)', { exact: true }).click();
+  await paneel.getByRole('button', { name: 'Fahrzeuge speichern' }).click();
+  await expect(
+    paneel.getByRole('button', { name: 'Fahrzeuge bearbeiten' }),
+  ).toHaveAccessibleDescription('Florian Musterstadt 10/1 (ELW 2)');
+
+  await oeffneSkizze(
+    page,
+    einsatzId,
+    page.locator(`[data-lfh="skizze-flaeche"] [data-ausstattung="fz-${elw2}"]`),
+  );
+  const anFs = await ausstattungImKasten(page, 'fs');
+  expect(anFs.map((x) => x.wort)).toEqual(['S2', 'S3', 'ELW 2']);
+  for (const x of anFs) expect(x.innen, `${x.schluessel} im Kasten`).toBe(true);
+  const amAbschnitt = await ausstattungImKasten(page, `ab-${n.ea[0]}`);
+  expect(amAbschnitt.map((x) => x.wort)).toEqual(['EAL', 'ELW 1']);
 });
 
 test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht obersten Abschnitten', async ({

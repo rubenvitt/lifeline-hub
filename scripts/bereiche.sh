@@ -30,7 +30,8 @@ bereiche_von() {
     # Zählregeln (verdichtungFixture.test.ts).
     src/karte/quellen.rs | tests/fixtures/verdichtung/*)
       echo "rust frontend e2e" ;;
-    # Die Hilfe bündelt die Anwenderdokumentation (`frontend/vite.config.ts`, LFH-1096).
+    # Das Frontend bündelt die Anwenderdokumentation als Hilfe (vite.config.ts, hilfe/kapitel.ts);
+    # Vitest und e2e lesen die Kapitel. Steht vor der Doku-Regel, die Markdown sonst ausnimmt.
     docs/anwender/*)
       echo "frontend e2e" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────

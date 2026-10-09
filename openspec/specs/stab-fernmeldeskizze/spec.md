@@ -281,6 +281,11 @@ Führungsmittel.
   sein (dieselbe Regel wie die Lagekarte, ein manuell gesetztes Zeichen gewinnt), dessen Einheit in
   der Führungsorganisation unter diesem Abschnitt hängt und unter keinem tieferen. Das Wort ist der
   Fahrzeugtyp, sonst der Funkrufname. Jedes Fahrzeug MUST höchstens einmal im Bild stehen.
+- Führungsmittel des Kastens „Einsatzleitung“ SHALL jedes der eigenen Führungsstelle zugeordnete
+  Fahrzeug sein, unabhängig von seiner Fachaufgabe, mit Zeichen, Wort und Titel nach denselben
+  Regeln wie im Abschnittskasten (LFH-1106). Ein solches Fahrzeug MUST NOT zugleich in einem
+  Abschnittskasten stehen. Ohne Zuordnung MUST der Kasten „Einsatzleitung“ bleiben wie ohne diese
+  Angabe.
 - Ein Abschnitt mit eingetragener Leitung SHALL das Zeichen „EAL“ tragen, ein Unterabschnitt
   „UEAL“.
 - Der Kasten „Einsatzleitung“ SHALL je Sachgebiet S1 bis S6 ein Zeichen mit dem Kürzel tragen,
@@ -306,8 +311,26 @@ Führungsmittel.
 
 #### Scenario: Fahrzeug ohne Abschnitt
 
-- **WHEN** ein ELW 2 keiner Einheit oder einer Einheit ohne Abschnitt disponiert ist
+- **WHEN** ein ELW 2 keiner Einheit oder einer Einheit ohne Abschnitt disponiert ist und der
+  eigenen Führungsstelle nicht zugeordnet ist
 - **THEN** erscheint er in keinem Kasten
+
+#### Scenario: ELW 2 der Einsatzleitung
+
+- **WHEN** der ELW 2 „Florian Musterstadt 10/1“ der eigenen Führungsstelle zugeordnet ist und der
+  Einheit „FüGr EL“ im Abschnitt „EA 1“ angehört
+- **THEN** zeigt der Kasten „Einsatzleitung“ nach den Sachgebieten ein Fahrzeugzeichen mit „ELW 2“,
+  und der Kasten „EA 1“ zeigt ihn nicht
+
+#### Scenario: ELW 2 ohne Einheit an der Führungsstelle
+
+- **WHEN** ein der Führungsstelle zugeordneter ELW 2 keiner Einheit angehört
+- **THEN** steht er im Kasten „Einsatzleitung“
+
+#### Scenario: Fahrzeuge nicht freigegeben
+
+- **WHEN** der Führungsstelle ein Fahrzeug zugeordnet ist, die Fahrzeuge aber nicht freigegeben sind
+- **THEN** steht im Kasten „Einsatzleitung“ kein Fahrzeugzeichen
 
 #### Scenario: Stab der Einsatzleitung
 

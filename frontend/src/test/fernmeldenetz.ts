@@ -135,7 +135,7 @@ export const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 
 export const fs = (p: Partial<Fuehrungsstelle> = {}): FernmeldenetzQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { sprechgruppen: [], ...p },
+  daten: { sprechgruppen: [], fahrzeug_ids: [], ...p },
 });
 
 /** Quellen mit leeren, geladenen Listen; `skizze` wird in die leere Skizze gemischt. */

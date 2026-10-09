@@ -17,7 +17,8 @@ export const FUEHRUNGSSTELLE_STELLE = 'Führungsstelle';
 
 /**
  * Die eine Erfasst-Regel: eine der Angaben ist nicht leer, oder ihr ist mindestens eine
- * Sprechgruppe zugeordnet. Tabelle, Lücken-Hinweis, Bericht und Skizze fragen nur hier.
+ * Sprechgruppe oder ein Fahrzeug zugeordnet (LFH-1106). Tabelle, Lücken-Hinweis, Bericht und
+ * Skizze fragen nur hier.
  */
 export function fuehrungsstelleErfasst(fs: Fuehrungsstelle | null): boolean {
   if (!fs) return false;
@@ -25,6 +26,7 @@ export function fuehrungsstelleErfasst(fs: Fuehrungsstelle | null): boolean {
     !!fs.rufname?.trim() ||
     !!fs.kommunikationsmittel?.trim() ||
     !!fs.erreichbarkeit?.trim() ||
-    fs.sprechgruppen.length > 0
+    fs.sprechgruppen.length > 0 ||
+    fs.fahrzeug_ids.length > 0
   );
 }
