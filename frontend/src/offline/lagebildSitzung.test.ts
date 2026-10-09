@@ -287,6 +287,16 @@ describe('Lagebild-Sitzung', () => {
       for (const wert of FREITEXTE) expect(await roh()).not.toContain(wert);
     });
 
+    it('schreibt einen alten Vollstand schon beim Start mit Server gekürzt zurück', async () => {
+      // `lagebildStarten` legt den Datensatz mit dem Vorrat neu an, BEVOR der Persister läuft.
+      await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(4), [VOLL]));
+      const qc = neuerClient();
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: 60_000 });
+      const platte = await roh();
+      expect(platte).toContain('Muster');
+      for (const wert of FREITEXTE) expect(platte).not.toContain(wert);
+    });
+
     it('kürzt auch einen Vorrat, den die serverbestätigte Sitzung nur weiterträgt', async () => {
       await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(4), [VOLL]));
       const qc = neuerClient();

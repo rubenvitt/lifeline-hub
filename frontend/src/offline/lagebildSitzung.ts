@@ -62,12 +62,13 @@ function leererClient(buster: string) {
 type VorratEintrag = PersistedClient['clientState']['queries'][number];
 
 /** Die Einträge eines gelesenen Stands, die jetzt noch gelten dürfen (Allowlist, Sperrmarke,
- *  24 h je Einzelstand). Wirft bei einem unlesbaren Stand. */
+ *  24 h je Einzelstand), gekürzt (LFH-1095): ein Stand aus der Zeit davor geht so weder in den
+ *  Speicher noch über `lagebildAnlegen` zurück auf die Platte. Wirft bei einem unlesbaren Stand. */
 function zulaessigeEintraege(qc: QueryClient, eintraege: VorratEintrag[]): VorratEintrag[] {
   const jetzt = Date.now();
-  return eintraege.filter((q) =>
-    lagebildStandZulaessig(qc, q.queryKey, q.state.dataUpdatedAt, jetzt),
-  );
+  return eintraege
+    .filter((q) => lagebildStandZulaessig(qc, q.queryKey, q.state.dataUpdatedAt, jetzt))
+    .map(lagebildKuerzen);
 }
 
 /**
@@ -107,10 +108,11 @@ function abonnieren(
     return {
       timestamp: Date.now(),
       buster,
-      // Gekürzt wird ALLES, was hinausgeht (LFH-1095, D1): auch ein Vorrat von vor der Kürzung.
+      // Gekürzt wird der Live-Stand (LFH-1095, D1); der Vorrat ist es schon
+      // (`zulaessigeEintraege`).
       clientState: {
         ...clientState,
-        queries: [...clientState.queries, ...rest].map(lagebildKuerzen),
+        queries: [...clientState.queries.map(lagebildKuerzen), ...rest],
       },
     };
   };
@@ -167,10 +169,7 @@ function wiederherstellen(qc: QueryClient, client: PersistedClient): void {
       q.state.status === 'error'
         ? { ...q, state: { ...q.state, status: 'success' as const, error: null } }
         : q,
-    )
-    // Ein Stand aus der Zeit vor der Kürzung (LFH-1095) kommt gekürzt in den Speicher: dasselbe
-    // Bild wie ein neuer, und die nächste Speicherung schreibt ihn gekürzt zurück.
-    .map(lagebildKuerzen);
+    );
   hydrate(qc, { mutations: [], queries });
 }
 

@@ -159,6 +159,9 @@ export function transportBilanz(
 interface OffeneFelder {
   ohneVerbleib: number;
   ohneFundort: number;
+  /** Angetroffene Personen, deren Fundort ohne Netz nicht geladen ist (LFH-1095): weder offen
+   *  noch vorhanden. */
+  fundortNichtGeladen: number;
   /** Datensätze mit mindestens einer Lücke — die Menge, die „Nur Lücken zeigen" zeigt. */
   datensaetze: number;
 }
@@ -166,14 +169,16 @@ interface OffeneFelder {
 export function offeneFelder(alle: readonly Person[]): OffeneFelder {
   let ohneVerbleib = 0;
   let ohneFundort = 0;
+  let fundortNichtGeladen = 0;
   let datensaetze = 0;
   for (const p of alle) {
     const l = lueckenVon(p);
     if (l.verbleib) ohneVerbleib++;
     if (l.fundort) ohneFundort++;
+    if (istAngetroffen(p) && nichtGeladen(p, 'antreff_ort')) fundortNichtGeladen++;
     if (l.verbleib || l.fundort) datensaetze++;
   }
-  return { ohneVerbleib, ohneFundort, datensaetze };
+  return { ohneVerbleib, ohneFundort, fundortNichtGeladen, datensaetze };
 }
 
 // ── Sichtungsbild ───────────────────────────────────────────────────────────────────────

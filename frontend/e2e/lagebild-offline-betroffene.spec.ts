@@ -177,6 +177,9 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
     await expect(page.locator('[data-lfh="nicht-geladen"]').first()).toBeVisible();
     await expect(page.getByText(FREITEXTE.zustand)).toHaveCount(0);
     await expect(page.getByText('Fundort offen')).toHaveCount(0);
+    await expect(page.locator('[data-lfh="offene-felder"]')).toHaveText(
+      '0 ohne Verbleib, Fundort nicht geladen',
+    );
 
     // (5) UHS-Liste nach Kaltstart wie mit Netz. Die UHS-Detailseite liest ein eigenes Fach
     //     (`einsatz-uhs-detail`), das schon vor dieser Änderung nicht offline vorgehalten wird.

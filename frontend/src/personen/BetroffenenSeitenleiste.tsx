@@ -68,6 +68,18 @@ function Farbfeld({ k, groesse }: { k: SichtungsbildSchluessel; groesse: number 
   );
 }
 
+/** Satz des Paneels „Offene Felder". Ohne Netz nicht geladene Fundorte (LFH-1095) bekommen
+ *  keine Zahl und keine Vollständigkeit — die hat niemand geprüft. */
+function offeneFelderText(offen: ReturnType<typeof offeneFelder>): string {
+  const datensaetze = `${offen.datensaetze} ${offen.datensaetze === 1 ? 'Datensatz' : 'Datensätze'}`;
+  if (offen.fundortNichtGeladen > 0) {
+    const satz = `${offen.ohneVerbleib} ohne Verbleib, Fundort nicht geladen`;
+    return offen.datensaetze === 0 ? satz : `${satz} — ${datensaetze}`;
+  }
+  if (offen.datensaetze === 0) return 'Keine offenen Felder bei angetroffenen Personen.';
+  return `${offen.ohneVerbleib} ohne Verbleib, ${offen.ohneFundort} ohne Fundort — ${datensaetze}`;
+}
+
 export default function BetroffenenSeitenleiste({
   alle,
   uhsName,
@@ -185,11 +197,7 @@ export default function BetroffenenSeitenleiste({
             data-lfh="offene-felder"
             style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}
           >
-            {offen.datensaetze === 0
-              ? 'Keine offenen Felder bei angetroffenen Personen.'
-              : `${offen.ohneVerbleib} ohne Verbleib, ${offen.ohneFundort} ohne Fundort — ${offen.datensaetze} ${
-                  offen.datensaetze === 1 ? 'Datensatz' : 'Datensätze'
-                }`}
+            {offeneFelderText(offen)}
           </p>
           <Button
             // Umschalter: der Name bleibt, der Zustand steht in `aria-pressed` und der Füllung.

@@ -121,7 +121,31 @@ describe('offeneFelder', () => {
       p({ antreff_ort: null }),
       p({ status: 'vermisst', aktuelle_verbleib_art: undefined, antreff_ort: null }),
     ];
-    expect(offeneFelder(alle)).toEqual({ ohneVerbleib: 2, ohneFundort: 2, datensaetze: 3 });
+    expect(offeneFelder(alle)).toEqual({
+      ohneVerbleib: 2,
+      ohneFundort: 2,
+      fundortNichtGeladen: 0,
+      datensaetze: 3,
+    });
+  });
+
+  it('zählt ohne Netz nicht geladene Fundorte getrennt, nicht als offen (LFH-1095)', () => {
+    const alle = lagebildKuerzen({
+      queryKey: [...einsatzKeys.personen(1)],
+      state: {
+        data: [
+          p({ antreff_ort: null }),
+          p({ aktuelle_verbleib_art: undefined }),
+          p({ status: 'vermisst', antreff_ort: null }),
+        ],
+      },
+    }).state.data as Person[];
+    expect(offeneFelder(alle)).toEqual({
+      ohneVerbleib: 1,
+      ohneFundort: 0,
+      fundortNichtGeladen: 2,
+      datensaetze: 1,
+    });
   });
 });
 

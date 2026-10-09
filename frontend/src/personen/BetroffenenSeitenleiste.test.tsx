@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { Person } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import BetroffenenSeitenleiste from './BetroffenenSeitenleiste';
+import { einsatzKeys } from '../api/queryKeys';
+import { lagebildKuerzen } from '../offline/lagebildKuerzung';
 
 /**
  * Die Seitenleiste liest die Bilanz aus `personenBilanz.ts` — hier nur, dass Notunterkunft und
@@ -81,5 +83,25 @@ describe('BetroffenenSeitenleiste — Verbleib und offene Felder (LFH-613)', () 
     expect(offen.querySelector('[data-lfh="offene-felder"]')).toHaveTextContent(
       /^0 ohne Verbleib, 1 ohne Fundort — 1 Datensatz$/,
     );
+  });
+});
+
+describe('BetroffenenSeitenleiste — ohne Netz nicht geladene Fundorte (LFH-1095)', () => {
+  const gekuerzt = (alle: Person[]) =>
+    lagebildKuerzen({ queryKey: [...einsatzKeys.personen(1)], state: { data: alle } }).state
+      .data as Person[];
+  const satz = () =>
+    screen
+      .getByRole('region', { name: 'Offene Felder' })
+      .querySelector('[data-lfh="offene-felder"]');
+
+  it('behauptet keine Vollständigkeit, die niemand geprüft hat', () => {
+    zeige(gekuerzt([p({ aktuelle_verbleib_art: 'vor_ort', antreff_ort: null })]));
+    expect(satz()).toHaveTextContent(/^0 ohne Verbleib, Fundort nicht geladen$/);
+  });
+
+  it('zählt die Verbleib-Lücken weiter', () => {
+    zeige(gekuerzt([p({}), p({ aktuelle_verbleib_art: 'vor_ort' })]));
+    expect(satz()).toHaveTextContent(/^1 ohne Verbleib, Fundort nicht geladen — 1 Datensatz$/);
   });
 });
