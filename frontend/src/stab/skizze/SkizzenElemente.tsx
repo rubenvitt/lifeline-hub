@@ -15,6 +15,7 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useRollen } from '../../components/instrument';
+import { farbenHell } from '../../theme/tokens';
 import EinsatzZeichen, { FunktionsZeichen } from '../../zeichen/EinsatzZeichen';
 import type {
   AusstattungsZeichen,
@@ -65,6 +66,32 @@ const MARKE = 10;
 
 /** Kantenlänge des taktischen Zeichens in px (ganzzahlig, die Bibliothek verlangt es). */
 const TZ_PX = TZ_HOEHE;
+
+/**
+ * Helle Unterlage hinter jedem taktischen Zeichen am Schirm (LFH-1107): Zeichen ohne Organisation
+ * zeichnet die Bibliothek mit schwarzem Umriss ohne Fläche, auf dem Grund des Nachtbetriebs hielt
+ * er nur rund 1,1 : 1. Die Unterlage ist Papier (`farbenHell.flaeche`), das Zeichen steht darauf wie
+ * im Druck, seine Farben nach DV 102 bleiben unverfälscht; am Tag verschwindet sie im Grund. Im
+ * Druck und in der Anlage steht keine (`unterlage` aus der Fläche, dazu `skizzeDruck.css`).
+ * Gemessen in beiden Modi im e2e „Zeichenkontrast“ (`fernmeldeskizze-ausstattung.spec.ts`).
+ */
+export const ZEICHEN_UNTERLAGE = farbenHell.flaeche;
+
+/**
+ * Die Unterlage deckt genau das Quadrat des Zeichens: die Bibliothek lässt darin rund 3 % Rand um
+ * den Umriss, und das Element wird nicht größer (Plätze, Treffläche und Abstände bleiben).
+ */
+function ZeichenUnterlage({ groesse }: { groesse: number }) {
+  return (
+    <rect
+      width={groesse}
+      height={groesse}
+      rx={1}
+      fill={ZEICHEN_UNTERLAGE}
+      data-teil="zeichen-grund"
+    />
+  );
+}
 
 /** Darstellungszustand eines Elements. */
 export interface Zustand {
@@ -199,7 +226,17 @@ function zeilenHoehe(text: string, schrift: number, zeile: number, breite: numbe
 }
 
 /** Das taktische Zeichen auf einem Platz (verschachteltes SVG der Bibliothek). */
-function Taktisch({ stelle, x, y }: { stelle: NetzStelle; x: number; y: number }) {
+function Taktisch({
+  stelle,
+  x,
+  y,
+  unterlage,
+}: {
+  stelle: NetzStelle;
+  x: number;
+  y: number;
+  unterlage: boolean;
+}) {
   if (stelle.art === 'komponente') return null;
   const tz =
     stelle.art === 'extern'
@@ -208,6 +245,7 @@ function Taktisch({ stelle, x, y }: { stelle: NetzStelle; x: number; y: number }
       : stelle.tz;
   return (
     <g transform={`translate(${x - TZ_PX / 2} ${y})`} aria-hidden="true" data-teil="tz">
+      {unterlage ? <ZeichenUnterlage groesse={TZ_PX} /> : null}
       <EinsatzZeichen tz={tz} size={TZ_PX} />
     </g>
   );
@@ -236,11 +274,13 @@ function Ausstattung({
   x,
   y,
   innen,
+  unterlage,
 }: {
   stelle: NetzStelle;
   x: number;
   y: number;
   innen: number;
+  unterlage: boolean;
 }) {
   if (stelle.art !== 'fuehrungsstelle' && stelle.art !== 'abschnitt') return null;
   const { plaetze } = ausstattungsZeilen(stelle.ausstattung, innen);
@@ -260,6 +300,7 @@ function Ausstattung({
           >
             <title>{p.ausstattung.titel}</title>
             <g transform={`translate(${cx - AUSSTATTUNG_ZEICHEN / 2} ${oben})`} aria-hidden="true">
+              {unterlage ? <ZeichenUnterlage groesse={AUSSTATTUNG_ZEICHEN} /> : null}
               <AusstattungsZeichenBild zeichen={p.ausstattung.zeichen} />
             </g>
             <text
@@ -304,11 +345,14 @@ export function StelleBild({
   platz,
   zustand,
   meldung,
+  unterlage = false,
 }: {
   stelle: NetzStelle;
   platz: Platz;
   zustand: Zustand;
   meldung?: string | null;
+  /** Helle Unterlage hinter den Zeichen (`ZEICHEN_UNTERLAGE`): nur am Schirm, nie im Druck. */
+  unterlage?: boolean;
 }) {
   const strich = zustand.hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
   const deckkraft = zurueckDeckkraft(zustand.zurueck, 'bild');
@@ -386,7 +430,7 @@ export function StelleBild({
             strokeWidth={STRICH_HERVORGEHOBEN}
           />
         ) : null}
-        <Taktisch stelle={stelle} x={cx} y={tzY} />
+        <Taktisch stelle={stelle} x={cx} y={tzY} unterlage={unterlage} />
         <Zeilen
           x={cx}
           y={nameY}
@@ -424,6 +468,7 @@ export function StelleBild({
             x={platz.x + KASTEN_POLSTER}
             y={ausstattungY}
             innen={innen}
+            unterlage={unterlage}
           />
         ) : null}
       </g>
