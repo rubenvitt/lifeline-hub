@@ -1,5 +1,5 @@
 import { App, Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
-import ZumEtbEintrag from '../etb/ZumEtbEintrag';
+import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -26,7 +26,7 @@ import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
 import { Paneel, monoStil } from '../components/instrument';
 import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
@@ -84,6 +84,13 @@ function BefehlDetail() {
     queryFn: () => ladeBefehl(einsatzId, befehlId),
     enabled: idGueltig,
   });
+  // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur am
+  // freigegebenen Befehl: ein Entwurf hat noch keinen ETB-Eintrag.
+  const etbSprung = useZumEtbEintrag(
+    einsatzId,
+    befehlQuery.data?.status === 'entwurf' ? null : befehlQuery.data?.etb_eintrag_id,
+  );
+  const druckWege = useDruckNebenwege();
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.befehl(einsatzId, befehlId) });
@@ -254,14 +261,17 @@ function BefehlDetail() {
    * verankert. Keine zweite, per CSS versteckte Kopie — das lieferte zwei gleichnamige Knöpfe
    * („Freigeben" doppelt vorgelesen, Tabulatur auf ein unsichtbares Ziel).
    *
-   * `htmlType="submit"` wäre hier falsch: der Block trägt mit „Drucken" und „Fortschreiben" auch
-   * Aktionen des freigegebenen Zweigs ohne `<Form>`, liegt deshalb außerhalb des Formulars, und
+   * `htmlType="submit"` wäre hier falsch: der Block trägt mit „Fortschreiben" auch eine Aktion
+   * des freigegebenen Zweigs ohne `<Form>`, liegt deshalb außerhalb des Formulars, und
    * „Entwurf speichern" ruft `form.submit()` von Hand.
    *
    * Der Autosave-Beleg geht mit den Knöpfen mit: oben stehengeblieben wäre er auf 390 px aus dem
    * Bild gescrollt, während man tippt.
+   *
+   * Nur Handlungen: Sprung und Drucken stehen als Nebenwege im Kopf (`weitere`, LFH-1079). Ohne
+   * Schreibrecht bleibt der Block deshalb ganz weg, sonst klebte eine leere Leiste am Rand.
    */
-  const aktionen = (
+  const aktionen = darfSchreiben && (
     <div
       className="befehl-no-print"
       data-lfh="befehl-aktionen"
@@ -269,14 +279,9 @@ function BefehlDetail() {
       style={aktionsleisteStil(verankert, token)}
     >
       {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 7 / 11 / 16 px, antds
-          Vorgabe `paddingXS` ließ 3 / 5 / 7 px. Der Sprung steht vorn, abgesetzt von
-          den Handlungen, nicht neben „Fortschreiben“ (LFH-616). */}
+          Vorgabe `paddingXS` ließ 3 / 5 / 7 px. */}
       <Space wrap size={token.marginSM}>
-        {!istEntwurf && befehl.etb_eintrag_id != null && (
-          <ZumEtbEintrag einsatzId={einsatzId} eintragId={befehl.etb_eintrag_id} />
-        )}
-        <DruckKnopf />
-        {!istEntwurf && darfSchreiben && (
+        {!istEntwurf && (
           <Button
             onClick={() => fortschreibenMutation.mutate()}
             loading={fortschreibenMutation.isPending}
@@ -284,7 +289,7 @@ function BefehlDetail() {
             Fortschreiben
           </Button>
         )}
-        {istEntwurf && darfSchreiben && (
+        {istEntwurf && (
           <>
             {/* Der sichtbare Beleg des stillen Autosave — ohne ihn wäre „gespeichert" von
                 „nicht gespeichert" nicht zu unterscheiden. */}
@@ -399,6 +404,12 @@ function BefehlDetail() {
             ]}
           />
         }
+        // Sprung und Drucken öffnen, senden nichts ab — Nebenwege im Kopf in jeder Breite, unter
+        // `md` hinter „Weitere" (LFH-1079, `frontend/AGENTS.md`, Aktionen).
+        weitere={{
+          name: 'Weitere Aktionen zum Befehl',
+          eintraege: [...(etbSprung ? [etbSprung] : []), ...druckWege],
+        }}
         aktionen={!verankert && aktionen}
       >
         {/* Der Grund eines gescheiterten Speicherns — nicht im `aktionen`-Block, der je Breite

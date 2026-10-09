@@ -984,3 +984,70 @@ describe('BefehlDetailPage — Entwurfsdruck (LFH-731)', () => {
     );
   });
 });
+
+/**
+ * ── Nebenwege im Kopf (LFH-1079, `frontend/AGENTS.md`, Aktionen) ──
+ *
+ * „Zum ETB-Eintrag“ und „Drucken / als PDF“ öffnen, erfassen nichts: sie stehen in jeder Breite
+ * im Seitenkopf, unter `md` hinter EINEM Auslöser „Weitere“, ab `md` als eigene Knöpfe. Die
+ * verankerte Leiste unterhalb von `lg` trägt nur noch, was schreibt.
+ */
+describe('BefehlDetailPage — Nebenwege im Kopf (LFH-1079)', () => {
+  const WEITERE = 'Weitere Aktionen zum Befehl';
+  const kopf = () => document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+  const leiste = () => document.querySelector<HTMLElement>('[data-lfh="befehl-aktionen"]');
+  function offenesMenue() {
+    return document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+  }
+
+  it('390 px, freigegeben: Drucken und ETB-Sprung nur im Menü „Weitere“, die Leiste trägt „Fortschreiben“', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    setzeViewportBreite(390);
+    renderAt(7);
+    const ausloeser = await screen.findByRole('button', { name: WEITERE });
+    expect(kopf()).toContainElement(ausloeser);
+    expect(within(leiste()!).getByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Zum ETB-Eintrag' })).toBeNull();
+
+    await userEvent.click(ausloeser);
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    const menue = offenesMenue()!;
+    expect(within(menue).getByRole('menuitem', { name: 'Zum ETB-Eintrag' })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+  });
+
+  it('390 px, Entwurf: im Kopf nur „Weitere“, die Leiste trägt genau eine Primäraktion', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    setzeViewportBreite(390);
+    renderAt(7);
+    const ausloeser = await screen.findByRole('button', { name: WEITERE });
+    expect(within(kopf()).getAllByRole('button')).toEqual([ausloeser]);
+    expect(leiste()!.querySelectorAll('.ant-btn-primary')).toHaveLength(1);
+  });
+
+  it('390 px, ohne Schreibrecht: keine leere verankerte Leiste', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      ...einsatz,
+      meine_rolle: 'beobachter',
+    } as never);
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    setzeViewportBreite(390);
+    renderAt(7);
+    await screen.findByRole('button', { name: WEITERE });
+    expect(leiste()).toBeNull();
+  });
+
+  it('1180 px (Gegenprobe): Drucken und ETB-Sprung als Knöpfe im Kopf, kein Auslöser', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    setzeViewportBreite(1180);
+    renderAt(7);
+    const sprung = await screen.findByRole('link', { name: 'Zum ETB-Eintrag' });
+    expect(kopf()).toContainElement(sprung);
+    expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(within(kopf()).getByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: WEITERE })).toBeNull();
+  });
+});

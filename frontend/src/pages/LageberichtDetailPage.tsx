@@ -10,7 +10,7 @@ import {
   Typography,
   theme,
 } from 'antd';
-import ZumEtbEintrag from '../etb/ZumEtbEintrag';
+import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -48,7 +48,7 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
 import { Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
@@ -116,6 +116,13 @@ function LageberichtDetail() {
   const vorlageDef = berichtQuery.data ? vorlage(berichtQuery.data.vorlage) : undefined;
   // Als Primitiv für `abschnittsEditor` (Übernahme-Zuordnung je Vorlage, LFH-870).
   const vorlageKey = berichtQuery.data?.vorlage;
+  // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur am
+  // freigegebenen Bericht: ein Entwurf hat noch keinen ETB-Eintrag.
+  const etbSprung = useZumEtbEintrag(
+    einsatzId,
+    berichtQuery.data?.status === 'entwurf' ? null : berichtQuery.data?.etb_eintrag_id,
+  );
+  const druckWege = useDruckNebenwege();
   /**
    * Die Leer-Marke je Kopfzeile — über ein Primitiv memoisiert. `befuellteAbschnitte(werte, …)`
    * liefert je Tastenanschlag ein neues `Set` mit gleichem Inhalt; als Prop am memoisierten
@@ -401,16 +408,17 @@ function LageberichtDetail() {
             ]}
           />
         }
+        // Sprung und Drucken öffnen, senden nichts ab — Nebenwege im Kopf, unter `md` hinter
+        // „Weitere" (LFH-1079, `frontend/AGENTS.md`, Aktionen). Beide nur mit Lesezugriff.
+        weitere={{
+          name: 'Weitere Aktionen zum Lagebericht',
+          eintraege: [...(etbSprung ? [etbSprung] : []), ...druckWege],
+        }}
         aktionen={
           <div className="lagebericht-no-print">
             {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 7 / 11 / 16 px, antds
-                Vorgabe `paddingXS` ließ 3 / 5 / 7 px. Der Sprung steht vorn, abgesetzt von
-                den Handlungen, nicht neben „Fortschreiben“ (LFH-616). */}
+                Vorgabe `paddingXS` ließ 3 / 5 / 7 px. */}
             <Space wrap size={token.marginSM}>
-              {!istEntwurf && bericht.etb_eintrag_id != null && (
-                <ZumEtbEintrag einsatzId={einsatzId} eintragId={bericht.etb_eintrag_id} />
-              )}
-              <DruckKnopf />
               {!istEntwurf && darfSchreiben && (
                 <Button
                   onClick={() => fortschreibenMutation.mutate()}

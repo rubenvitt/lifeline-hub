@@ -14,6 +14,7 @@ import { ApiError } from '../api/client';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
+import { setzeViewportBreite, setzeViewportZurueck } from '../test/viewport';
 
 vi.mock('../api/einsaetze');
 vi.mock('../api/lageberichte');
@@ -523,5 +524,74 @@ describe('LageberichtDetailPage — Übernahmen (LFH-869)', () => {
     }
     // Acht Abschnitte, fünf mit Übernahme: Auftrag, Anträge und Zusammenfassung tragen keine.
     expect(screen.getAllByRole('button', { name: /übernehmen$/, hidden: true })).toHaveLength(5);
+  });
+});
+
+/**
+ * ── Nebenwege im Kopf (LFH-1079, `frontend/AGENTS.md`, Aktionen) ──
+ *
+ * „Zum ETB-Eintrag“ und „Drucken / als PDF“ öffnen, erfassen nichts: unter `md` hinter EINEM
+ * Auslöser „Weitere“, ab `md` als eigene Knöpfe. Die Breiten stehen als Literale da (390 =
+ * Handschirm, 1180 = Tablet quer).
+ */
+describe('LageberichtDetailPage — Nebenwege im Kopf (LFH-1079)', () => {
+  const WEITERE = 'Weitere Aktionen zum Lagebericht';
+
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+  });
+  afterEach(() => setzeViewportZurueck());
+
+  function kopf() {
+    return document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+  }
+  function offenesMenue() {
+    return document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+  }
+
+  it('390 px, freigegeben: Drucken und ETB-Sprung nur im Menü „Weitere“, „Fortschreiben“ bleibt', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+    setzeViewportBreite(390);
+    renderBei('/einsaetze/1/lageberichte/9');
+    const ausloeser = await screen.findByRole('button', { name: WEITERE });
+    expect(within(kopf()).getByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
+    expect(within(kopf()).queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
+    expect(within(kopf()).queryByRole('link', { name: 'Zum ETB-Eintrag' })).toBeNull();
+
+    await userEvent.click(ausloeser);
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    const menue = offenesMenue()!;
+    expect(within(menue).getByRole('menuitem', { name: 'Zum ETB-Eintrag' })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+  });
+
+  it('390 px, Entwurf: eine Primäraktion, „Weitere“ steht vorn', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf', etb_eintrag_id: null }) as never,
+    );
+    setzeViewportBreite(390);
+    renderBei('/einsaetze/1/lageberichte/9');
+    const ausloeser = await screen.findByRole('button', { name: WEITERE });
+    expect(kopf().querySelectorAll('.ant-btn-primary')).toHaveLength(1);
+    expect(within(kopf()).getAllByRole('button')[0]).toBe(ausloeser);
+    expect(within(kopf()).queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
+  });
+
+  it('1180 px (Gegenprobe): Drucken und ETB-Sprung als Knöpfe, kein Auslöser', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+    setzeViewportBreite(1180);
+    renderBei('/einsaetze/1/lageberichte/9');
+    const sprung = await screen.findByRole('link', { name: 'Zum ETB-Eintrag' });
+    expect(kopf()).toContainElement(sprung);
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=5');
+    expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: WEITERE })).toBeNull();
   });
 });

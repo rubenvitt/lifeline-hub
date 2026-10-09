@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
@@ -14,6 +14,7 @@ import {
 import type { EinsatzAnzeige, Pressemitteilung } from '../api/types';
 import PressemitteilungDetailPage from './PressemitteilungDetailPage';
 import { freigabenFixture } from '../test/fixtures';
+import { setzeViewportBreite, setzeViewportZurueck } from '../test/viewport';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/presse', () => ({
@@ -169,5 +170,64 @@ describe('PressemitteilungDetailPage — Zeitstand in der Anzeigezone (LFH-692)'
     expect(vi.mocked(aktualisierePressemitteilung).mock.calls[0]).toContainEqual(
       expect.objectContaining({ zeitstand: '2026-09-30 12:00:00' }),
     );
+  });
+});
+
+/**
+ * ── Nebenwege im Kopf (LFH-1079, `frontend/AGENTS.md`, Aktionen) ──
+ *
+ * „Zum ETB-Eintrag“ und „Drucken / als PDF“ öffnen, erfassen nichts: unter `md` hinter EINEM
+ * Auslöser „Weitere“, ab `md` als eigene Knöpfe (390 = Handschirm, 1180 = Tablet quer).
+ */
+describe('PressemitteilungDetailPage — Nebenwege im Kopf (LFH-1079)', () => {
+  const WEITERE = 'Weitere Aktionen zur Pressemitteilung';
+  const FREIGEGEBEN = { ...ENTWURF, status: 'freigegeben', etb_eintrag_id: 77 } as Pressemitteilung;
+
+  afterEach(() => setzeViewportZurueck());
+
+  function kopf() {
+    return document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+  }
+  function offenesMenue() {
+    return document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+  }
+
+  it('390 px, freigegeben: Drucken und ETB-Sprung nur im Menü „Weitere“', async () => {
+    vi.mocked(ladePressemitteilung).mockResolvedValue(FREIGEGEBEN);
+    setzeViewportBreite(390);
+    setup();
+    const ausloeser = await screen.findByRole('button', { name: WEITERE });
+    expect(
+      within(kopf()).getByRole('button', { name: 'Folgemeldung schreiben' }),
+    ).toBeInTheDocument();
+    expect(within(kopf()).queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
+    expect(within(kopf()).queryByRole('link', { name: 'Zum ETB-Eintrag' })).toBeNull();
+
+    await userEvent.click(ausloeser);
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    const menue = offenesMenue()!;
+    expect(within(menue).getByRole('menuitem', { name: 'Zum ETB-Eintrag' })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+  });
+
+  it('390 px, Entwurf: eine Primäraktion, „Weitere“ steht vorn', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const ausloeser = await screen.findByRole('button', { name: WEITERE });
+    expect(kopf().querySelectorAll('.ant-btn-primary')).toHaveLength(1);
+    expect(within(kopf()).getAllByRole('button')[0]).toBe(ausloeser);
+    expect(within(kopf()).queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
+  });
+
+  it('1180 px (Gegenprobe): Drucken und ETB-Sprung als Knöpfe, kein Auslöser', async () => {
+    vi.mocked(ladePressemitteilung).mockResolvedValue(FREIGEGEBEN);
+    setzeViewportBreite(1180);
+    setup();
+    const sprung = await screen.findByRole('link', { name: 'Zum ETB-Eintrag' });
+    expect(kopf()).toContainElement(sprung);
+    expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: WEITERE })).toBeNull();
   });
 });
