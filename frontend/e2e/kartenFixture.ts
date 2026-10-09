@@ -134,17 +134,21 @@ export async function vektorStilBeantworten(
 
 /**
  * Alle Kacheln unter `praefix` mit `vektorKachel(layer)` beantworten. Liefert die Liste der
- * angefragten URLs (sie wächst weiter, während die Karte lädt).
+ * angefragten URLs (sie wächst weiter, während die Karte lädt). `cookies` sammelt, falls
+ * übergeben, den `Cookie`-Kopf jeder Anfrage (`''` ohne Kopf): der Kachel-Proxy verlangt eine
+ * Sitzung (LFH-1072), der Worker muss das Sitzungs-Cookie mitschicken.
  */
 export async function kachelnBeantworten(
   page: Page,
   praefix: string,
   layer: string,
+  cookies?: string[],
 ): Promise<string[]> {
   const anfragen: string[] = [];
   const body = vektorKachel(layer);
-  await page.route(`**${praefix}**`, (route: Route) => {
+  await page.route(`**${praefix}**`, async (route: Route) => {
     anfragen.push(route.request().url());
+    cookies?.push((await route.request().allHeaders())['cookie'] ?? '');
     return route.fulfill({ status: 200, contentType: 'application/x-protobuf', body });
   });
   return anfragen;

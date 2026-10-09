@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
@@ -136,6 +136,33 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
     await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
 
     await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue(''));
+  });
+
+  /**
+   * Eine Ablehnung nennt ihren Grund IM Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“); Dialog und Wortlaut bleiben stehen.
+   */
+  it('nennt bei einer Ablehnung (422) den Grund im Dialog und behält den Wortlaut', async () => {
+    handler();
+    server.use(
+      http.post('/api/personal', () =>
+        HttpResponse.json({ error: 'Personalnummer bereits vergeben' }, { status: 422 }),
+      ),
+    );
+    const geschlossen = vi.fn();
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness onClose={geschlossen} />);
+
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.type(within(dialog).getByLabelText('Name'), 'Erika Mustermann');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Personalnummer bereits vergeben',
+    );
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('Erika Mustermann');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(geschlossen).not.toHaveBeenCalled();
   });
 
   it('Bearbeiten: die Vorbelegung steht — sie ist kein Reset und bleibt erhalten', async () => {

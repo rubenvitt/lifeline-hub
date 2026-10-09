@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stehendeAuswahl } from './auswahl-kern';
 import { stehend } from './kontrast-kern';
 import { anlegen, anmelden, einsatzAnlegen } from './trefflaeche-kern';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Die Schrift auf der Auswahlfläche hält den Textboden, Tag ≥ 7 : 1 und Nacht ≥ 5 : 1, in Ruhe
@@ -96,7 +97,7 @@ for (const modus of ['light', 'dark'] as const) {
     test('Auswahlliste: gewählte Option der Einsatzart', async ({ page }) => {
       await anmelden(page);
       await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
-      await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+      await einsatzDialogOeffnen(page);
       await page.getByRole('combobox', { name: 'Einsatzart' }).click();
 
       const liste = await stehendeAuswahl(page);

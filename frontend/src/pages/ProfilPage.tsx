@@ -23,6 +23,12 @@ import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from 
 import type { AuthProvider, TotpEnrollStart } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import PasswortAendernDialog from '../auth/PasswortAendernDialog';
+import SitzungsListe from '../auth/SitzungsListe';
+import {
+  beendeAndereEigeneSitzungen,
+  beendeEigeneSitzung,
+  ladeEigeneSitzungen,
+} from '../api/sitzungen';
 import TotpPasswortDialog from '../auth/TotpPasswortDialog';
 import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from '../huelle/faehigkeiten';
 
@@ -379,6 +385,19 @@ export default function ProfilPage() {
               </section>
             )}
           </div>
+        </Paneel>
+
+        {/* Laufende Sitzungen des eigenen Kontos (LFH-1092): ein verlorenes Gerät abmelden, ohne
+            das Passwort zu wechseln. */}
+        <Paneel titel="Anmeldungen" koerperPolster>
+          <SitzungsListe
+            titel="Anmeldungen"
+            queryKey={globalKeys.sitzungenEigene()}
+            laden={ladeEigeneSitzungen}
+            beendeEine={beendeEigeneSitzung}
+            beendeAlle={beendeAndereEigeneSitzungen}
+            alleText="Alle anderen beenden"
+          />
         </Paneel>
       </div>
     </AdminPage>

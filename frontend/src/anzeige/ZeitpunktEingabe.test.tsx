@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Form } from 'antd';
+import { ConfigProvider, Form } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { readFileSync } from 'node:fs';
@@ -9,7 +9,13 @@ import { join } from 'node:path';
 import type { ReactNode } from 'react';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from './AnzeigeKonventionenContext';
-import { ZEIT_BLATT, ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from './ZeitpunktEingabe';
+import {
+  ZEIT_BLATT,
+  ZeitpunktEingabe,
+  ZeitraumEingabe,
+  zeitPanelAmFeldAb,
+  type Zeitraum,
+} from './ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from './zeitEingabe';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
@@ -287,7 +293,7 @@ describe('ZeitpunktEingabe/ZeitraumEingabe — stabil über Re-Render', () => {
   });
 });
 
-describe('ZeitpunktEingabe/ZeitraumEingabe — Blatt unter md (LFH-953)', () => {
+describe('ZeitpunktEingabe/ZeitraumEingabe — Blatt, wo das Panel nicht neben das Feld passt (LFH-953, LFH-1076)', () => {
   /** Das offene Panel; antd hängt es an `document.body`. */
   const panel = () =>
     waitFor(() => {
@@ -311,6 +317,51 @@ describe('ZeitpunktEingabe/ZeitraumEingabe — Blatt unter md (LFH-953)', () => 
   it('lässt das Panel ab md am Feld (antds Ausrichtung)', async () => {
     render(mitZone(null, <ZeitpunktEingabe aria-label="von" open />));
     expect(await panel()).not.toHaveClass(ZEIT_BLATT);
+  });
+
+  it('die Schwelle wächst mit der Stufe: kompakt ab md, komfortabel ab xxl, Handschuh nie', () => {
+    expect(zeitPanelAmFeldAb({ controlHeight: 30 })).toBe('md');
+    expect(zeitPanelAmFeldAb({ controlHeight: 48 })).toBe('xxl');
+    expect(zeitPanelAmFeldAb({ controlHeight: 72 })).toBeNull();
+  });
+
+  /** Stufe über das Dichte-Token, wie der `ConfigProvider` der App sie setzt. */
+  const inStufe = (controlHeight: number, kind: ReactNode) => (
+    <ConfigProvider theme={{ token: { controlHeight } }}>{mitZone(null, kind)}</ConfigProvider>
+  );
+
+  it('öffnet auf dem Führungs-Tablet in komfortabel und Handschuh als Blatt', async () => {
+    for (const controlHeight of [48, 72]) {
+      const { unmount } = render(
+        inStufe(controlHeight, <ZeitpunktEingabe aria-label="von" open />),
+      );
+      expect(await panel()).toHaveClass(ZEIT_BLATT);
+      unmount();
+    }
+    setzeViewportBreite(820);
+    render(inStufe(48, <ZeitraumEingabe placeholder={['Beginn', 'Ende']} open />));
+    expect(await panel()).toHaveClass(ZEIT_BLATT);
+  });
+
+  it('lässt das Panel in komfortabel ab xxl am Feld, in Handschuh nie', async () => {
+    setzeViewportBreite(1600);
+    const { unmount } = render(inStufe(48, <ZeitpunktEingabe aria-label="von" open />));
+    expect(await panel()).not.toHaveClass(ZEIT_BLATT);
+    unmount();
+    setzeViewportBreite(2560);
+    render(inStufe(72, <ZeitpunktEingabe aria-label="von" open />));
+    expect(await panel()).toHaveClass(ZEIT_BLATT);
+  });
+
+  it('sperrt das Tippen auch auf dem Tablet mit Fingerbedienung, sobald das Blatt steht', () => {
+    setzeZeigerGrob(true);
+    const { unmount } = render(inStufe(48, <ZeitpunktEingabe aria-label="von" />));
+    expect(screen.getByRole('textbox', { name: 'von' })).toHaveAttribute('readonly');
+    unmount();
+
+    // Gegenprobe: dasselbe Tablet in kompakt, das Panel steht am Feld.
+    render(inStufe(30, <ZeitpunktEingabe aria-label="von" />));
+    expect(screen.getByRole('textbox', { name: 'von' })).not.toHaveAttribute('readonly');
   });
 
   it('sperrt das Tippen nur auf dem Handschirm mit Fingerbedienung (keine Bildschirmtastatur)', () => {

@@ -3,6 +3,7 @@ import { waehleIn } from './auswahl-kern';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 import { MINI_JPEG } from './bildFixture';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Dokumentenablage im Browser — was jsdom nicht tragen kann:
@@ -61,14 +62,6 @@ async function anmelden(page: Page, modus?: 'light' | 'dark') {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 /** Seeding per `page.request` für die Layout-Läufe; den Ablegen-Weg über die Oberfläche prüft

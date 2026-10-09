@@ -283,3 +283,27 @@ describe('EtbEintragVorschau (LFH-664)', () => {
     );
   });
 });
+
+describe('EtbEintragVorschau — Fundstellen (LFH-1056)', () => {
+  it('markiert den Volltextbegriff in Inhalt, Von → An und Veranlassung', async () => {
+    etbHandler([eintrag()]);
+    const { container } = renderMitProviders(
+      <EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} fundstellen="deich nord pegel" />,
+    );
+    await screen.findByText('Nr. 12');
+    expect([...container.querySelectorAll('mark')].map((m) => m.textContent)).toEqual([
+      'Nord',
+      'Pegel',
+      'Deich',
+    ]);
+  });
+
+  it('ohne Begriff keine Markierung', async () => {
+    etbHandler([eintrag()]);
+    const { container } = renderMitProviders(
+      <EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />,
+    );
+    await screen.findByText('Deich an Station 4 sichern');
+    expect(container.querySelector('mark')).toBeNull();
+  });
+});

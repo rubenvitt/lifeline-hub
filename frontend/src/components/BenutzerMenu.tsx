@@ -1,6 +1,14 @@
-import { IconAbmelden, IconChevronRunter, IconDokument, IconPerson, type Icon } from '../icons';
+import {
+  IconAbmelden,
+  IconChevronRunter,
+  IconDokument,
+  IconDokumente,
+  IconPerson,
+  type Icon,
+} from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
+import { HILFE_PFAD } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
 import {
   useDichte,
@@ -214,14 +222,17 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
     },
     // Hinweis auf die LGPL-Bibliotheken (HEIC-Decoder, LFH-1000, `heic/LIESMICH.md`), ganz
     // unten, weil er selten gebraucht wird. Über `onClick`, nicht als `<a>` im Label: sonst
-    // öffnete nur ein Klick genau auf den Text, Enter und die Polsterung nicht.
+    // öffnete nur ein Klick genau auf den Text, Enter und die Polsterung nicht. Die Hilfe
+    // (LFH-1096) steht darüber, ebenso selten gebraucht.
     { type: 'divider' },
+    { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
     { key: 'lizenzen', icon: <IconDokument />, label: 'Lizenzen' },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') void abmelden();
+    else if (key === 'hilfe') navigate(HILFE_PFAD);
     else if (key === 'lizenzen') window.open(LIZENZ_HINWEIS, '_blank', 'noopener');
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);

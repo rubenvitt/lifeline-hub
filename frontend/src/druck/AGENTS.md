@@ -11,16 +11,24 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
-  `fuehrungsorganisation-druck`, `dokument-anlage-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
   `DRUCK_SPECS` der `playwright.config.ts`.
-- **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe sind `DruckKnopf`
-  (`useDrucken`, wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
+- **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe sind `DruckKnopf`,
+  im Seitenkopf `useDruckNebenwege` (LFH-1079); beide über `useDrucken` (wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
   nicht „letzter Abruf gelungen"). **Kein
-  `window.print()` direkt**, nie aus dem Passiv-Effekt. `components/druck/useDruckModus.ts`
+  `window.print()` direkt**, nie aus dem Passiv-Effekt. `useDrucken` druckt über
+  `components/druck/druckDialog.ts`: bleibt `beforeprint` aus (Safari stellt den Druck bei offenem
+  Live-Strom zurück, LFH-1105), schließt es den Strom in derselben Aufgabe und öffnet ihn danach
+  neu (`pausiereLiveStroeme`, Vollabgleich). `components/druck/useDruckModus.ts`
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
+- **Ohne Organisation druckt nur die Hilfe** (LFH-1096): `DruckKnopf ohneOrganisation` wartet
+  nicht auf Kopf und Logo und fragt `/api/organisation` gar nicht (die Hilfe ist ohne Anmeldung
+  offen). Jedes Druckstück einer Organisation oder eines Einsatzes bleibt beim Druckkopf. Die
+  Mappe der Hilfe beginnt jedes weitere Kapitel auf neuer Seite (`data-lfh="druck-kapitel"`),
+  Nachweis `e2e/hilfe-druck.spec.ts`.
 - Ein Editor druckt nie seine `<textarea>` (`MarkdownEditor` `druckfassung`).
 - **Abschnittstitel stehen im Titelblock** (LFH-1008): Firefox setzt `break-after: avoid` nicht
   um, ein Titel bliebe allein am Seitenende. Titel und erster Block teilen sich eine Hülle
@@ -29,6 +37,14 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   man `Markdown` als `titel` (Lesefassung) bzw. dem Editor als `druckTitel` (Entwurf: Akkordeonkopf
   und Feldetikett weichen auf Papier). Wirkung nur im echten Firefox-Druck sichtbar
   (Minimalprobe `docs/superpowers/specs/2026-09-25-lfh-22-belege/lfh-813/werkzeug/`).
+  Im Einsatzbericht (LFH-1098, `druck/einsatzbericht/Bloecke.tsx`) reichen Block und Abschnitt
+  ihre Titel an das erste Inhaltsstück weiter: eine Liste nimmt sie mit ihrer ersten Zeile auf
+  (zwei Subgrids desselben Rasters, die Etikettspalte bleibt gleich breit), eine Tabelle bis
+  `KURZE_TABELLE` Zeilen ganz, aber nur in Firefox (`titelblock-tabelle` unter
+  `@supports (-moz-appearance: none)`): Chromium hält Titel, Kopf und erste Zeile selbst
+  zusammen, eine Hülle rückte dort die ganze Tabelle weiter. Eine längere bleibt draußen: in einer
+  Hülle, die nicht bricht, rückt sie samt Titel auf die nächste Seite und lässt davor fast eine
+  Seite leer.
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
   brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur

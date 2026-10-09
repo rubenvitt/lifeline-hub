@@ -166,6 +166,24 @@ describe('BenutzerMenu — Reihenfolge (LFH-952)', () => {
     oeffnen.mockRestore();
   });
 
+  it('die Hilfe steht über dem Lizenzhinweis und öffnet die Hilfe-Seite (LFH-1096)', async () => {
+    server.use(meHandler(benutzer));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <Routes>
+          <Route path="/" element={<BenutzerMenu />} />
+          <Route path="/hilfe" element={<h1>Hilfe-Seite</h1>} />
+        </Routes>
+      </ThemeModeProvider>,
+    );
+    await oeffne();
+    const eintraege = await screen.findAllByRole('menuitem');
+    const hilfe = eintraege[eintraege.length - 2]!;
+    expect(hilfe.textContent).toBe('Hilfe');
+    await userEvent.click(hilfe);
+    expect(await screen.findByRole('heading', { name: 'Hilfe-Seite' })).toBeInTheDocument();
+  });
+
   it('Profil und Abmelden stehen vor Darstellung, Bediendichte und Helligkeit', async () => {
     zeige();
     await oeffne();

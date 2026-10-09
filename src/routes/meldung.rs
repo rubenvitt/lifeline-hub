@@ -357,6 +357,15 @@ pub async fn anlegen(
     if !crate::meldung::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
+    // Der Request-Wert hat dieselben Grenzen wie die Default-Fristen der Einstellungen
+    // (LFH-1060: ein riesiger Wert ließ die Fristrechnung panicken → 500 statt 400).
+    if let Some(v) = req.bestaetigung_frist_min {
+        if !crate::einsatz::einstellungen::ist_gueltige_frist_min(v) {
+            return Err(AppError::Validation(
+                "Bestätigungsfrist muss zwischen 1 und 10080 Minuten liegen".into(),
+            ));
+        }
+    }
     // Ein Abschnittsgerät (LFH-1043) meldet als sein Abschnitt; ein fremder Absender ist 403.
     let (einheit_id, abschnitt_id) =
         match crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { FOTO_JPEG } from './bildFixture';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Bildvorschau an Anhängen im Browser (LFH-759, Spec `anhang-vorschau`): das Vorschaubild vom
@@ -17,7 +18,7 @@ const HEIC = readFileSync(join(process.cwd(), 'src/heic/__fixtures__/hochkant.he
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
   await page.goto('/einsaetze');
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(name);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

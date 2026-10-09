@@ -1,0 +1,140 @@
+/* Anwenderdokumentation (LFH-1096): Lesespalte, Kapitelliste, Satz für gerendertes Markdown.
+   Radius 0, Haarlinien, Farben nur aus den Rollen. */
+
+.doku-gruppe {
+  padding: 20px;
+  background: var(--lfh-grund);
+}
+
+.doku-gruppen {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 768px) {
+  .doku-gruppen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.doku-gruppe__titel {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.doku-liste {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doku-liste li + li {
+  margin-top: 4px;
+}
+
+.doku-liste a {
+  display: block;
+  padding: 8px 0;
+}
+
+.doku-liste a[aria-current='page'] {
+  color: var(--lfh-text);
+  font-weight: 600;
+}
+
+.doku-kapitelseite {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+@media (min-width: 960px) {
+  .doku-kapitelseite {
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 48px;
+  }
+}
+
+.doku-navi {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--lfh-linie);
+}
+
+@media (min-width: 960px) {
+  .doku-navi {
+    padding-bottom: 0;
+    border-bottom: 0;
+    border-right: 1px solid var(--lfh-linie);
+    padding-right: 24px;
+  }
+}
+
+.doku-navi__zurueck {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.doku-gruppen-zeile {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--lfh-gedaempft);
+}
+
+.doku-text {
+  min-width: 0;
+  max-width: 72ch;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.doku-text h2 {
+  margin: 36px 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.doku-text h3 {
+  margin: 24px 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.doku-text p,
+.doku-text ul,
+.doku-text ol {
+  margin: 0 0 14px;
+}
+
+.doku-text ul,
+.doku-text ol {
+  padding-left: 22px;
+}
+
+.doku-text li + li {
+  margin-top: 4px;
+}
+
+.doku-text code {
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 0.9em;
+}
+
+.doku-text pre {
+  overflow-x: auto;
+  padding: 12px;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+.doku-text table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 14px;
+}
+
+.doku-text :is(th, td) {
+  padding: 6px 8px;
+  border: 1px solid var(--lfh-linie);
+  text-align: left;
+}

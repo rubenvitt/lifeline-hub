@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Der Einsatz-Navigationsrahmen auf dem Handschirm: kein waagerechter Überlauf und jede
@@ -43,18 +44,11 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
-}
-
 /**
- * Misst den waagerechten Überlauf elementweise UND benennt die Verursacher, aufgeteilt nach
- * Besitzer: `rahmen` (dieses Paket, wird zugesichert), `kopfzeile` und `inhalt` (fremd, werden
- * gemeldet). Ein Gesamtmaß wie `body.scrollWidth` lastete diesem Spec fremde Brüche an.
+ * Misst den waagerechten Überlauf je Element und je Textzeile UND benennt die Verursacher,
+ * aufgeteilt nach Besitzer: `rahmen` (dieses Paket, wird zugesichert), `kopfzeile` und `inhalt`
+ * (fremd, werden gemeldet). Ein Gesamtmaß wie `body.scrollWidth` lastete diesem Spec fremde
+ * Brüche an.
  */
 async function messeUeberlauf(page: Page) {
   return page.evaluate(() => {
@@ -71,26 +65,42 @@ async function messeUeberlauf(page: Page) {
       }
       return false;
     };
-    const zuBreit = Array.from(document.querySelectorAll('*')).filter(
-      (el) => el.getBoundingClientRect().right > grenze + 1 && !eingefasst(el),
-    );
+    const befunde: { el: Element; text: string }[] = Array.from(document.querySelectorAll('*'))
+      .filter((el) => el.getBoundingClientRect().right > grenze + 1 && !eingefasst(el))
+      .map((el) => ({ el, text: benenne(el) }));
+    // Auch Textzeilen: ein Block mit `white-space: nowrap` bleibt so breit wie sein Elternteil,
+    // sein Text läuft trotzdem hinaus — die Elementkästen allein sähen das nicht (wie
+    // `ueberstand-kern.ts`). Ein Text in einer eingefassten Fläche zählt nicht; klippt sein
+    // Elternteil selbst, endet die Zeile an dessen Rand (ragt der hinaus, meldet ihn die
+    // Elementmessung).
+    const gang = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const bereich = document.createRange();
+    for (let t = gang.nextNode(); t; t = gang.nextNode()) {
+      const eltern = t.parentElement;
+      if (!eltern || !t.textContent?.trim() || eingefasst(eltern)) continue;
+      bereich.selectNodeContents(t);
+      let rechts = Math.max(...Array.from(bereich.getClientRects(), (r) => r.right));
+      if (getComputedStyle(eltern).overflowX !== 'visible')
+        rechts = Math.min(rechts, eltern.getBoundingClientRect().right);
+      if (rechts > grenze + 1)
+        befunde.push({
+          el: eltern,
+          text: `Text „${t.textContent.trim().slice(0, 60)}" → ${Math.round(rechts)}px`,
+        });
+    }
     const im = (el: Element, wahl: string) => Boolean(el.closest(wahl));
+    const auswahl = (pruef: (el: Element) => boolean, anzahl: number) =>
+      befunde
+        .filter((b) => pruef(b.el))
+        .slice(0, anzahl)
+        .map((b) => b.text);
     return {
       innerWidth: window.innerWidth,
       // Was weder Kopfzeile noch Modulseite ist: der Navigationsrahmen selbst (Rahmen-Wurzel,
       // Rail, Modul-Spalte, der ans Dokument gehängte Drawer).
-      rahmen: zuBreit
-        .filter((el) => !im(el, '.ant-layout-header') && !im(el, '.ant-layout-content'))
-        .slice(0, 6)
-        .map(benenne),
-      kopfzeile: zuBreit
-        .filter((el) => im(el, '.ant-layout-header'))
-        .slice(0, 3)
-        .map(benenne),
-      inhalt: zuBreit
-        .filter((el) => im(el, '.ant-layout-content'))
-        .slice(0, 3)
-        .map(benenne),
+      rahmen: auswahl((el) => !im(el, '.ant-layout-header') && !im(el, '.ant-layout-content'), 6),
+      kopfzeile: auswahl((el) => im(el, '.ant-layout-header'), 3),
+      inhalt: auswahl((el) => im(el, '.ant-layout-content'), 3),
     };
   });
 }

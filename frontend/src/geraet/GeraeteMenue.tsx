@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Dropdown, Modal, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
-import { IconAbmelden, IconMenue, type Icon } from '../icons';
+import { IconAbmelden, IconDokumente, IconMenue, type Icon } from '../icons';
 import { useAuth } from '../auth/AuthContext';
 import {
   useDichte,
@@ -16,7 +16,7 @@ import {
   HELLIGKEIT_OPTIONEN,
 } from '../theme/darstellungOptionen';
 import { HELLIGKEIT_BODEN_WARNUNG, alsHelligkeit } from '../theme/helligkeit';
-import { KOPPELN_PFAD } from '../routing/deeplinks';
+import { HILFE_PFAD, KOPPELN_PFAD } from '../routing/deeplinks';
 
 const DARSTELLUNG_PRAEFIX = 'darstellung:';
 const DICHTE_PRAEFIX = 'stufe:';
@@ -33,8 +33,8 @@ function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Ico
 
 /**
  * Gerätemenü der Hülle (LFH-892, design.md D9) an der Stelle des Benutzermenüs: Darstellung,
- * Bediendichte (auch Handschuh, gespeichert am Gerät, Spec `feldgeraet-bedienung`), Helligkeit
- * und „Gerät abmelden“. Kein Profil: ein Gerät ist keine Person.
+ * Bediendichte (auch Handschuh, gespeichert am Gerät, Spec `feldgeraet-bedienung`), Helligkeit,
+ * Hilfe und „Gerät abmelden“. Kein Profil: ein Gerät ist keine Person.
  *
  * „Gerät abmelden“ beendet die Sitzung; zurück kommt das Gerät nur mit einem neuen Code der
  * Einsatzleitung. Für die Bedienung am Gerät ist das unumkehrbar und fragt deshalb zurück
@@ -103,11 +103,14 @@ export function GeraeteMenue() {
       }),
     },
     { type: 'divider' },
+    // Hilfe (LFH-1096): verlässt die Hülle; ihr Rückweg „Zum Gerät“ führt hierher zurück.
+    { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
     { key: 'abmelden', icon: <IconAbmelden />, label: 'Gerät abmelden …', danger: true },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'abmelden') setAbmeldenOffen(true);
+    else if (key === 'hilfe') void navigate(HILFE_PFAD);
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);
     else if (key.startsWith(DICHTE_PRAEFIX)) setDichte(key.slice(DICHTE_PRAEFIX.length) as Dichte);

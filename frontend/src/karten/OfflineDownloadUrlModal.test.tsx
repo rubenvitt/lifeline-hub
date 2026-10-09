@@ -1,8 +1,9 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
+import { NetzFehler } from '../api/client';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
@@ -153,9 +154,50 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
     await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
 
-    await screen.findByText('URL nicht erreichbar');
+    // Der Grund steht im Dialog, nicht im Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+    // Fehler“).
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('URL nicht erreichbar');
     expect(screen.getByLabelText('Name')).toHaveValue('Deutschland');
     expect(geschlossen).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  /** Ohne Servermeldung (Netz weg) nennt der Dialog den Netzfehler, nicht „Speichern“. */
+  it('nennt bei einem Netzfehler „nicht abgeschickt“ im Dialog', async () => {
+    server.use(http.post('/api/karte/offline-karten/download', () => HttpResponse.error()));
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), 'https://example.test/de.mbtiles');
+    await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
+    await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(new NetzFehler().message);
+    expect(within(dialog).getByRole('alert')).not.toHaveTextContent('Speichern fehlgeschlagen');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
+    handler(() => {}, 422);
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), 'https://example.test/de.mbtiles');
+    await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
+    await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
+    const dialog = screen.getByRole('dialog');
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs ein.
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
+    expect(within(wieder).queryByRole('alert')).toBeNull();
   });
   /** LFH-1078: die Maske erklärt nichts — Format und Pflicht zeigen Feldname und Prüfung. */
   it('trägt keinen Erklärkasten und keine Technikwörter', async () => {

@@ -28,8 +28,8 @@ pub const AUFBEWAHRUNG_TAGE: i64 = 365;
 wire_enum! {
     #[wire(ohne_serde)]
     /// Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
-    /// `migrations/0156_admin_audit.sql` — beide Seiten müssen zusammenpassen (Test
-    /// `jede_aktion_passiert_den_db_check`).
+    /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` —
+    /// beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum AdminAktion {
         BenutzerAngelegt => "benutzer_angelegt",
@@ -40,6 +40,9 @@ wire_enum! {
         ZweitfaktorZurueckgesetzt => "zweitfaktor_zurueckgesetzt",
         AnmeldewegAktiviert => "anmeldeweg_aktiviert",
         AnmeldewegDeaktiviert => "anmeldeweg_deaktiviert",
+        /// Eine Sitzung des Zielkontos beendet (LFH-1092), ein Eintrag je Sitzung; das Detail
+        /// nennt Gerät und Anmeldezeit.
+        SitzungBeendet => "sitzung_beendet",
     }
 }
 

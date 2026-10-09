@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Öffnungswege der Sprungpalette im echten Browser. In Vitest ist `window.open` ein Spy; ein
@@ -28,14 +29,6 @@ async function anmelden(page: Page) {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 async function zumModul(page: Page, id: string, modul: string) {
@@ -402,6 +395,8 @@ test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
     vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde', { exact: true }),
   ).toBeVisible();
   await expect(vorschau.getByText('Abschnitt Nord → Leitstelle')).toBeVisible();
+  // Die Fundstelle ist markiert, im Kopf der Vorschau wie im Inhalt (LFH-1056).
+  await expect(vorschau.locator('mark', { hasText: 'Wasserstand' })).toHaveCount(2);
   await page.keyboard.press('Escape');
   await expect(vorschau).toBeHidden();
   await expect(paletteInput(page)).toHaveValue('#Wasserstand');

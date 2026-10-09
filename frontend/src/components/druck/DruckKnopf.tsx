@@ -8,6 +8,8 @@ interface Props {
   gesperrt?: boolean;
   /** `primary` nur dort, wo Drucken die Primäraktion der Seite ist (ETB-Druckansicht). */
   typ?: 'primary' | 'default';
+  /** Druckstück ohne Organisation (Hilfe, LFH-1096): kein Warten auf Kopf und Logo. */
+  ohneOrganisation?: boolean;
 }
 
 /**
@@ -18,8 +20,13 @@ interface Props {
  * LFH-345 · M16) und daneben der Grund samt „Erneut laden". Kein `loading` am Knopf: antds
  * Ladezustand benennt ihn zu „loading Drucken / als PDF" um (LFH-495).
  */
-export default function DruckKnopf({ vorbereiten, gesperrt = false, typ = 'default' }: Props) {
-  const { drucken, zustand, wiederholen } = useDrucken();
+export default function DruckKnopf({
+  vorbereiten,
+  gesperrt = false,
+  typ = 'default',
+  ohneOrganisation = false,
+}: Props) {
+  const { drucken, zustand, wiederholen } = useDrucken({ mitOrganisation: !ohneOrganisation });
 
   if (zustand === 'fehler') {
     return (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ladeOrganisation } from '../../api/organisation';
 import { globalKeys } from '../../api/queryKeys';
+import { oeffneDruckdialog } from './druckDialog';
 
 type DruckZustand = 'bereit' | 'laedt' | 'fehler';
 
@@ -32,10 +33,15 @@ interface Drucken {
  * `setState` im Effekt. Scheitert die Abfrage, verfällt eine offene Anforderung: ein Dialog,
  * der Minuten später nach „Erneut laden" von selbst aufginge, wäre eine Überraschung.
  */
-export function useDrucken(): Drucken {
+export function useDrucken({
+  mitOrganisation = true,
+}: { mitOrganisation?: boolean } = {}): Drucken {
+  // Ohne Organisation druckt nur, was keiner Organisation gehört: die Hilfe (LFH-1096), die auch
+  // ohne Anmeldung offen ist. Dann fragt der Hook gar nicht erst (ohne Sitzung käme 401).
   const organisation = useQuery({
     queryKey: globalKeys.organisation(),
     queryFn: ladeOrganisation,
+    enabled: mitOrganisation,
   });
   const [anforderung, setAnforderung] = useState(0);
   const erledigt = useRef(0);
@@ -44,7 +50,7 @@ export function useDrucken(): Drucken {
    * HINTERGRUND-Refetch steht in TanStack v5 `isError`, `data` aber bleibt. Ein Fehler zählt nur,
    * solange es keine Daten gibt.
    */
-  const bereit = organisation.data !== undefined;
+  const bereit = !mitOrganisation || organisation.data !== undefined;
   const gescheitert = !bereit && organisation.isError;
 
   useEffect(() => {
@@ -86,7 +92,7 @@ export function useDrucken(): Drucken {
       .then(() => {
         if (abgebrochen) return;
         erledigt.current = anforderung;
-        window.print();
+        oeffneDruckdialog();
       });
     return () => {
       abgebrochen = true;

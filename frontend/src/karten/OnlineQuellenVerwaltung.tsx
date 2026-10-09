@@ -1,10 +1,11 @@
-import { App, Button, Popconfirm, Space, Tag } from 'antd';
+import { Button, Flex, Popconfirm, Space, Tag, theme } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import { listeOnlineQuellen, loescheOnlineQuelle, type OnlineQuelle } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
@@ -25,7 +26,7 @@ export default function OnlineQuellenVerwaltung() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [formOffen, setFormOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<OnlineQuelle | null>(null);
   const [katalogOffen, setKatalogOffen] = useState(false);
@@ -40,10 +41,16 @@ export default function OnlineQuellenVerwaltung() {
   const vorhandeneUrls = useMemo(() => new Set(quellen.map((q) => q.url)), [quellen]);
   const naechsteSortier = quellen.reduce((max, q) => Math.max(max, q.sortier), 0) + 1;
 
+  // Eine Ablehnung steht an der Zeile, an der gelöscht wurde (`ZeilenFehler` in der
+  // Aktionsspalte), kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Je Quelle
+  // gemerkt, aus den Callbacks der Mutation (`components/useZeilenFehler.ts`); Bearbeiten an der
+  // Zeile räumt ihren Grund.
+  const zeilen = useZeilenFehler<number>();
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheOnlineQuelle(id),
+    onMutate: (id) => zeilen.beginne(id),
+    onError: (e, id) => zeilen.melde(id, e, 'Löschen fehlgeschlagen'),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<OnlineQuelle>[] = [
@@ -135,28 +142,35 @@ export default function OnlineQuellenVerwaltung() {
             key: 'aktionen',
             // Die Zeilenaktionen sind kein Vergleichsgegenstand — nicht abwählbar.
             immerSichtbar: true,
-            render: (_, q: OnlineQuelle) => (
-              // `size="middle"` trennt die destruktive von der neutralen Aktion
-              // (`components/aktionsabstand.guard.test.ts`).
-              <Space size="middle">
-                <Button
-                  onClick={() => {
-                    setBearbeite(q);
-                    setFormOffen(true);
-                  }}
-                >
-                  Bearbeiten
-                </Button>
-                <Popconfirm
-                  title="Quelle löschen?"
-                  okText="Löschen"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => loeschenMutation.mutate(q.id)}
-                >
-                  <Button danger>Löschen</Button>
-                </Popconfirm>
-              </Space>
-            ),
+            render: (_, q: OnlineQuelle) => {
+              const grund = zeilen.grund(q.id);
+              return (
+                <Flex vertical gap={token.marginXXS} align="flex-start">
+                  {/* `size="middle"` trennt die destruktive von der neutralen Aktion
+                    (`components/aktionsabstand.guard.test.ts`). */}
+                  <Space size="middle">
+                    <Button
+                      onClick={() => {
+                        zeilen.beginne(q.id);
+                        setBearbeite(q);
+                        setFormOffen(true);
+                      }}
+                    >
+                      Bearbeiten
+                    </Button>
+                    <Popconfirm
+                      title="Quelle löschen?"
+                      okText="Löschen"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => loeschenMutation.mutate(q.id)}
+                    >
+                      <Button danger>Löschen</Button>
+                    </Popconfirm>
+                  </Space>
+                  {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
+                </Flex>
+              );
+            },
           },
         ] as KatalogSpalte<OnlineQuelle>[])
       : []),

@@ -129,3 +129,49 @@ describe.each([
     expect(screen.queryByRole('button', { name: NAME })).not.toBeInTheDocument();
   });
 });
+
+describe('EinsatzSeite — gesperrter Nebenweg und Sprung (LFH-1079)', () => {
+  const eintraege: readonly Nebenweg[] = [
+    {
+      key: 'etb',
+      label: 'Zum ETB-Eintrag',
+      ziel: '/einsaetze/1/etb?eintrag=42',
+      sprung: true,
+      onWahl: vi.fn(),
+    },
+    {
+      key: 'druck',
+      label: 'Drucken / als PDF (Organisation nicht geladen)',
+      gesperrt: true,
+      onWahl: vi.fn(),
+    },
+  ];
+
+  it('ab md: der Sprung ist ein Link mit „↗“, der gesperrte Weg ein gesperrter Knopf', () => {
+    setzeViewportBreite(1180);
+    const { container } = zeige(eintraege);
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    const sprung = within(kopf).getByRole('link', { name: 'Zum ETB-Eintrag' });
+    expect(sprung).toHaveTextContent('Zum ETB-Eintrag ↗');
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=42');
+    expect(
+      within(kopf).getByRole('button', { name: 'Drucken / als PDF (Organisation nicht geladen)' }),
+    ).toBeDisabled();
+  });
+
+  it('unter md: der gesperrte Weg ist ein gesperrter Eintrag, der Sprung ohne „↗“ im Namen', async () => {
+    setzeViewportBreite(390);
+    const druck = eintraege[1].onWahl as ReturnType<typeof vi.fn>;
+    zeige(eintraege);
+    await userEvent.click(screen.getByRole('button', { name: NAME }));
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    const menue = offenesMenue();
+    expect(within(menue).getByRole('menuitem', { name: 'Zum ETB-Eintrag' })).toBeInTheDocument();
+    const gesperrt = within(menue).getByRole('menuitem', {
+      name: 'Drucken / als PDF (Organisation nicht geladen)',
+    });
+    expect(gesperrt).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(gesperrt);
+    expect(druck).not.toHaveBeenCalled();
+  });
+});

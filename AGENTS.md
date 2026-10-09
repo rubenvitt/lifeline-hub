@@ -17,7 +17,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/etb/AGENTS.md` | ETB: Zeitachse, Erfassung, Kopfzahl und Modulzähler, Entwurfsspeicher |
 | `frontend/src/pages/lagekarte/AGENTS.md` | Lagekarte, Zeichnen und Messen |
 | `frontend/src/offline/AGENTS.md` | Lagebild ohne Netz (LFH-723), Schreiben ohne Netz (LFH-705) |
-| `frontend/src/auth/AGENTS.md` | Sitzung über mehrere Tabs, Client und Server (LFH-387) |
+| `frontend/src/auth/AGENTS.md` | Sitzung über mehrere Tabs (LFH-387), Sitzungen beenden (LFH-1092), Client und Server |
 | `frontend/src/betreuung/AGENTS.md` | Betreuung und Verpflegung, Client und Server |
 | `frontend/src/command-palette/AGENTS.md` | Sprungpalette |
 | `frontend/src/druck/AGENTS.md` | Druck (LFH-71/LFH-22) |
@@ -28,6 +28,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Client und Server |
 | `frontend/src/geraet/AGENTS.md` | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
+| `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Inhalts- und Mitänderungsregel, Hilfe in der App |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Schutzköpfe, Org-Ereignisse, Demo-Daten, Aufbewahrung, ClamAV |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |

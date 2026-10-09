@@ -4119,6 +4119,25 @@ export interface components {
          * @enum {string}
          */
         Sichtungskategorie: "sk1" | "sk2" | "sk3" | "sk4" | "tot" | "unverletzt";
+        /** @description Eine Personensitzung in der Sitzungsliste (LFH-1092). Zeitpunkte als UTC-`datetime`. */
+        SitzungAnzeige: {
+            /** @description Die Sitzung, mit der diese Anfrage kommt. */
+            aktuell: boolean;
+            angemeldet_at: string;
+            /** @description Grobe Bezeichnung wie „Firefox · Windows“; fehlt, wenn unbekannt. */
+            geraet?: string | null;
+            kennung: string;
+            /** @description Letzte Anfrage dieser Sitzung, auf [`ZULETZT_GESEHEN_TAKT_MINUTEN`] genau. */
+            zuletzt_gesehen_at: string;
+        };
+        /** @description Antwort der Beenden-Routen. */
+        SitzungenBeendet: {
+            /**
+             * Format: int32
+             * @description Zahl der beendeten Sitzungen.
+             */
+            beendet: number;
+        };
         SkizzenBereich: {
             bezeichnung: string;
             /** Format: double */

@@ -107,6 +107,16 @@
     break-inside: avoid;
   }
 
+  /* Um eine kurze Tabelle nur in Firefox (LFH-1098, `druck/einsatzbericht/Bloecke.tsx`): Chromium
+     hält Titel, Kopf und erste Zeile über `break-after: avoid` zusammen und bricht die Tabelle
+     danach. Hielte die Hülle dort, rückte die ganze Tabelle auf die nächste Seite. Die Weiche
+     erkennt Firefox an `-moz-appearance`, das nur er kennt. */
+  @supports (-moz-appearance: none) {
+    [data-lfh='druckwurzel'] [data-lfh='titelblock-tabelle'] {
+      break-inside: avoid;
+    }
+  }
+
   /* Eine überlange Tabellenzeile bricht frei, samt ihren Textblöcken (LFH-1009). Zusammenhalten
      hieße hier: die Zeile rückt auf die nächste Seite und lässt die aktuelle leer, und ihre
      Absätze reißen auf jeder Folgeseite Lücken. Welche Zeile überlang ist, entscheidet die Seite
@@ -116,6 +126,10 @@
     break-inside: auto;
   }
 
+  /* Kopf je Seite in Chromium und Firefox. WebKit (Safari, iPad, macOS-Hülle) wiederholt `thead`
+     im Druck nicht, auch nicht an einer statischen Tabelle: Engine-Grenze, hingenommen wie die
+     Seitenzählung (LFH-1110, Prüfliste LFH-22). Kein Ersatz über Seitenblöcke: Papierformat und
+     Skalierung wählt man erst im Druckdialog. */
   [data-lfh='druckwurzel'] thead {
     display: table-header-group;
   }
@@ -123,6 +137,11 @@
   /* Eine Anlage beginnt auf einer neuen Seite (LFH-893: die Funkplan-Tabelle hinter der
      Fernmeldeskizze). Die Seite markiert nur, die Mechanik steht hier. */
   [data-lfh='druckwurzel'] [data-lfh='druck-anlage'] {
+    break-before: page;
+  }
+
+  /* Jedes weitere Kapitel einer Mappe beginnt auf einer neuen Seite (Hilfe, LFH-1096). */
+  [data-lfh='druckwurzel'] [data-lfh='druck-kapitel'] + [data-lfh='druck-kapitel'] {
     break-before: page;
   }
 

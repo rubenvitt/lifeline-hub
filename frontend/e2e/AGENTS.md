@@ -35,3 +35,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   setzt ihn einmal je Lauf (je Shard eigenes Backend). Ohne ihn hielte die Von/An-Pflicht jeden
   Eintrag über die Oberfläche auf. Wer die Rufname-Abfrage prüft, nimmt eine frisch angelegte
   Person (`etb-standard-rufname.spec.ts`); ein per API gesäter ETB-Eintrag trägt `von` und `an`.
+- **Einen Einsatz über die Oberfläche legt nur `e2e/einsatz-kern.ts` an** (LFH-1114):
+  `einsatzDialogOeffnen` wartet, bis der Dialog „Neuen Einsatz anlegen“ ausgezoomt ist; ein
+  früherer Klick fiel unter Last neben „Anlegen“ (kein POST, Dialog offen). Wer die Oberfläche
+  nicht prüft, legt über die API an. Riegel `no-restricted-syntax` für `e2e/**`.

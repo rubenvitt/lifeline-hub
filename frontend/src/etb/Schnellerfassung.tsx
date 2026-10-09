@@ -155,6 +155,12 @@ function gleicheDatei(a: File, b: File): boolean {
   return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
 }
 
+/** Ein Feld, in dem getippt wird — der Startfokus nimmt es niemandem weg (LFH-1089). */
+function istEingabefeld(element: Element | null): boolean {
+  if (!(element instanceof HTMLElement)) return false;
+  return /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName) || element.isContentEditable;
+}
+
 function fehlerGrund(e: unknown): string {
   return e instanceof Error && e.message ? e.message : 'unbekannter Fehler';
 }
@@ -381,12 +387,15 @@ export default function Schnellerfassung({
   // (`useViewport`), und der Wechsel in die gestapelte Form montierte das Feld neu — ein früher
   // Fokus ginge verloren, und `startFokus` (unter `md` aus) stünde noch auf dem breiten Wert.
   // Danach fokussiert kein Aufklappen von selbst.
+  // Kein Fokusraub (LFH-1089): die Leiste montiert erst nach dem Laden der Entwürfe. Wer bis dahin
+  // schon in einem Eingabefeld tippt (Volltextsuche), behält es, sonst landeten die übrigen
+  // Zeichen im Entwurf. Ein fokussierter Knopf oder Link (Sprung über die Navigation) zählt nicht.
   const breiteBekannt = Object.keys(screens).length > 0;
   const startFokusErledigt = useRef(false);
   useEffect(() => {
     if (!breiteBekannt || startFokusErledigt.current) return;
     startFokusErledigt.current = true;
-    if (startFokus) textRef.current?.focus();
+    if (startFokus && !istEingabefeld(document.activeElement)) textRef.current?.focus();
   }, [breiteBekannt, startFokus]);
 
   /**

@@ -1,6 +1,7 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { erwarteHandyBreite, mitHandy } from './druckansicht-mobil-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Einsatzbericht (LFH-726) gegen einen echten Server: Einstieg über die Einsatzdaten, sieben
@@ -40,14 +41,6 @@ async function anmelden(page: Page) {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 /** Bis zu drei Versuche bei 503 („bitte erneut versuchen", SQLite-Schreibkonflikt). */
@@ -200,6 +193,30 @@ test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Pers
       rail: anzeige('nav[aria-label="Kategorien"]'),
       seitenkopf: anzeige('[data-lfh="seitenkopf"]'),
       tabellenkopf: anzeige('[data-lfh="druckwurzel"] thead'),
+      // LFH-1098: jeder Titel steht in einer Hülle mit dem ersten Stück seines Inhalts (die
+      // Tabellen hier sind kurz). Die Hülle um Listen und Text bricht in jeder Engine nicht.
+      titelOhneHuelle: Array.from(w.querySelectorAll('h3, h4, h5')).filter(
+        (h) => !h.closest('[data-lfh^="titelblock"]'),
+      ).length,
+      titelblockUmbruch: [
+        ...new Set(
+          Array.from(w.querySelectorAll('[data-lfh="titelblock"]')).map(
+            (b) => getComputedStyle(b).breakInside,
+          ),
+        ),
+      ].join(','),
+      // Die Stammdaten stehen in zwei Listen (erste Zeile im Titelblock, Rest danach); als
+      // Subgrids desselben Rasters beginnen alle Werte an derselben Kante. Das zeigt nur ein
+      // Browser, jsdom rechnet kein Raster.
+      wertKanten: [
+        ...new Set(
+          Array.from(w.querySelectorAll('[data-lfh="einsatzbericht-block-stammdaten"] dd')).map(
+            (d) => Math.round(d.getBoundingClientRect().left),
+          ),
+        ),
+      ].length,
+      stammdatenListen: w.querySelectorAll('[data-lfh="einsatzbericht-block-stammdaten"] dl')
+        .length,
     };
   });
   expect(druck.position).toBe('static');
@@ -208,6 +225,10 @@ test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Pers
   expect(druck.rail).toBe('none');
   expect(druck.seitenkopf, 'Bedienung der Druckansicht steht nicht auf dem Papier').toBe('none');
   expect(druck.tabellenkopf, 'Tabellenkopf wiederholt sich je Seite').toBe('table-header-group');
+  expect(druck.titelOhneHuelle, 'jeder Titel steht bei seinem Inhalt').toBe(0);
+  expect(druck.titelblockUmbruch, 'der Titelblock bricht nicht').toBe('avoid');
+  expect(druck.stammdatenListen, 'erste Zeile im Titelblock, Rest danach').toBe(2);
+  expect(druck.wertKanten, 'Werte beider Listen an einer Kante').toBe(1);
   expect(druck.rechts, 'nichts ragt rechts aus der Druckwurzel').toBeLessThanOrEqual(
     druck.wurzelRechts + 1,
   );

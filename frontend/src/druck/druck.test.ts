@@ -239,6 +239,18 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     expect(r!.koerper).toMatch(/break-inside:\s*avoid/);
   });
 
+  /**
+   * LFH-1098: um eine kurze Tabelle hält der Titelblock nur in Firefox. In Chromium rückte sonst
+   * die ganze Tabelle auf die nächste Seite, wo bisher nur Titel, Kopf und erste Zeile wanderten.
+   */
+  it('lässt den Titelblock einer Tabelle nur in Firefox nicht brechen', () => {
+    const sel = `${WURZEL} [data-lfh='titelblock-tabelle']`;
+    const alle = druckRegeln.filter((r) => einzeln(r.selektor).includes(sel));
+    expect(alle).toHaveLength(1);
+    expect(alle[0].kontext).toContain('@supports (-moz-appearance: none)');
+    expect(alle[0].koerper).toMatch(/break-inside:\s*avoid/);
+  });
+
   /** Auf Papier gibt es keinen Bildlauf: eine lange Codezeile wäre rechts abgeschnitten. */
   it('bricht Codeblöcke im Druck um, statt sie abzuschneiden', () => {
     const r = regelFuer(`${WURZEL} .markdown pre`);
@@ -274,6 +286,13 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
   it('beginnt eine Anlage auf einer neuen Seite', () => {
     const r = regelFuer(`${WURZEL} [data-lfh='druck-anlage']`);
     expect(r, 'keine Anlage-Regel').toBeDefined();
+    expect(r!.koerper).toMatch(/break-before:\s*page/);
+  });
+
+  /** LFH-1096: in der Mappe der Hilfe beginnt jedes weitere Kapitel auf einer neuen Seite. */
+  it('beginnt jedes weitere Kapitel einer Mappe auf einer neuen Seite', () => {
+    const r = regelFuer(`${WURZEL} [data-lfh='druck-kapitel'] + [data-lfh='druck-kapitel']`);
+    expect(r, 'keine Kapitel-Regel').toBeDefined();
     expect(r!.koerper).toMatch(/break-before:\s*page/);
   });
 

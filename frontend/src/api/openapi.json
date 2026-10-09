@@ -10923,6 +10923,54 @@
           "unverletzt"
         ]
       },
+      "SitzungAnzeige": {
+        "type": "object",
+        "description": "Eine Personensitzung in der Sitzungsliste (LFH-1092). Zeitpunkte als UTC-`datetime`.",
+        "required": [
+          "kennung",
+          "angemeldet_at",
+          "zuletzt_gesehen_at",
+          "aktuell"
+        ],
+        "properties": {
+          "aktuell": {
+            "type": "boolean",
+            "description": "Die Sitzung, mit der diese Anfrage kommt."
+          },
+          "angemeldet_at": {
+            "type": "string"
+          },
+          "geraet": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Grobe Bezeichnung wie „Firefox · Windows“; fehlt, wenn unbekannt."
+          },
+          "kennung": {
+            "type": "string"
+          },
+          "zuletzt_gesehen_at": {
+            "type": "string",
+            "description": "Letzte Anfrage dieser Sitzung, auf [`ZULETZT_GESEHEN_TAKT_MINUTEN`] genau."
+          }
+        }
+      },
+      "SitzungenBeendet": {
+        "type": "object",
+        "description": "Antwort der Beenden-Routen.",
+        "required": [
+          "beendet"
+        ],
+        "properties": {
+          "beendet": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Zahl der beendeten Sitzungen.",
+            "minimum": 0
+          }
+        }
+      },
       "SkizzenBereich": {
         "type": "object",
         "required": [

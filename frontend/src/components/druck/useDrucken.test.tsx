@@ -68,6 +68,20 @@ describe('useDrucken / DruckKnopf', () => {
     await waitFor(() => expect(drucke).toHaveBeenCalledTimes(2));
   });
 
+  it('ohne Organisation (Hilfe, LFH-1096): druckt sofort und fragt den Server nicht', async () => {
+    let abgefragt = false;
+    server.use(
+      http.get('/api/organisation', () => {
+        abgefragt = true;
+        return HttpResponse.json({}, { status: 401 });
+      }),
+    );
+    renderMitProviders(<DruckKnopf ohneOrganisation />);
+    await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    expect(abgefragt).toBe(false);
+  });
+
   it('führt einen Vorbereitungsschritt VOR dem Druck aus (Meldebild klappt auf)', async () => {
     server.use(http.get('/api/organisation', () => HttpResponse.json(ORG)));
     const reihenfolge: string[] = [];

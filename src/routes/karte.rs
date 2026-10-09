@@ -2184,9 +2184,15 @@ pub async fn offline_aktualisierung_einstellen(
     Ok(Json(aktualisierungs_status(&state).await?))
 }
 
-// ===== Style-/Tile-Proxy (LFH-182, öffentlich — wie /config & /tiles) =====
+// ===== Style-/Tile-Proxy (LFH-182) =====
 //
-// Alle Endpunkte: Quelle muss existieren + proxy=1 + aktiv=1 (sonst 404). Jede Upstream-URL läuft
+// Alle Endpunkte verlangen eine Sitzung (LFH-1072): sie rufen mit dem Key des Betreibers beim
+// Anbieter ab, anonyme Abrufe verbrauchten sein Kontingent. `CurrentUser` steht als erstes
+// Argument, damit 401 vor jeder Prüfung von Quelle, Slot oder Koordinate fällt; gekoppelte Geräte
+// bestehen die Schranke über `geraet::ALLE_GERAETE`. Antworten sind nur privat
+// zwischenspeicherbar ([`privates_cache_control`]).
+//
+// Quelle muss existieren + proxy=1 + aktiv=1 (sonst 404). Jede Upstream-URL läuft
 // VOR dem Fetch durch `url_ist_sicher` (Schema/Literal); der `proxy_client` ergänzt den pinnenden
 // DNS-Resolver (Anti-Rebinding) + per-Hop-Redirect-Prüfung. Clients können nie eine eigene
 // Ziel-URL wählen — nur die gespeicherte Quelle-`url` (style/raster) bzw. recordete Slots.
@@ -2227,17 +2233,44 @@ fn keine_kachel(z: i64, x: i64, y: i64) -> Option<Response> {
     (!proxy::kachel_koordinate_gueltig(z, x, y)).then(|| StatusCode::NO_CONTENT.into_response())
 }
 
+/// `Cache-Control` einer Proxy-Antwort: immer `private`, `public` und `s-maxage` des Anbieters
+/// fallen (LFH-1072). Nur Angemeldete bekommen die Antwort, ein geteilter Zwischenspeicher darf
+/// sie also nicht an Fremde weitergeben; `max-age`, `no-cache` & Co. bleiben.
+fn privates_cache_control(upstream: Option<&str>) -> String {
+    let mut teile = vec!["private"];
+    teile.extend(
+        upstream
+            .unwrap_or("")
+            .split(',')
+            .map(str::trim)
+            .filter(|d| {
+                let name = d
+                    .split('=')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .to_ascii_lowercase();
+                !d.is_empty() && !matches!(name.as_str(), "public" | "private" | "s-maxage")
+            }),
+    );
+    teile.join(", ")
+}
+
 /// JSON-Proxy-Antwort (style.json / tilejson): key-frei, nicht cachen.
 fn json_proxy_antwort(json: String) -> Response {
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
-        .header(header::CACHE_CONTROL, "no-cache")
+        .header(
+            header::CACHE_CONTROL,
+            privates_cache_control(Some("no-cache")),
+        )
         .body(Body::from(json))
         .unwrap()
 }
 
-/// Binär-Asset-Antwort (Tiles/Sprite/Glyphs): hygienisierte Header + nosniff durchreichen.
+/// Binär-Asset-Antwort (Tiles/Sprite/Glyphs): hygienisierte Header + nosniff durchreichen,
+/// `Cache-Control` privat.
 fn asset_antwort(a: crate::karte::proxy::AssetAntwort) -> Response {
     let mut b = Response::builder()
         .status(StatusCode::OK)
@@ -2246,9 +2279,10 @@ fn asset_antwort(a: crate::karte::proxy::AssetAntwort) -> Response {
     if let Some(ce) = a.content_encoding {
         b = b.header(header::CONTENT_ENCODING, ce);
     }
-    if let Some(cc) = a.cache_control {
-        b = b.header(header::CACHE_CONTROL, cc);
-    }
+    b = b.header(
+        header::CACHE_CONTROL,
+        privates_cache_control(a.cache_control.as_deref()),
+    );
     if let Some(et) = a.etag {
         b = b.header(header::ETAG, et);
     }
@@ -2288,6 +2322,7 @@ async fn proxy_asset(state: &AppState, u: reqwest::Url) -> Result<Response, AppE
 
 /// GET /api/karte/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
 pub async fn proxy_style(
+    _sitzung: CurrentUser,
     State(state): State<AppState>,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Response, AppError> {
@@ -2308,6 +2343,7 @@ pub async fn proxy_style(
 
 /// GET /api/karte/proxy/{id}/raster/{z}/{x}/{y} — Raster-Tile aus der gespeicherten Template-URL.
 pub async fn proxy_raster(
+    _sitzung: CurrentUser,
     State(state): State<AppState>,
     PfadParam((id, z, x, y)): PfadParam<(i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
@@ -2321,6 +2357,7 @@ pub async fn proxy_raster(
 
 /// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
 pub async fn proxy_tile(
+    _sitzung: CurrentUser,
     State(state): State<AppState>,
     PfadParam((id, slot, z, x, y)): PfadParam<(i64, i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
@@ -2335,6 +2372,7 @@ pub async fn proxy_tile(
 
 /// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
 pub async fn proxy_tilejson(
+    _sitzung: CurrentUser,
     State(state): State<AppState>,
     PfadParam((id, slot)): PfadParam<(i64, i64)>,
 ) -> Result<Response, AppError> {
@@ -2357,6 +2395,7 @@ pub async fn proxy_tilejson(
 
 /// GET /api/karte/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
 pub async fn proxy_sprite(
+    _sitzung: CurrentUser,
     State(state): State<AppState>,
     PfadParam((id, rest)): PfadParam<(i64, String)>,
 ) -> Result<Response, AppError> {
@@ -2369,6 +2408,7 @@ pub async fn proxy_sprite(
 
 /// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
 pub async fn proxy_glyphs(
+    _sitzung: CurrentUser,
     State(state): State<AppState>,
     PfadParam((id, slot, fontstack, range)): PfadParam<(i64, i64, String, String)>,
 ) -> Result<Response, AppError> {
@@ -2402,8 +2442,39 @@ mod proxy_antwort_tests {
         );
         assert_eq!(h.get(header::X_CONTENT_TYPE_OPTIONS).unwrap(), "nosniff");
         assert_eq!(h.get(header::CONTENT_ENCODING).unwrap(), "gzip");
-        assert_eq!(h.get(header::CACHE_CONTROL).unwrap(), "public, max-age=60");
+        assert_eq!(h.get(header::CACHE_CONTROL).unwrap(), "private, max-age=60");
         assert_eq!(h.get(header::ETAG).unwrap(), "\"abc\"");
+    }
+
+    /// LFH-1072: nur Angemeldete bekommen Proxy-Antworten, also darf sie kein geteilter
+    /// Zwischenspeicher halten. `public` und `s-maxage` fallen, der Rest bleibt.
+    #[test]
+    fn proxy_cache_control_ist_privat() {
+        for (upstream, erwartet) in [
+            (Some("public, max-age=60"), "private, max-age=60"),
+            (
+                Some("max-age=60, s-maxage=600, PUBLIC"),
+                "private, max-age=60",
+            ),
+            (Some("private, no-cache"), "private, no-cache"),
+            (Some("no-store"), "private, no-store"),
+            (Some(""), "private"),
+            (None, "private"),
+        ] {
+            assert_eq!(privates_cache_control(upstream), erwartet, "{upstream:?}");
+        }
+    }
+
+    #[test]
+    fn asset_antwort_ohne_upstream_cache_control_ist_privat() {
+        let r = asset_antwort(proxy::AssetAntwort {
+            bytes: Vec::new(),
+            content_type: "image/png".into(),
+            content_encoding: None,
+            cache_control: None,
+            etag: None,
+        });
+        assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "private");
     }
 
     #[test]
@@ -2414,7 +2485,10 @@ mod proxy_antwort_tests {
             r.headers().get(header::CONTENT_TYPE).unwrap(),
             "application/json"
         );
-        assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
+        assert_eq!(
+            r.headers().get(header::CACHE_CONTROL).unwrap(),
+            "private, no-cache"
+        );
     }
 
     #[test]

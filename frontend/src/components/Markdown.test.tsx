@@ -142,4 +142,48 @@ describe('Markdown', () => {
     const { container } = render(<Markdown unterEbene={3}>{''}</Markdown>);
     expect(container.querySelector('.markdown')).not.toBeNull();
   });
+
+  /*
+   * LFH-1056: Fundstellen der Volltextsuche werden im GERENDERTEN Text markiert, nicht im
+   * Quelltext — Fettung, Listen und Links bleiben heil.
+   */
+  describe('Fundstellen', () => {
+    const marken = (c: HTMLElement) => [...c.querySelectorAll('mark')].map((m) => m.textContent);
+
+    it('markiert Wortanfänge in Fettung, Liste und Linktext', () => {
+      const { container } = render(
+        <Markdown unterEbene={2} fundstellen="Deich Nord">
+          {
+            '**Deichbruch** bei Hochdeich\n\n- Abschnitt Nord\n- [Deichplan](https://example.org/nord)'
+          }
+        </Markdown>,
+      );
+      expect(marken(container)).toEqual(['Deich', 'Nord', 'Deich']);
+      expect(container.querySelector('strong')).toHaveTextContent('Deichbruch');
+      expect(container.querySelector('strong mark')).toHaveTextContent('Deich');
+      expect(container.querySelectorAll('li')).toHaveLength(2);
+      const link = screen.getByRole('link', { name: 'Deichplan' });
+      expect(link).toHaveAttribute('href', 'https://example.org/nord');
+      expect(link.querySelector('mark')).toHaveClass('lfh-fundstelle');
+    });
+
+    it('ohne Begriff keine Markierung', () => {
+      const { container } = render(<Markdown unterEbene={2}>{'Deichbruch'}</Markdown>);
+      expect(container.querySelector('mark')).toBeNull();
+    });
+
+    // Spitze Klammern liest Markdown als rohes HTML und zeigt sie als Text; der Server findet
+    // das Wort darin, also wird es auch markiert, ohne dass das HTML zum Element wird.
+    it('markiert auch in rohem HTML, das als Text erscheint', () => {
+      const { container } = render(
+        <Markdown unterEbene={2} fundstellen="mark deich">
+          {'Treffen am <Deich> bei <mark>roh</mark> markiert'}
+        </Markdown>,
+      );
+      expect(container.querySelector('p')).toHaveTextContent(
+        'Treffen am <Deich> bei <mark>roh</mark> markiert',
+      );
+      expect(marken(container)).toEqual(['Deich', 'mark', 'mark', 'mark']);
+    });
+  });
 });

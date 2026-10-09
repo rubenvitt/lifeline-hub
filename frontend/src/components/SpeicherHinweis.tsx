@@ -1,5 +1,5 @@
 import { Alert, Flex, theme, Typography } from 'antd';
-import { ApiError } from '../api/client';
+import { fehlerText as apiFehlerText } from '../api/client';
 import { StatusChip } from './instrument/Status';
 
 /**
@@ -15,11 +15,12 @@ import { StatusChip } from './instrument/Status';
  *
  * `fehlerText` ist rein und exportiert, damit die Fallunterscheidung ohne Render prüfbar ist.
  * „Ohne Fehler NICHTS" ist die Aussage, die ein Primitiv auffliegen lässt, das immer einen Text
- * liefert.
+ * liefert. Den Wortlaut nimmt sie aus `api/client.fehlerText`, damit Netzfehler („nicht
+ * abgeschickt“) und unklarer Ausgang („erst die Liste prüfen“) am Ort so heißen wie vorher im
+ * Toast (LFH-1077); nur ein fremder Fehler bekommt den Rückfalltext.
  */
 export function fehlerText(fehler: unknown, fallback = 'Speichern fehlgeschlagen'): string | null {
-  if (fehler == null) return null;
-  return fehler instanceof ApiError ? fehler.message : fallback;
+  return fehler == null ? null : apiFehlerText(fehler, fallback);
 }
 
 interface SpeicherFehlerProps {
@@ -104,5 +105,27 @@ export function SeitenHinweise({
       {zeigtRecht && <RechteHinweis sichtbar text={rechteText} />}
       <SpeicherFehler fehler={fehler} titel={fehlerTitel} fallback={fehlerFallback} />
     </Flex>
+  );
+}
+
+interface ZeilenFehlerProps {
+  /** Nur der Fehler DIESER Zeile, aus `components/useZeilenFehler.ts`. */
+  fehler: unknown;
+  /** Siehe {@link SpeicherFehlerProps.fallback}. */
+  fallback?: string;
+}
+
+/**
+ * Grund einer abgelehnten Zeilenaktion an der Zeile selbst (LFH-1077, `frontend/AGENTS.md`,
+ * „Rückwege und Fehler“): eine Zeile Text statt Alert, damit die Liste nicht springt. `data-fehler`
+ * ist der Prüfgriff, wie an den Modul-Zeilen der Einstellungen.
+ */
+export function ZeilenFehler({ fehler, fallback }: ZeilenFehlerProps) {
+  const text = fehlerText(fehler, fallback);
+  if (text === null) return null;
+  return (
+    <Typography.Text type="danger" role="alert" data-fehler="true">
+      {text}
+    </Typography.Text>
   );
 }

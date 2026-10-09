@@ -163,17 +163,17 @@ async fn falsche_methode_liefert_405_im_fehler_envelope() {
 }
 
 /// Nicht-numerische Route-ID (LFH-317): axums `Path` lieferte hier `text/plain`,
-/// `crate::extract::PfadParam` liefert 400 im `{error}`-Envelope. Genutzt wird der ÖFFENTLICHE
-/// Tile-Proxy (`/api/karte/proxy/{id}/raster/{z}/{x}/{y}`) — er erreicht den Extractor VOR dem
-/// Handler-Rumpf, also ohne Session oder DB-Fixture. Der Status bleibt 400 (axum-Default), nur
-/// der Body wird JSON.
+/// `crate::extract::PfadParam` liefert 400 im `{error}`-Envelope. Genutzt wird die ÖFFENTLICHE
+/// Offline-Kachelroute (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}`) — sie erreicht den
+/// Extractor VOR dem Handler-Rumpf, also ohne Session oder DB-Fixture. Der Status bleibt 400
+/// (axum-Default), nur der Body wird JSON.
 #[tokio::test]
 async fn nicht_numerische_route_id_liefert_400_im_fehler_envelope() {
     let app = common::setup().await;
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/karte/proxy/abc/raster/1/1/1")
+                .uri("/api/karte/offline/abc/tiles/1/1/1")
                 .body(Body::empty())
                 .unwrap(),
         )

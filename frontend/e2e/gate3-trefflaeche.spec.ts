@@ -615,7 +615,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
     // Alarm-Knöpfe per Regex: ihr Name trägt den ZUSTAND (Browser-Berechtigung, Tonfreigabe),
     // ein exakter Name pinnte eine Umgebung.
     const desktop = await haeltStufe(
-      kopf.getByRole('button', { name: /^Benachrichtigungen:/ }),
+      kopf.getByRole('button', { name: /^Benachrichtigung / }),
       BODEN.staffel[dichte],
       `Alarm-Knopf Benachrichtigung (${dichte})`,
     );
@@ -3914,7 +3914,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
         ],
         'Lagebericht',
       )}`,
-      // Lagebericht und Pressemitteilung tragen die Aktionen im Seitenkopf.
+      // Sprung und Drucken stehen als Nebenwege im Seitenkopf (LFH-1079).
       aktionen: '[data-lfh="seitenkopf-aktionen"]',
       fortschreiben: 'Fortschreiben',
     },
@@ -3926,8 +3926,9 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
         ['lage', 'auftrag', 'durchfuehrung'],
         'Befehl',
       )}`,
-      // Unter `lg` verankert am unteren Rand, darüber im Kopf: derselbe Block, eine Marke.
-      aktionen: '[data-lfh="befehl-aktionen"]',
+      // Sprung und Drucken stehen in jeder Breite im Seitenkopf (LFH-1079); unter `lg` trägt die
+      // verankerte Leiste nur die Handlungen.
+      aktionen: '[data-lfh="seitenkopf-aktionen"]',
       fortschreiben: 'Fortschreiben',
     },
     {
@@ -3985,7 +3986,7 @@ test('Detailseiten (LFH-968): der ETB-Sprung hält die Staffel und den Zielabsta
       for (const { dichte, soll } of STAFFEL) {
         await page.goto(seite.pfad);
         await stelleDichte(page, dichte);
-        // Vorbedingung: der Schreibzweig steht, „Fortschreiben“ ist Nachbar des Sprungs.
+        // Vorbedingung: der Schreibzweig steht („Fortschreiben“).
         await expect(
           page.getByRole('button', { name: seite.fortschreiben, exact: true }),
           `Vorbedingung ${seite.name}: „${seite.fortschreiben}“ steht`,

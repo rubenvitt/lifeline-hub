@@ -3924,6 +3924,257 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
+    // --- LFH-1092: Sitzungen beenden (0168 Kennung/Gerät, 0169/0170 Audit-CHECKs) ---
+
+    const MIGRATION_0168: &str = include_str!("../migrations/0168_session_kennung_geraet.sql");
+    const MIGRATION_0169: &str = include_str!("../migrations/0169_auth_audit_sitzung_beendet.sql");
+    const MIGRATION_0170: &str = include_str!("../migrations/0170_admin_audit_sitzung_beendet.sql");
+
+    /// Leerer In-Memory-Pool mit FKs und einem Minimal-`benutzer`.
+    async fn minimal_pool_mit_benutzer() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .expect("In-Memory-Pool");
+        sqlx::raw_sql(
+            "CREATE TABLE benutzer (id INTEGER PRIMARY KEY); \
+             INSERT INTO benutzer (id) VALUES (1), (2);",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool
+    }
+
+    /// DDL einer Tabelle ohne ihren Namen, Leerraum zusammengefasst.
+    async fn ddl_ohne_namen(pool: &SqlitePool, tabelle: &str) -> String {
+        let sql: String =
+            sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+                .bind(tabelle)
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        sql.replacen(&format!("CREATE TABLE \"{tabelle}\""), "CREATE TABLE T", 1)
+            .replacen(&format!("CREATE TABLE {tabelle}_neu"), "CREATE TABLE T", 1)
+            .replacen(&format!("CREATE TABLE {tabelle}"), "CREATE TABLE T", 1)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    #[tokio::test]
+    async fn migration_0168_gibt_bestandssitzungen_kennung_und_zuletzt_gesehen() {
+        let pool = minimal_pool_mit_benutzer().await;
+        // Schema der Sitzung im Stand vor 0168 (0002 + 0087 + 0147), ohne den Kopplungs-FK.
+        sqlx::raw_sql(
+            "CREATE TABLE session ( \
+                 token_hash  TEXT PRIMARY KEY, \
+                 benutzer_id INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE, \
+                 erstellt_at TEXT NOT NULL DEFAULT (datetime('now')), \
+                 expires_at  TEXT NOT NULL, \
+                 kopplung_id INTEGER); \
+             INSERT INTO session (token_hash, benutzer_id, erstellt_at, expires_at) VALUES \
+                 ('a', 1, '2026-10-01 08:00:00', '2026-10-08 08:00:00'), \
+                 ('b', 1, '2026-10-02 09:00:00', '2026-10-09 09:00:00'), \
+                 ('c', 2, '2026-10-03 10:00:00', '2026-10-10 10:00:00');",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::raw_sql(MIGRATION_0168).execute(&pool).await.unwrap();
+
+        let zeilen: Vec<(
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            Option<String>,
+        )> = sqlx::query_as(
+            "SELECT token_hash, kennung, zuletzt_gesehen_at, erstellt_at, geraet \
+                 FROM session ORDER BY token_hash",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let mut kennungen = std::collections::HashSet::new();
+        for (_, kennung, zuletzt, erstellt, geraet) in &zeilen {
+            let kennung = kennung
+                .as_deref()
+                .expect("jede Bestandssitzung hat eine Kennung");
+            assert_eq!(kennung.len(), 32, "128 Bit als Hex");
+            assert!(kennung
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+            assert!(
+                kennungen.insert(kennung.to_string()),
+                "Kennungen sind verschieden"
+            );
+            assert_eq!(zuletzt.as_deref(), Some(erstellt.as_str()));
+            assert_eq!(geraet, &None, "das Gerät des Bestands ist unbekannt");
+        }
+        assert_eq!(zeilen.len(), 3);
+        assert!(
+            sqlx::query("UPDATE session SET kennung = (SELECT kennung FROM session WHERE token_hash = 'a') WHERE token_hash = 'b'")
+                .execute(&pool)
+                .await
+                .is_err(),
+            "die Kennung ist eindeutig"
+        );
+    }
+
+    #[tokio::test]
+    async fn migration_0169_auth_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = minimal_pool_mit_benutzer().await;
+        sqlx::raw_sql(include_str!("../migrations/0091_auth_audit.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(MIGRATION_0143).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO auth_audit (zeitpunkt, ereignis, benutzername, benutzer_id, peer_ip, provider) \
+             VALUES ('2026-10-02 10:00:00', 'login_ok', 'admin', 1, '10.0.0.1', 'oidc'), \
+                    ('2026-10-02 10:01:00', 'passwort_geaendert', 'admin', 1, NULL, 'passwort'), \
+                    ('2026-10-02 10:02:00', 'logout', 'admin', 1, NULL, 'passwort')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM auth_audit WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let schema_vorher = schema_von(&pool, "auth_audit").await;
+        let ddl_vorher = ddl_ohne_namen(&pool, "auth_audit").await;
+        type Zeile = (
+            i64,
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+            Option<String>,
+            String,
+        );
+        let alle = "SELECT id, zeitpunkt, ereignis, benutzername, benutzer_id, peer_ip, provider \
+                    FROM auth_audit ORDER BY id";
+        let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+
+        assert!(MIGRATION_0169.starts_with("-- no-transaction"));
+        sqlx::raw_sql(MIGRATION_0169).execute(&pool).await.unwrap();
+
+        let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(zeilen_nachher, zeilen_vorher);
+        assert_eq!(schema_von(&pool, "auth_audit").await, schema_vorher);
+        assert_eq!(
+            ddl_ohne_namen(&pool, "auth_audit")
+                .await
+                .replacen(", 'sitzung_beendet'", "", 1),
+            ddl_vorher,
+            "die DDL unterscheidet sich ausschließlich im ereignis-CHECK"
+        );
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO auth_audit (ereignis, benutzername, benutzer_id, provider) \
+             VALUES ('sitzung_beendet', 'admin', 1, 'passwort') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("der neue CHECK nimmt sitzung_beendet");
+        assert_eq!(neue_id, 4, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        assert!(sqlx::query(
+            "INSERT INTO auth_audit (ereignis, provider) VALUES ('foo', 'passwort')"
+        )
+        .execute(&pool)
+        .await
+        .is_err());
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'auth_audit_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'auth_audit_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+    }
+
+    #[tokio::test]
+    async fn migration_0170_admin_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = minimal_pool_mit_benutzer().await;
+        sqlx::raw_sql(include_str!("../migrations/0156_admin_audit.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO admin_audit (zeitpunkt, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip) \
+             VALUES ('2026-10-02 10:00:00', 'benutzer_angelegt', 1, 'admin', 2, 'max', 'keiner', '10.0.0.1'), \
+                    ('2026-10-02 10:01:00', 'anmeldeweg_deaktiviert', 1, 'admin', NULL, 'oidc', NULL, NULL), \
+                    ('2026-10-02 10:02:00', 'benutzer_deaktiviert', 1, 'admin', 2, 'max', NULL, NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM admin_audit WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let schema_vorher = schema_von(&pool, "admin_audit").await;
+        let ddl_vorher = ddl_ohne_namen(&pool, "admin_audit").await;
+        type Zeile = (
+            i64,
+            String,
+            String,
+            Option<i64>,
+            Option<String>,
+            Option<i64>,
+            String,
+            Option<String>,
+            Option<String>,
+        );
+        let alle = "SELECT id, zeitpunkt, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, \
+                    detail, peer_ip FROM admin_audit ORDER BY id";
+        let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+
+        assert!(MIGRATION_0170.starts_with("-- no-transaction"));
+        sqlx::raw_sql(MIGRATION_0170).execute(&pool).await.unwrap();
+
+        let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(zeilen_nachher, zeilen_vorher);
+        assert_eq!(schema_von(&pool, "admin_audit").await, schema_vorher);
+        assert_eq!(
+            ddl_ohne_namen(&pool, "admin_audit")
+                .await
+                .replacen(", 'sitzung_beendet'", "", 1),
+            ddl_vorher,
+            "die DDL unterscheidet sich ausschließlich im aktion-CHECK"
+        );
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO admin_audit (aktion, akteur_id, ziel_benutzer_id, ziel) \
+             VALUES ('sitzung_beendet', 1, 2, 'max') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("der neue CHECK nimmt sitzung_beendet");
+        assert_eq!(neue_id, 4, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        assert!(
+            sqlx::query("INSERT INTO admin_audit (aktion, ziel) VALUES ('foo', 'x')")
+                .execute(&pool)
+                .await
+                .is_err()
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'admin_audit_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'admin_audit_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+    }
+
     /// 0115 übernimmt nur Bestandsnummern im exakten Muster `JJJJ-NNN` in die Zahlenspalten. Gegen
     /// die echte Migration auf einem Minimal-Schema: `2026-01` neben `2026-001` ergäbe sonst
     /// dasselbe Zahlenpaar und spränge den Unique-Index mitten in der Migration.

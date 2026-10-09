@@ -1,4 +1,4 @@
-import { Button, Collapse, Flex, Form, Input, Space } from 'antd';
+import { Button, Collapse, Flex, Form, Input, Modal, Space } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -24,6 +24,8 @@ import {
   type PatchBenutzer,
 } from '../api/benutzer';
 import { useAuth } from '../auth/AuthContext';
+import SitzungsListe from '../auth/SitzungsListe';
+import { beendeAlleSitzungenVon, beendeSitzungVon, ladeSitzungenVon } from '../api/sitzungen';
 import { globalKeys } from '../api/queryKeys';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { EIGENES_KONTO, LETZTER_ADMIN } from '../stammdaten/rechteText';
@@ -50,6 +52,8 @@ export default function BenutzerPage() {
   const [form] = Form.useForm<NeuerBenutzer>();
   const [zuBearbeiten, setZuBearbeiten] = useState<BenutzerAnzeige | null>(null);
   const [editForm] = Form.useForm<BearbeitenWerte>();
+  // Die Anmeldungen einer Person (LFH-1092), im Dialog außerhalb der Zeilen.
+  const [anmeldungenVon, setAnmeldungenVon] = useState<BenutzerAnzeige | null>(null);
   const { istSchmal } = useViewport();
 
   const benutzerQuery = useQuery({
@@ -208,7 +212,7 @@ export default function BenutzerPage() {
       title: 'Aktionen',
       key: 'aktionen',
       // Unter `md` nur der Menüauslöser: Steuerhöhe plus Zellpolster.
-      width: istSchmal ? 80 : 256,
+      width: istSchmal ? 80 : 376,
       immerSichtbar: true,
       fixed: 'right',
       render: (_, b) => {
@@ -222,6 +226,7 @@ export default function BenutzerPage() {
             <MenueAusloeser
               eintraege={[
                 { key: 'bearbeiten', label: 'Bearbeiten' },
+                ...(b.aktiv ? [{ key: 'anmeldungen', label: 'Anmeldungen' }] : []),
                 b.aktiv
                   ? grund
                     ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
@@ -240,6 +245,7 @@ export default function BenutzerPage() {
               }
               onWahl={(aktion) => {
                 if (aktion === 'bearbeiten') onBearbeiten();
+                else if (aktion === 'anmeldungen') setAnmeldungenVon(b);
                 else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
                 else zeilenAktion('reaktivieren', b.id);
               }}
@@ -253,6 +259,7 @@ export default function BenutzerPage() {
             deaktiviert={deaktivieren.isPending && deaktivieren.variables === b.id}
             reaktiviert={reaktivieren.isPending && reaktivieren.variables === b.id}
             onBearbeiten={onBearbeiten}
+            onAnmeldungen={() => setAnmeldungenVon(b)}
             onDeaktivieren={() => zeilenAktion('deaktivieren', b.id)}
             onReaktivieren={() => zeilenAktion('reaktivieren', b.id)}
           />
@@ -430,6 +437,29 @@ export default function BenutzerPage() {
         {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}
         <SpeicherFehler fehler={bearbeiten.error} />
       </ErfassungsModal>
+
+      <Modal
+        open={anmeldungenVon !== null}
+        title={anmeldungenVon ? `Anmeldungen · ${anmeldungenVon.anzeigename}` : 'Anmeldungen'}
+        onCancel={() => setAnmeldungenVon(null)}
+        footer={<Button onClick={() => setAnmeldungenVon(null)}>Schließen</Button>}
+        destroyOnHidden
+      >
+        {anmeldungenVon && (
+          <SitzungsListe
+            titel={`Anmeldungen von ${anmeldungenVon.anzeigename}`}
+            queryKey={globalKeys.sitzungenVon(anmeldungenVon.id)}
+            laden={() => ladeSitzungenVon(anmeldungenVon.id)}
+            beendeEine={(kennung) => beendeSitzungVon(anmeldungenVon.id, kennung)}
+            beendeAlle={() => beendeAlleSitzungenVon(anmeldungenVon.id)}
+            alleText={
+              anmeldungenVon.id === angemeldeterBenutzer?.id
+                ? 'Alle anderen beenden'
+                : 'Alle beenden'
+            }
+          />
+        )}
+      </Modal>
     </AdminPage>
   );
 }
@@ -444,6 +474,7 @@ function BenutzerAktionen({
   deaktiviert,
   reaktiviert,
   onBearbeiten,
+  onAnmeldungen,
   onDeaktivieren,
   onReaktivieren,
 }: {
@@ -452,6 +483,7 @@ function BenutzerAktionen({
   deaktiviert: boolean;
   reaktiviert: boolean;
   onBearbeiten: () => void;
+  onAnmeldungen: () => void;
   onDeaktivieren: () => void;
   onReaktivieren: () => void;
 }) {
@@ -461,6 +493,8 @@ function BenutzerAktionen({
     <Flex vertical gap={token.marginXXS} align="flex-start">
       <Space size="middle">
         <Button onClick={onBearbeiten}>Bearbeiten</Button>
+        {/* Öffnet nur die Liste; ein deaktiviertes Konto hat keine Anmeldungen. */}
+        {b.aktiv && <Button onClick={onAnmeldungen}>Anmeldungen</Button>}
         {b.aktiv ? (
           // KEINE Rückfrage (LFH-966, Linie aus LFH-363 wie „Außer Dienst“ in
           // `stammdaten/dienststatus.tsx`): Deaktivieren ist über „Reaktivieren“ umkehrbar.

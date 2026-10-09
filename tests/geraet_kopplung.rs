@@ -1239,6 +1239,32 @@ async fn geraet_erreicht_nur_gelistete_routen_seines_einsatzes() {
     assert_eq!(s, StatusCode::NOT_FOUND, "anderer Einsatz");
 }
 
+/// LFH-1072: der Kachel-Proxy verlangt eine Sitzung; jedes gekoppelte Gerät besteht sie, gleich
+/// welche Ansicht. Die Kachel außerhalb des Rasters ist 204 ohne Abruf, die unbekannte Quelle 404.
+#[tokio::test]
+async fn geraet_erreicht_den_kachel_proxy() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let (_, uhs_tablet) = tablet(&app, &admin, einsatz, uhs).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+
+    for geraet in [&uhs_tablet, &monitor] {
+        let (s, _) = anfrage(
+            &app,
+            "GET",
+            "/api/karte/proxy/999/raster/64/0/0",
+            geraet,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT);
+        let (s, _) = anfrage(&app, "GET", "/api/karte/proxy/999/style.json", geraet, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND);
+    }
+}
+
 #[tokio::test]
 async fn modulfreigaben_des_geraets_folgen_der_ansicht() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

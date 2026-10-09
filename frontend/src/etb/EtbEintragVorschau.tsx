@@ -8,6 +8,7 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbNummerAbfrage } from '../command-palette/datensatzAbfrage';
 import { VORSCHAU_UNTER_EBENE, VorschauZustand } from '../command-palette/VorschauZustand';
 import Markdown from '../components/Markdown';
+import Fundstellen from '../components/Fundstellen';
 import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbAnhaenge from './EtbAnhaenge';
@@ -52,16 +53,19 @@ export default function EtbEintragVorschau({
   einsatzId,
   id,
   lfdNr,
+  fundstellen,
 }: {
   einsatzId: number;
   id: number;
   lfdNr: number;
+  /** Begriff der Volltextsuche, dessen Fundstellen markiert werden (LFH-1056). */
+  fundstellen?: string;
 }) {
   const select = useCallback((liste: EtbEintragAnzeige[]) => liste.find((e) => e.id === id), [id]);
   const abfrage = useQuery({ ...etbNummerAbfrage(einsatzId, lfdNr), select });
   return (
     <VorschauZustand abfrage={abfrage} sorte="Der ETB-Eintrag">
-      {(e) => <EintragInhalt einsatzId={einsatzId} eintrag={e} />}
+      {(e) => <EintragInhalt einsatzId={einsatzId} eintrag={e} fundstellen={fundstellen} />}
     </VorschauZustand>
   );
 }
@@ -69,15 +73,23 @@ export default function EtbEintragVorschau({
 function EintragInhalt({
   einsatzId,
   eintrag: e,
+  fundstellen,
 }: {
   einsatzId: number;
   eintrag: EtbEintragAnzeige;
+  fundstellen?: string;
 }) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const darfOriginal = useDarfOriginalLaden(einsatzId);
   const farbe = etbTypFarbe(e.typ, token);
-  const vonAn = e.von || e.an ? `${e.von || '—'} → ${e.an || '—'}` : null;
+  const vonAn =
+    e.von || e.an ? (
+      <>
+        <Fundstellen text={e.von || '—'} begriff={fundstellen} /> →{' '}
+        <Fundstellen text={e.an || '—'} begriff={fundstellen} />
+      </>
+    ) : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
@@ -112,7 +124,11 @@ function EintragInhalt({
         </Datenfeld>
         {vonAn && <Datenfeld label="Von → An">{vonAn}</Datenfeld>}
         {e.meldeweg && <Datenfeld label="Meldeweg">{MELDEWEG_LABEL[e.meldeweg]}</Datenfeld>}
-        {e.veranlassung && <Datenfeld label="Veranlassung">{e.veranlassung}</Datenfeld>}
+        {e.veranlassung && (
+          <Datenfeld label="Veranlassung">
+            <Fundstellen text={e.veranlassung} begriff={fundstellen} />
+          </Datenfeld>
+        )}
         <Datenfeld label="Verfasser">{verfasserText(e)}</Datenfeld>
         {(e.berichtigt_eintrag_id != null || e.berichtigt_durch.length > 0) && (
           <Datenfeld label="Berichtigung" breit>
@@ -152,7 +168,7 @@ function EintragInhalt({
           </Datenfeld>
         )}
       </Datenraster>
-      <Markdown variante="kompakt" unterEbene={VORSCHAU_UNTER_EBENE}>
+      <Markdown variante="kompakt" unterEbene={VORSCHAU_UNTER_EBENE} fundstellen={fundstellen}>
         {e.inhalt}
       </Markdown>
       {/* Rendert nichts ohne Verknüpfung. */}

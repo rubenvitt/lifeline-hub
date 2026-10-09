@@ -399,3 +399,117 @@ describe('Erfassungsquittung nur mit Kennungen (LFH-941, design.md D6)', () => {
     });
   });
 });
+
+describe('Abgelehnte Einträge befristet (LFH-1093)', () => {
+  const TAG_MS = 24 * 60 * 60 * 1000;
+  const vor = (tage: number) => new Date(Date.now() - tage * TAG_MS).toISOString();
+
+  it('räumt beim Öffnen Ablehnungen älter als 30 Tage, ausstehende jeden Alters bleiben', async () => {
+    await queueLeerenFuerTests();
+    const roh = await openDB('lifeline-offline');
+    const person = {
+      art: 'person',
+      daten: { name: 'Muster', status: 'erfasst', client_id: 'p-alt' },
+    };
+    await roh.add('abgelehnt', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      eintrag: { ...eintrag, client_id: 'etb-alt' },
+      erstellt_at: vor(40),
+      grund: 'x',
+      abgelehnt_at: vor(31),
+    });
+    await roh.add('abgelehnt', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      eintrag: { ...eintrag, client_id: 'etb-jung' },
+      // Lange ausstehend, aber erst kürzlich abgelehnt: zählt ab der Ablehnung.
+      erstellt_at: vor(60),
+      grund: 'x',
+      abgelehnt_at: vor(29),
+    });
+    await roh.add('schreibaktionenAbgelehnt', {
+      benutzer_id: BENUTZER_B,
+      einsatz_id: 8,
+      aktion: person,
+      erstellt_at: vor(32),
+      grund: 'x',
+      abgelehnt_at: vor(31),
+    });
+    // Altbestand vor v4 ohne Benutzerbindung fällt ebenso unter die Frist.
+    await roh.add('schreibaktionenAbgelehnt', {
+      einsatz_id: 8,
+      aktion: person,
+      erstellt_at: vor(50),
+      grund: 'x',
+      abgelehnt_at: vor(45),
+    });
+    await roh.add('schreibaktionenAbgelehnt', {
+      benutzer_id: BENUTZER_B,
+      einsatz_id: 8,
+      aktion: { ...person, daten: { ...person.daten, client_id: 'p-jung' } },
+      erstellt_at: vor(2),
+      grund: 'x',
+      abgelehnt_at: vor(1),
+    });
+    await roh.add('ausstehend', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      eintrag: { ...eintrag, client_id: 'etb-offen' },
+      erstellt_at: vor(90),
+    });
+    await roh.add('schreibaktionen', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      aktion: { art: 'meldung', daten: { inhalt: 'offen' } },
+      erstellt_at: vor(90),
+    });
+    roh.close();
+
+    queueDbZuruecksetzenFuerTests();
+    await queueNichtZugeordnetZaehlen();
+
+    const clientIds = (zeilen: unknown[]) =>
+      zeilen.map((z) => {
+        const zeile = z as {
+          eintrag?: { client_id?: string };
+          aktion?: { daten: { client_id?: string; inhalt?: string } };
+        };
+        return (
+          zeile.eintrag?.client_id ?? zeile.aktion?.daten.client_id ?? zeile.aktion?.daten.inhalt
+        );
+      });
+    expect(clientIds(await rohLesen('lifeline-offline', 'abgelehnt'))).toEqual(['etb-jung']);
+    expect(clientIds(await rohLesen('lifeline-offline', 'schreibaktionenAbgelehnt'))).toEqual([
+      'p-jung',
+    ]);
+    expect(clientIds(await rohLesen('lifeline-offline', 'ausstehend'))).toEqual(['etb-offen']);
+    expect(clientIds(await rohLesen('lifeline-offline', 'schreibaktionen'))).toEqual(['offen']);
+  });
+
+  it('meldet eine Queue-Änderung nur, wenn etwas geräumt wurde', async () => {
+    await queueLeerenFuerTests();
+    const roh = await openDB('lifeline-offline');
+    await roh.add('abgelehnt', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      eintrag,
+      erstellt_at: vor(40),
+      grund: 'x',
+      abgelehnt_at: vor(31),
+    });
+    roh.close();
+    const gehoert = vi.fn();
+    window.addEventListener('lfh:offline-queue-geaendert', gehoert);
+    try {
+      queueDbZuruecksetzenFuerTests();
+      await queueNichtZugeordnetZaehlen();
+      expect(gehoert).toHaveBeenCalledTimes(1);
+      queueDbZuruecksetzenFuerTests();
+      await queueNichtZugeordnetZaehlen();
+      expect(gehoert).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener('lfh:offline-queue-geaendert', gehoert);
+    }
+  });
+});

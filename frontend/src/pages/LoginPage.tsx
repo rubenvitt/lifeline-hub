@@ -2,6 +2,7 @@ import { IconAnmelden, IconGlobus, IconSchluessel } from '../icons';
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { hilfePfad } from '../routing/deeplinks';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError, fehlerText } from '../api/client';
 import OtpEingabe from '../components/OtpEingabe';
@@ -479,6 +480,15 @@ export default function LoginPage() {
             )}
           </>
         )}
+        {/* Hilfe (LFH-1096): das Kapitel zum Anmelden, ohne Sitzung lesbar. */}
+        <Button
+          type="link"
+          block
+          className="login-hilfe"
+          onClick={() => void navigate(hilfePfad({ kapitel: 'anmelden-abmelden' }))}
+        >
+          Hilfe
+        </Button>
       </div>
     </div>
   );

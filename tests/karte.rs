@@ -1995,11 +1995,96 @@ async fn insert_proxy_quelle(
         .execute(pool).await.unwrap();
 }
 
+/// Bootstrappt Org + Admin auf `pool` und liefert (Router, Session-Cookie): die Proxy-Routen
+/// verlangen eine Sitzung (LFH-1072).
+async fn proxy_app(pool: sqlx::SqlitePool) -> (axum::Router, String) {
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let app = app_mit_pool(pool);
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    (app, cookie)
+}
+
+/// LFH-1072: ohne Sitzung endet jede Proxy-Route mit 401, bevor Quelle, Slot oder Koordinate
+/// geprüft werden. Quellen und Slots zeigen auf interne Adressen: erreichte eine Anfrage den
+/// Abruf, endete sie am SSRF-Gate mit 500. Unbekannte Quelle und Kachel außerhalb des Rasters
+/// verraten ohne Sitzung nichts (kein 404, kein 204).
+#[tokio::test]
+async fn proxy_ohne_sitzung_ist_401_ohne_abruf() {
+    let pool = pool().await;
+    insert_proxy_quelle(
+        &pool,
+        "R",
+        "https://127.0.0.1/{z}/{x}/{y}.png?key=K",
+        "raster",
+        1,
+        1,
+        0,
+    )
+    .await; // id 1
+    insert_proxy_quelle(
+        &pool,
+        "V",
+        "https://127.0.0.1/s.json?key=K",
+        "vektor",
+        1,
+        1,
+        1,
+    )
+    .await; // id 2
+    for (url, art) in [
+        ("https://127.0.0.1/{z}/{x}/{y}.pbf", "template"), // slot 1
+        ("https://127.0.0.1/tiles.json", "tilejson"),      // slot 2
+        ("https://127.0.0.1/sprite", "sprite"),            // slot 3
+        ("https://127.0.0.1/{fontstack}/{range}.pbf", "glyphs"), // slot 4
+    ] {
+        sqlx::query(
+            "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (2, ?, ?)",
+        )
+        .bind(url)
+        .bind(art)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let (app, cookie) = proxy_app(pool).await;
+
+    let pfade = [
+        "/api/karte/proxy/2/style.json",
+        "/api/karte/proxy/1/raster/3/7/7",
+        "/api/karte/proxy/2/tile/1/3/7/7",
+        "/api/karte/proxy/2/tilejson/2",
+        "/api/karte/proxy/2/sprite/3.json",
+        "/api/karte/proxy/2/glyphs/4/Arial/0-255",
+    ];
+    for pfad in pfade.iter().chain(&[
+        "/api/karte/proxy/999/style.json",
+        "/api/karte/proxy/1/raster/64/0/0",
+    ]) {
+        let res = anfrage(&app, "GET", pfad, None, None).await;
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "{pfad}");
+    }
+
+    // Gegenprobe: mit Sitzung erreicht jede Route den Abruf und endet am SSRF-Gate.
+    for pfad in pfade {
+        let res = anfrage(&app, "GET", pfad, Some(&cookie), None).await;
+        assert!(res.status().is_server_error(), "{pfad}: {}", res.status());
+    }
+}
+
 #[tokio::test]
 async fn proxy_style_unbekannte_id_ist_404() {
-    let app = app_mit_pool(pool().await);
+    let (app, cookie) = proxy_app(pool().await).await;
     // Route ist registriert → Handler-404 (JSON), nicht der SPA-HTML-Fallback.
-    let res = anfrage(&app, "GET", "/api/karte/proxy/999/style.json", None, None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/999/style.json",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
     assert_eq!(
         res.headers().get(header::CONTENT_TYPE).unwrap(),
@@ -2021,13 +2106,13 @@ async fn proxy_style_proxy0_oder_inaktiv_ist_404() {
         1,
     )
     .await; // id 2: inaktiv
-    let app = app_mit_pool(pool);
+    let (app, cookie) = proxy_app(pool).await;
     for id in [1, 2] {
         let res = anfrage(
             &app,
             "GET",
             &format!("/api/karte/proxy/{id}/style.json"),
-            None,
+            Some(&cookie),
             None,
         )
         .await;
@@ -2053,8 +2138,15 @@ async fn proxy_style_interne_gespeicherte_url_ist_fehler() {
         0,
     )
     .await;
-    let app = app_mit_pool(pool);
-    let res = anfrage(&app, "GET", "/api/karte/proxy/1/style.json", None, None).await;
+    let (app, cookie) = proxy_app(pool).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/1/style.json",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert!(
         res.status().is_server_error(),
         "SSRF-Gate vor Connect: {}",
@@ -2070,12 +2162,26 @@ async fn proxy_tile_art_mismatch_und_fremde_quelle_404() {
                                                                                          // Sprite-Slot (id 1) für quelle 1.
     sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
         .execute(&pool).await.unwrap();
-    let app = app_mit_pool(pool);
+    let (app, cookie) = proxy_app(pool).await;
     // Slot 1 ist 'sprite' → als Tile angefragt → 404 (art-Mismatch).
-    let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/1/tile/1/1/1/1",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND, "art-Mismatch");
     // Slot 1 gehört quelle 1; unter quelle 2 angefragt → 404 (cross-quelle).
-    let res = anfrage(&app, "GET", "/api/karte/proxy/2/tile/1/1/1/1", None, None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/2/tile/1/1/1/1",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND, "fremde quelle");
 }
 
@@ -2092,8 +2198,15 @@ async fn proxy_raster_nicht_numerisches_z_ist_400() {
         0,
     )
     .await;
-    let app = app_mit_pool(pool);
-    let res = anfrage(&app, "GET", "/api/karte/proxy/1/raster/abc/1/1", None, None).await;
+    let (app, cookie) = proxy_app(pool).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/1/raster/abc/1/1",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(
         res.status(),
         StatusCode::BAD_REQUEST,
@@ -2120,7 +2233,7 @@ async fn proxy_kachel_ausserhalb_des_rasters_ist_204_ohne_abruf() {
     insert_proxy_quelle(&pool, "V", "https://x/s.json?key=K", "vektor", 1, 1, 1).await; // id 2
     sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (2, 'https://127.0.0.1/{z}/{x}/{-y}.pbf', 'template')")
         .execute(&pool).await.unwrap(); // slot 1
-    let app = app_mit_pool(pool);
+    let (app, cookie) = proxy_app(pool).await;
 
     for pfad in [
         "/api/karte/proxy/1/raster/64/0/0",
@@ -2136,14 +2249,28 @@ async fn proxy_kachel_ausserhalb_des_rasters_ist_204_ohne_abruf() {
         // Auch vor der Quellenprüfung: eine unbekannte Quelle liefert hier kein 404.
         "/api/karte/proxy/999/raster/64/0/0",
     ] {
-        let res = anfrage(&app, "GET", pfad, None, None).await;
+        let res = anfrage(&app, "GET", pfad, Some(&cookie), None).await;
         assert_eq!(res.status(), StatusCode::NO_CONTENT, "{pfad}");
     }
 
     // Gegenprobe: eine gültige Kachel erreicht den Abruf und endet am SSRF-Gate.
-    let res = anfrage(&app, "GET", "/api/karte/proxy/1/raster/3/7/7", None, None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/1/raster/3/7/7",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert!(res.status().is_server_error(), "{}", res.status());
-    let res = anfrage(&app, "GET", "/api/karte/proxy/2/tile/1/3/7/7", None, None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/2/tile/1/3/7/7",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert!(res.status().is_server_error(), "{}", res.status());
 }
 
@@ -2151,13 +2278,13 @@ async fn proxy_kachel_ausserhalb_des_rasters_ist_204_ohne_abruf() {
 async fn proxy_glyphs_ungueltiger_range_ist_400() {
     let pool = pool().await;
     insert_proxy_quelle(&pool, "G", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
-    let app = app_mit_pool(pool);
+    let (app, cookie) = proxy_app(pool).await;
     // range ohne Bindestrich → validiere_range schlägt fehl (vor slot_aufloesen) → 400.
     let res = anfrage(
         &app,
         "GET",
         "/api/karte/proxy/1/glyphs/1/Arial/0_255",
-        None,
+        Some(&cookie),
         None,
     )
     .await;
@@ -2229,8 +2356,15 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     // Ein (z.B. von kompromittiertem Upstream eingeschleuster) Slot zeigt auf eine interne Adresse.
     sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://169.254.169.254/{z}/{x}/{y}', 'template')")
         .execute(&pool).await.unwrap();
-    let app = app_mit_pool(pool);
-    let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
+    let (app, cookie) = proxy_app(pool).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/1/tile/1/1/1/1",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert!(
         res.status().is_server_error(),
         "SSRF-Gate blockt internen Slot: {}",

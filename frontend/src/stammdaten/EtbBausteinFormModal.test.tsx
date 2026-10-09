@@ -82,6 +82,30 @@ describe('EtbBausteinFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
+   * Eine Ablehnung nennt ihren Grund IM Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“); Dialog und Wortlaut bleiben stehen.
+   */
+  it('nennt bei einer Ablehnung (422) den Grund im Dialog und behält den Wortlaut', async () => {
+    server.use(
+      http.patch('/api/etb-bausteine/2', () =>
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
+      ),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness bestand={baustein} />);
+
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByLabelText('Label');
+    await nutzer.clear(feld);
+    await nutzer.type(feld, 'Lage stabil');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Label bereits vergeben');
+    expect(within(dialog).getByLabelText('Label')).toHaveValue('Lage stabil');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  /**
    * Die Vorgabewerte (`typ: 'meldung'`, `sortier: 0`) stehen als `initialValues` an der Hülle —
    * von dort holt sie jedes `resetFields` wieder. Beleg ist der Weg über einen bearbeiteten
    * Datensatz: ohne `initialValues` stünde hier dessen Sortierung 7.

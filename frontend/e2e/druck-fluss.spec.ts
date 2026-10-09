@@ -1,5 +1,6 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { pdfAuszug, pngMitMassen, type PdfSeite } from './pdf-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Druck im normalen Fluss: ein Druckstück (Lagebericht lesend und im Entwurf, Befehl) steht
@@ -48,18 +49,6 @@ async function anmelden(page: Page) {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  // Erst klicken, wenn der Dialog steht: unter Last (170+ Kacheln, WebKit) fiel der Klick auf
-  // „Anlegen" mitten in den Zoom und erreichte den Knopf nie — kein POST, Dialog blieb offen.
-  await expect(page.getByRole('dialog', { name: 'Neuen Einsatz anlegen' })).toBeVisible();
-  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 /**
@@ -532,10 +521,13 @@ test('Lagebericht mit Organisationslogo: Logo im Druckkopf, im PDF nur auf Seite
   expect(hoch.ok(), await hoch.text()).toBe(true);
   const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Logo ${Date.now()}`);
   const id = await lageberichtSaeen(page, einsatzId, true);
-  await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
   await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
+  // Ab `md` steht Drucken als Knopf im Kopf, darunter hinter „Weitere“ (LFH-1079): die
+  // Vorbedingung „Organisation geladen“ deshalb vor dem Wechsel auf Papierbreite.
   await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled();
+  await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
 
   // Alle Engines: unter Druckmedium steht im Kopf ein GELADENES Bild mit den Maßen des Logos,
   // und es belegt Fläche (nicht `display: none`, nicht kaputt und weggefallen).

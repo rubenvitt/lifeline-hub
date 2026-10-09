@@ -201,6 +201,17 @@ export interface Nebenweg {
   ziel?: string;
   /** Läuft gerade (CSV-Abruf); zeigt sich am Knopf bzw. am Auslöser. */
   laeuft?: boolean;
+  /**
+   * Gerade nicht möglich (Zielmodul gesperrt, Organisation nicht geladen): gesperrter Knopf bzw.
+   * Eintrag. Den Grund trägt das `label` im sichtbaren Text (LFH-1079), ein `title` erscheint auf
+   * Touch nie.
+   */
+  gesperrt?: true;
+  /**
+   * Ein Sprung in ein anderes Modul (LFH-616): ab `md` trägt der Knopf „↗“ wie `SprungKnopf`. Im
+   * Menü bleibt das Zeichen weg, es stünde sonst im vorgelesenen Namen.
+   */
+  sprung?: true;
 }
 
 /** Nebenwege samt dem zugänglichen Namen des Auslösers „Weitere“ (nennt die Seite). */
@@ -227,7 +238,7 @@ function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
         eintraege={eintraege.map((e) =>
           e.laeuft
             ? { key: e.key, label: `${e.label} (läuft …)`, gesperrt: true as const }
-            : { key: e.key, label: e.label },
+            : { key: e.key, label: e.label, ...(e.gesperrt ? { gesperrt: e.gesperrt } : {}) },
         )}
         zugaenglicherName={name}
         onWahl={(key) => eintraege.find((e) => e.key === key)?.onWahl()}
@@ -239,7 +250,8 @@ function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
       {eintraege.map((e) => (
         <Button
           key={e.key}
-          href={e.ziel}
+          href={e.gesperrt ? undefined : e.ziel}
+          disabled={e.gesperrt}
           loading={e.laeuft}
           onClick={(ereignis) => {
             if (e.ziel != null) {
@@ -257,6 +269,7 @@ function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
           }}
         >
           {e.label}
+          {e.sprung && !e.gesperrt && <span aria-hidden="true"> ↗</span>}
         </Button>
       ))}
     </>
@@ -488,7 +501,10 @@ export default function EinsatzSeite({
           <div
             ref={aktionenRef}
             data-lfh="seitenkopf-aktionen"
-            style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginXS * 2 }}
+            // Zielabstand der Dichte-Staffel (LFH-968: `marginSM` = 7 / 11 / 16 px): ab `md` stehen
+            // Nebenwege hier als Geschwister nebeneinander, mit `marginXS * 2` fehlten im Handschuh
+            // 2 px zwischen zwei Knöpfen (LFH-1079).
+            style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}
           >
             {/* Unter `md` steht der Auslöser „Weitere“ VORN (LFH-963): hinten bräche er bei 390 px in
                 eine eigene Zeile und kostete die erste Personenzeile ihren Platz; vorn teilt er die

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
@@ -166,21 +166,47 @@ describe('FahrzeugFormModal — Hülle (LFH-346/A6)', () => {
   /**
    * Die Zusage muss BRECHEN, wenn der Server ablehnt — deshalb `mutateAsync`. Mit `mutate`
    * liefe die Hülle in ihren Erfolgszweig, leerte die Felder und schlösse den Dialog.
+   *
+   * Der Grund steht IM Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+   * Fehler“): ein Toast wäre nach drei Sekunden weg, der Dialog stünde unverändert da.
    */
-  it('behält bei einer Ablehnung (422) den Wortlaut und lässt den Dialog offen', async () => {
+  it('behält bei einer Ablehnung (422) den Wortlaut und nennt den Grund im Dialog', async () => {
     handler(() => {}, 422);
     const geschlossen = vi.fn();
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness onClose={geschlossen} />);
 
-    await nutzer.type(await screen.findByLabelText('Funkrufname'), 'Florian 1');
-    await nutzer.type(screen.getByLabelText('Kennzeichen'), 'XX-AB 1');
-    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 1');
+    await nutzer.type(within(dialog).getByLabelText('Kennzeichen'), 'XX-AB 1');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
-    await screen.findByText('Funkrufname bereits vergeben');
-    expect(screen.getByLabelText('Funkrufname')).toHaveValue('Florian 1');
-    expect(screen.getByLabelText('Kennzeichen')).toHaveValue('XX-AB 1');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Funkrufname bereits vergeben',
+    );
+    expect(within(dialog).getByLabelText('Funkrufname')).toHaveValue('Florian 1');
+    expect(within(dialog).getByLabelText('Kennzeichen')).toHaveValue('XX-AB 1');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     expect(geschlossen).not.toHaveBeenCalled();
+  });
+
+  it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
+    handler(() => {}, 422);
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 1');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
+    // ein, und jsdom beendet die Animation nie.
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(wieder).getByLabelText('Funkrufname')).toHaveValue(''));
+    expect(within(wieder).queryByRole('alert')).toBeNull();
   });
 
   it('Bearbeiten: die Vorbelegung steht — sie ist kein Reset und bleibt erhalten', async () => {

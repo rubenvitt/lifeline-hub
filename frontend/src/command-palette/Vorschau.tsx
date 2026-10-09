@@ -25,7 +25,14 @@ export function Vorschau({ ziel }: { ziel: VorschauZiel }) {
     case 'person':
       return <PersonVorschau einsatzId={einsatzId} personId={id} />;
     case 'etb':
-      return <EtbEintragVorschau einsatzId={einsatzId} id={id} lfdNr={ziel.lfdNr} />;
+      return (
+        <EtbEintragVorschau
+          einsatzId={einsatzId}
+          id={id}
+          lfdNr={ziel.lfdNr}
+          fundstellen={ziel.fundstellen}
+        />
+      );
     case 'meldung':
       return <MeldungVorschau einsatzId={einsatzId} id={id} />;
     case 'auftrag':

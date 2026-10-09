@@ -37,6 +37,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.benutzerEinstellungenVon(1)).not.toEqual(
       globalKeys.benutzerEinstellungenVon(2),
     );
+    // Sitzungen (LFH-1092): eigene und fremde unter EINEM Prefix, damit ein Beenden beide trifft.
+    expect(globalKeys.sitzungen()).toEqual(['sitzungen']);
+    expect(globalKeys.sitzungenEigene()).toEqual(['sitzungen', 'eigene']);
+    expect(globalKeys.sitzungenVon(7)).toEqual(['sitzungen', 'benutzer', 7]);
   });
 
   it('Stammdaten-Kataloge ohne Filter', () => {
@@ -102,10 +106,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 26 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 27 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(26);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(26);
+    expect(werte).toHaveLength(27);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(27);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

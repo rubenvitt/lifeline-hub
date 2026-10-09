@@ -141,9 +141,9 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
     // v5: Personen-Erfolgsquittungen. Jeder Store wird versionsgeguardet angelegt, sonst würfe
     // `createObjectStore` auf einer Bestands-DB.
     //
-    // Die Kürzung der Quittungen (LFH-941, design.md D6) läuft bewusst OHNE Versionssprung nach
-    // dem Öffnen: ein Tab mit altem Bundle hielte v5 offen, ein Upgrade hinge und mit ihm Queue,
-    // Abgleich und Anmeldung.
+    // Die Kürzung der Quittungen (LFH-941, design.md D6) und die Frist der Ablehnungen (LFH-1093)
+    // laufen bewusst OHNE Versionssprung nach dem Öffnen: ein Tab mit altem Bundle hielte v5
+    // offen, ein Upgrade hinge und mit ihm Queue, Abgleich und Anmeldung.
     const offen: Promise<IDBPDatabase<OfflineDB>> = openDB<OfflineDB>('lifeline-offline', 5, {
       upgrade(d, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
@@ -205,11 +205,41 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
       await quittungenKuerzen(d).catch((fehler: unknown) =>
         console.warn('Offline-Queue: Kürzen der Quittungen fehlgeschlagen', fehler),
       );
+      await ablehnungenBefristen(d, Date.now()).catch((fehler: unknown) =>
+        console.warn('Offline-Queue: Räumen alter Ablehnungen fehlgeschlagen', fehler),
+      );
       return d;
     });
     dbPromise = offen;
   }
   return dbPromise;
+}
+
+/** Höchstliegezeit eines abgelehnten Eintrags ab `abgelehnt_at` (LFH-1093, Spec `geraetedaten-raeumung`). */
+const ABGELEHNT_FRIST_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * LFH-1093: löscht in beiden Ablehnungs-Stores, was länger als die Frist
+ * abgelehnt ist, für jeden Benutzer und auch Altzeilen ohne Bindung. Gemessen an der Geräteuhr,
+ * die auch `abgelehnt_at` schreibt; eine Zeile ohne lesbaren Zeitpunkt bleibt. Die ausstehenden
+ * Stores fasst das nie an (Beweissicherung).
+ */
+async function ablehnungenBefristen(d: IDBPDatabase<OfflineDB>, jetzt: number): Promise<void> {
+  const grenze = jetzt - ABGELEHNT_FRIST_MS;
+  const tx = d.transaction(['abgelehnt', 'schreibaktionenAbgelehnt'], 'readwrite');
+  let geloescht = 0;
+  for (const name of ['abgelehnt', 'schreibaktionenAbgelehnt'] as const) {
+    let cursor = await tx.objectStore(name).openCursor();
+    while (cursor) {
+      if (Date.parse(cursor.value.abgelehnt_at) < grenze) {
+        await cursor.delete();
+        geloescht += 1;
+      }
+      cursor = await cursor.continue();
+    }
+  }
+  await tx.done;
+  if (geloescht > 0) meldeQueueAenderung();
 }
 
 type Bestandsquittung = Omit<PersonErfassungsQuittung, 'person_id' | 'registrier_nr'> & {

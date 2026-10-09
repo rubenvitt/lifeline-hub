@@ -62,6 +62,9 @@ Beim ersten Start entstehen Datenbank und Administrationskonto; das erzeugte Pas
 im Log. Alles Weitere — TLS, Anmeldeverfahren, Offline-Karten, Sicherung — steht in
 [docs/betrieb/packaging.md](docs/betrieb/packaging.md).
 
+Für die Menschen, die die App im Einsatz bedienen, gibt es die Anwenderdokumentation in
+[docs/anwender/](docs/anwender/README.md); dieselben Kapitel zeigt die App unter „Hilfe“.
+
 ## Entwickeln
 
 ```bash

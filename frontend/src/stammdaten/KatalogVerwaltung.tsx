@@ -7,7 +7,6 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useAuth } from '../auth/AuthContext';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
@@ -75,17 +74,13 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
   const invalidiere = () => qc.invalidateQueries({ queryKey });
 
   const query = useQuery({ queryKey, queryFn: liste });
-  const speicherFehler = useFehlerMeldung('Speichern fehlgeschlagen');
 
-  // Das Schliessen macht `onFertig`, das Leeren die Hülle.
-  //
-  // Der Toast BLEIBT hier (LFH-473, eigene Entscheidung für den Dialog): nach einer Ablehnung
-  // steht der Dialog offen und der Wortlaut in den Feldern, nichts wirkt gespeichert. Der
-  // Seiten-Slot läge hinter der Maske.
+  // Das Schliessen macht `onFertig`, das Leeren die Hülle. Kein `onError`-Toast: den Grund
+  // einer Ablehnung nennt die Hülle im Dialog (`speicherung`, `frontend/AGENTS.md`, „Rückwege
+  // und Fehler“, LFH-1077).
   const speichern = useMutation({
     mutationFn: ({ id, werte }: { id: number; werte: W }) => aktualisiere(id, werte),
     onSuccess: invalidiere,
-    onError: speicherFehler,
   });
 
   // KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
@@ -206,6 +201,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
         form={form}
         erfassenText="Speichern"
         laeuft={speichern.isPending}
+        speicherung={speichern}
         // `mutateAsync`: bei Ablehnung MUSS die Zusage brechen, sonst leert die Hülle die
         // Felder. Gelesen wird der ganze Formularspeicher, nicht die Werte aus `onFinish`:
         // eingeklappte, nie montierte Felder fehlten dort, und die Eingabe ist Vollersatz —

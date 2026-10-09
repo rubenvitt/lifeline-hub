@@ -10,10 +10,14 @@
 //!
 //! **Revokation = Snapshot:** die erlaubten Module werden einmal beim Verbindungsaufbau
 //! berechnet; ein Rechteentzug wirkt erst beim Reconnect. Den erzwingt die Lebensdauer jedes
-//! Stroms (LFH-920, [`crate::live::strom`]): das Restfenster nach einem Entzug von Sitzung oder
-//! Modulrecht ist höchstens `STROM_LEBENSDAUER + STROM_LEBENSDAUER_STREUUNG` (45 min). Es
+//! Stroms (LFH-920, [`crate::live::strom`]): das Restfenster nach einem Entzug eines
+//! Modulrechts ist höchstens `STROM_LEBENSDAUER + STROM_LEBENSDAUER_STREUUNG` (45 min). Es
 //! verrät nur Metadaten (alle Payloads tragen nur IDs), der Inhalts-GET antwortet sofort 403.
 //! Ein DB-Read je Event vervielfachte die Kosten bei Erfassungs-Bursts.
+//!
+//! **Das Ende der Sitzung selbst wirkt sofort** (LFH-1092, design.md D6): jeder Strom endet, sobald
+//! seine Sitzung gelöscht ist ([`crate::live::LiveHub::melde_sitzung_ende`]). Der Neuaufbau
+//! bekommt 401, und das Gerät räumt sein Lagebild, ohne dass dort jemand etwas bedient.
 //!
 //! **Zulassung:** beide Ströme stehen außerhalb der routerweiten Zulassung
 //! ([`crate::zulassung::OHNE_ZULASSUNGSGRENZE`]) und belegen stattdessen vor jeder weiteren
@@ -21,7 +25,7 @@
 //! insgesamt 503). Der Platz lebt im Strom.
 
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
+use crate::auth::session::{AktuelleSitzung, CurrentUser, SitzungKennung};
 use crate::einsatz::berechtigung::erlaubte_module;
 use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::error::AppError;
@@ -41,6 +45,7 @@ use tokio_stream::{Stream, StreamExt};
 pub async fn stream(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
+    AktuelleSitzung(sitzung): AktuelleSitzung,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
     // Erst der Platz, dann die Aufbauphase: ein abgewiesener Strom kostet keine Modulabfrage.
@@ -82,7 +87,14 @@ pub async fn stream(
     // erste Frame bleibt reiner Kommentar.
     let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")))
         .chain(tokio_stream::once(strom::retry_ereignis()));
-    let ende = kopplung_ende(&state, ctx.geraet.as_ref());
+    let kopplung = kopplung_ende(&state, ctx.geraet.as_ref());
+    let sitzung = sitzung_ende(&state, sitzung);
+    let ende = async move {
+        tokio::select! {
+            _ = kopplung => {}
+            _ = sitzung => {}
+        }
+    };
     let feed = futures::StreamExt::take_until(verbunden.chain(stream), ende);
 
     Ok(Sse::new(strom::begrenzt(
@@ -97,10 +109,52 @@ pub async fn stream(
 /// Einsatzabschluss). Widerruf und Gerätetausch wirken sofort über den Broadcast.
 const KOPPLUNG_PRUEFTAKT: std::time::Duration = std::time::Duration::from_secs(15);
 
+/// Endet, sobald die Sitzung des Stroms gelöscht ist (LFH-1092, design.md D6): sofort über
+/// [`crate::live::LiveHub::melde_sitzung_ende`]; verpasst der Empfänger Meldungen (`Lagged`),
+/// prüft er die Sitzung einmal in der Datenbank. Ohne Kennung (Bestand vor 0168 hat immer eine)
+/// endet nichts hier.
+fn sitzung_ende(
+    state: &AppState,
+    sitzung: Option<SitzungKennung>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+    let Some(SitzungKennung(kennung)) = sitzung else {
+        return Box::pin(std::future::pending());
+    };
+    // Vor dem ersten `await` abonniert: ein Beenden zwischen Anmeldeprüfung und Abo fängt die
+    // Prüfung nach `Lagged` nicht, wohl aber der Neuaufbau mit 401. Das Fenster ist der
+    // Aufbau dieses Stroms.
+    let mut rx = state.live.abonniere_sitzung_ende();
+    let pool = state.pool.clone();
+    Box::pin(async move {
+        loop {
+            match rx.recv().await {
+                Ok(beendet) if beendet == kennung => return,
+                Ok(_) => {}
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                    let lebt: Result<Option<i64>, _> =
+                        sqlx::query_scalar("SELECT 1 FROM session WHERE kennung = ?")
+                            .bind(&kennung)
+                            .fetch_optional(&pool)
+                            .await;
+                    if !matches!(lebt, Ok(Some(_))) {
+                        return;
+                    }
+                }
+                // Ohne Hub meldet niemand mehr ein Ende; der Strom endet dann mit seiner
+                // Lebensdauer (`live::strom`), nicht hier. Ein vorzeitiges Ende schlösse jeden
+                // Strom, dessen Router schon fallen gelassen ist (`oneshot` in den Tests).
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    std::future::pending::<()>().await
+                }
+            }
+        }
+    })
+}
+
 /// Endet, sobald die Kopplung einer Gerätesitzung beendet ist (LFH-892, design.md D7): sofort
 /// bei Widerruf und Gerätetausch über [`crate::live::LiveHub::melde_kopplung_ende`], sonst
-/// spätestens nach [`KOPPLUNG_PRUEFTAKT`]. Eine Personensitzung endet hier nie (Snapshot-Regel
-/// im Modulkopf bleibt).
+/// spätestens nach [`KOPPLUNG_PRUEFTAKT`]. Das Ende einer Personensitzung meldet
+/// [`sitzung_ende`].
 fn kopplung_ende(
     state: &AppState,
     geraet: Option<&crate::geraet::GeraetKontext>,
@@ -151,14 +205,16 @@ fn kopplung_ende(
 pub async fn org_stream(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
+    AktuelleSitzung(sitzung): AktuelleSitzung,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
     let platz = state.live.stroeme.belegen(benutzer.id)?;
     let rx = state.live.abonniere_org();
     let stream = crate::routes::support::sse_org_stream(rx, OrgAbonnent::aus(&benutzer));
     let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")))
         .chain(tokio_stream::once(strom::retry_ereignis()));
+    let ende = sitzung_ende(&state, sitzung);
     Ok(Sse::new(strom::begrenzt(
-        verbunden.chain(stream),
+        futures::StreamExt::take_until(verbunden.chain(stream), ende),
         platz,
         state.live.stroeme.lebensdauer(),
     ))

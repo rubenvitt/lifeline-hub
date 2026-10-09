@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 // Die Personen-Detailseite als Vollseiten-Route: Zwei-Spalten-Darstellung und Navigation
 // (jsdom rechnet kein Layout).
@@ -16,7 +17,7 @@ async function anmelden(page: Page) {
 
 async function einsatzAnlegenUndOeffnen(page: Page, name: string): Promise<number> {
   // Nach dem Anlegen navigiert die Seite direkt in den Einsatz-Workspace.
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(name);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

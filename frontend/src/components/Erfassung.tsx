@@ -11,6 +11,7 @@ import {
   type Ref,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import { SpeicherFehler } from './SpeicherHinweis';
 import { useViewport } from './useViewport';
 import './Erfassung.css';
 
@@ -171,8 +172,27 @@ interface ErfassungsFormularProps<T> {
    * sonst unsichtbar (LFH-974).
    */
   onPruefungGescheitert?: (fehlerFelder: string[]) => void;
+  /**
+   * Die Speicher-Mutation des Aufrufers (LFH-1077). Die Hülle zeigt ihren Fehler über der
+   * Aktionszeile, bis zum nächsten Absenden, und räumt ihn beim Einhängen und beim Abbrechen;
+   * ein Dialog öffnet so nie mit dem Grund der letzten Ablehnung. Kein `onError`-Toast
+   * (`frontend/AGENTS.md`, „Rückwege und Fehler“). Teilt sich eine Mutation mehrere Wege, reicht
+   * der Aufrufer nur den Fehler dieses Weges durch.
+   */
+  speicherung?: Speicherung;
+  /** Überschrift des Fehlers; Vorgabe „Nicht gespeichert“. */
+  speicherFehlerTitel?: string;
+  /** Text für einen Fehler ohne Servermeldung; Vorgabe „Speichern fehlgeschlagen“. */
+  speicherFehlerFallback?: string;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
+}
+
+/** Was die Hülle von einer Mutation braucht (`useMutation` erfüllt es). */
+export interface Speicherung {
+  error: unknown;
+  isPending: boolean;
+  reset: () => void;
 }
 
 /**
@@ -194,6 +214,9 @@ export function ErfassungsFormular<T extends object>({
   initialValues,
   steuerungRef,
   onPruefungGescheitert,
+  speicherung,
+  speicherFehlerTitel,
+  speicherFehlerFallback,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
@@ -224,6 +247,19 @@ export function ErfassungsFormular<T extends object>({
   useEffect(() => {
     fokussiereErstesFeld(wurzel.current);
   }, []);
+
+  // Ref, damit Einhängen und Abbrechen die AKTUELLE Mutation räumen, ohne dass ein neues
+  // Mutationsobjekt je Render den Effekt erneut auslöst.
+  const speicherungRef = useRef(speicherung);
+  speicherungRef.current = speicherung;
+  const raeumeSpeicherFehler = useCallback(() => {
+    const s = speicherungRef.current;
+    // Eine laufende Mutation bleibt unberührt: `reset()` hängte ihr Ergebnis ab.
+    if (s && !s.isPending && s.error != null) s.reset();
+  }, []);
+  useEffect(() => {
+    raeumeSpeicherFehler();
+  }, [raeumeSpeicherFehler]);
 
   useEffect(() => {
     if (fokusTick > 0) fokussiereErstesFeld(wurzel.current);
@@ -312,8 +348,9 @@ export function ErfassungsFormular<T extends object>({
     abbruchGenerationRef.current += 1;
     serienlaufRef.current = false;
     form.resetFields();
+    raeumeSpeicherFehler();
     onAbbrechen?.();
-  }, [form, onAbbrechen]);
+  }, [form, onAbbrechen, raeumeSpeicherFehler]);
 
   useImperativeHandle(steuerungRef, () => ({ abbrechen }), [abbrechen]);
 
@@ -345,6 +382,13 @@ export function ErfassungsFormular<T extends object>({
         }}
       >
         {children}
+        {speicherung && (
+          <SpeicherFehler
+            fehler={speicherung.error}
+            titel={speicherFehlerTitel}
+            fallback={speicherFehlerFallback}
+          />
+        )}
         <div
           style={{
             marginTop: token.margin,

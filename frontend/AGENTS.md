@@ -310,6 +310,9 @@ anwendbar), „nicht geprüft" ist keins.
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
   Modulbeschreibungen aus wenigen Fachwörtern.
+- **Erklärendes gehört in die Anwenderdokumentation** (`docs/anwender/`, in der App unter
+  „Hilfe“, LFH-1096): wer einen Erklärsatz entfernt, dessen Wissen sonst nirgends steht, schreibt
+  es dort ins Kapitel. Regeln: `docs/anwender/AGENTS.md`.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist seit LFH-1078 P7 leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
@@ -415,7 +418,10 @@ anwendbar), „nicht geprüft" ist keins.
   Öffnen-Wege stehen ab `md` als sekundäre Knöpfe, unter `md` hinter EINEM Auslöser „Weitere“
   (`MenueAusloeser`, Name nennt die Seite). In `aktionen` bleibt nur, was am Handy sichtbar sein
   muss: Segmentleiste und genau eine Erfassung, auf Betroffenen- und Tiere-Liste dazu „Vermisst
-  melden“. Nachgezogen sind Betroffene, Tiere, Schäden; die übrigen Seiten folgen im Folgeticket.
+  melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht,
+  Pressemitteilung, Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
+  `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
+  Kräfteübersicht, Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
   Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt
@@ -548,9 +554,17 @@ und `pages/personen/`.
 - **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`colorError` vor `colorWarning`; prüfbar
   über `data-alarm`/`data-unbearbeitet`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
   fünfte `KommPhase`.
-- **Speicherfehler an die Seite, Erfolg an den Toast:** `components/SpeicherHinweis.tsx`
-  (`SpeicherFehler`, `RechteHinweis`, `SeitenHinweise` für EINEN Slot); kein `onError`-Toast;
-  der Alert geht beim nächsten Absenden (mittesten).
+- **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
+  steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`
+  der Erfassungs-Hülle oder `SpeicherFehler` (Öffnen und Abbrechen räumen), am Formular oder
+  Paneel als `SpeicherFehler`, an der Zeile als `ZeilenFehler` (Grund je Zeile aus
+  `components/useZeilenFehler.ts`, gefüttert aus `onMutate`/`onError`, nicht aus
+  `mutation.variables`: die Mutation verfolgt nur den letzten Aufruf), Kopfaktionen und
+  Rückgängig aus dem Toast über `SeitenHinweise` (EIN Slot); die Anzeigen in
+  `components/SpeicherHinweis.tsx`. Kein `onError`-Toast: ein Fehler-Toast
+  bleibt nur ohne Ort (Zwischenablage, Hintergrund) und steht mit Grund in
+  `components/speicherfehler.guard.test.ts`. Ein Dialog schließt erst beim Erfolg; Prüfungen
+  ohne Server stehen am Feld.
 - **Gescheiterter Zustandsübergang meldet sich im Dialog** (LFH-535):
   `entwurf/FreigabeDialog.tsx`, kein `modal.confirm`; `freigabeGrund`, Vorrang Speicherfehler;
   Öffnen ruft `freigebenMutation.reset()`. Test zählt `.ant-message`, offen/zu über `ant-zoom-leave`.

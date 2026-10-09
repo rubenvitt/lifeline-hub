@@ -1,0 +1,56 @@
+---
+/**
+ * Ein Kapitel der Anwenderdokumentation (LFH-1096), gerendert aus `docs/anwender/kapitel/`.
+ *
+ * Kapitel verweisen relativ aufeinander (`[…](ohne-netz.md)`), damit sie auf GitHub tragen; hier
+ * werden daraus Adressen unter `/doku/`. Am gerenderten HTML statt per Remark-Plugin: Astro 7
+ * rendert Markdown mit Sätteri, Remark-Plugins bräuchten ein weiteres Paket. `set:html` ist
+ * sicher, weil die Kapitel kein HTML enthalten dürfen (Wächter
+ * `frontend/src/hilfe/anwenderdoku.guard.test.ts`) und aus dem Repo stammen.
+ */
+import { getCollection } from 'astro:content';
+import Grundriss from '../../layouts/Grundriss.astro';
+import { GRUPPEN } from '../../daten/gruppen';
+import '../../styles/doku.css';
+
+export async function getStaticPaths() {
+  const kapitel = (await getCollection('kapitel')).sort(
+    (a, b) => a.data.reihenfolge - b.data.reihenfolge,
+  );
+  return kapitel.map((eintrag) => ({ params: { kapitel: eintrag.id }, props: { eintrag, kapitel } }));
+}
+
+const { eintrag, kapitel } = Astro.props;
+const html = (eintrag.rendered?.html ?? '').replace(
+  /href="([a-z0-9-]+)\.md"/g,
+  (_m, name: string) => `href="/doku/${name}/"`,
+);
+const gruppen = GRUPPEN.filter((g) => eintrag.data.gruppen.includes(g.key)).map((g) => g.name);
+---
+
+<Grundriss
+  titel={`${eintrag.data.titel} · Anwenderdokumentation · Lifeline Hub`}
+  beschreibung={`Anwenderdokumentation Lifeline Hub: ${eintrag.data.titel}.`}
+>
+  <div class="abschnitt doku-kapitelseite">
+    <nav class="doku-navi" aria-label="Kapitel">
+      <a class="doku-navi__zurueck" href="/doku/">Alle Kapitel</a>
+      <ul class="doku-liste">
+        {
+          kapitel.map((k) => (
+            <li>
+              <a href={`/doku/${k.id}/`} aria-current={k.id === eintrag.id ? 'page' : undefined}>
+                {k.data.titel}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+    <article class="doku-text">
+      <p class="doku-gruppen-zeile mono">Für: {gruppen.join(' · ')}</p>
+      <h1 class="ueberschrift">{eintrag.data.titel}</h1>
+      <Fragment set:html={html} />
+    </article>
+  </div>
+</Grundriss>

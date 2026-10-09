@@ -212,9 +212,10 @@ Stand von SQLCipher zurück. Bewertung und Messung stehen im Ticket. Neu bewerte
 die Desktop-App eine eigene Datenbank bekommt, ein Betrieb ohne Datenträgerverschlüsselung
 unvermeidbar wird oder der Server ohne Konsole am Gerät entsperrt werden muss.
 
-Für die Geräte im Einsatz (Laptop, Tablet, Desktop-App) gilt dasselbe, siehe
-[desktop-app.md](desktop-app.md#daten-auf-dem-gerät). Sicherungen, die das Gerät verlassen,
-gehören auf ein verschlüsseltes Medium ([backup-restore.md](backup-restore.md)).
+Für die Geräte im Einsatz (Laptop, Tablet, Handy, Desktop-App) gilt dasselbe, dazu
+Bildschirmsperre und Abmelden an Gemeinschaftsgeräten, siehe [endgeraete.md](endgeraete.md).
+Sicherungen, die das Gerät verlassen, gehören auf ein verschlüsseltes Medium
+([backup-restore.md](backup-restore.md)).
 
 ### Datenträger: Mindest-Schreibrate (LFH-1052)
 

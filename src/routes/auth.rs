@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::auth::geraet_bezeichnung::GeraetAngabe;
 use crate::auth::session::{self, CurrentUser, SichererTransport, SESSION_COOKIE};
 use crate::auth::Benutzer;
 use crate::error::AppError;
@@ -226,6 +227,7 @@ pub async fn login(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
+    GeraetAngabe(geraet): GeraetAngabe,
     jar: CookieJar,
     JsonBody(req): JsonBody<LoginRequest>,
 ) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
@@ -284,7 +286,7 @@ pub async fn login(
         crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
-    let token = session::anlegen(&state.pool, benutzer.id).await?;
+    let token = session::anlegen(&state.pool, benutzer.id, geraet.as_deref()).await?;
     let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,
@@ -377,7 +379,8 @@ pub async fn logout(
         // Wer sich abmeldet, wird vor dem Löschen bestimmt — danach ist die Zuordnung weg.
         let benutzer_id = session::benutzer_id_zu_token(&state.pool, cookie.value()).await;
 
-        session::loeschen(&state.pool, cookie.value()).await?;
+        let beendet = session::loeschen(&state.pool, cookie.value()).await?;
+        state.live.melde_sitzung_ende(beendet);
 
         tracing::info!(benutzer_id = ?benutzer_id, peer_ip = ?peer_ip, "Abmeldung");
         crate::auth::audit::schreibe(
@@ -581,11 +584,13 @@ pub async fn passwort_aendern(
         .await?;
     let beendet = session::andere_loeschen(&mut tx, benutzer.id, &token).await?;
     tx.commit().await?;
+    let anzahl_beendet = beendet.len();
+    state.live.melde_sitzung_ende(beendet);
 
     tracing::info!(
         benutzer_id = benutzer.id,
         peer_ip = ?peer_ip,
-        andere_sitzungen_beendet = beendet,
+        andere_sitzungen_beendet = anzahl_beendet,
         "Passwort gewechselt"
     );
     crate::auth::audit::schreibe(
@@ -866,6 +871,7 @@ pub async fn oidc_callback(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
+    GeraetAngabe(geraet): GeraetAngabe,
     jar: CookieJar,
     Query(query): Query<OidcCallbackQuery>,
 ) -> Result<(CookieJar, Redirect), AppError> {
@@ -882,7 +888,13 @@ pub async fn oidc_callback(
     let cookie_state = jar.get(OIDC_STATE_COOKIE).map(|c| c.value().to_string());
     let jar = jar.remove(raeume_oidc_state_cookie());
 
-    let ergebnis = oidc_anmelden(&state.pool, query, cookie_state.as_deref()).await;
+    let ergebnis = oidc_anmelden(
+        &state.pool,
+        query,
+        cookie_state.as_deref(),
+        geraet.as_deref(),
+    )
+    .await;
     audit_anmeldung(
         &state.pool,
         crate::auth::provider::ID_OIDC,
@@ -909,6 +921,7 @@ async fn oidc_anmelden(
     pool: &SqlitePool,
     query: OidcCallbackQuery,
     cookie_state: Option<&str>,
+    geraet: Option<&str>,
 ) -> Result<(Benutzer, String, String), Abgewiesen> {
     // IdP-Error-Callback oder Query ohne `code`/`state`. Ein gespeicherter State-Eintrag wird
     // konsumiert, damit er nicht bis zum TTL-Ablauf in der Map hängt.
@@ -990,7 +1003,7 @@ async fn oidc_anmelden(
         return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(pool, benutzer.id).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet).await?;
     Ok((benutzer, token, eintrag.ziel_pfad))
 }
 
@@ -1226,6 +1239,7 @@ pub async fn webauthn_auth_finish(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
+    GeraetAngabe(geraet): GeraetAngabe,
     jar: CookieJar,
     JsonBody(body): JsonBody<PublicKeyCredential>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
@@ -1235,7 +1249,8 @@ pub async fn webauthn_auth_finish(
     let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
 
     let key = jar.get(WEBAUTHN_AUTH_COOKIE).map(|c| c.value().to_string());
-    let ergebnis = webauthn_auth_pruefen(&state.pool, webauthn, key, &body).await;
+    let ergebnis =
+        webauthn_auth_pruefen(&state.pool, webauthn, key, &body, geraet.as_deref()).await;
     audit_anmeldung(
         &state.pool,
         crate::auth::provider::ID_WEBAUTHN,
@@ -1260,6 +1275,7 @@ async fn webauthn_auth_pruefen(
     webauthn: &webauthn_rs::prelude::Webauthn,
     key: Option<String>,
     body: &PublicKeyCredential,
+    geraet: Option<&str>,
 ) -> Result<(Benutzer, String), Abgewiesen> {
     // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
     let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
@@ -1320,7 +1336,7 @@ async fn webauthn_auth_pruefen(
         return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(pool, benutzer.id).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet).await?;
     Ok((benutzer, token))
 }
 
@@ -1397,6 +1413,7 @@ pub async fn webauthn_discoverable_finish(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
+    GeraetAngabe(geraet): GeraetAngabe,
     jar: CookieJar,
     JsonBody(body): JsonBody<PublicKeyCredential>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
@@ -1406,7 +1423,8 @@ pub async fn webauthn_discoverable_finish(
     let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
 
     let key = jar.get(WEBAUTHN_DISC_COOKIE).map(|c| c.value().to_string());
-    let ergebnis = webauthn_discoverable_pruefen(&state.pool, webauthn, key, &body).await;
+    let ergebnis =
+        webauthn_discoverable_pruefen(&state.pool, webauthn, key, &body, geraet.as_deref()).await;
     audit_anmeldung(
         &state.pool,
         crate::auth::provider::ID_WEBAUTHN,
@@ -1432,6 +1450,7 @@ async fn webauthn_discoverable_pruefen(
     webauthn: &webauthn_rs::prelude::Webauthn,
     key: Option<String>,
     body: &PublicKeyCredential,
+    geraet: Option<&str>,
 ) -> Result<(Benutzer, String), Abgewiesen> {
     // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
     let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
@@ -1512,7 +1531,7 @@ async fn webauthn_discoverable_pruefen(
         return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(pool, benutzer.id).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet).await?;
     Ok((benutzer, token))
 }
 
@@ -1725,13 +1744,14 @@ pub async fn totp_finish(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
+    GeraetAngabe(geraet): GeraetAngabe,
     jar: CookieJar,
     JsonBody(req): JsonBody<TotpFinishRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
     quelle_pruefen(peer_ip, GesperrterWeg::Zweitfaktor)?;
 
     let key = jar.get(MFA_PENDING_COOKIE).map(|c| c.value().to_string());
-    let ergebnis = totp_pruefen(&state.pool, key, &req.code, peer_ip).await;
+    let ergebnis = totp_pruefen(&state.pool, key, &req.code, peer_ip, geraet.as_deref()).await;
     audit_anmeldung(
         &state.pool,
         crate::auth::totp::PROVIDER,
@@ -1758,6 +1778,7 @@ async fn totp_pruefen(
     key: Option<String>,
     code: &str,
     peer_ip: Option<std::net::IpAddr>,
+    geraet: Option<&str>,
 ) -> Result<(Benutzer, String), Abgewiesen> {
     // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
     let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
@@ -1838,7 +1859,7 @@ async fn totp_pruefen(
         crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
-    let token = session::anlegen(pool, benutzer.id).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet).await?;
     Ok((benutzer, token))
 }
 
@@ -1904,6 +1925,7 @@ pub async fn app_code_einloesen(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
+    GeraetAngabe(geraet): GeraetAngabe,
     jar: CookieJar,
     JsonBody(req): JsonBody<AppCodeEinloesen>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
@@ -1964,9 +1986,10 @@ pub async fn app_code_einloesen(
     }
     // Eine übrig gebliebene Sitzung im Webview würde sonst verwaist in der Tabelle stehen.
     if let Some(alt) = jar.get(SESSION_COOKIE) {
-        session::loeschen(&state.pool, alt.value()).await?;
+        let beendet = session::loeschen(&state.pool, alt.value()).await?;
+        state.live.melde_sitzung_ende(beendet);
     }
-    let token = session::anlegen(&state.pool, benutzer.id).await?;
+    let token = session::anlegen(&state.pool, benutzer.id, geraet.as_deref()).await?;
     let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,

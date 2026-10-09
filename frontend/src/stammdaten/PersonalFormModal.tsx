@@ -1,10 +1,9 @@
-import { App, AutoComplete, Form, Input, Typography } from 'antd';
+import { AutoComplete, Form, Input, Typography } from 'antd';
 import { Link } from 'react-router';
 import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
 import { aktualisierePerson, legePersonAn } from '../api/personal';
 import { listeQualifikationen } from '../api/qualifikationen';
 import type { Personal, PersonalVorschlaege } from '../api/types';
@@ -40,7 +39,6 @@ export default function PersonalFormModal({
 }) {
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
-  const { message } = App.useApp();
 
   const qualQuery = useQuery({
     queryKey: globalKeys.qualifikationen(),
@@ -84,9 +82,6 @@ export default function PersonalFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.personal() });
       qc.invalidateQueries({ queryKey: globalKeys.personalVorschlaege() });
     },
-    // Toast bleibt (LFH-473): nach der Ablehnung stehen Dialog und Wortlaut offen, nichts wirkt
-    // gespeichert; der Seiten-Slot läge hinter der Maske.
-    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   // Aktive Qualifikationen + bereits zugeordnete (auch deaktivierte) als Optionen,
@@ -114,6 +109,9 @@ export default function PersonalFormModal({
       form={form}
       erfassenText="Speichern"
       laeuft={mutation.isPending}
+      // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
+      // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
+      speicherung={mutation}
       initialValues={{ qualifikation_ids: [] }}
       serie={person == null}
       uebernahme={['traegerorganisation']}

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 // ETB-Entwurf-Tabs und Autosave; nach dem Anlegen wird direkt die ETB-Modul-URL angesteuert.
 
@@ -15,7 +16,7 @@ async function anmelden(page: Page) {
 }
 
 async function einsatzAnlegenUndOeffnen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(name);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   // App navigiert nach dem Anlegen automatisch in den Einsatz (Default-Modul).

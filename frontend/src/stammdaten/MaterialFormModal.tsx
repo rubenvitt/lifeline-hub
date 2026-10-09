@@ -1,7 +1,6 @@
-import { App, AutoComplete, Collapse, Form, Input } from 'antd';
+import { AutoComplete, Collapse, Form, Input } from 'antd';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereMaterial, legeMaterialAn, type MaterialEingabe } from '../api/material';
 import type { Material } from '../api/types';
@@ -31,7 +30,6 @@ export default function MaterialFormModal({
 }) {
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
-  const { message } = App.useApp();
 
   // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal`.
   useEffect(() => {
@@ -64,9 +62,6 @@ export default function MaterialFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.material() });
       qc.invalidateQueries({ queryKey: globalKeys.materialKategorien() });
     },
-    // Toast bleibt (LFH-473): nach der Ablehnung stehen Dialog und Wortlaut offen, nichts wirkt
-    // gespeichert; der Seiten-Slot läge hinter der Maske.
-    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (
@@ -76,6 +71,9 @@ export default function MaterialFormModal({
       form={form}
       erfassenText="Speichern"
       laeuft={mutation.isPending}
+      // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
+      // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
+      speicherung={mutation}
       // Nur im ANLEGEN-Modus — beim Bearbeiten wäre „Speichern und nächste" ein toter Knopf.
       serie={material == null}
       // Bestandsnummer und Bezeichnung sind je Gegenstand verschieden; Träger und

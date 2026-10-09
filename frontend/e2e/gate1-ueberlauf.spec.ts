@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 // Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen. Die gespeicherte Wahl
 // muss auch bei Touch gelten; Pixel prüft nur der Browser.
@@ -202,14 +203,6 @@ const PRUEFBREITEN = [
 
 async function anmelden(page: Page) {
   await anmeldenAlsAdmin(page);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 /**

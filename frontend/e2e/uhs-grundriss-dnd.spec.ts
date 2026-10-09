@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -22,7 +23,7 @@ test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH au
 
   // Einsatz anlegen — Mutation navigiert nach Erfolg nach /einsaetze/:id/<default-modul>.
   const einsatzName = `E2E UHS DnD ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(einsatzName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);

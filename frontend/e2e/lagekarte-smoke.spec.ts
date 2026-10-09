@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { stehendeAuswahl, waehleIn } from './auswahl-kern';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -44,7 +45,7 @@ async function anmelden(page: Page) {
 }
 
 async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   // Kein Modulname im Namen: die Kommandopalette durchsucht Module und Einsätze gemeinsam,
   // und ein „E2E Lagekarte …" ließ `command-palette.spec.ts` im strict mode flaken.
   await page.getByLabel('Bezeichnung').fill(`E2E Kartensmoke ${Date.now()}`);

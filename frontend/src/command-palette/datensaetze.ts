@@ -155,6 +155,8 @@ interface Kandidat {
   ziel: string;
   /** Lese-Vorschau (Taste →); fehlt bei einer Quelle ohne Vorschau. */
   vorschau?: VorschauZiel;
+  /** Fundstellen im Label (`Befehl.fundstellen`). */
+  fundstellen?: { begriff: string; ab: number };
 }
 
 type Zweig = 'zahl' | 'text' | 'beide';
@@ -186,6 +188,11 @@ function baueQuelle<T>(
      * Quelle an einer Stelle steht und nicht in `befehlFuer`.
      */
     vorschau?: (einsatzId: number, x: T) => VorschauZiel;
+    /**
+     * Fundstellen der Volltextsuche im Label (LFH-1056), nur bei einer Quelle, die der Server per
+     * Volltext gefiltert hat; vor `ab` steht im Label, was er nicht durchsucht.
+     */
+    fundstellen?: (x: T) => { begriff: string; ab: number };
   },
   extra: { sorte?: Nummernsorte; serverGefiltert?: boolean } = {},
 ): Quelle {
@@ -205,6 +212,7 @@ function baueQuelle<T>(
       basisLabel: f.label(x),
       ziel: f.ziel(einsatzId, x),
       vorschau: f.vorschau?.(einsatzId, x),
+      fundstellen: f.fundstellen?.(x),
     })),
   };
 }
@@ -257,7 +265,9 @@ function quellen(k: DatensatzKontext): Quelle[] {
         id: (x) => x.id,
         label: etbLabel,
         ziel: (id, x) => etbPfad(id, { eintrag: x.id }),
-        vorschau: etbVorschau,
+        // Die Treffer kommen aus `fts_query`: Label und Vorschau markieren, was sie traf (LFH-1056).
+        vorschau: (id, x) => ({ ...etbVorschau(id, x), fundstellen: k.suche.trim() }),
+        fundstellen: (x) => ({ begriff: k.suche.trim(), ab: etbLabelVorspann(x).length }),
       },
       { serverGefiltert: true },
     ),
@@ -355,9 +365,14 @@ function etbVorschau(einsatzId: number, x: EtbEintragAnzeige): VorschauZiel {
   return { art: 'etb', einsatzId, id: x.id, lfdNr: x.lfd_nr };
 }
 
+/** Der Teil der ETB-Zeile vor dem Inhalt: die laufende Nummer. */
+function etbLabelVorspann(x: EtbEintragAnzeige): string {
+  return `#${x.lfd_nr} · `;
+}
+
 /** ETB-Zeile: laufende Nummer plus gekürzter Inhalt, Form wie `meldungLabel`. */
 function etbLabel(x: EtbEintragAnzeige): string {
-  return `#${x.lfd_nr} · ${kuerze(x.inhalt)}`;
+  return `${etbLabelVorspann(x)}${kuerze(x.inhalt)}`;
 }
 
 /**
@@ -623,5 +638,6 @@ function befehlFuer(kand: Kandidat, navigate: DatensatzKontext['navigate']): Bef
     ...sprungZu(kand.ziel, navigate),
     // Welche Vorschau-Sorte, sagt die Quellentabelle (`quellen`), nicht diese Stelle.
     ...(kand.vorschau ? { vorschau: kand.vorschau } : {}),
+    ...(kand.fundstellen ? { fundstellen: kand.fundstellen } : {}),
   };
 }
