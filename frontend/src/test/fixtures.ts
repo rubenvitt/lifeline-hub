@@ -60,7 +60,7 @@ export function benutzerFixture(overrides: Partial<BenutzerAnzeige> = {}): Benut
   };
 }
 
-/** Ein System-Admin (admin-global schreibberechtigt). */
+/** Ein System-Admin. Schreibt in Modulen nur mit Einsatzrolle (LFH-1118). */
 export function adminFixture(overrides: Partial<BenutzerAnzeige> = {}): BenutzerAnzeige {
   return benutzerFixture({
     anzeigename: 'Admin',

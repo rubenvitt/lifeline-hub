@@ -35,7 +35,6 @@ import {
   darfEinsatzLeiten,
   istEinsatzLeitung,
 } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import {
   aktualisierePerson,
   entscheideAbgleich,
@@ -201,7 +200,6 @@ export default function PersonenDetailPage() {
   const aktuelleRouteRef = useRef({ einsatzId, personId });
   aktuelleRouteRef.current = { einsatzId, personId };
   const navigate = useNavigate();
-  const { benutzer } = useAuth();
   // Am gekoppelten Gerät (LFH-892): kein Status, kein Storno, keine Zuordnungen und Anhänge und
   // kein Sprung in fremde Module; der Rückweg führt in die Gerätehülle.
   const darf = useGeraetDarf();
@@ -489,7 +487,7 @@ export default function PersonenDetailPage() {
   }
   const p = detailQuery.data;
 
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
 
   function medSpalte(person: PersonDetail) {
@@ -587,7 +585,7 @@ export default function PersonenDetailPage() {
                     <Space size="middle" style={{ marginLeft: 12 }}>
                       <Button
                         type="primary"
-                        disabled={!darfEinsatzLeiten(einsatz, benutzer)}
+                        disabled={!darfEinsatzLeiten(einsatz)}
                         onClick={() =>
                           abgleichEntscheidenMutation.mutate({
                             vermisstId: person.id,
@@ -600,7 +598,7 @@ export default function PersonenDetailPage() {
                       </Button>
                       <Button
                         danger
-                        disabled={!darfEinsatzLeiten(einsatz, benutzer)}
+                        disabled={!darfEinsatzLeiten(einsatz)}
                         onClick={() =>
                           abgleichEntscheidenMutation.mutate({
                             vermisstId: person.id,

@@ -34,7 +34,6 @@ import type {
   MedienkontaktStatus,
   PressemitteilungVorlageKey,
 } from '../api/types';
-import { useAuth } from '../auth/AuthContext';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -149,7 +148,6 @@ function kontaktSpalten() {
 export default function PressePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -293,7 +291,7 @@ export default function PressePage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const sichtbar = sicht === 'offen' ? (offene ?? []) : kontakte;
   // Die offenen sind vollständig geladen: die Zahl stimmt ohne Kennzahlen.
   const offeneAnfragen = (offene ?? []).filter((k) => k.art === 'anfrage').length;

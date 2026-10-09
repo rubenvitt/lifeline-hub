@@ -105,7 +105,7 @@ export default function GeraetBetreuungsstellePage() {
   const namentlich = betreuungQuery.data?.namentlich
     ? (betreuungQuery.data.namentlich.find((n) => n.stelle_id === stelleId)?.anzahl ?? 0)
     : undefined;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
 
   const belegungMut = useMutation({
     // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an

@@ -76,7 +76,7 @@ export function belegungsQuittung(b: BelegungMitName): string {
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
-  const { benutzer, geraet } = useAuth();
+  const { geraet } = useAuth();
   // Ein BR-Gerät (LFH-1042) führt nur seinen Raum: kein Umschalter, kein Auflösen und Stornieren,
   // keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
   const darf = useGeraetDarf();
@@ -200,9 +200,7 @@ export default function BrDetailPage() {
   const einsatz = einsatzQuery.data;
   const br = detailQuery.data;
   const schreibgeschuetzt =
-    !darfImEinsatzSchreiben(einsatz, benutzer) ||
-    br.status === 'geplant' ||
-    br.status === 'aufgeloest';
+    !darfImEinsatzSchreiben(einsatz) || br.status === 'geplant' || br.status === 'aufgeloest';
 
   function onZuweisenEinheit(einheit: Einheit) {
     belegungMut.mutate({
@@ -326,7 +324,7 @@ export default function BrDetailPage() {
               </Button>
             </Popconfirm>
           )}
-          {darfImEinsatzSchreiben(einsatz, benutzer) && br.status === 'geplant' && (
+          {darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
             <>
               <Button
                 type="primary"

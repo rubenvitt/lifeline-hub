@@ -223,14 +223,11 @@ export default function MitgliederAbschnitt({
   const grundId = (m: MitgliedAnzeige) => `${grundPraefix}-leitung-${m.benutzer_id}`;
   /**
    * Die eigene Herabstufung fragt nach (LFH-966, Linie aus LFH-343): danach fehlt das Recht, die
-   * Rolle selbst zurückzuholen. Ein System-Admin behält es (`darfEinsatzLeiten`), also kein
-   * Rückfragebedarf; ebenso wenig beim Hochstufen oder in fremden Zeilen.
+   * Rolle selbst zurückzuholen, auch einem System-Admin (der Server fragt allein die Einsatzrolle,
+   * LFH-1118). Kein Rückfragebedarf beim Hochstufen oder in fremden Zeilen.
    */
   const rolleWaehlen = (m: MitgliedAnzeige, rolle: EinsatzRolle) => {
-    const eigeneHerabstufung =
-      m.benutzer_id === ich?.id &&
-      ich.system_rolle !== 'admin' &&
-      RANG[rolle] > RANG[m.einsatz_rolle];
+    const eigeneHerabstufung = m.benutzer_id === ich?.id && RANG[rolle] > RANG[m.einsatz_rolle];
     if (eigeneHerabstufung) setHerabstufung({ benutzerId: m.benutzer_id, rolle });
     else rolleSetzen({ benutzerId: m.benutzer_id, rolle });
   };

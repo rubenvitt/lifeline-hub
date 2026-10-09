@@ -13,7 +13,7 @@ import GeraetMeldungen from './GeraetMeldungen';
  * nennt Abschnitt und Gerät, wie bei der UHS.
  */
 export default function GeraetMeldenPage() {
-  const { benutzer, geraet } = useAuth();
+  const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -35,7 +35,7 @@ export default function GeraetMeldenPage() {
       <GeraetMeldungen
         einsatzId={einsatzId}
         absender={absender}
-        schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data, benutzer) || !abschnitt}
+        schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data) || !abschnitt}
       />
     </EinsatzSeite>
   );

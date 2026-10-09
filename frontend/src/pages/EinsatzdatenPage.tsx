@@ -645,9 +645,9 @@ export default function EinsatzdatenPage() {
     .map((m) => m.anzeigename)
     .join(', ');
 
-  const darfVerwaltenMitglieder = darfEinsatzLeiten(einsatz, benutzer);
+  const darfVerwaltenMitglieder = darfEinsatzLeiten(einsatz);
   // Aktiver Einsatz und Einsatzleitung (oder Admin); nach dem Abschluss fällt der Abschnitt weg.
-  const darfAbschliessen = darfEinsatzLeiten(einsatz, benutzer);
+  const darfAbschliessen = darfEinsatzLeiten(einsatz);
 
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
 

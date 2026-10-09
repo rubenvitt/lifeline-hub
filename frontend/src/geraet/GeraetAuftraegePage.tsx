@@ -46,7 +46,7 @@ function vergleiche(a: Auftrag, b: Auftrag): number {
  * Rückverweis ins ETB: das liest das Gerät nicht.
  */
 export default function GeraetAuftraegePage() {
-  const { geraet, benutzer } = useAuth();
+  const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -72,7 +72,7 @@ export default function GeraetAuftraegePage() {
     queryFn: () => listeEinheiten(einsatzId),
     enabled: geraet != null,
   });
-  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
 
   const eigeneAbschnitte = useMemo(
     () => new Set((abschnitteQuery.data ?? []).map((a) => a.id)),

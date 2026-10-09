@@ -5,7 +5,6 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import {
   legeNachforderungAn,
@@ -37,7 +36,6 @@ function abschlussZeit(n: Nachforderung): string {
 export default function NachforderungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token } = useRollen();
@@ -144,7 +142,7 @@ export default function NachforderungenPage() {
     },
     onError: invalidiere,
   });
-  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
 
   /**
    * Erfassung per Deeplink: `?neu=1` öffnet sie, eine Vorbelegung
@@ -244,7 +242,7 @@ export default function NachforderungenPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const listenProps = { darfSchreiben, onStatus, onAblehnen, kartenFehler: kartenFehler.grund };
   /*
    * Nach einer Ablehnung lädt `onError` neu; die Karte kann dabei in die andere Ansicht wandern

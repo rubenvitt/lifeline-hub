@@ -63,7 +63,7 @@ export function useBefehle(
     queryFn: () => ladeEinsatz(einsatzId!),
     enabled: einsatzId != null,
   });
-  const darfSchreibenImEinsatz = darfImEinsatzSchreiben(aktuellerEinsatz, benutzer);
+  const darfSchreibenImEinsatz = darfImEinsatzSchreiben(aktuellerEinsatz);
 
   /**
    * Der Speicher liegt in localStorage, nicht in React: gelesen wird bei JEDEM Render (höchstens

@@ -13,8 +13,8 @@ import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 
 afterEach(() => vi.restoreAllMocks());
 
-// Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die Einsatz-Rolle; admin-global
-// deckt schreibrecht.test.ts ab.
+// Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die Einsatz-Rolle; dass die
+// Systemrolle fürs Schreiben nicht zählt, deckt schreibrecht.test.ts ab.
 const nutzer = benutzerFixture({ anzeigename: 'A' });
 
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Hochwasser Nord' });

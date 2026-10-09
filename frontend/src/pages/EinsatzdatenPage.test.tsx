@@ -479,8 +479,7 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('blendet Verwaltungs-Aktionen für Führungspersonal aus', async () => {
-    // Benutzer ohne System-Admin: sonst gewährte der admin-globale Zweig die Leitungsrechte auch
-    // dem Führungspersonal-Konto.
+    // Benutzer ohne System-Admin: so prüft der Fall allein die Einsatzrolle.
     setup({
       einsatz: { meine_rolle: 'fuehrungspersonal' },
       benutzer: { ...admin, system_rolle: 'keiner' },

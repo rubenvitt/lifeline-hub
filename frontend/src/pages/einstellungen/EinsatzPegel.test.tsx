@@ -3,7 +3,8 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
+import { adminFixture } from '../../test/fixtures';
 import { renderMitProviders } from '../../test/utils';
 import { mitProzessZone } from '../../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
@@ -443,9 +444,7 @@ describe('EinsatzPegel', () => {
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
     aufbau.rolle = 'beobachter';
     await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) });
-    expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
   });
 
@@ -514,11 +513,24 @@ describe('EinsatzPegel', () => {
     stelleBereit({ rolle: 'beobachter' });
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
-    expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Station wählen' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Pegel/ })).toBeNull();
+  });
+
+  it('der Admin der Einsatz-Org ohne Rolle ist gesperrt: die Pegel-Routen verlangen eine Schreibrolle (LFH-1118)', async () => {
+    stelleBereit();
+    server.use(
+      meHandler(adminFixture({ org_id: 1 })),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...einsatz(), org_id: 1, meine_rolle: null }),
+      ),
+    );
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^Aktionen zu Pegel/ })).toBeNull();
   });
 
@@ -526,7 +538,7 @@ describe('EinsatzPegel', () => {
     stelleBereit();
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
-    expect(screen.queryByText('nur Einsatzleitung, Führungspersonal oder Org-Admin')).toBeNull();
+    expect(screen.queryByText('nur Einsatzleitung und Führungspersonal')).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Aktionen zu Pegel/ })).toHaveLength(2);
   });
 

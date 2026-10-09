@@ -183,7 +183,7 @@ export default function InfotelefonPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const personenFrei = istKeyFreigegeben('personen', stabFreigabe.freigaben);
   const zustand: KennzahlZustand = anrufeQuery.isPending
     ? 'laden'

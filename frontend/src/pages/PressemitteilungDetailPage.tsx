@@ -6,7 +6,6 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, pressemitteilungPfad, pressePfad, stabPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import {
@@ -78,7 +77,6 @@ function PressemitteilungDetail() {
   const einsatzId = Number(id);
   const pmId = Number(mitteilungId);
   const idGueltig = parseRouteId(mitteilungId) != null;
-  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -215,8 +213,8 @@ function PressemitteilungDetail() {
   const pm = pmQuery.data;
   const v = mitteilungVorlage(pm.vorlage);
   const istEntwurf = pm.status === 'entwurf';
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  const darfFreigeben = darfEinsatzLeiten(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  const darfFreigeben = darfEinsatzLeiten(einsatz);
   const status = pressemitteilungStatus[pm.status];
 
   const freigabeBestaetigen = async () => {

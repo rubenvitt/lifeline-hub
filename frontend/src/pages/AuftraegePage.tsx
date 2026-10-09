@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
@@ -16,7 +15,6 @@ import { modulName } from '../einsatz/modulRegistry';
 export default function AuftraegePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   // Der Reiter ist Zustand der Adresse (`auftraegePfad`, `reiter`): Brotkrume und Browser-Zurück
   // aus einem Befehl landen so auf „Einsatzbefehle", nicht auf der Vorgabe.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,7 +51,7 @@ export default function AuftraegePage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   return (
     // Titel und Ortspfad trägt der Seitenkopf; Mengen, Datenstand und Anlegen-Aktion
