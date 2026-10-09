@@ -170,9 +170,11 @@ als einen Anhang frei (WAL-Test, Entscheidung 5), ein Anhang hat höchstens 26 M
 Wartezeit eines anderen Schreibenden bleibt damit unter `busy_timeout` (5 s), solange der
 Datenträger mehr als ~5,2 MB/s schreibt. Das schafft jede SD-Karte ab Klasse 10 und jede SSD.
 Der Rückschrieb am Ende findet nur noch den Rest eines Anhangs vor. Langsamer als diese Grenze
-schreibt allenfalls ein defekter Datenträger; dann scheitert auch der normale Betrieb. Die
-Messung auf dem künftigen Rechner ist als eigene Aufgabe auf dem Entwicklungsboard
-nachzuholen, sobald er feststeht.
+schreibt allenfalls ein defekter Datenträger; dann scheitert auch der normale Betrieb. Einen
+festen Einsatzrechner wird es nicht geben (Ruben, 09.10.2026); statt einer Messung auf „dem“
+Rechner steht die Mindest-Schreibrate deshalb als Betriebsanforderung in
+`docs/betrieb/packaging.md`, Abschnitt „Datenträger: Mindest-Schreibrate“, samt dem Kommando,
+mit dem jeder Betreiber seinen Datenträger selbst prüft.
 
 ## Risks / Trade-offs
 
