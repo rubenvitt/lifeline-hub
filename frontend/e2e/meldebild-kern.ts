@@ -20,13 +20,7 @@ export async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-export async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
-}
+export { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Ad-hoc-Kräfte ohne Einheit erzeugen die Sammelzeile „Ohne Einheit" mit n Kindern — eine

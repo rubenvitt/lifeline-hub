@@ -6,6 +6,7 @@ import {
   type Request,
   type Route,
 } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /*
  * LFH-387 — Sitzung über mehrere Tabs.
@@ -256,7 +257,7 @@ test('(c) Sitzungsablauf: Tab 1 führt zur Anmeldung mit Rückkehrziel, Tab 2 fo
   await expect(tab2).toHaveURL(/\/profil$/);
 
   // Tab 1 schreibt → 401 → Anmeldung mit Rückkehrziel.
-  await tab1.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(tab1);
   await tab1.getByLabel('Bezeichnung').fill('nach Ablauf');
   const schreiben = tab1.waitForResponse(
     (r) => r.request().method() === 'POST' && pfad(r.request()) === '/api/einsaetze',

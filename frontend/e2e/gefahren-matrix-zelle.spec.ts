@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Die Zelle der Gefahrenmatrix ist EIN Auslöser (Dropdown), kein 5-Wege-Segmentcontrol — das
@@ -27,7 +28,7 @@ test('jede Matrix-Zelle misst auf dem Tablet mindestens 44 px', async ({ page })
     'komfortabel',
   ] as const);
   await anmelden(page);
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill('C12 Matrix');
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

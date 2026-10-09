@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Korrigierbares Zeichnen und Eigenposition an der echten Karte. Vitest belegt Adapter und
@@ -39,7 +40,7 @@ async function anmelden(page: Page) {
 /** Name ohne Modulnamen — die Kommandopalette sucht Module und Einsätze gemeinsam. */
 async function lagekarteOeffnen(page: Page, suche = '') {
   await anmelden(page);
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(`E2E Korrektur ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

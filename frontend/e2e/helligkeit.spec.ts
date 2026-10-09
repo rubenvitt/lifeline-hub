@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Der Helligkeitsregler im Browser (LFH-397, design.md D4/D5). jsdom rendert kein
@@ -68,8 +69,7 @@ test('Klick durch die Deckschicht: bei 40 % löst ein Knopf aus', async ({ page 
   await waehle40(page);
   await page.reload();
   expect((await schicht(page)).opacity).toBe('0.6');
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await einsatzDialogOeffnen(page);
 });
 
 test('Druck: bei 40 % wird nichts abgedunkelt, am Schirm schon', async ({ page }) => {

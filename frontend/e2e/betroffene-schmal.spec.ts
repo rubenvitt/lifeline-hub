@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Die Betroffenen-Module am Handschirm: geprüft wird die WEICHE — bei 390 px der Kartenzweig,
@@ -37,14 +38,6 @@ async function anmelden(page: Page) {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 /** Seeding per `page.request`: die Session ist Cookie-basiert, der Jar wird geteilt. */

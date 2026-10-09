@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast, pruefe } from './kontrast-kern';
 import { kartenpunktAufSeite, messeKante } from './karten-pixel-kern';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 async function vorbereiten(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -9,7 +10,7 @@ async function vorbereiten(page: Page, modus: 'light' | 'dark') {
   await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(`Kontrast ${modus} ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
