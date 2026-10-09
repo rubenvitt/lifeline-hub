@@ -1,6 +1,7 @@
 use super::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
+use std::collections::HashSet;
 
 /// Editierbare Felder eines Abschnitts (vom Handler getrimmt/validiert, hier zusätzlich auf
 /// Einsatz-Zugehörigkeit von parent/leiter geprüft). `sprechgruppe_tmo`/`_dmo` sind
@@ -540,6 +541,31 @@ pub async fn loese_auf_tx(
     Ok(())
 }
 
+/// Der Teilbaum eines Abschnitts: er selbst und alle Nachfahren über `ueber_abschnitt_id`
+/// (LFH-1043, Bindung der Abschnittsansicht). Bei jeder Anfrage neu berechnet, damit ein
+/// umgehängter Unterabschnitt sofort folgt. Ein fremder oder unbekannter Abschnitt ergibt die
+/// leere Menge. `UNION` statt `UNION ALL` hält die CTE auch bei zyklischen Altdaten endlich.
+pub async fn teilbaum(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    abschnitt_id: i64,
+) -> Result<HashSet<i64>, AppError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "WITH RECURSIVE baum(id) AS ( \
+           SELECT id FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ? \
+           UNION \
+           SELECT a.id FROM einsatzabschnitt a JOIN baum b ON a.ueber_abschnitt_id = b.id \
+             WHERE a.einsatz_id = ? \
+         ) SELECT id FROM baum",
+    )
+    .bind(abschnitt_id)
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(ids.into_iter().collect())
+}
+
 /// Löst einen Abschnitt in einer eigenen Transaktion auf (delegiert an [`loese_auf_tx`]); die
 /// Statement-Folge muss atomar bleiben.
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
@@ -896,6 +922,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )
@@ -1055,5 +1083,65 @@ mod tests {
             emp_ref, None,
             "Empfänger.abschnitt_id muss NULL sein (SET NULL)"
         );
+    }
+
+    #[tokio::test]
+    async fn teilbaum_umfasst_alle_nachfahren_und_nichts_fremdes() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        let nord = anlegen(&pool, einsatz, daten("Nord", None, None))
+            .await
+            .unwrap()
+            .id;
+        let ost = anlegen(&pool, einsatz, daten("Nord-Ost", Some(nord), None))
+            .await
+            .unwrap()
+            .id;
+        let tief = anlegen(&pool, einsatz, daten("Nord-Ost 1", Some(ost), None))
+            .await
+            .unwrap()
+            .id;
+        let sued = anlegen(&pool, einsatz, daten("Süd", None, None))
+            .await
+            .unwrap()
+            .id;
+        let sued_west = anlegen(&pool, einsatz, daten("Süd-West", Some(sued), None))
+            .await
+            .unwrap()
+            .id;
+
+        let t = teilbaum(&pool, einsatz, nord).await.unwrap();
+        assert_eq!(t, HashSet::from([nord, ost, tief]));
+        assert_eq!(
+            teilbaum(&pool, einsatz, ost).await.unwrap(),
+            HashSet::from([ost, tief])
+        );
+        assert_eq!(
+            teilbaum(&pool, einsatz, sued).await.unwrap(),
+            HashSet::from([sued, sued_west])
+        );
+
+        // Umgehängt: Nord-Ost unter Süd → Nord verliert den Ast, Süd gewinnt ihn.
+        patche(&pool, einsatz, ost, parent_patch(Some(sued)))
+            .await
+            .unwrap();
+        assert_eq!(
+            teilbaum(&pool, einsatz, nord).await.unwrap(),
+            HashSet::from([nord])
+        );
+        assert!(teilbaum(&pool, einsatz, sued)
+            .await
+            .unwrap()
+            .contains(&tief));
+
+        // Fremder Einsatz oder unbekannter Abschnitt: leer.
+        let anderer: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Andere') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(teilbaum(&pool, anderer, nord).await.unwrap().is_empty());
+        assert!(teilbaum(&pool, einsatz, 999_999).await.unwrap().is_empty());
     }
 }

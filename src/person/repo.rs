@@ -901,6 +901,7 @@ mod tests {
             status: None,
             notiz: None,
             betreuungsstelle_id: Some(id),
+            bestaetigung: None,
         };
         let mut personen = Vec::new();
         for _ in 0..4 {
@@ -918,6 +919,7 @@ mod tests {
             VerbleibDaten {
                 art: "entlassung",
                 betreuungsstelle_id: None,
+                bestaetigung: None,
                 ..nu(nord)
             },
             "entlassen",

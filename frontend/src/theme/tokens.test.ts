@@ -3,7 +3,7 @@
  * Tokens. Geprüft werden auch die Abstände: ein `antdToken`, das `padding*` weiter aus der
  * Modulkonstante läse, wäre sonst halb verdrahtet und trotzdem grün.
  */
-import { theme as antdTheme, type CheckboxProps } from 'antd';
+import { theme as antdTheme, type CheckboxProps, type RadioProps } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
@@ -13,6 +13,7 @@ import {
   antdKaestchen,
   antdKlappkopf,
   antdKomponenten,
+  antdOptionsknopf,
   kopfzeilenMasse,
   switchMasse,
 } from './tokens';
@@ -312,6 +313,48 @@ describe('Beschriftetes Kästchen folgt der Staffel (LFH-907)', () => {
 
   it('kein Komponenten-Token für das Kästchen — antd kennt keins für die Höhe des Labels', () => {
     expect(antdKomponenten(farbenHell, 'handschuh').Checkbox).toBeUndefined();
+  });
+});
+
+/**
+ * Beschrifteter Optionsknopf (LFH-1048): `label.ant-radio-wrapper` ist gebaut wie das Label des
+ * Kästchens (ohne Boden gemessen 21,5 / 23 / 23 px). Derselbe Boden 24 / 48 / 72. `Radio.Button` läuft
+ * durch dieselbe Stilfunktion; dort bleibt der Boden wirkungslos, solange er die Knopfhöhe nicht
+ * übersteigt. Literale, nicht die Quelle.
+ */
+describe('Beschrifteter Optionsknopf folgt der Staffel (LFH-1048)', () => {
+  const SOLL: Record<Dichte, number> = { kompakt: 24, komfortabel: 48, handschuh: 72 };
+
+  /** antd ruft die Stilfunktion mit den Props des Optionsknopfs. */
+  function stileFuer(d: Dichte, props: RadioProps) {
+    const stile = antdOptionsknopf(d).styles;
+    expect(typeof stile, d).toBe('function');
+    return (stile as (info: { props: RadioProps }) => { root?: unknown })({ props });
+  }
+
+  it('setzt den Boden der GEWÄHLTEN Stufe am Label und stellt Kreis und Text mittig', () => {
+    for (const d of Object.keys(SOLL) as Dichte[]) {
+      expect(stileFuer(d, { children: 'Mitlöschen' }).root, d).toEqual({
+        minHeight: SOLL[d],
+        alignItems: 'center',
+      });
+    }
+  });
+
+  it('lässt den Optionsknopf OHNE Text frei — die Auswahlspalte einer Tabelle trägt die Höhe', () => {
+    expect(stileFuer('handschuh', {}).root).toBeUndefined();
+  });
+
+  it('der Boden übersteigt nie die Höhe von Radio.Button (controlHeight und controlHeightSM)', () => {
+    for (const d of Object.keys(SOLL) as Dichte[]) {
+      const t = tokenFuer(d);
+      expect(t.controlHeight, d).toBeGreaterThanOrEqual(SOLL[d]);
+      expect(t.controlHeightSM, d).toBeGreaterThanOrEqual(SOLL[d]);
+    }
+  });
+
+  it('kein Komponenten-Token für den Optionsknopf — antd kennt keins für die Höhe des Labels', () => {
+    expect(antdKomponenten(farbenHell, 'handschuh').Radio).toBeUndefined();
   });
 });
 

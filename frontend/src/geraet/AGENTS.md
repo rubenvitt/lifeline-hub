@@ -19,6 +19,14 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   gebunden ist, sieht keine (`sicht` → `Keine`), Personen nur über `sichtbare_personen` /
   `fordere_person` seiner Art. Wer eine Route mehreren Ansichten öffnet, filtert über diese
   Helfer, nie über `ctx.geraet.is_none()`. Ein aufgelöster Abschnitt widerruft seine Kopplungen.
+- **Abschnittsansicht** (LFH-1043): der Bereich ist der Teilbaum des gebundenen Abschnitts samt
+  seiner Einheiten (`src/geraet/abschnitt.rs`, je Anfrage neu berechnet). Listen filtern über
+  `abschnitt::bereich`, Aufträge im SQL (`AuftragFilter.bereich`, sonst stimmt das Blättern
+  nicht); Fremdes ist 404, ein fremder Meldungsabsender 403, ohne Angabe meldet der Abschnitt.
+  Quittiert wird nur die eigene Empfängerzeile (`darfQuittierenFuer` an `AuftragKarte`).
+  Gefahrenzonen zeigt das Gerät einsatzweit, Bezirke und Skizzen nicht. Einsatzweite Zähler
+  (`modul_zaehler.rs`) bekommt es nicht. Die Karte kommt ohne gespeicherte Kartenansicht aus,
+  die steht in keiner Routenliste.
 - **Eine Ansicht wird verfügbar, wenn sie fertig ist:** `Funktionsansicht::ist_verfuegbar` erst
   setzen, wenn Routenliste, Stellenfilter, Server-Test und Hülle stehen. Vorher ist das Koppeln
   422, und die Kopplungsmaske bietet nur, was `GeraeteUebersicht.ansichten` nennt;
@@ -42,6 +50,12 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   hält ein Gerät dort; `GeraetEinsatzRahmen`, `GeraetUhs` und `GeraetAufnahme` führen fremde
   Einsatz- oder UHS-Kennungen auf die Startseite. Ein 401 führt über die Marke
   `geraet/geraetMarke.ts` (in `GERAETESPEICHER`) auf „Kopplung beendet“, nie auf die Anmeldung.
+- **Bediener am Gerät** (LFH-1046, Spec `geraete-kopplung`): Sichtung, Erst-Sichtung und Verbleib
+  nehmen am UHS-Gerät optional `bestaetigt_personal_id` aus dem Einsatzpersonal an
+  (`src/geraet/bestaetigung.rs`). Die Angabe ist ein Datenfeld, keine Anmeldung: keine Sitzung,
+  keine Rechte über die Ansicht hinaus; eine Person schickt sie nie (422). Im Client nur über
+  `geraet/BestaetigtVonFeld.tsx`, ohne Vorauswahl. ETB-Text und Verlauf nennen „bestätigt: Name“,
+  Erfasser bleibt das Gerät.
 - **Nichts auf der Platte** (design.md D8): kein Lagebild (`offline/lagebildSitzung.ts`
   überspringt Geräte), keine gemerkte UHS; die Schreib-Warteschlange bleibt an
   (`useOfflineSync` in der Hülle).
@@ -59,3 +73,8 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   nur für diese Ansicht); Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren
   Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`).
+- **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte
+  `BrDetailPage` unter `/geraet/:id/br/:brId` (`GeraetBr` hält die Kennung beim eigenen); ohne
+  `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Meldungen an
+  die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum);
+  das Navigationsziel heißt bei Abschnitt und Bereitstellungsraum „Melden“.

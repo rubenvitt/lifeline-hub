@@ -154,6 +154,9 @@ pub struct AnlegenBody {
     /// Offline-Queue mit `client_id`-Idempotenz (siehe unten), ein nachgeschobener
     /// Sichtungs-Call hätte keine — ein Replay legte die Sichtung ein zweites Mal an.
     pub sichtung: Option<String>,
+    /// Namentliche Bestätigung der Erst-Sichtung am Gerät (LFH-1046): Kennung in
+    /// `einsatz_personal`. Nur mit `sichtung` und nur an einem gekoppelten Gerät (sonst 422).
+    pub bestaetigt_personal_id: Option<i64>,
     /// Optionaler Eintritt in den UHS-Wartebereich in derselben Transaktion wie die
     /// Person-Anlage (LFH-458). Ein client_id-Replay erzeugt keine zweite Belegung.
     pub uhs_id: Option<i64>,
@@ -293,6 +296,18 @@ pub async fn anlegen(
             "Eine Erst-Sichtung ist nur mit Status erfasst oder betroffen zulässig".into(),
         ));
     }
+    if kategorie.is_none() && body.bestaetigt_personal_id.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Bestätigung gibt es nur zu einer Erst-Sichtung".into(),
+        ));
+    }
+    let bestaetigung = crate::geraet::bestaetigung::aufloesen(
+        &state.pool,
+        ctx.geraet.as_ref(),
+        einsatz_id,
+        body.bestaetigt_personal_id,
+    )
+    .await?;
 
     // LFH-613: erst das Feld isoliert (400), dann der Zusammenhang mit dem Status (422).
     let jetzt = jetzt_utc();
@@ -392,12 +407,16 @@ pub async fn anlegen(
                         k.as_str(),
                         None,
                         ctx.benutzer.id,
+                        bestaetigung.as_ref(),
                         // Anheben nur aus `erfasst` — eine bereits als betroffen angelegte
                         // Person bekäme sonst einen zweiten Statuswechsel ohne Anlass.
                         matches!(status_enum, PersonStatus::Erfasst),
                     )
                     .await?;
-                    let text = crate::person::etb_text_sichtung(reg, k);
+                    let text = crate::person::etb_text_bestaetigt(
+                        crate::person::etb_text_sichtung(reg, k),
+                        bestaetigung.as_ref(),
+                    );
                     crate::etb::system_audit_tx(
                         conn,
                         einsatz_id,
@@ -444,6 +463,8 @@ pub async fn anlegen(
                             status: None,
                             notiz: None,
                             betreuungsstelle_id: Some(stelle_id),
+                            // Eine Bestätigung gibt es nur zu einer Erst-Sichtung (oben).
+                            bestaetigung: None,
                         },
                         &art.kurzform(None),
                         ctx.benutzer.id,
@@ -759,6 +780,8 @@ pub async fn stornieren(
 pub struct SichtungBody {
     pub kategorie: String,
     pub notiz: Option<String>,
+    /// Namentliche Bestätigung am Gerät (LFH-1046): Kennung in `einsatz_personal`.
+    pub bestaetigt_personal_id: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/sichtung — Sichtung erfassen.
@@ -793,11 +816,21 @@ pub async fn sichten(
         }
     };
     let notiz = trimme(body.notiz);
+    let bestaetigung = crate::geraet::bestaetigung::aufloesen(
+        &state.pool,
+        ctx.geraet.as_ref(),
+        einsatz_id,
+        body.bestaetigt_personal_id,
+    )
+    .await?;
 
     // F06/LFH-244 Tier-A: Sichtungs-Erfassung (optionaler Status-Hub + INSERT + Cache-Update)
     // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus
     // dem VOR der Tx geladenen `person`-Vorzustand + `kategorie` berechenbar. SSE nach dem Commit.
-    let text = crate::person::etb_text_sichtung(person.registrier_nr, kategorie);
+    let text = crate::person::etb_text_bestaetigt(
+        crate::person::etb_text_sichtung(person.registrier_nr, kategorie),
+        bestaetigung.as_ref(),
+    );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let sichtung = crate::write_retry!(&state.pool, |conn| {
         let sichtung = sichtung_repo::erfassen_tx(
@@ -807,6 +840,7 @@ pub async fn sichten(
             kategorie.as_str(),
             notiz.as_deref(),
             ctx.benutzer.id,
+            bestaetigung.as_ref(),
             hebe_auf_betroffen,
         )
         .await?;
@@ -815,6 +849,22 @@ pub async fn sichten(
     })?;
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(sichtung)))
+}
+
+/// GET /api/einsaetze/{id}/personen/bestaetiger — Auswahl „Bestätigt von“ am Gerät (LFH-1046,
+/// Spec `geraete-kopplung`): das Personal des Einsatzes mit Name und Funktion. Nur für
+/// UHS-Geräte (Routenliste in `src/geraet/mod.rs`); eine Person bestätigt durch ihre eigene
+/// Anmeldung und bekommt 403.
+pub async fn bestaetiger(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personen>,
+) -> Result<Json<Vec<crate::geraet::bestaetigung::Bestaetiger>>, AppError> {
+    if ctx.geraet.is_none() {
+        return Err(AppError::Forbidden);
+    }
+    Ok(Json(
+        crate::geraet::bestaetigung::auswahl(&state.pool, ctx.einsatz.id).await?,
+    ))
 }
 
 /// GET /api/einsaetze/{id}/personen/{pid}/audit — Lese-Audit der Person, samt den Listenzugriffen
@@ -920,6 +970,8 @@ pub struct VerbleibBody {
     /// LFH-674: Betreuungsstelle eines Notunterkunft-Verbleibs. Nur die Kennung — `ziel`
     /// bleibt, was mitgeschickt wurde (der Client belegt es mit dem Namen vor).
     pub betreuungsstelle_id: Option<i64>,
+    /// Namentliche Bestätigung am Gerät (LFH-1046): Kennung in `einsatz_personal`.
+    pub bestaetigt_personal_id: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/verbleib — Verbleib-Ereignis erfassen.
@@ -987,6 +1039,13 @@ pub async fn verbleib(
     let ziel = trimme(body.ziel);
     let notiz = trimme(body.notiz);
     let kurzform = art.kurzform(ziel.as_deref());
+    let bestaetigung = crate::geraet::bestaetigung::aufloesen(
+        &state.pool,
+        ctx.geraet.as_ref(),
+        einsatz_id,
+        body.bestaetigt_personal_id,
+    )
+    .await?;
 
     let verbleib = verbleib_repo::erfassen(
         &state.pool,
@@ -999,6 +1058,7 @@ pub async fn verbleib(
             status: body.status.as_deref(),
             notiz: notiz.as_deref(),
             betreuungsstelle_id: body.betreuungsstelle_id,
+            bestaetigung: bestaetigung.as_ref(),
         },
         &kurzform,
         ctx.benutzer.id,
@@ -1024,10 +1084,13 @@ pub async fn verbleib(
         &state,
         einsatz_id,
         ctx.benutzer.id,
-        &format!(
-            "Person {}: {}",
-            registrier_anzeige(person.registrier_nr),
-            art.etb_sachverhalt()
+        &crate::person::etb_text_bestaetigt(
+            format!(
+                "Person {}: {}",
+                registrier_anzeige(person.registrier_nr),
+                art.etb_sachverhalt()
+            ),
+            bestaetigung.as_ref(),
         ),
     )
     .await;

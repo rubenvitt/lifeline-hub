@@ -1,11 +1,12 @@
 import { Button, Collapse, Form, Input, Space } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import dayjs, { type Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import { useState } from 'react';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { einsatzKeys } from '../api/queryKeys';
 import { schliesseLagebesprechungAb } from '../api/stab';
 import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
+import { serverJetzt } from '../offline/serveruhr';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { schnellwahlAuswahl, schnellwahlTermin } from '../components/terminSchnellwahl';
@@ -55,7 +56,7 @@ export default function LagebesprechungModal({
 }: LagebesprechungModalProps) {
   const qc = useQueryClient();
   const [vorbelegung] = useState(() =>
-    abschlussVorbelegung(stab.naechste_lagebesprechung_at, dayjs()),
+    abschlussVorbelegung(stab.naechste_lagebesprechung_at, serverJetzt()),
   );
   const [form] = Form.useForm<AbschlussFormWerte>();
 
@@ -82,7 +83,7 @@ export default function LagebesprechungModal({
         // `stab` ist hier die LIVE-Prop, nicht die eingefrorene Vorbelegung: nur so erkennt
         // `abschlussBody` einen inzwischen fremd gesetzten oder gelöschten Termin.
         await mutation.mutateAsync(
-          abschlussBody(werte, vorbelegung, dayjs(), stab.naechste_lagebesprechung_at),
+          abschlussBody(werte, vorbelegung, serverJetzt(), stab.naechste_lagebesprechung_at),
         );
       }}
       onFertig={onSchliessen}
@@ -104,7 +105,7 @@ export default function LagebesprechungModal({
         rules={[
           ({ getFieldValue }) => ({
             validator: (_, wert: Dayjs | null | undefined) =>
-              naechsteNachBesprechung(wert, getFieldValue('abgehalten'), dayjs())
+              naechsteNachBesprechung(wert, getFieldValue('abgehalten'), serverJetzt())
                 ? Promise.resolve()
                 : Promise.reject(new Error(NAECHSTE_ZU_FRUEH)),
           }),
@@ -122,7 +123,7 @@ export default function LagebesprechungModal({
                     // Ab dem SPÄTEREN von Zeitpunkt und jetzt: ein künftiger Zeitpunkt verhindert das 422, ein
                     // zurückliegender lässt „+1 h" nicht in der Vergangenheit landen.
                     schnellwahlTermin(
-                      terminBezug(form.getFieldValue('abgehalten'), dayjs()),
+                      terminBezug(form.getFieldValue('abgehalten'), serverJetzt()),
                       s.minuten,
                     ),
                   )

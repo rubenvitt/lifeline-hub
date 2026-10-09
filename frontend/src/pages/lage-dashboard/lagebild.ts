@@ -164,6 +164,8 @@ interface Kennzahl {
 interface Fuehrungsstand {
   uhsAktiv: number;
   uhsGeplant: number;
+  /** Kräfte an aktiven UHS (LFH-1045). */
+  uhsKraefte: number;
   bericht: {
     id: number;
     titel: string;
@@ -458,6 +460,7 @@ export function baueLagebild(
     fuehrung: {
       uhsAktiv: uhs.aktiv,
       uhsGeplant: uhs.geplant,
+      uhsKraefte: uhs.kraefteAktiv,
       bericht: bericht
         ? {
             id: bericht.id,

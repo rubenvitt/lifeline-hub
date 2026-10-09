@@ -151,6 +151,12 @@ Skizze eingepasst zeigen; Zoomen und Verschieben der Ansicht geschehen innerhalb
 Knöpfe, Mausrad mit Strg und zwei Finger. Bezeichnungen, Rufnamen und Bedingungszeichen MUST
 umbrechen bzw. mitwachsen und MUST NOT gekürzt werden.
 
+Liegt der Maßstab unter dem Mindestmaßstab der Dichte-Stufe (kleinster Maßstab, bei dem jedes
+Element den Boden der Stufe hält: kompakt und komfortabel 24 px, Handschuh 72 px in der kurzen
+Achse, in der Stufe Handschuh mit mindestens 16 px Abstand zwischen zwei Zielen), MUST die Fläche
+Übersicht sein: kein Element ist dann Zeigerziel, und ein Tippen oder Klick ohne Bewegung zoomt um
+den Punkt auf den Mindestmaßstab. Tastatur, Paneel und Lücken-Wahl MUST unverändert wählen.
+
 #### Scenario: Viele Abschnitte am Fükw
 
 - **WHEN** ein Einsatz acht oberste Abschnitte mit je drei Einheiten mit je zwei Sprechgruppen hat
@@ -161,6 +167,20 @@ umbrechen bzw. mitwachsen und MUST NOT gekürzt werden.
 
 - **WHEN** die Person am Fükw den Knopf „+“ zweimal und dann „Einpassen“ wählt
 - **THEN** wird die Ansicht zweimal vergrößert und danach wieder ganz eingepasst
+
+#### Scenario: Handschuh am Tablet
+
+- **WHEN** die große Skizze bei 1024 px in der Stufe Handschuh eingepasst geöffnet ist und die
+  Person auf „Einheit 3.2“ tippt
+- **THEN** wird nichts gewählt, die Ansicht zoomt um den getippten Punkt, jedes Element ist danach
+  mindestens 72 px in der kurzen Achse mit mindestens 16 px Abstand, und ein zweites Tippen wählt
+  „Einheit 3.2“
+
+#### Scenario: Handy
+
+- **WHEN** die große Skizze bei 390 px eingepasst geöffnet ist
+- **THEN** steht die ganze Skizze in der Fläche, kein Element ist Zeigerziel, und nach einem Tippen
+  ist jedes Element mindestens 24 × 24 px
 
 ### Requirement: Druck als eigenes Druckstück
 
@@ -204,8 +224,9 @@ Abschnitt „Kommunikationsskizze“ enthalten.
 
 ### Requirement: Eine Sammelschiene je Sprechgruppe
 Die Skizze SHALL jede Sprechgruppe des Einsatzes genau einmal als waagerechte Sammelschiene zeigen,
-mit einem Bedingungszeichen (Langsechseck mit Betriebsart und Bezeichnung) und, wenn vorhanden,
-dem Hinweis der Sprechgruppe darunter. Jede Stelle, der die Sprechgruppe zugeordnet ist, MUST mit
+mit einem Bedingungszeichen (Langsechseck mit Betriebsart und Bezeichnung) und darunter, soweit
+vorhanden, Netz, Sicherheit und Hinweis der Sprechgruppe in dieser Reihenfolge, getrennt durch
+„ · “; diese Zeile MUST NOT das Zeichen verbreitern. Jede Stelle, der die Sprechgruppe zugeordnet ist, MUST mit
 genau einer Stichleitung daran hängen. Eine Stelle mit mehreren Sprechgruppen MUST an jeder ihrer
 Schienen hängen. Kanten zwischen zwei Stellen MUST NOT für Sprechgruppen gezeichnet werden.
 
@@ -221,6 +242,11 @@ Schienen hängen. Kanten zwischen zwei Stellen MUST NOT für Sprechgruppen gezei
 #### Scenario: Sprechgruppe mit Hinweis
 - **WHEN** die Sprechgruppe „DMO 314_F*“ den Hinweis „Gesundheit“ trägt
 - **THEN** steht „Gesundheit“ unter ihrem Bedingungszeichen
+
+#### Scenario: Sprechgruppe mit Netz, Sicherheit und Hinweis
+- **WHEN** „DMO 314_F*“ Netz „Gateway“, Sicherheit „E2E“ und Hinweis „Gesundheit“ trägt
+- **THEN** steht „Gateway · E2E · Gesundheit“ unter ihrem Bedingungszeichen, und das Langsechseck
+  ist so breit wie ohne diese Angaben
 
 ### Requirement: Stellen als Führungsstellen-Kästen und Einheiten als Zeichen
 

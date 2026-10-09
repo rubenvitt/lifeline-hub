@@ -1011,5 +1011,35 @@ export function geraetBetreuungPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/betreuung`;
 }
 
+/** Eigener Bereitstellungsraum eines BR-Geräts (LFH-1042), Startseite der Ansicht. */
+export function geraetBrPfad(einsatzId: number, brId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/br/${brId}`;
+}
+
+/** Meldungen an die Einsatzleitung eines stellengebundenen Geräts ohne eigenen Stellenbereich. */
+export function geraetMeldungenPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/meldungen`;
+}
+
+/** Startseite des Abschnittsgeräts (LFH-1043): der eigene Abschnitt mit seinen Einheiten. */
+export function geraetAbschnittPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/abschnitt`;
+}
+
+/** Aufträge an den Bereich des Abschnittsgeräts. */
+export function geraetAuftraegePfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/auftraege`;
+}
+
+/** Meldung des Abschnittsgeräts an die Einsatzleitung. */
+export function geraetMeldenPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/melden`;
+}
+
+/** Karte des Abschnittsgeräts. */
+export function geraetKartePfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/karte`;
+}
+
 /** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
 export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';

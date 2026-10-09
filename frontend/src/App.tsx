@@ -10,10 +10,13 @@ import AppAnmeldungPage from './pages/AppAnmeldungPage';
 import KoppelnPage from './geraet/KoppelnPage';
 import KopplungBeendetPage from './geraet/KopplungBeendetPage';
 import GeraeteLayout, {
+  GeraetAbschnittRahmen,
   GeraetAufnahme,
   GeraetBetreuungRahmen,
   GeraetBetroffenAufnahme,
+  GeraetBr,
   GeraetEinsatzRahmen,
+  GeraetMeldungen,
   GeraetStart,
   GeraetMonitor,
   GeraetStelle,
@@ -23,6 +26,9 @@ import GeraeteLayout, {
 import GeraetPatientenPage from './geraet/GeraetPatientenPage';
 import GeraetBetroffenePage from './geraet/GeraetBetroffenePage';
 import GeraetBetreuungsstellePage from './geraet/GeraetBetreuungsstellePage';
+import GeraetAbschnittPage from './geraet/GeraetAbschnittPage';
+import GeraetAuftraegePage from './geraet/GeraetAuftraegePage';
+import GeraetMeldenPage from './geraet/GeraetMeldenPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
@@ -113,6 +119,8 @@ import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider
 
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
+// MapLibre gehört nicht ins Bündel der Gerätehülle (wie `LagekartePage`).
+const GeraetAbschnittKarte = lazy(() => import('./geraet/GeraetAbschnittKarte'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -238,6 +246,9 @@ export const appRouten = createRoutesFromElements(
         <Route path=":id" element={<GeraetEinsatzRahmen />}>
           <Route index element={<GeraetStart />} />
           <Route path="monitor" element={<GeraetMonitor />} />
+          {/* Bereitstellungsraum (LFH-1042): der eigene Raum und die Meldungen. */}
+          <Route path="br/:brId" element={<GeraetBr />} />
+          <Route path="meldungen" element={<GeraetMeldungen />} />
           {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
           <Route element={<GeraetUhsRahmen />}>
             <Route path="patienten" element={<GeraetPatientenPage />} />
@@ -252,6 +263,20 @@ export const appRouten = createRoutesFromElements(
             <Route path="betroffene/aufnahme" element={<GeraetBetroffenAufnahme />} />
             <Route path="betroffene/:personId" element={<PersonenDetailPage />} />
             <Route path="betreuung" element={<GeraetBetreuungsstellePage />} />
+          </Route>
+          {/* Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */}
+          <Route element={<GeraetAbschnittRahmen />}>
+            <Route path="abschnitt" element={<GeraetAbschnittPage />} />
+            <Route path="auftraege" element={<GeraetAuftraegePage />} />
+            <Route path="melden" element={<GeraetMeldenPage />} />
+            <Route
+              path="karte"
+              element={
+                <Suspense fallback={<div>Karte wird geladen…</div>}>
+                  <GeraetAbschnittKarte />
+                </Suspense>
+              }
+            />
           </Route>
           <Route path="*" element={<GeraetStart />} />
         </Route>

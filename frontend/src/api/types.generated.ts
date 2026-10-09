@@ -775,6 +775,16 @@ export interface components {
          * @enum {string}
          */
         BesetzungsZustand: "nicht_vergeben" | "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
+        /** @description Ein Eintrag der Auswahlliste „Bestätigt von“. */
+        Bestaetiger: {
+            funktion?: string | null;
+            /**
+             * Format: int64
+             * @description Kennung in `einsatz_personal`.
+             */
+            id: number;
+            name: string;
+        };
         /**
          * @description Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke
          *     und Stellen eines Einsatzes.
@@ -1570,6 +1580,12 @@ export interface components {
             status_kategorie?: components["schemas"]["StatusKategorie"] | null;
             status_label?: string | null;
             traegerorganisation?: string | null;
+            /**
+             * Format: int64
+             * @description UHS, an der die Kraft arbeitet (LFH-1045); `None` = an keiner. Unabhängig von Einheit
+             *     und Fahrzeug.
+             */
+            uhs_id?: number | null;
         };
         /**
          * @description Rolle einer Person innerhalb eines konkreten Einsatzes.
@@ -2768,6 +2784,12 @@ export interface components {
             bezeichnung: string;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description Gesamtstärke der zugeordneten Kräfte (LFH-1045), nur als Zahl; wie die Stärke der UHS
+             *     zählen Kräfte ohne Position nicht.
+             */
+            kraefte: number;
             /** Format: double */
             lat?: number | null;
             /** Format: double */
@@ -4076,6 +4098,8 @@ export interface components {
         };
         /** @description Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`). */
         SichtungAnzeige: {
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
+            bestaetigt_name?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             gesichtet_at: string;
@@ -4206,6 +4230,10 @@ export interface components {
             hinweis?: string | null;
             /** Format: int64 */
             id: number;
+            /** @description Netz (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030). */
+            netz?: string | null;
+            /** @description Sicherheit (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030). */
+            sicherheit?: string | null;
             /** Format: int64 */
             sortier: number;
         };
@@ -4250,6 +4278,8 @@ export interface components {
          * @description Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.
          *     `gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab
          *     über 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).
+         *     `FromRow` über die Spalten `fuehrer`, `unterfuehrer`, `mannschaft`, damit eine Abfrage
+         *     die gezählte Stärke flach mitliefern kann (UHS, LFH-1045).
          */
         Staerke: {
             /** Format: int32 */
@@ -4470,7 +4500,7 @@ export interface components {
             /** Format: int64 */
             uhs_id: number;
         };
-        /** @description Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder). */
+        /** @description Serialisierbare UHS-Anzeige (1:1 zur Tabelle plus die berechnete Stärke). */
         UhsAnzeige: {
             /** Format: int64 */
             abschnitt_id?: number | null;
@@ -4490,6 +4520,11 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             notiz?: string | null;
+            /**
+             * @description Stärke aus den zugeordneten Einsatzkräften (LFH-1045, Spec `uhs-staerke`), berechnet in
+             *     `repo::SELECT_ALLE`, nie gespeichert. `0/0/0` ohne Kräfte.
+             */
+            staerke: components["schemas"]["Staerke"];
             standort?: string | null;
             status: components["schemas"]["UhsStatus"];
             storniert_at?: string | null;
@@ -4499,9 +4534,34 @@ export interface components {
         /** @description Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material. */
         UhsDetail: components["schemas"]["UhsAnzeige"] & {
             belegungen: components["schemas"]["BelegungAnzeige"][];
+            /** @description Kräfte an der UHS (LFH-1045); leer für das UHS-Tablet (Scope-Matrix). */
+            kraefte: components["schemas"]["UhsKraft"][];
             material: components["schemas"]["EinsatzMaterialAnzeige"][];
             plaetze: components["schemas"]["PlatzAnzeige"][];
             plan?: components["schemas"]["UhsPlanAnzeige"] | null;
+        };
+        /**
+         * @description Eine Kraft an (oder für) einer UHS: nur was die UHS braucht, ohne Status, Bemerkung und
+         *     Trägerorganisation. So sieht auch der UHS-Laptop nicht mehr als Name, Funktion, Position und
+         *     Einheit (design.md D4).
+         */
+        UhsKraft: {
+            einheit?: string | null;
+            /**
+             * Format: int64
+             * @description Einheit der Kraft (Kennung und Name); fehlen ohne Einheit.
+             */
+            einheit_id?: number | null;
+            /** @description Qualifikationen als flacher Text, wie in der Personalliste. */
+            funktion?: string | null;
+            /**
+             * Format: int64
+             * @description `einsatz_personal.id`.
+             */
+            id: number;
+            ist_adhoc: boolean;
+            name: string;
+            staerke_position?: components["schemas"]["StaerkePosition"] | null;
         };
         /** @description Der Plan einer UHS ohne Bytes: Teil von `UhsDetail` und Antwort der schreibenden Routen. */
         UhsPlanAnzeige: {
@@ -4578,6 +4638,8 @@ export interface components {
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
+            bestaetigt_name?: string | null;
             /**
              * Format: int64
              * @description Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen

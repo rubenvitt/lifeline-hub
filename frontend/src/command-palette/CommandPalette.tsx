@@ -1,5 +1,5 @@
 import { IconChevronRechts, IconKreuz, IconLupe, IconPfeilLinks } from '../icons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
@@ -168,7 +168,6 @@ export function CommandPalette({
    * Begriff und Markierung wiederfindet.
    */
   const [vorschau, setVorschau] = useState<Befehl | null>(null);
-  const listeRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<InputRef>(null);
   /**
    * Letzte Zeigerposition über der Liste. Die Markierung folgt nur einem BEWEGTEN Zeiger: ein
@@ -305,14 +304,23 @@ export function CommandPalette({
     return () => clearTimeout(frist);
   }, [modus, rest]);
 
-  // Aktiven Eintrag in den Sichtbereich scrollen, auch nach der Rückkehr aus der Vorschau: die
-  // Liste kommt mit `scrollTop` 0 zurück, `aktiv` ändert sich dabei aber nicht.
-  useEffect(() => {
-    const el = listeRef.current?.querySelector('[aria-selected="true"]');
-    if (el instanceof HTMLElement && typeof el.scrollIntoView === 'function') {
-      el.scrollIntoView({ block: 'nearest' });
-    }
-  }, [aktiv, vorschau]);
+  /**
+   * Aktiven Eintrag in den Sichtbereich scrollen, auch nach der Rückkehr aus der Vorschau: die
+   * Liste kommt mit `scrollTop` 0 zurück, `aktiv` ändert sich dabei aber nicht.
+   *
+   * Als Callback-Ref an der aktiven Zeile, nicht als Effekt der Palette: antds Modal friert seinen
+   * Inhalt während der Einblend-Animation ein (rc-motion rendert die Kinder erst mit dem nächsten
+   * Animationsschritt neu). Ein Effekt lief dann, bevor die Liste im DOM stand, und scrollte ins
+   * Leere. Der Ref greift in dem Commit, der die Zeile wirklich einhängt. Die Identität wechselt
+   * mit `aktiv` und `vorschau`, damit React ihn bei jedem Wechsel erneut ruft.
+   */
+  const aktiveZeileImBlick = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- die Abhängigkeiten sind der Auslöser
+    [aktiv, vorschau],
+  );
 
   function aufZeiger(e: MouseEvent, b: Befehl) {
     const vorher = zeigerRef.current;
@@ -462,6 +470,7 @@ export function CommandPalette({
       <div
         key={b.id}
         id={`cmd-${b.id}`}
+        ref={istAktiv ? aktiveZeileImBlick : undefined}
         role="option"
         aria-selected={istAktiv}
         // Kontext und Nebenzeile BESCHREIBEN, sie benennen nicht (Begründung an `Befehl.kontext`).
@@ -746,7 +755,6 @@ export function CommandPalette({
           <div
             id="cmd-liste"
             role="listbox"
-            ref={listeRef}
             // `min(60vh, 480px)`: zeigt am Fükw-Schirm genug Befehle, `60vh` deckelt auf niedrigen Schirmen.
             style={{
               maxHeight: 'min(60vh, 480px)',

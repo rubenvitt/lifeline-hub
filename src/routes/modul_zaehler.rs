@@ -30,6 +30,11 @@ pub async fn liste(
             erlaubt.remove("personen");
             erlaubt.remove("meldungen");
             erlaubt.remove("betreuung");
+            // Ein Abschnittsgerät sieht nur seinen Teilbaum (LFH-1043); die einsatzweiten
+            // Zähler dieser Module verrieten den Rest des Einsatzes.
+            erlaubt.remove("einsatzabschnitte");
+            erlaubt.remove("einheiten");
+            erlaubt.remove("auftraege");
         }
     }
     let jetzt = crate::zeit::jetzt();

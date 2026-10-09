@@ -12,6 +12,7 @@ import {
   paneel,
   seedeGrund,
   stiche,
+  tippe,
   ziehe,
 } from './fernmeldeskizze-kern';
 import { svgTextKontrast } from './kontrast-kern';
@@ -41,8 +42,10 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
  * - RUHIGE FLÄCHE (ersetzt die Schleuse, LFH-867): unter dem Zeiger springt nichts.
  * - RECHTE: Beobachter liest (Hervorheben und Zoom gehen); Stab-Schreibrecht ohne Einheiten;
  *   390 px nur lesen.
- * - PRÜFLISTE 1 und 5: Trefffläche der eingepassten großen Skizze am Fükw, Kontrast
- *   zurückgenommener Texte (Boden 4,5 : 1).
+ * - PRÜFLISTE 1, 2 und 5: Trefffläche der großen Skizze (mit externen Stellen und Komponenten)
+ *   je Stufe bei 1366, 1024 (komfortabel, Handschuh) und 390 px; unter dem Mindestmaßstab ist
+ *   die Fläche Übersicht, das Tippen zoomt (LFH-1038). Kontrast zurückgenommener Texte (Boden
+ *   4,5 : 1).
  *
  * Druck (Format, Umbruch, Graustufen): `fernmeldeskizze-druck.spec.ts`.
  *
@@ -54,10 +57,12 @@ import { ADMIN, ADMIN_PW, anmeldenAls, wechsleZuRolle } from './rollen-kern';
 const FUEKW = { width: 1366, height: 768 };
 const HANDSCHIRM = { width: 390, height: 844 };
 const SUBPIXEL = 0.5;
-/** Prüfliste Kriterium 1: Ziel ≥ 24 × 24 CSS-px oder ein freier Kreis von 24 px. */
-const ZIEL_MIN = 24;
-/** Prüfliste Kriterium 5: zurückgenommener Text nie unter 4,5 : 1. */
-const TEXT_BODEN = 4.5;
+/**
+ * Prüfliste Kriterium 5: zurückgenommen ist nicht gesperrt, der Text hält das Ziel der Textstufen,
+ * Tag (hell) ≥ 7 : 1, Nacht (dunkel) ≥ 5 : 1 (`frontend/AGENTS.md`, „Textboden für jede
+ * Textstufe“; Deckkraft in `skizze/SkizzenElemente.tsx`, gerechnet in `zurueckKontrast.test.ts`).
+ */
+const ZURUECK_ZIEL = { light: 7, dark: 5 } as const;
 
 // ── Messung 1.1 ────────────────────────────────────────────────────────────────────────────
 
@@ -65,7 +70,12 @@ const LANG_SG = 'BN_BOS_LANGNAME_40';
 const LANG_RUF = 'Florian Musterstadt-Nord 12/34';
 const LANG_NAME = 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest';
 
-/** Spec „Viele Abschnitte am Fükw“: acht oberste Abschnitte mit je drei Einheiten an je zwei Gruppen. */
+/**
+ * Spec „Viele Abschnitte am Fükw“: acht oberste Abschnitte mit je drei Einheiten an je zwei
+ * Gruppen; dazu zwei externe Stellen (ILS an der TMO-Gruppe, Polizei ohne) und zwei Komponenten
+ * (Repeater an der DMO-Gruppe, Antenne ohne), damit die Messung jede Art von Stelle trifft
+ * (Prüfliste O6, LFH-1038).
+ */
 async function seedeGross(page: Page, einsatzId: string) {
   const a = api(page, einsatzId);
   const tmo = (await a.post('sprechgruppen', { bezeichnung: LANG_SG, betriebsart: 'TMO' })).id;
@@ -88,6 +98,26 @@ async function seedeGross(page: Page, einsatzId: string) {
       });
     }
   }
+  const stelle = async (stellenart: string, bezeichnung: string) => {
+    const plan = await a.post<{ id: number; bezeichnung: string }[]>(
+      'stab/kommunikationsplan/stellen',
+      { stellenart, bezeichnung },
+    );
+    return plan.find((x) => x.bezeichnung === bezeichnung)!.id;
+  };
+  const ils = await stelle('leitstelle', 'ILS Musterhausen');
+  await stelle('behoerde', 'Polizei');
+  await a.put(`stab/kommunikationsplan/stellen/${ils}/sprechgruppen/${tmo}`, {
+    status: 'bestehend',
+  });
+  const repeater = (
+    await a.post('stab/fernmeldeskizze/komponenten', {
+      art: 'repeater',
+      bezeichnung: 'Repeater Nord',
+    })
+  ).id;
+  await a.put(`stab/fernmeldeskizze/komponenten/${repeater}/sprechgruppen/${dmo}`);
+  await a.post('stab/fernmeldeskizze/komponenten', { art: 'antenne', bezeichnung: null });
   return { tmo, dmo };
 }
 
@@ -143,7 +173,24 @@ test('Messung 1.1: 8 × 3 eingepasst bei 1366/1024/768/390 px, kein Text ragt au
           ) as SVGTextElement[]) {
             // Lücken- und Meldungszeilen stehen bewusst unter bzw. neben dem Platz (D4).
             if (t.closest('[data-teil="luecke"]')) continue;
-            const b = t.getBBox();
+            // In den Raum des Platzes: Texte in Zeichen (Piktogramme) stehen unter einer
+            // eigenen Transformation, ihr `getBBox` allein gilt im Raum des Zeichens.
+            const roh = t.getBBox();
+            const m = el.getCTM()!.inverse().multiply(t.getCTM()!);
+            const ecken = [
+              [roh.x, roh.y],
+              [roh.x + roh.width, roh.y],
+              [roh.x, roh.y + roh.height],
+              [roh.x + roh.width, roh.y + roh.height],
+            ].map(([x, y]) => new DOMPoint(x, y).matrixTransform(m));
+            const xs = ecken.map((q) => q.x);
+            const ys = ecken.map((q) => q.y);
+            const b = {
+              x: Math.min(...xs),
+              y: Math.min(...ys),
+              width: Math.max(...xs) - Math.min(...xs),
+              height: Math.max(...ys) - Math.min(...ys),
+            };
             if (
               b.x < platz.x - 0.5 ||
               b.x + b.width > platz.x + platz.width + 0.5 ||
@@ -832,6 +879,107 @@ test('Ruhige Fläche: eine aufgelöste Einheit lässt die Einheit unter dem Zeig
     .not.toEqual(vorher);
 });
 
+/** Rechteck eines Knotens am Schirm. */
+async function amSchirm(ziel: Locator) {
+  const k = (await ziel.boundingBox())!;
+  return { x: k.x, y: k.y, breite: k.width, hoehe: k.height };
+}
+
+/**
+ * Steht das Rechteck noch dort? Der Bildlauf rastet auf ganze Pixel, das Paneel wächst um
+ * Bruchteile: bis zu einem halben Pixel bleibt (`SUBPIXEL`).
+ */
+function steht(jetzt: Awaited<ReturnType<typeof amSchirm>>, vorher: typeof jetzt, was: string) {
+  for (const k of ['x', 'y', 'breite', 'hoehe'] as const) {
+    expect(
+      Math.abs(jetzt[k] - vorher[k]),
+      `${was}: ${k} ${vorher[k]} → ${jetzt[k]}`,
+    ).toBeLessThanOrEqual(SUBPIXEL);
+  }
+}
+
+test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde Lage bewegen nichts unter dem Zeiger', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmeldenAls(page, ADMIN, ADMIN_PW);
+  const einsatzId = await einsatzAnlegen(page, `E2E Skizze ruhig am Schirm ${Date.now()}`);
+  const a = api(page, einsatzId);
+  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
+  await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea, sprechgruppe_ids: [bnBos] });
+  const zugB = (
+    await a.post('einheiten', { name: 'Zug B', abschnitt_id: ea, sprechgruppe_ids: [bnBos] })
+  ).id;
+  const key = `eh-${zugB}`;
+  const ziel = element(page, key);
+  await oeffneSkizze(page, einsatzId, ziel);
+  await flaecheInsBild(page);
+  const m = await mitte(ziel);
+  await page.mouse.move(m.x, m.y, { steps: 4 });
+  const vorher = await amSchirm(ziel);
+  const flaecheVorher = await amSchirm(flaeche(page));
+  const lageVorher = await lage(ziel);
+
+  // An einem anderen Arbeitsplatz entsteht eine Lücke: eine Einheit ohne Sprechgruppe.
+  await a.post('einheiten', { name: 'Zug Ohne', abschnitt_id: ea });
+  // Vorbedingung: das Ereignis ist angekommen — das Paneel nennt die Lücke.
+  await expect(
+    page.locator('[data-lfh="funkplan-luecke"]', { hasText: 'Einheiten ohne Sprechgruppe' }),
+  ).toContainText('Zug Ohne');
+  steht(await amSchirm(flaeche(page)), flaecheVorher, 'die Fläche bleibt am Schirm stehen');
+  steht(await amSchirm(ziel), vorher, 'unter dem Zeiger springt nichts');
+
+  // Ein anderer Arbeitsplatz verschiebt genau das Element unter dem Zeiger.
+  const neu = { x: lageVorher.x + 160, y: lageVorher.y + 80 };
+  const abruf = page.waitForResponse(
+    (r) =>
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/stab/fernmeldeskizze`) &&
+      r.request().method() === 'GET',
+  );
+  await a.put(`stab/fernmeldeskizze/lage/${key}`, { ...neu, version: null });
+  // Vorbedingung: der neue Stand ist geladen und gezeichnet.
+  await abruf;
+  await page.evaluate(() => new Promise((fertig) => requestAnimationFrame(() => fertig(null))));
+  steht(await amSchirm(flaeche(page)), flaecheVorher, 'die Fläche bleibt am Schirm stehen');
+  steht(await amSchirm(ziel), vorher, 'die fremde Lage wartet, bis der Zeiger geht');
+
+  await page.mouse.move(0, 0);
+  await expect
+    .poll(() => lage(ziel), { message: 'ohne Zeiger gilt die gespeicherte Lage' })
+    .toEqual(neu);
+});
+
+test('Ruhige Fläche am Schirm (1366 × 768): schließt sich eine Lücke ganz oben auf der Seite, rückt die Fläche nicht nach', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmeldenAls(page, ADMIN, ADMIN_PW);
+  const einsatzId = await einsatzAnlegen(page, `E2E Skizze ruhig oben ${Date.now()}`);
+  const a = api(page, einsatzId);
+  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const ea = (await a.post('abschnitte', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
+  const ohne = (await a.post('einheiten', { name: 'Zug Ohne', abschnitt_id: ea })).id;
+  const lueckeOhne = page.locator('[data-lfh="funkplan-luecke"]', {
+    hasText: 'Einheiten ohne Sprechgruppe',
+  });
+  await oeffneSkizze(page, einsatzId, element(page, `eh-${ohne}`));
+  await expect(lueckeOhne).toContainText('Zug Ohne');
+  // Ganz oben: der Bildlauf kann ein Schrumpfen darüber nicht ausgleichen.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const oben = await amSchirm(flaeche(page));
+  expect(oben.y, 'Vorbedingung: die Fläche beginnt im Fenster').toBeLessThan(FUEKW.height - 40);
+  await page.mouse.move(oben.x + oben.breite / 2, FUEKW.height - 20, { steps: 4 });
+
+  // An einem anderen Arbeitsplatz bekommt „Zug Ohne“ seine Sprechgruppe: die Zeile verliert ihren
+  // Betroffenen, das Paneel würde schrumpfen.
+  await a.put(`einheiten/${ohne}/sprechgruppen/${bnBos}`);
+  await expect(lueckeOhne).not.toContainText('Zug Ohne');
+  steht(await amSchirm(flaeche(page)), oben, 'die Fläche bleibt am Schirm stehen');
+});
+
 // ── Rechte ─────────────────────────────────────────────────────────────────────────────────
 
 test('Rechte: der Beobachter liest — kein Griff, nichts verschiebt, aber Hervorheben und Zoom gehen', async ({
@@ -928,14 +1076,14 @@ test('Mobil 390 px: nur lesen — kein Griff, keine Palette, aber Hervorheben un
 
   await expect(page.locator('[data-lfh="skizze-palette-knopf"]')).toHaveCount(0);
   await expect(page.locator('[data-lfh="skizze-rueckgaengig"]')).toHaveCount(0);
-  await ea1.click();
+  await tippe(page, ea1);
   await expect(paneel(page).locator('[data-lfh="skizze-rechte-grund"]')).toContainText(
     'Am schmalen Bildschirm nur lesen',
   );
   await expect(page.locator('[data-lfh="skizze-griff"]')).toHaveCount(0);
   await expect(ea1).toHaveCSS('cursor', 'pointer');
 
-  await element(page, `sg-${n.f314}`).click();
+  await tippe(page, element(page, `sg-${n.f314}`));
   await expect(ea1).toHaveAttribute('data-zurueck', 'true');
   const breite = () =>
     flaeche(page).evaluate((s) => Number(s.getAttribute('viewBox')!.split(' ')[2]));
@@ -950,12 +1098,32 @@ test('Mobil 390 px: nur lesen — kein Griff, keine Palette, aber Hervorheben un
 
 // ── Prüfliste Kriterium 1 und 5 ────────────────────────────────────────────────────────────
 
+/** Boden je Dichte-Stufe (LFH-1038 D2): kurze Achse und Abstand zweier Ziele in CSS-px. */
+const BODEN = {
+  kompakt: { ziel: 24, abstand: 0 },
+  komfortabel: { ziel: 24, abstand: 0 },
+  handschuh: { ziel: 72, abstand: 16 },
+} as const;
+const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+const TABLET = { width: 1024, height: 768 };
+
+/** Der Provider liest die gespeicherte Wahl beim Montieren, deshalb das Neuladen. */
+async function stelleDichte(page: Page, dichte: keyof typeof BODEN) {
+  await page.evaluate(([k, w]) => window.localStorage.setItem(k, w), [
+    DICHTE_SCHLUESSEL,
+    dichte,
+  ] as const);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+}
+
 /**
- * Trefffläche jedes Elements (Platz bzw. Trefferrechteck der Schiene) in CSS-px; unter 24 px
- * zählt die Abstandsausnahme (WCAG 2.5.8): ein Kreis von 24 px um die Mitte schneidet kein
- * anderes Ziel und keinen anderen solchen Kreis.
+ * Trefffläche jedes Elements (Platz bzw. Trefferrechteck der Schiene) in CSS-px: Zahl unter dem
+ * Boden, kleinstes Ziel und der kleinste freie Abstand zweier Ziele, die sich nicht berühren
+ * (Komponente auf ihrer Schiene, Schiene an der externen Spalte zählen nicht, wie in
+ * `ansicht.ts:mindestMassstab`).
  */
-async function treffflaechen(page: Page) {
+async function treffflaechen(page: Page, ziel: number) {
   return page.evaluate((min) => {
     const ziele = Array.from(document.querySelectorAll('[data-lfh="skizze-element"]')).flatMap(
       (el) => {
@@ -965,91 +1133,164 @@ async function treffflaechen(page: Page) {
         return [{ key, x: r.x, y: r.y, b: r.width, h: r.height }];
       },
     );
-    const klein = ziele.filter((z) => z.b < min || z.h < min);
-    const kreisFrei = (z: (typeof ziele)[number]) => {
-      const cx = z.x + z.b / 2;
-      const cy = z.y + z.h / 2;
-      return ziele.every((o) => {
-        if (o === z) return true;
-        const nx = Math.max(o.x, Math.min(cx, o.x + o.b));
-        const ny = Math.max(o.y, Math.min(cy, o.y + o.h));
-        const abstand = Math.hypot(cx - nx, cy - ny);
-        if (abstand < min / 2) return false;
-        if (o.b < min || o.h < min) {
-          const d = Math.hypot(cx - (o.x + o.b / 2), cy - (o.y + o.h / 2));
-          if (d < min) return false;
+    // Stelle und ihre Schiene (per Stichleitung verbunden) zählen nicht, wie in `mindestMassstab`.
+    const verbunden = new Set(
+      Array.from(document.querySelectorAll('[data-lfh="skizze-element"]'))
+        .map((el) => el.getAttribute('data-key')!)
+        .filter((k) => k.includes('~')),
+    );
+    let abstand = Number.POSITIVE_INFINITY;
+    let paar = '';
+    for (let i = 0; i < ziele.length; i++) {
+      for (let j = i + 1; j < ziele.length; j++) {
+        const a = ziele[i];
+        const o = ziele[j];
+        if (verbunden.has(`${a.key}~${o.key}`) || verbunden.has(`${o.key}~${a.key}`)) continue;
+        const dx = Math.max(0, a.x - (o.x + o.b), o.x - (a.x + a.b));
+        const dy = Math.max(0, a.y - (o.y + o.h), o.y - (a.y + a.h));
+        const d = Math.hypot(dx, dy);
+        if (d > 0.5 && d < abstand) {
+          abstand = d;
+          paar = `${a.key}/${o.key}`;
         }
-        return true;
-      });
-    };
+      }
+    }
     return {
       anzahl: ziele.length,
+      arten: [...new Set(ziele.map((z) => z.key.replace(/-.*/, '')))].sort(),
       kleinste: ziele.reduce((k, z) => (Math.min(z.b, z.h) < Math.min(k.b, k.h) ? z : k), ziele[0]),
-      ohneAusnahme: klein
-        .filter((z) => !kreisFrei(z))
-        .map((z) => `${z.key} ${Math.round(z.b)}×${Math.round(z.h)}`),
-      klein: klein.length,
+      klein: ziele.filter((z) => z.b < min - 0.5 || z.h < min - 0.5).map((z) => z.key),
+      abstand,
+      paar,
     };
-  }, ZIEL_MIN);
+  }, ziel);
 }
 
-test('Prüfliste 1: die eingepasste große Skizze hält am Fükw 24 × 24 px je Ziel; Messwert 390 px', async ({
+/**
+ * Ist irgendein Element in der Mitte seines Platzes Zeigerziel? In der Übersicht trifft dort nur
+ * der Grund (LFH-1038 D3); gezählt werden Elemente, deren Mitte in der Fläche liegt.
+ */
+async function zeigerziele(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const svg = document.querySelector('[data-lfh="skizze-flaeche"] svg')!.getBoundingClientRect();
+    return Array.from(document.querySelectorAll('[data-lfh="skizze-element"]')).filter((el) => {
+      const r = el.querySelector(':scope > rect')?.getBoundingClientRect();
+      if (!r) return false;
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      if (x < svg.left || x > svg.right || y < svg.top || y > svg.bottom) return false;
+      return document.elementFromPoint(x, y)?.closest('[data-lfh="skizze-element"]') != null;
+    }).length;
+  });
+}
+
+const PRUEFLISTE_1 = [
+  { name: 'Fükw', groesse: FUEKW, dichte: 'kompakt' },
+  { name: 'Tablet', groesse: TABLET, dichte: 'komfortabel' },
+  { name: 'Tablet Handschuh', groesse: TABLET, dichte: 'handschuh' },
+  { name: 'Handschirm', groesse: HANDSCHIRM, dichte: 'komfortabel' },
+] as const;
+
+test('Prüfliste 1 und 2: die große Skizze hält je Stufe ihren Boden, darunter ist sie Übersicht und das Tippen zoomt', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await page.setViewportSize(FUEKW);
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze Kriterium 1 ${Date.now()}`);
   await seedeGross(page, einsatzId);
-  const anker = flaeche(page).getByRole('button', { name: /^Einheit Einheit 8\.3/ });
-  await oeffneSkizze(page, einsatzId, anker);
-  await expect(page.locator('[data-lfh="modul-panel"]'), 'Panel offen am Fükw').toBeVisible();
-  const fuekw = await treffflaechen(page);
-  test.info().annotations.push({
-    type: 'messwert',
-    description: `Fükw: ${fuekw.anzahl} Ziele, kleinstes ${fuekw.kleinste.key} ${Math.round(fuekw.kleinste.b)}×${Math.round(fuekw.kleinste.h)} px, unter 24 px: ${fuekw.klein}`,
-  });
-  expect(fuekw.klein, 'am Fükw ist jedes Ziel mindestens 24 × 24 px').toBe(0);
-
-  // 390 px liest nur; das Tippen wählt. Gemessen und gemeldet, nicht als Boden gesetzt.
-  await page.setViewportSize(HANDSCHIRM);
-  await oeffneSkizze(page, einsatzId, anker);
-  const mobil = await treffflaechen(page);
-  test.info().annotations.push({
-    type: 'messwert',
-    description: `390 px: kleinstes ${mobil.kleinste.key} ${Math.round(mobil.kleinste.b)}×${Math.round(mobil.kleinste.h)} px, unter 24 px: ${mobil.klein}, davon ohne freien 24-px-Kreis: ${mobil.ohneAusnahme.length} (${mobil.ohneAusnahme.slice(0, 6).join(', ')})`,
-  });
-});
-
-test('Prüfliste 5: zurückgenommene Texte halten 4,5 : 1 (Name, Rufname, Lückenwort, „kein Rufname“)', async ({
-  page,
-}) => {
-  await page.setViewportSize(FUEKW);
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Skizze Kriterium 5 ${Date.now()}`);
-  const n = await seedeLuecken(page, einsatzId);
-  await oeffneSkizze(page, einsatzId, element(page, `ks-${n.ils}`));
-  // Die Schiene „DMO 505“ gewählt: nur „3. Zug“ hängt daran, alles andere tritt zurück.
-  await element(page, `sg-${n.d505}`).click();
-  const zurueck = (key: string) => element(page, key);
-  await expect(zurueck(`eh-${n.ohne}`)).toHaveAttribute('data-zurueck', 'true');
-  await expect(zurueck(`eh-${n.mit}`)).toHaveAttribute('data-zurueck', 'true');
-
-  const faelle: [string, Locator][] = [
-    ['Name', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').first()],
-    ['Rufname', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').nth(1)],
-    ['kein Rufname', zurueck(`eh-${n.ohne}`).locator('[data-teil="stelle"] > text').nth(1)],
-    ['Lückenwort', zurueck(`eh-${n.ohne}`).locator('[data-teil="luecke"] > text')],
-    ['Kasten (EA 1)', zurueck(`ab-${n.ea}`).locator('[data-teil="stelle"] > text').first()],
-  ];
+  const anker = flaeche(page).getByRole('button', { name: /^Einheit Einheit 4\.2/ });
   const gemessen: string[] = [];
-  const unter: string[] = [];
-  for (const [name, text] of faelle) {
-    await expect(text, `${name}: Text steht`).toHaveCount(1);
-    const m = await svgTextKontrast(text);
-    gemessen.push(`${name} ${m.verhaeltnis.toFixed(2)} (Deckkraft ${m.deckkraft})`);
-    if (m.verhaeltnis < TEXT_BODEN) unter.push(`${name}: ${m.verhaeltnis.toFixed(2)} : 1`);
+  for (const k of PRUEFLISTE_1) {
+    await page.setViewportSize(k.groesse);
+    await oeffneSkizze(page, einsatzId, anker);
+    await stelleDichte(page, k.dichte);
+    // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
+    await oeffneSkizze(page, einsatzId, anker);
+    // Externe Stellen und Komponenten kommen aus eigenen Abfragen und können nach dem Anker da sein.
+    await expect(flaeche(page).locator('[data-key^="ks-"]')).toHaveCount(2);
+    await expect(flaeche(page).locator('[data-key^="ko-"]')).toHaveCount(2);
+    if (k.groesse === FUEKW) {
+      await expect(page.locator('[data-lfh="modul-panel"]'), 'Panel offen am Fükw').toBeVisible();
+    }
+    const boden = BODEN[k.dichte];
+    const uebersicht = (await flaeche(page).getAttribute('data-uebersicht')) === 'true';
+    if (uebersicht) {
+      expect(await zeigerziele(page), `${k.name}: in der Übersicht ist kein Element Ziel`).toBe(0);
+      await anker.click({ force: true });
+      await expect(flaeche(page), `${k.name}: Tippen zoomt`).not.toHaveAttribute(
+        'data-uebersicht',
+        'true',
+      );
+      await expect(anker, `${k.name}: das erste Tippen wählt nicht`).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    }
+    const m = await treffflaechen(page, boden.ziel);
+    gemessen.push(
+      `${k.name} (${k.dichte}, ${uebersicht ? 'Übersicht, nach Tippen' : 'eingepasst'}): ` +
+        `${m.anzahl} Ziele (${m.arten.join(', ')}), kleinstes ${m.kleinste.key} ` +
+        `${Math.round(m.kleinste.b)}×${Math.round(m.kleinste.h)} px, ` +
+        `kleinster Abstand ${Math.round(m.abstand)} px (${m.paar})`,
+    );
+    expect(m.arten, `${k.name}: jede Art von Stelle gemessen`).toEqual(
+      expect.arrayContaining(['ab', 'eh', 'fs', 'ko', 'ks', 'sg']),
+    );
+    expect(m.klein, `${k.name}: kein Ziel unter ${boden.ziel} px`).toEqual([]);
+    if (boden.abstand > 0) {
+      expect(
+        m.abstand,
+        `${k.name}: Abstand ≥ ${boden.abstand} px (${m.paar})`,
+      ).toBeGreaterThanOrEqual(boden.abstand - SUBPIXEL);
+    }
+    if (uebersicht) {
+      await anker.click();
+      await expect(anker, `${k.name}: das zweite Tippen wählt`).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    }
   }
-  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' · ') });
-  expect(unter, `zurückgenommen unter ${TEXT_BODEN} : 1`).toEqual([]);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+for (const modus of ['dark', 'light'] as const) {
+  test(`Prüfliste 5: zurückgenommene Texte halten das Textziel im Modus ${modus} (Name, Rufname, Lückenwort, „kein Rufname“)`, async ({
+    page,
+  }) => {
+    const ziel = ZURUECK_ZIEL[modus];
+    await page.setViewportSize(FUEKW);
+    await anmeldenAls(page, ADMIN, ADMIN_PW);
+    const einsatzId = await einsatzAnlegen(page, `E2E Skizze Kriterium 5 ${modus} ${Date.now()}`);
+    const n = await seedeLuecken(page, einsatzId);
+    await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
+    await oeffneSkizze(page, einsatzId, element(page, `ks-${n.ils}`));
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    // Die Schiene „DMO 505“ gewählt: nur „3. Zug“ hängt daran, alles andere tritt zurück.
+    await element(page, `sg-${n.d505}`).click();
+    const zurueck = (key: string) => element(page, key);
+    await expect(zurueck(`eh-${n.ohne}`)).toHaveAttribute('data-zurueck', 'true');
+    await expect(zurueck(`eh-${n.mit}`)).toHaveAttribute('data-zurueck', 'true');
+
+    const faelle: [string, Locator][] = [
+      ['Name', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').first()],
+      ['Rufname', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').nth(1)],
+      ['kein Rufname', zurueck(`eh-${n.ohne}`).locator('[data-teil="stelle"] > text').nth(1)],
+      ['Lückenwort', zurueck(`eh-${n.ohne}`).locator('[data-teil="luecke"] > text')],
+      ['Kasten (EA 1)', zurueck(`ab-${n.ea}`).locator('[data-teil="stelle"] > text').first()],
+    ];
+    const gemessen: string[] = [];
+    const unter: string[] = [];
+    for (const [name, text] of faelle) {
+      await expect(text, `${name}: Text steht`).toHaveCount(1);
+      const m = await svgTextKontrast(text);
+      gemessen.push(`${name} ${m.verhaeltnis.toFixed(2)} (Deckkraft ${m.deckkraft})`);
+      if (m.verhaeltnis < ziel) unter.push(`${name}: ${m.verhaeltnis.toFixed(2)} : 1`);
+    }
+    test
+      .info()
+      .annotations.push({ type: 'messwert', description: `${modus}: ${gemessen.join(' · ')}` });
+    expect(unter, `zurückgenommen (${modus}) unter ${ziel} : 1`).toEqual([]);
+  });
+}

@@ -36,6 +36,7 @@ import {
   RUFNAME_ZEILE,
   TZ_HOEHE,
   ausstattungsZeilen,
+  komponentenBildHoehe,
   schienenLinieY,
   type Platz,
 } from '../fernmeldeskizzeLayout';
@@ -74,11 +75,13 @@ export interface Zustand {
 }
 
 /**
- * Deckkraft eines zurückgenommenen Elements: es tritt zurück, sein Text hält aber in beiden Modi
- * den Boden 4,5 : 1 (Prüfliste Kriterium 5, gerechnet in `zurueckKontrast.test.ts`; 0,55 fällt im
- * hellen Modus darunter). Die Hervorhebung trägt die Strichstärke, nicht die Deckkraft.
+ * Deckkraft eines zurückgenommenen Elements: es tritt zurück, sein Text hält aber das Ziel der
+ * Textstufen, hell 7,36 : 1 (Tag ≥ 7), dunkel 8,43 : 1 (Nacht ≥ 5); zurückgenommen ist nicht
+ * gesperrt (Prüfliste Kriterium 5, `stab/AGENTS.md`, gerechnet in `zurueckKontrast.test.ts`; 0,6
+ * hielt hell nur 4,83 : 1, 0,7 nur 6,84 : 1). Die Hervorhebung trägt die Strichstärke, nicht die
+ * Deckkraft.
  */
-export const ZURUECK_DECKKRAFT = 0.6;
+export const ZURUECK_DECKKRAFT = 0.72;
 
 /**
  * Deckkraft eines Teils an einem Element, `undefined` = voll. Lücken- und Meldungszeile (`marke`)
@@ -328,7 +331,7 @@ export function StelleBild({
         {meldung ? (
           <MarkenZeile
             x={cx}
-            y={platz.y + platz.hoehe + 8}
+            y={platz.y + komponentenBildHoehe(stelle) + 8}
             text={meldung}
             teil="meldung"
             anker="middle"
@@ -463,6 +466,8 @@ export function SchieneBild({
           breite={platz.breite}
           betriebsart={schiene.betriebsart}
           bezeichnung={schiene.bezeichnung}
+          netz={schiene.netz}
+          sicherheit={schiene.sicherheit}
           hinweis={schiene.hinweis}
           zeichenX={platz.zeichenX ?? undefined}
           hervorgehoben={zustand.hervorgehoben}

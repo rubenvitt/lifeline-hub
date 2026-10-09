@@ -56,6 +56,8 @@ function uhs(over: Partial<UhsDetail> = {}): UhsDetail {
     geaendert_at: 'x',
     geaendert_von: 1,
     storniert_at: null,
+    staerke: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    kraefte: [],
     plaetze: Array.from({ length: 6 }, (_, i) => platz(i)),
     belegungen: [],
     material: [],

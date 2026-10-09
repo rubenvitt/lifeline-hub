@@ -202,6 +202,22 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                     personal_name(personal),
                 ),
             ),
+            Vorgang::PersonalAnUhs { personal, uhs: u } => {
+                let p = szenario::PERSONAL
+                    .iter()
+                    .find(|p| p.schluessel == personal)
+                    .unwrap();
+                let mut qualis = p.qualifikationen.to_vec();
+                qualis.sort_by_key(|q| quali_sortier(q));
+                let funktion = qualis.join(", ");
+                eintrag(
+                    "system",
+                    crate::uhs::kraefte::etb_text_zugeordnet(
+                        &crate::personal::etb_bezeichnung(p.name, Some(&funktion)),
+                        uhs[u],
+                    ),
+                );
+            }
             Vorgang::Gefahrengebiet(v) => {
                 eintrag(
                     "system",
@@ -655,7 +671,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
 
     let ist = etb(&pool, erg.einsatz_id).await;
     let erwartet = erwartete_etb();
-    assert_eq!(ist.len(), 131, "Zahl der ETB-Einträge des Drehbuchs");
+    assert_eq!(ist.len(), 134, "Zahl der ETB-Einträge des Drehbuchs");
     assert_eq!(
         ist.iter()
             .map(|(_, typ, inhalt, zeit, _)| (typ.clone(), inhalt.clone(), zeit.clone()))
@@ -676,7 +692,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
     assert_eq!(je_typ("entscheidung"), 6);
     assert_eq!(je_typ("meldung"), 15);
     assert_eq!(je_typ("anordnung"), 6);
-    assert_eq!(je_typ("system"), 98);
+    assert_eq!(je_typ("system"), 101);
 
     // Einzelne Wortlaute als Literal, unabhängig von den Textfunktionen.
     let inhalte: Vec<&str> = ist.iter().map(|e| e.2.as_str()).collect();
@@ -689,6 +705,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
         "Fahrzeug «Musterstadt 85-2»: Status «4 – Am Einsatzort» → «6 – Nicht einsatzbereit»",
         "Person «Max Mustermann (Zugführer, Sprechfunker)» disponiert",
         "Einheit «Rettungsstaffel»: «Anna Probe» zugeordnet",
+        "«Anna Probe (Notarzt)» an UHS «Turnhalle Musterstadt» eingesetzt",
         "Gefahrengebiet «Überflutung Unterstadt» eingerichtet",
         "Gefahr «Ertrinken» für «Menschen» in «Überflutung Unterstadt» auf Warnstufe «hoch» gesetzt.",
         "Gefahr «Einsturz» für «Sachwerte» in «Hangrutsch Kirchberg» auf Warnstufe «mittel» gesetzt.",

@@ -217,6 +217,8 @@ export interface SprechgruppeEingabe {
   bezeichnung: string;
   betriebsart: Betriebsart;
   hinweis?: string | null;
+  netz?: string | null;
+  sicherheit?: string | null;
   sortier?: number;
 }
 
@@ -256,6 +258,7 @@ export type VerbleibStatus = S['VerbleibStatus'];
 export type Sichtung = S['SichtungAnzeige'];
 export type Verlaufsnotiz = S['NotizAnzeige'];
 export type Verbleib = S['VerbleibAnzeige'];
+export type Bestaetiger = S['Bestaetiger'];
 export type Abgleich = S['AbgleichAnzeige'];
 export type PersonDetail = S['PersonDetail'];
 export type PersonZugriff = S['ZugriffAnzeige'];
@@ -272,6 +275,8 @@ export type Uhs = S['UhsAnzeige'];
 export type UhsPlatz = S['PlatzAnzeige'];
 export type UhsBelegung = S['BelegungAnzeige'];
 export type UhsDetail = S['UhsDetail'];
+/** Kraft an einer UHS (LFH-1045): Name, Funktion, Position, Einheit. */
+export type UhsKraft = S['UhsKraft'];
 
 // ============================== LFH-14 Bereitstellungsräume ==============================
 export type BrStatus = S['BrStatus'];

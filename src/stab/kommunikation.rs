@@ -192,7 +192,7 @@ async fn laden_conn(
         "SELECT ss.stelle_id AS stelle_id, ss.status AS kanal_status, \
                 sg.id AS id, sg.org_id AS org_id, sg.einsatz_id AS einsatz_id, \
                 sg.bezeichnung AS bezeichnung, sg.betriebsart AS betriebsart, \
-                sg.hinweis AS hinweis, sg.aktiv AS aktiv, sg.sortier AS sortier, \
+                sg.hinweis AS hinweis, sg.netz AS netz, sg.sicherheit AS sicherheit, sg.aktiv AS aktiv, sg.sortier AS sortier, \
                 sg.angelegt_at AS angelegt_at \
          FROM einsatz_kommunikation_stelle_sprechgruppe ss \
          JOIN einsatz_kommunikation_stelle s ON s.id = ss.stelle_id \

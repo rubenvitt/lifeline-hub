@@ -12,6 +12,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { modulRegistry } from '../einsatz/modulRegistry';
+import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import { betreuungZugriffVon } from '../pages/lagekarte/betreuungEbene';
 import {
   VERBLEIB_ART_OPTIONEN,
@@ -44,7 +45,7 @@ interface VerbleibErfassungProps {
  * Betreuungsstelle nur bei der Notunterkunft UND mit Lesezugriff auf das Modul Betreuung — die
  * Grenze sitzt an der Datenquelle (ohne Zugriff kein Abruf, ein 403 heißt „keine Auswahl").
  * Die Notiz liegt unter „Weitere Angaben", OHNE `forceRender` (sie hat keine Vorbelegung, und
- * nur so bleibt „≤ 3 sichtbar" widerlegbar).
+ * nur so bleibt „≤ 3 sichtbar" widerlegbar); am UHS-Gerät dort auch „Bestätigt von“ (LFH-1046).
  *
  * Die Stellenwahl belegt „Ziel" sichtbar und änderbar mit dem Namen vor; gespeichert wird, was
  * dort steht.
@@ -170,9 +171,14 @@ export default function VerbleibErfassung({
             key: 'weitere',
             label: 'Weitere Angaben',
             children: (
-              <Form.Item label="Notiz" name="notiz" style={{ marginBottom: 0 }}>
-                <Input.TextArea rows={2} />
-              </Form.Item>
+              <>
+                {/* Am UHS-Gerät (LFH-1046); hier, weil Art, Ziel und Transportmittel das Budget
+                    schon füllen. */}
+                <BestaetigtVonFeld einsatzId={einsatzId} />
+                <Form.Item label="Notiz" name="notiz" style={{ marginBottom: 0 }}>
+                  <Input.TextArea rows={2} />
+                </Form.Item>
+              </>
             ),
           },
         ]}

@@ -22,6 +22,8 @@ export const AUFTRAG_EMPFAENGER_MAX = 50;
 export const AUFTRAG_EXTERN_BEZEICHNUNG_MAX = 200;
 /** Freier Empfänger-Tag eines Auftrags (`funktion_text`). */
 export const FUNKTION_TEXT_MAX = 200;
+/** Name und Funktion einer Ad-hoc-Kraft, die an einer UHS erfasst wird (LFH-1045). */
+export const PERSONAL_ADHOC_TEXT_MAX = 200;
 /** Bezeichnung einer Nachforderung. */
 export const NACHFORDERUNG_BEZEICHNUNG_MAX = 200;
 /** Art einer Nachforderung (Freitext, landet im ETB-Inhalt). */
@@ -42,3 +44,5 @@ export const SCHADEN_ORT_MAX = 500;
 export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
+/** Netz und Sicherheit einer Sprechgruppe (Bedingungszeichen, LFH-1030). */
+export const SPRECHGRUPPE_BEDINGUNG_MAX = 40;

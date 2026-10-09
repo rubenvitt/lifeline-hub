@@ -10,6 +10,8 @@
 //! gesperrt, ohne dass jemand an sie denkt. Herleitung:
 //! `openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md` (D4, D5).
 
+pub mod abschnitt;
+pub mod bestaetigung;
 pub mod code;
 pub mod repo;
 pub mod stelle;
@@ -142,6 +144,8 @@ impl Funktionsansicht {
                 | Funktionsansicht::UhsLaptop
                 | Funktionsansicht::Lagemonitor
                 | Funktionsansicht::Betreuungsstelle
+                | Funktionsansicht::Bereitstellungsraum
+                | Funktionsansicht::Einsatzabschnitt
         )
     }
 
@@ -174,11 +178,24 @@ impl Funktionsansicht {
                 "gefahrenzonen",
                 "einsatzabschnitte",
             ],
+            // LFH-1042: der eigene Raum, die Kräfte des Einsatzes und die eigenen Meldungen.
+            Funktionsansicht::Bereitstellungsraum => &[
+                "bereitstellungsraeume",
+                "einheiten",
+                "fahrzeuge",
+                "meldungen",
+            ],
+            Funktionsansicht::Einsatzabschnitt => &[
+                "einsatzabschnitte",
+                "einheiten",
+                "auftraege",
+                "meldungen",
+                "lagekarte",
+                "gefahrenzonen",
+            ],
             Funktionsansicht::Betreuungsstelle => &["betreuung", "personen", "meldungen"],
             // Noch nicht verfügbar (LFH-1040): ohne Module erreicht das Gerät nichts.
-            Funktionsansicht::Bereitstellungsraum
-            | Funktionsansicht::Einsatzabschnitt
-            | Funktionsansicht::Verpflegung => &[],
+            Funktionsansicht::Verpflegung => &[],
         }
     }
 
@@ -190,18 +207,18 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet => UHS_TABLET,
             Funktionsansicht::UhsLaptop => UHS_LAPTOP,
             Funktionsansicht::Lagemonitor => LAGEMONITOR,
+            Funktionsansicht::Bereitstellungsraum => BEREITSTELLUNGSRAUM,
+            Funktionsansicht::Einsatzabschnitt => EINSATZABSCHNITT,
             Funktionsansicht::Betreuungsstelle => BETREUUNGSSTELLE,
             // Noch nicht verfügbar (LFH-1040): nur `ALLE_ANSICHTEN`.
-            Funktionsansicht::Bereitstellungsraum
-            | Funktionsansicht::Einsatzabschnitt
-            | Funktionsansicht::Verpflegung => &[],
+            Funktionsansicht::Verpflegung => &[],
         }
     }
 }
 
 /// Zusätzliche Einsatzrouten des UHS-Tablets: die eigene UHS lesen, Belegung und
 /// Platzverfügbarkeit, Personen der eigenen UHS mit Aufnahme, Stammdaten, Sichtung, Verbleib und
-/// Notizen. Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
+/// Notizen, dazu die Auswahl „Bestätigt von“ (LFH-1046). Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
 /// Material, Status, Storno, Export, Druck, Abgleich und Anhänge fehlen bewusst.
 const UHS_TABLET: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/uhs"),
@@ -217,12 +234,13 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
 ];
-/// Zusätzliche Einsatzrouten des UHS-Laptops: alles des Tablets, dazu Plätze, Stammdaten und
-/// Anhänge der eigenen UHS, Meldungen anlegen und die eigenen lesen. Material liest der Laptop
+/// Zusätzliche Einsatzrouten des UHS-Laptops: alles des Tablets, dazu Plätze, Stammdaten,
+/// Kräfte und Anhänge der eigenen UHS, Meldungen anlegen und die eigenen lesen. Material liest der Laptop
 /// über das UHS-Detail. Status, Stornieren, UHS anlegen und die Zugriffsliste der Anhänge fehlen
 /// bewusst; jeder UHS-Handler hier prüft die Stelle über [`stelle`].
 const UHS_LAPTOP: &[(&str, &str)] = &[
@@ -247,11 +265,18 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
     ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}"),
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei"),
+    // Kräfte der eigenen UHS (LFH-1045): zuordnen, ad hoc erfassen, lösen. „Einheit zuordnen“
+    // bleibt der Leitung.
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/kraefte/verfuegbar"),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/kraefte"),
+    ("PUT", "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}"),
+    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
     ("GET", "/api/einsaetze/{id}/personen"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
@@ -262,6 +287,49 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
 /// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
 /// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
 const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor")];
+/// Zusätzliche Einsatzrouten des Abschnittsgeräts (LFH-1043): den eigenen Teilbaum und seine
+/// Einheiten lesen, Aufträge an den Bereich lesen, quittieren und ihren Vollzug melden, Meldungen
+/// an die Einsatzleitung anlegen und die eigenen lesen, Gefahrenzonen lesen. Jeder Handler hier
+/// schneidet über [`abschnitt::Abschnittsbereich`] zu; Abschnitte und Einheiten ändern, Aufträge
+/// erteilen oder abnehmen, ETB, Personen und Stellen fehlen bewusst.
+const EINSATZABSCHNITT: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/abschnitte"),
+    ("GET", "/api/einsaetze/{id}/einheiten"),
+    ("GET", "/api/einsaetze/{id}/auftraege"),
+    ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+    ),
+    ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("GET", "/api/einsaetze/{id}/zonen"),
+];
+
+/// Zusätzliche Einsatzrouten des Bereitstellungsraums (LFH-1042): den eigenen Raum lesen, Kräfte
+/// in ihm an- und abmelden (Eintritt, Wechsel herein, Austritt; `{bid}` ist immer der eigene) und
+/// ihn in Betrieb nehmen; die Einheiten- und Fahrzeugliste des Einsatzes lesen; Meldungen an die
+/// Einsatzleitung anlegen und die eigenen lesen. Jeder BR-Handler hier prüft die Stelle über
+/// [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Anlegen, Stammdaten, Auflösen,
+/// Stornieren und jede Änderung an Einheiten und Fahrzeugen (auch das Abrufen) fehlen bewusst.
+const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
+    ("GET", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
+    ),
+    ("GET", "/api/einsaetze/{id}/einheiten"),
+    ("GET", "/api/einsaetze/{id}/fahrzeuge"),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+];
+
 /// Zusätzliche Einsatzrouten der Betreuungsstelle (LFH-1041): die eigene Stelle in der
 /// Betreuungsübersicht, ihre Belegung melden und zurücknehmen samt Meldeverlauf, Personen der
 /// eigenen Stelle mit Aufnahme, Stammdaten, Verbleib und Notizen, Meldungen anlegen und die
@@ -466,6 +534,81 @@ mod tests {
         );
         assert_eq!(F::Verpflegung.stellenart(), None);
         assert_eq!(F::Lagemonitor.stellenart(), None);
+    }
+
+    #[test]
+    fn bereitstellungsraum_verwaltet_den_raum_nicht() {
+        let b = Funktionsansicht::Bereitstellungsraum;
+        assert!(b.ist_verfuegbar());
+        assert!(b.rolle().darf_schreiben());
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
+            ),
+            (
+                "POST",
+                "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
+            ),
+            ("GET", "/api/einsaetze/{id}/einheiten"),
+            ("POST", "/api/einsaetze/{id}/meldungen"),
+        ] {
+            assert!(darf_route(b, m, p), "BR-Gerät darf {m} {p}");
+        }
+        for (m, p) in [
+            ("POST", "/api/einsaetze/{id}/bereitstellungsraeume"),
+            ("PATCH", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+            ("DELETE", "/api/einsaetze/{id}/bereitstellungsraeume/{bid}"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}/position"),
+            ("GET", "/api/einsaetze/{id}/personen"),
+            ("GET", "/api/einsaetze/{id}/uhs"),
+        ] {
+            assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
+        }
+    }
+
+    #[test]
+    fn abschnittsgeraet_liest_seinen_bereich_und_meldet_nur_zurueck() {
+        let a = Funktionsansicht::Einsatzabschnitt;
+        assert!(a.ist_verfuegbar());
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/abschnitte"),
+            ("GET", "/api/einsaetze/{id}/einheiten"),
+            ("GET", "/api/einsaetze/{id}/auftraege"),
+            ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+            ),
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
+            ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("GET", "/api/einsaetze/{id}/zonen"),
+        ] {
+            assert!(darf_route(a, m, p), "Abschnittsgerät darf {m} {p}");
+        }
+        for (m, p) in [
+            ("POST", "/api/einsaetze/{id}/abschnitte"),
+            ("PATCH", "/api/einsaetze/{id}/abschnitte/{aid}"),
+            ("PATCH", "/api/einsaetze/{id}/abschnitte/{aid}/flaeche"),
+            ("DELETE", "/api/einsaetze/{id}/abschnitte/{aid}"),
+            ("POST", "/api/einsaetze/{id}/einheiten"),
+            ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
+            ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
+            ("POST", "/api/einsaetze/{id}/auftraege"),
+            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
+            ("GET", "/api/einsaetze/{id}/auftraege/kennzahlen"),
+            ("POST", "/api/einsaetze/{id}/zonen"),
+            ("GET", "/api/einsaetze/{id}/freie-zeichen"),
+            ("GET", "/api/einsaetze/{id}/personal"),
+            ("GET", "/api/einsaetze/{id}/personen"),
+            ("GET", "/api/einsaetze/{id}/uhs"),
+            ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
+            ("GET", "/api/einsaetze/{id}/lagemonitor"),
+        ] {
+            assert!(!darf_route(a, m, p), "Abschnittsgerät darf {m} {p} nicht");
+        }
     }
 
     #[test]

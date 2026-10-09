@@ -10,6 +10,8 @@ import type {
   BelegungsArt,
   UhsAnhang,
   AnhangZugriff,
+  UhsKraft,
+  StaerkePosition,
 } from './types';
 import {
   apiGet,
@@ -34,6 +36,49 @@ export function listeUhs(
 
 export function ladeUhs(einsatzId: number, uhsId: number): Promise<UhsDetail> {
   return apiGet<UhsDetail>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`);
+}
+
+// ---------- Kräfte der UHS (LFH-1045) ----------
+
+/** Einsatzkräfte ohne UHS: die Auswahl beim Zuordnen. */
+export function listeKraefteOhneUhs(einsatzId: number, uhsId: number): Promise<UhsKraft[]> {
+  return apiGet<UhsKraft[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/verfuegbar`);
+}
+
+export function ordneKraftZu(einsatzId: number, uhsId: number, kraftId: number): Promise<UhsKraft> {
+  return apiSend<UhsKraft>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/${kraftId}`, 'PUT');
+}
+
+export interface AdhocKraftEingabe {
+  name: string;
+  funktion?: string;
+  staerke_position?: StaerkePosition;
+}
+
+/** Ad-hoc-Kraft disponieren und der UHS zuordnen. */
+export function erfasseAdhocKraft(
+  einsatzId: number,
+  uhsId: number,
+  daten: AdhocKraftEingabe,
+): Promise<UhsKraft> {
+  return apiSend<UhsKraft>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte`, 'POST', daten);
+}
+
+/** Kraft von der UHS abziehen; sie bleibt im Einsatz. */
+export function zieheKraftAb(einsatzId: number, uhsId: number, kraftId: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/${kraftId}`, 'DELETE');
+}
+
+/** Alle Kräfte einer Einheit ohne UHS zuordnen (nur Einsatzleitung, kein Gerät). */
+export function ordneEinheitZu(
+  einsatzId: number,
+  uhsId: number,
+  einheitId: number,
+): Promise<UhsKraft[]> {
+  return apiSend<UhsKraft[]>(
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/einheit/${einheitId}`,
+    'PUT',
+  );
 }
 
 export interface UhsEingabe {

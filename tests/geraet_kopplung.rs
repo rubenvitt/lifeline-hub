@@ -13,8 +13,9 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
-    plan_hochladen, png_bytes, rolle_setzen, setup_mit_pool_und_live, system_etb_inhalte,
+    anfrage, anfrage_json, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit,
+    login_cookie, plan_hochladen, png_bytes, rolle_setzen, setup_mit_pool_und_live,
+    system_etb_inhalte,
 };
 
 // ---------- Helfer ----------
@@ -236,7 +237,7 @@ async fn uhs_eines_anderen_einsatzes_ist_404() {
 
 // ---------- Weitere Stellen (LFH-1040) ----------
 
-/// Die vier neuen Ansichten stehen im Katalog, sind aber erst koppelbar, wenn ihr Task sie
+/// Die neuen Ansichten stehen im Katalog, sind aber erst koppelbar, wenn ihr Task sie
 /// freischaltet; die Übersicht bietet nur die verfügbaren an, mit der Art ihrer Stelle.
 #[tokio::test]
 async fn neue_ansichten_sind_noch_nicht_koppelbar() {
@@ -244,7 +245,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    for ansicht in ["bereitstellungsraum", "einsatzabschnitt", "verpflegung"] {
+    for ansicht in ["verpflegung"] {
         let (s, v) = anlegen(
             &app,
             &admin,
@@ -271,6 +272,8 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
             {"ansicht": "uhs-laptop", "stellenart": "uhs"},
             {"ansicht": "lagemonitor", "stellenart": null},
             {"ansicht": "betreuungsstelle", "stellenart": "betreuungsstelle"},
+            {"ansicht": "bereitstellungsraum", "stellenart": "bereitstellungsraum"},
+            {"ansicht": "einsatzabschnitt", "stellenart": "einsatzabschnitt"},
         ])
     );
 }
@@ -392,6 +395,411 @@ async fn aufgeloester_abschnitt_beendet_seine_kopplung() {
             && t.contains("aufgelöst")),
         "ETB nennt das Gerät: {etb:?}"
     );
+}
+
+// ---------- Abschnittsgerät (LFH-1043) ----------
+
+const ZONE_POLY: &str =
+    r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
+
+async fn abschnitt_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    name: &str,
+    ueber: Option<i64>,
+) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        cookie,
+        Some(&json!({"name": name, "ueber_abschnitt_id": ueber})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+async fn einheit_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    name: &str,
+    abschnitt: i64,
+) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        cookie,
+        Some(&json!({"name": name, "abschnitt_id": abschnitt})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// Ein Auftrag an die Empfänger; liefert die Antwort (mit Empfängerzeilen).
+async fn auftrag_an(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    text: &str,
+    empfaenger: Value,
+) -> Value {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        cookie,
+        Some(&json!({"auftrag_text": text, "empfaenger": empfaenger})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v
+}
+
+/// Nord ⊃ Nord-Ost, daneben Süd; je eine Einheit darin.
+struct AbschnittsLage {
+    einsatz: i64,
+    nord: i64,
+    ost: i64,
+    sued: i64,
+    zug_nord: i64,
+    zug_ost: i64,
+    zug_sued: i64,
+}
+
+async fn abschnittslage(app: &axum::Router, admin: &str) -> AbschnittsLage {
+    let einsatz = einsatz_anlegen(app, admin).await;
+    let nord = abschnitt_anlegen(app, admin, einsatz, "EA Nord", None).await;
+    let ost = abschnitt_anlegen(app, admin, einsatz, "UA Nord-Ost", Some(nord)).await;
+    let sued = abschnitt_anlegen(app, admin, einsatz, "EA Süd", None).await;
+    AbschnittsLage {
+        einsatz,
+        nord,
+        ost,
+        sued,
+        zug_nord: einheit_anlegen(app, admin, einsatz, "1. Zug", nord).await,
+        zug_ost: einheit_anlegen(app, admin, einsatz, "2. Zug", ost).await,
+        zug_sued: einheit_anlegen(app, admin, einsatz, "3. Zug", sued).await,
+    }
+}
+
+/// Ein an `abschnitt` gekoppeltes Abschnittsgerät: `(kopplung_id, geräte-cookie)`.
+async fn abschnittsgeraet(
+    app: &axum::Router,
+    admin: &str,
+    einsatz: i64,
+    abschnitt: i64,
+) -> (i64, String) {
+    let (id, code) = kopplung(
+        app,
+        admin,
+        einsatz,
+        json!({"ansicht": "einsatzabschnitt", "stelle_id": abschnitt, "bezeichnung": "Tablet EA"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    (id, a.cookie.expect("Sitzungscookie"))
+}
+
+fn namen(v: &Value, feld: &str) -> Vec<String> {
+    let mut n: Vec<String> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x[feld].as_str().unwrap().to_string())
+        .collect();
+    n.sort();
+    n
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let basis = format!("/api/einsaetze/{}", l.einsatz);
+
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/abschnitte"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(namen(&v, "name"), ["EA Nord", "UA Nord-Ost"]);
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(namen(&v, "name"), ["1. Zug", "2. Zug"]);
+
+    // Einsatzweite Zähler bekommt das Gerät nicht.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/modul-zaehler"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for modul in ["einheiten", "einsatzabschnitte", "auftraege", "meldungen"] {
+        assert!(v.get(modul).is_none(), "kein Zähler {modul}: {v}");
+    }
+
+    // Umgehängt: Nord-Ost unter Süd → das Gerät verliert den Ast sofort.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{basis}/abschnitte/{}", l.ost),
+        &admin,
+        Some(&json!({"ueber_abschnitt_id": l.sued})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (_, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
+    assert_eq!(namen(&v, "name"), ["1. Zug"]);
+
+    // Nicht gelistet: 403.
+    for (m, p) in [
+        ("GET", format!("{basis}/etb")),
+        ("GET", format!("{basis}/personen")),
+        ("GET", format!("{basis}/uhs")),
+        ("GET", format!("{basis}/personal")),
+        ("PATCH", format!("{basis}/abschnitte/{}", l.nord)),
+        ("PUT", format!("{basis}/einheiten/{}/status", l.zug_nord)),
+        ("POST", format!("{basis}/auftraege")),
+    ] {
+        let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}");
+    }
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let basis = format!("/api/einsaetze/{}/auftraege", l.einsatz);
+
+    let an_ost = auftrag_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Deich sichern",
+        json!([{"empfaenger_typ": "abschnitt", "abschnitt_id": l.ost}]),
+    )
+    .await;
+    let an_sued = auftrag_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Straße sperren",
+        json!([{"empfaenger_typ": "einheit", "einheit_id": l.zug_sued}]),
+    )
+    .await;
+    let gemischt = auftrag_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Sandsäcke füllen",
+        json!([
+            {"empfaenger_typ": "abschnitt", "abschnitt_id": l.sued},
+            {"empfaenger_typ": "einheit", "einheit_id": l.zug_ost},
+        ]),
+    )
+    .await;
+    let id = |v: &Value| v["id"].as_i64().unwrap();
+    let zeile = |v: &Value, schluessel: &str, wert: i64| {
+        v["empfaenger"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e[schluessel] == wert)
+            .unwrap()["id"]
+            .as_i64()
+            .unwrap()
+    };
+
+    let (s, v) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut texte: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["auftrag_text"].as_str().unwrap())
+        .collect();
+    texte.sort();
+    assert_eq!(texte, ["Deich sichern", "Sandsäcke füllen"]);
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/{}", id(&an_ost)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/{}", id(&an_sued)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
+
+    // Quittung: die Zeile der eigenen Einheit ja, die von Süd nicht.
+    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/empfaenger/{zid}/quittieren");
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &quittieren(id(&gemischt), zeile(&gemischt, "einheit_id", l.zug_ost)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &quittieren(id(&gemischt), zeile(&gemischt, "abschnitt_id", l.sued)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde Empfängerzeile");
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &quittieren(id(&an_sued), zeile(&an_sued, "einheit_id", l.zug_sued)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
+
+    // Vollzug: eigener Auftrag ja, fremder 404, abnehmen gar nicht.
+    let vollzug = |aid: i64| format!("{basis}/{aid}/vollzug");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &vollzug(id(&an_ost)),
+        &geraet,
+        Some(&json!({"status": "vollzogen", "vollzugsmeldung": "Deich gesichert"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &vollzug(id(&an_sued)),
+        &geraet,
+        Some(&json!({"status": "in_arbeit"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/{}/abnehmen", id(&an_ost)),
+        &geraet,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_meldet_mit_eigenem_absender() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let meldung = |bezug: Value| {
+        let mut m = json!({
+            "absender": "EA Nord",
+            "meldeweg": "persoenlich",
+            "inhalt": "Lage ruhig",
+            "ereigniszeit": "2026-10-08 10:00:00",
+        });
+        m.as_object_mut()
+            .unwrap()
+            .extend(bezug.as_object().unwrap().clone());
+        m
+    };
+
+    let (s, v) = anfrage_json(&app, "POST", &meldungen, &geraet, Some(&meldung(json!({})))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(
+        v["abschnitt_id"], l.nord,
+        "ohne Angabe der eigene Abschnitt"
+    );
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &geraet,
+        Some(&meldung(json!({"abschnitt_id": l.ost}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["abschnitt_id"], l.ost, "Unterabschnitt bleibt");
+    for bezug in [
+        json!({"abschnitt_id": l.sued}),
+        json!({"einheit_id": l.zug_sued}),
+    ] {
+        let (s, v) = anfrage_json(&app, "POST", &meldungen, &geraet, Some(&meldung(bezug))).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    }
+    let _ = l.zug_nord;
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_sieht_gefahrenzonen_aber_keine_bezirke() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let zonen = format!("/api/einsaetze/{}/zonen", l.einsatz);
+    for typ in ["absperrbereich", "evakuierungsbezirk", "freie_skizze"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &zonen,
+            &admin,
+            Some(&json!({"typ": typ, "geometrie_typ": "Polygon", "geometrie": ZONE_POLY})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{typ}: {v}");
+    }
+    let (s, v) = anfrage(&app, "GET", &zonen, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(namen(&v, "typ"), ["absperrbereich"]);
+    let (_, v) = anfrage(&app, "GET", &zonen, &admin, None).await;
+    assert_eq!(
+        v.as_array().unwrap().len(),
+        3,
+        "die Einsatzleitung sieht alle"
+    );
+}
+
+/// Widerruf beendet auch ein Abschnittsgerät sofort.
+#[tokio::test]
+async fn widerrufenes_abschnittsgeraet_verliert_jeden_zugriff() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (id, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let einheiten = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let (s, _) = anfrage(&app, "GET", &einheiten, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK);
+    widerrufen(&app, &admin, l.einsatz, id).await;
+    let (s, _) = anfrage(&app, "GET", &einheiten, &geraet, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -1908,6 +2316,935 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
         let (s, _) = anfrage_json(&app, m, &pfad, &monitor, body.as_ref()).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
     }
+}
+
+// ---------- Bediener am Gerät (LFH-1046) ----------
+
+/// Ad-hoc-Kraft im Einsatz; liefert die Kennung in `einsatz_personal`.
+async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&json!({"adhoc": {"name": name, "funktion": "Notärztin"}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// POST mit Geräte-Cookie; liefert Status, Body und ob die Antwort ein Cookie setzt.
+async fn post_roh(
+    app: &axum::Router,
+    cookie: &str,
+    uri: &str,
+    body: Value,
+) -> (StatusCode, Value, bool) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header(header::COOKIE, cookie)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    let status = resp.status();
+    let setzt_cookie = resp.headers().contains_key(header::SET_COOKIE);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+        setzt_cookie,
+    )
+}
+
+/// System-Einträge des ETB als `(inhalt, erfasser_name)`.
+async fn system_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<(String, String)> {
+    let (_, etb) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    etb.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "system")
+        .map(|e| {
+            (
+                e["inhalt"].as_str().unwrap().to_string(),
+                e["erfasser_name"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn bestaetigte_sichtung_nennt_geraet_stelle_und_person() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let p = person_in(&app, &geraet, einsatz, None).await;
+    let pid = p["id"].as_i64().unwrap();
+
+    let (s, v, setzt_cookie) = post_roh(
+        &app,
+        &geraet,
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bestaetigt_name"], "Dr. A. Muster");
+    assert!(!setzt_cookie, "Die Bestätigung legt keine Sitzung an");
+
+    let etb = system_etb(&app, &admin, einsatz).await;
+    let eintrag = etb
+        .iter()
+        .find(|(t, _)| t.contains("Sichtung SK II"))
+        .unwrap_or_else(|| panic!("{etb:?}"));
+    assert!(
+        eintrag.0.ends_with(", bestätigt: Dr. A. Muster"),
+        "{eintrag:?}"
+    );
+    assert_eq!(eintrag.1, "UHS Nord · Tablet 1", "Erfasser ist das Gerät");
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["sichtungen"][0]["bestaetigt_name"], "Dr. A. Muster");
+}
+
+#[tokio::test]
+async fn bestaetigter_verbleib_und_erst_sichtung() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+
+    let (s, p) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"sichtung": "sk1", "bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    let pid = p["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &geraet,
+        Some(&json!({"art": "transport", "bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bestaetigt_name"], "Dr. A. Muster");
+
+    let etb = system_etb(&app, &admin, einsatz).await;
+    for wort in ["Sichtung SK I", "abtransportiert"] {
+        let eintrag = etb
+            .iter()
+            .find(|(t, _)| t.contains(wort))
+            .unwrap_or_else(|| panic!("{wort}: {etb:?}"));
+        assert!(
+            eintrag.0.ends_with(", bestätigt: Dr. A. Muster"),
+            "{eintrag:?}"
+        );
+        assert_eq!(eintrag.1, "UHS Nord · Tablet 1");
+    }
+
+    let (_, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(v["sichtungen"][0]["bestaetigt_name"], "Dr. A. Muster");
+    assert_eq!(v["verbleib"][0]["bestaetigt_name"], "Dr. A. Muster");
+
+    // Ohne Erst-Sichtung gibt es nichts zu bestätigen.
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn sichtung_ohne_bestaetigung_bleibt_wie_bisher() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let pid = person_in(&app, &geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({"kategorie": "sk3"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert!(v.get("bestaetigt_name").is_none(), "{v}");
+    let etb = system_etb(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|(t, e)| t.ends_with("Sichtung SK III") && e == "UHS Nord · Tablet 1"),
+        "{etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn bestaetigung_prueft_einsatz_und_sitzungsart() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let fremde_kraft = kraft(&app, &admin, anderer, "Fremd").await;
+    let eigene_kraft = kraft(&app, &admin, einsatz, "Eigen").await;
+    let pid = person_in(&app, &geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    let anzahl = || async {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM person_sichtung WHERE person_id = ?")
+            .bind(pid)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+    };
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": fremde_kraft})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Personal eines anderen Einsatzes"
+    );
+    assert_eq!(anzahl().await, 0, "keine Sichtung gespeichert");
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &admin,
+        Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": eigene_kraft})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Personensitzung");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &admin,
+        Some(&json!({"art": "vor_ort", "bestaetigt_personal_id": eigene_kraft})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Personensitzung, Verbleib"
+    );
+    assert_eq!(anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn bestaetigung_erweitert_die_rechte_des_geraets_nicht() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let pid = person_in(&app, &geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    let (s, _, _) = post_roh(
+        &app,
+        &geraet,
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    // Außerhalb der Ansicht weiter 403, die fremde UHS weiter 404, das Gerät bleibt das Gerät.
+    for (methode, pfad) in [
+        ("GET", format!("/api/einsaetze/{einsatz}/etb")),
+        ("GET", format!("/api/einsaetze/{einsatz}/personal")),
+        ("GET", format!("/api/einsaetze/{einsatz}/personen/export")),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),
+        ),
+    ] {
+        let (s, v) = anfrage(&app, methode, &pfad, &geraet, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{methode} {pfad}: {v}");
+    }
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{sued}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, v) = me(&app, &geraet).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!v["geraet"].is_null(), "weiter eine Gerätesitzung: {v}");
+}
+
+#[tokio::test]
+async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    kraft(&app, &admin, einsatz, "Zander").await;
+    kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/personen/bestaetiger");
+
+    let (s, v) = anfrage(&app, "GET", &pfad, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let namen: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, ["Dr. A. Muster", "Zander"]);
+    assert_eq!(v[0]["funktion"], "Notärztin");
+
+    let (s, _) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Personensitzung");
+
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Wand"}),
+    )
+    .await;
+    let monitor = koppeln(&app, &code, None).await.cookie.unwrap();
+    let (s, _) = anfrage(&app, "GET", &pfad, &monitor, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Lagemonitor");
+}
+
+// ---------- Bereitstellungsraum (LFH-1042) ----------
+
+/// Legt einen BR an (`geplant`); mit `aktiv` setzt die Einsatzleitung ihn in Betrieb.
+async fn br_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str, aktiv: bool) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        cookie,
+        Some(&json!({"bezeichnung": bez})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let br = v["id"].as_i64().unwrap();
+    if aktiv {
+        let (s, v) = anfrage_json(
+            app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+            cookie,
+            Some(&json!({"status": "aktiv"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+    br
+}
+
+/// Ein gekoppeltes BR-Gerät: `(kopplung_id, geräte-cookie)`.
+async fn br_geraet(app: &axum::Router, cookie: &str, einsatz: i64, br: i64) -> (i64, String) {
+    let (id, code) = kopplung(
+        app,
+        cookie,
+        einsatz,
+        json!({"ansicht": "bereitstellungsraum", "stelle_id": br, "bezeichnung": "Tablet BR"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    (id, a.cookie.expect("Sitzungscookie"))
+}
+
+async fn belegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+    einheit: i64,
+    art: &str,
+) -> (StatusCode, Value) {
+    anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung"),
+        cookie,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit, "art": art})),
+    )
+    .await
+}
+
+/// Das BR-Gerät kennt nur seinen Raum: Liste nur der eigene, ein fremder ist 404.
+#[tokio::test]
+async fn br_geraet_kennt_nur_den_eigenen_raum() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+
+    let (s, ich) = me(&app, &geraet).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(ich["geraet"]["stelle"], "BR Sportplatz");
+
+    let liste = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume");
+    let (s, v) = anfrage(&app, "GET", &liste, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ids: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![sportplatz], "nur der eigene Raum");
+    let (_, v) = anfrage(&app, "GET", &liste, &admin, None).await;
+    assert_eq!(v.as_array().unwrap().len(), 2, "die Person sieht beide");
+
+    let (s, v) = anfrage(&app, "GET", &format!("{liste}/{sportplatz}"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bezeichnung"], "BR Sportplatz");
+    let (s, _) = anfrage(&app, "GET", &format!("{liste}/{schule}"), &geraet, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+}
+
+/// Anmelden (Eintritt, Wechsel herein) und Abmelden (Austritt) im eigenen Raum; in einen
+/// fremden Raum bucht das Gerät nicht (404, wie beim Lesen).
+#[tokio::test]
+async fn br_geraet_meldet_kraefte_im_eigenen_raum_an_und_ab() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    let rtw = einheit_bilden(&app, &admin, einsatz, "RTW 1").await;
+    let detail = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, v) = anfrage(&app, "GET", &detail, &geraet, None).await;
+    assert_eq!(v["einheiten"][0]["name"], "LF Nord", "{v}");
+
+    // Ein Wechsel herein trägt den eigenen Raum als Ziel.
+    let (s, v) = belegen(&app, &admin, einsatz, schule, rtw, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, rtw, "wechsel").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    // In einen fremden Raum bucht das Gerät nichts, weder hinein noch hinaus.
+    let (s, _) = belegen(&app, &geraet, einsatz, schule, lf, "wechsel").await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Wechsel hinaus");
+    let (s, _) = belegen(&app, &geraet, einsatz, schule, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, lf, "austritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, v) = anfrage(&app, "GET", &detail, &geraet, None).await;
+    let namen: Vec<&str> = v["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, vec!["RTW 1"], "LF Nord ist abgerückt");
+
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == "LF Nord verlässt Bereitstellungsraum BR Sportplatz"),
+        "{etb:?}"
+    );
+}
+
+/// Das Gerät nimmt seinen Raum in Betrieb; auflösen, stornieren, anlegen und ändern bleibt bei
+/// der Einsatzleitung.
+#[tokio::test]
+async fn br_geraet_nimmt_den_raum_in_betrieb_aber_loest_ihn_nicht_auf() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", false).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{raum}/status"),
+        &geraet,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "auflösen aus geplant");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{raum}/status"),
+        &geraet,
+        Some(&json!({"status": "aktiv"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"], "aktiv");
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == "Bereitstellungsraum BR Sportplatz in Betrieb genommen"),
+        "{etb:?}"
+    );
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{raum}/status"),
+        &geraet,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "auflösen");
+
+    for (m, pfad, body) in [
+        ("DELETE", raum.clone(), None),
+        ("PATCH", raum.clone(), Some(json!({"notiz": "x"}))),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+            Some(json!({"bezeichnung": "BR Neu"})),
+        ),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+    let (_, v) = anfrage(&app, "GET", &raum, &admin, None).await;
+    assert_eq!(v["status"], "aktiv", "nichts aufgelöst");
+}
+
+/// Die Kräfte des Einsatzes liest das Gerät als Liste, ändern und abrufen kann es sie nicht; den
+/// Rest des Einsatzes (ETB, Personen, Einsatzabschnitte) erreicht es nicht.
+#[tokio::test]
+async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v[0]["name"], "LF Nord");
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    for (m, pfad, body) in [
+        (
+            "PATCH",
+            format!("/api/einsaetze/{einsatz}/einheiten/{lf}"),
+            Some(json!({"name": "LF Süd"})),
+        ),
+        (
+            "PATCH",
+            format!("/api/einsaetze/{einsatz}/einheiten/{lf}/position"),
+            Some(json!({"lat": 52.5, "lon": 13.4})),
+        ),
+        ("GET", format!("/api/einsaetze/{einsatz}/etb"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/personen"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/abschnitte"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/uhs"), None),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+
+    // Modulfreigaben und Zähler folgen der Ansicht; ein gebundenes Gerät bekommt keine
+    // einsatzweiten Zähler, auch nicht für die Kräfteliste, die es liest.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["einheiten"].is_null(), "{v}");
+    assert!(
+        v["meldungen"].is_null(),
+        "kein einsatzweiter Meldungszähler: {v}"
+    );
+    assert!(v["personen"].is_null(), "{v}");
+}
+
+/// Meldungen an die Einsatzleitung wie am UHS-Laptop: anlegen und nur die eigenen lesen.
+#[tokio::test]
+async fn br_geraet_meldet_und_liest_nur_eigene_meldungen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldung = |inhalt: &str| {
+        json!({
+            "absender": "BR Sportplatz",
+            "meldeweg": "persoenlich",
+            "inhalt": inhalt,
+            "ereigniszeit": "2026-10-08 10:00:00",
+        })
+    };
+
+    let (s, v) = anfrage_json(&app, "POST", &meldungen, &admin, Some(&meldung("Lage"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &geraet,
+        Some(&meldung("Raum voll")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage(&app, "GET", &meldungen, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let inhalte: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["inhalt"].as_str().unwrap())
+        .collect();
+    assert_eq!(inhalte, vec!["Raum voll"], "nur die eigene Meldung");
+}
+
+/// Ein widerrufenes BR-Gerät verliert sofort jeden Zugriff.
+#[tokio::test]
+async fn widerrufenes_br_geraet_verliert_den_raum() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (id, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let (s, _) = anfrage(&app, "GET", &raum, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK);
+
+    widerrufen(&app, &admin, einsatz, id).await;
+    let (s, _) = anfrage(&app, "GET", &raum, &geraet, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+}
+
+/// Der Live-Kanal des BR-Geräts trägt die Änderungen am Raum, aber kein ETB: eine Anmeldung durch
+/// die Einsatzleitung erreicht das Tablet, ihr ETB-Eintrag nicht.
+#[tokio::test]
+async fn live_kanal_des_br_geraets_traegt_den_raum_ohne_etb() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+
+    let mut br_strom = live_geraet(&app, &geraet, einsatz).await;
+    let mut admin_strom = live_geraet(&app, &admin, einsatz).await;
+    let (s, v) = belegen(&app, &admin, einsatz, sportplatz, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let mut beim_admin = Vec::new();
+    strom_lesen(
+        &mut admin_strom,
+        &mut beim_admin,
+        Duration::from_millis(500),
+    )
+    .await;
+    assert!(
+        beim_admin.iter().any(|e| e == "etb"),
+        "Gegenprobe: {beim_admin:?}"
+    );
+    let mut beim_br = Vec::new();
+    strom_lesen(&mut br_strom, &mut beim_br, Duration::from_millis(500)).await;
+    assert!(
+        beim_br.iter().any(|e| e == "bereitstellungsraum"),
+        "{beim_br:?}"
+    );
+    assert!(!beim_br.iter().any(|e| e == "etb"), "{beim_br:?}");
+}
+
+// ---------- Kräfte der UHS (LFH-1045) ----------
+
+/// Ad-hoc-Kraft im Einsatz (ohne UHS), disponiert von der Leitung; liefert die `ep_id`.
+async fn uhs_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&json!({"adhoc": {"name": name, "staerke_position": "mannschaft"}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// Die Stärke der UHS aus dem Detail, wie die Leitung sie sieht.
+async fn uhs_staerke(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64) -> Value {
+    let (s, v) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v["staerke"].clone()
+}
+
+#[tokio::test]
+async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let kraefte = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte");
+    let frei = uhs_kraft(&app, &admin, einsatz, "Freie Kraft").await;
+    let bei_sued = uhs_kraft(&app, &admin, einsatz, "Kraft Süd").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/{bei_sued}", kraefte(sued)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Leitung ordnet der UHS Süd zu");
+
+    // Auswahl: nur Kräfte ohne UHS.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/verfuegbar", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ids: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![frei], "{v}");
+
+    // Freie Kraft zuordnen: Erfolg, Stärke der eigenen UHS steigt.
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/{frei}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        uhs_staerke(&app, &geraet, einsatz, nord).await,
+        json!({"fuehrer": 0, "unterfuehrer": 0, "mannschaft": 1})
+    );
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(detail["kraefte"][0]["name"], "Freie Kraft", "{detail}");
+
+    // Eine Kraft der UHS Süd holt der Laptop nicht zu sich.
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/{bei_sued}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(
+        uhs_staerke(&app, &admin, einsatz, sued).await["mannschaft"],
+        json!(1),
+        "bleibt an der UHS Süd"
+    );
+
+    // Fremde UHS: lesen und ändern 404.
+    for (methode, pfad, body) in [
+        ("GET", format!("{}/verfuegbar", kraefte(sued)), None),
+        ("PUT", format!("{}/{frei}", kraefte(sued)), None),
+        ("DELETE", format!("{}/{bei_sued}", kraefte(sued)), None),
+        (
+            "POST",
+            kraefte(sued),
+            Some(json!({"name": "Spontan"}).to_string()),
+        ),
+    ] {
+        let (s, _) = anfrage(&app, methode, &pfad, &geraet, body.as_deref()).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{methode} {pfad}");
+    }
+
+    // Ad hoc an der eigenen UHS erfassen, dann lösen.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &kraefte(nord),
+        &geraet,
+        Some(&json!({"name": "Spontanhelfer", "funktion": "Sanitäter", "staerke_position": "mannschaft"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let spontan = v["id"].as_i64().unwrap();
+    assert_eq!(
+        uhs_staerke(&app, &admin, einsatz, nord).await["mannschaft"],
+        json!(2)
+    );
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/{spontan}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    // Eine ganze Einheit zuordnen bleibt der Leitung.
+    let einheit = common::einheit_bilden(&app, &admin, einsatz, "SEG 1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/einheit/{einheit}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    // Das Tablet erreicht keine dieser Routen und sieht keine Kräfte im Detail.
+    for (methode, pfad, body) in [
+        ("GET", format!("{}/verfuegbar", kraefte(nord)), None),
+        ("PUT", format!("{}/{frei}", kraefte(nord)), None),
+        ("DELETE", format!("{}/{frei}", kraefte(nord)), None),
+        (
+            "POST",
+            kraefte(nord),
+            Some(json!({"name": "Spontan"}).to_string()),
+        ),
+    ] {
+        let (s, _) = anfrage(&app, methode, &pfad, &tablet, body.as_deref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "Tablet {methode} {pfad}");
+    }
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+        &tablet,
+        None,
+    )
+    .await;
+    assert_eq!(detail["kraefte"], json!([]), "{detail}");
+}
+
+#[tokio::test]
+async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    for name in ["Kraftmann", "Kraftfrau", "Kraftkind", "Kraftopa"] {
+        let ep = uhs_kraft(&app, &admin, einsatz, name).await;
+        let (s, _) = anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/{ep}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+    }
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &monitor,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let uhs = v["uhs"].as_array().unwrap();
+    let zahl = |id: i64| uhs.iter().find(|u| u["id"] == id).unwrap()["kraefte"].clone();
+    assert_eq!(zahl(nord), json!(4));
+    assert_eq!(zahl(sued), json!(0));
+    let text = v.to_string();
+    assert!(!text.contains("Kraft"), "Name in der Antwort: {text}");
+    assert!(!text.contains("\"funktion\""), "{text}");
 }
 
 // ---------- Betreuungsstelle (LFH-1041) ----------

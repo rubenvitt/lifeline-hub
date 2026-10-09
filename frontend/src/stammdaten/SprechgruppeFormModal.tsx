@@ -1,4 +1,4 @@
-import { App, Form, Input } from 'antd';
+import { App, Collapse, Form, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,11 +8,14 @@ import { aktualisiereSprechgruppe, legeSprechgruppeAn } from '../api/sprechgrupp
 import type { Betriebsart, Sprechgruppe } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
+import { SPRECHGRUPPE_BEDINGUNG_MAX } from '../api/eingabegrenzen';
 
 interface FormWerte {
   bezeichnung: string;
   betriebsart: Betriebsart;
   hinweis?: string;
+  netz?: string;
+  sicherheit?: string;
 }
 
 export default function SprechgruppeFormModal({
@@ -35,6 +38,8 @@ export default function SprechgruppeFormModal({
       bezeichnung: sprechgruppe.bezeichnung,
       betriebsart: sprechgruppe.betriebsart,
       hinweis: sprechgruppe.hinweis ?? undefined,
+      netz: sprechgruppe.netz ?? undefined,
+      sicherheit: sprechgruppe.sicherheit ?? undefined,
     });
   }, [offen, sprechgruppe, form]);
 
@@ -44,6 +49,8 @@ export default function SprechgruppeFormModal({
         bezeichnung: werte.bezeichnung.trim(),
         betriebsart: werte.betriebsart,
         hinweis: leerZuNull(werte.hinweis),
+        netz: leerZuNull(werte.netz),
+        sicherheit: leerZuNull(werte.sicherheit),
       };
       return sprechgruppe
         ? aktualisiereSprechgruppe(sprechgruppe.id, eingabe)
@@ -92,6 +99,32 @@ export default function SprechgruppeFormModal({
       <Form.Item label="Hinweis" name="hinweis">
         <Input placeholder="Optionaler Hinweis" />
       </Form.Item>
+      {/* Feldbudget (LFH-19): drei Felder offen, Netz und Sicherheit (LFH-1030) zugeklappt. Trägt
+         die Sprechgruppe schon eine der beiden, steht der Bereich offen (je Sprechgruppe neu
+         montiert, `key`): zugeklappt wären die Felder nicht montiert, `onFinish` ließe sie aus,
+         und der PATCH leerte sie. Kurze Felder: natives `maxLength` aus dem Grenzspiegel. */}
+      <Collapse
+        key={sprechgruppe?.id ?? 'neu'}
+        ghost
+        style={{ marginInline: -8 }}
+        defaultActiveKey={sprechgruppe?.netz || sprechgruppe?.sicherheit ? ['bedingung'] : []}
+        items={[
+          {
+            key: 'bedingung',
+            label: 'Netz und Sicherheit',
+            children: (
+              <>
+                <Form.Item label="Netz" name="netz">
+                  <Input placeholder="z. B. Gateway" maxLength={SPRECHGRUPPE_BEDINGUNG_MAX} />
+                </Form.Item>
+                <Form.Item label="Sicherheit" name="sicherheit">
+                  <Input placeholder="z. B. E2E" maxLength={SPRECHGRUPPE_BEDINGUNG_MAX} />
+                </Form.Item>
+              </>
+            ),
+          },
+        ]}
+      />
     </ErfassungsModal>
   );
 }

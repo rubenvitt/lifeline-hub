@@ -37,7 +37,7 @@ Kopplung.
 | `unfallhilfsstellen`: Plätze anlegen, ändern, stornieren; Stammdaten der eigenen UHS; Anhänge der eigenen UHS | — | L/S | — |
 | `unfallhilfsstellen`: UHS anlegen, Status wechseln, stornieren | — | — | — |
 | `personen`: Personen der eigenen UHS | L | L | — |
-| `personen`: Aufnahme in die eigene UHS, Stammdaten, Sichtung, Verbleib, Notizen | S | S | — |
+| `personen`: Aufnahme in die eigene UHS, Stammdaten, Sichtung, Verbleib, Notizen, Auswahl „Bestätigt von“ | S | S | — |
 | `personen`: Export, Druck, Abgleich, Anhänge | — | — | — |
 | `material`: Material der eigenen UHS | — | L | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | — | L/S | — |
@@ -164,3 +164,73 @@ darf.
 
 - **WHEN** im Einsatz ein ETB-Eintrag entsteht
 - **THEN** erhält ein UHS-Tablet dazu kein Live-Ereignis
+
+### Requirement: Ansicht Bereitstellungsraum
+
+Die Funktionsansicht `bereitstellungsraum` SHALL an genau einen Bereitstellungsraum des Einsatzes
+gebunden sein und die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben;
+was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR der Kopplung.
+
+| Modul / Bereich | Bereitstellungsraum |
+| --- | --- |
+| Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
+| `bereitstellungsraeume`: eigener BR mit Belegung | L |
+| `bereitstellungsraeume`: Einheit oder Fahrzeug im eigenen BR anmelden (Eintritt, Wechsel herein), abmelden (Austritt) | S |
+| `bereitstellungsraeume`: eigenen BR in Betrieb nehmen (`geplant → aktiv`) | S |
+| `bereitstellungsraeume`: BR anlegen, Stammdaten ändern, auflösen, stornieren | — |
+| `einheiten`, `fahrzeuge`: Liste des Einsatzes | L |
+| `einheiten`, `fahrzeuge`: Detail, Position, Ändern, Abschnitt oder Auftrag zuweisen | — |
+| `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
+| alle übrigen Module, Einstellungen, Verwaltung | — |
+
+#### Scenario: Fremder BR
+
+- **WHEN** das Gerät des BR Sportplatz den BR Schule abruft
+- **THEN** antwortet der Server mit 404
+
+#### Scenario: BR-Liste
+
+- **WHEN** das Gerät des BR Sportplatz die BR-Liste abruft
+- **THEN** enthält sie nur den BR Sportplatz
+
+#### Scenario: Einheit anmelden
+
+- **WHEN** das Gerät des BR Sportplatz eine Einheit mit Eintritt in den BR Sportplatz bucht
+- **THEN** steht die Einheit im BR Sportplatz
+
+#### Scenario: Einheit in fremden BR buchen
+
+- **WHEN** das Gerät des BR Sportplatz eine Einheit in den BR Schule bucht
+- **THEN** antwortet der Server mit 404
+
+#### Scenario: Einheit abmelden
+
+- **WHEN** das Gerät des BR Sportplatz eine Einheit mit Austritt aus dem BR Sportplatz bucht
+- **THEN** steht die Einheit in keinem BR mehr
+
+#### Scenario: In Betrieb nehmen
+
+- **WHEN** das Gerät seinen geplanten BR auf `aktiv` setzt
+- **THEN** ist der BR aktiv
+
+#### Scenario: Auflösen am Gerät
+
+- **WHEN** das Gerät seinen aktiven BR auf `aufgeloest` setzt
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Einheit ändern
+
+- **WHEN** das Gerät eine Einheit des Einsatzes ändert
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Nur eigene Meldungen
+
+- **WHEN** die Einsatzleitung und das Gerät je eine Meldung anlegen
+- **AND** das Gerät die Meldungsliste abruft
+- **THEN** enthält sie nur die Meldung des Geräts
+
+#### Scenario: Widerruf
+
+- **WHEN** die Einsatzleitung die Kopplung widerruft
+- **AND** das Gerät danach seinen BR abruft
+- **THEN** antwortet der Server mit 401

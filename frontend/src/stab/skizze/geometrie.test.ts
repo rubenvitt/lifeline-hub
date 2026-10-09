@@ -35,7 +35,7 @@ const LINIE = 200 + SCHIENE_LINIE_VERSATZ;
 describe('Stichleitung', () => {
   it('aus der eigenen Steigleitung: waagerecht hinein, senkrecht auf die Linie', () => {
     const stelle = platz({ x: 160, y: 40, steigX: 140 });
-    const pkt = stichleitungsPunkte({ art: 'abschnitt' }, stelle, SCHIENE);
+    const pkt = stichleitungsPunkte({ art: 'abschnitt', bezeichnung: '' }, stelle, SCHIENE);
     const mitte = zeichenMitte({ art: 'abschnitt' }, stelle);
     expect(pkt).toEqual([
       { x: 160, y: mitte.y },
@@ -46,7 +46,9 @@ describe('Stichleitung', () => {
 
   it('Führungsstelle (Steigleitung in der Mitte): senkrecht unten heraus', () => {
     const stelle = platz({ x: 200, y: 40, steigX: 250 });
-    expect(stichleitungsPunkte({ art: 'fuehrungsstelle' }, stelle, SCHIENE)).toEqual([
+    expect(
+      stichleitungsPunkte({ art: 'fuehrungsstelle', bezeichnung: '' }, stelle, SCHIENE),
+    ).toEqual([
       { x: 250, y: 120 },
       { x: 250, y: LINIE },
     ]);
@@ -54,7 +56,7 @@ describe('Stichleitung', () => {
 
   it('verschoben über der Schiene: senkrecht aus der Mitte', () => {
     const stelle = platz({ x: 300, y: 400 });
-    expect(stichleitungsPunkte({ art: 'einheit' }, stelle, SCHIENE)).toEqual([
+    expect(stichleitungsPunkte({ art: 'einheit', bezeichnung: '' }, stelle, SCHIENE)).toEqual([
       { x: 350, y: 400 },
       { x: 350, y: LINIE },
     ]);
@@ -62,7 +64,7 @@ describe('Stichleitung', () => {
 
   it('neben der Schiene: waagerecht bis an ihr Ende, dann auf die Linie', () => {
     const stelle = platz({ x: 700, y: 100 });
-    const pkt = stichleitungsPunkte({ art: 'extern' }, stelle, SCHIENE);
+    const pkt = stichleitungsPunkte({ art: 'extern', bezeichnung: '' }, stelle, SCHIENE);
     const ay = zeichenMitte({ art: 'extern' }, stelle).y;
     expect(pkt).toEqual([
       { x: 700, y: ay },
@@ -78,7 +80,7 @@ describe('Stichleitung', () => {
       platz({ x: 120, y: 500 }),
       platz({ x: 0, y: LINIE - 40 }),
     ]) {
-      const pkt = stichleitungsPunkte({ art: 'einheit' }, stelle, SCHIENE);
+      const pkt = stichleitungsPunkte({ art: 'einheit', bezeichnung: '' }, stelle, SCHIENE);
       const letzter = pkt[pkt.length - 1];
       expect(letzter.y).toBe(LINIE);
       expect(letzter.x).toBeGreaterThanOrEqual(100);

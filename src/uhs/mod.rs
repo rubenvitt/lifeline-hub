@@ -1,6 +1,7 @@
 pub mod anhang;
 pub mod belegung_repo;
 pub mod hooks;
+pub mod kraefte;
 pub mod plan;
 pub mod platz_repo;
 pub mod repo;
@@ -129,7 +130,7 @@ wire_enum! {
     try_from = |s| format!("Ungültige BelegungsArt: {s}");
 }
 
-/// Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder).
+/// Serialisierbare UHS-Anzeige (1:1 zur Tabelle plus die berechnete Stärke).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct UhsAnzeige {
     pub id: i64,
@@ -150,6 +151,10 @@ pub struct UhsAnzeige {
     pub geaendert_at: String,
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
+    /// Stärke aus den zugeordneten Einsatzkräften (LFH-1045, Spec `uhs-staerke`), berechnet in
+    /// `repo::SELECT_ALLE`, nie gespeichert. `0/0/0` ohne Kräfte.
+    #[sqlx(flatten)]
+    pub staerke: crate::staerke::Staerke,
 }
 
 /// Serialisierbare Platz-Anzeige (1:1 zur Tabelle).

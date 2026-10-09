@@ -114,3 +114,65 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
     await kontext.close();
   }
 });
+
+/**
+ * Bediener am Gerät (LFH-1046, Spec `geraete-kopplung`): am Tablet nennt die Sichtung eine
+ * Person aus dem Einsatzpersonal; der Verlauf zeigt sie, das ETB nennt Gerät, Stelle und Person.
+ *
+ * Mutationsprobe: in `SichtungDialog` `<BestaetigtVonFeld>` entfernt → das Feld fehlt (rot).
+ */
+test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, browser }) => {
+  await anmeldenAlsAdmin(page);
+  const e = (await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Bediener ${Date.now()}` }))
+    .id;
+  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+    typ: 'behandlungsplatz',
+    bezeichnung: 'UHS Nord',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/einsaetze/${e}/personal`, {
+    adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
+  });
+  const person = await anlegen(page, `/api/einsaetze/${e}/personen`, {
+    name: 'Patient',
+    uhs_id: nord.id,
+  });
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+    ansicht: 'uhs-tablet',
+    uhs_id: nord.id,
+    bezeichnung: 'Tablet 1',
+  });
+
+  const kontext = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    hasTouch: true,
+  });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/patienten$`));
+
+    await tablet.goto(`/geraet/${e}/patienten/${person.id}`);
+    await tablet.getByRole('button', { name: 'Sichten', exact: true }).click();
+    const dialog = tablet.getByRole('dialog', { name: 'Sichtung erfassen' });
+    await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
+    await tablet.getByTitle('SK II', { exact: true }).click();
+    await dialog.getByRole('combobox', { name: 'Bestätigt von' }).click();
+    await tablet.getByTitle('Dr. A. Muster · Notärztin').click();
+    await dialog.getByRole('button', { name: 'Übernehmen' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(tablet.getByText('bestätigt: Dr. A. Muster')).toBeVisible();
+  } finally {
+    await kontext.close();
+  }
+
+  const etb = (await (await page.request.get(`/api/einsaetze/${e}/etb`)).json()) as {
+    typ: string;
+    inhalt: string;
+    erfasser_name: string;
+  }[];
+  const eintrag = etb.find((x) => x.typ === 'system' && x.inhalt.includes('Sichtung SK II'));
+  expect(eintrag?.inhalt).toMatch(/, bestätigt: Dr\. A\. Muster$/);
+  expect(eintrag?.erfasser_name).toBe('UHS Nord · Tablet 1');
+});

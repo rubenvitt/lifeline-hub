@@ -1,3 +1,73 @@
+## [1.0.0-alpha.97](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.96...v1.0.0-alpha.97) (2026-10-09)
+
+### Kommunikation
+
+#### Fernmeldeskizze
+
+- Die Fernmeldeskizze passt sich nun automatisch an verschiedene Bildschirmgrößen und Eingabegeräte an – mit optimierten Trefflächen für Touch-Bedienung am Handy (72 px Mindestgröße für Finger), Tablet mit Handschuhen und präzise Maussteuerung am Desktop
+- Bei starker Verkleinerung wechselt die Ansicht automatisch in einen Übersichtsmodus: Ein Tippen oder Klick zoomt die Skizze an der gewählten Stelle heran, erst dann können einzelne Elemente ausgewählt werden
+- Verbindungslinien zwischen Stellen sind nun auch mit Handschuhen sicher zu treffen
+- Komponenten und externe Stellen werden mit ausreichendem Abstand dargestellt, sodass sie auch auf kleinen Bildschirmen (ab 390 px Breite) gut bedienbar bleiben
+- Das Layout wurde korrigiert: Komponenten und Stichleitungen werden nun an der richtigen Position gezeichnet, Abstände zwischen den Zeilen wurden optimiert
+
+## [1.0.0-alpha.96](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.95...v1.0.0-alpha.96) (2026-10-09)
+
+### Kräfte und Mittel
+
+**Kräfte können nun Unterstützungseinheiten zugeordnet werden.** Die Stärke einer UHS wird automatisch aus den ihr zugeordneten Einsatzkräften berechnet. In der UHS-Detailansicht steht ein neuer Reiter „Kräfte" zur Verfügung, der die Stärke, Qualifikationen und eine Liste der zugeordneten Kräfte zeigt. Über das UHS-Laptop können Kräfte der eigenen UHS zugeordnet, erfasst oder abgezogen werden. Im Lagemonitor und Lage-Dashboard wird die Anzahl der Kräfte an einer UHS angezeigt.
+
+**Bereitstellungsräume können nun über ein gekoppeltes Tablet verwaltet werden.** Die BR-Leitung kann über ein zugeordnetes Gerät Einheiten und Fahrzeuge im eigenen Bereitstellungsraum an- und abmelden sowie den Raum in Betrieb nehmen. Das Gerät zeigt nur den eigenen Bereitstellungsraum und kann Meldungen an die Einsatzleitung senden. Die Verwaltung von Stammdaten und das Auflösen von Räumen bleibt der Einsatzleitung vorbehalten.
+
+### Betrieb und Installation
+
+**Verbesserte Stabilität bei hoher Systemlast.** Zwei Anzeigeprobleme wurden behoben, die bei hoher Auslastung zu falschem Scroll-Verhalten in der Sprungpalette und zu fehlendem Fokus in Infotelefon-Formularen führen konnten.
+
+## [1.0.0-alpha.95](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.94...v1.0.0-alpha.95) (2026-10-09)
+
+### Wichtige Änderungen
+
+- **Datenbankmigrationen**: Dieses Release enthält mehrere Datenbankmigrationen (0158–0166), die beim ersten Start automatisch ausgeführt werden. Eine Datensicherung vor dem Update wird empfohlen.
+
+### Kommunikation
+
+- **Sprechgruppen mit Netz und Sicherheit**: Sprechgruppen können jetzt die Bedingungsangaben „Netz" und „Sicherheit" (je max. 40 Zeichen) tragen. Diese werden im Katalog, beim einsatzlokalen Anlegen, im taktischen Zeichen, im Funkplan und in der Fernmeldeskizze angezeigt.
+
+- **Fernmeldeskizze als Anlage**: Die aktuelle Fernmeldeskizze kann nun als Bild-Anlage an Lageberichte und Befehle angehängt werden. Anlagen werden im Paneel angezeigt und im Ausdruck auf einem eigenen Blatt A4 quer dargestellt.
+
+- **Stabilere Live-Aktualisierung der Fernmeldeskizze**: Während Zeiger oder Fokus in der Skizze liegen, springen Elemente nicht mehr unter dem Zeiger, wenn andere Arbeitsplätze Änderungen vornehmen. Der Bildlauf gleicht Größenänderungen aus.
+
+### Führung
+
+- **Gerätekopplung für Einsatzabschnitte**: Geräte können nun an Einsatzabschnitte gebunden werden und zeigen eine angepasste Ansicht mit Einheiten des Teilbaums, Aufträgen mit Quittung, Meldemöglichkeit und einer Lagekarte mit Gefahrenzonen. Die Kopplung ist während der Dauer der Führungsaufgabe aktiv; aufgelöste Abschnitte widerrufen ihre Kopplungen automatisch.
+
+- **Erweiterte Stellenbindung**: Neben UHS-Stellen können Geräte künftig auch an Betreuungsstellen, Bereitstellungsräume und Verpflegungsstellen gebunden werden (Ansichten noch nicht aktiviert).
+
+- **Namentliche Bestätigung bei UHS-Geräten**: Bei Sichtung, Erst-Sichtung und Verbleib kann am UHS-Gerät eine Person aus dem Einsatzpersonal als Bestätigende eingetragen werden. Die Bestätigung erscheint im Einsatztagebuch und im Verlauf der Personenakte.
+
+### Zeiterfassung und Erinnerungen
+
+- **Korrekte Zeitvorbelegung bei vorgehenden Uhren**: Zeitfelder (Auftragserteilung, Alarmzeit, Erinnerungsfälligkeit, Lagebesprechungsabschluss, Wiedervorlage) nutzen jetzt die Serverzeit statt der Gerätezeit. Auf Geräten mit vorgehender Uhr werden dadurch keine zu frühen Zeitstempel mehr gesendet.
+
+- **Datenlöschung nach Kategoriefristen**: Die Karenzfrist für Datenkategorien beginnt jetzt ab dem Fristablauf, nicht erst ab dem nächsten Prüflauf. Nach Rückspielen einer Sicherung oder einem Stillstand beginnt die Karenz nicht neu.
+
+### Barrierefreiheit und Bedienung
+
+- **Verbesserte Treflflächen**: Beschriftete Optionsknöpfe haben jetzt die volle Zielhöhe nach den Dichtestufen (24/48/72 px), nicht mehr nur die Schrifthöhe.
+
+- **Kontrastverbesserung**: Zurückgenommene Texte in der Fernmeldeskizze erreichen jetzt im Tag-Modus das Ziel 7:1 statt nur den Boden 4,5:1 (Deckkraft von 0,6 auf 0,72 erhöht).
+
+### Betrieb und Installation
+
+- **Marketing-Website**: Neue statische Website unter `website/` mit Astro, die Module, Zeitachse, Leitsätze und Beispiele in der Gestaltungssprache „Instrumententafel" zeigt.
+
+- **Beschleunigte CI-Läufe**: Änderungen, die ausschließlich die Marketing-Website betreffen, durchlaufen nur noch Schnellprüfungen statt der vollständigen Test-Suite.
+
+### Fehlerbehebungen
+
+- **Stabile Kartenansicht**: Der Cache für Kartenkacheln wird jetzt nur noch pro Pfad verworfen, nicht mehr global. Parallele Tests beeinflussen sich dadurch nicht mehr gegenseitig.
+
+- **Robustere E2E-Tests**: Mehrere Zuverlässigkeitsverbesserungen in den automatisierten Tests, unter anderem besseres Warten auf Dialoge, Behandlung ausgehängter DOM-Knoten und Schließen stehender Benachrichtigungen vor Klicks im Seitenkopf.
+
 ## [1.0.0-alpha.94](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.93...v1.0.0-alpha.94) (2026-10-08)
 
 ### Datensicht

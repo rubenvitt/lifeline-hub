@@ -55,6 +55,83 @@ export function kleinsterMassstab(inhalt: Groesse, flaeche: Groesse): number {
   return Math.min(ZOOM_MIN, eingepasst(inhalt, flaeche).skala);
 }
 
+/**
+ * Boden der Treffläche je Dichte-Stufe (LFH-1038 D2): kurze Achse und Abstand zweier Ziele in
+ * Pixeln. Kompakt und komfortabel halten Kriterium 1 der Prüfliste (24 px, die Wahl ist keine
+ * zeitkritische Aktion), Handschuh Kriterium 2 (72 px, 16 px Abstand). Über das Token, nicht
+ * `useDichte()`, damit Bedienhöhe und Boden unter einem lokalen Theme nicht auseinanderlaufen.
+ */
+export interface Trefferboden {
+  ziel: number;
+  abstand: number;
+}
+
+export function trefferboden(token: { controlHeight: number }): Trefferboden {
+  return token.controlHeight >= 72 ? { ziel: 72, abstand: 16 } : { ziel: 24, abstand: 0 };
+}
+
+/**
+ * Ein Zeigerziel der Fläche: Rechteck in Skizzeneinheiten und ein senkrechter Rand in Pixeln, der
+ * nicht mitzoomt (eine Schiene ist eine Linie mit einem Band nach Dichte über und unter ihr, in
+ * der Waagerechten genau so lang wie die Linie; Stellen haben keinen Rand).
+ */
+export interface Zeigerziel {
+  key: string;
+  x: number;
+  y: number;
+  breite: number;
+  hoehe: number;
+  rand: number;
+}
+
+/** Freier Abstand zweier Ziele in Pixeln beim Maßstab `s`. */
+function freierAbstand(dx: number, dy: number, rand: number, s: number): number {
+  return Math.hypot(dx * s, Math.max(0, dy * s - rand));
+}
+
+/**
+ * Kleinster Maßstab, bei dem jedes Ziel den Boden der Stufe hält (LFH-1038 D1): die kurze Seite
+ * jeder Stelle und, mit Abstand, der freie Raum zwischen zwei Zielen samt ihrer Bänder. Nicht
+ * zählen Paare, die sich in Einheiten berühren oder überlappen (übereinander geschobene Stellen),
+ * und Paare, die `verbunden` nennt (Stelle und Schiene einer Stichleitung: dazwischen liegt die
+ * Stichleitung selbst als Ziel). Gedeckelt auf {@link ZOOM_MAX}; ohne Ziele 0.
+ */
+export function mindestMassstab(
+  ziele: readonly Zeigerziel[],
+  boden: Trefferboden,
+  verbunden: (a: string, b: string) => boolean = () => false,
+): number {
+  let s = 0;
+  for (const z of ziele) {
+    const kurz = Math.min(z.breite, z.hoehe);
+    if (z.rand === 0 && kurz > 0) s = Math.max(s, boden.ziel / kurz);
+  }
+  if (boden.abstand > 0) {
+    for (let i = 0; i < ziele.length; i++) {
+      for (let j = i + 1; j < ziele.length; j++) {
+        const a = ziele[i];
+        const b = ziele[j];
+        const dx = Math.max(0, a.x - (b.x + b.breite), b.x - (a.x + a.breite));
+        const dy = Math.max(0, a.y - (b.y + b.hoehe), b.y - (a.y + a.hoehe));
+        if ((dx === 0 && dy === 0) || verbunden(a.key, b.key)) continue;
+        const rand = a.rand + b.rand;
+        if (freierAbstand(dx, dy, rand, s) >= boden.abstand) continue;
+        if (freierAbstand(dx, dy, rand, ZOOM_MAX) < boden.abstand) return ZOOM_MAX;
+        // Der Abstand wächst mit dem Maßstab: halbieren zwischen `s` und dem Deckel.
+        let lo = s;
+        let hi = ZOOM_MAX;
+        for (let k = 0; k < 40; k++) {
+          const m = (lo + hi) / 2;
+          if (freierAbstand(dx, dy, rand, m) >= boden.abstand) hi = m;
+          else lo = m;
+        }
+        s = hi;
+      }
+    }
+  }
+  return Math.min(ZOOM_MAX, s);
+}
+
 /** Pixel der Fläche → Skizzeneinheiten. */
 export function zuSkizze(a: Ansicht, px: Punkt): Punkt {
   return { x: a.x + px.x / a.skala, y: a.y + px.y / a.skala };

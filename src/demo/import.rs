@@ -570,6 +570,29 @@ impl Ablauf<'_> {
                 )
                 .await
             }
+            Vorgang::PersonalAnUhs { personal, uhs } => {
+                // Wie `routes/einsatz_uhs_kraefte.rs::zuordnen` (LFH-1045): setzen, ETB.
+                let ep_id = frueher(&self.personal, "Personal", personal)?;
+                let uhs_id = frueher(&self.uhs, "UHS", uhs)?;
+                crate::uhs::kraefte::setze_uhs_tx(conn, self.einsatz_id, ep_id, Some(uhs_id))
+                    .await?;
+                let kraft = crate::personal::disposition_repo::laden_anzeige_tx(
+                    conn,
+                    self.einsatz_id,
+                    ep_id,
+                    true,
+                )
+                .await?;
+                let uhs = crate::uhs::repo::laden_tx(conn, self.einsatz_id, uhs_id).await?;
+                self.system_etb(
+                    conn,
+                    &crate::uhs::kraefte::etb_text_zugeordnet(
+                        &crate::personal::etb_bezeichnung(&kraft.name, kraft.funktion.as_deref()),
+                        &uhs.bezeichnung,
+                    ),
+                )
+                .await
+            }
             Vorgang::Gefahrengebiet(v) => {
                 // Wie `routes/lage_zone.rs::anlegen`: Prüfung, Zone samt Gefahrengebiet-Gruppe,
                 // ETB „eingerichtet“ aus der frisch geladenen Zone.
@@ -776,6 +799,7 @@ impl Ablauf<'_> {
                         kategorie.as_str(),
                         None,
                         self.admin_id,
+                        None,
                         true,
                     )
                     .await?;

@@ -199,7 +199,11 @@ export default function AufnahmePage() {
             )
           }
         >
-          <AufnahmeFelder modus="erfassen" ohneSichtung={!darf('person-sichtung')} />
+          <AufnahmeFelder
+            modus="erfassen"
+            einsatzId={einsatzId}
+            ohneSichtung={!darf('person-sichtung')}
+          />
         </ErfassungsFormular>
       )}
     </EinsatzSeite>

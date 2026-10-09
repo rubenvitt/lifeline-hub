@@ -288,6 +288,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("notiz", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("gesichtet_at", G_ZEIT),
             retain("gesichtet_von", G_FK),
+            // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
         ],
     },
     TabellenRegel {
@@ -326,6 +329,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_von", G_FK),
             // Kennung der Betreuungsstelle eines Notunterkunft-Verbleibs.
             retain("betreuungsstelle_id", G_FK),
+            // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
         ],
     },
     TabellenRegel {
@@ -494,6 +500,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("fahrzeug_id", G_FK),
+            retain("uhs_id", G_FK),
         ],
     },
     // ---------- Karte / freie Zeichen / Anhänge ----------
@@ -1665,6 +1672,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("bezeichnung", G_OP_LABEL),
             retain("betriebsart", G_ENUM),
             scrub("hinweis", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
+            // Netz/Sicherheit (LFH-1030): kurze technische Kennzeichnung des Kanals wie
+            // `bezeichnung`, kein Lagetext und kein Personenbezug.
+            retain("netz", G_OP_LABEL),
+            retain("sicherheit", G_OP_LABEL),
             retain("aktiv", G_KONFIG),
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),

@@ -68,7 +68,7 @@ async fn laden_tx(
     .await?;
     let sprechgruppen = sqlx::query_as::<_, Sprechgruppe>(
         "SELECT sg.id, sg.org_id, sg.einsatz_id, sg.bezeichnung, sg.betriebsart, \
-                sg.hinweis, sg.aktiv, sg.sortier, sg.angelegt_at \
+                sg.hinweis, sg.netz, sg.sicherheit, sg.aktiv, sg.sortier, sg.angelegt_at \
          FROM sprechgruppe sg \
          JOIN einsatz_fuehrungsstelle_sprechgruppe fs ON fs.sprechgruppe_id = sg.id \
          WHERE fs.einsatz_id = ? \

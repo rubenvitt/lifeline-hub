@@ -11,7 +11,11 @@
  * - **Tastatur:** Tab/Umschalt+Tab wandern in der Fokusfolge (`bedienung.ts`) und verlassen die
  *   Fläche an den Enden; alle übrigen Tasten gibt die Fläche als `TastenBefehl` nach oben.
  * - **Ruhige Fläche** (D4): solange Zeiger (ohne Touch) oder Fokus in der Fläche liegen, meldet
- *   sie `onHalten(true)`; die Seite hält dann die auto-gelegten Plätze fest.
+ *   sie `onHalten(true)`; das Bild hält dann, was ein anderer Arbeitsplatz bewegt, und die Fläche
+ *   am Schirm (LFH-1037, `FernmeldeskizzeBild.tsx`).
+ * - **Übersicht** (LFH-1038 D3): unter dem Mindestmaßstab der Dichte-Stufe (`ansicht.ts:
+ *   mindestMassstab`) ist kein Element Zeigerziel; ein Tippen ohne Bewegung zoomt um den Punkt auf
+ *   den Mindestmaßstab, erst dann wählt es. Tastatur, Paneel und Lücken-Wahl wählen immer.
  * - **Druck:** ohne Bedienelemente, Hervorhebung, Filter, Wahl und Meldungen am Element,
  *   eingepasst über die ganze Ausdehnung (D13, Prüfliste O4).
  */
@@ -20,6 +24,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -31,7 +36,9 @@ import type { Fernmeldenetz, NetzStelle } from '../fernmeldeskizze';
 import type { Platz, SkizzenLayout } from '../fernmeldeskizzeLayout';
 import { schienenLinieY } from '../fernmeldeskizzeLayout';
 import {
+  mindestMassstab,
   radFaktor,
+  trefferboden,
   verschiebeAnsicht,
   viewBoxAus,
   zoome,
@@ -40,6 +47,7 @@ import {
   type Ansicht,
   type Groesse,
   type Punkt,
+  type Zeigerziel,
 } from './ansicht';
 import { naechsterFokus, tastenBefehl, type TastenBefehl } from './bedienung';
 import type { ZiehDaten } from './wirkung';
@@ -370,6 +378,38 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
   } = props;
   const { token, rollen } = useRollen();
   const huelle = useRef<HTMLDivElement | null>(null);
+
+  // ── Mindestmaßstab und Übersicht (LFH-1038 D1–D3) ─────────────────────────────────────────
+  const steuerhoehe = token.controlHeight;
+  const boden = trefferboden({ controlHeight: steuerhoehe });
+  const mindest = useMemo(() => {
+    const ziele: Zeigerziel[] = [];
+    for (const st of netz.stellen) {
+      const p = layout.plaetze.get(st.key);
+      if (p) ziele.push({ key: st.key, x: p.x, y: p.y, breite: p.breite, hoehe: p.hoehe, rand: 0 });
+    }
+    // Eine Schiene trifft mit einem Band von `controlHeight` Pixeln um ihre Linie (`schienen`).
+    for (const sch of netz.schienen) {
+      const p = layout.plaetze.get(sch.key);
+      if (p) {
+        ziele.push({
+          key: sch.key,
+          x: p.x,
+          y: schienenLinieY(p),
+          breite: p.breite,
+          hoehe: 0,
+          rand: steuerhoehe / 2,
+        });
+      }
+    }
+    const paare = new Set(stichleitungen(netz).map((st) => `${st.stelle}|${st.schiene}`));
+    return mindestMassstab(
+      ziele,
+      trefferboden({ controlHeight: steuerhoehe }),
+      (a, b) => paare.has(`${a}|${b}`) || paare.has(`${b}|${a}`),
+    );
+  }, [netz, layout, steuerhoehe]);
+  const uebersicht = !druck && effektiv.skala < mindest - 1e-6;
   const svg = useRef<SVGSVGElement | null>(null);
   const elemente = useRef(new Map<string, SVGGElement>());
   const tastatur = useRef(false);
@@ -478,7 +518,8 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
       return;
     }
     const ziel = e.target as Element;
-    if (ziel.getAttribute('data-teil') === 'grund') {
+    // Nur die Haupttaste verschiebt und zoomt; die rechte gehört dem Kontextmenü.
+    if (e.button === 0 && ziel.getAttribute('data-teil') === 'grund') {
       geste.current = { art: 'pan', start: lokal(e), ansicht: effektiv, bewegt: false };
       ziel.setPointerCapture?.(e.pointerId);
     }
@@ -502,7 +543,12 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
   const aufUp = (e: ReactPointerEvent<SVGSVGElement>) => {
     zeiger.current.delete(e.pointerId);
     const g = geste.current;
-    if (g?.art === 'pan' && !g.bewegt) props.onWahl(null);
+    if (g?.art === 'pan' && !g.bewegt) {
+      // In der Übersicht ist der Grund das einzige Ziel: Tippen zoomt, statt die Wahl aufzuheben.
+      if (uebersicht) {
+        onAnsicht(zoome(effektiv, mindest / effektiv.skala, flaeche, inhalt, lokal(e)));
+      } else props.onWahl(null);
+    }
     if (zeiger.current.size < 2) geste.current = null;
   };
 
@@ -511,8 +557,8 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
   const melden = () => onHalten(drin.current.zeiger || drin.current.fokus);
 
   const s = effektiv.skala;
-  /** Trefferbreite dünner Linien am Schirm: Boden 24 px (WCAG 2.5.8), mit der Dichte wachsend. */
-  const linienTreffer = Math.max(24, (token.controlHeight * 2) / 3);
+  /** Trefferbreite dünner Linien am Schirm: Boden der Stufe (24 bzw. 72 px), mit der Dichte wachsend. */
+  const linienTreffer = Math.max(boden.ziel, (token.controlHeight * 2) / 3);
   const zustand = (key: string): Zustand =>
     druck ? { hervorgehoben: false, zurueck: false } : zustandVon(key, hervor, voll);
   // Eine Meldung am Element ist Rückmeldung an diesen Arbeitsplatz, kein Teil des Blatts
@@ -792,6 +838,7 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
         aria-roledescription="Zeichenfläche"
         // Kürzel der Fläche (`bedienung.ts:tastenBefehl`); sichtbar stehen sie an den Menüeinträgen.
         aria-keyshortcuts="Enter V Delete Backspace Escape ArrowUp ArrowDown ArrowLeft ArrowRight Shift+F10 Control+Z Control+Y = - 0"
+        data-uebersicht={uebersicht || undefined}
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
         width="100%"
@@ -800,12 +847,18 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
           display: 'block',
           touchAction: 'none',
           userSelect: 'none',
-          ...(druck ? {} : { cursor: geste.current?.art === 'pan' ? 'grabbing' : 'grab' }),
+          ...(druck
+            ? {}
+            : {
+                cursor: geste.current?.art === 'pan' ? 'grabbing' : uebersicht ? 'zoom-in' : 'grab',
+              }),
         }}
         onPointerDown={druck ? undefined : aufDown}
         onPointerMove={druck ? undefined : aufMove}
         onPointerUp={druck ? undefined : aufUp}
         onPointerCancel={druck ? undefined : aufUp}
+        // In der Übersicht ist kein Element Ziel, also auch kein Kontextmenü des Browsers.
+        onContextMenu={uebersicht ? (e) => e.preventDefault() : undefined}
       >
         {!druck ? (
           <rect
@@ -817,13 +870,16 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
             fill="transparent"
           />
         ) : null}
-        <g data-ebene="bereiche">{bereiche}</g>
-        <g data-ebene="verbindungen">{verbindungen}</g>
-        <g data-ebene="schienen">{schienen}</g>
-        <g data-ebene="stichleitungen">{stichElemente}</g>
-        <g data-ebene="stellen">{stellen}</g>
-        <g data-ebene="schriftfeld">{sf}</g>
-        {griffe}
+        {/* In der Übersicht trifft der Zeiger nur den Grund (LFH-1038 D3). */}
+        <g pointerEvents={uebersicht ? 'none' : undefined}>
+          <g data-ebene="bereiche">{bereiche}</g>
+          <g data-ebene="verbindungen">{verbindungen}</g>
+          <g data-ebene="schienen">{schienen}</g>
+          <g data-ebene="stichleitungen">{stichElemente}</g>
+          <g data-ebene="stellen">{stellen}</g>
+          <g data-ebene="schriftfeld">{sf}</g>
+          {griffe}
+        </g>
       </svg>
     </div>
   );

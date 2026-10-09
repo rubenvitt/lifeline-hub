@@ -2,10 +2,24 @@ use super::UhsAnzeige;
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
+/// Die Stärke zählt die zugeordneten Einsatzkräfte je aufgelöster Position (Dispo-Override vor
+/// Stamm-Default) wie `einheit::mitglied_repo::ist_staerke`; Kräfte ohne Position zählen nicht
+/// (LFH-1045, design.md D1).
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, abschnitt_id, typ, bezeichnung, standort, notiz, status, \
            lat, lon, \
-           erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at \
+           erfasst_at, erfasst_von, geaendert_at, geaendert_von, storniert_at, \
+           (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
+             WHERE ep.uhs_id = uhs.id \
+               AND COALESCE(ep.staerke_position, p.staerke_position) = 'fuehrer') AS fuehrer, \
+           (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
+             WHERE ep.uhs_id = uhs.id \
+               AND COALESCE(ep.staerke_position, p.staerke_position) = 'unterfuehrer') \
+             AS unterfuehrer, \
+           (SELECT COUNT(*) FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
+             WHERE ep.uhs_id = uhs.id \
+               AND COALESCE(ep.staerke_position, p.staerke_position) = 'mannschaft') \
+             AS mannschaft \
     FROM uhs";
 
 /// Eingabedaten beim Anlegen (Handler hat Typ/`bezeichnung` validiert/getrimmt).
@@ -267,14 +281,25 @@ pub async fn storniere(
     geaendert_von: i64,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    let belegt = aktive_belegungen_tx(&mut conn, id).await?;
+    storniere_tx(&mut conn, einsatz_id, id, geaendert_von).await
+}
+
+/// Wie [`storniere`] auf einer offenen Transaktion (LFH-1045: der Handler löst die Kräfte der
+/// UHS im selben Schreibvorgang).
+pub async fn storniere_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let belegt = aktive_belegungen_tx(&mut *conn, id).await?;
     if belegt > 0 {
         return Err(AppError::Conflict(format!(
             "Storno nicht möglich — noch {belegt} Person(en) belegt"
         )));
     }
     crate::storno::storniere(
-        &mut conn,
+        &mut *conn,
         "uhs",
         "einsatz_id",
         einsatz_id,

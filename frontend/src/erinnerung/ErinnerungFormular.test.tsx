@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
+import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import ErinnerungFormular from './ErinnerungFormular';
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
 vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
@@ -146,6 +147,42 @@ describe('ErinnerungFormular — Obergrenze des Intervalls', () => {
 
     await waitFor(() =>
       expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({ intervall_minuten: 10080 })),
+    );
+  });
+});
+
+/** LFH-1031: die Fälligkeit ist nach der Serveruhr vorbelegt, eine Eingabe bleibt. */
+describe('ErinnerungFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
+  mitProzessZone('UTC');
+  const SERVER = Date.parse('2026-10-04T10:00:00Z');
+  mitVorgehenderGeraeteuhr(SERVER);
+
+  it('ohne Eingabe ist die Serverzeit fällig', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(
+        expect.objectContaining({ faellig_at: '2026-10-04 10:00:00' }),
+      ),
+    );
+  });
+
+  it('eine eingetragene Fälligkeit bleibt unverändert', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
+    await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
+    const feld = screen.getByRole('textbox', { name: 'Fällig' });
+    await userEvent.click(feld);
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '2026-10-04 10:30');
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(
+        expect.objectContaining({ faellig_at: '2026-10-04 10:30:00' }),
+      ),
     );
   });
 });

@@ -114,6 +114,9 @@ export const EINSATZ_KEYS = {
   // Zugriffe auf die ganze Personenliste (LFH-916): eigener Prefix, unter `personen` zöge ihn
   // jedes `person`-Ereignis per Präfix mit.
   personenListenzugriffe: 'einsatz-personen-listenzugriffe',
+  // Auswahl „Bestätigt von“ am UHS-Gerät (LFH-1046): eigener Prefix, unter `personen` zöge ihn
+  // jedes `person`-Ereignis mit; das Personal liefert dem Gerät kein Ereignis.
+  personenBestaetiger: 'einsatz-personen-bestaetiger',
   // Fotos und Dateien an einer Person (LFH-757): live über das `person`-Ereignis. Nicht im
   // Lagebild offline (Patientenfotos und ihre Dateinamen bleiben vom Gerät fern, LFH-767).
   personAnhaenge: 'einsatz-person-anhaenge',
@@ -227,6 +230,10 @@ export const EINSATZ_STREAM_EVENTS = {
     // Statuswechsel, Nachtrag, Streichung und Fan-out an einer Person (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
     EINSATZ_KEYS.lagemonitor,
+    // Die Stärke einer UHS zählt die Positionen ihrer Kräfte (LFH-1045): eine geänderte Position
+    // oder eine entlassene Kraft ändert Liste und Detail der UHS.
+    EINSATZ_KEYS.uhs,
+    EINSATZ_KEYS.uhsDetail,
   ],
   lagebericht: [
     EINSATZ_KEYS.lageberichte,
@@ -402,6 +409,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Einsatzleitung und liefe bei jedem `uhs`-Ereignis mit.
  * - `personenListenzugriffe` (LFH-916): Export und Druck der Personenliste lädt erst mit der
  *   geöffneten Ansicht, aus demselben Grund wie `uhsAnhangZugriffe`.
+ * - `personenBestaetiger` (LFH-1046): das Gerät erhält keine Personal-Ereignisse (Ansicht); die
+ *   Auswahl lädt mit dem Dialog neu.
  * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
@@ -434,6 +443,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.uhsAnhangZugriffe,
   EINSATZ_KEYS.uhsPlanBild,
   EINSATZ_KEYS.personenListenzugriffe,
+  EINSATZ_KEYS.personenBestaetiger,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -506,9 +516,14 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.personAudit, einsatzId, personId] as const,
   personenListenzugriffe: (einsatzId: number) =>
     [EINSATZ_KEYS.personenListenzugriffe, einsatzId] as const,
+  personenBestaetiger: (einsatzId: number) =>
+    [EINSATZ_KEYS.personenBestaetiger, einsatzId] as const,
   personAnhaenge: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAnhaenge, einsatzId, personId] as const,
   personal: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId] as const,
+  /** Einsatzkräfte ohne UHS (LFH-1045), Auswahl beim Zuordnen; unter `personal`, weil jede
+   *  Zuordnung `personal` verteilt. */
+  personalOhneUhs: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId, 'ohne-uhs'] as const,
   fuehrungskraefte: (einsatzId: number) => [EINSATZ_KEYS.fuehrungskraefte, einsatzId] as const,
 
   // Struktur
@@ -1013,7 +1028,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Meldungen nur die Rückmeldungen, nicht die Liste.
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit samt Listenzugriffen der
- * Personenliste (LFH-916, nur für die Einsatzleitung), Chat, Dokumente, die
+ * Personenliste (LFH-916, nur für die Einsatzleitung), die Auswahl „Bestätigt von“ am Gerät
+ * (LFH-1046, Geräte speichern nichts), Chat, Dokumente, die
  * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
  * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
  * (Object-URLs, nur im Speicher, LFH-759),

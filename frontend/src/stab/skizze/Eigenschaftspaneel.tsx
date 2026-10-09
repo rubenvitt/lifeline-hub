@@ -485,6 +485,12 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
             <Datenfeld label="Bezeichnung" mono>
               {schiene.bezeichnung}
             </Datenfeld>
+            <Datenfeld label="Netz">
+              <Wert>{schiene.netz}</Wert>
+            </Datenfeld>
+            <Datenfeld label="Sicherheit">
+              <Wert>{schiene.sicherheit}</Wert>
+            </Datenfeld>
             <Datenfeld label="Hinweis">
               <Wert>{schiene.hinweis}</Wert>
             </Datenfeld>

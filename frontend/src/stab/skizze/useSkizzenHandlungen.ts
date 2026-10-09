@@ -48,6 +48,9 @@ import { bezugAus } from './bedienung';
  *   („Datensatz inzwischen gelöscht“), zusätzlich als letzte Meldung in der Statuszeile. Sie gilt
  *   bis zur nächsten Handlung an diesem Element oder bis sie quittiert ist (`quittiere`: Escape
  *   am Element, „Quittieren“ im Paneel; Prüfliste O4).
+ * - **Ruhige Fläche** (LFH-1037 D1): Nach jedem eigenen Schreiben einer Lage oder eines Bereichs,
+ *   gelungen oder nicht, meldet `onEigenes` das Element. Die Fläche gibt es dann frei
+ *   (`ruhigeFlaeche.ts`), es folgt nicht mehr dem gehaltenen Stand.
  */
 
 export const VERSCHOBEN_MELDUNG = 'von einem anderen Arbeitsplatz verschoben';
@@ -97,11 +100,14 @@ export function useSkizzenHandlungen(
   netz: Fernmeldenetz,
   aktionen: SkizzenAktionen | null,
   befehle: Befehlsstapel,
+  onEigenes?: (element: string) => void,
 ) {
   const netzRef = useRef(netz);
+  const eigenesRef = useRef(onEigenes);
   useLayoutEffect(() => {
     netzRef.current = netz;
-  }, [netz]);
+    eigenesRef.current = onEigenes;
+  }, [netz, onEigenes]);
   const bestaetigt = useRef(new Map<string, Bestaetigt>());
   const [eigeneLagen, setEigeneLagen] = useState<ReadonlyMap<string, EigeneLage>>(new Map());
   const [eigeneBereiche, setEigeneBereiche] = useState<ReadonlyMap<string, EigenerBereich>>(
@@ -225,6 +231,8 @@ export function useSkizzenHandlungen(
             });
             if (ist409(e)) bestaetigt.current.delete(key);
             throw e;
+          } finally {
+            eigenesRef.current?.(key);
           }
         });
       ketten.current.set(key, jetzt);
@@ -508,6 +516,8 @@ export function useSkizzenHandlungen(
           return neu;
         });
         throw e;
+      } finally {
+        eigenesRef.current?.(b.key);
       }
     },
     [pflicht, eigeneBereiche],

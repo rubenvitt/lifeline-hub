@@ -5,6 +5,7 @@ import {
   RASTER,
   SCHIENE_LINIE_VERSATZ,
   TZ_HOEHE,
+  komponentenBildHoehe,
   schienenLinieY,
   type Platz,
 } from '../fernmeldeskizzeLayout';
@@ -57,7 +58,7 @@ function ohneDoppel(punkte: Punkt[]): Punkt[] {
 
 /** Die Punkte der Stichleitung einer Stelle an einer Schiene, von der Stelle zur Linie. */
 export function stichleitungsPunkte(
-  s: Pick<NetzStelle, 'art'>,
+  s: Pick<NetzStelle, 'art' | 'bezeichnung'>,
   stelle: Platz,
   schiene: Platz,
 ): Punkt[] {
@@ -67,7 +68,8 @@ export function stichleitungsPunkte(
   const klemme = (x: number) => Math.min(bis, Math.max(von, x));
   const mitte = zeichenMitte(s, stelle);
   const cx = stelle.x + stelle.breite / 2;
-  const unten = stelle.y + stelle.hoehe;
+  // Eine Komponente endet, wo ihr Bild endet; ihr Platz reicht als Ziel tiefer (LFH-1038 D6).
+  const unten = stelle.y + (s.art === 'komponente' ? komponentenBildHoehe(s) : stelle.hoehe);
   /** Senkrecht aus dem Platz: unten heraus, oben heraus, oder aus der Zeichenmitte. */
   const ausgang = (x: number): Punkt => ({
     x,

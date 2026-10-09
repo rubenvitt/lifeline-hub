@@ -4,7 +4,7 @@ import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { RefSelectProps } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { InfotelefonAnliegen } from '../api/types';
 import type { AnrufEingabe } from '../api/infotelefon';
 import { Schnellerfassungszeile, useRollen } from '../components/instrument';
@@ -56,6 +56,17 @@ export default function AnrufErfassung({
   const [gespeichert, setGespeichert] = useState(0);
   const rueckrufNoetig = Form.useWatch('rueckruf_noetig', form) === true;
 
+  /**
+   * Nach dem Speichern steht der Fokus wieder im Anliegen. Als Effekt auf den Zähler, nicht per
+   * `requestAnimationFrame`: `resetFields` hängt jedes Feld neu ein (rc-field-form wechselt den
+   * Schlüssel), und unter Last lief der Frame vor diesem Commit. Der Fokus landete dann im alten,
+   * gleich entfernten Select und fiel auf `body`. Der Effekt läuft im selben Commit wie das Neu-
+   * Einhängen, der Ref zeigt dort schon auf das neue Feld.
+   */
+  useEffect(() => {
+    if (gespeichert > 0) anliegenRef.current?.focus();
+  }, [gespeichert]);
+
   const absenden = async (w: Werte) => {
     if (sendetRef.current || !w.anliegen) return;
     sendetRef.current = true;
@@ -70,7 +81,6 @@ export default function AnrufErfassung({
       });
       form.resetFields();
       setGespeichert((n) => n + 1);
-      requestAnimationFrame(() => anliegenRef.current?.focus());
     } catch {
       // Der Grund steht als `fehler` über der Zeile; die Felder bleiben stehen.
     } finally {

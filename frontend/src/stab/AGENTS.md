@@ -32,6 +32,21 @@ Löschpfad ruft `vergiss`). Schreibwege der Fläche nur über `stab/skizzenAktio
 Schreibrecht nur lesen. Keine Erreichbarkeit, keine Rufnummern, keine Personennamen, kein Fahrzeug
 als Element, kein ETB je Änderung; Druck A3/A4 quer mit Funkplan-Anlage (`stab/skizze/druckformat.ts`), Übernahme nur über
 den Funkplan (Abschnitt „Kommunikationsskizze“).
+**Ruhige Fläche** (LFH-1037): Zeiger (ohne Touch) oder Fokus in der Fläche halten, was ein anderer
+Arbeitsplatz bewegt: auto-gelegte Plätze, gespeicherte Lagen und Bereiche
+(`stab/skizze/ruhigeFlaeche.ts`, geschrieben wird mit der gehaltenen Version, also 409 statt
+stillem Überschreiben), den Maßstab der eingepassten Ansicht und den Ort der Fläche am Schirm
+(`stab/skizze/useAmSchirmHalten.ts`, Bildlauf gleicht aus; das Lücken-Paneel schrumpft nicht).
+Eigenes Schreiben gibt das Element frei. Nachweis am Schirm, nie nur in SVG-Koordinaten.
+**Treffläche der Fläche** (LFH-1038): Elemente sind nur über dem Mindestmaßstab der Stufe
+Zeigerziel (`stab/skizze/ansicht.ts:mindestMassstab`, gerechnet aus den Plätzen des Layouts; Boden
+über `trefferboden` aus dem Token: 24 px, Handschuh 72 px und 16 px Abstand). Darunter ist die
+Fläche Übersicht (`data-uebersicht`): das erste Tippen zoomt um den Punkt, Tastatur, Paneel und
+Lücken-Wahl wählen immer; keine Erklärung im UI. Abstand je Achse ohne das Band der Schiene,
+Paare mit Stichleitung zählen nicht. Komponenten mindestens `KOMPONENTE_HOEHE` hoch, ihre gezeichnete
+Höhe nur über `komponentenBildHoehe`. Linienziele (Verbindung, Stichleitung) halten den Boden in der
+Breite, nicht im Abstand. Nachweis e2e „Prüfliste 1 und 2“; e2e wählen Elemente per Zeiger über `tippe`
+(`e2e/fernmeldeskizze-kern.ts`).
 **Ausstattung im Kasten** (LFH-1029): Führungsstelle und Abschnitt tragen `ausstattung`, kleine
 Zeichen mit Wort darunter, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus). Ein
 Führungsfahrzeug (Fachaufgabe `fuehrung` aus `baueTzProps`, dieselbe Regel wie die Lagekarte) steht
@@ -39,6 +54,16 @@ im Kasten des nächsten Abschnitts über seiner Einheit im Baum; „EAL“/„UE
 Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung ohne `rueckwaertig`.
 Zeichen der Funktionen nur über `zeichen/fachobjektZeichen.ts:funktionsZeichen`; Höhe und Plätze nur
 über `stab/fernmeldeskizzeLayout.ts:ausstattungsZeilen` (Bild und Layout rechnen dieselbe Zahl).
+**Netz und Sicherheit** (LFH-1030, J.5): kurzer Freitext an der Sprechgruppe (Katalog und
+einsatzlokal, `SPRECHGRUPPE_BEDINGUNG_MAX`). Das Langsechseck bleibt „Betriebsart Bezeichnung“;
+Netz, Sicherheit und Hinweis stehen in dieser Reihenfolge in der Zeile darunter, nur über
+`skizzenZeichen.tsx:bedingungszeichenZusatz`, und verbreitern Zeichen und Schiene nie. In Tabellen
+heißt dieselbe Angabe „Bedingung“ (`kanalBedingung`, „TMO · Gateway · E2E“).
+**Zurücktreten** (LFH-1039): zurückgenommen (Hervorheben, Filter) ist nicht gesperrt; der Text hält
+das Ziel der Textstufen (Tag ≥ 7 : 1, Nacht ≥ 5 : 1), nicht nur den Boden 4,5. Das Bild tritt mit
+`skizze/SkizzenElemente.tsx:ZURUECK_DECKKRAFT` zurück (0,72: hell 7,36, dunkel 8,43 : 1), Lücken- und
+Meldungszeile nie (`zurueckDeckkraft`); gerechnet in `skizze/zurueckKontrast.test.ts`, gemessen in
+beiden Modi im e2e „Prüfliste 5“. Die Hervorhebung trägt die Strichstärke, nicht die Deckkraft.
 
 **Skizze als Anlage** (LFH-1028): Lagebericht und Befehl fügen die Skizze als PNG an
 (`entwurf/DokumentAnlagen.tsx`). Aufgenommen wird nur über `stab/SkizzenAufnahme.tsx`: dieselben
@@ -51,7 +76,8 @@ Netzes kommt dorthin, nie in eine Seite), Druckform außerhalb des Sichtbereichs
 Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
 `stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen` (dazu externe Stellen mit Status und
 Komponenten der Skizze, LFH-893): zugeordnete plus einsatzlokale
-Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Die eigene Führungsstelle ist erster Teilnehmer
+Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Spalte „Bedingung“ statt „Betriebsart“
+(LFH-1030), Summe der festen Breiten bleibt 630. Die eigene Führungsstelle ist erster Teilnehmer
 ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, steht „—“ bzw.
 „unvollständig“ mit Grund, nie „keine“. Eigene `key` je `Datensicht` (zwei Sichten in einer Datei).
 

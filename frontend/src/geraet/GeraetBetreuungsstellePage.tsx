@@ -170,7 +170,7 @@ export default function GeraetBetreuungsstellePage() {
             ) : (
               <GeraetMeldungen
                 einsatzId={einsatzId}
-                stelle={stelle.bezeichnung}
+                absender={[stelle.bezeichnung, geraet?.bezeichnung].filter(Boolean).join(' · ')}
                 schreibgeschuetzt={!darfSchreiben}
               />
             )}

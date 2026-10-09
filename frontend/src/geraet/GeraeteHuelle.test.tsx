@@ -11,6 +11,8 @@ import { neuerQueryClient, setzeOnline } from '../test/utils';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import type {
+  BrDetail,
+  Einheit,
   EinsatzMaterial,
   GeraetAnzeige,
   Meldung,
@@ -60,6 +62,8 @@ const uhs: UhsDetail = {
   geaendert_at: '2026-10-04 08:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  staerke: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+  kraefte: [],
   plaetze: [
     {
       id: 30,
@@ -447,6 +451,152 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
   it('das Tablet hat keinen Bereich „UHS“', async () => {
     stelleBereit();
     const router = renderApp('/geraet/7/stelle');
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/patienten'));
+  });
+});
+
+describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
+  const brGeraet = geraet({
+    ansicht: 'bereitstellungsraum',
+    uhs_id: null,
+    stelle_id: 4,
+    stelle: 'BR Sportplatz',
+    bezeichnung: 'Tablet BR',
+  });
+  const raum: BrDetail = {
+    id: 4,
+    einsatz_id: 7,
+    abschnitt_id: null,
+    bezeichnung: 'BR Sportplatz',
+    standort: null,
+    notiz: null,
+    status: 'aktiv',
+    erfasst_at: '2026-10-04 08:00:00',
+    erfasst_von: 1,
+    geaendert_at: '2026-10-04 08:00:00',
+    geaendert_von: 1,
+    storniert_at: null,
+    einheiten: [{ id: 31, name: 'RTW 1' }],
+    fahrzeuge: [],
+  };
+  const einheit = (id: number, name: string, br: number | null) =>
+    ({
+      id,
+      einsatz_id: 7,
+      abschnitt_id: null,
+      ueber_einheit_id: null,
+      typ_label: null,
+      name,
+      ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+      ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+      aktueller_br_id: br,
+    }) as unknown as Einheit;
+
+  function brBereit(detail: BrDetail = raum) {
+    stelleBereit(brGeraet);
+    const belegt: unknown[] = [];
+    const status: unknown[] = [];
+    const brListe = vi.fn();
+    server.use(
+      http.get('/api/einsaetze/7/bereitstellungsraeume/4', () => HttpResponse.json(detail)),
+      http.get('/api/einsaetze/7/bereitstellungsraeume', () => {
+        brListe();
+        return HttpResponse.json([detail]);
+      }),
+      http.get('/api/einsaetze/7/einheiten', () =>
+        HttpResponse.json([einheit(30, 'LF Nord', null), einheit(31, 'RTW 1', 4)]),
+      ),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/7/bereitstellungsraeume/4/belegung', async ({ request }) => {
+        belegt.push(await request.json());
+        return HttpResponse.json({}, { status: 201 });
+      }),
+      http.post('/api/einsaetze/7/bereitstellungsraeume/4/status', async ({ request }) => {
+        status.push(await request.json());
+        return HttpResponse.json({ ...detail, status: 'aktiv' });
+      }),
+    );
+    return { belegt, status, brListe };
+  }
+
+  it('Start am BR-Gerät: der eigene Raum, Navigation „Raum“ und „Melden“', async () => {
+    vi.useRealTimers();
+    const { brListe } = brBereit();
+    const router = renderApp('/geraet');
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/br/4'));
+    expect(await screen.findByRole('heading', { level: 1, name: /BR Sportplatz/ })).toBeVisible();
+    const nav = screen.getByRole('navigation', { name: 'Gerätenavigation' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((l) => l.textContent),
+    ).toEqual(['Raum', 'Melden']);
+    // Kein Umschalter zwischen Räumen, kein Auflösen, keine Brotkrumen in die Stabsoberfläche.
+    expect(screen.queryByRole('button', { name: 'Auflösen' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
+    expect(brListe).not.toHaveBeenCalled();
+    // Nichts auf der Platte: kein gemerkter Raum.
+    expect(Object.keys(localStorage).filter((k) => k.includes('br'))).toEqual([]);
+  });
+
+  it('meldet eine freie Einheit an und eine bereitgestellte ab', async () => {
+    vi.useRealTimers();
+    const { belegt } = brBereit();
+    renderApp('/geraet/7/br/4');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'LF Nord zuweisen' }));
+    await waitFor(() => expect(belegt).toHaveLength(1));
+    expect(belegt[0]).toEqual({ objekt_typ: 'einheit', objekt_id: 30, art: 'eintritt' });
+    await user.click(screen.getByRole('button', { name: 'entfernen' }));
+    await waitFor(() => expect(belegt).toHaveLength(2));
+    expect(belegt[1]).toEqual({ objekt_typ: 'einheit', objekt_id: 31, art: 'austritt' });
+  });
+
+  it('nimmt einen geplanten Raum in Betrieb, ohne „Stornieren“ anzubieten', async () => {
+    vi.useRealTimers();
+    const { status } = brBereit({ ...raum, status: 'geplant', einheiten: [] });
+    renderApp('/geraet/7/br/4');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'In Betrieb nehmen' }));
+    await waitFor(() => expect(status).toEqual([{ status: 'aktiv' }]));
+    expect(screen.queryByRole('button', { name: 'Stornieren' })).toBeNull();
+  });
+
+  it('ein fremder Raum und die Patientenliste führen auf den eigenen Raum', async () => {
+    brBereit();
+    const router = renderApp('/geraet/7/br/9');
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/br/4'));
+    await act(() => router.navigate('/geraet/7/patienten'));
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/br/4'));
+  });
+
+  it('Meldung an die Einsatzleitung: Absender ist der Raum', async () => {
+    vi.useRealTimers();
+    brBereit();
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
+      }),
+    );
+    renderApp('/geraet/7/meldungen');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Melden' })).toBeVisible();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Inhalt'), 'Raum voll');
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      absender: 'BR Sportplatz · Tablet BR',
+      empfaenger: 'Einsatzleitung',
+      inhalt: 'Raum voll',
+    });
+  });
+
+  it('das UHS-Tablet hat keine Meldungsseite', async () => {
+    stelleBereit();
+    const router = renderApp('/geraet/7/meldungen');
     await waitFor(() => expect(pfad(router)).toBe('/geraet/7/patienten'));
   });
 });

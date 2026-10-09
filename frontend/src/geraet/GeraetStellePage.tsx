@@ -15,11 +15,13 @@ import { Kennzahl, Kennzahlenband, Segmentleiste } from '../components/instrumen
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import MaterialTab from '../pages/uhs/MaterialTab';
 import UhsAnhaenge from '../pages/uhs/UhsAnhaenge';
+import UhsKraefte from '../pages/uhs/UhsKraefte';
 import { geraetUhsPfad } from '../routing/deeplinks';
 import GeraetMeldungen from './GeraetMeldungen';
 
 const BEREICH_NAME = {
   plaetze: 'Plätze',
+  kraefte: 'Kräfte',
   material: 'Material',
   meldungen: 'Meldungen',
   dateien: 'Dateien',
@@ -91,8 +93,9 @@ function PlaetzeBereich({ einsatzId, uhs }: { einsatzId: number; uhs: UhsDetail 
 
 /**
  * Bereich „UHS“ des UHS-Laptops (LFH-892, Subtask LFH-1025; Spec `feldgeraet-bedienung`): Plätze
- * in Zahlen mit dem Weg in den Grundriss, Material der eigenen UHS zum Lesen, Meldungen an die
- * Einsatzleitung und die Dateien der UHS. Der Grundriss selbst bleibt der eigene Bereich.
+ * in Zahlen mit dem Weg in den Grundriss, Stärke und Kräfte der UHS (LFH-1045), Material der
+ * eigenen UHS zum Lesen, Meldungen an die Einsatzleitung und die Dateien der UHS. Der Grundriss
+ * selbst bleibt der eigene Bereich.
  */
 export default function GeraetStellePage() {
   const { geraet, benutzer } = useAuth();
@@ -128,7 +131,7 @@ export default function GeraetStellePage() {
         <>
           <Segmentleiste
             rolle="tablist"
-            beschriftung="Plätze, Material, Meldungen und Dateien"
+            beschriftung="Plätze, Kräfte, Material, Meldungen und Dateien"
             wert={bereich}
             onWechsel={setBereich}
             optionen={BEREICHE.map((b) => ({ wert: b, label: BEREICH_NAME[b], steuert: feld }))}
@@ -137,12 +140,19 @@ export default function GeraetStellePage() {
           <div role="tabpanel" id={feld} aria-label={BEREICH_NAME[bereich]}>
             {bereich === 'plaetze' ? (
               <PlaetzeBereich einsatzId={einsatzId} uhs={uhs} />
+            ) : bereich === 'kraefte' ? (
+              <UhsKraefte
+                einsatzId={einsatzId}
+                uhs={uhs}
+                schreibgeschuetzt={schreibgeschuetzt}
+                einheitZuordnen={false}
+              />
             ) : bereich === 'material' ? (
               <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt />
             ) : bereich === 'meldungen' ? (
               <GeraetMeldungen
                 einsatzId={einsatzId}
-                stelle={uhs.bezeichnung}
+                absender={[uhs.bezeichnung, geraet?.bezeichnung].filter(Boolean).join(' · ')}
                 schreibgeschuetzt={schreibgeschuetzt}
               />
             ) : (

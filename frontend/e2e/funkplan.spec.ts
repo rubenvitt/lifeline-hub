@@ -11,6 +11,8 @@ import {
   KURZ,
   LOKAL,
   SG_HINWEIS,
+  SG_NETZ,
+  SG_SICHERHEIT,
   SG_LANG,
   SUBPIXEL,
   anmelden,
@@ -353,6 +355,8 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   await expect(tmo.getByRole('link', { name: EINHEIT_ZWEI })).toBeVisible();
   await expect(tmo.getByRole('link', { name: ABSCHNITT })).toBeVisible();
   await expect(tmo).toContainText(SG_HINWEIS);
+  // Bedingung statt Betriebsart (LFH-1030): lange Angaben brechen um, statt zu überhängen.
+  await expect(tmo).toContainText(`TMO · ${SG_NETZ} · ${SG_SICHERHEIT}`);
   await expect(tmo).toContainText(EINHEIT_RUF);
   // `POST …/einsaetze/{id}/sprechgruppen` legt einsatzlokal an; der Katalog ist Org-Stammdaten.
   await expect(tmo).toContainText('einsatzlokal');
