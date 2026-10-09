@@ -278,6 +278,59 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
 });
 
 /**
+ * LFH-1057: die geöffnete Auswahl „Stand“ zeigt unter der Bezeichnung die Erfassungszeit, am
+ * Handschirm in Handschuh-Dichte ohne Beschnitt; das geschlossene Feld trägt nur die Hauptzeile,
+ * damit das Band nicht höher wird. Die Liste ist im jsdom ohne Layout, deshalb hier.
+ */
+test('Lagekarte: die Auswahl „Stand“ zeigt die Erfassungszeit unter der Bezeichnung', async ({
+  page,
+}) => {
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (fehler) => seitenFehler.push(fehler));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  const stand = await page.request.post(`/api/einsaetze/${eid}/lage-snapshots`, {
+    data: { bezeichnung: 'Stand vor Ort' },
+  });
+  expect(stand.ok(), await stand.text()).toBeTruthy();
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  // Unter `xl` startet die Zeitachse ohne Wahl eingeklappt; Wahl und Dichte gesetzt, nicht geklickt.
+  await page.evaluate(() => {
+    localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+    localStorage.setItem('lifeline-hub.dichte', 'handschuh');
+  });
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+
+  const zeitachse = page.locator('[data-lfh="zeitachse"]');
+  const auswahl = zeitachse.getByRole('combobox', { name: 'Stand' });
+  await expect(auswahl).toBeVisible();
+  await auswahl.click();
+  const liste = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  const option = liste.locator('.ant-select-item-option[title="Stand vor Ort"]');
+  await expect(option.locator('[data-lfh="stand-name"]')).toHaveText('Stand vor Ort');
+  const zeit = option.locator('[data-lfh="stand-zeit"]');
+  // Heute `HHmm`, an einem anderen Tag `DDHHmm` (`formatZeitKurz`).
+  await expect(zeit).toHaveText(/^\d{4}(\d{2})?$/);
+  await expect(zeit).toBeInViewport({ ratio: 1 });
+  const zeitBox = (await zeit.boundingBox())!;
+  const optionBox = (await option.boundingBox())!;
+  expect(
+    zeitBox.y + zeitBox.height,
+    `Zweitzeile endet bei ${zeitBox.y + zeitBox.height}px, die Option bei ${optionBox.y + optionBox.height}px`,
+  ).toBeLessThanOrEqual(optionBox.y + optionBox.height + 0.5);
+  // Zugänglicher Name mit Bezeichnung und Zeit (antds Vorleseliste neben der aktiven Option).
+  await expect(page.getByRole('option', { name: /^Stand vor Ort, \d{4}(\d{2})?$/ })).toHaveCount(1);
+
+  await option.click();
+  await expect(page).toHaveURL(/[?&]snapshot=\d+/);
+  // Geschlossen nur die Hauptzeile.
+  await expect(zeitachse.locator('.ant-select-content')).toHaveText('Stand vor Ort');
+  expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
+
+/**
  * Messwerkzeug: geprüft wird die Ereignisfolge des ECHTEN terra-draw (die Figur UND eigene
  * Hilfspunkte bei `create`, `finish`, Mitlaufen bei der Bewegung), die der Unit-Test von
  * `messZeichnung.ts` nur nachbaut.
