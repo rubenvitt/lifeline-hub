@@ -9,6 +9,7 @@ import {
 } from './fernmeldeskizze-kern';
 import { NAME_SCHRIFT } from '../src/stab/fernmeldeskizzeLayout';
 import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
+import { waehleIn } from './auswahl-kern';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
 
 /**
@@ -145,12 +146,10 @@ test('Führungsstelle: der auf Einsatzdaten zugeordnete ELW 2 steht im Kasten �
   await page.goto(einsatzdatenPfad(Number(einsatzId)));
   const paneel = page.getByRole('region', { name: 'Eigene Führungsstelle' });
   await paneel.getByRole('button', { name: 'Fahrzeuge eintragen' }).click();
-  await paneel.getByRole('combobox', { name: 'Fahrzeuge' }).click();
-  // Erst die stehende Liste wählen: während des Einblendens geht ein Klick verloren.
-  const liste = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
-  await expect(liste).toBeVisible();
-  await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
-  await liste.getByTitle('Florian Musterstadt 10/1 (ELW 2)', { exact: true }).click();
+  await waehleIn(
+    paneel.getByRole('combobox', { name: 'Fahrzeuge' }),
+    'Florian Musterstadt 10/1 (ELW 2)',
+  );
   await paneel.getByRole('button', { name: 'Fahrzeuge speichern' }).click();
   await expect(
     paneel.getByRole('button', { name: 'Fahrzeuge bearbeiten' }),
