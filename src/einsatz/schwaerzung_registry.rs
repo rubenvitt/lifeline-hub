@@ -2349,6 +2349,32 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
 ];
 
+/// Ein Teil eines JSON-Dokuments, der früher fällt als seine Spalte (LFH-1069, Spec
+/// `aufbewahrung`, „Datenkategorien über eine zentrale Klassifikation“). Die Spalte selbst folgt
+/// der Einsatz-Frist; der Teil gehört einer Kategorie an und wird mit ihr ein leeres JSON-Array
+/// (`json_replace`, legt also nie einen fehlenden Schlüssel an). Bei der Einsatz-Schwärzung
+/// behandelt die Spalte ihn mit. Gepinnt in `tests::json_teil_haengt_an_einsatz_spalte` und
+/// `tests::kategorie_zuordnung_ist_gepinnt`.
+#[derive(Debug, Clone, Copy)]
+pub struct JsonTeilRegel {
+    pub tabelle: &'static str,
+    pub spalte: &'static str,
+    /// JSON-Pfad des Schlüssels (`$.…`), eine compile-time-Konstante.
+    pub schluessel: &'static str,
+    pub zuordnung: Zuordnung,
+}
+
+/// Teile eingefrorener JSON-Dokumente mit eigener Kategorie. Wer in ein solches Dokument Daten
+/// einer Kategorie aufnimmt, trägt den Schlüssel hier ein; kein Guard bemerkt das Fehlen.
+pub const JSON_TEILE: &[JsonTeilRegel] = &[JsonTeilRegel {
+    // Ein Lage-Stand friert die Angaben der Bilder der Lagekarte ein (Dateiname, Ecken,
+    // Hochladender), die mit `anhaenge` fallen (LFH-997); der Stand selbst folgt dem Einsatz.
+    tabelle: "lage_snapshot",
+    spalte: "daten",
+    schluessel: "$.bilder",
+    zuordnung: Z_ANHAENGE,
+}];
+
 /// Sucht die Klassifikation einer Spalte in der Registry (`None`, wenn nicht erfasst).
 pub fn klassifikation_von(tabelle: &str, spalte: &str) -> Option<Klassifikation> {
     TABELLEN
@@ -2560,6 +2586,34 @@ pub async fn scrubbe_aus_registry(
             query = query.bind(SCHWAERZUNG_PLATZHALTER);
         }
         query.bind(einsatz_id).execute(&mut *conn).await?;
+    }
+
+    // JSON-Teile (LFH-1069): nur wenn der Lauf den Teil erfasst, die Spalte aber nicht — sonst
+    // behandelt die Spalte (bei `lage_snapshot` die gelöschte Zeile) ihn schon. Zeilen, deren
+    // Teil schon leer ist, bleiben unberührt.
+    for teil in JSON_TEILE {
+        let spalte_erfasst = klassifikation_von(teil.tabelle, teil.spalte).is_some_and(
+            |k| matches!(k, Klassifikation::Scrub(_, zuordnung) if umfang.erfasst(zuordnung)),
+        );
+        if !umfang.erfasst(teil.zuordnung) || spalte_erfasst {
+            continue;
+        }
+        let Some(regel) = TABELLEN.iter().find(|r| r.tabelle == teil.tabelle) else {
+            return Err(sqlx::Error::Protocol(format!(
+                "JSON-Teil an unbekannter Tabelle {}",
+                teil.tabelle
+            )));
+        };
+        let (tabelle, spalte, schluessel) = (teil.tabelle, teil.spalte, teil.schluessel);
+        let sql = format!(
+            "UPDATE {tabelle} SET {spalte} = json_replace({spalte}, '{schluessel}', json('[]')) \
+             WHERE {} AND json_array_length({spalte}, '{schluessel}') > 0",
+            where_klausel(regel)
+        );
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
     }
     Ok(())
 }
@@ -3080,6 +3134,17 @@ mod tests {
             }
         }
 
+        for teil in JSON_TEILE {
+            if let Zuordnung::Kategorie(k) = teil.zuordnung {
+                ist.entry(k.as_str().to_string())
+                    .or_default()
+                    .insert(format!(
+                        "{}.{}{}",
+                        teil.tabelle, teil.spalte, teil.schluessel
+                    ));
+            }
+        }
+
         let menge = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<BTreeSet<_>>();
         let spalten_von = |tabelle: &str| {
             TABELLEN
@@ -3106,6 +3171,7 @@ mod tests {
         ] {
             anhaenge.extend(spalten_von(t));
         }
+        anhaenge.insert("lage_snapshot.daten$.bilder".to_string());
         let soll: BTreeMap<String, BTreeSet<String>> = [
             (
                 "behandlung".to_string(),
@@ -3147,6 +3213,33 @@ mod tests {
         .into_iter()
         .collect();
         assert_eq!(ist, soll, "Zuordnung weicht von design.md D1 ab");
+    }
+
+    /// LFH-1069, Spec `aufbewahrung`, „JSON-Teil an einer falschen Spalte“: ein Teil hängt an
+    /// einer Scrub-Spalte der Einsatz-Frist und gehört selbst einer Kategorie an — nur dann
+    /// fällt er früher als seine Spalte. Sein Schlüssel ist ein einfacher Pfad `$.name` (er
+    /// steht unmaskiert im SQL).
+    #[test]
+    fn json_teil_haengt_an_einsatz_spalte() {
+        for teil in JSON_TEILE {
+            let ort = format!("{}.{}{}", teil.tabelle, teil.spalte, teil.schluessel);
+            assert!(
+                matches!(
+                    klassifikation_von(teil.tabelle, teil.spalte),
+                    Some(Klassifikation::Scrub(_, Zuordnung::Einsatz))
+                ),
+                "{ort}: Spalte ist keine Scrub-Spalte der Einsatz-Frist"
+            );
+            assert!(
+                matches!(teil.zuordnung, Zuordnung::Kategorie(_)),
+                "{ort}: JSON-Teil gehört keiner Kategorie an"
+            );
+            let name = teil.schluessel.strip_prefix("$.").unwrap_or("");
+            assert!(
+                !name.is_empty() && name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+                "{ort}: Schlüssel ist kein einfacher Pfad"
+            );
+        }
     }
 
     /// Jede einsatzbezogene Tabelle mit FK auf `einsatz_person` steht im Behandlungsbezug

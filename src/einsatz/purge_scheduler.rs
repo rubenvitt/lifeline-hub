@@ -2410,6 +2410,11 @@ mod tests {
 
     /// Ein Bild der Lagekarte mit den Bytes `daten` (LFH-997).
     async fn bild_mit_bytes(pool: &SqlitePool, einsatz: i64, daten: &[u8]) {
+        bild_mit_namen(pool, einsatz, "Luftbild.png", daten).await;
+    }
+
+    /// Ein Bild der Lagekarte mit Dateinamen `name` und den Bytes `daten`.
+    async fn bild_mit_namen(pool: &SqlitePool, einsatz: i64, name: &str, daten: &[u8]) {
         let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
             .fetch_one(pool)
             .await
@@ -2418,10 +2423,11 @@ mod tests {
         let bild: i64 = sqlx::query_scalar(
             "INSERT INTO karte_hintergrundbild (einsatz_id, name, mime, groesse, sha256, \
                 ecken_json, hochgeladen_von) \
-             VALUES (?, 'Luftbild.png', 'image/png', ?, 'x', '[[0,0],[1,0],[1,1],[0,1]]', ?) \
+             VALUES (?, ?, 'image/png', ?, 'x', '[[0,0],[1,0],[1,1],[0,1]]', ?) \
              RETURNING id",
         )
         .bind(einsatz)
+        .bind(name)
         .bind(daten.len() as i64)
         .bind(b)
         .fetch_one(pool)
@@ -2614,6 +2620,130 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(geschwaerzt, None, "der Einsatz selbst ist nicht geschwärzt");
+    }
+
+    // ---------- LFH-1069: Bildangaben in Lage-Ständen fallen mit `anhaenge` ----------
+
+    /// Dateiname eines Bilds der Lagekarte, der nur in einem Lage-Stand überleben könnte.
+    const SNAPSHOT_BILDNAME: &str = "LFH1069-Drohne-Haus-Familie-Gepflanzt.jpg";
+
+    /// Abgeschlossener, lesbarer Einsatz mit einem Bild der Lagekarte, einem Lage-Stand darüber
+    /// (über `lage_snapshot::repo::erzeuge`, also mit dem echten Dokument) und vorgemerkter
+    /// Kategorie `anhaenge`, deren Karenz zum Zeitpunkt `2026-03-01` abgelaufen ist.
+    async fn lage_stand_mit_bild(pool: &SqlitePool) -> (i64, i64) {
+        let e = abgeschlossen_mit_frist(pool, "2099-01-01 00:00:00").await;
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        bild_mit_namen(pool, e, SNAPSHOT_BILDNAME, &BILD_KLARTEXT.repeat(10)).await;
+        sqlx::query(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, label, erstellt_von) \
+             VALUES (?, 50.1, 8.6, 'stelle', 'ELW', ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+        let stand = crate::lage_snapshot::repo::erzeuge(pool, e, b, Some("Stand 1"), Some("Notiz"))
+            .await
+            .unwrap();
+        kategorie_mit_frist(pool, e, "anhaenge", "2026-01-01 00:00:00").await;
+        sqlx::query(
+            "UPDATE einsatz_aufbewahrung_kategorie SET vorgemerkt_at = '2026-01-02 00:00:00' \
+             WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .execute(pool)
+        .await
+        .unwrap();
+        (e, stand.id)
+    }
+
+    /// Spec `aufbewahrung-kategorien`, „Bildangaben in Lage-Ständen“: nach der Schwärzung von
+    /// `anhaenge` ist `bilder` im Lage-Stand leer; Bezeichnung, Notiz und alle übrigen Schlüssel
+    /// sind unverändert. Belegt zugleich den Schlüssel `$.bilder` aus `JSON_TEILE` gegen das
+    /// echte Dokument: benennt jemand das Feld um, ist die Vorbedingung rot.
+    #[tokio::test]
+    async fn kategorie_anhaenge_leert_bildangaben_im_lage_stand() {
+        let pool = crate::db::test_pool().await;
+        let (e, id) = lage_stand_mit_bild(&pool).await;
+        let vorher = crate::lage_snapshot::repo::lade_dokument(&pool, e, id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            vorher.daten["bilder"][0]["name"], SNAPSHOT_BILDNAME,
+            "Vorbedingung: der Lage-Stand friert den Dateinamen unter `bilder` ein"
+        );
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            1
+        );
+
+        let nachher = crate::lage_snapshot::repo::lade_dokument(&pool, e, id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(nachher.daten["bilder"], serde_json::json!([]));
+        let ohne_bilder = |d: &serde_json::Value| {
+            let mut d = d.clone();
+            d.as_object_mut().unwrap().remove("bilder");
+            d
+        };
+        assert_eq!(ohne_bilder(&nachher.daten), ohne_bilder(&vorher.daten));
+        assert_eq!(nachher.daten["freie_zeichen"][0]["label"], "ELW");
+        assert_eq!(nachher.bezeichnung.as_deref(), Some("Stand 1"));
+        assert_eq!(nachher.notiz.as_deref(), Some("Notiz"));
+        assert_eq!(nachher.stand_at, vorher.stand_at);
+    }
+
+    /// Spec `aufbewahrung-kategorien`, „Dateiname eines Bilds im Lage-Stand ist physisch weg“.
+    #[tokio::test]
+    async fn bildname_im_lage_stand_hinterlaesst_keine_altbytes() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let (e, _) = lage_stand_mit_bild(&pool).await;
+        // Der Name steht in der Bild-Zeile und im Lage-Stand; die Bild-Zeile entfernt schon der
+        // Nachlauf (LFH-997), hier zählt der Lage-Stand.
+        assert!(
+            crate::db::datei_oder_wal_enthaelt(&pfad, SNAPSHOT_BILDNAME.as_bytes()),
+            "Vorbedingung: Dateiname liegt in der Datei"
+        );
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            1
+        );
+        assert_eq!(bilder_von(&pool, e).await, 0, "Bild der Lagekarte entfernt");
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, SNAPSHOT_BILDNAME.as_bytes()),
+            "Dateiname des Bilds steht noch in DB-Datei oder WAL"
+        );
+    }
+
+    /// Die Einsatz-Schwärzung löscht den Lage-Stand weiterhin ganz; der JSON-Teil ändert daran
+    /// nichts.
+    #[tokio::test]
+    async fn einsatz_schwaerzung_loescht_lage_stand_mit_bildern_ganz() {
+        let pool = crate::db::test_pool().await;
+        let (e, _) = lage_stand_mit_bild(&pool).await;
+        let mut tx = pool.begin().await.unwrap();
+        super::super::schwaerzung_registry::scrubbe_aus_registry(
+            &mut tx,
+            e,
+            super::super::schwaerzung_registry::Umfang::Alles,
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM lage_snapshot WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 0);
     }
 
     // ---------- LFH-905: Anhänge im Nachlauf, je Anhang eine Transaktion ----------
