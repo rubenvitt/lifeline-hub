@@ -1,5 +1,5 @@
 import { IconMenue } from '../icons';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
+import { useAlarmKante } from '../components/alarmOben';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
@@ -174,6 +175,16 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Ab `md` bleibt der Kopf beim Rollen stehen (LFH-952, `frontend/AGENTS.md`, Rahmen); seine
   // gemessene Höhe ist `--lfh-rahmen-oben`, unter der alles hängt, was selbst oben klebt.
   const kopfRef = useRahmenObenQuelle<HTMLElement>(mittel);
+  // Der Kopf ist auch Bedienkante der stehenden Alarme, in jeder Breite: unter `md` rollt er,
+  // steht beim Seitenbeginn aber im Bild (LFH-1112, `components/alarmOben.ts`).
+  const alarmKante = useAlarmKante<HTMLElement>();
+  const kopfRefs = useCallback(
+    (el: HTMLElement | null) => {
+      kopfRef(el);
+      alarmKante(el);
+    },
+    [kopfRef, alarmKante],
+  );
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
@@ -324,7 +335,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header
-        ref={kopfRef}
+        ref={kopfRefs}
         data-lfh="rahmen-kopf"
         style={mittel ? { ...KOPF_STIL, ...RAHMEN_KLEBT } : KOPF_STIL}
       >
