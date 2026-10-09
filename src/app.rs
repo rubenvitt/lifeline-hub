@@ -1678,7 +1678,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/karte/offline/sprites/{datei}",
             get(routes::karte::offline_sprite),
         )
-        // Style-/Tile-Proxy (öffentlich): verbirgt Upstream-Key und -URL.
+        // Style-/Tile-Proxy: verbirgt Upstream-Key und -URL, nur mit Sitzung (LFH-1072), damit
+        // Fremde das Anbieter-Kontingent nicht verbrauchen.
         .route(
             "/api/karte/proxy/{id}/style.json",
             get(routes::karte::proxy_style),
