@@ -21,6 +21,8 @@ import type {
   UhsDetail,
 } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
+import { freigabenFixture } from '../test/fixtures';
+import { zeitfenster } from '../test/verpflegungDaten';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
@@ -598,6 +600,107 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     stelleBereit();
     const router = renderApp('/geraet/7/meldungen');
     await waitFor(() => expect(pfad(router)).toBe('/geraet/7/patienten'));
+  });
+});
+
+describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () => {
+  const vGeraet = geraet({
+    ansicht: 'verpflegung',
+    uhs_id: null,
+    stelle_id: null,
+    stelle: null,
+    bezeichnung: 'Ausgabe Deich',
+  });
+  /** Laufend um die echte Uhr: die Seite trennt „laufend“ von „vergangen“ nach der Uhrzeit. */
+  const wire = (minuten: number) =>
+    new Date(Date.now() + minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+
+  function verpflegungBereit() {
+    stelleBereit(vGeraet);
+    const nachforderungen = vi.fn();
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({
+            nachforderungen: { zugriff: false },
+            personal: { zugriff: false },
+            etb: { zugriff: false },
+          }),
+        ),
+      ),
+      http.get('/api/einsaetze/7/verpflegung', () =>
+        HttpResponse.json({
+          zeitfenster: [zeitfenster({ id: 1, einsatz_id: 7, von_at: wire(-30), bis_at: wire(60) })],
+        }),
+      ),
+      http.get('/api/einsaetze/7/nachforderungen', () => {
+        nachforderungen();
+        return HttpResponse.json([]);
+      }),
+      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+    );
+    return { nachforderungen };
+  }
+
+  it('Start am Verpflegungsgerät: Zeitfenster, Navigation „Verpflegung“ und „Melden“, kein Planen', async () => {
+    vi.useRealTimers();
+    const { nachforderungen } = verpflegungBereit();
+    const router = renderApp('/geraet');
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/verpflegung'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Verpflegung' })).toBeVisible();
+    expect(await screen.findByRole('article', { name: /Zeitfenster Mittag/ })).toBeVisible();
+    const nav = screen.getByRole('navigation', { name: 'Gerätenavigation' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((l) => l.textContent),
+    ).toEqual(['Verpflegung', 'Melden']);
+    expect(screen.getByRole('button', { name: /^Ausgabe erfassen zu Mittag/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Zeitfenster anlegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Bedarf bearbeiten/ })).toBeNull();
+    // Kein Dreipunkt-Menü, in dem Planen stecken könnte.
+    expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
+    expect(nachforderungen).not.toHaveBeenCalled();
+  });
+
+  it('„Fehlmenge melden“ füllt die Meldung an die Einsatzleitung vor, Absender ist das Gerät', async () => {
+    vi.useRealTimers();
+    verpflegungBereit();
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
+      }),
+    );
+    const router = renderApp('/geraet/7/verpflegung');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /^Fehlmenge melden zu Mittag/ }));
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/meldungen'));
+    const inhalt = await screen.findByLabelText<HTMLTextAreaElement>('Inhalt');
+    await waitFor(() =>
+      expect(inhalt.value).toMatch(
+        /^Fehlmenge Verpflegung ‚Mittag‘ .+: 20 EP \(Bedarf 250, ausgegeben 230\)\.$/,
+      ),
+    );
+    // Aus der Adresse geräumt: ein Neuladen füllt nicht erneut.
+    expect(pfad(router)).toBe('/geraet/7/meldungen');
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      absender: 'Verpflegung · Ausgabe Deich',
+      empfaenger: 'Einsatzleitung',
+    });
+    expect((gesendet[0] as { inhalt: string }).inhalt).toMatch(/^Fehlmenge Verpflegung ‚Mittag‘/);
+    // Nach dem Senden steht die Maske leer da, nicht wieder vorbelegt.
+    await waitFor(() => expect(screen.getByLabelText('Inhalt')).toHaveValue(''));
+  });
+
+  it('eine fremde Seite führt auf die Verpflegung', async () => {
+    verpflegungBereit();
+    const router = renderApp('/geraet/7/patienten');
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/verpflegung'));
   });
 });
 

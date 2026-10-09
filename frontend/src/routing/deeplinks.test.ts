@@ -68,7 +68,9 @@ import {
   materialPfad,
   parseRouteId,
   ueberblickPfad,
+  parseMeldungInhalt,
 } from './deeplinks';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { STANDARDUMFANG } from '../druck/einsatzbericht/auswahl';
 
 const E = 5; // einsatzId
@@ -843,5 +845,23 @@ describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
   it('ohne Parameter gibt es keine Vorbelegung', () => {
     expect(parseNachforderungVorbelegung(new URLSearchParams('neu=1'))).toBeNull();
     expect(parseNachforderungVorbelegung(new URLSearchParams())).toBeNull();
+  });
+});
+
+describe('parseMeldungInhalt (Verpflegungsgerät, LFH-1044)', () => {
+  const params = (inhalt?: string) =>
+    new URLSearchParams(inhalt === undefined ? '' : `?${new URLSearchParams({ inhalt })}`);
+
+  it('übernimmt den Inhalt getrimmt', () => {
+    expect(parseMeldungInhalt(params('  Fehlmenge 20 EP  '))).toBe('Fehlmenge 20 EP');
+  });
+
+  it('ohne oder mit leerem Inhalt nichts', () => {
+    expect(parseMeldungInhalt(params())).toBeNull();
+    expect(parseMeldungInhalt(params('   '))).toBeNull();
+  });
+
+  it('kappt auf die Grenze des Inhalts', () => {
+    expect(parseMeldungInhalt(params('x'.repeat(ETB_INHALT_MAX + 5)))).toHaveLength(ETB_INHALT_MAX);
   });
 });

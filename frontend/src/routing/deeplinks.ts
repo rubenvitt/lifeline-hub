@@ -22,6 +22,7 @@ import {
   type BlockSchluessel,
 } from '../druck/einsatzbericht/auswahl';
 import type { EtbTyp, SchadenStatus, Spezies, ZoneTyp } from '../api/types';
+import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter';
 import type { TiereSicht } from '../pages/tiere/tierHelfer';
 import type { SchaedenSicht } from '../pages/schaeden/schadenHelfer';
@@ -1016,9 +1017,26 @@ export function geraetBrPfad(einsatzId: number, brId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/br/${brId}`;
 }
 
-/** Meldungen an die Einsatzleitung eines stellengebundenen Geräts ohne eigenen Stellenbereich. */
-export function geraetMeldungenPfad(einsatzId: number): string {
-  return `${GERAET_START_PFAD}/${einsatzId}/meldungen`;
+/**
+ * Meldungen an die Einsatzleitung eines Geräts ohne eigenen Stellenbereich (Bereitstellungsraum,
+ * Verpflegung). `inhalt` belegt das Formular vor; die Seite nimmt ihn danach aus der Adresse.
+ */
+export function geraetMeldungenPfad(einsatzId: number, opts: { inhalt?: string } = {}): string {
+  return mitQuery(`${GERAET_START_PFAD}/${einsatzId}/meldungen`, { inhalt: opts.inhalt });
+}
+
+/**
+ * Vorbelegter Inhalt aus `?inhalt=` ({@link geraetMeldungenPfad}): getrimmt, auf die Grenze des
+ * Inhalts gekappt (das Feld kappt beim Vorbelegen nicht selbst); leer heißt `null`.
+ */
+export function parseMeldungInhalt(params: URLSearchParams): string | null {
+  const inhalt = params.get('inhalt')?.trim().slice(0, ETB_INHALT_MAX).trim();
+  return inhalt ? inhalt : null;
+}
+
+/** Verpflegung des Verpflegungsgeräts (LFH-1044), Startseite der Ansicht. */
+export function geraetVerpflegungPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/verpflegung`;
 }
 
 /** Startseite des Abschnittsgeräts (LFH-1043): der eigene Abschnitt mit seinen Einheiten. */

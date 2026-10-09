@@ -76,5 +76,14 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
 - **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte
   `BrDetailPage` unter `/geraet/:id/br/:brId` (`GeraetBr` hält die Kennung beim eigenen); ohne
   `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Meldungen an
-  die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum);
-  das Navigationsziel heißt bei Abschnitt und Bereitstellungsraum „Melden“.
+  die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
+  Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
+- **Verpflegung** (LFH-1044): einsatzweit ohne Stelle, Startseite ist die geteilte
+  `VerpflegungPage` unter `/geraet/:id/verpflegung`; ohne `verpflegung-planen` kein Anlegen,
+  Bearbeiten, Löschen. Eine Fehlmenge geht als Meldung an die Einsatzleitung (`meldungVorbelegung`,
+  `?inhalt=` auf der Meldungsseite), nie als Nachforderung; eine Ausgabe mit `nachforderung_id`
+  lehnt der Server für jedes Gerät mit 403 ab. Ohne Stelle steht die Ansicht als Absender.
+  `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
+  Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf.
+  Einsatzweite Zähler für Meldungen und Personen bekommt kein Gerät, auch ohne Stelle
+  (`modul_zaehler.rs`).

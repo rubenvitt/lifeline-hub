@@ -26,6 +26,8 @@ export type GeraetFaehigkeit =
   | 'person-anhaenge'
   /** Bereitstellungsraum wechseln, anlegen, auflösen, stornieren (LFH-1042). */
   | 'br-verwalten'
+  /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044). */
+  | 'verpflegung-planen'
   /** Sprünge in Module außerhalb der Ansicht (Lagekarte, Tiere, Schäden, Einsatzübersicht). */
   | 'fremde-module';
 
@@ -41,6 +43,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
       return geraet.ansicht === 'uhs-tablet' || geraet.ansicht === 'uhs-laptop';
     case 'uhs-verwalten':
     case 'br-verwalten':
+    case 'verpflegung-planen':
     case 'person-status':
     case 'person-zuordnungen':
     case 'person-anhaenge':

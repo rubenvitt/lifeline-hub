@@ -108,9 +108,20 @@ pub async fn liste(
         phase,
         seite,
     };
-    Ok(Json(
-        repo::liste(&state.pool, einsatz_id, &filter, &jetzt()).await?,
-    ))
+    let mut liste = repo::liste(&state.pool, einsatz_id, &filter, &jetzt()).await?;
+    for m in &mut liste {
+        ohne_namen_fuer_geraet(ctx.geraet.as_ref(), m);
+    }
+    Ok(Json(liste))
+}
+
+/// Eine Ansicht ohne Personenbezug (Verpflegung, LFH-1044) erhält die Meldung ohne die Namen von
+/// Bearbeiter und Bestätiger; die Kennungen und der Quittungsstand bleiben.
+fn ohne_namen_fuer_geraet(geraet: Option<&crate::geraet::GeraetKontext>, m: &mut MeldungAnzeige) {
+    if geraet.is_some_and(|g| g.ansicht.ohne_personenbezug()) {
+        m.bearbeiter_name = None;
+        m.bestaetigt_von_name = None;
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -300,6 +311,8 @@ pub async fn anlegen(
             }
             live_publikation_sicherstellen(&state, &meldung).await?;
             auto_frist_erinnerung_sicherstellen(&state, &meldung).await?;
+            let mut meldung = meldung;
+            ohne_namen_fuer_geraet(ctx.geraet.as_ref(), &mut meldung);
             return Ok((StatusCode::CREATED, Json(meldung)));
         }
     }

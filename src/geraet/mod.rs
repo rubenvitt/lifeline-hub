@@ -146,6 +146,17 @@ impl Funktionsansicht {
                 | Funktionsansicht::Betreuungsstelle
                 | Funktionsansicht::Bereitstellungsraum
                 | Funktionsansicht::Einsatzabschnitt
+                | Funktionsansicht::Verpflegung
+        )
+    }
+
+    /// Ob die Ansicht ohne Personenbezug auskommt: keine Namen von Benutzern (etwa Bearbeiter
+    /// einer Meldung) und keine Freitexte des Einsatzkopfs, die Personen nennen können
+    /// (Lagemonitor, Verpflegung LFH-1044).
+    pub fn ohne_personenbezug(self) -> bool {
+        matches!(
+            self,
+            Funktionsansicht::Lagemonitor | Funktionsansicht::Verpflegung
         )
     }
 
@@ -194,8 +205,8 @@ impl Funktionsansicht {
                 "gefahrenzonen",
             ],
             Funktionsansicht::Betreuungsstelle => &["betreuung", "personen", "meldungen"],
-            // Noch nicht verfügbar (LFH-1040): ohne Module erreicht das Gerät nichts.
-            Funktionsansicht::Verpflegung => &[],
+            // LFH-1044: Zeitfenster mit Deckung und die eigenen Meldungen; keine Nachforderungen.
+            Funktionsansicht::Verpflegung => &["verpflegung", "meldungen"],
         }
     }
 
@@ -210,8 +221,7 @@ impl Funktionsansicht {
             Funktionsansicht::Bereitstellungsraum => BEREITSTELLUNGSRAUM,
             Funktionsansicht::Einsatzabschnitt => EINSATZABSCHNITT,
             Funktionsansicht::Betreuungsstelle => BETREUUNGSSTELLE,
-            // Noch nicht verfügbar (LFH-1040): nur `ALLE_ANSICHTEN`.
-            Funktionsansicht::Verpflegung => &[],
+            Funktionsansicht::Verpflegung => VERPFLEGUNG,
         }
     }
 }
@@ -356,6 +366,25 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+];
+
+/// Zusätzliche Einsatzrouten des Verpflegungsgeräts (LFH-1044), einsatzweit ohne Stelle: die
+/// Zeitfenster mit Deckung lesen, Portionen ausgeben und eine Ausgabe zurücknehmen; Meldungen an
+/// die Einsatzleitung anlegen und die eigenen lesen (so meldet das Gerät eine Fehlmenge).
+/// Zeitfenster anlegen, ändern und löschen, Nachforderungen (ihre Liste trägt Namen), Personal,
+/// Betreuung und ETB fehlen bewusst; eine Ausgabe auf eine Nachforderung lehnt der Handler ab.
+const VERPFLEGUNG: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/verpflegung"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben",
+    ),
+    (
+        "POST",
+        "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
+    ),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
 ];
@@ -566,6 +595,44 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/uhs"),
         ] {
             assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
+        }
+    }
+
+    #[test]
+    fn verpflegung_bucht_aber_plant_nicht() {
+        let v = Funktionsansicht::Verpflegung;
+        assert!(v.ist_verfuegbar());
+        assert!(v.rolle().darf_schreiben());
+        for (m, p) in [
+            ("GET", "/api/einsaetze/{id}/verpflegung"),
+            (
+                "POST",
+                "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben",
+            ),
+            (
+                "POST",
+                "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
+            ),
+            ("GET", "/api/einsaetze/{id}/meldungen"),
+            ("POST", "/api/einsaetze/{id}/meldungen"),
+        ] {
+            assert!(darf_route(v, m, p), "Verpflegungsgerät darf {m} {p}");
+        }
+        for (m, p) in [
+            ("POST", "/api/einsaetze/{id}/verpflegung/zeitfenster"),
+            ("PATCH", "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}"),
+            (
+                "DELETE",
+                "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}",
+            ),
+            ("GET", "/api/einsaetze/{id}/nachforderungen"),
+            ("POST", "/api/einsaetze/{id}/nachforderungen"),
+            ("GET", "/api/einsaetze/{id}/personal"),
+            ("GET", "/api/einsaetze/{id}/betreuung"),
+            ("GET", "/api/einsaetze/{id}/personen"),
+            ("GET", "/api/einsaetze/{id}/etb"),
+        ] {
+            assert!(!darf_route(v, m, p), "Verpflegungsgerät darf {m} {p} nicht");
         }
     }
 

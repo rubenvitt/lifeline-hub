@@ -287,4 +287,36 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
     await userEvent.click(within(menue).getByText('Nachfordern'));
     expect(props.onNachfordern).toHaveBeenCalledWith(zf);
   });
+
+  it('Verpflegungsgerät: „Fehlmenge melden" ohne Modul Nachforderungen, ohne Planen (LFH-1044)', async () => {
+    const zf = zeitfenster();
+    const onNachfordern = vi.fn();
+    zeige(zf, {
+      nachforderungenFrei: false,
+      nachschub: 'melden',
+      onBearbeiten: undefined,
+      onLoeschen: undefined,
+      onNachfordern,
+    });
+    expect(screen.queryByText('Nachfordern')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Bedarf bearbeiten/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: `Fehlmenge melden zu ${kennung}` }));
+    expect(onNachfordern).toHaveBeenCalledWith(zf);
+  });
+
+  it('Verpflegungsgerät: gedeckt, nichts zu melden', () => {
+    zeige(
+      zeitfenster({
+        ausgegeben: { gesamt: 250, sonderkost: KEINE_SONDERKOST },
+        fehlmenge: { gesamt: 0, sonderkost: KEINE_SONDERKOST },
+      }),
+      {
+        nachforderungenFrei: false,
+        nachschub: 'melden',
+        onBearbeiten: undefined,
+        onLoeschen: undefined,
+      },
+    );
+    expect(screen.queryByRole('button', { name: /Fehlmenge melden/ })).toBeNull();
+  });
 });

@@ -65,6 +65,12 @@ export interface ZeitfensterKarteProps {
   onAusgabeErfassen?: (zf: VerpflegungZeitfenster) => void;
   onBearbeiten?: (zf: VerpflegungZeitfenster) => void;
   onNachfordern?: (zf: VerpflegungZeitfenster) => void;
+  /**
+   * Weg des Nachschubs bei Fehlmenge: „Nachfordern" (Vorgabe, braucht das Modul Nachforderungen)
+   * oder „Fehlmenge melden" an die Einsatzleitung, wie beim Verpflegungsgerät (LFH-1044).
+   * Beides ruft `onNachfordern`.
+   */
+  nachschub?: 'nachfordern' | 'melden';
   onLoeschen?: (zf: VerpflegungZeitfenster) => void;
   onZuruecknehmen?: (ausgabe: VerpflegungAusgabe, zf: VerpflegungZeitfenster) => void;
   /**
@@ -106,6 +112,7 @@ export default function ZeitfensterKarte({
   onAusgabeErfassen,
   onBearbeiten,
   onNachfordern,
+  nachschub = 'nachfordern',
   onLoeschen,
   onZuruecknehmen,
   ausstehend = [],
@@ -124,8 +131,11 @@ export default function ZeitfensterKarte({
     ? ([
         onBearbeiten && { key: 'bearbeiten', label: 'Bedarf bearbeiten' },
         onNachfordern &&
-          nachforderungenFrei &&
-          nachforderungsAnzahl(zf) > 0 && { key: 'nachfordern', label: 'Nachfordern' },
+          (nachschub === 'melden' || nachforderungenFrei) &&
+          nachforderungsAnzahl(zf) > 0 && {
+            key: 'nachfordern',
+            label: nachschub === 'melden' ? 'Fehlmenge melden' : 'Nachfordern',
+          },
         onLoeschen && !hatGueltigeAusgabe && { key: 'loeschen', label: 'Löschen', danger: true },
       ].filter(Boolean) as Aktion[])
     : [];

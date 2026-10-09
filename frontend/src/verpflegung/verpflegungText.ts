@@ -100,14 +100,31 @@ export function nachforderungVorbelegung(
 ): NachforderungVorbelegung | null {
   const anzahl = nachforderungsAnzahl(zf);
   if (anzahl <= 0) return null;
-  const fehlend = KOSTFORMEN.filter((k) => zf.fehlmenge.sonderkost[k] > 0).map(
-    (k) => `${zf.fehlmenge.sonderkost[k]} ${KOSTFORM_LABEL[k]}`,
-  );
-  const sonderkost = fehlend.length > 0 ? ` Es fehlt Sonderkost: ${fehlend.join(', ')}.` : '';
   return {
     art: 'Verpflegung',
     bezeichnung: `Essensportionen ${zitat(zf.bezeichnung)} ${uhrzeitenText(zf, konv)}`,
     anzahl,
-    begruendung: `Unterdeckung Verpflegung ${zitat(zf.bezeichnung)}: Bedarf ${zf.bedarf.gesamt}, ausgegeben ${zf.ausgegeben.gesamt}.${sonderkost}`,
+    begruendung: `Unterdeckung Verpflegung ${zitat(zf.bezeichnung)}: Bedarf ${zf.bedarf.gesamt}, ausgegeben ${zf.ausgegeben.gesamt}.${fehlendeSonderkost(zf)}`,
   };
+}
+
+/** „ Es fehlt Sonderkost: …" in fester Reihenfolge, leer ohne fehlende Sonderkost. */
+function fehlendeSonderkost(zf: VerpflegungZeitfenster): string {
+  const fehlend = KOSTFORMEN.filter((k) => zf.fehlmenge.sonderkost[k] > 0).map(
+    (k) => `${zf.fehlmenge.sonderkost[k]} ${KOSTFORM_LABEL[k]}`,
+  );
+  return fehlend.length > 0 ? ` Es fehlt Sonderkost: ${fehlend.join(', ')}.` : '';
+}
+
+/**
+ * Text der Meldung an die Einsatzleitung, mit der das Verpflegungsgerät eine Fehlmenge meldet
+ * (LFH-1044: das Gerät fordert nicht selbst nach); `null` ohne Fehlmenge.
+ */
+export function meldungVorbelegung(
+  zf: VerpflegungZeitfenster,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string | null {
+  const anzahl = nachforderungsAnzahl(zf);
+  if (anzahl <= 0) return null;
+  return `Fehlmenge Verpflegung ${zitat(zf.bezeichnung)} ${uhrzeitenText(zf, konv)}: ${anzahl} EP (Bedarf ${zf.bedarf.gesamt}, ausgegeben ${zf.ausgegeben.gesamt}).${fehlendeSonderkost(zf)}`;
 }

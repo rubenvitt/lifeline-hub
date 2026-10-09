@@ -2,10 +2,15 @@ import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import { parseNachforderungVorbelegung, nachforderungenPfad } from '../routing/deeplinks';
+import {
+  geraetMeldungenPfad,
+  nachforderungenPfad,
+  parseNachforderungVorbelegung,
+} from '../routing/deeplinks';
 import { KEINE_SONDERKOST, zeitfenster } from '../test/verpflegungDaten';
 import {
   belegteKostformen,
+  meldungVorbelegung,
   nachforderungVorbelegung,
   sonderkostText,
   uhrzeitenText,
@@ -122,5 +127,39 @@ describe('nachforderungVorbelegung (design.md D9)', () => {
     expect(v.begruendung).toBe(
       'Unterdeckung Verpflegung ‚Mittag‘: Bedarf 250, ausgegeben 230. Es fehlt Sonderkost: 2 vegetarisch, 3 vegan.',
     );
+  });
+});
+
+describe('meldungVorbelegung (Verpflegungsgerät, LFH-1044)', () => {
+  it('nennt Zeitfenster mit Uhrzeiten, Bedarf, Ausgegebenes und Fehlmenge', () => {
+    expect(meldungVorbelegung(zeitfenster(), BERLIN)).toBe(
+      'Fehlmenge Verpflegung ‚Mittag‘ 12:00–13:30: 20 EP (Bedarf 250, ausgegeben 230).',
+    );
+  });
+
+  it('nennt fehlende Sonderkost, auch bei gedeckter Gesamtzahl', () => {
+    expect(
+      meldungVorbelegung(
+        zeitfenster({
+          ausgegeben: { gesamt: 250, sonderkost: KEINE_SONDERKOST },
+          fehlmenge: { gesamt: 0, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
+        }),
+        BERLIN,
+      ),
+    ).toBe(
+      'Fehlmenge Verpflegung ‚Mittag‘ 12:00–13:30: 3 EP (Bedarf 250, ausgegeben 250). Es fehlt Sonderkost: 3 vegan.',
+    );
+  });
+
+  it('ohne jede Fehlmenge keine Vorbelegung', () => {
+    expect(
+      meldungVorbelegung(zeitfenster({ fehlmenge: { gesamt: 0, sonderkost: KEINE_SONDERKOST } })),
+    ).toBeNull();
+  });
+
+  it('überlebt den Weg durch die Adresse unverändert', () => {
+    const inhalt = meldungVorbelegung(zeitfenster(), BERLIN)!;
+    const pfad = geraetMeldungenPfad(1, { inhalt });
+    expect(new URLSearchParams(pfad.slice(pfad.indexOf('?'))).get('inhalt')).toBe(inhalt);
   });
 });

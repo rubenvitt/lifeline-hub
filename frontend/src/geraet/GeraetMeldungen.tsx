@@ -1,5 +1,6 @@
 import { Alert, App, Form, Input, Space, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { useAuth } from '../auth/AuthContext';
 import { listeMeldungen } from '../api/meldungen';
@@ -50,22 +51,35 @@ function PrioritaetFeld({
  * Ereigniszeit setzt das Gerät, denn dort gibt es keinen Funkspruch abzuschreiben. Den
  * strukturierten Absender setzt beim Abschnittsgerät der Server. Ohne Netz merkt die
  * Warteschlange die Meldung vor.
+ *
+ * `vorbelegung` füllt den Inhalt (etwa die Fehlmenge aus der Verpflegung, LFH-1044) — bewusst
+ * per `setFieldsValue` statt `initialValues`: die Hülle setzt nach dem Senden darauf zurück, die
+ * Meldung stünde sonst sofort wieder da (Muster `NachforderungFormular`).
  */
 export default function GeraetMeldungen({
   einsatzId,
   absender,
   schreibgeschuetzt,
+  vorbelegung,
 }: {
   einsatzId: number;
   /** Absender als Freitext, z. B. „UHS Nord · Laptop 1“. */
   absender: string;
   schreibgeschuetzt: boolean;
+  /** Vorbelegter Inhalt; die Seite hält ihn identitätsstabil. */
+  vorbelegung?: string | null;
 }) {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const fehler = useFehlerMeldung();
   const [form] = Form.useForm<MeldungWerte>();
+
+  // Erst mit eingehängtem Formular: ohne Schreibrecht (oder solange es unbekannt ist) fehlt es.
+  useEffect(() => {
+    if (!vorbelegung || schreibgeschuetzt) return;
+    form.setFieldsValue({ inhalt: vorbelegung });
+  }, [form, vorbelegung, schreibgeschuetzt]);
 
   const meldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungen(einsatzId),

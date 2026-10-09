@@ -30,6 +30,7 @@ import {
   nimmAusgabeZurueck,
 } from '../api/verpflegung';
 import { useAuth } from '../auth/AuthContext';
+import { useGeraetDarf } from '../geraet/geraetSicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
@@ -40,7 +41,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseVerpflegungsausgabeOfflineFaehig } from '../offline/schreiben';
 import { useVorgemerkteAusgaben, type VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
-import { nachforderungenPfad } from '../routing/deeplinks';
+import { geraetMeldungenPfad, nachforderungenPfad } from '../routing/deeplinks';
 import {
   AusgabeDialog,
   LoeschenDialog,
@@ -50,7 +51,11 @@ import {
 } from '../verpflegung/VerpflegungDialoge';
 import ZeitfensterKarte from '../verpflegung/ZeitfensterKarte';
 import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
-import { nachforderungVorbelegung, zitat } from '../verpflegung/verpflegungText';
+import {
+  meldungVorbelegung,
+  nachforderungVorbelegung,
+  zitat,
+} from '../verpflegung/verpflegungText';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 
 /** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
@@ -118,11 +123,17 @@ type Dialog =
  * Nichts blinkt.
  *
  * Kopfzahlen rechnen mit der vollen Menge, auch solange ein Neuzugang hinter dem Banner wartet.
+ *
+ * Auf dem Verpflegungsgerät (LFH-1044) dieselbe Seite ohne Planen (Zeitfenster anlegen, Bedarf
+ * ändern, löschen) und ohne Brotkrumen; eine Fehlmenge geht als Meldung an die Einsatzleitung,
+ * nicht als Nachforderung.
  */
 export default function VerpflegungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
+  const { benutzer, geraet } = useAuth();
+  const darf = useGeraetDarf();
+  const planen = darf('verpflegung-planen');
   const { message } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -323,6 +334,11 @@ export default function VerpflegungPage() {
     setDialog({ art: 'anlegen' });
   };
   const nachfordern = (zf: VerpflegungZeitfenster) => {
+    if (geraet) {
+      const inhalt = meldungVorbelegung(zf, konventionen);
+      if (inhalt) void navigate(geraetMeldungenPfad(einsatzId, { inhalt }));
+      return;
+    }
     const vorbelegung = nachforderungVorbelegung(zf, konventionen);
     if (vorbelegung) void navigate(nachforderungenPfad(einsatzId, { vorbelegung }));
   };
@@ -333,21 +349,25 @@ export default function VerpflegungPage() {
       meta={`${alle.length} Zeitfenster · ${unterdeckung} mit Unterdeckung`}
       dataUpdatedAt={verpflegungQuery.dataUpdatedAt}
       breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: einsatz.bezeichnung },
-            { title: modulName('verpflegung') },
-          ]}
-        />
+        darf('fremde-module') && (
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: einsatz.bezeichnung },
+              { title: modulName('verpflegung') },
+            ]}
+          />
+        )
       }
       // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
-        <Button type="primary" disabled={!darfSchreiben} onClick={oeffneAnlegen}>
-          Zeitfenster anlegen
-        </Button>
+        planen && (
+          <Button type="primary" disabled={!darfSchreiben} onClick={oeffneAnlegen}>
+            Zeitfenster anlegen
+          </Button>
+        )
       }
-      neueZeile={darfSchreiben ? oeffneAnlegen : undefined}
+      neueZeile={darfSchreiben && planen ? oeffneAnlegen : undefined}
       hinweis={
         !darfSchreiben && <RechteHinweis sichtbar text={verpflegungRechteText(einsatz.status)} />
       }
@@ -412,7 +432,9 @@ export default function VerpflegungPage() {
         <SeitenLeer
           titel="Noch kein Zeitfenster"
           aktion={
-            darfSchreiben ? { label: 'Zeitfenster anlegen', onClick: oeffneAnlegen } : undefined
+            darfSchreiben && planen
+              ? { label: 'Zeitfenster anlegen', onClick: oeffneAnlegen }
+              : undefined
           }
         />
       ) : liste.length === 0 ? (
@@ -441,15 +463,24 @@ export default function VerpflegungPage() {
                 ausgabeMut.reset();
                 setDialog({ art: 'ausgabe', zf: x });
               }}
-              onBearbeiten={(x) => {
-                aendernMut.reset();
-                setDialog({ art: 'bearbeiten', zf: x });
-              }}
+              onBearbeiten={
+                planen
+                  ? (x) => {
+                      aendernMut.reset();
+                      setDialog({ art: 'bearbeiten', zf: x });
+                    }
+                  : undefined
+              }
               onNachfordern={nachfordern}
-              onLoeschen={(x) => {
-                loeschenMut.reset();
-                setDialog({ art: 'loeschen', zf: x });
-              }}
+              nachschub={geraet ? 'melden' : 'nachfordern'}
+              onLoeschen={
+                planen
+                  ? (x) => {
+                      loeschenMut.reset();
+                      setDialog({ art: 'loeschen', zf: x });
+                    }
+                  : undefined
+              }
               onZuruecknehmen={(a, x) => {
                 ruecknahmeMut.reset();
                 setDialog({ art: 'ruecknahme', zf: x, ausgabe: a });

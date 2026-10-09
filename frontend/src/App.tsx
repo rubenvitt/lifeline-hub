@@ -17,6 +17,7 @@ import GeraeteLayout, {
   GeraetBr,
   GeraetEinsatzRahmen,
   GeraetMeldungen,
+  GeraetVerpflegung,
   GeraetStart,
   GeraetMonitor,
   GeraetStelle,
@@ -249,6 +250,7 @@ export const appRouten = createRoutesFromElements(
           {/* Bereitstellungsraum (LFH-1042): der eigene Raum und die Meldungen. */}
           <Route path="br/:brId" element={<GeraetBr />} />
           <Route path="meldungen" element={<GeraetMeldungen />} />
+          <Route path="verpflegung" element={<GeraetVerpflegung />} />
           {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
           <Route element={<GeraetUhsRahmen />}>
             <Route path="patienten" element={<GeraetPatientenPage />} />
