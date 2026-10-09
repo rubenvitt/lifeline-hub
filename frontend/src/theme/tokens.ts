@@ -782,6 +782,16 @@ export function antdKomponenten(
       // 6,83, `bedienText` hält 7,59 (Nacht 9,53).
       colorPrimary: farben.bedienText,
     },
+    // Gewählter Tag und Bereichsenden der Datums- und Zeitraumwahl, auch die Zelle unter dem
+    // Zeiger, während das Ende gesucht wird (LFH-1068): Schrift `colorTextLightSolid` auf
+    // `colorPrimary` (= `bedien`). antds Weiß lag nachts bei 3,22, `aufBedien` hält 6,19 (Tag
+    // unverändert Weiß, 8,55). Die Tage dazwischen stehen auf `cellActiveWithRangeBg` (=
+    // Auswahlfläche). `cellHoverWithRangeBg`/`cellRangeBorderColor` leitet antd 6.6.5 noch ab,
+    // liest sie aber nirgends; sie bleiben deshalb ungesetzt. Im Picker liest nur die Zellschrift
+    // (`date-picker/style/panel.js`) das Token; der OK-Knopf trägt seine eigenen Variablen.
+    DatePicker: {
+      colorTextLightSolid: farben.aufBedien,
+    },
     Form: {
       colorError: farben.alarmText,
       colorWarning: farben.achtungText,

@@ -205,7 +205,9 @@ struct SnapshotDaten {
     /// Enthält `hoechste_warnstufe` je Gebiet (die Zonen-Färbung), ebenfalls eingefroren.
     gefahrengebiete: Vec<crate::gefahr::GefahrengebietAnzeige>,
     lagemeldungen: Vec<crate::meldung::LageMeldungAnzeige>,
-    /// Nur Metadaten; die BLOB-Bytes bleiben live (kein 5-MB-Grundriss je Stand).
+    /// Nur Metadaten; die BLOB-Bytes bleiben live (kein 5-MB-Grundriss je Stand). Fällt mit der
+    /// Kategorie `anhaenge` (`schwaerzung_registry::JSON_TEILE`): Name nicht ändern, ohne den
+    /// Schlüssel dort nachzuziehen.
     bilder: Vec<crate::karte_hintergrundbild::HintergrundbildAnzeige>,
     /// Betreuungsstellen mit Koordinate (Marker im Rückblick); am Modul Betreuung gegatet
     /// (`REDIGIERBARE_MODUL_FELDER`).

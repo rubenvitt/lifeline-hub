@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import MeldungKarte from './MeldungKarte';
@@ -183,6 +183,33 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
       within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /Auftrag erteilen/ }),
     );
     expect(cb.onAuftragErteilen).toHaveBeenCalledWith(m);
+  });
+
+  // Spec `modul-freigabe` (LFH-1051): ohne Freigabe der Aufträge steht „Auftrag erteilen" gesperrt
+  // mit Grund da (M16), wie „Zu Auftrag" im Chat.
+  it('sperrt „Auftrag erteilen" im Menü mit Grund, wenn die Aufträge nicht freigegeben sind', async () => {
+    const cb = alleCallbacks();
+    renderKarte(
+      <MeldungKarte meldung={schlimmstenfalls()} einsatzId={7} {...cb} auftragGesperrt />,
+    );
+    const menue = await oeffneAktionsmenue();
+    expect(within(menue).queryByRole('menuitem', { name: 'Auftrag erteilen' })).toBeNull();
+    const punkt = within(menue).getByRole('menuitem', {
+      name: 'Auftrag erteilen (Keine Berechtigung)',
+    });
+    expect(punkt).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(punkt);
+    expect(cb.onAuftragErteilen).not.toHaveBeenCalled();
+  });
+
+  it('sperrt den sichtbaren Knopf „Auftrag erteilen" mit Grund, wenn nicht gebündelt wird', async () => {
+    const cb = { darfSchreiben: true, onAuftragErteilen: vi.fn() };
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} {...cb} auftragGesperrt />);
+    expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).toBeNull();
+    const knopf = screen.getByRole('button', { name: 'Auftrag erteilen (Keine Berechtigung)' });
+    expect(knopf).toBeDisabled();
+    fireEvent.click(knopf);
+    expect(cb.onAuftragErteilen).not.toHaveBeenCalled();
   });
 
   it('führt bei „in_bearbeitung" „Als erledigt melden" sichtbar — und dann NICHT mehr im Menü', async () => {

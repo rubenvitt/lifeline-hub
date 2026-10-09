@@ -151,6 +151,9 @@ export default defineConfig(({ mode }) => {
           // Ebenso die Lizenzhinweise (LFH-1000, Benutzermenü „Lizenzen“): sie öffnen als eigene
           // Seite und kämen sonst als App-Hülle zurück.
           navigateFallbackDenylist: [/^\/api\//, /^\/lizenzen\//],
+          // Klick auf eine Alarm-Meldung, die über den Service Worker kam (LFH-1062, Android):
+          // `public/alarm-sw.js` holt den Tab nach vorn und meldet ihm den Klick.
+          importScripts: ['alarm-sw.js'],
         },
         manifest: pwaManifest,
       }),

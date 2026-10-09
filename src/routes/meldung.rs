@@ -2,7 +2,7 @@ use crate::app::AppState;
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
 };
-use crate::einsatz::modul::{Lagemeldungen, Meldungen};
+use crate::einsatz::modul::{Auftraege, Lagemeldungen, Meldungen};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -577,14 +577,17 @@ pub async fn lagerelevant(
 /// einen Auftrag/Befehl erteilen (Meldung→Auftrag, LFH-113). Erzeugt einen formalen Auftrag
 /// (inkl. ETB-Anordnung, Pattern B) und setzt den Rückbezug `meldung.auftrag_id` first-write-wins.
 /// Auftragsfelder durchlaufen dieselbe Validierung wie POST /auftraege (geteilt, kein zweiter Pfad).
-/// Schreibrecht + aktiv über `EinsatzSchreibzugriff<Meldungen>`, Cross-Einsatz-Schutz über
-/// `gehoert_pruefen` (wie die anderen Mutationen).
+/// Schreibrecht + aktiv über `EinsatzSchreibzugriff<Meldungen>`, dazu die Freigabe von
+/// `auftraege`; Cross-Einsatz-Schutz über `gehoert_pruefen` (wie die anderen Mutationen).
 pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
     PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
+    // Der Weg schreibt in die Aufträge, also gilt deren Modulfreigabe wie beim Heraufstufen aus
+    // dem Chat (Spec `modul-freigabe`, LFH-1051). 403 vor 404.
+    ctx.fordere_zielmodul::<Auftraege>(&state.pool).await?;
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
 
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.

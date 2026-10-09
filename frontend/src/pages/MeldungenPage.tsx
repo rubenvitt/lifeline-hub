@@ -45,6 +45,7 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useViewport } from '../components/useViewport';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
 import { modulName } from '../einsatz/modulRegistry';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
@@ -362,6 +363,8 @@ export default function MeldungenPage() {
   );
   const onBestaetigen = useCallback((meldungId: number) => bestaetigen(meldungId), [bestaetigen]);
   const mitglieder = mitgliederQuery.data ?? KEINE_MITGLIEDER;
+  // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
+  const auftragGesperrt = useSprungSperre(einsatzId)('auftraege');
 
   if (einsatzQuery.isLoading) {
     return (
@@ -386,6 +389,7 @@ export default function MeldungenPage() {
     onLagerelevant,
     onBestaetigen,
     onAuftragErteilen: setAuftragMeldung,
+    auftragGesperrt,
   };
 
   const auftragsZiele = {

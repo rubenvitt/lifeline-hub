@@ -47,6 +47,7 @@ import {
   zuflussText,
 } from './zeitachseModell';
 import { useDarfOriginalLaden } from '../einsatz/useDarfOriginalLaden';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 
 interface Props {
   /** Gesendete und gepufferte Einträge als EINE Chronologie (`etb/etbZeile.ts`). */
@@ -73,6 +74,8 @@ interface Props {
   onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, bietet jeder Eintrag „Auftrag erteilen" an (ETB→Auftrag, LFH-112). */
   onAuftragErteilen?: (eintrag: EtbEintragAnzeige) => void;
+  /** Aufträge ohne Freigabe (LFH-1051): „Auftrag erteilen“ steht gesperrt mit Grund im Menü. */
+  auftragGesperrt?: boolean;
   /** Abgelehnten Eintrag erneut in die Warteschlange geben (LFH-342 · C7). */
   onErneutSenden?: (puffer: AbgelehnterEintrag) => void;
   /** Abgelehnten Eintrag endgültig verwerfen. */
@@ -161,6 +164,7 @@ export default function EtbZeitachse({
   berichtigenGesperrt,
   onWiedervorlage,
   onAuftragErteilen,
+  auftragGesperrt = false,
   onErneutSenden,
   onVerwerfen,
   ladend,
@@ -256,6 +260,7 @@ export default function EtbZeitachse({
       berichtigenGesperrt={berichtigenGesperrt}
       kannWiedervorlage={onWiedervorlage != null}
       kannAuftrag={onAuftragErteilen != null}
+      auftragGesperrt={auftragGesperrt}
       aufrufe={aufrufe}
     />
   );
@@ -356,6 +361,7 @@ interface ZeilenProps {
   berichtigenGesperrt?: string;
   kannWiedervorlage: boolean;
   kannAuftrag: boolean;
+  auftragGesperrt: boolean;
   aufrufe: ZeilenAufrufe;
 }
 
@@ -375,6 +381,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
   berichtigenGesperrt,
   kannWiedervorlage,
   kannAuftrag,
+  auftragGesperrt,
   aufrufe,
 }: ZeilenProps) {
   const { token, rollen } = useRollen();
@@ -407,7 +414,17 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
           ]
         : []),
       ...(kannWiedervorlage ? [{ key: 'wiedervorlage' as const, label: 'Wiedervorlage' }] : []),
-      ...(kannAuftrag ? [{ key: 'auftrag' as const, label: 'Auftrag erteilen' }] : []),
+      ...(kannAuftrag
+        ? [
+            auftragGesperrt
+              ? {
+                  key: 'auftrag' as const,
+                  label: `Auftrag erteilen (${KEINE_BERECHTIGUNG})`,
+                  gesperrt: true as const,
+                }
+              : { key: 'auftrag' as const, label: 'Auftrag erteilen' },
+          ]
+        : []),
     ];
     // Auch hier, nicht nur im Baustein: `Zeitachseneintrag` zeigt seine Fußzeile, sobald
     // `aktionen` nicht `null` ist.

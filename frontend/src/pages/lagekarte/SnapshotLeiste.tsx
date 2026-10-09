@@ -17,6 +17,7 @@ import { useLageSnapshots } from './useLageSnapshots';
 import { bandStil } from './KartenFuss';
 import { useViewport } from '../../components/useViewport';
 import { Select } from '../../components/Select';
+import { schriftStil } from '../../components/instrument/rollenwerte';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
@@ -119,14 +120,62 @@ interface SnapshotLeisteProps {
   fehler: (e: unknown) => void;
 }
 
-function chipLabel(
+/** Beschriftung eines Standes: Hauptzeile, Erfassungszeit darunter und beides als ein Text. */
+export interface StandBeschriftung {
+  /** Bezeichnung, ohne Bezeichnung die Erfassungszeit. */
+  haupt: string;
+  /** Erfassungszeit als Zweitzeile; `null`, wenn sie schon die Hauptzeile ist. */
+  zeit: string | null;
+  /** Zugänglicher Name und Schieber-Tooltip: Bezeichnung und Zeit. */
+  voll: string;
+}
+
+/**
+ * Beschriftung eines Standes in der Auswahl „Stand“ und am Schieber (LFH-1057). Die Zeit ist
+ * `stand_at` (der erfasste Lagestand, unveränderlich), nicht `erstellt_at`. Rein und exportiert.
+ */
+export function standBeschriftung(
   bezeichnung: string | null | undefined,
   standAt: string,
   konv: AnzeigeKonventionen,
-): string {
+): StandBeschriftung {
   // `formatZeitKurz` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String.
   // In der Anzeigezone wie jede andere Zeit der Seite (LFH-913).
-  return bezeichnung?.trim() || formatZeitKurz(standAt, konv);
+  const zeit = formatZeitKurz(standAt, konv);
+  const name = bezeichnung?.trim();
+  return name
+    ? { haupt: name, zeit, voll: `${name}, ${zeit}` }
+    : { haupt: zeit, zeit: null, voll: zeit };
+}
+
+/**
+ * Eine Option der Auswahl „Stand“: Hauptzeile, darunter sekundär die Erfassungszeit (LFH-1057).
+ * Die Zeit läuft in `meta` (Mono, `tabular-nums`) wie jede Zeit neben Text; „Live“ und ein Stand
+ * ohne Bezeichnung bleiben einzeilig.
+ */
+function StandOption({
+  haupt,
+  zeit,
+  token,
+}: {
+  haupt: string;
+  zeit: string | null;
+  token: GlobalToken;
+}) {
+  if (zeit == null) return <>{haupt}</>;
+  return (
+    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <span data-lfh="stand-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {haupt}
+      </span>
+      <span
+        data-lfh="stand-zeit"
+        style={{ ...schriftStil('meta'), color: token.colorTextSecondary }}
+      >
+        {zeit}
+      </span>
+    </span>
+  );
 }
 
 /**
@@ -259,8 +308,16 @@ export function SnapshotLeiste({
   const optionen = [
     { value: LIVE, label: 'Live', title: 'Live' },
     ...[...chrono].reverse().map((s) => {
-      const label = chipLabel(s.bezeichnung, s.stand_at, konventionen);
-      return { value: s.id, label, title: s.notiz ? `${label} · ${s.notiz}` : label };
+      const { haupt, zeit, voll } = standBeschriftung(s.bezeichnung, s.stand_at, konventionen);
+      // `label` ist die Hauptzeile: sie steht im geschlossenen Feld, das am Handschirm keinen Platz
+      // für eine zweite Zeile hat. Die Zeit trägt `optionRender` in die geöffnete Liste.
+      return {
+        value: s.id,
+        label: haupt,
+        zeit,
+        title: s.notiz ? `${haupt} · ${s.notiz}` : haupt,
+        'aria-label': voll,
+      };
     }),
   ];
 
@@ -311,7 +368,8 @@ export function SnapshotLeiste({
               tooltip={{
                 formatter: (i) =>
                   i != null && chrono[i]
-                    ? chipLabel(chrono[i].bezeichnung, chrono[i].stand_at, konventionen)
+                    ? standBeschriftung(chrono[i].bezeichnung, chrono[i].stand_at, konventionen)
+                        .voll
                     : '',
               }}
               onChange={(i) => {
@@ -334,6 +392,9 @@ export function SnapshotLeiste({
               // wie die frühere Beschriftung steht dann „Live“.
               value={aktiverIndex >= 0 ? chrono[aktiverIndex].id : LIVE}
               options={optionen}
+              optionRender={({ data }) => (
+                <StandOption haupt={String(data.label)} zeit={data.zeit ?? null} token={token} />
+              )}
               onChange={waehle}
               // Ohne Suche: am Handschirm öffnete das Tippen sonst die Bildschirmtastatur über der
               // Karte, und eine Handvoll Stände braucht keinen Filter.

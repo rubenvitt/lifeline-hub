@@ -348,6 +348,11 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Eine Kategorie wirkt nur früher als die Einsatz-Frist und sperrt nicht; der Personenstamm geht
   erst, wenn alle Zwecke der Person geschwärzt sind. Herleitung:
   `openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md`.
+- **Daten einer Kategorie in einem eingefrorenen JSON-Dokument** (LFH-1069): folgt die Spalte
+  der Einsatz-Frist, steht der Schlüssel in `JSON_TEILE` (`einsatz/schwaerzung_registry.rs`)
+  und wird mit der Kategorie ein leeres Array (heute `lage_snapshot.daten` → `$.bilder`,
+  `anhaenge`). Wer in ein solches Dokument Daten einer Kategorie aufnimmt, trägt ihn dort ein;
+  kein Guard bemerkt das Fehlen.
 - **Endgültige Löschung des Skeletts** (LFH-750, Spec `aufbewahrung`): Phase D des Purge-Laufs
   (`einsatz/skelett_loeschung.rs`) löscht einen geschwärzten Einsatz samt ETB, sobald die
   Org-Einstellung `skelett_dauer_tage` (ab Abschluss, frühestens die Schwärzung) abgelaufen ist;

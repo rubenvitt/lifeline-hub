@@ -19,8 +19,17 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { KennungsLink } from '../components/kennungsLink';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 
 const { Text } = Typography;
+
+/** Eine Aktion hinter den sichtbaren Knöpfen; `gesperrt` zeigt sie mit Grund statt bedienbar. */
+interface WeitereAktion {
+  key: string;
+  label: string;
+  onClick: () => void;
+  gesperrt?: true;
+}
 
 interface BearbeiterOption {
   benutzer_id: number;
@@ -50,6 +59,11 @@ interface MeldungKarteProps {
   onBestaetigen?: (meldungId: number) => void;
   /** Öffnet das Auftrags-Formular zur Meldung → Auftrag-Erteilung. */
   onAuftragErteilen?: (m: Meldung) => void;
+  /**
+   * Aufträge ohne Freigabe (LFH-1051, Spec `modul-freigabe`): „Auftrag erteilen“ steht gesperrt
+   * mit Grund, wie „Zu Auftrag“ im Chat.
+   */
+  auftragGesperrt?: boolean;
 }
 
 /**
@@ -104,6 +118,7 @@ function MeldungKarte({
   onLagerelevant,
   onBestaetigen,
   onAuftragErteilen,
+  auftragGesperrt = false,
 }: MeldungKarteProps) {
   const { rollen, token } = useRollen();
   // Ein Gerät (UHS-Laptop) springt nicht in die Aufträge (LFH-892).
@@ -148,7 +163,7 @@ function MeldungKarte({
           ? { ziel: 'erledigt', label: MELDUNG_HANDLUNG.erledigt }
           : null;
 
-  const weitere: { key: string; label: string; onClick: () => void }[] = darfSchreiben
+  const weitere: WeitereAktion[] = darfSchreiben
     ? [
         // Was der Primär-Knopf gerade nicht zeigt, bleibt über das Menü erreichbar (z. B. der
         // Direktsprung auf „Als erledigt melden" bei einer neuen Meldung).
@@ -175,7 +190,16 @@ function MeldungKarte({
           ? [{ key: 'lr', label: 'An Lage übergeben', onClick: () => onLagerelevant(m.id) }]
           : []),
         ...(m.auftrag_id == null && onAuftragErteilen
-          ? [{ key: 'ae', label: 'Auftrag erteilen', onClick: () => onAuftragErteilen(m) }]
+          ? [
+              auftragGesperrt
+                ? {
+                    key: 'ae',
+                    label: `Auftrag erteilen (${KEINE_BERECHTIGUNG})`,
+                    onClick: () => {},
+                    gesperrt: true as const,
+                  }
+                : { key: 'ae', label: 'Auftrag erteilen', onClick: () => onAuftragErteilen(m) },
+            ]
           : []),
       ]
     : [];
@@ -312,7 +336,12 @@ function MeldungKarte({
                 />
               ) : (
                 weitere.map((w) => (
-                  <Button key={w.key} onClick={w.onClick}>
+                  <Button
+                    key={w.key}
+                    disabled={w.gesperrt}
+                    title={w.gesperrt && KEINE_BERECHTIGUNG}
+                    onClick={w.onClick}
+                  >
                     {w.label}
                   </Button>
                 ))

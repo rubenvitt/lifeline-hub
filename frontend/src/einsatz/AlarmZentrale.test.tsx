@@ -1092,3 +1092,97 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     expect(offeneDesktopAlarme()).toBe(0);
   });
 });
+
+/**
+ * LFH-1062: Auf Android gibt es den `Notification`-Konstruktor nicht; die Meldung kommt über den
+ * Service Worker, und dessen Klick-Nachricht führt zur Quelle.
+ */
+describe('AlarmZentrale: Meldungen über den Service Worker (LFH-1062)', () => {
+  type SwMeldung = { titel: string; tag: string; data: { id: string; ziel?: string } };
+
+  function stubAndroidMitServiceWorker() {
+    const Ctor = vi.fn(function () {
+      throw new TypeError('Illegal constructor');
+    }) as unknown as typeof Notification & { permission: NotificationPermission };
+    Ctor.permission = 'granted';
+    vi.stubGlobal('Notification', Ctor);
+    const sw: SwMeldung[] = [];
+    const hoerer: ((ev: MessageEvent) => void)[] = [];
+    const registrierung = {
+      showNotification: vi.fn(async (titel: string, opts: NotificationOptions = {}) => {
+        sw.push({ titel, tag: opts.tag ?? '', data: opts.data as SwMeldung['data'] });
+      }),
+      getNotifications: vi.fn(async (filter?: GetNotificationOptions) =>
+        sw
+          .filter((m) => !filter?.tag || m.tag === filter.tag)
+          .map((m) => ({ data: m.data, close: () => sw.splice(sw.indexOf(m), 1) })),
+      ),
+    };
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/141.0',
+      serviceWorker: {
+        controller: {
+          postMessage: (m: { typ?: string }) => {
+            if (m.typ !== 'lfh-alarm-nachfrage') return;
+            setTimeout(() => {
+              for (const f of hoerer) {
+                f(new MessageEvent('message', { data: { typ: 'lfh-alarm-antwort' } }));
+              }
+            }, 0);
+          },
+        },
+        ready: Promise.resolve(registrierung),
+        addEventListener: (typ: string, f: (ev: MessageEvent) => void) => {
+          if (typ === 'message') hoerer.push(f);
+        },
+      },
+    });
+    const klick = (id: string) => {
+      for (const f of hoerer)
+        f(new MessageEvent('message', { data: { typ: 'lfh-alarm-klick', id } }));
+    };
+    return { Ctor, sw, klick };
+  }
+
+  function setzeHidden(hidden: boolean) {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+  }
+
+  beforeEach(() => setzeViewportBreite(1366));
+  afterEach(() => {
+    schliesseAlleDesktopAlarme();
+    setzeHidden(false);
+    vi.unstubAllGlobals();
+    setzeViewportBreite(VIEWPORT_STANDARD);
+  });
+
+  it('meldet „erlaubt", zeigt die Sofortmeldung als Systemmeldung, und der Tipp führt zur Quelle', async () => {
+    stubAudioReady();
+    const { Ctor, sw, klick } = stubAndroidMitServiceWorker();
+    renderAlarm({ initialEntry: '/einsaetze/1/lage' });
+    // Erst die Antwort des Service Workers macht den Weg verfügbar.
+    expect(
+      await screen.findByRole('button', { name: /^Benachrichtigungen: erlaubt/ }),
+    ).toBeInTheDocument();
+
+    setzeHidden(true);
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: 3 } }));
+    });
+    await waitFor(() => expect(sw).toHaveLength(1));
+    expect(Ctor).not.toHaveBeenCalled();
+    expect(sw[0]).toMatchObject({ titel: 'Sofortmeldung eingegangen', tag: '1-sofort-3' });
+    expect(sw[0].data.ziel).toBe(new URL('/einsaetze/1/meldungen', window.location.href).href);
+    const id = sw[0].data.id;
+
+    // Der Service Worker holt den Tab nach vorn, der räumt ab; dann kommt der Klick.
+    setzeHidden(false);
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(sw).toHaveLength(0));
+    act(() => klick(id));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen');
+  });
+});
