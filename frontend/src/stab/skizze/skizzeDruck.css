@@ -47,6 +47,12 @@
     display: none !important;
   }
 
+  /* Die helle Unterlage hinter den Zeichen gilt nur dem Schirm (LFH-1107, `ZEICHEN_UNTERLAGE`); auf
+     Papier steht das Zeichen auf dem Papier. Wie bei der Meldung für Druckwege ohne `beforeprint`. */
+  .lfh-skizze-flaeche [data-teil='zeichen-grund'] {
+    display: none !important;
+  }
+
   /* Nutzhöhe quer bei 15 mm Rand (`druck/druck.css`): A3 267 mm, A4 180 mm; davon Druckkopf
      45 mm und Abstände. */
   .lfh-skizze-druck-a3 .lfh-skizze-flaeche svg {

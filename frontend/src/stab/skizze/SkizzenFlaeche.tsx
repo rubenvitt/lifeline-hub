@@ -739,7 +739,13 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
           {!druck ? (
             <rect x={p.x} y={p.y} width={p.breite} height={p.hoehe} fill="transparent" />
           ) : null}
-          <StelleBild stelle={st} platz={p} zustand={zustand(st.key)} meldung={meldung(st.key)} />
+          <StelleBild
+            stelle={st}
+            platz={p}
+            zustand={zustand(st.key)}
+            meldung={meldung(st.key)}
+            unterlage={!druck}
+          />
           {p.neu && !druck ? <NeuMarke platz={p} zustand={zustand(st.key)} /> : null}
         </>,
       ),
