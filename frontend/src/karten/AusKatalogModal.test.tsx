@@ -128,4 +128,33 @@ describe('AusKatalogModal — abgelehnte Übernahme (LFH-1077)', () => {
     await within(wieder).findByText('TopPlusOpen');
     expect(wieder.querySelector('[data-fehler]')).toBeNull();
   });
+
+  /**
+   * Zwei Übernahmen zugleich gibt es hier nicht: beide bekämen dieselbe `naechsteSortier`. Solange
+   * eine läuft, sind die anderen Einträge gesperrt — deshalb kann keine zweite Zeile den Grund der
+   * ersten verdrängen.
+   */
+  it('sperrt die anderen Einträge, solange eine Übernahme läuft', async () => {
+    let gibFrei: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (gibFrei = r));
+    server.use(
+      http.get('/api/karte/online-quellen/katalog', () => HttpResponse.json(KATALOG)),
+      http.post('/api/karte/online-quellen', async () => {
+        await freigabe;
+        return HttpResponse.json({ error: 'URL schon vorhanden' }, { status: 409 });
+      }),
+    );
+    renderMitProviders(<Harness />);
+    await screen.findByText('TopPlusOpen');
+    await userEvent.click(within(zeile('TopPlusOpen')).getByRole('button', { name: 'Hinzufügen' }));
+    await waitFor(() =>
+      expect(
+        within(zeile('Satellit (Esri)')).getByRole('button', { name: 'Hinzufügen' }),
+      ).toBeDisabled(),
+    );
+    gibFrei();
+    expect(await within(zeile('TopPlusOpen')).findByText('URL schon vorhanden')).toHaveAttribute(
+      'data-fehler',
+    );
+  });
 });

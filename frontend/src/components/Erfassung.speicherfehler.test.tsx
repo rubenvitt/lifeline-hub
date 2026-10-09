@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders } from '../test/utils';
-import { ErfassungsModal } from './Erfassung';
+import { ErfassungsFormular, ErfassungsModal } from './Erfassung';
 
 /**
  * Speicherfehler im Dialog (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): die Hülle
@@ -105,5 +105,57 @@ describe('ErfassungsModal — Speicherfehler im Dialog (LFH-1077)', () => {
     const wieder = await screen.findByRole('dialog');
     expect(within(wieder).getByLabelText('Name')).toHaveValue('');
     expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
+});
+
+function InlineHarness({ speichern }: { speichern: (w: Werte) => Promise<unknown> }) {
+  const [form] = Form.useForm<Werte>();
+  const [sichtbar, setSichtbar] = useState(true);
+  const mutation = useMutation({ mutationFn: speichern });
+  return (
+    <CommandPaletteProvider>
+      <Button onClick={() => setSichtbar((s) => !s)}>Umschalten</Button>
+      {sichtbar && (
+        <ErfassungsFormular<Werte>
+          form={form}
+          onErfassen={(w) => mutation.mutateAsync(w)}
+          onFertig={() => {}}
+          speicherung={mutation}
+          speicherFehlerFallback="Download fehlgeschlagen"
+          erfassenText="Speichern"
+        >
+          <Form.Item label="Name" name="name">
+            <Input />
+          </Form.Item>
+        </ErfassungsFormular>
+      )}
+    </CommandPaletteProvider>
+  );
+}
+
+describe('ErfassungsFormular — Speicherfehler beim Einhängen und ohne Servermeldung (LFH-1077)', () => {
+  it('räumt beim erneuten Einhängen den Grund, den niemand per Abbrechen geräumt hat', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(
+      <InlineHarness speichern={vi.fn().mockRejectedValue(new ApiError(422, 'Abgelehnt'))} />,
+    );
+    await user.type(screen.getByLabelText('Name'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Abgelehnt');
+
+    await user.click(screen.getByRole('button', { name: 'Umschalten' }));
+    await user.click(screen.getByRole('button', { name: 'Umschalten' }));
+    expect(await screen.findByLabelText('Name')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('nennt bei einem Fehler ohne Servermeldung den Rückfalltext des Aufrufers', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(
+      <InlineHarness speichern={vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))} />,
+    );
+    await user.type(screen.getByLabelText('Name'), 'x');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Download fehlgeschlagen');
   });
 });

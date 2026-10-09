@@ -358,12 +358,15 @@ describe('OfflineKartenVerwaltung', () => {
 
   const zeileVon = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
 
-  /** Bestätigt die offene Rückfrage „Offline-Karte löschen?". */
-  async function bestaetigeLoeschen() {
+  /**
+   * Bestätigt die `nummer`-te geöffnete Rückfrage „Offline-Karte löschen?". Jede Zeile hängt ihre
+   * eigene an `document.body`, die jüngste zuletzt; eine geschlossene bleibt in jsdom stehen.
+   */
+  async function bestaetigeLoeschen(nummer = 1) {
     const rueckfrage = await waitFor(() => {
-      const p = document.querySelector<HTMLElement>('.ant-popconfirm');
-      expect(p).not.toBeNull();
-      return p!;
+      const alle = document.querySelectorAll<HTMLElement>('.ant-popconfirm');
+      expect(alle.length).toBeGreaterThanOrEqual(nummer);
+      return alle[nummer - 1];
     });
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Löschen' }));
   }
@@ -458,6 +461,41 @@ describe('OfflineKartenVerwaltung', () => {
     );
     expect(await screen.findByText('Die Karte ist aktuell')).toBeInTheDocument();
     expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+  });
+
+  /**
+   * `useMutation` verfolgt nur den LETZTEN Aufruf: löscht Zeile B, bevor Zeile A geantwortet hat,
+   * erführe die Seite über `mutation.error` nichts von A's Ablehnung. Der Grund muss trotzdem an A
+   * stehen.
+   */
+  it('eine Ablehnung, die nach der Aktion an einer zweiten Zeile ankommt, steht an ihrer Zeile', async () => {
+    let gibFrei: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (gibFrei = r));
+    mockBasis(admin, [karte, kleineKarte]);
+    server.use(
+      http.delete('/api/karte/offline-karten/1', async () => {
+        await freigabe;
+        return HttpResponse.json({ error: 'Datei gesperrt' }, { status: 409 });
+      }),
+      http.delete('/api/karte/offline-karten/3', () => new HttpResponse(null, { status: 204 })),
+    );
+    render();
+    await screen.findByText('Deutschland – Bayern');
+    await userEvent.click(
+      within(zeileVon('Deutschland – Bremen')).getByRole('button', { name: 'Löschen' }),
+    );
+    await bestaetigeLoeschen(1);
+    await userEvent.click(
+      within(zeileVon('Deutschland – Bayern')).getByRole('button', { name: 'Löschen' }),
+    );
+    await bestaetigeLoeschen(2);
+    gibFrei();
+
+    expect(
+      await within(zeileVon('Deutschland – Bremen')).findByText('Datei gesperrt'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('Deutschland – Bayern').querySelector('[data-fehler]')).toBeNull();
+    ohneToastNurEinFehler();
   });
 
   it('URL-Download: Modal-Submit → POST /download mit kachel_schema shortbread', async () => {

@@ -1,8 +1,9 @@
 import { App, Button, Input, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ZeilenFehler, zeilenFehler } from '../components/SpeicherHinweis';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
   listeVorhandeneKarten,
   registriereOfflineKarte,
@@ -42,6 +43,13 @@ export default function OfflineVorhandeneModal({
     enabled: offen,
   });
 
+  // Eine Ablehnung steht an der Datei, an der übernommen wurde, kein Toast (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“, LFH-1077). Je Dateiname gemerkt, aus den Callbacks der Mutation
+  // (`components/useZeilenFehler.ts`); Öffnen und Schließen räumen alle Gründe.
+  const zeilen = useZeilenFehler<string>();
+  const { leere } = zeilen;
+  useEffect(() => leere(), [offen, leere]);
+
   const importMutation = useMutation({
     mutationFn: (v: VorhandeneKarte) =>
       registriereOfflineKarte({
@@ -51,23 +59,14 @@ export default function OfflineVorhandeneModal({
         lizenz: '© OpenStreetMap contributors (ODbL)',
         kachel_schema: 'shortbread',
       }),
+    onMutate: (v) => zeilen.beginne(v.dateiname),
+    onError: (e, v) => zeilen.melde(v.dateiname, e, 'Übernehmen fehlgeschlagen'),
     onSuccess: () => {
       invalidiereKarte(qc);
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-vorhandene') });
       message.success('Region übernommen');
     },
   });
-
-  // Eine Ablehnung steht an der Datei, an der übernommen wurde, kein Toast (`frontend/AGENTS.md`,
-  // „Rückwege und Fehler“, LFH-1077). Öffnen und Schließen räumen den Grund der letzten Ablehnung;
-  // eine laufende Übernahme bleibt unberührt, `reset()` hängte ihr Ergebnis ab. Ref, damit nur
-  // `offen` den Effekt auslöst, nicht jedes neue Mutationsobjekt.
-  const mutationRef = useRef(importMutation);
-  mutationRef.current = importMutation;
-  useEffect(() => {
-    const m = mutationRef.current;
-    if (!m.isPending && m.error != null) m.reset();
-  }, [offen]);
 
   return (
     <Modal
@@ -88,7 +87,7 @@ export default function OfflineVorhandeneModal({
           dataSource={vorhandeneQuery.data ?? []}
           emptyText="Keine neuen Dateien im Karten-Verzeichnis"
           renderItem={(v) => {
-            const fehler = zeilenFehler(importMutation, (i) => i.dateiname === v.dateiname);
+            const grund = zeilen.grund(v.dateiname);
             return (
               <ListenEintrag
                 actions={[
@@ -121,9 +120,9 @@ export default function OfflineVorhandeneModal({
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                         {v.dateiname} <Tag>{formatGroesse(v.groesse)}</Tag>
                       </Typography.Text>
-                      {fehler != null && (
+                      {grund && (
                         <div>
-                          <ZeilenFehler fehler={fehler} fallback="Übernehmen fehlgeschlagen" />
+                          <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
                         </div>
                       )}
                     </>

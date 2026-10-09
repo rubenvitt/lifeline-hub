@@ -253,6 +253,71 @@ describe('OnlineQuellenVerwaltung', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
+  /** Die `nummer`-te geöffnete Rückfrage; jede Zeile hängt ihre eigene an, die jüngste zuletzt. */
+  async function bestaetigeLoeschen(nummer: number) {
+    const rueckfrage = await waitFor(() => {
+      const alle = document.querySelectorAll<HTMLElement>('.ant-popconfirm');
+      expect(alle.length).toBeGreaterThanOrEqual(nummer);
+      return alle[nummer - 1];
+    });
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Löschen' }));
+  }
+
+  /**
+   * `useMutation` verfolgt nur den LETZTEN Aufruf: wer Zeile B löscht, bevor Zeile A geantwortet
+   * hat, verlöre über `mutation.error` A's Ablehnung. Der Grund steht trotzdem an A.
+   */
+  it('eine Ablehnung, die nach dem Löschen einer zweiten Zeile ankommt, steht an ihrer Zeile', async () => {
+    let gibFrei: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (gibFrei = r));
+    mockBasis(admin, [quelle, zweiteQuelle]);
+    server.use(
+      http.delete('/api/karte/online-quellen/1', async () => {
+        await freigabe;
+        return HttpResponse.json({ error: 'Quelle ist Grundkarte' }, { status: 409 });
+      }),
+      http.delete('/api/karte/online-quellen/2', () => new HttpResponse(null, { status: 204 })),
+    );
+    render();
+    await screen.findByText('Basemap.de');
+    const zeileVon = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+
+    await userEvent.click(
+      within(zeileVon('OpenStreetMap')).getByRole('button', { name: 'Löschen' }),
+    );
+    await bestaetigeLoeschen(1);
+    await userEvent.click(within(zeileVon('Basemap.de')).getByRole('button', { name: 'Löschen' }));
+    await bestaetigeLoeschen(2);
+    gibFrei();
+
+    expect(
+      await within(zeileVon('OpenStreetMap')).findByText('Quelle ist Grundkarte'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('Basemap.de').querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Bearbeiten an der Zeile räumt den Grund einer abgelehnten Löschung', async () => {
+    mockBasis(admin, [quelle, zweiteQuelle]);
+    server.use(
+      http.delete('/api/karte/online-quellen/2', () =>
+        HttpResponse.json({ error: 'Quelle ist Grundkarte' }, { status: 409 }),
+      ),
+    );
+    render();
+    await screen.findByText('Basemap.de');
+    const zeileVon = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+    await userEvent.click(within(zeileVon('Basemap.de')).getByRole('button', { name: 'Löschen' }));
+    await bestaetigeLoeschen(1);
+    await within(zeileVon('Basemap.de')).findByText('Quelle ist Grundkarte');
+
+    await userEvent.click(
+      within(zeileVon('Basemap.de')).getByRole('button', { name: 'Bearbeiten' }),
+    );
+    await screen.findByRole('dialog');
+    expect(zeileVon('Basemap.de').querySelector('[data-fehler]')).toBeNull();
+  });
+
   it('Katalog-Flow: „Aus Katalog hinzufügen" → Eintrag → POST mit korrektem Body', async () => {
     let postBody: unknown = null;
     mockBasis(admin, []);

@@ -162,6 +162,23 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
+  /** Ohne Servermeldung (Netz weg) nennt der Dialog den Vorgang, nicht „Speichern“. */
+  it('nennt bei einem Netzfehler „Download fehlgeschlagen“ im Dialog', async () => {
+    server.use(http.post('/api/karte/offline-karten/download', () => HttpResponse.error()));
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    await nutzer.type(await screen.findByLabelText('Name'), 'Deutschland');
+    await nutzer.type(screen.getByLabelText('URL (.mbtiles)'), 'https://example.test/de.mbtiles');
+    await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
+    await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Download fehlgeschlagen');
+    expect(within(dialog).getByRole('alert')).not.toHaveTextContent('Speichern fehlgeschlagen');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
   it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
     handler(() => {}, 422);
     const nutzer = userEvent.setup();

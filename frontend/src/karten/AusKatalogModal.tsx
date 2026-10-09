@@ -1,8 +1,9 @@
 import { Alert, App, Button, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
-import { ZeilenFehler, zeilenFehler } from '../components/SpeicherHinweis';
+import { useEffect } from 'react';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import type { OnlineStyle } from '../api/karte';
 import {
   ladeOnlineQuellenKatalog,
@@ -37,6 +38,13 @@ export default function AusKatalogModal({
     enabled: offen,
   });
 
+  // Eine Ablehnung steht am Eintrag, an dem übernommen wurde, kein Toast (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“, LFH-1077). Je URL gemerkt, aus den Callbacks der Mutation
+  // (`components/useZeilenFehler.ts`); Öffnen und Schließen räumen alle Gründe.
+  const zeilen = useZeilenFehler<string>();
+  const { leere } = zeilen;
+  useEffect(() => leere(), [offen, leere]);
+
   const hinzufuegenMutation = useMutation({
     mutationFn: (eintrag: OnlineStyle) => {
       const body: OnlineQuelleBody = {
@@ -56,6 +64,8 @@ export default function AusKatalogModal({
       };
       return legeOnlineQuelleAn(body);
     },
+    onMutate: (eintrag) => zeilen.beginne(eintrag.url),
+    onError: (e, eintrag) => zeilen.melde(eintrag.url, e, 'Übernehmen fehlgeschlagen'),
     onSuccess: (_, eintrag) => {
       invalidiereKarte(qc);
       message.success(
@@ -63,17 +73,6 @@ export default function AusKatalogModal({
       );
     },
   });
-
-  // Eine Ablehnung steht am Eintrag, an dem übernommen wurde, kein Toast (`frontend/AGENTS.md`,
-  // „Rückwege und Fehler“, LFH-1077). Öffnen und Schließen räumen den Grund der letzten Ablehnung;
-  // eine laufende Übernahme bleibt unberührt, `reset()` hängte ihr Ergebnis ab. Ref, damit nur
-  // `offen` den Effekt auslöst, nicht jedes neue Mutationsobjekt.
-  const mutationRef = useRef(hinzufuegenMutation);
-  mutationRef.current = hinzufuegenMutation;
-  useEffect(() => {
-    const m = mutationRef.current;
-    if (!m.isPending && m.error != null) m.reset();
-  }, [offen]);
 
   return (
     <Modal
@@ -95,7 +94,7 @@ export default function AusKatalogModal({
           emptyText="Katalog ist leer"
           renderItem={(eintrag) => {
             const vorhanden = vorhandeneUrls.has(eintrag.url);
-            const fehler = zeilenFehler(hinzufuegenMutation, (e) => e.url === eintrag.url);
+            const grund = zeilen.grund(eintrag.url);
             return (
               <ListenEintrag
                 actions={[
@@ -128,9 +127,9 @@ export default function AusKatalogModal({
                           style={{ marginTop: 8 }}
                         />
                       )}
-                      {fehler != null && (
+                      {grund && (
                         <div>
-                          <ZeilenFehler fehler={fehler} fallback="Übernehmen fehlgeschlagen" />
+                          <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
                         </div>
                       )}
                     </>

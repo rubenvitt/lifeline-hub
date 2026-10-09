@@ -182,6 +182,8 @@ interface ErfassungsFormularProps<T> {
   speicherung?: Speicherung;
   /** Überschrift des Fehlers; Vorgabe „Nicht gespeichert“. */
   speicherFehlerTitel?: string;
+  /** Text für einen Fehler ohne Servermeldung; Vorgabe „Speichern fehlgeschlagen“. */
+  speicherFehlerFallback?: string;
   /** Die `Form.Item`-Felder. */
   children: ReactNode;
 }
@@ -214,6 +216,7 @@ export function ErfassungsFormular<T extends object>({
   onPruefungGescheitert,
   speicherung,
   speicherFehlerTitel,
+  speicherFehlerFallback,
   children,
 }: ErfassungsFormularProps<T>) {
   const { token } = theme.useToken();
@@ -380,7 +383,11 @@ export function ErfassungsFormular<T extends object>({
       >
         {children}
         {speicherung && (
-          <SpeicherFehler fehler={speicherung.error} titel={speicherFehlerTitel} />
+          <SpeicherFehler
+            fehler={speicherung.error}
+            titel={speicherFehlerTitel}
+            fallback={speicherFehlerFallback}
+          />
         )}
         <div
           style={{

@@ -14,7 +14,8 @@ import {
 } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { ZeilenFehler, letzterZeilenFehler, zeilenAktion } from '../components/SpeicherHinweis';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -139,20 +140,29 @@ export default function OfflineKartenVerwaltung() {
     void qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-karten') });
   }, [phasenSignatur, qc]);
 
-  // Eine Ablehnung steht an der Zeile, an der gehandelt wurde (`zeilenGrund`), kein Toast
-  // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Erfolg bleibt beim Toast.
+  // Eine Ablehnung steht an der Zeile, an der gehandelt wurde, kein Toast (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“, LFH-1077); Erfolg bleibt beim Toast. Je Karte gemerkt, aus den
+  // Callbacks der drei Mutationen in EINEM Speicher (`components/useZeilenFehler.ts`): die zuletzt
+  // begonnene Aktion an einer Zeile räumt deren alten Grund, auch den einer anderen Mutation.
+  const zeilen = useZeilenFehler<number>();
   const abbrechenMutation = useMutation({
     mutationFn: (id: number) => brecheOfflineDownloadAb(id),
+    onMutate: (id) => zeilen.beginne(id),
+    onError: (e, id) => zeilen.melde(id, e, 'Abbrechen fehlgeschlagen'),
     onSuccess: () => invalidiereKarte(qc),
   });
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheOfflineKarte(id),
+    onMutate: (id) => zeilen.beginne(id),
+    onError: (e, id) => zeilen.melde(id, e, 'Löschen fehlgeschlagen'),
     onSuccess: () => invalidiereKarte(qc),
   });
   // „Jetzt aktualisieren“ (LFH-993): lädt einen vorhandenen neueren Stand sofort oder stößt einen
   // Neubau an, dessen Ergebnis der Server danach selbst ohne Ausfall eintauscht.
   const jetztMutation = useMutation({
     mutationFn: (k: OfflineKarte) => starteJetztAktualisieren(k.id),
+    onMutate: (k) => zeilen.beginne(k.id),
+    onError: (e, k) => zeilen.melde(k.id, e, 'Aktualisieren fehlgeschlagen'),
     onSuccess: ({ phase }) => {
       invalidiereKarte(qc);
       if (phase === 'aktuell') message.info('Die Karte ist aktuell');
@@ -160,14 +170,6 @@ export default function OfflineKartenVerwaltung() {
       else message.success('Neubau gestartet');
     },
   });
-
-  /** Drei Mutationen teilen sich eine Zeile; es zählt die zuletzt abgesendete. */
-  const zeilenGrund = (k: OfflineKarte) =>
-    letzterZeilenFehler([
-      zeilenAktion(abbrechenMutation, (id) => id === k.id, 'Abbrechen fehlgeschlagen'),
-      zeilenAktion(loeschenMutation, (id) => id === k.id, 'Löschen fehlgeschlagen'),
-      zeilenAktion(jetztMutation, (v) => v.id === k.id, 'Aktualisieren fehlgeschlagen'),
-    ]);
 
   const spalten: KatalogSpalte<OfflineKarte>[] = [
     {
@@ -346,7 +348,7 @@ export default function OfflineKartenVerwaltung() {
               // LFH-993: Neubau oder Veröffentlichung laufen — dann weder „Jetzt aktualisieren“
               // noch Löschen.
               const phase = aktualisierungJe.get(k.id)?.phase;
-              const grund = zeilenGrund(k);
+              const grund = zeilen.grund(k.id);
               return (
                 <Flex vertical gap={token.marginXXS} align="flex-start">
                   {/* `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion

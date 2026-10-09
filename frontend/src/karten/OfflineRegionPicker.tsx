@@ -2,6 +2,7 @@ import { App, Button, Modal, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fehlerText } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
   ladeBaubareRegionen,
@@ -19,7 +20,8 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
-import { ZeilenFehler, letzterZeilenFehler, zeilenAktion } from '../components/SpeicherHinweis';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
 import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
 
@@ -115,6 +117,22 @@ export default function OfflineRegionPicker({
   const karten = useMemo(() => kartenQuery.data ?? [], [kartenQuery.data]);
   const bauJobs = useMemo(() => bauStatusQuery.data ?? [], [bauStatusQuery.data]);
 
+  /**
+   * Eine Ablehnung steht an der Region, an der gehandelt wurde, kein Toast (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“, LFH-1077). Je Regionsname gemerkt, aus den Callbacks beider Mutationen
+   * (`components/useZeilenFehler.ts`): so erreicht auch der Download, den die Verkettung nach
+   * einem fertigen Bau anstößt, seine Region, selbst wenn danach schon die nächste Region lädt.
+   * Eine neue Aktion an der Region räumt ihren alten Grund.
+   *
+   * Ist der Picker zu, wenn ein Download scheitert (Verkettung im Hintergrund oder nach dem
+   * Schließen), ist kein Ort zu sehen: dann zusätzlich ein Toast. Ebenso Toast bleibt der im
+   * Hintergrund gescheiterte Bau (Verkettung unten).
+   */
+  const regionFehler = useZeilenFehler<string>();
+  // Der Stand von `offen` zum Zeitpunkt der Antwort, nicht des Absendens.
+  const offenRef = useRef(offen);
+  offenRef.current = offen;
+
   const download = useMutation({
     mutationFn: (e: OfflineKatalogEintrag) =>
       starteOfflineDownload({
@@ -125,6 +143,13 @@ export default function OfflineRegionPicker({
         groesse_erwartet: e.groesse,
         sha256_erwartet: e.sha256 ?? undefined,
       }),
+    onMutate: (e) => regionFehler.beginne(e.name),
+    onError: (fehler, e) => {
+      regionFehler.melde(e.name, fehler, 'Download fehlgeschlagen');
+      if (!offenRef.current) {
+        message.error(`${e.name}: ${fehlerText(fehler, 'Download fehlgeschlagen')}`);
+      }
+    },
     onSuccess: () => {
       invalidiereKarte(qc);
       message.success('Download gestartet');
@@ -133,6 +158,9 @@ export default function OfflineRegionPicker({
 
   const bauen = useMutation({
     mutationFn: ({ slug }: { slug: string; name: string }) => starteRegionBau(slug),
+    onMutate: ({ name }) => regionFehler.beginne(name),
+    onError: (fehler, { name }) =>
+      regionFehler.melde(name, fehler, 'Bau konnte nicht gestartet werden'),
     onSuccess: (_res, { slug, name }) => {
       setVerkettung((prev) => new Map(prev).set(slug, name));
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('bau-status') });
@@ -140,31 +168,10 @@ export default function OfflineRegionPicker({
     },
   });
 
-  /**
-   * Eine Ablehnung steht an der Region, an der gehandelt wurde, kein Toast (`frontend/AGENTS.md`,
-   * „Rückwege und Fehler“, LFH-1077). Das gilt auch für den Download, den die Verkettung nach
-   * einem fertigen Bau anstößt: er läuft über dieselbe Mutation und trifft die Region über ihren
-   * Namen. Bei zwei Mutationen an einer Region zählt die LETZTE Aktion (`submittedAt`) — ein
-   * neuer Bau räumt so den Grund eines früher abgelehnten Downloads.
-   *
-   * Einziger Fehler-Toast bleibt der im Hintergrund gescheiterte Bau (Verkettung unten): ohne
-   * Handlung des Nutzers, womöglich bei geschlossenem Dialog.
-   */
-  const zeilenGrund = (z: RegionZeile) =>
-    letzterZeilenFehler([
-      zeilenAktion(download, (v) => v.name === z.name, 'Download fehlgeschlagen'),
-      zeilenAktion(
-        bauen,
-        (v) => z.slug != null && v.slug === z.slug,
-        'Bau konnte nicht gestartet werden',
-      ),
-    ]);
-
-  // Schließen räumt die Gründe der letzten Ablehnungen; eine laufende Mutation bleibt unberührt,
-  // `reset()` hängte ihr Ergebnis ab. NICHT beim Öffnen: ein verketteter Download, der bei
-  // geschlossenem Dialog scheitert, soll beim nächsten Öffnen an seiner Region stehen.
+  // Schließen räumt die Gründe. NICHT beim Öffnen: ein Download, der bei geschlossenem Dialog
+  // scheitert, soll beim nächsten Öffnen an seiner Region stehen.
   const schliessen = () => {
-    for (const m of [download, bauen]) if (!m.isPending && m.error != null) m.reset();
+    regionFehler.leere();
     onClose();
   };
 
@@ -336,7 +343,7 @@ export default function OfflineRegionPicker({
               // seiner Gruppenüberschrift (h5).
               dataSource={items}
               renderItem={(z) => {
-                const grund = zeilenGrund(z);
+                const grund = regionFehler.grund(z.name);
                 return (
                   <ListenEintrag actions={[<span key="a">{aktion(z)}</span>]}>
                     <ListenEintragMeta

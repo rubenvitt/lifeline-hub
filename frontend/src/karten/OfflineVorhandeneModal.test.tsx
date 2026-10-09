@@ -101,4 +101,34 @@ describe('OfflineVorhandeneModal', () => {
     await within(wieder).findByDisplayValue('bremen');
     expect(wieder.querySelector('[data-fehler]')).toBeNull();
   });
+
+  /**
+   * Eine Übernahme nach der anderen: solange eine läuft, sind die anderen Dateien gesperrt, keine
+   * zweite Zeile kann den Grund der ersten verdrängen.
+   */
+  it('sperrt die anderen Dateien, solange eine Übernahme läuft', async () => {
+    let gibFrei: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (gibFrei = r));
+    server.use(
+      http.get('/api/karte/offline-karten/vorhandene', () => HttpResponse.json(DATEIEN)),
+      http.post('/api/karte/offline-karten', async () => {
+        await freigabe;
+        return HttpResponse.json({ error: 'Name schon vergeben' }, { status: 409 });
+      }),
+    );
+    renderMitProviders(<Harness />);
+    await screen.findByDisplayValue('bremen');
+    await userEvent.click(
+      within(zeile('osm.bremen.2026-07-02.mbtiles')).getByRole('button', { name: 'Übernehmen' }),
+    );
+    await waitFor(() =>
+      expect(
+        within(zeile('osm.hamburg.2026-07-02.mbtiles')).getByRole('button', { name: 'Übernehmen' }),
+      ).toBeDisabled(),
+    );
+    gibFrei();
+    expect(
+      await within(zeile('osm.bremen.2026-07-02.mbtiles')).findByText('Name schon vergeben'),
+    ).toHaveAttribute('data-fehler');
+  });
 });

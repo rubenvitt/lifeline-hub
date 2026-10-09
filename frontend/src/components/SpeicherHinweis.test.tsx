@@ -7,9 +7,6 @@ import {
   SpeicherFehler,
   ZeilenFehler,
   fehlerText,
-  letzterZeilenFehler,
-  zeilenAktion,
-  zeilenFehler,
 } from './SpeicherHinweis';
 
 describe('fehlerText', () => {
@@ -117,24 +114,6 @@ describe('fehlerFallback (LFH-690)', () => {
   });
 });
 
-describe('zeilenFehler (LFH-1077)', () => {
-  const abgelehnt = new ApiError(409, 'Download läuft schon');
-
-  it('liefert den Fehler nur für die Zeile, deren Variablen passen', () => {
-    const m = { error: abgelehnt, variables: { id: 7 } };
-    expect(zeilenFehler(m, (v) => v.id === 7)).toBe(abgelehnt);
-    expect(zeilenFehler(m, (v) => v.id === 8)).toBeNull();
-  });
-
-  it('liefert ohne Fehler nichts, auch wenn die Variablen passen', () => {
-    expect(zeilenFehler({ error: null, variables: { id: 7 } }, () => true)).toBeNull();
-  });
-
-  it('liefert ohne Variablen nichts', () => {
-    expect(zeilenFehler({ error: abgelehnt, variables: undefined }, () => true)).toBeNull();
-  });
-});
-
 describe('ZeilenFehler (LFH-1077)', () => {
   it('nennt den Grund an der Zeile, markiert mit data-fehler', () => {
     render(<ZeilenFehler fehler={new ApiError(409, 'Download läuft schon')} />);
@@ -146,42 +125,5 @@ describe('ZeilenFehler (LFH-1077)', () => {
   it('rendert ohne Fehler GAR NICHTS', () => {
     const { container } = render(<ZeilenFehler fehler={null} />);
     expect(container).toBeEmptyDOMElement();
-  });
-});
-
-describe('letzterZeilenFehler (LFH-1077)', () => {
-  const abgelehnt = new ApiError(409, 'Download läuft schon');
-  const m = (error: unknown, variables: number | undefined, submittedAt: number) => ({
-    error,
-    variables,
-    submittedAt,
-  });
-
-  it('nimmt die zuletzt abgesendete Aktion der Zeile, nicht die erste mit Fehler', () => {
-    // Erst abgelehntes Löschen, danach gelungenes Aktualisieren derselben Zeile: kein Grund mehr.
-    const aktionen = [
-      zeilenAktion(m(abgelehnt, 7, 100), (id) => id === 7, 'Löschen fehlgeschlagen'),
-      zeilenAktion(m(null, 7, 200), (id) => id === 7),
-    ];
-    expect(letzterZeilenFehler(aktionen)).toBeNull();
-  });
-
-  it('liefert Grund und Rückfalltext der letzten abgelehnten Aktion', () => {
-    const aktionen = [
-      zeilenAktion(m(null, 7, 100), (id) => id === 7),
-      zeilenAktion(m(abgelehnt, 7, 200), (id) => id === 7, 'Löschen fehlgeschlagen'),
-    ];
-    expect(letzterZeilenFehler(aktionen)).toEqual({
-      fehler: abgelehnt,
-      fallback: 'Löschen fehlgeschlagen',
-    });
-  });
-
-  it('übergeht Aktionen anderer Zeilen, auch wenn sie jünger sind', () => {
-    const aktionen = [
-      zeilenAktion(m(abgelehnt, 7, 100), (id) => id === 7),
-      zeilenAktion(m(null, 8, 200), (id) => id === 7),
-    ];
-    expect(letzterZeilenFehler(aktionen)).toEqual({ fehler: abgelehnt, fallback: undefined });
   });
 });

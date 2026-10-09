@@ -551,9 +551,11 @@ und `pages/personen/`.
 - **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
   steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`
   der Erfassungs-Hülle oder `SpeicherFehler` (Öffnen und Abbrechen räumen), am Formular oder
-  Paneel als `SpeicherFehler`, an der Zeile als `ZeilenFehler` (`zeilenFehler` aus
-  `mutation.variables`), Kopfaktionen und Rückgängig aus dem Toast über `SeitenHinweise` (EIN
-  Slot); alles in `components/SpeicherHinweis.tsx`. Kein `onError`-Toast: ein Fehler-Toast
+  Paneel als `SpeicherFehler`, an der Zeile als `ZeilenFehler` (Grund je Zeile aus
+  `components/useZeilenFehler.ts`, gefüttert aus `onMutate`/`onError`, nicht aus
+  `mutation.variables`: die Mutation verfolgt nur den letzten Aufruf), Kopfaktionen und
+  Rückgängig aus dem Toast über `SeitenHinweise` (EIN Slot); die Anzeigen in
+  `components/SpeicherHinweis.tsx`. Kein `onError`-Toast: ein Fehler-Toast
   bleibt nur ohne Ort (Zwischenablage, Hintergrund) und steht mit Grund in
   `components/speicherfehler.guard.test.ts`. Ein Dialog schließt erst beim Erfolg; Prüfungen
   ohne Server stehen am Feld.

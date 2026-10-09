@@ -295,4 +295,123 @@ describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)',
     await within(wieder).findByText('Bayern');
     expect(wieder.querySelector('[data-fehler]')).toBeNull();
   });
+
+  /**
+   * `useMutation` verfolgt nur den LETZTEN Aufruf: stößt die Verkettung den Download einer zweiten
+   * Region an, bevor der Download der ersten geantwortet hat, ginge deren Ablehnung über
+   * `mutation.error` verloren. Der Grund steht trotzdem an der ersten Region.
+   */
+  it('eine Ablehnung, die nach dem Download einer zweiten Region ankommt, steht an ihrer Region', async () => {
+    let gibFrei: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (gibFrei = r));
+    const downloads: string[] = [];
+    mockPicker({ karten: [], katalog: [bremenEintrag] });
+    server.use(
+      http.post('/api/karte/offline-karten/bauen', () => HttpResponse.json({ job_id: 1 })),
+      http.get('/api/karte/offline-karten/bau-status', () =>
+        HttpResponse.json([{ id: 1, slug: 'bayern', status: { status: 'done' }, gestartet: 'd' }]),
+      ),
+      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+        const frisch = new URL(request.url).searchParams.get('frisch') === '1';
+        return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
+      }),
+      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+        const { name } = (await request.json()) as { name: string };
+        downloads.push(name);
+        if (name !== 'Bremen') return HttpResponse.json({ status: 'laedt' }, { status: 202 });
+        await freigabe;
+        return HttpResponse.json({ error: 'Speicher voll' }, { status: 507 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: /^Laden/ }));
+    await waitFor(() => expect(downloads).toEqual(['Bremen']));
+    await userEvent.click(screen.getByRole('button', { name: /Bauen & laden/ }));
+    await waitFor(() => expect(downloads).toEqual(['Bremen', 'Bayern']));
+    gibFrei();
+
+    expect(await within(zeile('Bremen')).findByText('Speicher voll')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(zeile('Bayern').querySelector('[data-fehler]')).toBeNull();
+    ohneFehlerToastNurEinFehler();
+  });
+
+  /**
+   * Scheitert der verkettete Download bei GESCHLOSSENEM Picker, ist kein Ort zu sehen: dann meldet
+   * ein Toast die Region und den Grund, und beim nächsten Öffnen steht er an der Region.
+   */
+  it('ein verketteter Download, der bei geschlossenem Picker scheitert, meldet sich als Toast und an der Region', async () => {
+    let gestartet = false;
+    let fertig = false;
+    mockPicker({ karten: [], katalog: [bremenEintrag] });
+    server.use(
+      http.post('/api/karte/offline-karten/bauen', () => {
+        gestartet = true;
+        return HttpResponse.json({ job_id: 1 });
+      }),
+      http.get('/api/karte/offline-karten/bau-status', () =>
+        HttpResponse.json(
+          gestartet
+            ? [
+                {
+                  id: 1,
+                  slug: 'bayern',
+                  status: { status: fertig ? 'done' : 'building' },
+                  gestartet: 'd',
+                },
+              ]
+            : [],
+        ),
+      ),
+      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+        const frisch = new URL(request.url).searchParams.get('frisch') === '1';
+        return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
+      }),
+      http.post('/api/karte/offline-karten/download', () =>
+        HttpResponse.json({ error: 'Speicher voll' }, { status: 507 }),
+      ),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    await nutzer.click(await screen.findByRole('button', { name: /Bauen & laden/ }));
+    await screen.findByText(/Baut…/);
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs ein.
+    await nutzer.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /close|schlie/i }),
+    );
+    fertig = true;
+
+    expect(
+      await screen.findByText('Bayern: Speicher voll', undefined, { timeout: 6000 }),
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(1);
+
+    await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
+    const wieder = await screen.findByRole('dialog');
+    expect(await within(wieder).findByText('Speicher voll')).toHaveAttribute('data-fehler');
+  }, 15000);
+
+  it('ein verketteter Download, der bei offenem Picker scheitert, zeigt keinen Toast', async () => {
+    mockPicker({ karten: [], katalog: [bremenEintrag] });
+    server.use(
+      http.post('/api/karte/offline-karten/bauen', () => HttpResponse.json({ job_id: 1 })),
+      http.get('/api/karte/offline-karten/bau-status', () =>
+        HttpResponse.json([{ id: 1, slug: 'bayern', status: { status: 'done' }, gestartet: 'd' }]),
+      ),
+      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+        const frisch = new URL(request.url).searchParams.get('frisch') === '1';
+        return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
+      }),
+      http.post('/api/karte/offline-karten/download', () =>
+        HttpResponse.json({ error: 'Speicher voll' }, { status: 507 }),
+      ),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: /Bauen & laden/ }));
+    expect(await within(zeile('Bayern')).findByText('Speicher voll')).toHaveAttribute(
+      'data-fehler',
+    );
+    ohneFehlerToastNurEinFehler();
+  });
 });

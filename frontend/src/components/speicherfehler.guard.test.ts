@@ -39,8 +39,8 @@ const ERLAUBT: Record<string, { anzahl: number; grund: string }> = {
   'pages/ProfilPage.tsx': { anzahl: 1, grund: 'Zwischenablage abgelehnt' },
   'pages/lagekarte/kontextmenue.ts': { anzahl: 1, grund: 'Zwischenablage abgelehnt' },
   'karten/OfflineRegionPicker.tsx': {
-    anzahl: 1,
-    grund: 'Kartenbau scheitert im Hintergrund, der Dialog ist womöglich zu',
+    anzahl: 2,
+    grund: 'Kartenbau oder Download scheitert bei geschlossenem Dialog, kein Ort sichtbar',
   },
 };
 

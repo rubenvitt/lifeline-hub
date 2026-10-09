@@ -73,6 +73,7 @@ export default function OfflineDownloadUrlModal({
       laeuft={mutation.isPending}
       speicherung={mutation}
       speicherFehlerTitel="Download nicht gestartet"
+      speicherFehlerFallback="Download fehlgeschlagen"
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen.
       onErfassen={(w) => mutation.mutateAsync(w)}
       onFertig={onClose}
