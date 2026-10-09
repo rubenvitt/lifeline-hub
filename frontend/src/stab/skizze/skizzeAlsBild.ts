@@ -8,6 +8,8 @@
  * als `@font-face` mit Daten-URL in das SVG. {@link rastere} malt es auf weißen Grund.
  */
 
+import { SCHRIFTSCHNITTE, type Schriftschnitt } from '../../theme/schriften';
+
 /** Darstellungswerte, die ein Element der Skizze aus Stylesheets und Vererbung bezieht. */
 const STIL_EIGENSCHAFTEN = [
   'color',
@@ -84,7 +86,7 @@ export function serialisiereSvg(svg: SVGSVGElement, optionen: SvgSerialisierung)
   return new XMLSerializer().serializeToString(kopie);
 }
 
-/** Eine `@font-face` der Seite: Familie, Schnitt und Adresse der Datei. */
+/** Ein Schnitt der App-Schriften: Familie, Gewicht, Stil und absolute Adresse der Datei. */
 export interface SchriftFlaeche {
   familie: string;
   gewicht: string;
@@ -94,36 +96,20 @@ export interface SchriftFlaeche {
 
 const ohneAnfuehrung = (s: string) => s.trim().replace(/^["']|["']$/g, '');
 
-/**
- * Die `@font-face`-Regeln der Seite für die genannten Familien. Fremde Stylesheets, deren Regeln
- * der Browser nicht herausgibt, fallen still weg.
- */
+/** Die Schnitte der App-Schriften (`theme/schriften.ts`) für die genannten Familien. */
 export function schriftFlaechen(
-  blaetter: Iterable<CSSStyleSheet>,
+  schnitte: Iterable<Schriftschnitt>,
   familien: ReadonlySet<string>,
 ): SchriftFlaeche[] {
   const funde: SchriftFlaeche[] = [];
-  for (const blatt of blaetter) {
-    let regeln: CSSRuleList;
-    try {
-      regeln = blatt.cssRules;
-    } catch {
-      continue;
-    }
-    for (const regel of regeln) {
-      if (!regel.cssText.startsWith('@font-face')) continue;
-      const { style } = regel as CSSFontFaceRule;
-      const familie = ohneAnfuehrung(style.getPropertyValue('font-family'));
-      if (!familien.has(familie)) continue;
-      const src = /url\(\s*(["']?)([^"')]+)\1\s*\)/.exec(style.getPropertyValue('src'));
-      if (!src) continue;
-      funde.push({
-        familie,
-        gewicht: style.getPropertyValue('font-weight') || '400',
-        stil: style.getPropertyValue('font-style') || 'normal',
-        url: new URL(src[2], blatt.href ?? document.baseURI).href,
-      });
-    }
+  for (const s of schnitte) {
+    if (!familien.has(s.familie)) continue;
+    funde.push({
+      familie: s.familie,
+      gewicht: String(s.gewicht),
+      stil: 'normal',
+      url: new URL(s.datei, document.baseURI).href,
+    });
   }
   return funde;
 }
@@ -156,7 +142,7 @@ export async function schriftRegeln(svg: SVGSVGElement): Promise<string> {
       familien.add(f);
     }
   }
-  const flaechen = schriftFlaechen(document.styleSheets, familien);
+  const flaechen = schriftFlaechen(SCHRIFTSCHNITTE, familien);
   const regeln = await Promise.all(
     flaechen.map(async (f) => {
       try {

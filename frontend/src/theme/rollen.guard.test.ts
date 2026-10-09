@@ -21,6 +21,7 @@ import {
 } from './tokens';
 import { theme } from 'antd';
 import { seitenrinne } from './tokens';
+import { SCHRIFTSCHNITTE } from './schriften';
 import {
   etbTypFarbenDunkel,
   etbTypFarbenHell,
@@ -431,8 +432,7 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
 
   it('jeder Schnitt der Skala wird lokal ausgeliefert — kein künstlicher Fettdruck', () => {
     // Die Skala verlangt Archivo 400/500/600 und JetBrains Mono 400/500. Fehlt ein Schnitt in
-    // `schriften.css`, setzt der Browser still den nächsten.
-    const schriften = readFileSync(join(hier, 'schriften.css'), 'utf-8');
+    // `schriften.ts`, setzt der Browser still den nächsten.
     const familie = {
       text: 'LFH Archivo',
       zahl: 'LFH JetBrains Mono',
@@ -440,9 +440,8 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
     };
     for (const stufe of Object.values(schriftskala)) {
       const fam = familie[stufe.familie];
-      const faces = [...schriften.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((m) => m[1]);
-      const treffer = faces.filter(
-        (f) => f.includes(`font-family: '${fam}';`) && f.includes(`font-weight: ${stufe.gewicht};`),
+      const treffer = SCHRIFTSCHNITTE.filter(
+        (s) => s.familie === fam && s.gewicht === stufe.gewicht,
       );
       expect(treffer, `${fam} ${stufe.gewicht}`).toHaveLength(1);
     }

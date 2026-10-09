@@ -29,6 +29,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   offen). Jedes Druckstück einer Organisation oder eines Einsatzes bleibt beim Druckkopf. Die
   Mappe der Hilfe beginnt jedes weitere Kapitel auf neuer Seite (`data-lfh="druck-kapitel"`),
   Nachweis `e2e/hilfe-druck.spec.ts`.
+- **Schriften nur über die FontFace-API** (LFH-1108, `theme/schriften.ts`): WebKit baut
+  `@font-face`-Schnitte beim Druckstart neu auf und lädt sie nach. Safari zählt die Seiten im
+  ersten Durchlauf mit der Ersatzschrift und schneidet ab, was mit der Webschrift danach wächst.
+  Kein `@font-face` im CSS der App (`theme/schriften.test.ts`); jeder Schnitt lädt beim Start.
 - Ein Editor druckt nie seine `<textarea>` (`MarkdownEditor` `druckfassung`).
 - **Abschnittstitel stehen im Titelblock** (LFH-1008): Firefox setzt `break-after: avoid` nicht
   um, ein Titel bliebe allein am Seitenende. Titel und erster Block teilen sich eine Hülle

@@ -86,7 +86,7 @@ export const BESCHRIFTUNG_SCHRIFT = 10;
 export const GRUND = 'var(--lfh-skizze-grund, var(--lfh-flaeche))';
 const SCHRIFT_TEXT: CSSProperties = { fontFamily: 'var(--lfh-schrift-text)' };
 /**
- * Schrift der Paketzeichen: Arimo, an deren Metriken das Paket Breiten misst (`theme/schriften.css`
+ * Schrift der Paketzeichen: Arimo, an deren Metriken das Paket Breiten misst (`theme/schriften.ts`
  * bindet den Schnitt 500 aus `@einsatzzeichen/core/fonts` ein).
  */
 const SCHRIFT_ZEICHEN: CSSProperties = { fontFamily: "'Arimo', var(--lfh-schrift-text)" };

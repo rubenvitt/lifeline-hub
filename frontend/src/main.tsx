@@ -1,5 +1,4 @@
-// Reihenfolge zählt: erst Schriftrollen, dann Farb-/Formrollen, dann das globale CSS, das beide benutzt.
-import './theme/schriften.css';
+// Reihenfolge zählt: erst Farb-/Formrollen, dann das globale CSS, das sie benutzt.
 import './theme/rollen.css';
 import './index.css';
 // Druckmechanik aller Druckstücke; greift nur unter `@media print` mit Druckwurzel.
@@ -14,11 +13,13 @@ import { registerSW } from 'virtual:pwa-register';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { appRouten } from './App';
+import { meldeSchriftenAn } from './theme/schriften';
 import { ThemeModeProvider } from './theme/ThemeModeProvider';
 import { erzeugeQueryClient } from './api/queryClient';
 import { meldeAppAktualisierungVerfuegbar, setzeAppAktualisierer } from './pwa/appAktualisierung';
 
 dayjs.extend(utc);
+meldeSchriftenAn();
 
 const updateSW = registerSW({
   immediate: true,
