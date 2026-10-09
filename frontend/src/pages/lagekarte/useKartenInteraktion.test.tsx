@@ -9,6 +9,8 @@ import type { KarteMarker } from './marker';
 import { useKartenInteraktion } from './useKartenInteraktion';
 import { einsatzKeys } from '../../api/queryKeys';
 import { leseZuletztVerwendet } from './zuletztVerwendet';
+import { useKartenFehler } from './useKartenFehler';
+import { ApiError } from '../../api/client';
 
 // API-Client der freien Zeichen mocken; hier nur die Aufrufe prüfen.
 const freieZeichenApi = vi.hoisted(() => ({
@@ -87,7 +89,9 @@ function rendere(fehler: (e: unknown) => void = vi.fn(), erfolg: (text: string) 
         einsatzId: 1,
         darfSchreiben: true,
         waehlbar: [],
-        fehler,
+        // Jede Handlung meldet an dieselbe Sonde; Schlüssel prüft der Test mit `useKartenFehler`.
+        beginneHandlung: () => fehler,
+        verwirfHandlung: vi.fn(),
         erfolg,
       }),
     { wrapper: wrapper() },
@@ -312,7 +316,8 @@ describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
           einsatzId: 1,
           darfSchreiben: true,
           waehlbar: [],
-          fehler: vi.fn(),
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
           erfolg,
         }),
       {
@@ -351,7 +356,8 @@ describe('useKartenInteraktion — Betroffene: Verortung löschen (LFH-648)', ()
           einsatzId: 1,
           darfSchreiben: true,
           waehlbar: [],
-          fehler: vi.fn(),
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
         }),
       {
@@ -739,7 +745,8 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
           einsatzId: 1,
           darfSchreiben: true,
           waehlbar: [],
-          fehler: vi.fn(),
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
         }),
       {
@@ -889,7 +896,8 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
           einsatzId: 1,
           darfSchreiben: true,
           waehlbar: [],
-          fehler: vi.fn(),
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
           erfolg,
         }),
       {
@@ -1152,7 +1160,8 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
           einsatzId: 1,
           darfSchreiben: true,
           waehlbar: [],
-          fehler: vi.fn(),
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
           warnung,
         }),
@@ -1175,7 +1184,8 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
           einsatzId: 1,
           darfSchreiben: true,
           waehlbar: [],
-          fehler: vi.fn(),
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
           warnung,
         }),
@@ -1278,7 +1288,8 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
           einsatzId: 1,
           darfSchreiben: false,
           waehlbar: [],
-          fehler: vi.fn(),
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
         }),
       { wrapper: wrapper() },
@@ -1286,5 +1297,241 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
     act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 1, lat: 2 }));
     await new Promise((r) => setTimeout(r, 15));
     expect(freieZeichenApi.legeFreiesZeichenAn).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Gründe je Objekt (LFH-1077): zwei Handlungen an zwei Zeichen scheitern nebenläufig, in
+ * umgekehrter Folge — beide Gründe stehen im Kartenhinweis. Ein gemeinsamer Schlüssel für alle
+ * Handlungen verlöre den ersten.
+ */
+describe('useKartenInteraktion · Gründe je Objekt (LFH-1077)', () => {
+  it('zwei Zeichen scheitern nebenläufig: beide Gründe stehen, ein neuer Versuch räumt nur seinen', async () => {
+    const ablehnungen: ((e: unknown) => void)[] = [];
+    const haengt = () => new Promise<{ id: number }>((_, rej) => ablehnungen.push(rej));
+    freieZeichenApi.verschiebeFreiesZeichen
+      .mockImplementationOnce(haengt)
+      .mockImplementationOnce(haengt);
+    const { result } = renderHook(
+      () => {
+        const fehler = useKartenFehler(1);
+        const karte = useKartenInteraktion({
+          einsatzId: 1,
+          darfSchreiben: true,
+          waehlbar: [],
+          beginneHandlung: fehler.beginne,
+          verwirfHandlung: fehler.verwirf,
+          erfolg: vi.fn(),
+        });
+        return { fehler, karte };
+      },
+      { wrapper: wrapper() },
+    );
+    act(() => {
+      void result.current.karte.zeichenVerschieben(1, 3);
+      void result.current.karte.zeichenVerschieben(2, 3);
+    });
+    expect(ablehnungen).toHaveLength(2);
+    await act(async () => {
+      ablehnungen[1](new ApiError(422, 'Zeichen 2 gesperrt'));
+      ablehnungen[0](new ApiError(422, 'Zeichen 1 gesperrt'));
+    });
+    await waitFor(() => expect(result.current.fehler.gruende).toHaveLength(2));
+    expect(result.current.fehler.gruende.map((g) => (g.fehler as Error).message).sort()).toEqual([
+      'Zeichen 1 gesperrt',
+      'Zeichen 2 gesperrt',
+    ]);
+    expect(result.current.fehler.gruende[0].titel).toBe('Zeichen nicht verschoben');
+
+    // Erneuter Versuch an Zeichen 1, Antwort zurückgehalten: nur dessen Grund ist weg.
+    act(() => void result.current.karte.zeichenLoeschen(1));
+    expect(result.current.fehler.gruende.map((g) => (g.fehler as Error).message)).toEqual([
+      'Zeichen 2 gesperrt',
+    ]);
+  });
+});
+
+describe('useKartenInteraktion · „Zeichen hier setzen“ nach Einsatzwechsel (LFH-1077)', () => {
+  it('eine Ablehnung aus dem alten Einsatz erscheint nicht im Dialog des neuen', async () => {
+    let ablehnen: (e: unknown) => void = () => {};
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementationOnce(
+      () => new Promise<{ id: number }>((_, rej) => (ablehnen = rej)),
+    );
+    const { result, rerender } = renderHook(
+      ({ id }: { id: number }) =>
+        useKartenInteraktion({
+          einsatzId: id,
+          darfSchreiben: true,
+          waehlbar: [],
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
+          erfolg: vi.fn(),
+        }),
+      { wrapper: wrapper(), initialProps: { id: 1 } },
+    );
+    act(() =>
+      result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 8.6, lat: 50.1 }),
+    );
+    await waitFor(() => expect(result.current.zeichenAnPunktSpeicherung.isPending).toBe(true));
+    rerender({ id: 2 });
+    expect(result.current.zeichenAnPunktSpeicherung.isPending).toBe(false);
+    await act(async () => ablehnen(new ApiError(422, 'Ansicht gelöscht')));
+    expect(result.current.zeichenAnPunktSpeicherung.error).toBeNull();
+    // Im eigenen Einsatz stünde derselbe Fehler im Dialog.
+    rerender({ id: 1 });
+    expect(result.current.zeichenAnPunktSpeicherung.error).toBeInstanceOf(ApiError);
+  });
+});
+
+/**
+ * Ein Vorgang ohne Objekt (Verorten, Zeichen setzen, Zone anlegen) hat keinen Ort, an dem ein
+ * nächster Versuch ihn sicher räumt: wer den Modus selbst beendet, gibt ihn auf, und der Grund
+ * geht mit (LFH-1077).
+ */
+describe('useKartenInteraktion · Beenden räumt den Grund des Modus (LFH-1077)', () => {
+  function mitFehlern() {
+    return renderHook(
+      () => {
+        const fehler = useKartenFehler(1);
+        const karte = useKartenInteraktion({
+          einsatzId: 1,
+          darfSchreiben: true,
+          waehlbar: [],
+          beginneHandlung: fehler.beginne,
+          verwirfHandlung: fehler.verwirf,
+          erfolg: vi.fn(),
+        });
+        return { fehler, karte };
+      },
+      { wrapper: wrapper() },
+    );
+  }
+  const schluessel = (r: { current: { fehler: { gruende: readonly { schluessel: string }[] } } }) =>
+    r.current.fehler.gruende.map((g) => g.schluessel);
+
+  it('Verorten abgelehnt, Platzieren abgebrochen: der Grund geht', async () => {
+    einsatzUhsApi.aktualisiereUhs.mockRejectedValueOnce(new ApiError(422, 'UHS geschlossen'));
+    const { result } = mitFehlern();
+    act(() => result.current.karte.onPlatzierenStart({ typ: 'uhs', id: 2 }));
+    act(() => result.current.karte.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(schluessel(result)).toEqual(['verorten']));
+    act(() => result.current.karte.onPlatzierenAbbrechen());
+    expect(schluessel(result)).toEqual([]);
+  });
+
+  it.each([
+    ['Abbrechen', 'onZeichenPlatzierenAbbrechen'],
+    ['Fertig', 'onZeichenPlatzierenFertig'],
+  ] as const)('Zeichen setzen abgelehnt, %s: der Grund geht', async (_name, beenden) => {
+    freieZeichenApi.legeFreiesZeichenAn.mockRejectedValueOnce(new ApiError(422, 'Ansicht weg'));
+    const { result } = mitFehlern();
+    act(() => result.current.karte.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.karte.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(schluessel(result)).toEqual(['zeichen-setzen']));
+    act(() => result.current.karte[beenden]());
+    expect(schluessel(result)).toEqual([]);
+  });
+
+  it.each([
+    ['Abbrechen', 'onZeichnenAbbrechen'],
+    ['Fertig', 'onZoneZeichnenFertig'],
+    ['Verwerfen', 'bestaetigungVerwerfen'],
+  ] as const)(
+    'Zone abgelehnt, nächstes Zeichnen per %s beendet: der Grund geht',
+    async (_n, beenden) => {
+      lagezonenApi.legeZoneAn.mockRejectedValueOnce(new ApiError(422, 'Geometrie ungültig'));
+      const { result } = mitFehlern();
+      act(() =>
+        result.current.karte.onZoneZeichnenStart({ typ: 'freie_skizze', modus: 'polygon' }),
+      );
+      act(() => result.current.karte.onZoneGezeichnet(POLYGON));
+      act(() => result.current.karte.bestaetigungSpeichern());
+      await waitFor(() => expect(schluessel(result)).toEqual(['zone-anlegen']));
+      // Die Ablehnung beendet den Modus; erst wer neu ansetzt und aufgibt, räumt.
+      await waitFor(() => expect(result.current.karte.zoneEntwurf).toBeNull());
+      act(() =>
+        result.current.karte.onZoneZeichnenStart({ typ: 'freie_skizze', modus: 'polygon' }),
+      );
+      act(() => result.current.karte.onZoneGezeichnet(POLYGON));
+      expect(schluessel(result)).toEqual(['zone-anlegen']);
+      act(() => result.current.karte[beenden]());
+      expect(schluessel(result)).toEqual([]);
+    },
+  );
+
+  it('Abschnitt-Zeichnen abbrechen lässt den Grund einer Zone stehen', async () => {
+    lagezonenApi.legeZoneAn.mockRejectedValueOnce(new ApiError(422, 'Geometrie ungültig'));
+    const { result } = mitFehlern();
+    act(() => result.current.karte.onZoneZeichnenStart({ typ: 'freie_skizze', modus: 'polygon' }));
+    act(() => result.current.karte.onZoneGezeichnet(POLYGON));
+    act(() => result.current.karte.bestaetigungSpeichern());
+    await waitFor(() => expect(schluessel(result)).toEqual(['zone-anlegen']));
+    act(() => result.current.karte.onAbschnittZeichnenStart(3));
+    act(() => result.current.karte.onZeichnenAbbrechen());
+    expect(schluessel(result)).toEqual(['zone-anlegen']);
+  });
+});
+
+/**
+ * „Zeichen hier setzen“ gehört dem Einsatz und der Ansicht, in denen es abgeschickt wurde: ein
+ * Wechsel vor der Antwort darf weder Laufanzeige noch Invalidierung noch Ansicht verschieben.
+ */
+describe('useKartenInteraktion · „Zeichen hier setzen“ hält Einsatz und Ansicht (LFH-1077)', () => {
+  function aufbau() {
+    const client = neuerQueryClient();
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const hook = renderHook(
+      ({ id, ansicht }: { id: number; ansicht?: number }) =>
+        useKartenInteraktion({
+          einsatzId: id,
+          darfSchreiben: true,
+          waehlbar: [],
+          aktiveAnsichtId: ansicht,
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
+          erfolg: vi.fn(),
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+        initialProps: { id: 1, ansicht: 5 } as { id: number; ansicht?: number },
+      },
+    );
+    return { ...hook, invalidiert };
+  }
+
+  it('nach dem Einsatzwechsel läuft im neuen Einsatz nichts; der Erfolg frischt den alten auf', async () => {
+    let aufloesen: (v: { id: number }) => void = () => {};
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementationOnce(
+      () => new Promise<{ id: number }>((r) => (aufloesen = r)),
+    );
+    const { result, rerender, invalidiert } = aufbau();
+    act(() =>
+      result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 8.6, lat: 50.1 }),
+    );
+    await waitFor(() => expect(result.current.zeichenAnPunktLaeuft).toBe(true));
+    rerender({ id: 2, ansicht: 5 });
+    expect(result.current.zeichenAnPunktLaeuft).toBe(false);
+    await act(async () => aufloesen({ id: 9 }));
+    await waitFor(() =>
+      expect(invalidiert).toHaveBeenCalledWith({ queryKey: einsatzKeys.freieZeichen(1) }),
+    );
+    expect(invalidiert).not.toHaveBeenCalledWith({ queryKey: einsatzKeys.freieZeichen(2) });
+  });
+
+  it('die Ansicht kommt aus dem Aufruf, nicht aus einem späteren Render', async () => {
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const { result, rerender } = aufbau();
+    act(() => {
+      result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 8.6, lat: 50.1 });
+      // Der Wechsel fällt vor die Ausführung der Mutation (sie wartet erst auf `onMutate`).
+      rerender({ id: 1, ansicht: 6 });
+    });
+    await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1));
+    expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ ansicht_id: 5 }),
+    );
   });
 });

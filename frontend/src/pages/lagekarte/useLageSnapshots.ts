@@ -36,6 +36,8 @@ export function useLageSnapshots(einsatzId: number) {
     ladt: listeQuery.isLoading,
     sichern: (bezeichnung?: string) => sichernM.mutateAsync(bezeichnung),
     sichertGerade: sichernM.isPending,
+    /** Für die Erfassungs-Hülle: der Grund einer Ablehnung steht im Dialog (LFH-1077). */
+    sichernSpeicherung: sichernM,
     loesche: (id: number) => loeschenM.mutateAsync(id),
     loeschtGerade: loeschenM.isPending,
   };

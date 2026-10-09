@@ -59,6 +59,7 @@ import UploadFortschrittAnzeige from '../../components/UploadFortschritt';
 import { ablageFehlerKopf } from '../../components/useUploadFortschritt';
 import type { KartenAnsicht } from '../../api/types';
 import AnsichtSwitcher from './AnsichtSwitcher';
+import type { KartenGrund } from './useKartenFehler';
 import AnsichtZuordnung from './AnsichtZuordnung';
 
 export interface LayerSichtbar {
@@ -331,11 +332,17 @@ export interface SidebarProps {
   ansichten: KartenAnsicht[];
   aktiveAnsichtId?: number;
   onAnsichtWaehlen: (id: number) => void;
-  onAnsichtNeu: (name: string) => void;
-  onAnsichtUmbenennen: (id: number, name: string) => void;
+  /** Neu, Umbenennen, Löschen: der Dialog wartet auf die Antwort (siehe `AnsichtSwitcher`). */
+  onAnsichtNeu: (name: string) => Promise<unknown> | void;
+  onAnsichtUmbenennen: (id: number, name: string) => Promise<unknown> | void;
   onAnsichtStandard: (id: number) => void;
-  onAnsichtLoeschen: (id: number, objekte: 'freigeben' | 'loeschen') => void;
+  onAnsichtLoeschen: (id: number, objekte: 'freigeben' | 'loeschen') => Promise<unknown> | void;
   ansichtBusy: boolean;
+  /**
+   * Abgelehntes „Als Standard“ und „In dieser Ansicht speichern“ der aktiven Ansicht (LFH-1077):
+   * der Grund steht im Paneel „Kartenansicht“, das dafür aufgeht. Ein Ansichtswechsel räumt ihn.
+   */
+  ansichtFehler?: readonly KartenGrund[];
   /** Fehler-Slots je Sektion — siehe `SidebarSektionFehler`. */
   sektionFehler?: SidebarSektionFehler;
   /**
@@ -1030,13 +1037,20 @@ export default function Sidebar(props: SidebarProps) {
       <KlappPaneel
         titel="Kartenansicht"
         kennung="ansicht"
-        offen={paneele.zustand.ansicht || sektionFehler.ansichten != null}
+        offen={
+          paneele.zustand.ansicht ||
+          sektionFehler.ansichten != null ||
+          (props.ansichtFehler?.length ?? 0) > 0
+        }
         onUmschalten={umschalten('ansicht')}
       >
         {sektionFehler.ansichten ? (
           <FehlerSlot fehler={sektionFehler.ansichten} />
         ) : (
           <AnsichtSwitcher
+            // Ein Einsatzwechsel schließt offene Dialoge samt Grund; eine späte Antwort trifft
+            // dann keinen Dialog des neuen Einsatzes.
+            key={props.einsatzId}
             ansichten={props.ansichten}
             aktiveAnsichtId={props.aktiveAnsichtId}
             darfSchreiben={darfSchreiben}
@@ -1063,6 +1077,26 @@ export default function Sidebar(props: SidebarProps) {
               In dieser Ansicht speichern
             </Button>
           </Space>
+        )}
+        {(props.ansichtFehler?.length ?? 0) > 0 && (
+          <div
+            data-lfh="ansicht-fehler"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: token.marginSM,
+              marginTop: token.marginSM,
+            }}
+          >
+            {props.ansichtFehler?.map((g) => (
+              <SpeicherFehler
+                key={g.schluessel}
+                fehler={g.fehler}
+                titel={g.titel}
+                fallback={g.fallback}
+              />
+            ))}
+          </div>
         )}
       </KlappPaneel>
 

@@ -12,6 +12,8 @@ import {
 } from 'antd';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { anzahl } from '../anzeige/anzahl';
+import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
   OFFLINE_QUEUE_EVENT,
   abgelehntEntfernen,
@@ -82,6 +84,7 @@ function RecoveryCard({
   anhaenge = 0,
   daten,
   aktionen,
+  fehler,
 }: {
   titel: string;
   einsatzId: number;
@@ -91,9 +94,12 @@ function RecoveryCard({
   anhaenge?: number;
   daten: unknown;
   aktionen: ReactNode;
+  /** Grund der letzten gescheiterten Aktion an dieser Karte (LFH-1077). */
+  fehler: ZeilenGrund | null;
 }) {
   return (
     <Card size="small" title={titel} extra={aktionen}>
+      {fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />}
       <Descriptions
         size="small"
         column={1}
@@ -121,6 +127,9 @@ function RecoveryCard({
   );
 }
 
+/** Die Aktion fand ihren Eintrag nicht mehr (anderer Tab, schon gesendet). */
+class NichtMehrVorhanden extends Error {}
+
 /** Globale Recovery-Oberfläche für fachlich abgelehnte Aktionen. Von den
  * quarantänisierten v1-v3-Zeilen ohne sichere Benutzerzuordnung werden nur die
  * Anzahl und eine bestätigte Gesamt-Löschaktion angeboten — niemals Rohdaten. */
@@ -138,10 +147,25 @@ export default function OfflineRecoveryDrawer({
   const [laedt, setLaedt] = useState(false);
   const [aktionLaeuft, setAktionLaeuft] = useState<string | null>(null);
   const [geladenerScope, setGeladenerScope] = useState<string | null>(null);
+  const [ladeFehler, setLadeFehler] = useState<unknown>(null);
   const ladeGeneration = useRef(0);
+  // Gründe je Karte (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“); der Titel nennt eine
+  // Karte, die nach dem Fehler nicht mehr in der Liste steht.
+  const zeilen = useZeilenFehler<string>();
+  const { leere } = zeilen;
+  const titelJeZeile = useRef(new Map<string, string>());
+  const aktuellerScope = useRef(scopeKey);
+  aktuellerScope.current = scopeKey;
 
+  // Öffnen und ein Wechsel von Benutzer oder Einsatz räumen alte Gründe.
+  useEffect(() => {
+    if (open) leere();
+  }, [leere, open, scopeKey]);
+
+  /** Lädt die Liste; ein Fehler steht im Drawer, bis das nächste Laden beginnt. */
   const laden = useCallback(async () => {
     const generation = ++ladeGeneration.current;
+    setLadeFehler(null);
     if (benutzerId == null) {
       setEtb([]);
       setSchreibaktionen([]);
@@ -162,6 +186,8 @@ export default function OfflineRecoveryDrawer({
       setSchreibaktionen(fachaktionen);
       setNichtZugeordnet(legacy);
       setGeladenerScope(scopeKey);
+    } catch (e) {
+      if (ladeGeneration.current === generation) setLadeFehler(e);
     } finally {
       if (ladeGeneration.current === generation) setLaedt(false);
     }
@@ -169,77 +195,96 @@ export default function OfflineRecoveryDrawer({
 
   useEffect(() => {
     if (!open) return;
-    const neuLaden = () =>
-      void laden().catch(() => message.error('Offline-Daten konnten nicht geladen werden'));
+    const neuLaden = () => void laden();
     neuLaden();
     window.addEventListener(OFFLINE_QUEUE_EVENT, neuLaden);
     return () => window.removeEventListener(OFFLINE_QUEUE_EVENT, neuLaden);
-  }, [laden, message, open]);
+  }, [laden, open]);
 
-  const ausfuehren = async (schluessel: string, aktion: () => Promise<boolean>, erfolg: string) => {
+  const ausfuehren = async (
+    zeile: { schluessel: string; titel: string },
+    schluessel: string,
+    aktion: () => Promise<boolean>,
+    erfolg: string,
+  ) => {
+    const scope = scopeKey;
+    zeilen.beginne(zeile.schluessel);
     setAktionLaeuft(schluessel);
     try {
-      if (!(await aktion())) throw new Error('Eintrag ist nicht mehr verfügbar');
+      if (!(await aktion())) throw new NichtMehrVorhanden();
       await laden();
       message.success(erfolg);
-    } catch {
-      message.error('Aktion konnte nicht ausgeführt werden');
+    } catch (e) {
+      // Nach einem Wechsel von Benutzer oder Einsatz meldet eine späte Ablehnung nicht hier.
+      if (aktuellerScope.current !== scope) return;
+      titelJeZeile.current.set(zeile.schluessel, zeile.titel);
+      const weg = e instanceof NichtMehrVorhanden;
+      zeilen.melde(zeile.schluessel, e, weg ? 'Eintrag nicht mehr vorhanden' : 'Nicht ausgeführt');
+      // Ein anderer Tab hat ihn schon gesendet oder verworfen, sein Ereignis kommt hier nicht an:
+      // neu laden. Fehlt die Karte danach, steht der Grund über der Liste (`ohneKarte`).
+      if (weg) void laden();
     } finally {
       setAktionLaeuft(null);
     }
   };
 
   const knoepfe = (
-    schluessel: string,
+    zeile: { schluessel: string; titel: string },
     wiederholen: () => Promise<boolean>,
     verwerfen: () => Promise<boolean>,
     ohneAnhaenge?: { anzahl: number; senden: () => Promise<boolean> },
-  ) => (
-    <Space size="middle">
-      <Button
-        type="primary"
-        loading={aktionLaeuft === `${schluessel}:retry`}
-        onClick={() =>
-          void ausfuehren(`${schluessel}:retry`, wiederholen, 'Aktion erneut vorgemerkt')
-        }
-      >
-        Erneut versuchen
-      </Button>
-      {ohneAnhaenge && (
-        // LFH-746: Nach der Karenz des Verwaisten-Sweeps sind die Dateien weg, „Erneut versuchen“
-        // liefe wieder in dieselbe 400. Die Rückfrage sagt, was fehlen wird; der Eintrag ist
-        // danach append-only.
-        <Popconfirm
-          title="Ohne Anhänge senden?"
-          description={ohneAnhaengeHinweis(ohneAnhaenge.anzahl)}
-          okText="Nur den Text senden"
-          cancelText="Abbrechen"
-          onConfirm={() =>
-            ausfuehren(
-              `${schluessel}:ohne-anhaenge`,
-              ohneAnhaenge.senden,
-              'Eintrag ohne Anhänge erneut vorgemerkt',
-            )
+  ) => {
+    const { schluessel } = zeile;
+    return (
+      <Space size="middle">
+        <Button
+          type="primary"
+          loading={aktionLaeuft === `${schluessel}:retry`}
+          onClick={() =>
+            void ausfuehren(zeile, `${schluessel}:retry`, wiederholen, 'Aktion erneut vorgemerkt')
           }
         >
-          <Button loading={aktionLaeuft === `${schluessel}:ohne-anhaenge`}>
-            Ohne Anhänge senden
+          Erneut versuchen
+        </Button>
+        {ohneAnhaenge && (
+          // LFH-746: Nach der Karenz des Verwaisten-Sweeps sind die Dateien weg, „Erneut versuchen“
+          // liefe wieder in dieselbe 400. Die Rückfrage sagt, was fehlen wird; der Eintrag ist
+          // danach append-only.
+          <Popconfirm
+            title="Ohne Anhänge senden?"
+            description={ohneAnhaengeHinweis(ohneAnhaenge.anzahl)}
+            okText="Nur den Text senden"
+            cancelText="Abbrechen"
+            onConfirm={() =>
+              ausfuehren(
+                zeile,
+                `${schluessel}:ohne-anhaenge`,
+                ohneAnhaenge.senden,
+                'Eintrag ohne Anhänge erneut vorgemerkt',
+              )
+            }
+          >
+            <Button loading={aktionLaeuft === `${schluessel}:ohne-anhaenge`}>
+              Ohne Anhänge senden
+            </Button>
+          </Popconfirm>
+        )}
+        <Popconfirm
+          title="Offline-Aktion endgültig verwerfen?"
+          okText="Endgültig verwerfen"
+          cancelText="Abbrechen"
+          okButtonProps={{ danger: true }}
+          onConfirm={() =>
+            ausfuehren(zeile, `${schluessel}:discard`, verwerfen, 'Offline-Aktion verworfen')
+          }
+        >
+          <Button danger loading={aktionLaeuft === `${schluessel}:discard`}>
+            Verwerfen
           </Button>
         </Popconfirm>
-      )}
-      <Popconfirm
-        title="Offline-Aktion endgültig verwerfen?"
-        okText="Endgültig verwerfen"
-        cancelText="Abbrechen"
-        okButtonProps={{ danger: true }}
-        onConfirm={() => ausfuehren(`${schluessel}:discard`, verwerfen, 'Offline-Aktion verworfen')}
-      >
-        <Button danger loading={aktionLaeuft === `${schluessel}:discard`}>
-          Verwerfen
-        </Button>
-      </Popconfirm>
-    </Space>
-  );
+      </Space>
+    );
+  };
   const alsAktuellerBenutzer = (
     aktion: (aktuellerBenutzerId: number) => Promise<boolean>,
   ): Promise<boolean> => (benutzerId == null ? Promise.resolve(false) : aktion(benutzerId));
@@ -248,8 +293,18 @@ export default function OfflineRecoveryDrawer({
   const sichtbareEtb = scopeAktuell ? etb : [];
   const sichtbareSchreibaktionen = scopeAktuell ? schreibaktionen : [];
   const sichtbareNichtZugeordnet = scopeAktuell ? nichtZugeordnet : 0;
+  const legacyZeile = { schluessel: 'legacy', titel: 'Alte Offline-Daten ohne Zuordnung' };
+  const legacyGrund = zeilen.grund(legacyZeile.schluessel);
+  const sichtbareZeilen = new Set([
+    ...(sichtbareNichtZugeordnet > 0 ? [legacyZeile.schluessel] : []),
+    ...sichtbareEtb.map((e) => `etb:${e.id}`),
+    ...sichtbareSchreibaktionen.map((e) => `schreiben:${e.id}`),
+  ]);
+  // Gründe, deren Karte nach dem Fehler nicht mehr in der Liste steht.
+  const ohneKarte = zeilen.gemeldet().filter((s) => !sichtbareZeilen.has(s));
   const leer =
     !laedt &&
+    ladeFehler == null &&
     sichtbareEtb.length === 0 &&
     sichtbareSchreibaktionen.length === 0 &&
     sichtbareNichtZugeordnet === 0;
@@ -264,6 +319,24 @@ export default function OfflineRecoveryDrawer({
       destroyOnHidden
     >
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <SpeicherFehler
+          fehler={ladeFehler}
+          titel="Nicht geladen"
+          fallback="Offline-Daten konnten nicht geladen werden"
+        />
+        {ohneKarte.map((s) => {
+          const grund = zeilen.grund(s);
+          return (
+            grund && (
+              <ZeilenFehler
+                key={s}
+                fehler={grund.fehler}
+                fallback={grund.fallback}
+                kennung={titelJeZeile.current.get(s)}
+              />
+            )
+          );
+        })}
         {sichtbareNichtZugeordnet > 0 && (
           <Alert
             type="warning"
@@ -282,6 +355,7 @@ export default function OfflineRecoveryDrawer({
                   okButtonProps={{ danger: true }}
                   onConfirm={() =>
                     ausfuehren(
+                      legacyZeile,
                       'legacy:discard-all',
                       async () => (await queueNichtZugeordnetAlleVerwerfen()) > 0,
                       'Alte Offline-Daten ohne Zuordnung verworfen',
@@ -292,6 +366,9 @@ export default function OfflineRecoveryDrawer({
                     Alle alten Offline-Daten verwerfen
                   </Button>
                 </Popconfirm>
+                {legacyGrund && (
+                  <ZeilenFehler fehler={legacyGrund.fehler} fallback={legacyGrund.fallback} />
+                )}
               </Space>
             }
           />
@@ -300,17 +377,19 @@ export default function OfflineRecoveryDrawer({
         {sichtbareEtb.map((eintrag) => {
           if (eintrag.id == null) return null;
           const anhaenge = eintrag.eintrag.anhang_ids?.length ?? 0;
+          const zeile = { schluessel: `etb:${eintrag.id}`, titel: 'Abgelehnter ETB-Eintrag' };
           return (
             <RecoveryCard
-              key={`etb:${eintrag.id}`}
-              titel="Abgelehnter ETB-Eintrag"
+              key={zeile.schluessel}
+              titel={zeile.titel}
               einsatzId={eintrag.einsatz_id}
               zeitpunkt={eintrag.erstellt_at}
               grund={eintrag.grund}
               anhaenge={anhaenge}
               daten={eintrag.eintrag}
+              fehler={zeilen.grund(zeile.schluessel)}
               aktionen={knoepfe(
-                `etb:${eintrag.id}`,
+                zeile,
                 () => alsAktuellerBenutzer((id) => abgelehntWiederholen(id, eintrag.id!)),
                 () => alsAktuellerBenutzer((id) => abgelehntEntfernen(id, eintrag.id!)),
                 anhaenge > 0
@@ -327,25 +406,31 @@ export default function OfflineRecoveryDrawer({
           );
         })}
 
-        {sichtbareSchreibaktionen.map((eintrag) =>
-          eintrag.id == null ? null : (
+        {sichtbareSchreibaktionen.map((eintrag) => {
+          if (eintrag.id == null) return null;
+          const zeile = {
+            schluessel: `schreiben:${eintrag.id}`,
+            titel: aktionsTitel(eintrag.aktion),
+          };
+          return (
             <RecoveryCard
-              key={`schreiben:${eintrag.id}`}
-              titel={aktionsTitel(eintrag.aktion)}
+              key={zeile.schluessel}
+              titel={zeile.titel}
               einsatzId={eintrag.einsatz_id}
               zeitpunkt={eintrag.erstellt_at}
               grund={eintrag.grund}
               daten={eintrag.aktion.daten}
+              fehler={zeilen.grund(zeile.schluessel)}
               aktionen={knoepfe(
-                `schreiben:${eintrag.id}`,
+                zeile,
                 () =>
                   alsAktuellerBenutzer((id) => schreibaktionAbgelehntWiederholen(id, eintrag.id!)),
                 () =>
                   alsAktuellerBenutzer((id) => schreibaktionAbgelehntVerwerfen(id, eintrag.id!)),
               )}
             />
-          ),
-        )}
+          );
+        })}
 
         {leer && <Empty description="Keine wiederherzustellenden Offline-Aktionen" />}
       </Space>

@@ -116,8 +116,6 @@ interface SnapshotLeisteProps {
   aktiverSnapshotId?: number;
   /** Auswahl eines Standes (`null` = zurück in den Live-Modus). */
   onWaehle: (id: number | null) => void;
-  /** Stabiler Fehler-Handler. */
-  fehler: (e: unknown) => void;
 }
 
 /** Beschriftung eines Standes: Hauptzeile, Erfassungszeit darunter und beides als ein Text. */
@@ -198,13 +196,12 @@ export function SnapshotLeiste({
   darfSichern,
   aktiverSnapshotId,
   onWaehle,
-  fehler,
 }: SnapshotLeisteProps) {
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const { konventionen } = useAnzeigeKonventionen();
   const qc = useQueryClient();
-  const { snapshots, sichern, sichertGerade } = useLageSnapshots(einsatzId);
+  const { snapshots, sichern, sichertGerade, sichernSpeicherung } = useLageSnapshots(einsatzId);
   const [sichernOffen, setSichernOffen] = useState(false);
   const [sichernForm] = Form.useForm<{ bezeichnung?: string }>();
   const [spielt, setSpielt] = useState(false);
@@ -246,15 +243,9 @@ export function SnapshotLeiste({
     return () => clearTimeout(t);
   }, [spielt, aktiverIndex, chrono, onWaehle, prefetch]);
 
-  // Bei Ablehnung bricht die Zusage, damit `ErfassungsModal` Dialog und Wortlaut stehen lässt.
-  const aufSichern = async ({ bezeichnung }: { bezeichnung?: string }) => {
-    try {
-      await sichern(bezeichnung);
-    } catch (e) {
-      fehler(e);
-      throw e;
-    }
-  };
+  // Bei Ablehnung bricht die Zusage, damit `ErfassungsModal` Dialog und Wortlaut stehen lässt; den
+  // Grund zeigt die Hülle über `speicherung` im Dialog (LFH-1077).
+  const aufSichern = ({ bezeichnung }: { bezeichnung?: string }) => sichern(bezeichnung);
 
   const aufPlayPause = () => {
     if (spielt) {
@@ -430,6 +421,9 @@ export function SnapshotLeiste({
         form={sichernForm}
         erfassenText="Sichern"
         laeuft={sichertGerade}
+        speicherung={sichernSpeicherung}
+        speicherFehlerTitel="Stand nicht gesichert"
+        speicherFehlerFallback="Sichern fehlgeschlagen"
         onErfassen={aufSichern}
         onErfasst={() => {
           message.success('Stand gesichert');

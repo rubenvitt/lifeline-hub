@@ -4,10 +4,17 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createRef, type ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
-import { listeHintergrundbilder, type Hintergrundbild } from '../../api/kartenbilder';
-import { AusgangUnbekannt, type UploadFortschritt } from '../../api/client';
+import {
+  aktualisiereHintergrundbild,
+  listeHintergrundbilder,
+  loescheHintergrundbild,
+  type Ecken,
+  type Hintergrundbild,
+} from '../../api/kartenbilder';
+import { ApiError, AusgangUnbekannt, type UploadFortschritt } from '../../api/client';
 import type { KartenHandle } from './Kartenflaeche';
 import { useKartenbilder } from './useKartenbilder';
+import { useKartenFehler } from './useKartenFehler';
 
 /**
  * Bild-URLs der Hintergrundbilder (LFH-943, D4): jede URL wird freigegeben, ob übernommen,
@@ -91,7 +98,13 @@ function aufbau(einsatzId = 1) {
   );
   const hook = renderHook(
     ({ einsatz }: { einsatz: number }) =>
-      useKartenbilder({ einsatzId: einsatz, kartenRef, bildPlatzierenId: null, fehler }),
+      useKartenbilder({
+        einsatzId: einsatz,
+        kartenRef,
+        bildPlatzierenId: null,
+        ladeFehler: fehler,
+        beginneHandlung: () => vi.fn(),
+      }),
     { wrapper, initialProps: { einsatz: einsatzId } },
   );
   /** Neue Bilderliste wie nach einem Refetch (Live-Kanal, Opazität, Sichtbarkeit). */
@@ -209,7 +222,8 @@ describe('useKartenbilder im Rückblick', () => {
           kartenRef: createRef<KartenHandle>(),
           bildPlatzierenId: null,
           quelle: { typ: 'snapshot', id: 9 },
-          fehler,
+          ladeFehler: fehler,
+          beginneHandlung: () => vi.fn(),
         }),
       {
         wrapper: ({ children }: { children: ReactNode }) => (
@@ -289,5 +303,102 @@ describe('useKartenbilder: Upload (LFH-1021)', () => {
     // Der nächste Upload räumt den alten Fehler.
     act(() => hook.result.current.onBildUpload(datei()));
     await waitFor(() => expect(hook.result.current.bildUpload.fehler).toBeNull());
+  });
+});
+
+/**
+ * Bildaktionen der Leiste und der Ziehgriffe (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+ * Fehler“): eine Ablehnung steht im Hinweis über der Karte, je Bild, und die Zusage löst trotzdem
+ * auf — die Aufrufer fangen nichts, eine Ablehnung wäre sonst eine stille unbehandelte Rejection.
+ */
+describe('useKartenbilder: Bildaktionen melden am Kartenhinweis (LFH-1077)', () => {
+  const ECKEN = [
+    [9, 50],
+    [9.1, 50],
+    [9.1, 49.9],
+    [9, 49.9],
+  ] as unknown as Ecken;
+  type Bilder = ReturnType<typeof useKartenbilder>;
+
+  function mitHinweis() {
+    api.liste.set(1, [bild(3)]);
+    const qc = neuerQueryClient();
+    const invalidiert = vi.spyOn(qc, 'invalidateQueries');
+    const hook = renderHook(
+      () => {
+        const hinweis = useKartenFehler(1);
+        const bilder = useKartenbilder({
+          einsatzId: 1,
+          kartenRef: createRef<KartenHandle>(),
+          // Platzier-Modus für Bild 3: Ziehgriffe und Mittelpunkt schreiben dessen Ecken.
+          bildPlatzierenId: 3,
+          ladeFehler: vi.fn(),
+          beginneHandlung: hinweis.beginne,
+        });
+        return { hinweis, bilder };
+      },
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    return { hook, invalidiert };
+  }
+
+  const FAELLE: [string, (b: Bilder) => Promise<unknown>, string, 'aendern' | 'loeschen'][] = [
+    ['Sichtbarkeit', (b) => b.onBildToggle(3, false), 'Bild nicht geändert · Bild 3', 'aendern'],
+    ['Deckkraft', (b) => b.onBildOpazitaet(3, 40), 'Bild nicht geändert · Bild 3', 'aendern'],
+    ['Entfernen', (b) => b.onBildLoeschen(3), 'Bild nicht entfernt · Bild 3', 'loeschen'],
+    ['Ansicht', (b) => b.onBildVerschieben(3, 2), 'Bild nicht verschoben · Bild 3', 'aendern'],
+    ['Name', (b) => b.onBildUmbenennen(3, 'Neu'), 'Bild nicht umbenannt · Bild 3', 'aendern'],
+    ['Ziehgriff', (b) => b.onPlatzierGeometrie(ECKEN), 'Bild nicht platziert · Bild 3', 'aendern'],
+    ['Mittelpunkt', (b) => b.onBildMittelpunkt(50, 9), 'Bild nicht platziert · Bild 3', 'aendern'],
+  ];
+
+  it.each(FAELLE)('%s abgelehnt: Grund im Kartenhinweis, die Zusage löst auf', async (...fall) => {
+    const [, aktion, titel, api_] = fall;
+    vi.mocked(aktualisiereHintergrundbild).mockReset();
+    vi.mocked(loescheHintergrundbild).mockReset();
+    const abgelehnt = new ApiError(403, 'Keine Berechtigung');
+    if (api_ === 'aendern') vi.mocked(aktualisiereHintergrundbild).mockRejectedValueOnce(abgelehnt);
+    else vi.mocked(loescheHintergrundbild).mockRejectedValueOnce(abgelehnt);
+    const { hook } = mitHinweis();
+    await waitFor(() => expect(hook.result.current.bilder.bilder).toHaveLength(1));
+
+    await act(async () => {
+      await aktion(hook.result.current.bilder);
+    });
+    expect(hook.result.current.hinweis.gruende).toEqual([
+      expect.objectContaining({ schluessel: 'bild:3', titel, fehler: abgelehnt }),
+    ]);
+  });
+
+  it('der nächste Versuch räumt den Grund schon während er läuft; Erfolg frischt die Liste auf', async () => {
+    vi.mocked(aktualisiereHintergrundbild).mockReset();
+    vi.mocked(aktualisiereHintergrundbild).mockRejectedValueOnce(new ApiError(409, 'Geändert'));
+    let aufloesen: (b: Hintergrundbild) => void = () => {};
+    vi.mocked(aktualisiereHintergrundbild).mockImplementationOnce(
+      () => new Promise<Hintergrundbild>((r) => (aufloesen = r)),
+    );
+    const { hook, invalidiert } = mitHinweis();
+    await waitFor(() => expect(hook.result.current.bilder.bilder).toHaveLength(1));
+    await act(async () => {
+      await hook.result.current.bilder.onBildToggle(3, false);
+    });
+    expect(hook.result.current.hinweis.gruende).toHaveLength(1);
+
+    invalidiert.mockClear();
+    let zweiter: Promise<unknown> = Promise.resolve();
+    act(() => {
+      zweiter = hook.result.current.bilder.onBildToggle(3, false);
+    });
+    expect(hook.result.current.hinweis.gruende).toEqual([]);
+    await act(async () => {
+      aufloesen(bild(3));
+      await zweiter;
+    });
+    expect(hook.result.current.hinweis.gruende).toEqual([]);
+    expect(invalidiert).toHaveBeenCalledWith({ queryKey: einsatzKeys.kartenbilder(1) });
   });
 });

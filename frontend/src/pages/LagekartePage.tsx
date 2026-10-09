@@ -85,7 +85,9 @@ import {
 import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
 import Datenstand from '../components/Datenstand';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { fehlerText } from '../api/client';
+import { useKartenFehler } from './lagekarte/useKartenFehler';
+import { KartenFehlerHinweis } from './lagekarte/KartenFehlerHinweis';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -298,8 +300,21 @@ export default function LagekartePage() {
     effektiv,
   });
 
-  // Stabiler Fehler-Handler → als ehrliche Dep in Effekten nutzbar, ohne sie neu auszulösen.
-  const fehler = useFehlerMeldung();
+  // Ablehnungen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“):
+  // Zeichnen, Verorten, Bilder und Inspektoren im Hinweis über der Karte, „Als Standard“ und „In
+  // dieser Ansicht speichern“ im Paneel „Kartenansicht“ (ohne Leiste über der Karte), Dialoge in
+  // sich.
+  const kartenFehler = useKartenFehler(einsatzId);
+  const ansichtFehler = useKartenFehler(einsatzId);
+  const { beginne: beginneAnsicht, verwirf: verwirfAnsicht } = ansichtFehler;
+  // Bilder laden ohne Handlung im Hintergrund nach: dafür gibt es keinen Ort, es bleibt der Toast
+  // (`components/speicherfehler.guard.test.ts`, ERLAUBT). Stabil, er steht in Effekt-Deps.
+  const bildLadeFehler = useCallback(
+    (e: unknown) => {
+      message.error(fehlerText(e, 'Kartenbild nicht geladen'));
+    },
+    [message],
+  );
   const erfolg = useCallback(
     (text: string) => {
       message.success(text);
@@ -308,15 +323,32 @@ export default function LagekartePage() {
   );
 
   // „In dieser Ansicht speichern": den Karten-Zustand in die aktive Ansicht schreiben (nicht
-  // einsatzweit), mit Erfolgs-/Fehler-Feedback (die Mutation wirft, hier gefangen).
+  // einsatzweit); Erfolg als Toast, eine Ablehnung im Paneel (die Mutation wirft, hier gefangen).
+  // Der Grund gehört seiner Ansicht (Schlüssel `ansicht:<id>:…`, der Titel nennt sie): nur deren
+  // Paneel zeigt ihn, eine Antwort nach dem Wechsel steht über der Karte.
   const onAnsichtSpeichern = useCallback(async () => {
+    const melde = beginneAnsicht(
+      `ansicht:${aktiveAnsichtId}:speichern`,
+      aktiveAnsicht
+        ? `Ansicht nicht gespeichert · ${aktiveAnsicht.name}`
+        : 'Ansicht nicht gespeichert',
+    );
     try {
       await speichern();
       message.success('In der Ansicht gespeichert');
     } catch (e) {
-      fehler(e);
+      melde(e);
     }
-  }, [speichern, message, fehler]);
+  }, [speichern, message, beginneAnsicht, aktiveAnsichtId, aktiveAnsicht]);
+  // Ein Ansichtswechsel räumt die Gründe der verlassenen Ansicht: im Paneel der neuen wären sie
+  // falsch, und das Paneel ließe sich ihretwegen nicht zuklappen.
+  useEffect(() => {
+    const verlassen = aktiveAnsichtId;
+    return () => {
+      verwirfAnsicht(`ansicht:${verlassen}:speichern`);
+      verwirfAnsicht(`ansicht:${verlassen}:standard`);
+    };
+  }, [aktiveAnsichtId, verwirfAnsicht]);
 
   // Ansichtswechsel schreibt ?ansicht=; der Hook seedet Config/Layer/Fachebenen daraufhin aus der
   // Zielansicht.
@@ -345,58 +377,51 @@ export default function LagekartePage() {
     [searchParams, setSearchParams],
   );
 
+  // Neu, Umbenennen, Löschen: die Zusage bricht bei Ablehnung, der Dialog im `AnsichtSwitcher`
+  // bleibt dann offen und nennt den Grund (design.md D3).
   const onAnsichtNeu = useCallback(
     async (name: string) => {
-      try {
-        const neu = await neueAnsicht(name);
-        waehleAnsicht(neu.id);
-        message.success(`Ansicht „${name}" angelegt`);
-      } catch (e) {
-        fehler(e);
-      }
+      const neu = await neueAnsicht(name);
+      waehleAnsicht(neu.id);
+      message.success(`Ansicht „${name}" angelegt`);
     },
-    [neueAnsicht, waehleAnsicht, message, fehler],
+    [neueAnsicht, waehleAnsicht, message],
   );
 
   const onAnsichtUmbenennen = useCallback(
-    async (id: number, name: string) => {
-      try {
-        await umbenennen({ id, name });
-      } catch (e) {
-        fehler(e);
-      }
-    },
-    [umbenennen, fehler],
+    (id: number, name: string) => umbenennen({ id, name }),
+    [umbenennen],
   );
 
   const onAnsichtStandard = useCallback(
     async (id: number) => {
+      const name = ansichten?.find((a) => a.id === id)?.name;
+      const melde = beginneAnsicht(
+        `ansicht:${id}:standard`,
+        name ? `Nicht als Standardansicht gesetzt · ${name}` : 'Nicht als Standardansicht gesetzt',
+      );
       try {
         await setzeStandard(id);
         message.success('Als Standardansicht gesetzt');
       } catch (e) {
-        fehler(e);
+        melde(e);
       }
     },
-    [setzeStandard, message, fehler],
+    [setzeStandard, message, beginneAnsicht, ansichten],
   );
 
   const onAnsichtLoeschen = useCallback(
     async (id: number, objekte: 'freigeben' | 'loeschen') => {
-      try {
-        await loeschen({ id, objekte });
-        message.success('Ansicht gelöscht');
-        // War die gelöschte Ansicht aktiv, ?ansicht= räumen → Fallback auf die Standardansicht.
-        if (id === aktiveAnsichtId) {
-          const naechste = new URLSearchParams(searchParams);
-          naechste.delete('ansicht');
-          setSearchParams(naechste);
-        }
-      } catch (e) {
-        fehler(e);
+      await loeschen({ id, objekte });
+      message.success('Ansicht gelöscht');
+      // War die gelöschte Ansicht aktiv, ?ansicht= räumen → Fallback auf die Standardansicht.
+      if (id === aktiveAnsichtId) {
+        const naechste = new URLSearchParams(searchParams);
+        naechste.delete('ansicht');
+        setSearchParams(naechste);
       }
     },
-    [loeschen, aktiveAnsichtId, searchParams, setSearchParams, message, fehler],
+    [loeschen, aktiveAnsichtId, searchParams, setSearchParams, message],
   );
 
   const {
@@ -446,6 +471,7 @@ export default function LagekartePage() {
     messStart,
     legeZeichenAnPunkt,
     zeichenAnPunktLaeuft,
+    zeichenAnPunktSpeicherung,
     zeichenAendern,
     zeichenVerschieben,
     zeichenLoeschen,
@@ -466,7 +492,8 @@ export default function LagekartePage() {
     darfSchreiben,
     waehlbar,
     aktiveAnsichtId,
-    fehler,
+    beginneHandlung: kartenFehler.beginne,
+    verwirfHandlung: kartenFehler.verwirf,
     erfolg,
     warnung: (text) => message.warning(text),
   });
@@ -544,7 +571,15 @@ export default function LagekartePage() {
     onBildZentrieren,
     onBildUmbenennen,
     onBildMittelpunkt,
-  } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
+  } = useKartenbilder({
+    einsatzId,
+    kartenRef,
+    bildPlatzierenId,
+    aktiveAnsichtId,
+    quelle,
+    ladeFehler: bildLadeFehler,
+    beginneHandlung: kartenFehler.beginne,
+  });
 
   // Betroffene laufen getrennt von `alleVerortet` und nur bei freiem Modul „Personen" auf die Karte
   // — der Schalter gehört einer geteilten Ansicht und genügt allein nicht (`personenEbene.ts`).
@@ -930,6 +965,19 @@ export default function LagekartePage() {
     modusAktiv: exklusiverModusAktiv,
     imModus: leistenWahl.imModus,
   });
+  // Ansichtsgründe stehen im Paneel ihrer Ansicht; bei ausgeblendeter Leiste und für eine andere
+  // Ansicht (Antwort nach dem Wechsel) über der Karte (LFH-1077).
+  const ansichtGruendeImPaneel = leisteIstSichtbar
+    ? ansichtFehler.gruende.filter((g) => g.schluessel.startsWith(`ansicht:${aktiveAnsichtId}:`))
+    : [];
+  const kartenGruende = [
+    ...kartenFehler.gruende,
+    ...ansichtFehler.gruende.filter((g) => !ansichtGruendeImPaneel.includes(g)),
+  ];
+  const schliesseKartenGrund = (schluessel: string) =>
+    schluessel.startsWith('ansicht:')
+      ? verwirfAnsicht(schluessel)
+      : kartenFehler.verwirf(schluessel);
   const leisteSperrGrund =
     auswahlInhalt != null ? 'Auswahl offen' : leisteErzwungen ? 'Modus läuft' : null;
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte. Auf dem Handschirm bräche sie
@@ -1239,11 +1287,12 @@ export default function LagekartePage() {
           }}
         />
         <SnapshotLeiste
+          // Ein Einsatzwechsel beginnt mit frischer Sichern-Mutation: kein alter Grund im Dialog.
+          key={einsatzId}
           einsatzId={einsatzId}
           darfSichern={!!darfSchreiben}
           aktiverSnapshotId={snapshotParam}
           onWaehle={waehleSnapshot}
-          fehler={fehler}
         />
       </KartenFuss>
     </div>
@@ -1353,6 +1402,7 @@ export default function LagekartePage() {
         onAnsichtStandard={onAnsichtStandard}
         onAnsichtLoeschen={onAnsichtLoeschen}
         ansichtBusy={ansichtBusy}
+        ansichtFehler={ansichtGruendeImPaneel}
         auswahl={auswahlInhalt}
         zeichnenAnfrage={zeichnenAnfrage}
         /* Drei Sektionen, drei Ursachen. Der Slot an „Nicht verortet" hängt an denselben elf
@@ -1429,6 +1479,8 @@ export default function LagekartePage() {
             onZurueckAktuell={() => waehleSnapshot(null)}
           />
         )}
+        {/* Abgelehnte Kartenhandlungen (LFH-1077), im Fluss wie das Warn-Overlay darüber. */}
+        <KartenFehlerHinweis gruende={kartenGruende} onSchliessen={schliesseKartenGrund} />
         <div
           style={{
             display: 'flex',
@@ -1445,6 +1497,7 @@ export default function LagekartePage() {
           offen={zeichenHier != null}
           quelle={zeichenHier?.quelle ?? 'maus'}
           laeuft={zeichenAnPunktLaeuft}
+          speicherung={zeichenAnPunktSpeicherung}
           onSetzen={(spec) => {
             // Geschlossen wird nur der Dialog DIESER Stelle, nie ein später geöffneter.
             const punkt = zeichenHier;

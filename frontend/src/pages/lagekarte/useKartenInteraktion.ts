@@ -30,6 +30,7 @@ import type { ZeichenModus } from './zeichnen';
 import type { MessForm } from './messung';
 import type { PlatzierenPunktTyp } from './Sidebar';
 import { merkeZuletztVerwendet } from './zuletztVerwendet';
+import type { BeginneKartenHandlung } from './useKartenFehler';
 
 export type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
 type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
@@ -119,8 +120,16 @@ interface KartenInteraktionArgs {
   waehlbar: KarteMarker[];
   /** Aktive Ansicht: neu angelegte Objekte werden auf ihr gestempelt. */
   aktiveAnsichtId?: number;
-  /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
-  fehler: (e: unknown) => void;
+  /**
+   * Beginnt eine Handlung und liefert die Meldung ihrer Ablehnung für den Hinweis über der Karte
+   * (`useKartenFehler`, LFH-1077): kein Toast. Der Dialog „Zeichen hier setzen“ meldet in sich.
+   */
+  beginneHandlung: BeginneKartenHandlung;
+  /**
+   * Verwirft einen Grund (`useKartenFehler().verwirf`): wer Platzieren, Zeichen-Setzen oder
+   * Zonen-Zeichnen selbst beendet, gibt den Vorgang auf, und sein Grund geht mit.
+   */
+  verwirfHandlung: (schluessel: string) => void;
   /** Sichtbare fachliche Quittung nach serverseitig erfolgreicher Aktion. */
   erfolg: (text: string) => void;
   /**
@@ -140,7 +149,8 @@ export function useKartenInteraktion({
   darfSchreiben,
   waehlbar,
   aktiveAnsichtId,
-  fehler,
+  beginneHandlung,
+  verwirfHandlung,
   erfolg,
   warnung,
 }: KartenInteraktionArgs) {
@@ -280,7 +290,10 @@ export function useKartenInteraktion({
       }
       dispatch({ t: 'beenden', arten: ['platzieren'] });
     },
-    onError: fehler,
+    onMutate: () => ({
+      melde: beginneHandlung('verorten', 'Nicht verortet', 'Verorten fehlgeschlagen'),
+    }),
+    onError: (e, _v, kontext) => kontext?.melde(e),
     onSettled: () => {
       verortenLaeuft.current = false;
     },
@@ -310,31 +323,42 @@ export function useKartenInteraktion({
       if (zeichenSerie) setZeichenSerieAnzahl((n) => n + 1);
       else dispatch({ t: 'beenden', arten: ['zeichen'] });
     },
-    onError: fehler,
+    onMutate: () => ({
+      melde: beginneHandlung('zeichen-setzen', 'Zeichen nicht angelegt', 'Anlegen fehlgeschlagen'),
+    }),
+    onError: (e, _v, kontext) => kontext?.melde(e),
   });
 
   // Freies Zeichen an einer Stelle aus dem Kontextmenü (LFH-776, D7): ohne Platzier-Modus, sonst
-  // wie `legeZeichenMutation` (Ansicht, „zuletzt verwendet“, Invalidierung).
+  // wie `legeZeichenMutation` (Ansicht, „zuletzt verwendet“, Invalidierung). Eine Ablehnung steht
+  // im Dialog (`zeichenAnPunktSpeicherung`). Einsatz und Ansicht reisen mit: die Optionen der
+  // Mutation folgen dem jüngsten Render, ein Wechsel vor der Antwort verschöbe sonst beide.
   const zeichenAnPunktMutation = useMutation({
-    mutationFn: async (p: { spec: FreiesZeichenUpdate; lat: number; lon: number }) => {
-      await legeFreiesZeichenAn(einsatzId, {
+    mutationFn: async (p: {
+      einsatzId: number;
+      ansichtId: number | null;
+      spec: FreiesZeichenUpdate;
+      lat: number;
+      lon: number;
+    }) => {
+      await legeFreiesZeichenAn(p.einsatzId, {
         lat: p.lat,
         lon: p.lon,
         ...p.spec,
-        ansicht_id: aktiveAnsichtId ?? null,
+        ansicht_id: p.ansichtId,
       });
       return p.spec;
     },
-    onSuccess: (gesendet) => {
+    onSuccess: (gesendet, p) => {
       erfolg('Taktisches Zeichen angelegt');
       merkeZuletztVerwendet(gesendet);
-      qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(p.einsatzId) });
     },
-    onError: fehler,
     onSettled: () => {
       zeichenAnPunktLaeuftRef.current = false;
     },
   });
+  const zeichenAnPunktDiesesEinsatzes = zeichenAnPunktMutation.variables?.einsatzId === einsatzId;
   function legeZeichenAnPunkt(
     spec: FreiesZeichenUpdate,
     punkt: { lng: number; lat: number },
@@ -343,7 +367,7 @@ export function useKartenInteraktion({
     if (!darfSchreiben || zeichenAnPunktLaeuftRef.current) return;
     zeichenAnPunktLaeuftRef.current = true;
     zeichenAnPunktMutation.mutate(
-      { spec, lat: punkt.lat, lon: punkt.lng },
+      { einsatzId, ansichtId: aktiveAnsichtId ?? null, spec, lat: punkt.lat, lon: punkt.lng },
       nachErfolg ? { onSuccess: () => nachErfolg() } : undefined,
     );
   }
@@ -386,12 +410,17 @@ export function useKartenInteraktion({
   function loescheVerortung(marker: KarteMarker) {
     const vorgang = verortungLoeschenVorgang(marker);
     if (vorgang) {
+      const melde = beginneHandlung(
+        `objekt:${marker.schluessel}`,
+        `Verortung nicht gelöscht · ${marker.label}`,
+        'Löschen fehlgeschlagen',
+      );
       vorgang.aufruf
         .then(() => {
           erfolg('Verortung gelöscht');
           return Promise.all(vorgang.faecher.map((queryKey) => qc.invalidateQueries({ queryKey })));
         })
-        .catch(fehler);
+        .catch(melde);
     }
     setAuswahl(null);
   }
@@ -480,13 +509,17 @@ export function useKartenInteraktion({
       };
     }
     if (!vorgang) return;
+    const melde = beginneHandlung(
+      `objekt:${marker.schluessel}`,
+      `Symbol nicht gespeichert · ${marker.label}`,
+    );
     const { aufruf, fach } = vorgang;
     aufruf
       .then(() => {
         erfolg('Symbol gespeichert');
         return qc.invalidateQueries({ queryKey: fach });
       })
-      .catch(fehler);
+      .catch(melde);
   }
 
   // Bestätigungs-Phase persistieren: erst hier, nicht schon bei onZoneGezeichnet.
@@ -499,6 +532,7 @@ export function useKartenInteraktion({
       return;
     }
     dispatch({ t: 'zoneSpeichernStart' });
+    const melde = beginneHandlung('zone-anlegen', 'Zone nicht angelegt', 'Anlegen fehlgeschlagen');
     legeZoneAn(einsatzId, {
       typ: zu.typ,
       geometrie_typ: zu.geometrie.type,
@@ -518,7 +552,7 @@ export function useKartenInteraktion({
         ]).then(() => true);
       })
       .catch((e) => {
-        fehler(e);
+        melde(e);
         return false;
       })
       .then((erfolg) => {
@@ -547,8 +581,17 @@ export function useKartenInteraktion({
         }
       });
   };
+  /**
+   * Beendet den Zonen-Modus von Hand (Abbrechen, Fertig, Verwerfen) und räumt den Grund eines
+   * gescheiterten Anlegens: wer aufgibt, braucht ihn nicht mehr über der Karte. Die Ablehnung
+   * selbst beendet den Modus über `dispatch` und lässt ihn stehen.
+   */
+  const beendeZone = () => {
+    if (modusRef.current.art === 'zone') verwirfHandlung('zone-anlegen');
+    dispatch({ t: 'beenden', arten: ['zone'] });
+  };
   // Verwirft den Entwurf (stoppen() → clear()).
-  const bestaetigungVerwerfen = () => dispatch({ t: 'beenden', arten: ['zone'] });
+  const bestaetigungVerwerfen = beendeZone;
   // Erste Esc-Stufe in der Bestätigungsphase (LFH-712): die ungespeicherte Figur geht, der Modus
   // bleibt — derselbe Weg wie der Serienpfad (Fall `zone` + Nonce, damit die Karte `starten()`
   // ruft). Der Serienzähler bleibt. Während des Speicherns wirkungslos, weil die Promise-Kette
@@ -575,7 +618,10 @@ export function useKartenInteraktion({
     },
     [setAuswahl],
   );
-  const onPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['platzieren'] });
+  const onPlatzierenAbbrechen = () => {
+    if (modusRef.current.art === 'platzieren') verwirfHandlung('verorten');
+    dispatch({ t: 'beenden', arten: ['platzieren'] });
+  };
   const onAbschnittZeichnenStart = (id: number) => {
     dispatch({ t: 'abschnitt', id });
     setAuswahl(null);
@@ -595,7 +641,7 @@ export function useKartenInteraktion({
     [setZoneAuswahl, setAuswahl],
   );
   /** Beendet eine laufende Zonen-Serie — Vorbild: onBildPlatzierenFertig. */
-  const onZoneZeichnenFertig = () => dispatch({ t: 'beenden', arten: ['zone'] });
+  const onZoneZeichnenFertig = beendeZone;
   const onKoordinateEingeben = (lat: number, lon: number) => {
     if (darfSchreiben) verorten(lat, lon);
   };
@@ -609,9 +655,12 @@ export function useKartenInteraktion({
     setZeichenSerieAnzahl(0);
     setAuswahl(null);
   };
-  const onZeichenPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['zeichen'] });
+  const onZeichenPlatzierenAbbrechen = () => {
+    if (modusRef.current.art === 'zeichen') verwirfHandlung('zeichen-setzen');
+    dispatch({ t: 'beenden', arten: ['zeichen'] });
+  };
   /** Beendet eine laufende Zeichen-Serie — Vorbild: onBildPlatzierenFertig. */
-  const onZeichenPlatzierenFertig = () => dispatch({ t: 'beenden', arten: ['zeichen'] });
+  const onZeichenPlatzierenFertig = onZeichenPlatzierenAbbrechen;
   const onBildPlatzieren = (id: number) => {
     dispatch({ t: 'bild', id });
     setAuswahl(null);
@@ -646,12 +695,16 @@ export function useKartenInteraktion({
       return;
     }
     setAbschnittSpeichern(true);
+    const melde = beginneHandlung(
+      `objekt:abschnitt-${zeichneAbschnittId}`,
+      'Fläche nicht gespeichert',
+    );
     zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
       .then(() => {
         erfolg('Fläche gespeichert');
         return qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });
       })
-      .catch(fehler)
+      .catch(melde)
       .finally(() => {
         setAbschnittSpeichern(false);
         dispatch({ t: 'beenden', arten: ['abschnitt'] });
@@ -675,10 +728,14 @@ export function useKartenInteraktion({
     setSelektion({ art: 'fachebene', wert: { quelle, properties, geometrie } });
   };
   // ZeichnenSteuerung „Abbrechen" (Phase zeichnen): Entwurf + Abschnitt-Zeichnen verwerfen.
-  const onZeichnenAbbrechen = () => dispatch({ t: 'beenden', arten: ['zone', 'abschnitt'] });
+  const onZeichnenAbbrechen = () => {
+    if (modusRef.current.art === 'zone') verwirfHandlung('zone-anlegen');
+    dispatch({ t: 'beenden', arten: ['zone', 'abschnitt'] });
+  };
 
-  // Zonen-Inspector-CRUD.
+  // Zonen-Inspector-CRUD. Ändern und Aufheben teilen den Schlüssel der Zone, der letzte zählt.
   const zoneAendern = async (zoneId: number, patch: ZonePatch) => {
+    const melde = beginneHandlung(`zone:${zoneId}`, 'Zone nicht gespeichert');
     try {
       await aktualisiereZone(einsatzId, zoneId, patch);
       erfolg('Zone gespeichert');
@@ -687,47 +744,67 @@ export function useKartenInteraktion({
         qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
       ]);
     } catch (e) {
-      fehler(e);
+      melde(e);
       // Der Inspector braucht die Ablehnung, damit „speichert …" nicht fälschlich in „gespeichert"
-      // umspringt. Die sichtbare Fehlermeldung kommt weiterhin zentral.
+      // umspringt. Der Grund steht im Hinweis über der Karte.
       throw e;
     }
   };
-  const zoneLoeschen = (zoneId: number) =>
-    loescheZone(einsatzId, zoneId)
+  const zoneLoeschen = (zoneId: number) => {
+    const melde = beginneHandlung(
+      `zone:${zoneId}`,
+      'Zone nicht aufgehoben',
+      'Löschen fehlgeschlagen',
+    );
+    return loescheZone(einsatzId, zoneId)
       .then(() => {
         erfolg('Zone aufgehoben');
         setZoneAuswahl(null);
         qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
         return qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
       })
-      .catch(fehler);
+      .catch(melde);
+  };
 
   // Freies-Zeichen-Inspector-CRUD, Whole-Spec-Update (lat/lon unverändert). Jede quittiert erst
-  // nach erfolgreicher Antwort.
-  const zeichenAendern = (id: number, spec: FreiesZeichenUpdate) =>
-    aktualisiereFreiesZeichen(einsatzId, id, spec)
+  // nach erfolgreicher Antwort; die drei teilen den Schlüssel des Zeichens.
+  const zeichenAendern = (id: number, spec: FreiesZeichenUpdate) => {
+    const melde = beginneHandlung(`objekt:freies_zeichen-${id}`, 'Zeichen nicht gespeichert');
+    return aktualisiereFreiesZeichen(einsatzId, id, spec)
       .then(() => {
         erfolg('Taktisches Zeichen gespeichert');
         return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       })
-      .catch(fehler);
+      .catch(melde);
+  };
   // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch.
-  const zeichenVerschieben = (id: number, ansichtId: number | null) =>
-    verschiebeFreiesZeichen(einsatzId, id, ansichtId)
+  const zeichenVerschieben = (id: number, ansichtId: number | null) => {
+    const melde = beginneHandlung(
+      `objekt:freies_zeichen-${id}`,
+      'Zeichen nicht verschoben',
+      'Verschieben fehlgeschlagen',
+    );
+    return verschiebeFreiesZeichen(einsatzId, id, ansichtId)
       .then(() => {
         erfolg('Taktisches Zeichen verschoben');
         return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       })
-      .catch(fehler);
-  const zeichenLoeschen = (id: number) =>
-    loescheFreiesZeichen(einsatzId, id)
+      .catch(melde);
+  };
+  const zeichenLoeschen = (id: number) => {
+    const melde = beginneHandlung(
+      `objekt:freies_zeichen-${id}`,
+      'Zeichen nicht gelöscht',
+      'Löschen fehlgeschlagen',
+    );
+    return loescheFreiesZeichen(einsatzId, id)
       .then(() => {
         erfolg('Taktisches Zeichen gelöscht');
         setAuswahl(null);
         return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       })
-      .catch(fehler);
+      .catch(melde);
+  };
 
   return {
     // FSM-State (Display/Wiring).
@@ -746,7 +823,13 @@ export function useKartenInteraktion({
     messForm,
     messStart,
     exklusiverModusAktiv,
-    zeichenAnPunktLaeuft: zeichenAnPunktMutation.isPending,
+    // Für den Dialog „Zeichen hier setzen“: Lauf und Fehler nur des laufenden Einsatzes (LFH-1077).
+    zeichenAnPunktLaeuft: zeichenAnPunktDiesesEinsatzes && zeichenAnPunktMutation.isPending,
+    zeichenAnPunktSpeicherung: {
+      error: zeichenAnPunktDiesesEinsatzes ? zeichenAnPunktMutation.error : null,
+      isPending: zeichenAnPunktDiesesEinsatzes && zeichenAnPunktMutation.isPending,
+      reset: zeichenAnPunktMutation.reset,
+    },
     // Serienmodus.
     zeichenSerie,
     setZeichenSerie,
