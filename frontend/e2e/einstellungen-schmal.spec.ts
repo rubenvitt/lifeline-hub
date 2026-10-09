@@ -247,6 +247,8 @@ for (const [name, fenster] of [
 const HINWEIS_EINSTELLUNGEN = 'nur Einsatzleitung, Führungspersonal oder Org-Admin';
 const HINWEIS_FRIST = 'nur Einsatzleitung oder Org-Admin';
 const HINWEIS_MODULE = 'nur Einsatzleitung oder Org-Admin';
+/** Pegel schreibt über die Modul-Achse, nicht die Verwaltungsachse (LFH-1118). */
+const HINWEIS_PEGEL = 'nur Einsatzleitung und Führungspersonal';
 
 function rechteHinweis(p: Page, fragment: string) {
   return rechteHinweisZeile(p, fragment);
@@ -387,7 +389,7 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit Rechtehinw
   });
   await keinQuerlauf(page, `${basis}/pegel`, 'Maßgebliche Pegel', async (p) => {
     await expect(
-      rechteHinweis(p, HINWEIS_EINSTELLUNGEN),
+      rechteHinweis(p, HINWEIS_PEGEL),
       'Vorbedingung: der Rechtehinweis der Pegel-Sektion steht',
     ).toBeVisible();
     await expect(
