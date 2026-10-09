@@ -662,3 +662,57 @@ describe('EtbZeitachse – Dokumente mit ETB-Bezug (LFH-743)', () => {
     expect(z.querySelector('[data-lfh="etb-dokumente"]')).toBeNull();
   });
 });
+
+/**
+ * LFH-1056: Bei gesetztem Volltext markiert die Zeitachse, warum ein Eintrag dasteht — in Inhalt,
+ * Von, An und Veranlassung. Die Veranlassung steht sonst nicht in der Zeile; sie erscheint nur,
+ * wenn die Suche sie trifft.
+ */
+describe('EtbZeitachse — Fundstellen der Volltextsuche', () => {
+  const marken = (c: HTMLElement) => [...c.querySelectorAll('mark')].map((m) => m.textContent);
+
+  it('markiert Inhalt, Von und An', () => {
+    const { container } = renderZeitachse({
+      fundstellen: 'Deich Nord',
+      eintraege: [
+        eintrag({ inhalt: 'Deichbruch bei Hochdeich', von: 'EA Nord', an: 'Leitstelle' }),
+      ],
+    });
+    expect(marken(container)).toEqual(['Nord', 'Deich']);
+  });
+
+  it('zeigt eine getroffene Veranlassung mit Markierung', () => {
+    renderZeitachse({
+      fundstellen: 'brandschutz',
+      eintraege: [eintrag({ veranlassung: 'Brandschutz gestellt' })],
+    });
+    const zeile = screen.getByTestId('etb-ereigniszeile');
+    expect(zeile).toHaveTextContent('Veranlassung: Brandschutz gestellt');
+    expect(within(zeile).getByText('Brandschutz').tagName).toBe('MARK');
+  });
+
+  it('ohne Treffer in der Veranlassung bleibt sie weg', () => {
+    renderZeitachse({
+      fundstellen: 'lage',
+      eintraege: [eintrag({ veranlassung: 'Brandschutz gestellt' })],
+    });
+    expect(screen.getByTestId('etb-ereigniszeile')).not.toHaveTextContent('Veranlassung');
+  });
+
+  it('ohne Suchbegriff keine Markierung', () => {
+    const { container } = renderZeitachse({
+      eintraege: [eintrag({ inhalt: 'Deichbruch', veranlassung: 'Deich sichern' })],
+    });
+    expect(container.querySelector('mark')).toBeNull();
+    expect(container).not.toHaveTextContent('Veranlassung');
+  });
+
+  it('gepufferte Zeilen hat der Server nicht gefunden: keine Markierung', () => {
+    const { container } = renderZeitachse({
+      fundstellen: 'gesendet',
+      zeilen: baueZeilen({ eintraege: [], ausstehend: [ausstehend()], abgelehnt: [] }),
+    });
+    expect(container).toHaveTextContent('Noch nicht gesendet');
+    expect(container.querySelector('mark')).toBeNull();
+  });
+});

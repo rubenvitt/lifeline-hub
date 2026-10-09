@@ -28,6 +28,18 @@ body {
   transition: background-color 0.4s ease;
 }
 
+/* Fundstellen der Volltextsuche (LFH-1056, `components/Fundstellen.tsx`): Fläche `achtung` mit
+   Unterlinie, damit sie nicht wie die Deeplink-Hervorhebung oben (ganze Zeile, blau) aussieht.
+   Nachts trägt die Linie die Markierung, die Fläche hebt sich vom Paneel kaum ab
+   (`theme/fundstelleKontrast.test.ts`). Text erbt seine Farbe statt des Browser-Schwarz. */
+mark.lfh-fundstelle {
+  color: inherit;
+  background-color: var(--lfh-achtung-flaeche);
+  box-shadow: inset 0 -2px 0 var(--lfh-achtung);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 /* Fensterung der ETB-Zeitachse (LFH-947, design.md D6): Stundengruppen außerhalb des Bilds
    überspringt der Browser bei Layout und Malen. `auto` vor der Höhe merkt sich die zuletzt
    gemessene Höhe, die Bildlaufleiste springt auf dem Rückweg nicht. `scrollIntoView`
