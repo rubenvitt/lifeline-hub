@@ -1,3 +1,21 @@
+## [1.0.0-alpha.98](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.97...v1.0.0-alpha.98) (2026-10-09)
+
+### Wichtige Änderungen
+
+Keine Breaking Changes in diesem Release.
+
+### Betroffene
+
+Die neue **Gerätesicht für Betreuungsstellen** ermöglicht die dezentrale Arbeit direkt vor Ort: Tablets an der Betreuungsstelle können Betroffene aufnehmen, die aktuelle Belegung an die Führung melden und Meldungen austauschen. Aufgenommene Personen werden automatisch als „betroffen" erfasst und der Notunterkunft der jeweiligen Stelle zugeordnet. Die Betreuungsübersicht, der Meldeverlauf und die Belegungsmeldungen filtern nach der eigenen Stelle, sodass jede Betreuungsstelle nur ihre eigenen Betroffenen sieht und verwaltet.
+
+### Kommunikation
+
+Die **Fernmeldeskizze** nutzt nun alle Zeichen der @einsatzzeichen-Bibliothek: Bedingungszeichen, Sammelschienenführung, Leitungen und Stichleitungen (einschließlich Funk-Markierung und „geplant"-Kennzeichnung), Bereiche sowie die Verbindungsarten Melder, sonstige Verbindungen und Satellit werden normgerecht dargestellt. Die Zeichnung wurde vollständig auf die Kommunikationsskizze der Bibliothek umgestellt, sodass alle Zeichen einheitlich und normkonform erscheinen.
+
+### Betrieb und Installation
+
+Die Marketing-Website ist nun über **Cloudflare Pages** bereitgestellt und läuft unter dem Projekt „lifeline-hub". Die Dokumentation für Entwickler und Betreiber wurde entsprechend aktualisiert.
+
 ## [1.0.0-alpha.97](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.96...v1.0.0-alpha.97) (2026-10-09)
 
 ### Kommunikation
