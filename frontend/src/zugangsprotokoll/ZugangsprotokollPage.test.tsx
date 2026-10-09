@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { AnmeldeEintrag, BenutzerAnzeige, Zugangsaenderung } from '../api/types';
 import { ZUGANGSPROTOKOLL_SEITE } from '../api/zugangsprotokoll';
@@ -50,7 +50,16 @@ const ANMELDUNGEN: AnmeldeEintrag[] = [
 
 function Ort() {
   const { pathname, search } = useLocation();
-  return <output aria-label="Ort">{pathname + search}</output>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <output aria-label="Ort">{pathname + search}</output>
+      {/* Wie der Menüeintrag: dieselbe Seite ohne Filter. */}
+      <button type="button" onClick={() => navigate('/admin/zugangsprotokoll')}>
+        Menü
+      </button>
+    </>
+  );
 }
 
 /** Fängt die Abfragen beider Routen; liefert die gesehenen Suchparameter je Route. */
@@ -141,6 +150,28 @@ describe('ZugangsprotokollPage', () => {
       expect(gesehen.aenderungen.some((p) => p.get('konto') === 'marlene')).toBe(true),
     );
     expect(screen.getByLabelText('Ort')).toHaveTextContent('konto=marlene');
+  });
+
+  it('behält ein getipptes Konto über einen schnellen Spurwechsel', async () => {
+    const gesehen = zeige();
+    await within(await tabelle()).findByText('Rolle geändert');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Konto' }), {
+      target: { value: 'marlene' },
+    });
+    await userEvent.click(screen.getByRole('radio', { name: 'Anmeldungen' }));
+    await waitFor(() =>
+      expect(gesehen.anmeldungen.some((p) => p.get('konto') === 'marlene')).toBe(true),
+    );
+    expect(screen.getByLabelText('Ort')).toHaveTextContent('spur=anmeldungen');
+    expect(screen.getByRole('combobox', { name: 'Konto' })).toHaveValue('marlene');
+  });
+
+  it('leert das Kontofeld, wenn die Seite von außen ohne Filter geöffnet wird', async () => {
+    zeige(ME_ADMIN, '/admin/zugangsprotokoll?konto=marlene');
+    await within(await tabelle()).findByText('Rolle geändert');
+    expect(screen.getByRole('combobox', { name: 'Konto' })).toHaveValue('marlene');
+    await userEvent.click(screen.getByRole('button', { name: 'Menü' }));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Konto' })).toHaveValue(''));
   });
 
   it('lädt ältere Einträge über den Cursor der letzten Seite', async () => {

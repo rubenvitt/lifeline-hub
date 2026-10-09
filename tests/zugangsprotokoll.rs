@@ -136,6 +136,38 @@ async fn versuchter_name_ohne_konto_ist_filterbar() {
     assert_eq!(feld(&zeilen, "provider"), ["passwort", "passwort"]);
 }
 
+/// Die Abmeldung schreibt nur `benutzer_id`: ihr Name kommt aus dem Konto, gekürzt wie beim
+/// Schreiben, und der Kontofilter trifft sie.
+#[tokio::test]
+async fn abmeldung_ohne_namen_traegt_den_kontonamen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let lang = "l".repeat(70);
+    for name in ["bernd", lang.as_str()] {
+        benutzer_anlegen(&app, &admin, name, "keine").await;
+    }
+    let cookies = [
+        login_cookie(&app, "bernd", "berndpw1").await,
+        login_cookie(&app, &lang, &format!("{lang}pw1")).await,
+    ];
+    leeren(&pool).await;
+    for cookie in &cookies {
+        let (status, _) = anfrage(&app, "POST", "/api/auth/logout", cookie, None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+    }
+
+    let bernd = lesen(
+        &app,
+        &admin,
+        &format!("{ANMELDUNGEN}?konto=BERND&ereignis=logout"),
+    )
+    .await;
+    assert_eq!(feld(&bernd, "benutzername"), ["bernd"]);
+    let gekuerzt = format!("{}…", &lang[..64]);
+    let langer = lesen(&app, &admin, &format!("{ANMELDUNGEN}?konto={lang}")).await;
+    assert_eq!(feld(&langer, "benutzername"), [gekuerzt.as_str()]);
+}
+
 #[tokio::test]
 async fn anmeldespur_nach_ereignis_und_zeitraum() {
     let (app, pool) = setup_mit_pool().await;

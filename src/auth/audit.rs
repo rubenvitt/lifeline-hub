@@ -17,6 +17,7 @@
 //! eigene — [`AUFBEWAHRUNG_TAGE`], durchgesetzt von [`purge_abgelaufene`] im
 //! Purge-Scheduler.
 
+use crate::auth::benutzername;
 use crate::auth::spur::SpurFilter;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
@@ -121,15 +122,23 @@ pub struct AnmeldeEintragAnzeige {
 
 /// Liest die Anmeldespur, neueste zuerst. `konto` trifft den protokollierten Namen, auch einen
 /// versuchten, zu dem es kein Konto gibt.
+///
+/// Manche Ereignisse schreiben nur `benutzer_id` (Abmeldung, Code-Tausch, Gerätekopplung): ihr
+/// Name kommt aus dem Konto, gekürzt wie [`benutzername::fuer_protokoll`], damit Anzeige und
+/// Kontofilter sie wie jede andere Zeile behandeln.
 pub async fn liste(
     pool: &SqlitePool,
     filter: &SpurFilter,
     ereignis: Option<Ereignis>,
 ) -> Result<Vec<AnmeldeEintragAnzeige>, sqlx::Error> {
-    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
-        "SELECT id, zeitpunkt, ereignis, benutzername, benutzer_id, peer_ip, provider \
-         FROM auth_audit WHERE 1 = 1",
-    );
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(format!(
+        "SELECT * FROM (SELECT a.id, a.zeitpunkt, a.ereignis, \
+         COALESCE(a.benutzername, CASE WHEN length(b.benutzername) > {n} \
+           THEN substr(b.benutzername, 1, {n}) || '…' ELSE b.benutzername END) AS benutzername, \
+         a.benutzer_id, a.peer_ip, a.provider \
+         FROM auth_audit a LEFT JOIN benutzer b ON b.id = a.benutzer_id) WHERE 1 = 1",
+        n = benutzername::PROTOKOLL_LAENGE
+    ));
     if let Some(ereignis) = ereignis {
         qb.push(" AND ereignis = ");
         qb.push_bind(ereignis.as_str());

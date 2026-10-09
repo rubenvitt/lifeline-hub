@@ -118,7 +118,8 @@ nach Zeitraum, Konto und Ereignis bzw. Aktion, neueste zuerst. Dahinter stehen
 `GET /api/zugangsprotokoll/zugangsaenderungen` und `GET /api/zugangsprotokoll/anmeldungen`
 (Parameter `von`, `bis`, `konto`, `aktion` bzw. `ereignis`, `vor_id`, `limit`). Andere Rollen
 bekommen `403`. Der Kontofilter vergleicht ohne Groß-/Kleinschreibung und trifft in der Admin-Spur
-die handelnde Person und das Zielkonto. **Das Lesen schreibt keine Spur.**
+die handelnde Person und das Zielkonto. Zeilen der Anmeldespur ohne Namen (Abmeldung) zeigen den
+Namen des Kontos aus `benutzer_id` und sind so auch filterbar. **Das Lesen schreibt keine Spur.**
 
 **Prüfpunkte für den Betreiber (keine Rechtsberatung).** Die Spuren sind personenbezogen, die
 Admin-Spur ist ein Protokoll über Handlungen von Personen mit Admin-Rechten. Vor Inbetriebnahme

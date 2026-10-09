@@ -15,7 +15,7 @@ use std::borrow::Cow;
 pub const MAX_LAENGE: usize = 128;
 
 /// So viele Zeichen eines Namens gehen höchstens in `auth_audit` und Log-Felder.
-const PROTOKOLL_LAENGE: usize = 64;
+pub const PROTOKOLL_LAENGE: usize = 64;
 
 /// Schneidet Randleerzeichen ab und weist einen Namen über [`MAX_LAENGE`] Zeichen mit 400 ab.
 /// Ein leerer Name ist hier kein Fehler: der Login behandelt ihn wie einen unbekannten Namen,

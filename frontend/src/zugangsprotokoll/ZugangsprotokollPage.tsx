@@ -194,8 +194,8 @@ const AENDERUNGS_KARTE: Kartenplan<Zugangsaenderung, (typeof aenderungsSpalten)[
 
 /**
  * Filterleiste: Zeitraum, Konto, Ereignis bzw. Aktion. Zeiten und Auswahl melden sofort, das
- * Kontofeld entprellt (die Seite schreibt jede Meldung in die URL). Die Seite setzt die Leiste
- * je Spur per `key` neu auf; der Anfangsstand kommt aus der URL.
+ * Kontofeld entprellt (die Seite schreibt jede Meldung in die URL). Nur das Kontofeld hält
+ * einen eigenen Stand; ihn setzt die Seite bei fremder Änderung der URL per `key` neu auf.
  */
 function Filterleiste({
   filter,
@@ -356,8 +356,41 @@ function ZugangsprotokollInhalt() {
   const filter = useMemo(() => parseZugangsprotokollFilter(suchparameter), [suchparameter]);
   const { spur } = filter;
 
-  const setzeFilter = (teil: Partial<SeitenFilter>) =>
-    setSuchparameter(alsSuchparameter({ ...filter, ...teil }), { replace: true });
+  /**
+   * Zählmarke, die die Filterleiste neu aufsetzt, wenn die URL von außen kommt (Menüeintrag,
+   * Zurück-Taste) — sonst bliebe ein getipptes Konto über einer ungefilterten Liste stehen. Eine
+   * eigene Änderung setzt sie nicht neu auf (der Remount nähme dem Kontofeld den Fokus). Muster
+   * und Begründung der Folgerunde: `pages/EtbPage.tsx`.
+   */
+  const filterText = suchparameter.toString();
+  const [filterMarke, setFilterMarke] = useState(0);
+  const eigeneFilteraenderung = useRef(false);
+  const vorigerFilterText = useRef(filterText);
+  useEffect(() => {
+    if (vorigerFilterText.current === filterText) return;
+    vorigerFilterText.current = filterText;
+    if (eigeneFilteraenderung.current) {
+      eigeneFilteraenderung.current = false;
+      return;
+    }
+    setFilterMarke((m) => m + 1);
+  }, [filterText]);
+
+  /** Der aktuelle Filter für die entprellte Kontomeldung, die sonst einen alten Stand sähe. */
+  const filterRef = useRef(filter);
+  useEffect(() => {
+    filterRef.current = filter;
+  }, [filter]);
+
+  const setzeFilter = (teil: Partial<SeitenFilter>) => {
+    const zusammen = { ...filterRef.current, ...teil };
+    // Sofort nachführen: zwei Meldungen vor dem nächsten Render verlören sonst die erste.
+    filterRef.current = zusammen;
+    const neu = alsSuchparameter(zusammen);
+    if (neu.toString() === vorigerFilterText.current) return;
+    eigeneFilteraenderung.current = true;
+    setSuchparameter(neu, { replace: true });
+  };
 
   const gemeinsam = { von: filter.von, bis: filter.bis, konto: filter.konto };
   const anmeldeFilter = { ...gemeinsam, ereignis: filter.ereignis };
@@ -386,7 +419,7 @@ function ZugangsprotokollInhalt() {
         optionen={SPUREN}
         style={{ marginBottom: token.marginSM }}
       />
-      <Filterleiste key={spur} filter={filter} onChange={setzeFilter} />
+      <Filterleiste key={filterMarke} filter={filter} onChange={setzeFilter} />
       {spur === 'anmeldungen' ? (
         <SpurSicht
           kette={anmeldungen}
