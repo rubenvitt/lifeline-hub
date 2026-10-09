@@ -2161,7 +2161,7 @@ export interface components {
             /**
              * @description Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
              *     Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
-             *     Fahrzeuge (LFH-1106, design.md D2).
+             *     Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
              */
             fahrzeug_ids: number[];
             /** @description Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`). */

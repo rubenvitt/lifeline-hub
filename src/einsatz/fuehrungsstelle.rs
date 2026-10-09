@@ -32,7 +32,7 @@ pub struct FuehrungsstelleAnzeige {
     pub erreichbarkeit: Option<String>,
     /// Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
     /// Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
-    /// Fahrzeuge (LFH-1106, design.md D2).
+    /// Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
     pub fahrzeug_ids: Vec<i64>,
 }
 
@@ -76,6 +76,21 @@ pub async fn pruefe_fahrzeuge(
         )));
     }
     Ok(())
+}
+
+/// Trägt die Dispositionszeile die Führungsstelle? Wer sie löscht, fragt vorher: die Kaskade
+/// (Migration 0168) löst die Zuordnung still, das Ereignis `einsatz` muss der Aufrufer melden.
+pub async fn traegt_fahrzeug_tx(
+    conn: &mut SqliteConnection,
+    einsatz_fahrzeug_id: i64,
+) -> Result<bool, AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_fuehrungsstelle_fahrzeug WHERE einsatz_fahrzeug_id = ?",
+    )
+    .bind(einsatz_fahrzeug_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(treffer.is_some())
 }
 
 fn ids_json(ids: &[i64]) -> Result<String, AppError> {

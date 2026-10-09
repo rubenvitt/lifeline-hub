@@ -5770,7 +5770,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "description": "Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.\nNur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul\nFahrzeuge (LFH-1106, design.md D2)."
+            "description": "Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.\nNur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul\nFahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“)."
           },
           "kommunikationsmittel": {
             "type": [

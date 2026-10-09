@@ -470,6 +470,41 @@ async fn entlassen_loest_die_zuordnung() {
 }
 
 #[tokio::test]
+async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let elw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/1").await;
+    let mtw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 19/1").await;
+    let (status, _) = patchen(&app, &admin, einsatz, json!({"fahrzeug_ids": [elw]})).await;
+    assert_eq!(status, StatusCode::OK);
+    let mut rx = live.abonniere(einsatz);
+
+    let entlassen = |ef: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "DELETE",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &admin,
+                None,
+            )
+            .await
+            .0
+        }
+    };
+    assert_eq!(entlassen(mtw).await, StatusCode::NO_CONTENT);
+    assert_eq!(kopf_events(&mut rx), 0, "ohne Zuordnung kein Kopf-Ereignis");
+    assert_eq!(entlassen(elw).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        kopf_events(&mut rx),
+        1,
+        "die Führungsstelle hat sich geändert"
+    );
+}
+
+#[tokio::test]
 async fn beobachter_darf_fahrzeuge_nicht_zuordnen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
