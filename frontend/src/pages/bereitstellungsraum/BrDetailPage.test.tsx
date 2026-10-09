@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
@@ -11,6 +11,7 @@ import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
 import { einsatzFixture } from '../../test/fixtures';
+import { einsatzKeys } from '../../api/queryKeys';
 
 // `BrSwitcher` feuert eine eigene `listeBr`-Query ohne MSW-Handler (`onUnhandledRequest: 'error'`);
 // diese Datei testet die Seiten-Komposition, nicht den Switcher.
@@ -101,7 +102,7 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
   };
 }
 
-function renderBrDetail(brId = 1) {
+function renderBrDetail(brId = 1): QueryClient {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
     <QueryClientProvider client={qc}>
@@ -116,6 +117,7 @@ function renderBrDetail(brId = 1) {
       </AntApp>
     </QueryClientProvider>,
   );
+  return qc;
 }
 
 function renderBrBei(route: string) {
@@ -537,5 +539,157 @@ describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     expect(aufrufe).toEqual([]);
     await userEvent.click(ok);
     await waitFor(() => expect(aufrufe).toEqual(['storno']));
+  });
+});
+
+describe('BrDetailPage — Belegung springt nicht unter dem Zeiger (LFH-1113)', () => {
+  const alpha = { id: 10, name: 'Einheit Alpha' };
+  const aachen = { id: 11, name: 'Einheit Aachen' };
+
+  /** Der BR liefert, was `stand.br` gerade trägt — eine Live-Invalidierung holt den neuen Stand. */
+  function stelleBereit(stand: { br: BrDetail }, einheiten: Einheit[] = []) {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+  }
+
+  /** Die Live-Invalidierung `bereitstellungsraum`, wie sie der Ereignisstrom auslöst. */
+  async function liveInvalidierung(qc: QueryClient) {
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(1, 1) }));
+  }
+
+  it('fremde Anmeldung bei gehaltenem Zeiger: keine eingeschobene Zeile, sie erscheint nach dem Banner', async () => {
+    const stand = { br: brDetail({ einheiten: [alpha] }) };
+    stelleBereit(stand);
+    const qc = renderBrDetail();
+    expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
+
+    fireEvent.pointerMove(screen.getByTestId('br-belegung'), { pointerType: 'mouse' });
+    // „Aachen“ steht in der festen Folge VOR „Alpha“ — eingeschoben, rutschte „Alpha“ weg.
+    stand.br = brDetail({ einheiten: [alpha, aachen] });
+    await liveInvalidierung(qc);
+
+    const banner = await screen.findByRole('button', { name: '1 neu anzeigen' });
+    expect(screen.queryByText('Einheit Aachen')).not.toBeInTheDocument();
+    expect(screen.getByText('1 neue Einheit')).toBeInTheDocument();
+
+    await userEvent.click(banner);
+    const neu = await screen.findByText('Einheit Aachen');
+    expect(
+      neu.compareDocumentPosition(screen.getByText('Einheit Alpha')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '1 neu anzeigen' })).not.toBeInTheDocument();
+  });
+
+  it('Fokus in der Liste hält ebenso; nach dem Verlassen erscheint der Zuwachs', async () => {
+    const stand = { br: brDetail({ einheiten: [alpha] }) };
+    stelleBereit(stand);
+    const qc = renderBrDetail();
+    const entfernen = await screen.findByRole('button', { name: 'entfernen' });
+
+    act(() => entfernen.focus());
+    stand.br = brDetail({ einheiten: [alpha, aachen] });
+    await liveInvalidierung(qc);
+    const banner = await screen.findByRole('button', { name: '1 neu anzeigen' });
+    expect(screen.queryByText('Einheit Aachen')).not.toBeInTheDocument();
+
+    // Der Sprung zum Nachbarknopf derselben Fläche ist kein Verlassen.
+    act(() => banner.focus());
+    expect(screen.queryByText('Einheit Aachen')).not.toBeInTheDocument();
+
+    act(() => banner.blur());
+    expect(await screen.findByText('Einheit Aachen')).toBeInTheDocument();
+  });
+
+  it('ohne Zeiger und Fokus erscheint eine fremde Anmeldung sofort, in fester Reihenfolge', async () => {
+    // Der Server liefert ohne Ordnung; die Liste ordnet nach dem Namen.
+    const stand = { br: brDetail({ einheiten: [alpha, aachen] }) };
+    stelleBereit(stand);
+    renderBrDetail();
+    const neu = await screen.findByText('Einheit Aachen');
+    expect(
+      neu.compareDocumentPosition(screen.getByText('Einheit Alpha')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /neu anzeigen/ })).not.toBeInTheDocument();
+  });
+
+  it('Touch hält nicht: ein Tipp betritt und verlässt die Liste', async () => {
+    const stand = { br: brDetail({ einheiten: [alpha] }) };
+    stelleBereit(stand);
+    const qc = renderBrDetail();
+    await screen.findByText('Einheit Alpha');
+
+    fireEvent.pointerMove(screen.getByTestId('br-belegung'), { pointerType: 'touch' });
+    stand.br = brDetail({ einheiten: [alpha, aachen] });
+    await liveInvalidierung(qc);
+    expect(await screen.findByText('Einheit Aachen')).toBeInTheDocument();
+  });
+
+  it('eigene Anmeldung erscheint sofort, auch bei gehaltenem Zeiger', async () => {
+    const beta = einheit({ id: 30, name: 'Einheit Beta' });
+    const stand = { br: brDetail({ einheiten: [alpha] }) };
+    stelleBereit(stand, [beta]);
+    server.use(
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', () => {
+        stand.br = brDetail({ einheiten: [alpha, { id: 30, name: 'Einheit Beta' }] });
+        return HttpResponse.json({
+          id: 3,
+          einsatz_id: 1,
+          br_id: 1,
+          objekt_typ: 'einheit',
+          objekt_id: 30,
+          art: 'eintritt',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
+        });
+      }),
+    );
+    renderBrDetail();
+    await screen.findByText('Einheit Alpha');
+    const liste = screen.getByTestId('br-belegung');
+
+    fireEvent.pointerMove(liste, { pointerType: 'mouse' });
+    // `fireEvent` statt `userEvent`: der Zeiger bleibt dabei in der Liste.
+    fireEvent.click(await screen.findByRole('button', { name: 'Einheit Beta zuweisen' }));
+
+    expect(await within(liste).findByText('Einheit Beta')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /neu anzeigen/ })).not.toBeInTheDocument();
+  });
+
+  it('fremde Abmeldung fällt auch bei gehaltenem Zeiger sofort weg', async () => {
+    const stand = { br: brDetail({ einheiten: [alpha, aachen] }) };
+    stelleBereit(stand);
+    const qc = renderBrDetail();
+    await screen.findByText('Einheit Aachen');
+
+    fireEvent.pointerMove(screen.getByTestId('br-belegung'), { pointerType: 'mouse' });
+    stand.br = brDetail({ einheiten: [alpha] });
+    await liveInvalidierung(qc);
+    await waitFor(() => expect(screen.queryByText('Einheit Aachen')).not.toBeInTheDocument());
+    expect(screen.getByText('Einheit Alpha')).toBeInTheDocument();
+  });
+
+  it('Fahrzeuge: das Banner nennt das neue Fahrzeug', async () => {
+    const stand = { br: brDetail({ fahrzeuge: [{ id: 20, funkrufname: 'Florian 2' }] }) };
+    stelleBereit(stand);
+    const qc = renderBrDetail();
+    await screen.findByText('Florian 2');
+
+    fireEvent.pointerMove(screen.getByTestId('br-belegung'), { pointerType: 'mouse' });
+    stand.br = brDetail({
+      fahrzeuge: [
+        { id: 20, funkrufname: 'Florian 2' },
+        { id: 21, funkrufname: 'Florian 1' },
+      ],
+    });
+    await liveInvalidierung(qc);
+    expect(await screen.findByText('1 neues Fahrzeug')).toBeInTheDocument();
+    expect(screen.queryByText('Florian 1')).not.toBeInTheDocument();
   });
 });
