@@ -23,6 +23,20 @@ async function seedeEinheit(page: Page): Promise<{ einsatzId: string; einheitId:
   return { einsatzId, einheitId: ((await einheit.json()) as { id: number }).id };
 }
 
+/**
+ * Klickt eine Option erst, wenn die Auswahlliste fertig eingeblendet ist (LFH-1058). Während der
+ * Einblendung nimmt die Liste keine Zeigerereignisse an; Playwright versucht es dann mit anderen
+ * Scroll-Lagen und scrollt dabei das Dokument hinter dem Dialog. Die Liste steht absolut im
+ * Dokument und wandert mit, bis antd sie nach dem Scrollen neu anlegt — kam das zwischen
+ * `mousedown` und `mouseup`, landete der Klick auf `body`, und das Ereignis blieb leer.
+ */
+async function waehleStehend(page: Page, titel: string) {
+  const liste = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  await expect(liste).toBeVisible();
+  await expect(liste).not.toHaveClass(/ant-slide-up-(appear|enter)/);
+  await liste.locator(`[title="${titel}"]`).click();
+}
+
 function zeitachsePaneel(page: Page) {
   return page
     .getByRole('main')
@@ -50,9 +64,9 @@ test('Nachtrag an der Einheit wird zur Einsatzdauer im Meldebild — Schreib- un
   await paneel.getByRole('button', { name: 'Nachtragen' }).click();
   const dialog = page.getByRole('dialog', { name: /Zeitachse nachtragen/ });
   await dialog.getByRole('combobox', { name: 'Ereignis' }).click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) [title="Eintreffen"]')
-    .click();
+  await waehleStehend(page, 'Eintreffen');
+  // Vorbedingung: ein verlorener Klick wird hier rot, nicht erst als offener Dialog.
+  await expect(dialog.getByTitle('Eintreffen', { exact: true })).toBeVisible();
   // Der Zeitpunkt ist mit „jetzt" vorbelegt.
   await dialog.getByRole('button', { name: 'Nachtragen' }).click();
   await expect(dialog).toBeHidden();
