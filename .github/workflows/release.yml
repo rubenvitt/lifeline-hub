@@ -1,4 +1,5 @@
-# Release — ermittelt die Version, bumpt, taggt, legt das Release an.
+# Release — ermittelt die Version, bumpt, taggt, legt das Release als ENTWURF an und startet
+# `artefakte.yml`, das ihn nach grünem Bau aller Plattformen veröffentlicht (LFH-1054).
 #
 # WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: ci.yml ruft ihn nach grünem Gate und nur bei einem
 # Push. `workflow_call` statt `workflow_run`, weil semantic-release den Branch über env-ci aus
@@ -30,6 +31,11 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # `actions: write` nur für den Start von artefakte.yml (letzter Schritt). Der Aufrufer in
+    # ci.yml muss es ebenfalls gewähren, sonst kappt GitHub es still.
+    permissions:
+      contents: read
+      actions: write
     # Hängt am Ruhefenster: dessen Deckel steht bei 30 Minuten, die Release-Arbeit braucht rund
     # zehn. Ein kürzerer Timeout schnitte einen wartenden Lauf womöglich MITTEN im Release ab.
     # Wer den Deckel hebt, hebt diese Zahl mit.
@@ -50,15 +56,15 @@ jobs:
             echo "bereit=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Der Token kommt aus einer GitHub App: mit GITHUB_TOKEN erzeugte Pushes lösen KEINE
-      # weiteren Workflows aus (das `release: published`-Ereignis für die Artefakte käme nie
-      # an), und ein PAT läuft ab und hängt an einer Person.
+      # Der Token für Versions-Commit, Tag und Entwurf kommt aus einer GitHub App: ein PAT läuft
+      # ab und hängt an einer Person.
       #
-      # Die App braucht `Contents: Read & Write` (Versions-Commit und Tag), `Issues: Read &
-      # Write` (Kommentar an den enthaltenen PRs) und `Pull requests: Read`. Das
-      # `permissions:` oben gilt nur für GITHUB_TOKEN. Bewusst nicht per `permission-*`
-      # eingeengt: fehlte der App eine angeforderte Berechtigung, bräche der ganze Release
-      # statt nur des Kommentars (Fehlermodus bei SUCCESS_COMMENT_TEMPLATE in release.config.mjs).
+      # Die App braucht `Contents: Read & Write` (Versions-Commit, Tag, Entwurf). Die Kommentare
+      # an den enthaltenen PRs schreibt seit LFH-1054 nicht mehr semantic-release, sondern der
+      # Job `freigeben` in artefakte.yml mit GITHUB_TOKEN; dafür braucht die App `Issues` und
+      # `Pull requests` nicht mehr. Das `permissions:` oben gilt nur für GITHUB_TOKEN. Bewusst
+      # nicht per `permission-*` eingeengt: fehlte der App eine angeforderte Berechtigung, bräche
+      # der ganze Release.
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         if: steps.bereit.outputs.bereit == 'true'
@@ -109,6 +115,7 @@ jobs:
         run: mise exec -- pnpm install --frozen-lockfile
 
       - name: semantic-release
+        id: semrel
         if: steps.fenster.outputs.freigabe == 'true'
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -119,3 +126,22 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         # Unter `mise exec`, weil der prepareCmd `pnpm` auf dem PATH braucht.
         run: mise exec -- pnpm exec semantic-release
+
+      # EIN ENTWURF LÖST KEIN `release`-EREIGNIS AUS — die Artefakte startet deshalb dieser
+      # Schritt. Das Tag schreibt der `successCmd` von @semantic-release/exec (release.config.mjs);
+      # fehlt es, gab es nichts zu releasen. Mit GITHUB_TOKEN: `workflow_dispatch` ist die
+      # dokumentierte Ausnahme, die auch mit ihm einen Lauf startet; das App-Token bräuchte ein
+      # weiteres Recht. `--ref` ist das Tag: der Workflow läuft im Stand des Releases.
+      #
+      # SCHEITERT DIESER SCHRITT, liegt ein Entwurf ohne Bau da. Abhilfe: artefakte.yml von Hand
+      # mit dem Tag und `freigeben` starten (docs/betrieb/desktop-app.md, „Release-Ablauf“).
+      - name: Artefakte starten
+        if: steps.semrel.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.semrel.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh workflow run artefakte.yml --ref "$TAG" -f tag="$TAG" -f freigeben=true
+          echo "::notice::Release $TAG als Entwurf angelegt; artefakte.yml veröffentlicht ihn nach grünem Bau."

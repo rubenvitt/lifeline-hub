@@ -3,23 +3,37 @@
 # zusätzlich die Desktop-Hülle (LFH-721): Pakete für macOS arm64 und Windows x64 plus das
 # Update-Manifest latest.json, das installierte Hüllen über …/releases/latest/download/ lesen.
 #
-# Hängt am fertigen Release, nicht am Release-Lauf: so lassen sich die Artefakte eines
-# bestehenden Releases per workflow_dispatch nachbauen, ohne die Version neu zu ermitteln.
+# EIN RELEASE WIRD ERST HIER VERÖFFENTLICHT (LFH-1054). semantic-release legt es als Entwurf an
+# und startet diesen Workflow mit `freigeben: true` (letzter Schritt in release.yml). Der Job
+# `freigeben` veröffentlicht nur, wenn ALLE Bau-, Smoke-, Abbild- und Upload-Jobs grün sind;
+# danach `latest` an den Abbildern, PR-Kommentare und das Deployment. Bleibt ein Job rot, bleibt
+# das Release Entwurf, Tag und Versions-Commit bleiben, die Nummer ist verbraucht. Nach einer
+# vorübergehenden Störung (Runner, Apple) führt „Re-run failed jobs“ bis zur Veröffentlichung.
+#
+# Eigener Lauf statt Teil des Release-Laufs: so lassen sich die Artefakte eines bestehenden
+# Releases per workflow_dispatch nachbauen, ohne die Version neu zu ermitteln, und der bis zu
+# 90 Minuten lange Bau hält die Nebenläufigkeitsgruppe der CI nicht fest. Ein Nachbau ohne
+# `freigeben` veröffentlicht nichts und rollt nichts aus.
 #
 # Die Windows-Binary entsteht als CROSS-BUILD auf dem Linux-Runner (MinGW-w64); die .exe
 # linkt nur gegen Windows-System-DLLs. Der Windows-Runner trägt stattdessen den Smoke-Test —
 # er belegt, dass die Datei auf der Zielplattform startet.
 name: Artefakte
 
+# KEIN `release: published` mehr: ein Entwurf löst kein Ereignis aus, und das Veröffentlichen
+# übernimmt dieser Workflow selbst.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
         description: 'Release-Tag, dessen Artefakte (neu) gebaut werden sollen, z. B. v0.2.0'
         required: true
         type: string
+      freigeben:
+        description: 'Nach grünem Bau veröffentlichen, kommentieren und (alpha) ausrollen — setzt release.yml; von Hand nur für einen liegengebliebenen Entwurf'
+        required: false
+        type: boolean
+        default: false
       desktop:
         description: 'Desktop-Hülle auch für eine Vorabversion bauen (Prüflauf vor dem ersten stabilen Release)'
         required: false
@@ -30,7 +44,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: artefakte-${{ github.event.release.tag_name || inputs.tag }}
+  group: artefakte-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -44,10 +58,11 @@ jobs:
       tag: ${{ steps.pruefen.outputs.tag }}
       version: ${{ steps.pruefen.outputs.version }}
       desktop: ${{ steps.pruefen.outputs.desktop }}
+      vorab: ${{ steps.pruefen.outputs.vorab }}
     steps:
       - id: pruefen
         env:
-          ROH_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          ROH_TAG: ${{ inputs.tag }}
           DESKTOP_ERZWUNGEN: ${{ inputs.desktop || false }}
         run: |
           set -euo pipefail
@@ -57,9 +72,15 @@ jobs:
           fi
           echo "tag=$ROH_TAG" >> "$GITHUB_OUTPUT"
           echo "version=${ROH_TAG#v}" >> "$GITHUB_OUTPUT"
+          # Vorabversion ja/nein am Tag, nicht an github.event.release.prerelease: Ereignis gibt
+          # es keins mehr (LFH-1054), und beim Dispatch war es schon immer leer.
+          if [ "${ROH_TAG#*-}" = "$ROH_TAG" ]; then
+            echo "vorab=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "vorab=true" >> "$GITHUB_OUTPUT"
+          fi
           # Die Desktop-Hülle hat EINEN Kanal, den stabilen (Entscheidung 25.09.2026): gebaut
-          # wird bei einem Tag ohne Vorabkennung — oder per Dispatch ausdrücklich. Bewusst am
-          # Tag entschieden, nicht an github.event.release.prerelease: das ist beim Dispatch leer.
+          # wird bei einem Tag ohne Vorabkennung — oder per Dispatch ausdrücklich.
           if [ "${ROH_TAG#*-}" = "$ROH_TAG" ] || [ "$DESKTOP_ERZWUNGEN" = "true" ]; then
             echo "desktop=true" >> "$GITHUB_OUTPUT"
           else
@@ -277,7 +298,8 @@ jobs:
   # ── Desktop-Hülle (LFH-721) ─────────────────────────────────────────────────────────
   # Nativ je Plattform: die NSIS-Bündelung und WebView2 laufen auf dem Windows-Runner, nicht
   # als Cross-Build wie die Server-Binary. Hängt nur an `vorbereiten`, nie an `bauen` — ein
-  # roter Server-Build hält die Hülle nicht auf und umgekehrt. Kein MSI: MSI nimmt keine
+  # roter Server-Build hält den Bau der Hülle nicht auf und umgekehrt; veröffentlicht wird das
+  # Release trotzdem erst, wenn beide grün sind (Job `freigeben`). Kein MSI: MSI nimmt keine
   # Vorabversion an, und Prüfläufe per Dispatch tragen eine.
   desktop:
     name: ${{ matrix.name }}
@@ -598,22 +620,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # `latest` nur für stabile Releases: ein Prerelease darf den Tag nicht übernehmen, den
-      # ein `docker pull` ohne Angabe zieht. Die Kanal-Tags (beta/alpha) entstehen erst, wenn
-      # es die Branches gibt — bis dahin ist der Ausdruck schlicht leer.
-      - name: Abbild-Tags bestimmen
+      # Nur die Version: `latest` (das zieht ein `docker pull` ohne Angabe) setzt erst der Job
+      # `freigeben`, wenn das stabile Release wirklich veröffentlicht ist (LFH-1054).
+      - name: Abbild-Tag bestimmen
         id: tags
         env:
           VERSION: ${{ needs.vorbereiten.outputs.version }}
-          IST_VORAB: ${{ github.event.release.prerelease || false }}
-        run: |
-          set -euo pipefail
-          bild="ghcr.io/${GITHUB_REPOSITORY,,}"
-          tags="$bild:$VERSION"
-          if [ "$IST_VORAB" != "true" ]; then
-            tags="$tags,$bild:latest"
-          fi
-          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+        run: echo "tags=ghcr.io/${GITHUB_REPOSITORY,,}:$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -676,19 +689,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Abbild-Tags bestimmen
+      # Wie beim Hauptabbild: `latest` erst nach der Freigabe.
+      - name: Abbild-Tag bestimmen
         id: tags
         env:
           VERSION: ${{ needs.vorbereiten.outputs.version }}
-          IST_VORAB: ${{ github.event.release.prerelease || false }}
-        run: |
-          set -euo pipefail
-          bild="ghcr.io/${GITHUB_REPOSITORY,,}-karten-service"
-          tags="$bild:$VERSION"
-          if [ "$IST_VORAB" != "true" ]; then
-            tags="$tags,$bild:latest"
-          fi
-          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+        run: echo "tags=ghcr.io/${GITHUB_REPOSITORY,,}-karten-service:$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -710,14 +716,116 @@ jobs:
           docker run --rm --platform linux/amd64 "$bild" --help > /dev/null
           docker run --rm --platform linux/amd64 --entrypoint sh "$bild" -c 'docker --version && make --version > /dev/null && sqlite3 --version > /dev/null'
 
+  # ── Freigabe (LFH-1054) ───────────────────────────────────────────────────────────
+  # Der einzige Weg zu einem veröffentlichten Release. `!cancelled()` plus Einzelprüfung statt
+  # der Vorgabe „alle needs grün“, weil die Desktop-Jobs bei Vorabversionen `skipped` sind.
+  # `desktop` steht eigens in `needs`: `desktop-veroeffentlichen` läuft mit `!cancelled()` und
+  # wird auch grün, wenn eine Plattform fehlt — dann hinge ein Teilmanifest am Release.
+  # Jeder Schritt ist wiederholbar: schon veröffentlicht, `latest` schon gesetzt, Kommentar schon
+  # da — alles kein Fehler.
+  freigeben:
+    name: Release freigeben
+    needs: [vorbereiten, bauen, windows-smoke, veroeffentlichen, desktop, desktop-veroeffentlichen, docker, docker-karten]
+    if: >-
+      ${{ !cancelled() && inputs.freigeben
+      && needs.vorbereiten.result == 'success'
+      && needs.bauen.result == 'success'
+      && needs.windows-smoke.result == 'success'
+      && needs.veroeffentlichen.result == 'success'
+      && needs.docker.result == 'success'
+      && needs.docker-karten.result == 'success'
+      && (needs.vorbereiten.outputs.desktop != 'true'
+          || (needs.desktop.result == 'success' && needs.desktop-veroeffentlichen.result == 'success')) }}
+    runs-on: ubuntu-latest
+    # Das erste stabile Release kommentiert die ganze Historie; die Kommentare laufen der Reihe
+    # nach und warten bei GitHubs Ratenbegrenzung.
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Veröffentlichen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.vorbereiten.outputs.tag }}
+          VORAB: ${{ needs.vorbereiten.outputs.vorab }}
+        run: |
+          set -euo pipefail
+          # `gh release view/edit` finden einen Entwurf über sein ausstehendes Tag.
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+            echo "::notice::$TAG ist schon veröffentlicht."
+            exit 0
+          fi
+          # `--latest` ausdrücklich: für frisch veröffentlichte Releases nimmt GitHub sonst
+          # „latest“ an, und an `releases/latest/download/latest.json` hängt der Desktop-Updater.
+          if [ "$VORAB" = "true" ]; then
+            gh release edit "$TAG" --draft=false --latest=false
+          else
+            gh release edit "$TAG" --draft=false --latest
+          fi
+          echo "::notice::$TAG veröffentlicht."
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: needs.vorbereiten.outputs.vorab != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: needs.vorbereiten.outputs.vorab != 'true'
+
+      # Ein Prerelease darf `latest` nie übernehmen. Umgehängt wird das Manifest der Version,
+      # nichts wird neu gebaut — beide Architekturen, Provenance und SBOM bleiben dieselben.
+      - name: Abbilder als latest markieren
+        if: needs.vorbereiten.outputs.vorab != 'true'
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+        run: |
+          set -euo pipefail
+          for bild in "ghcr.io/${GITHUB_REPOSITORY,,}" "ghcr.io/${GITHUB_REPOSITORY,,}-karten-service"; do
+            docker buildx imagetools create --tag "$bild:latest" "$bild:$VERSION"
+          done
+
+      # Volle Historie: das Skript rechnet den Commit-Bereich seit dem letzten veröffentlichten
+      # Release desselben Kanals mit `git rev-list`.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        with:
+          version: 2026.9.1
+          cache: true
+
+      # Fehler hier machen den Job nicht rot (das Release steht schon), sie stehen als Warnung im
+      # Protokoll. Begründung und Rechnung im Kopf von scripts/release/pr-kommentare.mjs.
+      - name: Enthaltene Pull Requests kommentieren
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.vorbereiten.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/release/pr-kommentare.mjs ]; then
+            echo "::notice::Tag ohne pr-kommentare.mjs, Schritt übersprungen."
+            exit 0
+          fi
+          mise exec -- node scripts/release/pr-kommentare.mjs --tag "$TAG" --repo "$GITHUB_REPOSITORY"
+
   # Alpha-Releases gehen ohne Handgriff auf den Server. Dieser Job legt nur das
   # GitHub-Deployment an; ausgerollt wird von einem Pull-Agenten auf dem Server (Begründung im
-  # Kopf von deployment.yml). Nur beim echten Release-Ereignis: ein Nachbau per
-  # workflow_dispatch soll nicht nebenbei ein älteres Release ausrollen.
+  # Kopf von deployment.yml). Erst nach der Freigabe, und nur, wenn release.yml den Lauf
+  # gestartet hat (oder jemand ausdrücklich `freigeben` setzt): ein Nachbau soll nicht nebenbei
+  # ein älteres Release ausrollen.
   deployment:
     name: Deployment alpha anlegen
-    needs: [vorbereiten, docker, docker-karten]
-    if: github.event_name == 'release' && github.event.release.prerelease && contains(needs.vorbereiten.outputs.tag, '-alpha.')
+    needs: [vorbereiten, freigeben]
+    if: inputs.freigeben && contains(needs.vorbereiten.outputs.tag, '-alpha.')
     permissions:
       deployments: write
     uses: ./.github/workflows/deployment.yml

@@ -11,7 +11,7 @@
 #
 # Kein `cancel-in-progress` auf dem Release-Job: ein Abbruch zwischen dem Push des
 # Versions-Commits und dem Anlegen des GitHub-Releases hinterließe ein Tag ohne Release (und
-# ohne Binaries, artefakte.yml hängt an `release: published`). Deshalb entscheidet der Lauf
+# ohne Binaries, release.yml startet artefakte.yml erst danach). Deshalb entscheidet der Lauf
 # hier VOR der ersten schreibenden Handlung selbst.
 #
 # RELEASE-COMMITS ZÄHLEN NICHT ALS „NEUER COMMIT": semantic-release pusht

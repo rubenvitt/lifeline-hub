@@ -13,7 +13,8 @@
 # wählt nur der Server nach außen, und GitHub hält kein Geheimnis, mit dem man auf ihn käme.
 #
 # Aufrufwege:
-#   - automatisch aus artefakte.yml, nachdem beide Abbilder eines Alpha-Releases gepusht sind;
+#   - automatisch aus artefakte.yml, nachdem ein Alpha-Release freigegeben ist (Job `freigeben`:
+#     alle Plattformen gebaut, beide Abbilder gepusht, Release veröffentlicht);
 #   - von Hand (workflow_dispatch) für ein erneutes Ausrollen oder einen Rücksprung auf einen
 #     älteren Tag — dessen Abbilder müssen dann schon auf GHCR liegen.
 name: Deployment
