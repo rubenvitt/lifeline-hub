@@ -16,8 +16,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
   `DRUCK_SPECS` der `playwright.config.ts`.
-- **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe sind `DruckKnopf`
-  (`useDrucken`, wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
+- **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe sind `DruckKnopf`,
+  im Seitenkopf `useDruckNebenwege` (LFH-1079); beide über `useDrucken` (wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
   nicht „letzter Abruf gelungen"). **Kein
   `window.print()` direkt**, nie aus dem Passiv-Effekt. `components/druck/useDruckModus.ts`
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
