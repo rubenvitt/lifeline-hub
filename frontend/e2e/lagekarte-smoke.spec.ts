@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waehleIn } from './auswahl-kern';
+import { stehendeAuswahl, waehleIn } from './auswahl-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -300,7 +300,8 @@ test('Lagekarte: die Auswahl „Stand“ zeigt die Erfassungszeit unter der Beze
   const auswahl = zeitachse.getByRole('combobox', { name: 'Stand' });
   await expect(auswahl).toBeVisible();
   await auswahl.click();
-  const liste = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  // Gemessen und geklickt wird erst in der stehenden Liste (`auswahl-kern.ts`).
+  const liste = await stehendeAuswahl(page);
   const option = liste.locator('.ant-select-item-option[title="Stand vor Ort"]');
   await expect(option.locator('[data-lfh="stand-name"]')).toHaveText('Stand vor Ort');
   const zeit = option.locator('[data-lfh="stand-zeit"]');
