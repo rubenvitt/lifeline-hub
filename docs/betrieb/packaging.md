@@ -216,6 +216,28 @@ Für die Geräte im Einsatz (Laptop, Tablet, Desktop-App) gilt dasselbe, siehe
 [desktop-app.md](desktop-app.md#daten-auf-dem-gerät). Sicherungen, die das Gerät verlassen,
 gehören auf ein verschlüsseltes Medium ([backup-restore.md](backup-restore.md)).
 
+### Datenträger: Mindest-Schreibrate (LFH-1052)
+
+Einen festen Einsatzrechner gibt es nicht; die Anforderung gilt deshalb für jeden Rechner, der
+den Server trägt. Der Datenträger mit dem Datenverzeichnis (`--db-path`) muss **dauerhaft mehr
+als etwa 5,2 MB/s** schreiben. Die Schwärzung überschreibt Anhänge einzeln, jeder höchstens
+26 MB groß; solange ein Anhang in unter 5 s auf der Platte steht, wartet kein anderer
+Schreibender länger als `busy_timeout` und bekommt keinen Fehler. Jede SSD und jede SD-Karte
+ab Klasse 10 schafft das, billige USB-2-Sticks oft nicht.
+
+Wer einen Datenträger prüfen will, misst auf ihm direkt (Rust-Toolchain nötig, `TMPDIR` auf
+denselben Datenträger wie die Datenbank):
+
+```
+mkdir -p /pfad/zum/datenverzeichnis/lfh-mess
+TMPDIR=/pfad/zum/datenverzeichnis/lfh-mess LFH725_MB=50,200,500 \
+  cargo test --release --lib secure_delete_messung -- --ignored --nocapture
+```
+
+`warten max` im Modus `ON-einzeln` muss unter 5 s liegen. Herleitung:
+`openspec/changes/archive/2026-10-05-lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`,
+Abschnitt „Messung“.
+
 ## Lagekarte / Basemap
 
 Die Lagekarte (Modul „Lagekarte") rendert mit MapLibre GL und ist offline-fähig. Die
