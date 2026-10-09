@@ -24,11 +24,13 @@ pub async fn liste(
     // Ein Gerät (LFH-892) zählt nur die Module seiner Ansicht.
     if let Some(g) = &ctx.geraet {
         erlaubt = g.schneide_module(erlaubt);
-        // Personen, Meldungen und Betreuung zählen den ganzen Einsatz; ein stellengebundenes
-        // Gerät sieht nur seine Stelle (Stellenbindung) und bekommt diese Zähler deshalb nicht.
+        // Personen und Meldungen zählen den ganzen Einsatz; ein Gerät sieht nur die Personen
+        // seiner Stelle und nur die eigenen Meldungen, auch ohne Stelle (Verpflegung, LFH-1044),
+        // und bekommt diese Zähler deshalb nie. Betreuung zählt ebenfalls den ganzen Einsatz; ein
+        // stellengebundenes Gerät sieht nur seine Stelle (Stellenbindung).
+        erlaubt.remove("personen");
+        erlaubt.remove("meldungen");
         if crate::geraet::stelle::ist_gebunden(Some(g)) {
-            erlaubt.remove("personen");
-            erlaubt.remove("meldungen");
             erlaubt.remove("betreuung");
             // Ein Abschnittsgerät sieht nur seinen Teilbaum (LFH-1043); die einsatzweiten
             // Zähler dieser Module verrieten den Rest des Einsatzes.

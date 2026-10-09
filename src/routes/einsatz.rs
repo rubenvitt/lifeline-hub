@@ -138,10 +138,14 @@ pub async fn detail(
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
     );
-    // Der Lagemonitor erhält keine Freitexte, die Personen nennen können (LFH-892, Spec
-    // `lagemonitor`, „Keine personenbezogenen Daten“): Sachverhalt, meldende Stelle und die
-    // Ortsangabe fehlen (eine Wohnanschrift ist personenbezogen). Die Karte braucht nur den Punkt.
-    if ctx.geraet.as_ref().map(|g| g.ansicht) == Some(crate::geraet::Funktionsansicht::Lagemonitor)
+    // Lagemonitor und Verpflegung erhalten keine Freitexte, die Personen nennen können (LFH-892,
+    // Spec `lagemonitor`, „Keine personenbezogenen Daten“; LFH-1044): Sachverhalt, meldende Stelle
+    // und die Ortsangabe fehlen (eine Wohnanschrift ist personenbezogen). Die Karte braucht nur
+    // den Punkt.
+    if ctx
+        .geraet
+        .as_ref()
+        .is_some_and(|g| g.ansicht.ohne_personenbezug())
     {
         anzeige.sachverhalt = None;
         anzeige.meldende_stelle = None;

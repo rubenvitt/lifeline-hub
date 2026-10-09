@@ -234,3 +234,72 @@ was die Tabelle nicht nennt, MUST verboten sein. „Eigener BR“ heißt der BR 
 - **WHEN** die Einsatzleitung die Kopplung widerruft
 - **AND** das Gerät danach seinen BR abruft
 - **THEN** antwortet der Server mit 401
+
+### Requirement: Ansicht Verpflegung
+
+Die Funktionsansicht `verpflegung` SHALL einsatzweit gelten, an keine Stelle gebunden sein und
+die Einsatzrolle Führungspersonal tragen. Sie SHALL genau diese Rechte haben; was die Tabelle
+nicht nennt, MUST verboten sein. Sie MUST keine Namen von Einsatzkräften oder Benutzern
+erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Nachforderung.
+
+| Modul / Bereich | Verpflegung |
+| --- | --- |
+| Einsatzkopf, Modulfreigaben, Modulzähler, Live-Kanal | L |
+| `verpflegung`: Zeitfenster mit Bedarf, Ausgaben und Deckung | L |
+| `verpflegung`: Ausgabe buchen (ohne Bezug auf eine Nachforderung), Ausgabe zurücknehmen | S |
+| `verpflegung`: Zeitfenster anlegen, ändern, löschen | — |
+| `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
+| `nachforderungen`, `personal`, `betreuung`, `personen`, `etb` | — |
+| alle übrigen Module, Einstellungen, Verwaltung | — |
+
+Die Modulzähler eines Geräts MUST keine einsatzweiten Zähler für `meldungen` und `personen`
+enthalten, auch ohne Stellenbindung. Eigene Meldungen MUST ohne die Namen von Bearbeiter und
+Bestätiger kommen, der Einsatzkopf ohne Sachverhalt, meldende Stelle und Ortsangabe (wie beim
+Lagemonitor).
+
+#### Scenario: Keine Stelle
+
+- **WHEN** die Einsatzleitung ein Verpflegungsgerät mit einer Stelle koppeln will
+- **THEN** antwortet der Server mit 400
+
+#### Scenario: Portionen buchen
+
+- **WHEN** das Verpflegungsgerät zum Zeitfenster „Mittag“ eine Ausgabe von 40 EP bucht
+- **THEN** steigt die ausgegebene Menge des Zeitfensters um 40, und die Antwort nennt keinen Namen
+
+#### Scenario: Ausgabe auf eine Nachforderung
+
+- **WHEN** das Verpflegungsgerät eine Ausgabe mit Bezug auf eine Nachforderung bucht
+- **THEN** antwortet der Server mit 403, gleich ob es die Nachforderung gibt
+
+#### Scenario: Planen am Gerät
+
+- **WHEN** das Verpflegungsgerät ein Zeitfenster anlegt, ändert oder löscht
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Kein Personal
+
+- **WHEN** das Verpflegungsgerät Personal, Betreuung oder die Nachforderungen abruft
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Fehlmenge melden
+
+- **WHEN** das Verpflegungsgerät bei einem Zeitfenster mit Fehlmenge „Fehlmenge melden“ wählt und absendet
+- **THEN** entsteht eine Meldung an die Einsatzleitung mit Zeitfenster, Fehlmenge, Bedarf und ausgegebener Menge, und keine Nachforderung
+
+#### Scenario: Bearbeitete Meldung ohne Namen
+
+- **WHEN** die Einsatzleitung eine Meldung des Verpflegungsgeräts an sich nimmt und bestätigt
+- **AND** das Gerät seine Meldungen abruft
+- **THEN** steht die Meldung als bestätigt da, ohne den Namen der Bearbeiterin oder des Bestätigers
+
+#### Scenario: Live-Kanal
+
+- **WHEN** im Einsatz eine Ausgabe gebucht wird und ein ETB-Eintrag entsteht
+- **THEN** erhält das Verpflegungsgerät das Verpflegungsereignis und kein ETB-Ereignis
+
+#### Scenario: Widerruf
+
+- **WHEN** die Einsatzleitung die Kopplung widerruft
+- **AND** das Gerät danach eine Ausgabe bucht
+- **THEN** antwortet der Server mit 401

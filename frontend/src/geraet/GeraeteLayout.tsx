@@ -7,6 +7,7 @@ import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Funktionsansicht, GeraetAnzeige, ModulFreigaben } from '../api/types';
 import {
+  IconBesteck,
   IconHausHerz,
   IconKachelraster,
   IconKarte,
@@ -41,6 +42,7 @@ import {
   geraetPatientenPfad,
   geraetStellePfad,
   geraetUhsPfad,
+  geraetVerpflegungPfad,
   parseRouteId,
 } from '../routing/deeplinks';
 import { rahmenFarben } from '../theme/tokens';
@@ -48,6 +50,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import AufnahmePage from '../pages/personen/AufnahmePage';
 import BrDetailPage from '../pages/bereitstellungsraum/BrDetailPage';
 import UhsDetailPage from '../pages/uhs/UhsDetailPage';
+import VerpflegungPage from '../pages/VerpflegungPage';
 import GeraetMeldungenPage from './GeraetMeldungenPage';
 import GeraetStellePage from './GeraetStellePage';
 import LagemonitorPage from './LagemonitorPage';
@@ -62,8 +65,9 @@ export function istUhsAnsicht(ansicht: Funktionsansicht): boolean {
 /**
  * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, die
  * Betreuungsstelle mit ihren Betroffenen, der Lagemonitor mit seinem Großbild, der
- * Bereitstellungsraum mit seinem Raum (LFH-1042). Eine Ansicht ohne eigene Seiten (noch nicht
- * freigeschaltet, LFH-1040) hat keine: `null`.
+ * Bereitstellungsraum mit seinem Raum (LFH-1042), die Verpflegung mit ihren Zeitfenstern
+ * (LFH-1044). Eine Ansicht ohne eigene Seiten (noch nicht freigeschaltet, LFH-1040) hat keine:
+ * `null`.
  */
 export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
   switch (geraet.ansicht) {
@@ -79,7 +83,7 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
     case 'bereitstellungsraum':
       return geraet.stelle_id == null ? null : geraetBrPfad(geraet.einsatz_id, geraet.stelle_id);
     case 'verpflegung':
-      return null;
+      return geraetVerpflegungPfad(geraet.einsatz_id);
   }
 }
 
@@ -179,11 +183,21 @@ export function GeraetBr() {
   return <BrDetailPage />;
 }
 
-/** Meldungen an die Einsatzleitung für Ansichten ohne eigenen Stellenbereich (Bereitstellungsraum). */
+/** Meldungen an die Einsatzleitung für Ansichten ohne eigenen Stellenbereich (Bereitstellungsraum,
+ *  Verpflegung). */
 export function GeraetMeldungen() {
   const { geraet } = useAuth();
-  if (!geraet || geraet.ansicht !== 'bereitstellungsraum') return <GeraetStart />;
+  if (!geraet || (geraet.ansicht !== 'bereitstellungsraum' && geraet.ansicht !== 'verpflegung')) {
+    return <GeraetStart />;
+  }
   return <GeraetMeldungenPage />;
+}
+
+/** Die Zeitfenster der Verpflegungsansicht (LFH-1044), einsatzweit ohne Stelle. */
+export function GeraetVerpflegung() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'verpflegung') return <GeraetStart />;
+  return <VerpflegungPage />;
 }
 
 /** Bereich „UHS“ nur für die Ansicht, die Material und Dateien ihrer UHS führt (UHS-Laptop). */
@@ -269,6 +283,20 @@ function BrNavigationsziele({ geraet }: { geraet: GeraetAnzeige }) {
   );
 }
 
+/** Ziele der Verpflegung (LFH-1044): die Zeitfenster und Melden. */
+function VerpflegungNavigationsziele({ eid }: { eid: number }) {
+  return (
+    <>
+      <NavZiel zu={geraetVerpflegungPfad(eid)} Icon={IconBesteck}>
+        Verpflegung
+      </NavZiel>
+      <NavZiel zu={geraetMeldungenPfad(eid)} Icon={IconPapierflieger}>
+        Melden
+      </NavZiel>
+    </>
+  );
+}
+
 /**
  * Ob die Navigation ein Modul anbietet: nur, wenn der Server es nicht sperrt oder ausblendet.
  * Solange die Freigaben unbekannt sind, steht es da (wie die Modulleiste, `istModulGesperrt`).
@@ -311,8 +339,9 @@ function AbschnittNavigation({ eid }: { eid: number }) {
 /**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
  * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen. Das
- * Abschnittsgerät, der Bereitstellungsraum und die Betreuungsstelle haben eigene Ziele
- * ({@link AbschnittNavigation}, {@link BrNavigationsziele}, {@link BetreuungNavigationsziele}).
+ * Abschnittsgerät, der Bereitstellungsraum, die Betreuungsstelle und die Verpflegung haben eigene
+ * Ziele ({@link AbschnittNavigation}, {@link BrNavigationsziele},
+ * {@link BetreuungNavigationsziele}, {@link VerpflegungNavigationsziele}).
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   const eid = geraet.einsatz_id;
@@ -334,6 +363,8 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
         <AbschnittNavigation eid={eid} />
       ) : geraet.ansicht === 'bereitstellungsraum' ? (
         <BrNavigationsziele geraet={geraet} />
+      ) : geraet.ansicht === 'verpflegung' ? (
+        <VerpflegungNavigationsziele eid={eid} />
       ) : (
         <>
           <NavZiel zu={geraetPatientenPfad(eid)} Icon={IconPersonen}>

@@ -258,6 +258,11 @@ pub async fn ausgabe_erfassen(
         Some(s) if !s.is_empty() => zeit(s)?,
         _ => crate::zeit::jetzt(),
     };
+    // Nachforderungen liegen außerhalb jeder Geräteansicht (LFH-1044): ein Gerät bucht nie auf
+    // eine, sonst verriete 404 gegen 201, welche es gibt.
+    if req.nachforderung_id.is_some() && ctx.geraet.is_some() {
+        return Err(AppError::Forbidden);
+    }
     // Die Nachforderung muss zu DIESEM Einsatz gehören; der FK sichert nur, dass es sie gibt.
     // Vor der Transaktion: die Prüfung nimmt den Pool, und Nachforderungen werden nicht
     // gelöscht oder umgehängt.

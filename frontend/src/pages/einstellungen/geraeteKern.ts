@@ -31,7 +31,7 @@ export const ANSICHT_ZWECK: Record<Funktionsansicht, string> = {
   betreuungsstelle: 'Belegung, Betroffene, Meldungen einer Betreuungsstelle',
   bereitstellungsraum: 'Kräfte an- und abmelden in einem Bereitstellungsraum',
   einsatzabschnitt: 'Kräfte, Aufträge, Meldungen eines Abschnitts',
-  verpflegung: 'Portionen je Zeitfenster ausgeben',
+  verpflegung: 'Portionen je Zeitfenster ausgeben, Fehlmenge melden',
 };
 
 /** Feld der Kopplungsmaske je Stellenart: Beschriftung, Platzhalter, leere Auswahl. */

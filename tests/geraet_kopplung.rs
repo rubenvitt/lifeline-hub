@@ -237,24 +237,13 @@ async fn uhs_eines_anderen_einsatzes_ist_404() {
 
 // ---------- Weitere Stellen (LFH-1040) ----------
 
-/// Die neuen Ansichten stehen im Katalog, sind aber erst koppelbar, wenn ihr Task sie
-/// freischaltet; die Übersicht bietet nur die verfügbaren an, mit der Art ihrer Stelle.
+/// Alle Ansichten des Katalogs sind koppelbar; die Übersicht bietet sie in Bedienreihenfolge an,
+/// mit der Art ihrer Stelle.
 #[tokio::test]
-async fn neue_ansichten_sind_noch_nicht_koppelbar() {
+async fn uebersicht_bietet_alle_ansichten() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-
-    for ansicht in ["verpflegung"] {
-        let (s, v) = anlegen(
-            &app,
-            &admin,
-            einsatz,
-            json!({"ansicht": ansicht, "stelle_id": 1, "bezeichnung": "Gerät"}),
-        )
-        .await;
-        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{ansicht} → {v}");
-    }
 
     let (s, v) = anfrage(
         &app,
@@ -274,6 +263,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
             {"ansicht": "betreuungsstelle", "stellenart": "betreuungsstelle"},
             {"ansicht": "bereitstellungsraum", "stellenart": "bereitstellungsraum"},
             {"ansicht": "einsatzabschnitt", "stellenart": "einsatzabschnitt"},
+            {"ansicht": "verpflegung", "stellenart": null},
         ])
     );
 }
@@ -3597,4 +3587,434 @@ async fn widerrufene_betreuungsstelle_verliert_jeden_zugriff() {
     assert_eq!(s, StatusCode::UNAUTHORIZED);
     let (s, _) = belegung_melden(&app, &geraet, einsatz, nord, 2).await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
+}
+
+// ---------- Verpflegung (LFH-1044) ----------
+
+/// Ein gekoppeltes Verpflegungsgerät (einsatzweit, ohne Stelle): `(kopplung_id, geräte-cookie)`.
+async fn verpflegungsgeraet(app: &axum::Router, cookie: &str, einsatz: i64) -> (i64, String) {
+    let (id, code) = kopplung(
+        app,
+        cookie,
+        einsatz,
+        json!({"ansicht": "verpflegung", "bezeichnung": "Ausgabe Deich"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    (id, a.cookie.expect("Sitzungscookie"))
+}
+
+/// Legt das Zeitfenster „Mittag“ mit 250 EP Bedarf an; liefert seine Kennung.
+async fn mittag(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/verpflegung/zeitfenster"),
+        cookie,
+        Some(&json!({
+            "bezeichnung": "Mittag",
+            "von_at": "2026-10-08T12:00:00Z",
+            "bis_at": "2026-10-08T13:30:00Z",
+            "bedarf_kraefte": 180,
+            "bedarf_betreute": 70,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// Sammelt alle Objektschlüssel einer Antwort, rekursiv.
+fn schluessel(v: &Value, alle: &mut Vec<String>) {
+    match v {
+        Value::Object(o) => {
+            for (k, w) in o {
+                alle.push(k.clone());
+                schluessel(w, alle);
+            }
+        }
+        Value::Array(a) => a.iter().for_each(|w| schluessel(w, alle)),
+        _ => {}
+    }
+}
+
+/// Das Verpflegungsgerät ist einsatzweit: eine Stelle lehnt die Kopplung ab, ohne Stelle koppelt
+/// es mit der Rolle zum Schreiben.
+#[tokio::test]
+async fn verpflegungsgeraet_ist_an_keine_stelle_gebunden() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "verpflegung", "stelle_id": uhs, "bezeichnung": "Ausgabe"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let (s, ich) = me(&app, &geraet).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(ich["geraet"]["ansicht"], "verpflegung");
+    assert!(ich["geraet"]["stelle_id"].is_null(), "{ich}");
+}
+
+/// Das Gerät liest Zeitfenster mit Deckung, bucht Portionen und nimmt eine Buchung zurück; das
+/// Planen der Zeitfenster bleibt bei der Führung. Die Antwort trägt keine Namen.
+#[tokio::test]
+async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zf = mittag(&app, &admin, einsatz).await;
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &admin,
+        Some(&json!({"menge": 100, "ort": "Küche"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &geraet,
+        Some(&json!({"menge": 40, "ort": "Deich"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ausgabe = v["ausgabe_id"].as_i64().unwrap();
+    assert_eq!(v["zeitfenster"]["ausgegeben"]["gesamt"], 140, "{v}");
+    assert_eq!(v["zeitfenster"]["fehlmenge"]["gesamt"], 110, "{v}");
+
+    let (s, v) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zeitfenster"][0]["bezeichnung"], "Mittag");
+    assert_eq!(v["zeitfenster"][0]["ausgaben"].as_array().unwrap().len(), 2);
+    // Keine Namen und keine Urheber, weder der Person noch des Geräts.
+    let anzeigename: String =
+        sqlx::query_scalar("SELECT anzeigename FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let text = v.to_string();
+    assert!(!text.contains(&anzeigename), "Name in der Antwort: {text}");
+    let mut alle = Vec::new();
+    schluessel(&v, &mut alle);
+    assert!(
+        !alle
+            .iter()
+            .any(|k| k.contains("name") || k.contains("_von") || k.contains("benutzer")),
+        "{alle:?}"
+    );
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/ausgaben/{ausgabe}/zuruecknehmen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zeitfenster"]["ausgegeben"]["gesamt"], 100, "{v}");
+
+    // Nachforderungen liegen außerhalb der Ansicht: auch keine Buchung auf eine (sonst verriete
+    // 404 gegen 201, welche es gibt).
+    let (s, nf) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &admin,
+        Some(&json!({
+            "art": "Verpflegung",
+            "bezeichnung": "Verpflegung 60 EP",
+            "anzahl": 60,
+            "adressat_kategorie": "leitstelle",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{nf}");
+    let nid = nf["id"].as_i64().unwrap();
+    for n in [nid, nid + 1000] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+            &geraet,
+            Some(&json!({"menge": 5, "nachforderung_id": n})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "Nachforderung {n}: {v}");
+    }
+    let (_, v) = anfrage(&app, "GET", &basis, &admin, None).await;
+    assert_eq!(v["zeitfenster"][0]["ausgegeben"]["gesamt"], 100, "{v}");
+
+    for (m, pfad, body) in [
+        (
+            "POST",
+            format!("{basis}/zeitfenster"),
+            Some(json!({
+                "bezeichnung": "Abend",
+                "von_at": "2026-10-08T18:00:00Z",
+                "bis_at": "2026-10-08T19:00:00Z",
+                "bedarf_kraefte": 10,
+                "bedarf_betreute": 0,
+            })),
+        ),
+        (
+            "PATCH",
+            format!("{basis}/zeitfenster/{zf}"),
+            Some(json!({"bedarf_kraefte": 1})),
+        ),
+        ("DELETE", format!("{basis}/zeitfenster/{zf}"), None),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+    let (_, v) = anfrage(&app, "GET", &basis, &admin, None).await;
+    assert_eq!(
+        v["zeitfenster"].as_array().unwrap().len(),
+        1,
+        "nichts geplant"
+    );
+    assert_eq!(v["zeitfenster"][0]["bedarf"]["gesamt"], 250);
+}
+
+/// Personal, Betreuung, Nachforderungen, Personen und ETB erreicht das Gerät nicht; Modulzähler
+/// und Freigaben folgen der Ansicht, ohne einsatzweiten Meldungs- oder Personenzähler.
+#[tokio::test]
+async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    mittag(&app, &admin, einsatz).await;
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let e = format!("/api/einsaetze/{einsatz}");
+
+    for (m, pfad, body) in [
+        ("GET", format!("{e}/personal"), None),
+        ("GET", format!("{e}/betreuung"), None),
+        ("GET", format!("{e}/nachforderungen"), None),
+        (
+            "POST",
+            format!("{e}/nachforderungen"),
+            Some(json!({
+                "art": "Verpflegung",
+                "bezeichnung": "Essensportionen",
+                "anzahl": 20,
+                "adressat_kategorie": "leitstelle",
+            })),
+        ),
+        ("GET", format!("{e}/personen"), None),
+        ("GET", format!("{e}/etb"), None),
+        ("GET", format!("{e}/uhs"), None),
+        ("GET", format!("{e}/einheiten"), None),
+        ("GET", format!("{e}/lagemonitor"), None),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+
+    let (s, v) = anfrage(&app, "GET", &format!("{e}/modul-freigaben"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["verpflegung"]["zugriff"], true, "{v}");
+    assert_eq!(v["meldungen"]["zugriff"], true, "{v}");
+    assert_eq!(v["nachforderungen"]["zugriff"], false, "{v}");
+    assert_eq!(v["personal"]["zugriff"], false, "{v}");
+
+    let (s, v) = anfrage(&app, "GET", &format!("{e}/modul-zaehler"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(
+        v["meldungen"].is_null(),
+        "kein einsatzweiter Meldungszähler: {v}"
+    );
+    assert!(v["personen"].is_null(), "{v}");
+    assert!(v["personal"].is_null(), "{v}");
+}
+
+/// Eine Unterdeckung meldet das Gerät der Einsatzleitung; es liest nur die eigenen Meldungen.
+#[tokio::test]
+async fn verpflegungsgeraet_meldet_und_liest_nur_eigene_meldungen() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldung = |inhalt: &str| {
+        json!({
+            "absender": "Verpflegung · Ausgabe Deich",
+            "meldeweg": "persoenlich",
+            "inhalt": inhalt,
+            "prioritaet": "sofort",
+            "ereigniszeit": "2026-10-08 12:30:00",
+        })
+    };
+
+    let (s, v) = anfrage_json(&app, "POST", &meldungen, &admin, Some(&meldung("Lage"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &geraet,
+        Some(&meldung("Unterdeckung Mittag: 20 EP fehlen")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let mid = v["id"].as_i64().unwrap();
+
+    // Die Einsatzleitung nimmt die Meldung an sich und bestätigt sie: ihr Name erreicht das
+    // Gerät trotzdem nicht.
+    let (admin_id, anzeigename): (i64, String) =
+        sqlx::query_as("SELECT id, anzeigename FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{meldungen}/{mid}/zuweisen"),
+        &admin,
+        Some(&json!({"bearbeiter_id": admin_id})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("{meldungen}/{mid}/bestaetigen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bestaetigt_von_name"], anzeigename.as_str(), "{v}");
+
+    let (s, v) = anfrage(&app, "GET", &meldungen, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let liste = v.as_array().unwrap();
+    let inhalte: Vec<&str> = liste
+        .iter()
+        .map(|m| m["inhalt"].as_str().unwrap())
+        .collect();
+    assert_eq!(inhalte, vec!["Unterdeckung Mittag: 20 EP fehlen"]);
+    assert_eq!(liste[0]["ist_bestaetigt"], true, "{v}");
+    assert!(liste[0]["bearbeiter_name"].is_null(), "{v}");
+    assert!(liste[0]["bestaetigt_von_name"].is_null(), "{v}");
+    assert!(
+        !v.to_string().contains(&anzeigename),
+        "Name in der Antwort: {v}"
+    );
+}
+
+/// Der Einsatzkopf kommt beim Verpflegungsgerät ohne Freitexte, die Personen nennen können
+/// (wie beim Lagemonitor).
+#[tokio::test]
+async fn verpflegungsgeraet_liest_den_einsatzkopf_ohne_personenbezug() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}"),
+        &admin,
+        Some(&json!({
+            "sachverhalt": "Anrufer Max Muster meldet Wasser im Keller",
+            "meldende_stelle": "Max Muster",
+            "einsatzort": "Deichstraße 4",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["sachverhalt"].is_null(), "{v}");
+    assert!(v["meldende_stelle"].is_null(), "{v}");
+    assert!(v["einsatzort"].is_null(), "{v}");
+    assert!(!v.to_string().contains("Muster"), "{v}");
+}
+
+/// Ein widerrufenes Verpflegungsgerät verliert sofort jeden Zugriff.
+#[tokio::test]
+async fn widerrufenes_verpflegungsgeraet_verliert_jeden_zugriff() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zf = mittag(&app, &admin, einsatz).await;
+    let (id, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+    let basis = format!("/api/einsaetze/{einsatz}/verpflegung");
+    let (s, _) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK);
+
+    widerrufen(&app, &admin, einsatz, id).await;
+    let (s, _) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/zeitfenster/{zf}/ausgaben"),
+        &geraet,
+        Some(&json!({"menge": 5})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+}
+
+/// Der Live-Kanal des Verpflegungsgeräts trägt Verpflegung, aber kein ETB: das Anlegen eines
+/// Zeitfensters (mit ETB-Eintrag) erreicht das Gerät nur als Verpflegungsereignis.
+#[tokio::test]
+async fn live_kanal_des_verpflegungsgeraets_traegt_verpflegung_ohne_etb() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
+
+    let mut geraet_strom = live_geraet(&app, &geraet, einsatz).await;
+    let mut admin_strom = live_geraet(&app, &admin, einsatz).await;
+    mittag(&app, &admin, einsatz).await;
+
+    let mut beim_admin = Vec::new();
+    strom_lesen(
+        &mut admin_strom,
+        &mut beim_admin,
+        Duration::from_millis(500),
+    )
+    .await;
+    assert!(
+        beim_admin.iter().any(|e| e == "etb"),
+        "Gegenprobe: {beim_admin:?}"
+    );
+    let mut beim_geraet = Vec::new();
+    strom_lesen(
+        &mut geraet_strom,
+        &mut beim_geraet,
+        Duration::from_millis(500),
+    )
+    .await;
+    assert!(
+        beim_geraet.iter().any(|e| e == "verpflegung"),
+        "{beim_geraet:?}"
+    );
+    assert!(!beim_geraet.iter().any(|e| e == "etb"), "{beim_geraet:?}");
 }
