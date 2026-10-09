@@ -182,7 +182,11 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
     expect(url).not.toContain('{');
   }
   // Der Kachel-Proxy verlangt eine Sitzung (LFH-1072): auch der Worker-Fetch trägt das
-  // Sitzungs-Cookie, sonst bliebe die Online-Karte für jeden leer.
+  // Sitzungs-Cookie, sonst bliebe die Online-Karte für jeden leer. GEWARTET: der Kopf kommt erst
+  // nach `allHeaders()` in die Liste, eine leere Liste bewiese nichts.
+  await expect
+    .poll(() => kachelCookies.length, { timeout: 20_000, message: 'kein Cookie-Kopf gelesen' })
+    .toBeGreaterThan(0);
   for (const cookie of [...kachelCookies]) {
     expect(cookie, 'Kachel-Anfrage ohne Sitzungs-Cookie').toMatch(/(^|;\s*)lifeline_sid=/);
   }
