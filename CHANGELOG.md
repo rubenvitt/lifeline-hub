@@ -1,3 +1,15 @@
+## [1.0.0-alpha.100](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.99...v1.0.0-alpha.100) (2026-10-09)
+
+### Benutzerschnittstelle und Bedienung
+
+- **Benachrichtigungen verdecken nicht mehr die Kommandoleiste**: Stehende Alarme und Benachrichtigungen erscheinen nun unterhalb der Kommandoleiste und des Seitenkopfes, sodass wichtige Bedienelemente auf allen Bildschirmgrößen zugänglich bleiben – auch im gerollten Zustand und auf kleineren Displays (ab 820 px Breite)
+
+- **Stabilere Bedienung von Auswahllisten**: Auswahllisten in allen Bereichen (Kommunikationsplan, Fernmeldeskizze, Dokumente, Gerätekopplung, Lagekarte, Betreuungsstellen, Unterbringungsskizzen, Grundrisse, Führungsfunktionen, Hilfe und weiteren) reagieren zuverlässiger auf Klicks – Optionen werden erst nach vollständigem Einblenden der Liste anwählbar
+
+### Hilfe und Dokumentation
+
+- Die Anwenderhilfe wird nun korrekt in die Anwendung eingebunden und bei Änderungen automatisch aktualisiert
+
 ## [1.0.0-alpha.99](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.98...v1.0.0-alpha.99) (2026-10-09)
 
 ### Wichtige Änderungen
