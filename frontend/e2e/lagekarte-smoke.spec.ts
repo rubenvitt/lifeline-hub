@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { stehendeAuswahl, waehleIn } from './auswahl-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
@@ -255,18 +256,10 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
   ).toBeLessThanOrEqual(zeile + polster + 1);
 
   // Stand über die Auswahl wählen, dann über „Live“ zurück (LFH-899, D1).
-  await auswahl.click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle('Stand vor Ort', { exact: true })
-    .click();
+  await waehleIn(auswahl, 'Stand vor Ort');
   await expect(page).toHaveURL(/[?&]snapshot=\d+/);
   await expect(page.getByText('Historischer Stand — schreibgeschützt')).toBeVisible();
-  await auswahl.click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle('Live', { exact: true })
-    .click();
+  await waehleIn(auswahl, 'Live');
   await expect(page).not.toHaveURL(/[?&]snapshot=/);
   await expect(page.getByText('Historischer Stand — schreibgeschützt')).toHaveCount(0);
 
@@ -308,7 +301,8 @@ test('Lagekarte: die Auswahl „Stand“ zeigt die Erfassungszeit unter der Beze
   const auswahl = zeitachse.getByRole('combobox', { name: 'Stand' });
   await expect(auswahl).toBeVisible();
   await auswahl.click();
-  const liste = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  // Gemessen und geklickt wird erst in der stehenden Liste (`auswahl-kern.ts`).
+  const liste = await stehendeAuswahl(page);
   const option = liste.locator('.ant-select-item-option[title="Stand vor Ort"]');
   await expect(option.locator('[data-lfh="stand-name"]')).toHaveText('Stand vor Ort');
   const zeit = option.locator('[data-lfh="stand-zeit"]');

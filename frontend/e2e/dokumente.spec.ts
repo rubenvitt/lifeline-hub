@@ -1,4 +1,5 @@
 import { expect, test, type FileChooser, type Locator, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 import { MINI_JPEG } from './bildFixture';
@@ -91,14 +92,6 @@ function ablegenDialog(page: Page): Locator {
   return page.getByRole('dialog');
 }
 
-/** Option eines antd-`Select` im Portal — nur aus der GEÖFFNETEN Liste. */
-async function waehleOption(page: Page, label: string) {
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle(label, { exact: true })
-    .click();
-}
-
 /** Waagerechter Überlauf des Dokuments. */
 async function keinQuerlauf(page: Page, pfad: string) {
   await expect
@@ -148,8 +141,7 @@ async function legeAb(
   // Der Titel kommt aus dem Dateinamen ohne Endung — die Vorbelegung ist Teil des AK.
   await expect(dialog.getByLabel('Titel')).toHaveValue(titelSoll);
 
-  await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
-  await waehleOption(page, kategorie);
+  await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), kategorie);
   await dialog.getByRole('button', { name: 'Ablegen' }).click();
   await expect(dialog).toBeHidden();
 }
@@ -235,8 +227,7 @@ test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im
 
   // ── 4 · Kategorie-Filter ──────────────────────────────────────────────────────────────
   const werkzeuge = page.locator('[data-lfh="datensicht-werkzeuge"]');
-  await werkzeuge.getByRole('combobox', { name: 'Kategorie' }).click();
-  await waehleOption(page, 'Foto');
+  await waehleIn(werkzeuge.getByRole('combobox', { name: 'Kategorie' }), 'Foto');
   await expect(lageplan, 'gefiltert: die Lagekarte ist weg').toHaveCount(0);
   await expect(foto, 'gefiltert: das Foto bleibt').toBeVisible();
 
@@ -345,8 +336,7 @@ test('Rückmeldung: Fortschritt, Prüfphase und Entfernen-Zustand (LFH-654)', as
   await dialog
     .locator('input[type="file"]')
     .setInputFiles({ name: 'Lageplan Gross.pdf', mimeType: 'application/pdf', buffer: gross });
-  await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
-  await waehleOption(page, 'Lagekarte/Plan');
+  await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), 'Lagekarte/Plan');
   await dialog.getByRole('button', { name: 'Ablegen' }).click();
 
   const balken = dialog.getByRole('progressbar');
@@ -428,8 +418,7 @@ test('Bearbeiten: Titel und Kategorie ändern, Datei bleibt, ETB weist die Ände
   const dialog = page.getByRole('dialog').filter({ hasText: 'Dokument bearbeiten' });
   await expect(dialog.getByLabel('Titel'), 'vorbelegt mit dem Stand').toHaveValue('Lagepaln Nord');
   await dialog.getByLabel('Titel').fill('Lageplan Nord');
-  await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
-  await waehleOption(page, 'Lagekarte/Plan');
+  await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), 'Lagekarte/Plan');
   await dialog.getByRole('button', { name: 'Speichern' }).click();
   await expect(dialog).toBeHidden();
 

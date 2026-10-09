@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 
 /**
  * Hilfe (LFH-1096, Spec `anwenderdoku`): erreichbar vor der Anmeldung und aus dem Benutzermenü,
@@ -33,8 +34,7 @@ test('angemeldet: Hilfe aus dem Benutzermenü, Gruppe wählen, zurück in die Ap
   await page.getByRole('menuitem', { name: 'Hilfe' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
 
-  await page.getByRole('combobox', { name: 'Lesergruppe' }).click();
-  await page.getByTitle('Administration').click();
+  await waehleIn(page.getByRole('combobox', { name: 'Lesergruppe' }), 'Administration');
   await expect(page).toHaveURL(/\/hilfe\?gruppe=administration$/);
   const navi = page.getByRole('navigation', { name: 'Kapitel' });
   await expect(navi.getByText('Gerät verloren')).toBeVisible();

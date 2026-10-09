@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -61,8 +62,7 @@ async function pruefeSchaeden(page: Page, einsatzId: string, schwerNr: number) {
   const nummer = `S-${String(schwerNr).padStart(3, '0')}`;
   // Vorbedingung: der katastrophale Schaden steht nicht in der ersten Seite.
   await expect(page.getByText(nummer, { exact: true })).toHaveCount(0);
-  await page.getByRole('combobox', { name: 'Ausmaß' }).click();
-  await page.getByTitle('katastrophal', { exact: true }).click();
+  await waehleIn(page.getByRole('combobox', { name: 'Ausmaß' }), 'katastrophal');
   await expect(page.getByText(nummer, { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ältere laden' })).toHaveCount(0);
   await page.keyboard.press('Escape');

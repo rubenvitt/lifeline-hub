@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { FOTO_JPEG, MINI_JPEG } from './bildFixture';
 
 /**
@@ -110,9 +111,7 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   }
 
   // Aus den Dateien übernehmen: ersetzt die Bytes, die Lage bleibt.
-  await paneel.getByRole('combobox', { name: 'Aus Dateien übernehmen' }).click();
-  const auswahl = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
-  await auswahl.getByText('grundriss.jpg').click();
+  await waehleIn(paneel.getByRole('combobox', { name: 'Aus Dateien übernehmen' }), 'grundriss.jpg');
   await paneel.getByRole('button', { name: 'Übernehmen' }).click();
   await expect(page.getByText('Plan übernommen')).toBeVisible();
   // Der Browser zeigt die neuen Bytes, nicht den ersten Plan aus seinem HTTP-Cache: die

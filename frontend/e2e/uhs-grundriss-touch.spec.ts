@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { stehendeAuswahl } from './auswahl-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -136,10 +137,8 @@ async function eingeblendet(popup: Locator) {
   await expect(popup).not.toHaveClass(/ant-slide-(up|down)-(enter|appear)/);
 }
 
-/** Das offene Platzmenü bzw. die offene Auswahlliste (jeweils als Popup-Hülle). */
+/** Das offene Platzmenü (als Popup-Hülle); die Auswahlliste kommt aus `auswahl-kern.ts`. */
 const offenesPlatzmenue = (page: Page) => page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
-const offeneAuswahl = (page: Page) =>
-  page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
 
 /**
  * Startet einen Touch-Drag auf `quelle` in Richtung `zielMitte` und lässt ihn LAUFEN —
@@ -416,8 +415,10 @@ test.describe('UHS-Grundriss unter Touch', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('Patient zuweisen');
     await dialog.getByRole('combobox').tap();
-    await eingeblendet(offeneAuswahl(page));
-    await page.locator('.ant-select-item-option').filter({ hasText: personName }).tap();
+    const liste = await stehendeAuswahl(page);
+    await liste.locator('.ant-select-item-option').filter({ hasText: personName }).tap();
+    // Vorbedingung: ein verlorener Tipp wird hier rot, nicht erst an der leeren Karte.
+    await expect(dialog.locator('.ant-select-content')).toContainText(personName);
     // „Erfassen" ist der Vorgabetext der Erfassungshülle. Auf den Dialog eingegrenzt, weil
     // dieselbe Beschriftung auch an der Schnellerfassung hängt.
     await dialog.getByRole('button', { name: 'Erfassen', exact: true }).tap();

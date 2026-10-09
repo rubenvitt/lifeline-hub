@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -18,14 +19,6 @@ async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unkn
   const antwort = await page.request.post(pfad, data === undefined ? {} : { data });
   expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return (await antwort.json()) as T;
-}
-
-/** Option eines antd-`Select` im Portal, nur aus der geöffneten Liste. */
-async function waehleOption(page: Page, label: string) {
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle(label, { exact: true })
-    .click();
 }
 
 test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an die Einsatzleitung', async ({
@@ -135,8 +128,7 @@ test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', asy
   await expect(page.getByTestId('uhs-staerke')).toHaveText('0/0/0//0');
   await page.getByRole('button', { name: 'Kraft zuordnen' }).click();
   const dialog = page.getByRole('dialog', { name: 'Kraft zuordnen' });
-  await dialog.getByLabel('Kraft').click();
-  await waehleOption(page, 'Anna Arzt · Notarzt');
+  await waehleIn(dialog.getByLabel('Kraft'), 'Anna Arzt · Notarzt');
   await dialog.getByRole('button', { name: 'Zuordnen' }).click();
   await expect(page.getByTestId('uhs-staerke')).toHaveText('1/0/0//1');
   await expect(page.getByRole('row', { name: /Anna Arzt/ })).toBeVisible();
@@ -161,8 +153,7 @@ test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', asy
     const erfassen = laptop.getByRole('dialog', { name: 'Kraft erfassen' });
     await erfassen.getByLabel('Name').fill('Bernd Berg');
     await erfassen.getByLabel('Funktion').fill('Sanitäter');
-    await erfassen.getByLabel('Position').click();
-    await waehleOption(laptop, 'Mannschaft');
+    await waehleIn(erfassen.getByLabel('Position'), 'Mannschaft');
     await erfassen.getByRole('button', { name: 'Erfassen' }).click();
     await expect(laptop.getByTestId('uhs-staerke')).toHaveText('1/0/1//2');
 

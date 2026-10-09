@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import {
   detailBereit,
   einheitMitZuordnungen,
@@ -673,12 +674,7 @@ for (const { dichte, boden, abstand } of [
     const bezeichnung = page.getByRole('textbox', { name: 'Neue Bezeichnung', exact: true });
     const betriebsart = page.getByRole('combobox', { name: 'Neue Betriebsart', exact: true });
     await bezeichnung.fill('Messgruppe');
-    await betriebsart.click();
-    // AntD virtualisiert role=option in einen unsichtbaren ARIA-Hilfsknoten.
-    await page
-      .locator('.ant-select-dropdown:visible .ant-select-item-option-content')
-      .filter({ hasText: /^TMO$/ })
-      .click();
+    await waehleIn(betriebsart, 'TMO');
     const ergaenzt = [
       { name: 'Neue Bezeichnung', fokus: bezeichnung, huelle: bezeichnung },
       {

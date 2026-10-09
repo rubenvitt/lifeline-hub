@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 
 // Verbleib „Notunterkunft" an eine Betreuungsstelle knüpfen — Durchstich gegen das echte
 // Backend. Die Einzelheiten prüfen Vitest und `tests/verbleib_betreuungsstelle.rs`; hier geht
@@ -30,12 +31,7 @@ async function senden(
 
 /** Wählt in einem antd-Select des Dialogs einen Eintrag (der echte Optionsknoten, nicht der a11y-Spiegel). */
 async function waehle(page: Page, feld: string, eintrag: string) {
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('combobox', { name: feld }).click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle(eintrag)
-    .click();
+  await waehleIn(page.getByRole('dialog').getByRole('combobox', { name: feld }), eintrag);
 }
 
 async function zweiteSitzung(browser: Browser, benutzer: string, pw: string): Promise<Page> {
