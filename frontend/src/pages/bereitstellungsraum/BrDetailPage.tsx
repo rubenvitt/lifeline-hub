@@ -16,7 +16,13 @@ import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzB
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { BrStatus, Einheit, EinsatzFahrzeug } from '../../api/types';
+import type {
+  BrEinheitKurz,
+  BrFahrzeugKurz,
+  BrStatus,
+  Einheit,
+  EinsatzFahrzeug,
+} from '../../api/types';
 import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import SektionHeader from '../../components/SektionHeader';
@@ -26,6 +32,8 @@ import {
   Kennzahl,
   Kennzahlenband,
   monoStil,
+  Sammelbanner,
+  sammelbannerKurz,
   useRollen,
 } from '../../components/instrument';
 import StatusTag from '../../components/StatusTag';
@@ -38,6 +46,18 @@ import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { summiereStaerke } from '../../anzeige/staerke';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
+import { useDruckModus } from '../../components/druck/useDruckModus';
+import {
+  ordnungsschluessel,
+  useBelegungZufluss,
+  useHalteFlaeche,
+  zuflussText,
+} from './belegungZufluss';
+
+const EINHEIT_SCHLUESSEL = (e: BrEinheitKurz) => ordnungsschluessel(e.name);
+const FAHRZEUG_SCHLUESSEL = (f: BrFahrzeugKurz) => ordnungsschluessel(f.funkrufname);
+const KEINE_EINHEITEN: BrEinheitKurz[] = [];
+const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
 
 /** Die Bezeichnung reist nur für die Quittung mit, der Server bekommt allein `daten`. */
 type BelegungMitName = { daten: Parameters<typeof belegeBr>[2]; bezeichnung: string };
@@ -61,7 +81,7 @@ export default function BrDetailPage() {
   // keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
   const darf = useGeraetDarf();
   const verwalten = darf('br-verwalten');
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
   const listenPfad = bereitstellungsraeumeListePfad(einsatzId);
@@ -104,6 +124,25 @@ export default function BrDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
 
+  // ── Live-Zufluss der Belegung (LFH-1113, `belegungZufluss.ts`) ── Nur die gerenderten Listen
+  // nehmen `sichtbar`; Kennzahlen und „noch n belegt“ rechnen mit der vollen Menge, die Zahlen
+  // dürfen nicht lügen. Im Druck gilt die Schleuse nicht (wie `Datensicht`).
+  const { gehalten, flaeche } = useHalteFlaeche();
+  const druckt = useDruckModus();
+  const halten = gehalten && !druckt;
+  const einheitenZufluss = useBelegungZufluss(
+    detailQuery.data?.einheiten ?? KEINE_EINHEITEN,
+    EINHEIT_SCHLUESSEL,
+    halten,
+    brId,
+  );
+  const fahrzeugeZufluss = useBelegungZufluss(
+    detailQuery.data?.fahrzeuge ?? KEINE_FAHRZEUGE,
+    FAHRZEUG_SCHLUESSEL,
+    halten,
+    brId,
+  );
+
   const fehler = useFehlerMeldung();
 
   const statusMut = useMutation({
@@ -130,6 +169,11 @@ export default function BrDetailPage() {
     // `kommunikation/rueckgaengig.tsx`).
     onSuccess: (_antwort, belegung) => {
       message.success({ content: belegungsQuittung(belegung), key: 'br-belegung' });
+      // Die eigene Anmeldung steht sofort, auch wenn die Schleuse hält — VOR der Invalidierung.
+      const { objekt_typ, objekt_id, art } = belegung.daten;
+      if (art === 'eintritt') {
+        (objekt_typ === 'einheit' ? einheitenZufluss : fahrzeugeZufluss).merkeEigene(objekt_id);
+      }
       invalidate();
     },
     onError: fehler,
@@ -203,6 +247,30 @@ export default function BrDetailPage() {
     ? null
     : summiereStaerke(bereitgestellt, einheitenQuery.data ?? bereitgestellt);
   const fahrzeugZahl = br.fahrzeuge.length;
+
+  /**
+   * Der Banner steht im Kopf seiner Liste, in einem Platz fester Höhe: erschiene er über der
+   * Liste, schöbe er selbst die Zeilen unter dem Zeiger. Kurzform („1 neu“), der volle Satz geht
+   * an den Vorleser.
+   */
+  function bannerPlatz(
+    zufluss: { zurueckgehalten: readonly unknown[]; umgeordnet: boolean; gibFrei: () => void },
+    woerter: readonly [string, string],
+  ) {
+    const n = zufluss.zurueckgehalten.length;
+    return (
+      <div style={{ minHeight: token.controlHeight, display: 'flex', alignItems: 'center' }}>
+        {(n > 0 || zufluss.umgeordnet) && (
+          <Sammelbanner
+            aktion={{ label: 'anzeigen', onKlick: zufluss.gibFrei }}
+            kurz={sammelbannerKurz(n, zufluss.umgeordnet)}
+          >
+            {zuflussText(n, woerter, zufluss.umgeordnet)}
+          </Sammelbanner>
+        )}
+      </div>
+    );
+  }
   // Wie `aktive_belegungen_tx` im Server: belegte Einheiten und Fahrzeuge.
   const belegt = br.einheiten.length + fahrzeugZahl;
 
@@ -324,69 +392,81 @@ export default function BrDetailPage() {
               />
             </Kennzahlenband>
           </div>
-          <SektionHeader titel="Bereitgestellte Einheiten" />
-          <Liste
-            style={{ marginBottom: abstand.lg }}
-            dataSource={br.einheiten}
-            emptyText="Keine Einheiten bereitgestellt"
-            renderItem={(e) => (
-              <ListenEintrag
-                actions={
-                  !schreibgeschuetzt
-                    ? [
-                        <Button
-                          key="entfernen"
-                          danger
-                          onClick={() => onEntfernenEinheit(e)}
-                          loading={belegungMut.isPending}
-                        >
-                          entfernen
-                        </Button>,
-                      ]
-                    : []
-                }
-              >
-                <Space wrap>
-                  <span>{e.name}</span>
-                  {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
-                  <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
-                    <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
-                  </span>
-                </Space>
-              </ListenEintrag>
-            )}
-          />
+          {/* Die Halte-Fläche umfasst BEIDE Listen: eine eingeschobene Einheit schöbe auch die
+              Fahrzeugliste darunter. */}
+          <div data-testid="br-belegung" {...flaeche}>
+            <SektionHeader
+              titel="Bereitgestellte Einheiten"
+              extra={bannerPlatz(einheitenZufluss, ['neue Einheit', 'neue Einheiten'])}
+            />
+            <Liste
+              style={{ marginBottom: abstand.lg }}
+              dataSource={einheitenZufluss.sichtbar}
+              emptyText="Keine Einheiten bereitgestellt"
+              renderItem={(e) => (
+                <ListenEintrag
+                  actions={
+                    !schreibgeschuetzt
+                      ? [
+                          <Button
+                            key="entfernen"
+                            danger
+                            onClick={() => onEntfernenEinheit(e)}
+                            loading={belegungMut.isPending}
+                          >
+                            entfernen
+                          </Button>,
+                        ]
+                      : []
+                  }
+                >
+                  <Space wrap>
+                    <span>{e.name}</span>
+                    {einheitVon.get(e.id)?.typ_label && (
+                      <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>
+                    )}
+                    <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                      <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
+                    </span>
+                  </Space>
+                </ListenEintrag>
+              )}
+            />
 
-          <SektionHeader titel="Bereitgestellte Fahrzeuge" />
-          <Liste
-            dataSource={br.fahrzeuge}
-            emptyText="Keine Fahrzeuge bereitgestellt"
-            renderItem={(f) => (
-              <ListenEintrag
-                actions={
-                  !schreibgeschuetzt
-                    ? [
-                        <Button
-                          key="entfernen"
-                          danger
-                          onClick={() => onEntfernenFahrzeug(f)}
-                          loading={belegungMut.isPending}
-                        >
-                          entfernen
-                        </Button>,
-                      ]
-                    : []
-                }
-              >
-                <Space wrap>
-                  <span style={monoStil(13)}>{f.funkrufname}</span>
-                  {fahrzeugVon.get(f.id)?.fahrzeugtyp && (
-                    <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>
-                  )}
-                </Space>
-              </ListenEintrag>
-            )}
-          />
+            <SektionHeader
+              titel="Bereitgestellte Fahrzeuge"
+              extra={bannerPlatz(fahrzeugeZufluss, ['neues Fahrzeug', 'neue Fahrzeuge'])}
+            />
+            <Liste
+              dataSource={fahrzeugeZufluss.sichtbar}
+              emptyText="Keine Fahrzeuge bereitgestellt"
+              renderItem={(f) => (
+                <ListenEintrag
+                  actions={
+                    !schreibgeschuetzt
+                      ? [
+                          <Button
+                            key="entfernen"
+                            danger
+                            onClick={() => onEntfernenFahrzeug(f)}
+                            loading={belegungMut.isPending}
+                          >
+                            entfernen
+                          </Button>,
+                        ]
+                      : []
+                  }
+                >
+                  <Space wrap>
+                    <span style={monoStil(13)}>{f.funkrufname}</span>
+                    {fahrzeugVon.get(f.id)?.fahrzeugtyp && (
+                      <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>
+                    )}
+                  </Space>
+                </ListenEintrag>
+              )}
+            />
+          </div>
         </div>
 
         <KraefteOhneBrSidebar
