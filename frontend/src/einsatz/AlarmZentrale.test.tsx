@@ -6,7 +6,7 @@ import utc from 'dayjs/plugin/utc';
 import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate, useParams } from 'react-router';
-import AlarmZentrale from './AlarmZentrale';
+import AlarmZentrale, { sammelWortStil } from './AlarmZentrale';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { istAlarmGemutet } from '../alarm/alarmTon';
@@ -1194,5 +1194,18 @@ describe('AlarmZentrale: Meldungen über den Service Worker (LFH-1062)', () => {
     await waitFor(() => expect(sw).toHaveLength(0));
     act(() => klick(id));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen');
+  });
+});
+
+describe('AlarmZentrale: Wort der gebündelten Marke (LFH-1108)', () => {
+  it('bricht auf dem Handschirm ab 48 px Steuerhöhe auf das längste Wort um, sonst einzeilig', () => {
+    expect(sammelWortStil(30, true)).toEqual({});
+    for (const hoehe of [48, 72]) {
+      expect(sammelWortStil(hoehe, true)).toMatchObject({
+        whiteSpace: 'normal',
+        width: 'min-content',
+      });
+      expect(sammelWortStil(hoehe, false)).toEqual({});
+    }
   });
 });

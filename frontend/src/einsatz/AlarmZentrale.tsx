@@ -7,8 +7,17 @@ import {
 } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { alsZeitpunkt, zuWanduhr } from '../anzeige/zeitEingabe';
-import { App, Button, Dropdown, Tooltip } from 'antd';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { App, Button, Dropdown, Tooltip, theme } from 'antd';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { useNavigate } from 'react-router';
 import {
   ALARM_TON_STATUS_EVENT,
@@ -49,6 +58,19 @@ import { farbenDunkel, rahmenFarben } from '../theme/tokens';
  */
 function alarmKnopfFarbe(auffaellig: boolean): string {
   return auffaellig ? farbenDunkel.achtung : rahmenFarben.gedaempft;
+}
+
+/**
+ * Wort der gebündelten Marke. Auf dem Handschirm ab 48 px Steuerhöhe steht jedes Wort auf eigener
+ * Zeile und die Marke ist so breit wie ihr längstes Wort: „Benachrichtigung blockiert“ machte die
+ * Kopfgruppe auf 390 px in Handschuh-Dichte so breit wie den Schirm, sie brach auf zwei Kopfzeilen
+ * um, und der Wechsel auf „Ton blockiert“ ließ die Seite 72 px springen (LFH-1108). In `kompakt`
+ * hätten zwei Zeilen in 30 px keinen Platz. Auf dem Tablet bleibt das Wort einzeilig: dort hält
+ * die rechte Gruppe den Platz, den der Einsatzname für seine Trefffläche braucht.
+ */
+export function sammelWortStil(steuerHoehe: number, schmal: boolean): CSSProperties {
+  if (!schmal || steuerHoehe < 48) return {};
+  return { whiteSpace: 'normal', width: 'min-content', lineHeight: 1.25, textAlign: 'start' };
 }
 
 dayjs.extend(utc);
@@ -703,6 +725,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   // Tooltip erscheint auf Touch erst NACH dem Tipp, und der Tipp auf die Glocke schaltete den Ton
   // sofort und für jeden Einsatz stumm. Das Menü nennt Handlung und Zustand, bevor etwas schaltet.
   const { istSchmal, abBreite, istBeruehrung } = useViewport();
+  const { token } = theme.useToken();
   const knapp = !abBreite('xl');
   const buendeln = istSchmal || (knapp && istBeruehrung);
 
@@ -824,7 +847,9 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
             flexShrink: 0,
           }}
         >
-          {istSchmal || sammelAuffaellig ? sammelText : null}
+          {istSchmal || sammelAuffaellig ? (
+            <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
+          ) : null}
         </Button>
       </Dropdown>
     );
