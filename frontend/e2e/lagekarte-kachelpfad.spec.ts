@@ -109,7 +109,13 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
     layer: KACHEL_LAYER,
   });
   /** Die URLs, mit denen der Worker die Kacheln tatsächlich angefragt hat. */
-  const kachelAnfragen = await kachelnBeantworten(page, KACHEL_PRAEFIX, KACHEL_LAYER);
+  const kachelCookies: string[] = [];
+  const kachelAnfragen = await kachelnBeantworten(
+    page,
+    KACHEL_PRAEFIX,
+    KACHEL_LAYER,
+    kachelCookies,
+  );
 
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page);
@@ -174,6 +180,15 @@ test('Lagekarte: Kachel-Pfad — absolutiereProxyAnfrage läuft, der Worker holt
     // MapLibre nie (deshalb String-Konkatenation statt `new URL()` in `basemapStil.ts`).
     expect(url).not.toContain('%7B');
     expect(url).not.toContain('{');
+  }
+  // Der Kachel-Proxy verlangt eine Sitzung (LFH-1072): auch der Worker-Fetch trägt das
+  // Sitzungs-Cookie, sonst bliebe die Online-Karte für jeden leer. GEWARTET: der Kopf kommt erst
+  // nach `allHeaders()` in die Liste, eine leere Liste bewiese nichts.
+  await expect
+    .poll(() => kachelCookies.length, { timeout: 20_000, message: 'kein Cookie-Kopf gelesen' })
+    .toBeGreaterThan(0);
+  for (const cookie of [...kachelCookies]) {
+    expect(cookie, 'Kachel-Anfrage ohne Sitzungs-Cookie').toMatch(/(^|;\s*)lifeline_sid=/);
   }
 
   // (3) Der Worker hat die Antwort GELESEN: tragend ist das DEKODIERTE MERKMAL, nicht
