@@ -277,6 +277,13 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     expect(r!.koerper).toMatch(/break-before:\s*page/);
   });
 
+  /** LFH-1096: in der Mappe der Hilfe beginnt jedes weitere Kapitel auf einer neuen Seite. */
+  it('beginnt jedes weitere Kapitel einer Mappe auf einer neuen Seite', () => {
+    const r = regelFuer(`${WURZEL} [data-lfh='druck-kapitel'] + [data-lfh='druck-kapitel']`);
+    expect(r, 'keine Kapitel-Regel').toBeDefined();
+    expect(r!.koerper).toMatch(/break-before:\s*page/);
+  });
+
   it('schreibt break-* statt page-break-*', () => {
     expect(css).not.toMatch(/page-break-/);
   });

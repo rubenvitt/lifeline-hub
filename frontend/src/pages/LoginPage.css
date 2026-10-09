@@ -146,3 +146,8 @@
     animation: none;
   }
 }
+
+/* Hilfe (LFH-1096): ein Weg zum Kapitel „Anmelden und Abmelden“, unter allem anderen. */
+.login-hilfe {
+  margin-top: 16px;
+}

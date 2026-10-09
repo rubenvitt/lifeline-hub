@@ -69,6 +69,8 @@ import {
   parseRouteId,
   ueberblickPfad,
   parseMeldungInhalt,
+  hilfePfad,
+  parseHilfeGruppe,
 } from './deeplinks';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { STANDARDUMFANG } from '../druck/einsatzbericht/auswahl';
@@ -863,5 +865,22 @@ describe('parseMeldungInhalt (Verpflegungsgerät, LFH-1044)', () => {
 
   it('kappt auf die Grenze des Inhalts', () => {
     expect(parseMeldungInhalt(params('x'.repeat(ETB_INHALT_MAX + 5)))).toHaveLength(ETB_INHALT_MAX);
+  });
+});
+
+describe('hilfePfad / parseHilfeGruppe (LFH-1096)', () => {
+  it('lässt die Vorgabe „alle“ aus der Adresse', () => {
+    expect(hilfePfad()).toBe('/hilfe');
+    expect(hilfePfad({ gruppe: 'alle' })).toBe('/hilfe');
+    expect(hilfePfad({ kapitel: 'ohne-netz', gruppe: 'administration' })).toBe(
+      '/hilfe/ohne-netz?gruppe=administration',
+    );
+  });
+
+  it('liest die Gruppe zurück, Unbekanntes wird „alle“', () => {
+    const rund = new URL(hilfePfad({ gruppe: 'geraete' }), 'http://x').searchParams;
+    expect(parseHilfeGruppe(rund)).toBe('geraete');
+    expect(parseHilfeGruppe(new URLSearchParams('gruppe=leitstelle'))).toBe('alle');
+    expect(parseHilfeGruppe(new URLSearchParams(''))).toBe('alle');
   });
 });

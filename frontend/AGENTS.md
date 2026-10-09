@@ -310,6 +310,9 @@ anwendbar), „nicht geprüft" ist keins.
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
   Modulbeschreibungen aus wenigen Fachwörtern.
+- **Erklärendes gehört in die Anwenderdokumentation** (`docs/anwender/`, in der App unter
+  „Hilfe“, LFH-1096): wer einen Erklärsatz entfernt, dessen Wissen sonst nirgends steht, schreibt
+  es dort ins Kapitel. Regeln: `docs/anwender/AGENTS.md`.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist seit LFH-1078 P7 leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.

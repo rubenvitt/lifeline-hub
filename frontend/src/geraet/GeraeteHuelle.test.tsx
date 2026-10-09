@@ -258,6 +258,17 @@ describe('Gerätehülle — Kopfzeile', () => {
     await user.click(await screen.findByRole('menuitem', { name: /Handschuh/ }));
     expect(localStorage.getItem('lifeline-hub.dichte')).toBe('handschuh');
   });
+
+  it('Hilfe aus dem Gerätemenü, zurück führt „Zum Gerät“ (LFH-1096)', async () => {
+    vi.useRealTimers();
+    stelleBereit();
+    renderApp('/geraet');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Gerätemenü' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Hilfe/ }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Zum Gerät' })).toBeVisible();
+  });
 });
 
 describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {

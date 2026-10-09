@@ -11,7 +11,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
-  `fuehrungsorganisation-druck`, `dokument-anlage-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
@@ -21,6 +21,11 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nicht „letzter Abruf gelungen"). **Kein
   `window.print()` direkt**, nie aus dem Passiv-Effekt. `components/druck/useDruckModus.ts`
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
+- **Ohne Organisation druckt nur die Hilfe** (LFH-1096): `DruckKnopf ohneOrganisation` wartet
+  nicht auf Kopf und Logo und fragt `/api/organisation` gar nicht (die Hilfe ist ohne Anmeldung
+  offen). Jedes Druckstück einer Organisation oder eines Einsatzes bleibt beim Druckkopf. Die
+  Mappe der Hilfe beginnt jedes weitere Kapitel auf neuer Seite (`data-lfh="druck-kapitel"`),
+  Nachweis `e2e/hilfe-druck.spec.ts`.
 - Ein Editor druckt nie seine `<textarea>` (`MarkdownEditor` `druckfassung`).
 - **Abschnittstitel stehen im Titelblock** (LFH-1008): Firefox setzt `break-after: avoid` nicht
   um, ein Titel bliebe allein am Seitenende. Titel und erster Block teilen sich eine Hülle

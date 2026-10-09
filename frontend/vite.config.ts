@@ -2,7 +2,8 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA, type ManifestOptions } from 'vite-plugin-pwa';
 
@@ -167,6 +168,14 @@ export default defineConfig(({ mode }) => {
       strictPort: false,
       proxy: {
         '/api': { target: backendUrl, changeOrigin: true },
+      },
+      // Die Hilfe bindet die Anwenderdokumentation aus `docs/anwender/` ein (LFH-1096); sie liegt
+      // außerhalb der Workspace-Wurzel `frontend/`, Dev-Server und Vitest verweigerten sie sonst.
+      fs: {
+        allow: [
+          searchForWorkspaceRoot(process.cwd()),
+          fileURLToPath(new URL('../docs/anwender', import.meta.url)),
+        ],
       },
     },
     test: {

@@ -28,6 +28,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Client und Server |
 | `frontend/src/geraet/AGENTS.md` | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
+| `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Inhalts- und Mitänderungsregel, Hilfe in der App |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, Anhänge, Schutzköpfe, Org-Ereignisse, Demo-Daten, Aufbewahrung, ClamAV |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |

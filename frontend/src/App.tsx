@@ -109,6 +109,7 @@ import { modulRegistry } from './einsatz/modulRegistry';
 import {
   EINSTELLUNGEN_SEKTIONEN,
   GERAET_START_PFAD,
+  HILFE_PFAD,
   KOPPELN_PFAD,
   KOPPLUNG_BEENDET_PFAD,
 } from './routing/deeplinks';
@@ -122,6 +123,8 @@ const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
 // MapLibre gehört nicht ins Bündel der Gerätehülle (wie `LagekartePage`).
 const GeraetAbschnittKarte = lazy(() => import('./geraet/GeraetAbschnittKarte'));
+// Hilfe (LFH-1096): eigener Chunk mit den Kapiteltexten; der Service Worker hält ihn vor.
+const HilfePage = lazy(() => import('./hilfe/HilfePage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -237,6 +240,18 @@ function SitzungsLayout() {
 export const appRouten = createRoutesFromElements(
   <Route element={<App />}>
     <Route path="/login" element={<LoginPage />} />
+    {/* Hilfe (LFH-1096): ohne Sitzung offen, das Kapitel „Anmelden“ braucht man davor. */}
+    {[HILFE_PFAD, `${HILFE_PFAD}/:kapitel`].map((pfad) => (
+      <Route
+        key={pfad}
+        path={pfad}
+        element={
+          <Suspense fallback={null}>
+            <HilfePage />
+          </Suspense>
+        }
+      />
+    ))}
     {/* Gerätekopplung (LFH-892): Einlösen und Ende ohne Sitzung, ohne Anmeldung für Personen. */}
     <Route path={KOPPELN_PFAD} element={<KoppelnPage />} />
     <Route path={KOPPLUNG_BEENDET_PFAD} element={<KopplungBeendetPage />} />
