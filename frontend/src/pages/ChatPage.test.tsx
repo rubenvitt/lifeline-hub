@@ -4,7 +4,7 @@ import { Link, Route, Routes } from 'react-router';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import ChatPage from './ChatPage';
 import type { ChatKanal, ChatNachricht } from '../api/types';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
@@ -731,5 +731,406 @@ describe('ChatPage — Kanal anlegen unter md (LFH-976)', () => {
     expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
     // Der Grund steht am Fuß, für Leiste und Spalte gleich (M16).
     expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Ablehnungen am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): jeder Dialog trägt
+ * seinen Grund, die Lösch-Rückfrage wartet auf die Antwort, „Bezug entfernen“ meldet an der
+ * Nachricht; kein Fehler-Toast.
+ */
+describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
+  const eigene2: ChatNachricht = { ...nachricht, id: 6, inhalt: 'Zweite Lage' };
+  const mitBezug = (n: ChatNachricht): ChatNachricht => ({ ...n, bezug_typ: 'uhs', bezug_id: 3 });
+
+  /** Basis wie `setup`, dazu die Bezug-Listen und gezielte Schreib-Handler je Test. */
+  function setupFehler(nachrichten: ChatNachricht[] = [nachricht], client = neuerQueryClient()) {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/:id', ({ params }) =>
+        HttpResponse.json({ ...einsatz, id: Number(params.id) }),
+      ),
+      http.get('/api/einsaetze/:id/chat/kanaele', ({ params }) =>
+        HttpResponse.json([{ ...kanal, einsatz_id: Number(params.id) }]),
+      ),
+      http.get('/api/einsaetze/:id/chat/kanaele/1/nachrichten', ({ params }) =>
+        HttpResponse.json(params.id === '7' ? nachrichten : []),
+      ),
+      ...[
+        'uhs',
+        'schaeden/auswahl',
+        'personen/auswahl',
+        'lageberichte',
+        'meldungen',
+        'auftraege',
+        'abschnitte',
+        'einheiten',
+      ].map((pfad) => http.get(`/api/einsaetze/:id/${pfad}`, () => HttpResponse.json([]))),
+    );
+    return renderMitProviders(
+      <>
+        <Link to="/einsaetze/8/chat">Zu Einsatz B</Link>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/7/chat', client },
+    );
+  }
+
+  /** Der offene Dialog; rc-dialog lässt einen schließenden in jsdom stehen. */
+  const offenerDialog = () =>
+    waitFor(() => {
+      const offen = screen
+        .getAllByRole('dialog')
+        .filter((d) => d.closest('.ant-zoom-leave') == null);
+      expect(offen).toHaveLength(1);
+      return offen[0];
+    });
+  async function aktion(name: string, index = 0) {
+    await userEvent.click(
+      screen.getAllByRole('button', { name: /^Aktionen zu Nachricht von / })[index],
+    );
+    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+    );
+    await userEvent.click(within(offen[offen.length - 1]).getByRole('menuitem', { name }));
+    return offenerDialog();
+  }
+  const zeile = (text: string) =>
+    screen.getByText(text, { ignore: 'textarea' }).closest('li') as HTMLElement;
+  const gehalten = () => new Promise<never>(() => {});
+
+  it('Bearbeiten: der Grund steht im Dialog, der Text bleibt, kein Toast', async () => {
+    setupFehler();
+    server.use(
+      http.patch('/api/einsaetze/7/chat/nachrichten/5', () =>
+        HttpResponse.json({ error: 'Zu spät zum Bearbeiten' }, { status: 409 }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Bearbeiten');
+    await userEvent.type(within(dialog).getByLabelText('Text'), ' ergänzt');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Nachricht nicht gespeichert');
+    expect(grund).toHaveTextContent('Zu spät zum Bearbeiten');
+    expect(within(dialog).getByLabelText('Text')).toHaveValue('Erste Lage ergänzt');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Bearbeiten: das nächste Speichern räumt, Abbrechen bleibt bis dahin gesperrt', async () => {
+    let aufrufe = 0;
+    setupFehler();
+    server.use(
+      http.patch('/api/einsaetze/7/chat/nachrichten/5', () => {
+        aufrufe += 1;
+        return aufrufe === 2
+          ? gehalten()
+          : HttpResponse.json({ error: 'Zu spät zum Bearbeiten' }, { status: 409 });
+      }),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Bearbeiten');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await within(dialog).findByRole('alert');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(aufrufe).toBe(2));
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('Bearbeiten: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    setupFehler();
+    server.use(
+      http.patch('/api/einsaetze/7/chat/nachrichten/5', () =>
+        HttpResponse.json({ error: 'Zu spät zum Bearbeiten' }, { status: 409 }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Bearbeiten');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await within(dialog).findByRole('alert');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    const wieder = await aktion('Bearbeiten');
+    expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
+
+  it('Löschen: die Rückfrage wartet auf die Antwort und nennt eine Ablehnung', async () => {
+    let lehneAb: () => void = () => {};
+    setupFehler();
+    server.use(
+      http.delete(
+        '/api/einsaetze/7/chat/nachrichten/5',
+        () =>
+          new Promise<Response>((r) => {
+            lehneAb = () =>
+              r(HttpResponse.json({ error: 'Bereits heraufgestuft' }, { status: 409 }));
+          }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Löschen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ja, löschen' }));
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled(),
+    );
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+    await act(async () => lehneAb());
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht gelöscht');
+    expect(grund).toHaveTextContent('Bereits heraufgestuft');
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Löschen: Abbrechen und Öffnen zeigen nichts Altes, „Ja, löschen“ räumt', async () => {
+    let aufrufe = 0;
+    setupFehler();
+    server.use(
+      http.delete('/api/einsaetze/7/chat/nachrichten/5', () => {
+        aufrufe += 1;
+        return aufrufe === 2
+          ? gehalten()
+          : HttpResponse.json({ error: 'Bereits heraufgestuft' }, { status: 409 });
+      }),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Löschen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ja, löschen' }));
+    await within(dialog).findByRole('alert');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+
+    const wieder = await aktion('Löschen');
+    expect(within(wieder).queryByRole('alert')).toBeNull();
+    await userEvent.click(within(wieder).getByRole('button', { name: 'Ja, löschen' }));
+    await waitFor(() => expect(aufrufe).toBe(2));
+    expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
+
+  it('Löschen: schließt beim Erfolg', async () => {
+    const nachrichten = [nachricht];
+    setupFehler(nachrichten);
+    server.use(
+      http.delete('/api/einsaetze/7/chat/nachrichten/5', () => {
+        nachrichten[0] = { ...nachricht, geloescht_at: '2026-06-10 11:00:00' };
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Löschen');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ja, löschen' }));
+    await waitFor(() => expect(dialog.closest('.ant-zoom-leave')).not.toBeNull());
+  });
+
+  it('Kanal anlegen: der Grund steht im Dialog, kein Toast', async () => {
+    setupFehler();
+    server.use(
+      http.post('/api/einsaetze/7/chat/kanaele', () =>
+        HttpResponse.json({ error: 'Name vergeben' }, { status: 409 }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    await userEvent.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
+    const dialog = await offenerDialog();
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Allgemein');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Kanal nicht angelegt');
+    expect(grund).toHaveTextContent('Name vergeben');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Zu ETB: der Grund steht im Dialog, kein Toast', async () => {
+    setupFehler();
+    server.use(
+      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-etb', () =>
+        HttpResponse.json({ error: 'ETB gesperrt' }, { status: 409 }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Zu ETB');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Heraufstufen' }));
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht heraufgestuft');
+    expect(grund).toHaveTextContent('ETB gesperrt');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Zu Auftrag: der Grund steht im Dialog, ohne Ausweg während des Sendens', async () => {
+    let aufrufe = 0;
+    setupFehler();
+    server.use(
+      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-auftrag', () => {
+        aufrufe += 1;
+        return aufrufe === 2
+          ? gehalten()
+          : HttpResponse.json({ error: 'Empfänger unbekannt' }, { status: 422 });
+      }),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Zu Auftrag');
+    await userEvent.type(within(dialog).getByLabelText('Empfänger'), 'EA Nord{Enter}');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Auftrag nicht erteilt');
+    expect(grund).toHaveTextContent('Empfänger unbekannt');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(aufrufe).toBe(2));
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+  });
+
+  it('Zu Auftrag: Schließen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    setupFehler();
+    server.use(
+      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-auftrag', () =>
+        HttpResponse.json({ error: 'Empfänger unbekannt' }, { status: 422 }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Zu Auftrag');
+    await userEvent.type(within(dialog).getByLabelText('Empfänger'), 'EA Nord{Enter}');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    const wieder = await aktion('Zu Auftrag');
+    expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
+
+  it('Bezug setzen: der Grund steht im Dialog, kein Toast', async () => {
+    setupFehler([mitBezug(nachricht)]);
+    server.use(
+      http.get('/api/einsaetze/:id/uhs', () =>
+        HttpResponse.json([{ id: 3, bezeichnung: 'BHP 1', typ: 'behandlungsplatz' }]),
+      ),
+      http.put('/api/einsaetze/7/chat/nachrichten/5/bezug', () =>
+        HttpResponse.json({ error: 'Objekt storniert' }, { status: 422 }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Bezug ändern');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Bezug nicht gesetzt');
+    expect(grund).toHaveTextContent('Objekt storniert');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  /** `useMutation` verfolgt nur den letzten Aufruf; der Grund kommt aus den Callbacks. */
+  it('Bezug entfernen: zwei Nachrichten nebenläufig, der Grund steht an seiner', async () => {
+    let lehneAb: () => void = () => {};
+    let loesen5 = 0;
+    setupFehler([mitBezug(nachricht), mitBezug(eigene2)]);
+    server.use(
+      http.delete('/api/einsaetze/7/chat/nachrichten/5/bezug', () => {
+        loesen5 += 1;
+        if (loesen5 > 1) return gehalten();
+        return new Promise<Response>((r) => {
+          lehneAb = () => r(HttpResponse.json({ error: 'Bezug gesperrt' }, { status: 409 }));
+        });
+      }),
+      http.delete('/api/einsaetze/7/chat/nachrichten/6/bezug', () => HttpResponse.json(eigene2)),
+    );
+    await screen.findByText('Zweite Lage');
+    const schliessen = (text: string) =>
+      zeile(text).querySelector('.ant-tag-close-icon') as HTMLElement;
+    await userEvent.click(schliessen('Erste Lage'));
+    await userEvent.click(schliessen('Zweite Lage'));
+    await screen.findByText('Bezug entfernt');
+    await act(async () => lehneAb());
+
+    expect(await within(zeile('Erste Lage')).findByText('Bezug gesperrt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(zeile('Zweite Lage').querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+
+    // Das nächste Lösen räumt den Grund, schon bevor seine Antwort da ist.
+    await userEvent.click(schliessen('Erste Lage'));
+    await waitFor(() => expect(loesen5).toBe(2));
+    await waitFor(() =>
+      expect(within(zeile('Erste Lage')).queryByText('Bezug gesperrt')).toBeNull(),
+    );
+  });
+
+  it('meldet eine Ablehnung aus dem vorigen Einsatz nicht im neuen', async () => {
+    let lehneAb: (() => void) | null = null;
+    const geladen: string[] = [];
+    const client = neuerQueryClient();
+    setupFehler([mitBezug(nachricht)], client);
+    server.use(
+      http.get('/api/einsaetze/:id/chat/kanaele/1/nachrichten', ({ params }) => {
+        geladen.push(String(params.id));
+        return HttpResponse.json([mitBezug(nachricht)]);
+      }),
+      http.delete(
+        '/api/einsaetze/7/chat/nachrichten/5/bezug',
+        () =>
+          new Promise<Response>((r) => {
+            lehneAb = () => r(HttpResponse.json({ error: 'Bezug gesperrt' }, { status: 409 }));
+          }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    await userEvent.click(zeile('Erste Lage').querySelector('.ant-tag-close-icon') as HTMLElement);
+    // Erst wechseln, wenn die Anfrage des vorigen Einsatzes beim Server liegt.
+    await waitFor(() => expect(lehneAb).not.toBeNull());
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz B' }));
+    await waitFor(() => expect(geladen).toContain('8'));
+    await screen.findByText('Erste Lage');
+    act(() => lehneAb?.());
+    // Erst prüfen, wenn die Ablehnung angekommen ist und die Beobachter sie gesehen haben.
+    await waitFor(() => expect(client.getMutationCache().getAll()[0]?.state.status).toBe('error'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+  });
+
+  it('Bearbeiten: eine Antwort aus dem vorigen Einsatz sperrt und meldet den Dialog nicht', async () => {
+    let lehneAb: (() => void) | null = null;
+    const geladen: string[] = [];
+    const client = neuerQueryClient();
+    setupFehler([nachricht], client);
+    server.use(
+      http.get('/api/einsaetze/:id/chat/kanaele/1/nachrichten', ({ params }) => {
+        geladen.push(String(params.id));
+        return HttpResponse.json([nachricht]);
+      }),
+      http.patch(
+        '/api/einsaetze/7/chat/nachrichten/5',
+        () =>
+          new Promise<Response>((r) => {
+            lehneAb = () =>
+              r(HttpResponse.json({ error: 'Zu spät zum Bearbeiten' }, { status: 409 }));
+          }),
+      ),
+    );
+    await screen.findByText('Erste Lage');
+    const vorher = await aktion('Bearbeiten');
+    await userEvent.click(within(vorher).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(lehneAb).not.toBeNull());
+
+    await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz B' }));
+    await waitFor(() => expect(geladen).toContain('8'));
+    await screen.findByText('Erste Lage');
+    const dialog = await aktion('Bearbeiten');
+    // Das laufende Speichern des vorigen Einsatzes sperrt hier kein Abbrechen.
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+    act(() => lehneAb?.());
+    await waitFor(() => expect(client.getMutationCache().getAll()[0]?.state.status).toBe('error'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(within(dialog).queryByRole('alert')).toBeNull();
   });
 });

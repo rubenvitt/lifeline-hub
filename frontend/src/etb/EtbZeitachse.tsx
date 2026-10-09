@@ -18,6 +18,8 @@ import Markdown from '../components/Markdown';
 import Fundstellen from '../components/Fundstellen';
 import { fundstellen as fundstellenIn, suchphrasen } from '../components/volltextFundstellen';
 import { SeitenSkeleton } from '../components/SeitenZustand';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 import {
   Augenbraue,
   Sammelbanner,
@@ -88,6 +90,11 @@ interface Props {
   onErneutSenden?: (puffer: AbgelehnterEintrag) => void;
   /** Abgelehnten Eintrag endgültig verwerfen. */
   onVerwerfen?: (puffer: AbgelehnterEintrag) => void;
+  /**
+   * Grund, aus dem „Erneut senden“ an dieser Zeile scheiterte, je Zeilenschlüssel (LFH-1077,
+   * `components/useZeilenFehler.ts`). Er steht an der Zeile, nicht im Toast.
+   */
+  zeilenFehler?: (schluessel: string) => ZeilenGrund | null;
   /** Der Abruf läuft noch — über die Menge wird dann nichts behauptet (LFH-331 · B3). */
   ladend?: boolean;
   /** Der Abruf ist gescheitert. Die Meldung gehört der Seite; hier nur die Unterdrückung. */
@@ -187,6 +194,7 @@ export default function EtbZeitachse({
   auftragGesperrt = false,
   onErneutSenden,
   onVerwerfen,
+  zeilenFehler,
   ladend,
   fehler,
   leerText,
@@ -283,6 +291,7 @@ export default function EtbZeitachse({
       kannAuftrag={onAuftragErteilen != null}
       auftragGesperrt={auftragGesperrt}
       aufrufe={aufrufe}
+      fehler={z.art === 'abgelehnt' ? (zeilenFehler?.(z.schluessel) ?? null) : null}
     />
   );
 
@@ -386,6 +395,8 @@ interface ZeilenProps {
   kannAuftrag: boolean;
   auftragGesperrt: boolean;
   aufrufe: ZeilenAufrufe;
+  /** Grund eines gescheiterten „Erneut senden“; derselbe Wert, solange er steht (`memo`). */
+  fehler: ZeilenGrund | null;
 }
 
 /**
@@ -407,6 +418,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
   kannAuftrag,
   auftragGesperrt,
   aufrufe,
+  fehler,
 }: ZeilenProps) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
@@ -595,6 +607,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
               // Ausstehend sagt der Chip „vorgemerkt“ in der Meta-Zeile; ein Satz darunter
               // wiederholte ihn (LFH-1078).
               z.art === 'abgelehnt' ? `Vom Server abgelehnt: ${z.puffer.grund}` : null,
+              fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />,
               // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit — die Zahl macht
               // sichtbar, DASS sie mitgehen.
               anhangZahl(p.eintrag.anhang_ids),

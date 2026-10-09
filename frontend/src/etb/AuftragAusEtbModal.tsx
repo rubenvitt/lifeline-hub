@@ -1,6 +1,7 @@
 import { Modal, Typography } from 'antd';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
+import type { Speicherung } from '../components/Erfassung';
 
 interface Props {
   eintrag: EtbEintragAnzeige | null;
@@ -9,6 +10,12 @@ interface Props {
   /** Für die Katalogauswahl der Funktionen (LFH-549). */
   einsatzId?: number;
   senden: boolean;
+  /**
+   * Die Anlege-Mutation (LFH-1077): ihr Grund steht im Dialog, und solange sie läuft, schließt er
+   * nicht — sonst hätte eine Ablehnung keinen Ort mehr (`frontend/AGENTS.md`, „Rückwege und
+   * Fehler“).
+   */
+  speicherung?: Speicherung;
   onAbbrechen: () => void;
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
 }
@@ -27,15 +34,26 @@ export default function AuftragAusEtbModal({
   einsatzId,
   einheiten,
   senden,
+  speicherung,
   onAbbrechen,
   onAnlegen,
 }: Props) {
+  const sperrt = speicherung?.isPending === true;
   return (
     <Modal
       open={eintrag !== null}
       title="Aus ETB-Eintrag Auftrag erteilen"
       footer={null}
-      onCancel={onAbbrechen}
+      // Kreuz, Maske und Escape: gesperrt, solange der Auftrag unterwegs ist. Schließen räumt den
+      // Grund, damit der Dialog nie mit einer alten Ablehnung öffnet.
+      onCancel={() => {
+        if (sperrt) return;
+        if (speicherung?.error != null) speicherung.reset();
+        onAbbrechen();
+      }}
+      closable={sperrt ? { disabled: true } : true}
+      mask={{ closable: !sperrt }}
+      keyboard={!sperrt}
       destroyOnHidden
       width={520}
     >
@@ -57,6 +75,9 @@ export default function AuftragAusEtbModal({
           )
         }
         onAnlegen={onAnlegen}
+        speicherung={speicherung}
+        speicherFehlerTitel="Auftrag nicht erteilt"
+        speicherFehlerFallback="Auftrag erteilen fehlgeschlagen"
       />
     </Modal>
   );

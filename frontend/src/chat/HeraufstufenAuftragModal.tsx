@@ -1,4 +1,6 @@
 import { Modal, Typography } from 'antd';
+import { useEffect, useRef } from 'react';
+import type { Speicherung } from '../components/Erfassung';
 import type { ChatNachricht, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
 
@@ -12,6 +14,11 @@ interface Props {
   senden: boolean;
   onAbbrechen: () => void;
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
+  /**
+   * Die Heraufstufen-Mutation (LFH-1077): ihr Grund steht im Formular, bis zum nächsten Absenden;
+   * Öffnen und Schließen räumen ihn. Solange sie läuft, ist jeder Ausweg gesperrt.
+   */
+  speicherung?: Speicherung;
 }
 
 /**
@@ -27,13 +34,28 @@ export default function HeraufstufenAuftragModal({
   senden,
   onAbbrechen,
   onAnlegen,
+  speicherung,
 }: Props) {
+  const sperrt = speicherung?.isPending === true;
+  // Ein schließender Dialog bleibt bis zum Ende seiner Animation eingehängt; ein schnelles
+  // Wiederöffnen hängt das Formular nicht neu ein. Deshalb räumt jeder Wechsel von `offen`.
+  const speicherungRef = useRef(speicherung);
+  speicherungRef.current = speicherung;
+  useEffect(() => {
+    const s = speicherungRef.current;
+    if (s && !s.isPending && s.error != null) s.reset();
+  }, [offen]);
   return (
     <Modal
       open={offen}
       title="Zu Auftrag heraufstufen"
       footer={null}
-      onCancel={onAbbrechen}
+      onCancel={() => {
+        if (!sperrt) onAbbrechen();
+      }}
+      closable={sperrt ? { disabled: true } : true}
+      mask={{ closable: !sperrt }}
+      keyboard={!sperrt}
       destroyOnHidden
       width={520}
     >
@@ -54,6 +76,9 @@ export default function HeraufstufenAuftragModal({
           )
         }
         onAnlegen={onAnlegen}
+        speicherung={speicherung}
+        speicherFehlerTitel="Auftrag nicht erteilt"
+        speicherFehlerFallback="Heraufstufen fehlgeschlagen"
       />
     </Modal>
   );

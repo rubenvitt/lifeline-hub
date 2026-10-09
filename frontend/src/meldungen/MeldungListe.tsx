@@ -1,6 +1,7 @@
 import { SeitenLeer } from '../components/SeitenZustand';
 import type { Meldung, MeldungStatus } from '../api/types';
 import MeldungKarte from './MeldungKarte';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 interface BearbeiterOption {
   benutzer_id: number;
@@ -25,6 +26,11 @@ interface MeldungListeProps {
   onAuftragErteilen?: (m: Meldung) => void;
   /** Aufträge ohne Freigabe: „Auftrag erteilen“ steht gesperrt mit Grund. */
   auftragGesperrt?: boolean;
+  /**
+   * Grund der zuletzt abgelehnten Karten-Aktion je Meldung (`grund` aus `useZeilenFehler`). Jede
+   * Karte bekommt nur ihren Grund, ein stabiles Objekt: die übrigen bleiben gemerkt (LFH-1077).
+   */
+  kartenFehler?: (meldungId: number) => ZeilenGrund | null;
 }
 
 /** Meldungs-Liste: je Meldung eine MeldungKarte. */
@@ -41,6 +47,7 @@ export default function MeldungListe({
   onBestaetigen,
   onAuftragErteilen,
   auftragGesperrt,
+  kartenFehler,
 }: MeldungListeProps) {
   if (meldungen.length === 0) return <SeitenLeer titel="Keine Meldungen" />;
   return (
@@ -60,6 +67,7 @@ export default function MeldungListe({
           onBestaetigen={onBestaetigen}
           onAuftragErteilen={onAuftragErteilen}
           auftragGesperrt={auftragGesperrt}
+          fehlerGrund={kartenFehler?.(m.id) ?? null}
         />
       ))}
     </>

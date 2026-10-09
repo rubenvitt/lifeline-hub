@@ -1,9 +1,12 @@
 import { App, Drawer, Form, type FormProps } from 'antd';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { ErfassungsFormular, type ErfassungsFormularSteuerung } from './Erfassung';
+import {
+  ErfassungsFormular,
+  type ErfassungsFormularSteuerung,
+  type Speicherung,
+} from './Erfassung';
 import { einsatzKeys } from '../api/queryKeys';
-import { useFehlerMeldung } from './useFehlerMeldung';
 
 export interface AnlegenDrawerSlot<T> {
   einsatzId: number;
@@ -42,7 +45,6 @@ export default function AnlegenDrawer<T, E extends object>({
 }: Props<T, E>) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const fehler = useFehlerMeldung();
   const [form] = Form.useForm<E>();
   const angelegt = useRef<T | null>(null);
   const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
@@ -55,15 +57,25 @@ export default function AnlegenDrawer<T, E extends object>({
     form.resetFields();
   }, [einsatzId, form]);
 
+  // Kein `onError`: den Grund zeigt die Hülle im Drawer (`speicherung`, LFH-1077).
   const anlegenMut = useMutation({
-    mutationFn: (daten: E) => legeAn(einsatzId, daten),
-    onSuccess: () => {
+    mutationFn: (v: { einsatzId: number; daten: E }) => legeAn(v.einsatzId, v.daten),
+    onSuccess: (_neu, v) => {
       message.success(erfolgText);
-      qc.invalidateQueries({ queryKey: listenKey(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      qc.invalidateQueries({ queryKey: listenKey(v.einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(v.einsatzId) });
     },
-    onError: fehler,
   });
+  /*
+   * Nur das Anlegen DIESES Einsatzes gehört in den Drawer: ein laufendes aus dem vorigen sperrt
+   * hier kein Abbrechen, seine Ablehnung steht hier nicht.
+   */
+  const diesesAnlegen = anlegenMut.variables?.einsatzId === einsatzId;
+  const speicherung: Speicherung = {
+    error: diesesAnlegen ? anlegenMut.error : null,
+    isPending: diesesAnlegen && anlegenMut.isPending,
+    reset: anlegenMut.reset,
+  };
 
   const abbrechen = useCallback(() => {
     abbruchGeneration.current += 1;
@@ -82,6 +94,8 @@ export default function AnlegenDrawer<T, E extends object>({
       open={open}
       keyboard={false}
       onClose={drawerSchliessen}
+      // Während des Anlegens sichtbar gesperrt; die Hülle hält auch Maske und Escape zurück.
+      closable={speicherung.isPending ? { disabled: true } : true}
       size={420}
       destroyOnHidden
     >
@@ -90,7 +104,7 @@ export default function AnlegenDrawer<T, E extends object>({
         steuerungRef={formularSteuerung}
         onErfassen={async (daten) => {
           const generation = abbruchGeneration.current;
-          const neu = await anlegenMut.mutateAsync(daten);
+          const neu = await anlegenMut.mutateAsync({ einsatzId, daten });
           if (abbruchGeneration.current === generation) angelegt.current = neu;
         }}
         // Bindet einen laufenden Auftrag an dessen Einsatz-ID. Das hält nur, weil `abschicken` in
@@ -103,7 +117,10 @@ export default function AnlegenDrawer<T, E extends object>({
           if (neu) onAngelegt?.(neu);
         }}
         onAbbrechen={abbrechen}
-        laeuft={anlegenMut.isPending}
+        laeuft={speicherung.isPending}
+        speicherung={speicherung}
+        speicherFehlerTitel="Nicht angelegt"
+        speicherFehlerFallback="Anlegen fehlgeschlagen"
         erfassenText="Anlegen"
         initialValues={initialValues}
       >

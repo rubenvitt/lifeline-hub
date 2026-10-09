@@ -650,6 +650,8 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     await userEvent.type(feld(), 'Text{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(konflikt)).toBeInTheDocument();
+    // Genau einmal, an der Erfassung (LFH-1077): früher stand er zusätzlich im Toast.
+    expect(screen.getAllByText(konflikt)).toHaveLength(1);
     expect(feld()).toHaveValue('Text');
     const knopf = screen.getByRole('button', { name: /Erfassen$/ });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
@@ -657,6 +659,39 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
     const [erste, zweite] = vi.mocked(p.erfassen).mock.calls.map((c) => c[0].client_id);
     expect(zweite).not.toBe(erste);
+  });
+
+  /**
+   * Jede fachliche Ablehnung steht an der Erfassung, nicht im Toast (LFH-1077,
+   * `frontend/AGENTS.md`, „Rückwege und Fehler“), bis zum nächsten Absenden; eine Dateiwahl räumt
+   * sie nicht.
+   */
+  it('nennt eine fachliche Ablehnung an der Erfassung, bis zum nächsten Absenden', async () => {
+    let freigeben: () => void = () => {};
+    const p = props({
+      erfassen: vi
+        .fn<(e: NeuerEintrag) => Promise<void>>()
+        .mockRejectedValueOnce(new ApiError(422, 'Meldeweg unbekannt'))
+        .mockImplementationOnce(() => new Promise<void>((r) => (freigeben = r))),
+    });
+    const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(feld(), 'Text{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    const grund = await screen.findByText('Meldeweg unbekannt');
+    expect(grund.closest('[data-lfh="etb-ablehnung"]')).not.toBeNull();
+    expect(feld()).toHaveValue('Text');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await waehle(container, datei('a.jpg'));
+    expect(screen.getByText('Meldeweg unbekannt')).toBeInTheDocument();
+
+    hochladen.mockResolvedValueOnce(anzeige(1, 'a.jpg'));
+    const knopf = screen.getByRole('button', { name: /Erfassen$/ });
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+    fireEvent.click(knopf);
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Meldeweg unbekannt')).toBeNull();
+    await act(async () => freigeben());
   });
 
   it('lässt eine laufende Berichtigung nicht abbrechen', async () => {

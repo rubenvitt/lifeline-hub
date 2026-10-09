@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import MeldungenPage from './MeldungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
@@ -12,6 +12,7 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
+import { ApiError } from '../api/client';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
@@ -144,15 +145,28 @@ function LocationProbe() {
   return <span data-testid="loc-search">{useLocation().search}</span>;
 }
 
-function renderPage(route = '/einsaetze/1/meldungen') {
+/** Wechselt in einen anderen Einsatz, ohne die Seite neu einzuhängen (Route ohne `key`). */
+function ZuEinsatz2() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate('/einsaetze/2/meldungen')}>
+      Zu Einsatz 2
+    </button>
+  );
+}
+
+function renderPage(
+  route = '/einsaetze/1/meldungen',
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   server.use(meHandler(benutzerFixture({ anzeigename: 'Leitung' })));
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
         <AuthProvider>
           <MemoryRouter initialEntries={[route]}>
             <LocationProbe />
+            <ZuEinsatz2 />
             <Routes>
               <Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} />
             </Routes>
@@ -768,5 +782,468 @@ describe('MeldungenPage', () => {
     const karte = document.querySelector('[data-meldung-id="2"]') as HTMLElement;
     expect(within(karte).getByText('Bestätigung überfällig')).toBeInTheDocument();
     expect(within(karte).queryByText(/^\s*Alarm\s*$/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ablehnungen am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Erfassen im Paneel,
+ * Status, Bearbeiter und Bestätigen an der Karte, Lage-Übergabe und Auftrag im Dialog, Rückgängig
+ * im Seitenhinweis; kein Fehler-Toast.
+ */
+describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setzeOnline(true);
+    await queueLeerenFuerTests();
+    listeMeldungen.mockResolvedValue([meldung()]);
+  });
+  afterEach(() => {
+    for (const m of [
+      legeMeldungAn,
+      setzeMeldungStatus,
+      weiseBearbeiterZu,
+      markiereLagerelevant,
+      bestaetigeMeldung,
+      erteileAuftragAusMeldung,
+    ])
+      m.mockReset();
+  });
+
+  const karte = (id = 1) => document.querySelector(`[data-meldung-id="${id}"]`) as HTMLElement;
+  const seitenHinweis = () =>
+    waitFor(() => {
+      const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+      expect(h).not.toBeNull();
+      return h as HTMLElement;
+    });
+  const paneel = () => within(screen.getByRole('region', { name: 'Neue Meldung erfassen' }));
+  /** Der offene Dialog; rc-dialog lässt einen schließenden in jsdom stehen. */
+  const offenerDialog = () =>
+    waitFor(() => {
+      const offen = screen
+        .getAllByRole('dialog')
+        .filter((d) => d.closest('.ant-zoom-leave') == null);
+      expect(offen).toHaveLength(1);
+      return offen[0];
+    });
+
+  async function erfasse() {
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
+    await userEvent.type(paneel().getByLabelText('Absender'), 'RTW 2');
+    await userEvent.type(paneel().getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
+    await userEvent.click(paneel().getByRole('button', { name: 'Meldung erfassen' }));
+  }
+
+  it('Erfassen: der Grund steht im Paneel, der Wortlaut bleibt, kein Toast', async () => {
+    legeMeldungAn.mockRejectedValue(new ApiError(422, 'Absender unbekannt'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await erfasse();
+
+    const grund = await paneel().findByRole('alert');
+    expect(grund).toHaveTextContent('Meldung nicht erfasst');
+    expect(grund).toHaveTextContent('Absender unbekannt');
+    expect(paneel().getByLabelText('Inhalt / Wortlaut')).toHaveValue('Eingetroffen');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Erfassen: das nächste Absenden räumt, das Paneel bleibt bis zur Antwort', async () => {
+    legeMeldungAn
+      .mockRejectedValueOnce(new ApiError(422, 'Absender unbekannt'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await erfasse();
+    await paneel().findByText('Absender unbekannt');
+
+    await userEvent.click(paneel().getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(2));
+    expect(paneel().queryByText('Absender unbekannt')).toBeNull();
+    expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeDisabled();
+  });
+
+  it('Erfassen: Zuklappen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    legeMeldungAn.mockRejectedValue(new ApiError(422, 'Absender unbekannt'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await erfasse();
+    await paneel().findByText('Absender unbekannt');
+
+    await userEvent.click(paneel().getByRole('button', { name: 'Formular schließen' }));
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
+    expect(paneel().queryByRole('alert')).toBeNull();
+  });
+
+  it('Status: der Grund steht an genau dieser Karte, kein Toast', async () => {
+    listeMeldungen.mockResolvedValue([meldung(), meldung({ id: 2, lfd_nr: 2, absender: 'B' })]);
+    setzeMeldungStatus.mockRejectedValue(new ApiError(422, 'Übergang nicht erlaubt'));
+    renderPage();
+    await screen.findByText('B');
+    await userEvent.click(within(karte(1)).getByRole('button', { name: 'Sichten' }));
+
+    expect(await within(karte(1)).findByText('Übergang nicht erlaubt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(karte(2).querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  /** `useMutation` verfolgt nur den letzten Aufruf; der Grund kommt aus den Callbacks. */
+  it('Status: zwei Karten nebenläufig, die Ablehnung steht an ihrer Karte', async () => {
+    listeMeldungen.mockResolvedValue([meldung(), meldung({ id: 2, lfd_nr: 2, absender: 'B' })]);
+    let lehneAb: (e: Error) => void = () => {};
+    setzeMeldungStatus.mockImplementation((_e: number, mid: number) =>
+      mid === 1
+        ? new Promise((_r, reject) => (lehneAb = reject))
+        : Promise.resolve(meldung({ id: 2, status: 'gesichtet' })),
+    );
+    renderPage();
+    await screen.findByText('B');
+    await userEvent.click(within(karte(1)).getByRole('button', { name: 'Sichten' }));
+    await userEvent.click(within(karte(2)).getByRole('button', { name: 'Sichten' }));
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledTimes(2));
+    await act(async () => lehneAb(new ApiError(409, 'Zwischenzeitlich geändert')));
+
+    expect(await within(karte(1)).findByText('Zwischenzeitlich geändert')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+    // Karte 2 hat Erfolg und damit ihren Rückgängig-Toast; ein Fehler-Toast fehlt.
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+  });
+
+  it('Bearbeiter: der Grund steht an der Karte, die nächste Aktion dort räumt ihn', async () => {
+    weiseBearbeiterZu.mockRejectedValue(new ApiError(422, 'Kein Mitglied'));
+    setzeMeldungStatus.mockImplementation(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Bearbeiter für Meldung 1' }));
+    await userEvent.click(await screen.findByText('Sani Schmidt'));
+
+    expect(await within(karte()).findByText('Kein Mitglied')).toHaveAttribute('data-fehler');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(within(karte()).getByRole('button', { name: 'Sichten' }));
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledTimes(1));
+    expect(within(karte()).queryByText('Kein Mitglied')).toBeNull();
+  });
+
+  it('Bestätigen: der Grund steht an der Karte, kein Toast', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ bestaetigung_pflicht: true, ist_ueberfaellig: true }),
+    ]);
+    bestaetigeMeldung.mockRejectedValue(new ApiError(409, 'Bereits bestätigt'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(within(karte()).getByRole('button', { name: 'Bestätigen' }));
+    const pop = await screen.findByRole('tooltip');
+    await userEvent.click(within(pop).getByRole('button', { name: 'Bestätigen' }));
+
+    expect(await within(karte()).findByText('Bereits bestätigt')).toHaveAttribute('data-fehler');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Status: wechselt die Ansicht vor der Antwort, steht der Grund im Seitenhinweis', async () => {
+    let lehneAb: (e: Error) => void = () => {};
+    setzeMeldungStatus.mockImplementationOnce(
+      () => new Promise((_r, reject) => (lehneAb = reject)),
+    );
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
+    await userEvent.click(screen.getByText(/^Abgeschlossen \(/));
+    await waitFor(() => expect(karte()).toBeNull());
+    await act(async () => lehneAb(new ApiError(422, 'Übergang nicht erlaubt')));
+
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('Meldung #1 nicht geändert');
+    expect(grund).toHaveTextContent('Übergang nicht erlaubt');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(screen.getByText(/^Offen \(/));
+    expect(await within(karte()).findByText('Übergang nicht erlaubt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+  });
+
+  /** Gewandert in „Abgeschlossen“ hat die Karte keine Aktion mehr, die den Grund räumte. */
+  it('Status: wandert die Karte nach der Ablehnung, lässt sich der Hinweis schließen', async () => {
+    setzeMeldungStatus.mockRejectedValue(new ApiError(409, 'Zwischenzeitlich erledigt'));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(undefined, qc);
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(within(karte()).getByRole('button', { name: 'Sichten' }));
+    await within(karte()).findByText('Zwischenzeitlich erledigt');
+
+    // Ein fremder Abschluss kommt als Ereignis an: die Karte steht nun unter „Abgeschlossen“.
+    listeMeldungen.mockResolvedValue([
+      meldung({ status: 'erledigt', ist_offen: false, erledigt_at: '2026-06-12 09:30:00' }),
+    ]);
+    await act(() => qc.invalidateQueries());
+    await waitFor(() => expect(karte()).toBeNull());
+
+    const hinweis = await seitenHinweis();
+    const grund = await within(hinweis).findByRole('alert');
+    expect(grund).toHaveTextContent('Meldung #1 nicht geändert');
+    expect(grund).toHaveTextContent('Zwischenzeitlich erledigt');
+
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Hinweis schließen' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull(),
+    );
+    // Verworfen, nicht nur ausgeblendet: auch an der Karte steht er nicht mehr.
+    await userEvent.click(screen.getByText(/^Abgeschlossen \(/));
+    await waitFor(() => expect(karte()).not.toBeNull());
+    expect(karte().querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+  });
+
+  it('Status: alle Gründe ohne gezeigte Karte stehen im Seitenhinweis', async () => {
+    listeMeldungen.mockResolvedValue([meldung(), meldung({ id: 2, lfd_nr: 2, absender: 'B' })]);
+    setzeMeldungStatus
+      .mockRejectedValueOnce(new ApiError(422, 'Übergang nicht erlaubt'))
+      .mockRejectedValueOnce(new ApiError(409, 'Zwischenzeitlich geändert'));
+    renderPage();
+    await screen.findByText('B');
+    await userEvent.click(within(karte(1)).getByRole('button', { name: 'Sichten' }));
+    await userEvent.click(within(karte(2)).getByRole('button', { name: 'Sichten' }));
+    await within(karte(2)).findByText('Zwischenzeitlich geändert');
+
+    await userEvent.click(screen.getByText(/^Abgeschlossen \(/));
+    await waitFor(() => expect(karte(1)).toBeNull());
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('Meldung #1 · Übergang nicht erlaubt');
+    expect(grund).toHaveTextContent('Meldung #2 · Zwischenzeitlich geändert');
+  });
+
+  it('Status: solange die andere Ansicht lädt, springt kein Grund in den Seitenhinweis', async () => {
+    setzeMeldungStatus.mockRejectedValue(new ApiError(422, 'Übergang nicht erlaubt'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(within(karte()).getByRole('button', { name: 'Sichten' }));
+    await within(karte()).findByText('Übergang nicht erlaubt');
+
+    const aufrufe = listeMeldungen.mock.calls.length;
+    let liefere: (l: Meldung[]) => void = () => {};
+    listeMeldungen.mockImplementationOnce(() => new Promise((r) => (liefere = r)));
+    await userEvent.click(screen.getByText(/^Abgeschlossen \(/));
+    await waitFor(() => expect(listeMeldungen.mock.calls.length).toBeGreaterThan(aufrufe));
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+
+    await act(async () => liefere([meldung()]));
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('Übergang nicht erlaubt');
+  });
+
+  it('Rückgängig: abgelehnte Rücknahme im Seitenhinweis, die nächste räumt', async () => {
+    setzeMeldungStatus
+      .mockResolvedValueOnce(meldung({ status: 'gesichtet' }))
+      .mockRejectedValueOnce(new ApiError(422, 'Rücknahme nicht erlaubt'))
+      .mockResolvedValueOnce(meldung({ status: 'gesichtet' }))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht zurückgenommen');
+    expect(grund).toHaveTextContent('Rücknahme nicht erlaubt');
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledTimes(3));
+    const rueckgaengig = await screen.findAllByRole('button', { name: 'Rückgängig' });
+    await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledTimes(4));
+    expect(screen.queryByText('Rücknahme nicht erlaubt')).toBeNull();
+  });
+
+  async function oeffneLage() {
+    await userEvent.click(
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
+    );
+    return offenerDialog();
+  }
+
+  it('Lage: der Dialog bleibt bei einer Ablehnung offen, mit Text und Grund', async () => {
+    markiereLagerelevant.mockRejectedValue(new ApiError(409, 'Schon übergeben'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const dialog = await oeffneLage();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht übergeben');
+    expect(grund).toHaveTextContent('Schon übergeben');
+    expect(within(dialog).getByLabelText('Lage-Text')).toHaveValue('Deich instabil');
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Lage: wartet auf die Antwort, sperrt Abbrechen, das nächste Absenden räumt', async () => {
+    markiereLagerelevant
+      .mockRejectedValueOnce(new ApiError(409, 'Schon übergeben'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const dialog = await oeffneLage();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(2));
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('Lage: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    markiereLagerelevant.mockRejectedValue(new ApiError(409, 'Schon übergeben'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const dialog = await oeffneLage();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    const wieder = await oeffneLage();
+    expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
+
+  async function erteileAuftrag() {
+    await userEvent.click(within(await oeffneAktionsmenue()).getByText(/Auftrag erteilen/));
+    const dialog = await offenerDialog();
+    await userEvent.type(within(dialog).getByLabelText('Auftrag / Was'), 'Riegelstellung');
+    await userEvent.type(within(dialog).getByLabelText('Empfänger'), 'EA Nord{Enter}');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+    return dialog;
+  }
+
+  it('Auftrag: der Dialog bleibt bei einer Ablehnung offen, mit Grund, kein Toast', async () => {
+    erteileAuftragAusMeldung.mockRejectedValue(new ApiError(422, 'Empfänger unbekannt'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const dialog = await erteileAuftrag();
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Auftrag nicht erteilt');
+    expect(grund).toHaveTextContent('Empfänger unbekannt');
+    expect(within(dialog).getByLabelText('Auftrag / Was')).toHaveValue(
+      'Florian Nord 1: Deich instabilRiegelstellung',
+    );
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(setzeMeldungStatus).not.toHaveBeenCalled();
+  });
+
+  it('Auftrag: wartet auf die Antwort, ohne Ausweg, und das nächste Absenden räumt', async () => {
+    erteileAuftragAusMeldung
+      .mockRejectedValueOnce(new ApiError(422, 'Empfänger unbekannt'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const dialog = await erteileAuftrag();
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalledTimes(2));
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+  });
+
+  it('Auftrag: Schließen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    erteileAuftragAusMeldung.mockRejectedValue(new ApiError(422, 'Empfänger unbekannt'));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const dialog = await erteileAuftrag();
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await userEvent.click(within(await oeffneAktionsmenue()).getByText(/Auftrag erteilen/));
+    const wieder = await offenerDialog();
+    expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
+
+  /** Die Route hat keinen `key`: ein offener Dialog schriebe sonst mit der alten Meldung hierher. */
+  it.each([
+    ['Lage', /An Lage übergeben/],
+    ['Auftrag', /Auftrag erteilen/],
+  ])('%s: ein Einsatzwechsel schließt den offenen Dialog', async (_name, eintrag) => {
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(within(await oeffneAktionsmenue()).getByText(eintrag));
+    await offenerDialog();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(2, expect.anything()));
+    await screen.findByText('Florian Nord 1');
+    await waitFor(() =>
+      expect(
+        screen.queryAllByRole('dialog').filter((d) => d.closest('.ant-zoom-leave') == null),
+      ).toHaveLength(0),
+    );
+  });
+
+  it('Auftrag: eine Antwort aus dem vorigen Einsatz sperrt und meldet den Dialog nicht', async () => {
+    let lehneAb: ((e: Error) => void) | null = null;
+    erteileAuftragAusMeldung.mockImplementationOnce(
+      () => new Promise((_r, reject) => (lehneAb = reject)),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(undefined, client);
+    await screen.findByText('Florian Nord 1');
+    await erteileAuftrag();
+    await waitFor(() => expect(lehneAb).not.toBeNull());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(2, expect.anything()));
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(within(await oeffneAktionsmenue()).getByText(/Auftrag erteilen/));
+    const dialog = await offenerDialog();
+    // Das laufende Erteilen des vorigen Einsatzes sperrt hier kein Schließen.
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toBeEnabled();
+    act(() => lehneAb?.(new ApiError(422, 'Empfänger unbekannt')));
+    await waitFor(() => expect(client.getMutationCache().getAll()[0]?.state.status).toBe('error'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+  });
+
+  it('meldet Ablehnungen aus dem vorigen Einsatz nicht im neuen', async () => {
+    let lehneStatusAb: (e: Error) => void = () => {};
+    let lehneAnlegenAb: (e: Error) => void = () => {};
+    setzeMeldungStatus.mockImplementationOnce(
+      () => new Promise((_r, reject) => (lehneStatusAb = reject)),
+    );
+    legeMeldungAn.mockImplementationOnce(
+      () => new Promise((_r, reject) => (lehneAnlegenAb = reject)),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(undefined, client);
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
+    await erfasse();
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(2, expect.anything()));
+    act(() => {
+      lehneStatusAb(new ApiError(422, 'Übergang nicht erlaubt'));
+      lehneAnlegenAb(new ApiError(422, 'Absender unbekannt'));
+    });
+    // Erst prüfen, wenn beide Ablehnungen angekommen sind und die Beobachter sie gesehen haben.
+    await waitFor(() =>
+      expect(
+        client.getMutationCache().findAll({ predicate: (m) => m.state.status === 'error' }),
+      ).toHaveLength(2),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    await screen.findByText('Florian Nord 1');
+    expect(screen.queryByText('Übergang nicht erlaubt')).toBeNull();
+    expect(screen.queryByText('Absender unbekannt')).toBeNull();
+    // Das laufende Erfassen des vorigen Einsatzes hält das Paneel hier nicht offen.
+    expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeEnabled();
   });
 });

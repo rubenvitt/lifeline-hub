@@ -6,6 +6,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KanalAnlegenDialog from './KanalAnlegenDialog';
+import type { Speicherung } from '../components/Erfassung';
 
 interface Props {
   kanaele: ChatKanal[];
@@ -14,6 +15,8 @@ interface Props {
   darfSchreiben: boolean;
   /** Lehnt bei Ablehnung ab (`mutateAsync`); dann bleibt der Dialog mit den Eingaben offen. */
   onKanalAnlegen: (name: string, beschreibung?: string) => Promise<unknown>;
+  /** Die Anlege-Mutation; ihr Grund steht im Dialog (`KanalAnlegenDialog`, LFH-1077). */
+  kanalSpeicherung?: Speicherung;
 }
 
 /** Visuell verborgen, für Vorleser da (dieselbe Clip-Bauform wie `instrument/Status.tsx`). */
@@ -56,6 +59,7 @@ export default function KanalListe({
   onWechsel,
   darfSchreiben,
   onKanalAnlegen,
+  kanalSpeicherung,
 }: Props) {
   const [offen, setOffen] = useState(false);
   const { token, rollen } = useRollen();
@@ -160,6 +164,7 @@ export default function KanalListe({
         offen={offen}
         onSchliessen={() => setOffen(false)}
         onKanalAnlegen={onKanalAnlegen}
+        speicherung={kanalSpeicherung}
       />
     </Paneel>
   );

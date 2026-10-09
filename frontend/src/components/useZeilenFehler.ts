@@ -20,6 +20,8 @@ export interface ZeilenFehlerSpeicher<K> {
   melde: (schluessel: K, fehler: unknown, fallback?: string) => void;
   /** Alle Gründe weg, etwa wenn ein Dialog mit Zeilen öffnet oder schließt. */
   leere: () => void;
+  /** Ein Grund weg ohne neue Aktion, etwa wenn sein Seitenhinweis geschlossen wird. */
+  verwirf: (schluessel: K) => void;
 }
 
 /**
@@ -38,7 +40,8 @@ export interface ZeilenFehlerSpeicher<K> {
 export function useZeilenFehler<K>(): ZeilenFehlerSpeicher<K> {
   const [gruende, setGruende] = useState<ReadonlyMap<K, ZeilenGrund>>(() => new Map());
 
-  const beginne = useCallback((schluessel: K) => {
+  // Eine neue Aktion und das Verwerfen räumen gleich; zwei Namen, damit der Aufruf sagt, warum.
+  const entferne = useCallback((schluessel: K) => {
     setGruende((alt) => {
       if (!alt.has(schluessel)) return alt;
       const neu = new Map(alt);
@@ -59,10 +62,11 @@ export function useZeilenFehler<K>(): ZeilenFehlerSpeicher<K> {
     () => ({
       grund: (s: K) => gruende.get(s) ?? null,
       gemeldet: () => [...gruende.keys()],
-      beginne,
+      beginne: entferne,
       melde,
       leere,
+      verwirf: entferne,
     }),
-    [gruende, beginne, melde, leere],
+    [gruende, entferne, melde, leere],
   );
 }

@@ -22,12 +22,13 @@ import {
 } from '../api/etb';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import { fehlerText } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
+import type { Speicherung } from '../components/Erfassung';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
@@ -43,7 +44,7 @@ import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
 import { useEntwurfsVersand } from '../etb/entwuerfe/useEntwurfsVersand';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
-import { baueZeilen } from '../etb/etbZeile';
+import { abgelehntSchluessel, baueZeilen } from '../etb/etbZeile';
 import {
   ETB_MAX_SEITEN,
   naechsterSeitenParam,
@@ -367,15 +368,21 @@ export default function EtbPage() {
     );
   }
 
-  /**
-   * Zwei Zeilen, deren gruppengeführte Reihenfolge sich beim Statuswechsel umdreht. Eine
-   * einzeilige Fixture wäre wertlos: `toEqual(vorher)` über einem Einelement-Array ist immer grün.
-   *   Serverordnung  [10 Florian 1 (gebunden), 11 Florian 9 (verfügbar)]
-   *   gerendert      [11, 10]  (Gruppenachse führt: verfügbar vor gebunden)
-   *   nach dem Flip  [10, 11]  (beide verfügbar → nach Funkrufname)
-   * Die gerenderte Ausgangsfolge ist weder Server- noch Zielordnung.
+  /*
+   * Grund eines gescheiterten „Erneut senden“ an seiner Zeile (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“), je Zeile: zwei Zeilen können zugleich senden. Schlüssel mit Einsatz,
+   * die Seite bleibt beim Einsatzwechsel montiert; der Wechsel räumt die alten Gründe.
    */
+  const erneutFehler = useZeilenFehler<string>();
+  const [erneutFehlerEinsatz, setErneutFehlerEinsatz] = useState(einsatzId);
+  if (erneutFehlerEinsatz !== einsatzId) {
+    setErneutFehlerEinsatz(einsatzId);
+    erneutFehler.leere();
+  }
+
   async function abgelehntErneutSenden(puffer: AbgelehnterEintrag) {
+    const schluessel = `${einsatzId}:${abgelehntSchluessel(puffer)}`;
+    erneutFehler.beginne(schluessel);
     try {
       // Mit neuer client_id: ein abgelehnter Eintrag ist nie erfasst worden, ein neuer Schlüssel
       // legt also keine Dublette an. Mit dem alten liefe ein client_id-Konflikt (409) endlos in
@@ -383,7 +390,7 @@ export default function EtbPage() {
       await erfassen({ ...puffer.eintrag, client_id: neueClientId() });
       if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
     } catch (err) {
-      message.error(fehlerText(err, 'Erneut senden fehlgeschlagen'));
+      erneutFehler.melde(schluessel, err, 'Erneut senden fehlgeschlagen');
     }
   }
 
@@ -461,18 +468,29 @@ export default function EtbPage() {
     scrolleZurZeile(`eintrag-${hervorhebung.id}`);
   }, [hervorhebung]);
 
+  /*
+   * Kein `onError`: den Grund zeigt der Dialog (`speicherung`, LFH-1077). Der Einsatz reist in
+   * den `variables` mit, die Seite bleibt beim Einsatzwechsel montiert.
+   */
   const auftragMutation = useMutation({
-    mutationFn: ({ eintragId, daten }: { eintragId: number; daten: NeuerAuftrag }) =>
-      erteileAuftragAusEtb(einsatzId, eintragId, daten),
-    onSuccess: () => {
+    mutationFn: (v: { einsatzId: number; eintragId: number; daten: NeuerAuftrag }) =>
+      erteileAuftragAusEtb(v.einsatzId, v.eintragId, v.daten),
+    onSuccess: (_d, v) => {
       // ETB (neue Anordnung) + Auftrags-Board aktualisieren.
-      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(v.einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(v.einsatzId) });
       setAuftragZu(null);
       message.success('Auftrag aus ETB-Eintrag erteilt');
     },
-    onError: (e) => message.error(fehlerText(e, 'Auftrag erteilen fehlgeschlagen')),
   });
+  // Nur der Auftrag DIESES Einsatzes gehört in den Dialog: ein laufender aus dem vorigen sperrt
+  // hier kein Schließen, seine Ablehnung steht hier nicht.
+  const diesesAuftrag = auftragMutation.variables?.einsatzId === einsatzId;
+  const auftragSpeicherung: Speicherung = {
+    error: diesesAuftrag ? auftragMutation.error : null,
+    isPending: diesesAuftrag && auftragMutation.isPending,
+    reset: auftragMutation.reset,
+  };
 
   /**
    * Gesendete und gepufferte Einträge als eine Chronologie. Die Banner unten fassen zusammen, die
@@ -513,17 +531,12 @@ export default function EtbPage() {
    * ins Bild — `block: 'nearest'`, also gar nicht, wenn er sichtbar ist. Das ist die Antwort auf
    * eine eigene Handlung, kein Sprung unter dem Cursor (WCAG 3.2.5 zielt auf ungefragte
    * Änderungen). Der Fokus bleibt im Feld. Bei einer Ablehnung rollt nichts: der Wortlaut steht
-   * noch im Feld.
+   * noch im Feld, der Grund an der Erfassung (`Schnellerfassung`, LFH-1077), kein Toast.
    */
-  async function erfassenMitMeldung(e: NeuerEintrag) {
-    try {
-      await erfassen(e);
-      if (etbQuery.hasPreviousPage) await zumKopf();
-      zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
-    } catch (err) {
-      message.error(fehlerText(err, 'Senden fehlgeschlagen'));
-      throw err;
-    }
+  async function erfassenUndZeigen(e: NeuerEintrag) {
+    await erfassen(e);
+    if (etbQuery.hasPreviousPage) await zumKopf();
+    zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
   }
 
   // Seitenzustand: ohne den Einsatz gibt es weder Breadcrumb noch Schreibrecht — deshalb
@@ -604,7 +617,7 @@ export default function EtbPage() {
       {berichtigungZu ? (
         <Schnellerfassung
           key="berichtigung"
-          erfassen={erfassenMitMeldung}
+          erfassen={erfassenUndZeigen}
           berichtigungZu={berichtigungZu}
           onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
           bausteine={bausteineQuery.data ?? []}
@@ -615,7 +628,7 @@ export default function EtbPage() {
         <EtbEntwurfsTabs
           key={einsatzId}
           einsatzId={einsatzId}
-          erfassen={erfassenMitMeldung}
+          erfassen={erfassenUndZeigen}
           bausteine={bausteineQuery.data ?? []}
           einsatz={einsatz}
           rufname={rufname}
@@ -869,6 +882,7 @@ export default function EtbPage() {
               onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
               auftragGesperrt={auftragGesperrt}
               onErneutSenden={(p) => void abgelehntErneutSenden(p)}
+              zeilenFehler={(s) => erneutFehler.grund(`${einsatzId}:${s}`)}
               onVerwerfen={(p) => {
                 if (p.id != null) void abgelehntVerwerfen(p.id);
               }}
@@ -933,13 +947,14 @@ export default function EtbPage() {
           eintrag={auftragZu}
           abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
           einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
-          senden={auftragMutation.isPending}
+          senden={auftragSpeicherung.isPending}
+          speicherung={auftragSpeicherung}
           onAbbrechen={() => setAuftragZu(null)}
           // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Auftrag
           // angekommen ist (Bauform wie Meldung→Auftrag und Chat→Auftrag).
           onAnlegen={(daten) =>
             auftragZu
-              ? auftragMutation.mutateAsync({ eintragId: auftragZu.id, daten })
+              ? auftragMutation.mutateAsync({ einsatzId, eintragId: auftragZu.id, daten })
               : Promise.reject(new Error('Kein Quell-Eintrag'))
           }
         />

@@ -1,17 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route } from 'react-router';
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router';
 import { App as AntApp } from 'antd';
 import ErinnerungenPage from './ErinnerungenPage';
 import {
   erledigeErinnerung,
   ladeErinnerungKennzahlen,
+  legeErinnerungAn,
   listeAbgeschlosseneErinnerungen,
   listeOffeneErinnerungen,
   oeffneErinnerung,
   quittiereErinnerung,
 } from '../api/erinnerungen';
+import { ApiError } from '../api/client';
 import type { Erinnerung } from '../api/types';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
@@ -88,12 +91,22 @@ vi.mock('../api/erinnerungen', () => {
   };
 });
 
-function renderPage() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+/** Wechselt in einen anderen Einsatz, ohne die Seite neu einzuhängen (Route ohne `key`). */
+function ZuEinsatz2() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate('/einsaetze/2/erinnerungen')}>
+      Zu Einsatz 2
+    </button>
+  );
+}
+
+function renderPage(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <MemoryRouter initialEntries={['/einsaetze/1/erinnerungen']}>
+          <ZuEinsatz2 />
           <Routes>
             <Route path="/einsaetze/:id/erinnerungen" element={<ErinnerungenPage />} />
           </Routes>
@@ -188,5 +201,321 @@ describe('ErinnerungenPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     await waitFor(() => expect(oeffneErinnerung).toHaveBeenCalledWith(1, 7));
+  });
+});
+
+/**
+ * Ablehnungen am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Anlegen im Paneel,
+ * Erledigt/Erübrigt an der Karte, Rückgängig im Seitenhinweis; kein Fehler-Toast.
+ */
+describe('ErinnerungenPage · Ablehnung am Ort (LFH-1077)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const karte = (titel: string) =>
+    screen.getByText(titel).closest('[data-lfh="komm-karte"]') as HTMLElement;
+  const seitenHinweis = () =>
+    waitFor(() => {
+      const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+      expect(h).not.toBeNull();
+      return h as HTMLElement;
+    });
+  const paneel = () => within(screen.getByRole('region', { name: 'Neue Erinnerung' }));
+
+  async function legeAn() {
+    await userEvent.click(screen.getByRole('button', { name: /Erinnerung anlegen/ }));
+    await userEvent.type(paneel().getByLabelText('Titel'), 'Funkcheck');
+    await userEvent.click(paneel().getByRole('button', { name: 'Anlegen' }));
+  }
+
+  it('Anlegen: der Grund steht im Paneel, die Eingabe bleibt, kein Toast', async () => {
+    vi.mocked(legeErinnerungAn).mockRejectedValueOnce(new ApiError(422, 'Fälligkeit liegt zurück'));
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await legeAn();
+
+    const grund = await paneel().findByRole('alert');
+    expect(grund).toHaveTextContent('Erinnerung nicht angelegt');
+    expect(grund).toHaveTextContent('Fälligkeit liegt zurück');
+    expect(paneel().getByLabelText('Titel')).toHaveValue('Funkcheck');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Anlegen: das nächste Absenden räumt den Grund', async () => {
+    vi.mocked(legeErinnerungAn)
+      .mockRejectedValueOnce(new ApiError(422, 'Fälligkeit liegt zurück'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await legeAn();
+    await paneel().findByText('Fälligkeit liegt zurück');
+
+    await userEvent.click(paneel().getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(legeErinnerungAn).toHaveBeenCalledTimes(2));
+    expect(paneel().queryByText('Fälligkeit liegt zurück')).toBeNull();
+    // Solange die Antwort aussteht, bleibt das Paneel offen.
+    expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeDisabled();
+  });
+
+  it('Anlegen: Zuklappen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    vi.mocked(legeErinnerungAn).mockRejectedValueOnce(new ApiError(422, 'Fälligkeit liegt zurück'));
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await legeAn();
+    await paneel().findByText('Fälligkeit liegt zurück');
+
+    await userEvent.click(paneel().getByRole('button', { name: 'Formular schließen' }));
+    await userEvent.click(screen.getByRole('button', { name: /Erinnerung anlegen/ }));
+    expect(paneel().queryByRole('alert')).toBeNull();
+  });
+
+  it('Erledigt: der Grund steht an genau dieser Karte, kein Toast', async () => {
+    vi.mocked(erledigeErinnerung).mockRejectedValueOnce(new ApiError(409, 'Bereits erledigt'));
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await userEvent.click(
+      within(karte('Lagemeldung')).getByRole('button', { name: 'Erledigt (durchgeführt)' }),
+    );
+
+    expect(await within(karte('Lagemeldung')).findByText('Bereits erledigt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  /** `useMutation` verfolgt nur den letzten Aufruf; der Grund kommt aus den Callbacks. */
+  it('Erledigt: zwei Karten nebenläufig, die Ablehnung steht an ihrer Karte', async () => {
+    const zweite = {
+      id: 10,
+      einsatz_id: 1,
+      titel: 'Funkcheck',
+      beschreibung: null,
+      faellig_at: '2026-06-11 11:00:00',
+      status: 'offen',
+      ist_faellig: false,
+      quelle: 'manuell',
+      vollzug_status: 'offen',
+    } as unknown as Erinnerung;
+    const [erste] = await listeOffeneErinnerungen(1);
+    vi.mocked(listeOffeneErinnerungen).mockResolvedValueOnce([erste, zweite]);
+    let lehneAb: (e: Error) => void = () => {};
+    vi.mocked(erledigeErinnerung).mockImplementation((_e, eid) =>
+      eid === 7
+        ? new Promise((_r, reject) => (lehneAb = reject))
+        : Promise.resolve({} as Awaited<ReturnType<typeof erledigeErinnerung>>),
+    );
+    renderPage();
+    await screen.findByText('Funkcheck');
+    await userEvent.click(
+      within(karte('Lagemeldung')).getByRole('button', { name: 'Erledigt (durchgeführt)' }),
+    );
+    await userEvent.click(
+      within(karte('Funkcheck')).getByRole('button', { name: 'Erledigt (durchgeführt)' }),
+    );
+    await waitFor(() => expect(erledigeErinnerung).toHaveBeenCalledTimes(2));
+    await act(async () => lehneAb(new ApiError(409, 'Bereits erledigt')));
+
+    expect(await within(karte('Lagemeldung')).findByText('Bereits erledigt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+    // Die zweite Karte hat Erfolg und damit ihren Rückgängig-Toast; ein Fehler-Toast fehlt.
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+    vi.mocked(erledigeErinnerung).mockReset();
+  });
+
+  it('Erübrigt nach abgelehntem Erledigt räumt den Grund an der Karte', async () => {
+    vi.mocked(erledigeErinnerung).mockRejectedValueOnce(new ApiError(409, 'Bereits erledigt'));
+    vi.mocked(quittiereErinnerung).mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await userEvent.click(
+      within(karte('Lagemeldung')).getByRole('button', { name: 'Erledigt (durchgeführt)' }),
+    );
+    await within(karte('Lagemeldung')).findByText('Bereits erledigt');
+
+    await userEvent.click(
+      within(karte('Lagemeldung')).getByRole('button', { name: 'Erübrigt (zur Kenntnis)' }),
+    );
+    await waitFor(() => expect(quittiereErinnerung).toHaveBeenCalledTimes(1));
+    expect(within(karte('Lagemeldung')).queryByText('Bereits erledigt')).toBeNull();
+  });
+
+  it('Erledigt: nach Ansichtswechsel vor der Antwort steht der Grund im Seitenhinweis', async () => {
+    let lehneAb: (e: Error) => void = () => {};
+    vi.mocked(erledigeErinnerung).mockImplementationOnce(
+      () => new Promise((_r, reject) => (lehneAb = reject)),
+    );
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
+    await userEvent.click(screen.getByText('Abgeschlossen (2)'));
+    await screen.findByText('Ablöse erledigt');
+    await act(async () => lehneAb(new ApiError(409, 'Bereits erledigt')));
+
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('„Lagemeldung“ nicht geändert');
+    expect(grund).toHaveTextContent('Bereits erledigt');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    // Zurück in der Ansicht der Karte steht er an ihr, nicht doppelt oben.
+    await userEvent.click(screen.getByText('Offen (1)'));
+    expect(await within(karte('Lagemeldung')).findByText('Bereits erledigt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+  });
+
+  /** Gewandert in „Abgeschlossen“ hat die Karte keine Aktion mehr, die den Grund räumte. */
+  it('Erledigt: wandert die Karte nach der Ablehnung, lässt sich der Hinweis schließen', async () => {
+    vi.mocked(erledigeErinnerung).mockRejectedValueOnce(new ApiError(409, 'Bereits erledigt'));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(qc);
+    await screen.findByText('Lagemeldung');
+    const [lage] = await listeOffeneErinnerungen(1);
+    const frueher = await listeAbgeschlosseneErinnerungen(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
+    await within(karte('Lagemeldung')).findByText('Bereits erledigt');
+
+    // Ein fremder Abschluss kommt als Ereignis an: die Karte steht nun unter „Abgeschlossen“.
+    const erledigt = { ...lage, status: 'erledigt', erledigt_at: '2026-06-11 10:30:00' };
+    vi.mocked(listeOffeneErinnerungen).mockResolvedValueOnce([]);
+    vi.mocked(listeAbgeschlosseneErinnerungen).mockResolvedValueOnce([
+      erledigt as Erinnerung,
+      ...frueher,
+    ]);
+    vi.mocked(ladeErinnerungKennzahlen).mockResolvedValueOnce({ offen: 0, abgeschlossen: 3 });
+    await act(() => qc.invalidateQueries());
+
+    const hinweis = await seitenHinweis();
+    const grund = await within(hinweis).findByRole('alert');
+    expect(grund).toHaveTextContent('„Lagemeldung“ nicht geändert');
+    expect(grund).toHaveTextContent('Bereits erledigt');
+
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Hinweis schließen' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull(),
+    );
+    // Verworfen, nicht nur ausgeblendet: auch an der Karte steht er nicht mehr.
+    await userEvent.click(screen.getByText('Abgeschlossen (3)'));
+    await screen.findByText('Ablöse erledigt');
+    expect(within(karte('Lagemeldung')).queryByText('Bereits erledigt')).toBeNull();
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+  });
+
+  it('Erledigt: alle Gründe ohne gezeigte Karte stehen im Seitenhinweis', async () => {
+    const zweite = {
+      id: 10,
+      einsatz_id: 1,
+      titel: 'Funkcheck',
+      beschreibung: null,
+      faellig_at: '2026-06-11 11:00:00',
+      status: 'offen',
+      ist_faellig: false,
+      quelle: 'manuell',
+      vollzug_status: 'offen',
+    } as unknown as Erinnerung;
+    const [erste] = await listeOffeneErinnerungen(1);
+    vi.mocked(listeOffeneErinnerungen).mockResolvedValueOnce([erste, zweite]);
+    vi.mocked(erledigeErinnerung)
+      .mockRejectedValueOnce(new ApiError(409, 'Bereits erledigt'))
+      .mockRejectedValueOnce(new ApiError(409, 'Schon erübrigt'));
+    renderPage();
+    await screen.findByText('Funkcheck');
+    await userEvent.click(
+      within(karte('Lagemeldung')).getByRole('button', { name: 'Erledigt (durchgeführt)' }),
+    );
+    await userEvent.click(
+      within(karte('Funkcheck')).getByRole('button', { name: 'Erledigt (durchgeführt)' }),
+    );
+    await within(karte('Funkcheck')).findByText('Schon erübrigt');
+
+    await userEvent.click(screen.getByText('Abgeschlossen (2)'));
+    await screen.findByText('Ablöse erledigt');
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('„Lagemeldung“ · Bereits erledigt');
+    expect(grund).toHaveTextContent('„Funkcheck“ · Schon erübrigt');
+  });
+
+  it('Erledigt: solange die andere Ansicht lädt, springt kein Grund in den Seitenhinweis', async () => {
+    vi.mocked(erledigeErinnerung).mockRejectedValueOnce(new ApiError(409, 'Bereits erledigt'));
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
+    await within(karte('Lagemeldung')).findByText('Bereits erledigt');
+
+    const frueher = await listeAbgeschlosseneErinnerungen(1);
+    let liefere: (l: Erinnerung[]) => void = () => {};
+    vi.mocked(listeAbgeschlosseneErinnerungen).mockImplementationOnce(
+      () => new Promise((r) => (liefere = r)),
+    );
+    await userEvent.click(screen.getByText('Abgeschlossen (2)'));
+    await waitFor(() => expect(listeAbgeschlosseneErinnerungen).toHaveBeenCalledTimes(2));
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+
+    await act(async () => liefere(frueher));
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('Bereits erledigt');
+  });
+
+  it('Rückgängig: abgelehnte Rücknahme im Seitenhinweis, die nächste räumt', async () => {
+    vi.mocked(erledigeErinnerung).mockResolvedValue(
+      {} as Awaited<ReturnType<typeof erledigeErinnerung>>,
+    );
+    vi.mocked(oeffneErinnerung)
+      .mockRejectedValueOnce(new ApiError(409, 'Schon wieder offen'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+
+    const grund = await within(await seitenHinweis()).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht wieder geöffnet');
+    expect(grund).toHaveTextContent('Schon wieder offen');
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
+    const rueckgaengig = await screen.findAllByRole('button', { name: 'Rückgängig' });
+    await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
+    await waitFor(() => expect(oeffneErinnerung).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Schon wieder offen')).toBeNull();
+    vi.mocked(erledigeErinnerung).mockReset();
+  });
+
+  it('meldet Ablehnungen aus dem vorigen Einsatz nicht im neuen', async () => {
+    let lehneErledigtAb: (e: Error) => void = () => {};
+    let lehneAnlegenAb: (e: Error) => void = () => {};
+    vi.mocked(erledigeErinnerung).mockImplementationOnce(
+      () => new Promise((_r, reject) => (lehneErledigtAb = reject)),
+    );
+    vi.mocked(legeErinnerungAn).mockImplementationOnce(
+      () => new Promise((_r, reject) => (lehneAnlegenAb = reject)),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(qc);
+    await screen.findByText('Lagemeldung');
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt (durchgeführt)' }));
+    await legeAn();
+    await waitFor(() => expect(legeErinnerungAn).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
+    await waitFor(() => expect(listeOffeneErinnerungen).toHaveBeenCalledWith(2));
+    act(() => {
+      lehneErledigtAb(new ApiError(409, 'Bereits erledigt'));
+      lehneAnlegenAb(new ApiError(422, 'Fälligkeit liegt zurück'));
+    });
+    // Erst prüfen, wenn beide Ablehnungen angekommen sind und die Beobachter sie gesehen haben.
+    await waitFor(() =>
+      expect(
+        qc.getMutationCache().findAll({ predicate: (m) => m.state.status === 'error' }),
+      ).toHaveLength(2),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    await screen.findByText('Lagemeldung');
+    expect(screen.queryByText('Bereits erledigt')).toBeNull();
+    expect(screen.queryByText('Fälligkeit liegt zurück')).toBeNull();
+    // Das laufende Anlegen des vorigen Einsatzes hält das Paneel hier nicht offen.
+    expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeEnabled();
   });
 });

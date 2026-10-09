@@ -28,7 +28,8 @@ function ausstehendSchluessel(p: AusstehenderEintrag): string {
   return `ausstehend-${p.id ?? p.erstellt_at}`;
 }
 
-function abgelehntSchluessel(p: AbgelehnterEintrag): string {
+/** Auch der Schlüssel des Zeilenfehlers von „Erneut senden“ (`pages/EtbPage.tsx`, LFH-1077). */
+export function abgelehntSchluessel(p: AbgelehnterEintrag): string {
   return `abgelehnt-${p.id ?? p.abgelehnt_at}`;
 }
 

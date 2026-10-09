@@ -3,7 +3,7 @@ import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
-import { ErfassungsModal } from '../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { ETB_ANHAENGE_MAX } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import type { ChatNachricht, EtbTyp } from '../api/types';
@@ -29,6 +29,11 @@ interface Props {
   onAbbrechen: () => void;
   /** Heraufstufen. Muss bei Ablehnung ablehnen (`mutateAsync`), sonst leert die Hülle. */
   onHeraufstufen: (typ: EtbTyp, inhalt: string, anhangIds: number[]) => Promise<unknown>;
+  /**
+   * Die Speicher-Mutation (LFH-1077), an die Erfassungshülle durchgereicht: ihr Grund steht im
+   * Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen ihn.
+   */
+  speicherung?: Speicherung;
 }
 
 /**
@@ -46,6 +51,7 @@ export default function HeraufstufenModal({
   senden,
   onAbbrechen,
   onHeraufstufen,
+  speicherung,
 }: Props) {
   const [form] = Form.useForm<FormWerte>();
   const anhaenge = [...(nachricht?.anhaenge ?? [])].sort((a, b) => a.id - b.id);
@@ -72,6 +78,9 @@ export default function HeraufstufenModal({
       form={form}
       erfassenText="Heraufstufen"
       laeuft={senden}
+      speicherung={speicherung}
+      speicherFehlerTitel="Nicht heraufgestuft"
+      speicherFehlerFallback="Heraufstufen fehlgeschlagen"
       onErfassen={(w) => onHeraufstufen(w.typ, w.inhalt.trim(), w.anhang_ids ?? [])}
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}
