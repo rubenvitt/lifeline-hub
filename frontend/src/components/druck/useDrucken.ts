@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ladeOrganisation } from '../../api/organisation';
 import { globalKeys } from '../../api/queryKeys';
+import { oeffneDruckdialog } from './druckDialog';
 
 type DruckZustand = 'bereit' | 'laedt' | 'fehler';
 
@@ -86,7 +87,7 @@ export function useDrucken(): Drucken {
       .then(() => {
         if (abgebrochen) return;
         erledigt.current = anforderung;
-        window.print();
+        oeffneDruckdialog();
       });
     return () => {
       abgebrochen = true;

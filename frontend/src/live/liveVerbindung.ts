@@ -21,6 +21,29 @@ const RECONNECT_STREUUNG = 0.5;
  */
 export const WIEDERAUFBAU_SCHONFRIST_MS = 8000;
 
+/** Je offener Verbindung ihr Zugang für {@link pausiereLiveStroeme} (LFH-1105). */
+const pausierbare = new Set<() => (() => void) | null>();
+
+/**
+ * Schließt jeden offenen Live-Strom SOFORT (synchron) und liefert die Fortsetzung, oder `null`,
+ * wenn keiner offen war. Für den Druck in Safari (LFH-1105, `components/druck/druckDialog.ts`):
+ * eine offene `EventSource` hält dort `window.print()` zurück.
+ *
+ * Die Fortsetzung baut eine NEUE Verbindung auf (ohne `Last-Event-ID`): sie gleicht ab wie jeder
+ * Neuaufbau (`beiWiederaufbau`), verpasste Ereignisse gehen so nicht verloren. Status wird beim
+ * Pausieren keiner gemeldet, die Pause dauert nur den Druckdialog.
+ */
+export function pausiereLiveStroeme(): (() => void) | null {
+  const fortsetzungen = [...pausierbare].flatMap((pausieren) => pausieren() ?? []);
+  if (fortsetzungen.length === 0) return null;
+  let fortgesetzt = false;
+  return () => {
+    if (fortgesetzt) return;
+    fortgesetzt = true;
+    fortsetzungen.forEach((fortsetzen) => fortsetzen());
+  };
+}
+
 export interface LiveVerbindungOptionen {
   url: string;
   /** Ereignisname → Handler; angehängt an jede (auch jede neu aufgebaute) EventSource. */
@@ -166,18 +189,35 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     };
   };
 
+  const trenne = (quelle: EventSource) => {
+    opt.listeners.forEach(([event, handler]) => quelle.removeEventListener(event, handler));
+    quelle.onopen = null;
+    quelle.onerror = null;
+    quelle.close();
+  };
+
+  // Nur eine lebende Quelle wird pausiert. Nach CLOSED läuft schon Probe oder Backoff, die
+  // Quelle lädt nicht mehr und hält den Druck nicht auf.
+  const pausieren = () => {
+    const quelle = aktuelle;
+    if (!quelle || quelle.readyState === EventSource.CLOSED) return null;
+    schonfristBeenden();
+    aktuelle = null;
+    trenne(quelle);
+    return () => {
+      if (!abgebrochen && aktuelle === null) verbinde();
+    };
+  };
+  pausierbare.add(pausieren);
+
   verbinde();
 
   return () => {
     abgebrochen = true;
+    pausierbare.delete(pausieren);
     if (backoffTimer) clearTimeout(backoffTimer);
     schonfristBeenden();
-    if (aktuelle) {
-      opt.listeners.forEach(([event, handler]) => aktuelle!.removeEventListener(event, handler));
-      aktuelle.onopen = null;
-      aktuelle.onerror = null;
-      aktuelle.close();
-    }
+    if (aktuelle) trenne(aktuelle);
     meldeStatus('idle');
   };
 }

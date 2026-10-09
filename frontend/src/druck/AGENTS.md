@@ -19,7 +19,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe sind `DruckKnopf`
   (`useDrucken`, wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
   nicht „letzter Abruf gelungen"). **Kein
-  `window.print()` direkt**, nie aus dem Passiv-Effekt. `components/druck/useDruckModus.ts`
+  `window.print()` direkt**, nie aus dem Passiv-Effekt. `useDrucken` druckt über
+  `components/druck/druckDialog.ts`: bleibt `beforeprint` aus (Safari stellt den Druck bei offenem
+  Live-Strom zurück, LFH-1105), schließt es den Strom in derselben Aufgabe und öffnet ihn danach
+  neu (`pausiereLiveStroeme`, Vollabgleich). `components/druck/useDruckModus.ts`
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
 - Ein Editor druckt nie seine `<textarea>` (`MarkdownEditor` `druckfassung`).
 - **Abschnittstitel stehen im Titelblock** (LFH-1008): Firefox setzt `break-after: avoid` nicht
