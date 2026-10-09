@@ -116,6 +116,10 @@
     break-inside: auto;
   }
 
+  /* Kopf je Seite in Chromium und Firefox. WebKit (Safari, iPad, macOS-Hülle) wiederholt `thead`
+     im Druck nicht, auch nicht an einer statischen Tabelle: Engine-Grenze, hingenommen wie die
+     Seitenzählung (LFH-1110, Prüfliste LFH-22). Kein Ersatz über Seitenblöcke: Papierformat und
+     Skalierung wählt man erst im Druckdialog. */
   [data-lfh='druckwurzel'] thead {
     display: table-header-group;
   }
