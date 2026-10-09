@@ -996,3 +996,43 @@ async fn vollzug_offen_nimmt_in_arbeit_zurueck_und_ist_sonst_422() {
     let (verboten, _) = anfrage(&app, "POST", &pfad, &admin, Some(r#"{"status":"offen"}"#)).await;
     assert_eq!(verboten, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+/// LFH-1060: Erteilzeit und Frist nur aus 2000–2100. Ein Jahres-Tippfehler ergab eine sofort
+/// fällige Auto-Frist, ein Jahr am Rand ließ die Fristrechnung panicken (500).
+#[tokio::test]
+async fn zeitpunkte_ausserhalb_des_jahresbereichs_sind_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Mit Default-Quittierfrist, damit die Erteilzeit in die Minutenrechnung geht.
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/einstellungen"),
+        &admin,
+        Some(r#"{"auftrag_quittierung_frist_min":60}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    for (feld, wert) in [
+        ("frist_at", "0226-06-19 09:00:00"),
+        ("frist_at", "2101-01-01 00:00:00"),
+        ("erteilt_at", "1999-12-31 23:59:59"),
+        ("erteilt_at", "+262142-12-31 23:30:00"),
+    ] {
+        let mut body = serde_json::json!({
+            "auftrag_text": "X",
+            "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "S4" }]
+        });
+        body[feld] = serde_json::json!(wert);
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/auftraege"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}={wert}: {j:?}");
+    }
+}
