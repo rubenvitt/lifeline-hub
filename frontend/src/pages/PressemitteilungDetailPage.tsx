@@ -1,5 +1,5 @@
 import { App, Breadcrumb, Button, Checkbox, Form, Input, Space, Typography } from 'antd';
-import ZumEtbEintrag from '../etb/ZumEtbEintrag';
+import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
 import type { Dayjs } from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -35,7 +35,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
@@ -101,6 +101,13 @@ function PressemitteilungDetail() {
     enabled: idGueltig && stabFreigabe.zustand === 'frei',
   });
   const vorlageDef = pmQuery.data ? mitteilungVorlage(pmQuery.data.vorlage) : undefined;
+  // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur an der
+  // freigegebenen Mitteilung: ein Entwurf hat noch keinen ETB-Eintrag.
+  const etbSprung = useZumEtbEintrag(
+    einsatzId,
+    pmQuery.data?.status === 'entwurf' ? null : pmQuery.data?.etb_eintrag_id,
+  );
+  const druckWege = useDruckNebenwege();
   // Über ein Primitiv memoisiert, damit das `memo`-Akkordeon nicht je Anschlag neu rendert
   // (Begründung in `LageberichtDetailPage`).
   const befuelltKette = befuellungsKette(werte, vorlageDef?.abschnitte ?? []);
@@ -284,16 +291,17 @@ function PressemitteilungDetail() {
             ]}
           />
         }
+        // Sprung und Drucken öffnen, senden nichts ab — Nebenwege im Kopf, unter `md` hinter
+        // „Weitere" (LFH-1079, `frontend/AGENTS.md`, Aktionen). Beide nur mit Lesezugriff.
+        weitere={{
+          name: 'Weitere Aktionen zur Pressemitteilung',
+          eintraege: [...(etbSprung ? [etbSprung] : []), ...druckWege],
+        }}
         aktionen={
           <div className="lagebericht-no-print">
             {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 7 / 11 / 16 px, antds
-                Vorgabe `paddingXS` ließ 3 / 5 / 7 px. Der Sprung steht vorn, abgesetzt von
-                den Handlungen, nicht neben „Folgemeldung schreiben“ (LFH-616). */}
+                Vorgabe `paddingXS` ließ 3 / 5 / 7 px. */}
             <Space wrap size={token.marginSM}>
-              {!istEntwurf && pm.etb_eintrag_id != null && (
-                <ZumEtbEintrag einsatzId={einsatzId} eintragId={pm.etb_eintrag_id} />
-              )}
-              <DruckKnopf />
               {!istEntwurf && darfSchreiben && (
                 <Button
                   onClick={() => fortschreibenMutation.mutate()}

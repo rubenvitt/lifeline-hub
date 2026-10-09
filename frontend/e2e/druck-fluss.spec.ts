@@ -532,10 +532,13 @@ test('Lagebericht mit Organisationslogo: Logo im Druckkopf, im PDF nur auf Seite
   expect(hoch.ok(), await hoch.text()).toBe(true);
   const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Logo ${Date.now()}`);
   const id = await lageberichtSaeen(page, einsatzId, true);
-  await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
   await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
+  // Ab `md` steht Drucken als Knopf im Kopf, darunter hinter „Weitere“ (LFH-1079): die
+  // Vorbedingung „Organisation geladen“ deshalb vor dem Wechsel auf Papierbreite.
   await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled();
+  await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
 
   // Alle Engines: unter Druckmedium steht im Kopf ein GELADENES Bild mit den Maßen des Logos,
   // und es belegt Fläche (nicht `display: none`, nicht kaputt und weggefallen).

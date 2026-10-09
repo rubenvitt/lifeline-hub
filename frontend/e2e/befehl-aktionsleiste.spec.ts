@@ -25,7 +25,8 @@ const ABSCHNITTE = [
   'Einsatzunterstützung',
   'Führung und Kommunikation',
 ];
-const AKTIONEN = ['Drucken / als PDF', 'Entwurf speichern', 'Freigeben'];
+/** Was die Leiste trägt. Drucken ist ein Nebenweg und steht im Seitenkopf (LFH-1079). */
+const AKTIONEN = ['Entwurf speichern', 'Freigeben'];
 
 /**
  * Kleinster freier Streifen zwischen der Oberkante eines per Tabulator angesteuerten
