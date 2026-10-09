@@ -69,6 +69,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.sprechgruppenAlle()).toEqual(['sprechgruppen', 'alle']);
   });
 
+  it('Betrieb: Datenträgerprüfung (LFH-1100)', () => {
+    expect(globalKeys.datentraeger()).toEqual(['datentraeger']);
+  });
+
   it('Karte: barer Prefix und alle acht Bereiche', () => {
     expect(globalKeys.adminKarte()).toEqual(['admin-karte']);
     expect(globalKeys.karteConfig()).toEqual(['karte-config']);

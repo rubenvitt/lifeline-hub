@@ -2859,6 +2859,104 @@
           "anhaenge"
         ]
       },
+      "DatentraegerGrund": {
+        "type": "string",
+        "description": "Warum ein Ort `unbekannt` ist.",
+        "enum": [
+          "netzlaufwerk",
+          "virtuell",
+          "kein_zugriff",
+          "nicht_unterstuetzt",
+          "werkzeug_fehlt",
+          "ausgabe_unbekannt"
+        ]
+      },
+      "DatentraegerOrt": {
+        "type": "object",
+        "description": "Ein Ort in [`DatentraegerStatus`].",
+        "required": [
+          "art",
+          "pfad",
+          "wert"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/DatentraegerOrtArt"
+          },
+          "grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DatentraegerGrund",
+                "description": "Nur bei `unbekannt`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pfad": {
+            "type": "string"
+          },
+          "wert": {
+            "$ref": "#/components/schemas/DatentraegerWert"
+          }
+        }
+      },
+      "DatentraegerOrtArt": {
+        "type": "string",
+        "description": "Geprüfter Ort.",
+        "enum": [
+          "datenbank",
+          "sicherung",
+          "auslagerung"
+        ]
+      },
+      "DatentraegerStatus": {
+        "type": "object",
+        "description": "Antwort von `GET /api/system/datentraeger`.",
+        "required": [
+          "gesamt",
+          "warnung",
+          "extern_zugesichert",
+          "orte"
+        ],
+        "properties": {
+          "extern_zugesichert": {
+            "type": "boolean",
+            "description": "`--datentraeger-verschluesselung-extern` ist gesetzt."
+          },
+          "geprueft_um": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Prüfung; fehlt vor der ersten."
+          },
+          "gesamt": {
+            "$ref": "#/components/schemas/DatentraegerWert",
+            "description": "Schlechtester Wert aller Orte; vor der ersten Prüfung `unbekannt`."
+          },
+          "orte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DatentraegerOrt"
+            }
+          },
+          "warnung": {
+            "type": "boolean",
+            "description": "Ob die Verwaltung warnt (vor der ersten Prüfung nie)."
+          }
+        }
+      },
+      "DatentraegerWert": {
+        "type": "string",
+        "description": "Ergebnis der Prüfung für einen Ort oder gesamt.",
+        "enum": [
+          "verschluesselt",
+          "unverschluesselt",
+          "unbekannt"
+        ]
+      },
       "DemoBericht": {
         "type": "object",
         "description": "Ergebnis eines Imports oder eines Entfernens, je Stammdatenart.",

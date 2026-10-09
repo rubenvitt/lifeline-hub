@@ -76,6 +76,13 @@ Sicherung; danach bricht er sie ab, und es bleibt eine `.part`-Datei bis zum nä
 Ein Verzeichnis **auf einem separaten Medium** (USB/Netzlaufwerk) schützt zusätzlich gegen
 Plattendefekt; ein Verzeichnis neben der Datenbank nur gegen Bedienfehler.
 
+Die Datenträgerprüfung des Servers prüft das Sicherungsverzeichnis mit: liegt es auf einem
+unverschlüsselten Medium, warnt die Verwaltung, auf einem Netzlaufwerk ist das Ergebnis
+„unbekannt“ (LFH-1100, [packaging.md](packaging.md#prüfung-im-betrieb-lfh-1100)). Mit
+Empfänger (`--backup-empfaenger`) ist die Sicherung selbst verschlüsselt; die Warnung bleibt
+trotzdem, denn die Pflicht gilt für jedes Medium mit Einsatzdaten. Die Klartext-Zwischenkopie
+liegt neben der Datenbank und zählt zum Ort „Datenbank“.
+
 > Die automatischen Sicherungen sind wie jeder Export session-bereinigt: sie enthalten
 > keine Anmelde-Tokens.
 

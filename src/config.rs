@@ -376,6 +376,17 @@ pub struct Config {
     )]
     pub backup_empfaenger: Vec<age::x25519::Recipient>,
 
+    /// Zusicherung des Betreibers, dass der Datenträger außerhalb der Sicht des Servers
+    /// verschlüsselt ist (LFH-1100), etwa LUKS auf dem Docker-Host. Dann warnt die
+    /// Datenträgerprüfung bei „unbekannt“ nicht mehr; ein erkannter unverschlüsselter Datenträger
+    /// warnt weiter. Steht beim Start im Log.
+    #[arg(
+        long,
+        env = "LIFELINE_DATENTRAEGER_VERSCHLUESSELUNG_EXTERN",
+        default_value_t = false
+    )]
+    pub datentraeger_verschluesselung_extern: bool,
+
     /// KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt periodisch importieren (LFH-83).
     /// **Default AN** — auch im Dev-Betrieb, damit die Ebene überall bundesweit zeigt, was
     /// sie zeigen soll. Jeder Lauf lädt rund 4–5 GB (nur, wenn der Extrakt neu ist);
@@ -869,6 +880,24 @@ mod tests {
                 "Prüfabstand {falsch} h liegt außerhalb 1…168"
             );
         }
+    }
+
+    /// LFH-1100: die Zusicherung externer Verschlüsselung ist aus, bis Flag oder Env sie setzen.
+    #[test]
+    fn datentraeger_verschluesselung_extern() {
+        assert!(!parse_hermetisch(["lifeline-hub"]).datentraeger_verschluesselung_extern);
+        assert!(
+            parse_hermetisch(["lifeline-hub", "--datentraeger-verschluesselung-extern"])
+                .datentraeger_verschluesselung_extern
+        );
+        assert!(
+            parse_mit_env(
+                "LIFELINE_DATENTRAEGER_VERSCHLUESSELUNG_EXTERN",
+                "true",
+                &["lifeline-hub"]
+            )
+            .datentraeger_verschluesselung_extern
+        );
     }
 
     #[test]

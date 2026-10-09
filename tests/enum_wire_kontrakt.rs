@@ -746,6 +746,29 @@ fn fuehrungsfunktion_besetzungszustand_wire() {
     } in lifeline_hub::fuehrung::aufloesung::BesetzungsZustand::ALLE);
 }
 
+/// LFH-1100: Datenträgerprüfung, Wire-Vertrag von `GET /api/system/datentraeger`.
+#[test]
+fn datentraeger_wire() {
+    enum_wire!(lifeline_hub::datentraeger::Wert {
+        Verschluesselt => "verschluesselt",
+        Unverschluesselt => "unverschluesselt",
+        Unbekannt => "unbekannt",
+    } in lifeline_hub::datentraeger::Wert::ALLE);
+    enum_wire!(lifeline_hub::datentraeger::Grund {
+        Netzlaufwerk => "netzlaufwerk",
+        Virtuell => "virtuell",
+        KeinZugriff => "kein_zugriff",
+        NichtUnterstuetzt => "nicht_unterstuetzt",
+        WerkzeugFehlt => "werkzeug_fehlt",
+        AusgabeUnbekannt => "ausgabe_unbekannt",
+    } in lifeline_hub::datentraeger::Grund::ALLE);
+    enum_wire!(lifeline_hub::datentraeger::OrtArt {
+        Datenbank => "datenbank",
+        Sicherung => "sicherung",
+        Auslagerung => "auslagerung",
+    } in lifeline_hub::datentraeger::OrtArt::ALLE);
+}
+
 /// LFH-632: Dokumentenablage. `DokumentKategorie` trägt die DB-CHECK-Werte aus
 /// `migrations/0116_einsatz_dokument.sql` — Drift endet sonst im Constraint-Sicherheitsnetz.
 #[test]

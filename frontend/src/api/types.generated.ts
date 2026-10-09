@@ -1073,6 +1073,40 @@ export interface components {
          * @enum {string}
          */
         Datenkategorie: "behandlung" | "personenauskunft" | "anhaenge";
+        /**
+         * @description Warum ein Ort `unbekannt` ist.
+         * @enum {string}
+         */
+        DatentraegerGrund: "netzlaufwerk" | "virtuell" | "kein_zugriff" | "nicht_unterstuetzt" | "werkzeug_fehlt" | "ausgabe_unbekannt";
+        /** @description Ein Ort in [`DatentraegerStatus`]. */
+        DatentraegerOrt: {
+            art: components["schemas"]["DatentraegerOrtArt"];
+            grund?: components["schemas"]["DatentraegerGrund"] | null;
+            pfad: string;
+            wert: components["schemas"]["DatentraegerWert"];
+        };
+        /**
+         * @description Geprüfter Ort.
+         * @enum {string}
+         */
+        DatentraegerOrtArt: "datenbank" | "sicherung" | "auslagerung";
+        /** @description Antwort von `GET /api/system/datentraeger`. */
+        DatentraegerStatus: {
+            /** @description `--datentraeger-verschluesselung-extern` ist gesetzt. */
+            extern_zugesichert: boolean;
+            /** @description Zeitpunkt der letzten Prüfung; fehlt vor der ersten. */
+            geprueft_um?: string | null;
+            /** @description Schlechtester Wert aller Orte; vor der ersten Prüfung `unbekannt`. */
+            gesamt: components["schemas"]["DatentraegerWert"];
+            orte: components["schemas"]["DatentraegerOrt"][];
+            /** @description Ob die Verwaltung warnt (vor der ersten Prüfung nie). */
+            warnung: boolean;
+        };
+        /**
+         * @description Ergebnis der Prüfung für einen Ort oder gesamt.
+         * @enum {string}
+         */
+        DatentraegerWert: "verschluesselt" | "unverschluesselt" | "unbekannt";
         /** @description Ergebnis eines Imports oder eines Entfernens, je Stammdatenart. */
         DemoBericht: {
             je_art: components["schemas"]["DemoBerichtZeile"][];

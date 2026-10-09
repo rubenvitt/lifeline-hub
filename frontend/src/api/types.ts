@@ -78,6 +78,11 @@ export interface FachebenenSichtbar {
   autobahn: boolean;
 }
 
+// ============================== Datenträgerprüfung (LFH-1100) ==============================
+/** Letztes Ergebnis der Datenträgerprüfung des Server-Rechners, nur für den System-Admin. */
+export type DatentraegerStatus = S['DatentraegerStatus'];
+export type DatentraegerOrt = S['DatentraegerOrt'];
+
 // ============================== Demo-Daten ==============================
 /** Stand der Demo-Daten der eigenen Organisation, die eine Antwort aller vier Endpunkte.
  *  `import` fehlt ohne aktiven Import, `bericht` fehlt, solange nie importiert wurde. */

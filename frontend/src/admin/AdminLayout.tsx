@@ -9,6 +9,7 @@ import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { useViewport } from '../components/useViewport';
 import { adminAufbewahrung, adminBenutzer, adminDemoDaten, adminGruppen } from './adminNav';
 import { useDemoDatenStatus } from './useDemoDaten';
+import DatentraegerWarnung from './DatentraegerWarnung';
 
 const { Sider, Content } = Layout;
 
@@ -16,7 +17,8 @@ const { Sider, Content } = Layout;
  * Admin-Shell: eine linke Sidebar (gruppiertes `Menu`) als EINZIGE Nav-Ebene für `/admin`, plus
  * `<Outlet>`. Menü und Routen stammen aus der `adminNav`-Registry; die aktive Sektion folgt der
  * URL. Gate `darfVerwaltung` (sonst Redirect zu /einsaetze). „Benutzer" und „Aufbewahrung" nur
- * für System-Admins, „Demo-Daten“ zusätzlich nur bei 200 von `GET /api/demo-daten`.
+ * für System-Admins, „Demo-Daten“ zusätzlich nur bei 200 von `GET /api/demo-daten`. Über dem
+ * Inhalt steht für System-Admins die Warnleiste der Datenträgerprüfung (LFH-1100).
  */
 /**
  * Menü-Key einer Sektion — EINE Quelle für Eintrag und Präfix-Match, sonst verlöre eine
@@ -252,6 +254,7 @@ export default function AdminLayout() {
             </div>
           )}
         </nav>
+        <DatentraegerWarnung />
         <Outlet />
       </div>
     );
@@ -273,6 +276,8 @@ export default function AdminLayout() {
         </nav>
       </Sider>
       <Content style={{ paddingInlineStart: token.paddingLG }}>
+        {/* Befund des Server-Rechners (LFH-1100), nur für den System-Admin und nur bei Warnung. */}
+        <DatentraegerWarnung />
         <Outlet />
       </Content>
     </Layout>

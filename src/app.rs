@@ -38,6 +38,8 @@ pub struct AppState {
     pub backup_download: crate::backup::DownloadSperre,
     /// Öffentliche Schlüssel, an die `GET /api/backup` verschlüsselt (LFH-1002); leer → Klartext.
     pub backup_empfaenger: crate::backup::Empfaenger,
+    /// Letztes Ergebnis der Datenträgerprüfung (LFH-1100), `GET /api/system/datentraeger`.
+    pub datentraeger: crate::datentraeger::Stand,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -102,6 +104,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
+        .route(
+            "/api/system/datentraeger",
+            get(routes::system::datentraeger),
+        )
         .route(
             "/api/auth/login",
             post(routes::auth::login).layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),

@@ -836,6 +836,8 @@ export const GLOBAL_KEYS = {
   // Instanz / Betrieb — NICHT mandantenbezogen
   adminKarte: 'admin-karte',
   karteConfig: 'karte-config',
+  // Datenträgerprüfung des Server-Rechners (LFH-1100), nur für den System-Admin.
+  datentraeger: 'datentraeger',
 
   // Externe Quellen
   fachebene: 'fachebene',
@@ -944,6 +946,7 @@ export const globalKeys = {
     [GLOBAL_KEYS.benutzerEinstellungen, benutzerId] as const,
 
   // Karte: barer Prefix (invalidiereKarte trifft alle sieben Bereiche) + adressierter Bereich.
+  datentraeger: () => [GLOBAL_KEYS.datentraeger] as const,
   adminKarte: () => [GLOBAL_KEYS.adminKarte] as const,
   adminKarteBereich: (bereich: AdminKarteBereich) => [GLOBAL_KEYS.adminKarte, bereich] as const,
   karteConfig: () => [GLOBAL_KEYS.karteConfig] as const,
@@ -1011,7 +1014,7 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
  * - `sitzungen`: Anmeldungen einer Person, gelesen beim Öffnen und nach dem Beenden.
- * - `adminKarte`, `karteConfig`: instanzweit, nicht mandantenbezogen.
+ * - `adminKarte`, `karteConfig`, `datentraeger`: instanzweit, nicht mandantenbezogen.
  * - `fachebene`: externe Quellen mit eigener Nachfrage.
  */
 export const NICHT_LIVE_GLOBAL_KEYS = [
@@ -1023,6 +1026,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.sitzungen,
   GLOBAL_KEYS.adminKarte,
   GLOBAL_KEYS.karteConfig,
+  GLOBAL_KEYS.datentraeger,
   GLOBAL_KEYS.fachebene,
 ] as const satisfies readonly GlobalKey[];
 

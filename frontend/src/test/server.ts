@@ -135,6 +135,19 @@ export const server = setupServer(
     HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
   ),
   /**
+   * Datenträgerprüfung (LFH-1100): alles verschlüsselt als Default, damit die Verwaltung keine
+   * Warnleiste zeigt. Tests der Warnung überschreiben per `server.use()`.
+   */
+  http.get('/api/system/datentraeger', () =>
+    HttpResponse.json({
+      gesamt: 'verschluesselt',
+      warnung: false,
+      extern_zugesichert: false,
+      geprueft_um: '2026-10-09 12:00:00',
+      orte: [{ art: 'datenbank', pfad: '/var/lib/lifeline', wert: 'verschluesselt' }],
+    }),
+  ),
+  /**
    * Funktionskatalog (LFH-549) — leer als Default; Empfängerfelder und ETB-Vorschläge fragen ihn
    * beim Mount ab. Tests mit Katalog überschreiben per `server.use()` oder ersetzen den Hook.
    */

@@ -212,6 +212,46 @@ Stand von SQLCipher zurück. Bewertung und Messung stehen im Ticket. Neu bewerte
 die Desktop-App eine eigene Datenbank bekommt, ein Betrieb ohne Datenträgerverschlüsselung
 unvermeidbar wird oder der Server ohne Konsole am Gerät entsperrt werden muss.
 
+#### Prüfung im Betrieb (LFH-1100)
+
+Der Server prüft beim Start und danach stündlich, ob das Verzeichnis der Datenbank, das
+Sicherungsverzeichnis (`--backup-verzeichnis`) und die Auslagerung auf einem verschlüsselten
+Datenträger liegen. Jeder Ort ist danach **verschlüsselt**, **unverschlüsselt** oder
+**unbekannt**. Ist einer unverschlüsselt oder unbekannt, steht eine Warnzeile im Log (beim
+ersten Ergebnis und bei jeder Änderung) und über jeder Seite der Verwaltung eine Warnleiste mit
+Ort und Pfad. Die Leiste sehen nur System-Admins. Der Server läuft bei jedem Ergebnis normal
+weiter; er blockiert nichts.
+
+| System | Geprüft wird | Ohne Adminrechte |
+|---|---|---|
+| Linux | Gerätekette des Mounts über `/proc/self/mountinfo` und `/sys/dev/block`: dm-crypt (`CRYPT-…`) direkt, unter LVM oder RAID; Swap aus `/proc/swaps` (zram zählt nicht) | ja |
+| macOS | Startvolume über `fdesetup isactive`, andere Volumes über `diskutil info -plist`; Auslagerung über `sysctl vm.swapusage` | ja |
+| Windows | BitLocker-Schutzstatus des Laufwerks über PowerShell (`System.Volume.BitLockerProtection`), Auslagerungsdateien aus `Win32_PageFileUsage` | ja |
+
+**Unbekannt** heißt: Die Prüfung kann es nicht feststellen. Das gilt für ein Netzlaufwerk, ein
+Container-Dateisystem (overlay), ZFS, fehlende Rechte oder eine Ausgabe, die sie nicht kennt.
+Die Ausgaben unter macOS und Windows sind aus Beispielen abgeleitet. Was nicht passt, ergibt
+„unbekannt“, nie „verschlüsselt“.
+
+**Docker/Hetzner:** Ein Volume auf einem LUKS-Host erkennt die Prüfung oft auch im Container.
+Den Swap des Hosts sieht sie dort aber nicht, das Ergebnis ist dann „unbekannt“. Liegt die
+Verschlüsselung beim Host, wird
+`--datentraeger-verschluesselung-extern` (`LIFELINE_DATENTRAEGER_VERSCHLUESSELUNG_EXTERN=true`)
+gesetzt. Dann warnt „unbekannt“ nicht mehr. Ein erkannter unverschlüsselter Datenträger warnt
+weiter, die Zusicherung verdeckt keinen Befund.
+
+**Virtuelle Maschine:** Eine VM auf einem verschlüsselten Host (Proxmox, Hyper-V, WSL2) sieht
+ihre virtuelle Platte als nacktes Gerät (`/dev/vda`, `/dev/sda`) und meldet „unverschlüsselt“.
+Der Schalter hilft dort bewusst nicht. Die Warnung verschwindet erst mit einer Verschlüsselung
+in der VM selbst.
+
+Unter Linux zählen nur Geräte, die mit Schlüssel arbeiten (LUKS, plain, BitLocker- und
+TrueCrypt-Container über cryptsetup); dm-integrity und dm-verity ohne Verschlüsselung darüber
+gelten als unverschlüsselt. Ein btrfs über mehrere Geräte ist nur verschlüsselt, wenn jedes
+Gerät es ist. Hinter einem loop-Gerät liegt eine Datei, deren Datenträger die Prüfung nicht
+verfolgt: „unbekannt“. Unter Windows ist ein Volume, das ohne eigenen Buchstaben in einen
+Ordner eingehängt ist, „unbekannt“.
+
 Für die Geräte im Einsatz (Laptop, Tablet, Handy, Desktop-App) gilt dasselbe, dazu
 Bildschirmsperre und Abmelden an Gemeinschaftsgeräten, siehe [endgeraete.md](endgeraete.md).
 Sicherungen, die das Gerät verlassen, gehören auf ein verschlüsseltes Medium
