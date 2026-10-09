@@ -32,6 +32,11 @@ set -euo pipefail
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
+# Nach Bereichen statt nach Bündel (LFH-1115), wie die CI im PR:
+#   --geaendert[=REF]  die Schnellprüfungen und nur die Suiten, die die Änderungen seit dem
+#                      Abzweig von REF (Vorgabe origin/alpha) brauchen — Commits, Index,
+#                      Arbeitsbaum und neue Dateien. Zuordnung: scripts/bereiche.sh.
+#   --auswahl          nur anzeigen, welche Schritte liefen, nichts fahren
 # Unabhängig vom Bündel:
 #   --abbrechen      nach dem ersten roten Schritt keinen weiteren starten (Vorgabe:
 #                    alle fahren und am Ende einmal rot melden)
@@ -41,8 +46,17 @@ set -euo pipefail
 #   PW_PROJEKTE=chromium   PW_PROJEKTE=firefox,webkit
 NUR="alle"
 ABBRECHEN=0
+GEAENDERT=""
+AUSWAHL=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --geaendert) GEAENDERT="origin/alpha"; shift ;;
+    --geaendert=*)
+      GEAENDERT="${1#--geaendert=}"
+      [ -n "$GEAENDERT" ] || { echo "FEHLER: --geaendert= braucht einen Ref." >&2; exit 2; }
+      shift
+      ;;
+    --auswahl) AUSWAHL=1; shift ;;
     --nur)
       NUR="${2:-}"
       [ -n "$NUR" ] || { echo "FEHLER: --nur braucht ein Bündel." >&2; exit 2; }
@@ -54,6 +68,10 @@ while [ $# -gt 0 ]; do
     *) echo "FEHLER: unbekanntes Argument '$1'." >&2; exit 2 ;;
   esac
 done
+if [ -n "$GEAENDERT" ] && [ "$NUR" != alle ]; then
+  echo "FEHLER: --geaendert und --nur schließen sich aus." >&2
+  exit 2
+fi
 VITEST_SHARD="${VITEST_SHARD:-}"
 PW_SHARD="${PW_SHARD:-}"
 PW_PROJEKTE="${PW_PROJEKTE:-}"
@@ -210,6 +228,12 @@ schritt_7() {
   # Ein vorgegebenes Binary (PW_BINAER, CI-Shard ohne Cargo) hat kein Build-Ziel zu prüfen.
   if [ -z "${PW_BINAER:-}" ]; then
     bauziel_pruefen "$ROOT"
+    # Mit --geaendert ohne Rust-Suite baut Schritt 4 das Binary nicht mit; ein liegengebliebenes
+    # von einem älteren Stand prüfte das Frontend gegen ein fremdes Backend. Wie der CI-Job
+    # `e2e-Binary`, nur dieses Binary.
+    if [ "${BINAER_BAUEN:-0}" = 1 ]; then
+      ohne_dev_env cargo build --bin lifeline-hub
+    fi
   fi
   binaer="$(backend_binaer_pfad "$ROOT")"
   # Fehlt es ungefragt, meldet der Schritt „übersprungen" (Gesamtstatus „OK mit Lücke"), nie
@@ -281,7 +305,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung (LFH-386/518/520/1101)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung (LFH-386/518/520/1101/1115)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -294,6 +318,9 @@ schritt_11() {
   # Frist und Wiederholung der Netz-Schritte in den Workflows (LFH-1101): bricht die Frist einen
   # hängenden Versuch nicht ab, steht der Job wieder bis zu seinem Timeout.
   "$ROOT/scripts/wiederholen.test.sh"
+  # Die Bereichs-Erkennung (LFH-1115) entscheidet im PR, welche Suiten laufen: ein vergessener
+  # Querbezug ließe eine Suite still aus, deren Rot erst auf `alpha` auffiele.
+  "$ROOT/scripts/bereiche.test.sh"
 }
 
 schritt_12() {
@@ -377,8 +404,45 @@ if [ "$_summe" != "$_soll" ]; then
   exit 2
 fi
 
+# Die Suiten, die die Änderungen seit dem Abzweig von $GEAENDERT brauchen (scripts/bereiche.sh).
+# Gezählt wird gegen die Merge-Basis wie im PR, nicht gegen die Spitze des Refs: was dort seit
+# dem Abzweig hinzukam, ist nicht die eigene Änderung.
+geaendert_auswahl() {
+  local basis bereiche
+  if ! git -C "$ROOT" rev-parse --verify --quiet "$GEAENDERT^{commit}" > /dev/null; then
+    echo "FEHLER: '$GEAENDERT' fehlt in diesem Checkout (vorher 'git fetch origin alpha')." >&2
+    exit 2
+  fi
+  basis="$(git -C "$ROOT" merge-base HEAD "$GEAENDERT")"
+  bereiche="$(
+    {
+      git -C "$ROOT" diff --name-only "$basis"
+      git -C "$ROOT" ls-files --others --exclude-standard
+    } | "$ROOT/scripts/bereiche.sh"
+  )"
+  echo "==> Geändert seit $GEAENDERT (Basis ${basis:0:10}): $(echo "$bereiche" | tr '\n' ' ')" >&2
+  lauf="$BUENDEL_schnell"
+  case "$bereiche" in *rust=true*) lauf="$lauf $BUENDEL_rust" ;; esac
+  case "$bereiche" in *frontend=true*) lauf="$lauf $BUENDEL_frontend" ;; esac
+  case "$bereiche" in
+    *e2e=true*)
+      lauf="$lauf $BUENDEL_e2e"
+      case "$bereiche" in *rust=true*) ;; *) export BINAER_BAUEN=1 ;; esac
+      ;;
+  esac
+  # shellcheck disable=SC2086 # Wortzerlegung: eine Schrittnummer je Zeile.
+  lauf="$(printf '%s\n' $lauf | sort -n | tr '\n' ' ')"
+  lauf="${lauf% }"
+}
+
 case "$NUR" in
-  alle)     lauf="$BUENDEL_alle" ;;
+  alle)
+    if [ -n "$GEAENDERT" ]; then
+      geaendert_auswahl
+    else
+      lauf="$BUENDEL_alle"
+    fi
+    ;;
   schnell)  lauf="$BUENDEL_schnell" ;;
   rust)     lauf="$BUENDEL_rust" ;;
   frontend) lauf="$BUENDEL_frontend" ;;
@@ -390,6 +454,11 @@ case "$NUR" in
     ;;
 esac
 
+if [ "$AUSWAHL" = 1 ]; then
+  echo "Schritte: $lauf"
+  exit 0
+fi
+
 # $lauf unquotiert: die Schrittnummern sollen als einzelne Argumente ankommen. Nicht in einer
 # Bedingung aufrufen (s. lib/schritte.sh).
 # shellcheck disable=SC2086
@@ -399,5 +468,7 @@ schritte_bericht || gesamt=$?
 if [ "$NUR" != alle ]; then
   echo "    Bündel '$NUR' (Schritte: $lauf von $SCHRITTE) ist ein TEILSTÜCK."
   echo "    Vor dem Merge gilt der volle Lauf ohne --nur."
+elif [ -n "$GEAENDERT" ]; then
+  echo "    Nach Bereichen seit $GEAENDERT (Schritte: $lauf von $SCHRITTE), wie die CI im PR."
 fi
 exit "$gesamt"

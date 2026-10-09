@@ -7,8 +7,19 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` → `check-deps.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed).
+- **Im PR laufen nur die betroffenen Suiten** (LFH-1111/1115): `scripts/bereiche.sh` ordnet
+  jede geänderte Datei den Suiten Rust, Frontend und e2e zu, der CI-Job `aenderungen` und
+  `check-all.sh --geaendert` fragen beide nur dieses Skript; die Schnellprüfungen und
+  Push-Läufe auf Kanal-Branches laufen immer voll. **Im Zweifel alles:** ein Pfad ohne Regel
+  fordert alle drei. Eine Datei, die eine Suite aus einem fremden Bereich liest (Rust liest
+  `frontend/src/api/openapi.json`, Vitest liest `src-tauri/src/faehigkeiten.js`), braucht
+  einen Querbezug in `bereiche.sh`; `scripts/bereiche.test.sh` (Schritt 11) sucht solche
+  Pfade im Quelltext und wird rot, wenn einer fehlt. Übersprungene Matrix-Jobs laufen leer
+  und grün durch statt per Job-`if`, sonst hingen ihre Required Checks auf „Expected"
+  (Kopf von `ci.yml`). `check-all.sh --geaendert` wählt lokal dieselben Suiten wie die CI im
+  PR, `--auswahl` zeigt sie nur an; ohne Argument läuft alles.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,
