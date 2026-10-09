@@ -8,7 +8,9 @@ import { anmeldenAlsAdmin, wechsleZuRolle, type Rolle } from './rollen-kern';
  *   links aus dem Dialog („Abbrechen“ bei x = −75). Unter `md` stehen sie untereinander.
  * - **Zeiteingabe** (`anzeige/ZeitpunktEingabe.tsx`): antds Panel mit Uhrzeit war 437 px breit,
  *   „OK“ und die Uhrzeit lagen außerhalb, die Seite scrollte seitlich. Unter `md` steht es als
- *   Blatt am unteren Rand (`anzeige/ZeitpunktEingabe.css`).
+ *   Blatt am unteren Rand (`anzeige/ZeitpunktEingabe.css`). Auf dem Führungs-Tablet (820 und
+ *   1024 px) ebenso in `komfortabel` und `handschuh` (LFH-1076): dort war das Panel 797 bzw.
+ *   1191 px breit.
  * - **Kürzel** „Strg + ↵“ nur bei feinem Zeiger (`components/Erfassung.css`).
  *
  * Gemessen in `kompakt` und `komfortabel` (die breiteren Knöpfe verschlimmerten den Überlauf) und
@@ -21,6 +23,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle, type Rolle } from './rollen-kern';
  *  Werkzeugleiste abgezogen). Mit der Gerätehöhe sähe die Spec ein Blatt, das am Handy nicht passt. */
 const HANDY = { width: 390, height: 700 };
 const TABLET_HOCH = { width: 820, height: 1180 };
+/** Führungs-Tablet quer. */
+const TABLET_QUER = { width: 1024, height: 768 };
 const DESKTOP = { width: 1440, height: 900 };
 const SUBPIXEL = 0.5;
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
@@ -28,10 +32,12 @@ const STUFEN = ['kompakt', 'komfortabel'] as const;
 /** Das Blatt misst zusätzlich `handschuh`: dort ist es höher als der Schirm und rollt in sich. */
 const STUFEN_BLATT = [...STUFEN, 'handschuh'] as const;
 type Stufe = (typeof STUFEN_BLATT)[number];
+type Groesse = { width: number; height: number };
 /** Steuerhöhe der Stufe als Literal (Dichte-Staffel, `frontend/AGENTS.md`). */
 const STEUERHOEHE: Record<Stufe, number> = { kompakt: 30, komfortabel: 48, handschuh: 72 };
 /** Freier Streifen über dem Blatt, auf den man zum Schließen tippt (Blatt ≤ 85 % der Höhe). */
-const STREIFEN = Math.floor(HANDY.height * 0.15) - 1;
+const streifen = (g: Groesse) => Math.floor(g.height * 0.15) - 1;
+const STREIFEN = streifen(HANDY);
 
 /** Das offene Panel einer Zeiteingabe. */
 const panel = (page: Page) => page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)');
@@ -90,13 +96,11 @@ function liegtIn(
   );
 }
 
-const SCHIRM = { x: 0, y: 0, ...HANDY };
+const schirm = (g: Groesse) => ({ x: 0, y: 0, ...g });
 
-async function keinSeitlicherUeberlauf(page: Page, wo: string) {
+async function keinSeitlicherUeberlauf(page: Page, wo: string, g: Groesse = HANDY) {
   const breite = await page.evaluate(() => document.documentElement.scrollWidth);
-  expect(breite, `${wo}: scrollWidth ${breite}, Soll ≤ ${HANDY.width}`).toBeLessThanOrEqual(
-    HANDY.width,
-  );
+  expect(breite, `${wo}: scrollWidth ${breite}, Soll ≤ ${g.width}`).toBeLessThanOrEqual(g.width);
 }
 
 /** Kalendertitel (antd, deutsches Gebietsschema) eines Tages in zwei Tagen. */
@@ -110,8 +114,14 @@ function tagInZweiTagen(): string {
  * Das offene Panel liegt im Schirm; Tag und Stunde werden gewählt und mit „OK“ übernommen.
  * Der Tag liegt in der Zukunft, egal in welcher Zone: Seeds von „jetzt“ fallen danach heraus.
  */
-async function waehleImPanel(page: Page, stunde: number, wo: string, dichte: Stufe) {
-  const p = await pruefeBlatt(page, wo);
+async function waehleImPanel(
+  page: Page,
+  stunde: number,
+  wo: string,
+  dichte: Stufe,
+  g: Groesse = HANDY,
+) {
+  const p = await pruefeBlatt(page, wo, g);
   await p.locator(`td[title="${tagInZweiTagen()}"]`).click();
   const zelle = p.locator(
     `.ant-picker-time-panel-column[data-type="hour"] li[data-value="${stunde}"]`,
@@ -124,23 +134,109 @@ async function waehleImPanel(page: Page, stunde: number, wo: string, dichte: Stu
   ).toBeGreaterThanOrEqual(STEUERHOEHE[dichte] - SUBPIXEL);
   await zelle.click();
   const ok = p.getByRole('button', { name: 'OK', exact: true });
-  expect(liegtIn(await kasten(ok), SCHIRM), `${wo}: „OK“ liegt nicht im Schirm`).toBe(true);
+  expect(liegtIn(await kasten(ok), schirm(g)), `${wo}: „OK“ liegt nicht im Schirm`).toBe(true);
   await ok.click();
 }
 
 /** Das offene Blatt liegt im Schirm und lässt oben einen Streifen zum Wegtippen frei. */
-async function pruefeBlatt(page: Page, wo: string) {
+async function pruefeBlatt(page: Page, wo: string, g: Groesse = HANDY) {
   const p = panel(page);
   await expect(p).toBeVisible();
   // Erst nach der Einblendung messen: währenddessen ist das Panel skaliert.
   await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
   const k = await kasten(p);
-  expect(liegtIn(k, SCHIRM), `${wo}: Panel ${JSON.stringify(k)} liegt nicht im Schirm`).toBe(true);
-  expect(k.y, `${wo}: über dem Blatt bleibt kein Streifen zum Schließen`).toBeGreaterThanOrEqual(
-    STREIFEN,
+  expect(liegtIn(k, schirm(g)), `${wo}: Panel ${JSON.stringify(k)} liegt nicht im Schirm`).toBe(
+    true,
   );
-  await keinSeitlicherUeberlauf(page, `${wo}, Panel offen`);
+  expect(k.y, `${wo}: über dem Blatt bleibt kein Streifen zum Schließen`).toBeGreaterThanOrEqual(
+    streifen(g),
+  );
+  await keinSeitlicherUeberlauf(page, `${wo}, Panel offen`, g);
   return p;
+}
+
+/**
+ * „Zeitfenster anlegen“ (Verpflegung): Beginn und Ende im Blatt wählen, „Anlegen“ im Schirm und
+ * wirksam. Die Rolle ist vorher gewechselt.
+ */
+async function pruefeZeitfenster(
+  page: Page,
+  einsatzId: string,
+  rolle: Rolle | null,
+  dichte: Stufe,
+  g: Groesse,
+) {
+  const wer = `${rolle ?? 'admin'}, ${dichte}, ${g.width} px`;
+  await stelleDichte(page, dichte);
+  await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
+  await stufeAngekommen(page, dichte);
+
+  // Der Kopfknopf; im leeren Zustand trägt die Leerfläche einen zweiten.
+  await page
+    .locator('[data-lfh="seitenkopf"]')
+    .getByRole('button', { name: 'Zeitfenster anlegen', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Zeitfenster anlegen' });
+  await expect(dialog).toBeVisible();
+  const bezeichnung = `Mittag ${rolle ?? 'admin'} ${dichte} ${g.width}`;
+  await dialog.getByLabel('Bezeichnung', { exact: true }).fill(bezeichnung);
+
+  await dialog.getByPlaceholder('Beginn', { exact: true }).click();
+  await waehleImPanel(page, 12, `${wer}, Beginn`, dichte, g);
+  // antd springt nach „OK“ ins Ende-Feld; das Panel bleibt dafür offen.
+  await waehleImPanel(page, 13, `${wer}, Ende`, dichte, g);
+  await expect(panel(page)).toBeHidden();
+
+  await dialog.getByLabel('Einsatzkräfte (EP)', { exact: true }).fill('20');
+  await dialog.getByLabel('Betreute (EP)', { exact: true }).fill('10');
+  const anlegen = dialog.getByRole('button', { name: 'Anlegen', exact: true });
+  await anlegen.scrollIntoViewIfNeeded();
+  expect(liegtIn(await kasten(anlegen), schirm(g)), `${wer}: „Anlegen“ im Schirm`).toBe(true);
+  await anlegen.click();
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByRole('article', { name: new RegExp(`^Zeitfenster ${bezeichnung} `) }),
+  ).toBeVisible();
+  await keinSeitlicherUeberlauf(page, `${wer}, Verpflegung`, g);
+}
+
+/**
+ * ETB-Filter „von“: Zeitpunkt mit Uhrzeit im Blatt setzen, der Filter wirkt. Die Rolle ist vorher
+ * gewechselt; ohne Schreibrecht fehlt die Erfassungsleiste (Vorbedingung des Rollenzweigs).
+ */
+async function pruefeEtbFilter(
+  page: Page,
+  einsatzId: string,
+  inhalt: string,
+  rolle: Rolle | null,
+  dichte: Stufe,
+  g: Groesse,
+) {
+  const wer = `${rolle ?? 'admin'}, ${dichte}, ${g.width} px`;
+  await stelleDichte(page, dichte);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await stufeAngekommen(page, dichte);
+  await expect(page.getByText(inhalt)).toBeVisible();
+  await expect(page.locator('.etb-erfassung-sticky')).toHaveCount(rolle ? 0 : 1);
+
+  if (g.width < 768) {
+    await page.getByRole('button', { name: /^Filter/ }).click();
+  } else if (!rolle) {
+    // Ab `md` nimmt die Erfassungsleiste beim Laden den Fokus; ein früher geöffnetes Panel
+    // schlösse sich dabei wieder.
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'BODY'))
+      .not.toBe('BODY');
+  }
+  const von = page.getByPlaceholder('von', { exact: true });
+  await von.click();
+  await waehleImPanel(page, 14, `${wer}, ETB „von“`, dichte, g);
+
+  await expect(panel(page)).toBeHidden();
+  await expect(von).toHaveValue(/ 14:00/);
+  await expect(page.getByText(inhalt)).toBeHidden();
+  await expect(page.getByText('Kein Eintrag passt zum Filter')).toBeVisible();
+  await keinSeitlicherUeberlauf(page, `${wer}, ETB gefiltert`, g);
 }
 
 /** Serienmaske: „Betroffene erfassen“ über ihre Adresse (`?neu=1`). */
@@ -206,39 +302,8 @@ for (const dichte of STUFEN) {
     await page.setViewportSize(HANDY);
 
     for (const rolle of [null, 'fuehrungspersonal'] as (Rolle | null)[]) {
-      const wer = `${rolle ?? 'admin'}, ${dichte}`;
       if (rolle) await wechsleZuRolle(page, rolle, einsatzId);
-      await stelleDichte(page, dichte);
-      await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
-      await stufeAngekommen(page, dichte);
-
-      // Der Kopfknopf; im leeren Zustand trägt die Leerfläche einen zweiten.
-      await page
-        .locator('[data-lfh="seitenkopf"]')
-        .getByRole('button', { name: 'Zeitfenster anlegen', exact: true })
-        .click();
-      const dialog = page.getByRole('dialog', { name: 'Zeitfenster anlegen' });
-      await expect(dialog).toBeVisible();
-      const bezeichnung = `Mittag ${rolle ?? 'admin'} ${dichte}`;
-      await dialog.getByLabel('Bezeichnung', { exact: true }).fill(bezeichnung);
-
-      await dialog.getByPlaceholder('Beginn', { exact: true }).click();
-      await waehleImPanel(page, 12, `${wer}, Beginn`, dichte);
-      // antd springt nach „OK“ ins Ende-Feld; das Panel bleibt dafür offen.
-      await waehleImPanel(page, 13, `${wer}, Ende`, dichte);
-      await expect(panel(page)).toBeHidden();
-
-      await dialog.getByLabel('Einsatzkräfte (EP)', { exact: true }).fill('20');
-      await dialog.getByLabel('Betreute (EP)', { exact: true }).fill('10');
-      const anlegen = dialog.getByRole('button', { name: 'Anlegen', exact: true });
-      await anlegen.scrollIntoViewIfNeeded();
-      expect(liegtIn(await kasten(anlegen), SCHIRM), `${wer}: „Anlegen“ im Schirm`).toBe(true);
-      await anlegen.click();
-      await expect(dialog).toBeHidden();
-      await expect(
-        page.getByRole('article', { name: new RegExp(`^Zeitfenster ${bezeichnung} `) }),
-      ).toBeVisible();
-      await keinSeitlicherUeberlauf(page, `${wer}, Verpflegung`);
+      await pruefeZeitfenster(page, einsatzId, rolle, dichte, HANDY);
     }
   });
 }
@@ -259,25 +324,36 @@ for (const dichte of STUFEN_BLATT) {
     await page.setViewportSize(HANDY);
 
     for (const rolle of [null, 'beobachter'] as (Rolle | null)[]) {
-      const wer = `${rolle ?? 'admin'}, ${dichte}`;
       if (rolle) await wechsleZuRolle(page, rolle, einsatzId);
-      await stelleDichte(page, dichte);
-      await page.goto(`/einsaetze/${einsatzId}/etb`);
-      await stufeAngekommen(page, dichte);
-      await expect(page.getByText(inhalt)).toBeVisible();
-      // Vorbedingung des Rollenzweigs: ohne Schreibrecht fehlt die Erfassungsleiste.
-      await expect(page.locator('.etb-erfassung-sticky')).toHaveCount(rolle ? 0 : 1);
+      await pruefeEtbFilter(page, einsatzId, inhalt, rolle, dichte, HANDY);
+    }
+  });
+}
 
-      await page.getByRole('button', { name: /^Filter/ }).click();
-      const von = page.getByPlaceholder('von', { exact: true });
-      await von.click();
-      await waehleImPanel(page, 14, `${wer}, ETB „von“`, dichte);
+/** Führungs-Tablet hoch und quer in den Stufen, deren Panel nicht neben das Feld passt (LFH-1076). */
+for (const dichte of ['komfortabel', 'handschuh'] as const) {
+  test(`Führungs-Tablet, Stufe ${dichte}: Zeitpanel als Blatt im Schirm, „OK“ übernimmt`, async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await ohneDevtoolsKnopf(page);
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page);
+    const inhalt = `Lagemeldung vor dem Filter ${Date.now()}`;
+    const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: { typ: 'meldung', inhalt, von: 'ELW 1', an: 'Leitstelle' },
+    });
+    expect(r.ok(), await r.text()).toBeTruthy();
 
-      await expect(panel(page)).toBeHidden();
-      await expect(von).toHaveValue(/ 14:00/);
-      await expect(page.getByText(inhalt)).toBeHidden();
-      await expect(page.getByText('Kein Eintrag passt zum Filter')).toBeVisible();
-      await keinSeitlicherUeberlauf(page, `${wer}, ETB gefiltert`);
+    for (const g of [TABLET_HOCH, TABLET_QUER]) {
+      await page.setViewportSize(g);
+      await pruefeEtbFilter(page, einsatzId, inhalt, null, dichte, g);
+      await pruefeZeitfenster(page, einsatzId, null, dichte, g);
+    }
+    await wechsleZuRolle(page, 'beobachter', einsatzId);
+    for (const g of [TABLET_HOCH, TABLET_QUER]) {
+      await page.setViewportSize(g);
+      await pruefeEtbFilter(page, einsatzId, inhalt, 'beobachter', dichte, g);
     }
   });
 }
@@ -331,7 +407,7 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
   });
 });
 
-test('Tablet hoch und Desktop: Fußreihe bleibt einzeilig, Panel bleibt am Feld, Kürzel sichtbar', async ({
+test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel bleibt am Feld, Kürzel sichtbar', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -341,7 +417,9 @@ test('Tablet hoch und Desktop: Fußreihe bleibt einzeilig, Panel bleibt am Feld,
   for (const groesse of [TABLET_HOCH, DESKTOP]) {
     const wo = `${groesse.width} px`;
     await page.setViewportSize(groesse);
+    await stelleDichte(page, 'kompakt');
     await page.goto(`/einsaetze/${einsatzId}/personen?neu=1`);
+    await stufeAngekommen(page, 'kompakt');
     const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
     await expect(dialog).toBeVisible();
     await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
