@@ -11,10 +11,8 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   `pnpm build`, Ausgabe `dist`; Cloudflare installiert selbst aus dem Lockfile. Node und pnpm
   setzen dort die Umgebungsvariablen `NODE_VERSION` und `PNPM_VERSION`: wer `engines` oder
   `packageManager` in `website/package.json` hebt, zieht beide im Pages-Projekt nach.
-- **CI:** Ein PR, der nur `website/` ändert, fährt nur die Schnellprüfungen; Rust-, Frontend-
-  und e2e-Suite laufen leer und grün durch (Job `aenderungen`, Mechanik im Kopf von
-  `.github/workflows/ci.yml`). Eine Datei außerhalb von `website/` im selben PR schaltet
-  alles wieder ein.
+- **CI:** `website/` löst keine schwere Suite aus; ein PR, der nur hier ändert, fährt nur die
+  Schnellprüfungen (Bereichs-Erkennung, `scripts/AGENTS.md`).
 - **Kopien statt zweiter Quelle:** `src/styles/rollen.css` (aus `frontend/src/theme/rollen.css`),
   `src/daten/module.ts` (aus `frontend/src/einsatz/modulRegistry.ts`, Name und Beschreibung
   wörtlich), `src/components/Bildmarke.astro` (aus `frontend/src/marke/bildmarkeGeometrie.ts`)
