@@ -1,0 +1,109 @@
+/* Hilfe (LFH-1096): eine Lesespalte neben der Kapitelliste, im Instrumententafel-Stil wie die
+   Anmeldung (Flächen und Linien aus den Rollen, Radius 0). Unter 992 px steht die Liste über dem
+   Text. Druckmechanik nur in `druck/druck.css`; hier steht nur der Seitenumbruch je Kapitel. */
+
+.hilfe-seite {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--lfh-grund);
+  color: var(--lfh-text);
+}
+
+.hilfe-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+.hilfe-kopf__marke {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hilfe-kopf__name {
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.hilfe-kopf__titel {
+  margin: 0 0 0 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--lfh-linie);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.hilfe-kopf__aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hilfe-rumpf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+@media (min-width: 992px) {
+  .hilfe-rumpf {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 24px;
+    padding: 24px;
+  }
+}
+
+.hilfe-navi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hilfe-navi__gruppe {
+  width: 100%;
+}
+
+.hilfe-navi .ant-menu {
+  border-inline-end: 0;
+  background: transparent;
+}
+
+.hilfe-inhalt {
+  min-width: 0;
+  max-width: 72ch;
+}
+
+.hilfe-kapitel + .hilfe-kapitel {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--lfh-linie);
+}
+
+.hilfe-kapitel__titel {
+  margin: 0 0 12px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.hilfe-druckkopf {
+  margin-bottom: 12px;
+  font-size: 9pt;
+}
+
+@media print {
+  .hilfe-kapitel + .hilfe-kapitel {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+}

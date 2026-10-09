@@ -130,6 +130,11 @@
     break-before: page;
   }
 
+  /* Jedes weitere Kapitel einer Mappe beginnt auf einer neuen Seite (Hilfe, LFH-1096). */
+  [data-lfh='druckwurzel'] [data-lfh='druck-kapitel'] + [data-lfh='druck-kapitel'] {
+    break-before: page;
+  }
+
   [data-lfh='druckwurzel'] img {
     max-width: 100%;
   }

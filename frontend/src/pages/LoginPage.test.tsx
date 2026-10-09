@@ -36,6 +36,21 @@ describe('LoginPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'lifeline-hub' })).toBeInTheDocument();
   });
 
+  it('führt zur Hilfe beim Anmelden, ohne Sitzung (LFH-1096)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+    renderMitProviders(
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/hilfe/anmelden-abmelden" element={<div>Kapitel Anmelden</div>} />
+      </Routes>,
+      { route: '/login' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Hilfe' }));
+    expect(await screen.findByText('Kapitel Anmelden')).toBeInTheDocument();
+  });
+
   it('übersetzt den generischen 401 („Nicht angemeldet") in eine verständliche Login-Meldung', async () => {
     server.use(
       http.post('/api/auth/login', () =>

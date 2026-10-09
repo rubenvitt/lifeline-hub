@@ -1,0 +1,53 @@
+---
+/**
+ * Übersicht der Anwenderdokumentation (LFH-1096) nach Lesergruppen. Die Kapitel kommen aus
+ * `docs/anwender/kapitel/` (Content-Collection `kapitel`), dieselben wie in der App.
+ */
+import { getCollection } from 'astro:content';
+import Grundriss from '../../layouts/Grundriss.astro';
+import { GRUPPEN } from '../../daten/gruppen';
+import '../../styles/doku.css';
+
+const kapitel = (await getCollection('kapitel')).sort(
+  (a, b) => a.data.reihenfolge - b.data.reihenfolge,
+);
+---
+
+<Grundriss
+  titel="Anwenderdokumentation · Lifeline Hub"
+  beschreibung="Wie Lifeline Hub im Einsatz arbeitet: Anmelden, Arbeiten ohne Netz, Gerät verloren."
+>
+  <section class="abschnitt">
+    <header class="abschnitt-kopf">
+      <h1 class="ueberschrift">Anwenderdokumentation</h1>
+      <p class="lauftext">
+        Was die Oberfläche nicht zeigen kann: Folgen, Sonderlagen und Rechte. Dieselben Kapitel
+        stehen in der App unter „Hilfe“, dort im Stand der eigenen Installation; hier steht der
+        Stand der Entwicklung.
+      </p>
+    </header>
+    <div class="doku-gruppen fugenraster">
+      {
+        GRUPPEN.map((g) => {
+          const liste = kapitel.filter((k) => k.data.gruppen.includes(g.key));
+          return (
+            <section class="doku-gruppe">
+              <h2 class="doku-gruppe__titel">{g.name}</h2>
+              {liste.length === 0 ? (
+                <p class="lauftext">Noch keine Kapitel.</p>
+              ) : (
+                <ul class="doku-liste">
+                  {liste.map((k) => (
+                    <li>
+                      <a href={`/doku/${k.id}/`}>{k.data.titel}</a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })
+      }
+    </div>
+  </section>
+</Grundriss>

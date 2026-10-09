@@ -26,6 +26,7 @@ import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter';
 import type { TiereSicht } from '../pages/tiere/tierHelfer';
 import type { SchaedenSicht } from '../pages/schaeden/schadenHelfer';
+import { istGruppe, type Gruppe } from '../hilfe/gruppen';
 
 /** Zentrale Route zur Einsatzliste. */
 export function einsaetzePfad(): string {
@@ -946,6 +947,26 @@ export function einsatzEinstellungenPfad(
 
 /** Einlöseseite eines Kopplungscodes. Ohne Einsatz-Präfix: das Gerät kennt seinen Einsatz erst
  *  nach dem Einlösen. */
+// ── Hilfe (LFH-1096) ─────────────────────────────────────────────────────────
+
+/** Hilfe-Seite; offen ohne Anmeldung, auch für gekoppelte Geräte. */
+export const HILFE_PFAD = '/hilfe';
+
+/**
+ * Ohne Kapitel zeigt die Hilfe alle Kapitel der Gruppe hintereinander (Einweisungsmappe), mit
+ * Kapitel nur dieses. Die Gruppe reist in der Adresse; die Vorgabe `alle` steht nicht darin.
+ */
+export function hilfePfad(opts: { kapitel?: string; gruppe?: Gruppe } = {}): string {
+  const pfad = opts.kapitel ? `${HILFE_PFAD}/${opts.kapitel}` : HILFE_PFAD;
+  return mitQuery(pfad, { gruppe: opts.gruppe === 'alle' ? undefined : opts.gruppe });
+}
+
+/** Gruppe aus der Adresse; Fehlendes oder Unbekanntes ist `alle`. */
+export function parseHilfeGruppe(params: URLSearchParams): Gruppe {
+  const wert = params.get('gruppe') ?? '';
+  return istGruppe(wert) ? wert : 'alle';
+}
+
 export const KOPPELN_PFAD = '/koppeln';
 
 /**
