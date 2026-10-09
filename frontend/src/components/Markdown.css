@@ -22,15 +22,17 @@
 /* Außenränder kollabieren lassen: der Container gibt den Abstand vor, nicht
    das erste/letzte Markdown-Element. Steht dort ein Titelblock (`markdownTitelbloecke.ts`,
    LFH-1008), gilt es für sein erstes bzw. letztes Kind und für den Block hinter dem Titelplatz
-   (der Abschnittstitel steht davor, `Markdown titel`); `:where`, damit die Stärke die der
-   ersten Regel bleibt. */
+   (der Abschnittstitel steht davor, `Markdown titel`). Nur die Hülle steht in `:where`: so hat
+   jede Zeile die Stärke der ersten (0,2,0) und schlägt wie sie `.markdown--dokument p` (0,1,1).
+   Stand bis LFH-1098 auch das Kind in `:where`, verlor die Regel gegen den Absatzrand, und der
+   erste Absatz unter einem Titel rückte 0,6 em tiefer als ohne Hülle. */
 .markdown > :first-child,
-.markdown > :where([data-lfh='titelblock']:first-child) > :where(:first-child),
-.markdown > :where([data-lfh='titelblock']:first-child) > :where([data-lfh='titelplatz'] + *) {
+.markdown > :where([data-lfh='titelblock']:first-child) > :first-child,
+.markdown > :where([data-lfh='titelblock']:first-child) > [data-lfh='titelplatz'] + * {
   margin-top: 0;
 }
 .markdown > :last-child,
-.markdown > :where([data-lfh='titelblock']:last-child) > :where(:last-child) {
+.markdown > :where([data-lfh='titelblock']:last-child) > :last-child {
   margin-bottom: 0;
 }
 

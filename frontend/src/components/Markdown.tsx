@@ -144,6 +144,7 @@ function Markdown({ children, variante = 'dokument', unterEbene, titel, fundstel
 /**
  * Gemerkt (LFH-947): alle Eigenschaften sind Werte, ein Rerender des Aufrufers mit demselben
  * Text parst nicht neu. Die Zeitachse rendert hunderte davon. Ausnahme ist `titel`, ein
- * Element; das reichen nur die Lesefassungen der Vorlagendokumente herein, nicht die Zeitachse.
+ * Element; das reichen nur die Lesefassungen der Vorlagendokumente und der Einsatzbericht herein,
+ * nicht die Zeitachse.
  */
 export default memo(Markdown);
