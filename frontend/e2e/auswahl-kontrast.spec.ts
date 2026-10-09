@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { stehendeAuswahl } from './auswahl-kern';
 import { stehend } from './kontrast-kern';
 import { anlegen, anmelden, einsatzAnlegen } from './trefflaeche-kern';
 
@@ -98,17 +99,13 @@ for (const modus of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
       await page.getByRole('combobox', { name: 'Einsatzart' }).click();
 
-      const gewaehlt = page.locator(
-        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-selected',
-      );
+      const liste = await stehendeAuswahl(page);
+      const gewaehlt = liste.locator('.ant-select-item-option-selected');
       await expect(gewaehlt, 'Vorbedingung: genau eine gewählte Option').toHaveCount(1);
       await expect(gewaehlt).toHaveText('Realeinsatz');
       // Beim Öffnen macht rc-select die gewählte Option zur aktiven. Für die Ruhe liegt der Zeiger
       // deshalb auf einer ANDEREN Option.
-      await page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
-        .filter({ hasText: 'Übung' })
-        .hover();
+      await liste.locator('.ant-select-item-option').filter({ hasText: 'Übung' }).hover();
       await expect(gewaehlt, 'Vorbedingung Ruhe').not.toHaveClass(/ant-select-item-option-active/);
       await haelt(gewaehlt, modus, `${modus}/Einsatzart, gewählt`);
       await gewaehlt.hover();

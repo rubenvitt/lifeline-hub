@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { auftraegePfad } from '../src/routing/deeplinks';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
@@ -40,8 +41,7 @@ test('Auftrag an S3 zeigt die aktuelle Besetzung und folgt ihr live', async ({ p
   await page.getByRole('button', { name: /Auftrag erteilen/ }).click();
   await page.getByLabel('Auftrag / Was').fill('Lage an der Brücke erkunden');
   const empfaenger = page.getByRole('combobox', { name: 'Empfänger', exact: true });
-  await empfaenger.click();
-  await page.getByTitle('S3 – Einsatz (Müller)', { exact: true }).click();
+  await waehleIn(empfaenger, 'S3 – Einsatz (Müller)');
   // Mehrere Empfänger sind erlaubt, die Liste bleibt offen: Escape schließt sie.
   await empfaenger.press('Escape');
   // Senden über den Knopf im <form> (der Select schluckt Enter).

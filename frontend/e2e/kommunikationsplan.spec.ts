@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 
 /**
  * Kommunikationsplan S6 (LFH-848): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein
@@ -187,16 +188,14 @@ test('Leitstelle und Verbindung anlegen: die zweite Seite folgt live, die Lücke
 
   await page.getByRole('button', { name: 'Stelle hinzufügen' }).click();
   const maske = page.getByRole('dialog', { name: 'Stelle hinzufügen' });
-  await maske.getByLabel('Art').click();
-  await page.getByTitle('Leitstelle', { exact: true }).click();
+  await waehleIn(maske.getByLabel('Art'), 'Leitstelle');
   await maske.getByLabel('Bezeichnung').fill('ILS Nordwest');
   await maske.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(maske).toBeHidden();
 
   await page.getByRole('button', { name: 'Verbindung zu ILS Nordwest hinzufügen' }).click();
   const verbindung = page.getByRole('dialog', { name: /Verbindung hinzufügen/ });
-  await verbindung.getByLabel('Mittel').click();
-  await page.getByTitle('Festnetz', { exact: true }).click();
+  await waehleIn(verbindung.getByLabel('Mittel'), 'Festnetz');
   await verbindung.getByLabel('Nummer/Adresse').fill('0421 112 0');
   await verbindung.getByRole('button', { name: 'Speichern', exact: true }).click();
   await expect(verbindung).toBeHidden();

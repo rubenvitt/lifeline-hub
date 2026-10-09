@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../src/stammdaten/rechteText';
+import { stehendeAuswahl } from './auswahl-kern';
 import {
   ADMIN,
   anmeldenAlsAdmin,
@@ -48,10 +49,8 @@ async function rolleWaehlen(page: Page, name: string, option: string) {
   await zugriff(page)
     .getByRole('combobox', { name: `Rolle von ${name}` })
     .click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
-    .filter({ hasText: option })
-    .click();
+  const liste = await stehendeAuswahl(page);
+  await liste.locator('.ant-select-item-option').filter({ hasText: option }).click();
 }
 
 const keinToast = async (page: Page) => expect(page.locator('.ant-message-notice')).toHaveCount(0);
@@ -82,15 +81,11 @@ for (const breite of [390, 1440]) {
         '',
       );
       await zeile.getByRole('combobox').click();
-      const beobachter = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
-        .filter({ hasText: 'Beobachter' });
+      // `force` unten, weil Playwright an `aria-disabled` sonst endlos auf „enabled“ wartet; dann
+      // prüft es auch keine Ruhe ab, also erst das Aufklappen auslaufen lassen.
+      const liste = await stehendeAuswahl(page);
+      const beobachter = liste.locator('.ant-select-item-option').filter({ hasText: 'Beobachter' });
       await expect(beobachter).toHaveClass(/ant-select-item-option-disabled/);
-      // `force`, weil Playwright an `aria-disabled` sonst endlos auf „enabled“ wartet; dann prüft
-      // es auch keine Ruhe ab, also erst das Aufklappen auslaufen lassen.
-      await expect(
-        page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)'),
-      ).not.toHaveClass(/-(appear|enter)/);
       await beobachter.click({ force: true });
       await page.keyboard.press('Escape');
       await expect(

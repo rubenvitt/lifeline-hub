@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -254,18 +255,10 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
   ).toBeLessThanOrEqual(zeile + polster + 1);
 
   // Stand über die Auswahl wählen, dann über „Live“ zurück (LFH-899, D1).
-  await auswahl.click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle('Stand vor Ort', { exact: true })
-    .click();
+  await waehleIn(auswahl, 'Stand vor Ort');
   await expect(page).toHaveURL(/[?&]snapshot=\d+/);
   await expect(page.getByText('Historischer Stand — schreibgeschützt')).toBeVisible();
-  await auswahl.click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle('Live', { exact: true })
-    .click();
+  await waehleIn(auswahl, 'Live');
   await expect(page).not.toHaveURL(/[?&]snapshot=/);
   await expect(page.getByText('Historischer Stand — schreibgeschützt')).toHaveCount(0);
 

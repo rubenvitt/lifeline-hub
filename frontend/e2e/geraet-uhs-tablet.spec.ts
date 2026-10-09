@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -156,10 +157,11 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
     await tablet.goto(`/geraet/${e}/patienten/${person.id}`);
     await tablet.getByRole('button', { name: 'Sichten', exact: true }).click();
     const dialog = tablet.getByRole('dialog', { name: 'Sichtung erfassen' });
-    await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
-    await tablet.getByTitle('SK II', { exact: true }).click();
-    await dialog.getByRole('combobox', { name: 'Bestätigt von' }).click();
-    await tablet.getByTitle('Dr. A. Muster · Notärztin').click();
+    await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), 'SK II');
+    await waehleIn(
+      dialog.getByRole('combobox', { name: 'Bestätigt von' }),
+      'Dr. A. Muster · Notärztin',
+    );
     await dialog.getByRole('button', { name: 'Übernehmen' }).click();
     await expect(dialog).toHaveCount(0);
     await expect(tablet.getByText('bestätigt: Dr. A. Muster')).toBeVisible();

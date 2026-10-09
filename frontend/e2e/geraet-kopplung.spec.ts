@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -28,13 +29,9 @@ async function einsatzMitUhs(page: Page): Promise<{ einsatz: number; uhs: number
   return { einsatz: einsatz.id, uhs: uhs.id };
 }
 
-/** Wählt im offenen Auswahlfeld `feld` die Option `option` (antd rendert die Liste im Portal). */
+/** Wählt im Auswahlfeld `feld` die Option `option` (antd rendert die Liste im Portal). */
 async function waehle(page: Page, feld: string, option: string) {
-  await page.getByRole('combobox', { name: feld }).click();
-  await page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .getByTitle(option, { exact: true })
-    .click();
+  await waehleIn(page.getByRole('combobox', { name: feld }), option);
 }
 
 async function geraetOeffnen(browser: Browser) {
