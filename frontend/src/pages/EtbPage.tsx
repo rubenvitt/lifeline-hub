@@ -59,6 +59,7 @@ import { Segmentleiste, monoStil, useRollen, type SegmentOption } from '../compo
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { useFokusInLeiste } from '../components/fokusInLeiste';
 import { neueClientId } from '../offline/clientId';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
@@ -72,19 +73,6 @@ import {
 
 /** Breite der Seitenleiste „Bilanz" — ab `xl`. */
 const LEISTE_BREITE = 260;
-
-/**
- * Schwebende Teile der Leiste, die antd an `document.body` hängt (Typ-Auswahl, Chip-Editoren,
- * Baustein-Dialog). Ein Fokuswechsel dorthin verlässt die Leiste nicht.
- */
-const LEISTEN_SCHWEBE =
-  '.ant-select-dropdown, .ant-dropdown, .ant-picker-dropdown, .ant-popover, .ant-modal-wrap';
-
-/** Liegt `ziel` in der Leiste oder in einem ihrer schwebenden Teile? */
-function inLeiste(wurzel: HTMLElement, ziel: EventTarget | Element | null): boolean {
-  if (!(ziel instanceof Element)) return false;
-  return wurzel.contains(ziel) || ziel.closest(LEISTEN_SCHWEBE) != null;
-}
 
 /**
  * Wie viele Filter der aufklappbaren Leiste gesetzt sind: Volltext, Zeitraum, Einheit und der
@@ -345,7 +333,7 @@ export default function EtbPage() {
     setVorigeFilterZahl(filterZahl);
     if (vorigeFilterZahl === 0) setFilterOffen(true);
   }
-  const [fokusInLeiste, setFokusInLeiste] = useState(false);
+  const { fokusInLeiste, setFokusInLeiste, leistenFokus } = useFokusInLeiste();
   // `?neu=1` (Schnellaktion) gilt als Fokus in der Leiste: kommt sie erst nach dem Laden der
   // Entwürfe, montiert sie damit aufgeklappt und fokussiert ihr Feld selbst (`startFokus`).
   if (searchParams.get('neu') === '1' && !fokusInLeiste) setFokusInLeiste(true);
@@ -608,18 +596,8 @@ export default function EtbPage() {
         breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
       }
       style={breit ? { marginInlineEnd: LEISTE_BREITE + token.marginLG } : undefined}
-      // Fokus in der Leiste klappt sie auf (D4). `focusin`/`focusout` steigen auf, auch aus den
-      // Portalen der Leiste (React-Baum). Verlässt der Fokus sie in einen ihrer schwebenden Teile,
-      // bleibt sie offen; ohne `relatedTarget` (Fenster verliert den Fokus, Element entfällt)
-      // entscheidet der Fokus eine Runde später.
-      onFocus={() => setFokusInLeiste(true)}
-      onBlur={(e) => {
-        const wurzel = e.currentTarget;
-        if (inLeiste(wurzel, e.relatedTarget)) return;
-        window.setTimeout(() => {
-          if (!inLeiste(wurzel, document.activeElement)) setFokusInLeiste(false);
-        }, 0);
-      }}
+      // Fokus in der Leiste klappt sie auf (D4, `components/fokusInLeiste.ts`).
+      {...leistenFokus}
     >
       {berichtigungZu ? (
         <Schnellerfassung

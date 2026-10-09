@@ -5,7 +5,7 @@ import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
-import AnrufErfassung from './AnrufErfassung';
+import AnrufErfassung, { formularLeer } from './AnrufErfassung';
 
 /** Anliegen wählen: das antd-Select öffnet per Klick, die Option ist ein `option`-Element. */
 async function waehleAnliegen(label: string) {
@@ -173,5 +173,45 @@ describe('AnrufErfassung — Kürzel und Uhrzeit ohne Erklärsatz (LFH-1078)', (
     renderMitProviders(<AnrufErfassung onErfassen={vi.fn()} laeuft={false} fehler={null} />);
     expect(screen.getByLabelText('Uhrzeit')).toHaveAttribute('placeholder', 'jetzt');
     expect(screen.queryByText(/Leer gelassen/)).toBeNull();
+  });
+});
+
+describe('AnrufErfassung — eingeklappt (LFH-1067)', () => {
+  const p = { onErfassen: vi.fn().mockResolvedValue({}), laeuft: false, fehler: null };
+
+  it('zeigt eingeklappt nur Anliegen und „Erfassen“, aufgeklappt wieder alles', () => {
+    const { rerender } = renderMitProviders(<AnrufErfassung {...p} einklappbar />);
+    expect(screen.getByLabelText('Anliegen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Erfassen/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Notiz')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rückruf nötig')).not.toBeInTheDocument();
+    expect(screen.queryByText('Anrufer und Uhrzeit')).not.toBeInTheDocument();
+    rerender(<AnrufErfassung {...p} einklappbar={false} />);
+    expect(screen.getByLabelText('Notiz')).toBeInTheDocument();
+    expect(screen.getByText('Anrufer und Uhrzeit')).toBeInTheDocument();
+  });
+
+  it('klappt mit Inhalt nicht ein: nichts Begonnenes verschwindet', async () => {
+    const { rerender } = renderMitProviders(<AnrufErfassung {...p} einklappbar={false} />);
+    await userEvent.type(screen.getByLabelText('Notiz'), 'Keller');
+    rerender(<AnrufErfassung {...p} einklappbar />);
+    expect(screen.getByLabelText('Notiz')).toHaveValue('Keller');
+  });
+
+  it('klappt mit Fehler nicht ein', () => {
+    renderMitProviders(<AnrufErfassung {...p} fehler={new Error('weg')} einklappbar />);
+    expect(screen.getByLabelText('Notiz')).toBeInTheDocument();
+  });
+});
+
+describe('formularLeer', () => {
+  it('zählt Leerzeichen nicht als Inhalt, jedes gesetzte Feld schon', () => {
+    expect(formularLeer(undefined)).toBe(true);
+    expect(formularLeer({ notiz: '  ', rueckruf_noetig: false })).toBe(true);
+    expect(formularLeer({ anliegen: 'presse' })).toBe(false);
+    expect(formularLeer({ notiz: 'x' })).toBe(false);
+    expect(formularLeer({ rueckruf_noetig: true })).toBe(false);
+    expect(formularLeer({ anrufer_name: 'A' })).toBe(false);
+    expect(formularLeer({ rueckruf: '0171' })).toBe(false);
   });
 });

@@ -270,6 +270,12 @@ interface EinsatzSeiteProps {
   /** Ortsangabe vor dem Titel (z. B. eine `Breadcrumb` aus `routing/deeplinks`). */
   breadcrumb?: ReactNode;
   /**
+   * Den Ortspfad erst ab `md` zeigen (`lfh-ortspfad--ab-md`): für Seiten, deren erster Bildschirm
+   * auf dem Handy der Zeitachse gehört (Informationstelefon, LFH-1067). Den Einsatz nennt dort der
+   * Wechsler, den Rückweg die Navigation.
+   */
+  ortspfadAbMd?: boolean;
+  /**
    * Optionales Mono-Meta neben dem Titel, z. B. eine Nummer oder ein Zählerstand. Zahlen und
    * Zeiten laufen in Mono.
    */
@@ -361,6 +367,7 @@ export default function EinsatzSeite({
   titel,
   beschreibung,
   breadcrumb,
+  ortspfadAbMd = false,
   meta,
   aktionen,
   weitere,
@@ -436,7 +443,11 @@ export default function EinsatzSeite({
             minWidth: 0,
           }}
         >
-          {breadcrumb && <Ortspfad farben={farben}>{breadcrumb}</Ortspfad>}
+          {breadcrumb && (
+            <Ortspfad farben={farben} className={ortspfadAbMd ? 'lfh-ortspfad--ab-md' : undefined}>
+              {breadcrumb}
+            </Ortspfad>
+          )}
           <Typography.Title level={1} style={seitentitelStil(farben)}>
             {titel}
           </Typography.Title>
