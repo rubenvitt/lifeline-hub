@@ -94,6 +94,7 @@ import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import AdminLayout from './admin/AdminLayout';
 import DemoDatenPage from './admin/DemoDatenPage';
 import AufbewahrungUebersicht from './aufbewahrung/AufbewahrungUebersicht';
+import ZugangsprotokollPage from './zugangsprotokoll/ZugangsprotokollPage';
 import ArchivAktePage from './aufbewahrung/ArchivAktePage';
 import {
   adminGruppen,
@@ -327,6 +328,8 @@ export const appRouten = createRoutesFromElements(
                eine ungültige id leitet auf die Übersicht. */}
             <Route path="aufbewahrung" element={<AufbewahrungUebersicht />} />
             <Route path="aufbewahrung/:einsatzId" element={<ArchivAktePage />} />
+            {/* Zugangsprotokoll (LFH-1097): nur für den System-Admin, die Seite schützt sich selbst. */}
+            <Route path="zugangsprotokoll" element={<ZugangsprotokollPage />} />
             {/* Stammdaten-Detailrouten liegen IM `AdminLayout`, damit die Sidebar als Rückweg bleibt,
                und neben der `adminGruppen`-Schleife, weil die Registry keine Detailadressen führt. */}
             <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />

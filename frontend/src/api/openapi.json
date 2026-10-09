@@ -278,6 +278,19 @@
           "kritisch"
         ]
       },
+      "AdminAktion": {
+        "type": "string",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql` — beide Seiten müssen zusammenpassen (Test\n`jede_aktion_passiert_den_db_check`). Zugleich Schema-Anker der Union in\n[`ZugangsaenderungAnzeige`] (LFH-120).",
+        "enum": [
+          "benutzer_angelegt",
+          "benutzer_deaktiviert",
+          "benutzer_reaktiviert",
+          "rolle_geaendert",
+          "zweitfaktor_zurueckgesetzt",
+          "anmeldeweg_aktiviert",
+          "anmeldeweg_deaktiviert"
+        ]
+      },
       "AdressatKategorie": {
         "type": "string",
         "description": "Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag\n(`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).",
@@ -449,6 +462,53 @@
         "enum": [
           "fernmeldeskizze"
         ]
+      },
+      "AnmeldeEintragAnzeige": {
+        "type": "object",
+        "description": "Eine Zeile der Anmeldespur, wie die Verwaltung sie liest (LFH-1097).",
+        "required": [
+          "id",
+          "zeitpunkt",
+          "ereignis",
+          "provider"
+        ],
+        "properties": {
+          "benutzer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "benutzername": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Angemeldeter oder VERSUCHTER Name, gekürzt."
+          },
+          "ereignis": {
+            "$ref": "#/components/schemas/Ereignis"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "peer_ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "description": "Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`."
+          }
+        }
       },
       "AnsichtAuswahl": {
         "type": "object",
@@ -4727,6 +4787,17 @@
           "person",
           "fahrzeug",
           "extern"
+        ]
+      },
+      "Ereignis": {
+        "type": "string",
+        "description": "Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in\n`migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` —\nbeide Seiten müssen zusammenpassen (Test `jede_variante_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`AnmeldeEintragAnzeige`] (LFH-120).",
+        "enum": [
+          "login_ok",
+          "login_fehlgeschlagen",
+          "logout",
+          "passwort_geaendert",
+          "passwort_wechsel_abgewiesen"
         ]
       },
       "Erhebung": {
@@ -13250,6 +13321,67 @@
           "24h",
           "12h"
         ]
+      },
+      "ZugangsaenderungAnzeige": {
+        "type": "object",
+        "description": "Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097).",
+        "required": [
+          "id",
+          "zeitpunkt",
+          "aktion",
+          "ziel"
+        ],
+        "properties": {
+          "akteur_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "akteur_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Benutzername der handelnden Person zum Zeitpunkt der Aktion, gekürzt."
+          },
+          "aktion": {
+            "$ref": "#/components/schemas/AdminAktion"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "peer_ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`."
+          },
+          "ziel": {
+            "type": "string",
+            "description": "Benutzername des Zielkontos oder id des Anmeldewegs."
+          },
+          "ziel_benutzer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Gesetzt, wenn das Ziel ein Konto ist; fehlt beim Anmeldeweg."
+          }
+        }
       },
       "ZugriffAnzeige": {
         "type": "object",

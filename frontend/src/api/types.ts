@@ -868,6 +868,16 @@ export interface NeueNachforderung {
   angefordert_at?: string;
 }
 
+// ============================== Zugangsprotokoll (LFH-1097) ==============================
+/** Ereignis der Anmeldespur (`auth_audit`). */
+export type AnmeldeEreignis = S['Ereignis'];
+/** Zeile der Anmeldespur (`GET /api/zugangsprotokoll/anmeldungen`). */
+export type AnmeldeEintrag = S['AnmeldeEintragAnzeige'];
+/** Aktion der Admin-Spur (`admin_audit`). */
+export type AdminAktion = S['AdminAktion'];
+/** Zeile der Admin-Spur (`GET /api/zugangsprotokoll/zugangsaenderungen`). */
+export type Zugangsaenderung = S['ZugangsaenderungAnzeige'];
+
 // ============================== Aufbewahrung (Archiv des Org-Admins) ==============================
 /** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sieben Werte, `retention::zustand`). */
 export type AufbewahrungZustand = S['AufbewahrungZustand'];

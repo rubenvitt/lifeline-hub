@@ -461,6 +461,24 @@ fn serde_wire_gleich_as_str() {
         Oidc,
         Webauthn,
     });
+
+    // Zugangsprotokoll (LFH-1097): Wire = DB-CHECK in 0091/0143 bzw. 0156.
+    enum_wire_as_str!(lifeline_hub::auth::audit::Ereignis {
+        LoginOk,
+        LoginFehlgeschlagen,
+        Logout,
+        PasswortGeaendert,
+        PasswortWechselAbgewiesen,
+    });
+    enum_wire_as_str!(lifeline_hub::auth::admin_audit::AdminAktion {
+        BenutzerAngelegt,
+        BenutzerDeaktiviert,
+        BenutzerReaktiviert,
+        RolleGeaendert,
+        ZweitfaktorZurueckgesetzt,
+        AnmeldewegAktiviert,
+        AnmeldewegDeaktiviert,
+    });
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —

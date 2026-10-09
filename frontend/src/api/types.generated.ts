@@ -113,6 +113,14 @@ export interface components {
          */
         AbschnittLagezustand: "planmaessig" | "angespannt" | "kritisch";
         /**
+         * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
+         *     `migrations/0156_admin_audit.sql` — beide Seiten müssen zusammenpassen (Test
+         *     `jede_aktion_passiert_den_db_check`). Zugleich Schema-Anker der Union in
+         *     [`ZugangsaenderungAnzeige`] (LFH-120).
+         * @enum {string}
+         */
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert";
+        /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
          * @enum {string}
@@ -181,6 +189,21 @@ export interface components {
          * @enum {string}
          */
         AnlageArt: "fernmeldeskizze";
+        /** @description Eine Zeile der Anmeldespur, wie die Verwaltung sie liest (LFH-1097). */
+        AnmeldeEintragAnzeige: {
+            /** Format: int64 */
+            benutzer_id?: number | null;
+            /** @description Angemeldeter oder VERSUCHTER Name, gekürzt. */
+            benutzername?: string | null;
+            ereignis: components["schemas"]["Ereignis"];
+            /** Format: int64 */
+            id: number;
+            peer_ip?: string | null;
+            /** @description Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`. */
+            provider: string;
+            /** @description UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`. */
+            zeitpunkt: string;
+        };
         /** @description Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle. */
         AnsichtAuswahl: {
             ansicht: components["schemas"]["Funktionsansicht"];
@@ -1759,6 +1782,14 @@ export interface components {
          * @enum {string}
          */
         EmpfaengerTyp: "abschnitt" | "einheit" | "funktion" | "person" | "fahrzeug" | "extern";
+        /**
+         * @description Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
+         *     `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` —
+         *     beide Seiten müssen zusammenpassen (Test `jede_variante_passiert_den_db_check`). Zugleich
+         *     Schema-Anker der Union in [`AnmeldeEintragAnzeige`] (LFH-120).
+         * @enum {string}
+         */
+        Ereignis: "login_ok" | "login_fehlgeschlagen" | "logout" | "passwort_geaendert" | "passwort_wechsel_abgewiesen";
         /**
          * @description Erhebungsart einer Zahl (Plangröße oder Stand). Wire == `as_str()`.
          * @enum {string}
@@ -5066,6 +5097,27 @@ export interface components {
          * @enum {string}
          */
         Zeitformat: "24h" | "12h";
+        /** @description Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097). */
+        ZugangsaenderungAnzeige: {
+            /** Format: int64 */
+            akteur_id?: number | null;
+            /** @description Benutzername der handelnden Person zum Zeitpunkt der Aktion, gekürzt. */
+            akteur_name?: string | null;
+            aktion: components["schemas"]["AdminAktion"];
+            detail?: string | null;
+            /** Format: int64 */
+            id: number;
+            peer_ip?: string | null;
+            /** @description UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`. */
+            zeitpunkt: string;
+            /** @description Benutzername des Zielkontos oder id des Anmeldewegs. */
+            ziel: string;
+            /**
+             * Format: int64
+             * @description Gesetzt, wenn das Ziel ein Konto ist; fehlt beim Anmeldeweg.
+             */
+            ziel_benutzer_id?: number | null;
+        };
         /** @description Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht). */
         ZugriffAnzeige: {
             art: components["schemas"]["ZugriffArt"];

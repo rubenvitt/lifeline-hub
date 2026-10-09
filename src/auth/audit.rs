@@ -9,15 +9,19 @@
 //! **Warum eine Tabelle und nicht nur `tracing`:** nur so ist die Spur revisionssicher,
 //! im Backup enthalten und über die API auswertbar — der Unterschied zwischen einer
 //! Debugging-Hilfe und einem Zugriffsnachweis. Zusätzlich geht jedes Ereignis in den
-//! `tracing`-Log, wo es im Request-Span (Methode, Pfad, Request-ID) landet.
+//! `tracing`-Log, wo es im Request-Span (Methode, Pfad, Request-ID) landet. Gelesen wird die
+//! Spur über `GET /api/zugangsprotokoll/anmeldungen` (System-Admin, LFH-1097, [`liste`]).
 //!
 //! **Personenbezug:** Benutzername und IP sind personenbezogene Daten. Anders als die
 //! Einsatzdaten hängen sie an keiner Einsatz-Aufbewahrungsfrist, brauchen also eine
 //! eigene — [`AUFBEWAHRUNG_TAGE`], durchgesetzt von [`purge_abgelaufene`] im
 //! Purge-Scheduler.
 
+use crate::auth::spur::SpurFilter;
 use crate::wire_enum::wire_enum;
-use sqlx::SqlitePool;
+use serde::Serialize;
+use sqlx::{QueryBuilder, Sqlite, SqlitePool};
+use utoipa::ToSchema;
 
 /// Aufbewahrungsfrist der Audit-Spur in Tagen.
 ///
@@ -27,12 +31,12 @@ use sqlx::SqlitePool;
 pub const AUFBEWAHRUNG_TAGE: i64 = 90;
 
 wire_enum! {
-    #[wire(ohne_serde)]
     /// Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
     /// `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und
     /// `0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test
-    /// `jede_variante_passiert_den_db_check`).
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// `jede_variante_passiert_den_db_check`). Zugleich Schema-Anker der Union in
+    /// [`AnmeldeEintragAnzeige`] (LFH-120).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum Ereignis {
         LoginOk => "login_ok",
         LoginFehlgeschlagen => "login_fehlgeschlagen",
@@ -94,6 +98,50 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AuditEintrag<'_>) {
             "Auth-Audit konnte nicht geschrieben werden: {e}"
         );
     }
+}
+
+/// Eine Zeile der Anmeldespur, wie die Verwaltung sie liest (LFH-1097).
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct AnmeldeEintragAnzeige {
+    pub id: i64,
+    /// UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`.
+    pub zeitpunkt: String,
+    #[schema(value_type = Ereignis)]
+    pub ereignis: String,
+    /// Angemeldeter oder VERSUCHTER Name, gekürzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub benutzername: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub benutzer_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_ip: Option<String>,
+    /// Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`.
+    pub provider: String,
+}
+
+/// Liest die Anmeldespur, neueste zuerst. `konto` trifft den protokollierten Namen, auch einen
+/// versuchten, zu dem es kein Konto gibt.
+pub async fn liste(
+    pool: &SqlitePool,
+    filter: &SpurFilter,
+    ereignis: Option<Ereignis>,
+) -> Result<Vec<AnmeldeEintragAnzeige>, sqlx::Error> {
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT id, zeitpunkt, ereignis, benutzername, benutzer_id, peer_ip, provider \
+         FROM auth_audit WHERE 1 = 1",
+    );
+    if let Some(ereignis) = ereignis {
+        qb.push(" AND ereignis = ");
+        qb.push_bind(ereignis.as_str());
+    }
+    if let Some(konto) = &filter.konto {
+        qb.push(" AND benutzername = ");
+        qb.push_bind(konto.clone());
+        qb.push(" COLLATE NOCASE");
+    }
+    filter.zeitraum_und_cursor(&mut qb);
+    filter.ordnung_und_seite(&mut qb);
+    qb.build_query_as().fetch_all(pool).await
 }
 
 /// Löscht Audit-Einträge, deren Aufbewahrungsfrist abgelaufen ist. Liefert die Anzahl.

@@ -56,7 +56,8 @@ RUST_LOG=lifeline_hub=debug,tower_http=debug ./lifeline-hub …
 ## Auth-Audit-Spur
 
 Anmelde-Ereignisse landen **zusätzlich zum Log** in der Tabelle `auth_audit` — nur so sind
-sie revisionssicher, im Backup enthalten und auswertbar. Protokolliert werden:
+sie revisionssicher, im Backup enthalten und auswertbar (in der Verwaltung, siehe
+„Zugangsprotokoll in der Verwaltung“). Protokolliert werden:
 
 | Ereignis | Wann | Benutzername |
 |---|---|---|
@@ -99,6 +100,43 @@ Phase C im Purge-Scheduler, der ohnehin läuft.
 **Ein Schreibfehler bricht die Anmeldung nicht.** Bewusst so: einen Login im Einsatz zu
 verweigern, weil die Audit-Tabelle klemmt, wäre der schlechtere Ausgang. Die Lücke bleibt
 über einen `error!` im Log sichtbar.
+
+## Admin-Spur
+
+Was ein Admin am Zugang ändert, steht in der Tabelle `admin_audit` (LFH-1005): Konto angelegt,
+deaktiviert, reaktiviert, Rolle geändert, Zweitfaktor zurückgesetzt, Anmeldeweg geschaltet. Jede
+Zeile nennt Zeitpunkt, handelnde Person (Benutzername als Schnappschuss), Zielkonto oder
+Anmeldeweg, bei Bedarf ein Detail (Rollen alt → neu) und die Quell-IP. Geschrieben wird nach der
+Aktion; ein Schreibfehler hält sie nicht auf. **Aufbewahrung:** 365 Tage
+(`auth::admin_audit::AUFBEWAHRUNG_TAGE`), Phase C im Purge-Scheduler.
+
+## Zugangsprotokoll in der Verwaltung
+
+Beide Spuren liest der System-Admin unter **Verwaltung → Zugangsprotokoll** (LFH-1097), ohne
+Datenbankzugriff: Reiter „Zugangsänderungen“ (Admin-Spur) und „Anmeldungen“ (Anmeldespur), Filter
+nach Zeitraum, Konto und Ereignis bzw. Aktion, neueste zuerst. Dahinter stehen
+`GET /api/zugangsprotokoll/zugangsaenderungen` und `GET /api/zugangsprotokoll/anmeldungen`
+(Parameter `von`, `bis`, `konto`, `aktion` bzw. `ereignis`, `vor_id`, `limit`). Andere Rollen
+bekommen `403`. Der Kontofilter vergleicht ohne Groß-/Kleinschreibung und trifft in der Admin-Spur
+die handelnde Person und das Zielkonto. **Das Lesen schreibt keine Spur.**
+
+**Prüfpunkte für den Betreiber (keine Rechtsberatung).** Die Spuren sind personenbezogen, die
+Admin-Spur ist ein Protokoll über Handlungen von Personen mit Admin-Rechten. Vor Inbetriebnahme
+klärt der Betreiber mit seinem Datenschutzbeauftragten und gegebenenfalls der Interessenvertretung:
+
+1. **Rechtsgrundlage und Zweck:** Sind die Admins Beschäftigte, gelten der
+   Beschäftigtendatenschutz (§ 26 BDSG bzw. Landesrecht) und die Zweckbindung; bei Ehrenamtlichen
+   die DSGVO allgemein. Zweck ist der Nachweis von Zugangsänderungen und Anmeldeversuchen, keine
+   Leistungs- oder Verhaltenskontrolle.
+2. **Speicherdauer:** Ob 365 Tage (Admin-Spur) und 90 Tage (Anmeldespur) verhältnismäßig sind
+   (Art. 5 Abs. 1 lit. e DSGVO). Die Begründung der Werte steht an den Konstanten; andere Fristen
+   brauchen heute eine Codeänderung.
+3. **Mitbestimmung:** Eine technische Einrichtung, die objektiv geeignet ist, Verhalten oder
+   Leistung zu überwachen, ist in der Regel mitbestimmungspflichtig (§ 87 Abs. 1 Nr. 6 BetrVG, im
+   öffentlichen Dienst die Personalvertretungsgesetze). Das betrifft schon das Aufzeichnen; die
+   Ansicht macht die Auswertung nur leichter.
+4. **Kreis der Lesenden:** Nur System-Admins lesen; sie sind zugleich die Gruppe, deren Handlungen
+   die Admin-Spur festhält. Wer das Lesen selbst protokolliert haben will, braucht eine Änderung.
 
 ## Anmelde-Bremse
 

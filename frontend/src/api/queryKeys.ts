@@ -814,6 +814,8 @@ export const GLOBAL_KEYS = {
   // Aufbewahrung abgeschlossener Einsätze der eigenen Organisation (Übersicht, Archivakte,
   // Archiv-ETB), nur für den System-Admin.
   aufbewahrung: 'aufbewahrung',
+  // Zugangsprotokoll (LFH-1097): Anmelde- und Admin-Spur, nur für den System-Admin.
+  zugangsprotokoll: 'zugangsprotokoll',
 
   // Stammdaten-Kataloge
   personal: 'personal',
@@ -852,6 +854,9 @@ type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
  * ein Filter-Objekt änderte jeden Cache-Key dieser drei Listen.
  */
 type Dienstfilter = 'alle' | 'im-dienst';
+
+/** Die beiden Spuren unter dem `zugangsprotokoll`-Prefix (LFH-1097). */
+export type ZugangsprotokollSpur = 'anmeldungen' | 'zugangsaenderungen';
 
 /** Die drei adressierten Bereiche unter dem `aufbewahrung`-Prefix. */
 type AufbewahrungBereich = 'akte' | 'etb' | 'antraege';
@@ -907,6 +912,13 @@ export const globalKeys = {
   /** Löschersuchen nach Art. 17 eines Einsatzes (LFH-751). */
   aufbewahrungAntraege: (einsatzId: number) =>
     [GLOBAL_KEYS.aufbewahrung, 'antraege' satisfies AufbewahrungBereich, einsatzId] as const,
+  /** Prefix beider Spuren des Zugangsprotokolls. */
+  zugangsprotokoll: () => [GLOBAL_KEYS.zugangsprotokoll] as const,
+  /** Seitenkette einer Spur mit ihrem Filter. */
+  zugangsprotokollSeiten: (
+    spur: ZugangsprotokollSpur,
+    filter: Readonly<Record<string, string | undefined>>,
+  ) => [GLOBAL_KEYS.zugangsprotokoll, spur, filter] as const,
 
   // Stammdaten-Kataloge ohne Filter
   qualifikationen: () => [GLOBAL_KEYS.qualifikationen] as const,
@@ -1016,6 +1028,7 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `sitzungen`: Anmeldungen einer Person, gelesen beim Öffnen und nach dem Beenden.
  * - `adminKarte`, `karteConfig`, `datentraeger`: instanzweit, nicht mandantenbezogen.
  * - `fachebene`: externe Quellen mit eigener Nachfrage.
+ * - `zugangsprotokoll`: geladen beim Öffnen und bei Filterwechsel, nie live (LFH-1097).
  */
 export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
@@ -1028,6 +1041,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.karteConfig,
   GLOBAL_KEYS.datentraeger,
   GLOBAL_KEYS.fachebene,
+  GLOBAL_KEYS.zugangsprotokoll,
 ] as const satisfies readonly GlobalKey[];
 
 /**

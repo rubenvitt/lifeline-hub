@@ -27,6 +27,13 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     // Löschersuchen (LFH-751) unter demselben Prefix: Antrag und Rücknahme treffen Liste, Akte und
     // Übersicht mit einem Invalidate.
     expect(globalKeys.aufbewahrungAntraege(7)).toEqual(['aufbewahrung', 'antraege', 7]);
+    // Zugangsprotokoll (LFH-1097): beide Spuren unter EINEM Prefix, der Filter als drittes Glied.
+    expect(globalKeys.zugangsprotokoll()).toEqual(['zugangsprotokoll']);
+    expect(globalKeys.zugangsprotokollSeiten('anmeldungen', { konto: 'root' })).toEqual([
+      'zugangsprotokoll',
+      'anmeldungen',
+      { konto: 'root' },
+    ]);
     // Der Stand liegt serverseitig unter einem festen Schlüssel; ein anderer Query-Key träfe ein
     // leeres Cache-Fach.
     expect(globalKeys.benutzerEinstellungenVon(7)).toEqual(['benutzer-einstellungen', 7]);

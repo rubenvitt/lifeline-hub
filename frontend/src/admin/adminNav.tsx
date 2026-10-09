@@ -99,6 +99,15 @@ export const adminDemoDaten = { key: 'demo-daten', label: 'Demo-Daten' } as cons
  */
 export const adminAufbewahrung = { key: 'aufbewahrung', label: 'Aufbewahrung' } as const;
 
+/**
+ * Zugangsprotokoll (LFH-1097): Sonder-Eintrag nur für den System-Admin. Anmelde- und Admin-Spur
+ * sind Personen- und Beschäftigtendaten ohne Einsatzbezug; die Führungskraft sieht sie nicht.
+ */
+export const adminZugangsprotokoll = {
+  key: 'zugangsprotokoll',
+  label: 'Zugangsprotokoll',
+} as const;
+
 /** `/admin/<gruppe>/<sektion>`. */
 export function adminSektionPfad(gruppe: string, sektion: string): string {
   return `/admin/${gruppe}/${sektion}`;
@@ -112,6 +121,11 @@ export function adminBenutzerPfad(): string {
 /** `/admin/demo-daten`. */
 export function adminDemoDatenPfad(): string {
   return `/admin/${adminDemoDaten.key}`;
+}
+
+/** `/admin/zugangsprotokoll`. */
+export function adminZugangsprotokollPfad(): string {
+  return `/admin/${adminZugangsprotokoll.key}`;
 }
 
 /** `/admin/aufbewahrung` — Übersicht der abgeschlossenen Einsätze. */

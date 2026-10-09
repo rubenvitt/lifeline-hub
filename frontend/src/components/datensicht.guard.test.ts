@@ -190,6 +190,8 @@ const KONSUMENTEN = [
   '/src/pages/SchaedenPage.tsx',
   '/src/pages/TierePage.tsx',
   '/src/pages/uhs/BewegungenTab.tsx',
+  // Das Zugangsprotokoll der Verwaltung (LFH-1097): zwei Spuren im Servermodus, „Ältere laden“.
+  '/src/zugangsprotokoll/ZugangsprotokollPage.tsx',
 ];
 
 /** Alle Quelldateien als Rohtext, Pfad relativ zu `src/` (führendes `/src/…`). */

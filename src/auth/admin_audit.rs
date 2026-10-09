@@ -12,11 +12,17 @@
 //!
 //! **Personenbezug:** Namen und IP sind personenbezogen, deshalb eine eigene Frist
 //! ([`AUFBEWAHRUNG_TAGE`]), durchgesetzt von [`purge_abgelaufene`] im Purge-Scheduler.
+//!
+//! **Lesen:** `GET /api/zugangsprotokoll/zugangsaenderungen` (System-Admin, LFH-1097,
+//! [`liste`]); das Lesen selbst schreibt keinen Eintrag.
 
+use crate::auth::spur::SpurFilter;
 use crate::auth::Benutzer;
 use crate::wire_enum::wire_enum;
-use sqlx::SqlitePool;
+use serde::Serialize;
+use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 use std::net::IpAddr;
+use utoipa::ToSchema;
 
 /// Aufbewahrungsfrist der Admin-Spur in Tagen.
 ///
@@ -26,11 +32,11 @@ use std::net::IpAddr;
 pub const AUFBEWAHRUNG_TAGE: i64 = 365;
 
 wire_enum! {
-    #[wire(ohne_serde)]
     /// Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
     /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` —
-    /// beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`).
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    /// beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
+    /// Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AdminAktion {
         BenutzerAngelegt => "benutzer_angelegt",
         BenutzerDeaktiviert => "benutzer_deaktiviert",
@@ -113,6 +119,58 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
             "Admin-Audit konnte nicht geschrieben werden: {e}"
         );
     }
+}
+
+/// Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097).
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct ZugangsaenderungAnzeige {
+    pub id: i64,
+    /// UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`.
+    pub zeitpunkt: String,
+    #[schema(value_type = AdminAktion)]
+    pub aktion: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub akteur_id: Option<i64>,
+    /// Benutzername der handelnden Person zum Zeitpunkt der Aktion, gekürzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub akteur_name: Option<String>,
+    /// Gesetzt, wenn das Ziel ein Konto ist; fehlt beim Anmeldeweg.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_benutzer_id: Option<i64>,
+    /// Benutzername des Zielkontos oder id des Anmeldewegs.
+    pub ziel: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peer_ip: Option<String>,
+}
+
+/// Liest die Admin-Spur, neueste zuerst. `konto` trifft die handelnde Person UND das Zielkonto
+/// („was hat dieses Konto getan oder erlitten“), nie einen Anmeldeweg gleichen Namens.
+pub async fn liste(
+    pool: &SqlitePool,
+    filter: &SpurFilter,
+    aktion: Option<AdminAktion>,
+) -> Result<Vec<ZugangsaenderungAnzeige>, sqlx::Error> {
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT id, zeitpunkt, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, \
+                peer_ip \
+         FROM admin_audit WHERE 1 = 1",
+    );
+    if let Some(aktion) = aktion {
+        qb.push(" AND aktion = ");
+        qb.push_bind(aktion.as_str());
+    }
+    if let Some(konto) = &filter.konto {
+        qb.push(" AND (akteur_name = ");
+        qb.push_bind(konto.clone());
+        qb.push(" COLLATE NOCASE OR (ziel_benutzer_id IS NOT NULL AND ziel = ");
+        qb.push_bind(konto.clone());
+        qb.push(" COLLATE NOCASE))");
+    }
+    filter.zeitraum_und_cursor(&mut qb);
+    filter.ordnung_und_seite(&mut qb);
+    qb.build_query_as().fetch_all(pool).await
 }
 
 /// Löscht Einträge, deren Aufbewahrungsfrist abgelaufen ist. Liefert die Anzahl. Idempotent.
