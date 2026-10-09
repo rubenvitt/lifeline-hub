@@ -20,6 +20,14 @@ async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unkn
   return (await antwort.json()) as T;
 }
 
+/** Option eines antd-`Select` im Portal, nur aus der geöffneten Liste. */
+async function waehleOption(page: Page, label: string) {
+  await page
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .getByTitle(label, { exact: true })
+    .click();
+}
+
 test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an die Einsatzleitung', async ({
   page,
   browser,
@@ -86,6 +94,81 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
     expect(liste.find((m) => m.inhalt === 'Decken werden knapp')?.absender).toBe(
       'UHS Nord · Laptop 1',
     );
+  } finally {
+    await kontext.close();
+  }
+});
+
+/**
+ * Stärke der UHS (LFH-1045, Spec `uhs-staerke`): die Einsatzleitung ordnet eine Kraft im Reiter
+ * „Kräfte“ zu, der Laptop sieht die Stärke im Bereich „UHS“ und erfasst selbst eine Kraft.
+ *
+ * Mutationsprobe: in `GeraetStellePage` den Bereich „Kräfte“ gestrichen → der Laptop-Schritt wird
+ * rot.
+ */
+test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', async ({
+  page,
+  browser,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatz = await anlegen(page, '/api/einsaetze', {
+    bezeichnung: `E2E Stärke ${Date.now()}`,
+  });
+  const e = einsatz.id;
+  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+    typ: 'behandlungsplatz',
+    bezeichnung: 'UHS Nord',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/einsaetze/${e}/personal`, {
+    adhoc: { name: 'Anna Arzt', funktion: 'Notarzt', staerke_position: 'fuehrer' },
+  });
+  const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
+    page,
+    `/api/einsaetze/${e}/geraete`,
+    { ansicht: 'uhs-laptop', uhs_id: nord.id, bezeichnung: 'Laptop 1' },
+  );
+
+  // Einsatzleitung: Reiter „Kräfte“ der UHS-Detailseite.
+  await page.goto(`/einsaetze/${e}/unfallhilfsstellen/${nord.id}`);
+  await page.getByRole('tab', { name: 'Kräfte' }).click();
+  await expect(page.getByTestId('uhs-staerke')).toHaveText('0/0/0//0');
+  await page.getByRole('button', { name: 'Kraft zuordnen' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Kraft zuordnen' });
+  await dialog.getByLabel('Kraft').click();
+  await waehleOption(page, 'Anna Arzt · Notarzt');
+  await dialog.getByRole('button', { name: 'Zuordnen' }).click();
+  await expect(page.getByTestId('uhs-staerke')).toHaveText('1/0/0//1');
+  await expect(page.getByRole('row', { name: /Anna Arzt/ })).toBeVisible();
+
+  const kontext = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+  const laptop = await kontext.newPage();
+  try {
+    await laptop.goto(`/koppeln#${kopplung.code.code}`);
+    await laptop.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(laptop).toHaveURL(new RegExp(`/geraet/${e}/patienten$`));
+    await laptop
+      .getByRole('navigation', { name: 'Gerätenavigation' })
+      .getByRole('link', { name: 'UHS' })
+      .click();
+    await laptop.getByRole('tab', { name: 'Kräfte' }).click();
+    await expect(laptop.getByTestId('uhs-staerke')).toHaveText('1/0/0//1');
+    await expect(laptop.getByText('Notarzt 1')).toBeVisible();
+    // Eine ganze Einheit ordnet nur die Einsatzleitung zu.
+    await expect(laptop.getByRole('button', { name: 'Einheit zuordnen' })).toHaveCount(0);
+
+    await laptop.getByRole('button', { name: 'Kraft erfassen' }).click();
+    const erfassen = laptop.getByRole('dialog', { name: 'Kraft erfassen' });
+    await erfassen.getByLabel('Name').fill('Bernd Berg');
+    await erfassen.getByLabel('Funktion').fill('Sanitäter');
+    await erfassen.getByLabel('Position').click();
+    await waehleOption(laptop, 'Mannschaft');
+    await erfassen.getByRole('button', { name: 'Erfassen' }).click();
+    await expect(laptop.getByTestId('uhs-staerke')).toHaveText('1/0/1//2');
+
+    // Die Einsatzleitung sieht dieselbe Stärke im Seitenkopf.
+    await page.reload();
+    await expect(page.getByText(/Stärke 1\/0\/1\/\/2/)).toBeVisible();
   } finally {
     await kontext.close();
   }

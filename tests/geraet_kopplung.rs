@@ -3025,3 +3025,223 @@ async fn live_kanal_des_br_geraets_traegt_den_raum_ohne_etb() {
     );
     assert!(!beim_br.iter().any(|e| e == "etb"), "{beim_br:?}");
 }
+
+// ---------- Kräfte der UHS (LFH-1045) ----------
+
+/// Ad-hoc-Kraft im Einsatz (ohne UHS), disponiert von der Leitung; liefert die `ep_id`.
+async fn uhs_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&json!({"adhoc": {"name": name, "staerke_position": "mannschaft"}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// Die Stärke der UHS aus dem Detail, wie die Leitung sie sieht.
+async fn uhs_staerke(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64) -> Value {
+    let (s, v) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v["staerke"].clone()
+}
+
+#[tokio::test]
+async fn laptop_pflegt_die_kraefte_nur_der_eigenen_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let kraefte = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte");
+    let frei = uhs_kraft(&app, &admin, einsatz, "Freie Kraft").await;
+    let bei_sued = uhs_kraft(&app, &admin, einsatz, "Kraft Süd").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/{bei_sued}", kraefte(sued)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Leitung ordnet der UHS Süd zu");
+
+    // Auswahl: nur Kräfte ohne UHS.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/verfuegbar", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ids: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![frei], "{v}");
+
+    // Freie Kraft zuordnen: Erfolg, Stärke der eigenen UHS steigt.
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/{frei}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        uhs_staerke(&app, &geraet, einsatz, nord).await,
+        json!({"fuehrer": 0, "unterfuehrer": 0, "mannschaft": 1})
+    );
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(detail["kraefte"][0]["name"], "Freie Kraft", "{detail}");
+
+    // Eine Kraft der UHS Süd holt der Laptop nicht zu sich.
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/{bei_sued}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(
+        uhs_staerke(&app, &admin, einsatz, sued).await["mannschaft"],
+        json!(1),
+        "bleibt an der UHS Süd"
+    );
+
+    // Fremde UHS: lesen und ändern 404.
+    for (methode, pfad, body) in [
+        ("GET", format!("{}/verfuegbar", kraefte(sued)), None),
+        ("PUT", format!("{}/{frei}", kraefte(sued)), None),
+        ("DELETE", format!("{}/{bei_sued}", kraefte(sued)), None),
+        (
+            "POST",
+            kraefte(sued),
+            Some(json!({"name": "Spontan"}).to_string()),
+        ),
+    ] {
+        let (s, _) = anfrage(&app, methode, &pfad, &geraet, body.as_deref()).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{methode} {pfad}");
+    }
+
+    // Ad hoc an der eigenen UHS erfassen, dann lösen.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &kraefte(nord),
+        &geraet,
+        Some(&json!({"name": "Spontanhelfer", "funktion": "Sanitäter", "staerke_position": "mannschaft"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let spontan = v["id"].as_i64().unwrap();
+    assert_eq!(
+        uhs_staerke(&app, &admin, einsatz, nord).await["mannschaft"],
+        json!(2)
+    );
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/{spontan}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    // Eine ganze Einheit zuordnen bleibt der Leitung.
+    let einheit = common::einheit_bilden(&app, &admin, einsatz, "SEG 1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{}/einheit/{einheit}", kraefte(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    // Das Tablet erreicht keine dieser Routen und sieht keine Kräfte im Detail.
+    for (methode, pfad, body) in [
+        ("GET", format!("{}/verfuegbar", kraefte(nord)), None),
+        ("PUT", format!("{}/{frei}", kraefte(nord)), None),
+        ("DELETE", format!("{}/{frei}", kraefte(nord)), None),
+        (
+            "POST",
+            kraefte(nord),
+            Some(json!({"name": "Spontan"}).to_string()),
+        ),
+    ] {
+        let (s, _) = anfrage(&app, methode, &pfad, &tablet, body.as_deref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "Tablet {methode} {pfad}");
+    }
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+        &tablet,
+        None,
+    )
+    .await;
+    assert_eq!(detail["kraefte"], json!([]), "{detail}");
+}
+
+#[tokio::test]
+async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    for name in ["Kraftmann", "Kraftfrau", "Kraftkind", "Kraftopa"] {
+        let ep = uhs_kraft(&app, &admin, einsatz, name).await;
+        let (s, _) = anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte/{ep}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+    }
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &monitor,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let uhs = v["uhs"].as_array().unwrap();
+    let zahl = |id: i64| uhs.iter().find(|u| u["id"] == id).unwrap()["kraefte"].clone();
+    assert_eq!(zahl(nord), json!(4));
+    assert_eq!(zahl(sued), json!(0));
+    let text = v.to_string();
+    assert!(!text.contains("Kraft"), "Name in der Antwort: {text}");
+    assert!(!text.contains("\"funktion\""), "{text}");
+}

@@ -236,8 +236,8 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
 ];
-/// Zusätzliche Einsatzrouten des UHS-Laptops: alles des Tablets, dazu Plätze, Stammdaten und
-/// Anhänge der eigenen UHS, Meldungen anlegen und die eigenen lesen. Material liest der Laptop
+/// Zusätzliche Einsatzrouten des UHS-Laptops: alles des Tablets, dazu Plätze, Stammdaten,
+/// Kräfte und Anhänge der eigenen UHS, Meldungen anlegen und die eigenen lesen. Material liest der Laptop
 /// über das UHS-Detail. Status, Stornieren, UHS anlegen und die Zugriffsliste der Anhänge fehlen
 /// bewusst; jeder UHS-Handler hier prüft die Stelle über [`stelle`].
 const UHS_LAPTOP: &[(&str, &str)] = &[
@@ -262,6 +262,12 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
     ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}"),
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei"),
+    // Kräfte der eigenen UHS (LFH-1045): zuordnen, ad hoc erfassen, lösen. „Einheit zuordnen“
+    // bleibt der Leitung.
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/kraefte/verfuegbar"),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/kraefte"),
+    ("PUT", "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}"),
+    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
     ("GET", "/api/einsaetze/{id}/personen"),
     ("POST", "/api/einsaetze/{id}/personen"),

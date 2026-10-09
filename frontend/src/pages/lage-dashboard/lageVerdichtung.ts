@@ -184,10 +184,23 @@ interface UhsVerdichtung {
   aktiv: number;
   aufgeloest: number;
   gesamt: number;
+  /** Kräfte an aktiven UHS, Summe ihrer Stärke (LFH-1045, Spec `uhs-staerke`). */
+  kraefteAktiv: number;
 }
 export function verdichteUhs(uhs: Uhs[]): UhsVerdichtung {
-  const v: UhsVerdichtung = { geplant: 0, aktiv: 0, aufgeloest: 0, gesamt: uhs.length };
-  for (const u of uhs) v[u.status] += 1;
+  const v: UhsVerdichtung = {
+    geplant: 0,
+    aktiv: 0,
+    aufgeloest: 0,
+    gesamt: uhs.length,
+    kraefteAktiv: 0,
+  };
+  for (const u of uhs) {
+    v[u.status] += 1;
+    if (u.status === 'aktiv') {
+      v.kraefteAktiv += u.staerke.fuehrer + u.staerke.unterfuehrer + u.staerke.mannschaft;
+    }
+  }
   return v;
 }
 

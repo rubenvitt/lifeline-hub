@@ -66,6 +66,7 @@ import { ladeMatrix } from '../../api/gefahren';
 import { listeEtb } from '../../api/etb';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../../anzeige/format';
+import { kraefteText } from '../../anzeige/staerke';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import { useViewport } from '../../components/useViewport';
@@ -605,7 +606,11 @@ export default function LageDashboardPage() {
               titel="UHS aktiv"
               groesse="klein"
               wert={uhsGesperrt ? '—' : (fuehrung?.uhsAktiv ?? '')}
-              notiz={uhsGesperrt ? NICHT_FREIGEGEBEN : `${fuehrung?.uhsGeplant ?? 0} geplant`}
+              notiz={
+                uhsGesperrt
+                  ? NICHT_FREIGEGEBEN
+                  : `${fuehrung?.uhsGeplant ?? 0} geplant · ${kraefteText(fuehrung?.uhsKraefte ?? 0)}`
+              }
               zustand={zFuehrung(quellZustand.uhs)}
               ziel={uhsGesperrt ? undefined : unfallhilfsstellenListePfad(einsatzId)}
             />

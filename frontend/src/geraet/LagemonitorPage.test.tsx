@@ -62,6 +62,7 @@ const lage: LagemonitorAnzeige = {
       lon: 13.4,
       belegt: 3,
       plaetze: 8,
+      kraefte: 4,
     },
   ],
 };
@@ -136,6 +137,8 @@ describe('Lagemonitor — Großbild', () => {
     expect(within(betroffene).getByText('vermisst')).toBeInTheDocument();
     const kraefte = screen.getByRole('region', { name: 'Kräfte' });
     expect(within(kraefte).getByText('2/6/30')).toBeInTheDocument();
+    // Kräfte an den UHS nur als Zahl (LFH-1045).
+    expect(within(kraefte).getByText('4 an UHS')).toBeInTheDocument();
     const belegung = screen.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
     expect(within(belegung).getByText('3/8')).toBeInTheDocument();
     expect(within(belegung).getByText('UHS Nord')).toBeInTheDocument();

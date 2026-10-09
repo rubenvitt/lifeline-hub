@@ -31,10 +31,13 @@ import Grundriss from './Grundriss';
 import MaterialTab from './MaterialTab';
 import BewegungenTab from './BewegungenTab';
 import UhsAnhaenge from './UhsAnhaenge';
+import UhsKraefte from './UhsKraefte';
+import { staerkeText } from '../../anzeige/staerke';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
 const REITER_NAME = {
   material: 'Material',
+  kraefte: 'Kräfte',
   bewegungen: 'Bewegungen',
   dateien: 'Dateien',
 } as const;
@@ -62,6 +65,8 @@ export default function UhsDetailPage() {
   const { benutzer, geraet } = useAuth();
   const reiterListe: Reiter[] = [
     ...(!geraet && darf('uhs-material') ? (['material'] as const) : []),
+    // LFH-1045: die Kräfte der UHS; der Laptop führt sie im Bereich „UHS“.
+    ...(!geraet ? (['kraefte'] as const) : []),
     'bewegungen',
     // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
     ...(!geraet && darf('uhs-anhaenge') ? (['dateien'] as const) : []),
@@ -153,7 +158,12 @@ export default function UhsDetailPage() {
 
   // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
   // nur seine Beschriftung aus `uhsTyp`. Die Notiz ist Freitext und bleibt Beschreibungszeile.
-  const meta = [uhsTyp[uhs.typ].label, uhs.standort ?? 'ohne Standort'].join(' · ');
+  // Die Stärke steht im Kopf jeder Ansicht (LFH-1045), die Kräfte dazu im Reiter.
+  const meta = [
+    uhsTyp[uhs.typ].label,
+    uhs.standort ?? 'ohne Standort',
+    `Stärke ${staerkeText(uhs.staerke)}`,
+  ].join(' · ');
 
   return (
     <EinsatzSeite
@@ -278,7 +288,14 @@ export default function UhsDetailPage() {
           ? { role: 'tabpanel', id: reiterFeld, 'aria-label': REITER_NAME[reiter] }
           : { style: { marginTop: 16 } })}
       >
-        {reiter === 'material' ? (
+        {reiter === 'kraefte' ? (
+          <UhsKraefte
+            einsatzId={einsatzId}
+            uhs={uhs}
+            schreibgeschuetzt={schreibgeschuetzt}
+            einheitZuordnen
+          />
+        ) : reiter === 'material' ? (
           <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
         ) : reiter === 'bewegungen' ? (
           <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />

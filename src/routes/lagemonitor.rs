@@ -56,6 +56,9 @@ pub struct LagemonitorUhs {
     pub belegt: i64,
     /// Plätze ohne Wartebereich.
     pub plaetze: i64,
+    /// Gesamtstärke der zugeordneten Kräfte (LFH-1045), nur als Zahl; wie die Stärke der UHS
+    /// zählen Kräfte ohne Position nicht.
+    pub kraefte: i64,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -140,13 +143,18 @@ pub async fn lagebild(
         Option<f64>,
         i64,
         i64,
+        i64,
     )> = sqlx::query_as(
         "SELECT u.id, u.bezeichnung, u.typ, u.status, u.lat, u.lon, \
                (SELECT COUNT(*) FROM einsatz_person p \
                  WHERE p.aktuelle_uhs_id = u.id AND p.storniert_at IS NULL), \
                (SELECT COUNT(*) FROM uhs_platz pl \
                  WHERE pl.uhs_id = u.id AND pl.storniert_at IS NULL \
-                   AND pl.typ <> 'wartebereich') \
+                   AND pl.typ <> 'wartebereich'), \
+               (SELECT COUNT(*) FROM einsatz_personal ep \
+                 LEFT JOIN personal sp ON sp.id = ep.personal_id \
+                 WHERE ep.uhs_id = u.id AND COALESCE(ep.staerke_position, sp.staerke_position) \
+                   IN ('fuehrer', 'unterfuehrer', 'mannschaft')) \
              FROM uhs u \
              WHERE u.einsatz_id = ? AND u.storniert_at IS NULL AND u.status <> 'aufgeloest' \
              ORDER BY u.bezeichnung COLLATE NOCASE, u.id",
@@ -155,7 +163,7 @@ pub async fn lagebild(
     .fetch_all(pool)
     .await?;
     let mut uhs = Vec::with_capacity(zeilen.len());
-    for (id, bezeichnung, typ, status, lat, lon, belegt, plaetze) in zeilen {
+    for (id, bezeichnung, typ, status, lat, lon, belegt, plaetze, kraefte) in zeilen {
         uhs.push(LagemonitorUhs {
             id,
             bezeichnung,
@@ -166,6 +174,7 @@ pub async fn lagebild(
             lon,
             belegt,
             plaetze,
+            kraefte,
         });
     }
 

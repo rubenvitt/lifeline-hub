@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summiereStaerke } from './staerke';
+import { kraefteText, summiereStaerke } from './staerke';
 
 describe('summiereStaerke', () => {
   it('liefert null bei leerer Liste — „keine Einheit" ist nicht „0/0/0"', () => {
@@ -62,5 +62,13 @@ describe('summiereStaerke', () => {
     const x = { id: 7, ueber_einheit_id: 8, ist_kumuliert: s };
     const y = { id: 8, ueber_einheit_id: 7, ist_kumuliert: s };
     expect(summiereStaerke([y, x])).toEqual(s);
+  });
+});
+
+describe('kraefteText', () => {
+  it('Einzahl nur bei genau einer Kraft', () => {
+    expect(kraefteText(0)).toBe('0 Kräfte');
+    expect(kraefteText(1)).toBe('1 Kraft');
+    expect(kraefteText(4)).toBe('4 Kräfte');
   });
 });

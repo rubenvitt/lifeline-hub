@@ -487,6 +487,12 @@ pub enum Vorgang {
         personal: &'static str,
         einheit: &'static str,
     },
+    /// Disponierte Kraft an einer UHS einsetzen (Stärke der UHS, LFH-1045). ETB: „«…» an UHS
+    /// «…» eingesetzt“.
+    PersonalAnUhs {
+        personal: &'static str,
+        uhs: &'static str,
+    },
     /// Gefahrengebiet auf der Lagekarte einrichten und bewerten. ETB: „Gefahrengebiet «…»
     /// eingerichtet“, dazu die Warnstufe der Bewertung.
     Gefahrengebiet(GefahrengebietVorlage),
@@ -616,6 +622,10 @@ const fn einheit(
 
 const fn personal_zu(vor_min: i64, personal: &'static str, einheit: &'static str) -> Schritt {
     s(vor_min, Vorgang::PersonalZuEinheit { personal, einheit })
+}
+
+const fn personal_an_uhs(vor_min: i64, personal: &'static str, uhs: &'static str) -> Schritt {
+    s(vor_min, Vorgang::PersonalAnUhs { personal, uhs })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1000,6 +1010,9 @@ pub const DREHBUCH: &[Schritt] = &[
     personal_zu(242, "truppfuehrer", "logistik"),
     personal_zu(242, "san2", "logistik"),
     personal_zu(242, "funker", "zug"),
+    personal_an_uhs(241, "gruppenfuehrer_san", "turnhalle"),
+    personal_an_uhs(241, "san1", "turnhalle"),
+    personal_an_uhs(241, "notarzt", "turnhalle"),
     fms(240, "gwsan", 4),
     vollzug(
         238,
@@ -1408,6 +1421,7 @@ pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
             Vorgang::Abschnitt(_)
             | Vorgang::FahrzeugZuEinheit { .. }
             | Vorgang::PersonalZuEinheit { .. }
+            | Vorgang::PersonalAnUhs { .. }
             | Vorgang::Gefahrengebiet(_)
             | Vorgang::Uhs(_)
             | Vorgang::Bereitstellungsraum(_)
@@ -1570,6 +1584,7 @@ mod tests {
         let mut vollzogen = BTreeSet::new();
         let mut erinnerungen = BTreeSet::new();
         let mut erledigt = BTreeSet::new();
+        let mut an_uhs = BTreeSet::new();
         for schritt in DREHBUCH {
             match schritt.vorgang {
                 Vorgang::PersonalZuEinheit {
@@ -1579,6 +1594,14 @@ mod tests {
                     assert!(personal.contains(p), "{p} nicht disponiert");
                     assert!(einheiten.contains(einheit), "{einheit} nicht gebildet");
                     assert!(zugeordnet.insert(p), "{p} doppelt zugeordnet");
+                }
+                Vorgang::PersonalAnUhs {
+                    personal: p,
+                    uhs: u,
+                } => {
+                    assert!(personal.contains(p), "{p} nicht disponiert");
+                    assert!(uhs.contains(u), "{u} vor {p}");
+                    assert!(an_uhs.insert(p), "{p} doppelt an einer UHS");
                 }
                 Vorgang::Gefahrengebiet(v) => assert!(v.ring.len() >= 3, "{}", v.label),
                 Vorgang::Uhs(v) => {

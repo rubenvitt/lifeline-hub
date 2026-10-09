@@ -46,6 +46,14 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   for (const name of ['Erste', 'Zweite', 'Dritte']) {
     await anlegen(page, `/api/einsaetze/${e}/personen`, { name, uhs_id: nord.id });
   }
+  // LFH-1045: zwei Kräfte an der UHS Nord; der Monitor zeigt nur ihre Zahl.
+  for (const name of ['Kraft Eins', 'Kraft Zwei']) {
+    const kraft = await anlegen(page, `/api/einsaetze/${e}/personal`, {
+      adhoc: { name, staerke_position: 'mannschaft' },
+    });
+    const zu = await page.request.put(`/api/einsaetze/${e}/uhs/${nord.id}/kraefte/${kraft.id}`);
+    expect(zu.ok(), await zu.text()).toBeTruthy();
+  }
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
     `/api/einsaetze/${e}/geraete`,
@@ -66,6 +74,11 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     const erste = belegung.locator('[data-lfh="monitor-uhs"]').first();
     await expect(erste).toContainText('UHS Nord');
     await expect(erste.locator('span').first()).toHaveText('3');
+    // Die Kräfte an den UHS als eine Zahl, ohne Namen (LFH-1045).
+    await expect(
+      monitor.getByRole('region', { name: 'Kräfte' }).locator('[data-lfh="monitor-zusatz"]'),
+    ).toHaveText('2 an UHS');
+    await expect(monitor.getByText('Kraft Eins')).toHaveCount(0);
     await expect(belegung.getByText('+5 weitere')).toBeVisible();
     // Der lange Name reißt nicht nach einer Zeile ab: er bricht um und zeigt zwei Zeilen.
     const lang = belegung.getByText(langerName);

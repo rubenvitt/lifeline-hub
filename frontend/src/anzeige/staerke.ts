@@ -69,3 +69,8 @@ export function staerkeText(s: Staerke | null | undefined): string {
   const { fuehrer, unterfuehrer, mannschaft } = s;
   return `${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`;
 }
+
+/** „1 Kraft“, „4 Kräfte“: Kräfte an UHS als Zahl (LFH-1045, Lage-Dashboard). */
+export function kraefteText(anzahl: number): string {
+  return `${anzahl} ${anzahl === 1 ? 'Kraft' : 'Kräfte'}`;
+}

@@ -22,6 +22,8 @@ export const AUFTRAG_EMPFAENGER_MAX = 50;
 export const AUFTRAG_EXTERN_BEZEICHNUNG_MAX = 200;
 /** Freier Empfänger-Tag eines Auftrags (`funktion_text`). */
 export const FUNKTION_TEXT_MAX = 200;
+/** Name und Funktion einer Ad-hoc-Kraft, die an einer UHS erfasst wird (LFH-1045). */
+export const PERSONAL_ADHOC_TEXT_MAX = 200;
 /** Bezeichnung einer Nachforderung. */
 export const NACHFORDERUNG_BEZEICHNUNG_MAX = 200;
 /** Art einer Nachforderung (Freitext, landet im ETB-Inhalt). */

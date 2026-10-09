@@ -9,7 +9,8 @@ use sqlx::{SqliteConnection, SqlitePool};
 /// Status. Live oder Snapshot wählt `zu_anzeige`. `ist_demo` liest die Demo-Marke der
 /// Stamm-Person live (LFH-733, design.md D2); ad-hoc findet keine Marke.
 const SELECT_AUFGELOEST: &str = "\
-    SELECT ep.id, ep.einsatz_id, ep.personal_id, ep.einheit_id, ep.fahrzeug_id, ep.status_id, \
+    SELECT ep.id, ep.einsatz_id, ep.personal_id, ep.einheit_id, ep.fahrzeug_id, ep.uhs_id, \
+           ep.status_id, \
            ep.staerke_position AS ep_staerke_position, \
            ep.snap_name, ep.snap_funktion, ep.snap_traegerorganisation, \
            ep.bemerkung, ep.disponiert_at, ep.disponiert_von, \
@@ -35,6 +36,7 @@ struct Row {
     personal_id: Option<i64>,
     einheit_id: Option<i64>,
     fahrzeug_id: Option<i64>,
+    uhs_id: Option<i64>,
     status_id: Option<i64>,
     ep_staerke_position: Option<String>,
     snap_name: String,
@@ -85,6 +87,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzPersonalAnzeige {
         personal_id: row.personal_id,
         einheit_id: row.einheit_id,
         fahrzeug_id: row.fahrzeug_id,
+        uhs_id: row.uhs_id,
         ist_adhoc: row.personal_id.is_none(),
         name,
         funktion,
@@ -126,6 +129,29 @@ pub async fn liste(
         .into_iter()
         .map(|r| zu_anzeige(r, einsatz_aktiv))
         .collect())
+}
+
+/// Disponiertes Personal einer UHS (`Some`) oder ohne UHS (`None`), aufgelöst und nach Namen
+/// sortiert (LFH-1045, Spec `uhs-staerke`).
+pub async fn liste_je_uhs(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    uhs_id: Option<i64>,
+    einsatz_aktiv: bool,
+) -> Result<Vec<EinsatzPersonalAnzeige>, AppError> {
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE ep.einsatz_id = ?1 AND ep.uhs_id IS ?2 ORDER BY ep.id"
+    )))
+    .bind(einsatz_id)
+    .bind(uhs_id)
+    .fetch_all(pool)
+    .await?;
+    let mut liste: Vec<_> = rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect();
+    liste.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(liste)
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.

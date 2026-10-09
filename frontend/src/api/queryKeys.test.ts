@@ -70,6 +70,9 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.kraefteZeitachse,
       // Die Kräftesummen des Lagemonitors (LFH-892).
       EINSATZ_KEYS.lagemonitor,
+      // Die Stärke der UHS aus den Positionen ihrer Kräfte (LFH-1045).
+      EINSATZ_KEYS.uhs,
+      EINSATZ_KEYS.uhsDetail,
     ]);
   });
 
