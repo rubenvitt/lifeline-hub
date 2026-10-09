@@ -7,7 +7,7 @@
 use axum::extract::rejection::{JsonRejection, PathRejection};
 use axum::extract::{ConnectInfo, FromRequest, FromRequestParts, Request};
 use axum::http::request::Parts;
-use axum::http::HeaderMap;
+use axum::http::{HeaderMap, StatusCode};
 use ipnet::IpNet;
 use serde::de::DeserializeOwned;
 use std::convert::Infallible;
@@ -127,12 +127,18 @@ where
     }
 }
 
-/// Bildet eine `JsonRejection` auf einen `AppError` ab. Alle Arme landen auf 400 (formal
-/// ungültig).
+/// Bildet eine `JsonRejection` auf einen `AppError` ab. Ein Body über dem `DefaultBodyLimit`
+/// der Route ist 413 (LFH-1074, `src/AGENTS.md`, Eingabegrenzen), alle übrigen Arme landen auf
+/// 400 (formal ungültig).
 ///
-/// Bewusste Ungenauigkeit: `MissingJsonContentType` wäre HTTP-korrekt 415, `LengthLimitError`
-/// 413. `AppError` trägt beide Codes nicht; der Envelope zählt hier mehr als die Code-Nuance.
+/// Bewusste Ungenauigkeit: `MissingJsonContentType` wäre HTTP-korrekt 415. `AppError` trägt den
+/// Code nicht; der Envelope zählt hier mehr als die Code-Nuance.
 fn rejection_zu_app_error(rejection: JsonRejection) -> AppError {
+    // axum meldet die Längengrenze beim Puffern als `BytesRejection` mit Status 413; andere
+    // Lesefehler tragen einen anderen Status.
+    if rejection.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        return AppError::PayloadTooLarge("Anfrage ist zu groß.".into());
+    }
     match rejection {
         JsonRejection::JsonSyntaxError(_) => {
             AppError::Validation("Anfrage-Body ist kein gültiges JSON.".into())
@@ -305,6 +311,23 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let json: Value = serde_json::from_str(&body).expect("Body ist JSON");
         assert!(json["error"].as_str().unwrap().contains("Content-Type"));
+    }
+
+    /// Ein Body über dem `DefaultBodyLimit` ist 413 im `{error}`-Format (LFH-1074).
+    #[tokio::test]
+    async fn body_ueber_dem_limit_wird_413_mit_envelope() {
+        let app = probe_router().layer(axum::extract::DefaultBodyLimit::max(16));
+        let req = Request::builder()
+            .method("POST")
+            .uri("/t")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(r#"{"name":"Probe","anzahl":42}"#))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: Value = serde_json::from_slice(&bytes).expect("Body ist JSON");
+        assert_eq!(json["error"], "Anfrage ist zu groß.");
     }
 
     // ── Client-IP hinter vertrauenswürdigen Proxys (LFH-604) ──

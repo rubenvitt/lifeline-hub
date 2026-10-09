@@ -146,3 +146,27 @@ Punkten auf die Grenze hinweisen und das Speichern verhindern.
 #### Scenario: Zeichnung über der Grenze
 - **WHEN** eine gezeichnete Zone mehr als 5 000 Punkte hat
 - **THEN** zeigt die Zeichensteuerung den Hinweis auf die Grenze, und Speichern ist nicht möglich
+
+### Requirement: Übergroßer Body wird vor dem Handler abgewiesen
+Ein Request-Body MUST höchstens 256 KiB groß sein, sofern die Route kein eigenes Limit trägt.
+Ein eigenes Limit MUST nur eine Route tragen, deren Body enger zu begrenzen ist (öffentliche
+Anmelderouten) oder legitim größer sein kann (Uploads, Logo, Zone anlegen und Abschnittsfläche
+setzen mit 320 KiB). Ein JSON-Body über dem Limit seiner Route MUST mit 413 und einer Meldung im
+`{error}`-Format abgelehnt werden, ohne dass der Handler läuft. Uploads (Multipart) behalten ihre
+eigenen Meldungen.
+
+#### Scenario: Zu großer Body an einer normalen Schreibroute
+- **WHEN** ein ETB-Eintrag mit einem Body von 256 KiB + 1 Byte erfasst wird
+- **THEN** antwortet der Server mit 413 und einer Meldung, und es entsteht kein Eintrag
+
+#### Scenario: Body an der Grenze erreicht die Feldprüfung
+- **WHEN** ein ETB-Eintrag mit einem Body von genau 256 KiB und zu langem `inhalt` erfasst wird
+- **THEN** antwortet der Server mit 400 und der Feldmeldung zu „Inhalt“
+
+#### Scenario: Geometrie knapp über 256 KiB
+- **WHEN** eine Zone mit einer Geometrie von 256 KiB + 1 Byte angelegt wird
+- **THEN** antwortet der Server mit 400 aus der Geometrieprüfung, nicht mit 413
+
+#### Scenario: Geometrie-Route über ihrem Limit
+- **WHEN** eine Zone mit einem Body über 320 KiB angelegt wird
+- **THEN** antwortet der Server mit 413

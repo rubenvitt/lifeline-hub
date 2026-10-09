@@ -189,14 +189,14 @@ async fn nicht_numerische_route_id_liefert_400_im_fehler_envelope() {
     );
 }
 
-/// Meldung, mit der `JsonBody` einen Body über der Grenze abweist (400, s. `src/extract.rs`).
-const BODY_UNLESBAR: &str = "Anfrage-Body konnte nicht gelesen werden.";
+/// Meldung, mit der `JsonBody` einen Body über der Grenze abweist (413, LFH-1074, s.
+/// `src/extract.rs`).
+const BODY_ZU_GROSS: &str = "Anfrage ist zu groß.";
 
-/// Öffentliche Anmelde-Starts begrenzen den Body auf 4 KiB (LFH-921): ohne Grenze gälte axums
-/// Vorgabe von 2 MiB. Die Abweisung kommt wie jede `JsonBody`-Rejection als 400 im
-/// `{error}`-Format.
+/// Öffentliche Anmelde-Starts begrenzen den Body auf 4 KiB (LFH-921): ohne eigene Grenze gälte
+/// das allgemeine Body-Limit von 256 KiB. Die Abweisung kommt als 413 im `{error}`-Format (LFH-1074).
 #[tokio::test]
-async fn zu_grosser_login_body_liefert_400_im_fehler_envelope() {
+async fn zu_grosser_login_body_liefert_413_im_fehler_envelope() {
     let app = common::setup().await;
     let body =
         serde_json::json!({ "benutzername": "a".repeat(5 * 1024), "passwort": "x" }).to_string();
@@ -207,8 +207,8 @@ async fn zu_grosser_login_body_liefert_400_im_fehler_envelope() {
 
     let status = resp.status();
     let json = assert_fehler_envelope(resp, "Login-Body über 4 KiB").await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(json["error"], BODY_UNLESBAR, "abgewiesen wegen der Größe");
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(json["error"], BODY_ZU_GROSS, "abgewiesen wegen der Größe");
 }
 
 /// Die übrigen öffentlichen Routen mit Body tragen nur einen kurzen Code und haben ebenfalls
@@ -229,16 +229,16 @@ fn json_post(pfad: &str, body: &str) -> Request<Body> {
 }
 
 #[tokio::test]
-async fn zu_grosser_body_der_code_routen_liefert_400_im_fehler_envelope() {
+async fn zu_grosser_body_der_code_routen_liefert_413_im_fehler_envelope() {
     let app = common::setup().await;
     let body = serde_json::json!({ "code": "a".repeat(5 * 1024), "verifier": "x" }).to_string();
     for pfad in OEFFENTLICHE_CODE_ROUTEN {
         let resp = app.clone().oneshot(json_post(pfad, &body)).await.unwrap();
         let status = resp.status();
         let json = assert_fehler_envelope(resp, pfad).await;
-        assert_eq!(status, StatusCode::BAD_REQUEST, "{pfad}");
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{pfad}");
         assert_eq!(
-            json["error"], BODY_UNLESBAR,
+            json["error"], BODY_ZU_GROSS,
             "{pfad}: abgewiesen wegen der Größe"
         );
     }
@@ -253,7 +253,7 @@ async fn code_routen_nehmen_body_unter_4_kib_an() {
         let resp = app.clone().oneshot(json_post(pfad, &body)).await.unwrap();
         let json = assert_fehler_envelope(resp, pfad).await;
         assert_ne!(
-            json["error"], BODY_UNLESBAR,
+            json["error"], BODY_ZU_GROSS,
             "{pfad}: 3 KiB müssen unter der Grenze liegen"
         );
     }
@@ -278,7 +278,7 @@ async fn passkey_abschluss_nimmt_mehr_als_4_kib_an() {
         let resp = app.clone().oneshot(req).await.unwrap();
         let json = assert_fehler_envelope(resp, pfad).await;
         assert_ne!(
-            json["error"], BODY_UNLESBAR,
+            json["error"], BODY_ZU_GROSS,
             "{pfad}: 6 KiB müssen unter der Grenze liegen"
         );
     }

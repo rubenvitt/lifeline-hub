@@ -12,7 +12,8 @@ Verbindlich nach `src/error.rs`, in jeder Schicht, für Neues und Angefasstes:
 **400** `Validation` — das Feld für sich (kaputtes JSON, falscher Typ, **unbekannter Enum-Wert**,
 fehlendes oder **leeres** Pflichtfeld) · **422** `UnprocessableEntity` — der Zusammenhang
 (Feld-Kombination, **Status-Übergang**, Zustand) · **409** `Conflict` — Nebenläufigkeit (CAS) oder
-Lebenszyklus (storniert).
+Lebenszyklus (storniert) · **413** `PayloadTooLarge` — Body über dem Limit der Route, vor dem
+Handler (`JsonBody`, LFH-1074).
 - Referenzpaare: `tests/freies_zeichen.rs`, `tests/einsatz_schaden.rs`;
   `abschliessen_ohne_grund_ist_400` gegen `abschluss_ohne_grund_ist_422_und_mit_grund_ok` nicht
   „harmonisieren".
@@ -33,7 +34,7 @@ Lebenszyklus (storniert).
   `tests/fehler_vertrag.rs`), damit Rejections im `{error}`-Format ankommen. `PfadParam` → 400,
   `EinsatzKontext` → 404 (`src/einsatz/kontext.rs`); beide sind orthogonal.
 
-## Backend — Eingabegrenzen (LFH-937)
+## Backend — Eingabegrenzen (LFH-937, LFH-1074)
 
 Spec `eingabegrenzen`, Herleitung
 `openspec/changes/archive/2026-10-06-lfh-937-eingabegrenzen/design.md`. Neu und Angefasstes:
@@ -51,6 +52,17 @@ Spec `eingabegrenzen`, Herleitung
   `auftrag::EMPFAENGER_MAX` (gezählt vor dem Entdoppeln).
 - **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
   `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
+- **Body-Limit** (LFH-1074): jede Route nimmt höchstens `JSON_BODY_MAX` (256 KiB, `app.rs`) an,
+  sonst 413 vor dem Handler; kein legitimer JSON-Body kommt darüber (Sweep vom 09.10.2026). Ein
+  eigenes Limit trägt nur eine Route, deren legitimer Body größer sein kann, als Konstante in
+  `app.rs`/`transfer.rs` (`tests/zulassung_guard.rs`):
+  - Anmeldung, Zweitfaktor, Code-Einlösen, Koppeln (4 KiB), Passkey-Abschlüsse (16 KiB): enger,
+    öffentlich.
+  - Uploads (`UPLOAD_BODY_MAX`), Logo (1 MiB + 64 KiB): Multipart mit Datei.
+  - Zone anlegen, Abschnittsfläche setzen (`GEOMETRIE_BODY_MAX`, 320 KiB): Geometrie bis 256 KiB
+    plus Rahmen, damit die Geometrieprüfung (400) die wirksame Grenze bleibt.
+  Ein neues Feld, das den Body über 256 KiB tragen kann, braucht zuerst eine Feldgrenze, dann eine
+  Ausnahme hier.
 - **Spiegel:** jede Grenze, die eine Maske kennt, steht in `frontend/src/api/eingabegrenzen.ts`;
   `tests/eingabegrenzen_spiegel.rs` vergleicht Name für Name. Neue Grenze → beide Seiten und
   die Tabelle im Test.
