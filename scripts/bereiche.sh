@@ -30,6 +30,9 @@ bereiche_von() {
     # Zählregeln (verdichtungFixture.test.ts).
     src/karte/quellen.rs | tests/fixtures/verdichtung/*)
       echo "rust frontend e2e" ;;
+    # Die Hilfe bündelt die Anwenderdokumentation (`frontend/vite.config.ts`, LFH-1096).
+    docs/anwender/*)
+      echo "frontend e2e" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
     # liest keine Suite; Prettier über `frontend/**/*.md` läuft in den Schnellprüfungen.
