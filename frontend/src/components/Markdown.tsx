@@ -2,12 +2,15 @@ import {
   createContext,
   memo,
   useContext,
+  useMemo,
   type ComponentPropsWithoutRef,
   type ReactNode,
 } from 'react';
 import ReactMarkdown, { type Components, type Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import titelbloecke, { TITELPLATZ } from './markdownTitelbloecke';
+import fundstellenMarkieren from './markdownFundstellen';
+import { suchphrasen } from './volltextFundstellen';
 import './Markdown.css';
 
 type Variante = 'kompakt' | 'dokument';
@@ -30,6 +33,11 @@ interface Props {
    * (`markdownTitelbloecke.ts`), damit er im Druck nicht allein am Seitenende bleibt (LFH-1008).
    */
   titel?: ReactNode;
+  /**
+   * Begriff der Volltextsuche: seine Fundstellen werden im gerenderten Text markiert (LFH-1056,
+   * `markdownFundstellen.ts`). Fehlt er, rendert der Text wie immer, auch im Druck.
+   */
+  fundstellen?: string;
 }
 
 /** Ebene einer Überschrift, die über einem Markdown-Text stehen kann (h1 … h5). */
@@ -110,14 +118,20 @@ const REHYPE_PLUGINS_MIT_KOPF: PluggableList = [[titelbloecke, { kopf: true }]];
  * über seine eingebaute URL-Transformation. Damit ist die Anzeige XSS-sicher,
  * ohne dass wir selbst sanitisieren müssen.
  */
-function Markdown({ children, variante = 'dokument', unterEbene, titel }: Props) {
+function Markdown({ children, variante = 'dokument', unterEbene, titel, fundstellen }: Props) {
   const mitKopf = titel !== undefined && titel !== null;
+  const basis = mitKopf ? REHYPE_PLUGINS_MIT_KOPF : REHYPE_PLUGINS;
+  // Je Begriff EINE Liste: eine neue je Render stieße den Parse an (s. `REMARK_PLUGINS`).
+  const rehypePlugins = useMemo<PluggableList>(() => {
+    const phrasen = fundstellen ? suchphrasen(fundstellen) : [];
+    return phrasen.length > 0 ? [...basis, [fundstellenMarkieren, { phrasen }]] : basis;
+  }, [basis, fundstellen]);
   return (
     <div className={`markdown markdown--${variante}`}>
       <TitelKontext.Provider value={titel}>
         <ReactMarkdown
           remarkPlugins={REMARK_PLUGINS}
-          rehypePlugins={mitKopf ? REHYPE_PLUGINS_MIT_KOPF : REHYPE_PLUGINS}
+          rehypePlugins={rehypePlugins}
           components={KOMPONENTEN[unterEbene]}
         >
           {children}

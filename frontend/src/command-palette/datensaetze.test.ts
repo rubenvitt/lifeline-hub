@@ -634,6 +634,30 @@ describe('baueDatensatzTreffer — Textzweig und ETB', () => {
   });
 
   /**
+   * LFH-1056: Ein Volltexttreffer trägt den Begriff in Zeile und Vorschau, damit beide seine
+   * Fundstellen markieren — in der Zeile erst hinter der Nummer, die der Server nicht durchsucht.
+   */
+  it('reicht den Volltextbegriff an Zeile und Vorschau weiter', () => {
+    const [t] = baueDatensatzTreffer(
+      kontext({
+        suche: ' deich ',
+        quellen: { etbText: [etb({ id: 12, lfd_nr: 99, inhalt: 'Deich hält' })] },
+      }),
+    );
+    expect(t.befehl.label).toBe('#99 · Deich hält');
+    expect(t.befehl.fundstellen).toEqual({ begriff: 'deich', ab: '#99 · '.length });
+    expect(t.befehl.vorschau).toMatchObject({ art: 'etb', lfdNr: 99, fundstellen: 'deich' });
+  });
+
+  it('ein Nummerntreffer markiert nichts', () => {
+    const [t] = baueDatensatzTreffer(
+      kontext({ suche: '99', quellen: { etbNummer: [etb({ id: 12, lfd_nr: 99 })] } }),
+    );
+    expect(t.befehl.fundstellen).toBeUndefined();
+    expect(t.befehl.vorschau).not.toHaveProperty('fundstellen');
+  });
+
+  /**
    * `before_lfd_nr` filtert strikt `<`; bei einer Nummernlücke liefert der Cursor den
    * nächstälteren Eintrag, ohne Gleichheitsvergleich stünde still der falsche da.
    */
@@ -1236,9 +1260,12 @@ describe('baueDatensatzTreffer — Öffnungsart und Vorschau (LFH-645)', () => {
     ]);
     for (const [id, { quelle, befehl }] of je) {
       const art = ERWARTETE_ART[quelle];
+      // Der Volltextzweig (110) trägt zusätzlich seinen Begriff (LFH-1056).
       const erwartet =
         art === 'etb'
-          ? { art, einsatzId: 5, id, lfdNr: id === 109 ? 9 : 10 }
+          ? id === 109
+            ? { art, einsatzId: 5, id, lfdNr: 9 }
+            : { art, einsatzId: 5, id, lfdNr: 10, fundstellen: 'flor' }
           : { art, einsatzId: 5, id };
       expect(befehl.vorschau, quelle).toEqual(erwartet);
     }

@@ -402,6 +402,8 @@ test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
     vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde', { exact: true }),
   ).toBeVisible();
   await expect(vorschau.getByText('Abschnitt Nord → Leitstelle')).toBeVisible();
+  // Die Fundstelle ist markiert, im Kopf der Vorschau wie im Inhalt (LFH-1056).
+  await expect(vorschau.locator('mark', { hasText: 'Wasserstand' })).toHaveCount(2);
   await page.keyboard.press('Escape');
   await expect(vorschau).toBeHidden();
   await expect(paletteInput(page)).toHaveValue('#Wasserstand');

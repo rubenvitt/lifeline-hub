@@ -28,6 +28,7 @@ import {
   type PaletteModus,
 } from './typen';
 import { Vorschau } from './Vorschau';
+import Fundstellen from '../components/Fundstellen';
 import { palettenZeilenStil, schliessKnopfMass, vorschauZielStil } from './zeilenStil';
 
 /**
@@ -507,7 +508,9 @@ export function CommandPalette({
             fontSize: schriftskala.text.groesse,
           }}
         >
-          <span style={einzeilig}>{b.label}</span>
+          <span style={einzeilig}>
+            <Fundstellen text={b.label} begriff={b.fundstellen?.begriff} ab={b.fundstellen?.ab} />
+          </span>
           {b.nebenzeile && (
             <span
               id={nebenzeileId}
@@ -726,7 +729,11 @@ export function CommandPalette({
                 Zurück
               </Button>
               <span style={{ flex: 1, minWidth: 0, fontSize: schriftskala.text.groesse }}>
-                {vorschau.label}
+                <Fundstellen
+                  text={vorschau.label}
+                  begriff={vorschau.fundstellen?.begriff}
+                  ab={vorschau.fundstellen?.ab}
+                />
               </span>
               {vorschau.kontext && (
                 <span

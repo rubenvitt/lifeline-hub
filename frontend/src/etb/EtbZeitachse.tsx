@@ -15,6 +15,8 @@ import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import { HERVORGEHOBEN } from '../components/Datensicht';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import Markdown from '../components/Markdown';
+import Fundstellen from '../components/Fundstellen';
+import { fundstellen as fundstellenIn, suchphrasen } from '../components/volltextFundstellen';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import {
   Augenbraue,
@@ -56,6 +58,12 @@ interface Props {
   /** Per ?eintrag=<id> adressierter Eintrag — wird hervorgehoben (LFH-25). */
   highlightId?: number | null;
   /**
+   * Begriff der Volltextsuche (`?q=`): seine Fundstellen in Inhalt, Von, An und Veranlassung
+   * gesendeter Einträge werden markiert (LFH-1056). Gepufferte Zeilen hat der Server nicht
+   * gefunden, sie bleiben unmarkiert.
+   */
+  fundstellen?: string;
+  /**
    * Zählt je Sprung über `?eintrag=` hoch (auch auf denselben Eintrag). Ein Sprung hebt das
    * Einfrieren auf: das Ziel könnte sonst hinter dem Sammelbanner stehen.
    */
@@ -95,9 +103,20 @@ export const MELDEWEG_LABEL = Object.fromEntries(
   MELDEWEG_OPTIONEN.map((o) => [o.value, o.label]),
 ) as Record<MeldeWeg, string>;
 
-function vonAn(von?: string | null, an?: string | null): string | null {
+function vonAn(von?: string | null, an?: string | null, begriff?: string): ReactNode {
   if (!von && !an) return null;
-  return `${von || '—'} → ${an || '—'}`;
+  return (
+    <>
+      <Fundstellen text={von || '—'} begriff={begriff} /> →{' '}
+      <Fundstellen text={an || '—'} begriff={begriff} />
+    </>
+  );
+}
+
+/** Trifft die Volltextsuche die Veranlassung? Nur dann steht sie in der Hinweiszeile. */
+function veranlassungGetroffen(veranlassung: string | null | undefined, begriff?: string): boolean {
+  if (!begriff || !veranlassung) return false;
+  return fundstellenIn(veranlassung, suchphrasen(begriff)).length > 0;
 }
 
 /** „1 Anhang" / „n Anhänge" an einer gepufferten Zeile (LFH-117); ohne Anhang nichts. */
@@ -155,6 +174,7 @@ export default function EtbZeitachse({
   zeilen,
   einsatzId,
   highlightId,
+  fundstellen,
   sprungMarke,
   eigeneBenutzerId,
   onBerichtigen,
@@ -249,6 +269,7 @@ export default function EtbZeitachse({
       z={z}
       einsatzId={einsatzId}
       hervorgehoben={z.art === 'eintrag' && z.eintrag.id === highlightId}
+      fundstellen={z.art === 'eintrag' ? fundstellen || undefined : undefined}
       index={index}
       dokumente={z.art === 'eintrag' ? dokumente?.get(z.eintrag.id) : undefined}
       darfOriginal={darfOriginal}
@@ -349,6 +370,8 @@ interface ZeilenProps {
   z: EtbZeile;
   einsatzId: number;
   hervorgehoben: boolean;
+  /** Begriff der Volltextsuche, nur an gesendeten Einträgen (s. `EtbZeitachse fundstellen`). */
+  fundstellen?: string;
   index: Berichtigungsindex;
   dokumente?: readonly EtbDokument[];
   darfOriginal: boolean;
@@ -368,6 +391,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
   z,
   einsatzId,
   hervorgehoben,
+  fundstellen,
   index,
   dokumente,
   darfOriginal,
@@ -434,6 +458,13 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
     const stil = verweisStil(token);
     return hinweisZeile(
       [
+        // Die Veranlassung steht sonst nicht in der Zeile; trifft die Suche sie, sagt erst sie, warum
+        // der Eintrag dasteht (LFH-1056).
+        veranlassungGetroffen(e.veranlassung, fundstellen) && (
+          <span key="veranlassung">
+            Veranlassung: <Fundstellen text={e.veranlassung!} begriff={fundstellen} />
+          </span>
+        ),
         istNachgetragen(e.ereigniszeit, e.received_at) && (
           <span key="nachtrag">
             <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
@@ -570,14 +601,14 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
         nr={`Nr. ${e.lfd_nr}`}
         typ={e.typ}
         typwort={etbTyp[e.typ].label}
-        meta={vonAn(e.von, e.an)}
+        meta={vonAn(e.von, e.an, fundstellen)}
         toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
         hinweis={eintragsHinweis(e)}
         verfasser={verfasserText(e)}
         weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
       >
         {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
-        <Markdown variante="kompakt" unterEbene={2}>
+        <Markdown variante="kompakt" unterEbene={2} fundstellen={fundstellen}>
           {e.inhalt}
         </Markdown>
       </Zeitachseneintrag>

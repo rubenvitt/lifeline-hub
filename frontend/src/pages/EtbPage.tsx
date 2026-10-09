@@ -876,6 +876,7 @@ export default function EtbPage() {
               zeilen={chronologie}
               einsatzId={einsatzId}
               highlightId={highlightId}
+              fundstellen={filter.q}
               sprungMarke={hervorhebung?.marke}
               eigeneBenutzerId={benutzer?.id}
               ladend={etbQuery.isLoading}

@@ -53,6 +53,12 @@ export interface Befehl {
    * Spec `modul-benennung`). Wie {@link Befehl.kontext} Beschreibung, kein Name.
    */
   nebenzeile?: string;
+  /**
+   * Fundstellen der Volltextsuche im Label markieren (LFH-1056): `begriff` ist der Suchbegriff,
+   * vor `ab` steht, was der Server nicht durchsucht hat (die Nummer). Nur Darstellung; Name und
+   * Gedächtnis hängen weiter am reinen `label`.
+   */
+  fundstellen?: { begriff: string; ab: number };
   kuerzel?: string;
   /**
    * Dieser eine Befehl geht NICHT ins Gedächtnis, obwohl seine Gruppe merkbar ist.
@@ -97,11 +103,12 @@ export type Oeffnung = 'hier' | 'neuerTab';
  * Das Ziel trägt nur Kennungen, nie den Datensatz: das Bauteil liest ihn aus dem Fach der
  * Trefferliste (`datensatzAbfrage.ts`) und bleibt live. Der ETB trägt zusätzlich `lfdNr`, weil
  * kein Fach einen Eintrag über seine `id` adressiert; gelesen wird über den Nummerncursor, danach
- * wird die `id` geprüft.
+ * wird die `id` geprüft. Ein Volltexttreffer trägt dazu den Suchbegriff, dessen Fundstellen die
+ * Vorschau markiert (LFH-1056).
  */
 export type VorschauZiel =
   | { art: VorschauArt; einsatzId: number; id: number }
-  | { art: 'etb'; einsatzId: number; id: number; lfdNr: number };
+  | { art: 'etb'; einsatzId: number; id: number; lfdNr: number; fundstellen?: string };
 
 /** Die Sorten, deren Ziel allein aus `einsatzId` und `id` besteht. */
 export type VorschauArt =
