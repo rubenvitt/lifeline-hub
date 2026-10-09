@@ -11227,6 +11227,20 @@
             "type": "integer",
             "format": "int64"
           },
+          "netz": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Netz (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030)."
+          },
+          "sicherheit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sicherheit (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030)."
+          },
           "sortier": {
             "type": "integer",
             "format": "int64"

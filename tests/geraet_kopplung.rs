@@ -245,7 +245,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    for ansicht in ["betreuungsstelle", "einsatzabschnitt", "verpflegung"] {
+    for ansicht in ["betreuungsstelle", "verpflegung"] {
         let (s, v) = anlegen(
             &app,
             &admin,
@@ -272,6 +272,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
             {"ansicht": "uhs-laptop", "stellenart": "uhs"},
             {"ansicht": "lagemonitor", "stellenart": null},
             {"ansicht": "bereitstellungsraum", "stellenart": "bereitstellungsraum"},
+            {"ansicht": "einsatzabschnitt", "stellenart": "einsatzabschnitt"},
         ])
     );
 }
@@ -393,6 +394,411 @@ async fn aufgeloester_abschnitt_beendet_seine_kopplung() {
             && t.contains("aufgelöst")),
         "ETB nennt das Gerät: {etb:?}"
     );
+}
+
+// ---------- Abschnittsgerät (LFH-1043) ----------
+
+const ZONE_POLY: &str =
+    r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
+
+async fn abschnitt_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    name: &str,
+    ueber: Option<i64>,
+) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        cookie,
+        Some(&json!({"name": name, "ueber_abschnitt_id": ueber})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+async fn einheit_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    name: &str,
+    abschnitt: i64,
+) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        cookie,
+        Some(&json!({"name": name, "abschnitt_id": abschnitt})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// Ein Auftrag an die Empfänger; liefert die Antwort (mit Empfängerzeilen).
+async fn auftrag_an(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    text: &str,
+    empfaenger: Value,
+) -> Value {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        cookie,
+        Some(&json!({"auftrag_text": text, "empfaenger": empfaenger})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v
+}
+
+/// Nord ⊃ Nord-Ost, daneben Süd; je eine Einheit darin.
+struct AbschnittsLage {
+    einsatz: i64,
+    nord: i64,
+    ost: i64,
+    sued: i64,
+    zug_nord: i64,
+    zug_ost: i64,
+    zug_sued: i64,
+}
+
+async fn abschnittslage(app: &axum::Router, admin: &str) -> AbschnittsLage {
+    let einsatz = einsatz_anlegen(app, admin).await;
+    let nord = abschnitt_anlegen(app, admin, einsatz, "EA Nord", None).await;
+    let ost = abschnitt_anlegen(app, admin, einsatz, "UA Nord-Ost", Some(nord)).await;
+    let sued = abschnitt_anlegen(app, admin, einsatz, "EA Süd", None).await;
+    AbschnittsLage {
+        einsatz,
+        nord,
+        ost,
+        sued,
+        zug_nord: einheit_anlegen(app, admin, einsatz, "1. Zug", nord).await,
+        zug_ost: einheit_anlegen(app, admin, einsatz, "2. Zug", ost).await,
+        zug_sued: einheit_anlegen(app, admin, einsatz, "3. Zug", sued).await,
+    }
+}
+
+/// Ein an `abschnitt` gekoppeltes Abschnittsgerät: `(kopplung_id, geräte-cookie)`.
+async fn abschnittsgeraet(
+    app: &axum::Router,
+    admin: &str,
+    einsatz: i64,
+    abschnitt: i64,
+) -> (i64, String) {
+    let (id, code) = kopplung(
+        app,
+        admin,
+        einsatz,
+        json!({"ansicht": "einsatzabschnitt", "stelle_id": abschnitt, "bezeichnung": "Tablet EA"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    (id, a.cookie.expect("Sitzungscookie"))
+}
+
+fn namen(v: &Value, feld: &str) -> Vec<String> {
+    let mut n: Vec<String> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x[feld].as_str().unwrap().to_string())
+        .collect();
+    n.sort();
+    n
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let basis = format!("/api/einsaetze/{}", l.einsatz);
+
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/abschnitte"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(namen(&v, "name"), ["EA Nord", "UA Nord-Ost"]);
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(namen(&v, "name"), ["1. Zug", "2. Zug"]);
+
+    // Einsatzweite Zähler bekommt das Gerät nicht.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/modul-zaehler"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for modul in ["einheiten", "einsatzabschnitte", "auftraege", "meldungen"] {
+        assert!(v.get(modul).is_none(), "kein Zähler {modul}: {v}");
+    }
+
+    // Umgehängt: Nord-Ost unter Süd → das Gerät verliert den Ast sofort.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{basis}/abschnitte/{}", l.ost),
+        &admin,
+        Some(&json!({"ueber_abschnitt_id": l.sued})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (_, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
+    assert_eq!(namen(&v, "name"), ["1. Zug"]);
+
+    // Nicht gelistet: 403.
+    for (m, p) in [
+        ("GET", format!("{basis}/etb")),
+        ("GET", format!("{basis}/personen")),
+        ("GET", format!("{basis}/uhs")),
+        ("GET", format!("{basis}/personal")),
+        ("PATCH", format!("{basis}/abschnitte/{}", l.nord)),
+        ("PUT", format!("{basis}/einheiten/{}/status", l.zug_nord)),
+        ("POST", format!("{basis}/auftraege")),
+    ] {
+        let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}");
+    }
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let basis = format!("/api/einsaetze/{}/auftraege", l.einsatz);
+
+    let an_ost = auftrag_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Deich sichern",
+        json!([{"empfaenger_typ": "abschnitt", "abschnitt_id": l.ost}]),
+    )
+    .await;
+    let an_sued = auftrag_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Straße sperren",
+        json!([{"empfaenger_typ": "einheit", "einheit_id": l.zug_sued}]),
+    )
+    .await;
+    let gemischt = auftrag_an(
+        &app,
+        &admin,
+        l.einsatz,
+        "Sandsäcke füllen",
+        json!([
+            {"empfaenger_typ": "abschnitt", "abschnitt_id": l.sued},
+            {"empfaenger_typ": "einheit", "einheit_id": l.zug_ost},
+        ]),
+    )
+    .await;
+    let id = |v: &Value| v["id"].as_i64().unwrap();
+    let zeile = |v: &Value, schluessel: &str, wert: i64| {
+        v["empfaenger"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e[schluessel] == wert)
+            .unwrap()["id"]
+            .as_i64()
+            .unwrap()
+    };
+
+    let (s, v) = anfrage(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut texte: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["auftrag_text"].as_str().unwrap())
+        .collect();
+    texte.sort();
+    assert_eq!(texte, ["Deich sichern", "Sandsäcke füllen"]);
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/{}", id(&an_ost)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/{}", id(&an_sued)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
+
+    // Quittung: die Zeile der eigenen Einheit ja, die von Süd nicht.
+    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/empfaenger/{zid}/quittieren");
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &quittieren(id(&gemischt), zeile(&gemischt, "einheit_id", l.zug_ost)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &quittieren(id(&gemischt), zeile(&gemischt, "abschnitt_id", l.sued)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde Empfängerzeile");
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &quittieren(id(&an_sued), zeile(&an_sued, "einheit_id", l.zug_sued)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
+
+    // Vollzug: eigener Auftrag ja, fremder 404, abnehmen gar nicht.
+    let vollzug = |aid: i64| format!("{basis}/{aid}/vollzug");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &vollzug(id(&an_ost)),
+        &geraet,
+        Some(&json!({"status": "vollzogen", "vollzugsmeldung": "Deich gesichert"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &vollzug(id(&an_sued)),
+        &geraet,
+        Some(&json!({"status": "in_arbeit"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{basis}/{}/abnehmen", id(&an_ost)),
+        &geraet,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_meldet_mit_eigenem_absender() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let meldung = |bezug: Value| {
+        let mut m = json!({
+            "absender": "EA Nord",
+            "meldeweg": "persoenlich",
+            "inhalt": "Lage ruhig",
+            "ereigniszeit": "2026-10-08 10:00:00",
+        });
+        m.as_object_mut()
+            .unwrap()
+            .extend(bezug.as_object().unwrap().clone());
+        m
+    };
+
+    let (s, v) = anfrage_json(&app, "POST", &meldungen, &geraet, Some(&meldung(json!({})))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(
+        v["abschnitt_id"], l.nord,
+        "ohne Angabe der eigene Abschnitt"
+    );
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &geraet,
+        Some(&meldung(json!({"abschnitt_id": l.ost}))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["abschnitt_id"], l.ost, "Unterabschnitt bleibt");
+    for bezug in [
+        json!({"abschnitt_id": l.sued}),
+        json!({"einheit_id": l.zug_sued}),
+    ] {
+        let (s, v) = anfrage_json(&app, "POST", &meldungen, &geraet, Some(&meldung(bezug))).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    }
+    let _ = l.zug_nord;
+}
+
+#[tokio::test]
+async fn abschnittsgeraet_sieht_gefahrenzonen_aber_keine_bezirke() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let zonen = format!("/api/einsaetze/{}/zonen", l.einsatz);
+    for typ in ["absperrbereich", "evakuierungsbezirk", "freie_skizze"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &zonen,
+            &admin,
+            Some(&json!({"typ": typ, "geometrie_typ": "Polygon", "geometrie": ZONE_POLY})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{typ}: {v}");
+    }
+    let (s, v) = anfrage(&app, "GET", &zonen, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(namen(&v, "typ"), ["absperrbereich"]);
+    let (_, v) = anfrage(&app, "GET", &zonen, &admin, None).await;
+    assert_eq!(
+        v.as_array().unwrap().len(),
+        3,
+        "die Einsatzleitung sieht alle"
+    );
+}
+
+/// Widerruf beendet auch ein Abschnittsgerät sofort.
+#[tokio::test]
+async fn widerrufenes_abschnittsgeraet_verliert_jeden_zugriff() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (id, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let einheiten = format!("/api/einsaetze/{}/einheiten", l.einsatz);
+    let (s, _) = anfrage(&app, "GET", &einheiten, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK);
+    widerrufen(&app, &admin, l.einsatz, id).await;
+    let (s, _) = anfrage(&app, "GET", &einheiten, &geraet, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -2508,7 +2914,8 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
     }
 
-    // Modulfreigaben und Zähler folgen der Ansicht.
+    // Modulfreigaben und Zähler folgen der Ansicht; ein gebundenes Gerät bekommt keine
+    // einsatzweiten Zähler, auch nicht für die Kräfteliste, die es liest.
     let (s, v) = anfrage(
         &app,
         "GET",
@@ -2518,7 +2925,7 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    assert_eq!(v["einheiten"]["gesamt"], 1, "{v}");
+    assert!(v["einheiten"].is_null(), "{v}");
     assert!(
         v["meldungen"].is_null(),
         "kein einsatzweiter Meldungszähler: {v}"

@@ -7,9 +7,8 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import GeraetMeldungen from './GeraetMeldungen';
 
 /**
- * Meldungen an die Einsatzleitung als eigener Bereich der Gerätehülle, für stellengebundene
- * Ansichten ohne Stellenbereich (Bereitstellungsraum, LFH-1042). Absender ist die Stelle der
- * Kopplung.
+ * Meldungen an die Einsatzleitung als eigener Bereich der Gerätehülle des Bereitstellungsraums
+ * (LFH-1042). Absender sind Stelle und Gerät der Kopplung, wie bei UHS und Abschnitt.
  */
 export default function GeraetMeldungenPage() {
   const { geraet, benutzer } = useAuth();
@@ -20,11 +19,12 @@ export default function GeraetMeldungenPage() {
     enabled: geraet != null,
   });
   const stelle = geraet?.stelle ?? '';
+  const absender = [stelle, geraet?.bezeichnung].filter(Boolean).join(' · ');
   return (
-    <EinsatzSeite titel="Meldungen" meta={stelle} dataUpdatedAt={einsatzQuery.dataUpdatedAt}>
+    <EinsatzSeite titel="Melden" meta={stelle} dataUpdatedAt={einsatzQuery.dataUpdatedAt}>
       <GeraetMeldungen
         einsatzId={einsatzId}
-        stelle={stelle}
+        absender={absender}
         schreibgeschuetzt={!darfImEinsatzSchreiben(einsatzQuery.data, benutzer)}
       />
     </EinsatzSeite>

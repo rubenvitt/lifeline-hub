@@ -453,7 +453,7 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
   });
 });
 
-describe('Bereitstellungsraum — eigener Raum und Meldungen (LFH-1042)', () => {
+describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
   const brGeraet = geraet({
     ansicht: 'bereitstellungsraum',
     uhs_id: null,
@@ -518,7 +518,7 @@ describe('Bereitstellungsraum — eigener Raum und Meldungen (LFH-1042)', () => 
     return { belegt, status, brListe };
   }
 
-  it('Start am BR-Gerät: der eigene Raum, Navigation „Raum“ und „Meldungen“', async () => {
+  it('Start am BR-Gerät: der eigene Raum, Navigation „Raum“ und „Melden“', async () => {
     vi.useRealTimers();
     const { brListe } = brBereit();
     const router = renderApp('/geraet');
@@ -529,7 +529,7 @@ describe('Bereitstellungsraum — eigener Raum und Meldungen (LFH-1042)', () => 
       within(nav)
         .getAllByRole('link')
         .map((l) => l.textContent),
-    ).toEqual(['Raum', 'Meldungen']);
+    ).toEqual(['Raum', 'Melden']);
     // Kein Umschalter zwischen Räumen, kein Auflösen, keine Brotkrumen in die Stabsoberfläche.
     expect(screen.queryByRole('button', { name: 'Auflösen' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
@@ -580,7 +580,7 @@ describe('Bereitstellungsraum — eigener Raum und Meldungen (LFH-1042)', () => 
       }),
     );
     renderApp('/geraet/7/meldungen');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Meldungen' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Melden' })).toBeVisible();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Inhalt'), 'Raum voll');
     await user.click(screen.getByRole('button', { name: 'Meldung senden' }));

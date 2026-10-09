@@ -204,8 +204,9 @@ Abschnitt „Kommunikationsskizze“ enthalten.
 
 ### Requirement: Eine Sammelschiene je Sprechgruppe
 Die Skizze SHALL jede Sprechgruppe des Einsatzes genau einmal als waagerechte Sammelschiene zeigen,
-mit einem Bedingungszeichen (Langsechseck mit Betriebsart und Bezeichnung) und, wenn vorhanden,
-dem Hinweis der Sprechgruppe darunter. Jede Stelle, der die Sprechgruppe zugeordnet ist, MUST mit
+mit einem Bedingungszeichen (Langsechseck mit Betriebsart und Bezeichnung) und darunter, soweit
+vorhanden, Netz, Sicherheit und Hinweis der Sprechgruppe in dieser Reihenfolge, getrennt durch
+„ · “; diese Zeile MUST NOT das Zeichen verbreitern. Jede Stelle, der die Sprechgruppe zugeordnet ist, MUST mit
 genau einer Stichleitung daran hängen. Eine Stelle mit mehreren Sprechgruppen MUST an jeder ihrer
 Schienen hängen. Kanten zwischen zwei Stellen MUST NOT für Sprechgruppen gezeichnet werden.
 
@@ -221,6 +222,11 @@ Schienen hängen. Kanten zwischen zwei Stellen MUST NOT für Sprechgruppen gezei
 #### Scenario: Sprechgruppe mit Hinweis
 - **WHEN** die Sprechgruppe „DMO 314_F*“ den Hinweis „Gesundheit“ trägt
 - **THEN** steht „Gesundheit“ unter ihrem Bedingungszeichen
+
+#### Scenario: Sprechgruppe mit Netz, Sicherheit und Hinweis
+- **WHEN** „DMO 314_F*“ Netz „Gateway“, Sicherheit „E2E“ und Hinweis „Gesundheit“ trägt
+- **THEN** steht „Gateway · E2E · Gesundheit“ unter ihrem Bedingungszeichen, und das Langsechseck
+  ist so breit wie ohne diese Angaben
 
 ### Requirement: Stellen als Führungsstellen-Kästen und Einheiten als Zeichen
 

@@ -73,6 +73,10 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
     await laptop.getByLabel('Inhalt').fill('Decken werden knapp');
     await laptop.getByRole('radio', { name: 'dringend' }).click();
     await laptop.getByRole('button', { name: 'Meldung senden' }).click();
+    // Erst die Quittung des Servers: der Text allein stünde schon im Eingabefeld (ein gesteuertes
+    // `textarea` trägt seinen Wert als Textinhalt), die Abfrage unten liefe dann der Meldung voraus.
+    await expect(laptop.getByText(/Meldung #\d+ gesendet/)).toBeVisible();
+    await expect(laptop.getByLabel('Inhalt')).toHaveValue('');
     await expect(laptop.getByText('Decken werden knapp')).toBeVisible();
 
     // Die Einsatzleitung sieht die Meldung mit der Stelle als Absender.

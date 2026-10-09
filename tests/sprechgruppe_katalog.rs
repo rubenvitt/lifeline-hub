@@ -2,12 +2,13 @@
 //! LFH-306: echter Teil-PATCH statt Vollersatz.
 //!
 //! Eigene Datei, damit die Katalog-Zusagen per `cargo test --test sprechgruppe_katalog`
-//! einzeln fahrbar sind; die einsatz-lokalen Sprechgruppen sind bewusst nicht hier.
+//! einzeln fahrbar sind; die einsatz-lokalen Sprechgruppen sind bewusst nicht hier, außer
+//! Netz und Sicherheit (LFH-1030), die beide Wege gleich prüfen.
 
 use axum::http::StatusCode;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, login_cookie, setup};
+use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, setup, setup_mit_pool};
 
 /// Legt einen Katalog-Eintrag mit ALLEN Feldern gesetzt an und liefert seine id.
 async fn katalog_anlegen(
@@ -285,4 +286,191 @@ async fn patch_nicht_admin_ist_403() {
         .0,
         StatusCode::FORBIDDEN
     );
+}
+
+// ---------- Netz und Sicherheit (LFH-1030) ----------
+
+#[tokio::test]
+async fn netz_und_sicherheit_anlegen_patchen_leeren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/sprechgruppen",
+        &admin,
+        Some(
+            r#"{"bezeichnung":"314_F","betriebsart":"DMO","netz":" Gateway ","sicherheit":"E2E"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    assert_eq!(json["netz"], "Gateway", "getrimmt");
+    assert_eq!(json["sicherheit"], "E2E");
+    let u = format!("/api/sprechgruppen/{}", json["id"]);
+
+    // Hinweis bearbeiten lässt Netz und Sicherheit stehen.
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(r#"{"hinweis":"Gesundheit"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["netz"], "Gateway", "nicht gesendetes Feld bleibt");
+    assert_eq!(json["sicherheit"], "E2E", "nicht gesendetes Feld bleibt");
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(r#"{"netz":"Repeater","sicherheit":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["netz"], "Repeater");
+    // Leer wird nicht ausgeliefert (`skip_serializing_if`), nicht als `null`.
+    assert!(json.get("sicherheit").is_none(), "{json:?}");
+    assert_eq!(json["hinweis"], "Gesundheit", "Nachbarfeld unberührt");
+}
+
+#[tokio::test]
+async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let lang = "x".repeat(41);
+    let genau = "ä".repeat(40);
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/sprechgruppen",
+        &admin,
+        Some(&format!(
+            r#"{{"bezeichnung":"1","betriebsart":"TMO","netz":"{lang}"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
+    assert_eq!(json["error"], "Netz darf höchstens 40 Zeichen lang sein");
+
+    // 40 Zeichen (nicht Bytes) sind erlaubt.
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/sprechgruppen",
+        &admin,
+        Some(&format!(
+            r#"{{"bezeichnung":"2","betriebsart":"TMO","sicherheit":"{genau}"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    let u = format!("/api/sprechgruppen/{}", json["id"]);
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&format!(r#"{{"sicherheit":"{lang}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
+    assert_eq!(
+        json["error"],
+        "Sicherheit darf höchstens 40 Zeichen lang sein"
+    );
+
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &admin,
+        Some(&format!(
+            r#"{{"bezeichnung":"9","betriebsart":"DMO","netz":"{lang}"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
+}
+
+#[tokio::test]
+async fn einsatzlokale_sprechgruppe_traegt_netz_und_sicherheit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &admin,
+        Some(r#"{"bezeichnung":"999","betriebsart":"DMO","netz":"Repeater","sicherheit":"  "}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    assert_eq!(json["netz"], "Repeater");
+    assert!(
+        json.get("sicherheit").is_none(),
+        "leer bleibt leer: {json:?}"
+    );
+
+    let (status, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let lokal = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["bezeichnung"] == "999")
+        .unwrap();
+    assert_eq!(lokal["netz"], "Repeater");
+}
+
+/// Schwärzung: Netz und Sicherheit sind Kennzeichnung wie die Bezeichnung und bleiben, der
+/// Hinweis geht (`schwaerzung_registry`, Tabelle `sprechgruppe`).
+#[tokio::test]
+async fn schwaerzung_behaelt_netz_und_sicherheit_und_nimmt_den_hinweis() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &admin,
+        Some(r#"{"bezeichnung":"999","betriebsart":"DMO","netz":"Repeater","sicherheit":"E2E","hinweis":"Hof Müller"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+
+    let mut tx = pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        einsatz,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let (netz, sicherheit, hinweis): (Option<String>, Option<String>, Option<String>) =
+        sqlx::query_as("SELECT netz, sicherheit, hinweis FROM sprechgruppe WHERE id = ?")
+            .bind(json["id"].as_i64().unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(netz.as_deref(), Some("Repeater"));
+    assert_eq!(sicherheit.as_deref(), Some("E2E"));
+    assert_eq!(hinweis, None);
 }

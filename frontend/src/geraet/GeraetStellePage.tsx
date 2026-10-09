@@ -142,7 +142,7 @@ export default function GeraetStellePage() {
             ) : bereich === 'meldungen' ? (
               <GeraetMeldungen
                 einsatzId={einsatzId}
-                stelle={uhs.bezeichnung}
+                absender={[uhs.bezeichnung, geraet?.bezeichnung].filter(Boolean).join(' · ')}
                 schreibgeschuetzt={schreibgeschuetzt}
               />
             ) : (

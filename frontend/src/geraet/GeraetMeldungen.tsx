@@ -45,22 +45,23 @@ function PrioritaetFeld({
 }
 
 /**
- * Meldung an die Einsatzleitung und die eigenen Meldungen eines stellengebundenen Geräts
- * (Scope-Matrix: anlegen, eigene lesen; UHS-Laptop und Bereitstellungsraum). Absender ist die
- * Stelle; Meldeweg, Art und Ereigniszeit setzt das Gerät, denn an der Stelle gibt es keinen
- * Funkspruch abzuschreiben. Ohne Netz merkt die Warteschlange die Meldung vor.
+ * Meldung an die Einsatzleitung und die eigenen Meldungen eines Geräts (Scope-Matrix: anlegen,
+ * eigene lesen; UHS-Laptop und Abschnittsgerät). Absender ist die Stelle; Meldeweg, Art und
+ * Ereigniszeit setzt das Gerät, denn dort gibt es keinen Funkspruch abzuschreiben. Den
+ * strukturierten Absender setzt beim Abschnittsgerät der Server. Ohne Netz merkt die
+ * Warteschlange die Meldung vor.
  */
 export default function GeraetMeldungen({
   einsatzId,
-  stelle,
+  absender,
   schreibgeschuetzt,
 }: {
   einsatzId: number;
-  /** Bezeichnung der Stelle, erster Teil des Absenders. */
-  stelle: string;
+  /** Absender als Freitext, z. B. „UHS Nord · Laptop 1“. */
+  absender: string;
   schreibgeschuetzt: boolean;
 }) {
-  const { benutzer, geraet } = useAuth();
+  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const fehler = useFehlerMeldung();
@@ -90,7 +91,6 @@ export default function GeraetMeldungen({
     onError: fehler,
   });
 
-  const absender = [stelle, geraet?.bezeichnung].filter(Boolean).join(' · ');
   const absenden = (w: MeldungWerte) =>
     senden.mutateAsync({
       absender,

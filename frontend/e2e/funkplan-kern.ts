@@ -97,6 +97,9 @@ export const SG_LANG = 'TMO 412_F_DRK Nordwest-Reserve';
 /** Ein Zweck von 60 Zeichen, wie ihn der S6 in den Hinweis schreibt. */
 export const SG_HINWEIS = 'Führungskanal EA Nordwest, Ausweich bei Störung auf DMO 505';
 export const EINHEIT_ZWEI = 'Technischer Zug Musterstadt-Südost';
+/** Netz und Sicherheit der langen TMO-Gruppe (LFH-1030), je an der Grenze von 40 Zeichen. */
+export const SG_NETZ = 'BOS-Digitalfunk Gateway Hof Nordwest 412';
+export const SG_SICHERHEIT = 'Ende-zu-Ende-Verschlüsselung BSI-Karte';
 
 export async function seedeSprechgruppen(page: Page, einsatzId: string) {
   const basis = `/api/einsaetze/${einsatzId}`;
@@ -112,6 +115,8 @@ export async function seedeSprechgruppen(page: Page, einsatzId: string) {
     bezeichnung: SG_LANG,
     betriebsart: 'TMO',
     hinweis: SG_HINWEIS,
+    netz: SG_NETZ,
+    sicherheit: SG_SICHERHEIT,
   });
   const dmo = await post('sprechgruppen', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
   await post('sprechgruppen', { bezeichnung: LOKAL, betriebsart: 'DMO' });

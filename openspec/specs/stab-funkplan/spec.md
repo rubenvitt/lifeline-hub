@@ -297,10 +297,15 @@ Einsatzes, also jede der eigenen Führungsstelle, einem Abschnitt oder einer Ein
 jede einsatzlokale. Teilnehmer sind die eigene Führungsstelle (zuerst, mit Rufname, Ziel
 Einsatzdaten), die Abschnitte und Einheiten, die externen Stellen des Kommunikationsplans mit ihrem
 Status und die Komponenten der Fernmeldeskizze. Spalten:
-Sprechgruppe (fixiert, Festbreitenschrift), Betriebsart, Hinweis, Herkunft (Katalog oder
+Sprechgruppe (fixiert, Festbreitenschrift), Bedingung (Betriebsart, Netz und Sicherheit in
+Festbreitenschrift, getrennt durch „ · “, leere weggelassen), Hinweis, Herkunft (Katalog oder
 einsatzlokal) und Teilnehmer. Zuerst TMO, dann DMO, je in der Sortierung der Sprechgruppen. Sie ist
 schreibgeschützt und aus denselben Quellen abgeleitet wie die Tabelle. Fehlt eine dieser Quellen,
 auch die Führungsstelle, MUST die Zelle „unvollständig“ bzw. den Grund tragen, nie „keine“.
+
+#### Scenario: Bedingung in der Sprechgruppen-Darstellung
+- **WHEN** „TMO 311“ Netz „BOS“ und keine Sicherheit trägt
+- **THEN** steht in der Spalte „Bedingung“ „TMO · BOS“
 
 #### Scenario: Teilnehmer einer Sprechgruppe
 - **WHEN** „TMO 311“ dem Abschnitt „EA Nord“ (Kurzbezeichnung „EA N“) und der Einheit „1. Zug“

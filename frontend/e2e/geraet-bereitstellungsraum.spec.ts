@@ -45,7 +45,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/br/${sportplatz.id}$`));
 
     const nav = tablet.getByRole('navigation', { name: 'Gerätenavigation' });
-    await expect(nav.getByRole('link')).toHaveText(['Raum', 'Meldungen']);
+    await expect(nav.getByRole('link')).toHaveText(['Raum', 'Melden']);
     await expect(tablet.getByRole('heading', { level: 1, name: /BR Sportplatz/ })).toBeVisible();
     await expect(tablet.getByText('BR Schule')).toHaveCount(0);
 
@@ -62,7 +62,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     await belegung.click();
     await expect(tablet.getByText('Keine Einheiten bereitgestellt')).toBeVisible();
 
-    await nav.getByRole('link', { name: 'Meldungen' }).click();
+    await nav.getByRole('link', { name: 'Melden' }).click();
     await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/meldungen$`));
     await expect(tablet.getByText('Noch keine Meldungen von dieser Stelle')).toBeVisible();
     await tablet.getByLabel('Inhalt').fill('Raum voll, weitere Kräfte zum BR Schule');

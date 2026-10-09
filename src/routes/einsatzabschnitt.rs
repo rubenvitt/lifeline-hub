@@ -68,7 +68,12 @@ pub async fn liste(
     ctx: EinsatzLesezugriff<Einsatzabschnitte>,
 ) -> Result<Json<Vec<EinsatzabschnittAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    Ok(Json(abschnitt_repo::liste(&state.pool, einsatz_id).await?))
+    let mut liste = abschnitt_repo::liste(&state.pool, einsatz_id).await?;
+    // Ein Abschnittsgerät (LFH-1043) sieht nur seinen Teilbaum.
+    if let Some(b) = crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
+        liste.retain(|a| b.abschnitte.contains(&a.id));
+    }
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]

@@ -42,3 +42,5 @@ export const SCHADEN_ORT_MAX = 500;
 export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
+/** Netz und Sicherheit einer Sprechgruppe (Bedingungszeichen, LFH-1030). */
+export const SPRECHGRUPPE_BEDINGUNG_MAX = 40;

@@ -18,6 +18,8 @@ import {
   ZEICHENBREITE_EM,
   bedingungszeichenBreite,
   bedingungszeichenText,
+  bedingungszeichenZusatz,
+  kanalBedingung,
   komponentenPiktogramm,
   leitungsBeschreibung,
   sammelschienenMindestbreite,
@@ -123,6 +125,45 @@ describe('Bedingungszeichen', () => {
       return Math.max(...xs) - Math.min(...xs);
     };
     expect(breite('BN_BOS Großschadenslage')).toBeGreaterThan(breite('311'));
+  });
+
+  it('setzt Netz, Sicherheit und Hinweis in dieser Reihenfolge unter das Zeichen (LFH-1030)', () => {
+    expect(
+      bedingungszeichenZusatz({ netz: 'Gateway', sicherheit: 'E2E', hinweis: 'Gesundheit' }),
+    ).toBe('Gateway · E2E · Gesundheit');
+    expect(bedingungszeichenZusatz({ netz: ' ', sicherheit: 'E2E', hinweis: null })).toBe('E2E');
+    expect(bedingungszeichenZusatz({ netz: 'Repeater' })).toBe('Repeater');
+    expect(bedingungszeichenZusatz({ netz: null, sicherheit: '', hinweis: undefined })).toBeNull();
+  });
+
+  it('zeichnet Netz und Sicherheit unter das Zeichen und nennt sie, ohne es zu verbreitern', () => {
+    const { container } = zeichne(
+      <Bedingungszeichen
+        x={200}
+        y={100}
+        betriebsart="DMO"
+        bezeichnung="314_F*"
+        netz="Gateway"
+        sicherheit="E2E"
+        hinweis="Gesundheit"
+      />,
+    );
+    const name =
+      'Bedingungszeichen DMO 314_F*, Netz: Gateway, Sicherheit: E2E, Hinweis: Gesundheit';
+    const zeichen = screen.getByRole('img', { name });
+    const texte = [...zeichen.querySelectorAll('text')].map((t) => t.textContent);
+    expect(texte).toEqual(['DMO 314_F*', 'Gateway · E2E · Gesundheit']);
+    const punkte = container.querySelector('polygon')!.getAttribute('points');
+    const { container: ohne } = zeichne(
+      <Bedingungszeichen x={200} y={100} betriebsart="DMO" bezeichnung="314_F*" />,
+    );
+    expect(ohne.querySelector('polygon')!.getAttribute('points')).toBe(punkte);
+  });
+
+  it('nennt die Bedingung eines Kanals für die Tabelle', () => {
+    expect(kanalBedingung('TMO', 'Gateway', 'E2E')).toBe('TMO · Gateway · E2E');
+    expect(kanalBedingung('DMO', null, ' ')).toBe('DMO');
+    expect(kanalBedingung('TMO', undefined, 'E2E')).toBe('TMO · E2E');
   });
 
   it('lässt ohne Hinweis die zweite Zeile weg', () => {

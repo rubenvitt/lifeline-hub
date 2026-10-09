@@ -55,6 +55,15 @@ pub struct EmpfaengerFilter {
     pub einheit_id: Option<i64>,
 }
 
+/// Bereich eines Abschnittsgeräts (LFH-1043): ein Auftrag passt, wenn MINDESTENS EIN Empfänger
+/// einen der Abschnitte oder eine der Einheiten trägt. Beide Listen als JSON für `json_each(?)`,
+/// damit die Zahl der Anweisungen nicht von der Größe des Teilbaums abhängt.
+#[derive(Debug, Default)]
+pub struct EmpfaengerBereich {
+    pub abschnitte_json: String,
+    pub einheiten_json: String,
+}
+
 /// Bearbeitungsstatus als SQL-Ausdruck: `'abgenommen'`, wenn `abgenommen_at` gesetzt ist, sonst
 /// die Vollzugs-Achse. EINMAL definiert für die Spalte in [`ANZEIGE_SELECT`] und den
 /// Status-Filter in [`liste`] (LFH-933).
@@ -242,6 +251,8 @@ pub struct AuftragFilter<'a> {
     pub status: Option<&'a str>,
     pub richtung: Option<&'a str>,
     pub empfaenger: Option<&'a EmpfaengerFilter>,
+    /// Zusätzlich zum Empfängerfilter: nur Aufträge im Bereich eines Abschnittsgeräts.
+    pub bereich: Option<&'a EmpfaengerBereich>,
     pub phase: Option<crate::kommunikation::ListenPhase>,
     pub seite: Option<crate::kommunikation::Seite>,
 }
@@ -283,6 +294,15 @@ fn filter_bedingung(f: &AuftragFilter<'_>) -> (String, Vec<FilterWert>) {
             " AND EXISTS (SELECT 1 FROM auftrag_empfaenger fe WHERE fe.auftrag_id = a.id)",
         ),
         None => {}
+    }
+    if let Some(b) = f.bereich {
+        sql.push_str(
+            " AND EXISTS (SELECT 1 FROM auftrag_empfaenger be WHERE be.auftrag_id = a.id \
+               AND (be.abschnitt_id IN (SELECT value FROM json_each(?)) \
+                 OR be.einheit_id IN (SELECT value FROM json_each(?))))",
+        );
+        werte.push(FilterWert::Text(b.abschnitte_json.clone()));
+        werte.push(FilterWert::Text(b.einheiten_json.clone()));
     }
     (sql, werte)
 }
@@ -2053,6 +2073,47 @@ mod tests {
             treffer_gesamt > 50,
             "die Filter treffen tatsächlich etwas: {treffer_gesamt}"
         );
+
+        // LFH-1043: Bereich eines Abschnittsgeräts — Abschnitte ODER Einheiten aus Listen.
+        let bereiche: [(&[i64], &[i64]); 5] = [
+            (&[a1], &[]),
+            (&[], &[u2]),
+            (&[a1, a2], &[u1]),
+            (&[a2], &[u2]),
+            (&[], &[]),
+        ];
+        for (abschnitte, einheiten) in bereiche {
+            let bereich = EmpfaengerBereich {
+                abschnitte_json: serde_json::to_string(abschnitte).unwrap(),
+                einheiten_json: serde_json::to_string(einheiten).unwrap(),
+            };
+            let erwartet: Vec<AuftragDetail> = alle
+                .iter()
+                .filter(|d| {
+                    d.empfaenger.iter().any(|x| {
+                        x.abschnitt_id.is_some_and(|a| abschnitte.contains(&a))
+                            || x.einheit_id.is_some_and(|u| einheiten.contains(&u))
+                    })
+                })
+                .cloned()
+                .collect();
+            let ist = liste_gefiltert(
+                &pool,
+                e,
+                &AuftragFilter {
+                    bereich: Some(&bereich),
+                    ..Default::default()
+                },
+                jetzt,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                als_json(&ist),
+                als_json(&erwartet),
+                "Bereich {abschnitte:?}/{einheiten:?}"
+            );
+        }
     }
 
     /// LFH-933: die Empfänger vieler Aufträge kommen gebündelt, je Auftrag in `id`-Reihenfolge,

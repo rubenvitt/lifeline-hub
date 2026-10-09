@@ -1685,6 +1685,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )
@@ -1872,6 +1874,8 @@ mod tests {
                 bezeichnung: "412_F_DRK",
                 betriebsart: "TMO",
                 hinweis: None,
+                netz: None,
+                sicherheit: None,
                 sortier: 0,
             },
         )

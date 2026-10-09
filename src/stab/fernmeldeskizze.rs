@@ -487,7 +487,7 @@ async fn komponenten_laden(
         "SELECT ks.komponente_id AS bezug_id, \
                 sg.id AS id, sg.org_id AS org_id, sg.einsatz_id AS einsatz_id, \
                 sg.bezeichnung AS bezeichnung, sg.betriebsart AS betriebsart, \
-                sg.hinweis AS hinweis, sg.aktiv AS aktiv, sg.sortier AS sortier, \
+                sg.hinweis AS hinweis, sg.netz AS netz, sg.sicherheit AS sicherheit, sg.aktiv AS aktiv, sg.sortier AS sortier, \
                 sg.angelegt_at AS angelegt_at \
          FROM fernmeldeskizze_komponente_sprechgruppe ks \
          JOIN fernmeldeskizze_komponente k ON k.id = ks.komponente_id \

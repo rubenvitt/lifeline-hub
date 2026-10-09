@@ -4218,6 +4218,10 @@ export interface components {
             hinweis?: string | null;
             /** Format: int64 */
             id: number;
+            /** @description Netz (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030). */
+            netz?: string | null;
+            /** @description Sicherheit (BBK-Anhang J.5), steht unter dem Bedingungszeichen (LFH-1030). */
+            sicherheit?: string | null;
             /** Format: int64 */
             sortier: number;
         };

@@ -228,8 +228,7 @@ function funkplanSpalten(druckt: boolean) {
   ]);
 }
 
-type SprechgruppenSpalteKey =
-  'sprechgruppe' | 'betriebsart' | 'hinweis' | 'herkunft' | 'teilnehmer';
+type SprechgruppenSpalteKey = 'sprechgruppe' | 'bedingung' | 'hinweis' | 'herkunft' | 'teilnehmer';
 
 /** Teilnehmer einer Sprechgruppe: je Stelle der Verweis auf ihren Datensatz und ihr Rufname. */
 function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
@@ -284,15 +283,21 @@ function sprechgruppenSpalten() {
       ),
     },
     {
-      title: 'Betriebsart',
-      key: 'betriebsart' as SprechgruppenSpalteKey,
-      width: 100,
-      render: (_t, z) => <Mono>{z.betriebsart}</Mono>,
+      // Betriebsart, Netz und Sicherheit wie unter dem Bedingungszeichen (LFH-1030); die Breite
+      // kommt vom Hinweis (100 + 220 → 160 + 160), die Summe bleibt.
+      title: 'Bedingung',
+      key: 'bedingung' as SprechgruppenSpalteKey,
+      width: 160,
+      render: (_t, z) => (
+        <span style={{ overflowWrap: 'anywhere' }}>
+          <Mono>{z.bedingung}</Mono>
+        </span>
+      ),
     },
     {
       title: 'Hinweis',
       key: 'hinweis' as SprechgruppenSpalteKey,
-      width: 220,
+      width: 160,
       render: (_t, z) =>
         z.hinweis ? <span style={{ overflowWrap: 'anywhere' }}>{z.hinweis}</span> : <Leer />,
     },
@@ -1059,7 +1064,7 @@ export default function FunkplanPage() {
               karte={{
                 art: 'plan',
                 titel: { spalte: 'sprechgruppe' },
-                sekundaer: ['betriebsart', 'herkunft', 'teilnehmer'],
+                sekundaer: ['bedingung', 'herkunft', 'teilnehmer'],
               }}
             />
           ) : (
