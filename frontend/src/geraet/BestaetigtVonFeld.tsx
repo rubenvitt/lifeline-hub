@@ -10,9 +10,9 @@ import { Select } from '../components/Select';
 export const BESTAETIGT_FELD = 'bestaetigt_personal_id';
 
 /** Ob die Sitzung eine Bestätigung nennen kann: nur ein UHS-Gerät (LFH-1046). Eine Person
- *  bestätigt durch ihre eigene Anmeldung, der Lagemonitor erfasst nichts. */
+ *  bestätigt durch ihre eigene Anmeldung; die übrigen Ansichten erreichen die Auswahl nicht. */
 export function kannBestaetigen(geraet: GeraetAnzeige | null): boolean {
-  return geraet != null && geraet.ansicht !== 'lagemonitor';
+  return geraet?.ansicht === 'uhs-tablet' || geraet?.ansicht === 'uhs-laptop';
 }
 
 export function bestaetigerOptionen(liste: readonly Bestaetiger[]) {

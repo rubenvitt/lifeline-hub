@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { ladeBetreuung } from '../api/betreuung';
 import { ApiError } from '../api/client';
+import { useAuthOptional } from '../auth/AuthContext';
 import { erfasseVerbleib, type VerbleibEingabe } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Betreuungsstelle } from '../api/types';
@@ -57,6 +58,9 @@ export default function VerbleibErfassung({
 }: VerbleibErfassungProps) {
   const [form] = Form.useForm<VerbleibFormWerte>();
   const art = Form.useWatch('art', form);
+  // Das Gerät einer Betreuungsstelle bringt nur in die eigene Stelle (LFH-1041); ohne Stelle
+  // lehnt der Server die Notunterkunft ab.
+  const stellePflicht = useAuthOptional()?.geraet?.ansicht === 'betreuungsstelle';
 
   // Freigaben des Servers (LFH-669): solange sie fehlen, gilt die Betreuung als nicht frei.
   const freigabenQuery = useQuery({
@@ -121,8 +125,9 @@ export default function VerbleibErfassung({
       </Form.Item>
       {felder.stelle && (
         <Form.Item
-          label="Betreuungsstelle (optional)"
+          label={stellePflicht ? 'Betreuungsstelle' : 'Betreuungsstelle (optional)'}
           name="betreuungsstelle_id"
+          rules={stellePflicht ? [{ required: true, message: 'Stelle wählen' }] : undefined}
           // Nur ein 403 heißt „keine Auswahl" (dann fehlt das Feld). Jeder andere Fehler ist ein Ausfall
           // der Quelle und sagt sich.
           extra={
@@ -132,7 +137,7 @@ export default function VerbleibErfassung({
           }
         >
           <Select
-            allowClear
+            allowClear={!stellePflicht}
             placeholder={betreuungQuery.isPending ? 'Stellen werden geladen …' : 'Stelle wählen'}
             loading={betreuungQuery.isPending}
             options={stellenOptionen(stellen)}

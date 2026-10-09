@@ -12,6 +12,8 @@ import KopplungBeendetPage from './geraet/KopplungBeendetPage';
 import GeraeteLayout, {
   GeraetAbschnittRahmen,
   GeraetAufnahme,
+  GeraetBetreuungRahmen,
+  GeraetBetroffenAufnahme,
   GeraetBr,
   GeraetEinsatzRahmen,
   GeraetMeldungen,
@@ -22,6 +24,8 @@ import GeraeteLayout, {
   GeraetUhs,
 } from './geraet/GeraeteLayout';
 import GeraetPatientenPage from './geraet/GeraetPatientenPage';
+import GeraetBetroffenePage from './geraet/GeraetBetroffenePage';
+import GeraetBetreuungsstellePage from './geraet/GeraetBetreuungsstellePage';
 import GeraetAbschnittPage from './geraet/GeraetAbschnittPage';
 import GeraetAuftraegePage from './geraet/GeraetAuftraegePage';
 import GeraetMeldenPage from './geraet/GeraetMeldenPage';
@@ -252,6 +256,13 @@ export const appRouten = createRoutesFromElements(
             <Route path="aufnahme" element={<GeraetAufnahme />} />
             <Route path="uhs/:uhsId" element={<GeraetUhs />} />
             <Route path="stelle" element={<GeraetStelle />} />
+          </Route>
+          {/* Betreuungsstelle (LFH-1041); jede andere Ansicht landet auf ihrer Startseite. */}
+          <Route element={<GeraetBetreuungRahmen />}>
+            <Route path="betroffene" element={<GeraetBetroffenePage />} />
+            <Route path="betroffene/aufnahme" element={<GeraetBetroffenAufnahme />} />
+            <Route path="betroffene/:personId" element={<PersonenDetailPage />} />
+            <Route path="betreuung" element={<GeraetBetreuungsstellePage />} />
           </Route>
           {/* Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */}
           <Route element={<GeraetAbschnittRahmen />}>

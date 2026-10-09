@@ -59,6 +59,8 @@ use crate::einsatz::lagekennzahl;
 use crate::einsatz::modul::Betreuung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
+use crate::geraet::stelle::{self, Sicht};
+use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
 use crate::routes::support;
 
@@ -151,6 +153,12 @@ pub async fn uebersicht(
     ctx: EinsatzLesezugriff<Betreuung>,
 ) -> Result<Json<BetreuungUebersicht>, AppError> {
     let mut uebersicht = repo::uebersicht(&state.pool, ctx.einsatz.id).await?;
+    // Stellenbindung (LFH-1041): ein Gerät sieht nur seine Betreuungsstelle, keine Bezirke.
+    let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle);
+    if sicht != Sicht::Alle {
+        uebersicht.bezirke.clear();
+        uebersicht.stellen.retain(|s| sicht.sieht(s.id));
+    }
     // Ein 403 heißt „keine Auskunft“; jeder andere Fehler (DB) bleibt ein Fehler, statt still
     // als fehlendes Recht durchzugehen.
     let personen_erlaubt = match ctx.fordere_modul_zugriff(&state.pool, "personen").await {
@@ -163,6 +171,7 @@ pub async fn uebersicht(
             crate::person::repo::namentlich_je_stelle(&state.pool, ctx.einsatz.id)
                 .await?
                 .into_iter()
+                .filter(|(stelle_id, _)| sicht.sieht(*stelle_id))
                 .map(|(stelle_id, anzahl)| StelleNamentlich { stelle_id, anzahl })
                 .collect(),
         );
@@ -213,6 +222,7 @@ pub async fn belegung_verlauf(
     ctx: EinsatzLesezugriff<Betreuung>,
     PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<BelegungVerlaufEintrag>>, AppError> {
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle, sid)?;
     Ok(Json(
         repo::belegung_verlauf(&state.pool, ctx.einsatz.id, sid).await?,
     ))
@@ -606,6 +616,7 @@ pub async fn belegung_melden(
     JsonBody(req): JsonBody<BelegungMelden>,
 ) -> Result<(StatusCode, Json<StelleMeldungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle, sid)?;
     support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
     let client_id = client_id(req.client_id.as_deref())?;
     if let Some(cid) = client_id.as_deref() {
@@ -644,6 +655,13 @@ pub async fn belegung_zuruecknehmen(
     PfadParam((_eid, mid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<StelleMeldungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Stellenbindung (LFH-1041): die Meldung einer fremden Stelle gibt es für das Gerät nicht.
+    if ctx.geraet.is_some() {
+        let sid = repo::stelle_der_belegung(&state.pool, einsatz_id, mid)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle, sid)?;
+    }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let m = crate::write_retry!(&state.pool, |conn| {

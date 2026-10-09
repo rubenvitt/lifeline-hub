@@ -992,6 +992,25 @@ export function geraetStellePfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/stelle`;
 }
 
+/** Betroffene der eigenen Betreuungsstelle, Startseite ihres Geräts (LFH-1041). */
+export function geraetBetroffenePfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/betroffene`;
+}
+
+export function geraetBetroffenerPfad(einsatzId: number, personId: number): string {
+  return `${geraetBetroffenePfad(einsatzId)}/${personId}`;
+}
+
+/** Aufnahme in die eigene Betreuungsstelle; die Stelle setzt der Server. */
+export function geraetBetroffenAufnahmePfad(einsatzId: number): string {
+  return `${geraetBetroffenePfad(einsatzId)}/aufnahme`;
+}
+
+/** Bereich „Stelle“ der Betreuungsstelle: Belegung, Meldeverlauf, Meldungen. */
+export function geraetBetreuungPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/betreuung`;
+}
+
 /** Eigener Bereitstellungsraum eines BR-Geräts (LFH-1042), Startseite der Ansicht. */
 export function geraetBrPfad(einsatzId: number, brId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/br/${brId}`;

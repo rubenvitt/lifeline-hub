@@ -1537,6 +1537,22 @@ pub async fn belegung_melden_tx(
     })
 }
 
+/// Die Stelle einer Belegungsmeldung des Einsatzes; `None`, wenn es sie dort nicht gibt. Für die
+/// Stellenbindung eines Geräts vor der Rücknahme (LFH-1041).
+pub async fn stelle_der_belegung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    belegung_id: i64,
+) -> Result<Option<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT stelle_id FROM betreuungsstelle_belegung WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(belegung_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
 /// Nimmt eine Belegungsmeldung zurück, im Ablauf wie eine Standmeldung. Zusätzlich gilt D4: an
 /// einer geschlossenen Stelle ist die Rücknahme 422, sonst stünde sie nach Rücknahme der
 /// Leermeldung „geschlossen und belegt“ da. Reihenfolge: storniert 409 → geschlossen 422 →

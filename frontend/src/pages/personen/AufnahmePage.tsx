@@ -101,7 +101,13 @@ export default function AufnahmePage() {
         const zusatz =
           uhsAuftrag && person.aktuelle_uhs_id === uhsAuftrag && person.aktueller_platz_id === null
             ? ' · im Wartebereich'
-            : '';
+            : person.aktuelle_verbleib_betreuungsstelle_id != null
+              ? ' · untergebracht'
+              : '';
+        // Die Aufnahme an der Betreuungsstelle zählt dort namentlich (LFH-1041).
+        if (person.aktuelle_verbleib_betreuungsstelle_id != null) {
+          void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
+        }
         if (uhsAuftrag) {
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsAuftrag) });
           void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
@@ -193,7 +199,11 @@ export default function AufnahmePage() {
             )
           }
         >
-          <AufnahmeFelder modus="erfassen" einsatzId={einsatzId} />
+          <AufnahmeFelder
+            modus="erfassen"
+            einsatzId={einsatzId}
+            ohneSichtung={!darf('person-sichtung')}
+          />
         </ErfassungsFormular>
       )}
     </EinsatzSeite>

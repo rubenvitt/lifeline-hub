@@ -1030,9 +1030,11 @@ export default function PersonenDetailPage() {
       gefahr: true,
     };
 
-    const primaer = p.aktuelle_sichtung == null ? sichten : verbleib;
+    // An der Betreuungsstelle wird nicht gesichtet (LFH-1041); dort führt der Verbleib.
+    const sichtungFrei = darf('person-sichtung');
+    const primaer = sichtungFrei && p.aktuelle_sichtung == null ? sichten : verbleib;
     const uebrig = [
-      primaer === sichten ? verbleib : sichten,
+      ...(sichtungFrei ? [primaer === sichten ? verbleib : sichten] : []),
       bearbeiten,
       ...statuswechsel,
       ...(statusFrei ? [stornieren] : []),

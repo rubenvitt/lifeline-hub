@@ -96,10 +96,13 @@ export function skFlaechenStil(token: { controlHeight: number }): CSSProperties 
 export default function AufnahmeFelder({
   modus,
   einsatzId,
+  ohneSichtung = false,
 }: {
   modus: AufnahmeModus;
   /** Für „Bestätigt von“ am UHS-Gerät (LFH-1046); ohne Kennung kein Feld. */
   einsatzId?: number;
+  /** Ohne Sichtung und ohne ihren Folgestatus, etwa am Gerät einer Betreuungsstelle (LFH-1041). */
+  ohneSichtung?: boolean;
 }) {
   const { token } = theme.useToken();
   const flaeche = skFlaechenStil(token);
@@ -139,12 +142,12 @@ export default function AufnahmeFelder({
     <>
       {/* Text, kein Feld: das Budget von vier sichtbaren Feldern bleibt. Er sagt, was die Maske
           anlegt, damit niemand zwischen zwei Knöpfen raten muss (LFH-963). */}
-      {modus === 'erfassen' && (
+      {modus === 'erfassen' && !ohneSichtung && (
         <Typography.Paragraph data-lfh="folgestatus" type="secondary">
           {FOLGESTATUS_HINWEIS}
         </Typography.Paragraph>
       )}
-      {modus !== 'vermisst' && (
+      {modus !== 'vermisst' && !ohneSichtung && (
         <Form.Item label="Sichtungskategorie" name="sichtung">
           {/* Dieselbe fachliche Kennzeichnung wie in Liste und Verlauf; die Beschriftung trägt den
              Textkontrast unabhängig von SK-Farbe und Radio-Zustand. */}

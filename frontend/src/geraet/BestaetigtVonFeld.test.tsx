@@ -116,6 +116,7 @@ describe('Bestätigt von (LFH-1046)', () => {
     expect(kannBestaetigen(TABLET)).toBe(true);
     expect(kannBestaetigen({ ...TABLET, ansicht: 'uhs-laptop' })).toBe(true);
     expect(kannBestaetigen({ ...TABLET, ansicht: 'lagemonitor', uhs_id: null })).toBe(false);
+    expect(kannBestaetigen({ ...TABLET, ansicht: 'betreuungsstelle', uhs_id: null })).toBe(false);
   });
 
   it('bestaetigerOptionen nennt die Funktion, wenn es eine gibt', () => {

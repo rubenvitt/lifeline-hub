@@ -245,7 +245,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    for ansicht in ["betreuungsstelle", "verpflegung"] {
+    for ansicht in ["verpflegung"] {
         let (s, v) = anlegen(
             &app,
             &admin,
@@ -271,6 +271,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
             {"ansicht": "uhs-tablet", "stellenart": "uhs"},
             {"ansicht": "uhs-laptop", "stellenart": "uhs"},
             {"ansicht": "lagemonitor", "stellenart": null},
+            {"ansicht": "betreuungsstelle", "stellenart": "betreuungsstelle"},
             {"ansicht": "bereitstellungsraum", "stellenart": "bereitstellungsraum"},
             {"ansicht": "einsatzabschnitt", "stellenart": "einsatzabschnitt"},
         ])
@@ -3244,4 +3245,356 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
     let text = v.to_string();
     assert!(!text.contains("Kraft"), "Name in der Antwort: {text}");
     assert!(!text.contains("\"funktion\""), "{text}");
+}
+
+// ---------- Betreuungsstelle (LFH-1041) ----------
+
+/// Legt eine Betreuungsstelle in Betrieb an.
+async fn betreuungsstelle_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    bez: &str,
+) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+        cookie,
+        Some(&json!({"bezeichnung": bez, "art": "notunterkunft", "kapazitaet_personen": 80})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let stelle = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}"),
+        cookie,
+        Some(&json!({"status": "in_betrieb"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    stelle
+}
+
+/// Zwei Betreuungsstellen und ein Gerät an der ersten: `(einsatz, nord, sued, kopplung, gerät)`.
+async fn zwei_stellen_mit_geraet(app: &axum::Router, admin: &str) -> (i64, i64, i64, i64, String) {
+    let einsatz = einsatz_anlegen(app, admin).await;
+    let nord = betreuungsstelle_anlegen(app, admin, einsatz, "NU Turnhalle Nord").await;
+    let sued = betreuungsstelle_anlegen(app, admin, einsatz, "NU Schule Süd").await;
+    let (id, code) = kopplung(
+        app,
+        admin,
+        einsatz,
+        json!({"ansicht": "betreuungsstelle", "stelle_id": nord, "bezeichnung": "Tablet NU"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    (einsatz, nord, sued, id, a.cookie.expect("Sitzungscookie"))
+}
+
+async fn belegung_melden(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    stelle: i64,
+    belegt: i64,
+) -> (StatusCode, Value) {
+    anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}/belegungen"),
+        cookie,
+        Some(&json!({"belegt": belegt})),
+    )
+    .await
+}
+
+/// Person mit Verbleib „Notunterkunft“ an `stelle`, angelegt von der Einsatzleitung.
+async fn person_in_stelle(app: &axum::Router, admin: &str, einsatz: i64, stelle: i64) -> i64 {
+    let person = person_in(app, admin, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
+        admin,
+        Some(&json!({"art": "notunterkunft", "betreuungsstelle_id": stelle})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    person
+}
+
+#[tokio::test]
+async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, _, geraet) = zwei_stellen_mit_geraet(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/betreuung/bezirke"),
+        &admin,
+        Some(
+            &json!({"bezeichnung": "Uferstraße", "plan_personen": 40, "plan_erhebung": "gezaehlt"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ids: Vec<i64> = v["stellen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|st| st["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![nord], "nur die eigene Stelle");
+    assert_eq!(v["bezirke"], json!([]), "keine Bezirke");
+
+    // Melden und Meldeverlauf: eigene Stelle ja, fremde 404.
+    let (s, v) = belegung_melden(&app, &geraet, einsatz, nord, 12).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let eigene_meldung = v["meldung_id"].as_i64().unwrap();
+    let (s, _) = belegung_melden(&app, &geraet, einsatz, sued, 3).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Meldung an fremde Stelle");
+    for (stelle, erwartet) in [(nord, StatusCode::OK), (sued, StatusCode::NOT_FOUND)] {
+        let (s, v) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{stelle}/belegungen"),
+            &geraet,
+            None,
+        )
+        .await;
+        assert_eq!(s, erwartet, "Meldeverlauf {stelle}: {v}");
+    }
+
+    // Zurücknehmen: die Meldung einer fremden Stelle gibt es für das Gerät nicht.
+    let (s, v) = belegung_melden(&app, &admin, einsatz, sued, 5).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let fremde_meldung = v["meldung_id"].as_i64().unwrap();
+    for (meldung, erwartet) in [
+        (fremde_meldung, StatusCode::NOT_FOUND),
+        (eigene_meldung, StatusCode::OK),
+    ] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/betreuung/belegungen/{meldung}/zuruecknehmen"),
+            &geraet,
+            None,
+        )
+        .await;
+        assert_eq!(s, erwartet, "Rücknahme {meldung}: {v}");
+    }
+
+    // Kopfzahl, Bezirke und Stammdaten der Stelle bleiben verboten.
+    for (m, p, body) in [
+        (
+            "GET",
+            format!("/api/einsaetze/{einsatz}/betreuung/belegung"),
+            None,
+        ),
+        (
+            "PATCH",
+            format!("/api/einsaetze/{einsatz}/betreuung/stellen/{nord}"),
+            Some(json!({"status": "geschlossen"})),
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+            Some(json!({"bezeichnung": "NU West", "art": "notunterkunft"})),
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/betreuung/stellen/{nord}/stornieren"),
+            None,
+        ),
+    ] {
+        let (s, v) = anfrage_json(&app, m, &p, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}: {v}");
+    }
+
+    // Die Zähler zählen den ganzen Einsatz und fehlen deshalb am Gerät.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for modul in ["betreuung", "personen", "meldungen"] {
+        assert!(v.get(modul).is_none(), "{modul}: {v}");
+    }
+}
+
+#[tokio::test]
+async fn aufnahme_an_der_betreuungsstelle_bringt_in_die_eigene_stelle() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, _, geraet) = zwei_stellen_mit_geraet(&app, &admin).await;
+    let (s, v) = belegung_melden(&app, &admin, einsatz, nord, 40).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let aufgenommen = person_in(&app, &geraet, einsatz, None).await;
+    assert_eq!(aufgenommen["status"], "betroffen", "{aufgenommen}");
+    assert_eq!(aufgenommen["aktuelle_verbleib_art"], "notunterkunft");
+    assert_eq!(aufgenommen["aktuelle_verbleib_betreuungsstelle_id"], nord);
+    let aufgenommen = aufgenommen["id"].as_i64().unwrap();
+
+    // Eine Person der anderen Stelle sieht das Gerät nicht.
+    let fremd = person_in_stelle(&app, &admin, einsatz, sued).await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ids: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![aufgenommen]);
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{fremd}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Person der anderen Stelle");
+
+    // Die Mengenmeldung bleibt führend; die Aufnahme steht nur in „davon namentlich“.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stellen"][0]["belegung"]["belegt"], 40, "{v}");
+    assert_eq!(v["namentlich"], json!([{"stelle_id": nord, "anzahl": 1}]));
+
+    // Keine Erst-Sichtung, keine UHS, keine vermisste Person.
+    for body in [
+        json!({"name": "A", "sichtung": "SK3"}),
+        json!({"name": "B", "uhs_id": 1}),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/personen"),
+            &geraet,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{body}: {v}");
+    }
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"name": "C", "status": "vermisst"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    // Sichtung über die eigene Route gibt es am Gerät ebenfalls nicht.
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{aufgenommen}/sichtung"),
+        &geraet,
+        Some(&json!({"kategorie": "SK3"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn betreuungsstelle_bringt_in_keine_fremde_notunterkunft() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, _, geraet) = zwei_stellen_mit_geraet(&app, &admin).await;
+    let person = person_in_stelle(&app, &admin, einsatz, nord).await;
+    let verbleib = |body: Value| {
+        let app = app.clone();
+        let geraet = geraet.clone();
+        async move {
+            anfrage_json(
+                &app,
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
+                &geraet,
+                Some(&body),
+            )
+            .await
+        }
+    };
+
+    let (s, v) = verbleib(json!({"art": "notunterkunft", "betreuungsstelle_id": sued})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "fremde Stelle: {v}");
+    let (s, v) = verbleib(json!({"art": "notunterkunft", "ziel": "Turnhalle Ost"})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Notunterkunft ohne Stelle: {v}");
+    let (s, v) = verbleib(json!({"art": "notunterkunft", "betreuungsstelle_id": nord})).await;
+    assert_eq!(s, StatusCode::CREATED, "eigene Stelle: {v}");
+    let (s, v) = verbleib(json!({"art": "entlassung"})).await;
+    assert_eq!(s, StatusCode::CREATED, "Entlassung: {v}");
+
+    // Nach der Entlassung sieht das Gerät die Person weiterhin, wie die UHS nach dem Austritt.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+#[tokio::test]
+async fn widerrufene_betreuungsstelle_verliert_jeden_zugriff() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _, kopplung_id, geraet) = zwei_stellen_mit_geraet(&app, &admin).await;
+    let (s, _) = belegung_melden(&app, &geraet, einsatz, nord, 1).await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    widerrufen(&app, &admin, einsatz, kopplung_id).await;
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = belegung_melden(&app, &geraet, einsatz, nord, 2).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
 }

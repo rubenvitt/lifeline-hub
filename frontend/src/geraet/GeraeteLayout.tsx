@@ -21,11 +21,18 @@ import {
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
-import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
+import {
+  EinsatzPfadeProvider,
+  GERAET_BETREUUNG_PFADE,
+  GERAET_PFADE,
+} from '../routing/EinsatzPfade';
 import {
   geraetAbschnittPfad,
   geraetAufnahmePfad,
   geraetAuftraegePfad,
+  geraetBetreuungPfad,
+  geraetBetroffenAufnahmePfad,
+  geraetBetroffenePfad,
   geraetBrPfad,
   geraetKartePfad,
   geraetMeldenPfad,
@@ -53,9 +60,10 @@ export function istUhsAnsicht(ansicht: Funktionsansicht): boolean {
 }
 
 /**
- * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, der
- * Lagemonitor mit seinem Großbild, der Bereitstellungsraum mit seinem Raum (LFH-1042). Eine
- * Ansicht ohne eigene Seiten (noch nicht freigeschaltet, LFH-1040) hat keine: `null`.
+ * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, die
+ * Betreuungsstelle mit ihren Betroffenen, der Lagemonitor mit seinem Großbild, der
+ * Bereitstellungsraum mit seinem Raum (LFH-1042). Eine Ansicht ohne eigene Seiten (noch nicht
+ * freigeschaltet, LFH-1040) hat keine: `null`.
  */
 export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
   switch (geraet.ansicht) {
@@ -64,11 +72,12 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
     case 'uhs-tablet':
     case 'uhs-laptop':
       return geraetPatientenPfad(geraet.einsatz_id);
+    case 'betreuungsstelle':
+      return geraetBetroffenePfad(geraet.einsatz_id);
     case 'einsatzabschnitt':
       return geraetAbschnittPfad(geraet.einsatz_id);
     case 'bereitstellungsraum':
       return geraet.stelle_id == null ? null : geraetBrPfad(geraet.einsatz_id, geraet.stelle_id);
-    case 'betreuungsstelle':
     case 'verpflegung':
       return null;
   }
@@ -99,6 +108,13 @@ export function GeraetUhsRahmen() {
   return <Outlet />;
 }
 
+/** Die Seiten der Betreuungsstelle (LFH-1041); jede andere Ansicht landet auf ihrer Startseite. */
+export function GeraetBetreuungRahmen() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'betreuungsstelle') return <GeraetStart />;
+  return <Outlet />;
+}
+
 /** Die Seiten der Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */
 export function GeraetAbschnittRahmen() {
   const { geraet } = useAuth();
@@ -120,6 +136,20 @@ export function GeraetAufnahme() {
   if (!geraet || geraet.uhs_id == null) return <GeraetStart />;
   if (parseRouteId(suche.get('uhs') ?? undefined) !== geraet.uhs_id) {
     return <Navigate to={geraetAufnahmePfad(geraet.einsatz_id, { uhs: geraet.uhs_id })} replace />;
+  }
+  return <AufnahmePage />;
+}
+
+/**
+ * Aufnahme in die eigene Betreuungsstelle: ohne UHS-Auftrag, die Stelle bucht der Server mit der
+ * Person (LFH-1041). Ein mitgebrachtes `?uhs` fällt weg.
+ */
+export function GeraetBetroffenAufnahme() {
+  const { geraet } = useAuth();
+  const [suche] = useSearchParams();
+  if (!geraet) return <GeraetStart />;
+  if (suche.has('uhs')) {
+    return <Navigate to={geraetBetroffenAufnahmePfad(geraet.einsatz_id)} replace />;
   }
   return <AufnahmePage />;
 }
@@ -165,11 +195,22 @@ export function GeraetStelle() {
   return <GeraetStellePage />;
 }
 
-function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: ReactNode }) {
+function NavZiel({
+  zu,
+  Icon,
+  end,
+  children,
+}: {
+  zu: string;
+  Icon: Icon;
+  end?: boolean;
+  children: ReactNode;
+}) {
   const { token } = theme.useToken();
   return (
     <NavLink
       to={zu}
+      end={end}
       style={({ isActive }) => ({
         flex: '1 1 0',
         display: 'flex',
@@ -190,6 +231,24 @@ function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: Rea
       <Icon size={22} />
       {children}
     </NavLink>
+  );
+}
+
+/** Betroffene, Aufnahme und „Stelle“ mit Belegung und Meldungen der Betreuungsstelle (LFH-1041). */
+function BetreuungNavigationsziele({ eid }: { eid: number }) {
+  return (
+    <>
+      {/* `end`: die Aufnahme liegt unter den Betroffenen und markiert sonst beide Ziele. */}
+      <NavZiel zu={geraetBetroffenePfad(eid)} Icon={IconPersonen} end>
+        Betroffene
+      </NavZiel>
+      <NavZiel zu={geraetBetroffenAufnahmePfad(eid)} Icon={IconPersonPlus}>
+        Aufnahme
+      </NavZiel>
+      <NavZiel zu={geraetBetreuungPfad(eid)} Icon={IconHausHerz}>
+        Stelle
+      </NavZiel>
+    </>
   );
 }
 
@@ -252,8 +311,8 @@ function AbschnittNavigation({ eid }: { eid: number }) {
 /**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
  * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen. Das
- * Abschnittsgerät und der Bereitstellungsraum haben eigene Ziele ({@link AbschnittNavigation},
- * {@link BrNavigationsziele}).
+ * Abschnittsgerät, der Bereitstellungsraum und die Betreuungsstelle haben eigene Ziele
+ * ({@link AbschnittNavigation}, {@link BrNavigationsziele}, {@link BetreuungNavigationsziele}).
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   const eid = geraet.einsatz_id;
@@ -269,7 +328,9 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      {geraet.ansicht === 'einsatzabschnitt' ? (
+      {geraet.ansicht === 'betreuungsstelle' ? (
+        <BetreuungNavigationsziele eid={eid} />
+      ) : geraet.ansicht === 'einsatzabschnitt' ? (
         <AbschnittNavigation eid={eid} />
       ) : geraet.ansicht === 'bereitstellungsraum' ? (
         <BrNavigationsziele geraet={geraet} />
@@ -321,8 +382,9 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   useEinsatzLiveStream(geraet.einsatz_id);
   // Die Warteschlange bleibt an: eine Aufnahme ohne Netz geht nicht verloren (design.md D8).
   useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
+  const pfade = geraet.ansicht === 'betreuungsstelle' ? GERAET_BETREUUNG_PFADE : GERAET_PFADE;
   return (
-    <EinsatzPfadeProvider pfade={GERAET_PFADE}>
+    <EinsatzPfadeProvider pfade={pfade}>
       <div
         className="geraet-huelle"
         style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}

@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::geraet::stelle;
+use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
@@ -196,6 +197,17 @@ pub async fn anlegen(
         ctx.fordere_modul_zugriff(&state.pool, "unfallhilfsstellen")
             .await?;
     }
+    // Aufnahme an der Betreuungsstelle (LFH-1041, Spec `funktionsansichten`): im selben Schritt
+    // der Verbleib „Notunterkunft“ an der eigenen Stelle. Eine Erst-Sichtung gibt es dort nicht.
+    let betreuungsstelle = stelle::eigene(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle);
+    if betreuungsstelle.is_some()
+        && body
+            .sichtung
+            .as_deref()
+            .is_some_and(|s| !s.trim().is_empty())
+    {
+        return Err(AppError::Forbidden);
+    }
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
 
     // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-/Lese-Gates (LFH-769), aber
@@ -223,7 +235,13 @@ pub async fn anlegen(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("erfasst")
+        // Wer an einer Betreuungsstelle aufgenommen wird, ist betroffen (LFH-1041); eine Sichtung,
+        // die sonst `erfasst → betroffen` hebt, gibt es dort nicht.
+        .unwrap_or(if betreuungsstelle.is_some() {
+            "betroffen"
+        } else {
+            "erfasst"
+        })
         .to_owned();
     let Some(status_enum) = PersonStatus::parse(&status) else {
         return Err(AppError::Validation(
@@ -243,6 +261,21 @@ pub async fn anlegen(
         return Err(AppError::UnprocessableEntity(
             "Eine vermisste Person kann keinen UHS-Wartebereich betreten".into(),
         ));
+    }
+    if let Some(stelle_id) = betreuungsstelle {
+        if matches!(status_enum, PersonStatus::Vermisst) {
+            return Err(AppError::UnprocessableEntity(
+                "Eine vermisste Person kann nicht in die Betreuungsstelle aufgenommen werden"
+                    .into(),
+            ));
+        }
+        let stelle =
+            crate::betreuung::repo::stelle_laden(&state.pool, einsatz_id, stelle_id).await?;
+        if stelle.storniert_at.is_some() {
+            return Err(AppError::Conflict(
+                "Die Betreuungsstelle ist storniert".into(),
+            ));
+        }
     }
 
     // Erst-Sichtung: das Feld für sich → 400, die Kombination mit dem Status → 422
@@ -316,89 +349,74 @@ pub async fn anlegen(
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (person, war_neu, uhs_etb_id) = crate::write_retry!(&state.pool, |conn| {
-        let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            status_enum.as_str(),
-            client_id.as_deref(),
-            repo::NeueDaten {
-                name: name.as_deref(),
-                vorname: vorname.as_deref(),
-                geschlecht: body.geschlecht.as_deref(),
-                geburtsdatum: geburtsdatum.as_deref(),
-                alter_geschaetzt: body.alter_geschaetzt,
-                herkunft_adresse: herkunft.as_deref(),
-                antreff_ort: antreff.as_deref(),
-                melder_kontakt: melder.as_deref(),
-                notiz: notiz.as_deref(),
-                zustand: zustand.as_deref(),
-                antreff_lat: body.antreff_lat,
-                antreff_lon: body.antreff_lon,
-                vermisst_seit: vermisst_seit.as_deref(),
-            },
-        )
-        .await?;
-        let mut uhs_etb_id = None;
-        if war_neu {
-            // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
-            // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
-            // ein zweiter Roundtrip für einen Wert, der schon dasteht.
-            let text = crate::person::etb_text_erfasst(reg);
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
-
-            /*
-             * Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
-             * stünde sie sonst ein zweites Mal im Verlauf — in genau der Kette, aus der der
-             * medizinische Verlauf gelesen wird.
-             *
-             * DIESER RIEGEL IST PER HTTP NICHT ERREICHBAR, und das gehört dazu: der
-             * Replay-Lookup oben (`laden_nach_client_id`, vor der Transaktion) trägt
-             * dasselbe Prädikat wie der In-Tx-Zweig und gibt vorher zurück. `war_neu` wird
-             * hier also nur dann false, wenn ein fremder Commit zwischen Pool-Read und
-             * `BEGIN IMMEDIATE` fällt — ein sequentieller Test kann das nicht erzeugen.
-             * `replay_derselben_client_id_legt_die_sichtung_nicht_doppelt_an` belegt
-             * deshalb den WEG (ein Replay erzeugt keine zweite Person und keine zweite
-             * Sichtung), nicht diese Bedingung; sie bliebe auch ohne sie grün. Wer den
-             * Riegel entfernt, bricht keinen Test — er bricht das Rennen.
-             */
-            if let Some(k) = kategorie {
-                sichtung_repo::erfassen_tx(
-                    conn,
-                    einsatz_id,
-                    id,
-                    k.as_str(),
-                    None,
-                    ctx.benutzer.id,
-                    bestaetigung.as_ref(),
-                    // Anheben nur aus `erfasst` — eine bereits als betroffen angelegte
-                    // Person bekäme sonst einen zweiten Statuswechsel ohne Anlass.
-                    matches!(status_enum, PersonStatus::Erfasst),
-                )
-                .await?;
-                let text = crate::person::etb_text_bestaetigt(
-                    crate::person::etb_text_sichtung(reg, k),
-                    bestaetigung.as_ref(),
-                );
+    let (person, war_neu, uhs_etb_id, verbleib_etb_id) =
+        crate::write_retry!(&state.pool, |conn| {
+            let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
+                conn,
+                einsatz_id,
+                ctx.benutzer.id,
+                status_enum.as_str(),
+                client_id.as_deref(),
+                repo::NeueDaten {
+                    name: name.as_deref(),
+                    vorname: vorname.as_deref(),
+                    geschlecht: body.geschlecht.as_deref(),
+                    geburtsdatum: geburtsdatum.as_deref(),
+                    alter_geschaetzt: body.alter_geschaetzt,
+                    herkunft_adresse: herkunft.as_deref(),
+                    antreff_ort: antreff.as_deref(),
+                    melder_kontakt: melder.as_deref(),
+                    notiz: notiz.as_deref(),
+                    zustand: zustand.as_deref(),
+                    antreff_lat: body.antreff_lat,
+                    antreff_lon: body.antreff_lon,
+                    vermisst_seit: vermisst_seit.as_deref(),
+                },
+            )
+            .await?;
+            let mut uhs_etb_id = None;
+            let mut verbleib_etb_id = None;
+            if war_neu {
+                // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
+                // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
+                // ein zweiter Roundtrip für einen Wert, der schon dasteht.
+                let text = crate::person::etb_text_erfasst(reg);
                 crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                     .await?;
-            }
-            if let Some(uhs_id) = body.uhs_id {
-                crate::uhs::belegung_repo::eintritt_tx(
-                    conn,
-                    einsatz_id,
-                    id,
-                    uhs_id,
-                    None,
-                    None,
-                    ctx.benutzer.id,
-                )
-                .await?;
-                let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
-                let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
-                uhs_etb_id = Some(
+
+                /*
+                 * Erst-Sichtung NUR bei einer wirklich neuen Person: bei einem Offline-Replay
+                 * stünde sie sonst ein zweites Mal im Verlauf — in genau der Kette, aus der der
+                 * medizinische Verlauf gelesen wird.
+                 *
+                 * DIESER RIEGEL IST PER HTTP NICHT ERREICHBAR, und das gehört dazu: der
+                 * Replay-Lookup oben (`laden_nach_client_id`, vor der Transaktion) trägt
+                 * dasselbe Prädikat wie der In-Tx-Zweig und gibt vorher zurück. `war_neu` wird
+                 * hier also nur dann false, wenn ein fremder Commit zwischen Pool-Read und
+                 * `BEGIN IMMEDIATE` fällt — ein sequentieller Test kann das nicht erzeugen.
+                 * `replay_derselben_client_id_legt_die_sichtung_nicht_doppelt_an` belegt
+                 * deshalb den WEG (ein Replay erzeugt keine zweite Person und keine zweite
+                 * Sichtung), nicht diese Bedingung; sie bliebe auch ohne sie grün. Wer den
+                 * Riegel entfernt, bricht keinen Test — er bricht das Rennen.
+                 */
+                if let Some(k) = kategorie {
+                    sichtung_repo::erfassen_tx(
+                        conn,
+                        einsatz_id,
+                        id,
+                        k.as_str(),
+                        None,
+                        ctx.benutzer.id,
+                        bestaetigung.as_ref(),
+                        // Anheben nur aus `erfasst` — eine bereits als betroffen angelegte
+                        // Person bekäme sonst einen zweiten Statuswechsel ohne Anlass.
+                        matches!(status_enum, PersonStatus::Erfasst),
+                    )
+                    .await?;
+                    let text = crate::person::etb_text_bestaetigt(
+                        crate::person::etb_text_sichtung(reg, k),
+                        bestaetigung.as_ref(),
+                    );
                     crate::etb::system_audit_tx(
                         conn,
                         einsatz_id,
@@ -406,16 +424,75 @@ pub async fn anlegen(
                         startwert,
                         &text,
                     )
-                    .await?,
-                );
+                    .await?;
+                }
+                if let Some(uhs_id) = body.uhs_id {
+                    crate::uhs::belegung_repo::eintritt_tx(
+                        conn,
+                        einsatz_id,
+                        id,
+                        uhs_id,
+                        None,
+                        None,
+                        ctx.benutzer.id,
+                    )
+                    .await?;
+                    let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
+                    let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
+                    uhs_etb_id = Some(
+                        crate::etb::system_audit_tx(
+                            conn,
+                            einsatz_id,
+                            ctx.benutzer.id,
+                            startwert,
+                            &text,
+                        )
+                        .await?,
+                    );
+                }
+                if let Some(stelle_id) = betreuungsstelle {
+                    let art = VerbleibArt::Notunterkunft;
+                    verbleib_repo::erfassen_tx(
+                        conn,
+                        einsatz_id,
+                        id,
+                        verbleib_repo::VerbleibDaten {
+                            art: art.as_str(),
+                            transportmittel: None,
+                            ziel: None,
+                            status: None,
+                            notiz: None,
+                            betreuungsstelle_id: Some(stelle_id),
+                            // Eine Bestätigung gibt es nur zu einer Erst-Sichtung (oben).
+                            bestaetigung: None,
+                        },
+                        &art.kurzform(None),
+                        ctx.benutzer.id,
+                    )
+                    .await?;
+                    let text = format!(
+                        "Person {}: {}",
+                        registrier_anzeige(reg),
+                        art.etb_sachverhalt()
+                    );
+                    verbleib_etb_id = Some(
+                        crate::etb::system_audit_tx(
+                            conn,
+                            einsatz_id,
+                            ctx.benutzer.id,
+                            startwert,
+                            &text,
+                        )
+                        .await?,
+                    );
+                }
             }
-        }
-        // NACH Sichtung und UHS-Eintritt geladen: sonst trüge die Antwort den Vorzustand — Status
-        // `erfasst`, `aktuelle_sichtung` leer —, und der Client zeigte die Quittung zu
-        // einem Datensatz, den es so nie gab.
-        let person = repo::laden_tx(conn, einsatz_id, id).await?;
-        Ok((person, war_neu, uhs_etb_id))
-    })?;
+            // NACH Sichtung, UHS-Eintritt und Verbleib geladen: sonst trüge die Antwort den Vorzustand — Status
+            // `erfasst`, `aktuelle_sichtung` leer —, und der Client zeigte die Quittung zu
+            // einem Datensatz, den es so nie gab.
+            let person = repo::laden_tx(conn, einsatz_id, id).await?;
+            Ok((person, war_neu, uhs_etb_id, verbleib_etb_id))
+        })?;
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
         if let Some(uhs_id) = body.uhs_id {
@@ -423,7 +500,7 @@ pub async fn anlegen(
                 .live
                 .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", uhs_id);
         }
-        if let Some(etb_id) = uhs_etb_id {
+        for etb_id in uhs_etb_id.into_iter().chain(verbleib_etb_id) {
             state.live.publiziere(einsatz_id, etb_id);
         }
     }
@@ -921,6 +998,17 @@ pub async fn verbleib(
         body.status.as_deref(),
         "Unbekannter Verbleib-Status",
     )?;
+    // Stellenbindung (LFH-1041): ein Gerät der Betreuungsstelle bringt in keine andere
+    // Notunterkunft, auch nicht ohne Stelle; die übrigen Verbleib-Arten bleiben frei.
+    if art == VerbleibArt::Notunterkunft
+        && stelle::eigene(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle).is_some()
+    {
+        stelle::fordere_ziel_stelle(
+            ctx.geraet.as_ref(),
+            Bindungsart::Betreuungsstelle,
+            body.betreuungsstelle_id,
+        )?;
+    }
     if let Some(stelle_id) = body.betreuungsstelle_id {
         if art != VerbleibArt::Notunterkunft {
             return Err(AppError::UnprocessableEntity(
