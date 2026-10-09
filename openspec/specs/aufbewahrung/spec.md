@@ -17,8 +17,10 @@ Klassifikation führen: **Scrub** (personenbezogen, wird geschwärzt, mit einer 
 leeren, Platzhalter, Platzhalter nur wenn gesetzt, Platzhalter mit Zeilenkennung, Zeile
 löschen) oder **Retain** (bleibt erhalten, mit Begründung). Jede Scrub-Spalte MUST zusätzlich
 genau einer Zuordnung angehören: einer Datenkategorie der Capability
-`aufbewahrung-kategorien`, dem Personenstamm oder der Einsatz-Frist. Diese Klassifikation MUST
-die einzige Quelle sein, aus der die Schwärzung des Einsatzes und jeder Kategorie ihre
+`aufbewahrung-kategorien`, dem Personenstamm oder der Einsatz-Frist. Ein Teil eines
+JSON-Dokuments in einer Scrub-Spalte, die der Einsatz-Frist folgt, MAY in derselben
+Klassifikation einer Datenkategorie zugeordnet sein; er wird mit dieser Kategorie zu einem
+leeren Array. Diese Klassifikation MUST die einzige Quelle sein, aus der die Schwärzung des Einsatzes und jeder Kategorie ihre
 Anweisungen bildet. Eine einsatzbezogene Spalte oder Tabelle ohne Klassifikation MUST die
 Testsuite scheitern lassen. Ein Klassifikationseintrag ohne zugehörige Spalte MUST die
 Testsuite ebenfalls scheitern lassen.
@@ -35,6 +37,11 @@ Testsuite ebenfalls scheitern lassen.
 #### Scenario: Kategorie-Schwärzung folgt derselben Klassifikation
 - **WHEN** eine Datenkategorie eines Einsatzes geschwärzt wird
 - **THEN** ist genau jede Scrub-Spalte dieser Kategorie nach ihrer Strategie behandelt
+- **AND** ist jeder JSON-Teil dieser Kategorie ein leeres Array, und der Rest seines Dokuments ist unverändert
+
+#### Scenario: JSON-Teil an einer falschen Spalte
+- **WHEN** ein JSON-Teil an einer Spalte hängt, die keine Scrub-Spalte der Einsatz-Frist ist, oder selbst keiner Kategorie angehört
+- **THEN** scheitert die Testsuite und nennt Tabelle, Spalte und Schlüssel
 
 ### Requirement: Frist aus der Aufbewahrungsdauer beim Abschluss
 

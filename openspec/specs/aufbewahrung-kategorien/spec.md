@@ -191,6 +191,11 @@ und unumkehrbar sein und die physische Entfernung nach `aufbewahrung` einhalten.
 - **AND** tragen Personen, Schäden, Meldungen und die übrigen Objekte der Lagekarte ihre Angaben unverändert
 - **AND** nennt das ETB die Schwärzung der Anhänge mit Rechtsgrundlage
 
+#### Scenario: Bildangaben in Lage-Ständen
+- **WHEN** ein Lage-Stand Bilder der Lagekarte enthält und die Kategorie `anhaenge` geschwärzt wird
+- **THEN** enthält der Lage-Stand keine Bildangaben mehr, und der Rückblick der Lagekarte zeigt keine Bilder
+- **AND** tragen Bezeichnung, Notiz und alle übrigen Objekte des Lage-Stands ihre Angaben unverändert
+
 #### Scenario: Zweiter Lauf
 - **WHEN** der Purge-Lauf eine bereits geschwärzte Kategorie erneut antrifft
 - **THEN** ändert er nichts und schreibt keinen Eintrag
@@ -198,6 +203,10 @@ und unumkehrbar sein und die physische Entfernung nach `aufbewahrung` einhalten.
 #### Scenario: Klartext ist physisch weg
 - **WHEN** eine Kategorie mit einem eindeutigen Klartext in einer ihrer Spalten geschwärzt ist
 - **THEN** kommt der Klartext weder in der Datenbankdatei noch im Write-Ahead-Log vor
+
+#### Scenario: Dateiname eines Bilds im Lage-Stand ist physisch weg
+- **WHEN** ein Lage-Stand den eindeutigen Dateinamen eines Bilds der Lagekarte enthält und die Kategorie `anhaenge` geschwärzt ist
+- **THEN** kommt der Dateiname weder in der Datenbankdatei noch im Write-Ahead-Log vor
 
 ### Requirement: Zusammenspiel mit der Einsatz-Frist
 

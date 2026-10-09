@@ -4,7 +4,8 @@
 //! JSON-Dokument je Snapshot mit `schema_version`; einsatzweit, unabhängig von Kartenansichten.
 //!
 //! **Unveränderlichkeit:** nach dem Anlegen sind `daten`, `stand_at` und `erstellt_*` nicht mehr
-//! schreibbar; ein PATCH berührt nur `bezeichnung`/`notiz`.
+//! schreibbar; ein PATCH berührt nur `bezeichnung`/`notiz`. Einzige Ausnahme ist die Schwärzung:
+//! die Kategorie `anhaenge` leert `daten.bilder` (`schwaerzung_registry::JSON_TEILE`, LFH-1069).
 
 pub mod repo;
 
