@@ -9,7 +9,7 @@ import {
 } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
-import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, istSprungGesperrt, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
@@ -271,6 +271,8 @@ export default function EtbPage() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const dokumenteFrei = istKeyFreigegeben('dokumente', modulFreigabenQuery.data);
+  // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
+  const auftragGesperrt = istSprungGesperrt('auftraege', modulFreigabenQuery.data);
   const dokumenteQuery = useQuery({
     queryKey: einsatzKeys.dokumente(einsatzId),
     queryFn: () => listeDokumente(einsatzId),
@@ -886,6 +888,7 @@ export default function EtbPage() {
               berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
               onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
               onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
+              auftragGesperrt={auftragGesperrt}
               onErneutSenden={(p) => void abgelehntErneutSenden(p)}
               onVerwerfen={(p) => {
                 if (p.id != null) void abgelehntVerwerfen(p.id);
