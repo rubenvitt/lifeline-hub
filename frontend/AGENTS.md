@@ -74,6 +74,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     nie gerechnet). Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
     `components/rahmenOben.guard.test.ts`). Den Fokusabstand trägt `scroll-padding-block-start`
     am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
+  - **Stehende Alarme liegen unter der Bedienkante** (LFH-1112, Spec
+    `einsatztauglichkeit-layout`): unter Kommandoleiste und Seitenkopf, solange er im Bild ist,
+    gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
+    Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
+    deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**

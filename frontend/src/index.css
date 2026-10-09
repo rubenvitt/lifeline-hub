@@ -6,6 +6,14 @@ body {
   padding: 0;
 }
 
+/* Stehende Alarme unter der Bedienkante (LFH-1112, Spec `einsatztauglichkeit-layout`): antd 6
+   liest die Oberkante der Benachrichtigungen aus `--notification-top` und schreibt sie nur inline,
+   wenn `top` konfiguriert ist (`AntApp` in `main.tsx` trägt deshalb keins). Die Kante misst
+   `components/alarmOben.ts`; ohne Quelle gilt antds Vorgabe 24 px. */
+.ant-notification {
+  --notification-top: var(--lfh-alarm-oben, 24px);
+}
+
 /* Deeplink-Highlight einer per ?<modul>=<id> angesteuerten Zeile (LFH-25), aus Rollen (LFH-698,
    Spec `deeplink-hervorhebung`). Zwei Kanäle: die Fläche `bedien-flaeche` („aktive Beziehung“,
    dieselbe Rolle, die die ETB-Zeitachse inline setzt) und eine 2-px-Linie oben und unten in

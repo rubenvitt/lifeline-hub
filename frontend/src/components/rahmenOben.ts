@@ -45,7 +45,8 @@ function neuRechnen(): void {
   for (const h of hoerer) h();
 }
 
-function abonniere(h: () => void): () => void {
+/** Hört auf Änderungen der Summe, außerhalb von React (`alarmOben.ts`). */
+export function abonniereRahmenOben(h: () => void): () => void {
   hoerer.add(h);
   return () => hoerer.delete(h);
 }
@@ -57,7 +58,7 @@ export function leseRahmenOben(): number {
 
 /** Die Summe in px; rendert neu, sobald sie sich ändert. */
 export function useRahmenOben(): number {
-  return useSyncExternalStore(abonniere, leseRahmenOben, leseRahmenOben);
+  return useSyncExternalStore(abonniereRahmenOben, leseRahmenOben, leseRahmenOben);
 }
 
 /**
