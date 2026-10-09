@@ -33,6 +33,26 @@ describe('AnrufErfassung (LFH-554)', () => {
     expect(screen.getByText('1 erfasst')).toBeInTheDocument();
   });
 
+  it('steht auch dann wieder im Anliegen, wenn ein Frame vor dem Neu-Einhängen läuft', async () => {
+    // `resetFields` hängt jedes Feld neu ein. Unter CI-Last lief ein `requestAnimationFrame` vor
+    // diesem Commit, der Fokus fiel auf `body`. Ein sofort laufender Frame stellt das nach.
+    const erfassen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<AnrufErfassung onErfassen={erfassen} laeuft={false} fehler={null} />);
+    await waehleAnliegen('Auskunft zur Lage');
+    await userEvent.type(screen.getByLabelText('Notiz'), 'Sperrung B 3');
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 0;
+    });
+    try {
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Anliegen')));
+    } finally {
+      frame.mockRestore();
+    }
+  });
+
   it('macht die Rückrufnummer mit „Rückruf nötig“ sichtbar und zur Pflicht', async () => {
     const erfassen = vi.fn().mockResolvedValue({});
     renderMitProviders(<AnrufErfassung onErfassen={erfassen} laeuft={false} fehler={null} />);
