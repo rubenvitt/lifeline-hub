@@ -68,6 +68,21 @@ export function darfModuleVerwalten(
   return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
 }
 
+/** Verwaltungsangaben des Einsatzes ändern (LFH-1066): Kopfdaten, Einstellungen und
+    Führungsstelle. Aktiver Einsatz UND (Einsatzleitung ODER Führungspersonal ODER System-Admin der
+    Einsatz-Org) — wie der Server (`EinsatzVerwaltungszugriff`). Der Admin einer fremden Org liest
+    nur; eine Mitgliedschaft trägt auch über die Org-Grenze. */
+export function darfEinsatzVerwalten(
+  einsatz: EinsatzOrgKontext,
+  benutzer: BenutzerOrgKontext,
+): boolean {
+  if (einsatz?.status !== 'aktiv') return false;
+  if (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal') {
+    return true;
+  }
+  return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
+}
+
 /** Allgemeines Einsatz-Schreibrecht: aktiver Einsatz UND (Einsatzleitung ODER Führungspersonal
     ODER System-Admin) — die Norm für die Schreib-UI aller Einsatz-Module. */
 export function darfImEinsatzSchreiben(

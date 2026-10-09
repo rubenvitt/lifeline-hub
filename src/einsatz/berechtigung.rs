@@ -174,15 +174,17 @@ pub fn fordere_schreibrecht(rolle: Option<EinsatzRolle>) -> Result<(), AppError>
     }
 }
 
-/// Gate der PATCH-Kopfdaten-Route: Einsatz-Schreibrecht (Einsatzleitung oder
-/// Führungspersonal) ODER System-Admin (`system_rolle == admin`). Bewusst
-/// lokal zu dieser Route — `fordere_schreibrecht` (ETB) bleibt unberührt, und
-/// die Admin-Erlaubnis gilt NICHT für org-weite Führungskräfte ohne Mitgliedschaft.
+/// Gate der Verwaltungsrouten (Kopfdaten, Einstellungen, Führungsstelle; hinter
+/// `EinsatzVerwaltungszugriff`): Einsatz-Schreibrecht (Einsatzleitung oder Führungspersonal)
+/// ODER System-Admin der Einsatz-Org (`src/AGENTS.md`, „Admin-Schreibwege am Einsatz“, LFH-1066).
+/// Der Admin einer fremden Org liest serverweit, schreibt hier aber nur mit Mitgliedschaft; die
+/// Admin-Erlaubnis gilt NICHT für org-weite Führungskräfte ohne Mitgliedschaft.
 pub fn fordere_schreibrecht_oder_admin(
     benutzer: &Benutzer,
+    einsatz_org_id: i64,
     rolle: Option<EinsatzRolle>,
 ) -> Result<(), AppError> {
-    if benutzer.ist_admin() {
+    if benutzer.ist_admin() && benutzer.org_id == einsatz_org_id {
         return Ok(());
     }
     fordere_schreibrecht(rolle)
@@ -838,19 +840,42 @@ mod tests {
     }
 
     #[test]
-    fn schreibrecht_oder_admin_erlaubt_admin_ohne_rolle() {
+    fn schreibrecht_oder_admin_erlaubt_admin_der_einsatz_org_ohne_rolle() {
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
-        assert!(fordere_schreibrecht_oder_admin(&admin, None).is_ok());
+        assert!(fordere_schreibrecht_oder_admin(&admin, 1, None).is_ok());
+    }
+
+    #[test]
+    fn schreibrecht_oder_admin_blockt_admin_einer_fremden_org_ohne_schreibrolle() {
+        // LFH-1066: lesen serverweit, schreiben nur in der eigenen Org.
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert!(matches!(
+            fordere_schreibrecht_oder_admin(&admin, 2, None).unwrap_err(),
+            AppError::Forbidden
+        ));
+        assert!(matches!(
+            fordere_schreibrecht_oder_admin(&admin, 2, Some(EinsatzRolle::Beobachter)).unwrap_err(),
+            AppError::Forbidden
+        ));
+        // Die Mitgliedschaft trägt über die Org-Grenze.
+        assert!(
+            fordere_schreibrecht_oder_admin(&admin, 2, Some(EinsatzRolle::Einsatzleitung)).is_ok()
+        );
+        assert!(
+            fordere_schreibrecht_oder_admin(&admin, 2, Some(EinsatzRolle::Fuehrungspersonal))
+                .is_ok()
+        );
     }
 
     #[test]
     fn schreibrecht_oder_admin_erlaubt_schreibberechtigte_rollen() {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(
-            fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Einsatzleitung)).is_ok()
+            fordere_schreibrecht_oder_admin(&normal, 1, Some(EinsatzRolle::Einsatzleitung)).is_ok()
         );
         assert!(
-            fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Fuehrungspersonal)).is_ok()
+            fordere_schreibrecht_oder_admin(&normal, 1, Some(EinsatzRolle::Fuehrungspersonal))
+                .is_ok()
         );
     }
 
@@ -858,17 +883,18 @@ mod tests {
     fn schreibrecht_oder_admin_blockt_beobachter_und_fremde_ohne_admin() {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(matches!(
-            fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Beobachter)).unwrap_err(),
+            fordere_schreibrecht_oder_admin(&normal, 1, Some(EinsatzRolle::Beobachter))
+                .unwrap_err(),
             AppError::Forbidden
         ));
         assert!(matches!(
-            fordere_schreibrecht_oder_admin(&normal, None).unwrap_err(),
+            fordere_schreibrecht_oder_admin(&normal, 1, None).unwrap_err(),
             AppError::Forbidden
         ));
         // Org-Führungskraft ohne Mitgliedschaft ist KEIN System-Admin → blockiert.
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(matches!(
-            fordere_schreibrecht_oder_admin(&fk, None).unwrap_err(),
+            fordere_schreibrecht_oder_admin(&fk, 1, None).unwrap_err(),
             AppError::Forbidden
         ));
     }

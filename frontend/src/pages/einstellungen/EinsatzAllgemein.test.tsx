@@ -6,13 +6,15 @@ import EinsatzAllgemein from './EinsatzAllgemein';
 import { modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
 import { mitVorgabe } from '../../components/vorgabeText';
 
-// Die Systemrolle ist umschaltbar, weil `darfImEinsatzSchreiben` einen System-Admin unabhängig von
-// `meine_rolle` durchlässt — ein fest auf 'admin' verdrahteter Mock löste den Rechte-Hinweis nie
-// aus.
-const { benutzerRolle } = vi.hoisted(() => ({ benutzerRolle: { wert: 'admin' } }));
+// Systemrolle und Org sind umschaltbar, weil `darfEinsatzVerwalten` den System-Admin der
+// Einsatz-Org unabhängig von `meine_rolle` durchlässt — ein fest auf 'admin' verdrahteter Mock
+// löste den Rechte-Hinweis nie aus.
+const { benutzerRolle } = vi.hoisted(() => ({ benutzerRolle: { wert: 'admin', org: 1 } }));
 
 vi.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ benutzer: { id: 1, system_rolle: benutzerRolle.wert } }),
+  useAuth: () => ({
+    benutzer: { id: 1, system_rolle: benutzerRolle.wert, org_id: benutzerRolle.org },
+  }),
   AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 
@@ -68,10 +70,12 @@ describe('EinsatzAllgemein', () => {
       id: 1,
       bezeichnung: 'Lage',
       status: 'aktiv',
+      org_id: 1,
       meine_rolle: 'einsatzleitung',
     } as never);
     vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
     benutzerRolle.wert = 'admin';
+    benutzerRolle.org = 1;
   });
 
   it('zeigt die gespeicherten Werte (Default-Modul)', async () => {
@@ -238,9 +242,46 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Admin'),
+      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
+  it('sperrt den Admin einer fremden Org und nennt den Grund (LFH-1066)', async () => {
+    benutzerRolle.org = 2;
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      org_id: 1,
+      meine_rolle: null,
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue(BASIS as never);
+
+    rendern();
+
+    expect(
+      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
+  it('lässt den Admin der Einsatz-Org ohne Mitgliedschaft speichern (LFH-1066)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      org_id: 1,
+      meine_rolle: null,
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue(BASIS as never);
+
+    rendern();
+
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeEnabled();
+    expect(
+      screen.queryByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
+    ).not.toBeInTheDocument();
   });
 
   it('nennt einen gescheiterten Speicherversuch dauerhaft auf der Seite (H14)', async () => {

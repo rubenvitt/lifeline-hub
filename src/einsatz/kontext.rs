@@ -97,9 +97,13 @@ impl EinsatzKontext {
         berechtigung::fordere_schreibrecht(self.rolle)
     }
 
-    /// Schreib-Gate ODER System-Admin (für Kopfdaten-/Einstellungs-Routen).
+    /// Schreib-Gate ODER System-Admin der Einsatz-Org (Kopfdaten, Einstellungen, Führungsstelle).
     pub fn fordere_schreibrecht_oder_admin(&self) -> Result<(), AppError> {
-        berechtigung::fordere_schreibrecht_oder_admin(&self.benutzer, self.rolle)
+        berechtigung::fordere_schreibrecht_oder_admin(
+            &self.benutzer,
+            self.einsatz.org_id,
+            self.rolle,
+        )
     }
 
     /// Nur-Einsatzleitung-Gate.
@@ -256,9 +260,10 @@ impl<M: ModulMarker> Deref for EinsatzLeitungszugriff<M> {
     }
 }
 
-/// Gate der Kopfdaten- und Einstellungs-Routen: Org-Floor → `fordere_schreibrecht_oder_admin`
-/// → `fordere_aktiv`. Anders als [`EinsatzSchreibzugriff`] darf hier auch ein System-Admin ohne
-/// Mitgliedschaft schreiben; ein Modul-Gate gibt es nicht.
+/// Gate der Kopfdaten-, Einstellungs- und Führungsstellen-Routen: Org-Floor →
+/// `fordere_schreibrecht_oder_admin` → `fordere_aktiv`. Anders als [`EinsatzSchreibzugriff`] darf
+/// hier auch der System-Admin der Einsatz-Org ohne Mitgliedschaft schreiben (der einer fremden
+/// Org nicht, LFH-1066); ein Modul-Gate gibt es nicht.
 pub struct EinsatzVerwaltungszugriff(pub EinsatzKontext);
 
 impl FromRequestParts<AppState> for EinsatzVerwaltungszugriff {

@@ -45,13 +45,14 @@ import {
 import { fehlerText } from '../api/client';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
+import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { useViewport } from '../components/useViewport';
 import { useAuth } from '../auth/AuthContext';
 import {
-  darfImEinsatzSchreiben,
   darfEinsatzLeiten,
+  darfEinsatzVerwalten,
   istEinsatzLeitung,
 } from '../einsatz/schreibrecht';
 import type {
@@ -535,7 +536,9 @@ export default function EinsatzdatenPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  const darfBearbeiten = darfImEinsatzSchreiben(einsatz, benutzer);
+  // Kopfdaten und Führungsstelle laufen über die Verwaltungsrouten: der Admin nur der Einsatz-Org
+  // (LFH-1066, wie der Server).
+  const darfBearbeiten = darfEinsatzVerwalten(einsatz, benutzer);
 
   const leitung = (mitgliederQuery.data ?? [])
     .filter((m) => m.einsatz_rolle === 'einsatzleitung')
@@ -621,6 +624,12 @@ export default function EinsatzdatenPage() {
             )}
           </>
         )
+      }
+      // Am aktiven Einsatz ohne Verwaltungsrecht der Grund; bedingt übergeben, sonst bliebe ein
+      // leerer Slot mit Außenabstand (wie `StabPage`).
+      hinweis={
+        einsatz.status === 'aktiv' &&
+        !darfBearbeiten && <RechteHinweis sichtbar text={NUR_LEITUNG_FUEHRUNG_ORG_ADMIN} />
       }
     >
       {bearbeiten ? (

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   einsatzRechteGrund,
   NUR_ADMIN,
-  NUR_LEITUNG_FUEHRUNG_ADMIN,
+  NUR_LEITUNG_FUEHRUNG_ORG_ADMIN,
   NUR_LEITUNG_ORG_ADMIN,
 } from './nurAnsicht';
 
@@ -17,7 +17,7 @@ describe('nurAnsicht (LFH-1078)', () => {
       einsatzRechteGrund('abgeschlossen'),
       einsatzRechteGrund('aktiv'),
       NUR_ADMIN,
-      NUR_LEITUNG_FUEHRUNG_ADMIN,
+      NUR_LEITUNG_FUEHRUNG_ORG_ADMIN,
       NUR_LEITUNG_ORG_ADMIN,
     ])
       expect(grund.split(' ').length).toBeLessThanOrEqual(5);
