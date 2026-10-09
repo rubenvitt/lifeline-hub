@@ -106,3 +106,38 @@ export function SeitenHinweise({
     </Flex>
   );
 }
+
+/**
+ * Der Fehler einer Mutation, wenn er zu dieser Zeile gehört, sonst `null` (LFH-1077). Eine
+ * Mutation dient allen Zeilen einer Liste; ihre `variables` sagen, welche zuletzt geschrieben
+ * hat. react-query hält beides bis zum nächsten `mutate()`.
+ */
+export function zeilenFehler<V>(
+  mutation: { error: unknown; variables: V | undefined },
+  passt: (variablen: V) => boolean,
+): unknown {
+  const { error, variables } = mutation;
+  return error != null && variables !== undefined && passt(variables) ? error : null;
+}
+
+interface ZeilenFehlerProps {
+  /** Aus {@link zeilenFehler}: nur der Fehler DIESER Zeile. */
+  fehler: unknown;
+  /** Siehe {@link SpeicherFehlerProps.fallback}. */
+  fallback?: string;
+}
+
+/**
+ * Grund einer abgelehnten Zeilenaktion an der Zeile selbst (LFH-1077, `frontend/AGENTS.md`,
+ * „Rückwege und Fehler“): eine Zeile Text statt Alert, damit die Liste nicht springt. `data-fehler`
+ * ist der Prüfgriff, wie an den Modul-Zeilen der Einstellungen.
+ */
+export function ZeilenFehler({ fehler, fallback }: ZeilenFehlerProps) {
+  const text = fehlerText(fehler, fallback);
+  if (text === null) return null;
+  return (
+    <Typography.Text type="danger" role="alert" data-fehler="true">
+      {text}
+    </Typography.Text>
+  );
+}

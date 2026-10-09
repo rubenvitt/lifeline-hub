@@ -1,7 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../api/client';
-import { RechteHinweis, SeitenHinweise, SpeicherFehler, fehlerText } from './SpeicherHinweis';
+import {
+  RechteHinweis,
+  SeitenHinweise,
+  SpeicherFehler,
+  ZeilenFehler,
+  fehlerText,
+  zeilenFehler,
+} from './SpeicherHinweis';
 
 describe('fehlerText', () => {
   it('nimmt die Servermeldung eines ApiError', () => {
@@ -105,5 +112,37 @@ describe('fehlerFallback (LFH-690)', () => {
   it('ohne Angabe bleibt der Standardsatz (Bestandsaufrufer)', () => {
     render(<SpeicherFehler fehler={new TypeError('x')} />);
     expect(screen.getByText('Speichern fehlgeschlagen')).toBeInTheDocument();
+  });
+});
+
+describe('zeilenFehler (LFH-1077)', () => {
+  const abgelehnt = new ApiError(409, 'Download läuft schon');
+
+  it('liefert den Fehler nur für die Zeile, deren Variablen passen', () => {
+    const m = { error: abgelehnt, variables: { id: 7 } };
+    expect(zeilenFehler(m, (v) => v.id === 7)).toBe(abgelehnt);
+    expect(zeilenFehler(m, (v) => v.id === 8)).toBeNull();
+  });
+
+  it('liefert ohne Fehler nichts, auch wenn die Variablen passen', () => {
+    expect(zeilenFehler({ error: null, variables: { id: 7 } }, () => true)).toBeNull();
+  });
+
+  it('liefert ohne Variablen nichts', () => {
+    expect(zeilenFehler({ error: abgelehnt, variables: undefined }, () => true)).toBeNull();
+  });
+});
+
+describe('ZeilenFehler (LFH-1077)', () => {
+  it('nennt den Grund an der Zeile, markiert mit data-fehler', () => {
+    render(<ZeilenFehler fehler={new ApiError(409, 'Download läuft schon')} />);
+    const hinweis = screen.getByRole('alert');
+    expect(hinweis).toHaveTextContent('Download läuft schon');
+    expect(hinweis).toHaveAttribute('data-fehler');
+  });
+
+  it('rendert ohne Fehler GAR NICHTS', () => {
+    const { container } = render(<ZeilenFehler fehler={null} />);
+    expect(container).toBeEmptyDOMElement();
   });
 });
