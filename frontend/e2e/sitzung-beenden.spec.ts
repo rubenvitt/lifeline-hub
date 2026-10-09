@@ -110,6 +110,8 @@ test('ein Admin beendet die Anmeldung in der Benutzerverwaltung', async ({ page,
   const { kontext, geraet } = await verlorenesGeraet(browser, einsatzId, person);
 
   await page.goto('/admin/benutzer');
+  // Ab 50 Konten blättert die Tabelle; die Zeile steht erst nach der Suche sicher auf Seite 1.
+  await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
   const zeile = page.getByRole('row').filter({ hasText: `@${person.benutzername}` });
   await zeile.getByRole('button', { name: 'Anmeldungen' }).click();
   const dialog = page.getByRole('dialog', { name: 'Anmeldungen · E2E Verlust' });
