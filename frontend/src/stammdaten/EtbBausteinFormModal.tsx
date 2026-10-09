@@ -1,8 +1,7 @@
-import { App, Collapse, Form, Input, InputNumber, Typography } from 'antd';
+import { Collapse, Form, Input, InputNumber, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereBaustein, legeBausteinAn, type BausteinEingabe } from '../api/etbBaustein';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
@@ -33,7 +32,6 @@ export default function EtbBausteinFormModal({
 }) {
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
-  const { message } = App.useApp();
 
   // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal`. Die Vorgabewerte stehen
   // als `initialValues` an der Hülle.
@@ -65,9 +63,6 @@ export default function EtbBausteinFormModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() });
     },
-    // Toast bleibt (LFH-473): nach der Ablehnung stehen Dialog und Wortlaut offen, nichts wirkt
-    // gespeichert; der Seiten-Slot läge hinter der Maske.
-    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (
@@ -77,6 +72,9 @@ export default function EtbBausteinFormModal({
       form={form}
       erfassenText="Speichern"
       laeuft={mutation.isPending}
+      // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
+      // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
+      speicherung={mutation}
       initialValues={{ typ: 'meldung', sortier: 0 }}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen.
       //

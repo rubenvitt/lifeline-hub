@@ -20,6 +20,8 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
 import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
 
@@ -115,6 +117,22 @@ export default function OfflineRegionPicker({
   const karten = useMemo(() => kartenQuery.data ?? [], [kartenQuery.data]);
   const bauJobs = useMemo(() => bauStatusQuery.data ?? [], [bauStatusQuery.data]);
 
+  /**
+   * Eine Ablehnung steht an der Region, an der gehandelt wurde, kein Toast (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“, LFH-1077). Je Regionsname gemerkt, aus den Callbacks beider Mutationen
+   * (`components/useZeilenFehler.ts`): so erreicht auch der Download, den die Verkettung nach
+   * einem fertigen Bau anstößt, seine Region, selbst wenn danach schon die nächste Region lädt.
+   * Eine neue Aktion an der Region räumt ihren alten Grund.
+   *
+   * Ist der Picker zu, wenn ein Download scheitert (Verkettung im Hintergrund oder nach dem
+   * Schließen), ist kein Ort zu sehen: dann zusätzlich ein Toast. Ebenso Toast bleibt der im
+   * Hintergrund gescheiterte Bau (Verkettung unten).
+   */
+  const regionFehler = useZeilenFehler<string>();
+  // Der Stand von `offen` zum Zeitpunkt der Antwort, nicht des Absendens.
+  const offenRef = useRef(offen);
+  offenRef.current = offen;
+
   const download = useMutation({
     mutationFn: (e: OfflineKatalogEintrag) =>
       starteOfflineDownload({
@@ -125,22 +143,37 @@ export default function OfflineRegionPicker({
         groesse_erwartet: e.groesse,
         sha256_erwartet: e.sha256 ?? undefined,
       }),
+    onMutate: (e) => regionFehler.beginne(e.name),
+    onError: (fehler, e) => {
+      regionFehler.melde(e.name, fehler, 'Download fehlgeschlagen');
+      if (!offenRef.current) {
+        message.error(`${e.name}: ${fehlerText(fehler, 'Download fehlgeschlagen')}`);
+      }
+    },
     onSuccess: () => {
       invalidiereKarte(qc);
       message.success('Download gestartet');
     },
-    onError: (e) => message.error(fehlerText(e, 'Download fehlgeschlagen')),
   });
 
   const bauen = useMutation({
     mutationFn: ({ slug }: { slug: string; name: string }) => starteRegionBau(slug),
+    onMutate: ({ name }) => regionFehler.beginne(name),
+    onError: (fehler, { name }) =>
+      regionFehler.melde(name, fehler, 'Bau konnte nicht gestartet werden'),
     onSuccess: (_res, { slug, name }) => {
       setVerkettung((prev) => new Map(prev).set(slug, name));
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('bau-status') });
       message.success('Bau gestartet');
     },
-    onError: (e) => message.error(fehlerText(e, 'Bau konnte nicht gestartet werden')),
   });
+
+  // Schließen räumt die Gründe. NICHT beim Öffnen: ein Download, der bei geschlossenem Dialog
+  // scheitert, soll beim nächsten Öffnen an seiner Region stehen.
+  const schliessen = () => {
+    regionFehler.leere();
+    onClose();
+  };
 
   // Verkettung: ein Bau-Job einer verketteten Region erreicht „done“ → frischen Katalog holen
   // (TTL umgehen) und den Download anstoßen. Bei „failed“ endet die Verkettung mit Fehler.
@@ -288,7 +321,7 @@ export default function OfflineRegionPicker({
       open={offen}
       title="Region aufs Gerät bringen"
       footer={null}
-      onCancel={onClose}
+      onCancel={schliessen}
       destroyOnHidden
       width={560}
     >
@@ -309,18 +342,28 @@ export default function OfflineRegionPicker({
               // Auswahlliste („welche Region?“). Als Überschrift stünde der Eintrag zudem über
               // seiner Gruppenüberschrift (h5).
               dataSource={items}
-              renderItem={(z) => (
-                <ListenEintrag actions={[<span key="a">{aktion(z)}</span>]}>
-                  <ListenEintragMeta
-                    title={z.name}
-                    description={
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {z.region}
-                      </Typography.Text>
-                    }
-                  />
-                </ListenEintrag>
-              )}
+              renderItem={(z) => {
+                const grund = regionFehler.grund(z.name);
+                return (
+                  <ListenEintrag actions={[<span key="a">{aktion(z)}</span>]}>
+                    <ListenEintragMeta
+                      title={z.name}
+                      description={
+                        <>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            {z.region}
+                          </Typography.Text>
+                          {grund && (
+                            <div>
+                              <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
+                            </div>
+                          )}
+                        </>
+                      }
+                    />
+                  </ListenEintrag>
+                );
+              }}
             />
           </div>
         ))

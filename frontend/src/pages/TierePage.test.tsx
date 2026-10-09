@@ -7,6 +7,7 @@ import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
+import { NetzFehler } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { onlineManager } from '@tanstack/react-query';
 import TierePage from './TierePage';
@@ -321,9 +322,7 @@ describe('TierePage', () => {
       onlineManager.setOnline(false);
       await userEvent.click(knopf);
 
-      expect(
-        await screen.findByText('Keine Verbindung zum Server — Export nicht möglich'),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(new NetzFehler().message)).toBeInTheDocument();
       expect(knopf).not.toHaveClass('ant-btn-loading');
       // Kein Nachlauf, wenn das Netz zurückkommt.
       onlineManager.setOnline(true);

@@ -1,13 +1,13 @@
-import { App, Space, Switch, Typography } from 'antd';
+import { Space, Switch, theme, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
 import {
   speichereAutoAktualisierung,
   type AktualisierungsStatus,
   type AutoAktualisierungBody,
 } from '../api/offlineKarten';
 import { globalKeys } from '../api/queryKeys';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ortszeit } from './ortszeit';
 
 /** Auswahl des Prüfabstands (Stunden); der Server nimmt 1…168. */
@@ -24,7 +24,8 @@ export function abstandText(stunden: number): string {
  * das nächste Mal baut. Auskunft, keine Warnung — deshalb Text, keine Hinweisfläche.
  *
  * Admins schalten die Automatik und den Abstand hier; jede Änderung speichert sofort. Der Schalter
- * folgt dem Server: scheitert das Speichern, bleibt er stehen.
+ * folgt dem Server: scheitert das Speichern, bleibt er stehen, und der Grund steht an der Zeile bis
+ * zur nächsten Änderung — kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
  */
 export default function AutoAktualisierungZeile({
   status,
@@ -34,11 +35,10 @@ export default function AutoAktualisierungZeile({
   istAdmin: boolean;
 }) {
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { token } = theme.useToken();
   const speichern = useMutation({
     mutationFn: (body: AutoAktualisierungBody) => speichereAutoAktualisierung(body),
     onSuccess: (neu) => qc.setQueryData(globalKeys.adminKarteBereich('aktualisierung'), neu),
-    onError: (e) => message.error(`Einstellung nicht gespeichert: ${fehlerText(e)}`),
   });
 
   const abstaende = ABSTAENDE.includes(status.intervall_stunden)
@@ -99,6 +99,11 @@ export default function AutoAktualisierungZeile({
           <Typography.Text type="secondary">{zeiten.join(' · ')}</Typography.Text>
         )}
       </Space>
+      {speichern.error != null && (
+        <div style={{ marginTop: token.marginXS }}>
+          <SpeicherFehler fehler={speichern.error} titel="Einstellung nicht gespeichert" />
+        </div>
+      )}
     </div>
   );
 }

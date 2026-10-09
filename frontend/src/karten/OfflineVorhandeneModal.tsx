@@ -1,8 +1,9 @@
 import { App, Button, Input, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
   listeVorhandeneKarten,
   registriereOfflineKarte,
@@ -42,6 +43,13 @@ export default function OfflineVorhandeneModal({
     enabled: offen,
   });
 
+  // Eine Ablehnung steht an der Datei, an der übernommen wurde, kein Toast (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“, LFH-1077). Je Dateiname gemerkt, aus den Callbacks der Mutation
+  // (`components/useZeilenFehler.ts`); Öffnen und Schließen räumen alle Gründe.
+  const zeilen = useZeilenFehler<string>();
+  const { leere } = zeilen;
+  useEffect(() => leere(), [offen, leere]);
+
   const importMutation = useMutation({
     mutationFn: (v: VorhandeneKarte) =>
       registriereOfflineKarte({
@@ -51,12 +59,13 @@ export default function OfflineVorhandeneModal({
         lizenz: '© OpenStreetMap contributors (ODbL)',
         kachel_schema: 'shortbread',
       }),
+    onMutate: (v) => zeilen.beginne(v.dateiname),
+    onError: (e, v) => zeilen.melde(v.dateiname, e, 'Übernehmen fehlgeschlagen'),
     onSuccess: () => {
       invalidiereKarte(qc);
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-vorhandene') });
       message.success('Region übernommen');
     },
-    onError: (e) => message.error(fehlerText(e, 'Übernehmen fehlgeschlagen')),
   });
 
   return (
@@ -77,41 +86,51 @@ export default function OfflineVorhandeneModal({
           // Titel ist ein Eingabefeld, und ein Bedienelement gehört nicht in eine Überschrift.
           dataSource={vorhandeneQuery.data ?? []}
           emptyText="Keine neuen Dateien im Karten-Verzeichnis"
-          renderItem={(v) => (
-            <ListenEintrag
-              actions={[
-                <Button
-                  key="imp"
-                  type="link"
-                  disabled={importMutation.isPending}
-                  onClick={() => importMutation.mutate(v)}
-                >
-                  Übernehmen
-                </Button>,
-              ]}
-            >
-              <ListenEintragMeta
-                title={
-                  /*
-                   * Ohne Größen-Prop, obwohl das Feld im Titel einer Listenzeile sitzt und die Zeile wächst: es
-                   * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
-                   * Handschuh-Betrieb.
-                   */
-                  <Input
-                    style={{ maxWidth: 260 }}
-                    value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
-                    onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}
-                    aria-label={`Name für ${v.dateiname}`}
-                  />
-                }
-                description={
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {v.dateiname} <Tag>{formatGroesse(v.groesse)}</Tag>
-                  </Typography.Text>
-                }
-              />
-            </ListenEintrag>
-          )}
+          renderItem={(v) => {
+            const grund = zeilen.grund(v.dateiname);
+            return (
+              <ListenEintrag
+                actions={[
+                  <Button
+                    key="imp"
+                    type="link"
+                    disabled={importMutation.isPending}
+                    onClick={() => importMutation.mutate(v)}
+                  >
+                    Übernehmen
+                  </Button>,
+                ]}
+              >
+                <ListenEintragMeta
+                  title={
+                    /*
+                     * Ohne Größen-Prop, obwohl das Feld im Titel einer Listenzeile sitzt und die Zeile wächst: es
+                     * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
+                     * Handschuh-Betrieb.
+                     */
+                    <Input
+                      style={{ maxWidth: 260 }}
+                      value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
+                      onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}
+                      aria-label={`Name für ${v.dateiname}`}
+                    />
+                  }
+                  description={
+                    <>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {v.dateiname} <Tag>{formatGroesse(v.groesse)}</Tag>
+                      </Typography.Text>
+                      {grund && (
+                        <div>
+                          <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
+                        </div>
+                      )}
+                    </>
+                  }
+                />
+              </ListenEintrag>
+            );
+          }}
         />
       )}
     </Modal>

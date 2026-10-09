@@ -1,11 +1,24 @@
 import { IconChevronRunter, IconLadekreis } from '../icons';
-import { App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Tooltip, Typography } from 'antd';
+import {
+  App,
+  Button,
+  Dropdown,
+  Flex,
+  Popconfirm,
+  Progress,
+  Space,
+  Tag,
+  theme,
+  Tooltip,
+  Typography,
+} from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
   brecheOfflineDownloadAb,
@@ -65,6 +78,7 @@ export default function OfflineKartenVerwaltung() {
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [pickerOffen, setPickerOffen] = useState(false);
   const [urlOffen, setUrlOffen] = useState(false);
   const [vorhandenOffen, setVorhandenOffen] = useState(false);
@@ -126,27 +140,35 @@ export default function OfflineKartenVerwaltung() {
     void qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-karten') });
   }, [phasenSignatur, qc]);
 
+  // Eine Ablehnung steht an der Zeile, an der gehandelt wurde, kein Toast (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“, LFH-1077); Erfolg bleibt beim Toast. Je Karte gemerkt, aus den
+  // Callbacks der drei Mutationen in EINEM Speicher (`components/useZeilenFehler.ts`): die zuletzt
+  // begonnene Aktion an einer Zeile räumt deren alten Grund, auch den einer anderen Mutation.
+  const zeilen = useZeilenFehler<number>();
   const abbrechenMutation = useMutation({
     mutationFn: (id: number) => brecheOfflineDownloadAb(id),
+    onMutate: (id) => zeilen.beginne(id),
+    onError: (e, id) => zeilen.melde(id, e, 'Abbrechen fehlgeschlagen'),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(fehlerText(e, 'Abbrechen fehlgeschlagen')),
   });
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheOfflineKarte(id),
+    onMutate: (id) => zeilen.beginne(id),
+    onError: (e, id) => zeilen.melde(id, e, 'Löschen fehlgeschlagen'),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
   // „Jetzt aktualisieren“ (LFH-993): lädt einen vorhandenen neueren Stand sofort oder stößt einen
   // Neubau an, dessen Ergebnis der Server danach selbst ohne Ausfall eintauscht.
   const jetztMutation = useMutation({
     mutationFn: (k: OfflineKarte) => starteJetztAktualisieren(k.id),
+    onMutate: (k) => zeilen.beginne(k.id),
+    onError: (e, k) => zeilen.melde(k.id, e, 'Aktualisieren fehlgeschlagen'),
     onSuccess: ({ phase }) => {
       invalidiereKarte(qc);
       if (phase === 'aktuell') message.info('Die Karte ist aktuell');
       else if (phase === 'laedt') message.success('Update lädt');
       else message.success('Neubau gestartet');
     },
-    onError: (e) => message.error(fehlerText(e, 'Aktualisieren fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<OfflineKarte>[] = [
@@ -326,33 +348,37 @@ export default function OfflineKartenVerwaltung() {
               // LFH-993: Neubau oder Veröffentlichung laufen — dann weder „Jetzt aktualisieren“
               // noch Löschen.
               const phase = aktualisierungJe.get(k.id)?.phase;
+              const grund = zeilen.grund(k.id);
               return (
-                // `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
-                // (`components/aktionsabstand.guard.test.ts`).
-                <Space size="middle">
-                  {k.status === 'bereit' && k.aktualisierbar && !laeuft && !phase && (
-                    <Button
-                      aria-label={`Jetzt aktualisieren: ${k.name}`}
-                      loading={jetztMutation.isPending && jetztMutation.variables?.id === k.id}
-                      onClick={() => jetztMutation.mutate(k)}
-                    >
-                      Jetzt aktualisieren
-                    </Button>
-                  )}
-                  {laeuft && (
-                    <Button onClick={() => abbrechenMutation.mutate(k.id)}>Abbrechen</Button>
-                  )}
-                  {!laeuft && !phase && (
-                    <Popconfirm
-                      title="Offline-Karte löschen?"
-                      okText="Löschen"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => loeschenMutation.mutate(k.id)}
-                    >
-                      <Button danger>Löschen</Button>
-                    </Popconfirm>
-                  )}
-                </Space>
+                <Flex vertical gap={token.marginXXS} align="flex-start">
+                  {/* `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
+                      (`components/aktionsabstand.guard.test.ts`). */}
+                  <Space size="middle">
+                    {k.status === 'bereit' && k.aktualisierbar && !laeuft && !phase && (
+                      <Button
+                        aria-label={`Jetzt aktualisieren: ${k.name}`}
+                        loading={jetztMutation.isPending && jetztMutation.variables?.id === k.id}
+                        onClick={() => jetztMutation.mutate(k)}
+                      >
+                        Jetzt aktualisieren
+                      </Button>
+                    )}
+                    {laeuft && (
+                      <Button onClick={() => abbrechenMutation.mutate(k.id)}>Abbrechen</Button>
+                    )}
+                    {!laeuft && !phase && (
+                      <Popconfirm
+                        title="Offline-Karte löschen?"
+                        okText="Löschen"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => loeschenMutation.mutate(k.id)}
+                      >
+                        <Button danger>Löschen</Button>
+                      </Popconfirm>
+                    )}
+                  </Space>
+                  {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
+                </Flex>
               );
             },
           },
