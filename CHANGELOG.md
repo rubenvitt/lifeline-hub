@@ -1,3 +1,15 @@
+## [1.0.0-alpha.96](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.95...v1.0.0-alpha.96) (2026-10-09)
+
+### Kräfte und Mittel
+
+**Kräfte können nun Unterstützungseinheiten zugeordnet werden.** Die Stärke einer UHS wird automatisch aus den ihr zugeordneten Einsatzkräften berechnet. In der UHS-Detailansicht steht ein neuer Reiter „Kräfte" zur Verfügung, der die Stärke, Qualifikationen und eine Liste der zugeordneten Kräfte zeigt. Über das UHS-Laptop können Kräfte der eigenen UHS zugeordnet, erfasst oder abgezogen werden. Im Lagemonitor und Lage-Dashboard wird die Anzahl der Kräfte an einer UHS angezeigt.
+
+**Bereitstellungsräume können nun über ein gekoppeltes Tablet verwaltet werden.** Die BR-Leitung kann über ein zugeordnetes Gerät Einheiten und Fahrzeuge im eigenen Bereitstellungsraum an- und abmelden sowie den Raum in Betrieb nehmen. Das Gerät zeigt nur den eigenen Bereitstellungsraum und kann Meldungen an die Einsatzleitung senden. Die Verwaltung von Stammdaten und das Auflösen von Räumen bleibt der Einsatzleitung vorbehalten.
+
+### Betrieb und Installation
+
+**Verbesserte Stabilität bei hoher Systemlast.** Zwei Anzeigeprobleme wurden behoben, die bei hoher Auslastung zu falschem Scroll-Verhalten in der Sprungpalette und zu fehlendem Fokus in Infotelefon-Formularen führen konnten.
+
 ## [1.0.0-alpha.95](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.94...v1.0.0-alpha.95) (2026-10-09)
 
 ### Wichtige Änderungen
