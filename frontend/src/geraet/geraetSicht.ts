@@ -22,6 +22,8 @@ export type GeraetFaehigkeit =
   | 'person-zuordnungen'
   /** Fotos und Dateien einer Person. */
   | 'person-anhaenge'
+  /** Bereitstellungsraum wechseln, anlegen, auflösen, stornieren (LFH-1042). */
+  | 'br-verwalten'
   /** Sprünge in Module außerhalb der Ansicht (Lagekarte, Tiere, Schäden, Einsatzübersicht). */
   | 'fremde-module';
 
@@ -34,6 +36,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'uhs-anhaenge':
       return geraet.ansicht === 'uhs-laptop';
     case 'uhs-verwalten':
+    case 'br-verwalten':
     case 'person-status':
     case 'person-zuordnungen':
     case 'person-anhaenge':

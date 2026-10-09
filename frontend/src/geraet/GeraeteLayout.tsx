@@ -11,6 +11,7 @@ import {
   IconKachelraster,
   IconKarte,
   IconKlemmbrettListe,
+  IconLagerhalle,
   IconOrganigramm,
   IconPapierflieger,
   IconPersonPlus,
@@ -25,8 +26,10 @@ import {
   geraetAbschnittPfad,
   geraetAufnahmePfad,
   geraetAuftraegePfad,
+  geraetBrPfad,
   geraetKartePfad,
   geraetMeldenPfad,
+  geraetMeldungenPfad,
   geraetMonitorPfad,
   geraetPatientenPfad,
   geraetStellePfad,
@@ -36,7 +39,9 @@ import {
 import { rahmenFarben } from '../theme/tokens';
 import { SeitenLeer } from '../components/SeitenZustand';
 import AufnahmePage from '../pages/personen/AufnahmePage';
+import BrDetailPage from '../pages/bereitstellungsraum/BrDetailPage';
 import UhsDetailPage from '../pages/uhs/UhsDetailPage';
+import GeraetMeldungenPage from './GeraetMeldungenPage';
 import GeraetStellePage from './GeraetStellePage';
 import LagemonitorPage from './LagemonitorPage';
 import { GeraeteKopf } from './GeraeteKopf';
@@ -49,8 +54,8 @@ export function istUhsAnsicht(ansicht: Funktionsansicht): boolean {
 
 /**
  * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, der
- * Lagemonitor mit seinem Großbild. Eine Ansicht ohne eigene Seiten (noch nicht freigeschaltet,
- * LFH-1040) hat keine: `null`.
+ * Lagemonitor mit seinem Großbild, der Bereitstellungsraum mit seinem Raum (LFH-1042). Eine
+ * Ansicht ohne eigene Seiten (noch nicht freigeschaltet, LFH-1040) hat keine: `null`.
  */
 export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
   switch (geraet.ansicht) {
@@ -61,8 +66,9 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
       return geraetPatientenPfad(geraet.einsatz_id);
     case 'einsatzabschnitt':
       return geraetAbschnittPfad(geraet.einsatz_id);
-    case 'betreuungsstelle':
     case 'bereitstellungsraum':
+      return geraet.stelle_id == null ? null : geraetBrPfad(geraet.einsatz_id, geraet.stelle_id);
+    case 'betreuungsstelle':
     case 'verpflegung':
       return null;
   }
@@ -128,6 +134,28 @@ export function GeraetUhs() {
   return <UhsDetailPage />;
 }
 
+/** Der eigene Bereitstellungsraum (LFH-1042); jede andere Kennung führt zur Startseite. */
+export function GeraetBr() {
+  const { geraet } = useAuth();
+  const { brId } = useParams();
+  if (
+    !geraet ||
+    geraet.ansicht !== 'bereitstellungsraum' ||
+    geraet.stelle_id == null ||
+    parseRouteId(brId) !== geraet.stelle_id
+  ) {
+    return <GeraetStart />;
+  }
+  return <BrDetailPage />;
+}
+
+/** Meldungen an die Einsatzleitung für Ansichten ohne eigenen Stellenbereich (Bereitstellungsraum). */
+export function GeraetMeldungen() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'bereitstellungsraum') return <GeraetStart />;
+  return <GeraetMeldungenPage />;
+}
+
 /** Bereich „UHS“ nur für die Ansicht, die Material und Dateien ihrer UHS führt (UHS-Laptop). */
 export function GeraetStelle() {
   const { geraet } = useAuth();
@@ -162,6 +190,23 @@ function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: Rea
       <Icon size={22} />
       {children}
     </NavLink>
+  );
+}
+
+/** Ziele des Bereitstellungsraums (LFH-1042): der eigene Raum und Melden, wie beim Abschnittsgerät. */
+function BrNavigationsziele({ geraet }: { geraet: GeraetAnzeige }) {
+  const eid = geraet.einsatz_id;
+  return (
+    <>
+      {geraet.stelle_id != null && (
+        <NavZiel zu={geraetBrPfad(eid, geraet.stelle_id)} Icon={IconLagerhalle}>
+          Raum
+        </NavZiel>
+      )}
+      <NavZiel zu={geraetMeldungenPfad(eid)} Icon={IconPapierflieger}>
+        Melden
+      </NavZiel>
+    </>
   );
 }
 
@@ -207,7 +252,8 @@ function AbschnittNavigation({ eid }: { eid: number }) {
 /**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
  * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen. Das
- * Abschnittsgerät hat eigene Ziele ({@link AbschnittNavigation}).
+ * Abschnittsgerät und der Bereitstellungsraum haben eigene Ziele ({@link AbschnittNavigation},
+ * {@link BrNavigationsziele}).
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   const eid = geraet.einsatz_id;
@@ -225,6 +271,8 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
     >
       {geraet.ansicht === 'einsatzabschnitt' ? (
         <AbschnittNavigation eid={eid} />
+      ) : geraet.ansicht === 'bereitstellungsraum' ? (
+        <BrNavigationsziele geraet={geraet} />
       ) : (
         <>
           <NavZiel zu={geraetPatientenPfad(eid)} Icon={IconPersonen}>

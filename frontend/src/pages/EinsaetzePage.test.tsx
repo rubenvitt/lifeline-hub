@@ -1,4 +1,4 @@
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -253,10 +253,14 @@ describe('EinsaetzePage', () => {
   // nicht aussehen wie „noch keine Daten".
 
   it('zeigt beim Laden Karten-Skelette im Raster und noch keinen Anlegen-Knopf', async () => {
+    // Die Antwort wartet, bis der Ladezustand geprüft ist: eine feste Verzögerung lief unter Last
+    // ab, bevor die Prüfung dran war.
+    let antworten!: () => void;
+    const freigabe = new Promise<void>((r) => (antworten = r));
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', async () => {
-        await delay(60);
+        await freigabe;
         return HttpResponse.json([einsatz()]);
       }),
     );
@@ -269,6 +273,7 @@ describe('EinsaetzePage', () => {
       expect(raster.querySelectorAll('.lfh-skelett__balken').length).toBeGreaterThan(0),
     );
     expect(screen.queryByRole('button', { name: /Neuer Einsatz/ })).toBeNull();
+    antworten();
 
     // Erst nach dem Laden erscheint er — oben hat also der Ladezustand ihn verborgen, nicht ein
     // fehlendes Recht.

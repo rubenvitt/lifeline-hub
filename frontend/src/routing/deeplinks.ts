@@ -992,6 +992,16 @@ export function geraetStellePfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/stelle`;
 }
 
+/** Eigener Bereitstellungsraum eines BR-Geräts (LFH-1042), Startseite der Ansicht. */
+export function geraetBrPfad(einsatzId: number, brId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/br/${brId}`;
+}
+
+/** Meldungen an die Einsatzleitung eines stellengebundenen Geräts ohne eigenen Stellenbereich. */
+export function geraetMeldungenPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/meldungen`;
+}
+
 /** Startseite des Abschnittsgeräts (LFH-1043): der eigene Abschnitt mit seinen Einheiten. */
 export function geraetAbschnittPfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/abschnitt`;

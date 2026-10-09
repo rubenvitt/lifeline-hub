@@ -13,8 +13,9 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
-    plan_hochladen, png_bytes, rolle_setzen, setup_mit_pool_und_live, system_etb_inhalte,
+    anfrage, anfrage_json, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit,
+    login_cookie, plan_hochladen, png_bytes, rolle_setzen, setup_mit_pool_und_live,
+    system_etb_inhalte,
 };
 
 // ---------- Helfer ----------
@@ -236,7 +237,7 @@ async fn uhs_eines_anderen_einsatzes_ist_404() {
 
 // ---------- Weitere Stellen (LFH-1040) ----------
 
-/// Die vier neuen Ansichten stehen im Katalog, sind aber erst koppelbar, wenn ihr Task sie
+/// Die neuen Ansichten stehen im Katalog, sind aber erst koppelbar, wenn ihr Task sie
 /// freischaltet; die Übersicht bietet nur die verfügbaren an, mit der Art ihrer Stelle.
 #[tokio::test]
 async fn neue_ansichten_sind_noch_nicht_koppelbar() {
@@ -244,7 +245,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    for ansicht in ["betreuungsstelle", "bereitstellungsraum", "verpflegung"] {
+    for ansicht in ["betreuungsstelle", "verpflegung"] {
         let (s, v) = anlegen(
             &app,
             &admin,
@@ -270,6 +271,7 @@ async fn neue_ansichten_sind_noch_nicht_koppelbar() {
             {"ansicht": "uhs-tablet", "stellenart": "uhs"},
             {"ansicht": "uhs-laptop", "stellenart": "uhs"},
             {"ansicht": "lagemonitor", "stellenart": null},
+            {"ansicht": "bereitstellungsraum", "stellenart": "bereitstellungsraum"},
             {"ansicht": "einsatzabschnitt", "stellenart": "einsatzabschnitt"},
         ])
     );
@@ -2651,4 +2653,375 @@ async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
     let monitor = koppeln(&app, &code, None).await.cookie.unwrap();
     let (s, _) = anfrage(&app, "GET", &pfad, &monitor, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Lagemonitor");
+}
+
+// ---------- Bereitstellungsraum (LFH-1042) ----------
+
+/// Legt einen BR an (`geplant`); mit `aktiv` setzt die Einsatzleitung ihn in Betrieb.
+async fn br_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str, aktiv: bool) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        cookie,
+        Some(&json!({"bezeichnung": bez})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let br = v["id"].as_i64().unwrap();
+    if aktiv {
+        let (s, v) = anfrage_json(
+            app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+            cookie,
+            Some(&json!({"status": "aktiv"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+    br
+}
+
+/// Ein gekoppeltes BR-Gerät: `(kopplung_id, geräte-cookie)`.
+async fn br_geraet(app: &axum::Router, cookie: &str, einsatz: i64, br: i64) -> (i64, String) {
+    let (id, code) = kopplung(
+        app,
+        cookie,
+        einsatz,
+        json!({"ansicht": "bereitstellungsraum", "stelle_id": br, "bezeichnung": "Tablet BR"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    (id, a.cookie.expect("Sitzungscookie"))
+}
+
+async fn belegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+    einheit: i64,
+    art: &str,
+) -> (StatusCode, Value) {
+    anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung"),
+        cookie,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit, "art": art})),
+    )
+    .await
+}
+
+/// Das BR-Gerät kennt nur seinen Raum: Liste nur der eigene, ein fremder ist 404.
+#[tokio::test]
+async fn br_geraet_kennt_nur_den_eigenen_raum() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+
+    let (s, ich) = me(&app, &geraet).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(ich["geraet"]["stelle"], "BR Sportplatz");
+
+    let liste = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume");
+    let (s, v) = anfrage(&app, "GET", &liste, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ids: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![sportplatz], "nur der eigene Raum");
+    let (_, v) = anfrage(&app, "GET", &liste, &admin, None).await;
+    assert_eq!(v.as_array().unwrap().len(), 2, "die Person sieht beide");
+
+    let (s, v) = anfrage(&app, "GET", &format!("{liste}/{sportplatz}"), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bezeichnung"], "BR Sportplatz");
+    let (s, _) = anfrage(&app, "GET", &format!("{liste}/{schule}"), &geraet, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+}
+
+/// Anmelden (Eintritt, Wechsel herein) und Abmelden (Austritt) im eigenen Raum; in einen
+/// fremden Raum bucht das Gerät nicht (404, wie beim Lesen).
+#[tokio::test]
+async fn br_geraet_meldet_kraefte_im_eigenen_raum_an_und_ab() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    let rtw = einheit_bilden(&app, &admin, einsatz, "RTW 1").await;
+    let detail = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, v) = anfrage(&app, "GET", &detail, &geraet, None).await;
+    assert_eq!(v["einheiten"][0]["name"], "LF Nord", "{v}");
+
+    // Ein Wechsel herein trägt den eigenen Raum als Ziel.
+    let (s, v) = belegen(&app, &admin, einsatz, schule, rtw, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, rtw, "wechsel").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    // In einen fremden Raum bucht das Gerät nichts, weder hinein noch hinaus.
+    let (s, _) = belegen(&app, &geraet, einsatz, schule, lf, "wechsel").await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Wechsel hinaus");
+    let (s, _) = belegen(&app, &geraet, einsatz, schule, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+
+    let (s, v) = belegen(&app, &geraet, einsatz, sportplatz, lf, "austritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (_, v) = anfrage(&app, "GET", &detail, &geraet, None).await;
+    let namen: Vec<&str> = v["einheiten"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(namen, vec!["RTW 1"], "LF Nord ist abgerückt");
+
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == "LF Nord verlässt Bereitstellungsraum BR Sportplatz"),
+        "{etb:?}"
+    );
+}
+
+/// Das Gerät nimmt seinen Raum in Betrieb; auflösen, stornieren, anlegen und ändern bleibt bei
+/// der Einsatzleitung.
+#[tokio::test]
+async fn br_geraet_nimmt_den_raum_in_betrieb_aber_loest_ihn_nicht_auf() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", false).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{raum}/status"),
+        &geraet,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "auflösen aus geplant");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{raum}/status"),
+        &geraet,
+        Some(&json!({"status": "aktiv"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"], "aktiv");
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == "Bereitstellungsraum BR Sportplatz in Betrieb genommen"),
+        "{etb:?}"
+    );
+
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{raum}/status"),
+        &geraet,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "auflösen");
+
+    for (m, pfad, body) in [
+        ("DELETE", raum.clone(), None),
+        ("PATCH", raum.clone(), Some(json!({"notiz": "x"}))),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+            Some(json!({"bezeichnung": "BR Neu"})),
+        ),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+    let (_, v) = anfrage(&app, "GET", &raum, &admin, None).await;
+    assert_eq!(v["status"], "aktiv", "nichts aufgelöst");
+}
+
+/// Die Kräfte des Einsatzes liest das Gerät als Liste, ändern und abrufen kann es sie nicht; den
+/// Rest des Einsatzes (ETB, Personen, Einsatzabschnitte) erreicht es nicht.
+#[tokio::test]
+async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v[0]["name"], "LF Nord");
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    for (m, pfad, body) in [
+        (
+            "PATCH",
+            format!("/api/einsaetze/{einsatz}/einheiten/{lf}"),
+            Some(json!({"name": "LF Süd"})),
+        ),
+        (
+            "PATCH",
+            format!("/api/einsaetze/{einsatz}/einheiten/{lf}/position"),
+            Some(json!({"lat": 52.5, "lon": 13.4})),
+        ),
+        ("GET", format!("/api/einsaetze/{einsatz}/etb"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/personen"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/abschnitte"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/uhs"), None),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+
+    // Modulfreigaben und Zähler folgen der Ansicht; ein gebundenes Gerät bekommt keine
+    // einsatzweiten Zähler, auch nicht für die Kräfteliste, die es liest.
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["einheiten"].is_null(), "{v}");
+    assert!(
+        v["meldungen"].is_null(),
+        "kein einsatzweiter Meldungszähler: {v}"
+    );
+    assert!(v["personen"].is_null(), "{v}");
+}
+
+/// Meldungen an die Einsatzleitung wie am UHS-Laptop: anlegen und nur die eigenen lesen.
+#[tokio::test]
+async fn br_geraet_meldet_und_liest_nur_eigene_meldungen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldung = |inhalt: &str| {
+        json!({
+            "absender": "BR Sportplatz",
+            "meldeweg": "persoenlich",
+            "inhalt": inhalt,
+            "ereigniszeit": "2026-10-08 10:00:00",
+        })
+    };
+
+    let (s, v) = anfrage_json(&app, "POST", &meldungen, &admin, Some(&meldung("Lage"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &geraet,
+        Some(&meldung("Raum voll")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage(&app, "GET", &meldungen, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let inhalte: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["inhalt"].as_str().unwrap())
+        .collect();
+    assert_eq!(inhalte, vec!["Raum voll"], "nur die eigene Meldung");
+}
+
+/// Ein widerrufenes BR-Gerät verliert sofort jeden Zugriff.
+#[tokio::test]
+async fn widerrufenes_br_geraet_verliert_den_raum() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (id, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let raum = format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{sportplatz}");
+    let (s, _) = anfrage(&app, "GET", &raum, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK);
+
+    widerrufen(&app, &admin, einsatz, id).await;
+    let (s, _) = anfrage(&app, "GET", &raum, &geraet, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+}
+
+/// Der Live-Kanal des BR-Geräts trägt die Änderungen am Raum, aber kein ETB: eine Anmeldung durch
+/// die Einsatzleitung erreicht das Tablet, ihr ETB-Eintrag nicht.
+#[tokio::test]
+async fn live_kanal_des_br_geraets_traegt_den_raum_ohne_etb() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+
+    let mut br_strom = live_geraet(&app, &geraet, einsatz).await;
+    let mut admin_strom = live_geraet(&app, &admin, einsatz).await;
+    let (s, v) = belegen(&app, &admin, einsatz, sportplatz, lf, "eintritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let mut beim_admin = Vec::new();
+    strom_lesen(
+        &mut admin_strom,
+        &mut beim_admin,
+        Duration::from_millis(500),
+    )
+    .await;
+    assert!(
+        beim_admin.iter().any(|e| e == "etb"),
+        "Gegenprobe: {beim_admin:?}"
+    );
+    let mut beim_br = Vec::new();
+    strom_lesen(&mut br_strom, &mut beim_br, Duration::from_millis(500)).await;
+    assert!(
+        beim_br.iter().any(|e| e == "bereitstellungsraum"),
+        "{beim_br:?}"
+    );
+    assert!(!beim_br.iter().any(|e| e == "etb"), "{beim_br:?}");
 }

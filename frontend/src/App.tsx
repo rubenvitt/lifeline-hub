@@ -12,7 +12,9 @@ import KopplungBeendetPage from './geraet/KopplungBeendetPage';
 import GeraeteLayout, {
   GeraetAbschnittRahmen,
   GeraetAufnahme,
+  GeraetBr,
   GeraetEinsatzRahmen,
+  GeraetMeldungen,
   GeraetStart,
   GeraetMonitor,
   GeraetStelle,
@@ -240,6 +242,9 @@ export const appRouten = createRoutesFromElements(
         <Route path=":id" element={<GeraetEinsatzRahmen />}>
           <Route index element={<GeraetStart />} />
           <Route path="monitor" element={<GeraetMonitor />} />
+          {/* Bereitstellungsraum (LFH-1042): der eigene Raum und die Meldungen. */}
+          <Route path="br/:brId" element={<GeraetBr />} />
+          <Route path="meldungen" element={<GeraetMeldungen />} />
           {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
           <Route element={<GeraetUhsRahmen />}>
             <Route path="patienten" element={<GeraetPatientenPage />} />

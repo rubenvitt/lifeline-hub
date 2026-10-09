@@ -37,6 +37,7 @@ import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { summiereStaerke } from '../../anzeige/staerke';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { useGeraetDarf } from '../../geraet/geraetSicht';
 
 /** Die Bezeichnung reist nur für die Quittung mit, der Server bekommt allein `daten`. */
 type BelegungMitName = { daten: Parameters<typeof belegeBr>[2]; bezeichnung: string };
@@ -55,7 +56,11 @@ export function belegungsQuittung(b: BelegungMitName): string {
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
+  const { benutzer, geraet } = useAuth();
+  // Ein BR-Gerät (LFH-1042) führt nur seinen Raum: kein Umschalter, kein Auflösen und Stornieren,
+  // keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
+  const darf = useGeraetDarf();
+  const verwalten = darf('br-verwalten');
   const { rollen } = useRollen();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
@@ -84,10 +89,12 @@ export default function BrDetailPage() {
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
 
-  // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier.
+  // Diesen BR als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier. Ein
+  // Gerät merkt nichts auf der Platte (`frontend/src/geraet/AGENTS.md`, „Nichts auf der Platte“).
+  const merken = geraet == null;
   useEffect(() => {
-    if (detailQuery.isSuccess) merkeLetztenBr(einsatzId, brId);
-  }, [detailQuery.isSuccess, einsatzId, brId]);
+    if (merken && detailQuery.isSuccess) merkeLetztenBr(einsatzId, brId);
+  }, [merken, detailQuery.isSuccess, einsatzId, brId]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
@@ -205,19 +212,25 @@ export default function BrDetailPage() {
         // `wrap`: bei langem Namen rutscht der Status unter den Namen, statt auf 390 px
         // über den Rand zu ragen (gemessen 11 px, LFH-435).
         <Space wrap>
-          <BrSwitcher einsatzId={einsatzId} aktuellerBr={br} />
+          {verwalten ? (
+            <BrSwitcher einsatzId={einsatzId} aktuellerBr={br} />
+          ) : (
+            <span>{br.bezeichnung}</span>
+          )}
           <StatusTag darstellung={brStatus[br.status]} />
         </Space>
       }
       breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
-            { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
-            { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
-            { title: br.bezeichnung },
-          ]}
-        />
+        darf('fremde-module') && (
+          <Breadcrumb
+            items={[
+              { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
+              { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
+              { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
+              { title: br.bezeichnung },
+            ]}
+          />
+        )
       }
       aktionen={
         // `size="middle"`: „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“
@@ -225,7 +238,7 @@ export default function BrDetailPage() {
         <Space wrap size="middle">
           {/* Belegt, lehnt der Server das Auflösen ab (409): der Knopf ist dann gesperrt, der
               Grund steht in wenigen Wörtern daneben, nicht als Satz in der Rückfrage (LFH-1078). */}
-          {!schreibgeschuetzt && br.status === 'aktiv' && belegt > 0 && (
+          {verwalten && !schreibgeschuetzt && br.status === 'aktiv' && belegt > 0 && (
             <>
               <Button danger disabled>
                 Auflösen
@@ -233,7 +246,7 @@ export default function BrDetailPage() {
               <Typography.Text type="secondary">noch {belegt} belegt</Typography.Text>
             </>
           )}
-          {!schreibgeschuetzt && br.status === 'aktiv' && belegt === 0 && (
+          {verwalten && !schreibgeschuetzt && br.status === 'aktiv' && belegt === 0 && (
             <Popconfirm
               title="BR auflösen?"
               okText="BR auflösen"
@@ -254,16 +267,18 @@ export default function BrDetailPage() {
               >
                 In Betrieb nehmen
               </Button>
-              <Popconfirm
-                title="BR stornieren?"
-                okText="BR stornieren"
-                okButtonProps={{ danger: true }}
-                onConfirm={() => stornoMut.mutate()}
-              >
-                <Button danger loading={stornoMut.isPending}>
-                  Stornieren
-                </Button>
-              </Popconfirm>
+              {verwalten && (
+                <Popconfirm
+                  title="BR stornieren?"
+                  okText="BR stornieren"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => stornoMut.mutate()}
+                >
+                  <Button danger loading={stornoMut.isPending}>
+                    Stornieren
+                  </Button>
+                </Popconfirm>
+              )}
             </>
           )}
         </Space>
