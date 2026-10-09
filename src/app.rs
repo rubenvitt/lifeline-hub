@@ -76,6 +76,11 @@ const AUTH_START_BODY_MAX: usize = 4 * 1024;
 /// Entscheidung 6).
 const AUTH_FINISH_BODY_MAX: usize = 16 * 1024;
 
+/// Body-Grenze der übrigen öffentlichen Routen mit Body (Zweitfaktor, App-Code, Gerätekopplung;
+/// LFH-1061): sie tragen nur einen kurzen Code (TOTP- oder Recovery-Code, Einmalcode samt
+/// PKCE-`verifier` bis 128 Zeichen, Kopplungscode). Bemessen wie die Anmelde-Starts.
+const AUTH_CODE_BODY_MAX: usize = 4 * 1024;
+
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
 pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     // Grenzen der großen Transfers (LFH-938, `src/transfer.rs`): EINE Upload-Grenze für alle
@@ -118,10 +123,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/auth/app-code/einloesen",
-            post(routes::auth::app_code_einloesen),
+            post(routes::auth::app_code_einloesen).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
         // LFH-892: ein Gerät löst seinen Kopplungscode ein (öffentlich, Rate-Limit je Quelle).
-        .route("/api/geraete/koppeln", post(routes::geraet::koppeln))
+        .route(
+            "/api/geraete/koppeln",
+            post(routes::geraet::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route(
@@ -159,7 +167,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/auth/totp/enroll/finish",
             post(routes::auth::totp_enroll_finish),
         )
-        .route("/api/auth/totp/finish", post(routes::auth::totp_finish))
+        .route(
+            "/api/auth/totp/finish",
+            post(routes::auth::totp_finish).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
         .route("/api/auth/passwort", post(routes::auth::passwort_aendern))
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))

@@ -211,6 +211,54 @@ async fn zu_grosser_login_body_liefert_400_im_fehler_envelope() {
     assert_eq!(json["error"], BODY_UNLESBAR, "abgewiesen wegen der Größe");
 }
 
+/// Die übrigen öffentlichen Routen mit Body tragen nur einen kurzen Code und haben ebenfalls
+/// 4 KiB (LFH-1061).
+const OEFFENTLICHE_CODE_ROUTEN: [&str; 3] = [
+    "/api/auth/totp/finish",
+    "/api/auth/app-code/einloesen",
+    "/api/geraete/koppeln",
+];
+
+fn json_post(pfad: &str, body: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(pfad)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+#[tokio::test]
+async fn zu_grosser_body_der_code_routen_liefert_400_im_fehler_envelope() {
+    let app = common::setup().await;
+    let body = serde_json::json!({ "code": "a".repeat(5 * 1024), "verifier": "x" }).to_string();
+    for pfad in OEFFENTLICHE_CODE_ROUTEN {
+        let resp = app.clone().oneshot(json_post(pfad, &body)).await.unwrap();
+        let status = resp.status();
+        let json = assert_fehler_envelope(resp, pfad).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{pfad}");
+        assert_eq!(
+            json["error"], BODY_UNLESBAR,
+            "{pfad}: abgewiesen wegen der Größe"
+        );
+    }
+}
+
+/// Unter der Grenze geht der Body an den Handler weiter und scheitert erst an seinem Inhalt.
+#[tokio::test]
+async fn code_routen_nehmen_body_unter_4_kib_an() {
+    let app = common::setup().await;
+    let body = serde_json::json!({ "code": "a".repeat(3 * 1024), "verifier": "x" }).to_string();
+    for pfad in OEFFENTLICHE_CODE_ROUTEN {
+        let resp = app.clone().oneshot(json_post(pfad, &body)).await.unwrap();
+        let json = assert_fehler_envelope(resp, pfad).await;
+        assert_ne!(
+            json["error"], BODY_UNLESBAR,
+            "{pfad}: 3 KiB müssen unter der Grenze liegen"
+        );
+    }
+}
+
 /// Die Passkey-Abschlüsse haben 16 KiB (LFH-921): ein 6-KiB-Body scheitert dort an seinem
 /// Inhalt, nicht an der Größe.
 #[tokio::test]
