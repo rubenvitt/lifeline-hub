@@ -4,7 +4,7 @@
 //!
 //! Eine Zeile je Einsatz (Migration 0145), lazy beim ersten Schreiben; fehlt sie, gilt die
 //! Führungsstelle als nicht erfasst und der Abruf liefert alle Angaben leer. Sprechgruppen (0145)
-//! und Fahrzeuge (0168) hängen in eigenen Zuordnungstabellen. Nicht zu verwechseln
+//! und Fahrzeuge (0171) hängen in eigenen Zuordnungstabellen. Nicht zu verwechseln
 //! mit `einsatz_mitgliedschaft.fuehrungsstelle` (Freitext je Person, LFH-461).
 //!
 //! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2).
@@ -79,7 +79,7 @@ pub async fn pruefe_fahrzeuge(
 }
 
 /// Trägt die Dispositionszeile die Führungsstelle? Wer sie löscht, fragt vorher: die Kaskade
-/// (Migration 0168) löst die Zuordnung still, das Ereignis `einsatz` muss der Aufrufer melden.
+/// (Migration 0171) löst die Zuordnung still, das Ereignis `einsatz` muss der Aufrufer melden.
 pub async fn traegt_fahrzeug_tx(
     conn: &mut SqliteConnection,
     einsatz_fahrzeug_id: i64,
