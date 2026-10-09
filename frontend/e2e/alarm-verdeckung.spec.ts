@@ -69,7 +69,7 @@ async function alarmeUnter(page: Page, kante: number) {
 /**
  * Jedes sichtbare Bedienelement der Kommandoleiste liegt obenauf: der Treffer in seiner Mitte
  * ist es selbst. Bedienbare zusätzlich mit `trial`-Klick; ein gesperrter Zustandsknopf
- * („Benachrichtigungen: blockiert“) besteht keinen Klick, trägt aber seinen Tooltip.
+ * („Benachrichtigung blockiert“) besteht keinen Klick, trägt aber seinen Tooltip.
  */
 async function kommandoleisteKlickbar(page: Page) {
   const ziele = page
