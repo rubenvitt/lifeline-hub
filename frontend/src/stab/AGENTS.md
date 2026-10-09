@@ -53,7 +53,10 @@ Breite, nicht im Abstand. Nachweis e2e „Prüfliste 1 und 2“; e2e wählen Ele
 Zeichen mit Wort darunter, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus). Ein
 Führungsfahrzeug (Fachaufgabe `fuehrung` aus `baueTzProps`, dieselbe Regel wie die Lagekarte) steht
 im Kasten des nächsten Abschnitts über seiner Einheit im Baum; „EAL“/„UEAL“ nur mit eingetragener
-Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung ohne `rueckwaertig`.
+Leitung; im Kasten „Einsatzleitung“ die Sachgebiete aus der Stab-Besetzung ohne `rueckwaertig`,
+danach die der Führungsstelle zugeordneten Fahrzeuge (`fahrzeug_ids`, LFH-1106, jede Fachaufgabe).
+Ein zugeordnetes Fahrzeug steht nur dort, im Funkplan unter der Zeile `fs`; die Führungsstelle
+liefert nur IDs, Namen kommen aus der Fahrzeug-Quelle (mit deren Freigabe).
 Zeichen der Funktionen nur über `zeichen/fachobjektZeichen.ts:funktionsZeichen`; Höhe und Plätze nur
 über `stab/fernmeldeskizzeLayout.ts:ausstattungsZeilen` (Bild und Layout rechnen dieselbe Zahl).
 **Netz und Sicherheit** (LFH-1030, J.5): kurzer Freitext an der Sprechgruppe (Katalog und

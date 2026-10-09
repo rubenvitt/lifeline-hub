@@ -245,6 +245,8 @@ export interface FuehrungsstellePatch {
   kommunikationsmittel?: string | null;
   erreichbarkeit?: string | null;
   sprechgruppe_ids?: number[];
+  /** Dispositionszeilen, die die Führungsstelle tragen (LFH-1106); ersetzt vollständig. */
+  fahrzeug_ids?: number[];
 }
 
 // ============================== E‑2 Personen ==============================

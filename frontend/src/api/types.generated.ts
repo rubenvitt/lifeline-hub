@@ -2158,6 +2158,12 @@ export interface components {
         FuehrungsstelleAnzeige: {
             /** @description Personenbezogen: wird geschwärzt und steht nie im Lagebericht. */
             erreichbarkeit?: string | null;
+            /**
+             * @description Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
+             *     Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
+             *     Fahrzeuge (LFH-1106, design.md D2).
+             */
+            fahrzeug_ids: number[];
             /** @description Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`). */
             kommunikationsmittel?: string | null;
             /** @description Funkrufname der Führungsstelle, z. B. „Florian Musterstadt 10/1“. */

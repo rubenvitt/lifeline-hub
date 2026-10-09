@@ -1731,6 +1731,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("sprechgruppe_id", G_FK),
         ],
     },
+    // Fahrzeuge der eigenen Führungsstelle (LFH-1106): reine Zuordnung, kein Personenbezug.
+    TabellenRegel {
+        tabelle: "einsatz_fuehrungsstelle_fahrzeug",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("einsatz_fahrzeug_id", G_FK),
+        ],
+    },
     // ---------- Führungsdokumentation: ETB (RETAIN, Wortlaut) und Führungsmodule ----------
     // Rechtsverbindlich ist allein der ETB-Wortlaut. Die Freitexte der Module darunter werden
     // gescrubbt, ihre Struktur bleibt (LFH-701, Linie A).

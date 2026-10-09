@@ -188,7 +188,7 @@ beforeEach(() => {
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue(FAHRZEUGE);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue(PERSONAL);
   vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(SPRECHGRUPPEN);
-  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({ sprechgruppen: [] });
+  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({ sprechgruppen: [], fahrzeug_ids: [] });
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
   vi.mocked(ladeStab).mockResolvedValue({ besetzung: [], anzahl_lagebesprechungen: 0 });
@@ -1081,6 +1081,7 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     sprechgruppen: [sg(1, 'TMO', 'TMO 311')],
     kommunikationsmittel: 'digitalfunk',
     erreichbarkeit: '0171 ELW',
+    fahrzeug_ids: [],
   };
 
   it('steht erfasst als erste Zeile mit Verweis auf die Einsatzdaten; der Hinweis entfällt', async () => {
@@ -1122,6 +1123,7 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
   it('zählt die Verbindung Führungsstelle → oberster Abschnitt und verweist auf den Abschnitt', async () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
       sprechgruppen: [sg(7, 'TMO', 'TMO 700')],
+      fahrzeug_ids: [],
     });
     setup();
     await screen.findByText('Florian 1/42-1');

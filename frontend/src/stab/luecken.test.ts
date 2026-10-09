@@ -77,7 +77,7 @@ const fs = (
   p: Partial<Fuehrungsstelle> = {},
 ): FuehrungsstelleQuelle => ({
   zustand: 'daten',
-  daten: { sprechgruppen, ...p },
+  daten: { sprechgruppen, fahrzeug_ids: [], ...p },
 });
 
 describe('abschnitteOhneSprechgruppe', () => {

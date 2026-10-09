@@ -2,24 +2,33 @@
 
 ## Purpose
 Hält je Einsatz die eigene Führungsstelle (ELW, Einsatzleitung) als Gegenstelle für Funkplan und
-Fernmeldeskizze fest: Rufname, Sprechgruppen, Kommunikationsmittel und Erreichbarkeit, samt Rechten,
-Live-Verhalten und Schwärzung.
+Fernmeldeskizze fest: Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und die
+Fahrzeuge, die sie tragen, samt Rechten, Live-Verhalten und Schwärzung.
 
 ## Requirements
 
 ### Requirement: Angaben der eigenen Führungsstelle
-Ein Einsatz SHALL genau eine eigene Führungsstelle mit vier optionalen Angaben tragen: Rufname,
-Sprechgruppen (TMO und DMO), Kommunikationsmittel und Erreichbarkeit. Ist keine Angabe gesetzt,
+Ein Einsatz SHALL genau eine eigene Führungsstelle mit fünf optionalen Angaben tragen: Rufname,
+Sprechgruppen (TMO und DMO), Kommunikationsmittel, Erreichbarkeit und Fahrzeuge (null oder mehr
+disponierte Fahrzeuge dieses Einsatzes, die die Führungsstelle tragen). Ist keine Angabe gesetzt,
 gilt die Führungsstelle als nicht erfasst. Die Führungsstelle je Person (Einsatzmitgliedschaft)
 MUST davon unberührt bleiben.
 
 #### Scenario: Neuer Einsatz
 - **WHEN** ein Einsatz angelegt wird
-- **THEN** liefert der Abruf der Führungsstelle alle vier Angaben leer, und sie gilt als nicht erfasst
+- **THEN** liefert der Abruf der Führungsstelle alle fünf Angaben leer, und sie gilt als nicht erfasst
 
 #### Scenario: Nur Rufname
 - **WHEN** nur der Rufname „Florian Musterstadt 10/1“ gespeichert ist
 - **THEN** gilt die Führungsstelle als erfasst, und Sprechgruppen, Kommunikationsmittel und Erreichbarkeit bleiben leer
+
+#### Scenario: Nur ein Fahrzeug
+- **WHEN** der Führungsstelle nur der disponierte ELW 2 „Florian Musterstadt 10/1“ zugeordnet ist
+- **THEN** gilt sie als erfasst, und Rufname, Sprechgruppen, Kommunikationsmittel und Erreichbarkeit bleiben leer
+
+#### Scenario: Fahrzeug wird entlassen
+- **WHEN** ein der Führungsstelle zugeordnetes Fahrzeug aus dem Einsatz entlassen wird
+- **THEN** ist es der Führungsstelle nicht mehr zugeordnet
 
 ### Requirement: Lesen mit dem Einsatz
 Jede Person, die den Einsatz lesen darf, SHALL die Führungsstelle lesen können, unabhängig von
@@ -66,8 +75,22 @@ einsatzlokalen Sprechgruppen dieses Einsatzes angehören; jede andere ergibt 422
 - **WHEN** als Kommunikationsmittel ein unbekannter Wert gesendet wird
 - **THEN** antwortet der Server mit 400
 
+### Requirement: Fahrzeuge der Führungsstelle
+Der Abruf SHALL die zugeordneten Fahrzeuge nur als IDs der Disposition liefern, nie mit
+Funkrufname, Typ oder anderen Fahrzeugdaten. Gesendete Fahrzeuge MUST die Zuordnung vollständig
+ersetzen. Ein Fahrzeug, das diesem Einsatz nicht disponiert ist, MUST mit 422 abgelehnt werden,
+ohne eine Angabe teilweise zu speichern.
+
+#### Scenario: Fremdes Fahrzeug
+- **WHEN** zusammen mit einem Rufname ein Fahrzeug eines anderen Einsatzes gesendet wird
+- **THEN** wird die Änderung mit 422 abgelehnt, und auch der Rufname bleibt unverändert
+
+#### Scenario: Ohne Fahrzeug-Freigabe lesen
+- **WHEN** eine Person ohne Freigabe für Fahrzeuge die Führungsstelle abruft
+- **THEN** erhält sie die Fahrzeug-IDs, aber keine Fahrzeugdaten
+
 ### Requirement: Bearbeitung auf der Seite Einsatzdaten
-Die Seite Einsatzdaten SHALL ein Paneel „Eigene Führungsstelle“ mit den vier Angaben zeigen. Jede
+Die Seite Einsatzdaten SHALL ein Paneel „Eigene Führungsstelle“ mit den fünf Angaben zeigen. Jede
 Angabe MUST einzeln in der Leseansicht bearbeitbar sein und beim Speichern genau ihr eigenes Feld
 senden; ein unveränderter Wert sendet nichts. Ohne Schreibrecht MUST keine Angabe eine Aufforderung
 tragen, leere Angaben zeigen „—“. Ein Speicherfehler MUST an der Zeile stehen.
@@ -75,6 +98,14 @@ tragen, leere Angaben zeigen „—“. Ein Speicherfehler MUST an der Zeile ste
 #### Scenario: Sprechgruppen zuordnen
 - **WHEN** eine schreibberechtigte Person an der Zeile „Sprechgruppen“ die Sprechgruppen „TMO 311“ und „DMO 505“ wählt und speichert
 - **THEN** zeigt die Zeile beide nach Betriebsart, und die Anfrage trug nur die Sprechgruppen
+
+#### Scenario: ELW 2 zuordnen
+- **WHEN** eine schreibberechtigte Person an der Zeile „Fahrzeuge“ den ELW 2 „Florian Musterstadt 10/1“ wählt und speichert
+- **THEN** zeigt die Zeile „Florian Musterstadt 10/1 (ELW 2)“, und die Anfrage trug nur die Fahrzeuge
+
+#### Scenario: Fahrzeuge nicht freigegeben
+- **WHEN** eine Person ohne Freigabe für Fahrzeuge das Paneel öffnet
+- **THEN** zeigt die Zeile „Fahrzeuge“ „nicht freigegeben“ ohne Aufforderung, und die übrigen Angaben bleiben bedienbar
 
 #### Scenario: Beobachter sieht die Angaben
 - **WHEN** eine Person mit der Rolle Beobachter die Seite öffnet
