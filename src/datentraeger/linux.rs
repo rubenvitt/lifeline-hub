@@ -813,7 +813,7 @@ mod tests {
 
     #[test]
     fn alle_cryptsetup_arten_mit_schluessel_sind_verschluesselt() {
-        for uuid in [
+        for kennung in [
             "CRYPT-LUKS1-abc-x",
             "CRYPT-LUKS2-abc-x",
             "CRYPT-PLAIN-swap",
@@ -821,10 +821,10 @@ mod tests {
             "CRYPT-TCRYPT-x",
         ] {
             let bg = Beispiel {
-                uuid: HashMap::from([(DM0, uuid)]),
+                uuid: HashMap::from([(DM0, kennung)]),
                 ..Default::default()
             };
-            assert_eq!(pruefe_geraet(&bg, DM0), Befund::Verschluesselt, "{uuid}");
+            assert_eq!(pruefe_geraet(&bg, DM0), Befund::Verschluesselt, "{kennung}");
         }
     }
 
