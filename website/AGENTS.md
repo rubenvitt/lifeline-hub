@@ -5,8 +5,12 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
 
 - **Bauen:** `mise exec -- pnpm -C website install` und `… build` (Ergebnis `website/dist/`).
   Eigenes `package.json`, Lockfile und `pnpm-workspace.yaml`; nichts aus `frontend/` wird
-  importiert, damit die Seite ohne die App baut. Kein Deployment, kein Schritt in
-  `scripts/check-all.sh`.
+  importiert, damit die Seite ohne die App baut. Kein Schritt in `scripts/check-all.sh`.
+- **Bereitstellung:** Cloudflare Pages, Projekt `lifeline-hub` (https://lifeline-hub.pages.dev),
+  verbunden mit dem Repo, Produktions-Branch `alpha`. Stammverzeichnis `website`, Build-Befehl
+  `pnpm build`, Ausgabe `dist`; Cloudflare installiert selbst aus dem Lockfile. Node und pnpm
+  setzen dort die Umgebungsvariablen `NODE_VERSION` und `PNPM_VERSION`: wer `engines` oder
+  `packageManager` in `website/package.json` hebt, zieht beide im Pages-Projekt nach.
 - **CI:** Ein PR, der nur `website/` ändert, fährt nur die Schnellprüfungen; Rust-, Frontend-
   und e2e-Suite laufen leer und grün durch (Job `aenderungen`, Mechanik im Kopf von
   `.github/workflows/ci.yml`). Eine Datei außerhalb von `website/` im selben PR schaltet
