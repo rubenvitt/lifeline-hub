@@ -367,6 +367,85 @@ for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
 }
 
 /**
+ * Informationstelefon auf dem Handschirm (LFH-1067): beim Öffnen stehen in jeder Dichtestufe
+ * mindestens zwei Anrufe ganz über der Oberkante der angepinnten Erfassung. Vorher stand ab
+ * `komfortabel` kein einziger Anruf im Bild (Leiste 268 px ab y = 576, erster Anruf y = 654).
+ * Zehn Anrufe über sechs Anliegen, die Notiz bricht am Handy um: die Seite rollt in jeder Dichte,
+ * und die Zeilen sind so hoch wie im Betrieb. Mutationsprobe (je einzeln rot, in `handschuh`):
+ * Erfassung nicht einklappen, Aufgliederung offen, Ortspfad auch unter `md`, Segmentleiste im
+ * Inhalt statt im Kopf.
+ */
+test('Informationstelefon (LFH-1067): auf 390 × 844 stehen beim Öffnen zwei Anrufe ganz im Bild', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Flaeche 1067 Hand ${Date.now()}`);
+  const anliegen = [
+    'vermisstensuche',
+    'auskunft_lage',
+    'hinweis',
+    'hilfeangebot',
+    'beschwerde',
+    'sonstiges',
+  ];
+  for (let n = 1; n <= 10; n += 1) {
+    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/stab/infotelefon`, {
+      data: {
+        anliegen: anliegen[n % anliegen.length],
+        notiz: `Probe ${n}: Wasser im Keller`,
+        rueckruf: `0171 ${String(n).padStart(3, '0')}`,
+        rueckruf_noetig: n % 2 === 0,
+      },
+    });
+    expect(anruf.ok(), await anruf.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  for (const dichte of DICHTEN) {
+    await page.goto(`/einsaetze/${einsatzId}/stab/infotelefon`);
+    await stelleDichte(page, dichte);
+    const zeilen = page.locator('[data-anruf]');
+    await expect(zeilen).toHaveCount(10);
+    await expect(page.getByRole('combobox', { name: 'Anliegen' })).toBeVisible();
+    await schriftenGeladen(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const reserve = await page.evaluate(
+      () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    );
+    expect(reserve, `${dichte}: Vorbedingung — die Seite hat eine Bildlaufreserve`).toBeGreaterThan(
+      0,
+    );
+
+    const m = await page.evaluate(() => {
+      const leiste = document.querySelector('.etb-erfassung-sticky')!.getBoundingClientRect();
+      const zeilen = [...document.querySelectorAll('[data-anruf]')].map((z) =>
+        z.getBoundingClientRect(),
+      );
+      return {
+        oberkante: leiste.top,
+        leiste: leiste.height,
+        ganz: zeilen.filter((z) => z.top >= 0 && z.bottom <= leiste.top + 0.5).length,
+        erste: zeilen[0]?.top ?? -1,
+        fokus: document.activeElement?.tagName ?? '',
+      };
+    });
+    gemessen.push(
+      `${dichte}: Leiste ab y = ${Math.round(m.oberkante)} (${Math.round(m.leiste)} px), erster Anruf y = ${Math.round(m.erste)}, ganz sichtbar ${m.ganz}`,
+    );
+    expect(m.fokus, `${dichte}: beim Laden liegt kein Fokus in einem Feld`).not.toBe('INPUT');
+    expect
+      .soft(
+        m.ganz,
+        `${dichte}: ganz sichtbare Anrufe über der Leiste (Leiste ab y = ${Math.round(m.oberkante)}, erster Anruf y = ${Math.round(m.erste)})`,
+      )
+      .toBeGreaterThanOrEqual(2);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
  * Bedienziele der ausgeklappten Zeitachse (LFH-899): der kleinste Abstand zwischen zwei Zielen und
  * die Zahl der Reihen. Ziele sind die Knöpfe, die Auswahl, der Schieber und sein Griff; Griff und
  * Schieber gegeneinander zählen nicht (der Griff liegt auf der Schiene). Abstand zweier Kästen =

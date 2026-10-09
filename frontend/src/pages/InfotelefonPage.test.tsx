@@ -10,6 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, InfotelefonAnruf } from '../api/types';
 import InfotelefonPage from './InfotelefonPage';
 import { freigabenFixture } from '../test/fixtures';
+import { setzeViewportBreite } from '../test/viewport';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/infotelefon', () => ({
@@ -186,5 +187,38 @@ describe('InfotelefonPage (LFH-554)', () => {
     );
     unmount();
     expect(document.documentElement.style.getPropertyValue('--lfh-etb-fokusabstand')).toBe('');
+  });
+});
+
+describe('InfotelefonPage auf dem Handschirm (LFH-1067)', () => {
+  it('zeigt zuerst die Anrufe: Zahlen in der Meta, Aufgliederung hinter einem Knopf, Leiste eingeklappt', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const liste = await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    await waitFor(() => expect(within(liste).getAllByRole('listitem')).toHaveLength(2));
+    expect(screen.getByText('2 Anrufe · 1 offener Rückruf')).toBeInTheDocument();
+    expect(screen.queryByText('Anrufe', { exact: true })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Nach Anliegen' })).toBeNull();
+    expect(screen.queryByLabelText('Notiz')).toBeNull();
+
+    const knopf = screen.getByRole('button', { name: 'Nach Anliegen' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region', { name: 'Nach Anliegen' })).toHaveTextContent(
+      /Vermisstensuche1Auskunft zur Lage1/,
+    );
+  });
+
+  it('klappt die Erfassung mit dem Fokus auf und ohne Inhalt wieder zu', async () => {
+    setzeViewportBreite(390);
+    setup();
+    await screen.findByRole('list', { name: 'Anrufprotokoll' });
+    expect(screen.queryByLabelText('Notiz')).toBeNull();
+    await userEvent.click(screen.getByLabelText('Anliegen'));
+    expect(await screen.findByLabelText('Notiz')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Nach Anliegen' }));
+    await waitFor(() => expect(screen.queryByLabelText('Notiz')).toBeNull());
   });
 });

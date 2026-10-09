@@ -29,6 +29,10 @@ import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../presse/labels';
  *   ↵-Kappe nur ab `lg` mit feinem Zeiger (Muster `etb/Schnellerfassung.tsx`).
  * - Leere Uhrzeit: der Server setzt jetzt (`routes/infotelefon.rs`), daher der Platzhalter.
  * - Scheitert das Speichern, bleiben die Felder stehen und der Grund steht darüber.
+ * - `einklappbar` (unter `md`, solange der Fokus nicht in der Leiste liegt, LFH-1067): bei leerem
+ *   Formular und ohne Fehler stehen nur Anliegen und „Erfassen“ da — dasselbe Muster wie die
+ *   ETB-Leiste (`etb/AGENTS.md`, Erfassung), sonst verdeckte die Leiste beim Öffnen alle Anrufe.
+ *   Eingeklappt wird nur ein leeres Formular, also geht nichts verloren.
  */
 interface Werte {
   anliegen?: InfotelefonAnliegen;
@@ -39,14 +43,30 @@ interface Werte {
   eingang?: Dayjs;
 }
 
+/** Steht nichts im Formular? Leerzeichen zählen nicht als Inhalt. */
+export function formularLeer(w: Werte | undefined): boolean {
+  if (w == null) return true;
+  return (
+    w.anliegen == null &&
+    !w.notiz?.trim() &&
+    w.rueckruf_noetig !== true &&
+    !w.anrufer_name?.trim() &&
+    !w.rueckruf?.trim() &&
+    w.eingang == null
+  );
+}
+
 export default function AnrufErfassung({
   onErfassen,
   laeuft,
   fehler,
+  einklappbar = false,
 }: {
   onErfassen: (eingabe: AnrufEingabe) => Promise<unknown>;
   laeuft: boolean;
   fehler: unknown;
+  /** Darf die Leiste einklappen (Handschirm, Fokus außerhalb)? Siehe Kopfkommentar. */
+  einklappbar?: boolean;
 }) {
   const [form] = Form.useForm<Werte>();
   const { token } = useRollen();
@@ -55,6 +75,8 @@ export default function AnrufErfassung({
   const sendetRef = useRef(false);
   const [gespeichert, setGespeichert] = useState(0);
   const rueckrufNoetig = Form.useWatch('rueckruf_noetig', form) === true;
+  const leer = Form.useWatch(formularLeer, form) !== false;
+  const eingeklappt = einklappbar && leer && fehler == null;
 
   /**
    * Nach dem Speichern steht der Fokus wieder im Anliegen. Als Effekt auf den Zähler, nicht per
@@ -110,13 +132,17 @@ export default function AnrufErfassung({
           // Vier Bedienelemente in einer Zelle: jedes Feld mit eigenem Rahmen, sonst stand die
           // Notiz rahmenlos neben dem umrandeten Anliegen (LFH-978).
           felderUmrandet
-          hinweis={gespeichert > 0 ? `${gespeichert} erfasst` : undefined}
+          hinweis={gespeichert > 0 && !eingeklappt ? `${gespeichert} erfasst` : undefined}
         >
           <Flex wrap gap={token.marginXS} style={{ width: '100%', padding: token.paddingXS }}>
             <Form.Item
               name="anliegen"
               rules={[{ required: true, message: 'Anliegen wählen' }]}
-              style={{ marginBottom: 0, minWidth: 180, flex: '0 0 auto' }}
+              style={
+                eingeklappt
+                  ? { marginBottom: 0, minWidth: 0, flex: '1 1 0' }
+                  : { marginBottom: 0, minWidth: 180, flex: '0 0 auto' }
+              }
             >
               <Select
                 ref={anliegenRef}
@@ -125,25 +151,29 @@ export default function AnrufErfassung({
                 options={ANLIEGEN_REIHENFOLGE.map((a) => ({ value: a, label: ANLIEGEN_LABEL[a] }))}
               />
             </Form.Item>
-            <Form.Item
-              name="notiz"
-              rules={[zeichenRegel(INFOTELEFON_NOTIZ_MAX, 'Notiz')]}
-              style={{ marginBottom: 0, flex: '1 1 240px', minWidth: 0 }}
-            >
-              <Input
-                aria-label="Notiz"
-                placeholder="Notiz zum Anruf"
-                // Zähler ab 80 % im Feld selbst (Suffix), keine weitere Zeile (LFH-937).
-                count={zeichenGrenze(INFOTELEFON_NOTIZ_MAX)}
-              />
-            </Form.Item>
-            <Form.Item
-              name="rueckruf_noetig"
-              valuePropName="checked"
-              style={{ marginBottom: 0, alignSelf: 'center' }}
-            >
-              <Checkbox>Rückruf nötig</Checkbox>
-            </Form.Item>
+            {!eingeklappt && (
+              <>
+                <Form.Item
+                  name="notiz"
+                  rules={[zeichenRegel(INFOTELEFON_NOTIZ_MAX, 'Notiz')]}
+                  style={{ marginBottom: 0, flex: '1 1 240px', minWidth: 0 }}
+                >
+                  <Input
+                    aria-label="Notiz"
+                    placeholder="Notiz zum Anruf"
+                    // Zähler ab 80 % im Feld selbst (Suffix), keine weitere Zeile (LFH-937).
+                    count={zeichenGrenze(INFOTELEFON_NOTIZ_MAX)}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="rueckruf_noetig"
+                  valuePropName="checked"
+                  style={{ marginBottom: 0, alignSelf: 'center' }}
+                >
+                  <Checkbox>Rückruf nötig</Checkbox>
+                </Form.Item>
+              </>
+            )}
             <Button type="primary" htmlType="submit" loading={laeuft} aria-keyshortcuts="Enter">
               Erfassen
               {!istBeruehrung && abBreite('lg') && (
@@ -155,39 +185,41 @@ export default function AnrufErfassung({
           </Flex>
         </Schnellerfassungszeile>
         {rueckrufNoetig && rueckrufFeld}
-        <Collapse
-          ghost
-          items={[
-            {
-              key: 'weitere',
-              label: 'Anrufer und Uhrzeit',
-              forceRender: true,
-              children: (
-                <Flex wrap gap={token.marginSM}>
-                  <Form.Item
-                    label="Name"
-                    name="anrufer_name"
-                    style={{ marginBottom: 0, flex: '1 1 200px' }}
-                  >
-                    <Input maxLength={INFOTELEFON_KURZ_MAX} />
-                  </Form.Item>
-                  {!rueckrufNoetig && <div style={{ flex: '1 1 200px' }}>{rueckrufFeld}</div>}
-                  <Form.Item
-                    label="Uhrzeit"
-                    name="eingang"
-                    style={{ marginBottom: 0, flex: '1 1 200px' }}
-                  >
-                    <ZeitpunktEingabe
-                      format="DD.MM.YYYY HH:mm"
-                      placeholder="jetzt"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Flex>
-              ),
-            },
-          ]}
-        />
+        {!eingeklappt && (
+          <Collapse
+            ghost
+            items={[
+              {
+                key: 'weitere',
+                label: 'Anrufer und Uhrzeit',
+                forceRender: true,
+                children: (
+                  <Flex wrap gap={token.marginSM}>
+                    <Form.Item
+                      label="Name"
+                      name="anrufer_name"
+                      style={{ marginBottom: 0, flex: '1 1 200px' }}
+                    >
+                      <Input maxLength={INFOTELEFON_KURZ_MAX} />
+                    </Form.Item>
+                    {!rueckrufNoetig && <div style={{ flex: '1 1 200px' }}>{rueckrufFeld}</div>}
+                    <Form.Item
+                      label="Uhrzeit"
+                      name="eingang"
+                      style={{ marginBottom: 0, flex: '1 1 200px' }}
+                    >
+                      <ZeitpunktEingabe
+                        format="DD.MM.YYYY HH:mm"
+                        placeholder="jetzt"
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Flex>
+                ),
+              },
+            ]}
+          />
+        )}
       </Flex>
     </Form>
   );

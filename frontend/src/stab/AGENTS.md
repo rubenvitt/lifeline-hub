@@ -136,3 +136,9 @@ Medien kommen aus `…/medienkontakte/kennzahlen` über den ganzen Bestand, nich
 geladenen Liste (LFH-1075). Das Presse-Log lädt offene ganz, erledigte seitenweise. **Nicht offline**: die
 Keys fehlen in `LAGEBILD_OFFLINE` (LFH-767). Informationstelefon: Vollliste mit eigener
 Zufluss-Schleuse (`infotelefon/zufluss.ts`), Zählung aus derselben Menge (serverseitig LFH-862).
+**Informationstelefon unter `md`** (LFH-1067): zuerst die Anrufe, nach dem Muster der ETB-Erfassung
+(`etb/AGENTS.md`). Die Leiste startet eingeklappt (`AnrufErfassung einklappbar`: nur Anliegen und
+„Erfassen“, solange der Fokus nicht in ihr liegt und das Formular leer ist), die Kennzahlen stehen
+als Meta im Kopf, Segmentleiste und „Nach Anliegen“ (Knopf, klappt die Aufgliederung auf) als
+Kopfaktionen, der Ortspfad erst ab `md` (`EinsatzSeite ortspfadAbMd`). Nachweis: zwei Anrufe ganz
+über der Leiste auf 390 × 844 in jeder Dichte (`e2e/leisten-flaeche.spec.ts`).

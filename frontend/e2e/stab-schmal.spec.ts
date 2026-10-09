@@ -235,6 +235,10 @@ test.describe('Informationstelefon am Handschirm (LFH-978)', () => {
 
       const zeile = page.locator('.lfh-schnellerfassung');
       const notiz = zeile.getByRole('textbox', { name: 'Notiz', exact: true });
+      // Unter `md` startet die Leiste eingeklappt (LFH-1067): der Fokus klappt sie auf, ein Text
+      // hält sie offen, wenn der Fokus sie für die Messung verlässt.
+      await zeile.getByRole('combobox', { name: 'Anliegen' }).focus();
+      await notiz.fill('Keller');
       await expect(notiz).toBeVisible();
       // Den Rand zeichnet die Hülle des Feldes (der Zähler steht als Suffix darin).
       const traeger = zeile

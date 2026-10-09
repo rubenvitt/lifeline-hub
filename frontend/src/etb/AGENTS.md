@@ -35,7 +35,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
     eingeklappt (`EtbEntwurfsTabs einklappbar`, `Schnellerfassung eingeklappt`): kein Fokus beim
     Mount, ohne Reiterband, Feld- und Hinweiszeile, solange der Fokus nicht in ihr liegt und genau
     ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
-    (`LEISTEN_SCHWEBE` in `pages/EtbPage.tsx`). Nachweis: zwei Einträge ganz im Bild auf
+    (`LEISTEN_SCHWEBE`, `components/fokusInLeiste.ts`, auch für das Informationstelefon). Nachweis: zwei Einträge ganz im Bild auf
     390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
 - **Kopfzahl und Bilanz zählt der Server über DENSELBEN Filter** (LFH-612, `GET …/etb/zaehler`,
   `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität

@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Flex, Typography } from 'antd';
+import { App, Breadcrumb, Button, Flex, Typography } from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { useAuth } from '../auth/AuthContext';
 import { HERVORGEHOBEN } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
+import { useFokusInLeiste } from '../components/fokusInLeiste';
 import {
   Kennzahl,
   Paneel,
@@ -28,6 +29,7 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusWahl from '../components/StatusWahl';
 import StatusTag from '../components/StatusTag';
+import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
@@ -51,9 +53,16 @@ import { infotelefonStatus } from '../theme/statusFarben';
  *
  * **Datenschutz:** Name, Rückrufnummer und Notiz stehen nur hier; die Medienlage und der
  * Lagebericht bekommen sie nie (`stab/medienlage.ts`).
+ *
+ * **Unter `md` zuerst die Anrufe** (LFH-1067, Muster des ETB, `etb/AGENTS.md`, Erfassung): die
+ * Erfassung startet eingeklappt, die Kennzahlen stehen als Meta im Kopf, „Nach Anliegen“ hinter
+ * einem Knopf, der Ortspfad erst ab `md` (wie auf der Lagekarte). Nachweis: zwei
+ * Anrufe ganz über der Leiste auf 390 × 844 in jeder Dichte (`e2e/leisten-flaeche.spec.ts`).
  */
 
 type Sicht = 'alle' | 'offen';
+
+const ANLIEGEN_ID = 'infotelefon-nach-anliegen';
 
 const SEITE = { titel: 'Informationstelefon', mitArtikel: 'das Informationstelefon' };
 
@@ -74,6 +83,9 @@ export default function InfotelefonPage() {
   const stabFreigabe = useStabFreigabe(einsatzId);
   const frei = stabFreigabe.zustand === 'frei';
   const [sicht, setSicht] = useState<Sicht>('alle');
+  const { istSchmal } = useViewport();
+  const { fokusInLeiste, leistenFokus } = useFokusInLeiste();
+  const [anliegenOffen, setAnliegenOffen] = useState(false);
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
@@ -126,9 +138,23 @@ export default function InfotelefonPage() {
     () => (sicht === 'offen' ? anrufe.filter((a) => a.status === 'offen') : anrufe),
     [anrufe, sicht],
   );
-  const betreten = useCallback(() => {
-    setGefroren((vorher) => vorher ?? einfrieren(gefiltert));
-  }, [gefiltert]);
+  const betreten = useCallback(
+    (e: FocusEvent<HTMLDivElement>) => {
+      setGefroren((vorher) => vorher ?? einfrieren(gefiltert));
+      // Steht ein per Tastatur erreichtes Ziel schon im Fenster, rollt der Browser nicht und
+      // übergeht damit den Fokusabstand: unter `md` steht der erste Anruf beim Öffnen dicht über
+      // der Leiste und lag halb dahinter (LFH-1067). Auch `block: 'nearest'` rollt dann nicht,
+      // `end` rechnet den Abstand (`scroll-margin-block-end`) ein.
+      const ziel = e.target;
+      if (!(ziel instanceof Element) || !ziel.matches(':focus-visible')) return;
+      const kasten = ziel.getBoundingClientRect();
+      const abstand = parseFloat(getComputedStyle(ziel).scrollMarginBlockEnd) || 0;
+      if (kasten.top >= 0 && kasten.bottom + abstand > window.innerHeight) {
+        ziel.scrollIntoView?.({ block: 'end' });
+      }
+    },
+    [gefiltert],
+  );
   const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
     const ziel = e.relatedTarget as Node | null;
     if (ziel != null && listeRef.current?.contains(ziel)) return;
@@ -166,12 +192,65 @@ export default function InfotelefonPage() {
       : 'daten';
   // Kennzahlen zählen die ganze Menge; nur die Zeitachse hält Fremdes zurück.
   const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, gefroren, benutzer?.id);
+  // Unter `md` trägt die Meta die Kennzahlen; ab `md` stehen sie als Kacheln darunter.
+  const anrufeText = anrufe.length === 1 ? '1 Anruf' : `${anrufe.length} Anrufe`;
+  const meta =
+    zustand !== 'daten'
+      ? undefined
+      : istSchmal && offene.length > 0
+        ? `${anrufeText} · ${offene.length === 1 ? '1 offener Rückruf' : `${offene.length} offene Rückrufe`}`
+        : anrufeText;
+  const aufgliederung = zustand === 'daten' && jeAnliegen.length > 0 && (
+    <Paneel titel="Nach Anliegen">
+      {jeAnliegen.map((x) => (
+        <PaneelZeile key={x.anliegen}>
+          <span>{ANLIEGEN_LABEL[x.anliegen]}</span>
+          <span style={monoStil(14)}>{x.anzahl}</span>
+        </PaneelZeile>
+      ))}
+    </Paneel>
+  );
+  const segmentleiste = (
+    <Segmentleiste<Sicht>
+      beschriftung="Anrufe filtern"
+      wert={sicht}
+      onWechsel={setSicht}
+      optionen={[
+        { wert: 'alle', label: 'alle' },
+        { wert: 'offen', label: 'offene Rückrufe' },
+      ]}
+      style={
+        istSchmal
+          ? { flexWrap: 'nowrap', overflowX: 'auto', flex: '0 1 auto', minWidth: 0 }
+          : undefined
+      }
+    />
+  );
 
   return (
     <EinsatzSeite
       titel="Informationstelefon"
-      meta={zustand === 'daten' ? `${anrufe.length} Anrufe` : undefined}
+      meta={meta}
+      // Unter `md` steht die Segmentleiste im Kopf wie die Typleiste des ETB: über der Zeitachse
+      // kostete sie eine eigene Zeile samt Abstand.
+      aktionen={
+        istSchmal ? (
+          <>
+            {segmentleiste}
+            {aufgliederung && (
+              <Button
+                aria-expanded={anliegenOffen}
+                aria-controls={ANLIEGEN_ID}
+                onClick={() => setAnliegenOffen((o) => !o)}
+              >
+                Nach Anliegen
+              </Button>
+            )}
+          </>
+        ) : undefined
+      }
       dataUpdatedAt={anrufeQuery.dataUpdatedAt}
+      ortspfadAbMd
       breadcrumb={
         <Breadcrumb
           items={[
@@ -189,47 +268,38 @@ export default function InfotelefonPage() {
       }
       fuss={
         darfSchreiben ? (
-          <div ref={erfassungRef} className="etb-erfassung-sticky">
+          // Fokus in der Leiste klappt sie auf (`components/fokusInLeiste.ts`).
+          <div ref={erfassungRef} className="etb-erfassung-sticky" {...leistenFokus}>
             <AnrufErfassung
               onErfassen={(e) => erfassenMutation.mutateAsync(e)}
               laeuft={erfassenMutation.isPending}
               fehler={erfassenMutation.error}
+              einklappbar={istSchmal && !fokusInLeiste}
             />
           </div>
         ) : undefined
       }
     >
       <Flex vertical gap={token.margin}>
-        {/* Kein `Kennzahlenband`: dessen sechs Plätze gehören der Lage (LFH-640). */}
-        <Flex wrap gap={token.margin}>
-          <Kennzahl titel="Anrufe" wert={anrufe.length} zustand={zustand} groesse="klein" />
-          <Kennzahl
-            titel="offene Rückrufe"
-            wert={offene.length}
-            zustand={zustand}
-            ton={offene.length > 0 ? 'achtung' : 'neutral'}
-            groesse="klein"
-          />
-        </Flex>
-        {zustand === 'daten' && jeAnliegen.length > 0 && (
-          <Paneel titel="Nach Anliegen">
-            {jeAnliegen.map((x) => (
-              <PaneelZeile key={x.anliegen}>
-                <span>{ANLIEGEN_LABEL[x.anliegen]}</span>
-                <span style={monoStil(14)}>{x.anzahl}</span>
-              </PaneelZeile>
-            ))}
-          </Paneel>
+        {istSchmal ? (
+          anliegenOffen && aufgliederung && <div id={ANLIEGEN_ID}>{aufgliederung}</div>
+        ) : (
+          <>
+            {/* Kein `Kennzahlenband`: dessen sechs Plätze gehören der Lage (LFH-640). */}
+            <Flex wrap gap={token.margin}>
+              <Kennzahl titel="Anrufe" wert={anrufe.length} zustand={zustand} groesse="klein" />
+              <Kennzahl
+                titel="offene Rückrufe"
+                wert={offene.length}
+                zustand={zustand}
+                ton={offene.length > 0 ? 'achtung' : 'neutral'}
+                groesse="klein"
+              />
+            </Flex>
+            {aufgliederung}
+            {segmentleiste}
+          </>
         )}
-        <Segmentleiste<Sicht>
-          beschriftung="Anrufe filtern"
-          wert={sicht}
-          onWechsel={setSicht}
-          optionen={[
-            { wert: 'alle', label: 'alle' },
-            { wert: 'offen', label: 'offene Rückrufe' },
-          ]}
-        />
         {statusMutation.error != null && <SpeicherFehler fehler={statusMutation.error} />}
         {anrufeQuery.isError ? (
           <SeitenFehler
