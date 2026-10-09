@@ -354,9 +354,13 @@ export default function MeldungFormular({
                       <Form.Item
                         name="frist_min"
                         noStyle
-                        // Der Server lehnt eine Frist unter einer Minute ab. Als Regel statt `min`
-                        // am Feld: das klemmte still, statt den Wert stehen zu lassen.
-                        rules={[{ type: 'integer', min: 1, message: 'Frist mindestens 1 Min' }]}
+                        // Der Server nimmt 1 bis 10080 Minuten an, wie bei den Default-Fristen.
+                        // Als Regel statt `min`/`max` am Feld: das klemmte still, statt den Wert
+                        // stehen zu lassen.
+                        rules={[
+                          { type: 'integer', min: 1, message: 'Frist mindestens 1 Min' },
+                          { type: 'integer', max: 10080, message: 'Frist höchstens 10080 Min' },
+                        ]}
                       >
                         <InputNumber
                           precision={0}

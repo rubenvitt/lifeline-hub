@@ -2,8 +2,8 @@ use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Erinnerungen;
 use crate::erinnerung::{
-    anreichern_alle, repo, ErinnerungAnzeige, FAELLIG_JAHRE, INTERVALL_MAX_MINUTEN,
-    STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT,
+    anreichern_alle, repo, ErinnerungAnzeige, INTERVALL_MAX_MINUTEN, STATUS_ERLEDIGT, STATUS_OFFEN,
+    STATUS_QUITTIERT,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -18,7 +18,6 @@ use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::Datelike;
 
 use serde::Deserialize;
 
@@ -105,20 +104,12 @@ pub struct NeueErinnerung {
 }
 
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
-/// Akzeptiert mit/ohne Sekunden und nur Jahre aus [`FAELLIG_JAHRE`] (LFH-924: ein Jahr
+/// Akzeptiert mit/ohne Sekunden und nur Jahre aus [`crate::zeit::JAHRE`] (LFH-924: ein Jahr
 /// „0226“ oder „-262000“ war sofort fällig und hielt den Planer fest); sonst `Validation`.
 fn parse_faellig(roh: &str) -> Result<String, AppError> {
-    let ungueltig = || AppError::Validation("Ungültiger Fälligkeitszeitpunkt".into());
-    let normal = crate::zeit::normalisiere_eingabe(roh).ok_or_else(ungueltig)?;
-    let jahr = crate::zeit::parse(&normal).ok_or_else(ungueltig)?.year();
-    if !FAELLIG_JAHRE.contains(&jahr) {
-        return Err(AppError::Validation(format!(
-            "Fälligkeit muss zwischen den Jahren {} und {} liegen",
-            FAELLIG_JAHRE.start(),
-            FAELLIG_JAHRE.end()
-        )));
-    }
-    Ok(normal)
+    let normal = crate::zeit::normalisiere_eingabe(roh)
+        .ok_or_else(|| AppError::Validation("Ungültiger Fälligkeitszeitpunkt".into()))?;
+    crate::zeit::im_jahresbereich(normal, "Fälligkeit")
 }
 
 /// POST /api/einsaetze/{id}/erinnerungen — Erinnerung anlegen (Schreibrecht + aktiv).

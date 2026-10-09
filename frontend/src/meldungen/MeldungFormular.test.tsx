@@ -431,4 +431,17 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     expect(screen.getByText('Frist mindestens 1 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
   });
+
+  it('lehnt eine Frist über einer Woche ab, wie der Server', async () => {
+    const onAnlegen = renderFormular();
+    await userEvent.click(klappkopf());
+    await userEvent.click(screen.getByRole('switch', { name: 'Bestätigung erforderlich' }));
+    fireEvent.change(screen.getByLabelText('Bestätigungsfrist in Minuten'), {
+      target: { value: '10081' },
+    });
+    await fuellePflichtfelder('RTW 2', 'MANV');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    expect(await screen.findByText('Frist höchstens 10080 Min')).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+  });
 });

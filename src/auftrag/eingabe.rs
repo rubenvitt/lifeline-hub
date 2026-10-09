@@ -14,10 +14,12 @@ use std::collections::HashSet;
 
 use serde::Deserialize;
 
-/// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
-fn parse_zeit(roh: &str) -> Result<String, AppError> {
-    crate::zeit::normalisiere_eingabe(roh)
-        .ok_or_else(|| AppError::Validation("Ungültiger Zeitpunkt".into()))
+/// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC); nur Jahre aus
+/// [`crate::zeit::JAHRE`] (LFH-1060), sonst 400.
+fn parse_zeit(roh: &str, was: &str) -> Result<String, AppError> {
+    let normal = crate::zeit::normalisiere_eingabe(roh)
+        .ok_or_else(|| AppError::Validation("Ungültiger Zeitpunkt".into()))?;
+    crate::zeit::im_jahresbereich(normal, was)
 }
 
 fn trimme(o: &Option<String>) -> Option<&str> {
@@ -319,13 +321,13 @@ pub async fn validiere_neuen_auftrag(
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
     let erteilt = match trimme(&req.erteilt_at) {
-        Some(e) => parse_zeit(e)?,
+        Some(e) => parse_zeit(e, "Erteilzeit")?,
         None => now.to_string(),
     };
     // Frist: expliziter Request-Wert; sonst (LFH-133) aus Default-Quittierfrist abgeleitet
     // (Erteilzeit + Minuten); ohne beides keine Frist (heutiges Verhalten).
     let frist = match trimme(&req.frist_at) {
-        Some(f) => Some(parse_zeit(f)?),
+        Some(f) => Some(parse_zeit(f, "Frist")?),
         None => default_quittierung_frist_min.and_then(|min| frist_aus_minuten(&erteilt, min)),
     };
 

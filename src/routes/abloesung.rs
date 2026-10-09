@@ -52,10 +52,16 @@ fn pruefe_rhythmus(minuten: i64) -> Result<i64, AppError> {
     Ok(minuten)
 }
 
-/// Optionale Zeitangabe: fehlt/leer → `None`, sonst normalisiert (400 bei Unparsbarem).
-fn zeit(eingabe: Option<String>) -> Result<Option<String>, AppError> {
+/// Optionale Zeitangabe: fehlt/leer → `None`, sonst normalisiert; 400 bei Unparsbarem und bei
+/// einem Jahr außerhalb von [`crate::zeit::JAHRE`] (LFH-1060: Beginn und Vollzug werden zur
+/// Fälligkeit, ein Jahr am Rand ließ deren Minutenrechnung panicken, ein Tippfehler alarmierte
+/// sofort).
+fn zeit(eingabe: Option<String>, was: &str) -> Result<Option<String>, AppError> {
     match eingabe.as_deref().map(str::trim) {
-        Some(s) if !s.is_empty() => Ok(Some(crate::etb::normalisiere_zeit(s)?)),
+        Some(s) if !s.is_empty() => Ok(Some(crate::zeit::im_jahresbereich(
+            crate::etb::normalisiere_zeit(s)?,
+            was,
+        )?)),
         _ => Ok(None),
     }
 }
@@ -106,7 +112,7 @@ pub async fn beginnen(
     let jetzt = jetzt();
     let rhythmus_minuten = req.rhythmus_minuten.map(pruefe_rhythmus).transpose()?;
     // Ohne Beginn: das Eintreffen der offenen Einsatzperiode, sonst jetzt (Repo, LFH-552).
-    let beginn_at = zeit(req.beginn_at)?;
+    let beginn_at = zeit(req.beginn_at, "Beginn")?;
     let (anzeige, etb_id) = repo::beginnen(
         &state.pool,
         einsatz_id,
@@ -148,7 +154,7 @@ pub async fn aendern(
         andere => andere,
     };
     let eingabe = AenderungEingabe {
-        beginn_at: zeit(req.beginn_at)?,
+        beginn_at: zeit(req.beginn_at, "Beginn")?,
         rhythmus_minuten,
         abloesende_einheit_id: req.abloesende_einheit_id,
     };
@@ -184,7 +190,7 @@ pub async fn vollziehen(
 ) -> Result<Json<AbloesungVollzugAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let jetzt = jetzt();
-    let vollzogen_at = zeit(req.vollzogen_at)?.unwrap_or_else(|| jetzt.clone());
+    let vollzogen_at = zeit(req.vollzogen_at, "Vollzug")?.unwrap_or_else(|| jetzt.clone());
     let (anzeige, etb_id) = repo::vollziehen(
         &state.pool,
         einsatz_id,
@@ -279,10 +285,22 @@ mod tests {
     #[test]
     fn unparsbare_zeit_ist_400() {
         assert_eq!(
-            zeit(Some("gestern".into())).unwrap_err().status(),
+            zeit(Some("gestern".into()), "Beginn").unwrap_err().status(),
             StatusCode::BAD_REQUEST
         );
-        assert_eq!(zeit(Some("  ".into())).unwrap(), None);
-        assert_eq!(zeit(None).unwrap(), None);
+        assert_eq!(zeit(Some("  ".into()), "Beginn").unwrap(), None);
+        assert_eq!(zeit(None, "Beginn").unwrap(), None);
+    }
+
+    #[test]
+    fn zeit_ausserhalb_des_jahresbereichs_ist_400() {
+        for roh in ["0226-09-22 09:30:00", "+262142-12-31 23:30:00"] {
+            let err = zeit(Some(roh.into()), "Beginn").unwrap_err();
+            assert_eq!(err.status(), StatusCode::BAD_REQUEST, "{roh}");
+        }
+        assert_eq!(
+            zeit(Some("2026-09-22T09:30:00Z".into()), "Beginn").unwrap(),
+            Some("2026-09-22 09:30:00".into())
+        );
     }
 }

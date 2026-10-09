@@ -1523,3 +1523,45 @@ async fn auto_etb_aus_unterdrueckt_etb_meldung_am_http_rand() {
     .await;
     assert!(etb.as_array().unwrap().is_empty());
 }
+
+/// LFH-1060: Eine riesige Bestätigungsfrist ließ `plus_minuten` panicken (500); jetzt gelten
+/// dieselben Grenzen wie für die Default-Fristen (1–10080 Minuten), außerhalb 400.
+#[tokio::test]
+async fn bestaetigungsfrist_ausserhalb_der_grenzen_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = |frist: i64| {
+        serde_json::json!({
+            "absender": "Florian Nord 1",
+            "meldeweg": "funk",
+            "inhalt": "Deich instabil",
+            "ereigniszeit": "2026-06-12 09:00:00",
+            "bestaetigung_pflicht": true,
+            "bestaetigung_frist_min": frist
+        })
+        .to_string()
+    };
+    for frist in [0, 10_081, 200_000_000_000_000, i64::MAX] {
+        let (status, json) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/meldungen"),
+            &admin,
+            Some(&body(frist)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{frist}: {json:?}");
+    }
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &admin,
+        Some(&body(10_080)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    let frist = zeit(&json["bestaetigung_frist_at"]) - zeit(&json["eingang_at"]);
+    assert_eq!(frist, Duration::minutes(10_080));
+}

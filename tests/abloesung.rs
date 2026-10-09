@@ -221,6 +221,11 @@ async fn statuscodes() {
         format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":10081}}"#),
         format!(r#"{{"einheit_id":{f1}}}"#),
         format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":60,"beginn_at":"gestern"}}"#),
+        // LFH-1060: Jahr außerhalb 2000–2100; am Rand panickte die Fälligkeitsrechnung (500).
+        format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":60,"beginn_at":"0226-09-22 09:30:00"}}"#),
+        format!(
+            r#"{{"einheit_id":{f1},"rhythmus_minuten":60,"beginn_at":"+262142-12-31 23:30:00"}}"#
+        ),
     ] {
         let (s, j) = anfrage(&app, "POST", &pfad(e), &admin, Some(&body)).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{body} → {j:?}");
@@ -282,10 +287,41 @@ async fn statuscodes() {
 
     // 422: zweite laufende Schicht
     let body = format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":60}}"#);
-    let (s, _) = anfrage(&app, "POST", &pfad(e), &admin, Some(&body)).await;
+    let (s, schicht) = anfrage(&app, "POST", &pfad(e), &admin, Some(&body)).await;
     assert_eq!(s, StatusCode::CREATED);
     let (s, _) = anfrage(&app, "POST", &pfad(e), &admin, Some(&body)).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // 400 (LFH-1060): Beginn und Vollzug am Rand des Jahresbereichs, auch beim Ändern.
+    let aid = schicht["id"].as_i64().unwrap();
+    for (methode, unterpfad, body) in [
+        ("PATCH", "", r#"{"beginn_at":"+262142-12-31 23:30:00"}"#),
+        ("PATCH", "", r#"{"beginn_at":"2101-01-01 00:00:00"}"#),
+        (
+            "POST",
+            "/vollzug",
+            r#"{"vollzogen_at":"+262142-12-31 23:30:00"}"#,
+        ),
+        (
+            "POST",
+            "/vollzug",
+            r#"{"vollzogen_at":"1999-12-31 23:59:59"}"#,
+        ),
+    ] {
+        let (s, j) = anfrage(
+            &app,
+            methode,
+            &format!("{}/{aid}{unterpfad}", pfad(e)),
+            &admin,
+            Some(body),
+        )
+        .await;
+        assert_eq!(
+            s,
+            StatusCode::BAD_REQUEST,
+            "{methode} {unterpfad} {body} → {j:?}"
+        );
+    }
 }
 
 #[tokio::test]
