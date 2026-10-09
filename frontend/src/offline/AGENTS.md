@@ -117,7 +117,12 @@ draußen gelassen werden.
 - **Grundsatz:** Was der Server wieder liefern kann, geht bei jedem Ausgang (Quittungen,
   Ortscache, Erfassungswerte). Was nur auf dem Gerät liegt (ETB-Entwürfe), überlebt ein
   Sitzungsende, gebunden an `benutzer_id` und ohne angemeldeten Besitzer höchstens 24 h. Die
-  Offline-Queue bleibt immer. Geräte-Einstellungen ohne Personenbezug bleiben.
+  Offline-Queue bleibt bei jedem Ausgang. Geräte-Einstellungen ohne Personenbezug bleiben.
+- **Abgelehnte Queue-Einträge sind befristet** (LFH-1093): 30 Tage ab `abgelehnt_at`, geräumt
+  beim Öffnen von `lifeline-offline` ohne Versionssprung, für jeden Benutzer und den Altbestand
+  ohne Bindung, an der Geräteuhr wie `abgelehnt_at` selbst. Ausstehende Einträge haben keine
+  Frist. Der Einsatzabschluss ist bewusst kein Anlass: offline unbekannt, und die Nachbereitung
+  braucht den Beleg. Spec `geraetedaten-raeumung`, „Abgelehnte Queue-Einträge sind befristet“.
 - **Ein Weg hinaus:** `abmeldenLokal(anlass)` im `AuthProvider` ruft nach `lagebildLoeschen`
   `geraetRaeumen(anlass)`. `logout()` übergibt `'abmelden'`, die beiden 401-Wege
   `'sitzungsende'`; eine 401 schon beim Start räumt mit demselben Anlass. Nach Start und jeder Anmeldung räumt `geraetFuerBenutzerRaeumen` fremde und

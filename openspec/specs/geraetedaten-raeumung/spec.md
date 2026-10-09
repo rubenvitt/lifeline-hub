@@ -12,7 +12,7 @@ vorgehaltene Lagebild regelt `lagebild-offline-lesen`.
 Meldet sich eine Person ab, MUST das System alle personenbezogenen Daten dieser Person vom
 Gerät löschen: Erfassungsquittungen, ETB-Entwürfe, Ortscache und die Sitzungswerte der
 Erfassungsmasken. Die vorgemerkten und abgelehnten Einträge der Offline-Queue MUST unverändert
-bleiben.
+bleiben; für abgelehnte gilt allein die Frist aus „Abgelehnte Queue-Einträge sind befristet“.
 
 #### Scenario: Nach dem Abmelden liegt nichts mehr auf dem Gerät
 
@@ -175,3 +175,28 @@ ihrem Alter erhalten bleiben.
 - **WHEN** eine Person in Einsatz 3 einen Entwurf mit Text hat, der seit 20 Tagen unverändert
   ist, und das ETB von Einsatz 7 öffnet
 - **THEN** bleibt der Entwurf in Einsatz 3 erhalten
+
+### Requirement: Abgelehnte Queue-Einträge sind befristet
+
+Ein fachlich abgelehnter Eintrag der Offline-Queue (ETB-Eintrag oder Schreibaktion) MUST
+höchstens 30 Tage nach seiner Ablehnung auf dem Gerät liegen. Das System MUST ihn beim nächsten
+Öffnen der Offline-Queue danach löschen, unabhängig davon, wem er gehört und ob jemand
+angemeldet ist. Ausstehende, noch nicht gesendete Einträge MUST das System nie wegen ihres
+Alters löschen.
+
+#### Scenario: Abgelaufene Ablehnung ist nach dem Öffnen weg
+
+- **WHEN** ein abgelehnter Personen-Eintrag vor 31 Tagen abgelehnt wurde und die App die
+  Offline-Queue öffnet
+- **THEN** liegt er danach nicht mehr auf dem Gerät
+
+#### Scenario: Junge Ablehnung bleibt
+
+- **WHEN** ein Eintrag vor 29 Tagen abgelehnt wurde und die App die Offline-Queue öffnet
+- **THEN** bleibt er in der Liste der abgelehnten Einträge
+
+#### Scenario: Ausstehende Einträge überleben jede Frist
+
+- **WHEN** ein vorgemerkter ETB-Eintrag und eine vorgemerkte Meldung seit 90 Tagen ausstehen
+  und die App die Offline-Queue öffnet
+- **THEN** bleiben beide ausstehend und werden beim nächsten Abgleich gesendet
