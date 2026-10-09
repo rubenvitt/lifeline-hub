@@ -615,7 +615,7 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
     {
       pfad: `${R}/einstellungen/allgemein`,
       anker: segment(/^Allgemein$/, 'tab'),
-      hinweis: /nur Einsatzleitung, Führungspersonal oder Admin$/,
+      hinweis: /nur Einsatzleitung, Führungspersonal oder Org-Admin$/,
       gesperrt: knopf('Speichern'),
       ziele: [
         {
@@ -630,6 +630,7 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
     {
       pfad: `${R}/einsatzdaten`,
       anker: (page) => inMain(page).locator('.ant-collapse-header').first(),
+      hinweis: /nur Einsatzleitung, Führungspersonal oder Org-Admin$/,
       fehlt: knopf('Bearbeiten'),
       ziele: [
         {

@@ -8,14 +8,14 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { ladeEinsatz, ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfEinsatzVerwalten } from '../einsatz/schreibrecht';
 import {
   EINSTELLUNGEN_SEKTIONEN,
   einsatzEinstellungenPfad,
   type EinstellungenSektion,
 } from '../routing/deeplinks';
 import type { EinsatzEinstellungen } from '../api/types';
-import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_FUEHRUNG_ADMIN } from '../components/nurAnsicht';
+import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -34,7 +34,8 @@ interface EinstellungenDaten {
   einstellungen?: EinsatzEinstellungen;
   /** Einsatz läuft noch — abgeschlossene Einsätze sind eingefroren. */
   istAktiv: boolean;
-  /** Allgemeines Einsatz-Schreibrecht (schließt „aktiv" bereits ein). */
+  /** Verwaltungsrecht am Einsatz (`darfEinsatzVerwalten`, schließt „aktiv" ein): der Admin nur
+      der Einsatz-Org. */
   darfBearbeiten: boolean;
   neuLaden: () => void;
 }
@@ -54,7 +55,7 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
     einsatz: einsatzQuery.data,
     einstellungen: einstellungenQuery.data,
     istAktiv: einsatzQuery.data?.status === 'aktiv',
-    darfBearbeiten: darfImEinsatzSchreiben(einsatzQuery.data, benutzer),
+    darfBearbeiten: darfEinsatzVerwalten(einsatzQuery.data, benutzer),
     neuLaden: () => {
       void einsatzQuery.refetch();
       void einstellungenQuery.refetch();
@@ -63,10 +64,10 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
 }
 
 /**
- * Erklärt die fehlende Berechtigung auf allen Sektionen mit Einsatz-Schreibrecht gleich. Ausgegraut
+ * Erklärt die fehlende Berechtigung auf allen Sektionen mit Verwaltungsrecht gleich. Ausgegraut
  * allein nennt keinen Grund; der Text steht einmal, damit er nicht auseinanderläuft.
  */
-export const RECHTE_TEXT = NUR_LEITUNG_FUEHRUNG_ADMIN;
+export const RECHTE_TEXT = NUR_LEITUNG_FUEHRUNG_ORG_ADMIN;
 
 /** Aktive Sektion aus dem Pfad: `/einsaetze/1/einstellungen/verhalten` → `verhalten`. */
 function sektionAus(pathname: string): EinstellungenSektion {

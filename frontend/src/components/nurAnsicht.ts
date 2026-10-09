@@ -14,7 +14,8 @@ export const NUR_ADMIN = 'nur System-Admin';
 /** Freigaben, die nur die Einsatzleitung erteilt (etwa einer Pressemitteilung, LFH-554). */
 export const NUR_LEITUNG = 'nur Einsatzleitung';
 export const NUR_LEITUNG_FUEHRUNG = 'nur Einsatzleitung und Führungspersonal';
-export const NUR_LEITUNG_FUEHRUNG_ADMIN = 'nur Einsatzleitung, Führungspersonal oder Admin';
+/** Kopfdaten, Einstellungen und Führungsstelle (LFH-1066): der Admin nur der Org des Einsatzes. */
+export const NUR_LEITUNG_FUEHRUNG_ORG_ADMIN = 'nur Einsatzleitung, Führungspersonal oder Org-Admin';
 /** Fristen ändert nur der Admin der Org, der der Einsatz gehört (LFH-753) — nicht jeder Admin. */
 export const NUR_LEITUNG_ORG_ADMIN = 'nur Einsatzleitung oder Org-Admin';
 export const EINSATZ_ABGESCHLOSSEN = 'Einsatz abgeschlossen';

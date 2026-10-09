@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
+  darfEinsatzVerwalten,
   darfModuleVerwalten,
   darfOriginalLaden,
   darfVerwaltung,
@@ -104,6 +105,43 @@ describe('darfModuleVerwalten (LFH-995)', () => {
       ),
     ).toBe(false);
     expect(darfModuleVerwalten(undefined, adminOrg1)).toBe(false);
+  });
+});
+
+describe('darfEinsatzVerwalten (LFH-1066)', () => {
+  const eigeneOrg = { ...aktiv, org_id: 1 };
+  const adminOrg1 = { system_rolle: 'admin' as const, org_id: 1 };
+  const adminOrg2 = { system_rolle: 'admin' as const, org_id: 2 };
+  const keinerOrg2 = { system_rolle: 'keiner' as const, org_id: 2 };
+
+  it('erlaubt Einsatzleitung und Führungspersonal, auch über die Org-Grenze', () => {
+    for (const meine_rolle of ['einsatzleitung', 'fuehrungspersonal'] as const) {
+      expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle }, keinerOrg2)).toBe(true);
+      expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle }, adminOrg2)).toBe(true);
+    }
+  });
+
+  it('erlaubt den Admin ohne Schreibrolle nur in der Org des Einsatzes', () => {
+    expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle: null }, adminOrg1)).toBe(true);
+    expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle: 'beobachter' }, adminOrg1)).toBe(true);
+    expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle: null }, adminOrg2)).toBe(false);
+    expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle: 'beobachter' }, adminOrg2)).toBe(
+      false,
+    );
+  });
+
+  it('verweigert Beobachter ohne Admin, den abgeschlossenen Einsatz und fehlende Daten', () => {
+    expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle: 'beobachter' }, keinerOrg2)).toBe(
+      false,
+    );
+    expect(
+      darfEinsatzVerwalten(
+        { status: 'abgeschlossen', org_id: 1, meine_rolle: 'einsatzleitung' },
+        adminOrg1,
+      ),
+    ).toBe(false);
+    expect(darfEinsatzVerwalten(undefined, adminOrg1)).toBe(false);
+    expect(darfEinsatzVerwalten({ ...eigeneOrg, meine_rolle: null }, undefined)).toBe(false);
   });
 });
 

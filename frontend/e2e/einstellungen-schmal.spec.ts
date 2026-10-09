@@ -244,7 +244,7 @@ for (const [name, fenster] of [
 
 /** Die Rechtehinweise der Sektionen, je über ein Fragment, das nur EINEN Hinweis trifft —
  *  auf der Aufbewahrung stehen zwei (Einstellungen und Frist). */
-const HINWEIS_EINSTELLUNGEN = 'nur Einsatzleitung, Führungspersonal oder Admin';
+const HINWEIS_EINSTELLUNGEN = 'nur Einsatzleitung, Führungspersonal oder Org-Admin';
 const HINWEIS_FRIST = 'nur Einsatzleitung oder Org-Admin';
 const HINWEIS_MODULE = 'nur Einsatzleitung oder Org-Admin';
 

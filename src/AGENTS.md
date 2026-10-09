@@ -254,6 +254,20 @@ Spec `passwort-anmeldung`, Herleitung
   Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
 - Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
 
+## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
+
+- **Ein System-Admin schreibt ohne Mitgliedschaft nur an Einsätzen seiner eigenen Org**; lesen
+  darf er serverweit (Org-Floor, `darf_fremdeinsatz_lesen`). Eine Mitgliedschaft mit
+  Schreibrolle trägt über die Org-Grenze. Fremd ohne Mitgliedschaft: 403, vor dem 409 des
+  Freeze.
+- Kopfdaten, Einstellungen und Führungsstelle tragen das zentral über
+  `EinsatzVerwaltungszugriff` (`fordere_schreibrecht_oder_admin`); Frist-PUT, Kategorien-Frist,
+  Original-Abruf und Modul-Override prüfen `benutzer.org_id == einsatz.org_id` im Handler. Ein
+  neuer Admin-Schreibweg nimmt den Extractor oder dieselbe Prüfung, nie `ist_admin()` allein.
+- Der Client spiegelt das über `BenutzerAnzeige.org_id` (`darfEinsatzVerwalten`,
+  `darfModuleVerwalten` in `frontend/src/einsatz/schreibrecht.ts`). Nachweis
+  `tests/einsatz_verwaltungsrecht.rs`.
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und
