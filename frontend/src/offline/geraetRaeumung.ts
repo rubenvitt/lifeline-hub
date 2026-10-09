@@ -4,7 +4,8 @@
  *
  * Grundsatz: Was der Server wieder liefern kann, geht bei jedem Ausgang. Was nur auf diesem
  * Gerät liegt (ETB-Entwürfe), überlebt einen unfreiwilligen Ausgang, an die Person gebunden und
- * befristet. Die Offline-Queue bleibt immer, sie ist Beweissicherung.
+ * befristet. Die Offline-Queue bleibt bei jedem Ausgang, sie ist Beweissicherung; abgelehnte
+ * Einträge löscht sie selbst 30 Tage nach der Ablehnung (LFH-1093).
  *
  * Einziger Aufrufer ist der `AuthProvider` (`auth/AuthContext.tsx`), wie beim Lagebild.
  */
@@ -18,7 +19,7 @@ import { personErfassungsQuittungenAufraeumen, personErfassungsQuittungenRaeumen
  * - `gebunden-befristet`: an `benutzer_id` gebunden; Abmelden und Benutzerwechsel räumen,
  *   ein Sitzungsende nicht; ohne angemeldeten Besitzer höchstens 24 h.
  * - `lagebild`: eigener Weg, `lagebildLoeschen` (LFH-723).
- * - `queue`: bleibt, Beweissicherung (LFH-705).
+ * - `queue`: bleibt bei jedem Ausgang, Beweissicherung (LFH-705); Ablehnungen befristet (LFH-1093).
  * - `bleibt`: kein Personenbezug, bewusst stehen gelassen.
  */
 export type GeraeteEntscheidung =
@@ -45,7 +46,8 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     ort: 'IndexedDB lifeline-offline: ausstehend, abgelehnt, schreibaktionen, schreibaktionenAbgelehnt',
     datei: 'offline/queue.ts',
     entscheidung: 'queue',
-    grund: 'Offline-Queue, an benutzer_id gebunden; Beweissicherung, wird nie automatisch geräumt.',
+    grund:
+      'Offline-Queue, an benutzer_id gebunden; Beweissicherung, kein Ausgang räumt sie. Ausstehendes bleibt unbefristet, Abgelehntes geht 30 Tage nach abgelehnt_at beim Öffnen der DB (LFH-1093).',
   },
   {
     ort: 'IndexedDB lifeline-offline: personErfassungsQuittungen',
