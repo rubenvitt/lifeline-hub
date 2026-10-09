@@ -32,7 +32,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **Schriften nur über die FontFace-API** (LFH-1108, `theme/schriften.ts`): WebKit baut
   `@font-face`-Schnitte beim Druckstart neu auf und lädt sie nach. Safari zählt die Seiten im
   ersten Durchlauf mit der Ersatzschrift und schneidet ab, was mit der Webschrift danach wächst.
-  Kein `@font-face` im CSS der App (`theme/schriften.test.ts`); jeder Schnitt lädt beim Start.
+  Kein `@font-face` im CSS der App (`theme/schriften.test.ts`); was der Bildschirm nicht braucht,
+  lädt die App nach dem Laden im Leerlauf, damit der Druck es vorfindet.
 - Ein Editor druckt nie seine `<textarea>` (`MarkdownEditor` `druckfassung`).
 - **Abschnittstitel stehen im Titelblock** (LFH-1008): Firefox setzt `break-after: avoid` nicht
   um, ein Titel bliebe allein am Seitenende. Titel und erster Block teilen sich eine Hülle

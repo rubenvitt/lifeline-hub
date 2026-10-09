@@ -22,7 +22,10 @@ function cssDateien(verzeichnis: string, praefix = ''): [string, string][] {
 }
 
 describe('Schriften (LFH-1108)', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
 
   it('kein CSS der App meldet eine Schrift per @font-face an', () => {
     const verstoesse = cssDateien(SRC)
@@ -31,7 +34,8 @@ describe('Schriften (LFH-1108)', () => {
     expect(verstoesse).toEqual([]);
   });
 
-  it('meldet jeden Schnitt an und lädt ihn sofort', () => {
+  it('meldet jeden Schnitt sofort an und lädt alle, sobald der Browser Luft hat', () => {
+    vi.useFakeTimers();
     const geladen: string[] = [];
     class Schnitt {
       constructor(
@@ -58,6 +62,9 @@ describe('Schriften (LFH-1108)', () => {
     expect(menge[0].source).toBe(
       `url(${JSON.stringify(SCHRIFTSCHNITTE[0].datei)}) format('woff2')`,
     );
+    // Was der Bildschirm braucht, lädt der Browser selbst; der Rest kommt danach.
+    expect(geladen).toHaveLength(0);
+    vi.runAllTimers();
     expect(geladen).toHaveLength(SCHRIFTSCHNITTE.length);
   });
 });

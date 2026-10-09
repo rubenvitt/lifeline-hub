@@ -55,18 +55,28 @@ export const SCHRIFTSCHNITTE: readonly Schriftschnitt[] = [
 ];
 
 /**
- * Meldet alle Schnitte an und lädt sie sofort, auch die, die der erste Bildschirm nicht braucht:
- * der Druck setzt sie (Archivo 700 in Markdown-Fettdruck). Scheitert ein Schnitt, steht der Text
+ * Meldet alle Schnitte an. Was der Bildschirm braucht, lädt der Browser bei Bedarf wie bei
+ * `@font-face`; den Rest lädt die App, sobald die Seite geladen ist und der Browser Luft hat, denn
+ * der Druck setzt ihn (Archivo 700 in Markdown-Fettdruck). Scheitert ein Schnitt, steht der Text
  * in der Ersatzschrift.
  */
 export function meldeSchriftenAn(menge: FontFaceSet = document.fonts): void {
-  for (const s of SCHRIFTSCHNITTE) {
+  const schnitte = SCHRIFTSCHNITTE.map((s) => {
     const schnitt = new FontFace(s.familie, `url(${JSON.stringify(s.datei)}) format('woff2')`, {
       weight: String(s.gewicht),
       style: 'normal',
       display: 'swap',
     });
     menge.add(schnitt);
-    schnitt.load().catch(() => undefined);
-  }
+    return schnitt;
+  });
+  const ladeAlle = () => {
+    for (const schnitt of schnitte) schnitt.load().catch(() => undefined);
+  };
+  const nachLeerlauf = () =>
+    typeof requestIdleCallback === 'function'
+      ? requestIdleCallback(ladeAlle, { timeout: 5000 })
+      : setTimeout(ladeAlle, 1000);
+  if (document.readyState === 'complete') nachLeerlauf();
+  else window.addEventListener('load', nachLeerlauf, { once: true });
 }
