@@ -1173,7 +1173,7 @@ describe('AlarmZentrale: Meldungen über den Service Worker (LFH-1062)', () => {
     renderAlarm({ initialEntry: '/einsaetze/1/lage' });
     // Erst die Antwort des Service Workers macht den Weg verfügbar.
     expect(
-      await screen.findByRole('button', { name: /^Benachrichtigungen: erlaubt/ }),
+      await screen.findByRole('button', { name: /^Benachrichtigung erlaubt/ }),
     ).toBeInTheDocument();
 
     setzeHidden(true);
