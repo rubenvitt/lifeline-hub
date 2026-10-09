@@ -222,6 +222,37 @@ describe('OnlineQuellenVerwaltung', () => {
     ).not.toBeInTheDocument();
   });
 
+  /**
+   * Zeilenfehler (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund einer
+   * abgelehnten Löschung steht an GENAU der Zeile, an der gelöscht wurde; kein Toast.
+   */
+  it('zeigt eine abgelehnte Löschung an ihrer Zeile, nicht als Toast', async () => {
+    mockBasis(admin, [quelle, zweiteQuelle]);
+    server.use(
+      http.delete('/api/karte/online-quellen/2', () =>
+        HttpResponse.json({ error: 'Quelle ist Grundkarte' }, { status: 409 }),
+      ),
+    );
+    render();
+    await screen.findByText('Basemap.de');
+    const zeileVon = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+
+    await userEvent.click(within(zeileVon('Basemap.de')).getByRole('button', { name: 'Löschen' }));
+    const rueckfrage = await waitFor(() => {
+      const p = document.querySelector<HTMLElement>('.ant-popconfirm');
+      expect(p).not.toBeNull();
+      return p!;
+    });
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Löschen' }));
+
+    expect(
+      await within(zeileVon('Basemap.de')).findByText('Quelle ist Grundkarte'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('OpenStreetMap').querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
   it('Katalog-Flow: „Aus Katalog hinzufügen" → Eintrag → POST mit korrektem Body', async () => {
     let postBody: unknown = null;
     mockBasis(admin, []);

@@ -1,6 +1,5 @@
 import { App, Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { starteOfflineDownload } from '../api/offlineKarten';
 import { invalidiereKarte } from './invalidiereKarte';
@@ -57,12 +56,12 @@ export default function OfflineDownloadUrlModal({
         kachel_schema: 'shortbread',
       }),
     // Das Schließen macht `onFertig`. Die Erfolgsmeldung quittiert einen Vorgang, der im
-    // Hintergrund weiterläuft.
+    // Hintergrund weiterläuft; eine Ablehnung zeigt die Hülle im Dialog (`speicherung`), kein
+    // Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
     onSuccess: () => {
       invalidiereKarte(qc);
       message.success('Download gestartet');
     },
-    onError: (e) => message.error(fehlerText(e, 'Download fehlgeschlagen')),
   });
 
   return (
@@ -72,6 +71,8 @@ export default function OfflineDownloadUrlModal({
       form={form}
       erfassenText="Download starten"
       laeuft={mutation.isPending}
+      speicherung={mutation}
+      speicherFehlerTitel="Download nicht gestartet"
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen.
       onErfassen={(w) => mutation.mutateAsync(w)}
       onFertig={onClose}

@@ -1,8 +1,8 @@
 import { App, Button, Input, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
+import { ZeilenFehler, zeilenFehler } from '../components/SpeicherHinweis';
 import {
   listeVorhandeneKarten,
   registriereOfflineKarte,
@@ -56,8 +56,18 @@ export default function OfflineVorhandeneModal({
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-vorhandene') });
       message.success('Region übernommen');
     },
-    onError: (e) => message.error(fehlerText(e, 'Übernehmen fehlgeschlagen')),
   });
+
+  // Eine Ablehnung steht an der Datei, an der übernommen wurde, kein Toast (`frontend/AGENTS.md`,
+  // „Rückwege und Fehler“, LFH-1077). Öffnen und Schließen räumen den Grund der letzten Ablehnung;
+  // eine laufende Übernahme bleibt unberührt, `reset()` hängte ihr Ergebnis ab. Ref, damit nur
+  // `offen` den Effekt auslöst, nicht jedes neue Mutationsobjekt.
+  const mutationRef = useRef(importMutation);
+  mutationRef.current = importMutation;
+  useEffect(() => {
+    const m = mutationRef.current;
+    if (!m.isPending && m.error != null) m.reset();
+  }, [offen]);
 
   return (
     <Modal
@@ -77,41 +87,51 @@ export default function OfflineVorhandeneModal({
           // Titel ist ein Eingabefeld, und ein Bedienelement gehört nicht in eine Überschrift.
           dataSource={vorhandeneQuery.data ?? []}
           emptyText="Keine neuen Dateien im Karten-Verzeichnis"
-          renderItem={(v) => (
-            <ListenEintrag
-              actions={[
-                <Button
-                  key="imp"
-                  type="link"
-                  disabled={importMutation.isPending}
-                  onClick={() => importMutation.mutate(v)}
-                >
-                  Übernehmen
-                </Button>,
-              ]}
-            >
-              <ListenEintragMeta
-                title={
-                  /*
-                   * Ohne Größen-Prop, obwohl das Feld im Titel einer Listenzeile sitzt und die Zeile wächst: es
-                   * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
-                   * Handschuh-Betrieb.
-                   */
-                  <Input
-                    style={{ maxWidth: 260 }}
-                    value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
-                    onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}
-                    aria-label={`Name für ${v.dateiname}`}
-                  />
-                }
-                description={
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {v.dateiname} <Tag>{formatGroesse(v.groesse)}</Tag>
-                  </Typography.Text>
-                }
-              />
-            </ListenEintrag>
-          )}
+          renderItem={(v) => {
+            const fehler = zeilenFehler(importMutation, (i) => i.dateiname === v.dateiname);
+            return (
+              <ListenEintrag
+                actions={[
+                  <Button
+                    key="imp"
+                    type="link"
+                    disabled={importMutation.isPending}
+                    onClick={() => importMutation.mutate(v)}
+                  >
+                    Übernehmen
+                  </Button>,
+                ]}
+              >
+                <ListenEintragMeta
+                  title={
+                    /*
+                     * Ohne Größen-Prop, obwohl das Feld im Titel einer Listenzeile sitzt und die Zeile wächst: es
+                     * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
+                     * Handschuh-Betrieb.
+                     */
+                    <Input
+                      style={{ maxWidth: 260 }}
+                      value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
+                      onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}
+                      aria-label={`Name für ${v.dateiname}`}
+                    />
+                  }
+                  description={
+                    <>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {v.dateiname} <Tag>{formatGroesse(v.groesse)}</Tag>
+                      </Typography.Text>
+                      {fehler != null && (
+                        <div>
+                          <ZeilenFehler fehler={fehler} fallback="Übernehmen fehlgeschlagen" />
+                        </div>
+                      )}
+                    </>
+                  }
+                />
+              </ListenEintrag>
+            );
+          }}
         />
       )}
     </Modal>

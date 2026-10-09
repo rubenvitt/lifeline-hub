@@ -1,11 +1,23 @@
 import { IconChevronRunter, IconLadekreis } from '../icons';
-import { App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Tooltip, Typography } from 'antd';
+import {
+  App,
+  Button,
+  Dropdown,
+  Flex,
+  Popconfirm,
+  Progress,
+  Space,
+  Tag,
+  theme,
+  Tooltip,
+  Typography,
+} from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
+import { ZeilenFehler, letzterZeilenFehler, zeilenAktion } from '../components/SpeicherHinweis';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
   brecheOfflineDownloadAb,
@@ -65,6 +77,7 @@ export default function OfflineKartenVerwaltung() {
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [pickerOffen, setPickerOffen] = useState(false);
   const [urlOffen, setUrlOffen] = useState(false);
   const [vorhandenOffen, setVorhandenOffen] = useState(false);
@@ -126,15 +139,15 @@ export default function OfflineKartenVerwaltung() {
     void qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-karten') });
   }, [phasenSignatur, qc]);
 
+  // Eine Ablehnung steht an der Zeile, an der gehandelt wurde (`zeilenGrund`), kein Toast
+  // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Erfolg bleibt beim Toast.
   const abbrechenMutation = useMutation({
     mutationFn: (id: number) => brecheOfflineDownloadAb(id),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(fehlerText(e, 'Abbrechen fehlgeschlagen')),
   });
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheOfflineKarte(id),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
   // „Jetzt aktualisieren“ (LFH-993): lädt einen vorhandenen neueren Stand sofort oder stößt einen
   // Neubau an, dessen Ergebnis der Server danach selbst ohne Ausfall eintauscht.
@@ -146,8 +159,15 @@ export default function OfflineKartenVerwaltung() {
       else if (phase === 'laedt') message.success('Update lädt');
       else message.success('Neubau gestartet');
     },
-    onError: (e) => message.error(fehlerText(e, 'Aktualisieren fehlgeschlagen')),
   });
+
+  /** Drei Mutationen teilen sich eine Zeile; es zählt die zuletzt abgesendete. */
+  const zeilenGrund = (k: OfflineKarte) =>
+    letzterZeilenFehler([
+      zeilenAktion(abbrechenMutation, (id) => id === k.id, 'Abbrechen fehlgeschlagen'),
+      zeilenAktion(loeschenMutation, (id) => id === k.id, 'Löschen fehlgeschlagen'),
+      zeilenAktion(jetztMutation, (v) => v.id === k.id, 'Aktualisieren fehlgeschlagen'),
+    ]);
 
   const spalten: KatalogSpalte<OfflineKarte>[] = [
     {
@@ -326,33 +346,37 @@ export default function OfflineKartenVerwaltung() {
               // LFH-993: Neubau oder Veröffentlichung laufen — dann weder „Jetzt aktualisieren“
               // noch Löschen.
               const phase = aktualisierungJe.get(k.id)?.phase;
+              const grund = zeilenGrund(k);
               return (
-                // `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
-                // (`components/aktionsabstand.guard.test.ts`).
-                <Space size="middle">
-                  {k.status === 'bereit' && k.aktualisierbar && !laeuft && !phase && (
-                    <Button
-                      aria-label={`Jetzt aktualisieren: ${k.name}`}
-                      loading={jetztMutation.isPending && jetztMutation.variables?.id === k.id}
-                      onClick={() => jetztMutation.mutate(k)}
-                    >
-                      Jetzt aktualisieren
-                    </Button>
-                  )}
-                  {laeuft && (
-                    <Button onClick={() => abbrechenMutation.mutate(k.id)}>Abbrechen</Button>
-                  )}
-                  {!laeuft && !phase && (
-                    <Popconfirm
-                      title="Offline-Karte löschen?"
-                      okText="Löschen"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => loeschenMutation.mutate(k.id)}
-                    >
-                      <Button danger>Löschen</Button>
-                    </Popconfirm>
-                  )}
-                </Space>
+                <Flex vertical gap={token.marginXXS} align="flex-start">
+                  {/* `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
+                      (`components/aktionsabstand.guard.test.ts`). */}
+                  <Space size="middle">
+                    {k.status === 'bereit' && k.aktualisierbar && !laeuft && !phase && (
+                      <Button
+                        aria-label={`Jetzt aktualisieren: ${k.name}`}
+                        loading={jetztMutation.isPending && jetztMutation.variables?.id === k.id}
+                        onClick={() => jetztMutation.mutate(k)}
+                      >
+                        Jetzt aktualisieren
+                      </Button>
+                    )}
+                    {laeuft && (
+                      <Button onClick={() => abbrechenMutation.mutate(k.id)}>Abbrechen</Button>
+                    )}
+                    {!laeuft && !phase && (
+                      <Popconfirm
+                        title="Offline-Karte löschen?"
+                        okText="Löschen"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => loeschenMutation.mutate(k.id)}
+                      >
+                        <Button danger>Löschen</Button>
+                      </Popconfirm>
+                    )}
+                  </Space>
+                  {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
+                </Flex>
               );
             },
           },

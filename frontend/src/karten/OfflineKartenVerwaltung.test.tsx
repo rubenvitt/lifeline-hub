@@ -352,6 +352,114 @@ describe('OfflineKartenVerwaltung', () => {
     await waitFor(() => expect(abgebrochen).toBe(true));
   });
 
+  // ── Zeilenfehler (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“) ─────────────────
+  // Der Grund einer abgelehnten Zeilenaktion steht an GENAU der Zeile, an der gehandelt wurde;
+  // kein Toast. Die Tabelle pollt, der Grund bleibt trotzdem bis zur nächsten Aktion stehen.
+
+  const zeileVon = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
+
+  /** Bestätigt die offene Rückfrage „Offline-Karte löschen?". */
+  async function bestaetigeLoeschen() {
+    const rueckfrage = await waitFor(() => {
+      const p = document.querySelector<HTMLElement>('.ant-popconfirm');
+      expect(p).not.toBeNull();
+      return p!;
+    });
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Löschen' }));
+  }
+
+  function ohneToastNurEinFehler() {
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  }
+
+  it('eine abgelehnte Löschung steht an ihrer Zeile', async () => {
+    mockBasis(admin, [karte, kleineKarte]);
+    server.use(
+      http.delete('/api/karte/offline-karten/3', () =>
+        HttpResponse.json({ error: 'Datei gesperrt' }, { status: 409 }),
+      ),
+    );
+    render();
+    await screen.findByText('Deutschland – Bayern');
+    await userEvent.click(
+      within(zeileVon('Deutschland – Bayern')).getByRole('button', { name: 'Löschen' }),
+    );
+    await bestaetigeLoeschen();
+
+    expect(
+      await within(zeileVon('Deutschland – Bayern')).findByText('Datei gesperrt'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('Deutschland – Bremen').querySelector('[data-fehler]')).toBeNull();
+    ohneToastNurEinFehler();
+  });
+
+  it('ein abgelehntes Abbrechen steht an seiner Zeile', async () => {
+    mockBasis(admin, [karte, karteLaedt]);
+    server.use(
+      http.post('/api/karte/offline-karten/2/abbrechen', () =>
+        HttpResponse.json({ error: 'Download schon fertig' }, { status: 409 }),
+      ),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Abbrechen' }));
+
+    expect(
+      await within(zeileVon('Deutschland – Bayern')).findByText('Download schon fertig'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('Deutschland – Bremen').querySelector('[data-fehler]')).toBeNull();
+    ohneToastNurEinFehler();
+  });
+
+  it('ein abgelehntes „Jetzt aktualisieren“ steht an seiner Zeile', async () => {
+    mockBasis(admin, [karte, kleineKarte]);
+    server.use(
+      http.post('/api/karte/offline-karten/1/jetzt-aktualisieren', () =>
+        HttpResponse.json({ error: 'Kartenbau-Dienst nicht erreichbar' }, { status: 502 }),
+      ),
+    );
+    render();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Jetzt aktualisieren: Deutschland – Bremen' }),
+    );
+
+    expect(
+      await within(zeileVon('Deutschland – Bremen')).findByText(
+        'Kartenbau-Dienst nicht erreichbar',
+      ),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('Deutschland – Bayern').querySelector('[data-fehler]')).toBeNull();
+    ohneToastNurEinFehler();
+  });
+
+  /**
+   * Drei Mutationen teilen sich eine Zeile: es zählt die LETZTE Aktion an ihr. Ein gelungenes
+   * „Jetzt aktualisieren“ nach einer abgelehnten Löschung räumt deren Grund, obwohl die
+   * Löschmutation ihren Fehler bis zum nächsten Löschen hält.
+   */
+  it('die nächste Aktion an der Zeile räumt den Grund der vorigen', async () => {
+    mockBasis(admin, [karte]);
+    server.use(
+      http.delete('/api/karte/offline-karten/1', () =>
+        HttpResponse.json({ error: 'Datei gesperrt' }, { status: 409 }),
+      ),
+      http.post('/api/karte/offline-karten/1/jetzt-aktualisieren', () =>
+        HttpResponse.json({ phase: 'aktuell' }),
+      ),
+    );
+    render();
+    await screen.findByText('Deutschland – Bremen');
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    await bestaetigeLoeschen();
+    await within(zeileVon('Deutschland – Bremen')).findByText('Datei gesperrt');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Jetzt aktualisieren: Deutschland – Bremen' }),
+    );
+    expect(await screen.findByText('Die Karte ist aktuell')).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+  });
+
   it('URL-Download: Modal-Submit → POST /download mit kachel_schema shortbread', async () => {
     let postBody: unknown = null;
     mockBasis(admin, []);
@@ -622,8 +730,37 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
       name: 'Automatisch aktualisieren',
     });
     await userEvent.click(schalter);
-    expect(await screen.findByText(/Einstellung nicht gespeichert/)).toBeInTheDocument();
+    // Der Grund steht am Block, nicht im Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+    // Fehler“).
+    const block = await zeile();
+    const hinweis = await within(block).findByRole('alert');
+    expect(hinweis).toHaveTextContent('Einstellung nicht gespeichert');
+    expect(hinweis).toHaveTextContent('kaputt');
     expect(schalter).toBeChecked();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('der nächste Speicherversuch räumt den Grund', async () => {
+    let versuche = 0;
+    mockBasis(admin);
+    server.use(
+      http.put('/api/karte/offline-karten/aktualisierung/einstellung', async ({ request }) => {
+        versuche += 1;
+        if (versuche === 1) return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+        return HttpResponse.json({ ...STATUS_VORGABE, ...((await request.json()) as object) });
+      }),
+    );
+    render();
+    const block = await zeile();
+    await userEvent.click(
+      await within(block).findByRole('switch', { name: 'Automatisch aktualisieren' }),
+    );
+    await within(block).findByRole('alert');
+
+    await userEvent.click(within(block).getByRole('combobox', { name: 'Prüfabstand' }));
+    await userEvent.click(await screen.findByTitle('alle 12 h'));
+    await waitFor(() => expect(versuche).toBe(2));
+    await waitFor(() => expect(within(block).queryByRole('alert')).toBeNull());
   });
 
   it('ein gespeicherter Abstand außerhalb der Liste erscheint als eigene Option', async () => {

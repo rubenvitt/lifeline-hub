@@ -260,4 +260,35 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
       await within(dialog).findByText('Schlüssel in der URL ist im Browser sichtbar.'),
     ).toBeInTheDocument();
   });
+
+  /**
+   * Speicherfehler im Dialog (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund
+   * der Ablehnung steht im offenen Dialog, der Wortlaut bleibt, kein Toast. Abbrechen und
+   * erneutes Öffnen zeigen keinen alten Grund.
+   */
+  it('zeigt eine Ablehnung im Dialog, behält den Wortlaut und zeigt keinen Toast', async () => {
+    server.use(
+      http.patch('/api/karte/online-quellen/3', () =>
+        HttpResponse.json({ error: 'Name schon vergeben' }, { status: 409 }),
+      ),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness bestand={quelle} />);
+    const dialog = await screen.findByRole('dialog');
+    const name = within(dialog).getByLabelText('Name');
+    await nutzer.clear(name);
+    await nutzer.type(name, 'OSM Standard');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Name schon vergeben');
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('OSM Standard');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs ein.
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(wieder).getByLabelText('Name')).toHaveValue(''));
+    expect(within(wieder).queryByRole('alert')).toBeNull();
+  });
 });

@@ -1,8 +1,7 @@
-import { App, Collapse, Form, Input, InputNumber, Switch } from 'antd';
+import { Collapse, Form, Input, InputNumber, Switch } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import type { OnlineStyleTyp } from '../api/karte';
 import {
@@ -57,7 +56,6 @@ export default function OnlineQuelleFormModal({
 }) {
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const typ = Form.useWatch('typ', form) ?? 'vektor';
   const proxy = Form.useWatch('proxy', form);
 
@@ -91,11 +89,11 @@ export default function OnlineQuelleFormModal({
       };
       return quelle ? aktualisiereOnlineQuelle(quelle.id, body) : legeOnlineQuelleAn(body);
     },
-    // Das Schließen macht `onFertig`, das Leeren die Hülle.
+    // Das Schließen macht `onFertig`, das Leeren die Hülle. Eine Ablehnung zeigt die Hülle im
+    // Dialog (`speicherung`), kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
     onSuccess: () => {
       invalidiereKarte(qc);
     },
-    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (
@@ -105,6 +103,7 @@ export default function OnlineQuelleFormModal({
       form={form}
       erfassenText="Speichern"
       laeuft={mutation.isPending}
+      speicherung={mutation}
       // Proxy ist Default-an (key-frei + serverseitig gecacht).
       initialValues={{ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: true }}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen.

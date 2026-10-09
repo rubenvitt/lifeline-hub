@@ -120,6 +120,41 @@ export function zeilenFehler<V>(
   return error != null && variables !== undefined && passt(variables) ? error : null;
 }
 
+/** Eine Mutation, die an einer Zeile schreiben kann; Eingabe für {@link letzterZeilenFehler}. */
+export interface ZeilenAktion {
+  error: unknown;
+  submittedAt: number;
+  /** Betraf der letzte Aufruf dieser Mutation die Zeile? */
+  passt: boolean;
+  /** Text für einen Fehler, der keine `ApiError` ist. */
+  fallback?: string;
+}
+
+/** Bindet eine Mutation an eine Zeile; `passt` sieht die `variables` des letzten Aufrufs. */
+export function zeilenAktion<V>(
+  mutation: { error: unknown; variables: V | undefined; submittedAt: number },
+  passt: (variablen: V) => boolean,
+  fallback?: string,
+): ZeilenAktion {
+  const { error, variables, submittedAt } = mutation;
+  return { error, submittedAt, passt: variables !== undefined && passt(variables), fallback };
+}
+
+/**
+ * Der Grund der LETZTEN Aktion an einer Zeile, an der mehrere Mutationen schreiben (LFH-1077).
+ * Jede Mutation hält ihren Fehler bis zu ihrem nächsten Aufruf; ohne den Vergleich über
+ * `submittedAt` stünde nach einem gelungenen Aktualisieren noch der Grund eines früher
+ * abgelehnten Löschens an der Zeile.
+ */
+export function letzterZeilenFehler(
+  aktionen: readonly ZeilenAktion[],
+): { fehler: unknown; fallback?: string } | null {
+  const anDerZeile = aktionen.filter((a) => a.passt);
+  if (anDerZeile.length === 0) return null;
+  const letzte = anDerZeile.reduce((a, b) => (b.submittedAt > a.submittedAt ? b : a));
+  return letzte.error != null ? { fehler: letzte.error, fallback: letzte.fallback } : null;
+}
+
 interface ZeilenFehlerProps {
   /** Aus {@link zeilenFehler}: nur der Fehler DIESER Zeile. */
   fehler: unknown;

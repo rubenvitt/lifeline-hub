@@ -1,10 +1,10 @@
-import { App, Button, Popconfirm, Space, Tag } from 'antd';
+import { Button, Flex, Popconfirm, Space, Tag, theme } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
+import { ZeilenFehler, zeilenFehler } from '../components/SpeicherHinweis';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import { listeOnlineQuellen, loescheOnlineQuelle, type OnlineQuelle } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
@@ -25,7 +25,7 @@ export default function OnlineQuellenVerwaltung() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [formOffen, setFormOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<OnlineQuelle | null>(null);
   const [katalogOffen, setKatalogOffen] = useState(false);
@@ -40,10 +40,11 @@ export default function OnlineQuellenVerwaltung() {
   const vorhandeneUrls = useMemo(() => new Set(quellen.map((q) => q.url)), [quellen]);
   const naechsteSortier = quellen.reduce((max, q) => Math.max(max, q.sortier), 0) + 1;
 
+  // Eine Ablehnung steht an der Zeile, an der gelöscht wurde (`ZeilenFehler` in der
+  // Aktionsspalte), kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheOnlineQuelle(id),
     onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<OnlineQuelle>[] = [
@@ -136,26 +137,32 @@ export default function OnlineQuellenVerwaltung() {
             // Die Zeilenaktionen sind kein Vergleichsgegenstand — nicht abwählbar.
             immerSichtbar: true,
             render: (_, q: OnlineQuelle) => (
-              // `size="middle"` trennt die destruktive von der neutralen Aktion
-              // (`components/aktionsabstand.guard.test.ts`).
-              <Space size="middle">
-                <Button
-                  onClick={() => {
-                    setBearbeite(q);
-                    setFormOffen(true);
-                  }}
-                >
-                  Bearbeiten
-                </Button>
-                <Popconfirm
-                  title="Quelle löschen?"
-                  okText="Löschen"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => loeschenMutation.mutate(q.id)}
-                >
-                  <Button danger>Löschen</Button>
-                </Popconfirm>
-              </Space>
+              <Flex vertical gap={token.marginXXS} align="flex-start">
+                {/* `size="middle"` trennt die destruktive von der neutralen Aktion
+                    (`components/aktionsabstand.guard.test.ts`). */}
+                <Space size="middle">
+                  <Button
+                    onClick={() => {
+                      setBearbeite(q);
+                      setFormOffen(true);
+                    }}
+                  >
+                    Bearbeiten
+                  </Button>
+                  <Popconfirm
+                    title="Quelle löschen?"
+                    okText="Löschen"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => loeschenMutation.mutate(q.id)}
+                  >
+                    <Button danger>Löschen</Button>
+                  </Popconfirm>
+                </Space>
+                <ZeilenFehler
+                  fehler={zeilenFehler(loeschenMutation, (id) => id === q.id)}
+                  fallback="Löschen fehlgeschlagen"
+                />
+              </Flex>
             ),
           },
         ] as KatalogSpalte<OnlineQuelle>[])

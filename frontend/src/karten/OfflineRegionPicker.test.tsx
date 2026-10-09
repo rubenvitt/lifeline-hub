@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -177,5 +178,121 @@ describe('OfflineRegionPicker', () => {
     render();
     await screen.findByRole('button', { name: /^Laden/ });
     expect(screen.queryByText(/Planetiler|Shortbread|ohne Netz nutzbar/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Zeilenfehler im Picker (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): eine abgelehnte
+ * Aktion nennt ihren Grund an GENAU der Region, an der sie ausgelöst wurde; kein Fehler-Toast. Das
+ * gilt auch für den Download, den die Verkettung nach einem fertigen Bau selbst anstößt. Einziger
+ * Fehler-Toast bleibt der im Hintergrund gescheiterte Bau.
+ */
+describe('OfflineRegionPicker — abgelehnte Aktionen an der Region (LFH-1077)', () => {
+  const zeile = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
+
+  function ohneFehlerToastNurEinFehler() {
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+  }
+
+  function Harness() {
+    const [offen, setOffen] = useState(true);
+    return (
+      <>
+        <button type="button" onClick={() => setOffen(true)}>
+          Wieder öffnen
+        </button>
+        <OfflineRegionPicker offen={offen} onClose={() => setOffen(false)} />
+      </>
+    );
+  }
+
+  function ladenAbgelehnt() {
+    mockPicker({ karten: [], katalog: [bremenEintrag, bayernEintrag], bauVerfuegbar: false });
+    server.use(
+      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+        const { name } = (await request.json()) as { name: string };
+        return name === 'Bremen'
+          ? HttpResponse.json({ error: 'Speicher voll' }, { status: 507 })
+          : HttpResponse.json({ status: 'laedt' }, { status: 202 });
+      }),
+    );
+  }
+
+  it('Laden: der Grund steht an der Region', async () => {
+    ladenAbgelehnt();
+    render();
+    await screen.findByText('Bayern');
+    await userEvent.click(within(zeile('Bremen')).getByRole('button', { name: /^Laden/ }));
+
+    expect(await within(zeile('Bremen')).findByText('Speicher voll')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(zeile('Bayern').querySelector('[data-fehler]')).toBeNull();
+    ohneFehlerToastNurEinFehler();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Bauen & laden: der Grund steht an der Region', async () => {
+    mockPicker({ karten: [], katalog: [bremenEintrag] });
+    server.use(
+      http.post('/api/karte/offline-karten/bauen', () =>
+        HttpResponse.json({ error: 'Kartenbau-Dienst ausgelastet' }, { status: 503 }),
+      ),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: /Bauen & laden/ }));
+
+    expect(
+      await within(zeile('Bayern')).findByText('Kartenbau-Dienst ausgelastet'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeile('Bremen').querySelector('[data-fehler]')).toBeNull();
+    ohneFehlerToastNurEinFehler();
+  });
+
+  it('der verkettete Download nach dem Bau meldet seine Ablehnung an der Region', async () => {
+    let downloads = 0;
+    mockPicker({ karten: [], katalog: [bremenEintrag] });
+    server.use(
+      http.post('/api/karte/offline-karten/bauen', () => HttpResponse.json({ job_id: 1 })),
+      http.get('/api/karte/offline-karten/bau-status', () =>
+        HttpResponse.json([{ id: 1, slug: 'bayern', status: { status: 'done' }, gestartet: 'd' }]),
+      ),
+      http.get('/api/karte/offline-karten/katalog', ({ request }) => {
+        const frisch = new URL(request.url).searchParams.get('frisch') === '1';
+        return HttpResponse.json(frisch ? [bremenEintrag, bayernEintrag] : [bremenEintrag]);
+      }),
+      http.post('/api/karte/offline-karten/download', () => {
+        downloads += 1;
+        return HttpResponse.json({ error: 'Speicher voll' }, { status: 507 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: /Bauen & laden/ }));
+
+    await waitFor(() => expect(downloads).toBe(1));
+    expect(await within(zeile('Bayern')).findByText('Speicher voll')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(zeile('Bremen').querySelector('[data-fehler]')).toBeNull();
+    ohneFehlerToastNurEinFehler();
+  });
+
+  it('zeigt nach Schließen und erneutem Öffnen keinen alten Grund', async () => {
+    ladenAbgelehnt();
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    await screen.findByText('Bayern');
+    await nutzer.click(within(zeile('Bremen')).getByRole('button', { name: /^Laden/ }));
+    await within(zeile('Bremen')).findByText('Speicher voll');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs ein.
+    await nutzer.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /close|schlie/i }),
+    );
+    await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
+    const wieder = await screen.findByRole('dialog');
+    await within(wieder).findByText('Bayern');
+    expect(wieder.querySelector('[data-fehler]')).toBeNull();
   });
 });

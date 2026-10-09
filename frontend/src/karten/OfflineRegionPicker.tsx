@@ -2,7 +2,6 @@ import { App, Button, Modal, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fehlerText } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
   ladeBaubareRegionen,
@@ -20,6 +19,7 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
+import { ZeilenFehler, letzterZeilenFehler, zeilenAktion } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
 import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
 
@@ -129,7 +129,6 @@ export default function OfflineRegionPicker({
       invalidiereKarte(qc);
       message.success('Download gestartet');
     },
-    onError: (e) => message.error(fehlerText(e, 'Download fehlgeschlagen')),
   });
 
   const bauen = useMutation({
@@ -139,8 +138,35 @@ export default function OfflineRegionPicker({
       qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('bau-status') });
       message.success('Bau gestartet');
     },
-    onError: (e) => message.error(fehlerText(e, 'Bau konnte nicht gestartet werden')),
   });
+
+  /**
+   * Eine Ablehnung steht an der Region, an der gehandelt wurde, kein Toast (`frontend/AGENTS.md`,
+   * „Rückwege und Fehler“, LFH-1077). Das gilt auch für den Download, den die Verkettung nach
+   * einem fertigen Bau anstößt: er läuft über dieselbe Mutation und trifft die Region über ihren
+   * Namen. Bei zwei Mutationen an einer Region zählt die LETZTE Aktion (`submittedAt`) — ein
+   * neuer Bau räumt so den Grund eines früher abgelehnten Downloads.
+   *
+   * Einziger Fehler-Toast bleibt der im Hintergrund gescheiterte Bau (Verkettung unten): ohne
+   * Handlung des Nutzers, womöglich bei geschlossenem Dialog.
+   */
+  const zeilenGrund = (z: RegionZeile) =>
+    letzterZeilenFehler([
+      zeilenAktion(download, (v) => v.name === z.name, 'Download fehlgeschlagen'),
+      zeilenAktion(
+        bauen,
+        (v) => z.slug != null && v.slug === z.slug,
+        'Bau konnte nicht gestartet werden',
+      ),
+    ]);
+
+  // Schließen räumt die Gründe der letzten Ablehnungen; eine laufende Mutation bleibt unberührt,
+  // `reset()` hängte ihr Ergebnis ab. NICHT beim Öffnen: ein verketteter Download, der bei
+  // geschlossenem Dialog scheitert, soll beim nächsten Öffnen an seiner Region stehen.
+  const schliessen = () => {
+    for (const m of [download, bauen]) if (!m.isPending && m.error != null) m.reset();
+    onClose();
+  };
 
   // Verkettung: ein Bau-Job einer verketteten Region erreicht „done“ → frischen Katalog holen
   // (TTL umgehen) und den Download anstoßen. Bei „failed“ endet die Verkettung mit Fehler.
@@ -288,7 +314,7 @@ export default function OfflineRegionPicker({
       open={offen}
       title="Region aufs Gerät bringen"
       footer={null}
-      onCancel={onClose}
+      onCancel={schliessen}
       destroyOnHidden
       width={560}
     >
@@ -309,18 +335,28 @@ export default function OfflineRegionPicker({
               // Auswahlliste („welche Region?“). Als Überschrift stünde der Eintrag zudem über
               // seiner Gruppenüberschrift (h5).
               dataSource={items}
-              renderItem={(z) => (
-                <ListenEintrag actions={[<span key="a">{aktion(z)}</span>]}>
-                  <ListenEintragMeta
-                    title={z.name}
-                    description={
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {z.region}
-                      </Typography.Text>
-                    }
-                  />
-                </ListenEintrag>
-              )}
+              renderItem={(z) => {
+                const grund = zeilenGrund(z);
+                return (
+                  <ListenEintrag actions={[<span key="a">{aktion(z)}</span>]}>
+                    <ListenEintragMeta
+                      title={z.name}
+                      description={
+                        <>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            {z.region}
+                          </Typography.Text>
+                          {grund && (
+                            <div>
+                              <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
+                            </div>
+                          )}
+                        </>
+                      }
+                    />
+                  </ListenEintrag>
+                );
+              }}
             />
           </div>
         ))
