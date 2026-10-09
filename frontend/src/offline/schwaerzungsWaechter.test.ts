@@ -12,7 +12,17 @@ import { schwaerzungsWaechterVorbelegen } from './schwaerzungsWaechter';
  * verschwundener Einsatz wird geräumt wie beim 404 auf den Kopf.
  */
 
-const warte = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Wartet, bis `Date.now()` über dem Stand beim Aufruf liegt. Jeder danach gesetzte
+ * `dataUpdatedAt` ist dann echt jünger als jeder davor. `hydrate` übernimmt nur einen echt
+ * jüngeren Stand; ein fester `setTimeout` reicht dafür nicht, weil Node Timer gegen die gecachte
+ * Loop-Zeit misst und nicht gegen `Date.now()`. Unter Last bekamen beide Abrufe sonst dieselbe
+ * Millisekunde.
+ */
+async function naechsteMillisekunde(): Promise<void> {
+  const jetzt = Date.now();
+  while (Date.now() <= jetzt) await new Promise((r) => setTimeout(r, 1));
+}
 
 function neuerClient() {
   return erzeugeQueryClient({ queries: { retry: false } });
@@ -85,7 +95,7 @@ describe('Schwärzungswächter — Stand im Einsatzkopf', () => {
     await kopfAbrufen(qc, 7);
     qc.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
     const quelle = neuerClient();
-    await warte(2);
+    await naechsteMillisekunde();
     await kopfAbrufen(quelle, 7, 1);
     hydrate(qc, dehydrate(quelle));
     expect(qc.getQueryData(einsatzKeys.einsatz(7))).toEqual(kopf(7, 1));
@@ -111,7 +121,7 @@ describe('Schwärzungswächter — Stand im Einsatzkopf', () => {
     const qc = neuerClient();
     await kopfAbrufen(qc, 7);
     const vorher = Date.now() - 1;
-    await warte(2);
+    await naechsteMillisekunde();
     await kopfAbrufen(qc, 7, 1);
     const marke = qc.getQueryState(einsatzKeys.einsatz(7))!.dataUpdatedAt;
     expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), vorher)).toBe(false);
@@ -137,7 +147,7 @@ describe('Schwärzungswächter — Einsatzliste', () => {
     const kopfAbruf = vi.fn(async () => kopf(7, 1));
     await qc.fetchQuery({ queryKey: einsatzKeys.einsatz(7), queryFn: async () => kopf(7) });
     await listeAbrufen(qc, [kopf(7)]);
-    await warte(2);
+    await naechsteMillisekunde();
     qc.getQueryCache()
       .find({ queryKey: einsatzKeys.einsatz(7) })!
       .setOptions({
@@ -157,7 +167,7 @@ describe('Schwärzungswächter — Einsatzliste', () => {
     await listeAbrufen(qc, [kopf(7), kopf(8)]);
     qc.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
     const quelle = neuerClient();
-    await warte(2);
+    await naechsteMillisekunde();
     await listeAbrufen(quelle, [kopf(8)]);
     hydrate(qc, dehydrate(quelle));
     expect(qc.getQueryData(globalKeys.einsaetze())).toEqual([kopf(8)]);
@@ -231,7 +241,7 @@ describe('Schwärzungswächter — Vorbelegung aus dem Vorrat', () => {
     const vorrat = [eintrag(einsatzKeys.einsatz(7), kopf(7)), eintrag(einsatzKeys.personen(7), [])];
     const alt = Date.now();
     schwaerzungsWaechterVorbelegen(qc, vorrat);
-    await warte(2);
+    await naechsteMillisekunde();
     await listeAbrufen(qc, [kopf(7, 1), kopf(8)]);
     expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(false);
     expect(lagebildStandZulaessig(qc, einsatzKeys.personen(8), alt)).toBe(true);
@@ -240,7 +250,7 @@ describe('Schwärzungswächter — Vorbelegung aus dem Vorrat', () => {
   it('verwirft ihn auch, wenn die Liste schon vor der Vorbelegung kam', async () => {
     const qc = neuerClient();
     const alt = Date.now();
-    await warte(2);
+    await naechsteMillisekunde();
     await listeAbrufen(qc, [kopf(7, 1)]);
     schwaerzungsWaechterVorbelegen(qc, [eintrag(einsatzKeys.einsatz(7), kopf(7))]);
     expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(false);
@@ -254,7 +264,7 @@ describe('Schwärzungswächter — Vorbelegung aus dem Vorrat', () => {
       const qc = neuerClient();
       const alt = Date.now();
       schwaerzungsWaechterVorbelegen(qc, reihe);
-      await warte(2);
+      await naechsteMillisekunde();
       await listeAbrufen(qc, [kopf(7, 1)]);
       expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(true);
     }
@@ -264,7 +274,7 @@ describe('Schwärzungswächter — Vorbelegung aus dem Vorrat', () => {
     const qc = neuerClient();
     const alt = Date.now();
     schwaerzungsWaechterVorbelegen(qc, [eintrag(einsatzKeys.personen(7), [{ id: 1 }])]);
-    await warte(2);
+    await naechsteMillisekunde();
     await listeAbrufen(qc, [kopf(7, 1)]);
     expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(false);
   });
@@ -272,10 +282,10 @@ describe('Schwärzungswächter — Vorbelegung aus dem Vorrat', () => {
   it('lässt den Live-Kopf auf der Platte, der den höheren Stand vor der Vorbelegung trug', async () => {
     const qc = neuerClient();
     const alt = Date.now();
-    await warte(2);
+    await naechsteMillisekunde();
     await kopfAbrufen(qc, 7, 1);
     const live = qc.getQueryState(einsatzKeys.einsatz(7))!.dataUpdatedAt;
-    await warte(2);
+    await naechsteMillisekunde();
     schwaerzungsWaechterVorbelegen(qc, [eintrag(einsatzKeys.einsatz(7), kopf(7))]);
     expect(lagebildStandZulaessig(qc, einsatzKeys.einsatz(7), live)).toBe(true);
     expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(false);
