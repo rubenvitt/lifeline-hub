@@ -29,6 +29,12 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   man `Markdown` als `titel` (Lesefassung) bzw. dem Editor als `druckTitel` (Entwurf: Akkordeonkopf
   und Feldetikett weichen auf Papier). Wirkung nur im echten Firefox-Druck sichtbar
   (Minimalprobe `docs/superpowers/specs/2026-09-25-lfh-22-belege/lfh-813/werkzeug/`).
+  Im Einsatzbericht (LFH-1098, `druck/einsatzbericht/Bloecke.tsx`) reichen Block und Abschnitt
+  ihre Titel an das erste Inhaltsstück weiter: eine Liste nimmt sie mit ihrer ersten Zeile auf
+  (zwei Subgrids desselben Rasters, die Etikettspalte bleibt gleich breit), eine Tabelle bis
+  `KURZE_TABELLE` Zeilen ganz. Eine längere bleibt draußen: in einer Hülle, die nicht bricht,
+  rücken Firefox und Chromium sie samt Titel auf die nächste Seite und lassen davor fast eine
+  Seite leer.
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
   brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur
