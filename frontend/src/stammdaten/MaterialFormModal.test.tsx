@@ -118,6 +118,32 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
     expect(geschlossen).not.toHaveBeenCalled();
   });
 
+  /**
+   * Eine Ablehnung nennt ihren Grund IM Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“); Dialog und Wortlaut bleiben stehen.
+   */
+  it('nennt bei einer Ablehnung (422) den Grund im Dialog und behält den Wortlaut', async () => {
+    server.use(
+      http.post('/api/material', () =>
+        HttpResponse.json({ error: 'Bestandsnummer bereits vergeben' }, { status: 422 }),
+      ),
+    );
+    const geschlossen = vi.fn();
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness onClose={geschlossen} />);
+
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.type(within(dialog).getByLabelText('Bezeichnung'), 'Wolldecke');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Bestandsnummer bereits vergeben',
+    );
+    expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue('Wolldecke');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(geschlossen).not.toHaveBeenCalled();
+  });
+
   it('nach erfolgreichem Bearbeiten startet das nächste Anlegen leer', async () => {
     handler();
     const nutzer = userEvent.setup();

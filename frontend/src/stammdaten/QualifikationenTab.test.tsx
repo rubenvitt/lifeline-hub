@@ -204,9 +204,36 @@ describe('QualifikationenTab', () => {
     await userEvent.type(feld, 'Gruppenführer');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
-    await screen.findByText('Label bereits vergeben');
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(within(screen.getByRole('dialog')).getByLabelText('Label')).toHaveValue('Gruppenführer');
+    // Der Grund steht IM Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+    // Fehler“).
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Label bereits vergeben');
+    expect(within(dialog).getByLabelText('Label')).toHaveValue('Gruppenführer');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('zeigt nach Abbrechen und erneutem Bearbeiten keinen alten Grund', async () => {
+    server.use(
+      http.patch('/api/qualifikationen/1', () =>
+        HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
+      ),
+    );
+    render(admin);
+    await screen.findByText('Sanitäter');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
+    // ein, und jsdom beendet die Animation nie.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Bearbeiten' })[1]);
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(wieder).getByLabelText('Label')).toHaveValue('Gruppenführer'),
+    );
+    expect(within(wieder).queryByRole('alert')).toBeNull();
   });
 });
 

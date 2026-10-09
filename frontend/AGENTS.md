@@ -548,9 +548,15 @@ und `pages/personen/`.
 - **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`colorError` vor `colorWarning`; prüfbar
   über `data-alarm`/`data-unbearbeitet`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
   fünfte `KommPhase`.
-- **Speicherfehler an die Seite, Erfolg an den Toast:** `components/SpeicherHinweis.tsx`
-  (`SpeicherFehler`, `RechteHinweis`, `SeitenHinweise` für EINEN Slot); kein `onError`-Toast;
-  der Alert geht beim nächsten Absenden (mittesten).
+- **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
+  steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`
+  der Erfassungs-Hülle oder `SpeicherFehler` (Öffnen und Abbrechen räumen), am Formular oder
+  Paneel als `SpeicherFehler`, an der Zeile als `ZeilenFehler` (`zeilenFehler` aus
+  `mutation.variables`), Kopfaktionen und Rückgängig aus dem Toast über `SeitenHinweise` (EIN
+  Slot); alles in `components/SpeicherHinweis.tsx`. Kein `onError`-Toast: ein Fehler-Toast
+  bleibt nur ohne Ort (Zwischenablage, Hintergrund) und steht mit Grund in
+  `components/speicherfehler.guard.test.ts`. Ein Dialog schließt erst beim Erfolg; Prüfungen
+  ohne Server stehen am Feld.
 - **Gescheiterter Zustandsübergang meldet sich im Dialog** (LFH-535):
   `entwurf/FreigabeDialog.tsx`, kein `modal.confirm`; `freigabeGrund`, Vorrang Speicherfehler;
   Öffnen ruft `freigebenMutation.reset()`. Test zählt `.ant-message`, offen/zu über `ant-zoom-leave`.

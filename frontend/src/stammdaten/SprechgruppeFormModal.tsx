@@ -1,8 +1,7 @@
-import { App, Collapse, Form, Input } from 'antd';
+import { Collapse, Form, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereSprechgruppe, legeSprechgruppeAn } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
@@ -29,7 +28,6 @@ export default function SprechgruppeFormModal({
 }) {
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
-  const { message } = App.useApp();
 
   // VORBELEGUNG, kein Zurücksetzen — Begründung in `FahrzeugFormModal` (LFH-346/A6).
   useEffect(() => {
@@ -60,9 +58,6 @@ export default function SprechgruppeFormModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() });
     },
-    // Toast bleibt (LFH-473): nach der Ablehnung stehen Dialog und Wortlaut offen, nichts wirkt
-    // gespeichert; der Seiten-Slot läge hinter der Maske.
-    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (
@@ -72,6 +67,9 @@ export default function SprechgruppeFormModal({
       form={form}
       erfassenText="Speichern"
       laeuft={mutation.isPending}
+      // Kein `onError`-Toast: die Hülle nennt den Grund einer Ablehnung im Dialog
+      // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077).
+      speicherung={mutation}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
       onErfassen={(w) => mutation.mutateAsync(w)}
       onFertig={onClose}
