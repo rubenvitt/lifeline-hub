@@ -10,11 +10,14 @@
   overflow: auto;
 }
 
+/* Etikett „Vorschau“ (split) als Augenbraue in der Textrolle `schwach` (LFH-1059), nicht in
+   geerbter Farbe mit `opacity: 0.55`: das lag am Tag bei rund 4 : 1, und Deckkraft lehnt der
+   Messkern ab (`frontend/AGENTS.md`, Textboden für jede Textstufe). */
 .markdown-editor__label {
   font-size: 0.75em;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  opacity: 0.55;
+  color: var(--lfh-schwach);
   margin-bottom: 6px;
 }
 
