@@ -30,6 +30,10 @@ bereiche_von() {
     # Zählregeln (verdichtungFixture.test.ts).
     src/karte/quellen.rs | tests/fixtures/verdichtung/*)
       echo "rust frontend e2e" ;;
+    # Das Frontend bündelt die Anwenderdokumentation als Hilfe (vite.config.ts, hilfe/kapitel.ts);
+    # Vitest und e2e lesen die Kapitel. Steht vor der Doku-Regel, die Markdown sonst ausnimmt.
+    docs/anwender/*)
+      echo "frontend e2e" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
     # liest keine Suite; Prettier über `frontend/**/*.md` läuft in den Schnellprüfungen.
