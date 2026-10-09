@@ -3849,7 +3849,7 @@ mod tests {
     async fn purge_loescht_abgelaufene_sitzungen() {
         let pool = crate::db::test_pool().await;
         let (b, _) = aktiver_einsatz(&pool).await;
-        let gueltig = crate::auth::session::anlegen(&pool, b).await.unwrap();
+        let gueltig = crate::auth::session::anlegen(&pool, b, None).await.unwrap();
         sqlx::query(
             "INSERT INTO session (token_hash, benutzer_id, expires_at) \
              VALUES ('abgelaufen', ?, datetime('now', '-1 minute'))",

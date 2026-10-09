@@ -30,6 +30,8 @@ use utoipa::OpenApi;
         crate::auftrag::EmpfaengerTyp,
         crate::auth::BenutzerAnzeige,
         crate::routes::auth::MeAntwort,
+        crate::auth::session::SitzungAnzeige,
+        crate::routes::sitzung::SitzungenBeendet,
         crate::auth::OrgRolle,
         crate::auth::SystemRolle,
         crate::auth::provider::AuthProviderAnzeige,

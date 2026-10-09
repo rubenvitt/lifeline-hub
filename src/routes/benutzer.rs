@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel};
-use crate::auth::session::AdminUser;
+use crate::auth::session::{self, AdminUser};
 use crate::auth::{
     BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY, ROLLE_ADMIN,
     ROLLE_KEINER,
@@ -273,11 +273,9 @@ pub async fn deaktivieren(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("DELETE FROM session WHERE benutzer_id = ?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    let beendet = session::alle_loeschen(&mut tx, id).await?;
     tx.commit().await?;
+    state.live.melde_sitzung_ende(beendet);
 
     admin_audit::schreibe(
         &state.pool,
@@ -368,13 +366,13 @@ pub async fn bearbeiten(
     .execute(&mut *tx)
     .await?;
     // Beim Deaktivieren die Sessions des Nutzers invalidieren (analog `deaktivieren`).
-    if !aktiv {
-        sqlx::query("DELETE FROM session WHERE benutzer_id = ?")
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
-    }
+    let beendet = if aktiv {
+        Vec::new()
+    } else {
+        session::alle_loeschen(&mut tx, id).await?
+    };
     tx.commit().await?;
+    state.live.melde_sitzung_ende(beendet);
 
     let mut rollen = Vec::new();
     if system_rolle != ziel.system_rolle.as_str() {
@@ -454,11 +452,9 @@ pub async fn totp_reset(
     .execute(&mut *tx)
     .await?;
     crate::auth::totp::storage::loesche_recovery_codes(&mut *tx, id).await?;
-    sqlx::query("DELETE FROM session WHERE benutzer_id = ?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    let beendet = session::alle_loeschen(&mut tx, id).await?;
     tx.commit().await?;
+    state.live.melde_sitzung_ende(beendet);
 
     admin_audit::schreibe(
         &state.pool,

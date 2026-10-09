@@ -76,56 +76,178 @@ fn hash_token(token: &str) -> String {
         .collect()
 }
 
+/// Öffentliche Kennung einer Sitzung (LFH-1092): 128 Bit Zufall als Hex, unabhängig vom Token.
+/// Sie steht in der Sitzungsliste und adressiert das Beenden; aus ihr folgt nichts über den Token.
+fn neue_kennung() -> String {
+    let mut bytes = [0u8; 16];
+    OsRng.fill_bytes(&mut bytes);
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Takt, in dem „zuletzt gesehen“ fortgeschrieben wird (LFH-1092, design.md D2). Eine Anfrage
+/// innerhalb des Takts schreibt nichts und öffnet damit keine Schreibtransaktion; die Liste zeigt
+/// den Zeitpunkt mit dieser Unschärfe.
+pub const ZULETZT_GESEHEN_TAKT_MINUTEN: i64 = 5;
+
 /// Lebensdauer einer Sitzung ab Anmeldung, ohne Verlängerung. Eine Quelle für den Ablauf in
 /// der DB und das `Max-Age` des Cookies (LFH-779), damit das Cookie nie länger lebt als die
 /// Sitzung dahinter und umgekehrt.
 pub const SITZUNG_TAGE: i64 = 7;
 
 /// Legt eine neue Session für den Benutzer an (TTL [`SITZUNG_TAGE`]) und liefert den Token.
+/// `geraet` ist die grobe Bezeichnung aus dem User-Agent ([`crate::auth::geraet_bezeichnung`]).
 ///
 /// Ein Gerätekonto (LFH-892) bekommt hier nie eine Sitzung: jeder Anmeldeweg einer Person läuft
 /// durch diese Funktion, ein Gerät meldet sich nur über den Kopplungscode an
 /// ([`anlegen_geraet`]). Zusätzlich zum Passwort-Sentinel, der den Passwortweg schon sperrt.
-pub async fn anlegen(pool: &SqlitePool, benutzer_id: i64) -> Result<String, AppError> {
+pub async fn anlegen(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+    geraet: Option<&str>,
+) -> Result<String, AppError> {
     if crate::geraet::repo::ist_geraetekonto(pool, benutzer_id).await? {
         return Err(AppError::Unauthorized);
     }
     let token = neuer_token();
     sqlx::query(
-        "INSERT INTO session (token_hash, benutzer_id, expires_at) \
-         VALUES (?, ?, datetime('now', ?))",
+        "INSERT INTO session (token_hash, benutzer_id, expires_at, kennung, zuletzt_gesehen_at, geraet) \
+         VALUES (?, ?, datetime('now', ?), ?, datetime('now'), ?)",
     )
     .bind(hash_token(&token))
     .bind(benutzer_id)
     .bind(format!("+{SITZUNG_TAGE} days"))
+    .bind(neue_kennung())
+    .bind(geraet)
     .execute(pool)
     .await?;
     Ok(token)
 }
 
-/// Löscht eine Session anhand ihres Tokens (idempotent).
-pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM session WHERE token_hash = ?")
-        .bind(hash_token(token))
-        .execute(pool)
-        .await?;
-    Ok(())
+/// Löscht eine Session anhand ihres Tokens (idempotent) und liefert ihre Kennung, falls es sie
+/// gab. Der Aufrufer meldet sie an [`crate::live::LiveHub::melde_sitzung_ende`].
+pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<Option<String>, AppError> {
+    let kennung: Option<Option<String>> =
+        sqlx::query_scalar("DELETE FROM session WHERE token_hash = ? RETURNING kennung")
+            .bind(hash_token(token))
+            .fetch_optional(pool)
+            .await?;
+    Ok(kennung.flatten())
 }
 
 /// Löscht alle Sessions eines Benutzers AUSSER der zum übergebenen Token (Passwortwechsel,
-/// LFH-471). Läuft auf dem Executor des Aufrufers, damit der Wechsel mit dem neuen Hash in einer
-/// Transaktion steht.
+/// LFH-471) und liefert ihre Kennungen. Läuft auf dem Executor des Aufrufers, damit der Wechsel
+/// mit dem neuen Hash in einer Transaktion steht.
 pub async fn andere_loeschen(
     conn: &mut sqlx::SqliteConnection,
     benutzer_id: i64,
     eigener_token: &str,
-) -> Result<u64, AppError> {
-    let ergebnis = sqlx::query("DELETE FROM session WHERE benutzer_id = ? AND token_hash <> ?")
-        .bind(benutzer_id)
-        .bind(hash_token(eigener_token))
-        .execute(conn)
-        .await?;
-    Ok(ergebnis.rows_affected())
+) -> Result<Vec<String>, AppError> {
+    let kennungen: Vec<Option<String>> = sqlx::query_scalar(
+        "DELETE FROM session WHERE benutzer_id = ? AND token_hash <> ? RETURNING kennung",
+    )
+    .bind(benutzer_id)
+    .bind(hash_token(eigener_token))
+    .fetch_all(conn)
+    .await?;
+    Ok(kennungen.into_iter().flatten().collect())
+}
+
+/// Löscht ALLE Sessions eines Benutzers (Deaktivieren, Zweitfaktor-Reset) und liefert ihre
+/// Kennungen für [`crate::live::LiveHub::melde_sitzung_ende`].
+pub async fn alle_loeschen(
+    conn: &mut sqlx::SqliteConnection,
+    benutzer_id: i64,
+) -> Result<Vec<String>, AppError> {
+    let kennungen: Vec<Option<String>> =
+        sqlx::query_scalar("DELETE FROM session WHERE benutzer_id = ? RETURNING kennung")
+            .bind(benutzer_id)
+            .fetch_all(conn)
+            .await?;
+    Ok(kennungen.into_iter().flatten().collect())
+}
+
+/// Eine Personensitzung in der Sitzungsliste (LFH-1092). Zeitpunkte als UTC-`datetime`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct SitzungAnzeige {
+    pub kennung: String,
+    pub angemeldet_at: String,
+    /// Letzte Anfrage dieser Sitzung, auf [`ZULETZT_GESEHEN_TAKT_MINUTEN`] genau.
+    pub zuletzt_gesehen_at: String,
+    /// Grobe Bezeichnung wie „Firefox · Windows“; fehlt, wenn unbekannt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub geraet: Option<String>,
+    /// Die Sitzung, mit der diese Anfrage kommt.
+    pub aktuell: bool,
+}
+
+/// Die laufenden Personensitzungen eines Benutzers, zuletzt gesehen zuerst. Sitzungen
+/// gekoppelter Geräte und abgelaufene erscheinen nicht. `aktuelle_kennung` markiert die eigene.
+pub async fn liste(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+    aktuelle_kennung: Option<&str>,
+) -> Result<Vec<SitzungAnzeige>, AppError> {
+    Ok(sqlx::query_as::<_, SitzungAnzeige>(
+        "SELECT kennung, erstellt_at AS angemeldet_at, \
+                COALESCE(zuletzt_gesehen_at, erstellt_at) AS zuletzt_gesehen_at, geraet, \
+                COALESCE(kennung = ?, 0) AS aktuell \
+         FROM session \
+         WHERE benutzer_id = ? AND kopplung_id IS NULL AND kennung IS NOT NULL \
+           AND expires_at > datetime('now') \
+         ORDER BY zuletzt_gesehen_at DESC, erstellt_at DESC, kennung",
+    )
+    .bind(aktuelle_kennung)
+    .bind(benutzer_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Welche Personensitzungen [`beenden`] löscht.
+#[derive(Debug, Clone, Copy)]
+pub enum Auswahl<'a> {
+    /// Genau die Sitzung mit dieser Kennung.
+    Eine(&'a str),
+    /// Alle, außer der mit dieser Kennung (`None`: alle).
+    AlleAusser(Option<&'a str>),
+}
+
+/// Eine von [`beenden`] gelöschte Sitzung, für Audit und Strom-Ende.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct BeendeteSitzung {
+    pub kennung: String,
+    pub angemeldet_at: String,
+    pub geraet: Option<String>,
+}
+
+/// Beendet Personensitzungen eines Benutzers (LFH-1092, design.md D5): löscht nur die Zeilen,
+/// nichts am Konto, und nie eine Sitzung eines gekoppelten Geräts. Liefert die gelöschten.
+pub async fn beenden(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+    auswahl: Auswahl<'_>,
+) -> Result<Vec<BeendeteSitzung>, AppError> {
+    let basis = "DELETE FROM session \
+                 WHERE benutzer_id = ? AND kopplung_id IS NULL AND kennung IS NOT NULL";
+    let rueckgabe = "RETURNING kennung, erstellt_at AS angemeldet_at, geraet";
+    let beendet = match auswahl {
+        Auswahl::Eine(kennung) => {
+            let sql = format!("{basis} AND kennung = ? {rueckgabe}");
+            sqlx::query_as::<_, BeendeteSitzung>(sqlx::AssertSqlSafe(sql))
+                .bind(benutzer_id)
+                .bind(kennung)
+                .fetch_all(pool)
+                .await?
+        }
+        Auswahl::AlleAusser(ausser) => {
+            let sql = format!("{basis} AND kennung IS NOT COALESCE(?, '') {rueckgabe}");
+            sqlx::query_as::<_, BeendeteSitzung>(sqlx::AssertSqlSafe(sql))
+                .bind(benutzer_id)
+                .bind(ausser)
+                .fetch_all(pool)
+                .await?
+        }
+    };
+    Ok(beendet)
 }
 
 /// Löscht alle abgelaufenen Sitzungen (Purge-Lauf, Phase C2, LFH-928). Die Bedingung ist das
@@ -162,12 +284,14 @@ pub async fn anlegen_geraet(
 ) -> Result<String, AppError> {
     let token = neuer_token();
     sqlx::query(
-        "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id) VALUES (?, ?, ?, ?)",
+        "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id, kennung, zuletzt_gesehen_at) \
+         VALUES (?, ?, ?, ?, ?, datetime('now'))",
     )
     .bind(hash_token(&token))
     .bind(benutzer_id)
     .bind(expires_at)
     .bind(kopplung_id)
+    .bind(neue_kennung())
     .execute(conn)
     .await?;
     Ok(token)
@@ -178,33 +302,83 @@ pub(crate) async fn benutzer_aus_token(
     pool: &SqlitePool,
     token: &str,
 ) -> Result<Benutzer, AppError> {
-    sitzung_aus_token(pool, token).await.map(|(b, _)| b)
+    sitzung_aus_token(pool, token).await.map(|(b, _, _)| b)
 }
 
-/// Wie [`benutzer_aus_token`], liefert bei einer Gerätesitzung zusätzlich deren Kontext. Eine
-/// Gerätesitzung, deren Kopplung widerrufen, abgelaufen oder deren Einsatz nicht mehr aktiv ist,
-/// ist tot (401), bei jeder Anfrage neu geprüft: so wirkt ein Widerruf sofort (design.md D7).
+/// Die öffentliche Kennung der Sitzung einer Anfrage (LFH-1092). [`CurrentUser`] legt sie in die
+/// Extensions; die Live-Ströme lesen sie dort, um mit ihrer Sitzung zu enden.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SitzungKennung(pub String);
+
+/// Extractor: die [`SitzungKennung`] der Anfrage, sofern ein vorheriger Extractor
+/// ([`CurrentUser`], [`AdminUser`], `EinsatzKontext`) die Sitzung schon aufgelöst hat. Steht in
+/// der Argumentliste deshalb NACH ihm; axum löst Extractors in dieser Reihenfolge auf.
+#[derive(Debug, Clone)]
+pub struct AktuelleSitzung(pub Option<SitzungKennung>);
+
+impl<S: Send + Sync> FromRequestParts<S> for AktuelleSitzung {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(AktuelleSitzung(
+            parts.extensions.get::<SitzungKennung>().cloned(),
+        ))
+    }
+}
+
+/// Wie [`benutzer_aus_token`], liefert bei einer Gerätesitzung zusätzlich deren Kontext und die
+/// Kennung der Sitzung. Eine Gerätesitzung, deren Kopplung widerrufen, abgelaufen oder deren
+/// Einsatz nicht mehr aktiv ist, ist tot (401), bei jeder Anfrage neu geprüft: so wirkt ein
+/// Widerruf sofort (design.md D7).
+///
+/// Schreibt „zuletzt gesehen“ fort, aber nur, wenn der Wert älter als
+/// [`ZULETZT_GESEHEN_TAKT_MINUTEN`] ist (LFH-1092, design.md D2). Scheitert das Schreiben, bleibt
+/// die Anfrage gültig: die Angabe ist Komfort, keine Prüfung.
 pub(crate) async fn sitzung_aus_token(
     pool: &SqlitePool,
     token: &str,
-) -> Result<(Benutzer, Option<crate::geraet::GeraetKontext>), AppError> {
+) -> Result<
+    (
+        Benutzer,
+        Option<crate::geraet::GeraetKontext>,
+        Option<SitzungKennung>,
+    ),
+    AppError,
+> {
     #[derive(sqlx::FromRow)]
     struct Zeile {
         #[sqlx(flatten)]
         benutzer: Benutzer,
         kopplung_id: Option<i64>,
+        kennung: Option<String>,
+        gesehen_veraltet: bool,
     }
+    let token_hash = hash_token(token);
     let zeile = sqlx::query_as::<_, Zeile>(
         "SELECT b.id, b.org_id, b.anzeigename, b.benutzername, b.passwort_hash, \
-                b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at, s.kopplung_id \
+                b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at, s.kopplung_id, s.kennung, \
+                COALESCE(s.zuletzt_gesehen_at < datetime('now', ?), 1) AS gesehen_veraltet \
          FROM session s \
          JOIN benutzer b ON b.id = s.benutzer_id \
          WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND b.aktiv = 1",
     )
-    .bind(hash_token(token))
+    .bind(format!("-{ZULETZT_GESEHEN_TAKT_MINUTEN} minutes"))
+    .bind(&token_hash)
     .fetch_optional(pool)
     .await?
     .ok_or(AppError::Unauthorized)?;
+
+    if zeile.gesehen_veraltet {
+        if let Err(e) = sqlx::query(
+            "UPDATE session SET zuletzt_gesehen_at = datetime('now') WHERE token_hash = ?",
+        )
+        .bind(&token_hash)
+        .execute(pool)
+        .await
+        {
+            tracing::warn!(error = %e, "zuletzt gesehen nicht fortgeschrieben");
+        }
+    }
 
     let geraet = match zeile.kopplung_id {
         None => None,
@@ -214,7 +388,7 @@ pub(crate) async fn sitzung_aus_token(
                 .ok_or(AppError::Unauthorized)?,
         ),
     };
-    Ok((zeile.benutzer, geraet))
+    Ok((zeile.benutzer, geraet, zeile.kennung.map(SitzungKennung)))
 }
 
 /// Kopf, mit dem ein Browser-Tab bei schreibenden Anfragen den Benutzer nennt, den er anzeigt
@@ -275,10 +449,13 @@ impl FromRequestParts<AppState> for CurrentUser {
             .map(|c| c.value().to_string())
             .ok_or(AppError::Unauthorized)?;
 
-        let (benutzer, geraet) = sitzung_aus_token(&state.pool, &token).await?;
+        let (benutzer, geraet, kennung) = sitzung_aus_token(&state.pool, &token).await?;
         if let Some(geraet) = geraet {
             fordere_geraeteroute(parts, state, &geraet).await?;
             parts.extensions.insert(geraet);
+        }
+        if let Some(kennung) = kennung {
+            parts.extensions.insert(kennung);
         }
         pruefe_erwarteten_benutzer(&parts.method, &parts.headers, benutzer.id)?;
         Ok(CurrentUser(benutzer))
@@ -451,7 +628,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
 
-        let token = anlegen(&pool, id).await.unwrap();
+        let token = anlegen(&pool, id, None).await.unwrap();
 
         let gespeichert: String = sqlx::query_scalar("SELECT token_hash FROM session")
             .fetch_one(&pool)
@@ -481,7 +658,7 @@ mod tests {
         // pinnen die 7 Tage bewusst als Literal: eine andere Dauer ist eine Entscheidung.
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        anlegen(&pool, id).await.unwrap();
+        anlegen(&pool, id, None).await.unwrap();
 
         let tage: f64 =
             sqlx::query_scalar("SELECT julianday(expires_at) - julianday('now') FROM session")
@@ -499,7 +676,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
 
-        let token = anlegen(&pool, id).await.unwrap();
+        let token = anlegen(&pool, id, None).await.unwrap();
         // Der Klartext-Token (aus dem Cookie) löst weiterhin auf.
         assert!(benutzer_aus_token(&pool, &token).await.is_ok());
 
@@ -520,7 +697,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
 
-        let token = anlegen(&pool, id).await.unwrap();
+        let token = anlegen(&pool, id, None).await.unwrap();
         let benutzer = benutzer_aus_token(&pool, &token).await.unwrap();
         assert_eq!(benutzer.id, id);
         assert_eq!(benutzer.benutzername, "max");
@@ -557,7 +734,7 @@ mod tests {
     async fn session_eines_inaktiven_benutzers_ist_unauthorized() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 0).await; // inaktiv
-        let token = anlegen(&pool, id).await.unwrap();
+        let token = anlegen(&pool, id, None).await.unwrap();
         let err = benutzer_aus_token(&pool, &token).await.unwrap_err();
         assert!(matches!(err, AppError::Unauthorized));
     }
@@ -566,9 +743,198 @@ mod tests {
     async fn loeschen_invalidiert_session() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        let token = anlegen(&pool, id).await.unwrap();
+        let token = anlegen(&pool, id, None).await.unwrap();
         loeschen(&pool, &token).await.unwrap();
         let err = benutzer_aus_token(&pool, &token).await.unwrap_err();
         assert!(matches!(err, AppError::Unauthorized));
+    }
+
+    // --- LFH-1092: Kennung, Gerät, zuletzt gesehen, Liste, Beenden ---
+
+    async fn kennung_zu(pool: &SqlitePool, token: &str) -> String {
+        sqlx::query_scalar("SELECT kennung FROM session WHERE token_hash = ?")
+            .bind(hash_token(token))
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn anlegen_speichert_kennung_geraet_und_zuletzt_gesehen() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        let a = anlegen(&pool, id, Some("Firefox · Windows")).await.unwrap();
+        let b = anlegen(&pool, id, None).await.unwrap();
+
+        let (kennung, geraet, frisch): (String, Option<String>, bool) = sqlx::query_as(
+            "SELECT kennung, geraet, zuletzt_gesehen_at >= datetime('now', '-1 minute') \
+             FROM session WHERE token_hash = ?",
+        )
+        .bind(hash_token(&a))
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(kennung.len(), 32);
+        assert!(kennung.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(
+            !a.contains(&kennung),
+            "die Kennung ist kein Teil des Tokens"
+        );
+        assert_eq!(geraet.as_deref(), Some("Firefox · Windows"));
+        assert!(frisch);
+        assert_ne!(kennung, kennung_zu(&pool, &b).await);
+    }
+
+    #[tokio::test]
+    async fn zuletzt_gesehen_wird_nur_nach_dem_takt_geschrieben() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        let token = anlegen(&pool, id, None).await.unwrap();
+        let setze = |vor: &'static str| {
+            let pool = pool.clone();
+            let token = token.clone();
+            async move {
+                sqlx::query(
+                    "UPDATE session SET zuletzt_gesehen_at = datetime('now', ?) WHERE token_hash = ?",
+                )
+                .bind(vor)
+                .bind(hash_token(&token))
+                .execute(&pool)
+                .await
+                .unwrap();
+            }
+        };
+        let alter_in_minuten = || async {
+            sqlx::query_scalar::<_, f64>(
+                "SELECT (julianday('now') - julianday(zuletzt_gesehen_at)) * 1440 FROM session",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+
+        setze("-2 minutes").await;
+        let (_, _, kennung) = sitzung_aus_token(&pool, &token).await.unwrap();
+        assert_eq!(
+            kennung,
+            Some(SitzungKennung(kennung_zu(&pool, &token).await))
+        );
+        assert!(
+            alter_in_minuten().await > 1.5,
+            "innerhalb des Takts kein Schreiben"
+        );
+
+        setze("-6 minutes").await;
+        sitzung_aus_token(&pool, &token).await.unwrap();
+        assert!(
+            alter_in_minuten().await < 0.5,
+            "nach dem Takt fortgeschrieben"
+        );
+    }
+
+    #[tokio::test]
+    async fn liste_markiert_die_aktuelle_und_laesst_abgelaufene_weg() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        let a = anlegen(&pool, id, Some("Firefox · Windows")).await.unwrap();
+        let b = anlegen(&pool, id, Some("Safari · iPadOS")).await.unwrap();
+        let c = anlegen(&pool, id, None).await.unwrap();
+        sqlx::query("UPDATE session SET zuletzt_gesehen_at = datetime('now', '-1 hour') WHERE token_hash = ?")
+            .bind(hash_token(&b))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE session SET expires_at = datetime('now', '-1 minute') WHERE token_hash = ?",
+        )
+        .bind(hash_token(&c))
+        .execute(&pool)
+        .await
+        .unwrap();
+        let ka = kennung_zu(&pool, &a).await;
+
+        let liste = liste(&pool, id, Some(&ka)).await.unwrap();
+        let kurz: Vec<(Option<&str>, bool)> = liste
+            .iter()
+            .map(|s| (s.geraet.as_deref(), s.aktuell))
+            .collect();
+        assert_eq!(
+            kurz,
+            vec![
+                (Some("Firefox · Windows"), true),
+                (Some("Safari · iPadOS"), false)
+            ],
+            "zuletzt gesehen zuerst, abgelaufene nicht"
+        );
+    }
+
+    #[tokio::test]
+    async fn beenden_loescht_nur_die_auswahl_und_laesst_das_konto() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        let a = anlegen(&pool, id, Some("Firefox · Windows")).await.unwrap();
+        let b = anlegen(&pool, id, Some("Safari · iPadOS")).await.unwrap();
+        let c = anlegen(&pool, id, None).await.unwrap();
+        let (ka, kb) = (kennung_zu(&pool, &a).await, kennung_zu(&pool, &b).await);
+        let konto = || async {
+            sqlx::query_as::<_, (i64, String)>(
+                "SELECT aktiv, passwort_hash FROM benutzer WHERE id = ?",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = konto().await;
+
+        let eine = beenden(&pool, id, Auswahl::Eine(&kb)).await.unwrap();
+        assert_eq!(eine.len(), 1);
+        assert_eq!(eine[0].kennung, kb);
+        assert_eq!(eine[0].geraet.as_deref(), Some("Safari · iPadOS"));
+        assert!(matches!(
+            benutzer_aus_token(&pool, &b).await,
+            Err(AppError::Unauthorized)
+        ));
+        assert!(
+            beenden(&pool, id, Auswahl::Eine(&kb))
+                .await
+                .unwrap()
+                .is_empty(),
+            "idempotent"
+        );
+
+        let andere = beenden(&pool, id, Auswahl::AlleAusser(Some(&ka)))
+            .await
+            .unwrap();
+        assert_eq!(andere.len(), 1, "nur c");
+        assert!(
+            benutzer_aus_token(&pool, &a).await.is_ok(),
+            "die ausgenommene bleibt"
+        );
+        assert!(benutzer_aus_token(&pool, &c).await.is_err());
+
+        let alle = beenden(&pool, id, Auswahl::AlleAusser(None)).await.unwrap();
+        assert_eq!(alle.len(), 1);
+        assert!(benutzer_aus_token(&pool, &a).await.is_err());
+        assert_eq!(konto().await, vorher, "Konto unverändert");
+    }
+
+    #[tokio::test]
+    async fn loeschwege_liefern_die_kennungen() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        let a = anlegen(&pool, id, None).await.unwrap();
+        let b = anlegen(&pool, id, None).await.unwrap();
+        let c = anlegen(&pool, id, None).await.unwrap();
+        let (ka, kb, kc) = (
+            kennung_zu(&pool, &a).await,
+            kennung_zu(&pool, &b).await,
+            kennung_zu(&pool, &c).await,
+        );
+        assert_eq!(loeschen(&pool, &a).await.unwrap(), Some(ka));
+        assert_eq!(loeschen(&pool, &a).await.unwrap(), None);
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(andere_loeschen(&mut conn, id, &c).await.unwrap(), vec![kb]);
+        assert_eq!(alle_loeschen(&mut conn, id).await.unwrap(), vec![kc]);
     }
 }

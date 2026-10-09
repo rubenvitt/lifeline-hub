@@ -3,6 +3,7 @@ pub mod admin_audit;
 pub mod audit;
 pub mod benutzername;
 pub mod bootstrap;
+pub mod geraet_bezeichnung;
 pub mod huelle;
 pub mod oidc;
 pub mod password;

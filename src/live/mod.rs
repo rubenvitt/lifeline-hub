@@ -287,6 +287,10 @@ pub struct LiveHub {
     /// Beendete Gerätekopplungen (LFH-892, design.md D7): Widerruf, neuer Code, Einsatzabschluss.
     /// Ein Live-Strom einer Gerätesitzung endet, sobald seine Kopplung hier erscheint.
     kopplung_ende: broadcast::Sender<i64>,
+    /// Beendete Sitzungen, als öffentliche Kennung (LFH-1092, design.md D6): Beenden über die
+    /// Sitzungsliste, Logout, Passwortwechsel, Deaktivieren, Zweitfaktor-Reset. Ein Live-Strom
+    /// endet, sobald seine Sitzung hier erscheint.
+    sitzung_ende: broadcast::Sender<String>,
     /// Zulassung und Lebensdauer der Live-Ströme (LFH-920): je Benutzer und insgesamt
     /// gedeckelt, jeder Strom endet nach seiner Lebensdauer.
     pub stroeme: strom::StromZulassung,
@@ -363,6 +367,7 @@ impl LiveHub {
             org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
             epoch,
             kopplung_ende: broadcast::channel(256).0,
+            sitzung_ende: broadcast::channel(256).0,
             stroeme: strom::StromZulassung::neu(grenzen),
         }
     }
@@ -376,6 +381,24 @@ impl LiveHub {
     /// Abonniert die beendeten Gerätekopplungen.
     pub fn abonniere_kopplung_ende(&self) -> broadcast::Receiver<i64> {
         self.kopplung_ende.subscribe()
+    }
+
+    /// Meldet beendete Sitzungen (LFH-1092): offene Live-Ströme dieser Sitzungen enden. Jeder
+    /// Weg, der Zeilen aus `session` löscht, meldet deren Kennungen hier (`src/AGENTS.md`).
+    pub fn melde_sitzung_ende<I, K>(&self, kennungen: I)
+    where
+        I: IntoIterator<Item = K>,
+        K: Into<String>,
+    {
+        for kennung in kennungen {
+            // Ohne Abonnenten ist `send` ein Fehler ohne Folgen: dann ist kein Strom offen.
+            let _ = self.sitzung_ende.send(kennung.into());
+        }
+    }
+
+    /// Abonniert die beendeten Sitzungen.
+    pub fn abonniere_sitzung_ende(&self) -> broadcast::Receiver<String> {
+        self.sitzung_ende.subscribe()
     }
 
     /// Abonniert den Org-Kanal (LFH-734). Gefiltert wird beim Abonnenten, nicht hier.

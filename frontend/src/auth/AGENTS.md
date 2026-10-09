@@ -21,3 +21,23 @@ originweit, der Benutzer steht pro Tab — **der Server ist die Wahrheit, der Ka
   (kein Selbst-Echo). **Der Konflikt wird per Neuladen gelöst, nie im laufenden Baum** — sonst
   speicherte eine noch montierte Seite von A ihren Entwurf mit der Kennung von B. Offline-Abgleich
   ruht im Konflikt (`abgleichFuer`).
+
+## Sitzungen beenden (LFH-1092)
+
+Herleitung: `/mnt/project-files/lfh-1092/design.md`. Eine Sitzung trägt eine öffentliche
+`kennung` (nie den Token-Hash), die grobe Gerätebezeichnung (Backend
+`src/auth/geraet_bezeichnung.rs`, der rohe `User-Agent` wird nie gespeichert) und „zuletzt gesehen“
+im 5-min-Takt.
+
+- **Jeder Weg, der Sitzungszeilen löscht, meldet ihre Kennungen an `live.melde_sitzung_ende`**
+  (Logout, Passwort, Deaktivieren, Zweitfaktor-Reset, Neuanmeldung, Beenden): offene Live-Ströme
+  enden dann sofort, und das Gerät räumt über `/me` → 401 sein Lagebild. Die Löschfunktionen im
+  Backend-Modul `src/auth/session.rs` liefern die Kennungen dafür. Nachweis `tests/sitzungen.rs`,
+  `e2e/sitzung-beenden.spec.ts`.
+- Beenden lässt Konto, Passwort und Zweitfaktor unberührt; Sitzungen gekoppelter Geräte
+  (`kopplung_id`) stehen weder in der Liste noch werden sie beendet. Admin-Routen
+  (`/api/benutzer/{id}/sitzungen…`) prüfen die Organisation, fremd = 404. Die aktuelle Sitzung
+  endet nur über Abmelden (422). Je beendete Sitzung ein Spureintrag: selbst `auth_audit`,
+  Admin `admin_audit`, beide `sitzung_beendet`.
+- `SitzungsListe` fragt nicht nach (umkehrbar durch erneutes Anmelden), „Alle … beenden“ steht
+  erst ab zwei beendbaren Sitzungen. Der Query-Key `sitzungen` ist nicht live.

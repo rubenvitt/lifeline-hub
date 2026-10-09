@@ -42,6 +42,9 @@ export type Bindungsart = S['Bindungsart'];
 export type SystemRolle = S['SystemRolle'];
 export type OrgRolle = S['OrgRolle'];
 export type BenutzerAnzeige = S['BenutzerAnzeige'];
+/** Eine laufende Sitzung in der Sitzungsliste (LFH-1092). */
+export type SitzungAnzeige = S['SitzungAnzeige'];
+export type SitzungenBeendet = S['SitzungenBeendet'];
 export type EinsatzStatus = S['EinsatzStatus'];
 export type EinsatzRolle = S['EinsatzRolle'];
 export type Einsatzart = S['Einsatzart'];

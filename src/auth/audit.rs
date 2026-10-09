@@ -29,8 +29,9 @@ pub const AUFBEWAHRUNG_TAGE: i64 = 90;
 wire_enum! {
     #[wire(ohne_serde)]
     /// Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
-    /// `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` —
-    /// beide Seiten müssen zusammenpassen (Test `jede_variante_passiert_den_db_check`).
+    /// `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und
+    /// `0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test
+    /// `jede_variante_passiert_den_db_check`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum Ereignis {
         LoginOk => "login_ok",
@@ -41,6 +42,9 @@ wire_enum! {
         /// Passwortwechsel mit falschem Alt-Passwort abgewiesen (LFH-827). In einer gültigen
         /// Sitzung ist das das Muster einer übernommenen Sitzung, die das Konto kapern will.
         PasswortWechselAbgewiesen => "passwort_wechsel_abgewiesen",
+        /// Eine Person hat eine ihrer anderen Sitzungen über die Sitzungsliste beendet (LFH-1092),
+        /// ein Eintrag je Sitzung. Beendet ein Admin, steht es in `admin_audit`.
+        SitzungBeendet => "sitzung_beendet",
     }
 }
 

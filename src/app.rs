@@ -172,6 +172,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::auth::totp_finish).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
         .route("/api/auth/passwort", post(routes::auth::passwort_aendern))
+        .route("/api/auth/sitzungen", get(routes::sitzung::eigene_liste))
+        .route(
+            "/api/auth/sitzungen/andere-beenden",
+            post(routes::sitzung::eigene_andere_beenden),
+        )
+        .route(
+            "/api/auth/sitzungen/{kennung}",
+            delete(routes::sitzung::eigene_beenden),
+        )
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route("/api/benutzer/{id}", patch(routes::benutzer::bearbeiten))
@@ -182,6 +191,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/benutzer/{id}/totp/reset",
             post(routes::benutzer::totp_reset),
+        )
+        .route(
+            "/api/benutzer/{id}/sitzungen",
+            get(routes::sitzung::admin_liste),
+        )
+        .route(
+            "/api/benutzer/{id}/sitzungen/beenden",
+            post(routes::sitzung::admin_alle_beenden),
+        )
+        .route(
+            "/api/benutzer/{id}/sitzungen/{kennung}",
+            delete(routes::sitzung::admin_beenden),
         )
         .route(
             "/api/benutzer-einstellungen",
