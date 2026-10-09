@@ -2,7 +2,7 @@ use crate::app::AppState;
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Auftraege, Chat, Etb, ModulMarker};
+use crate::einsatz::modul::{Auftraege, Chat, Etb};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -321,7 +321,7 @@ pub async fn heraufstufen(
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
     // Das Heraufstufen schreibt ins ETB, also gilt dessen Modulfreigabe (Spec `modul-freigabe`,
     // LFH-904): Chat-Schreibrecht allein ist kein Weg am gesperrten Tagebuch vorbei. 403 vor 404.
-    fordere_zielmodul::<Etb>(&state, &ctx).await?;
+    ctx.fordere_zielmodul::<Etb>(&state.pool).await?;
     let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -396,7 +396,7 @@ pub async fn heraufstufen_auftrag(
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
     // Wie POST /auftraege: die Freigabe von `auftraege`, nicht zusätzlich die des ETB — die
     // ETB-Anordnung ist dort wie hier Nebeneffekt (Spec `modul-freigabe`, LFH-904).
-    fordere_zielmodul::<Auftraege>(&state, &ctx).await?;
+    ctx.fordere_zielmodul::<Auftraege>(&state.pool).await?;
     let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -427,14 +427,4 @@ pub async fn heraufstufen_auftrag(
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok((StatusCode::CREATED, Json(nachricht)))
-}
-
-/// Modulfreigabe des Moduls, in das ein Heraufstufen schreibt (LFH-904). Der Extractor prüft nur
-/// das Chat-Modul; das Zielmodul kommt als Marker, damit kein Key als Literal driftet.
-async fn fordere_zielmodul<M: ModulMarker>(
-    state: &AppState,
-    ctx: &EinsatzSchreibzugriff<Chat>,
-) -> Result<(), AppError> {
-    let key = M::KEY.expect("Zielmodul des Heraufstufens ist an ein Modul gebunden");
-    ctx.fordere_modul_zugriff(&state.pool, key).await
 }

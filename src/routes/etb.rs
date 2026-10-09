@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Etb;
+use crate::einsatz::modul::{Auftraege, Etb};
 use crate::error::AppError;
 use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
 use crate::etb::zaehler::EtbZaehlerAnzeige;
@@ -257,13 +257,17 @@ pub async fn anhang_herunterladen(
 /// eigener ETB-Anordnung, Pattern B) und setzt am erzeugten Auftrag den Quellbezug
 /// `auftrag.quell_etb_eintrag_id` auf den auslösenden Eintrag. Die Auftragsfelder durchlaufen
 /// dieselbe Validierung wie POST /auftraege (geteilt, kein zweiter Pfad). Schreibrecht + aktiv
-/// + Cross-Einsatz-Schutz wie bei `erfassen`. Antwortet mit dem erzeugten Auftrag (201).
+/// + Cross-Einsatz-Schutz wie bei `erfassen`, dazu die Freigabe von `auftraege`. Antwortet mit
+/// dem erzeugten Auftrag (201).
 pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Etb>,
     PfadParam((_eid, eintrag_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<crate::auftrag::AuftragDetail>), AppError> {
+    // Der Weg schreibt in die Aufträge, also gilt deren Modulfreigabe wie beim Heraufstufen aus
+    // dem Chat (Spec `modul-freigabe`, LFH-1051). 403 vor 404.
+    ctx.fordere_zielmodul::<Auftraege>(&state.pool).await?;
     let einsatz_id = ctx.einsatz.id;
     // Cross-Einsatz-Schutz: der Quell-Eintrag muss zu diesem Einsatz gehören.
     if !repo::gehoert_zu_einsatz(&state.pool, eintrag_id, einsatz_id).await? {
