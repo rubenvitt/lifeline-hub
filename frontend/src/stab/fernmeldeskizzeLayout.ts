@@ -35,7 +35,8 @@ import {
  *   mit gespeicherter Lage. Dass eine fremde Lage beim Halten wartet, regelt das Netz
  *   (`skizze/ruhigeFlaeche.ts`, LFH-1037).
  *
- * Maße und Abstände sind benannte Konstanten, die die Darstellung teilt; Textbreiten schätzt
+ * Maße und Abstände sind benannte Konstanten, die die Darstellung teilt; die Breite des
+ * Bedingungszeichens misst das Paket (`bedingungszeichenBreite`), andere Textbreiten schätzt
  * `stab/skizzenZeichen.tsx` (`schaetzeTextbreite`), damit Layout und Bild dieselbe Zahl rechnen.
  * Die Werte sind vorläufig bis zur Messung (tasks.md 1.1, Nachtrag in design.md D4).
  */

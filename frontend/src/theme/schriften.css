@@ -4,9 +4,9 @@
    Schrift, die erst geladen werden muss, ist im Einsatz keine. Vite hasht die
    woff2 ins Bundle, rust-embed nimmt sie ins Binary.
 
-   Alle drei Familien stehen unter SIL OFL 1.1; Herkunft und Lizenztexte in
+   Alle vier Familien stehen unter SIL OFL 1.1; Herkunft und Lizenztexte in
    `src/assets/fonts/LIESMICH.md` bzw. `src/assets/fonts/lizenzen/`.
-   Gesamtbudget 131,4 KB in 8 Schnitten — der Deckel aus LFH-352 liegt bei 200 KB.
+   Gesamtbudget 155,5 KB in 9 Schnitten — der Deckel aus LFH-352 liegt bei 200 KB.
    Archivo 600 und JetBrains Mono 500 kamen mit dem Neuentwurf „Instrumententafel"
    (21.09.2026) dazu: Seitentitel/Augenbraue tragen 600, Datenwerte Mono 500.
 
@@ -14,6 +14,10 @@
      LFH Archivo         Fließtext, Formulare, Listen
      LFH Archivo Narrow  Köpfe und Sektionsmarken — kartografisch, schmal
      LFH JetBrains Mono  alle fachlichen Zahlen (Stärke, DTG, Koordinaten, Nummern)
+     Arimo               Text in taktischen Zeichen (LFH-1033): Bedingungszeichen der
+                         Fernmeldeskizze und Kürzel der Katalogzeichen. Die Datei kommt aus
+                         `@einsatzzeichen/core/fonts`, damit sie zu den Metriken passt, an
+                         denen das Paket Breiten misst; sie wandert mit jedem Update mit.
 
    `font-display: swap` ist Absicht: lieber sofort in der Systemschrift lesbar
    als eine Sekunde lang gar nichts — im Einsatz zählt der erste Blick. */
@@ -71,6 +75,13 @@
   font-family: 'LFH JetBrains Mono';
   src: url('../assets/fonts/jetbrains-mono-600.woff2') format('woff2');
   font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Arimo';
+  src: url('@einsatzzeichen/core/fonts/text-medium.woff2') format('woff2');
+  font-weight: 500;
   font-style: normal;
   font-display: swap;
 }

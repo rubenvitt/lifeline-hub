@@ -6,10 +6,10 @@ allowBuilds:
 # die Karenzzeit für frisch veröffentlichte Versionen gilt ihr nicht, weil Hub und Bibliothek
 # im Gleichschritt veröffentlichen (LFH-505). Nur exakte Versionen, keine Scope-Freigabe.
 minimumReleaseAgeExclude:
-  - '@einsatzzeichen/core@3.0.0'
-  - '@einsatzzeichen/maplibre@3.0.0'
-  - '@einsatzzeichen/react@3.0.0'
-  - '@einsatzzeichen/schema@3.0.0'
+  - '@einsatzzeichen/core@3.0.0 || 4.3.0'
+  - '@einsatzzeichen/maplibre@3.0.0 || 4.3.0'
+  - '@einsatzzeichen/react@3.0.0 || 4.3.0'
+  - '@einsatzzeichen/schema@3.0.0 || 4.3.0'
 
 # ═══════════════════════════════════════════════════════════════════════════════════
 # DIES IST DAS FRONTEND-GEGENSTÜCK ZU .cargo/audit.toml (LFH-354).

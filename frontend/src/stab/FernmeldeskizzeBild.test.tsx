@@ -277,8 +277,8 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
   it('Geplante Datenverbindung: glatt, gestrichelt, mit Zeichen für Daten und dem Wort „geplant“', () => {
     bild();
     const vb = element('vb-8')!;
-    const linie = vb.querySelector('[data-teil="linie"]')!;
-    expect(linie.getAttribute('stroke-dasharray')).toBeTruthy();
+    // Gestrichelt: die Linie besteht aus einzelnen Strichen (`commsLink` des Pakets).
+    expect(vb.querySelectorAll('[data-teil="linie"] polyline').length).toBeGreaterThan(1);
     expect(vb.querySelector('[data-teil="funk"]')).toBeNull();
     expect(vb.querySelector('[data-teil="art"]')).not.toBeNull();
     expect(within(vb as unknown as HTMLElement).getAllByText('geplant').length).toBeGreaterThan(0);

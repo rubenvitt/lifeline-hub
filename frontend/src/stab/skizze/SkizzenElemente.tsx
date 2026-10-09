@@ -43,11 +43,10 @@ import {
 import { STELLENART_LABEL } from '../kommunikationsplan';
 import {
   BereichsRahmen,
-  GEPLANT_SCHRIFT,
   KomponentenZeichen,
   Leitung,
+  Leitungsbild,
   STRICH,
-  STRICHMUSTER_GEPLANT,
   STRICH_HERVORGEHOBEN,
   Sammelschiene,
   umbrich,
@@ -489,32 +488,15 @@ export function StichBild({
   geplant: boolean;
   zustand: Zustand;
 }) {
-  const strich = zustand.hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
-  const a = punkte[punkte.length - 2] ?? punkte[0];
-  const b = punkte[punkte.length - 1];
   return (
     <g data-teil="stich" opacity={zurueckDeckkraft(zustand.zurueck, 'bild')}>
-      <polyline
-        points={punkte.map((p) => `${p.x},${p.y}`).join(' ')}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strich}
-        strokeDasharray={geplant ? STRICHMUSTER_GEPLANT : undefined}
-        data-teil="stich-linie"
+      <Leitungsbild
+        punkte={punkte}
+        medium="leitung"
+        status={geplant ? 'geplant' : 'bestehend'}
+        strich={zustand.hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH}
+        linienTeil="stich-linie"
       />
-      {geplant ? (
-        <text
-          data-teil="geplant"
-          x={(a.x + b.x) / 2 + 4}
-          y={(a.y + b.y) / 2}
-          fontSize={GEPLANT_SCHRIFT}
-          dominantBaseline="central"
-          fill="currentColor"
-          style={SCHRIFT_TEXT}
-        >
-          geplant
-        </text>
-      ) : null}
     </g>
   );
 }
