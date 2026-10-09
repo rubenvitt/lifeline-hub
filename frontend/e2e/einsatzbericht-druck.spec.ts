@@ -1,6 +1,7 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { erwarteHandyBreite, mitHandy } from './druckansicht-mobil-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Einsatzbericht (LFH-726) gegen einen echten Server: Einstieg über die Einsatzdaten, sieben
@@ -40,14 +41,6 @@ async function anmelden(page: Page) {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 /** Bis zu drei Versuche bei 503 („bitte erneut versuchen", SQLite-Schreibkonflikt). */

@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 import { MINI_JPEG } from './bildFixture';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Fotos und Dateien an einem Schaden im Browser: der Download (ob aus `<a href download>` ein
@@ -39,7 +40,7 @@ async function anmelden(page: Page, modus?: 'light' | 'dark') {
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
   await page.goto('/einsaetze');
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(name);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

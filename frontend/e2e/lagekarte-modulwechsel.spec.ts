@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Modulwechsel mit laufendem Werkzeug (LFH-943, Spec `lagekarte-ressourcen`): Wer misst oder
@@ -16,7 +17,7 @@ const FUEKW = { width: 1440, height: 900 };
 const HANDSCHIRM = { width: 390, height: 844 };
 
 async function einsatzAnlegen(page: Page): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(`E2E Modulwechsel ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

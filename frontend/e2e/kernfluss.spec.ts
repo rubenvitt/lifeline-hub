@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { einsatzAnlegen } from './einsatz-kern';
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -9,16 +10,6 @@ async function anmelden(page: Page) {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-/** Legt einen Einsatz an und liefert seine DB-id; die Anlegen-Mutation navigiert in den
- *  Einsatz, die id steckt danach in der URL. */
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 // Smoke-Kernfluss: Login → Einsatz anlegen → ETB-Eintrag erfassen → derselbe Eintrag erscheint

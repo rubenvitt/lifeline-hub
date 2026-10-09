@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 import { gedrueckt, ruheUndZeiger } from './kontrast-kern';
 
 /**
@@ -37,8 +38,7 @@ for (const modus of ['light', 'dark'] as const) {
     await anmelden.click();
     await expect(page).toHaveURL(/\/einsaetze/);
 
-    await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Neuen Einsatz anlegen' });
+    const dialog = await einsatzDialogOeffnen(page);
     const anlegen = dialog.getByRole('button', { name: 'Anlegen', exact: true });
     await ruheUndZeiger(page, anlegen, TEXT[modus], `${modus}/Anlegen`);
   });

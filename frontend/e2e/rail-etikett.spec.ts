@@ -1,5 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * LFH-644: Kein Kurzetikett der IconRail ist breiter als die Rail. „ERFASSUNG“ (9 px Versalien,
@@ -25,14 +26,6 @@ const STUFEN = ['kompakt', 'komfortabel', 'handschuh'] as const;
 
 /** `boundingBox()` liefert Fließkomma; ein zufällig rotes Gate wird abgeschaltet statt befolgt. */
 const SUBPIXEL = 0.5;
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
-}
 
 for (const stufe of STUFEN) {
   test(`Stufe ${stufe}: jedes Rail-Etikett passt in die Rail (1440/1024, beide Modi)`, async ({

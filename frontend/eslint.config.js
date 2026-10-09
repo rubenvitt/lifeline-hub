@@ -64,6 +64,13 @@ export default tseslint.config(
           message:
             'Kein `waitUntil: networkidle` in e2e (LFH-385): der SSE-Strom der Einsatzrouten hält das Netz offen. Auf einen Inhaltsanker warten.',
         },
+        {
+          // LFH-1114: ein Klick in den noch einblendenden Dialog ging unter Last verloren.
+          selector:
+            "CallExpression[callee.property.name='click'] > MemberExpression > CallExpression[callee.property.name='getByRole'] > ObjectExpression > Property[key.name='name'] > Literal[value='Neuer Einsatz']",
+          message:
+            'Den Dialog „Neuen Einsatz anlegen“ über `einsatzDialogOeffnen`/`einsatzAnlegen` aus `e2e/einsatz-kern.ts` öffnen (LFH-1114): erst der eingeblendete Dialog nimmt Klicks sicher an.',
+        },
       ],
     },
   },

@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 // Gezogen wird zwischen Liste und Platz: das verlangt die Drei-Spalten-Form, und die steht erst,
 // wenn die Fläche neben beiden Seitenspalten ganz in den Rahmen passt (`dreiSpaltenPassen` in
@@ -32,7 +33,7 @@ async function ziehe(page: Page, quelle: Locator, ziel: Locator) {
 async function setupBelegterPlatz(page: Page): Promise<string> {
   await anmelden(page);
   const einsatzName = `E2E UHS Move ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(einsatzName);
   await page.getByRole('button', { name: 'Anlegen' }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);
@@ -136,7 +137,7 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
 }) => {
   await anmelden(page);
   const einsatzName = `E2E UHS Uniform ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(einsatzName);
   await page.getByRole('button', { name: 'Anlegen' }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);
@@ -234,7 +235,7 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   await anmelden(page);
 
   const einsatzName = `E2E UHS PersonScroll ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(einsatzName);
   await page.getByRole('button', { name: 'Anlegen' }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);
@@ -294,7 +295,7 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   await anmelden(page);
 
   const einsatzName = `E2E UHS Overlap ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(einsatzName);
   await page.getByRole('button', { name: 'Anlegen' }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);
@@ -365,7 +366,7 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   await anmelden(page);
 
   const einsatzName = `E2E UHS PersonDrop ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(einsatzName);
   await page.getByRole('button', { name: 'Anlegen' }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Die Kartenleiste lässt sich auch am Fükw ausblenden, und die Wahl bleibt gemerkt. Bei
@@ -25,7 +26,7 @@ async function anmelden(page: Page) {
 }
 
 async function einsatzAnlegen(page: Page): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   // Kein Modulname im Einsatznamen (Kommandopalette sucht Module und Einsätze gemeinsam).
   await page.getByLabel('Bezeichnung').fill(`E2E Fükw-Fläche ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();

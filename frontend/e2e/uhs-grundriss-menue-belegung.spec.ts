@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 // Gezogen wird zwischen Liste und Platz: das verlangt die Drei-Spalten-Form, und die steht erst,
 // wenn die Fläche neben beiden Seitenspalten ganz in den Rahmen passt (`dreiSpaltenPassen` in
@@ -32,7 +33,7 @@ async function ziehe(page: Page, quelle: Locator, ziel: Locator) {
 async function grundrissMitZweiPlaetzen(page: Page): Promise<string> {
   await anmelden(page);
   const einsatzName = `E2E UHS Menue ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(einsatzName);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu } from './rollen-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 /**
  * Die Kopfzeile auf dem Handschirm. Ob das Inline-`paddingInline` antds Klassenregel schlägt
@@ -18,14 +19,6 @@ const BREIT = { width: 1366, height: 768 };
 
 async function anmelden(page: Page) {
   await anmeldenAlsAdmin(page);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste auf 390 px', async ({

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
 import { ueberstaende } from './ueberstand-kern';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 /**
  * Die Lagekarten-Leiste trägt den mitwachsenden Kippschalter (im Handschuh 72 × 144 px, siehe
@@ -39,7 +40,7 @@ async function anmelden(page: Page) {
 }
 
 async function einsatzMitBild(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(name);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);

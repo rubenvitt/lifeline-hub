@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
 import { haeltStufe, ruhigeHoehe, SUBPIXEL } from './trefflaeche-kern';
+import { einsatzAnlegen } from './einsatz-kern';
 
 // e2e-Smoke der Kommandopalette: echtes Hotkey-Verhalten, Navigation und die Koexistenz des
 // Palette-Modals über einem offenen antd-Drawer — was jsdom nicht kann.
@@ -20,14 +21,6 @@ async function anmelden(page: Page) {
   await page.getByLabel('Passwort').fill(PW);
   await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
 /** Hartes Navigieren zu einem Modul + warten, bis der Header gemountet ist — sonst kommt der

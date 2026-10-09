@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { einsatzDialogOeffnen } from './einsatz-kern';
 
 // Browser-Smoke der jsdom-blinden Deeplink-Mechanismen: <Navigate>-Redirect bei ungültiger
 // Detail-ID und ?eintrag=-Highlight/Scroll im ETB (reales Router-/DOM-Verhalten).
@@ -16,7 +17,7 @@ async function anmelden(page: Page) {
 
 async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   const name = `E2E Deeplink ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await einsatzDialogOeffnen(page);
   await page.getByLabel('Bezeichnung').fill(name);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   // Anlegen navigiert direkt in den neuen Einsatz (/einsaetze/:id/<default-modul>).
