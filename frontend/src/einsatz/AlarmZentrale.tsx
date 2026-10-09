@@ -720,6 +720,9 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         : desktop === 'blockiert'
           ? 'Benachrichtigungen sind im Browser blockiert'
           : 'Benachrichtigungen sind auf diesem Gerät nicht verfügbar';
+  // Name des breiten Knopfs nach dem Muster des Ton-Knopfs: der sichtbare Zustand wortgleich vorn
+  // (WCAG 2.5.3, LFH-1103), die Handlung nur, wo der Knopf eine hat — allein `aus` ist änderbar.
+  const desktopName = desktop === 'aus' ? `${desktopText} – aktivieren` : desktopText;
   const tonText = gemutet
     ? 'Ton stumm'
     : tonStatus === 'bereit'
@@ -835,7 +838,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       <Tooltip title={desktopWort ? desktopHinweis : `${desktopText} — ${desktopHinweis}`}>
         <Button
           type="text"
-          aria-label={`Benachrichtigungen: ${DESKTOP_WORT[desktop]}`}
+          aria-label={desktopName}
           aria-disabled={desktop !== 'aus'}
           onClick={desktop === 'aus' ? desktopAktivieren : undefined}
           icon={desktopIcon}
