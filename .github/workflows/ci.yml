@@ -46,7 +46,7 @@ concurrency:
   group: ci-${{ github.ref }}
   # NUR Pull-Request-Läufe abbrechen: auf einem Kanal-Branch hängt der Release-Job am selben
   # Lauf, und ein Abbruch zwischen Versions-Commit und GitHub-Release hinterließe ein Tag ohne
-  # Release (und ohne Artefakte, die an `release: published` hängen).
+  # Release (und ohne Artefakte, die release.yml erst nach dem Entwurf startet).
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -488,8 +488,10 @@ jobs:
     # Nur bei einem Push auf einen Kanal-Branch, nicht bei jedem grünen PR-Lauf.
     if: github.event_name == 'push'
     uses: ./.github/workflows/release.yml
+    # `actions: write`: release.yml startet artefakte.yml per workflow_dispatch (LFH-1054).
     permissions:
       contents: read
+      actions: write
     secrets:
       RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

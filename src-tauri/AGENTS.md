@@ -29,7 +29,8 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   (`version.workspace = true`), `tauri.conf.json` trägt keine; `prepareCmd` setzt sie über
   `-p lifeline-hub`. Kein eigenes Versionsfeld in `src-tauri` (driftet beim alpha-Merge; Test
   `version_kommt_aus_dem_workspace`).
-- Pakete + `latest.json` nur bei stabilen Tags (`artefakte.yml`, Ausgabe `desktop`);
+- Pakete + `latest.json` nur bei stabilen Tags (`artefakte.yml`, Ausgabe `desktop`); ein roter
+  Desktop-Bau hält die Veröffentlichung des Releases auf (Job `freigeben`, LFH-1054);
   `scripts/release/desktop-manifest.mjs`, Selbsttest in Schritt 8. Der Updater-Schlüssel liegt
   außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in
   `tauri.conf.json`.

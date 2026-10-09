@@ -230,6 +230,19 @@ unberührt.
   „latest“ lesen.
 - `latest.json` erzeugt `scripts/release/desktop-manifest.mjs` aus den tatsächlich gebauten
   Paketen. Scheitert eine Plattform, fehlt sie im Manifest, statt ins Leere zu zeigen.
+- **Ein Release erscheint erst, wenn alles gebaut ist** (LFH-1054). `semantic-release` legt es
+  als Entwurf an und startet `artefakte.yml` mit `freigeben`. Erst wenn alle Server-Binaries,
+  beide Abbilder und bei stabilen Tags beide Desktop-Pakete samt `latest.json` hängen,
+  veröffentlicht der Job „Release freigeben“ den Entwurf, setzt bei stabilen Tags `latest` an
+  den Abbildern, kommentiert die enthaltenen PRs und legt bei Alpha das Deployment an. Die Apps
+  sehen ein neues stabiles Release also erst, wenn sein Manifest vollständig ist.
+- **Ein Job bleibt rot:** Release bleibt Entwurf (unter „Releases“ nur für Berechtigte
+  sichtbar), Tag und Versions-Commit bleiben, die Nummer ist verbraucht. War die Ursache eine
+  Störung (Runner, Apple-Notarisierung), im Lauf „Re-run failed jobs“ — er veröffentlicht dann
+  doch. War es ein Fehler im Code, den Fix mergen: der nächste Lauf erzeugt die nächste Nummer.
+  Den liegengebliebenen Entwurf bei Gelegenheit löschen (das Tag bleibt).
+- **Entwurf ohne Bau** (der Schritt „Artefakte starten“ in `release.yml` ist gescheitert):
+  „Run workflow“ auf `artefakte.yml` mit dem Tag und `freigeben: true`.
 
 ## Im Browser anmelden (macOS, LFH-818)
 

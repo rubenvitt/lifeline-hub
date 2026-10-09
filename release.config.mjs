@@ -15,7 +15,8 @@
  * DESSELBEN Kanals, der erste Merge `alpha → main` also die ganze Historie.
  *
  * Der Abbruch käme an der teuersten Stelle: Changelog, Versions-Commit und Tag wären gepusht,
- * und weil `artefakte.yml` an `release: published` hängt, entstünden nie Binaries.
+ * und weil `release.yml` die Artefakte erst nach dem Anlegen des Entwurfs startet, entstünden nie
+ * Binaries.
  *
  * Gekappt wird NUR dieser Text, nicht `nextRelease.notes`: CHANGELOG.md bleibt vollständig,
  * darauf zeigt der angehängte Hinweis. Eine Kürzung im prepare-Schritt wäre bis zum publish
@@ -52,40 +53,12 @@ const RELEASE_BODY_TEMPLATE = [
 ].join('\n');
 
 /*
- * JEDER RELEASE KOMMENTIERT SEINE ENTHALTENEN PULL REQUESTS — die Rückrichtung des Changelogs,
- * denn wer eine Änderung sucht, landet über die Suche zuerst beim PR. Kommentiert wird, was
- * `@semantic-release/github` dem Release zurechnet: PRs, deren Merge-Commit seit dem letzten
- * Release DESSELBEN Kanals liegt, plus die Issues, die sie per Schlüsselwort schließen.
- *
- * ZWEI KOMMENTARE JE PULL REQUEST SIND DER NORMALFALL (Vorabversion auf `alpha`, dann stabil
- * nach `alpha → main`) — deshalb nennt der Text den Kanal.
- *
- * DIE BERECHTIGUNG HÄNGT AN DER GITHUB APP, nicht am Workflow: kommentiert wird mit dem
- * App-Token, der **Issues: Read & Write** und **Pull requests: Read** braucht. Fehlt das, ist
- * der Fehlermodus STILL: das Plugin protokolliert 403/404 nur (`success.js`), der Lauf bleibt
- * grün. Im Job-Protokoll nach „Not allowed to add a comment" suchen.
- *
- * Die Vorlage folgt denselben Lodash-Regeln wie RELEASE_BODY_TEMPLATE. Ihre Auswertung liegt
- * als einzige NICHT im try/catch des Plugins: eine kaputte Vorlage bricht den `success`-Schritt
- * nach dem Veröffentlichen — Release und Tag stünden, der Lauf wäre rot.
+ * DIE PULL REQUESTS KOMMENTIERT NICHT MEHR DAS PLUGIN (LFH-1054): das Release entsteht als
+ * Entwurf (`draftRelease` unten), und `@semantic-release/github` kommentierte trotzdem sofort —
+ * mit Link auf den für alle anderen unsichtbaren Entwurf, auch wenn der Bau danach rot wird.
+ * Kommentiert wird nach der Freigabe aus `artefakte.yml` (Job `freigeben`,
+ * `scripts/release/pr-kommentare.mjs`); Wortlaut, Berechtigung und Rechnung stehen dort.
  */
-const SUCCESS_COMMENT_TEMPLATE = [
-  '<%',
-  '  const ghRelease = releases.find((r) => r.name === "GitHub release" && r.url);',
-  '  const ziel = ghRelease',
-  '    ? "[" + nextRelease.gitTag + "](" + ghRelease.url + ")"',
-  '    : "`" + nextRelease.gitTag + "`";',
-  '  const kanal = nextRelease.channel;',
-  '  const wo = kanal ? "der Vorabversion " + ziel : "Version " + ziel;',
-  '  const ende = kanal ? " (Kanal `" + kanal + "`)." : ".";',
-  '  const satz = issue.pull_request',
-  '    ? "Dieser Pull Request ist in " + wo + " enthalten" + ende',
-  '    : "Dieses Issue ist mit " + wo + " erledigt" + ende;',
-  '  const nachsatz = kanal',
-  '    ? "\\n\\nEine stabile Version entsteht erst, wenn dieser Stand nach `main` gemergt wird."',
-  '    : "";',
-  '%>🚀 <%= satz %><%= nachsatz %>',
-].join('\n');
 
 /*
  * DIE VORLAGE FÜR DIE KI-NOTIZEN, gerichtet an wer im Einsatz führt oder den Hub betreibt.
@@ -176,6 +149,15 @@ export default {
       '@semantic-release/exec',
       {
         /*
+         * DAS NEUE TAG FÜR DEN NÄCHSTEN SCHRITT: `release.yml` startet damit `artefakte.yml`
+         * (ein Entwurf löst kein `release`-Ereignis aus). Läuft im `success`-Schritt, also nur,
+         * wenn der Entwurf wirklich angelegt ist. Ohne `$GITHUB_OUTPUT` (lokaler Lauf) nichts.
+         * Shell-Variablen OHNE geschweifte Klammern: die Zeile ist eine Lodash-Vorlage, und `${`
+         * wertet sie als JavaScript aus (`${GITHUB_OUTPUT:-…}` bräche den Lauf nach dem Release).
+         */
+        successCmd:
+          'if [ -n "$GITHUB_OUTPUT" ]; then echo "tag=${nextRelease.gitTag}" >> "$GITHUB_OUTPUT"; fi',
+        /*
          * ZWEI VERSIONSDATEIEN, EIN LAUF.
          *
          * `-p lifeline-hub`: dessen Version erbt aus `[workspace.package]`, also setzt der Aufruf
@@ -204,8 +186,8 @@ export default {
           'CHANGELOG.md',
         ],
         /*
-         * `[skip ci]` verhindert die Schleife Release → Push → Gate → Release. Der
-         * Artefakt-Workflow hängt am `release: published`-Ereignis und läuft trotzdem.
+         * `[skip ci]` verhindert die Schleife Release → Push → Gate → Release. Den
+         * Artefakt-Workflow startet `release.yml` selbst, er läuft trotzdem.
          */
         message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
       },
@@ -214,11 +196,19 @@ export default {
       '@semantic-release/github',
       {
         /*
-         * OHNE ASSETS — die baut `.github/workflows/artefakte.yml` auf das fertige Release hin,
-         * statt sechs Builds auf vier Runnertypen in diesem Job zu serialisieren.
+         * OHNE ASSETS — die baut `.github/workflows/artefakte.yml` an den Entwurf, statt sechs
+         * Builds auf vier Runnertypen in diesem Job zu serialisieren.
+         *
+         * ALS ENTWURF (LFH-1054): veröffentlicht wird erst, wenn alle Plattformen gebaut und
+         * angehängt sind (Job `freigeben` in artefakte.yml). Sonst stand bei einem Fehler auf nur
+         * einer Plattform ein öffentliches Release ohne Artefakte da, und ein Neubau half nicht,
+         * weil das Tag den fehlerhaften Stand trägt. Tag und Versions-Commit pusht semantic-release
+         * weiterhin selbst; bleibt der Bau rot, bleibt der Entwurf liegen und die Nummer ist
+         * verbraucht (der nächste Lauf rechnet aus den Git-Tags).
          */
-        // Begründung, Berechtigung und Fallen: oben bei SUCCESS_COMMENT_TEMPLATE.
-        successComment: SUCCESS_COMMENT_TEMPLATE,
+        draftRelease: true,
+        // Kommentiert wird erst nach der Freigabe; Begründung oben vor KI_PROMPT.
+        successCommentCondition: false,
         // Keine `released on @<kanal>`-Etiketten (Vorgabe an): die Aussage steht im Kommentar,
         // und das Plugin legte die Etiketten nebenbei im Repository an.
         releasedLabels: false,
