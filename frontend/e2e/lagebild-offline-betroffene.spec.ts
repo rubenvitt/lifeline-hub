@@ -27,6 +27,7 @@ const backendUrl = lauf
 test.use({ baseURL: backendUrl || undefined });
 
 const NAME = 'Offlinebetroffen';
+const UHS = 'BHP Funkloch';
 const FREITEXTE = {
   herkunft_adresse: 'Lindenallee 17',
   melder_kontakt: '0170 5550199',
@@ -124,7 +125,7 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
     const basis = `/api/einsaetze/${einsatzId}`;
     const uhsId = await post(page, `${basis}/uhs`, {
       typ: 'behandlungsplatz',
-      bezeichnung: 'BHP Funkloch',
+      bezeichnung: UHS,
     });
     await post(page, `${basis}/uhs/${uhsId}/status`, { status: 'aktiv' });
     await post(page, `${basis}/personen`, {
@@ -140,8 +141,9 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
     await page.goto(`/einsaetze/${einsatzId}/personen`);
     await expect(page.getByText(NAME).first()).toBeVisible();
     await expect(page.getByText(FREITEXTE.zustand).first()).toBeVisible();
-    await innerhalbNavigieren(page, `/einsaetze/${einsatzId}/unfallhilfsstellen/${uhsId}`);
-    await expect(page.getByText(NAME).first()).toBeVisible();
+    await expect(page.getByText(`UHS ${UHS}`).first()).toBeVisible();
+    await innerhalbNavigieren(page, `/einsaetze/${einsatzId}/unfallhilfsstellen/liste`);
+    await expect(page.getByText(UHS).first()).toBeVisible();
 
     // (2) Die Platte, roh: Personen und UHS liegen dort, kein Freitext und keine Koordinate.
     for (const erwartet of ['"einsatz-personen"', '"einsatz-uhs"', NAME]) {
@@ -164,21 +166,23 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
       ),
     ).toBe('scheitert');
 
-    // (4) Betroffene nach Kaltstart: Name und Sichtung stehen, die Freitexte „nicht geladen“,
-    //     und kein „Fundort offen“.
+    // (4) Betroffene nach Kaltstart: Name, Sichtung und UHS stehen, die Freitexte „nicht
+    //     geladen“, und kein „Fundort offen“.
     await page.goto(`/einsaetze/${einsatzId}/personen`);
     await expect(page).not.toHaveURL(/\/login/);
     await expect(page.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
     await expect(page.getByText(NAME).first()).toBeVisible();
     await expect(page.getByText('SK II').first()).toBeVisible();
+    await expect(page.getByText(`UHS ${UHS}`).first()).toBeVisible();
     await expect(page.locator('[data-lfh="nicht-geladen"]').first()).toBeVisible();
     await expect(page.getByText(FREITEXTE.zustand)).toHaveCount(0);
     await expect(page.getByText('Fundort offen')).toHaveCount(0);
 
-    // (5) UHS nach Kaltstart: die Person steht in ihrer UHS wie mit Netz.
-    await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen/${uhsId}`);
+    // (5) UHS-Liste nach Kaltstart wie mit Netz. Die UHS-Detailseite liest ein eigenes Fach
+    //     (`einsatz-uhs-detail`), das schon vor dieser Änderung nicht offline vorgehalten wird.
+    await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen/liste`);
     await expect(page.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
-    await expect(page.getByText(NAME).first()).toBeVisible();
+    await expect(page.getByText(UHS).first()).toBeVisible();
 
     await page.context().setOffline(false);
     expect(seitenFehler).toEqual([]);
