@@ -80,6 +80,30 @@ export const STEIG_ABSTAND = RASTER;
 const ZEICHEN_ABSTAND = 4;
 
 /**
+ * Mindesthöhe des Platzes einer Komponente: die einer Einheit mit einzeiligem Namen (LFH-1038 D6).
+ * Gezeichnet wird nur Zeichen und Bezeichnung; der Platz ist Ziel und Wahlrahmen und hält so am
+ * Fükw eingepasst den Boden von 24 px wie eine Einheit.
+ */
+export const KOMPONENTE_HOEHE = aufRaster(
+  TZ_HOEHE + ZEICHEN_ABSTAND + NAME_ZEILE + RUFNAME_ZEILE + LUECKE_ZEILE,
+);
+/** Abstand zweier Komponenten auf einer Schiene, wie zwischen zwei Stellen einer Spalte. */
+export const KOMPONENTE_ABSTAND = STAPEL_ABSTAND;
+/** Oberkante einer Komponente unter der Oberkante ihrer Spur (Zeichenmitte auf der Linie). */
+const KOMPONENTE_OBEN = SCHIENE_LINIE_VERSATZ - ZEICHEN_GROESSE / 2;
+/** So weit ragt eine Komponente unter ihre Spur; die nächste Ebene rückt um so viel tiefer. */
+const KOMPONENTE_UEBERSTAND = Math.max(0, KOMPONENTE_OBEN + KOMPONENTE_HOEHE - SPUR_HOEHE);
+
+/** Gezeichnete Höhe einer Komponente: Zeichen und Bezeichnung, ohne den Boden des Platzes. */
+export function komponentenBildHoehe(s: Pick<NetzStelle, 'bezeichnung'>): number {
+  return aufRaster(
+    ZEICHEN_GROESSE +
+      ZEICHEN_ABSTAND +
+      zeilen(s.bezeichnung, NAME_SCHRIFT, KOMPONENTE_BREITE) * NAME_ZEILE,
+  );
+}
+
+/**
  * Ausstattung im Kasten (LFH-1029): je Zeichen ein Platz mit Zeichen und Wort darunter, so
  * viele Plätze je Zeile wie die Innenbreite fasst. Gemessen im Druck (`e2e/fernmeldeskizze-
  * ausstattung.spec.ts`, „Messung“): acht Abschnitte, A4 quer 3,4 pt, A3 quer 5,1 pt, so
@@ -211,13 +235,11 @@ export function stellenMasse(s: NetzStelle): { breite: number; hoehe: number } {
         LUECKE_ZEILE;
       return { breite, hoehe: aufRaster(hoehe) };
     }
-    case 'komponente': {
-      const hoehe =
-        ZEICHEN_GROESSE +
-        ZEICHEN_ABSTAND +
-        zeilen(s.bezeichnung, NAME_SCHRIFT, KOMPONENTE_BREITE) * NAME_ZEILE;
-      return { breite: KOMPONENTE_BREITE, hoehe: aufRaster(hoehe) };
-    }
+    case 'komponente':
+      return {
+        breite: KOMPONENTE_BREITE,
+        hoehe: Math.max(KOMPONENTE_HOEHE, komponentenBildHoehe(s)),
+      };
   }
 }
 
@@ -332,7 +354,7 @@ export function layoutFernmeldenetz(
   }
   const komponentenAn = (s: NetzSchiene) =>
     s.teilnehmer.map((t) => t.element).filter((k) => ersteSchiene.get(k) === s.key);
-  const komponentenBreite = (n: number) => n * (KOMPONENTE_BREITE + RASTER);
+  const komponentenBreite = (n: number) => n * (KOMPONENTE_BREITE + KOMPONENTE_ABSTAND);
 
   const entwuerfe: Entwurf[] = [];
   const untenZeile: NetzSchiene[] = [];
@@ -407,7 +429,13 @@ export function layoutFernmeldenetz(
     y += stapelHoehe + STAPEL_ABSTAND;
     bandY.push(y);
     const spuren = spurenJeBand.get(t)?.length ?? 0;
-    if (spuren > 0) y += spuren * SPUR_HOEHE + STAPEL_ABSTAND;
+    // Trägt die letzte Spur Komponenten, ragen sie unter das Band (LFH-1038 D6).
+    const ueberstand = entwuerfe.some(
+      (e) => e.band === t && e.komponenten.length > 0 && spurJe.get(e.s.key) === spuren - 1,
+    )
+      ? KOMPONENTE_UEBERSTAND
+      : 0;
+    if (spuren > 0) y += spuren * SPUR_HOEHE + ueberstand + STAPEL_ABSTAND;
   }
 
   for (const sp of spalten) {
@@ -467,6 +495,7 @@ export function layoutFernmeldenetz(
   // Unten eine Zeile, umbrochen an der Breite des Baums, unter der Spalte der externen Stellen.
   let ux = RAND;
   let uy = Math.max(y, untenZeile.length > 0 ? externUnten : 0);
+  let zeileMitKomponenten = false;
   const zeilenEnde = Math.max(baumRechts, RAND + 4 * KASTEN_BREITE);
   for (const s of untenZeile) {
     const breite = aufRaster(sammelschienenMindestbreite(s.betriebsart, s.bezeichnung));
@@ -474,8 +503,10 @@ export function layoutFernmeldenetz(
     const belegt = breite + komponentenBreite(komponenten.length);
     if (ux > RAND && ux + belegt > zeilenEnde) {
       ux = RAND;
-      uy += SPUR_HOEHE;
+      uy += SPUR_HOEHE + (zeileMitKomponenten ? KOMPONENTE_UEBERSTAND + STAPEL_ABSTAND : 0);
+      zeileMitKomponenten = false;
     }
+    zeileMitKomponenten ||= komponenten.length > 0;
     const p = setze(s.key, {
       x: ux,
       y: uy,

@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import { taktischeDtgVoll, DEFAULT_KONVENTIONEN } from '../anzeige/format';
@@ -28,6 +29,7 @@ import {
 import FernmeldeskizzeBild from './FernmeldeskizzeBild';
 import type { SkizzenAktionen } from './skizzenAktionen';
 import { STRICH_HERVORGEHOBEN, schaetzeTextbreite } from './skizzenZeichen';
+import { eingepasst } from './skizze/ansicht';
 import { ZURUECK_DECKKRAFT } from './skizze/SkizzenElemente';
 import { VERSCHOBEN_MELDUNG } from './skizze/useSkizzenHandlungen';
 
@@ -826,6 +828,78 @@ describe('Fernmeldeskizze — Ziehen (5.2, 6.2, 7.3)', () => {
 });
 
 // ── Rechte und Geräte ────────────────────────────────────────────────────────────────────────
+
+describe('Fernmeldeskizze — Übersicht unter dem Mindestmaßstab (LFH-1038 D3, D4)', () => {
+  /** Stufe Handschuh über das Token, wie `ThemeModeProvider` sie setzt. */
+  function handschuh(n: Fernmeldenetz = netz()) {
+    const props = { netz: n, aktionen: aktionenAttrappe(), einsatzbezeichnung: 'Übung' };
+    return renderMitProviders(
+      <ConfigProvider theme={{ token: { controlHeight: 72 } }}>
+        <FernmeldeskizzeBild {...props} />
+      </ConfigProvider>,
+    );
+  }
+  const skalaAmSchirm = () => FLAECHE.width / Number(svg().getAttribute('viewBox')!.split(' ')[2]);
+  const ohneZeiger = (el: Element) => el.closest('[pointer-events="none"]') !== null;
+  const tippe = (p: { clientX: number; clientY: number }) => {
+    const grund = document.querySelector('[data-teil="grund"]')!;
+    const touch = { ...ZEIGER, pointerType: 'touch' };
+    fireEvent.pointerDown(grund, { ...touch, ...p });
+    fireEvent.pointerUp(svg(), { ...touch, ...p });
+  };
+
+  it('Handschuh eingepasst: ganze Skizze, kein Element ist Zeigerziel, Tippen zoomt statt zu wählen', () => {
+    const n = netz();
+    handschuh(n);
+    const vorher = skalaAmSchirm();
+    expect(svg()).toHaveAttribute('data-uebersicht', 'true');
+    expect(ohneZeiger(element('eh-10')!)).toBe(true);
+    expect(ohneZeiger(element('sg-1')!)).toBe(true);
+    // Die eingepasste Ansicht bleibt: die ganze Skizze steht in der Fläche.
+    const ausdehnung = layoutFernmeldenetz(n);
+    expect(vorher).toBeLessThanOrEqual(
+      eingepasst(ausdehnung, { breite: FLAECHE.width, hoehe: FLAECHE.height }).skala + 1e-6,
+    );
+
+    const ziel = plaetze(n).get('eh-10')!;
+    const punkt = amSchirm({ x: ziel.x + ziel.breite / 2, y: ziel.y + ziel.hoehe / 2 });
+    tippe(punkt);
+
+    expect(skalaAmSchirm()).toBeGreaterThan(vorher);
+    expect(svg()).not.toHaveAttribute('data-uebersicht');
+    expect(ohneZeiger(element('eh-10')!)).toBe(false);
+    expect(element('eh-10')).toHaveAttribute('aria-pressed', 'false');
+    // Der getippte Punkt bleibt unter dem Finger: dort liegt jetzt „1. Zug“.
+    const nachher = amSchirm({ x: ziel.x + ziel.breite / 2, y: ziel.y + ziel.hoehe / 2 });
+    expect(nachher.clientX).toBeCloseTo(punkt.clientX, 0);
+    expect(nachher.clientY).toBeCloseTo(punkt.clientY, 0);
+    // Über dem Mindestmaßstab hält „1. Zug“ 72 px in der kurzen Achse.
+    expect(Math.min(ziel.breite, ziel.hoehe) * skalaAmSchirm()).toBeGreaterThanOrEqual(72 - 1e-6);
+  });
+
+  it('Handschuh in der Übersicht: die Tastatur wählt weiter, ohne zu zoomen', async () => {
+    const user = userEvent.setup();
+    handschuh();
+    const vorher = skalaAmSchirm();
+    act(() => element('ab-1')!.focus());
+    await user.keyboard('{Enter}');
+    expect(within(paneel()).getByRole('heading', { name: 'EA 1' })).toBeInTheDocument();
+    expect(skalaAmSchirm()).toBeCloseTo(vorher);
+  });
+
+  it('Handschuh: Linien treffen 72 px breit, kompakt 24 px', () => {
+    const breite = () =>
+      Number(
+        element('vb-8')!.querySelector('line[stroke="transparent"]')!.getAttribute('stroke-width'),
+      ) * skalaAmSchirm();
+    const { unmount } = handschuh();
+    expect(breite()).toBeCloseTo(72);
+    unmount();
+    bild();
+    expect(svg()).not.toHaveAttribute('data-uebersicht');
+    expect(breite()).toBeCloseTo(24);
+  });
+});
 
 describe('Fernmeldeskizze — Rechte und Geräte (6.5)', () => {
   it('Nur Leserecht: nichts verschieben, zuordnen oder anlegen, aber hervorheben und zoomen', async () => {

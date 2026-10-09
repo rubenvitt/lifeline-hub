@@ -36,6 +36,7 @@ import {
   RUFNAME_ZEILE,
   TZ_HOEHE,
   ausstattungsZeilen,
+  komponentenBildHoehe,
   schienenLinieY,
   type Platz,
 } from '../fernmeldeskizzeLayout';
@@ -330,7 +331,7 @@ export function StelleBild({
         {meldung ? (
           <MarkenZeile
             x={cx}
-            y={platz.y + platz.hoehe + 8}
+            y={platz.y + komponentenBildHoehe(stelle) + 8}
             text={meldung}
             teil="meldung"
             anker="middle"

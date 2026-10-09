@@ -151,6 +151,12 @@ Skizze eingepasst zeigen; Zoomen und Verschieben der Ansicht geschehen innerhalb
 Knöpfe, Mausrad mit Strg und zwei Finger. Bezeichnungen, Rufnamen und Bedingungszeichen MUST
 umbrechen bzw. mitwachsen und MUST NOT gekürzt werden.
 
+Liegt der Maßstab unter dem Mindestmaßstab der Dichte-Stufe (kleinster Maßstab, bei dem jedes
+Element den Boden der Stufe hält: kompakt und komfortabel 24 px, Handschuh 72 px in der kurzen
+Achse, in der Stufe Handschuh mit mindestens 16 px Abstand zwischen zwei Zielen), MUST die Fläche
+Übersicht sein: kein Element ist dann Zeigerziel, und ein Tippen oder Klick ohne Bewegung zoomt um
+den Punkt auf den Mindestmaßstab. Tastatur, Paneel und Lücken-Wahl MUST unverändert wählen.
+
 #### Scenario: Viele Abschnitte am Fükw
 
 - **WHEN** ein Einsatz acht oberste Abschnitte mit je drei Einheiten mit je zwei Sprechgruppen hat
@@ -161,6 +167,20 @@ umbrechen bzw. mitwachsen und MUST NOT gekürzt werden.
 
 - **WHEN** die Person am Fükw den Knopf „+“ zweimal und dann „Einpassen“ wählt
 - **THEN** wird die Ansicht zweimal vergrößert und danach wieder ganz eingepasst
+
+#### Scenario: Handschuh am Tablet
+
+- **WHEN** die große Skizze bei 1024 px in der Stufe Handschuh eingepasst geöffnet ist und die
+  Person auf „Einheit 3.2“ tippt
+- **THEN** wird nichts gewählt, die Ansicht zoomt um den getippten Punkt, jedes Element ist danach
+  mindestens 72 px in der kurzen Achse mit mindestens 16 px Abstand, und ein zweites Tippen wählt
+  „Einheit 3.2“
+
+#### Scenario: Handy
+
+- **WHEN** die große Skizze bei 390 px eingepasst geöffnet ist
+- **THEN** steht die ganze Skizze in der Fläche, kein Element ist Zeigerziel, und nach einem Tippen
+  ist jedes Element mindestens 24 × 24 px
 
 ### Requirement: Druck als eigenes Druckstück
 
