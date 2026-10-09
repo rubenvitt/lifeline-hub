@@ -68,6 +68,7 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckModus } from '../components/druck/useDruckModus';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -183,6 +184,9 @@ const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as c
 
 /** Breite der Auftragsspalte: gekürzt auf zwei Zeilen, der Volltext steht im `title`. */
 const AUFTRAG_BREITE = 180;
+
+/** Zusatzspalten, die nie auf dem Blatt stehen (LFH-1109, Begründung an `spalten`). */
+const NUR_AM_SCHIRM: ReadonlySet<string> = new Set(['funk', 'mittel']);
 
 /**
  * Die Spalten des Rasters. Eine Fabrik, weil zwei Zellen vom Kontext abhängen (Einsatz-ID für den
@@ -839,6 +843,12 @@ export default function KraefteuebersichtPage() {
     return HandStatusZelle;
   }, [darfSchreibenFrueh, statusOptionen, handLaeuft, handEid, handMutate]);
 
+  // Das Blatt trägt nur die Grundspalten (LFH-1109). Die Zusatzspalten stehen am Schirm ab `xxl`
+  // oder per Handwahl; auf A4 hoch ließen sie der Einheitenspalte neben den Mindestbreiten der
+  // übrigen neun Spalten gut 120 px, Namen brachen silbenweise (`e2e/meldebild-druck.spec.ts`,
+  // Lesbarkeit mit eingeblendeten Zusatzspalten). Über den Druckmodus, nicht über `@media print`:
+  // eine ausgeblendete Zelle ließe ihre `col` stehen.
+  const druckt = useDruckModus();
   const spalten = useMemo(
     () =>
       rasterSpalten(
@@ -847,8 +857,9 @@ export default function KraefteuebersichtPage() {
         { zeit: (utc) => formatUhrzeitMitTag(utc, konventionen), handStatus },
         { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
         { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit },
-      ),
+      ).filter((spalte) => !druckt || !NUR_AM_SCHIRM.has(spalte.key)),
     [
+      druckt,
       einsatzId,
       auftraegeZustand,
       konventionen,
