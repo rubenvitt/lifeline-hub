@@ -187,6 +187,78 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
   });
 });
 
+/**
+ * Ein abgelehntes „Bilden“ nennt seinen Grund im Dialog, kein Toast (LFH-1077,
+ * `frontend/AGENTS.md`, „Rückwege und Fehler“).
+ */
+describe('EinheitenPage · Einheit bilden abgelehnt (LFH-1077)', () => {
+  function seite() {
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten', client: neuerQueryClient() },
+    );
+  }
+  async function bilde(name = '2. Zug') {
+    await userEvent.click(await screen.findByRole('button', { name: 'Einheit bilden' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), name);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
+    return dialog;
+  }
+  const ablehnen = () =>
+    http.post('/api/einsaetze/1/einheiten', () =>
+      HttpResponse.json({ error: 'Name bereits vergeben' }, { status: 409 }),
+    );
+
+  it('nennt den Grund im Dialog, behält den Namen und zeigt keinen Toast', async () => {
+    server.use(...handlers(), ablehnen());
+    seite();
+    const dialog = await bilde();
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Name bereits vergeben');
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('2. Zug');
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('das nächste Absenden räumt den Grund', async () => {
+    let erster = true;
+    server.use(
+      ...handlers(),
+      http.post('/api/einsaetze/1/einheiten', async () => {
+        if (erster) {
+          erster = false;
+          return HttpResponse.json({ error: 'Name bereits vergeben' }, { status: 409 });
+        }
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
+    seite();
+    const dialog = await bilde();
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bilden' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+  });
+
+  it('nach Abbrechen und erneutem Öffnen steht kein alter Grund', async () => {
+    server.use(...handlers(), ablehnen());
+    seite();
+    const dialog = await bilde();
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
+    // ein, und jsdom beendet die Animation nie.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit bilden' }));
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
+  });
+});
+
 describe('EinheitenPage', () => {
   /**
    * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`, nicht bloß die Existenz

@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
@@ -77,6 +77,117 @@ describe('BemerkungZelle', () => {
     expect(onSpeichern).toHaveBeenCalledWith('Tank leer');
     // Nach dem Übernehmen ist das Feld wieder zu — der Aufrufer liefert den neuen Wert nach.
     expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('wartet auf die Antwort: bis zum Erfolg bleibt das Feld offen, ein zweites Verlassen sendet nicht (LFH-1077)', async () => {
+    /**
+     * Liefert `onSpeichern` eine Zusage, schließt die Zelle erst beim Erfolg (design.md D3): sonst
+     * hätte eine Ablehnung keinen Ort mehr, und der getippte Wortlaut wäre weg.
+     */
+    let erfuellen: (() => void) | undefined;
+    const onSpeichern = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          erfuellen = resolve;
+        }),
+    );
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
+
+    await userEvent.click(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'Tank leer');
+    druecke(feld, ENTER);
+
+    expect(onSpeichern).toHaveBeenCalledWith('Tank leer');
+    expect(screen.getByRole('textbox')).toHaveValue('Tank leer');
+    fireEvent.blur(screen.getByRole('textbox'));
+    expect(onSpeichern).toHaveBeenCalledTimes(1);
+    druecke(screen.getByRole('textbox'), ESCAPE);
+    expect(screen.getByRole('textbox')).toHaveValue('Tank leer');
+
+    await act(async () => erfuellen?.());
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('nach einer Ablehnung bleibt der Wortlaut stehen, erneutes Übernehmen sendet wieder (LFH-1077)', async () => {
+    const onSpeichern = vi
+      .fn<(wert: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('abgelehnt'))
+      .mockResolvedValueOnce(undefined);
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
+
+    await userEvent.click(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'Achse defekt');
+    await act(async () => druecke(feld, ENTER));
+
+    expect(screen.getByRole('textbox')).toHaveValue('Achse defekt');
+
+    await act(async () => druecke(screen.getByRole('textbox'), ENTER));
+    expect(onSpeichern).toHaveBeenCalledTimes(2);
+    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt');
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('nach einer Ablehnung schickt das Verlassen den abgelehnten Wortlaut nicht noch einmal, Enter schon (LFH-1077)', async () => {
+    /**
+     * antd ruft `onChange` beim Verlassen unbedingt. Ohne Riegel ginge derselbe abgelehnte Text ein
+     * zweites Mal hinaus, nur weil man in die nächste Zelle klickt. Enter bleibt der ausdrückliche
+     * Wiederholungsweg; ein geänderter Text geht auch beim Verlassen hinaus.
+     */
+    const onSpeichern = vi
+      .fn<(wert: string) => Promise<void>>()
+      .mockRejectedValue(new Error('abgelehnt'));
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
+
+    await userEvent.click(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'Achse defekt');
+    await act(async () => druecke(feld, ENTER));
+    expect(onSpeichern).toHaveBeenCalledTimes(1);
+
+    await act(async () => fireEvent.blur(screen.getByRole('textbox')));
+    expect(onSpeichern).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('textbox')).toHaveValue('Achse defekt');
+
+    await act(async () => druecke(screen.getByRole('textbox'), ENTER));
+    expect(onSpeichern).toHaveBeenCalledTimes(2);
+    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt');
+
+    await userEvent.type(screen.getByRole('textbox'), '!');
+    await act(async () => fireEvent.blur(screen.getByRole('textbox')));
+    expect(onSpeichern).toHaveBeenCalledTimes(3);
+    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt!');
+  });
+
+  it('solange gesendet wird, ist das Feld gesperrt und als beschäftigt markiert (LFH-1077)', async () => {
+    /**
+     * Ohne Sperre ginge Getipptes verloren: ein zweites Enter wäre still ignoriert, beim Erfolg
+     * schlösse das Feld mit dem alten Wortlaut. `readOnly` behält den Fokus, anders als `disabled`.
+     */
+    let ablehnen: (() => void) | undefined;
+    const onSpeichern = vi.fn(
+      () =>
+        new Promise<void>((_, reject) => {
+          ablehnen = () => reject(new Error('abgelehnt'));
+        }),
+    );
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
+
+    await userEvent.click(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }));
+    const feld = screen.getByRole('textbox');
+    expect(feld).not.toHaveAttribute('readonly');
+    await userEvent.type(feld, 'Tank leer');
+    await act(async () => druecke(feld, ENTER));
+
+    expect(screen.getByRole('textbox')).toHaveAttribute('readonly');
+    expect(screen.getByRole('textbox').closest('[aria-busy="true"]')).not.toBeNull();
+    await userEvent.type(screen.getByRole('textbox'), ' und mehr');
+    expect(screen.getByRole('textbox')).toHaveValue('Tank leer');
+
+    await act(async () => ablehnen?.());
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('readonly');
+    expect(screen.getByRole('textbox').closest('[aria-busy="true"]')).toBeNull();
   });
 
   it('Wegklicken übernimmt ebenfalls — nicht nur die Eingabetaste', async () => {

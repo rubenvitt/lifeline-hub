@@ -13,6 +13,8 @@ import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
 import { formatUhrzeitMitTag } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StatusWahl, { type StatusBedienung } from '../components/StatusWahl';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 import { monoStil, Paneel, Sammelbanner, StatusChip, useRollen } from '../components/instrument';
 import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
 import {
@@ -62,6 +64,11 @@ export interface FmsTableauProps {
   bedienungVon: (ef: EinsatzFahrzeug) => StatusBedienung;
   /** Fahrzeuge ODER ihre Gliederung laden noch zum ersten Mal. */
   ladend?: boolean;
+  /**
+   * Grund des letzten abgelehnten Wechsels an diesem Fahrzeug, aus derselben Quelle wie Zeile und
+   * Karte (`components/useZeilenFehler.ts`); er steht an der Kachel (LFH-1077).
+   */
+  zeilenFehler?: (ef: EinsatzFahrzeug) => ZeilenGrund | null;
 }
 
 const KACHEL = 'fms-kachel';
@@ -90,6 +97,7 @@ export default function FmsTableau({
   darfSchreiben,
   bedienungVon,
   ladend = false,
+  zeilenFehler,
 }: FmsTableauProps) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
@@ -242,6 +250,7 @@ export default function FmsTableau({
           <div style={kachelRasterStil(token)}>
             {g.kacheln.map(({ ef, einheit }) => {
               const bedienung = bedienungVon(ef);
+              const grund = zeilenFehler?.(ef) ?? null;
               const status = fahrzeugStatus(ef, katalogNach);
               const seit = bedienung.laeuft
                 ? '…'
@@ -302,6 +311,7 @@ export default function FmsTableau({
                       {einheit ?? OHNE_EINHEIT_TITEL}
                     </span>
                   )}
+                  {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
                 </div>
               );
             })}

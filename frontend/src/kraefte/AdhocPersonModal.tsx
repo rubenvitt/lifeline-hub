@@ -1,7 +1,6 @@
-import { App, Form, Input } from 'antd';
+import { Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
-import { fehlerText } from '../api/client';
 import { disponiereAdhoc, type AdhocEingabe } from '../api/einsatzPersonal';
 import { POSITION_OPTIONEN } from '../api/personal';
 import { einsatzKeys } from '../api/queryKeys';
@@ -33,7 +32,6 @@ export default function AdhocPersonModal({
   onAngelegt,
 }: AdhocPersonModalProps) {
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [form] = Form.useForm<AdhocEingabe>();
   const angelegtRef = useRef<EinsatzPersonal | null>(null);
 
@@ -44,7 +42,6 @@ export default function AdhocPersonModal({
       void qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     },
-    onError: (e: unknown) => message.error(fehlerText(e)),
   });
 
   return (
@@ -54,6 +51,11 @@ export default function AdhocPersonModal({
       form={form}
       erfassenText="Disponieren"
       laeuft={mutation.isPending}
+      // Grund einer Ablehnung im Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen
+      // ihn (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
+      speicherung={mutation}
+      speicherFehlerTitel="Nicht disponiert"
+      speicherFehlerFallback="Disponieren fehlgeschlagen"
       serie={serie}
       uebernahme={serie ? ['traegerorganisation', 'staerke_position'] : undefined}
       onErfassen={(w) => mutation.mutateAsync(w)}

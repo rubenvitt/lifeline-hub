@@ -14,7 +14,7 @@ import {
 } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -49,14 +49,13 @@ import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnitt
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
 import AbschnittDaten from './einsatzabschnitte/AbschnittDaten';
 import { abschnittLagezustand } from '../theme/statusFarben';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { abrufZustand } from '../api/abrufZustand';
 import {
   einheitenPfad,
   parseAbschnitteAnsicht,
   type AbschnitteAnsicht,
 } from '../routing/deeplinks';
-import { RechteHinweis } from '../components/SpeicherHinweis';
+import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SprungKnopf } from '../components/Sprung';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -209,7 +208,6 @@ export default function EinsatzabschnittePage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = useFehlerMeldung();
 
   const abschnitte = useMemo(() => abschnitteQuery.data ?? [], [abschnitteQuery.data]);
   const istGesperrt = useSprungSperre(einsatzId);
@@ -257,7 +255,6 @@ export default function EinsatzabschnittePage() {
       setBearbeiten(false);
       message.success('Gespeichert');
     },
-    onError: fehler,
   });
   const aufloesen = useMutation({
     mutationFn: (aid: number) => loeseAbschnittAuf(einsatzId, aid),
@@ -266,8 +263,21 @@ export default function EinsatzabschnittePage() {
       setGewaehlt(null);
       setBearbeiten(false);
     },
-    onError: fehler,
   });
+
+  /*
+   * Speichern und Auflösen melden ihre Ablehnung im Detailpaneel, kein Toast (LFH-1077,
+   * `frontend/AGENTS.md`, „Rückwege und Fehler“). Der Grund gehört zum gezeigten Abschnitt: jede
+   * neue Handlung, Abbrechen, Bearbeiten und der Wechsel des Abschnitts räumen ihn. Eine laufende
+   * Mutation bleibt unberührt, `reset()` hängte ihr Ergebnis ab. Ref, damit der Effekt beim
+   * Wechsel die AKTUELLEN Mutationen räumt, ohne je Render neu zu laufen.
+   */
+  const detailFehler = speichern.error ?? aufloesen.error;
+  const detailRef = useRef([speichern, aufloesen]);
+  detailRef.current = [speichern, aufloesen];
+  const raeumeDetail = useCallback(() => {
+    for (const m of detailRef.current) if (!m.isPending && m.error != null) m.reset();
+  }, []);
 
   // Beim Wechsel des angezeigten Abschnitts zurück in die Lese-Ansicht — auch wenn die Vorwahl
   // wechselt, weil ein anderer Arbeitsplatz den Abschnitt aufgelöst hat; sonst füllte das Formular
@@ -275,7 +285,8 @@ export default function EinsatzabschnittePage() {
   const aktuellId = aktuell?.id;
   useEffect(() => {
     setBearbeiten(false);
-  }, [aktuellId]);
+    raeumeDetail();
+  }, [aktuellId, raeumeDetail]);
 
   // Formular mit den Werten des aktuellen Abschnitts vorbelegen, sobald der Edit-Modus öffnet.
   useEffect(() => {
@@ -301,6 +312,7 @@ export default function EinsatzabschnittePage() {
    * beim Speichern. Abbrechen hinterlässt nichts.
    */
   function entwurfOeffnen() {
+    raeumeDetail();
     setGewaehlt(null);
     setBearbeiten(false);
     form.resetFields();
@@ -556,7 +568,10 @@ export default function EinsatzabschnittePage() {
               <Form<AbschnittWerte>
                 form={form}
                 layout="vertical"
-                onFinish={(w) => speichern.mutate(w)}
+                onFinish={(w) => {
+                  raeumeDetail();
+                  speichern.mutate(w);
+                }}
               >
                 <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
                   <Input autoFocus />
@@ -652,12 +667,14 @@ export default function EinsatzabschnittePage() {
                 <Form.Item label="Bemerkung" name="bemerkung">
                   <Input.TextArea rows={2} />
                 </Form.Item>
+                <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
                 <Space size="middle">
                   <Button type="primary" htmlType="submit" loading={speichern.isPending}>
                     Speichern
                   </Button>
                   <Button
                     onClick={() => {
+                      raeumeDetail();
                       setEntwurf(false);
                       setBearbeiten(false);
                     }}
@@ -672,7 +689,10 @@ export default function EinsatzabschnittePage() {
                       }
                       okText="Abschnitt auflösen"
                       okButtonProps={{ danger: true }}
-                      onConfirm={() => aufloesen.mutate(aktuell.id)}
+                      onConfirm={() => {
+                        raeumeDetail();
+                        aufloesen.mutate(aktuell.id);
+                      }}
                     >
                       <Button danger>Auflösen</Button>
                     </Popconfirm>
@@ -684,22 +704,34 @@ export default function EinsatzabschnittePage() {
                 <AbschnittDaten abschnitt={aktuell} staerken={staerken} />
 
                 {darfSchreiben && (
-                  <Space size="middle" style={{ marginTop: 12 }}>
-                    <Button type="primary" onClick={() => setBearbeiten(true)}>
-                      Bearbeiten
-                    </Button>
-                    <Popconfirm
-                      title="Abschnitt auflösen?"
-                      description={
-                        'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'
-                      }
-                      okText="Abschnitt auflösen"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => aufloesen.mutate(aktuell.id)}
-                    >
-                      <Button danger>Auflösen</Button>
-                    </Popconfirm>
-                  </Space>
+                  <div style={{ marginTop: 12 }}>
+                    <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
+                    <Space size="middle">
+                      <Button
+                        type="primary"
+                        onClick={() => {
+                          raeumeDetail();
+                          setBearbeiten(true);
+                        }}
+                      >
+                        Bearbeiten
+                      </Button>
+                      <Popconfirm
+                        title="Abschnitt auflösen?"
+                        description={
+                          'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'
+                        }
+                        okText="Abschnitt auflösen"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => {
+                          raeumeDetail();
+                          aufloesen.mutate(aktuell.id);
+                        }}
+                      >
+                        <Button danger>Auflösen</Button>
+                      </Popconfirm>
+                    </Space>
+                  </div>
                 )}
 
                 {einheitenListe}
@@ -709,5 +741,24 @@ export default function EinsatzabschnittePage() {
         </div>
       )}
     </EinsatzSeite>
+  );
+}
+
+/**
+ * Grund einer abgelehnten Handlung im Detailpaneel, über ihren Knöpfen. `speicherFehler` wählt den
+ * Wortlaut: ohne ihn stammt der Fehler vom Auflösen.
+ */
+function DetailFehler({ speicherFehler, fehler }: { speicherFehler: unknown; fehler: unknown }) {
+  const { token } = useRollen();
+  if (fehler == null) return null;
+  const vomAufloesen = speicherFehler == null;
+  return (
+    <div style={{ marginBottom: token.marginSM }}>
+      <SpeicherFehler
+        fehler={fehler}
+        titel={vomAufloesen ? 'Nicht aufgelöst' : undefined}
+        fallback={vomAufloesen ? 'Auflösen fehlgeschlagen' : undefined}
+      />
+    </div>
   );
 }

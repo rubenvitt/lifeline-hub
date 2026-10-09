@@ -10,6 +10,8 @@ import {
 import KommKarte from '../kommunikation/KommKarte';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 const { Text } = Typography;
 
@@ -34,6 +36,8 @@ interface NachforderungKarteProps {
   darfSchreiben?: boolean;
   onStatus?: (id: number, status: NachforderungStatus) => void;
   onAblehnen?: (id: number) => void;
+  /** Grund der zuletzt abgelehnten Fortschaltung, aus `components/useZeilenFehler.ts`. */
+  fehlerGrund?: ZeilenGrund | null;
 }
 
 /**
@@ -49,6 +53,7 @@ function NachforderungKarte({
   darfSchreiben,
   onStatus,
   onAblehnen,
+  fehlerGrund,
 }: NachforderungKarteProps) {
   const { formatZeit } = useAnzeigeKonventionen();
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
@@ -132,6 +137,13 @@ function NachforderungKarte({
         )}
       </Space>
 
+      {/* Grund einer abgelehnten Fortschaltung über den Knöpfen, bis zur nächsten an dieser Karte
+         (LFH-1077). */}
+      {fehlerGrund && (
+        <div style={{ marginTop: 8 }}>
+          <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
+        </div>
+      )}
       {/* `<Space size="middle">`: „Ablehnen" ist `danger` und braucht Abstand zur Fortschaltung
          (gepinnt in `components/aktionsabstand.guard.test.ts`). */}
       {aktionen.length > 0 && (

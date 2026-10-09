@@ -8,7 +8,7 @@ import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { useEffect } from 'react';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
-import { ErfassungsFormular } from '../components/Erfassung';
+import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
 import type { NachforderungVorbelegung } from '../routing/deeplinks';
 
@@ -47,6 +47,7 @@ export default function NachforderungFormular({
   onAnlegen,
   card = true,
   vorbelegung,
+  speicherung,
 }: {
   senden: boolean;
   /**
@@ -63,6 +64,11 @@ export default function NachforderungFormular({
    * Druck vor der Dublette. `setFieldsValue` beim Öffnen ist Vorbelegen, kein Reset.
    */
   vorbelegung?: NachforderungVorbelegung | null;
+  /**
+   * Die Anlege-Mutation: ihr Fehler steht im Formular bis zum nächsten Absetzen; Einhängen und
+   * Abbrechen räumen ihn (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
+   */
+  speicherung?: Speicherung;
 }) {
   const [form] = Form.useForm<FormWerte>();
 
@@ -107,6 +113,9 @@ export default function NachforderungFormular({
       // Das Inline-Formular schließt nach dem Absetzen NICHT — Zuklappen ist ausdrückliche Nutzeraktion.
       onFertig={() => {}}
       laeuft={senden}
+      speicherung={speicherung}
+      speicherFehlerTitel="Nachforderung nicht abgesetzt"
+      speicherFehlerFallback="Absetzen fehlgeschlagen"
       erfassenText="Nachforderung absetzen"
       serie
       uebernahme={UEBERNAHME}

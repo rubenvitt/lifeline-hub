@@ -12,7 +12,17 @@ interface Optionen<T extends { id: number }, V> {
   nochOptimistisch: (zeile: T, v: V) => boolean;
   zuruecknehmen: (zeile: T, vorher: T) => T;
   onErfolg?: () => void;
-  onFehler: (e: unknown) => void;
+  /**
+   * Eine Änderung an der Zeile beginnt; mit den Variablen, damit der Aufrufer den alten Grund
+   * GENAU dieser Zeile räumt (`components/useZeilenFehler.ts`, `beginne`).
+   */
+  onBeginn?: (v: V) => void;
+  /**
+   * Der Server lehnt ab, nach dem Zurücknehmen. Mit den Variablen, damit der Grund an der Zeile
+   * steht, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). Ohne Rückruf nimmt
+   * der Hook nur zurück.
+   */
+  onFehler?: (e: unknown, v: V) => void;
   onSettled: () => void;
 }
 
@@ -29,6 +39,7 @@ export function useOptimistischesZeilenUpdate<T extends { id: number }, V>({
   nochOptimistisch,
   zuruecknehmen,
   onErfolg,
+  onBeginn,
   onFehler,
   onSettled,
 }: Optionen<T, V>) {
@@ -36,6 +47,7 @@ export function useOptimistischesZeilenUpdate<T extends { id: number }, V>({
   return useMutation({
     mutationFn,
     onMutate: async (v: V) => {
+      onBeginn?.(v);
       await qc.cancelQueries({ queryKey });
       const id = zeilenId(v);
       const vorher = qc.getQueryData<T[]>(queryKey)?.find((z) => z.id === id);
@@ -58,7 +70,7 @@ export function useOptimistischesZeilenUpdate<T extends { id: number }, V>({
           ),
         );
       }
-      onFehler(e);
+      onFehler?.(e, v);
     },
     onSettled,
   });

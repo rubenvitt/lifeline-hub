@@ -51,7 +51,7 @@ import { abstand } from '../theme/tokens';
 import DemoMarke from '../components/DemoMarke';
 import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
@@ -118,7 +118,10 @@ export default function PersonalPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = useFehlerMeldung();
+  // Ablehnungen an der Zeile, je Disposition gemerkt; alle Zeilenaktionen teilen den Speicher, die
+  // zuletzt begonnene zählt (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Der Dialog
+  // zeigt seinen Fehler über `speicherung` selbst.
+  const zeilen = useZeilenFehler<number>();
 
   const disponiereMutation = useMutation({
     mutationFn: (personalId: number) => disponierePerson(einsatzId, personalId),
@@ -126,7 +129,6 @@ export default function PersonalPage() {
       message.success('Personal disponiert');
       invalidate();
     },
-    onError: fehler,
   });
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzPersonal,
@@ -136,25 +138,29 @@ export default function PersonalPage() {
     mutationFn: (v) => aktualisiereDisposition(einsatzId, v.epId, { status_id: v.statusId }),
     zeilenId: (v) => v.epId,
     ...katalogStatusWechsel<EinsatzPersonal>(statusQuery.data),
-    onFehler: fehler,
+    onBeginn: (v) => zeilen.beginne(v.epId),
+    onFehler: (e, v) => zeilen.melde(v.epId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
   const positionMutation = useMutation({
     mutationFn: (v: { epId: number; position: StaerkePosition | null }) =>
       aktualisiereDisposition(einsatzId, v.epId, { staerke_position: v.position }),
+    onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, v) => zeilen.melde(v.epId, e, 'Position nicht gespeichert'),
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { epId: number; bemerkung: string }) =>
       aktualisiereDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
+    onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),
   });
   const entfernenMutation = useMutation({
     mutationFn: (epId: number) => entferneDisposition(einsatzId, epId),
+    onMutate: (epId) => zeilen.beginne(epId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, epId) => zeilen.melde(epId, e, 'Entfernen fehlgeschlagen'),
   });
 
   if (einsatzQuery.isLoading) {
@@ -422,7 +428,8 @@ export default function PersonalPage() {
           wert={ep.bemerkung}
           kennung={ep.name}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(val) => bemerkungMutation.mutate({ epId: ep.id, bemerkung: val })}
+          // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
+          onSpeichern={(val) => bemerkungMutation.mutateAsync({ epId: ep.id, bemerkung: val })}
         />
       ),
     },
@@ -532,6 +539,7 @@ export default function PersonalPage() {
             suche={{ platzhalter: 'Name, Funktion' }}
             standardSortierung={{ spalte: 'name', richtung: 'auf' }}
             spaltenAusVoreinstellung={['bemerkung']}
+            zeilenFehler={(p) => zeilen.grund(p.id)}
             gruppen={{
               schluessel: (ep) => kategorieVon(ep.status_kategorie),
               etikett: kategorieEtikett,
@@ -583,6 +591,9 @@ export default function PersonalPage() {
         erfassenText="Disponieren"
         serie
         laeuft={disponiereMutation.isPending}
+        speicherung={disponiereMutation}
+        speicherFehlerTitel="Nicht disponiert"
+        speicherFehlerFallback="Disponieren fehlgeschlagen"
         onErfassen={async (w) => {
           await disponiereMutation.mutateAsync(w.personal_id);
         }}

@@ -55,7 +55,8 @@ import {
   SeitenSkeleton,
 } from '../components/SeitenZustand';
 import './EinheitDetailPage.css';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 
 /**
  * Die echte Höhe zählt: Handschuh-Stufe und umgebrochene Aktionen verändern die Leiste. Der
@@ -174,7 +175,19 @@ export default function EinheitDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = useFehlerMeldung();
+  /*
+   * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): Speichern und Auflösen am Paneel „Kopfdaten“, Zuordnen am Paneel der
+   * Zuordnung, Entfernen und „Als Einheitsführer“ an der Zeile. Die Gründe je Zeile und je Paneel
+   * kommen aus den Callbacks, nicht aus `mutation.error`/`mutation.variables`
+   * (`components/useZeilenFehler.ts`): zwei schnelle Zuordnungen hintereinander, und die
+   * Ablehnung der ersten ginge verloren. Entfernen und „Als Einheitsführer“ teilen sich den
+   * Speicher der Personalzeile.
+   */
+  const personalZeilen = useZeilenFehler<number>();
+  const fahrzeugZeilen = useZeilenFehler<number>();
+  const materialZeilen = useZeilenFehler<number>();
+  const zuordnen = useZeilenFehler<'personal' | 'fahrzeug' | 'material'>();
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const aktuell = einheiten.find((e) => e.id === einheitId) ?? null;
@@ -203,7 +216,6 @@ export default function EinheitDetailPage() {
       invalidate();
       message.success('Gespeichert');
     },
-    onError: fehler,
   });
 
   const aufloesen = useMutation({
@@ -213,42 +225,47 @@ export default function EinheitDetailPage() {
       invalidate();
       void navigate(einheitenPfad(einsatzId));
     },
-    onError: fehler,
   });
   const personalZu = useMutation({
     mutationFn: (epId: number) => ordnePersonalZu(einsatzId, einheitId, epId),
+    onMutate: () => zuordnen.beginne('personal'),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e) => zuordnen.melde('personal', e),
   });
   const personalFrei = useMutation({
     mutationFn: (epId: number) => gibPersonalFrei(einsatzId, einheitId, epId),
+    onMutate: (epId) => personalZeilen.beginne(epId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, epId) => personalZeilen.melde(epId, e, 'Entfernen fehlgeschlagen'),
   });
   const fahrzeugZu = useMutation({
     mutationFn: (efId: number) => ordneFahrzeugZu(einsatzId, einheitId, efId),
+    onMutate: () => zuordnen.beginne('fahrzeug'),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e) => zuordnen.melde('fahrzeug', e),
   });
   const fahrzeugFrei = useMutation({
     mutationFn: (efId: number) => gibFahrzeugFrei(einsatzId, einheitId, efId),
+    onMutate: (efId) => fahrzeugZeilen.beginne(efId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, efId) => fahrzeugZeilen.melde(efId, e, 'Entfernen fehlgeschlagen'),
   });
   const materialZu = useMutation({
     mutationFn: (emId: number) => ordneMaterialZu(einsatzId, einheitId, emId),
+    onMutate: () => zuordnen.beginne('material'),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e) => zuordnen.melde('material', e),
   });
   const materialFrei = useMutation({
     mutationFn: (emId: number) => gibMaterialFrei(einsatzId, einheitId, emId),
+    onMutate: (emId) => materialZeilen.beginne(emId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, emId) => materialZeilen.melde(emId, e, 'Entfernen fehlgeschlagen'),
   });
   const fuehrerSetzen = useMutation({
     // Baut den PATCH-Body aus dem Server-Stand (`aktuell`), nicht aus dem Formular: ungespeicherte
     // Kopf-Edits werden nicht mitgesendet (Vollersatz-Vertrag). Zuerst Kopfdaten „Speichern".
-    mutationFn: (epId: number | null) => {
+    mutationFn: (epId: number) => {
       const e = aktuell!;
       return aktualisiereEinheit(einsatzId, e.id, {
         name: e.name,
@@ -262,9 +279,46 @@ export default function EinheitDetailPage() {
         bemerkung: e.bemerkung,
       });
     },
+    onMutate: (epId) => personalZeilen.beginne(epId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, epId) => personalZeilen.melde(epId, e, 'Einheitsführer nicht gesetzt'),
   });
+  /*
+   * Speichern und Auflösen teilen sich den Ort am Paneel „Kopfdaten“: die zuletzt begonnene
+   * Handlung zählt, ihr Start räumt den Grund der anderen. Eine laufende bleibt unberührt.
+   */
+  const kopfFehler = speichern.error ?? aufloesen.error;
+  const raeumeKopf = (andere: typeof speichern | typeof aufloesen) => {
+    if (!andere.isPending && andere.error != null) andere.reset();
+  };
+
+  /*
+   * Die Route hat keinen `key`: der Wechsel zu einer anderen Einheit behält diese Seite. Die Gründe
+   * der vorigen gehören nicht an die nächste, also räumt jeder Wechsel alle Orte. `reset` und
+   * `leere` sind stabil, der Effekt läuft nur mit `einheitId`.
+   */
+  const { reset: speichernReset } = speichern;
+  const { reset: aufloesenReset } = aufloesen;
+  const { leere: leerePersonal } = personalZeilen;
+  const { leere: leereFahrzeuge } = fahrzeugZeilen;
+  const { leere: leereMaterial } = materialZeilen;
+  const { leere: leereZuordnen } = zuordnen;
+  useEffect(() => {
+    speichernReset();
+    aufloesenReset();
+    leerePersonal();
+    leereFahrzeuge();
+    leereMaterial();
+    leereZuordnen();
+  }, [
+    einheitId,
+    speichernReset,
+    aufloesenReset,
+    leerePersonal,
+    leereFahrzeuge,
+    leereMaterial,
+    leereZuordnen,
+  ]);
 
   // Formular mit den Kopfdaten füllen, sobald sie da sind bzw. sich ändern.
   useEffect(() => {
@@ -354,14 +408,19 @@ export default function EinheitDetailPage() {
       allgemein: 'Material konnte nicht geladen werden',
     }) ?? 'Kein freies Material';
 
-  /** Eine Zuordnungszeile — Bezeichnung links, Aktionen rechts. */
+  /**
+   * Eine Zuordnungszeile — Bezeichnung links, Aktionen rechts, darunter der Grund einer
+   * abgelehnten Zeilenaktion.
+   */
   const zuordnungsZeile = (
     schluessel: string | number,
     inhalt: React.ReactNode,
     aktionen: React.ReactNode,
+    fehlerGrund: ZeilenGrund | null,
   ) => (
     <div
       key={schluessel}
+      data-lfh="einheit-zuordnung"
       style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -376,6 +435,11 @@ export default function EinheitDetailPage() {
     >
       {inhalt}
       {aktionen}
+      {fehlerGrund && (
+        <div style={{ flexBasis: '100%' }}>
+          <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
+        </div>
+      )}
     </div>
   );
 
@@ -423,7 +487,10 @@ export default function EinheitDetailPage() {
             form={form}
             layout="vertical"
             disabled={!darfSchreiben}
-            onFinish={(w) => speichern.mutate(w)}
+            onFinish={(w) => {
+              raeumeKopf(aufloesen);
+              speichern.mutate(w);
+            }}
           >
             <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
               <Input />
@@ -518,6 +585,15 @@ export default function EinheitDetailPage() {
                   borderTop: `1px solid ${rollen.linie}`,
                 }}
               >
+                {kopfFehler != null && (
+                  <div style={{ marginBottom: token.marginSM }}>
+                    <SpeicherFehler
+                      fehler={kopfFehler}
+                      titel={speichern.error != null ? undefined : 'Nicht aufgelöst'}
+                      fallback={speichern.error != null ? undefined : 'Auflösen fehlgeschlagen'}
+                    />
+                  </div>
+                )}
                 <Space size="middle" wrap>
                   <Button type="primary" htmlType="submit" loading={speichern.isPending}>
                     Speichern
@@ -527,7 +603,10 @@ export default function EinheitDetailPage() {
                     description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch."
                     okText="Einheit auflösen"
                     okButtonProps={{ danger: true }}
-                    onConfirm={() => aufloesen.mutate()}
+                    onConfirm={() => {
+                      raeumeKopf(speichern);
+                      aufloesen.mutate();
+                    }}
                   >
                     <Button danger loading={aufloesen.isPending}>
                       Auflösen
@@ -585,6 +664,7 @@ export default function EinheitDetailPage() {
                   </Button>
                 </Space>
               ),
+              personalZeilen.grund(m.ep_id),
             ),
           )}
           {darfSchreiben && (
@@ -597,6 +677,7 @@ export default function EinheitDetailPage() {
               onSelect={(epId) => personalZu.mutate(Number(epId))}
             />
           )}
+          <ZuordnenFehler grund={zuordnen.grund('personal')} />
         </Paneel>
 
         <Paneel titel="Fahrzeuge" meta={aktuell.fahrzeug_mitglieder.length} koerperPolster>
@@ -612,6 +693,7 @@ export default function EinheitDetailPage() {
                   Entfernen
                 </Button>
               ),
+              fahrzeugZeilen.grund(m.ef_id),
             ),
           )}
           {darfSchreiben && (
@@ -624,6 +706,7 @@ export default function EinheitDetailPage() {
               onSelect={(efId) => fahrzeugZu.mutate(Number(efId))}
             />
           )}
+          <ZuordnenFehler grund={zuordnen.grund('fahrzeug')} />
         </Paneel>
 
         <Paneel titel="Material" meta={aktuell.material_mitglieder.length} koerperPolster>
@@ -638,6 +721,7 @@ export default function EinheitDetailPage() {
                   Entfernen
                 </Button>
               ),
+              materialZeilen.grund(m.em_id),
             ),
           )}
           {darfSchreiben && (
@@ -653,8 +737,27 @@ export default function EinheitDetailPage() {
               onSelect={(emId) => materialZu.mutate(Number(emId))}
             />
           )}
+          <ZuordnenFehler grund={zuordnen.grund('material')} />
         </Paneel>
       </div>
     </EinsatzSeite>
+  );
+}
+
+/**
+ * Grund einer abgelehnten Zuordnung unter dem Auswahlfeld ihres Paneels, bis zur nächsten Auswahl
+ * (deren `onMutate` räumt ihn).
+ */
+function ZuordnenFehler({ grund }: { grund: ZeilenGrund | null }) {
+  const { token } = useRollen();
+  if (grund == null) return null;
+  return (
+    <div style={{ marginTop: token.marginSM }}>
+      <SpeicherFehler
+        fehler={grund.fehler}
+        titel="Nicht zugeordnet"
+        fallback="Zuordnen fehlgeschlagen"
+      />
+    </div>
   );
 }

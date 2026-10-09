@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import NachforderungenPage from './NachforderungenPage';
 import { AuthProvider } from '../auth/AuthContext';
+import { ApiError } from '../api/client';
 import { ladeEinsatz } from '../api/einsaetze';
 import { nachforderungenPfad } from '../routing/deeplinks';
 import type { Nachforderung } from '../api/types';
@@ -307,5 +308,286 @@ describe('NachforderungenPage', () => {
       );
       expect(screen.queryByLabelText('Art')).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Anlegen am
+ * Formular, Fortschalten an der Karte, Rückgängig im Seitenhinweis, Ablehnen im Dialog. Kein
+ * Fehler-Toast; Erfolgs- und Rückgängig-Toasts bleiben.
+ */
+describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listeNachforderungen.mockResolvedValue([nf()]);
+  });
+
+  const karte = (bezeichnung: string) =>
+    screen.getByText(bezeichnung).closest('[data-lfh="komm-karte"]') as HTMLElement;
+  const zweiNachforderungen = () =>
+    listeNachforderungen.mockResolvedValue([
+      nf({ id: 1, bezeichnung: 'Bedarf eins' }),
+      nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+    ]);
+  const seitenHinweis = () =>
+    waitFor(() => {
+      const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+      expect(h).not.toBeNull();
+      return h as HTMLElement;
+    });
+
+  async function setzeAb() {
+    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+  }
+
+  it('Anlegen: der Grund steht am Formular, die Eingabe bleibt, kein Toast', async () => {
+    legeNachforderungAn.mockRejectedValue(new ApiError(422, 'Art unbekannt'));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    await userEvent.type(screen.getByLabelText('Art'), 'SEG');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
+    await setzeAb();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Art unbekannt');
+    expect(screen.getByLabelText('Art')).toHaveValue('SEG');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Anlegen: das nächste Absetzen räumt den Grund', async () => {
+    legeNachforderungAn
+      .mockRejectedValueOnce(new ApiError(422, 'Art unbekannt'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    await userEvent.type(screen.getByLabelText('Art'), 'SEG');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
+    await setzeAb();
+    await screen.findByText('Art unbekannt');
+
+    await setzeAb();
+    await waitFor(() => expect(screen.queryByText('Art unbekannt')).not.toBeInTheDocument());
+  });
+
+  it('Anlegen: Zuklappen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    legeNachforderungAn.mockRejectedValue(new ApiError(422, 'Art unbekannt'));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    await userEvent.type(screen.getByLabelText('Art'), 'SEG');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
+    await setzeAb();
+    await screen.findByText('Art unbekannt');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Formular schließen' })[0]);
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    await screen.findByLabelText('Art');
+    expect(screen.queryByText('Art unbekannt')).not.toBeInTheDocument();
+  });
+
+  it('Fortschalten: der Grund steht an genau dieser Karte', async () => {
+    zweiNachforderungen();
+    setzeNachforderungStatus.mockRejectedValue(new ApiError(422, 'Übergang nicht erlaubt'));
+    renderPage();
+    await screen.findByText('Bedarf zwei');
+    await userEvent.click(
+      within(karte('Bedarf eins')).getByRole('button', { name: 'Zusage erfassen' }),
+    );
+
+    expect(await within(karte('Bedarf eins')).findByText('Übergang nicht erlaubt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(karte('Bedarf zwei').querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  /**
+   * `useMutation` verfolgt nur den LETZTEN Aufruf: schaltet Karte 2, bevor Karte 1 geantwortet
+   * hat, ginge die Ablehnung von Karte 1 über `mutation.error` verloren.
+   */
+  it('Fortschalten: zwei Karten nebenläufig, die Ablehnung steht an ihrer Karte', async () => {
+    zweiNachforderungen();
+    let lehneAb: (e: Error) => void = () => {};
+    setzeNachforderungStatus.mockImplementation((_e: number, nfId: number) =>
+      nfId === 1
+        ? new Promise((_r, reject) => (lehneAb = reject))
+        : Promise.resolve(nf({ id: 2, status: 'zugesagt' })),
+    );
+    renderPage();
+    await screen.findByText('Bedarf zwei');
+    await userEvent.click(
+      within(karte('Bedarf eins')).getByRole('button', { name: 'Zusage erfassen' }),
+    );
+    await userEvent.click(
+      within(karte('Bedarf zwei')).getByRole('button', { name: 'Zusage erfassen' }),
+    );
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(2));
+    await act(async () => lehneAb(new ApiError(409, 'Zwischenzeitlich geändert')));
+
+    expect(
+      await within(karte('Bedarf eins')).findByText('Zwischenzeitlich geändert'),
+    ).toHaveAttribute('data-fehler');
+    expect(karte('Bedarf zwei').querySelector('[data-fehler]')).toBeNull();
+    // Karte 2 hat Erfolg und damit ihren Rückgängig-Toast; ein Fehler-Toast fehlt.
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+  });
+
+  it('Fortschalten: die nächste Aktion an derselben Karte räumt den Grund', async () => {
+    setzeNachforderungStatus
+      .mockRejectedValueOnce(new ApiError(422, 'Übergang nicht erlaubt'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await screen.findByText('Übergang nicht erlaubt');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Übergang nicht erlaubt')).not.toBeInTheDocument(),
+    );
+  });
+
+  /**
+   * Nach der Ablehnung lädt die Seite neu (optimistische Sperre, 422): hat ein anderer Arbeitsplatz
+   * das Eintreffen schon gemeldet, wandert die Karte nach „Abgeschlossen“ und mit ihr ihr Grund.
+   * Solange sie in der gezeigten Liste fehlt, steht er im Seitenhinweis.
+   */
+  it('Fortschalten: wandert die Karte aus der gezeigten Liste, steht ihr Grund im Seitenhinweis', async () => {
+    const unterwegs = nf({ status: 'unterwegs', unterwegs_at: '2026-06-12 09:30:00' });
+    listeNachforderungen.mockResolvedValue([unterwegs]);
+    setzeNachforderungStatus.mockImplementation(() => {
+      listeNachforderungen.mockResolvedValue([
+        nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
+      ]);
+      return Promise.reject(new ApiError(422, 'Bereits eingetroffen gemeldet'));
+    });
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: 'Eintreffen melden' }));
+
+    await waitFor(() => expect(screen.queryByText('2 RTW zur Verstärkung')).toBeNull());
+    const hinweis = await seitenHinweis();
+    const grund = await within(hinweis).findByRole('alert');
+    expect(grund).toHaveTextContent('Bereits eingetroffen gemeldet');
+    // Der Titel nennt die Nachforderung: oben steht nicht mehr, welche Karte gemeint ist.
+    expect(grund).toHaveTextContent('Status von „2 RTW zur Verstärkung“ nicht geändert');
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+
+    // In der Ansicht, die die Karte zeigt, steht der Grund wieder an ihr, nicht doppelt oben.
+    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
+    expect(
+      await within(karte('2 RTW zur Verstärkung')).findByText('Bereits eingetroffen gemeldet'),
+    ).toHaveAttribute('data-fehler');
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+  });
+
+  /** Rückgängig kommt aus dem Toast; die Karte ist dann oft gewandert. */
+  it('Rückgängig: eine abgelehnte Rücknahme steht im Seitenhinweis, nicht an der Karte', async () => {
+    setzeNachforderungStatus
+      .mockResolvedValueOnce(nf({ status: 'zugesagt' }))
+      .mockRejectedValueOnce(new ApiError(422, 'Rücknahme nicht erlaubt'));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+
+    const hinweis = await seitenHinweis();
+    expect(await within(hinweis).findByRole('alert')).toHaveTextContent('Rücknahme nicht erlaubt');
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+  });
+
+  it('Rückgängig: die nächste Rücknahme räumt den Seitenhinweis', async () => {
+    setzeNachforderungStatus
+      .mockResolvedValueOnce(nf({ status: 'zugesagt' }))
+      .mockRejectedValueOnce(new ApiError(422, 'Rücknahme nicht erlaubt'))
+      .mockResolvedValueOnce(nf({ status: 'zugesagt' }))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await screen.findByText('Rücknahme nicht erlaubt');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(3));
+    const rueckgaengig = await screen.findAllByRole('button', { name: 'Rückgängig' });
+    await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(4));
+    await waitFor(() =>
+      expect(screen.queryByText('Rücknahme nicht erlaubt')).not.toBeInTheDocument(),
+    );
+  });
+
+  async function lehneAbImDialog(grund = 'keine Reserven') {
+    await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Ablehnungsgrund'), grund);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
+    return dialog;
+  }
+
+  /** Der Dialog wartet auf die Antwort (design.md D3): bis dahin bleibt der Grund getippt. */
+  it('Ablehnen: der Dialog bleibt bei einer Ablehnung offen, mit Grund und Fehler', async () => {
+    lehneNachforderungAb.mockRejectedValue(new ApiError(409, 'Bereits zugesagt'));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    const dialog = await lehneAbImDialog();
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Bereits zugesagt');
+    expect(within(dialog).getByLabelText('Ablehnungsgrund')).toHaveValue('keine Reserven');
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Ablehnen: der Dialog wartet auf die Antwort und schließt erst beim Erfolg', async () => {
+    let antworte: (n: Nachforderung) => void = () => {};
+    lehneNachforderungAb.mockImplementation(() => new Promise((r) => (antworte = r)));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    const dialog = await lehneAbImDialog();
+
+    await waitFor(() => expect(lehneNachforderungAb).toHaveBeenCalledTimes(1));
+    expect(within(dialog).getByLabelText('Ablehnungsgrund')).toHaveValue('keine Reserven');
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+
+    await act(async () => antworte(nf({ status: 'abgelehnt' })));
+    await waitFor(() => expect(dialog.closest('.ant-zoom-leave')).not.toBeNull());
+    expect(await screen.findByText('Nachforderung abgelehnt')).toBeInTheDocument();
+  });
+
+  it('Ablehnen: das nächste Absenden räumt den Fehler', async () => {
+    lehneNachforderungAb
+      .mockRejectedValueOnce(new ApiError(409, 'Bereits zugesagt'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    const dialog = await lehneAbImDialog();
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+  });
+
+  it('Ablehnen: Abbrechen und erneutes Öffnen zeigen keinen alten Fehler', async () => {
+    lehneNachforderungAb.mockRejectedValue(new ApiError(409, 'Bereits zugesagt'));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    const dialog = await lehneAbImDialog();
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
+    // ein, und jsdom beendet die Animation nie.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Ablehnen' })[0]);
+    const wieder = await waitFor(() => {
+      const offen = screen.getAllByRole('dialog').find((d) => d.closest('.ant-zoom-leave') == null);
+      expect(offen).toBeDefined();
+      return offen as HTMLElement;
+    });
+    expect(within(wieder).getByLabelText('Ablehnungsgrund')).toHaveValue('');
+    expect(within(wieder).queryByRole('alert')).toBeNull();
   });
 });

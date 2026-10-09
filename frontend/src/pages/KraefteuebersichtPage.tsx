@@ -1,7 +1,7 @@
 import { IconPlus, IconTrichter } from '../icons';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
-import { App as AntApp, Breadcrumb, Button, Input, Space, Tag, theme } from 'antd';
+import { Breadcrumb, Button, Input, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -27,7 +27,6 @@ import {
   RUECKMELDUNG_WORT,
   rueckmeldungJeEinheit,
 } from '../meldungen/rueckmeldung';
-import { ApiError } from '../api/client';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { ankerText, dauerText, kraftDauern, type LaufendeDauer } from '../kraefte/zeitachse';
@@ -59,7 +58,8 @@ import Statusband from '../kraefte/Statusband';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
 import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
 import { legeLageberichtAn } from '../api/lageberichte';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import type { FahrzeugStatus, StatusKategorie } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
@@ -202,6 +202,8 @@ interface RueckmeldungSpalte {
 interface StatusKontext {
   zeit: (utc: string) => string;
   handStatus: ((z: RasterZeile) => React.ReactNode) | null;
+  /** Grund des zuletzt abgelehnten Handstatus je Einheit (`components/useZeilenFehler.ts`). */
+  handFehler: (einheitId: number) => ZeilenGrund | null;
 }
 
 /**
@@ -245,6 +247,9 @@ function rasterSpalten(
         <StatusSpalte
           zeile={z}
           handStatus={kontext.handStatus}
+          fehler={
+            z.art === 'einheit' && z.einheitId != null ? kontext.handFehler(z.einheitId) : null
+          }
           gruende={toenungsGruende(z, rueckmeldung.jeZeile.get(z.key))}
         />
       ),
@@ -419,10 +424,16 @@ function StatusSpalte({
   zeile: z,
   handStatus,
   gruende,
+  fehler,
 }: {
   zeile: RasterZeile;
   handStatus: StatusKontext['handStatus'];
   gruende: readonly string[];
+  /**
+   * Grund eines abgelehnten Handstatus (LFH-1077). Steht unabhängig vom Auslöser: nach einer
+   * Ablehnung nimmt der Refetch ihn oft weg, weil die Einheit inzwischen ein Fahrzeug führt.
+   */
+  fehler: ZeilenGrund | null;
 }) {
   const { token, rollen } = useRollen();
   // Der Grund der Zeilentönung als Wort (LFH-973): sichtbar in einer Spalte, die auch bei
@@ -455,11 +466,12 @@ function StatusSpalte({
       </>
     );
   }
-  if (!status && !grund) return null;
+  if (!status && !grund && !fehler) return null;
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', gap: token.marginXXS }}>
       {status}
       {grund}
+      {fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />}
     </span>
   );
 }
@@ -631,7 +643,6 @@ export default function KraefteuebersichtPage() {
   const lageberichtGesperrt = sprungGesperrt('lageberichte');
   const { benutzer } = useAuth();
   const navigate = useNavigate();
-  const { message } = AntApp.useApp();
   const { token } = theme.useToken();
   const qc = useQueryClient();
   const { konventionen } = useAnzeigeKonventionen();
@@ -761,17 +772,21 @@ export default function KraefteuebersichtPage() {
 
   /**
    * Handstatus einer Einheit ohne Fahrzeug. Kein optimistisches Update: der Status ist eine
-   * Ableitung des Servers, und die Antwort trägt ihn fertig.
+   * Ableitung des Servers, und die Antwort trägt ihn fertig. Eine Ablehnung steht in der
+   * Statuszelle der Zeile, bis zum nächsten Handstatus dort (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“).
    */
+  const handFehler = useZeilenFehler<number>();
   const handStatusMutation = useMutation({
     mutationFn: (v: { eid: number; statusId: number | null }) =>
       setzeEinheitStatus(einsatzId, v.eid, v.statusId),
+    onMutate: (v) => handFehler.beginne(v.eid),
     onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
     // Auch der Fehlerweg holt den Serverstand: ein 422 heißt meist, dass die Einheit inzwischen ein
     // Fahrzeug hat — ohne Refetch bliebe der Auslöser stehen.
-    onError: (e) => {
+    onError: (e, v) => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-      message.error(e instanceof ApiError && e.status === 422 ? e.message : 'Status nicht gesetzt');
+      handFehler.melde(v.eid, e, 'Status nicht gesetzt');
     },
   });
 
@@ -844,7 +859,11 @@ export default function KraefteuebersichtPage() {
       rasterSpalten(
         einsatzId,
         auftraegeZustand,
-        { zeit: (utc) => formatUhrzeitMitTag(utc, konventionen), handStatus },
+        {
+          zeit: (utc) => formatUhrzeitMitTag(utc, konventionen),
+          handStatus,
+          handFehler: handFehler.grund,
+        },
         { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
         { zustand: periodenZustand, jeEinheit: imEinsatzJeEinheit },
       ),
@@ -853,6 +872,7 @@ export default function KraefteuebersichtPage() {
       auftraegeZustand,
       konventionen,
       handStatus,
+      handFehler.grund,
       rueckmeldungZustand,
       rueckmeldungJeZeile,
       periodenZustand,

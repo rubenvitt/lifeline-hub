@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import { AuthProvider } from '../auth/AuthContext';
+import { ApiError } from '../api/client';
 import type { ModulFreigaben, VerpflegungZeitfenster } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
@@ -274,6 +275,59 @@ describe('VerpflegungPage (LFH-634)', () => {
     const keys = spion.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
     expect(keys).not.toContain(JSON.stringify(['etb', 1]));
     expect(screen.queryByText(/Offline vorgemerkt/)).toBeNull();
+  });
+
+  /**
+   * Rückgängig kommt aus dem Toast, kein Dialog und oft keine sichtbare Karte mehr: der Grund
+   * einer abgelehnten Rücknahme steht im Hinweis der Seite, kein Fehler-Toast (LFH-1077).
+   */
+  describe('Rückgängig abgelehnt (LFH-1077)', () => {
+    async function erfasseUndNimmZurueck() {
+      await screen.findAllByRole('article');
+      await userEvent.click(
+        screen.getByRole('button', { name: `Ausgabe erfassen zu ${zeitfensterKennung(mittag())}` }),
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
+      await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '20');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+      const rueckgaengig = await screen.findAllByRole('button', { name: /Rückgängig/ });
+      await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
+    }
+    const seitenHinweis = () =>
+      waitFor(() => {
+        const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+        expect(h).not.toBeNull();
+        return h as HTMLElement;
+      });
+
+    it('der Grund steht im Seitenhinweis, kein Fehler-Toast', async () => {
+      erfasseAusgabe.mockResolvedValue({ ausgabe_id: 55, zeitfenster: mittag() });
+      nimmAusgabeZurueck.mockRejectedValue(new ApiError(409, 'Ausgabe bereits zurückgenommen'));
+      renderPage();
+      await erfasseUndNimmZurueck();
+
+      const hinweis = await seitenHinweis();
+      expect(await within(hinweis).findByRole('alert')).toHaveTextContent(
+        'Ausgabe bereits zurückgenommen',
+      );
+      expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+    });
+
+    it('die nächste Rücknahme räumt den Hinweis', async () => {
+      erfasseAusgabe.mockResolvedValue({ ausgabe_id: 55, zeitfenster: mittag() });
+      nimmAusgabeZurueck
+        .mockRejectedValueOnce(new ApiError(409, 'Ausgabe bereits zurückgenommen'))
+        .mockImplementationOnce(() => new Promise(() => {}));
+      renderPage();
+      await erfasseUndNimmZurueck();
+      await screen.findByText('Ausgabe bereits zurückgenommen');
+
+      await erfasseUndNimmZurueck();
+      await waitFor(() => expect(nimmAusgabeZurueck).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(screen.queryByText('Ausgabe bereits zurückgenommen')).not.toBeInTheDocument(),
+      );
+    });
   });
 
   describe('Ausgabe ohne Verbindung (LFH-688)', () => {

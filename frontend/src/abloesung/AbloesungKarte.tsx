@@ -3,6 +3,8 @@ import type { Dayjs } from 'dayjs';
 import type { Abloesung } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
 import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../stab/lagebesprechungZustand';
@@ -20,6 +22,8 @@ interface AbloesungKarteProps {
   onAbloeserPlanen?: (schicht: Abloesung) => void;
   onRhythmusAendern?: (schicht: Abloesung) => void;
   onZuruecknehmen?: (schicht: Abloesung) => void;
+  /** Grund der zuletzt abgelehnten Rücknahme an dieser Karte, aus `components/useZeilenFehler.ts`. */
+  fehlerGrund?: ZeilenGrund | null;
 }
 
 /** „in 23 min" · „seit 12 min überfällig" — das Wort neben der Uhrzeit. */
@@ -49,6 +53,7 @@ export default function AbloesungKarte({
   onAbloeserPlanen,
   onRhythmusAendern,
   onZuruecknehmen,
+  fehlerGrund,
 }: AbloesungKarteProps) {
   const { token, rollen } = useRollen();
   const laufend = s.status === 'laufend';
@@ -160,6 +165,12 @@ export default function AbloesungKarte({
               }}
             />
           </Flex>
+        )}
+        {/* Grund einer abgelehnten Rücknahme über dem Knopf, bis zur nächsten (LFH-1077). */}
+        {fehlerGrund && (
+          <div style={{ marginTop: token.marginXS }}>
+            <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
+          </div>
         )}
         {darfSchreiben && !laufend && s.ruecknehmbar && onZuruecknehmen && (
           <Flex justify="flex-end" style={{ marginTop: token.marginXS }}>
