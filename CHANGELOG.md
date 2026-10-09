@@ -1,3 +1,69 @@
+## [1.0.0-alpha.99](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.98...v1.0.0-alpha.99) (2026-10-09)
+
+### Wichtige Änderungen
+
+- **Endgeräte-Sicherheit**: Betriebsvorgabe zur Geräteverschlüsselung, automatischen Bildschirmsperre und Umgang mit Gemeinschaftsgeräten. Was auf einem Gerät im Klartext liegt und wie bei Geräteverlust vorzugehen ist, ist jetzt dokumentiert.
+- **Mindestanforderung Server-Datenträger**: Schreibrate des Datenträgers muss für schnelle Schwärzung größerer Anhänge ausreichen (> ~5,2 MB/s). Prüfkommando für Betreiber verfügbar.
+- **Sitzungsverwaltung**: Personen und Admins können einzelne oder alle anderen Anmeldungen desselben Kontos beenden, ohne das Konto zu deaktivieren. Betroffene Geräte fallen sofort auf die Anmeldung zurück.
+- **Release-Prozess**: Neue Versionen werden erst veröffentlicht, wenn alle Plattformen erfolgreich gebaut wurden. Bei Fehlern bleibt das Release als Entwurf stehen.
+
+### Einsatztagebuch
+
+- **Volltextsuche mit Markierung**: Gefundene Begriffe werden in Inhalt, Von, An und Veranlassung farblich hervorgehoben. Die Markierung funktioniert auch bei Groß-/Kleinschreibung und Umlauten.
+- **Schnellerfassung nimmt Fokus nicht mehr weg**: Wer bereits in der Volltextsuche tippt, verliert den Fokus nicht mehr, wenn die Schnellerfassung nachlädt.
+- **Auftrag erteilen**: Die Funktion „Auftrag erteilen" aus Einsatztagebuch und Meldungen verlangt die Freigabe des Moduls „Aufträge". Ohne Freigabe ist der Eintrag gesperrt.
+
+### Lagekarte
+
+- **Kachel-Proxy nur mit Anmeldung**: Online-Basiskarten sind nur noch mit gültiger Sitzung abrufbar. Anonyme Zugriffe, die das Kontingent verbrauchen konnten, sind nicht mehr möglich.
+- **Stand-Auswahl zeigt Erfassungszeit**: Jeder gespeicherte Lagestand zeigt in der Auswahl neben der Bezeichnung auch die Erfassungszeit.
+- **Bildangaben fallen mit Kategorie „Anhänge"**: Bei der Kategorieschwärzung werden auch Bildangaben in Lage-Ständen gelöscht.
+
+### Kräfte und Mittel
+
+- **Fahrzeuge der eigenen Führungsstelle**: Die Einsatzleitung kann eigene Fahrzeuge (z. B. ELW 2) der Führungsstelle zuordnen. Diese erscheinen im Kasten „Einsatzleitung" der Fernmeldeskizze und unter der Führungsstelle im Funkplan, nicht mehr bei ihrer Einheit.
+- **Belegungslisten springen nicht mehr**: Fremde An- und Abmeldungen in Belegungslisten erscheinen gesammelt in einem Banner, solange Fokus oder Zeiger in der Liste stehen. Eigene Anmeldungen erscheinen sofort.
+
+### Alarm und Benachrichtigungen
+
+- **Alarm-Meldungen auf Android**: Chrome auf Android zeigt Benachrichtigungen jetzt über den Service Worker. Ein Klick auf die Benachrichtigung führt zur Quelle.
+- **Benachrichtigungs-Knopf lesbarer**: Der Knopf nennt den aktuellen Zustand vorn im Namen („Benachrichtigung aus – aktivieren"), um Screenreader-Nutzung zu verbessern.
+
+### Führung
+
+- **Fernmeldeskizze im Nachtbetrieb**: Taktische Zeichen ohne Organisation stehen auf heller Unterlage, damit sie auf dunklem Grund lesbar bleiben (Kontrast 21:1 statt 1,12:1). Druck und Anlage bleiben unverändert.
+- **Zeitraumwahl nachts lesbarer**: Die Schrift auf den Bereichsenden der Zeitraumwahl ist im Nachtbetrieb jetzt hell genug (6,19:1 statt 3,22:1).
+- **Zeitpanel am Tablet als Blatt**: In den Dichtestufen „komfortabel" und „handschuh" erscheint das Zeitpanel auf Tablets als Blatt statt neben dem Feld, wenn es nicht daneben passt.
+
+### Dokumentation und Drucken
+
+- **Anwenderdokumentation**: Neue Hilfe-Seite in der App mit Kapiteln zu Anmelden/Abmelden, Arbeiten ohne Netz und Geräteverlust. Druckbar als Einzelkapitel oder Mappe je Lesergruppe. Auch auf der Website unter /doku/ verfügbar.
+- **Einsatzbericht: Titel bleiben zusammen**: Titel im Einsatzbericht brechen nicht mehr einzeln am Seitenende, auch nicht in Firefox.
+- **Drucken in Safari**: Safari öffnet den Druckdialog jetzt auch bei offenem Live-Strom. Der Strom wird vorher geschlossen und danach neu aufgebaut.
+- **Safari-Tabellenkopf im Druck**: WebKit wiederholt Tabellenköpfe nicht über Seitenumbrüche. Dies wird als Engine-Grenze hingenommen.
+- **Markdown-Editor: „Vorschau"-Etikett lesbarer**: Das Etikett im Vorschaumodus ist nicht mehr halbtransparent, sondern nutzt die schwache Textrolle (8,2:1 am Tag, 5,7:1 nachts).
+
+### Detailseiten und Bedienung
+
+- **Detailseiten am Handy**: „Drucken / als PDF" und „Zum ETB-Eintrag" sind auf dem Handy unter „Weitere" zusammengefasst, ab Tablet als Knöpfe sichtbar.
+- **Informationstelefon am Handy**: Anrufliste steht jetzt zuerst, Erfassungsleiste klappt automatisch ein. Mindestens zwei Anrufe sind immer über der Leiste sichtbar.
+
+### Verpflegung
+
+- **Funktionsansicht für Verpflegungsgeräte**: Gekoppelte Verpflegungsgeräte können Portionen buchen, Ausgaben zurücknehmen und Fehlmengen als vorbelegte Meldung an die Einsatzleitung schicken. Nachforderungen, Personal, Betreuung und ETB bleiben gesperrt.
+
+### Verwaltung
+
+- **Sitzungen beenden**: Im Profil und in der Benutzerverwaltung können einzelne oder alle anderen Anmeldungen derselben Person beendet werden. Offene Ströme enden sofort, das Gerät fällt auf die Anmeldeseite.
+
+### Betrieb und Installation
+
+- **Offline-Queue räumt abgelehnte Einträge**: Abgelehnte ETB-Einträge und Schreibaktionen werden nach 30 Tagen automatisch gelöscht. Ausstehende Einträge bleiben unbefristet.
+- **CI-Optimierung**: Pull Requests fahren nur noch die Testsuiten der geänderten Bereiche. Reine Frontend-Änderungen lösen keine Rust-Tests aus.
+- **Fehlerbehandlung**: Netzfehler und Ablehnungen erscheinen direkt am Ort der Eingabe (Dialog, Zeile, Feld) statt nur im Toast. Betrifft Stammdaten, Karten, Zeitwerte und Zeilenanpassungen.
+- **Zeitwerte am Rand**: Eingaben außerhalb plausibler Jahresgrenzen (2000–2100) oder zu langer Fristen werden mit 400 abgelehnt, statt den Server abstürzen zu lassen.
+- **Body-Größe begrenzt**: Zweitfaktor-Abschluss, App-Code-Einlösung und Gerätekopplung akzeptieren maximal 4 KiB Body.
+
 ## [1.0.0-alpha.98](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.97...v1.0.0-alpha.98) (2026-10-09)
 
 ### Wichtige Änderungen
