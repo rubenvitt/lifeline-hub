@@ -172,13 +172,18 @@ describe('Markdown', () => {
       expect(container.querySelector('mark')).toBeNull();
     });
 
-    it('rohes HTML wird auch mit Begriff kein Element', () => {
+    // Spitze Klammern liest Markdown als rohes HTML und zeigt sie als Text; der Server findet
+    // das Wort darin, also wird es auch markiert, ohne dass das HTML zum Element wird.
+    it('markiert auch in rohem HTML, das als Text erscheint', () => {
       const { container } = render(
-        <Markdown unterEbene={2} fundstellen="mark">
-          {'<mark>roh</mark> markiert'}
+        <Markdown unterEbene={2} fundstellen="mark deich">
+          {'Treffen am <Deich> bei <mark>roh</mark> markiert'}
         </Markdown>,
       );
-      expect(marken(container)).toEqual(['mark']);
+      expect(container.querySelector('p')).toHaveTextContent(
+        'Treffen am <Deich> bei <mark>roh</mark> markiert',
+      );
+      expect(marken(container)).toEqual(['Deich', 'mark', 'mark', 'mark']);
     });
   });
 });

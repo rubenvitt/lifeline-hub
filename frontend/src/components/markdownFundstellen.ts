@@ -5,6 +5,10 @@
  * Listen und Links, und rohes HTML lässt `Markdown` nicht durch. Jeder Textknoten wird für sich
  * durchsucht (`volltextFundstellen.ts`); ein Wort über eine Formatgrenze hinweg („**Dei**ch")
  * trifft auch der Server nicht, denn `unicode61` trennt an den Sternen.
+ *
+ * Rohes HTML („Treffen am <Deich>") kommt als Knoten `raw` an; `react-markdown` macht ihn erst
+ * NACH den Plugins zu Text. Er wird deshalb wie Text behandelt und landet als Text im Baum — der
+ * Server hat das Wort darin gefunden, ein Element entsteht daraus nicht.
  */
 import { FUNDSTELLE_KLASSE, type Suchphrase, zerlegeNachFundstellen } from './volltextFundstellen';
 
@@ -14,7 +18,7 @@ interface Knoten {
 }
 
 interface Text extends Knoten {
-  type: 'text';
+  type: 'text' | 'raw';
   value: string;
 }
 
@@ -23,7 +27,7 @@ interface Eltern extends Knoten {
 }
 
 function istText(k: Knoten): k is Text {
-  return k.type === 'text';
+  return k.type === 'text' || k.type === 'raw';
 }
 
 function hat(k: Knoten): k is Eltern {

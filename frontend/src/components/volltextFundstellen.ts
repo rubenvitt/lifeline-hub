@@ -11,8 +11,13 @@
  * - **Faltung wie `unicode61`** (`migrations/0004_etb.sql`, Standardoptionen): Groß/Klein egal;
  *   ein lateinischer Buchstabe mit GENAU einem Diakritikum verliert es („Gebaude" trifft
  *   „Gebäude"), mit zweien bleibt er ganz (`remove_diacritics=1`). Andere Schriften, „ß", „Ø"
- *   und „Ł" bleiben, wie sie sind. Ein einzeln stehendes Diakritikum zählt zum Wort, trägt aber
- *   nichts bei. Tokens sind Buchstaben, Ziffern und Privatzeichen, alles andere trennt.
+ *   und „Ł" bleiben, wie sie sind; „ς" wird „σ". Ein einzeln stehendes Diakritikum zählt zum
+ *   Wort, trägt aber nichts bei. Tokens sind Buchstaben, Ziffern und Privatzeichen, alles andere
+ *   trennt.
+ *
+ * Bewusst nicht nachgebaut: unicode61 verwirft einzeln stehende Diakritika nur aus einem Teil von
+ * U+0300–U+0331 und behandelt andere als Trenner oder Wortteil (Thai, Arabisch). Für Text in
+ * lateinischer Schrift ändert das nichts; dort markiert die Hilfe genau, was der Server trifft.
  *
  * Die Suche verknüpft die Phrasen mit UND über alle Spalten; markiert wird jede Fundstelle jeder
  * Phrase, in jedem Feld für sich. Die Fälle in `volltextFundstellen.test.ts` sind gegen SQLite 3.45
@@ -49,7 +54,8 @@ function falte(zeichen: string): string {
   const [basis, ...marken] = Array.from(zeichen.normalize('NFD'));
   const ohne =
     marken.length === 1 && DIAKRITIKUM.test(marken[0]) && LATEINISCH.test(basis) ? basis : zeichen;
-  return ohne.toLowerCase();
+  // Das Schluss-Sigma faltet unicode61 auf σ, `toLowerCase` lässt es stehen.
+  return ohne === 'ς' ? 'σ' : ohne.toLowerCase();
 }
 
 interface Token {

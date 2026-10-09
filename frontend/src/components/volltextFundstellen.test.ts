@@ -39,6 +39,8 @@ describe('fundstellen', () => {
     expect(markiert('Gebäude eingestürzt', 'gebaude')).toEqual(['Gebäude']);
     expect(markiert('GEBÄUDE', 'Gebäude')).toEqual(['GEBÄUDE']);
     expect(markiert('İstanbul', 'istan')).toEqual(['İstan']);
+    // unicode61 faltet das Schluss-Sigma auf σ, `toLowerCase` nicht.
+    expect(markiert('ΠΑΣ πας', 'πασ')).toEqual(['ΠΑΣ', 'πας']);
   });
 
   it('faltet, was unicode61 nicht faltet, auch nicht', () => {
