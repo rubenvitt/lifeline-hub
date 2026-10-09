@@ -32,8 +32,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Im Einsatzbericht (LFH-1098, `druck/einsatzbericht/Bloecke.tsx`) reichen Block und Abschnitt
   ihre Titel an das erste Inhaltsstück weiter: eine Liste nimmt sie mit ihrer ersten Zeile auf
   (zwei Subgrids desselben Rasters, die Etikettspalte bleibt gleich breit), eine Tabelle bis
-  `KURZE_TABELLE` Zeilen ganz. Eine längere bleibt draußen: in einer Hülle, die nicht bricht,
-  rücken Firefox und Chromium sie samt Titel auf die nächste Seite und lassen davor fast eine
+  `KURZE_TABELLE` Zeilen ganz, aber nur in Firefox (`titelblock-tabelle` unter
+  `@supports (-moz-appearance: none)`): Chromium hält Titel, Kopf und erste Zeile selbst
+  zusammen, eine Hülle rückte dort die ganze Tabelle weiter. Eine längere bleibt draußen: in einer
+  Hülle, die nicht bricht, rückt sie samt Titel auf die nächste Seite und lässt davor fast eine
   Seite leer.
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
