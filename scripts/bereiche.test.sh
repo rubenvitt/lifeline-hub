@@ -27,6 +27,7 @@ fall() { # <pfad> <erwartete Wörter>
 }
 fall website/src/pages/index.astro ""
 fall docs/betrieb.md ""
+fall docs/anwender/kapitel/x.md "frontend e2e"
 fall openspec/specs/x/spec.md ""
 fall .claude/skills/x/SKILL.md ""
 fall frontend/AGENTS.md ""

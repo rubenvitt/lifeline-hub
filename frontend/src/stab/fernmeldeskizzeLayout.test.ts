@@ -89,7 +89,7 @@ function netz(
       daten:
         p.fs === null || p.fs === undefined
           ? null
-          : { rufname: 'Florian 10/1', sprechgruppen: p.fs },
+          : { rufname: 'Florian 10/1', sprechgruppen: p.fs, fahrzeug_ids: [] },
     },
     sprechgruppen: daten([]),
     stellen: daten(p.stellen ?? []),

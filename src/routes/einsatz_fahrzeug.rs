@@ -240,12 +240,18 @@ pub async fn entfernen(
         anzeige.funkrufname
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let trug_fuehrungsstelle = crate::write_retry!(&state.pool, |conn| {
+        let trug = crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
         disposition_repo::entferne_tx(conn, einsatz_id, ef_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(())
+        Ok(trug)
     })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
+    // Die Kaskade hat die Zuordnung an der Führungsstelle gelöst (LFH-1106): deren Leser hängen
+    // am Ereignis `einsatz`.
+    if trug_fuehrungsstelle {
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

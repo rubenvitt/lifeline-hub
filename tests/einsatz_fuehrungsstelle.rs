@@ -75,7 +75,7 @@ async fn neuer_einsatz_hat_leere_fuehrungsstelle() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"sprechgruppen": []}),
+        json!({"sprechgruppen": [], "fahrzeug_ids": []}),
         "leere Angaben fehlen im JSON"
     );
 }
@@ -232,7 +232,7 @@ async fn fremde_sprechgruppe_ist_422_und_speichert_nichts() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"sprechgruppen": []}),
+        json!({"sprechgruppen": [], "fahrzeug_ids": []}),
         "auch der Rufname aus demselben Aufruf ist nicht gespeichert"
     );
 }
@@ -273,7 +273,7 @@ async fn null_leert_die_sprechgruppen() {
 
     let (status, json) = patchen(&app, &admin, einsatz, json!({"sprechgruppe_ids": null})).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
-    assert_eq!(json, json!({"sprechgruppen": []}));
+    assert_eq!(json, json!({"sprechgruppen": [], "fahrzeug_ids": []}));
 }
 
 #[tokio::test]
@@ -285,7 +285,7 @@ async fn leerer_patch_legt_nichts_an() {
 
     let (status, json) = patchen(&app, &admin, einsatz, json!({})).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
-    assert_eq!(json, json!({"sprechgruppen": []}));
+    assert_eq!(json, json!({"sprechgruppen": [], "fahrzeug_ids": []}));
     let zeilen: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?")
             .bind(einsatz)
@@ -321,7 +321,7 @@ async fn ein_fehler_im_schreiben_hinterlaesst_nichts() {
 
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"sprechgruppen": []})
+        json!({"sprechgruppen": [], "fahrzeug_ids": []})
     );
 }
 
@@ -358,6 +358,168 @@ async fn abgeschlossener_einsatz_ist_409() {
 
     let (status, _) = patchen(&app, &admin, einsatz, json!({"rufname": "X"})).await;
     assert_eq!(status, StatusCode::CONFLICT);
+}
+
+// ---------- Fahrzeuge (LFH-1106) ----------
+
+async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufname: &str) -> i64 {
+    let (status, json) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(&json!({"adhoc": {"funkrufname": funkrufname, "fahrzeugtyp": "ELW 2"}})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "Fahrzeug anlegen: {json:?}");
+    json["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn fahrzeuge_ersetzen_die_zuordnung_und_liefern_nur_ids() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let elw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/1").await;
+    let kdow = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/2").await;
+
+    let (status, json) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"fahrzeug_ids": [kdow, elw, elw]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(
+        json,
+        json!({"sprechgruppen": [], "fahrzeug_ids": [elw.min(kdow), elw.max(kdow)]}),
+        "nur IDs, aufsteigend, entdoppelt"
+    );
+
+    let (_, json) = patchen(&app, &admin, einsatz, json!({"fahrzeug_ids": [elw]})).await;
+    assert_eq!(json["fahrzeug_ids"], json!([elw]), "ersetzt vollständig");
+
+    // Eine andere Angabe lässt die Fahrzeuge stehen.
+    let (_, json) = patchen(&app, &admin, einsatz, json!({"rufname": "Florian 10"})).await;
+    assert_eq!(json["fahrzeug_ids"], json!([elw]));
+
+    let (_, json) = patchen(&app, &admin, einsatz, json!({"fahrzeug_ids": null})).await;
+    assert_eq!(json["fahrzeug_ids"], json!([]), "null leert");
+    assert_eq!(lesen(&app, &admin, einsatz).await.1, json);
+}
+
+#[tokio::test]
+async fn fahrzeug_eines_anderen_einsatzes_ist_422_und_speichert_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Anderer").await;
+    let fremd = adhoc_fahrzeug(&app, &admin, anderer, "Florian Anderswo 10/1").await;
+
+    for ids in [json!([fremd]), json!([987_654])] {
+        let (status, json) = patchen(
+            &app,
+            &admin,
+            einsatz,
+            json!({"rufname": "Florian 10", "fahrzeug_ids": ids}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+    }
+    assert_eq!(
+        lesen(&app, &admin, einsatz).await.1,
+        json!({"sprechgruppen": [], "fahrzeug_ids": []}),
+        "auch der Rufname bleibt ungespeichert"
+    );
+}
+
+#[tokio::test]
+async fn zu_viele_fahrzeuge_sind_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let max = lifeline_hub::einsatz::fuehrungsstelle::FAHRZEUGE_JE_FUEHRUNGSSTELLE_MAX as i64;
+    let ids: Vec<i64> = (1..=max + 1).collect();
+    let (status, json) = patchen(&app, &admin, einsatz, json!({"fahrzeug_ids": ids})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
+}
+
+#[tokio::test]
+async fn entlassen_loest_die_zuordnung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let elw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/1").await;
+    let (status, _) = patchen(&app, &admin, einsatz, json!({"fahrzeug_ids": [elw]})).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "Vorbedingung: entlassen");
+    assert_eq!(
+        lesen(&app, &admin, einsatz).await.1["fahrzeug_ids"],
+        json!([])
+    );
+}
+
+#[tokio::test]
+async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let elw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/1").await;
+    let mtw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 19/1").await;
+    let (status, _) = patchen(&app, &admin, einsatz, json!({"fahrzeug_ids": [elw]})).await;
+    assert_eq!(status, StatusCode::OK);
+    let mut rx = live.abonniere(einsatz);
+
+    let entlassen = |ef: i64| {
+        let (app, admin) = (app.clone(), admin.clone());
+        async move {
+            anfrage(
+                &app,
+                "DELETE",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &admin,
+                None,
+            )
+            .await
+            .0
+        }
+    };
+    assert_eq!(entlassen(mtw).await, StatusCode::NO_CONTENT);
+    assert_eq!(kopf_events(&mut rx), 0, "ohne Zuordnung kein Kopf-Ereignis");
+    assert_eq!(entlassen(elw).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        kopf_events(&mut rx),
+        1,
+        "die Führungsstelle hat sich geändert"
+    );
+}
+
+#[tokio::test]
+async fn beobachter_darf_fahrzeuge_nicht_zuordnen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let elw = adhoc_fahrzeug(&app, &admin, einsatz, "Florian Musterstadt 10/1").await;
+    let id = benutzer_anlegen(&app, &admin, "beobachterin", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "beobachter").await;
+    let beobachter = login_cookie(&app, "beobachterin", "beobachterinpw1").await;
+
+    let (status, _) = patchen(&app, &beobachter, einsatz, json!({"fahrzeug_ids": [elw]})).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        lesen(&app, &admin, einsatz).await.1["fahrzeug_ids"],
+        json!([])
+    );
 }
 
 // ---------- Live ----------

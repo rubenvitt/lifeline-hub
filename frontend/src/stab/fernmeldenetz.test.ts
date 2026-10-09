@@ -124,7 +124,7 @@ const LEER_SKIZZE: Fernmeldeskizze = {
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const fs = (p: Partial<Fuehrungsstelle> = {}): FernmeldenetzQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { sprechgruppen: [], ...p },
+  daten: { sprechgruppen: [], fahrzeug_ids: [], ...p },
 });
 
 function quellen(
@@ -897,5 +897,71 @@ describe('baueFernmeldenetz · Führungsmittel und Funktionen im Kasten (LFH-102
     // Die Leitung kommt aus dem Abschnitt selbst und bleibt.
     expect(ausstattung(netz, 'ab-1')).toEqual(['EAL']);
     expect(ausstattung(netz, 'fs')).toEqual([]);
+  });
+
+  describe('Fahrzeuge der eigenen Führungsstelle (LFH-1106)', () => {
+    const basis = {
+      abschnitte: daten([abschnitt(1, { leiter_id: 5 })]),
+      einheiten: daten([einheit(10, { abschnitt_id: 1, name: 'FüGr EL' })]),
+      besetzung: daten([besetzt('s2', 'einsatzleitung')]),
+      fahrzeuge: daten([
+        fahrzeug(100, {
+          einheit_id: 10,
+          fahrzeugtyp: 'ELW 2',
+          funkrufname: 'Florian Musterstadt 10/1',
+        }),
+        fahrzeug(101, { einheit_id: 10, fahrzeugtyp: 'ELW 1' }),
+        fahrzeug(102, { fahrzeugtyp: 'MTW', funkrufname: 'Florian Musterstadt 19/1' }),
+      ]),
+    };
+
+    it('ein zugeordneter ELW 2 steht im Kasten „Einsatzleitung“ und in keinem Abschnittskasten', () => {
+      const netz = baueFernmeldenetz(
+        quellen({ ...basis, fuehrungsstelle: fs({ fahrzeug_ids: [100] }) }),
+      );
+      expect(ausstattung(netz, 'fs')).toEqual(['S2', 'ELW 2']);
+      expect(ausstattung(netz, 'ab-1')).toEqual(['EAL', 'ELW 1']);
+      const fsStelle = stelleMit(netz, 'fs');
+      expect(fsStelle.art === 'fuehrungsstelle' && fsStelle.ausstattung[1]).toMatchObject({
+        art: 'fuehrungsmittel',
+        schluessel: 'fz-100',
+        titel: 'ELW 2 · Florian Musterstadt 10/1',
+        zeichen: { art: 'tz', tz: { fachaufgabe: 'fuehrung' } },
+      });
+    });
+
+    it('auch ohne Einheit und ohne Fachaufgabe Führung, sortiert nach Wort', () => {
+      const netz = baueFernmeldenetz(
+        quellen({ ...basis, fuehrungsstelle: fs({ fahrzeug_ids: [102, 100] }) }),
+      );
+      expect(ausstattung(netz, 'fs')).toEqual(['S2', 'ELW 2', 'MTW']);
+      const alle = netz.stellen.flatMap((s) =>
+        s.art === 'abschnitt' || s.art === 'fuehrungsstelle' ? s.ausstattung : [],
+      );
+      // Jedes Fahrzeug höchstens einmal im Bild.
+      const schluessel = alle.filter((a) => a.art === 'fuehrungsmittel').map((a) => a.schluessel);
+      expect(new Set(schluessel).size).toBe(schluessel.length);
+    });
+
+    it('ohne Zuordnung bleibt der Kasten wie bisher; eine veraltete ID fällt weg', () => {
+      const ohne = baueFernmeldenetz(quellen({ ...basis, fuehrungsstelle: fs() }));
+      expect(ausstattung(ohne, 'fs')).toEqual(['S2']);
+      expect(ausstattung(ohne, 'ab-1')).toEqual(['EAL', 'ELW 1', 'ELW 2']);
+      const veraltet = baueFernmeldenetz(
+        quellen({ ...basis, fuehrungsstelle: fs({ fahrzeug_ids: [999] }) }),
+      );
+      expect(ausstattung(veraltet, 'fs')).toEqual(['S2']);
+    });
+
+    it('ohne Freigabe der Fahrzeuge steht kein Fahrzeugzeichen im Kasten', () => {
+      const netz = baueFernmeldenetz(
+        quellen({
+          ...basis,
+          fahrzeuge: { zustand: 'gesperrt', daten: basis.fahrzeuge.daten },
+          fuehrungsstelle: fs({ fahrzeug_ids: [100] }),
+        }),
+      );
+      expect(ausstattung(netz, 'fs')).toEqual(['S2']);
+    });
   });
 });

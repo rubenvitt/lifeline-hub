@@ -53,7 +53,7 @@ const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const ohne = <T>(zustand: 'gesperrt' | 'fehler' | 'laden'): Quelle<T> => ({ zustand, daten: [] });
 const fs = (p: Partial<Fuehrungsstelle> = {}): FunkplanQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { sprechgruppen: [], ...p },
+  daten: { sprechgruppen: [], fahrzeug_ids: [], ...p },
 });
 
 function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {

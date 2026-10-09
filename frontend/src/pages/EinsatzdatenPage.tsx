@@ -37,6 +37,7 @@ import {
   ladeEinsatz,
   ladeFuehrungsstelle,
   ladeMitglieder,
+  ladeModulFreigaben,
   patcheEinsatz,
   patcheFuehrungsstelle,
   schliesseEinsatzAb,
@@ -57,9 +58,13 @@ import {
 import type {
   EinsatzAnzeige,
   Einsatzart,
+  EinsatzFahrzeug,
   Fuehrungsstelle,
   FuehrungsstellePatch,
 } from '../api/types';
+import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
+import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
+import { ZUSTAND_GRUND } from '../stab/funkplan';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import {
@@ -71,7 +76,7 @@ import {
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
-import { modulName } from '../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -335,16 +340,56 @@ function sprechgruppenText(fs: Pick<Fuehrungsstelle, 'sprechgruppen'>): string {
     .join(' · ');
 }
 
-/** Gleiche Sprechgruppen-Auswahl unabhängig von der Reihenfolge („unverändert → kein Senden“). */
+/** Gleiche Auswahl (Sprechgruppen, Fahrzeuge) unabhängig von der Reihenfolge („unverändert → kein Senden“). */
 function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
   if (a.length !== b.length) return false;
   const menge = new Set(a);
   return b.every((id) => menge.has(id));
 }
 
+/** Ein Fahrzeug, wie die Zeile „Fahrzeuge“ es nennt: „Florian 10/1 (ELW 2)“. */
+function fahrzeugText(f: EinsatzFahrzeug): string {
+  const typ = f.fahrzeugtyp?.trim();
+  return typ ? `${f.funkrufname} (${typ})` : f.funkrufname;
+}
+
+/**
+ * Die disponierten Fahrzeuge für die Zeile „Fahrzeuge“ (LFH-1106). Die Führungsstelle liefert nur
+ * IDs; Namen kommen aus dem Modul Fahrzeuge, abgerufen nur mit dessen Freigabe.
+ */
+function useFahrzeugeQuelle(einsatzId: number): {
+  zustand: AbrufZustand;
+  fahrzeuge: EinsatzFahrzeug[];
+} {
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const frei = freigabenQuery.data != null && istKeyFreigegeben('fahrzeuge', freigabenQuery.data);
+  const fahrzeugeQuery = useQuery({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: frei,
+  });
+  const zustand: AbrufZustand = freigabenQuery.isError
+    ? 'fehler'
+    : freigabenQuery.data == null
+      ? 'laden'
+      : !frei
+        ? 'gesperrt'
+        : abrufZustand(fahrzeugeQuery);
+  const fahrzeuge = zustand === 'daten' ? (fahrzeugeQuery.data ?? []) : [];
+  return {
+    zustand,
+    fahrzeuge: [...fahrzeuge].sort((a, b) =>
+      a.funkrufname.localeCompare(b.funkrufname, 'de', { numeric: true }),
+    ),
+  };
+}
+
 /**
  * Eigene Führungsstelle des Einsatzes (LFH-849, Spec `einsatz-fuehrungsstelle`): die Gegenstelle
- * des Funkplans. Vier Zeilen, jede schickt nur ihr Feld an `…/fuehrungsstelle`, mit dem
+ * des Funkplans. Fünf Zeilen, jede schickt nur ihr Feld an `…/fuehrungsstelle`, mit dem
  * Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
  */
 function FuehrungsstellePaneel({
@@ -373,6 +418,7 @@ function FuehrungsstellePaneel({
   });
   const speichern = (etikett: string, patch: FuehrungsstellePatch) =>
     mutation.mutateAsync({ etikett, patch });
+  const fahrzeugQuelle = useFahrzeugeQuelle(einsatzId);
 
   const fs = query.data;
   const text = (
@@ -458,11 +504,65 @@ function FuehrungsstellePaneel({
                 etikett: 'Erreichbarkeit',
                 wert: text('Erreichbarkeit', fs.erreichbarkeit, false, 'erreichbarkeit'),
               },
+              {
+                etikett: 'Fahrzeuge',
+                wert: (
+                  <FahrzeugeAngabe
+                    ids={fs.fahrzeug_ids}
+                    quelle={fahrzeugQuelle}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(ids) => speichern('Fahrzeuge', { fahrzeug_ids: ids })}
+                  />
+                ),
+              },
             ]}
           />
         )}
       </PaneelZustand>
     </Paneel>
+  );
+}
+
+/**
+ * Zeile „Fahrzeuge“ der Führungsstelle (LFH-1106): welche disponierten Fahrzeuge sie tragen.
+ * Ohne Freigabe für Fahrzeuge gesperrt, mit dem Grund statt eines leeren Werts.
+ */
+function FahrzeugeAngabe({
+  ids,
+  quelle,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  ids: readonly number[];
+  quelle: ReturnType<typeof useFahrzeugeQuelle>;
+  darfSchreiben: boolean;
+  onSpeichern: (ids: number[]) => Promise<unknown>;
+}) {
+  if (quelle.zustand !== 'daten') return <>{ZUSTAND_GRUND[quelle.zustand]}</>;
+  // Eine ID ohne disponiertes Fahrzeug (inzwischen entlassen) fällt still weg.
+  const gewaehlt = quelle.fahrzeuge.filter((f) => ids.includes(f.id));
+  return (
+    <InlineAngabe<number[]>
+      etikett="Fahrzeuge"
+      wert={gewaehlt.map((f) => f.id)}
+      anzeige={gewaehlt.map(fahrzeugText).join(', ')}
+      leer={(w) => w.length === 0}
+      gleich={gleicheIds}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={onSpeichern}
+      eingabe={({ feld, popup, value, onChange }) => (
+        <Select<number[]>
+          {...feld}
+          {...popup}
+          mode="multiple"
+          allowClear
+          options={quelle.fahrzeuge.map((f) => ({ value: f.id, label: fahrzeugText(f) }))}
+          value={value}
+          onChange={(w) => onChange(w ?? [])}
+          style={{ width: '100%' }}
+        />
+      )}
+    />
   );
 }
 
