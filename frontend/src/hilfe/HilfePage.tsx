@@ -1,8 +1,9 @@
-import { Button, Menu, Select } from 'antd';
+import { Button, Menu } from 'antd';
 import type { MouseEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import Markdown from '../components/Markdown';
+import { Select } from '../components/Select';
 import { SeitenLeer } from '../components/SeitenZustand';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { Bildmarke } from '../marke/Bildmarke';
@@ -70,6 +71,7 @@ export default function HilfePage() {
           <Select<Gruppe>
             aria-label="Lesergruppe"
             className="hilfe-navi__gruppe"
+            showSearch={false}
             value={gruppe}
             options={GRUPPEN.map((g) => ({ value: g.key, label: g.name }))}
             onChange={(g) => void navigate(hilfePfad({ gruppe: g }))}
