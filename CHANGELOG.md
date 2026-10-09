@@ -1,3 +1,49 @@
+## [1.0.0-alpha.95](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.94...v1.0.0-alpha.95) (2026-10-09)
+
+### Wichtige Änderungen
+
+- **Datenbankmigrationen**: Dieses Release enthält mehrere Datenbankmigrationen (0158–0166), die beim ersten Start automatisch ausgeführt werden. Eine Datensicherung vor dem Update wird empfohlen.
+
+### Kommunikation
+
+- **Sprechgruppen mit Netz und Sicherheit**: Sprechgruppen können jetzt die Bedingungsangaben „Netz" und „Sicherheit" (je max. 40 Zeichen) tragen. Diese werden im Katalog, beim einsatzlokalen Anlegen, im taktischen Zeichen, im Funkplan und in der Fernmeldeskizze angezeigt.
+
+- **Fernmeldeskizze als Anlage**: Die aktuelle Fernmeldeskizze kann nun als Bild-Anlage an Lageberichte und Befehle angehängt werden. Anlagen werden im Paneel angezeigt und im Ausdruck auf einem eigenen Blatt A4 quer dargestellt.
+
+- **Stabilere Live-Aktualisierung der Fernmeldeskizze**: Während Zeiger oder Fokus in der Skizze liegen, springen Elemente nicht mehr unter dem Zeiger, wenn andere Arbeitsplätze Änderungen vornehmen. Der Bildlauf gleicht Größenänderungen aus.
+
+### Führung
+
+- **Gerätekopplung für Einsatzabschnitte**: Geräte können nun an Einsatzabschnitte gebunden werden und zeigen eine angepasste Ansicht mit Einheiten des Teilbaums, Aufträgen mit Quittung, Meldemöglichkeit und einer Lagekarte mit Gefahrenzonen. Die Kopplung ist während der Dauer der Führungsaufgabe aktiv; aufgelöste Abschnitte widerrufen ihre Kopplungen automatisch.
+
+- **Erweiterte Stellenbindung**: Neben UHS-Stellen können Geräte künftig auch an Betreuungsstellen, Bereitstellungsräume und Verpflegungsstellen gebunden werden (Ansichten noch nicht aktiviert).
+
+- **Namentliche Bestätigung bei UHS-Geräten**: Bei Sichtung, Erst-Sichtung und Verbleib kann am UHS-Gerät eine Person aus dem Einsatzpersonal als Bestätigende eingetragen werden. Die Bestätigung erscheint im Einsatztagebuch und im Verlauf der Personenakte.
+
+### Zeiterfassung und Erinnerungen
+
+- **Korrekte Zeitvorbelegung bei vorgehenden Uhren**: Zeitfelder (Auftragserteilung, Alarmzeit, Erinnerungsfälligkeit, Lagebesprechungsabschluss, Wiedervorlage) nutzen jetzt die Serverzeit statt der Gerätezeit. Auf Geräten mit vorgehender Uhr werden dadurch keine zu frühen Zeitstempel mehr gesendet.
+
+- **Datenlöschung nach Kategoriefristen**: Die Karenzfrist für Datenkategorien beginnt jetzt ab dem Fristablauf, nicht erst ab dem nächsten Prüflauf. Nach Rückspielen einer Sicherung oder einem Stillstand beginnt die Karenz nicht neu.
+
+### Barrierefreiheit und Bedienung
+
+- **Verbesserte Treflflächen**: Beschriftete Optionsknöpfe haben jetzt die volle Zielhöhe nach den Dichtestufen (24/48/72 px), nicht mehr nur die Schrifthöhe.
+
+- **Kontrastverbesserung**: Zurückgenommene Texte in der Fernmeldeskizze erreichen jetzt im Tag-Modus das Ziel 7:1 statt nur den Boden 4,5:1 (Deckkraft von 0,6 auf 0,72 erhöht).
+
+### Betrieb und Installation
+
+- **Marketing-Website**: Neue statische Website unter `website/` mit Astro, die Module, Zeitachse, Leitsätze und Beispiele in der Gestaltungssprache „Instrumententafel" zeigt.
+
+- **Beschleunigte CI-Läufe**: Änderungen, die ausschließlich die Marketing-Website betreffen, durchlaufen nur noch Schnellprüfungen statt der vollständigen Test-Suite.
+
+### Fehlerbehebungen
+
+- **Stabile Kartenansicht**: Der Cache für Kartenkacheln wird jetzt nur noch pro Pfad verworfen, nicht mehr global. Parallele Tests beeinflussen sich dadurch nicht mehr gegenseitig.
+
+- **Robustere E2E-Tests**: Mehrere Zuverlässigkeitsverbesserungen in den automatisierten Tests, unter anderem besseres Warten auf Dialoge, Behandlung ausgehängter DOM-Knoten und Schließen stehender Benachrichtigungen vor Klicks im Seitenkopf.
+
 ## [1.0.0-alpha.94](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.93...v1.0.0-alpha.94) (2026-10-08)
 
 ### Datensicht
