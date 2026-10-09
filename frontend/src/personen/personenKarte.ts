@@ -6,6 +6,7 @@ import { sichtungsfarben } from '../theme/tokens';
 import type { KarteMarker } from '../pages/lagekarte/marker';
 import { SK_WORT } from './personMeta';
 import { istAngetroffen } from './personenBilanz';
+import { nichtGeladen as fundortNichtGeladen } from '../offline/lagebildKuerzung';
 
 /**
  * Marker der Kartenansicht „Betroffene" — rein, damit die Auswahl ohne WebGL prüfbar ist.
@@ -15,6 +16,8 @@ import { istAngetroffen } from './personenBilanz';
  *   FUNDort. Das gilt auch für eine stehengebliebene Koordinate nach einem Wechsel zu
  *   „vermisst" — die Regel hängt an der Anzeige, nicht an den Eingabewegen.
  * - Nur ein VOLLSTÄNDIGES Paar `antreff_lat`/`antreff_lon` ist eine Koordinate.
+ * - Ohne Netz liegt die Koordinate nicht vor (LFH-1095): die Person zählt als `nichtGeladen`,
+ *   nicht als „ohne Koordinate".
  * - Farbe aus der Sichtungsachse; ohne Sichtung und „unverletzt" neutral. Zweiter Kanal ist die
  *   Beschriftung `R-042 · SK II` — auch „ohne Sichtung" wird gesagt.
  *
@@ -39,13 +42,18 @@ export const SK_KURZZEICHEN: Record<Sichtungskategorie | 'ohne', string> = {
 export function personenMarker(
   personen: readonly Person[],
   token: GlobalToken,
-): { marker: KarteMarker[]; ohneKoordinate: number } {
+): { marker: KarteMarker[]; ohneKoordinate: number; nichtGeladen: number } {
   const marker: KarteMarker[] = [];
   let ohneKoordinate = 0;
+  let nichtGeladen = 0;
   const neutral = rollenFarbe('neutral', token);
 
   for (const p of personen) {
     if (p.storniert_at || !istAngetroffen(p)) continue;
+    if (fundortNichtGeladen(p, 'antreff_lat')) {
+      nichtGeladen += 1;
+      continue;
+    }
     const lat = p.antreff_lat;
     const lon = p.antreff_lon;
     if (lat == null || lon == null) {
@@ -70,5 +78,5 @@ export function personenMarker(
     });
   }
 
-  return { marker, ohneKoordinate };
+  return { marker, ohneKoordinate, nichtGeladen };
 }

@@ -6,7 +6,12 @@ import { erzeugeQueryClient } from '../api/queryClient';
 import type { BenutzerAnzeige, MeAntwort } from '../api/types';
 import { merkeGeraet } from '../geraet/geraetMarke';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import { lagebildAnlegen, lagebildLesen, lagebildLoeschenPlatte } from './lagebildSpeicher';
+import {
+  LAGEBILD_DB,
+  lagebildAnlegen,
+  lagebildLesen,
+  lagebildLoeschenPlatte,
+} from './lagebildSpeicher';
 import {
   lagebildAnmelden,
   lagebildBeenden,
@@ -14,6 +19,8 @@ import {
   lagebildStarten,
 } from './lagebildSitzung';
 import { HOECHSTLIEGEZEIT_MS } from './lagebildStart';
+import { nichtGeladen } from './lagebildKuerzung';
+import { rohLesen } from '../test/rohIdb';
 import { queueAlleLaden, queueEinreihen, queueLeerenFuerTests } from './queue';
 
 const A = { id: 7, benutzername: 'a', anzeigename: 'A' } as BenutzerAnzeige;
@@ -99,19 +106,22 @@ describe('Lagebild-Sitzung', () => {
 
     it('führt Vorrat und Live-Stand zusammen, der Live-Stand gewinnt', async () => {
       await vorratAnlegen((q) => {
-        q.setQueryData(einsatzKeys.personen(3), [{ id: 1, alt: true }]);
+        q.setQueryData(einsatzKeys.personen(3), [{ id: 1, name: 'alt' }]);
         q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
       });
       const qc = neuerClient();
       await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
-      await qc.fetchQuery({ queryKey: einsatzKeys.personen(3), queryFn: async () => [{ id: 1 }] });
+      await qc.fetchQuery({
+        queryKey: einsatzKeys.personen(3),
+        queryFn: async () => [{ id: 1, name: 'neu' }],
+      });
       await qc.fetchQuery({ queryKey: einsatzKeys.etbZaehler(3, {}), queryFn: async () => 7 });
       const satz = await warteAufGeschrieben((n) => n >= 3);
       const personen = satz.client.clientState.queries.filter(
         (q) => q.queryKey[0] === 'einsatz-personen',
       );
       expect(personen).toHaveLength(1);
-      expect(personen[0].state.data).toEqual([{ id: 1 }]);
+      expect(personen[0].state.data).toEqual([expect.objectContaining({ id: 1, name: 'neu' })]);
       expect(await plattenKeys()).toEqual(
         expect.arrayContaining([
           einsatzKeys.personen(3),
@@ -193,19 +203,22 @@ describe('Lagebild-Sitzung', () => {
 
     it('holt einen live überdeckten Vorrat-Stand nicht zurück (LFH-939)', async () => {
       await vorratAnlegen((q) => {
-        q.setQueryData(einsatzKeys.personen(3), [{ id: 1, alt: true }]);
+        q.setQueryData(einsatzKeys.personen(3), [{ id: 1, name: 'alt' }]);
         q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
       });
       const qc = neuerClient();
       await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
-      await qc.fetchQuery({ queryKey: einsatzKeys.personen(3), queryFn: async () => [{ id: 1 }] });
+      await qc.fetchQuery({
+        queryKey: einsatzKeys.personen(3),
+        queryFn: async () => [{ id: 1, name: 'neu' }],
+      });
       const personenAufPlatte = async () =>
         (await lagebildLesen())?.client.clientState.queries.find(
           (q) => q.queryKey[0] === 'einsatz-personen',
         )?.state.data;
       await expect
         .poll(personenAufPlatte, { timeout: 2000, interval: DROSSEL })
-        .toEqual([{ id: 1 }]);
+        .toEqual([expect.objectContaining({ id: 1, name: 'neu' })]);
       // Die Live-Query verlässt den Cache: der ältere Vorrat-Stand kommt nicht wieder.
       qc.removeQueries({ queryKey: einsatzKeys.personen(3) });
       qc.setQueryData(einsatzKeys.abschnitte(3), [{ id: 9 }]);
@@ -226,6 +239,62 @@ describe('Lagebild-Sitzung', () => {
       expect(await plattenKeys()).toEqual(
         expect.arrayContaining([einsatzKeys.einheiten(3), einsatzKeys.personen(3)]),
       );
+    });
+  });
+
+  describe('Betroffene ohne Freitexte auf der Platte (LFH-1095)', () => {
+    const VOLL = {
+      id: 1,
+      name: 'Muster',
+      aktuelle_sichtung: 'sk2',
+      aktuelle_uhs_id: 5,
+      herkunft_adresse: 'Hauptstraße 1',
+      melder_kontakt: '0170 123',
+      notiz: 'Diabetikerin',
+      zustand: 'unterkühlt',
+      antreff_ort: 'Keller',
+      antreff_lat: 53.07,
+      antreff_lon: 8.8,
+    };
+    const FREITEXTE = ['Hauptstraße', '0170', 'Diabetikerin', 'unterkühlt', 'Keller', '53.07'];
+
+    /** Die Platte, roh gelesen (eigene Verbindung, `test/rohIdb.ts`). */
+    const roh = async () => JSON.stringify(await rohLesen(LAGEBILD_DB, 'stand'));
+
+    it('schreibt die Personenliste ohne Freitexte, der Live-Cache bleibt voll', async () => {
+      const qc = neuerClient();
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+      qc.setQueryData(einsatzKeys.personen(3), [VOLL]);
+      await warteAufGeschrieben((n) => n > 0);
+      const platte = await roh();
+      expect(platte).toContain('Muster');
+      expect(platte).toContain('sk2');
+      for (const wert of FREITEXTE) expect(platte).not.toContain(wert);
+      expect(qc.getQueryData(einsatzKeys.personen(3))).toEqual([VOLL]);
+    });
+
+    it('kürzt einen alten Vollstand beim Wiederherstellen und beim nächsten Speichern', async () => {
+      await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(3), [VOLL]));
+      expect(await roh()).toContain('Diabetikerin');
+      const qc = neuerClient();
+      await lagebildStarten(qc, { art: 'netzfehler' }, { drosselMs: DROSSEL });
+      const [p] = qc.getQueryData<Record<string, unknown>[]>(einsatzKeys.personen(3))!;
+      expect(p).toMatchObject({ id: 1, name: 'Muster', aktuelle_sichtung: 'sk2' });
+      expect(p).not.toHaveProperty('notiz');
+      expect(nichtGeladen(p, 'notiz')).toBe(true);
+      qc.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+      await warteAufGeschrieben((n) => n >= 2);
+      for (const wert of FREITEXTE) expect(await roh()).not.toContain(wert);
+    });
+
+    it('kürzt auch einen Vorrat, den die serverbestätigte Sitzung nur weiterträgt', async () => {
+      await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(4), [VOLL]));
+      const qc = neuerClient();
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+      qc.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+      await warteAufGeschrieben((n) => n >= 2);
+      expect(await plattenKeys()).toContainEqual(einsatzKeys.personen(4));
+      for (const wert of FREITEXTE) expect(await roh()).not.toContain(wert);
     });
   });
 
@@ -255,7 +324,9 @@ describe('Lagebild-Sitzung', () => {
     const offline = neuerClient();
     await lagebildStarten(offline, { art: 'netzfehler' });
     expect(offline.getQueryState(einsatzKeys.personen(3))?.status).toBe('success');
-    expect(offline.getQueryData(einsatzKeys.personen(3))).toEqual([{ id: 1 }]);
+    expect(offline.getQueryData(einsatzKeys.personen(3))).toEqual([
+      expect.objectContaining({ id: 1 }),
+    ]);
   });
 
   it('überdeckt ohne Netz einen jüngeren Fehler nicht mit dem vorgehaltenen Stand', async () => {
@@ -322,7 +393,9 @@ describe('Lagebild-Sitzung', () => {
     expect(await lagebildStarten(zweiter, { art: 'netzfehler' }, { drosselMs: DROSSEL })).toEqual(
       A,
     );
-    expect(zweiter.getQueryData(einsatzKeys.personen(3))).toEqual([{ id: 1 }]);
+    expect(zweiter.getQueryData(einsatzKeys.personen(3))).toEqual([
+      expect.objectContaining({ id: 1 }),
+    ]);
   });
 
   it('löscht bei einer Server-Ablehnung und stellt nichts wieder her', async () => {

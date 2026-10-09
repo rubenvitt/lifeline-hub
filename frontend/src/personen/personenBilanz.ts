@@ -1,5 +1,6 @@
 import type { Person, Sichtungskategorie, VerbleibArt } from '../api/types';
 import { hatKoordinate } from './koordinate';
+import { nichtGeladen } from '../offline/lagebildKuerzung';
 
 /**
  * Ableitungen der Betroffenen-Seitenleiste („Sichtungsbild", „Verbleib", „Offene Felder") und
@@ -10,7 +11,8 @@ import { hatKoordinate } from './koordinate';
  * vermisste hat naturgemäß weder Fundort noch Verbleib; Abgemeldete sind abgeschlossen.
  *  · ohne Verbleib — keine Verbleib-Art UND keine aktuelle UHS. Wer in einer UHS liegt, ist
  *    verortet.
- *  · ohne Fundort  — weder `antreff_ort` noch eine Fundort-Koordinate; eine genügt.
+ *  · ohne Fundort  — weder `antreff_ort` noch eine Fundort-Koordinate; eine genügt. Ein ohne
+ *    Netz nicht geladener Fundort (LFH-1095) ist unbekannt, keine Lücke.
  *
  * ── VERBLEIB IST STRUKTUR, NICHT DIE KURZFORM ───────────────────────────────────────────
  * Gezählt wird nach `aktuelle_verbleib_art`; die Kurzform `aktueller_verbleib` bleibt
@@ -47,7 +49,7 @@ export function lueckenVon(p: LueckenFelder): Luecken {
   if (!istAngetroffen(p)) return { verbleib: false, fundort: false };
   return {
     verbleib: verbleibKlasse(p) === 'offen',
-    fundort: leer(p.antreff_ort) && !hatKoordinate(p),
+    fundort: !nichtGeladen(p, 'antreff_ort') && leer(p.antreff_ort) && !hatKoordinate(p),
   };
 }
 

@@ -130,6 +130,15 @@ describe('ebenenZeilen', () => {
     expect(zeilen.find((z) => z.key === 'uhs')!.anzahl).toBe(1);
   });
 
+  it('„Betroffene" ohne Netz mit nicht geladenen Fundorten: „—" statt „0" (LFH-1095)', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, {
+      zugriff: 'frei',
+      anzahl: 0,
+      nichtGeladen: true,
+    });
+    expect(zeilen.find((z) => z.key === 'person')!.anzahl).toBe('—');
+  });
+
   it('„Betroffene" ausgeblendet: keine Zeile', () => {
     const zeilen = ebenenZeilen([], 0, ALLE_AN, false, { zugriff: 'ausgeblendet', anzahl: 0 });
     expect(zeilen.map((z) => z.key)).not.toContain('person');

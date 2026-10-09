@@ -73,7 +73,14 @@ export function personIdAusSchluessel(schluessel: string): number | null {
  * der Karte" über einer leeren Karte falsch — dann sagt der Satz, dass die Auswahl keine
  * angetroffene Person enthält.
  */
-export function ohneKoordinateText(anzahl: number, verortet: number, wartendNeu = 0): string {
+export function ohneKoordinateText(
+  anzahl: number,
+  verortet: number,
+  wartendNeu = 0,
+  nichtGeladen = 0,
+): string {
+  // Ohne Netz liegen die Fundorte nicht vor (LFH-1095): keine Zahl, die niemand geprüft hat.
+  if (nichtGeladen > 0) return 'Fundorte nicht geladen';
   // Ein wartender Zugang steht noch nicht auf der Karte (Schleuse, LFH-668): dann keine
   // Vollständigkeit behaupten.
   if (anzahl === 0 && wartendNeu > 0) return 'Keine Person ohne Koordinate';
@@ -111,10 +118,11 @@ export default function BetroffeneKarte({
     effektiv,
   });
 
-  const { marker: frisch, ohneKoordinate } = useMemo(
-    () => personenMarker(personen, token),
-    [personen, token],
-  );
+  const {
+    marker: frisch,
+    ohneKoordinate,
+    nichtGeladen,
+  } = useMemo(() => personenMarker(personen, token), [personen, token]);
 
   // ── Schleuse (LFH-668) ───────────────────────────────────────────────────────────
   // `gehalten === null`: offen. Geschlossen wird mit dem gerade gezeigten Stand — bei offener
@@ -214,7 +222,7 @@ export default function BetroffeneKarte({
         marginBlockEnd: token.marginXS,
       }}
     >
-      {ohneKoordinateText(ohneKoordinate, marker.length, wartend.neu)}
+      {ohneKoordinateText(ohneKoordinate, marker.length, wartend.neu, nichtGeladen)}
     </div>
   );
 

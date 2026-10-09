@@ -90,6 +90,11 @@ describe('ohneKoordinateText', () => {
     expect(ohneKoordinateText(3, 2, 1)).toBe('3 Personen ohne Koordinate — nicht auf der Karte');
   });
 
+  it('ohne Netz nicht geladene Fundorte: keine Aussage über die Vollständigkeit (LFH-1095)', () => {
+    expect(ohneKoordinateText(0, 0, 0, 3)).toBe('Fundorte nicht geladen');
+    expect(ohneKoordinateText(1, 0, 0, 3)).toBe('Fundorte nicht geladen');
+  });
+
   it('wartet ein Zugang, behauptet er KEINE vollständige Karte (LFH-668, D6)', () => {
     expect(ohneKoordinateText(0, 2, 1)).toBe('Keine Person ohne Koordinate');
     expect(ohneKoordinateText(0, 0, 1)).toBe('Keine Person ohne Koordinate');

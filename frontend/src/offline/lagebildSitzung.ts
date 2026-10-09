@@ -4,6 +4,7 @@ import type { BenutzerAnzeige, MeAntwort } from '../api/types';
 import { warGeraet } from '../geraet/geraetMarke';
 import { fetchErfolgeVerfolgen } from './lagebildBestaetigung';
 import { lagebildDehydrierOptionen, lagebildStandZulaessig } from './lagebildFilter';
+import { lagebildKuerzen } from './lagebildKuerzung';
 import { erzeugeLagebildPersister, type LagebildPersister } from './lagebildPersister';
 import {
   lagebildAnlegen,
@@ -106,7 +107,11 @@ function abonnieren(
     return {
       timestamp: Date.now(),
       buster,
-      clientState: { ...clientState, queries: [...clientState.queries, ...rest] },
+      // Gekürzt wird ALLES, was hinausgeht (LFH-1095, D1): auch ein Vorrat von vor der Kürzung.
+      clientState: {
+        ...clientState,
+        queries: [...clientState.queries, ...rest].map(lagebildKuerzen),
+      },
     };
   };
   // Nur der Query-Cache (LFH-939 D1): Mutationen werden nie geschrieben
@@ -162,7 +167,10 @@ function wiederherstellen(qc: QueryClient, client: PersistedClient): void {
       q.state.status === 'error'
         ? { ...q, state: { ...q.state, status: 'success' as const, error: null } }
         : q,
-    );
+    )
+    // Ein Stand aus der Zeit vor der Kürzung (LFH-1095) kommt gekürzt in den Speicher: dasselbe
+    // Bild wie ein neuer, und die nächste Speicherung schreibt ihn gekürzt zurück.
+    .map(lagebildKuerzen);
   hydrate(qc, { mutations: [], queries });
 }
 

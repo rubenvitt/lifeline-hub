@@ -15,6 +15,7 @@ import type { Person } from '../api/types';
 import { STATUS_META } from './personMeta';
 import { GESCHLECHT_KURZ } from './personBefehl';
 import { koordinatenText } from './koordinate';
+import { nichtGeladen } from '../offline/lagebildKuerzung';
 import {
   istAngetroffen,
   lueckenText,
@@ -108,6 +109,16 @@ function PersonZelle({ p }: { p: Person }) {
   );
 }
 
+/** Ohne Netz liegt das Feld nicht vor (LFH-1095): weder leer noch offen. */
+function NichtGeladenZelle() {
+  const { rollen } = useRollen();
+  return (
+    <span data-lfh="nicht-geladen" style={{ fontSize: 12, color: rollen.gedaempft }}>
+      nicht geladen
+    </span>
+  );
+}
+
 /** Offene Zelle in `achtung`, sonst neutraler Gedankenstrich. */
 function Leerzelle({ offen }: { offen: boolean }) {
   const { rollen } = useRollen();
@@ -117,6 +128,7 @@ function Leerzelle({ offen }: { offen: boolean }) {
 function FundortZelle({ p }: { p: Person }) {
   const { rollen } = useRollen();
   const koordinate = koordinatenText(p);
+  if (nichtGeladen(p, 'antreff_ort')) return <NichtGeladenZelle />;
   if (!p.antreff_ort && !koordinate) return <Leerzelle offen={lueckenVon(p).fundort} />;
   return (
     <div style={{ minWidth: 0 }}>
@@ -192,6 +204,9 @@ function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
 
 function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: ZustandBedienung }) {
   const { rollen } = useRollen();
+  // Nicht bearbeitbar: eine pausierte Änderung überschriebe nach der Rückkehr des Netzes einen
+  // Wert, den niemand gesehen hat (LFH-1095).
+  if (nichtGeladen(p, 'zustand')) return <NichtGeladenZelle />;
   // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht angeboten.
   if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {
     return p.zustand ? (
@@ -290,7 +305,9 @@ export function personenSpalten(
       mindestBreite: 160,
       suchText: (p) => p.notiz,
       render: (_, p) =>
-        p.notiz ? (
+        nichtGeladen(p, 'notiz') ? (
+          <NichtGeladenZelle />
+        ) : p.notiz ? (
           <Typography.Text
             type="secondary"
             ellipsis={{ tooltip: p.notiz }}

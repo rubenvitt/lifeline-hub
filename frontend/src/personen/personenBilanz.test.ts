@@ -11,6 +11,8 @@ import {
   verbleibKlasse,
   verbleibZaehlung,
 } from './personenBilanz';
+import { einsatzKeys } from '../api/queryKeys';
+import { lagebildKuerzen } from '../offline/lagebildKuerzung';
 
 /** Die Zählungen der Seitenleiste — ohne Rendern, gegen handgezählte Literale. */
 
@@ -79,6 +81,17 @@ describe('Lücken', () => {
     expect(lueckenVon(p({ ...ohne, antreff_ort: 'Brücke' })).fundort).toBe(false);
     // Ein halbes Paar ist kein Fundort (dieselbe Regel wie Anzeige und Bearbeiten).
     expect(lueckenVon(p({ ...ohne, antreff_lat: 52.2691 })).fundort).toBe(true);
+  });
+
+  it('führt einen ohne Netz nicht geladenen Fundort NICHT als Lücke (LFH-1095)', () => {
+    const voll = p({ antreff_ort: null, aktuelle_verbleib_art: undefined });
+    expect(lueckenVon(voll)).toEqual({ verbleib: true, fundort: true });
+    const [gekuerzt] = lagebildKuerzen({
+      queryKey: [...einsatzKeys.personen(1)],
+      state: { data: [voll] },
+    }).state.data as Person[];
+    // Der Fundort ist unbekannt, nicht leer; der Verbleib liegt vor und bleibt eine Lücke.
+    expect(lueckenVon(gekuerzt)).toEqual({ verbleib: true, fundort: false });
   });
 
   it('zählt eine Person in einer UHS nicht als „Verbleib offen"', () => {

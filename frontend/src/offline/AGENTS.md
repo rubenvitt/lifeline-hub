@@ -23,6 +23,17 @@ draußen gelassen werden.
   Entscheidung Ruben 06.10.2026): nur Nummer, Name und Status, keine neue Datenart. Sie hält
   Sprungpalette und Auswahlfelder ohne Netz am Leben. Die Meldungsseite (offen, Seiten der
   abgeschlossenen, Kennzahlen, Einzelabruf) bleibt draußen wie die Vollliste.
+- **Die Betroffenen liegen ohne Freitexte auf der Platte** (LFH-1095, Entscheidung Ruben
+  09.10.2026): `lagebildKuerzen` (`offline/lagebildKuerzung.ts`) kürzt jede Person beim Speichern
+  (Live und Vorrat) und vor dem `hydrate` (Bestand von davor) auf die Positivliste
+  `PERSON_AUF_DER_PLATTE`. Weg sind Adresse, Melderkontakt, Notiz, Zustand und Fundort samt
+  Koordinate; Sichtung, Verbleib und UHS/Platz bleiben. Ein neues Feld der Personenantwort bricht
+  den Typcheck, bis es dort eingeordnet ist. Der Live-Cache bleibt voll. Der gekürzte Datensatz
+  trägt `nicht_geladen`; jede Anzeige dieser Felder fragt `nichtGeladen(p, feld)` und zeigt
+  „nicht geladen“, nie leer, offen oder bearbeitbar (Liste, Lücken, Karten). Wer ein weiteres
+  Personenfeld aus der Liste anzeigt, prüft dasselbe. Herleitung:
+  `/mnt/project-files/lfh-1095/design.md`, Bedrohungsmodell
+  `/mnt/project-files/lfh-1003/bedrohungsmodell.md`, 5 a).
 - **Die Lagekarte liest Schäden als Marker** (`schadenMarker`, LFH-931, ohne Freitexte). Beide
   Prefixe stehen in `LAGEBILD_OFFLINE`: die Marker für Karte und Dashboard, die Volltextliste für
   die Schadenseite.
