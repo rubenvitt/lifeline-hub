@@ -2,7 +2,8 @@
  * Lesergruppen der Anwenderdokumentation (LFH-1096). Eigenes Modul ohne die Kapiteltexte, damit
  * Adressen und Menüs es laden können, ohne die Hilfe in den Haupt-Chunk zu ziehen.
  *
- * Eine Gruppe ist ein Filter, kein Recht: jede Person sieht jedes Kapitel.
+ * Eine Gruppe ist ein Filter, kein Recht: jede Person sieht jedes Kapitel. Kopie für die Website:
+ * `website/src/daten/gruppen.ts` (website/AGENTS.md, „Kopien statt zweiter Quelle“).
  */
 export const GRUPPEN = [
   { key: 'alle', name: 'Alle' },
