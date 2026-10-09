@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '../api/client';
+import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
 import {
   RechteHinweis,
   SeitenHinweise,
@@ -16,6 +16,14 @@ describe('fehlerText', () => {
 
   it('faellt bei fremden Fehlern auf den Standardsatz zurueck', () => {
     expect(fehlerText(new TypeError('boom'))).toBe('Speichern fehlgeschlagen');
+  });
+
+  // LFH-1077: Wer vom Toast auf den Ort umstellt, darf den Unterschied „nicht abgeschickt“ /
+  // „unklar, ob angekommen“ nicht an den Rückfalltext verlieren.
+  it('nennt bei Netzfehler und unklarem Ausgang deren eigenen Wortlaut, nicht den Rückfall', () => {
+    expect(fehlerText(new NetzFehler(), 'Download fehlgeschlagen')).toBe(new NetzFehler().message);
+    expect(fehlerText(new AusgangUnbekannt())).toBe(new AusgangUnbekannt().message);
+    expect(new AusgangUnbekannt().message).toMatch(/unklar/);
   });
 
   // Die Gegenaussage: ohne sie waere ein Primitiv, das IMMER einen Text liefert, ebenfalls gruen —
@@ -120,6 +128,11 @@ describe('ZeilenFehler (LFH-1077)', () => {
     const hinweis = screen.getByRole('alert');
     expect(hinweis).toHaveTextContent('Download läuft schon');
     expect(hinweis).toHaveAttribute('data-fehler');
+  });
+
+  it('nennt bei unklarem Ausgang, dass erst die Liste zu prüfen ist', () => {
+    render(<ZeilenFehler fehler={new AusgangUnbekannt()} fallback="Löschen fehlgeschlagen" />);
+    expect(screen.getByRole('alert')).toHaveTextContent(new AusgangUnbekannt().message);
   });
 
   it('rendert ohne Fehler GAR NICHTS', () => {

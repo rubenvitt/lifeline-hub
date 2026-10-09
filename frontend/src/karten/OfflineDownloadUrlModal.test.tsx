@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
+import { NetzFehler } from '../api/client';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
@@ -162,8 +163,8 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
-  /** Ohne Servermeldung (Netz weg) nennt der Dialog den Vorgang, nicht „Speichern“. */
-  it('nennt bei einem Netzfehler „Download fehlgeschlagen“ im Dialog', async () => {
+  /** Ohne Servermeldung (Netz weg) nennt der Dialog den Netzfehler, nicht „Speichern“. */
+  it('nennt bei einem Netzfehler „nicht abgeschickt“ im Dialog', async () => {
     server.use(http.post('/api/karte/offline-karten/download', () => HttpResponse.error()));
     const nutzer = userEvent.setup();
     renderMitProviders(<Harness />);
@@ -174,7 +175,7 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
 
     const dialog = screen.getByRole('dialog');
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Download fehlgeschlagen');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(new NetzFehler().message);
     expect(within(dialog).getByRole('alert')).not.toHaveTextContent('Speichern fehlgeschlagen');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });

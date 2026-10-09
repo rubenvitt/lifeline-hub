@@ -6,6 +6,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import type { QueryClient } from '@tanstack/react-query';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { NetzFehler } from '../api/client';
 import { erzeugeQueryClient } from '../api/queryClient';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { DemoDatenStatus } from '../api/types';
@@ -480,13 +481,13 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
 });
 
 describe('DemoDatenPage — Netzfehler beim Vorgang', () => {
-  it('nennt unter „Import fehlgeschlagen“ die Erreichbarkeit, nicht „Speichern fehlgeschlagen“', async () => {
+  it('nennt unter „Import fehlgeschlagen“ den Netzfehler, nicht „Speichern fehlgeschlagen“', async () => {
     demoServer(NICHT_IMPORTIERT);
     server.use(http.post('/api/demo-daten', () => HttpResponse.error()));
     setup(admin);
     await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
     expect(await screen.findByText('Import fehlgeschlagen')).toBeInTheDocument();
-    const text = screen.getByText('Der Server hat nicht geantwortet. Bitte erneut versuchen.');
+    const text = screen.getByText(new NetzFehler().message);
     expect(text.closest('.ant-message')).toBeNull();
     expect(screen.queryByText('Speichern fehlgeschlagen')).toBeNull();
   });

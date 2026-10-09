@@ -73,8 +73,9 @@ const FEHLER_TITEL: Record<Vorgang, string> = {
 };
 
 /**
- * Text für einen Fehler ohne Serverantwort (Netz, Zeitüberschreitung). Ohne ihn stünde unter
- * „Import fehlgeschlagen“ der Standardsatz „Speichern fehlgeschlagen“ aus `fehlerText`.
+ * Text für einen Fehler, den weder Server noch Netzschicht benennen. Ohne ihn stünde unter
+ * „Import fehlgeschlagen“ der Standardsatz „Speichern fehlgeschlagen“ aus `fehlerText`. Netzfehler
+ * und unklarer Ausgang tragen ihren eigenen Wortlaut aus `api/client` (LFH-1077).
  */
 const NETZ_FEHLER = 'Der Server hat nicht geantwortet. Bitte erneut versuchen.';
 

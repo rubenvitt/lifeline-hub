@@ -1,5 +1,5 @@
 import { Alert, Flex, theme, Typography } from 'antd';
-import { ApiError } from '../api/client';
+import { fehlerText as apiFehlerText } from '../api/client';
 import { StatusChip } from './instrument/Status';
 
 /**
@@ -15,11 +15,12 @@ import { StatusChip } from './instrument/Status';
  *
  * `fehlerText` ist rein und exportiert, damit die Fallunterscheidung ohne Render prüfbar ist.
  * „Ohne Fehler NICHTS" ist die Aussage, die ein Primitiv auffliegen lässt, das immer einen Text
- * liefert.
+ * liefert. Den Wortlaut nimmt sie aus `api/client.fehlerText`, damit Netzfehler („nicht
+ * abgeschickt“) und unklarer Ausgang („erst die Liste prüfen“) am Ort so heißen wie vorher im
+ * Toast (LFH-1077); nur ein fremder Fehler bekommt den Rückfalltext.
  */
 export function fehlerText(fehler: unknown, fallback = 'Speichern fehlgeschlagen'): string | null {
-  if (fehler == null) return null;
-  return fehler instanceof ApiError ? fehler.message : fallback;
+  return fehler == null ? null : apiFehlerText(fehler, fallback);
 }
 
 interface SpeicherFehlerProps {
