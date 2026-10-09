@@ -96,3 +96,37 @@ for (const modus of ['light', 'dark'] as const) {
     }).toPass({ timeout: 10_000 });
   });
 }
+
+/**
+ * Etikett „Vorschau“ des Markdown-Editors im Layout `split` (LFH-1059), gemessen am
+ * Befehlsentwurf: Textrolle `schwach` statt geerbter Farbe mit `opacity: 0.55`. Deckkraft lehnt
+ * der Messkern ab; dass das Etikett die Rolle IST, prüft der Abgleich mit der Rollen-Property.
+ */
+for (const modus of ['light', 'dark'] as const) {
+  test(`${modus}: Markdown-Editor — Etikett „Vorschau“ hält den Textboden`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await anmelden(page, modus);
+    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 1059 ${modus} ${Date.now()}`,
+    });
+    const { id } = await post(page, `/api/einsaetze/${einsatzId}/befehle`, {
+      vorlage: 'befehl_lad',
+      titel: 'Befehl Etikettprobe',
+    });
+
+    await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${id}`);
+    const etikett = page.locator('.markdown-editor--split .markdown-editor__label').first();
+    await expect(etikett).toHaveText('Vorschau');
+    await page.mouse.move(1, 1);
+
+    await expect(async () => {
+      const m = await kontrast(etikett);
+      expect(m.verhaeltnis, `Etikett: ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(TEXT[modus]);
+      const farbe = await etikett.evaluate((el) => getComputedStyle(el).color);
+      expect(rgb((farbe.match(/[\d.]+/g) ?? []).map(Number)), 'Etikettfarbe').toBe(
+        await rolle(page, '--lfh-schwach'),
+      );
+    }).toPass({ timeout: 10_000 });
+  });
+}
