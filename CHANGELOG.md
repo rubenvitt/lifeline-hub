@@ -1,3 +1,15 @@
+## [1.0.0-alpha.97](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.96...v1.0.0-alpha.97) (2026-10-09)
+
+### Kommunikation
+
+#### Fernmeldeskizze
+
+- Die Fernmeldeskizze passt sich nun automatisch an verschiedene Bildschirmgrößen und Eingabegeräte an – mit optimierten Trefflächen für Touch-Bedienung am Handy (72 px Mindestgröße für Finger), Tablet mit Handschuhen und präzise Maussteuerung am Desktop
+- Bei starker Verkleinerung wechselt die Ansicht automatisch in einen Übersichtsmodus: Ein Tippen oder Klick zoomt die Skizze an der gewählten Stelle heran, erst dann können einzelne Elemente ausgewählt werden
+- Verbindungslinien zwischen Stellen sind nun auch mit Handschuhen sicher zu treffen
+- Komponenten und externe Stellen werden mit ausreichendem Abstand dargestellt, sodass sie auch auf kleinen Bildschirmen (ab 390 px Breite) gut bedienbar bleiben
+- Das Layout wurde korrigiert: Komponenten und Stichleitungen werden nun an der richtigen Position gezeichnet, Abstände zwischen den Zeilen wurden optimiert
+
 ## [1.0.0-alpha.96](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.95...v1.0.0-alpha.96) (2026-10-09)
 
 ### Kräfte und Mittel
