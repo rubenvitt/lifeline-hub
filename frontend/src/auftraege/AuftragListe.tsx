@@ -8,6 +8,7 @@ import {
 } from '../components/fensterAusschnitt';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import AuftragKarte from './AuftragKarte';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 interface AuftragListeProps {
   auftraege: Auftrag[];
@@ -28,6 +29,14 @@ interface AuftragListeProps {
   onAbnehmen?: (auftragId: number) => void;
   /** Ab {@link AUFTRAG_SCHWELLE} Aufträgen nur den Sichtbereich rendern (LFH-949, D6). */
   fenster?: boolean;
+  /**
+   * Grund der zuletzt abgelehnten Karten-Aktion je Auftrag (`grund` aus
+   * `components/useZeilenFehler.ts`). Die Liste reicht jeder Karte nur ihren Grund durch, ein
+   * stabiles Objekt: die übrigen Karten bleiben gemerkt (LFH-1077).
+   */
+  kartenFehler?: (auftragId: number) => ZeilenGrund | null;
+  /** Dasselbe für die Quittungen je Auftrag. */
+  quittierFehler?: (auftragId: number) => ZeilenGrund | null;
 }
 
 /** Ab wie vielen Aufträgen eine Liste mit `fenster` nur ihren Ausschnitt rendert. */
@@ -50,6 +59,8 @@ export default function AuftragListe({
   onVollzugMelden,
   onAbnehmen,
   fenster = false,
+  kartenFehler,
+  quittierFehler,
 }: AuftragListeProps) {
   const druckt = useDruckModus();
   const virtuell = fenster && !druckt && auftraege.length > AUFTRAG_SCHWELLE;
@@ -83,6 +94,8 @@ export default function AuftragListe({
       onInArbeit={onInArbeit}
       onVollzugMelden={onVollzugMelden}
       onAbnehmen={onAbnehmen}
+      fehlerGrund={kartenFehler?.(a.id) ?? null}
+      quittierFehlerGrund={quittierFehler?.(a.id) ?? null}
     />
   );
   if (!virtuell) return <>{auftraege.map(karte)}</>;

@@ -1,10 +1,10 @@
-import { App, Col, Collapse, Form, Input, Row, type FormInstance } from 'antd';
+import { Col, Collapse, Form, Input, Row, type FormInstance } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { serverJetzt } from '../offline/serveruhr';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
-import { ErfassungsFormular } from '../components/Erfassung';
+import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import { useEffect, useState, type ReactNode } from 'react';
 import dayjs from 'dayjs';
 import type {
@@ -122,6 +122,51 @@ function empfaengerRegel(katalog: FunktionsVorschlaege['katalog']) {
 }
 
 /**
+ * Alle Empfänger eines Auftrags: die Werte des Empfängerfeldes und bei Richtung „extern“ mit
+ * Bezeichnung der externe Adressat. Dieselbe Rechnung für Regel und Absenden, sonst ließe die
+ * Regel durch, was beim Absenden leer bliebe.
+ */
+function alleEmpfaenger(
+  w: Pick<FormWerte, 'empfaenger' | 'richtung' | 'externKategorie' | 'externBezeichnung'>,
+  katalog: FunktionsVorschlaege['katalog'],
+): NeuerEmpfaenger[] {
+  const empfaenger = baueEmpfaenger(w.empfaenger ?? [], katalog);
+  if (w.richtung === 'extern' && (w.externBezeichnung ?? '').trim()) {
+    empfaenger.push({
+      empfaenger_typ: 'extern',
+      extern_kategorie: w.externKategorie,
+      extern_bezeichnung: w.externBezeichnung.trim(),
+    });
+  }
+  return empfaenger;
+}
+
+/**
+ * Pflicht-Empfänger als Regel am Feld (LFH-1077): eine Prüfung ohne Server ist kein Speicherfehler
+ * und kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“). Der externe Adressat zählt mit;
+ * wie das Feld `richtung` und `externBezeichnung` folgt, steht am Effekt in `AuftragFormular`.
+ */
+function pflichtEmpfaengerRegel(
+  katalog: FunktionsVorschlaege['katalog'],
+  { getFieldValue }: Pick<FormInstance<FormWerte>, 'getFieldValue'>,
+) {
+  return {
+    validator: (_: unknown, werte: unknown) =>
+      alleEmpfaenger(
+        {
+          empfaenger: Array.isArray(werte) ? (werte as string[]) : [],
+          richtung: getFieldValue('richtung'),
+          externKategorie: getFieldValue('externKategorie'),
+          externBezeichnung: String(getFieldValue('externBezeichnung') ?? ''),
+        },
+        katalog,
+      ).length === 0
+        ? Promise.reject(new Error('Mindestens ein Empfänger ist erforderlich'))
+        : Promise.resolve(),
+  };
+}
+
+/**
  * Gesamtzahl der Empfänger (LFH-937): `maxCount` am Select begrenzt nur die Tags; bei Richtung
  * „extern“ mit Bezeichnung kommt der externe Adressat dazu, 50 Tags ergäben 51 Empfänger und 400.
  */
@@ -161,6 +206,9 @@ export default function AuftragFormular({
   zitat,
   serie = false,
   onFertig,
+  speicherung,
+  speicherFehlerTitel,
+  speicherFehlerFallback,
   card = true,
   einsatzId,
 }: {
@@ -192,10 +240,17 @@ export default function AuftragFormular({
   serie?: boolean;
   /** Nach erfolgreichem Einzel-Erfassen. Ohne Angabe bleibt das Inline-Formular offen. */
   onFertig?: () => void;
+  /**
+   * Die Anlege-Mutation, an die Erfassungshülle durchgereicht (LFH-1077): sie zeigt den Grund einer
+   * Ablehnung im Formular und räumt ihn beim Einhängen und Abbrechen (Escape). Die Modal-Einbettungen
+   * lassen sie weg.
+   */
+  speicherung?: Speicherung;
+  speicherFehlerTitel?: string;
+  speicherFehlerFallback?: string;
   /** Umschließendes Paneel mit Titel rendern. `false`, wo der Container den Titel schon liefert. */
   card?: boolean;
 }) {
-  const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
   // Richtung steuert die Sichtbarkeit der externen Adressat-Felder.
   const richtung = Form.useWatch('richtung', form);
@@ -203,29 +258,30 @@ export default function AuftragFormular({
   const [suche, setSuche] = useState('');
   const funktionen: FunktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
 
+  /*
+   * Die Empfänger-Regeln zählen den externen Adressaten mit: ändern sich Richtung oder Bezeichnung,
+   * prüft das Feld neu, aber erst, wenn es berührt ist oder sich schon gemeldet hat (nach einem
+   * Absendeversuch). `dependencies` prüfte schon beim ersten Umschalten der Richtung und meldete
+   * „Mindestens ein Empfänger“, bevor jemand absenden wollte.
+   */
+  const externBezeichnung = Form.useWatch('externBezeichnung', form);
+  useEffect(() => {
+    if (form.isFieldTouched('empfaenger') || form.getFieldError('empfaenger').length > 0)
+      form.validateFields(['empfaenger']).catch(() => {});
+  }, [richtung, externBezeichnung, form]);
+
   // initialText kann verzögert eintreffen (z. B. Heraufstufung) → ins Feld spiegeln.
   useEffect(() => {
     if (initialText) form.setFieldValue('text', initialText);
   }, [initialText, form]);
 
   /**
-   * Das `return` ist tragend: die Hülle lässt die Felder stehen, wenn die Zusage bricht. Auch der
-   * fehlende Empfänger LEHNT AB, sonst räumte die Hülle ein Formular, das nichts gespeichert hat.
+   * Das `return` ist tragend: die Hülle lässt die Felder stehen, wenn die Zusage bricht. Den
+   * fehlenden Empfänger fängt die Regel am Feld ab (`pflichtEmpfaengerRegel`), hier kommt er nicht
+   * mehr an.
    */
   const absenden = (w: FormWerte) => {
-    const empfaenger = baueEmpfaenger(w.empfaenger ?? [], funktionen.katalog);
-    // Externer Adressat: bei Richtung extern als Empfänger-Zeile ergänzen.
-    if (w.richtung === 'extern' && (w.externBezeichnung ?? '').trim()) {
-      empfaenger.push({
-        empfaenger_typ: 'extern',
-        extern_kategorie: w.externKategorie,
-        extern_bezeichnung: w.externBezeichnung.trim(),
-      });
-    }
-    if (empfaenger.length === 0) {
-      message.error('Mindestens ein Empfänger ist erforderlich');
-      return Promise.reject(new Error('Kein Empfänger'));
-    }
+    const empfaenger = alleEmpfaenger(w, funktionen.katalog);
     return onAnlegen({
       auftrag_text: w.text.trim(),
       absicht: w.absicht?.trim() || undefined,
@@ -385,6 +441,9 @@ export default function AuftragFormular({
       // Das Inline-Formular schließt nach dem Senden NICHT; in den Modal-Einbettungen schließt der
       // Aufrufer selbst.
       onFertig={onFertig ?? (() => {})}
+      speicherung={speicherung}
+      speicherFehlerTitel={speicherFehlerTitel}
+      speicherFehlerFallback={speicherFehlerFallback}
       laeuft={senden}
       erfassenText="Auftrag erteilen"
       serie={serie}
@@ -411,8 +470,11 @@ export default function AuftragFormular({
           <Form.Item
             name="empfaenger"
             label="Empfänger"
-            rules={[empfaengerRegel(funktionen.katalog), empfaengerAnzahlRegel]}
-            dependencies={['richtung', 'externBezeichnung']}
+            rules={[
+              (f) => pflichtEmpfaengerRegel(funktionen.katalog, f),
+              empfaengerRegel(funktionen.katalog),
+              empfaengerAnzahlRegel,
+            ]}
           >
             <Select
               mode="tags"

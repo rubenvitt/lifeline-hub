@@ -12,7 +12,7 @@ import AuftragListe from '../auftraege/AuftragListe';
 import VollzugMeldenModal from '../auftraege/VollzugMeldenModal';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { prioRang } from '../kommunikation';
 
@@ -50,7 +50,6 @@ export default function GeraetAuftraegePage() {
   const einsatzId = geraet?.einsatz_id ?? 0;
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const fehler = useFehlerMeldung();
   const [vollzugFuer, setVollzugFuer] = useState<number | null>(null);
 
   const einsatzQuery = useQuery({
@@ -88,25 +87,45 @@ export default function GeraetAuftraegePage() {
     [eigeneAbschnitte, eigeneEinheiten],
   );
 
+  /*
+   * Ablehnungen an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“):
+   * Quittung an der Empfängerzeile, „In Bearbeitung“ an der Karte, Vollzug melden im Dialog. Die
+   * Gründe je Karte aus den Callbacks, nicht aus `mutation.variables`
+   * (`components/useZeilenFehler.ts`).
+   */
+  const kartenFehler = useZeilenFehler<number>();
+  const quittierFehler = useZeilenFehler<number>();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
   const quittieren = useMutation({
     mutationFn: (z: { auftragId: number; empfaengerId: number }) =>
       quittiereEmpfaenger(einsatzId, z.auftragId, z.empfaengerId),
+    onMutate: (z) => quittierFehler.beginne(z.auftragId),
     onSuccess: () => {
       message.success('Empfang quittiert');
       void invalidiere();
     },
-    onError: fehler,
+    onError: (e, z) => quittierFehler.melde(z.auftragId, e, 'Quittieren fehlgeschlagen'),
   });
-  const vollzug = useMutation({
-    mutationFn: (v: { auftragId: number; status: 'in_arbeit' | 'vollzogen'; text?: string }) =>
-      setzeVollzug(einsatzId, v.auftragId, v.status, v.text),
-    onSuccess: (_d, v) => {
-      setVollzugFuer(null);
-      message.success(v.status === 'vollzogen' ? 'Vollzug gemeldet' : 'Auftrag in Bearbeitung');
+  const inArbeit = useMutation({
+    mutationFn: (auftragId: number) => setzeVollzug(einsatzId, auftragId, 'in_arbeit'),
+    onMutate: (auftragId) => kartenFehler.beginne(auftragId),
+    onSuccess: () => {
+      message.success('Auftrag in Bearbeitung');
       void invalidiere();
     },
-    onError: fehler,
+    onError: (e, auftragId) => kartenFehler.melde(auftragId, e, 'Statuswechsel fehlgeschlagen'),
+  });
+  // Eigene Mutation für den Dialog: ihr Fehler steht dort, nicht an der Karte.
+  const vollzugMelden = useMutation({
+    mutationFn: (v: { auftragId: number; text: string }) =>
+      setzeVollzug(einsatzId, v.auftragId, 'vollzogen', v.text),
+    onMutate: (v) => kartenFehler.beginne(v.auftragId),
+    // Nur den eigenen Dialog schließen: steht er inzwischen für einen anderen Auftrag, bleibt er.
+    onSuccess: (_d, v) => {
+      setVollzugFuer((f) => (f === v.auftragId ? null : f));
+      message.success('Vollzug gemeldet');
+      void invalidiere();
+    },
   });
 
   const auftraege = useMemo(
@@ -133,17 +152,22 @@ export default function GeraetAuftraegePage() {
           quittierungZiel={quittieren.isPending ? quittieren.variables : null}
           onQuittieren={(auftragId, empfaengerId) => quittieren.mutate({ auftragId, empfaengerId })}
           darfQuittierenFuer={darfQuittierenFuer}
-          onInArbeit={(auftragId) => vollzug.mutate({ auftragId, status: 'in_arbeit' })}
+          onInArbeit={(auftragId) => inArbeit.mutate(auftragId)}
           onVollzugMelden={setVollzugFuer}
+          kartenFehler={kartenFehler.grund}
+          quittierFehler={quittierFehler.grund}
         />
       )}
       <VollzugMeldenModal
         offen={vollzugFuer != null}
         onAbbrechen={() => setVollzugFuer(null)}
-        onBestaetigen={(text) => {
-          if (vollzugFuer != null)
-            vollzug.mutate({ auftragId: vollzugFuer, status: 'vollzogen', text });
-        }}
+        speicherung={vollzugMelden}
+        // mutateAsync: der Dialog leert seinen Text erst, wenn die Meldung angekommen ist.
+        onBestaetigen={(text) =>
+          vollzugFuer == null
+            ? Promise.resolve()
+            : vollzugMelden.mutateAsync({ auftragId: vollzugFuer, text })
+        }
       />
     </EinsatzSeite>
   );

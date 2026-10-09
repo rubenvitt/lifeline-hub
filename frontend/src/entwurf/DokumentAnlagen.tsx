@@ -1,8 +1,7 @@
-import { App, Button, Flex, Popconfirm, Space, Typography } from 'antd';
+import { Alert, App, Button, Flex, Popconfirm, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { fehlerText } from '../api/client';
 import {
   dokumentAnlageDateiPfad,
   entferneDokumentAnlage,
@@ -72,6 +71,11 @@ export default function DokumentAnlagen({
   const stabFreigabe = useStabFreigabe(einsatzId);
   const ohneVerbindung = useOhneVerbindung();
   const [nimmtAuf, setNimmtAuf] = useState(false);
+  /**
+   * Grund, warum sich die Skizze im Browser nicht zeichnen ließ (lokal, kein Serveraufruf). Ein
+   * Programmfehler beim Zeichnen steht als „Skizze nicht gezeichnet“, nicht mit seinem Wortlaut.
+   */
+  const [skizzenFehler, setSkizzenFehler] = useState<string | null>(null);
 
   const ablegen = useMutation({
     mutationFn: (bild: SkizzenBild) =>
@@ -86,7 +90,7 @@ export default function DokumentAnlagen({
       void qc.invalidateQueries({ queryKey: key });
       message.success('Fernmeldeskizze angefügt');
     },
-    onError: (e) => message.error(fehlerText(e, 'Fernmeldeskizze nicht angefügt')),
+    // Kein `onError`: der Grund steht beim Knopf (`anfuegenFehler`, LFH-1077).
   });
   const entfernen = useMutation({
     mutationFn: (anlageId: number) =>
@@ -101,9 +105,35 @@ export default function DokumentAnlagen({
   const darfAnfuegen = schreibt && stabFreigabe.zustand === 'frei' && !ohneVerbindung;
   const laeuft = nimmtAuf || ablegen.isPending;
 
+  /** Ein neuer Versuch räumt den Grund des vorigen, gleich ob er beim Zeichnen oder beim Server lag. */
+  const starteAufnahme = () => {
+    setSkizzenFehler(null);
+    ablegen.reset();
+    setNimmtAuf(true);
+  };
+
+  /**
+   * Ein Anfügen, ein Grund (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Server
+   * lehnte ab oder die Skizze ließ sich nicht zeichnen. Er steht beim Knopf — im Paneel oder, ohne
+   * Anlage, in der Zeile mit dem Knopf — bis zum nächsten Versuch; auch dann, wenn der Knopf
+   * inzwischen fehlt (offline, Freigabe weg).
+   */
+  const anfuegenFehlt = ablegen.error != null || skizzenFehler != null;
+  const anfuegenFehler =
+    ablegen.error != null ? (
+      <SpeicherFehler fehler={ablegen.error} titel="Fernmeldeskizze nicht angefügt" />
+    ) : skizzenFehler != null ? (
+      <Alert
+        type="error"
+        showIcon
+        title="Fernmeldeskizze nicht angefügt"
+        description={skizzenFehler}
+      />
+    ) : null;
+
   const anfuegen = darfAnfuegen ? (
     <Button
-      onClick={() => setNimmtAuf(true)}
+      onClick={starteAufnahme}
       loading={laeuft}
       disabled={anlagen.length >= MAX_ANLAGEN}
       data-lfh="anlage-skizze-anfuegen"
@@ -122,25 +152,27 @@ export default function DokumentAnlagen({
       }}
       onFehler={(e) => {
         setNimmtAuf(false);
-        message.error(
-          typeof e === 'string'
-            ? `Fernmeldeskizze nicht angefügt: ${e}`
-            : fehlerText(e, 'Fernmeldeskizze nicht angefügt'),
-        );
+        setSkizzenFehler(typeof e === 'string' ? e : 'Skizze nicht gezeichnet');
       }}
     />
   ) : null;
 
   if (anlagen.length === 0) {
-    if (!anfuegen) return null;
+    if (!anfuegen && !anfuegenFehlt) return null;
     return (
       <Flex
+        vertical
         className={ohneDruckKlasse}
         gap={token.marginXS}
         style={{ marginBlock: token.marginSM }}
       >
-        {anfuegen}
-        {aufnahme}
+        {(anfuegen || aufnahme) && (
+          <Flex gap={token.marginXS}>
+            {anfuegen}
+            {aufnahme}
+          </Flex>
+        )}
+        {anfuegenFehler}
       </Flex>
     );
   }
@@ -162,6 +194,7 @@ export default function DokumentAnlagen({
             fehler={entfernen.error}
             titel={fehlerAnlage ? `${anlageName(fehlerAnlage)} nicht entfernt` : 'Nicht entfernt'}
           />
+          {anfuegenFehler}
           <AnhangVorschauGruppe>
             {anlagen.map((a) => (
               <div key={a.id} data-lfh="dokument-anlage-zeile" data-anlage-id={a.id}>

@@ -7,7 +7,6 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, befehlDetailPfad, auftraegePfad } from '../routing/deeplinks';
-import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
 import type { BefehlAbschnitt, BefehlAnzeige } from '../api/types';
@@ -96,9 +95,6 @@ function BefehlDetail() {
     qc.invalidateQueries({ queryKey: einsatzKeys.befehl(einsatzId, befehlId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   };
-  const fehler = (e: unknown) => {
-    if (aktiv.current) message.error(fehlerText(e));
-  };
 
   // Persistiert die Formularwerte als Entwurf (ohne Erfolgs-Toast); geteilt von „Entwurf speichern"
   // und dem Freigabe-Flow.
@@ -171,14 +167,29 @@ function BefehlDetail() {
     },
   });
 
+  /**
+   * Kein `onError`: der Grund steht über dem Inhalt, im Block des Speicherfehlers (LFH-1077,
+   * `frontend/AGENTS.md`, „Rückwege und Fehler“), bis zum nächsten Versuch. Nach dem Verlassen
+   * zeigt ihn niemand mehr an — der frühere `aktiv`-Riegel des Toasts entfällt damit von selbst.
+   */
   const fortschreibenMutation = useMutation({
     mutationFn: () => schreibeBefehlFort(einsatzId, befehlId),
     onSuccess: (neu: BefehlAnzeige) => {
       qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
       navigate(befehlDetailPfad(einsatzId, neu.id));
     },
-    onError: fehler,
   });
+  /*
+   * Auf schmalem Bildschirm klebt „Fortschreiben“ unten in der Leiste, der Grund steht oben außer
+   * Sicht: ein neuer Grund holt seinen Block in den Blick. `nearest`, damit ein schon sichtbarer
+   * Block nicht springt. Nur hier, nicht beim Speichern: der Autosave scheitert auch ungefragt, und
+   * ein Sprung mitten im Tippen nähme den Cursor aus dem Blick.
+   */
+  const fehlerBlock = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (fortschreibenMutation.error != null)
+      fehlerBlock.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [fortschreibenMutation.error]);
 
   // Ungültige Befehl-ID → zurück auf den Reiter Befehle, nicht auf die Vorgabe „Aufträge" (LFH-972).
   if (!idGueltig) {
@@ -412,13 +423,23 @@ function BefehlDetail() {
         }}
         aktionen={!verankert && aktionen}
       >
-        {/* Der Grund eines gescheiterten Speicherns — nicht im `aktionen`-Block, der je Breite
-            zwischen Kopf und Leiste wandert; der Alert steht in jeder Breite über dem Inhalt.
-            `befehl-no-print`, weil ein „Nicht gespeichert"-Banner im ausgedruckten Befehl eine
-            Aussage mit Außenwirkung wäre. */}
-        {schutz.speicherFehler != null && (
-          <div className="befehl-no-print" style={{ marginBottom: token.marginSM }}>
+        {/* Der Grund eines gescheiterten Speicherns oder Fortschreibens — nicht im
+            `aktionen`-Block, der je Breite zwischen Kopf und Leiste wandert; der Alert steht in
+            jeder Breite über dem Inhalt. `befehl-no-print`, weil ein „Nicht gespeichert"-Banner im
+            ausgedruckten Befehl eine Aussage mit Außenwirkung wäre. Speichern gibt es nur im
+            Entwurf, Fortschreiben nur nach der Freigabe: es steht höchstens einer da. */}
+        {(schutz.speicherFehler ?? fortschreibenMutation.error) != null && (
+          <div
+            ref={fehlerBlock}
+            className="befehl-no-print"
+            style={{ marginBottom: token.marginSM }}
+          >
             <SpeicherFehler fehler={schutz.speicherFehler} />
+            <SpeicherFehler
+              fehler={fortschreibenMutation.error}
+              titel="Nicht fortgeschrieben"
+              fallback="Fortschreiben fehlgeschlagen"
+            />
           </div>
         )}
 

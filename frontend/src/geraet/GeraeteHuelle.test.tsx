@@ -442,13 +442,22 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     await waitFor(() => expect(screen.getByLabelText('Inhalt')).toHaveValue(''));
   });
 
-  it('Meldung abgelehnt: der Wortlaut bleibt stehen, die Priorität auch', async () => {
+  /**
+   * Speicherfehler an den Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund
+   * steht im Formular über „Meldung senden“, nicht im Toast, bis zum nächsten Absenden.
+   */
+  it('Meldung abgelehnt: der Grund steht im Formular, der Wortlaut bleibt stehen, die Priorität auch', async () => {
     vi.useRealTimers();
     laptopBereit();
+    let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/7/meldungen', () =>
-        HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 }),
-      ),
+      http.post('/api/einsaetze/7/meldungen', () => {
+        versuch += 1;
+        // Der zweite Versuch bleibt offen: geräumt wird beim Absenden, nicht erst beim Erfolg.
+        return versuch === 1
+          ? HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 })
+          : new Promise<Response>(() => {});
+      }),
     );
     renderApp('/geraet/7/stelle');
     const user = userEvent.setup();
@@ -456,9 +465,23 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     await user.type(await screen.findByLabelText('Inhalt'), 'Zwei Tragen frei');
     await user.click(screen.getByRole('radio', { name: 'sofort' }));
     await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
-    expect(await screen.findByText(/Einsatz ist abgeschlossen/)).toBeInTheDocument();
+
+    const treffer = await screen.findByText('Einsatz ist abgeschlossen');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    const alarm = treffer.closest('[role="alert"]') as HTMLElement;
+    expect(alarm).toHaveTextContent('Meldung nicht gesendet');
+    expect(alarm.closest('form')).toContainElement(screen.getByLabelText('Inhalt'));
+    expect(alarm.closest('form')).toContainElement(
+      screen.getByRole('button', { name: 'Meldung senden' }),
+    );
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     expect(screen.getByLabelText('Inhalt')).toHaveValue('Zwei Tragen frei');
     expect(screen.getByRole('radio', { name: 'sofort' })).toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(versuch).toBe(2));
+    await waitFor(() => expect(screen.queryByText('Einsatz ist abgeschlossen')).toBeNull());
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
   });
 
   it('das Tablet hat keinen Bereich „UHS“', async () => {

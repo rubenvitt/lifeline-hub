@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../api/client';
 import * as anlagenApi from '../api/dokumentAnlagen';
 import type { DokumentAnlage } from '../api/types';
 import type { StabFreigabe } from '../stab/useStabFreigabe';
@@ -102,9 +103,8 @@ describe('DokumentAnlagen (LFH-1028)', () => {
     aufnahme = { art: 'fehler', fehler: 'Abschnitte nicht geladen' };
     zeige(true);
     await userEvent.click(await screen.findByRole('button', { name: 'Fernmeldeskizze anfügen' }));
-    expect(
-      await screen.findByText('Fernmeldeskizze nicht angefügt: Abschnitte nicht geladen'),
-    ).toBeInTheDocument();
+    const alarm = (await screen.findByText('Abschnitte nicht geladen')).closest('[role="alert"]');
+    expect(alarm).toHaveTextContent('Fernmeldeskizze nicht angefügt');
     expect(anlagenApi.legeDokumentAnlageAb).not.toHaveBeenCalled();
   });
 
@@ -166,5 +166,122 @@ describe('DokumentAnlagen (LFH-1028)', () => {
     zeige(true);
     await screen.findByRole('link', { name: 'Anlage 10: Fernmeldeskizze herunterladen' });
     expect(screen.getByRole('button', { name: 'Fernmeldeskizze anfügen' })).toBeDisabled();
+  });
+});
+
+/**
+ * Speicherfehler an den Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund
+ * eines gescheiterten Anfügens steht beim Knopf — im Paneel „Anlagen“ oder, ohne Anlage, in der
+ * Zeile mit dem Knopf —, nicht im Toast, und geht mit dem nächsten Anfügen. Ein Anfügen, ein Alert,
+ * gleich ob die Skizze sich nicht zeichnen ließ oder der Server ablehnte.
+ */
+describe('DokumentAnlagen — gescheitertes Anfügen (LFH-1077)', () => {
+  /** Erst die geladene Liste: vorher stünde der Knopf in der Zeile ohne Anlage. */
+  async function geladen(mitAnlage: boolean) {
+    if (mitAnlage) await screen.findByRole('region', { name: 'Anlagen' });
+    else await waitFor(() => expect(anlagenApi.listeDokumentAnlagen).toHaveBeenCalled());
+    await screen.findByRole('button', { name: 'Fernmeldeskizze anfügen' });
+  }
+
+  /** Der Block, in dem der Grund stehen muss: das Paneel oder die Zeile mit dem Knopf. */
+  function ort(mitAnlage: boolean): HTMLElement {
+    // Per Kennung: antd hängt beim Ausblenden der Ladeanzeige noch „loading“ in den Namen.
+    const knopf = document.querySelector('[data-lfh="anlage-skizze-anfuegen"]') as HTMLElement;
+    if (mitAnlage) return screen.getByRole('region', { name: 'Anlagen' });
+    expect(screen.queryByRole('region', { name: 'Anlagen' })).toBeNull();
+    return knopf.closest('.befehl-no-print') as HTMLElement;
+  }
+
+  it.each([
+    ['ohne Anlage', false],
+    ['mit Anlage', true],
+  ])('%s: der Server lehnt ab — der Grund steht beim Knopf, ohne Toast', async (_, mitAnlage) => {
+    vi.mocked(anlagenApi.listeDokumentAnlagen).mockResolvedValue(mitAnlage ? [anlage(1)] : []);
+    // Die Suite fährt ohne `mockReset`: offene Einmal-Antworten eines roten Tests wanderten weiter.
+    vi.mocked(anlagenApi.legeDokumentAnlageAb)
+      .mockReset()
+      .mockRejectedValueOnce(new ApiError(409, 'Dokument ist freigegeben'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    zeige(true);
+    await geladen(mitAnlage);
+    await userEvent.click(screen.getByRole('button', { name: 'Fernmeldeskizze anfügen' }));
+
+    const treffer = await screen.findByText('Dokument ist freigegeben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    const alarm = treffer.closest('[role="alert"]') as HTMLElement;
+    expect(alarm).toHaveTextContent('Fernmeldeskizze nicht angefügt');
+    expect(ort(mitAnlage)).toContainElement(alarm);
+    // Eine Handlung, ein Alert.
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: /Fernmeldeskizze anfügen/ }));
+    await waitFor(() => expect(screen.queryByText('Dokument ist freigegeben')).toBeNull());
+    expect(anlagenApi.legeDokumentAnlageAb).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['ohne Anlage', false],
+    ['mit Anlage', true],
+  ])(
+    '%s: die Skizze zeichnet nicht — der Grund steht beim Knopf, ohne Toast',
+    async (_, mitAnlage) => {
+      vi.mocked(anlagenApi.listeDokumentAnlagen).mockResolvedValue(mitAnlage ? [anlage(1)] : []);
+      vi.mocked(anlagenApi.legeDokumentAnlageAb)
+        .mockReset()
+        .mockImplementation(() => new Promise(() => {}));
+      // Ein Programmfehler beim Zeichnen nennt keinen Wortlaut für Menschen.
+      aufnahme = { art: 'fehler', fehler: new Error('canvas tainted') };
+      zeige(true);
+      await geladen(mitAnlage);
+      await userEvent.click(screen.getByRole('button', { name: 'Fernmeldeskizze anfügen' }));
+
+      const alarm = (await screen.findByText('Fernmeldeskizze nicht angefügt')).closest(
+        '[role="alert"]',
+      ) as HTMLElement;
+      expect(alarm.closest('.ant-message')).toBeNull();
+      expect(alarm).toHaveTextContent('Skizze nicht gezeichnet');
+      expect(ort(mitAnlage)).toContainElement(alarm);
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+      // Der nächste Versuch zeichnet und sendet: der alte Grund ist weg.
+      aufnahme = { art: 'bild' };
+      await userEvent.click(screen.getByRole('button', { name: /Fernmeldeskizze anfügen/ }));
+      await waitFor(() => expect(anlagenApi.legeDokumentAnlageAb).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText('Fernmeldeskizze nicht angefügt')).toBeNull();
+    },
+  );
+
+  /**
+   * Ohne Anlage und ohne Knopf (offline, Freigabe weg) stünde sonst nichts mehr da: der Grund
+   * „nicht abgeschickt“ verschwände mit dem Knopf.
+   */
+  it('ohne Anlage: fällt danach das Netz weg, bleibt der Grund stehen', async () => {
+    vi.mocked(anlagenApi.listeDokumentAnlagen).mockResolvedValue([]);
+    vi.mocked(anlagenApi.legeDokumentAnlageAb)
+      .mockReset()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const { rerender } = zeige(true);
+    await geladen(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Fernmeldeskizze anfügen' }));
+    const alarm = (await screen.findByText('Fernmeldeskizze nicht angefügt')).closest(
+      '[role="alert"]',
+    ) as HTMLElement;
+    const text = alarm.textContent;
+
+    ohneNetz = true;
+    rerender(
+      <DokumentAnlagen
+        dokument="befehle"
+        einsatzId={3}
+        dokumentId={7}
+        einsatzbezeichnung="Hochwasser"
+        schreibt
+        ohneDruckKlasse="befehl-no-print"
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Fernmeldeskizze anfügen/ })).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent(text ?? '');
   });
 });

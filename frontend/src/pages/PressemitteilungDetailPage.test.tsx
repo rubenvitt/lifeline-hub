@@ -10,7 +10,9 @@ import {
   aktualisierePressemitteilung,
   gibPressemitteilungFrei,
   ladePressemitteilung,
+  schreibePressemitteilungFort,
 } from '../api/presse';
+import { ApiError } from '../api/client';
 import type { EinsatzAnzeige, Pressemitteilung } from '../api/types';
 import PressemitteilungDetailPage from './PressemitteilungDetailPage';
 import { freigabenFixture } from '../test/fixtures';
@@ -143,6 +145,41 @@ describe('PressemitteilungDetailPage (LFH-554)', () => {
     );
     expect(screen.getByRole('button', { name: 'Folgemeldung schreiben' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Freigeben' })).toBeNull();
+  });
+
+  /**
+   * Speicherfehler an die Seite (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund
+   * steht über dem Inhalt, nicht im Toast, und geht mit dem nächsten Versuch.
+   */
+  it('Folgemeldung abgelehnt: der Grund steht über dem Inhalt, ohne Toast, bis zum nächsten Versuch', async () => {
+    vi.mocked(ladePressemitteilung).mockResolvedValue({ ...ENTWURF, status: 'freigegeben' });
+    vi.mocked(schreibePressemitteilungFort)
+      .mockReset()
+      .mockRejectedValueOnce(new ApiError(409, 'Mitteilung ist schon fortgeschrieben'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    setup();
+    const knopf = await screen.findByRole('button', { name: 'Folgemeldung schreiben' });
+    await userEvent.click(knopf);
+
+    const treffer = await screen.findByText('Mitteilung ist schon fortgeschrieben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    const alarm = treffer.closest('[role="alert"]') as HTMLElement;
+    expect(alarm).toHaveTextContent('Folgemeldung nicht angelegt');
+    // Über dem Inhalt, nicht im Aktionsblock des Kopfes; nicht auf Papier.
+    const block = alarm.closest('.lagebericht-no-print');
+    expect(block).not.toBeNull();
+    expect(block).not.toContainElement(knopf);
+    expect(
+      alarm.compareDocumentPosition(screen.getByText(/^Zeitstand:/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(knopf);
+    await waitFor(() =>
+      expect(screen.queryByText('Mitteilung ist schon fortgeschrieben')).toBeNull(),
+    );
+    expect(schreibePressemitteilungFort).toHaveBeenCalledTimes(2);
   });
 });
 

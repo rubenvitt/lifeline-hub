@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -8,9 +8,14 @@ import AuftraegePage from './AuftraegePage';
 import type { Auftrag } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
+import { ApiError } from '../api/client';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
-vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ benutzer: { id: 1 } }),
+  useAuthOptional: () => ({ benutzer: { id: 1 } }),
+}));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
@@ -119,16 +124,20 @@ function LocationProbe() {
   );
 }
 
-function renderPage(route = '/einsaetze/1/auftraege') {
+/** `palette`: mit der Tastatur-Registry der App, damit Escape die Erfassungshülle erreicht. */
+function renderPage(route = '/einsaetze/1/auftraege', { palette = false } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const routen = (
+    <Routes>
+      <Route path="/einsaetze/:id/auftraege" element={<AuftraegePage />} />
+    </Routes>
+  );
   const ergebnis = render(
     <QueryClientProvider client={client}>
       <AntApp>
         <MemoryRouter initialEntries={[route]}>
           <LocationProbe />
-          <Routes>
-            <Route path="/einsaetze/:id/auftraege" element={<AuftraegePage />} />
-          </Routes>
+          {palette ? <CommandPaletteProvider>{routen}</CommandPaletteProvider> : routen}
         </MemoryRouter>
       </AntApp>
     </QueryClientProvider>,
@@ -472,7 +481,7 @@ describe('AuftraegePage', () => {
     renderPage();
     await screen.findByText('Deich sichern');
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung beginnen' }));
-    await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'in_arbeit', undefined));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'in_arbeit'));
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
 
@@ -485,7 +494,7 @@ describe('AuftraegePage', () => {
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(1));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(setzeVollzug).toHaveBeenLastCalledWith(1, 1, 'offen', undefined));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenLastCalledWith(1, 1, 'offen'));
   });
 
   it('nimmt einen vollzogenen Auftrag ab', async () => {
@@ -618,6 +627,294 @@ describe('AuftraegePage', () => {
       expect(screen.getByRole('tab', { name: 'Einzelaufträge' })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: 'Einsatzbefehle' })).toBeInTheDocument();
       expect(container.querySelector('[data-lfh="reiter-abgrenzung"]')).toBeNull();
+    });
+  });
+
+  /**
+   * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund einer
+   * Ablehnung steht dort, wo gehandelt wurde — am Paneel, an der Karte, im Dialog —, bis zum
+   * nächsten Absenden; kein Toast. Jede Handlung hat ihren eigenen Ort, auch wo sich früher vier
+   * Mutationen eine Meldung teilten.
+   */
+  describe('Speicherfehler am Ort (LFH-1077)', () => {
+    const karte = (id: number) =>
+      document.querySelector<HTMLElement>(`[data-auftrag-id="${id}"]`) as HTMLElement;
+    const zweiAuftraege = () =>
+      listeAuftraege.mockResolvedValue([
+        auftrag(),
+        auftrag({
+          id: 2,
+          auftrag_text: 'Pegel messen',
+          empfaenger: [{ ...empf(2, 'EA Süd', null), auftrag_id: 2 }],
+        }),
+      ]);
+
+    it('Anlegen: der Grund steht am Paneel „Neuer Auftrag“, der Wortlaut bleibt', async () => {
+      let gibFrei: (a: Auftrag) => void = () => {};
+      legeAuftragAn
+        .mockRejectedValueOnce(new ApiError(422, 'Empfänger gehört nicht zum Einsatz'))
+        .mockImplementationOnce(() => new Promise((r) => (gibFrei = r)));
+      renderPage();
+      await screen.findByText('Deich sichern');
+      await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
+      await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
+      await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+      await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+      const paneel = screen.getByRole('region', { name: 'Neuer Auftrag' });
+      expect(await within(paneel).findByRole('alert')).toHaveTextContent(
+        'Empfänger gehört nicht zum Einsatz',
+      );
+      expect(screen.getByLabelText('Auftrag / Was')).toHaveValue('Erkunden');
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+      // Das nächste Absenden räumt den Grund.
+      await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+      await waitFor(() => expect(within(paneel).queryByRole('alert')).toBeNull());
+      await act(async () => gibFrei(auftrag()));
+    });
+
+    it('Anlegen: Zuklappen und erneutes Aufklappen zeigen keinen alten Grund', async () => {
+      legeAuftragAn.mockRejectedValue(new ApiError(422, 'Empfänger gehört nicht zum Einsatz'));
+      renderPage();
+      await screen.findByText('Deich sichern');
+      await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
+      await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
+      await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+      await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+      await within(screen.getByRole('region', { name: 'Neuer Auftrag' })).findByRole('alert');
+
+      await userEvent.click(screen.getAllByRole('button', { name: /Formular schließen/ })[0]);
+      await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
+      const paneel = await screen.findByRole('region', { name: 'Neuer Auftrag' });
+      expect(within(paneel).queryByRole('alert')).toBeNull();
+    });
+
+    it('Anlegen: während des Sendens lässt sich das Paneel nicht schließen; die Ablehnung steht danach darin', async () => {
+      let lehneAb: (e: unknown) => void = () => {};
+      legeAuftragAn.mockImplementationOnce(() => new Promise((_r, reject) => (lehneAb = reject)));
+      renderPage();
+      await screen.findByText('Deich sichern');
+      // Auch gesperrte Knöpfe anklicken: der Klick darf nichts bewirken, nicht nur nicht ankommen.
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      await user.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
+      await user.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
+      await user.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+      await user.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+      await waitFor(() => expect(legeAuftragAn).toHaveBeenCalledTimes(1));
+
+      for (const schliessen of screen.getAllByRole('button', { name: /Formular schließen/ })) {
+        expect(schliessen).toBeDisabled();
+        await user.click(schliessen);
+      }
+      const paneel = screen.getByRole('region', { name: 'Neuer Auftrag' });
+      await act(async () => lehneAb(new ApiError(422, 'Empfänger gehört nicht zum Einsatz')));
+      expect(await within(paneel).findByRole('alert')).toHaveTextContent(
+        'Empfänger gehört nicht zum Einsatz',
+      );
+      expect(screen.getByLabelText('Auftrag / Was')).toHaveValue('Erkunden');
+    });
+
+    it('Anlegen: Escape im Formular leert die Felder und räumt den Grund', async () => {
+      legeAuftragAn.mockRejectedValue(new ApiError(422, 'Empfänger gehört nicht zum Einsatz'));
+      renderPage(undefined, { palette: true });
+      await screen.findByText('Deich sichern');
+      await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
+      await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
+      await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+      await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+      const paneel = screen.getByRole('region', { name: 'Neuer Auftrag' });
+      await within(paneel).findByRole('alert');
+
+      fireEvent.keyDown(screen.getByLabelText('Auftrag / Was'), { key: 'Escape' });
+      await waitFor(() => expect(screen.getByLabelText('Auftrag / Was')).toHaveValue(''));
+      expect(within(paneel).queryByRole('alert')).toBeNull();
+    });
+
+    it('Quittieren: der Grund steht an der Empfängerzeile seiner Karte, die übrigen bleiben leer', async () => {
+      zweiAuftraege();
+      quittiereEmpfaenger.mockRejectedValue(new ApiError(409, 'Bereits quittiert'));
+      renderPage();
+      await screen.findByText('Pegel messen');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Nord quittieren' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
+
+      expect(await within(karte(1)).findByText('Bereits quittiert')).toHaveAttribute('data-fehler');
+      // Nach dem Rückrollen steht die Zeile wieder offen da, der Grund daneben.
+      expect(within(karte(1)).getByText('1 Empfänger · 0/1 quittiert')).toBeInTheDocument();
+      expect(karte(2).querySelector('[data-fehler]')).toBeNull();
+      expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('Quittieren: die nächste Quittung an derselben Karte räumt den Grund', async () => {
+      zweiAuftraege();
+      quittiereEmpfaenger
+        .mockRejectedValueOnce(new ApiError(409, 'Bereits quittiert'))
+        .mockImplementationOnce(() => new Promise(() => {}));
+      renderPage();
+      await screen.findByText('Pegel messen');
+      await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Nord quittieren' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
+      await within(karte(1)).findByText('Bereits quittiert');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Nord quittieren' }));
+      const bestaetigen = await screen.findAllByRole('button', { name: 'Empfang quittieren' });
+      await userEvent.click(bestaetigen[bestaetigen.length - 1]);
+      await waitFor(() => expect(karte(1).querySelector('[data-fehler]')).toBeNull());
+    });
+
+    it('In Bearbeitung: der Grund steht an der Karte', async () => {
+      zweiAuftraege();
+      setzeVollzug.mockRejectedValue(new ApiError(422, 'Auftrag ist bereits vollzogen'));
+      renderPage();
+      await screen.findByText('Pegel messen');
+      await userEvent.click(within(karte(1)).getByRole('button', { name: 'Bearbeitung beginnen' }));
+
+      expect(await within(karte(1)).findByText('Auftrag ist bereits vollzogen')).toHaveAttribute(
+        'data-fehler',
+      );
+      expect(karte(2).querySelector('[data-fehler]')).toBeNull();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    /**
+     * `useMutation` verfolgt nur den LETZTEN Aufruf: schaltet Karte 2, bevor Karte 1 geantwortet
+     * hat, ginge Karte 1's Ablehnung über `mutation.error` verloren. Der Grund steht trotzdem an 1.
+     */
+    it('In Bearbeitung: eine Ablehnung, die nach dem Schalten einer zweiten Karte ankommt, steht an ihrer Karte', async () => {
+      zweiAuftraege();
+      let lehneAb: (e: Error) => void = () => {};
+      setzeVollzug.mockImplementation((_e: number, auftragId: number) =>
+        auftragId === 1
+          ? new Promise((_r, reject) => (lehneAb = reject))
+          : Promise.resolve(auftrag({ id: 2, bearbeitungsstatus: 'in_arbeit' })),
+      );
+      renderPage();
+      await screen.findByText('Pegel messen');
+      await userEvent.click(within(karte(1)).getByRole('button', { name: 'Bearbeitung beginnen' }));
+      await userEvent.click(within(karte(2)).getByRole('button', { name: 'Bearbeitung beginnen' }));
+      await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(2));
+      await act(async () => lehneAb(new ApiError(409, 'Auftrag wurde zwischenzeitlich geändert')));
+
+      expect(
+        await within(karte(1)).findByText('Auftrag wurde zwischenzeitlich geändert'),
+      ).toHaveAttribute('data-fehler');
+      expect(karte(2).querySelector('[data-fehler]')).toBeNull();
+      // Karte 2 hat Erfolg und damit ihren Rückgängig-Toast; ein Fehler-Toast fehlt.
+      expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+    });
+
+    /**
+     * Rückgängig kommt aus dem Toast: die Karte ist dann oft nicht mehr zu sehen (gewandert,
+     * Ansicht gewechselt). Der Grund steht deshalb im Hinweis der Seite, nicht an der Karte.
+     */
+    it('Rückgängig: eine abgelehnte Rücknahme steht im Seitenhinweis, nicht an der Karte', async () => {
+      setzeVollzug
+        .mockResolvedValueOnce(auftrag({ bearbeitungsstatus: 'in_arbeit' }))
+        .mockRejectedValueOnce(new ApiError(422, 'Auftrag ist bereits vollzogen'));
+      renderPage();
+      await screen.findByText('Deich sichern');
+      await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung beginnen' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+
+      const hinweis = await waitFor(() => {
+        const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+        expect(h).not.toBeNull();
+        return h as HTMLElement;
+      });
+      expect(await within(hinweis).findByRole('alert')).toHaveTextContent(
+        'Auftrag ist bereits vollzogen',
+      );
+      expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+      expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+    });
+
+    it('Rückgängig: die nächste Rücknahme räumt den Seitenhinweis', async () => {
+      setzeVollzug
+        .mockResolvedValueOnce(auftrag({ bearbeitungsstatus: 'in_arbeit' }))
+        .mockRejectedValueOnce(new ApiError(422, 'Auftrag ist bereits vollzogen'))
+        .mockResolvedValueOnce(auftrag({ bearbeitungsstatus: 'in_arbeit' }))
+        .mockImplementationOnce(() => new Promise(() => {}));
+      renderPage();
+      await screen.findByText('Deich sichern');
+      await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung beginnen' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+      await screen.findByText('Auftrag ist bereits vollzogen');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung beginnen' }));
+      await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(3));
+      const rueckgaengig = await screen.findAllByRole('button', { name: 'Rückgängig' });
+      await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
+      await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(4));
+      await waitFor(() =>
+        expect(screen.queryByText('Auftrag ist bereits vollzogen')).not.toBeInTheDocument(),
+      );
+    });
+
+    it('Vollzug melden: der Grund steht im Dialog, der Text bleibt, die Karte bleibt leer', async () => {
+      zweiAuftraege();
+      setzeVollzug.mockRejectedValue(new ApiError(422, 'Auftrag ist bereits abgenommen'));
+      renderPage();
+      await screen.findByText('Pegel messen');
+      await userEvent.click(within(karte(1)).getByRole('button', { name: 'Vollzug melden' }));
+      const dialog = await screen.findByRole('dialog');
+      const feld = within(dialog).getByPlaceholderText('Rückmeldung zur Erledigung');
+      await userEvent.type(feld, 'Deich gehalten');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Vollzug melden' }));
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Auftrag ist bereits abgenommen',
+      );
+      expect(feld).toHaveValue('Deich gehalten');
+      expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    /**
+     * Der Erfolg schließt nur den Dialog, für den er gilt: steht der Dialog inzwischen für einen
+     * anderen Auftrag offen, bleibt er offen.
+     */
+    it('Vollzug melden: der Erfolg schließt nur den Dialog seines Auftrags', async () => {
+      zweiAuftraege();
+      let gibFrei: (a: Auftrag) => void = () => {};
+      setzeVollzug.mockImplementationOnce(() => new Promise((r) => (gibFrei = r)));
+      renderPage();
+      await screen.findByText('Pegel messen');
+      await userEvent.click(within(karte(1)).getByRole('button', { name: 'Vollzug melden' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(
+        within(dialog).getByPlaceholderText('Rückmeldung zur Erledigung'),
+        'Deich gehalten',
+      );
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Vollzug melden' }));
+      await waitFor(() => expect(setzeVollzug).toHaveBeenCalledTimes(1));
+      // Der Dialog wechselt den Auftrag, bevor die erste Meldung angekommen ist.
+      await userEvent.click(within(karte(2)).getByRole('button', { name: 'Vollzug melden' }));
+      await act(async () => gibFrei(auftrag({ bearbeitungsstatus: 'vollzogen' })));
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(document.querySelector('.ant-zoom-leave')).toBeNull();
+    });
+
+    it('Abnehmen: der Grund steht an der Karte', async () => {
+      listeAuftraege.mockResolvedValue([
+        auftrag({ bearbeitungsstatus: 'vollzogen' }),
+        auftrag({ id: 2, auftrag_text: 'Pegel messen', bearbeitungsstatus: 'vollzogen' }),
+      ]);
+      nimmAb.mockRejectedValue(new ApiError(409, 'Auftrag ist bereits abgenommen'));
+      renderPage();
+      await userEvent.click(await screen.findByText(/^Abgeschlossen/));
+      await screen.findByText('Pegel messen');
+      await userEvent.click(within(karte(1)).getByRole('button', { name: 'Abnehmen' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Auftrag abnehmen' }));
+
+      expect(await within(karte(1)).findByText('Auftrag ist bereits abgenommen')).toHaveAttribute(
+        'data-fehler',
+      );
+      expect(karte(2).querySelector('[data-fehler]')).toBeNull();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     });
   });
 });

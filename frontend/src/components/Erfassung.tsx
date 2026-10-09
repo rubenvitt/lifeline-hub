@@ -177,7 +177,7 @@ interface ErfassungsFormularProps<T> {
    * Aktionszeile, bis zum nächsten Absenden, und räumt ihn beim Einhängen und beim Abbrechen;
    * ein Dialog öffnet so nie mit dem Grund der letzten Ablehnung. Kein `onError`-Toast
    * (`frontend/AGENTS.md`, „Rückwege und Fehler“). Teilt sich eine Mutation mehrere Wege, reicht
-   * der Aufrufer nur den Fehler dieses Weges durch.
+   * der Aufrufer nur den Fehler dieses Weges durch. Solange sie läuft, ist Abbrechen gesperrt.
    */
   speicherung?: Speicherung;
   /** Überschrift des Fehlers; Vorgabe „Nicht gespeichert“. */
@@ -252,6 +252,16 @@ export function ErfassungsFormular<T extends object>({
   // Mutationsobjekt je Render den Effekt erneut auslöst.
   const speicherungRef = useRef(speicherung);
   speicherungRef.current = speicherung;
+  /*
+   * Solange die `speicherung` läuft, ist Abbrechen auf allen Wegen wirkungslos (Knopf gesperrt,
+   * Escape, Steuerung von außen): der Dialog bleibt bis zur Antwort offen, sonst hätte ihre
+   * Ablehnung keinen Ort mehr (LFH-1077, design.md D3). `laeuft` allein sperrt nicht: ein Upload
+   * darf abgebrochen werden (`ErfassungsAnhangAblegenModal`, LFH-878). Ref, weil Escape und
+   * Steuerung ihn außerhalb des Renders lesen.
+   */
+  const sperrtAbbruch = speicherung?.isPending === true;
+  const sperrtAbbruchRef = useRef(sperrtAbbruch);
+  sperrtAbbruchRef.current = sperrtAbbruch;
   const raeumeSpeicherFehler = useCallback(() => {
     const s = speicherungRef.current;
     // Eine laufende Mutation bleibt unberührt: `reset()` hängte ihr Ergebnis ab.
@@ -345,6 +355,7 @@ export function ErfassungsFormular<T extends object>({
   }
 
   const abbrechen = useCallback(() => {
+    if (sperrtAbbruchRef.current) return;
     abbruchGenerationRef.current += 1;
     serienlaufRef.current = false;
     form.resetFields();
@@ -429,7 +440,7 @@ export function ErfassungsFormular<T extends object>({
             }
           >
             {onAbbrechen && (
-              <Button block={istSchmal} onClick={abbrechen}>
+              <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
                 Abbrechen
               </Button>
             )}
@@ -487,6 +498,7 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
  *
  * Deshalb besitzen alle vier Wege denselben zentralen Abbruch: Knopf und Escape gehen direkt
  * durch `ErfassungsFormular.abbrechen`, Kreuz und Maske über `ErfassungsFormularSteuerung`.
+ * Während die Mutation läuft, sind Kreuz und Maske zusätzlich sichtbar gesperrt.
  */
 export function ErfassungsModal<T extends object>({
   offen,
@@ -495,20 +507,23 @@ export function ErfassungsModal<T extends object>({
   ...rest
 }: ErfassungsModalProps<T>) {
   const { form } = rest;
+  const sperrtAbbruch = rest.speicherung?.isPending === true;
   const formularSteuerung = useRef<ErfassungsFormularSteuerung>(null);
   const schliessen = useCallback(() => {
     if (formularSteuerung.current) formularSteuerung.current.abbrechen();
-    else {
+    else if (!sperrtAbbruch) {
       form.resetFields();
       onAbbrechen();
     }
-  }, [form, onAbbrechen]);
+  }, [form, onAbbrechen, sperrtAbbruch]);
 
   return (
     <Modal
       open={offen}
       title={titel}
       onCancel={schliessen}
+      closable={sperrtAbbruch ? { disabled: true } : true}
+      mask={{ closable: !sperrtAbbruch }}
       footer={null}
       destroyOnHidden
       keyboard={false}

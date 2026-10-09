@@ -40,6 +40,14 @@ function rendern(over: Partial<Parameters<typeof AuftragFormular>[0]> = {}) {
   );
 }
 
+/** Richtung „extern“ samt Bezeichnung: der externe Adressat zählt als Empfänger. */
+async function externMitBezeichnung() {
+  await userEvent.click(screen.getByText(/Befehlsschema/));
+  await userEvent.click(screen.getByLabelText('Richtung'));
+  await userEvent.click(await screen.findByTitle('Extern'));
+  await userEvent.type(screen.getByLabelText('Externe Bezeichnung'), 'Leitstelle Nord');
+}
+
 describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
   /**
    * „≤ 4" allein ist nicht widerlegbar (ohne `forceRender` rendert der Collapse erst beim
@@ -294,13 +302,6 @@ describe('AuftragFormular — Eingabegrenzen (LFH-937)', () => {
     expect(onAnlegen).not.toHaveBeenCalled();
   });
 
-  async function externMitBezeichnung() {
-    await userEvent.click(screen.getByText(/Befehlsschema/));
-    await userEvent.click(screen.getByLabelText('Richtung'));
-    await userEvent.click(await screen.findByTitle('Extern'));
-    await userEvent.type(screen.getByLabelText('Externe Bezeichnung'), 'Leitstelle Nord');
-  }
-
   it('extern: 50 Tags plus externer Adressat sind 51 Empfänger und werden abgelehnt', async () => {
     const onAnlegen = vi.fn().mockResolvedValue(undefined);
     rendern({ onAnlegen });
@@ -358,5 +359,62 @@ describe('AuftragFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     await userEvent.type(feld, '2026-10-04 09:30');
     await userEvent.keyboard('{Enter}');
     expect(await erteilen(onAnlegen)).toBe('2026-10-04 09:30:00');
+  });
+});
+
+/**
+ * Der Pflicht-Empfänger ist eine Prüfung ohne Server: sie steht als Regel am Feld, nicht als
+ * Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
+ */
+describe('AuftragFormular — Pflicht-Empfänger am Feld (LFH-1077)', () => {
+  it('ohne Empfänger steht der Grund am Feld, und nichts geht hinaus', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+
+    const grund = await screen.findByText('Mindestens ein Empfänger ist erforderlich');
+    expect(grund.closest('.ant-form-item')).toContainElement(screen.getByLabelText('Empfänger'));
+    expect(onAnlegen).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(screen.getByLabelText('Auftrag / Was')).toHaveValue('Erkunden');
+  });
+
+  it('meldet sich nicht, bevor abgesendet wurde, auch nicht beim Umschalten der Richtung', async () => {
+    rendern();
+    await userEvent.click(screen.getByText(/Befehlsschema/));
+    await userEvent.click(screen.getByLabelText('Richtung'));
+    await userEvent.click(await screen.findByTitle('Extern'));
+    await userEvent.type(screen.getByLabelText('Externe Bezeichnung'), 'L');
+    await userEvent.clear(screen.getByLabelText('Externe Bezeichnung'));
+    await userEvent.click(screen.getByLabelText('Richtung'));
+    await userEvent.click(await screen.findByTitle('Intern'));
+
+    // Die Prüfung läuft asynchron: erst eine Runde abwarten, dann das Fehlen feststellen.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('Mindestens ein Empfänger ist erforderlich')).toBeNull();
+  });
+
+  it('ein externer Adressat mit Bezeichnung räumt den Grund und genügt als Empfänger', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen });
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await screen.findByText('Mindestens ein Empfänger ist erforderlich');
+
+    // Die Regel hängt an Richtung und Bezeichnung (`dependencies`), nicht nur am Feld selbst.
+    await externMitBezeichnung();
+    await waitFor(() =>
+      expect(screen.queryByText('Mindestens ein Empfänger ist erforderlich')).toBeNull(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0].empfaenger).toEqual([
+      {
+        empfaenger_typ: 'extern',
+        extern_kategorie: 'leitstelle',
+        extern_bezeichnung: 'Leitstelle Nord',
+      },
+    ]);
   });
 });

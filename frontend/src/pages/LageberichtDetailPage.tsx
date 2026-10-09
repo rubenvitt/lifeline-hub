@@ -52,7 +52,6 @@ import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
 import { Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * Formularwerte des Entwurfs: Titel, Zeitstand (Zeitpunkt, die Anzeigezone nur im Feld, UTC erst
@@ -151,7 +150,6 @@ function LageberichtDetail() {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
   };
-  const fehler = useFehlerMeldung();
 
   // Persistiert die Formularwerte als Entwurf (ohne Erfolgs-Toast); geteilt von „Entwurf speichern"
   // und dem Freigabe-Flow.
@@ -263,13 +261,16 @@ function LageberichtDetail() {
     },
   });
 
+  /**
+   * Kein `onError`: der Grund steht über dem Inhalt, im Block des Speicherfehlers (LFH-1077,
+   * `frontend/AGENTS.md`, „Rückwege und Fehler“), bis zum nächsten Versuch.
+   */
   const fortschreibenMutation = useMutation({
     mutationFn: () => schreibeLageberichtFort(einsatzId, berichtId),
     onSuccess: (neu: LageberichtAnzeige) => {
       qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
       navigate(lageberichtDetailPfad(einsatzId, neu.id));
     },
-    onError: fehler,
   });
 
   // Ungültige Lagebericht-ID → zurück zur Liste.
@@ -458,12 +459,18 @@ function LageberichtDetail() {
           </div>
         }
       >
-        {/* Der Grund eines gescheiterten Speicherns — Zwilling in `BefehlDetailPage`.
-            `lagebericht-no-print`, weil ein „Nicht gespeichert"-Banner im ausgedruckten Bericht
-            eine Aussage mit Außenwirkung wäre. */}
-        {schutz.speicherFehler != null && (
+        {/* Der Grund eines gescheiterten Speicherns oder Fortschreibens — Zwilling in
+            `BefehlDetailPage`. `lagebericht-no-print`, weil ein „Nicht gespeichert"-Banner im
+            ausgedruckten Bericht eine Aussage mit Außenwirkung wäre. Speichern gibt es nur im
+            Entwurf, Fortschreiben nur nach der Freigabe: es steht höchstens einer da. */}
+        {(schutz.speicherFehler ?? fortschreibenMutation.error) != null && (
           <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
             <SpeicherFehler fehler={schutz.speicherFehler} />
+            <SpeicherFehler
+              fehler={fortschreibenMutation.error}
+              titel="Nicht fortgeschrieben"
+              fallback="Fortschreiben fehlgeschlagen"
+            />
           </div>
         )}
 
