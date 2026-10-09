@@ -24,6 +24,21 @@ export const server = setupServer(
    */
   http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
   /**
+   * Eigene Sitzungen (LFH-1092) — nur die aktuelle als Default (echter Zustand einer frischen
+   * Anmeldung). Das Profil fragt sie beim Mount ab; Tests der Liste überschreiben per
+   * `server.use()`.
+   */
+  http.get('/api/auth/sitzungen', () =>
+    HttpResponse.json([
+      {
+        kennung: '0'.repeat(32),
+        angemeldet_at: '2026-10-09 08:00:00',
+        zuletzt_gesehen_at: '2026-10-09 08:00:00',
+        aktuell: true,
+      },
+    ]),
+  ),
+  /**
    * Eigene ETB-Lesemarke — „nichts Neues" als Default (echter Serverzustand); die ETB-Seite
    * fragt sie beim Mount ab. Tests des Banners überschreiben per `server.use()`.
    */

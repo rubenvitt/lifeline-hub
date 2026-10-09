@@ -806,6 +806,8 @@ export const GLOBAL_KEYS = {
   authProvider: 'auth-provider',
   // Präferenzen des ANGEMELDETEN Benutzers.
   benutzerEinstellungen: 'benutzer-einstellungen',
+  // Laufende Sitzungen (LFH-1092): die eigenen und die einer Person für den Admin.
+  sitzungen: 'sitzungen',
   // Stand der Demo-Daten der eigenen Organisation, nur für den System-Admin; 404 heißt „nicht
   // freigeschaltet“.
   demoDaten: 'demo-daten',
@@ -878,6 +880,13 @@ export const globalKeys = {
   orgEinstellungen: () => [GLOBAL_KEYS.orgEinstellungen] as const,
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
+  /**
+   * Sitzungen (LFH-1092): der argumentlose Accessor ist der Invalidierungs-Prefix für beide
+   * Fächer, die eigenen Sitzungen und die einer Person (für den Admin).
+   */
+  sitzungen: () => [GLOBAL_KEYS.sitzungen] as const,
+  sitzungenEigene: () => [GLOBAL_KEYS.sitzungen, 'eigene'] as const,
+  sitzungenVon: (benutzerId: number) => [GLOBAL_KEYS.sitzungen, 'benutzer', benutzerId] as const,
   demoDaten: () => [GLOBAL_KEYS.demoDaten] as const,
   /**
    * Aufbewahrung: der ARGUMENTLOSE Accessor ist Übersicht UND Invalidierungs-Prefix für Akte und
@@ -1001,6 +1010,7 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
+ * - `sitzungen`: Anmeldungen einer Person, gelesen beim Öffnen und nach dem Beenden.
  * - `adminKarte`, `karteConfig`: instanzweit, nicht mandantenbezogen.
  * - `fachebene`: externe Quellen mit eigener Nachfrage.
  */
@@ -1010,6 +1020,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
   GLOBAL_KEYS.benutzerEinstellungen,
+  GLOBAL_KEYS.sitzungen,
   GLOBAL_KEYS.adminKarte,
   GLOBAL_KEYS.karteConfig,
   GLOBAL_KEYS.fachebene,

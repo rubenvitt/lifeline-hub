@@ -377,7 +377,7 @@ describe('BenutzerPage', () => {
     const koerper = container.querySelector<HTMLTableElement>('.ant-table-body table')!;
     // Σ der Zahlbreiten + Mindestmaß der Fließspalte, als Literal (zurückgerechnet prüfte die Zahl
     // die Rechnung gegen sich selbst).
-    expect(koerper.style.width).toBe('820px');
+    expect(koerper.style.width).toBe('940px');
     expect(koerper.style.tableLayout).toBe('auto');
     // Spalte 0 trägt ihre Zahl; unter `auto` ist sie Vorzugsbreite, der Umbruch hält sie dort.
     expect(koerper.querySelector('col')).toHaveStyle({ width: '136px' });
@@ -386,6 +386,59 @@ describe('BenutzerPage', () => {
     // Ein Opt-in, das nicht trägt, meldet sich in DEV — hier darf es das nicht.
     expect(warnung).not.toHaveBeenCalledWith(expect.stringContaining('[KatalogTabelle]'));
     warnung.mockRestore();
+  });
+
+  it('zeigt die Anmeldungen einer Person im Dialog und beendet alle (LFH-1092)', async () => {
+    let beendet = false;
+    const eva = benutzer({
+      id: 2,
+      anzeigename: 'Eva',
+      benutzername: 'eva',
+      system_rolle: 'keiner',
+    });
+    server.use(
+      meHandler(benutzer()),
+      http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva])),
+      http.get('/api/benutzer/2/sitzungen', () =>
+        HttpResponse.json(
+          beendet
+            ? []
+            : [
+                {
+                  kennung: 'a'.repeat(32),
+                  angemeldet_at: '2026-10-09 08:00:00',
+                  zuletzt_gesehen_at: '2026-10-09 08:00:00',
+                  geraet: 'Safari · iPadOS',
+                  aktuell: false,
+                },
+                {
+                  kennung: 'b'.repeat(32),
+                  angemeldet_at: '2026-10-09 08:00:00',
+                  zuletzt_gesehen_at: '2026-10-09 08:00:00',
+                  geraet: 'Firefox · Windows',
+                  aktuell: false,
+                },
+              ],
+        ),
+      ),
+      http.post('/api/benutzer/2/sitzungen/beenden', () => {
+        beendet = true;
+        return HttpResponse.json({ beendet: 2 });
+      }),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+      </Routes>,
+      { route: '/admin/benutzer' },
+    );
+    const zeile = (await screen.findByText('@eva')).closest('tr')!;
+    await userEvent.click(within(zeile).getByRole('button', { name: 'Anmeldungen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Anmeldungen · Eva' });
+    expect(await within(dialog).findByText('Safari · iPadOS')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Alle beenden' }));
+    expect(await within(dialog).findByText('Keine Anmeldungen')).toBeInTheDocument();
+    expect(beendet).toBe(true);
   });
 
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {

@@ -408,7 +408,8 @@ pub async fn koppeln(
     }
     // Eine übrig gebliebene Sitzung im Browser (etwa einer Person) stünde sonst verwaist da.
     if let Some(alt) = jar.get(SESSION_COOKIE) {
-        session::loeschen(&state.pool, alt.value()).await?;
+        let beendet = session::loeschen(&state.pool, alt.value()).await?;
+        state.live.melde_sitzung_ende(beendet);
     }
     let jar = jar.add(crate::routes::auth::session_cookie(token, secure));
     tracing::info!(kopplung_id = ein.kopplung_id, peer_ip = ?peer_ip, "Gerät gekoppelt");

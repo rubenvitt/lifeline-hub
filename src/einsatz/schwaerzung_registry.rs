@@ -2345,6 +2345,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
             retain("expires_at", G_ZEIT),
             retain("kopplung_id", G_FK),
+            retain(
+                "kennung",
+                "Zufällige öffentliche Sitzungskennung (technisch, kein Personenbezug)",
+            ),
+            retain("zuletzt_gesehen_at", G_ZEIT),
+            retain(
+                "geraet",
+                "Grobe Geräteklasse wie „Safari · iPadOS“, nie der User-Agent (kein Personenbezug)",
+            ),
         ],
     },
 ];

@@ -9,7 +9,8 @@
 //! * **Lebensdauer:** jeder Strom endet nach [`STROM_LEBENSDAUER`] plus einem Zufallsanteil bis
 //!   [`STROM_LEBENSDAUER_STREUUNG`]. Der Browser verbindet mit `Last-Event-ID` neu, der Replay
 //!   schließt die Lücke, und Sitzung und Modulrechte werden dabei frisch geprüft. Ein Entzug
-//!   wirkt so spätestens nach der Höchstlebensdauer.
+//!   wirkt so spätestens nach der Höchstlebensdauer; das Ende der Sitzung selbst (Abmelden,
+//!   Beenden, Deaktivieren) schließt ihre Ströme sofort (`routes/live.rs`, LFH-1092).
 //!
 //! Der Platz wird belegt, bevor die Aufbauphase des Stroms Datenbank liest, und lebt im Strom:
 //! er fällt zurück, sobald hyper den Body fallen lässt (Abbruch durch den Client oder Ende der
