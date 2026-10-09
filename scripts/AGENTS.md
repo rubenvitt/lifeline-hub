@@ -53,6 +53,12 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   Ruleset 17017911. `PW_PROJEKTE=chromium` wählt lokal eine Teilmenge. Schritt 7 bricht vorab
   ab, wenn ein Browser fehlt, und überspringt nie still
   (`openspec/changes/archive/2026-10-01-lfh-729-druck-firefox-webkit-pdf-nachweis/design.md`, D1/D2).
+- **Die e2e-Anteile teilen nach gemessener Laufzeit, nicht nach Testzahl** (LFH-1117):
+  `PW_SHARD=k/n` geht an `frontend/playwright.config.ts`, die mit `scripts/e2e-anteile.mjs` und
+  `frontend/e2e/laufzeiten.json` die Dateien des Anteils wählt; nie zusätzlich `--shard` (die
+  Config bricht ab). Eine neue Spec zählt bis zur nächsten Messung mit dem Median. Auffrischen:
+  das Artefakt `e2e-laufzeiten` eines vollen Laufs einchecken; die Zusammenfassung des Jobs
+  „Testberichte zusammenführen“ zeigt, wie weit der langsamste Anteil über dem Mittel liegt.
 - **Keine Namen, die sich nur in der Groß-/Kleinschreibung unterscheiden** (LFH-1053, Schritt 14,
   `scripts/check-schreibweisen.sh`): je Verzeichnis weder ganze Namen noch Modulnamen (ohne
   TS/JS-Endung, Verzeichnisse zählen mit). Die CI läuft nur unter Linux; den Konflikt sah erst

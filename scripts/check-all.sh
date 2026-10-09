@@ -41,7 +41,7 @@ set -euo pipefail
 #   --abbrechen      nach dem ersten roten Schritt keinen weiteren starten (Vorgabe:
 #                    alle fahren und am Ende einmal rot melden)
 # Geteilt wird über die Umgebung, nicht über weitere Flags:
-#   VITEST_SHARD=1/3   PW_SHARD=2/4
+#   VITEST_SHARD=1/3   PW_SHARD=2/4 (e2e nach gemessener Laufzeit, LFH-1117)
 # Playwright-Projekte (Vorgabe: alle, so auch die CI; Firefox/WebKit fahren nur die Druck-Specs):
 #   PW_PROJEKTE=chromium   PW_PROJEKTE=firefox,webkit
 NUR="alle"
@@ -253,8 +253,10 @@ schritt_7() {
   fi
   # Den ermittelten Pfad weitergeben: die Suite nimmt genau das Binary, das hier geprüft wurde,
   # statt Cargo ein zweites Mal (unter `mise exec`, womöglich mit anderer Umgebung) zu fragen.
+  # `PW_SHARD` geht als Umgebung an die Config, nicht als `--shard`: sie verteilt nach
+  # gemessener Laufzeit statt nach Testzahl (LFH-1117, `scripts/e2e-anteile.mjs`).
   # `${a[@]+…}`: ein leeres Array unter `set -u` bricht in Bash 3.2 (macOS) sonst ab.
-  PW_BINAER="$binaer" $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"} \
+  PW_BINAER="$binaer" PW_SHARD="$PW_SHARD" $PNPM -C "$FE" exec playwright test \
     ${projekt_args[@]+"${projekt_args[@]}"}
 }
 
@@ -305,7 +307,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung (LFH-386/518/520/1101/1115)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, e2e-Anteile (LFH-386/518/520/1101/1115/1117)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -321,6 +323,9 @@ schritt_11() {
   # Die Bereichs-Erkennung (LFH-1115) entscheidet im PR, welche Suiten laufen: ein vergessener
   # Querbezug ließe eine Suite still aus, deren Rot erst auf `alpha` auffiele.
   "$ROOT/scripts/bereiche.test.sh"
+  # Die Verteilung der e2e-Anteile nach Laufzeit (LFH-1117): eine Datei, die in keinem Anteil
+  # landet, fährt nie, und keiner der vier Pflicht-Checks wird rot.
+  mise exec -- node --test "$ROOT/scripts/e2e-anteile.test.mjs"
 }
 
 schritt_12() {
