@@ -329,7 +329,12 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
   // Vorbedingung VOR der Messung, mit vollem Namen statt Regex: der Name trägt den Zustand,
   // und ein Fehlschlag soll die gestörte Nachbildung nennen, nicht das Layout. Gesperrt hieße
   // der Ton-Knopf „Ton blockiert – freischalten".
-  await expect(alarm.getByRole('button', { name: 'Benachrichtigungen: erlaubt' })).toBeVisible();
+  await expect(
+    alarm.getByRole('button', {
+      name: 'Benachrichtigung erlaubt',
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(alarm.getByRole('button', { name: 'Ton bereit – stummschalten' })).toBeVisible();
   // Ruhezustand ohne Wort — aber benannt: beide Ziele stehen mit Zustand im Namen da.
   await expect(alarm).toHaveText('');

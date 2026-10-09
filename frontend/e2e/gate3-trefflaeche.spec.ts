@@ -615,7 +615,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
     // Alarm-Knöpfe per Regex: ihr Name trägt den ZUSTAND (Browser-Berechtigung, Tonfreigabe),
     // ein exakter Name pinnte eine Umgebung.
     const desktop = await haeltStufe(
-      kopf.getByRole('button', { name: /^Benachrichtigungen:/ }),
+      kopf.getByRole('button', { name: /^Benachrichtigung / }),
       BODEN.staffel[dichte],
       `Alarm-Knopf Benachrichtigung (${dichte})`,
     );

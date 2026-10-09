@@ -245,7 +245,10 @@ test.describe('Fükw mit Maus: die längsten Zustandswörter in einer Kopfzeile'
           alarm.getByRole('button', { name: 'Ton blockiert – freischalten' }),
         ).toHaveText('Ton blockiert', { timeout: NACH_DER_FRIST });
         await expect(
-          alarm.getByRole('button', { name: `Benachrichtigungen: ${benachrichtigung}` }),
+          alarm.getByRole('button', {
+            name: `Benachrichtigung ${benachrichtigung}`,
+            exact: true,
+          }),
         ).toHaveText(`Benachrichtigung ${benachrichtigung}`);
         await kopfIstEinzeilig(tab, `${rolle} ${breite} px`);
         await tab.close();

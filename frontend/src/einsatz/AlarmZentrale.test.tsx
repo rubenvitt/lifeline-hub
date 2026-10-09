@@ -204,11 +204,11 @@ describe('AlarmZentrale', () => {
   it('zeigt den Benachrichtigungs-Status dauerhaft und aktiviert aus der User-Geste', async () => {
     const NotificationMock = stubNotification('default');
     renderAlarm();
-    const aus = screen.getByRole('button', { name: 'Benachrichtigungen: aus' });
+    const aus = screen.getByRole('button', { name: 'Benachrichtigung aus – aktivieren' });
     expect(aus).toHaveTextContent('Benachrichtigung aus');
     await userEvent.click(aus);
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Benachrichtigungen: erlaubt' })).toHaveTextContent(
+      expect(screen.getByRole('button', { name: 'Benachrichtigung erlaubt' })).toHaveTextContent(
         'Benachrichtigung erlaubt',
       );
     });
@@ -218,10 +218,22 @@ describe('AlarmZentrale', () => {
   it('zeigt Browser-Blockade dauerhaft an', () => {
     stubNotification('denied');
     renderAlarm();
-    const knopf = screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' });
+    const knopf = screen.getByRole('button', { name: 'Benachrichtigung blockiert' });
     expect(knopf).toHaveTextContent('Benachrichtigung blockiert');
     expect(knopf).toHaveStyle({ color: farbenDunkel.achtung });
   });
+
+  it.each(['default', 'granted', 'denied', 'unsupported'] as const)(
+    'Benachrichtigung %s: der sichtbare Zustand steht wortgleich vorn im Namen (WCAG 2.5.3)',
+    (permission) => {
+      if (permission === 'unsupported') Reflect.deleteProperty(window, 'Notification');
+      else stubNotification(permission);
+      renderAlarm();
+      const knopf = screen.getByRole('button', { name: /^Benachrichtigung / });
+      expect(knopf.textContent).toMatch(/^Benachrichtigung /);
+      expect(knopf.getAttribute('aria-label')!.startsWith(knopf.textContent!)).toBe(true);
+    },
+  );
 
   it('bündelt beim vierten Sofort-Ereignis die drei vorherigen und behält das neueste einzeln', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
@@ -518,7 +530,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
 
     // Die zwei Ziele der breiten Bauform sind WEG — sonst erfüllte auch ein zusätzlicher Knopf die
     // Aussage.
-    expect(screen.queryByRole('button', { name: 'Benachrichtigungen: blockiert' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Benachrichtigung blockiert' })).toBeNull();
     // Über ein MUSTER über alle drei Wortlaute: `tonStatus` dreht erst einen Microtask später auf
     // `bereit`, ein Literal träfe den Knopf in diesem Moment nicht und die Zeile belegte nichts.
     expect(screen.queryByRole('button', { name: /^Ton / })).toBeNull();
@@ -614,9 +626,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     setzeViewportBreite(768);
     renderAlarm();
 
-    expect(
-      screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Benachrichtigung blockiert' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
 });
@@ -699,7 +709,7 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     const ton = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
     await waitFor(() => expect(ton).toHaveAttribute('aria-pressed', 'false'));
     expect(ton).not.toHaveTextContent('Ton bereit');
-    const desktop = screen.getByRole('button', { name: 'Benachrichtigungen: aus' });
+    const desktop = screen.getByRole('button', { name: 'Benachrichtigung aus – aktivieren' });
     expect(desktop).not.toHaveTextContent('Benachrichtigung aus');
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
@@ -708,7 +718,7 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     stubAudioReady();
     stubNotification('denied');
     renderAlarm();
-    expect(screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' })).toHaveTextContent(
+    expect(screen.getByRole('button', { name: 'Benachrichtigung blockiert' })).toHaveTextContent(
       'Benachrichtigung blockiert',
     );
     await userEvent.click(
@@ -840,7 +850,7 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
     stubAudioReady();
     Reflect.deleteProperty(window, 'Notification');
     renderAlarm();
-    const knopf = screen.getByRole('button', { name: 'Benachrichtigungen: nicht verfügbar' });
+    const knopf = screen.getByRole('button', { name: 'Benachrichtigung nicht verfügbar' });
     expect(knopf).toHaveTextContent('Benachrichtigung nicht verfügbar');
     expect(knopf).toHaveStyle({ color: rahmenFarben.gedaempft });
     expect(knopf).toHaveAttribute('aria-disabled', 'true');
