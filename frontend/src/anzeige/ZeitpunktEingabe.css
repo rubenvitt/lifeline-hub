@@ -1,14 +1,16 @@
-/* Zeiteingabe unter `md` als Blatt am unteren Rand (LFH-953, `ZeitpunktEingabe.tsx`).
+/* Zeiteingabe als Blatt am unteren Rand (LFH-953, LFH-1076, `ZeitpunktEingabe.tsx`).
 
    antd legt Kalender und Uhrzeitspalten nebeneinander (ETB-Filter 437 px, mit Sekunden; in
-   `komfortabel` breiter) und richtet das Popup am Feld aus. Auf 390 px ragte es über den Rand:
-   Freitag, Samstag, die Uhrzeit und „OK“ lagen außerhalb, und die Seite bekam einen waagerechten
-   Überlauf. Mit `showTime` übernimmt antd den Wert erst nach „OK“, der Filter war unbedienbar.
+   `komfortabel` 797, in `handschuh` 1191 px) und richtet das Popup am Feld aus. Auf 390 px ragte
+   es über den Rand: Freitag, Samstag, die Uhrzeit und „OK“ lagen außerhalb, und die Seite bekam
+   einen waagerechten Überlauf. Auf dem Führungs-Tablet in `handschuh` ebenso. Mit `showTime`
+   übernimmt antd den Wert erst nach „OK“, der Filter war unbedienbar.
 
-   Darum unter `md`: das Popup steht fest am unteren Rand über die volle Breite, Kalender und
-   Uhrzeit untereinander, die Spalten teilen sich die Breite. Ein Ausrichten am Feld scheitert in
-   jeder Lage (rechtsbündig gekippt lag es links außerhalb), deshalb `!important` gegen die
-   Inline-Lage, die rc-trigger setzt.
+   Darum, wo das Panel nicht sicher neben das Feld passt (unter `md`; in `komfortabel` unter
+   `xxl`; in `handschuh` immer, `zeitPanelAmFeldAb`): das Popup steht fest am unteren Rand über
+   die volle Breite, Kalender und Uhrzeit untereinander, die Spalten teilen sich die Breite. Ein
+   Ausrichten am Feld scheitert dort in jeder Lage (rechtsbündig gekippt lag es links außerhalb),
+   deshalb `!important` gegen die Inline-Lage, die rc-trigger setzt.
 
    Das Blatt nimmt höchstens 85 % der Höhe: darüber bleibt ein Streifen, auf den man tippt, um es
    ohne Wert zu schließen (am Handy gibt es kein Escape, und „OK“ ist ohne Wert gesperrt). Ist der
