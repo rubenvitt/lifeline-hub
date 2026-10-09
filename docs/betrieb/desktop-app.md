@@ -286,7 +286,9 @@ und die Entwürfe, die Warteschlange bleibt (Beweissicherung).
 
 Der Rechner **muss** deshalb einen verschlüsselten Datenträger haben: FileVault auf dem Mac,
 BitLocker oder die Geräteverschlüsselung unter Windows. Eine Verschlüsselung in der App gibt
-es nicht. Begründung in [packaging.md](packaging.md#datenträgerverschlüsselung-ist-pflicht-lfh-1004).
+es nicht. Begründung in [packaging.md](packaging.md#datenträgerverschlüsselung-ist-pflicht-lfh-1004),
+Vorgaben für alle Endgeräte (Bildschirmsperre, Gemeinschaftsgeräte, Verlust) in
+[endgeraete.md](endgeraete.md).
 
 ## Grenzen (offen)
 
