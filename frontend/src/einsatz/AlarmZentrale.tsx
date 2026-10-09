@@ -20,8 +20,10 @@ import {
   type AlarmTonStatus,
 } from '../alarm/alarmTon';
 import {
+  DESKTOP_ZUSTAND_EVENT,
   desktopPermission,
   fordereDesktopPermission,
+  type DesktopMeldung,
   schliesseAlleDesktopAlarme,
   schliesseDesktopAlarm,
   schliesseDesktopMeldung,
@@ -128,7 +130,7 @@ type AlarmScope = {
   /** `tag` der Desktop-Meldung zum letzten Unwetterhinweis — ein neuer ersetzt auch sie. */
   unwetterTag: string | null;
   /** Desktop-Meldung je Toast-Key: Quittieren im Toast schließt sie mit (LFH-951). */
-  desktopMeldungen: Map<string, Notification>;
+  desktopMeldungen: Map<string, DesktopMeldung>;
 };
 
 /**
@@ -416,11 +418,15 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       setPermission(desktopPermission());
       if (!document.hidden) schliesseAlleDesktopAlarme();
     };
+    // Der Service Worker bestätigt den zweiten Weg erst nach dem Mount (LFH-1062).
+    const neuLesen = () => setPermission(desktopPermission());
     window.addEventListener('focus', aktualisieren);
     document.addEventListener('visibilitychange', aktualisieren);
+    window.addEventListener(DESKTOP_ZUSTAND_EVENT, neuLesen);
     return () => {
       window.removeEventListener('focus', aktualisieren);
       document.removeEventListener('visibilitychange', aktualisieren);
+      window.removeEventListener(DESKTOP_ZUSTAND_EVENT, neuLesen);
     };
   }, []);
 
@@ -459,6 +465,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       const desktop = zeigeDesktopAlarm('Sofortmeldung eingegangen', {
         koerper: SOFORT_ZUSTAND,
         tag: desktopTag,
+        ziel: meldungenPfad(einsatzId),
         beiKlick: () => {
           if (alarmScope.aktiv) navigate(meldungenPfad(einsatzId));
         },
@@ -515,6 +522,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       const desktop = zeigeDesktopAlarm(titel, {
         koerper: beschreibung,
         tag: desktopTag,
+        ziel,
         beiKlick: () => {
           if (alarmScope.aktiv) navigate(ziel);
         },
@@ -563,6 +571,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       const desktop = zeigeDesktopAlarm(titel, {
         koerper: beschreibung,
         tag: desktopTag,
+        ziel,
         beiKlick: () => {
           if (alarmScope.aktiv) navigate(ziel);
         },
@@ -621,6 +630,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       const desktop = zeigeDesktopAlarm(titel, {
         koerper: beschreibung,
         tag: desktopTag,
+        ziel,
         beiKlick: () => {
           if (alarmScope.aktiv) navigate(ziel);
         },
