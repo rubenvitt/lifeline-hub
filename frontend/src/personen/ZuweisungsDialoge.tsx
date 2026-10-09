@@ -11,7 +11,6 @@ import { aenderePersonBelegung } from '../api/einsatzUhs';
 import type { Uhs } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { SPEZIES_META } from '../pages/tiere/tierHelfer';
 
 /**
@@ -20,7 +19,8 @@ import { SPEZIES_META } from '../pages/tiere/tierHelfer';
  * Auswahlmasken: Enter schluckt der `Select`, die Struktur belegt der Seitentest.
  *
  * Jeder Dialog besitzt seine Mutation; was danach ungültig wird, sagt die Seite über
- * `onZugewiesen`. Schliessen und Leeren besorgt die Hülle.
+ * `onZugewiesen`. Schliessen und Leeren besorgt die Hülle, ebenso den Grund einer Ablehnung: er
+ * steht im Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
  */
 
 interface ZuweisungsDialogProps {
@@ -57,7 +57,6 @@ export function UhsZuweisenDialog({
   uhsListe: Uhs[];
 }) {
   const [form] = Form.useForm<UhsWerte>();
-  const fehler = useFehlerMeldung();
   const belegungMutation = useMutation({
     mutationFn: (v: UhsWerte) =>
       aenderePersonBelegung(einsatzId, personId, {
@@ -66,7 +65,6 @@ export function UhsZuweisenDialog({
         notiz: v.notiz ?? null,
       }),
     onSuccess: onZugewiesen,
-    onError: fehler,
   });
 
   return (
@@ -76,6 +74,8 @@ export function UhsZuweisenDialog({
       form={form}
       erfassenText="Zuweisen"
       laeuft={belegungMutation.isPending}
+      speicherung={belegungMutation}
+      speicherFehlerTitel="Nicht zugewiesen"
       onErfassen={(v) => belegungMutation.mutateAsync(v)}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
@@ -113,7 +113,6 @@ export function TierZuweisenDialog({
   onSchliessen,
 }: ZuweisungsDialogProps) {
   const [form] = Form.useForm<{ tier_id: number }>();
-  const fehler = useFehlerMeldung();
   const tiereQuery = useQuery({
     queryKey: einsatzKeys.tiere(einsatzId),
     queryFn: () => listeTiere(einsatzId),
@@ -126,7 +125,6 @@ export function TierZuweisenDialog({
     mutationFn: (tierId: number) =>
       aktualisiereTier(einsatzId, tierId, { halter_person_id: personId, halter_kontakt: null }),
     onSuccess: onZugewiesen,
-    onError: fehler,
   });
 
   return (
@@ -136,6 +134,8 @@ export function TierZuweisenDialog({
       form={form}
       erfassenText="Zuweisen"
       laeuft={zuweisenMutation.isPending}
+      speicherung={zuweisenMutation}
+      speicherFehlerTitel="Nicht zugewiesen"
       onErfassen={(v) => zuweisenMutation.mutateAsync(v.tier_id)}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
@@ -172,7 +172,6 @@ export function SchadenZuweisenDialog({
   onSchliessen,
 }: ZuweisungsDialogProps) {
   const [form] = Form.useForm<{ schaden_id: number }>();
-  const fehler = useFehlerMeldung();
   // Die Auswahl kennt alle nicht stornierten Schäden, auch bei großem Bestand (LFH-1075).
   const schaedenQuery = useQuery({
     queryKey: einsatzKeys.schaedenAuswahl(einsatzId),
@@ -191,7 +190,6 @@ export function SchadenZuweisenDialog({
         geschaedigt_kontakt: null,
       }),
     onSuccess: onZugewiesen,
-    onError: fehler,
   });
 
   return (
@@ -201,6 +199,8 @@ export function SchadenZuweisenDialog({
       form={form}
       erfassenText="Zuweisen"
       laeuft={zuweisenMutation.isPending}
+      speicherung={zuweisenMutation}
+      speicherFehlerTitel="Nicht zugewiesen"
       onErfassen={(v) => zuweisenMutation.mutateAsync(v.schaden_id)}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}

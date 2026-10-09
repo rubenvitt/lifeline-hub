@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -699,7 +699,12 @@ describe('TierePage', () => {
     expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBeNull();
   });
 
-  it('speichert den Antreffort nach Schließen während des POST nicht', async () => {
+  /**
+   * Der Dialog wartet auf die Antwort (LFH-1077, design.md D3): solange erfasst wird, sind Kreuz
+   * und Abbrechen gesperrt, sonst hätte eine Ablehnung keinen Ort mehr. Erst der Erfolg schließt
+   * und merkt den Antreffort.
+   */
+  it('sperrt das Schließen, solange erfasst wird; erst der Erfolg schließt und merkt den Ort', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
     const postStart = new Promise<void>((resolve) => {
@@ -713,12 +718,7 @@ describe('TierePage', () => {
         postGestartet();
         await antwortGate;
         return HttpResponse.json(
-          {
-            ...tierBasis,
-            id: 99,
-            registrier_nr: 99,
-            rufname: 'Abbruch-Tier',
-          },
+          { ...tierBasis, id: 99, registrier_nr: 99, rufname: 'Warte-Tier' },
           { status: 201 },
         );
       }),
@@ -726,17 +726,21 @@ describe('TierePage', () => {
     render(einsatzAktiv, []);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Abbruchort Tier');
-    await userEvent.type(screen.getByLabelText('Rufname'), 'Abbruch-Tier');
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Wartort Tier');
+    await userEvent.type(screen.getByLabelText('Rufname'), 'Warte-Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await postStart;
-    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    expect(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBeNull();
+
     await act(async () => {
       antwortFreigeben();
     });
-    await screen.findByText('Abbruch-Tier');
-
-    expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBeNull();
+    await warteBisDialogWeg();
+    await waitFor(() =>
+      expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBe('Wartort Tier'),
+    );
   });
 
   it('liest nur den Tierwert des aktuellen Einsatzes und füllt ihn nach Serien-Reset nicht erneut ein', async () => {
@@ -1117,5 +1121,117 @@ describe('TierePage — Einstieg in den Druck (LFH-727)', () => {
     });
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' }));
     expect(await screen.findByText('DRUCK-SEITE')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Der Grund einer Ablehnung steht im Erfassungsdialog, kein Toast (LFH-1077,
+ * `frontend/AGENTS.md`, „Rückwege und Fehler“).
+ */
+describe('TierePage — Ablehnung im Dialog (LFH-1077)', () => {
+  const ablehnen = () => HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 });
+
+  async function erfasse(rufname: string) {
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Rufname'), rufname);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    return dialog;
+  }
+
+  it('nennt den Grund im Dialog, behält den Wortlaut und zeigt keinen Toast', async () => {
+    server.use(http.post('/api/einsaetze/1/tiere', ablehnen));
+    render(einsatzAktiv, []);
+    const dialog = await erfasse('Rex');
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Einsatz ist abgeschlossen');
+    expect(within(dialog).getByLabelText('Rufname')).toHaveValue('Rex');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('das nächste Absenden räumt den Grund; solange es läuft, ist Abbrechen gesperrt', async () => {
+    let erster = true;
+    server.use(
+      http.post('/api/einsaetze/1/tiere', async () => {
+        if (erster) {
+          erster = false;
+          return ablehnen();
+        }
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
+    render(einsatzAktiv, []);
+    const dialog = await erfasse('Rex');
+    await within(dialog).findByRole('alert');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
+    server.use(http.post('/api/einsaetze/1/tiere', ablehnen));
+    render(einsatzAktiv, []);
+    const dialog = await erfasse('Rex');
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
+    const wieder = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
+  });
+
+  /**
+   * Das Anlegen in Einsatz A gehört nicht in den Dialog von B: weder sperrt es dort das
+   * Abbrechen, noch steht seine späte Ablehnung darin.
+   */
+  it('ein laufendes Anlegen aus Einsatz A sperrt in B nichts und meldet dort nichts', async () => {
+    let postGestartet!: () => void;
+    let antwortFreigeben!: () => void;
+    const postStart = new Promise<void>((r) => (postGestartet = r));
+    const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+        const id = Number(params.einsatzId);
+        return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
+      }),
+      http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/tiere', async () => {
+        postGestartet();
+        await antwortGate;
+        return ablehnen();
+      }),
+    );
+    const { client } = renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/tiere"
+          element={
+            <>
+              <EinsatzWechsel />
+              <TierePage />
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/1/tiere' },
+    );
+    await erfasse('Rex');
+    await postStart;
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await screen.findByText('Einsatz 2');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
+    const dialogB = await screen.findByRole('dialog');
+    expect(within(dialogB).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+
+    await act(async () => antwortFreigeben());
+    // Die Ablehnung aus A ist durch: erst jetzt ist „kein Grund in B“ eine Aussage.
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+    expect(within(dialogB).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 });

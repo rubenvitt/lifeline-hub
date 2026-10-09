@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { App, Collapse, Form, Input } from 'antd';
+import { Collapse, Form, Input } from 'antd';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { legeSchadenAn, type SchadenEingabe } from '../../api/einsatzSchaden';
 import type { Ausmass, SchadenTyp } from '../../api/types';
-import { ErfassungsModal } from '../../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
 import FormularEingehaengt from '../../components/FormularEingehaengt';
 import { useFormularEingehaengt } from '../../components/useFormularEingehaengt';
 import KoordinatenFeld from '../../anzeige/KoordinatenFeld';
@@ -49,7 +48,6 @@ type SchadenFormular = Omit<SchadenEingabe, 'lat' | 'lon'> & {
  * Hülle; nur „Geschädigt" liegt in lokalem State und wird hier geleert.
  */
 export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, orgName }: Props) {
-  const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<SchadenFormular>();
   const geladeneOeffnung = useRef<string | null>(null);
@@ -79,13 +77,24 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
   }, [einsatzId, form, formular.da, formular.jeDa, open]);
 
   const anlegenMutation = useMutation({
-    mutationFn: (v: SchadenEingabe) => legeSchadenAn(einsatzId, v),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    mutationFn: (v: { einsatzId: number; daten: SchadenEingabe }) =>
+      legeSchadenAn(v.einsatzId, v.daten),
+    onSuccess: (_schaden, v) => {
+      qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(v.einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(v.einsatzId) });
     },
-    onError: (e: unknown) => message.error(fehlerText(e)),
   });
+  /*
+   * Der Dialog hat keinen `key` und bleibt über einen Einsatzwechsel derselbe: nur das Anlegen
+   * DIESES Einsatzes gehört hinein. Ein laufendes aus dem vorigen sperrt hier kein Abbrechen, seine
+   * Ablehnung steht hier nicht (wie `pages/TierePage.tsx`).
+   */
+  const diesesAnlegen = anlegenMutation.variables?.einsatzId === einsatzId;
+  const anlegenSpeicherung: Speicherung = {
+    error: diesesAnlegen ? anlegenMutation.error : null,
+    isPending: diesesAnlegen && anlegenMutation.isPending,
+    reset: anlegenMutation.reset,
+  };
 
   /**
    * `mutateAsync`, nicht `mutate`: die Hülle leert nur, wenn der Datensatz angekommen ist.
@@ -97,13 +106,16 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
   async function onErfassen(daten: SchadenFormular) {
     const koord = alsLatLon(daten.koordinaten);
     await anlegenMutation.mutateAsync({
-      typ: daten.typ,
-      ausmass: daten.ausmass,
-      ort: daten.ort,
-      beschreibung: daten.beschreibung ?? null,
-      lat: koord?.lat ?? null,
-      lon: koord?.lon ?? null,
-      ...geschaedigtFelder(geschaedigt, orgId),
+      einsatzId,
+      daten: {
+        typ: daten.typ,
+        ausmass: daten.ausmass,
+        ort: daten.ort,
+        beschreibung: daten.beschreibung ?? null,
+        lat: koord?.lat ?? null,
+        lon: koord?.lon ?? null,
+        ...geschaedigtFelder(geschaedigt, orgId),
+      },
     });
   }
 
@@ -124,7 +136,11 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
         setGeschaedigt(null);
         onClose();
       }}
-      laeuft={anlegenMutation.isPending}
+      laeuft={anlegenSpeicherung.isPending}
+      // Grund einer Ablehnung im Dialog, kein Toast (LFH-1077); Öffnen und Abbrechen räumen ihn.
+      speicherung={anlegenSpeicherung}
+      speicherFehlerTitel="Nicht angelegt"
+      speicherFehlerFallback="Anlegen fehlgeschlagen"
       erfassenText="Anlegen"
       serie
       uebernahme={['ort']}

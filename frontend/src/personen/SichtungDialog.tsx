@@ -4,7 +4,6 @@ import { erfasseSichtung } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import { SK_META } from './personMeta';
 
@@ -37,12 +36,10 @@ export default function SichtungDialog({
   onSchliessen,
 }: SichtungDialogProps) {
   const [form] = Form.useForm<SichtungWerte>();
-  const fehler = useFehlerMeldung();
   const sichtungMutation = useMutation({
     mutationFn: (v: SichtungWerte) =>
       erfasseSichtung(einsatzId, personId, v.kategorie, v.notiz ?? null, v.bestaetigt_personal_id),
     onSuccess: onErfasst,
-    onError: fehler,
   });
 
   return (
@@ -52,6 +49,9 @@ export default function SichtungDialog({
       form={form}
       erfassenText="Übernehmen"
       laeuft={sichtungMutation.isPending}
+      // Grund einer Ablehnung im Dialog, bis zum nächsten Absenden (LFH-1077).
+      speicherung={sichtungMutation}
+      speicherFehlerTitel="Sichtung nicht gespeichert"
       onErfassen={(v) => sichtungMutation.mutateAsync(v)}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}

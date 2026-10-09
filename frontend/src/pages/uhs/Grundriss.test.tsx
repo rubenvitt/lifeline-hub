@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { server } from '../../test/server';
 import { App as AntApp, ConfigProvider } from 'antd';
@@ -22,6 +22,24 @@ import {
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 import { setzeMasse } from '../../test/elementMasse';
+import type { DragEndEvent } from '@dnd-kit/core';
+
+/**
+ * Der Abwurf eines Zugs, abgegriffen am `DndContext` (sonst unverändert): jsdom misst keine
+ * Rechtecke, ein Zug träfe kein Ziel. So prüfen Tests, was ein Abwurf auf ein Ziel auslöst.
+ */
+const zug = vi.hoisted(() => ({ ende: null as ((e: DragEndEvent) => void) | null }));
+vi.mock('@dnd-kit/core', async (echtImport) => {
+  const echt = await echtImport<typeof import('@dnd-kit/core')>();
+  const { createElement } = await import('react');
+  return {
+    ...echt,
+    DndContext: (props: Parameters<typeof echt.DndContext>[0]) => {
+      zug.ende = props.onDragEnd ?? null;
+      return createElement(echt.DndContext, props);
+    },
+  };
+});
 
 // Diese Datei prüft den Grundriss in der Drei-Spalten-Form, alle Bereiche zugleich im Baum. Seit
 // LFH-970 entscheidet die gemessene Rahmenbreite, nicht die Fensterbreite; jsdom misst 0 (Reiter).
@@ -1721,5 +1739,360 @@ describe('Grundriss – Knopf „Plan“ (LFH-999)', () => {
     expect(document.getElementById(knopf.getAttribute('aria-controls')!)).toContainElement(region);
     await userEvent.click(knopf);
     expect(screen.queryByRole('region', { name: 'Plan' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
+  const toasts = () => document.querySelectorAll('.ant-message-notice').length;
+  /** Der Hinweis über der Fläche: je Platz eine Zeile mit Bezeichnung und Grund. */
+  const flaechenGrund = (bezeichnung: string) =>
+    [...document.querySelectorAll<HTMLElement>('[data-lfh="platz-fehler"]')].find((z) =>
+      z.textContent?.startsWith(bezeichnung),
+    ) ?? null;
+  const karte = (bezeichnung: string) =>
+    screen.getAllByTestId('platz-karte').find((k) => k.textContent?.startsWith(bezeichnung))!;
+  /** Der zuletzt geöffnete Dialog: rc-dialog friert schließende Dialoge in jsdom ein. */
+  const dialog = async () => {
+    await screen.findAllByRole('dialog');
+    return screen.getAllByRole('dialog').pop()!;
+  };
+  function tor() {
+    let frei: () => void = () => {};
+    const offen = new Promise<void>((r) => (frei = r));
+    return { offen, frei: () => frei() };
+  }
+  const zweiPlaetze = () =>
+    uhsDetail({
+      status: 'aktiv',
+      plaetze: [
+        platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' }),
+        platz({ id: 11, bezeichnung: 'Bett 2', pos_x: 200, verfuegbarkeit: 'aufbereitung' }),
+      ],
+    });
+  const belegt = () =>
+    person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+
+  it('Zurückweisen: der Grund steht über der Fläche beim Platz, die Karte trägt die Marke', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+        HttpResponse.json({ error: 'Person hat offene Sichtung' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), [belegt()]);
+    await userEvent.click(await screen.findByRole('button', { name: 'zurückweisen' }));
+
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+    expect(within(flaechenGrund('Bett 1')!).getByRole('alert')).toHaveTextContent(
+      'Person hat offene Sichtung',
+    );
+    expect(karte('Bett 1')).toHaveAttribute('data-fehler', 'true');
+    expect(flaechenGrund('Bett 2')).toBeNull();
+    expect(karte('Bett 2')).not.toHaveAttribute('data-fehler');
+    expect(toasts()).toBe(0);
+  });
+
+  it('die Karte mit Grund trägt den Rand aus `colorError`, die Meldung nennt den Platz', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+        HttpResponse.json({ error: 'Person hat offene Sichtung' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), [belegt()]);
+    await userEvent.click(await screen.findByRole('button', { name: 'zurückweisen' }));
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+
+    // Eine Farbe über jsdom normiert, wie sie im Stil der Karte steht.
+    const normiert = (farbe: string) => {
+      const probe = document.createElement('div');
+      probe.style.color = farbe;
+      return probe.style.color;
+    };
+    const fehlerFarbe = normiert(antdToken(farbenDunkel, 'kompakt')!.colorError!);
+    expect(karte('Bett 1').style.borderColor).toBe(fehlerFarbe);
+    expect(karte('Bett 2').style.borderColor).not.toBe(fehlerFarbe);
+    // Vorgelesen wird der Platz mit dem Grund, nicht der Grund allein.
+    expect(within(flaechenGrund('Bett 1')!).getByRole('alert')).toHaveTextContent(
+      'Bett 1 · Person hat offene Sichtung',
+    );
+  });
+
+  it('der Grund eines Platzes, den es nicht mehr gibt, steht nicht über der Fläche', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+        HttpResponse.json({ error: 'Person hat offene Sichtung' }, { status: 409 }),
+      ),
+    );
+    const { neu } = renderGrundriss(zweiPlaetze(), [belegt()]);
+    await userEvent.click(await screen.findByRole('button', { name: 'zurückweisen' }));
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+
+    neu(uhsDetail({ status: 'aktiv', plaetze: [zweiPlaetze().plaetze[1]] }));
+    await waitFor(() => expect(screen.queryByText('Bett 1')).toBeNull());
+    expect(document.querySelector('[data-lfh="platz-fehler"]')).toBeNull();
+    expect(screen.queryByText('Person hat offene Sichtung')).toBeNull();
+  });
+
+  it('Verfügbarkeit: zwei Plätze nebenläufig, die späte Ablehnung des ersten steht bei ihm', async () => {
+    const erste = tor();
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/:pid/verfuegbarkeit', async ({ params }) => {
+        if (params.pid === '10') {
+          await erste.offen;
+          return HttpResponse.json({ error: 'Platz ist reserviert' }, { status: 409 });
+        }
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
+    renderGrundriss(zweiPlaetze(), []);
+    const [frei1, frei2] = await screen.findAllByRole('button', { name: 'als frei markieren' });
+    await userEvent.click(frei1);
+    await userEvent.click(frei2);
+    await act(async () => erste.frei());
+
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+    expect(flaechenGrund('Bett 1')).toHaveTextContent('Platz ist reserviert');
+    expect(flaechenGrund('Bett 2')).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Verfügbarkeit: die nächste Aktion am Platz räumt den Grund', async () => {
+    let erster = true;
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', async () => {
+        if (erster) {
+          erster = false;
+          return HttpResponse.json({ error: 'Platz ist reserviert' }, { status: 409 });
+        }
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
+    renderGrundriss(zweiPlaetze(), []);
+    const knopf = (await screen.findAllByRole('button', { name: 'als frei markieren' }))[0];
+    await userEvent.click(knopf);
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+
+    await userEvent.click(knopf);
+    await waitFor(() => expect(flaechenGrund('Bett 1')).toBeNull());
+    expect(karte('Bett 1')).not.toHaveAttribute('data-fehler');
+  });
+
+  it('Zurück in den Wartebereich: der Grund steht beim Platz, nicht in einem Dialog', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+        HttpResponse.json({ error: 'Wartebereich voll' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), [belegt()]);
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await userEvent.click(within(menue).getByText('Zurück in den Wartebereich'));
+
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+    expect(flaechenGrund('Bett 1')).toHaveTextContent('Wartebereich voll');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Zurück in den Wartebereich: eine Ablehnung rollt die Person auf ihr Bett zurück', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+        HttpResponse.json({ error: 'Wartebereich voll' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), [belegt()]);
+    await waitFor(() => expect(karte('Bett 1')).toHaveTextContent('R-007'));
+    // Nur das Zurückrollen bringt sie zurück: jeder spätere Abruf der Personen bleibt aus.
+    server.use(
+      http.get('/api/einsaetze/1/personen', async () => {
+        await delay('infinite');
+        return HttpResponse.json([]);
+      }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await userEvent.click(within(menue).getByText('Zurück in den Wartebereich'));
+
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+    expect(karte('Bett 1')).toHaveTextContent('R-007');
+  });
+
+  it('Ziehen in den Wartebereich: der Grund steht im Wartebereich, nicht über der Fläche', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/5/uhs-belegung', () =>
+        HttpResponse.json({ error: 'UHS nicht aktiv' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), [person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null })]);
+    await screen.findAllByTestId('platz-karte');
+    act(() =>
+      zug.ende!({
+        active: { id: 'person-5', data: { current: { kind: 'person', personId: 5 } } },
+        over: { id: 'drop-inbox', data: { current: { kind: 'inbox' } } },
+        delta: { x: 0, y: 0 },
+      } as unknown as DragEndEvent),
+    );
+
+    const wartebereich = screen
+      .getByText('Wartebereich (Eingang)')
+      .closest<HTMLElement>('[data-lfh="paneel"]')!;
+    expect(await within(wartebereich).findByRole('alert')).toHaveTextContent('UHS nicht aktiv');
+    expect(document.querySelector('[data-lfh="platz-fehler"]')).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Platz verschieben: der Grund steht beim Platz, kein Toast', async () => {
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = () => {};
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = vorher;
+    });
+    server.use(
+      http.patch('/api/einsaetze/1/uhs/1/plaetze/10', () =>
+        HttpResponse.json({ error: 'Position belegt' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
+    karte('Bett 1').focus();
+    await userEvent.keyboard(' ');
+    await userEvent.keyboard('{ArrowRight}');
+    await userEvent.keyboard(' ');
+
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+    expect(flaechenGrund('Bett 1')).toHaveTextContent('Position belegt');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Platz löschen: der Grund steht beim Platz, kein Toast', async () => {
+    server.use(
+      http.delete('/api/einsaetze/1/uhs/1/plaetze/10', () =>
+        HttpResponse.json({ error: 'Platz ist belegt' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await userEvent.click(within(menue).getByText('Platz löschen'));
+
+    await waitFor(() => expect(flaechenGrund('Bett 1')).not.toBeNull());
+    expect(flaechenGrund('Bett 1')).toHaveTextContent('Platz ist belegt');
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+  });
+
+  it('Patient zuweisen per Auswahl: der Grund steht im Dialog, nicht über der Fläche', async () => {
+    const zweiter = tor();
+    let versuche = 0;
+    server.use(
+      http.post('/api/einsaetze/1/personen/5/uhs-belegung', async () => {
+        versuche += 1;
+        if (versuche > 1) await zweiter.offen;
+        return HttpResponse.json({ error: 'Platz inzwischen belegt' }, { status: 409 });
+      }),
+    );
+    renderGrundriss(
+      uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] }),
+      [person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null })],
+    );
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+    const d = await dialog();
+    await userEvent.click(within(d).getByRole('combobox', { name: 'Patient' }));
+    const liste = await waitFor(() => {
+      const el = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+      if (!el) throw new Error('kein offenes Auswahlfeld');
+      return el as HTMLElement;
+    });
+    await userEvent.click(within(liste).getByText(/R-005/));
+    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+
+    const grund = await within(d).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht zugewiesen');
+    expect(grund).toHaveTextContent('Platz inzwischen belegt');
+    expect(flaechenGrund('Bett 1')).toBeNull();
+    expect(toasts()).toBe(0);
+
+    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(within(d).queryByRole('alert')).toBeNull());
+    expect(within(d).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    await act(async () => zweiter.frei());
+    await within(d).findByRole('alert');
+
+    await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByTestId('platz-karte'));
+    expect(within(await dialog()).queryByRole('alert')).toBeNull();
+  });
+
+  it('Verbleib: der Grund steht im Dialog, Abbrechen und Öffnen zeigen ihn nicht', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/verbleib', () =>
+        HttpResponse.json({ error: 'Verbleib abgelehnt' }, { status: 409 }),
+      ),
+    );
+    renderGrundriss(zweiPlaetze(), [belegt()]);
+    const oeffnen = await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' });
+    await userEvent.click(oeffnen);
+    const d = await dialog();
+    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+
+    expect(await within(d).findByRole('alert')).toHaveTextContent('Verbleib abgelehnt');
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+
+    await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(oeffnen);
+    expect(within(await dialog()).queryByRole('alert')).toBeNull();
+  });
+
+  it('Plätze anlegen: der Grund steht am Block, das nächste Anlegen räumt ihn, Abbrechen auch', async () => {
+    let erster = true;
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async () => {
+        if (erster) {
+          erster = false;
+          return HttpResponse.json({ error: 'Zu viele Plätze' }, { status: 422 });
+        }
+        await delay('infinite');
+        return HttpResponse.json([]);
+      }),
+    );
+    renderGrundriss(uhsDetail({ plaetze: [], status: 'geplant' }), []);
+    await userEvent.click(screen.getByRole('button', { name: 'Plätze anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    const block = () =>
+      screen
+        .getByRole('button', { name: /Anlegen/ })
+        .closest<HTMLElement>('[data-lfh="plaetze-anlegen"]')!;
+    const grund = await within(block()).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht angelegt');
+    expect(grund).toHaveTextContent('Zu viele Plätze');
+    expect(toasts()).toBe(0);
+
+    await userEvent.click(screen.getByRole('button', { name: /Anlegen/ }));
+    await waitFor(() => expect(within(block()).queryByRole('alert')).toBeNull());
+  });
+
+  it('Plätze anlegen: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', () =>
+        HttpResponse.json({ error: 'Zu viele Plätze' }, { status: 422 }),
+      ),
+    );
+    renderGrundriss(uhsDetail({ plaetze: [], status: 'geplant' }), []);
+    await userEvent.click(screen.getByRole('button', { name: 'Plätze anlegen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await screen.findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Plätze anlegen' }));
+    expect(screen.getByRole('button', { name: /Anlegen/ })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

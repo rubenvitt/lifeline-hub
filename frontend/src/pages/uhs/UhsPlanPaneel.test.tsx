@@ -8,6 +8,7 @@ import { installiereXhrAttrappe } from '../../test/xhrAttrappe';
 import { einpassen, type UhsPlan } from '../../api/uhsPlan';
 import type { UhsAnhang, UhsDetail, UhsPlatz } from '../../api/types';
 import UhsPlanPaneel, { PLAN_ACCEPT } from './UhsPlanPaneel';
+import { UPLOAD_MAX_GROESSE } from '../../api/upload';
 
 const PLAN: UhsPlan = {
   uhs_id: 1,
@@ -277,5 +278,33 @@ describe('UhsPlanPaneel (LFH-999)', () => {
     zeichne(uhs({ plan: PLAN }));
     await userEvent.click(screen.getByRole('switch', { name: 'Im Nachtbetrieb umkehren' }));
     expect(await screen.findByText('Plan nicht gefunden')).toBeInTheDocument();
+  });
+
+  it('nennt eine zu große Datei am Hochladen, ohne Anfrage und ohne Toast', async () => {
+    planServer();
+    const anfragen = installiereXhrAttrappe();
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    const { container } = zeichne(uhs());
+    const eingabe = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const gross = new File(['png'], 'riesig.png', { type: 'image/png' });
+    Object.defineProperty(gross, 'size', { value: UPLOAD_MAX_GROESSE + 1 });
+    await userEvent.upload(eingabe, gross);
+
+    const feld = screen
+      .getByRole('button', { name: /Plan hochladen/ })
+      .closest<HTMLElement>('[data-lfh="plan-datei"]')!;
+    expect(await within(feld).findByRole('alert')).toHaveTextContent('Datei ist zu groß');
+    expect(anfragen).toHaveLength(0);
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    // Die nächste Wahl räumt den Hinweis. rc-upload tauscht das Eingabefeld nach jeder Wahl aus.
+    await userEvent.upload(
+      container.querySelector<HTMLInputElement>('input[type="file"]')!,
+      new File(['png'], 'halle.png', { type: 'image/png' }),
+    );
+    await waitFor(() => expect(anfragen).toHaveLength(1));
+    expect(within(feld).queryByRole('alert')).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { Form } from 'antd';
 import { useEffect, useRef } from 'react';
-import { ErfassungsModal } from '../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 import {
@@ -39,6 +39,11 @@ interface Props {
   onFertig: () => void;
   /** Abbrechen/Schließen. Der Aufrufer setzt `modus` auf `null`. */
   onCancel: () => void;
+  /**
+   * Fehler und Lauf der Anlage über DIESE Maske (LFH-1077): die Hülle zeigt den Grund im Dialog
+   * und räumt ihn beim Öffnen und Abbrechen. Die Erfassungszeile meldet ihre Fehler selbst.
+   */
+  speicherung?: Speicherung;
 }
 
 /**
@@ -61,6 +66,7 @@ export default function PersonErfassungModal({
   onErfassen,
   onFertig,
   onCancel,
+  speicherung,
 }: Props) {
   const [form] = Form.useForm<AufnahmeWerte>();
   const geladeneOeffnung = useRef<string | null>(null);
@@ -99,6 +105,8 @@ export default function PersonErfassungModal({
       onFertig={onFertig}
       onAbbrechen={onCancel}
       laeuft={isPending}
+      speicherung={speicherung}
+      speicherFehlerTitel="Person nicht erfasst"
       serie
       uebernahme={['antreff_ort']}
     >

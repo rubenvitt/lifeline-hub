@@ -1934,6 +1934,9 @@ export default function Datensicht<T extends object, const K extends string>(
   const zeilenKlick = onZeileKlick
     ? (zeile: T): HTMLAttributes<HTMLElement> => ({
         onClick: (event) => {
+          // Ein Portal (Auswahlliste eines Selects in der Zeile) reicht seinen Klick an die Zeile
+          // weiter, liegt im DOM aber woanders: er gehört nicht der Zeile (wie im Baum unten).
+          if (!event.currentTarget.contains(event.target as Node)) return;
           if ((event.target as HTMLElement).closest('a')) return;
           onZeileKlick(zeile);
         },
@@ -2329,6 +2332,47 @@ export default function Datensicht<T extends object, const K extends string>(
     kartenListen
   );
 
+  /**
+   * Gründe, deren Zeile in `daten` steht, aber hinter Suche, Filter oder Sammelbanner verborgen ist
+   * (LFH-1077): sonst schwiege die Sicht über eine Ablehnung, bis jemand den Filter löst. Sie
+   * stehen über der Liste, je Zeile mit ihrer Kennung (Kartentitel, sonst erste Spalte).
+   */
+  const gezeigteSchluessel = useMemo(
+    () => new Set(sichtbareZeilen.map(schluessel)),
+    [sichtbareZeilen, schluessel],
+  );
+  const kennungsSpalte =
+    (karte.art === 'plan' ? spalten.find((s) => s.key === karte.titel.spalte) : undefined) ??
+    spalten[0];
+  const verdeckteFehler = zeilenFehler
+    ? daten.flatMap((zeile, index) => {
+        const k = schluessel(zeile);
+        if (gezeigteSchluessel.has(k)) return [];
+        const grund = zeilenFehler(zeile);
+        return grund ? [{ k, zeile, index, grund }] : [];
+      })
+    : [];
+  const verdeckteFehlerBlock = verdeckteFehler.length > 0 && (
+    <div
+      data-lfh="datensicht-verdeckte-fehler"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: token.marginXXS,
+        marginBlockEnd: token.marginXS,
+      }}
+    >
+      {verdeckteFehler.map(({ k, zeile, index, grund }) => (
+        <ZeilenFehler
+          key={String(k)}
+          fehler={grund.fehler}
+          fallback={grund.fallback}
+          kennung={kennungsSpalte ? zelle(kennungsSpalte, zeile, index) : String(k)}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <section
       ref={wurzel}
@@ -2339,6 +2383,7 @@ export default function Datensicht<T extends object, const K extends string>(
       onPointerLeave={zeigerRaus}
     >
       {werkzeugzeile}
+      {verdeckteFehlerBlock}
       {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}
       {alsTabelle ? tabelle : kartenZweig}
     </section>

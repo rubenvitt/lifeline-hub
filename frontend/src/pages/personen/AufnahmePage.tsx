@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Form } from 'antd';
+import { Alert, Breadcrumb, Form } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -6,9 +6,8 @@ import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import { registrierAnzeige } from '../../api/einsatzPerson';
-import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
-import { ErfassungsFormular } from '../../components/Erfassung';
+import { ErfassungsFormular, type Speicherung } from '../../components/Erfassung';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
@@ -53,7 +52,6 @@ export default function AufnahmePage() {
   const pfade = useEinsatzPfade();
   const darf = useGeraetDarf();
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [form] = Form.useForm<AufnahmeWerte>();
   const [quittung, setQuittung] = useState<string | null>(null);
   const sitzungsortGeladen = useRef<number | null>(null);
@@ -86,14 +84,17 @@ export default function AufnahmePage() {
     // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
     // (LFH-705, design.md D6).
     networkMode: 'always',
-    mutationFn: async (daten: AufnahmeEingabe) => {
+    mutationFn: async ({ einsatzId, daten }: { einsatzId: number; daten: AufnahmeEingabe }) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfassePersonOfflineFaehig(benutzer.id, einsatzId, {
         ...daten,
         ...(uhsAuftrag !== null ? { uhs_id: uhsAuftrag } : {}),
       });
     },
-    onSuccess: (ergebnis) => {
+    // Die Quittung der vorigen Person geht mit dem nächsten Absenden: neben einer Ablehnung
+    // behauptete sie sonst Erfolg.
+    onMutate: () => setQuittung(null),
+    onSuccess: (ergebnis, { einsatzId }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         setQuittung('Offline vorgemerkt · R-…');
       } else {
@@ -123,8 +124,19 @@ export default function AufnahmePage() {
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     },
-    onError: (e) => message.error(fehlerText(e)),
   });
+
+  /*
+   * Das Layout keyt sein `Outlet` nicht, die Seite bleibt über einen Einsatzwechsel dieselbe: nur
+   * das Anlegen DIESES Einsatzes gehört ans Formular (wie `pages/TierePage.tsx`). Ein laufendes aus
+   * dem vorigen dreht hier nicht, seine Ablehnung steht hier nicht.
+   */
+  const diesesAnlegen = anlegenMutation.variables?.einsatzId === einsatzId;
+  const anlegenSpeicherung: Speicherung = {
+    error: diesesAnlegen ? anlegenMutation.error : null,
+    isPending: diesesAnlegen && anlegenMutation.isPending,
+    reset: anlegenMutation.reset,
+  };
 
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -179,9 +191,15 @@ export default function AufnahmePage() {
           form={form}
           serie
           uebernahme={['antreff_ort']}
-          laeuft={anlegenMutation.isPending}
+          laeuft={anlegenSpeicherung.isPending}
+          // Eine Ablehnung steht am Formular, bis zum nächsten Absenden, kein Toast (LFH-1077).
+          // Ohne Netz merkt `erfassePersonOfflineFaehig` vor; hier landen nur Ablehnungen.
+          speicherung={anlegenSpeicherung}
+          speicherFehlerTitel="Person nicht erfasst"
           // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
-          onErfassen={(werte) => anlegenMutation.mutateAsync(aufnahmeZuEingabe(werte))}
+          onErfassen={(werte) =>
+            anlegenMutation.mutateAsync({ einsatzId, daten: aufnahmeZuEingabe(werte) })
+          }
           // Erst die Post-Acceptance-Stufe darf den Sitzungswert ändern: ein Abbruch während des
           // POST besteht die Generation davor nicht.
           onErfasst={(daten) => {

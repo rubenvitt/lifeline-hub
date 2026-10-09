@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
@@ -691,5 +691,275 @@ describe('BrDetailPage — Belegung springt nicht unter dem Zeiger (LFH-1113)', 
     await liveInvalidierung(qc);
     expect(await screen.findByText('1 neues Fahrzeug')).toBeInTheDocument();
     expect(screen.queryByText('Florian 1')).not.toBeInTheDocument();
+  });
+});
+
+describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
+  const alpha = { id: 10, name: 'Einheit Alpha' };
+  const bravo = { id: 11, name: 'Einheit Bravo' };
+
+  function seite(
+    br: BrDetail,
+    belegung: Parameters<typeof http.post>[1],
+    {
+      einheiten = [] as Einheit[],
+      fahrzeuge = [] as EinsatzFahrzeug[],
+    }: { einheiten?: Einheit[]; fahrzeuge?: EinsatzFahrzeug[] } = {},
+  ) {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', belegung),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <AuthProvider>
+            <MemoryRouter initialEntries={['/einsaetze/1/bereitstellungsraeume/1']}>
+              <Routes>
+                <Route
+                  path="/einsaetze/:id/bereitstellungsraeume/:brId"
+                  element={<BrDetailPage />}
+                />
+              </Routes>
+            </MemoryRouter>
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    );
+    return qc;
+  }
+
+  const zeile = (name: string) => screen.getByText(name).closest<HTMLElement>('.listen-eintrag')!;
+  const seitenZeile = (name: string) =>
+    screen.getByText(name).closest<HTMLElement>('[data-lfh="br-kraft-zeile"]')!;
+  const hinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+  const abgelehnt = (text: string) => () => HttpResponse.json({ error: text }, { status: 409 });
+
+  it('Entfernen: der Grund steht an genau dieser Zeile, kein Toast', async () => {
+    seite(brDetail({ einheiten: [alpha, bravo] }), abgelehnt('Einheit ist im Einsatz gebunden'));
+    await screen.findByText('Einheit Alpha');
+    await userEvent.click(
+      within(zeile('Einheit Alpha')).getByRole('button', { name: 'entfernen' }),
+    );
+
+    expect(await within(zeile('Einheit Alpha')).findByRole('alert')).toHaveTextContent(
+      'Einheit ist im Einsatz gebunden',
+    );
+    expect(within(zeile('Einheit Bravo')).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Entfernen: das nächste Entfernen an der Zeile räumt den Grund', async () => {
+    let erster = true;
+    seite(brDetail({ einheiten: [alpha] }), async () => {
+      if (erster) {
+        erster = false;
+        return HttpResponse.json({ error: 'Einheit ist im Einsatz gebunden' }, { status: 409 });
+      }
+      await delay('infinite');
+      return HttpResponse.json({});
+    });
+    await screen.findByText('Einheit Alpha');
+    await userEvent.click(screen.getByRole('button', { name: 'entfernen' }));
+    await within(zeile('Einheit Alpha')).findByRole('alert');
+
+    // Regex: das Ladesymbol des ersten Laufs klingt in jsdom nicht ab und bleibt im Namen.
+    await userEvent.click(screen.getByRole('button', { name: /entfernen/ }));
+    await waitFor(() => expect(within(zeile('Einheit Alpha')).queryByRole('alert')).toBeNull());
+  });
+
+  it('Entfernen: zwei Zeilen nebenläufig, die späte Ablehnung der ersten steht an ihr', async () => {
+    let lehneAb: () => void = () => {};
+    const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
+    seite(brDetail({ einheiten: [alpha, bravo] }), async ({ request }) => {
+      const body = (await request.json()) as { objekt_id: number };
+      if (body.objekt_id === 10) {
+        await ersteAblehnung;
+        return HttpResponse.json({ error: 'Einheit ist im Einsatz gebunden' }, { status: 409 });
+      }
+      await delay('infinite');
+      return HttpResponse.json({});
+    });
+    await screen.findByText('Einheit Alpha');
+    await userEvent.click(
+      within(zeile('Einheit Alpha')).getByRole('button', { name: 'entfernen' }),
+    );
+    await userEvent.click(
+      within(zeile('Einheit Bravo')).getByRole('button', { name: 'entfernen' }),
+    );
+    await act(async () => lehneAb());
+
+    expect(await within(zeile('Einheit Alpha')).findByRole('alert')).toHaveTextContent(
+      'Einheit ist im Einsatz gebunden',
+    );
+    expect(within(zeile('Einheit Bravo')).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Entfernen: nur die laufende Zeile dreht', async () => {
+    seite(brDetail({ einheiten: [alpha, bravo] }), async () => {
+      await delay('infinite');
+      return HttpResponse.json({});
+    });
+    await screen.findByText('Einheit Alpha');
+    await userEvent.click(
+      within(zeile('Einheit Alpha')).getByRole('button', { name: 'entfernen' }),
+    );
+
+    await waitFor(() =>
+      expect(within(zeile('Einheit Alpha')).getByRole('button', { name: /entfernen/ })).toHaveClass(
+        'ant-btn-loading',
+      ),
+    );
+    expect(
+      within(zeile('Einheit Bravo')).getByRole('button', { name: /entfernen/ }),
+    ).not.toHaveClass('ant-btn-loading');
+  });
+
+  it('Zuweisen aus der Seitenleiste: der Grund steht an der Zeile der Kraft', async () => {
+    seite(brDetail(), abgelehnt('Fahrzeug steht bereits in einem BR'), {
+      fahrzeuge: [fahrzeug({ id: 20, funkrufname: 'Florian 1' })],
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Florian 1 zuweisen' }));
+
+    expect(await within(seitenZeile('Florian 1')).findByRole('alert')).toHaveTextContent(
+      'Fahrzeug steht bereits in einem BR',
+    );
+    expect(hinweis()).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Zuweisen: blendet die Suche die Zeile aus, steht der Grund mit Namen über der Liste', async () => {
+    seite(brDetail(), abgelehnt('Fahrzeug steht bereits in einem BR'), {
+      fahrzeuge: [
+        fahrzeug({ id: 20, funkrufname: 'Florian 1' }),
+        fahrzeug({ id: 21, funkrufname: 'Rotkreuz 2' }),
+      ],
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Florian 1 zuweisen' }));
+    await within(seitenZeile('Florian 1')).findByRole('alert');
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Kräfte suchen' }), 'Rotkreuz');
+    await waitFor(() => expect(screen.queryByText('Florian 1')).toBeNull());
+    const block = document.querySelector<HTMLElement>('[data-lfh="br-verdeckte-fehler"]');
+    expect(block).not.toBeNull();
+    expect(within(block!).getByRole('alert')).toHaveTextContent(
+      'Florian 1 · Fahrzeug steht bereits in einem BR',
+    );
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Kräfte suchen' }));
+    expect(within(seitenZeile('Florian 1')).getByRole('alert')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="br-verdeckte-fehler"]')).toBeNull();
+  });
+
+  it('Zuweisen: ist die Zeile danach weg, steht der Grund im Seitenhinweis', async () => {
+    const frei = fahrzeug({ id: 20, funkrufname: 'Florian 1' });
+    const qc = seite(brDetail(), abgelehnt('Fahrzeug steht bereits in einem BR'), {
+      fahrzeuge: [frei],
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Florian 1 zuweisen' }));
+    await within(seitenZeile('Florian 1')).findByRole('alert');
+
+    // Der Stand holt die Seite ein: das Fahrzeug steht jetzt in einem anderen BR.
+    server.use(
+      http.get('/api/einsaetze/1/fahrzeuge', () =>
+        HttpResponse.json([{ ...frei, aktueller_br_id: 99 }]),
+      ),
+    );
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(1) }));
+
+    await waitFor(() => expect(screen.queryByText('Florian 1')).toBeNull());
+    const grund = await within(hinweis()!).findByRole('alert');
+    expect(grund).toHaveTextContent('Fahrzeug „Florian 1“ nicht zugewiesen');
+    expect(grund).toHaveTextContent('Fahrzeug steht bereits in einem BR');
+  });
+
+  it('Wechsel zu einem anderen Raum: die Gründe des vorigen bleiben nicht stehen', async () => {
+    /** Die Route hat keinen `key`: dieselbe Seite zeigt nach dem Wechsel den nächsten Raum. */
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/1/bereitstellungsraeume/2')}>
+          Zum zweiten Raum
+        </button>
+      );
+    }
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId', ({ params }) =>
+        HttpResponse.json(brDetail({ id: Number(params.brId), einheiten: [alpha] })),
+      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', abgelehnt('gebunden')),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <AuthProvider>
+            <MemoryRouter initialEntries={['/einsaetze/1/bereitstellungsraeume/1']}>
+              <Wechsel />
+              <Routes>
+                <Route
+                  path="/einsaetze/:id/bereitstellungsraeume/:brId"
+                  element={<BrDetailPage />}
+                />
+              </Routes>
+            </MemoryRouter>
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'entfernen' }));
+    await within(zeile('Einheit Alpha')).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Raum' }));
+    await waitFor(() => expect(within(zeile('Einheit Alpha')).queryByRole('alert')).toBeNull());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('Status: der Grund steht im Seitenhinweis, kein Toast', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/status', () =>
+        HttpResponse.json({ error: 'BR ist noch belegt' }, { status: 409 }),
+      ),
+    );
+    seite(brDetail({ status: 'aktiv' }), abgelehnt('x'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'BR auflösen' }));
+
+    const grund = await within(hinweis()!).findByRole('alert');
+    expect(grund).toHaveTextContent('BR ist noch belegt');
+    expect(grund).toHaveTextContent('Status nicht geändert');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Storno: der Grund steht im Seitenhinweis, „In Betrieb nehmen“ räumt ihn', async () => {
+    server.use(
+      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', () =>
+        HttpResponse.json({ error: 'BR hat Belegungen' }, { status: 409 }),
+      ),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/status', async () => {
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
+    seite(brDetail({ status: 'geplant' }), abgelehnt('x'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'BR stornieren' }));
+
+    const grund = await within(hinweis()!).findByRole('alert');
+    expect(grund).toHaveTextContent('BR hat Belegungen');
+    expect(grund).toHaveTextContent('Nicht storniert');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'In Betrieb nehmen' }));
+    await waitFor(() => expect(hinweis()).toBeNull());
   });
 });

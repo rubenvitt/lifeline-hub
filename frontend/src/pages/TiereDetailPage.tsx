@@ -17,7 +17,7 @@ import { Datenfeld, Datenraster, Paneel, StatusChip, monoStil } from '../compone
 import { SPEZIES_META, TIER_ABSCHLUSS, TIER_STATUS } from './tiere/tierHelfer';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -38,7 +38,7 @@ import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import TierAnhaenge from './tiere/TierAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { ErfassungsModal } from '../components/Erfassung';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
@@ -99,8 +99,6 @@ export default function TiereDetailPage() {
     abschluss_ziel?: string;
   }>();
 
-  const fehler = useFehlerMeldung();
-
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
@@ -149,8 +147,6 @@ export default function TiereDetailPage() {
             editSitzung.beende();
           },
         });
-      } else {
-        fehler(e);
       }
     },
   });
@@ -158,7 +154,6 @@ export default function TiereDetailPage() {
     mutationFn: (v: { status: TierStatus }) =>
       setzeTierStatus(einsatzId, tierId, { status: v.status }),
     onSuccess: invalidateDetail,
-    onError: fehler,
   });
   const stornoMutation = useMutation({
     mutationFn: (tid: number) => storniereTier(einsatzId, tid),
@@ -166,7 +161,6 @@ export default function TiereDetailPage() {
       invalidate();
       navigate(tierePfad(einsatzId));
     },
-    onError: fehler,
   });
   const abschlussMutation = useMutation({
     mutationFn: (v: { abschluss_grund: AbschlussGrund; abschluss_ziel?: string }) =>
@@ -177,8 +171,31 @@ export default function TiereDetailPage() {
       }),
     // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`).
     onSuccess: invalidateDetail,
-    onError: fehler,
   });
+
+  /*
+   * Jede Ablehnung steht an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+   * Fehler“): Bearbeiten am Formular, Status und Storno im Seitenhinweis, Abschließen im Dialog.
+   * Den Sperrkonflikt beantwortet weiter der Konfliktdialog, er steht nicht noch am Formular.
+   */
+  const sperrkonflikt = istKonflikt(editMutation.error) && !editMutation.variables?.overwrite;
+  const editFehler = sperrkonflikt ? null : editMutation.error;
+  // Status und Storno teilen sich den Seitenhinweis: der Start der einen räumt die andere.
+  const kopfFehler = statusMutation.error ?? stornoMutation.error;
+  const raeume = (m: { isPending: boolean; error: unknown; reset: () => void }) => {
+    if (!m.isPending && m.error != null) m.reset();
+  };
+
+  // Die Route hat keinen `key`: der Wechsel zu einem anderen Tier behält die Seite, nicht die
+  // Gründe.
+  const { reset: editReset } = editMutation;
+  const { reset: statusReset } = statusMutation;
+  const { reset: stornoReset } = stornoMutation;
+  useEffect(() => {
+    editReset();
+    statusReset();
+    stornoReset();
+  }, [tierId, editReset, statusReset, stornoReset]);
 
   // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
@@ -324,7 +341,13 @@ export default function TiereDetailPage() {
                     Abschließen
                   </Button>
                 ) : (
-                  <Button key={s} onClick={() => statusMutation.mutate({ status: s })}>
+                  <Button
+                    key={s}
+                    onClick={() => {
+                      raeume(stornoMutation);
+                      statusMutation.mutate({ status: s });
+                    }}
+                  >
                     {s === 'vermisst'
                       ? 'Als vermisst markieren'
                       : s === 'aktiv' && t.status === 'vermisst'
@@ -335,6 +358,7 @@ export default function TiereDetailPage() {
               )}
               <Button
                 onClick={() => {
+                  raeume(editMutation);
                   editSitzung.starte(t, {
                     rufname: t.rufname,
                     rasse_beschreibung: t.rasse_beschreibung,
@@ -365,7 +389,10 @@ export default function TiereDetailPage() {
               </Button>
               <Popconfirm
                 title="Tier stornieren?"
-                onConfirm={() => stornoMutation.mutate(t.id)}
+                onConfirm={() => {
+                  raeume(statusMutation);
+                  stornoMutation.mutate(t.id);
+                }}
                 okText="Tier stornieren"
                 okButtonProps={{ danger: true }}
               >
@@ -375,6 +402,20 @@ export default function TiereDetailPage() {
           )}
           <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
         </Space>
+      }
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        kopfFehler != null && (
+          <SeitenHinweise
+            fehler={kopfFehler}
+            fehlerTitel={statusMutation.error != null ? 'Status nicht geändert' : 'Nicht storniert'}
+            fehlerFallback={
+              statusMutation.error != null
+                ? 'Statuswechsel fehlgeschlagen'
+                : 'Stornieren fehlgeschlagen'
+            }
+          />
+        )
       }
     >
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
@@ -401,11 +442,19 @@ export default function TiereDetailPage() {
             }}
           >
             {detailAnsicht}
+            {editFehler != null && (
+              <div style={{ marginTop: 16 }}>
+                <SpeicherFehler fehler={editFehler} />
+              </div>
+            )}
             <Space style={{ marginTop: 16 }}>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
                 Speichern
               </Button>
-              <Button onClick={editSitzung.beende}>Abbrechen</Button>
+              {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+              <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
+                Abbrechen
+              </Button>
             </Space>
           </Form>
         ) : (
@@ -436,6 +485,9 @@ export default function TiereDetailPage() {
         form={abschlussForm}
         erfassenText="Abschließen"
         laeuft={abschlussMutation.isPending}
+        speicherung={abschlussMutation}
+        speicherFehlerTitel="Nicht abgeschlossen"
+        speicherFehlerFallback="Abschließen fehlgeschlagen"
         onErfassen={(v) => abschlussMutation.mutateAsync(v)}
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}

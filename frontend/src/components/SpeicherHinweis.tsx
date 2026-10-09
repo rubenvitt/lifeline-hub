@@ -1,4 +1,5 @@
 import { Alert, Flex, theme, Typography } from 'antd';
+import type { ReactNode } from 'react';
 import { fehlerText as apiFehlerText } from '../api/client';
 import { StatusChip } from './instrument/Status';
 
@@ -113,6 +114,11 @@ interface ZeilenFehlerProps {
   fehler: unknown;
   /** Siehe {@link SpeicherFehlerProps.fallback}. */
   fallback?: string;
+  /**
+   * Kennung der Zeile, wenn der Grund nicht an ihr steht (Block über Liste oder Fläche). Sie steht
+   * in derselben Meldung, sonst läse ein Screenreader den Grund ohne die Zeile.
+   */
+  kennung?: ReactNode;
 }
 
 /**
@@ -120,11 +126,12 @@ interface ZeilenFehlerProps {
  * „Rückwege und Fehler“): eine Zeile Text statt Alert, damit die Liste nicht springt. `data-fehler`
  * ist der Prüfgriff, wie an den Modul-Zeilen der Einstellungen.
  */
-export function ZeilenFehler({ fehler, fallback }: ZeilenFehlerProps) {
+export function ZeilenFehler({ fehler, fallback, kennung }: ZeilenFehlerProps) {
   const text = fehlerText(fehler, fallback);
   if (text === null) return null;
   return (
     <Typography.Text type="danger" role="alert" data-fehler="true">
+      {kennung != null && <Typography.Text>{kennung} · </Typography.Text>}
       {text}
     </Typography.Text>
   );

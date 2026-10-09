@@ -11,7 +11,8 @@ import Datenstand from '../../components/Datenstand';
 import StatusTag from '../../components/StatusTag';
 import { monoStil } from '../../components/instrument';
 import { materialStatus } from '../../theme/statusFarben';
-import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { ZeilenFehler } from '../../components/SpeicherHinweis';
+import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useAuthOptional } from '../../auth/AuthContext';
 import { KennungsLink } from '../../components/kennungsLink';
 import { sprungGesperrtText } from '../../components/Sprung';
@@ -70,15 +71,18 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
     qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) });
   }
 
-  const fehler = useFehlerMeldung();
+  // Ablehnungen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“):
+  // Lösen meldet an der Zeile, Zuordnen im Dialog.
+  const loesenZeilen = useZeilenFehler<number>();
 
   const loesenMut = useMutation({
     mutationFn: (emId: number) => aktualisiereDisposition(einsatzId, emId, { uhs_id: null }),
+    onMutate: (emId) => loesenZeilen.beginne(emId),
     onSuccess: () => {
       message.success('Material gelöst');
       invalidate();
     },
-    onError: fehler,
+    onError: (e, emId) => loesenZeilen.melde(emId, e, 'Lösen fehlgeschlagen'),
   });
 
   const zuordnenMut = useMutation({
@@ -87,7 +91,6 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
       message.success('Material zugeordnet');
       invalidate();
     },
-    onError: fehler,
   });
 
   const columns = [
@@ -123,21 +126,28 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
           {
             title: 'Aktion',
             key: 'aktion',
-            render: (_: unknown, em: EinsatzMaterial) =>
+            render: (_: unknown, em: EinsatzMaterial) => {
               // Keine Rückfrage: die gelöste Zuordnung ist umkehrbar (über „Material zuordnen" darüber),
               // also `danger` und Abstand, aber keine zusätzliche Reibung.
-              bedienbar ? (
-                // Ohne Größen-Prop: die Zelle hängt an keiner Backend-Konstante, die Tabelle wächst mit.
-                // `loading` je Zeile, nicht je Mutation (`loesenMut` bedient alle Zeilen): es fängt den
-                // zweiten Klick ab, den sonst die Rückfrage abgefangen hätte.
-                <Button
-                  danger
-                  loading={loesenMut.isPending && loesenMut.variables === em.id}
-                  onClick={() => loesenMut.mutate(em.id)}
-                >
-                  Lösen
-                </Button>
-              ) : null,
+              if (!bedienbar) return null;
+              const grund = loesenZeilen.grund(em.id);
+              return (
+                <Space orientation="vertical" size={4}>
+                  {/* Ohne Größen-Prop: die Zelle hängt an keiner Backend-Konstante, die Tabelle
+                      wächst mit. `loading` je Zeile, nicht je Mutation (`loesenMut` bedient alle
+                      Zeilen): es fängt den zweiten Klick ab, den sonst die Rückfrage abgefangen
+                      hätte. */}
+                  <Button
+                    danger
+                    loading={loesenMut.isPending && loesenMut.variables === em.id}
+                    onClick={() => loesenMut.mutate(em.id)}
+                  >
+                    Lösen
+                  </Button>
+                  {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
+                </Space>
+              );
+            },
           },
         ]),
   ];
@@ -194,6 +204,9 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         form={form}
         erfassenText="Zuordnen"
         laeuft={zuordnenMut.isPending}
+        speicherung={zuordnenMut}
+        speicherFehlerTitel="Nicht zugeordnet"
+        speicherFehlerFallback="Zuordnen fehlgeschlagen"
         // `mutateAsync`: ein abgelehnter PATCH lässt die Auswahl stehen.
         onErfassen={(werte) => zuordnenMut.mutateAsync(werte.em_id)}
         onFertig={() => setZuordnenOffen(false)}

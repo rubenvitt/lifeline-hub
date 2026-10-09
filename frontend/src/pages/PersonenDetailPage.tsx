@@ -12,6 +12,7 @@ import {
   Button,
   Col,
   Collapse,
+  Flex,
   Form,
   Input,
   InputNumber,
@@ -26,7 +27,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -98,7 +99,12 @@ import {
   verortenLinkStil,
   type PersonBearbeitenWerte,
 } from '../personen/personBearbeiten';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import {
+  useZeilenFehler,
+  type ZeilenFehlerSpeicher,
+  type ZeilenGrund,
+} from '../components/useZeilenFehler';
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { KennungsLink } from '../components/kennungsLink';
 
@@ -198,8 +204,6 @@ export default function PersonenDetailPage() {
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const personId = Number(personIdParam);
   const idGueltig = parseRouteId(personIdParam) != null;
-  const aktuelleRouteRef = useRef({ einsatzId, personId });
-  aktuelleRouteRef.current = { einsatzId, personId };
   const navigate = useNavigate();
   const { benutzer } = useAuth();
   // Am gekoppelten Gerät (LFH-892): kein Status, kein Storno, keine Zuordnungen und Anhänge und
@@ -212,7 +216,31 @@ export default function PersonenDetailPage() {
   const [editForm] = Form.useForm<PersonBearbeitenWerte>();
   const editSitzung = useEditSitzung<PersonBearbeitenWerte>(editForm);
 
-  const fehler = useFehlerMeldung();
+  /*
+   * Jede Ablehnung steht an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+   * Fehler“): Dialoge und Formulare tragen den Fehler ihrer Mutation, Zeilen den Grund aus diesen
+   * Speichern. Der Statuswechsel ist eine Kopfaktion; sein Grund hängt an Einsatz und Person, damit
+   * er nach einem Personenwechsel nicht an der falschen Person steht.
+   */
+  const statusFehler = useZeilenFehler<string>();
+  const statusSchluessel = (eid: number, pid: number) => `${eid}:${pid}`;
+  // Schlüssel ist die Kennung (T-007, S-009): sie nennt die Zeile auch, wenn sie fort ist.
+  const tierFehler = useZeilenFehler<string>();
+  const schadenFehler = useZeilenFehler<string>();
+  const abgleichFehler = useZeilenFehler<number>();
+  /*
+   * Eine Zeilenaktion gehört der Person, an der sie begann (`person` in den Variablen): die Route
+   * hat keinen `key`, eine Ablehnung, die erst nach einem Wechsel eintrifft, meldet sich nicht an
+   * der nächsten Person.
+   */
+  const personSchluessel = statusSchluessel(einsatzId, personId);
+  const personJetzt = useRef(personSchluessel);
+  useLayoutEffect(() => {
+    personJetzt.current = personSchluessel;
+  });
+  const nochDa = (person: string) => person === personJetzt.current;
+  const zeilenGrund = (g: ZeilenGrund | null) =>
+    g && <ZeilenFehler fehler={g.fehler} fallback={g.fallback} />;
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
@@ -277,6 +305,7 @@ export default function PersonenDetailPage() {
     mutationFn: (v: { einsatzId: number; personId: number; status: PersonStatus }) =>
       setzePersonStatus(v.einsatzId, v.personId, v.status),
     onMutate: async (v) => {
+      statusFehler.beginne(statusSchluessel(v.einsatzId, v.personId));
       const listenKey = einsatzKeys.personen(v.einsatzId);
       const detailKey = einsatzKeys.person(v.einsatzId, v.personId);
       await Promise.all([
@@ -322,12 +351,11 @@ export default function PersonenDetailPage() {
             : aktuell,
         );
       }
-      const aktuelleRoute = aktuelleRouteRef.current;
-      if (
-        aktuelleRoute.einsatzId === variablen.einsatzId &&
-        aktuelleRoute.personId === variablen.personId
-      )
-        fehler(e);
+      statusFehler.melde(
+        statusSchluessel(variablen.einsatzId, variablen.personId),
+        e,
+        'Statuswechsel fehlgeschlagen',
+      );
     },
     onSettled: (_daten, _fehler, variablen) => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(variablen.einsatzId) });
@@ -354,7 +382,7 @@ export default function PersonenDetailPage() {
       // `fordere_aktiv` („Einsatz ist abgeschlossen und schreibgeschützt"), greift vor der
       // CAS-Prüfung und ist per `overwrite` nicht zu umgehen. Ein 409 auf den Overwrite zeigt
       // deshalb die Servermeldung, statt denselben Dialog erneut zu öffnen (dieselbe Weiche wie in
-      // SchaedenDetailPage/TiereDetailPage).
+      // SchaedenDetailPage/TiereDetailPage). Jeder andere Fehler steht am Formular (`editFehler`).
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
@@ -368,18 +396,27 @@ export default function PersonenDetailPage() {
             editSitzung.beende();
           },
         });
-      } else {
-        fehler(e);
       }
     },
   });
+  // Der Sperrkonflikt fragt nach (oben); am Formular steht nur, was keine Rückfrage auslöst.
+  const editFehler =
+    editMutation.error != null &&
+    !(istKonflikt(editMutation.error) && !editMutation.variables?.overwrite)
+      ? editMutation.error
+      : null;
+  /** Abbrechen räumt den Grund; eine laufende Mutation bleibt unberührt. */
+  function raeume(m: { isPending: boolean; error: unknown; reset: () => void }) {
+    if (!m.isPending && m.error != null) m.reset();
+  }
   const stornoMutation = useMutation({
     mutationFn: (pid: number) => stornierePerson(einsatzId, pid),
+    // Die Rückfrage schließt erst hier (design.md D3); eine Ablehnung steht in ihr.
     onSuccess: () => {
+      setStornoOffen(false);
       invalidate();
       navigate(pfade.personenListe(einsatzId));
     },
-    onError: fehler,
   });
 
   /**
@@ -401,7 +438,6 @@ export default function PersonenDetailPage() {
       invalidateDetail();
       notizForm.resetFields();
     },
-    onError: fehler,
   });
 
   // Verbleib (Dialog in `personen/VerbleibErfassung.tsx`)
@@ -415,7 +451,6 @@ export default function PersonenDetailPage() {
   const austrittMutation = useMutation({
     mutationFn: () => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
     onSuccess: invalidateUhs,
-    onError: fehler,
   });
 
   // Tiere (Halter) / Schäden (Geschädigte) von der Personen-Seite zuweisen und lösen. Die
@@ -430,15 +465,22 @@ export default function PersonenDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId) });
   }
   const tierLoesenMut = useMutation({
-    mutationFn: (tierId: number) => aktualisiereTier(einsatzId, tierId, { halter_person_id: null }),
+    mutationFn: (v: { id: number; kennung: string; person: string }) =>
+      aktualisiereTier(einsatzId, v.id, { halter_person_id: null }),
+    onMutate: (v) => tierFehler.beginne(v.kennung),
     onSuccess: invalidateZuordnung,
-    onError: fehler,
+    onError: (e, v) => {
+      if (nochDa(v.person)) tierFehler.melde(v.kennung, e, 'Lösen fehlgeschlagen');
+    },
   });
   const schadenLoesenMut = useMutation({
-    mutationFn: (schadenId: number) =>
-      aktualisiereSchaden(einsatzId, schadenId, { geschaedigt_person_id: null }),
+    mutationFn: (v: { id: number; kennung: string; person: string }) =>
+      aktualisiereSchaden(einsatzId, v.id, { geschaedigt_person_id: null }),
+    onMutate: (v) => schadenFehler.beginne(v.kennung),
     onSuccess: invalidateZuordnung,
-    onError: fehler,
+    onError: (e, v) => {
+      if (nochDa(v.person)) schadenFehler.melde(v.kennung, e, 'Lösen fehlgeschlagen');
+    },
   });
 
   const abgleichEntscheidenMutation = useMutation({
@@ -446,10 +488,53 @@ export default function PersonenDetailPage() {
       vermisstId: number;
       abgleichId: number;
       entscheidung: 'bestaetigt' | 'verworfen';
+      person: string;
     }) => entscheideAbgleich(einsatzId, v.vermisstId, v.abgleichId, v.entscheidung),
+    onMutate: (v) => abgleichFehler.beginne(v.abgleichId),
     onSuccess: invalidateDetail,
-    onError: fehler,
+    onError: (e, v) => {
+      if (nochDa(v.person)) abgleichFehler.melde(v.abgleichId, e, 'Entscheiden fehlgeschlagen');
+    },
   });
+
+  /*
+   * Gründe, Bearbeitung und Notiztext gehören zur Person: ein Wechsel auf eine andere (gleiche
+   * Route, kein `key`) räumt sie. Erst beim Wechsel, nicht beim Einhängen: das Notizformular hängt
+   * dann noch nicht, und `resetFields` warnte über eine unverbundene Form.
+   */
+  const { leere: leereTiere } = tierFehler;
+  const { leere: leereSchaeden } = schadenFehler;
+  const { leere: leereAbgleiche } = abgleichFehler;
+  const { reset: editReset } = editMutation;
+  const { reset: stornoReset } = stornoMutation;
+  const { reset: notizReset } = notizMutation;
+  const { reset: austrittReset } = austrittMutation;
+  const { beende: beendeEdit } = editSitzung;
+  const vorigePerson = useRef(personSchluessel);
+  useEffect(() => {
+    if (vorigePerson.current === personSchluessel) return;
+    vorigePerson.current = personSchluessel;
+    leereTiere();
+    leereSchaeden();
+    leereAbgleiche();
+    editReset();
+    stornoReset();
+    notizReset();
+    austrittReset();
+    beendeEdit();
+    notizForm.resetFields();
+  }, [
+    personSchluessel,
+    leereTiere,
+    leereSchaeden,
+    leereAbgleiche,
+    editReset,
+    stornoReset,
+    notizReset,
+    austrittReset,
+    beendeEdit,
+    notizForm,
+  ]);
 
   // Die Blöcke „Zugeordnete Tiere/Schäden" hält der Einsatz-Live-Stream im EinsatzLayout aktuell:
   // `tier`→'einsatz-tiere', `schaden`→'einsatz-schaeden'. Der Prefix-Match deckt die Keys
@@ -547,6 +632,11 @@ export default function PersonenDetailPage() {
             >
               <Input.TextArea rows={2} />
             </Form.Item>
+            {notizMutation.error != null && (
+              <div style={{ marginBottom: token.marginSM }}>
+                <SpeicherFehler fehler={notizMutation.error} titel="Notiz nicht angelegt" />
+              </div>
+            )}
             <Button type="primary" htmlType="submit" loading={notizMutation.isPending}>
               Notiz anlegen
             </Button>
@@ -593,6 +683,7 @@ export default function PersonenDetailPage() {
                             vermisstId: person.id,
                             abgleichId: a.id,
                             entscheidung: 'bestaetigt',
+                            person: personSchluessel,
                           })
                         }
                       >
@@ -606,12 +697,16 @@ export default function PersonenDetailPage() {
                             vermisstId: person.id,
                             abgleichId: a.id,
                             entscheidung: 'verworfen',
+                            person: personSchluessel,
                           })
                         }
                       >
                         Verwerfen
                       </Button>
                     </Space>
+                  )}
+                  {abgleichFehler.grund(a.id) && (
+                    <div>{zeilenGrund(abgleichFehler.grund(a.id))}</div>
                   )}
                 </li>
               ))}
@@ -760,11 +855,25 @@ export default function PersonenDetailPage() {
             <Form.Item label="Notiz" name="notiz">
               <Input.TextArea rows={2} />
             </Form.Item>
+            {editFehler != null && (
+              <div style={{ marginBottom: token.marginSM }}>
+                <SpeicherFehler fehler={editFehler} />
+              </div>
+            )}
             <Space>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
                 Speichern
               </Button>
-              <Button onClick={editSitzung.beende}>Abbrechen</Button>
+              {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+              <Button
+                disabled={editMutation.isPending}
+                onClick={() => {
+                  raeume(editMutation);
+                  editSitzung.beende();
+                }}
+              >
+                Abbrechen
+              </Button>
             </Space>
           </Form>
         ) : (
@@ -818,7 +927,7 @@ export default function PersonenDetailPage() {
                     ) : (
                       <Space wrap style={{ marginTop: 4 }}>
                         {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
-                          <Space key={t.id} size={4}>
+                          <Space key={t.id} size={4} data-lfh="zuordnung">
                             <Tag
                               style={{ cursor: 'pointer' }}
                               onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
@@ -828,10 +937,20 @@ export default function PersonenDetailPage() {
                               {t.rufname ? ` „${t.rufname}"` : ''}
                             </Tag>
                             {darfZuordnen && (
-                              <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>
+                              <Button
+                                type="text"
+                                onClick={() =>
+                                  tierLoesenMut.mutate({
+                                    id: t.id,
+                                    kennung: tierRegistrierAnzeige(t.registrier_nr),
+                                    person: personSchluessel,
+                                  })
+                                }
+                              >
                                 lösen
                               </Button>
                             )}
+                            {zeilenGrund(tierFehler.grund(tierRegistrierAnzeige(t.registrier_nr)))}
                           </Space>
                         ))}
                       </Space>
@@ -857,7 +976,7 @@ export default function PersonenDetailPage() {
                     ) : (
                       <Space wrap style={{ marginTop: 4 }}>
                         {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
-                          <Space key={sch.id} size={4}>
+                          <Space key={sch.id} size={4} data-lfh="zuordnung">
                             <KennungsLink to={schadenDetailPfad(einsatzId, sch.id)}>
                               <Tag style={{ cursor: 'pointer' }}>
                                 {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} (
@@ -865,9 +984,21 @@ export default function PersonenDetailPage() {
                               </Tag>
                             </KennungsLink>
                             {darfZuordnen && (
-                              <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>
+                              <Button
+                                type="text"
+                                onClick={() =>
+                                  schadenLoesenMut.mutate({
+                                    id: sch.id,
+                                    kennung: schadenRegistrierAnzeige(sch.registrier_nr),
+                                    person: personSchluessel,
+                                  })
+                                }
+                              >
                                 lösen
                               </Button>
+                            )}
+                            {zeilenGrund(
+                              schadenFehler.grund(schadenRegistrierAnzeige(sch.registrier_nr)),
                             )}
                           </Space>
                         ))}
@@ -875,7 +1006,7 @@ export default function PersonenDetailPage() {
                     )}
                   </div>
 
-                  <div>
+                  <div data-lfh="uhs-verortung">
                     <Typography.Text
                       type="secondary"
                       style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
@@ -912,6 +1043,17 @@ export default function PersonenDetailPage() {
                         </Space>
                       )}
                     </div>
+                    {/* Unter beiden Zweigen: hat ein anderer schon ausgetragen, wechselt der
+                        Zweig. */}
+                    {austrittMutation.error != null && (
+                      <div style={{ marginTop: token.marginXS }}>
+                        <SpeicherFehler
+                          fehler={austrittMutation.error}
+                          titel="Nicht ausgetragen"
+                          fallback="Austragen fehlgeschlagen"
+                        />
+                      </div>
+                    )}
                   </div>
                 </Space>
               ),
@@ -986,8 +1128,11 @@ export default function PersonenDetailPage() {
     // Statuswechsel: irreversible Ziele über den Dialog, umkehrbare direkt. Bei `verstorben` steht
     // ein Weg zurück zwar formal in der Tabelle, ein versehentliches „verstorben" ist aber keine
     // Buchung, die man beiläufig zurücknimmt.
-    if (IRREVERSIBEL.includes(aktion.status)) setStatusDialog(aktion.status);
-    else statusMutation.mutate({ einsatzId, personId: p.id, status: aktion.status });
+    if (IRREVERSIBEL.includes(aktion.status)) {
+      // Die Rückfrage öffnet ohne den Grund eines früheren Wechsels.
+      statusFehler.beginne(statusSchluessel(einsatzId, p.id));
+      setStatusDialog(aktion.status);
+    } else statusMutation.mutate({ einsatzId, personId: p.id, status: aktion.status });
   }
 
   /**
@@ -1047,8 +1192,68 @@ export default function PersonenDetailPage() {
     statusMutation.variables?.einsatzId === einsatzId &&
     statusMutation.variables.personId === p.id;
 
+  /*
+   * Seitenhinweis (LFH-1077): der Grund eines Statuswechsels ohne offene Rückfrage, dazu die Gründe
+   * von Zeilen, die nicht mehr dastehen (etwa live von anderer Seite gelöst).
+   */
+  const statusGrund = statusFehler.grund(statusSchluessel(einsatzId, p.id));
+  const tierKennungen = new Set(
+    (tiereDerPersonQuery.data ?? []).map((t) => tierRegistrierAnzeige(t.registrier_nr)),
+  );
+  const schadenKennungen = new Set(
+    (schaedenDerPersonQuery.data ?? []).map((sch) => schadenRegistrierAnzeige(sch.registrier_nr)),
+  );
+  const fort = <K,>(
+    art: string,
+    speicher: ZeilenFehlerSpeicher<K>,
+    da: (k: K) => boolean,
+    titel: (k: K) => string,
+  ) =>
+    speicher
+      .gemeldet()
+      .filter((k) => !da(k))
+      .map((k) => ({ schluessel: `${art}:${String(k)}`, titel: titel(k), ...speicher.grund(k) }));
+  const seitenGruende = [
+    ...(statusGrund && statusDialog === null
+      ? [{ schluessel: 'status', titel: 'Status nicht geändert', ...statusGrund }]
+      : []),
+    ...fort(
+      'tier',
+      tierFehler,
+      (k) => tierKennungen.has(k),
+      (k) => `Tier ${k} nicht gelöst`,
+    ),
+    ...fort(
+      'schaden',
+      schadenFehler,
+      (k) => schadenKennungen.has(k),
+      (k) => `Schaden ${k} nicht gelöst`,
+    ),
+    ...fort(
+      'abgleich',
+      abgleichFehler,
+      (id) => p.abgleiche.some((a) => a.id === id),
+      () => 'Abgleich nicht entschieden',
+    ),
+  ];
+
   return (
     <EinsatzSeite
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        seitenGruende.length > 0 && (
+          <Flex vertical gap={token.marginSM}>
+            {seitenGruende.map((g) => (
+              <SpeicherFehler
+                key={g.schluessel}
+                fehler={g.fehler}
+                titel={g.titel}
+                fallback={g.fallback}
+              />
+            ))}
+          </Flex>
+        )
+      }
       dataUpdatedAt={gemeinsamerDatenstand(
         detailQuery.dataUpdatedAt,
         tiereDerPersonQuery.dataUpdatedAt,
@@ -1123,35 +1328,72 @@ export default function PersonenDetailPage() {
         </Col>
       </Row>
 
+      {/* Beide Rückfragen warten auf die Antwort (design.md D3): sie schließen erst beim Erfolg,
+          bis dahin sind ihre Auswege gesperrt, und eine Ablehnung steht in ihnen. */}
       <Modal
         open={statusDialog !== null}
         title={statusDialog ? `Status auf „${STATUS_META[statusDialog].label}" setzen?` : ''}
         okText="Status setzen"
+        cancelText="Abbrechen"
         okButtonProps={{ danger: true }}
         confirmLoading={laeuftStatus}
+        cancelButtonProps={{ disabled: laeuftStatus }}
+        closable={laeuftStatus ? { disabled: true } : true}
+        mask={{ closable: !laeuftStatus }}
+        keyboard={!laeuftStatus}
         onOk={() => {
-          if (statusDialog)
-            statusMutation.mutate({ einsatzId, personId: p.id, status: statusDialog });
+          if (!statusDialog) return;
+          statusMutation.mutateAsync({ einsatzId, personId: p.id, status: statusDialog }).then(
+            () => setStatusDialog(null),
+            () => {},
+          );
+        }}
+        onCancel={() => {
+          if (laeuftStatus) return;
+          statusFehler.beginne(statusSchluessel(einsatzId, p.id));
           setStatusDialog(null);
         }}
-        onCancel={() => setStatusDialog(null)}
       >
         Wird im ETB vermerkt.
+        {statusGrund && (
+          <div style={{ marginTop: token.marginSM }}>
+            <SpeicherFehler
+              fehler={statusGrund.fehler}
+              titel="Status nicht geändert"
+              fallback={statusGrund.fallback}
+            />
+          </div>
+        )}
       </Modal>
 
       <Modal
         open={stornoOffen}
         title="Person stornieren?"
         okText="Stornieren"
+        cancelText="Abbrechen"
         okButtonProps={{ danger: true }}
         confirmLoading={stornoMutation.isPending}
-        onOk={() => {
-          stornoMutation.mutate(p.id);
+        cancelButtonProps={{ disabled: stornoMutation.isPending }}
+        closable={stornoMutation.isPending ? { disabled: true } : true}
+        mask={{ closable: !stornoMutation.isPending }}
+        keyboard={!stornoMutation.isPending}
+        onOk={() => stornoMutation.mutate(p.id)}
+        onCancel={() => {
+          if (stornoMutation.isPending) return;
+          raeume(stornoMutation);
           setStornoOffen(false);
         }}
-        onCancel={() => setStornoOffen(false)}
       >
         Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
+        {stornoMutation.error != null && (
+          <div style={{ marginTop: token.marginSM }}>
+            <SpeicherFehler
+              fehler={stornoMutation.error}
+              titel="Nicht storniert"
+              fallback="Stornieren fehlgeschlagen"
+            />
+          </div>
+        )}
       </Modal>
 
       <SichtungDialog
@@ -1177,7 +1419,11 @@ export default function PersonenDetailPage() {
         offen={uhsModalOffen}
         belegt={p.aktuelle_uhs_id != null}
         uhsListe={uhsListeQuery.data ?? []}
-        onZugewiesen={invalidateUhs}
+        onZugewiesen={() => {
+          // Die neue Verortung ersetzt die alte: ein gescheitertes Austragen gilt nicht mehr.
+          raeume(austrittMutation);
+          invalidateUhs();
+        }}
         onSchliessen={() => setUhsModalOffen(false)}
       />
 

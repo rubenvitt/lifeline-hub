@@ -351,18 +351,20 @@ export function abgleichSpalten(
       width: 220,
       immerSichtbar: true,
       render: (_: unknown, v: Person) => (
-        <Select<number>
-          placeholder="gefundene Person …"
-          style={{ width: 200 }}
-          // Bleibt: der Zeilenklick der Tabelle hängt weiter am `onRow` des Primitivs.
-          onClick={(e) => e.stopPropagation()}
-          onChange={(gid) => onAbgleich(v.id, gid)}
-          options={gefundene.map((g) => ({
-            value: g.id,
-            label: `${registrierAnzeige(g.registrier_nr)} ${g.name ?? 'unbekannt'}`,
-          }))}
-          disabled={gefundene.length === 0}
-        />
+        // Der Klick gehört der Zelle, sonst navigierte die Zeile auf die Detailseite. Die Hülle
+        // fängt auch die Wahl im Auswahlmenü: React reicht Klicks aus dem Portal durch den Baum.
+        <div onClick={(e) => e.stopPropagation()}>
+          <Select<number>
+            placeholder="gefundene Person …"
+            style={{ width: 200 }}
+            onChange={(gid) => onAbgleich(v.id, gid)}
+            options={gefundene.map((g) => ({
+              value: g.id,
+              label: `${registrierAnzeige(g.registrier_nr)} ${g.name ?? 'unbekannt'}`,
+            }))}
+            disabled={gefundene.length === 0}
+          />
+        </div>
       ),
     },
   ]);
