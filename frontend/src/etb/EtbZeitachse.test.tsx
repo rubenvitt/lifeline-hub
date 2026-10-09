@@ -312,6 +312,43 @@ describe('EtbZeitachse – Aktionsmenü (LFH-365 · B5e)', () => {
     expect(onBerichtigen).not.toHaveBeenCalled();
   });
 
+  // Spec `modul-freigabe` (LFH-1051): ohne Freigabe der Aufträge steht „Auftrag erteilen" gesperrt
+  // mit Grund da (M16), wie „Zu Auftrag" im Chat, statt in ein 403 zu laufen.
+  it('sperrt „Auftrag erteilen" mit Grund, wenn die Aufträge nicht freigegeben sind', async () => {
+    const onAuftragErteilen = vi.fn();
+    renderZeitachse({
+      eintraege: [eintrag({ id: 4, lfd_nr: 17 })],
+      ...alle,
+      onAuftragErteilen,
+      auftragGesperrt: true,
+    });
+    const menue = await oeffneMenue(17);
+    expect(within(menue).queryByRole('menuitem', { name: 'Auftrag erteilen' })).toBeNull();
+    const punkt = within(menue).getByRole('menuitem', {
+      name: 'Auftrag erteilen (Keine Berechtigung)',
+    });
+    expect(punkt).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(punkt);
+    expect(onAuftragErteilen).not.toHaveBeenCalled();
+    expect(within(menue).getByRole('menuitem', { name: 'Wiedervorlage' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('lässt „Auftrag erteilen" bedienbar, wenn die Aufträge freigegeben sind', async () => {
+    const onAuftragErteilen = vi.fn();
+    renderZeitachse({
+      eintraege: [eintrag({ id: 4, lfd_nr: 17 })],
+      ...alle,
+      onAuftragErteilen,
+      auftragGesperrt: false,
+    });
+    const menue = await oeffneMenue(17);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Auftrag erteilen' }));
+    expect(onAuftragErteilen).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
+  });
+
   it('lässt „Berichtigen" an einer Berichtigung weg', async () => {
     renderZeitachse({
       eintraege: [eintrag({ id: 2, lfd_nr: 2, typ: 'berichtigung', berichtigt_eintrag_id: 1 })],

@@ -23,6 +23,8 @@ interface MeldungListeProps {
   onBestaetigen?: (meldungId: number) => void;
   /** Öffnet das Auftrags-Formular zur Meldung → Auftrag-Erteilung. */
   onAuftragErteilen?: (m: Meldung) => void;
+  /** Aufträge ohne Freigabe: „Auftrag erteilen“ steht gesperrt mit Grund. */
+  auftragGesperrt?: boolean;
 }
 
 /** Meldungs-Liste: je Meldung eine MeldungKarte. */
@@ -38,6 +40,7 @@ export default function MeldungListe({
   onLagerelevant,
   onBestaetigen,
   onAuftragErteilen,
+  auftragGesperrt,
 }: MeldungListeProps) {
   if (meldungen.length === 0) return <SeitenLeer titel="Keine Meldungen" />;
   return (
@@ -56,6 +59,7 @@ export default function MeldungListe({
           onLagerelevant={onLagerelevant}
           onBestaetigen={onBestaetigen}
           onAuftragErteilen={onAuftragErteilen}
+          auftragGesperrt={auftragGesperrt}
         />
       ))}
     </>

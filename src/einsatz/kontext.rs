@@ -127,6 +127,17 @@ impl EinsatzKontext {
         )
         .await
     }
+
+    /// Modulfreigabe des Moduls, in das ein Weg aus einem anderen Modul heraus schreibt
+    /// (Spec `modul-freigabe`; LFH-904 Chat, LFH-1051 ETB und Meldungen). Der Extractor prüft
+    /// nur das Quellmodul; das Zielmodul kommt als Marker, damit kein Key als Literal driftet.
+    pub async fn fordere_zielmodul<Z: ModulMarker>(
+        &self,
+        pool: &SqlitePool,
+    ) -> Result<(), AppError> {
+        let key = Z::KEY.expect("Zielmodul ist an ein Modul gebunden");
+        self.fordere_modul_zugriff(pool, key).await
+    }
 }
 
 /// Lese-Gate-Extractor (LFH-230): Org-Floor (via [`EinsatzKontext`]) + `fordere_lesezugriff`

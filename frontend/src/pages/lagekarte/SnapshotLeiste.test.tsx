@@ -18,7 +18,13 @@ vi.mock('../../api/lageSnapshot', () => ({
   ladeLageSnapshot: (...a: unknown[]) => ladeLageSnapshot(...a),
 }));
 
-import { SnapshotLeiste, ANZEIGE_MS, bandStile, startEingeklappt } from './SnapshotLeiste';
+import {
+  SnapshotLeiste,
+  ANZEIGE_MS,
+  bandStile,
+  standBeschriftung,
+  startEingeklappt,
+} from './SnapshotLeiste';
 import { setzeViewportBreite } from '../../test/viewport';
 import { dichten } from '../../theme/tokens';
 import {
@@ -175,6 +181,47 @@ describe('SnapshotLeiste', () => {
       'Stand B',
       'Stand A',
     ]);
+  });
+
+  it('jede Option nennt Bezeichnung und darunter die Erfassungszeit, ohne Bezeichnung die Zeit einmal (LFH-1057)', async () => {
+    renderLeiste(
+      [
+        snapshot({ id: 10, bezeichnung: null, stand_at: '2026-07-24 08:00:00' }),
+        snapshot({ id: 30, bezeichnung: 'Stand A', stand_at: '2026-07-24 10:15:00' }),
+      ],
+      {},
+    );
+    const zeitA = formatZeitKurz('2026-07-24 10:15:00', DEFAULT_KONVENTIONEN);
+    const zeitOhne = formatZeitKurz('2026-07-24 08:00:00', DEFAULT_KONVENTIONEN);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Stand' }));
+    const optionen = await waitFor(() => {
+      const o = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option',
+        ),
+      );
+      expect(o.length).toBe(3);
+      return o;
+    });
+    const [live, mit, ohne] = optionen;
+    // „Live“ bleibt einzeilig.
+    expect(live.querySelector('[data-lfh="stand-zeit"]')).toBeNull();
+    expect(live.textContent).toBe('Live');
+    // Mit Bezeichnung: Hauptzeile Bezeichnung, Zweitzeile die Erfassungszeit.
+    expect(mit.querySelector('[data-lfh="stand-name"]')?.textContent).toBe('Stand A');
+    expect(mit.querySelector('[data-lfh="stand-zeit"]')?.textContent).toBe(zeitA);
+    // Ohne Bezeichnung ist die Zeit die Hauptzeile und steht nicht doppelt.
+    expect(ohne.querySelector('[data-lfh="stand-zeit"]')).toBeNull();
+    expect(ohne.textContent).toBe(zeitOhne);
+    // Zugänglicher Name mit Bezeichnung und Zeit: an der Option und in antds Vorleseliste (die nur
+    // die Nachbarn der aktiven Option rendert, hier „Live“ und den jüngsten Stand).
+    expect(mit).toHaveAttribute('aria-label', `Stand A, ${zeitA}`);
+    expect(screen.getByRole('option', { name: `Stand A, ${zeitA}` })).toBeInTheDocument();
+  });
+
+  it('das geschlossene Feld zeigt nur die Hauptzeile (LFH-1057)', () => {
+    renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], { aktiverSnapshotId: 7 });
+    expect(auswahlText()).toBe('Stand A');
   });
 
   it('die Auswahl zeigt den aktiven Stand, sonst „Live“', () => {
@@ -511,5 +558,49 @@ describe('SnapshotLeiste — Standzeit in der Anzeigezone (LFH-913)', () => {
       { zeitzone: 'Europe/Berlin' },
     );
     expect(auswahlText()).toBe('241000');
+  });
+});
+
+/** LFH-1057: Beschriftung eines Standes in der Auswahl „Stand“ und am Schieber. */
+describe('standBeschriftung', () => {
+  const berlin: AnzeigeKonventionen = { zeitzone: 'Europe/Berlin' };
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-07-24T12:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('mit Bezeichnung: Bezeichnung als Haupt-, Erfassungszeit als Zweitzeile (heute HHmm)', () => {
+    expect(standBeschriftung('Lage 08:00', '2026-07-24 08:00:00', berlin)).toEqual({
+      haupt: 'Lage 08:00',
+      zeit: '1000',
+      voll: 'Lage 08:00, 1000',
+    });
+  });
+
+  it('mit Bezeichnung an einem anderen Tag: Zeit als DDHHmm', () => {
+    expect(standBeschriftung('vor Evakuierung', '2026-07-22 21:30:00', berlin)).toEqual({
+      haupt: 'vor Evakuierung',
+      zeit: '222330',
+      voll: 'vor Evakuierung, 222330',
+    });
+  });
+
+  it('ohne Bezeichnung: die Zeit ist die Hauptzeile, keine Zweitzeile', () => {
+    expect(standBeschriftung(null, '2026-07-24 08:00:00', berlin)).toEqual({
+      haupt: '1000',
+      zeit: null,
+      voll: '1000',
+    });
+    expect(standBeschriftung(undefined, '2026-07-22 08:00:00', berlin)).toEqual({
+      haupt: '221000',
+      zeit: null,
+      voll: '221000',
+    });
+  });
+
+  it('eine Bezeichnung aus Leerzeichen zählt als keine; Ränder fallen weg', () => {
+    expect(standBeschriftung('   ', '2026-07-24 08:00:00', berlin).zeit).toBeNull();
+    expect(standBeschriftung('  Lage  ', '2026-07-24 08:00:00', berlin).haupt).toBe('Lage');
   });
 });
