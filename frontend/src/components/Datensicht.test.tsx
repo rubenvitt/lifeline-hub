@@ -567,6 +567,23 @@ describe('pruefeKartenplan()', () => {
   });
 
   /**
+   * Der Zeilenfehler merkt sich die gezeigten Gründe nur für die oberste Ebene (LFH-1077): an einem
+   * Baumkind bliebe ein geräumter Grund stehen.
+   */
+  it('meldet zeilenFehler zusammen mit baum', () => {
+    const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
+    const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
+    const zeilenFehler = () => null;
+    expect(
+      meldung(
+        pruefeKartenplan({ spalten: ohneFilterSpalten, karte, baum, zeilenFehler }, 'Meldebild'),
+        'zeilenFehler',
+      ),
+    ).toHaveLength(1);
+    expect(pruefeKartenplan({ spalten, karte, zeilenFehler }, 'Fahrzeuge')).toEqual([]);
+  });
+
+  /**
    * Im Baummodus klappt die ganze Zeile auf (LFH-338 · C3). Ein zusätzliches `onZeileKlick` wäre
    * eine zweite Wirkung auf demselben Klick und wird gemeldet.
    */

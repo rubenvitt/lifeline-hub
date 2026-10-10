@@ -554,6 +554,94 @@ describe('KraefteuebersichtPage — Raster', () => {
     await waitFor(() => expect(setzeEinheitStatus).toHaveBeenCalledWith(1, 20, 102));
   });
 
+  /**
+   * Ein abgelehnter Handstatus nennt den Grund in der Statuszelle seiner Zeile, kein Toast
+   * (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). Zwei Zeilen zugleich gibt es hier
+   * nicht: solange ein Handstatus läuft, sind alle Auslöser gesperrt.
+   */
+  describe('Handstatus abgelehnt (LFH-1077)', () => {
+    const zweiOhneFahrzeug = () =>
+      vi.mocked(listeEinheiten).mockResolvedValue([
+        { ...EINHEIT_E10, name: 'Fachberater' },
+        { ...EINHEIT_E10, id: 21, name: 'Verbindung' },
+      ]);
+    async function waehle(container: HTMLElement, schluessel: string, name: RegExp) {
+      const e = zeile(container, schluessel)!;
+      fireEvent.click(await within(e).findByRole('button', { name }));
+      const menue = await waitFor(() => {
+        const m = document.querySelector(
+          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+        ) as HTMLElement | null;
+        expect(m).not.toBeNull();
+        return m!;
+      });
+      fireEvent.click(within(menue).getByText(/S2 · Frei auf Wache/));
+    }
+
+    it('der Grund steht in der Statuszelle dieser Zeile', async () => {
+      zweiOhneFahrzeug();
+      vi.mocked(setzeEinheitStatus).mockRejectedValue(
+        new ApiError(422, 'Einheit führt inzwischen ein Fahrzeug'),
+      );
+      const { container } = setup();
+      await screen.findByText('Verbindung');
+      await waehle(container, 'eh-20', /Fachberater/);
+
+      expect(
+        await within(zeile(container, 'eh-20')!).findByText(
+          'Einheit führt inzwischen ein Fahrzeug',
+        ),
+      ).toHaveAttribute('data-fehler');
+      expect(zeile(container, 'eh-21')!.querySelector('[data-fehler]')).toBeNull();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('der Grund bleibt, wenn der Refetch den Auslöser entfernt', async () => {
+      vi.mocked(listeEinheiten).mockResolvedValue([{ ...EINHEIT_E10, name: 'Fachberater' }]);
+      vi.mocked(setzeEinheitStatus).mockImplementation(async () => {
+        // Inzwischen hat die Einheit ein Fahrzeug: der Refetch nach der Ablehnung nimmt den
+        // Handstatus-Auslöser weg.
+        vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+        vi.mocked(listeEinheiten).mockResolvedValue([
+          {
+            ...EINHEIT_E10,
+            name: 'Fachberater',
+            fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+          },
+        ]);
+        throw new ApiError(422, 'Einheit führt inzwischen ein Fahrzeug');
+      });
+      const { container } = setup();
+      await screen.findByText('Fachberater');
+      await waehle(container, 'eh-20', /Fachberater/);
+
+      await waitFor(() =>
+        expect(
+          within(zeile(container, 'eh-20')!).queryByRole('button', { name: /Fachberater/ }),
+        ).toBeNull(),
+      );
+      expect(
+        within(zeile(container, 'eh-20')!).getByText('Einheit führt inzwischen ein Fahrzeug'),
+      ).toHaveAttribute('data-fehler');
+    });
+
+    it('der nächste Handstatus an derselben Zeile räumt den Grund', async () => {
+      zweiOhneFahrzeug();
+      vi.mocked(setzeEinheitStatus)
+        .mockRejectedValueOnce(new ApiError(422, 'Status nicht erlaubt'))
+        .mockImplementationOnce(() => new Promise(() => {}));
+      const { container } = setup();
+      await screen.findByText('Verbindung');
+      await waehle(container, 'eh-20', /Fachberater/);
+      await within(zeile(container, 'eh-20')!).findByText('Status nicht erlaubt');
+
+      await waehle(container, 'eh-20', /Fachberater/);
+      await waitFor(() =>
+        expect(zeile(container, 'eh-20')!.querySelector('[data-fehler]')).toBeNull(),
+      );
+    });
+  });
+
   it('zeigt den jüngsten offenen Auftrag der Einheit als Deeplink', async () => {
     mitEinheit();
     vi.mocked(listeOffeneAuftraege).mockResolvedValue([AUFTRAG_A3]);

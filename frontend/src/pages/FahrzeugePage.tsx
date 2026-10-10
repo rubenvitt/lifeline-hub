@@ -70,7 +70,8 @@ import DemoMarke from '../components/DemoMarke';
 import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 import { fmsEtikett } from '../kraefte/meldebildRaster';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
@@ -148,6 +149,9 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
  * Besatzungs-Block je disponiertem Fahrzeug: Mitglieder (über `fahrzeug_id`), Ist/Soll als
  * `Staerke`, Frei-Pool-Picker (nur `fahrzeug_id == null`). Eine Kraft in einer anderen Einheit als
  * das Fahrzeug wird markiert.
+ *
+ * Abgelehntes Zuordnen steht unter dem Auswahlfeld, abgelehntes Freigeben an der Kraft (LFH-1077,
+ * `frontend/AGENTS.md`, „Rückwege und Fehler“).
  */
 function BesatzungsBlock({
   ef,
@@ -156,6 +160,8 @@ function BesatzungsBlock({
   freiInhalt,
   onZuordnen,
   onFreigeben,
+  zuordnenFehler,
+  freigebenFehler,
 }: {
   ef: EinsatzFahrzeug;
   personal: EinsatzPersonal[];
@@ -168,11 +174,15 @@ function BesatzungsBlock({
   freiInhalt: string;
   onZuordnen: (epId: number) => void;
   onFreigeben: (epId: number) => void;
+  /** Grund des letzten abgelehnten Zuordnens an diesem Fahrzeug. */
+  zuordnenFehler: ZeilenGrund | null;
+  /** Grund des letzten abgelehnten Freigebens je Kraft. */
+  freigebenFehler: (epId: number) => ZeilenGrund | null;
 }) {
   const crew = personal.filter((p) => p.fahrzeug_id === ef.id);
   const frei = personal.filter((p) => p.fahrzeug_id == null);
   return (
-    <div style={{ paddingLeft: 8 }}>
+    <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
       <Space size={abstand.sm} style={{ marginBottom: abstand.sm }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
         <BesatzungsStaerkeBadge crew={crew} soll={ef.soll_besatzung ?? null} />
@@ -182,27 +192,30 @@ function BesatzungsBlock({
           <Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text>
         </div>
       ) : (
-        crew.map((m) => (
-          <Space
-            key={m.id}
-            style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
-          >
-            <Space size={abstand.sm}>
-              <span>
-                {m.name}
-                {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
-              </span>
-              {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
-                <Tag style={{ margin: 0 }}>andere Einheit</Tag>
-              )}
-            </Space>
-            {darfSchreiben && (
-              <Button danger onClick={() => onFreigeben(m.id)}>
-                Freigeben
-              </Button>
-            )}
-          </Space>
-        ))
+        crew.map((m) => {
+          const grund = freigebenFehler(m.id);
+          return (
+            <div key={m.id}>
+              <Space style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}>
+                <Space size={abstand.sm}>
+                  <span>
+                    {m.name}
+                    {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
+                  </span>
+                  {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
+                    <Tag style={{ margin: 0 }}>andere Einheit</Tag>
+                  )}
+                </Space>
+                {darfSchreiben && (
+                  <Button danger onClick={() => onFreigeben(m.id)}>
+                    Freigeben
+                  </Button>
+                )}
+              </Space>
+              {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
+            </div>
+          );
+        })
       )}
       {darfSchreiben && (
         <Select
@@ -213,6 +226,15 @@ function BesatzungsBlock({
           options={frei.map((p) => ({ value: p.id, label: p.name }))}
           onSelect={(epId) => onZuordnen(Number(epId))}
         />
+      )}
+      {zuordnenFehler && (
+        <div style={{ maxWidth: 420, marginTop: abstand.sm }}>
+          <SpeicherFehler
+            fehler={zuordnenFehler.fehler}
+            titel="Nicht zugeordnet"
+            fallback={zuordnenFehler.fallback}
+          />
+        </div>
       )}
     </div>
   );
@@ -308,7 +330,12 @@ export default function FahrzeugePage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = useFehlerMeldung();
+  // Ablehnungen am Ort (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077): die Dialoge über
+  // `speicherung`, Zeilenaktionen je Fahrzeug an Zeile, Karte und Kachel, die Besatzung im Block.
+  // Alle Zeilenaktionen teilen einen Speicher; die zuletzt begonnene zählt.
+  const zeilen = useZeilenFehler<number>();
+  const zuordnenFehler = useZeilenFehler<number>();
+  const freigebenFehler = useZeilenFehler<number>();
 
   const disponiereMutation = useMutation({
     mutationFn: (fahrzeugId: number) => disponiereFahrzeug(einsatzId, fahrzeugId),
@@ -316,7 +343,6 @@ export default function FahrzeugePage() {
       message.success('Fahrzeug disponiert');
       invalidate();
     },
-    onError: fehler,
   });
   // Schließen und Leeren gehören der Erfassungshülle: sie schließt über `onFertig` (nur beim
   // Einzel-Erfassen) und setzt auf beiden Wegen zurück. Ein Reset hier wäre doppelt und im
@@ -324,7 +350,6 @@ export default function FahrzeugePage() {
   const adhocMutation = useMutation({
     mutationFn: (daten: AdhocEingabe) => disponiereAdhoc(einsatzId, daten),
     onSuccess: invalidate,
-    onError: fehler,
   });
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzFahrzeug,
@@ -337,29 +362,34 @@ export default function FahrzeugePage() {
     // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
     // das ohne Stream (offline, Proxy) nie käme.
     onErfolg: () => void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
-    onFehler: fehler,
+    onBeginn: (v) => zeilen.beginne(v.efId),
+    onFehler: (e, v) => zeilen.melde(v.efId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { efId: number; bemerkung: string }) =>
       aktualisiereDisposition(einsatzId, v.efId, { bemerkung: v.bemerkung }),
+    onMutate: (v) => zeilen.beginne(v.efId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, v) => zeilen.melde(v.efId, e, 'Bemerkung nicht gespeichert'),
   });
   const entfernenMutation = useMutation({
     mutationFn: (efId: number) => entferneDisposition(einsatzId, efId),
+    onMutate: (efId) => zeilen.beginne(efId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, efId) => zeilen.melde(efId, e, 'Entfernen fehlgeschlagen'),
   });
   const besatzungZuMutation = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
+    onMutate: (v) => zuordnenFehler.beginne(v.efId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, v) => zuordnenFehler.melde(v.efId, e, 'Zuordnen fehlgeschlagen'),
   });
   const besatzungFreiMutation = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
+    onMutate: (v) => freigebenFehler.beginne(v.epId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Freigeben fehlgeschlagen'),
   });
 
   if (einsatzQuery.isLoading) {
@@ -576,7 +606,8 @@ export default function FahrzeugePage() {
           wert={ef.bemerkung}
           kennung={ef.funkrufname}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(val) => bemerkungMutation.mutate({ efId: ef.id, bemerkung: val })}
+          // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
+          onSpeichern={(val) => bemerkungMutation.mutateAsync({ efId: ef.id, bemerkung: val })}
         />
       ),
     },
@@ -694,6 +725,7 @@ export default function FahrzeugePage() {
               }
               darfSchreiben={darfSchreiben}
               bedienungVon={statusBedienungVon}
+              zeilenFehler={(f) => zeilen.grund(f.id)}
               ladend={efQuery.isLoading || einheitenQuery.isLoading}
             />
           ) : (
@@ -707,6 +739,7 @@ export default function FahrzeugePage() {
               suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
               standardSortierung={{ spalte: 'funkrufname', richtung: 'auf' }}
               spaltenAusVoreinstellung={['bemerkung']}
+              zeilenFehler={(f) => zeilen.grund(f.id)}
               gruppen={{
                 schluessel: (ef) => kategorieVon(ef.status_kategorie),
                 etikett: kategorieEtikett,
@@ -718,6 +751,11 @@ export default function FahrzeugePage() {
               // Besatzung je Fahrzeug eingeklappt, über den beschrifteten Auslöser in Tabelle UND
               // Karte aufklappbar (LFH-697); die Ist/Soll-Stärke steht dauerhaft in der
               // Besatzungs-Spalte bzw. im Sekundärfeld.
+              //
+              // Gemerkte Karten und Zellen zeichnen den Bereich nur neu, wenn `aufklappen` ein neues
+              // Objekt ist (es steht in der Garnitur). Die Besatzungsfehler kommen wie `personal`
+              // allein über diesen Abschluss: wer das Objekt einmal merkt, nimmt die Gründe in die
+              // Abhängigkeiten, sonst blieben ein neuer und ein geräumter Grund unsichtbar.
               aufklappen={{
                 etikett: 'Besatzung',
                 zugaenglicherName: (ef) => `Besatzung zu ${ef.funkrufname}`,
@@ -729,6 +767,8 @@ export default function FahrzeugePage() {
                     freiInhalt={besatzungInhalt}
                     onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
                     onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+                    zuordnenFehler={zuordnenFehler.grund(ef.id)}
+                    freigebenFehler={freigebenFehler.grund}
                   />
                 ),
               }}
@@ -766,6 +806,9 @@ export default function FahrzeugePage() {
         erfassenText="Disponieren"
         serie
         laeuft={disponiereMutation.isPending}
+        speicherung={disponiereMutation}
+        speicherFehlerTitel="Nicht disponiert"
+        speicherFehlerFallback="Disponieren fehlgeschlagen"
         onErfassen={async (w) => {
           await disponiereMutation.mutateAsync(w.fahrzeug_id);
         }}
@@ -803,8 +846,11 @@ export default function FahrzeugePage() {
         serie
         uebernahme={['traegerorganisation', 'fahrzeugtyp']}
         laeuft={adhocMutation.isPending}
+        speicherung={adhocMutation}
+        speicherFehlerTitel="Nicht disponiert"
+        speicherFehlerFallback="Disponieren fehlgeschlagen"
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
-        // ankam. Den Fehlertext meldet `onError` der Mutation.
+        // ankam. Den Grund zeigt die Hülle über `speicherung`.
         onErfassen={(w) => adhocMutation.mutateAsync(w)}
         onFertig={() => setAdhocOffen(false)}
         onAbbrechen={() => setAdhocOffen(false)}

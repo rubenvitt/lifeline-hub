@@ -9,6 +9,11 @@ export interface ZeilenGrund {
 export interface ZeilenFehlerSpeicher<K> {
   /** Grund der letzten Ablehnung an dieser Zeile, sonst `null`. */
   grund: (schluessel: K) => ZeilenGrund | null;
+  /**
+   * Alle Schlüssel mit Grund, in Meldereihenfolge. Für Gründe, deren Zeile nicht mehr gezeigt wird
+   * (etwa in eine andere Ansicht gewandert): sie gehören dann in den Seitenhinweis.
+   */
+  gemeldet: () => K[];
   /** In `onMutate`: eine neue Aktion an der Zeile räumt deren alten Grund. */
   beginne: (schluessel: K) => void;
   /** In `onError`. */
@@ -51,7 +56,13 @@ export function useZeilenFehler<K>(): ZeilenFehlerSpeicher<K> {
   }, []);
 
   return useMemo(
-    () => ({ grund: (s: K) => gruende.get(s) ?? null, beginne, melde, leere }),
+    () => ({
+      grund: (s: K) => gruende.get(s) ?? null,
+      gemeldet: () => [...gruende.keys()],
+      beginne,
+      melde,
+      leere,
+    }),
     [gruende, beginne, melde, leere],
   );
 }

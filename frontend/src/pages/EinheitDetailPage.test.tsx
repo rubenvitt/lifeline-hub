@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { delay, http, HttpResponse, type HttpHandler } from 'msw';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinheitDetailPage from './EinheitDetailPage';
@@ -95,7 +95,7 @@ function rendere(route = '/einsaetze/1/einheiten/10') {
  * erste Treffer gewinnt — andersherum schluckte der grüne Boden aus {@link handlers} jede
  * Abweichung.
  */
-function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
+function zeige(...abweichungen: HttpHandler[]) {
   server.use(...abweichungen, ...handlers());
   return renderMitProviders(
     <Routes>
@@ -383,6 +383,289 @@ describe('EinheitDetailPage · Auflösen', () => {
 
     await waitFor(() => expect(geloest).toBe(true));
     expect(await screen.findByText('Gliederung')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Speichern und
+ * Auflösen melden am Paneel „Kopfdaten“, Zuordnen am Paneel der Zuordnung, Entfernen und
+ * „Als Einheitsführer“ an der Zeile. Kein Fehler-Toast.
+ */
+describe('EinheitDetailPage · Speicherfehler am Ort (LFH-1077)', () => {
+  const paneel = (titel: string) => screen.getByRole('region', { name: titel });
+  const zeileVon = (text: string) =>
+    screen
+      .getByText(text, { exact: false })
+      .closest('[data-lfh="einheit-zuordnung"]') as HTMLElement;
+  const mitMitgliedern = [
+    {
+      ...einheiten[0],
+      personal_mitglieder: [
+        { ep_id: 1, name: 'Max Mustermann', staerke_position: null, ist_fuehrer: false },
+        { ep_id: 2, name: 'Uwe Unter', staerke_position: null, ist_fuehrer: false },
+      ],
+      fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+      material_mitglieder: [{ em_id: 40, bezeichnung: 'Tragkraftspritze', menge: 1 }],
+    },
+  ];
+  const mitglieder = () =>
+    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(mitMitgliedern));
+  const abgelehnt =
+    (text: string, status = 409) =>
+    () =>
+      HttpResponse.json({ error: text }, { status });
+
+  /** Einmal ablehnen, danach ohne Antwort: geprüft wird der Zustand, solange sie aussteht. */
+  function erstAblehnenDannWarten(text: string) {
+    let erster = true;
+    return async () => {
+      if (erster) {
+        erster = false;
+        return HttpResponse.json({ error: text }, { status: 409 });
+      }
+      await delay('infinite');
+      return HttpResponse.json({});
+    };
+  }
+
+  async function waehleAus(container: HTMLElement, platzhalter: string, eintrag: string) {
+    await oeffneAuswahl(container, platzhalter);
+    await userEvent.click(
+      await screen.findByText(
+        (_, el) =>
+          typeof el?.className === 'string' &&
+          el.className.includes('ant-select-item-option-content') &&
+          el.textContent === eintrag,
+      ),
+    );
+  }
+
+  it('Speichern: der Grund steht am Paneel „Kopfdaten“, kein Toast', async () => {
+    server.use(
+      http.patch('/api/einsaetze/1/einheiten/10', abgelehnt('Name bereits vergeben', 422)),
+      ...handlers(),
+    );
+    rendere();
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    expect(await within(paneel('Kopfdaten')).findByRole('alert')).toHaveTextContent(
+      'Name bereits vergeben',
+    );
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Speichern: das nächste Speichern räumt den Grund', async () => {
+    server.use(
+      http.patch('/api/einsaetze/1/einheiten/10', erstAblehnenDannWarten('Name bereits vergeben')),
+      ...handlers(),
+    );
+    rendere();
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await within(paneel('Kopfdaten')).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull());
+  });
+
+  it('Auflösen: der Grund steht am Paneel „Kopfdaten“, kein Toast', async () => {
+    server.use(
+      http.delete('/api/einsaetze/1/einheiten/10', abgelehnt('Einheit ist disponiert')),
+      ...handlers(),
+    );
+    rendere();
+    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    const blase = await screen.findByRole('tooltip');
+    await userEvent.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
+
+    expect(await within(paneel('Kopfdaten')).findByRole('alert')).toHaveTextContent(
+      'Einheit ist disponiert',
+    );
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Zuordnen: der Grund steht am Paneel der Zuordnung, die nächste Auswahl räumt ihn', async () => {
+    const { container } = zeige(
+      http.get('/api/einsaetze/1/personal', () =>
+        HttpResponse.json([
+          { id: 5, name: 'Erika Frei', einheit_id: null },
+          { id: 6, name: 'Otto Frei', einheit_id: null },
+        ]),
+      ),
+      http.put(
+        '/api/einsaetze/1/einheiten/10/personal/:epId',
+        erstAblehnenDannWarten('Person ist einer anderen Einheit zugeordnet'),
+      ),
+    );
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    await waehleAus(container, 'Person zuordnen …', 'Erika Frei');
+
+    expect(await within(paneel('Personal')).findByRole('alert')).toHaveTextContent(
+      'Person ist einer anderen Einheit zugeordnet',
+    );
+    expect(within(paneel('Fahrzeuge')).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await waehleAus(container, 'Person zuordnen …', 'Otto Frei');
+    await waitFor(() => expect(within(paneel('Personal')).queryByRole('alert')).toBeNull());
+  });
+
+  /**
+   * Wie beim Entfernen: `personalZu.error` kennte nur die zweite, noch laufende Zuordnung; die
+   * Ablehnung der ersten ginge verloren.
+   */
+  it('Zuordnen: zwei Zuordnungen nebenläufig, die späte Ablehnung der ersten steht am Paneel', async () => {
+    let lehneAb: () => void = () => {};
+    const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
+    const { container } = zeige(
+      http.get('/api/einsaetze/1/personal', () =>
+        HttpResponse.json([
+          { id: 5, name: 'Erika Frei', einheit_id: null },
+          { id: 6, name: 'Otto Frei', einheit_id: null },
+        ]),
+      ),
+      http.put('/api/einsaetze/1/einheiten/10/personal/:epId', async ({ params }) => {
+        if (params.epId === '5') {
+          await ersteAblehnung;
+          return HttpResponse.json(
+            { error: 'Person ist einer anderen Einheit zugeordnet' },
+            { status: 409 },
+          );
+        }
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    );
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    await waehleAus(container, 'Person zuordnen …', 'Erika Frei');
+    await waehleAus(container, 'Person zuordnen …', 'Otto Frei');
+    await act(async () => lehneAb());
+
+    expect(await within(paneel('Personal')).findByRole('alert')).toHaveTextContent(
+      'Person ist einer anderen Einheit zugeordnet',
+    );
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Wechsel zu einer anderen Einheit: die Gründe der vorigen bleiben nicht stehen', async () => {
+    /** Die Route hat keinen `key`: dieselbe Seite zeigt nach dem Wechsel die nächste Einheit. */
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/1/einheiten/11')}>
+          Zur zweiten Einheit
+        </button>
+      );
+    }
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([...einheiten, { ...einheiten[0], id: 11, name: '2. Zug' }]),
+      ),
+      http.get('/api/einsaetze/1/personal', () =>
+        HttpResponse.json([{ id: 5, name: 'Erika Frei', einheit_id: null }]),
+      ),
+      http.patch('/api/einsaetze/1/einheiten/10', abgelehnt('Name bereits vergeben', 422)),
+      http.put('/api/einsaetze/1/einheiten/10/personal/:epId', abgelehnt('Person ist gebunden')),
+      ...handlers(),
+    );
+    const { container } = renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/einheiten/10' },
+    );
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waehleAus(container, 'Person zuordnen …', 'Erika Frei');
+    await within(paneel('Kopfdaten')).findByRole('alert');
+    await within(paneel('Personal')).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Einheit' }));
+    await screen.findByRole('heading', { name: '2. Zug', level: 1 });
+    expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
+    expect(within(paneel('Personal')).queryByRole('alert')).toBeNull();
+  });
+
+  /**
+   * `useMutation` verfolgt nur den LETZTEN Aufruf: entfernt man Zeile 2, bevor Zeile 1 geantwortet
+   * hat, ginge die Ablehnung von Zeile 1 über `mutation.error` verloren.
+   */
+  it('Entfernen: zwei Zeilen nebenläufig, die Ablehnung steht an ihrer Zeile', async () => {
+    let lehneAb: () => void = () => {};
+    const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
+    zeige(
+      mitglieder(),
+      http.delete('/api/einsaetze/1/einheiten/10/personal/:epId', async ({ params }) => {
+        if (params.epId === '1') {
+          await ersteAblehnung;
+          return HttpResponse.json({ error: 'Person führt die Einheit' }, { status: 409 });
+        }
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await screen.findByText('Max Mustermann', { exact: false });
+    await userEvent.click(
+      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Entfernen' }),
+    );
+    await userEvent.click(within(zeileVon('Uwe Unter')).getByRole('button', { name: 'Entfernen' }));
+    lehneAb();
+
+    expect(
+      await within(zeileVon('Max Mustermann')).findByText('Person führt die Einheit'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('Uwe Unter').querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Als Einheitsführer: der Grund steht an der Zeile, die nächste Aktion dort räumt ihn', async () => {
+    zeige(
+      mitglieder(),
+      http.patch(
+        '/api/einsaetze/1/einheiten/10',
+        erstAblehnenDannWarten('Person ist nicht disponiert'),
+      ),
+    );
+    await screen.findByText('Max Mustermann', { exact: false });
+    const knopf = () =>
+      within(zeileVon('Max Mustermann')).getByRole('button', { name: 'Als Einheitsführer' });
+    await userEvent.click(knopf());
+
+    expect(
+      await within(zeileVon('Max Mustermann')).findByText('Person ist nicht disponiert'),
+    ).toHaveAttribute('data-fehler');
+    expect(zeileVon('Uwe Unter').querySelector('[data-fehler]')).toBeNull();
+    expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
+
+    await userEvent.click(knopf());
+    await waitFor(() =>
+      expect(zeileVon('Max Mustermann').querySelector('[data-fehler]')).toBeNull(),
+    );
+  });
+
+  it('Fahrzeug und Material entfernen: der Grund steht an ihrer Zeile', async () => {
+    zeige(
+      mitglieder(),
+      http.delete(
+        '/api/einsaetze/1/einheiten/10/fahrzeug/30',
+        abgelehnt('Fahrzeug ist im Einsatz gebunden'),
+      ),
+      http.delete('/api/einsaetze/1/einheiten/10/material/40', abgelehnt('Material ist verliehen')),
+    );
+    await screen.findByText('FW 1/44-1');
+    await userEvent.click(within(zeileVon('FW 1/44-1')).getByRole('button', { name: 'Entfernen' }));
+    await userEvent.click(
+      within(zeileVon('Tragkraftspritze')).getByRole('button', { name: 'Entfernen' }),
+    );
+
+    expect(
+      await within(zeileVon('FW 1/44-1')).findByText('Fahrzeug ist im Einsatz gebunden'),
+    ).toHaveAttribute('data-fehler');
+    expect(
+      await within(zeileVon('Tragkraftspritze')).findByText('Material ist verliehen'),
+    ).toHaveAttribute('data-fehler');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 });
 

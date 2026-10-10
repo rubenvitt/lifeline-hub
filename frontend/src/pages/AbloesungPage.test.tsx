@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import AbloesungPage from './AbloesungPage';
+import { ApiError } from '../api/client';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
@@ -684,6 +685,148 @@ describe('AbloesungPage (LFH-635)', () => {
       await userEvent.click(screen.getByRole('radio', { name: /^Laufend/ }));
       await waitFor(() => expect(kartenNamen()).toHaveLength(4));
       expect(sammelbanner()).toBeNull();
+    });
+  });
+});
+
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): die Rücknahme an
+ * der Karte meldet an der Karte, Rückgängig aus dem Toast im Hinweis der Seite. Kein Fehler-Toast.
+ */
+describe('AbloesungPage — Rücknahme abgelehnt (LFH-1077)', () => {
+  const karte = (name: string) => screen.getByRole('article', { name: `Schicht ${name}` });
+  const seitenHinweis = () =>
+    waitFor(() => {
+      const h = document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+      expect(h).not.toBeNull();
+      return h as HTMLElement;
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    freigaben.wert = freigabenFixture();
+    einsatz.wert = {
+      id: 1,
+      bezeichnung: 'Hochwasser',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    };
+    listeEinheitenPerioden.mockResolvedValue([]);
+    listeAbloesungVorgaben.mockResolvedValue([]);
+  });
+
+  describe('Rückgängig aus dem Toast', () => {
+    const a = schicht({ id: 1, faellig_at: inMinuten(-12), abloesende_einheit_id: 12 });
+    beforeEach(() => {
+      laufendLiefert([a]);
+      vollzieheAbloesung.mockResolvedValue({
+        abgeloest: { ...a, status: 'abgeloest', ruecknehmbar: true },
+        folgeschicht: null,
+      });
+    });
+    async function vollzieheUndNimmZurueck() {
+      await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+      const rueckgaengig = await screen.findAllByRole('button', { name: /Rückgängig/ });
+      await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
+    }
+
+    it('der Grund steht im Seitenhinweis, kein Fehler-Toast', async () => {
+      nimmVollzugZurueck.mockRejectedValue(new ApiError(409, 'Folgeschicht bereits abgelöst'));
+      renderPage();
+      await vollzieheUndNimmZurueck();
+
+      const hinweis = await seitenHinweis();
+      expect(await within(hinweis).findByRole('alert')).toHaveTextContent(
+        'Folgeschicht bereits abgelöst',
+      );
+      expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+      expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+    });
+
+    it('die nächste Rücknahme räumt den Hinweis', async () => {
+      nimmVollzugZurueck
+        .mockRejectedValueOnce(new ApiError(409, 'Folgeschicht bereits abgelöst'))
+        .mockImplementationOnce(() => new Promise(() => {}));
+      renderPage();
+      await vollzieheUndNimmZurueck();
+      await screen.findByText('Folgeschicht bereits abgelöst');
+
+      await vollzieheUndNimmZurueck();
+      await waitFor(() => expect(nimmVollzugZurueck).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(screen.queryByText('Folgeschicht bereits abgelöst')).not.toBeInTheDocument(),
+      );
+    });
+  });
+
+  describe('Rücknahme an der Karte', () => {
+    beforeEach(() => {
+      listeAbloesungen.mockImplementation((_e: number, status: string) =>
+        Promise.resolve(
+          status === 'laufend'
+            ? []
+            : [
+                schicht({ id: 1, status: 'abgeloest', ruecknehmbar: true }),
+                schicht({ id: 2, status: 'abgeloest', ruecknehmbar: true }),
+              ],
+        ),
+      );
+    });
+    async function zeigeAbgeloeste() {
+      renderPage();
+      await screen.findByText('Keine laufenden Schichten');
+      await userEvent.click(screen.getByRole('radio', { name: 'Abgelöst' }));
+      await screen.findByRole('article', { name: 'Schicht Florian 2' });
+    }
+    const nimmZurueck = (name: string) =>
+      userEvent.click(within(karte(name)).getByRole('button', { name: 'Vollzug zurücknehmen' }));
+
+    it('der Grund steht an genau dieser Karte, kein Toast', async () => {
+      nimmVollzugZurueck.mockRejectedValue(new ApiError(409, 'Folgeschicht bereits abgelöst'));
+      await zeigeAbgeloeste();
+      await nimmZurueck('Florian 1');
+
+      expect(
+        await within(karte('Florian 1')).findByText('Folgeschicht bereits abgelöst'),
+      ).toHaveAttribute('data-fehler');
+      expect(karte('Florian 2').querySelector('[data-fehler]')).toBeNull();
+      expect(document.querySelector('[data-lfh="seiten-beschreibung"]')).toBeNull();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('zwei Karten nebenläufig: die Ablehnung steht an ihrer Karte', async () => {
+      let lehneAb: (e: Error) => void = () => {};
+      nimmVollzugZurueck.mockImplementation((_e: number, id: number) =>
+        id === 1
+          ? new Promise((_r, reject) => (lehneAb = reject))
+          : Promise.resolve(schicht({ id: 2 })),
+      );
+      await zeigeAbgeloeste();
+      await nimmZurueck('Florian 1');
+      await nimmZurueck('Florian 2');
+      await waitFor(() => expect(nimmVollzugZurueck).toHaveBeenCalledTimes(2));
+      await act(async () => lehneAb(new ApiError(409, 'Folgeschicht bereits abgelöst')));
+
+      expect(
+        await within(karte('Florian 1')).findByText('Folgeschicht bereits abgelöst'),
+      ).toHaveAttribute('data-fehler');
+      expect(karte('Florian 2').querySelector('[data-fehler]')).toBeNull();
+      // Karte 2 hat Erfolg und damit ihren Erfolgs-Toast; ein Fehler-Toast fehlt.
+      expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+    });
+
+    it('die nächste Rücknahme an derselben Karte räumt den Grund', async () => {
+      nimmVollzugZurueck
+        .mockRejectedValueOnce(new ApiError(409, 'Folgeschicht bereits abgelöst'))
+        .mockImplementationOnce(() => new Promise(() => {}));
+      await zeigeAbgeloeste();
+      await nimmZurueck('Florian 1');
+      await within(karte('Florian 1')).findByText('Folgeschicht bereits abgelöst');
+
+      await nimmZurueck('Florian 1');
+      await waitFor(() => expect(karte('Florian 1').querySelector('[data-fehler]')).toBeNull());
     });
   });
 });

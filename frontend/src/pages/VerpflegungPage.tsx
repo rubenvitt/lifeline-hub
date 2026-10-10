@@ -33,7 +33,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { RechteHinweis } from '../components/SpeicherHinweis';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { Sammelbanner, sammelbannerKurz, Segmentleiste, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
@@ -144,6 +144,8 @@ export default function VerpflegungPage() {
 
   const [ansicht, setAnsicht] = useState<Ansicht>('laufend');
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  // Grund einer abgelehnten Rücknahme aus dem Rückgängig-Toast (`rueckgaengigMut`).
+  const [ruecknahmeFehler, setRuecknahmeFehler] = useState<unknown>(null);
   // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären sonst
   // alle Zeitfenster des neuen Einsatzes „fremde Neuzugänge".
   const [zuflussZustand, setZuflussZustand] = useState<{ einsatzId: number } & Zuflussstand>({
@@ -272,16 +274,19 @@ export default function VerpflegungPage() {
       message.success(`Zeitfenster ${zitat(zf.bezeichnung)} gelöscht`);
     },
   });
-  // Rückgängig aus dem Toast: kein Dialog, in dem ein Fehler stehen könnte — also Toast.
+  // Rückgängig aus dem Toast: kein Dialog, und die Karte ist oft nicht mehr zu sehen — der Grund
+  // einer Ablehnung steht im Hinweis der Seite, bis zur nächsten Rücknahme (LFH-1077). Aus den
+  // Callbacks statt aus `mutation.error`: der kennt nur den letzten Aufruf.
   const rueckgaengigMut = useMutation({
     mutationFn: (ausgabeId: number) => nimmAusgabeZurueck(einsatzId, ausgabeId),
+    onMutate: () => setRuecknahmeFehler(null),
     onSuccess: () => {
       invalidiere(false);
       message.success('Ausgabe zurückgenommen');
     },
     onError: (e) => {
+      setRuecknahmeFehler(e);
       invalidiere(false);
-      message.error(e instanceof Error ? e.message : 'Rücknahme fehlgeschlagen');
     },
   });
   const ausgabeMut = useMutation({
@@ -368,8 +373,17 @@ export default function VerpflegungPage() {
         )
       }
       neueZeile={darfSchreiben && planen ? oeffneAnlegen : undefined}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        !darfSchreiben && <RechteHinweis sichtbar text={verpflegungRechteText(einsatz.status)} />
+        (!darfSchreiben || ruecknahmeFehler != null) && (
+          <SeitenHinweise
+            rechteFehlt={!darfSchreiben}
+            rechteText={verpflegungRechteText(einsatz.status)}
+            fehler={ruecknahmeFehler}
+            fehlerTitel="Nicht zurückgenommen"
+            fehlerFallback="Rücknahme fehlgeschlagen"
+          />
+        )
       }
     >
       {/* Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen. Das

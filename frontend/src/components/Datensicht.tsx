@@ -33,6 +33,8 @@ import Augenbraue from './instrument/Augenbraue';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
+import { ZeilenFehler } from './SpeicherHinweis';
+import type { ZeilenGrund } from './useZeilenFehler';
 import {
   etikettVon,
   hatWaehlbareSpalten,
@@ -442,6 +444,13 @@ interface DatensichtProps<T extends object, K extends string> {
   werkzeuge?: ReactNode;
   /** Einziger Aufklappweg, beschriftet, in beiden Zweigen (LFH-697); schließt `baum` aus. */
   aufklappen?: Aufklappbereich<T>;
+  /**
+   * Grund der letzten abgelehnten Aktion an dieser Zeile (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“), aus `components/useZeilenFehler.ts`. Er steht als `ZeilenFehler` in
+   * der Kennungszelle bzw. unten in der Karte. Den Grund liefert dasselbe Objekt, solange er gilt:
+   * gemerkte Zeilen zeichnen neu, wenn es sich ändert, und nur dann. Schließt `baum` aus.
+   */
+  zeilenFehler?: (zeile: T) => ZeilenGrund | null;
 }
 
 // ── Konstanten ───────────────────────────────────────────────────────────────────────
@@ -683,10 +692,21 @@ export function pruefeKartenplan<T extends object, K extends string>(
     | 'aufklappen'
     | 'onZeileKlick'
     | 'serverseitig'
+    | 'zeilenFehler'
   >,
   bezeichnung: string,
 ): string[] {
-  const { spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, serverseitig } = props;
+  const {
+    spalten,
+    karte,
+    suche,
+    baum,
+    gruppen,
+    aufklappen,
+    onZeileKlick,
+    serverseitig,
+    zeilenFehler,
+  } = props;
   const befunde: string[] = [];
   const bekannt = new Map<string, DatensichtSpalte<T, K>>();
   for (const spalte of spalten) {
@@ -734,6 +754,9 @@ export function pruefeKartenplan<T extends object, K extends string>(
     // Im Baummodus klappt die ganze Zeile auf; ein zusätzliches `onZeileKlick` wäre eine zweite
     // Wirkung auf demselben Klick.
     if (onZeileKlick) befunde.push('onZeileKlick und baum schließen sich aus.');
+    // Die gezeigten Gründe merkt sich die Tabelle nur für die oberste Ebene; an einem Baumkind
+    // bliebe ein geräumter Grund hinter `shouldCellUpdate` stehen (LFH-1077).
+    if (zeilenFehler) befunde.push('zeilenFehler und baum schließen sich aus.');
   }
   // Die Gruppenachse sortiert im Client; über eine geblätterte Servermenge zählte sie nur das Fenster.
   if (serverseitig && gruppen) befunde.push('serverseitig und gruppen schließen sich aus.');
@@ -861,14 +884,16 @@ interface GemerkteKarteProps {
   tiefe: number;
   offen: boolean;
   klasse: string | undefined;
+  /** Zeilenfehler der Karte; verglichen nach Identität wie der Datensatz. */
+  fehler: ZeilenGrund | null;
   garnitur: number;
 }
 
 /**
- * Eine Karte rendert nur bei geändertem Datensatz, geänderter Lage, Aufklappzustand, Klasse oder
- * neuer Garnitur (D5). `zeichne` ist je Render neu und wird nicht verglichen: wenn die Karte
- * rendert, nimmt sie den jüngsten Stand, und alles, was sie außer dem Datensatz liest, steht in
- * der Garnitur.
+ * Eine Karte rendert nur bei geändertem Datensatz, geänderter Lage, Aufklappzustand, Klasse,
+ * Zeilenfehler oder neuer Garnitur (D5). `zeichne` ist je Render neu und wird nicht verglichen:
+ * wenn die Karte rendert, nimmt sie den jüngsten Stand, und alles, was sie außer dem Datensatz
+ * liest, steht in der Garnitur.
  */
 const GemerkteKarte = memo(
   function GemerkteKarte({ zeichne }: GemerkteKarteProps) {
@@ -880,6 +905,7 @@ const GemerkteKarte = memo(
     a.tiefe === b.tiefe &&
     a.offen === b.offen &&
     a.klasse === b.klasse &&
+    a.fehler === b.fehler &&
     a.garnitur === b.garnitur,
 );
 
@@ -912,6 +938,7 @@ export default function Datensicht<T extends object, const K extends string>(
     onZeileKlick,
     werkzeuge,
     aufklappen,
+    zeilenFehler,
   } = props;
 
   const { token } = theme.useToken();
@@ -1374,10 +1401,22 @@ export default function Datensicht<T extends object, const K extends string>(
           aufklappen,
           onZeileKlick,
           serverseitig,
+          zeilenFehler,
         },
         bezeichnung,
       ),
-    [spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, serverseitig, bezeichnung],
+    [
+      spalten,
+      karte,
+      suche,
+      baum,
+      gruppen,
+      aufklappen,
+      onZeileKlick,
+      serverseitig,
+      zeilenFehler,
+      bezeichnung,
+    ],
   );
   const befundSchluessel = befunde.join(' | ');
   useEffect(() => {
@@ -1770,6 +1809,64 @@ export default function Datensicht<T extends object, const K extends string>(
         : antdSpalten;
 
   /**
+   * Der Zeilenfehler steht in der KENNUNGSZELLE unter ihrem Inhalt: sie ist immer sichtbar (wie
+   * der Aufklapp-Auslöser), eine eigene Spalte oder Zeile gäbe es nur für den seltenen Fehlerfall.
+   * Ohne Grund bleibt die Zelle unverändert, ohne Hülle.
+   */
+  const fehlerJeZeile = (zeile: T): ZeilenGrund | null => zeilenFehler?.(zeile) ?? null;
+  const spaltenMitFehler: KatalogSpalte<T>[] =
+    zeilenFehler && tabellenSpalten.length > 0 && ersteSpalte
+      ? [
+          {
+            ...tabellenSpalten[0],
+            render: (wert: unknown, zeile: T, index: number) => {
+              const basis = tabellenSpalten[0].render;
+              const inhalt = basis
+                ? (basis(wert, zeile, index) as ReactNode)
+                : zelle(ersteSpalte, zeile, index);
+              const grund = fehlerJeZeile(zeile);
+              if (!grund) return inhalt;
+              return (
+                <div
+                  data-lfh="datensicht-fehler-zelle"
+                  style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
+                >
+                  <div>{inhalt}</div>
+                  {/* Breite 0, Mindestbreite 100 %: die Tabelle legt ihre Spalten automatisch aus,
+                      ein langer Grund verbreiterte sonst die Kennungsspalte. So bricht er um und
+                      zählt nicht zur Spaltenbreite. */}
+                  <div style={{ width: 0, minWidth: '100%' }}>
+                    <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
+                  </div>
+                </div>
+              );
+            },
+          },
+          ...tabellenSpalten.slice(1),
+        ]
+      : tabellenSpalten;
+  /**
+   * Die zuletzt GEZEIGTEN Gründe je Zeile (nach dem Commit gesetzt, wie `useGarnitur`): die
+   * Kennungszelle rendert neu, wenn ihr Grund ein anderes Objekt ist, sonst bliebe ein neuer Grund
+   * hinter `shouldCellUpdate` unsichtbar. Gemerkt werden nur die Zeilen der obersten Ebene; das
+   * genügt, weil `zeilenFehler` und `baum` sich ausschließen (`pruefeKartenplan`): an einem
+   * Baumkind verschwände ein geräumter Grund nicht.
+   */
+  const gezeigteFehler = useRef<ReadonlyMap<Key, ZeilenGrund>>(new Map());
+  useLayoutEffect(() => {
+    if (!zeilenFehler) return;
+    const stand = new Map<Key, ZeilenGrund>();
+    for (const zeile of daten) {
+      const grund = zeilenFehler(zeile);
+      if (grund) stand.set(schluessel(zeile), grund);
+    }
+    gezeigteFehler.current = stand;
+  });
+  const fehlerNeu = (zeile: T) =>
+    zeilenFehler != null &&
+    fehlerJeZeile(zeile) !== (gezeigteFehler.current.get(schluessel(zeile)) ?? null);
+
+  /**
    * Eine Zelle rendert nur bei geändertem Datensatz oder neuer Garnitur (D4). antd ruft sonst bei
    * jedem Render jedes `render` aller Zeilen; ein Live-Ereignis mit einer Person kostete die ganze
    * Liste. Ein Verwender, der `shouldCellUpdate` selbst setzt, behält seinen.
@@ -1790,11 +1887,21 @@ export default function Datensicht<T extends object, const K extends string>(
   const garniturNeu = tabellenGarnitur.neu;
   // Je Render neu gebaut wie `tabellenSpalten`: ein neues Spaltenobjekt rendert keine Zelle, das
   // entscheidet allein `shouldCellUpdate`.
-  const gemerkteSpalten = tabellenSpalten.map((s): KatalogSpalte<T> =>
-    s.shouldCellUpdate
-      ? s
-      : { ...s, shouldCellUpdate: (zeile, vorher) => zeile !== vorher || garniturNeu },
-  );
+  // Die erste Spalte trägt den Zeilenfehler: auch ein eigenes `shouldCellUpdate` lässt dort einen
+  // neuen oder geräumten Grund durch.
+  const gemerkteSpalten = spaltenMitFehler.map((s, i): KatalogSpalte<T> => {
+    const eigen = s.shouldCellUpdate;
+    if (eigen) {
+      return i === 0 && zeilenFehler
+        ? { ...s, shouldCellUpdate: (zeile, vorher) => eigen(zeile, vorher) || fehlerNeu(zeile) }
+        : s;
+    }
+    return {
+      ...s,
+      shouldCellUpdate: (zeile, vorher) =>
+        zeile !== vorher || garniturNeu || (i === 0 && fehlerNeu(zeile)),
+    };
+  });
 
   const { von: fensterVon, bis: fensterBis } = ausschnitt;
   const tabellenZeilen = useMemo(
@@ -1942,8 +2049,18 @@ export default function Datensicht<T extends object, const K extends string>(
 
   // ── Kartenzweig ───────────────────────────────────────────────────────────────────
   const kartenEintrag = (zeile: T, index: number, tiefe: number): ReactNode => {
+    const grund = fehlerJeZeile(zeile);
+    const fehlerZeile = grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />;
     if (karte.art === 'eigen') {
-      return karte.render({ zeile, index, tiefe });
+      const eigen = karte.render({ zeile, index, tiefe });
+      return fehlerZeile ? (
+        <>
+          {eigen}
+          {fehlerZeile}
+        </>
+      ) : (
+        eigen
+      );
     }
     const titelSpalte = spalten.find((s) => s.key === karte.titel.spalte);
     const titelInhalt = titelSpalte ? zelle(titelSpalte, zeile, index) : null;
@@ -2061,6 +2178,7 @@ export default function Datensicht<T extends object, const K extends string>(
               </div>
             )}
             {aufklappen && <div>{aufklappAusloeser(zeile, true)}</div>}
+            {fehlerZeile}
           </div>
         </ListenEintrag>
         {/* Der Bereich steht UNTER der Karte in voller Breite, sonst zöge er die Aktionsleiste von
@@ -2094,6 +2212,7 @@ export default function Datensicht<T extends object, const K extends string>(
       tiefe={tiefe}
       offen={aufklappen != null && aufgeklappt.includes(schluessel(zeile))}
       klasse={zeilenKlasse?.(zeile)}
+      fehler={fehlerJeZeile(zeile)}
       garnitur={kartenGarnitur.nummer}
       zeichne={() => kartenEintrag(zeile, index, tiefe)}
     />

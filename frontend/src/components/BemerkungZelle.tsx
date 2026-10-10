@@ -1,5 +1,5 @@
 import { IconStift } from '../icons';
-import { useId, useState, type CSSProperties } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button, Typography } from 'antd';
 import { useRollen } from './instrument/rollenwerte';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
@@ -81,8 +81,14 @@ interface BemerkungZelleProps {
   /**
    * Übernahme des neuen Wertes. Absichtlich NUR der Wert: die Aufrufer schließen über ihre eigene
    * Kennung und Mutation.
+   *
+   * Liefert er eine Zusage (`mutateAsync`), WARTET die Zelle (LFH-1077, design.md D3): das Feld
+   * bleibt mit dem Wortlaut offen, bis sie erfüllt ist; bei Ablehnung bleibt es stehen, den Grund
+   * zeigt der Aufrufer an der Zeile. Solange sie aussteht, ist das Feld nur lesbar, sendet ein
+   * weiteres Verlassen nichts und Escape bricht nicht ab. Den abgelehnten Wortlaut schickt nur
+   * Enter erneut, nicht das Verlassen.
    */
-  onSpeichern: (wert: string) => void;
+  onSpeichern: (wert: string) => void | Promise<unknown>;
   /**
    * Menschenlesbare Zeilenkennung (Funkrufname, Name, Bezeichnung) für den zugänglichen Namen —
    * sonst liefern n Zeilen n gleichnamige Knöpfe. Optional für den Einzelgebrauch außerhalb einer
@@ -117,7 +123,24 @@ export function BemerkungZelle({
   const { token, rollen } = useRollen();
   const wertId = useId();
   const knopfRef = useFokusRueckgabe(bearbeitet);
+  // Ref, weil Enter und das folgende Verlassen im selben Zug ankommen.
+  const sendetRef = useRef(false);
+  // Ref für den Riegel, Zustand für die Anzeige: Sperre und `aria-busy` brauchen einen Render.
+  const [sendet, setSendet] = useState(false);
+  // Abgelehnter Wortlaut (LFH-1077): das Verlassen schickt ihn nicht noch einmal, Enter schon.
+  const abgelehntRef = useRef<string | null>(null);
+  // Von `onChange` zurückgehaltener Wortlaut, den ein folgendes `onEnd` (Enter) doch schickt.
+  const zurueckRef = useRef<string | null>(null);
+  const huelleRef = useRef<HTMLDivElement>(null);
   const gefuellt = !!wert;
+
+  // Solange gesendet wird, ist das Feld nur lesbar: sonst ginge Getipptes verloren (ein zweites
+  // Enter liefe in den Riegel, beim Erfolg schlösse das Feld). `readOnly` statt `disabled`, damit
+  // der Fokus bleibt; antds `editable` reicht das Attribut nicht durch.
+  useLayoutEffect(() => {
+    const feld = huelleRef.current?.querySelector('textarea');
+    if (feld) feld.readOnly = sendet;
+  }, [sendet, bearbeitet]);
 
   /**
    * Lesezweig bei „—": ohne Schreibrecht gibt es keine Aktion, eine Aufforderung liefe ins Leere.
@@ -175,22 +198,65 @@ export function BemerkungZelle({
     );
   }
 
+  const schliessen = () => {
+    abgelehntRef.current = null;
+    setBearbeitet(false);
+  };
+
+  const senden = (val: string) => {
+    zurueckRef.current = null;
+    // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen Riegel kostete
+    // ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
+    const ergebnis = val !== (wert ?? '') ? onSpeichern(val) : undefined;
+    if (!(ergebnis instanceof Promise)) {
+      schliessen();
+      return;
+    }
+    sendetRef.current = true;
+    setSendet(true);
+    ergebnis.then(
+      () => {
+        sendetRef.current = false;
+        setSendet(false);
+        schliessen();
+      },
+      () => {
+        // Abgelehnt: Feld und Wortlaut bleiben, der Grund steht an der Zeile.
+        sendetRef.current = false;
+        setSendet(false);
+        abgelehntRef.current = val;
+      },
+    );
+  };
+
   return (
-    <Typography.Text
-      editable={{
-        // `editing` KONTROLLIERT und hier immer an: außerhalb der Bearbeitung trägt einer der
-        // beiden Knöpfe oben, `Typography` steht nur für das Eingabefeld im Baum.
-        editing: true,
-        onChange: (val) => {
-          setBearbeitet(false);
-          // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen Riegel kostete
-          // ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
-          if (val !== (wert ?? '')) onSpeichern(val);
-        },
-        onCancel: () => setBearbeitet(false),
-      }}
-    >
-      {wert ?? ''}
-    </Typography.Text>
+    // `aria-busy` an der Hülle, `readOnly` am Feld (Effekt oben): antd reicht keines davon durch.
+    <div ref={huelleRef} aria-busy={sendet || undefined}>
+      <Typography.Text
+        editable={{
+          // `editing` KONTROLLIERT und hier immer an: außerhalb der Bearbeitung trägt einer der
+          // beiden Knöpfe oben, `Typography` steht nur für das Eingabefeld im Baum.
+          editing: true,
+          onChange: (val) => {
+            if (sendetRef.current) return;
+            // Enter und Verlassen rufen beide hierher. Den abgelehnten Wortlaut hält dieser Zweig
+            // zurück; nur Enter (`onEnd`, gleich danach) schickt ihn erneut.
+            if (val === abgelehntRef.current) {
+              zurueckRef.current = val;
+              return;
+            }
+            senden(val);
+          },
+          onEnd: () => {
+            if (zurueckRef.current !== null) senden(zurueckRef.current);
+          },
+          onCancel: () => {
+            if (!sendetRef.current) schliessen();
+          },
+        }}
+      >
+        {wert ?? ''}
+      </Typography.Text>
+    </div>
   );
 }

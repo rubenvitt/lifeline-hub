@@ -38,7 +38,8 @@ import {
 } from '../abloesung/zufluss';
 import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { RechteHinweis } from '../components/SpeicherHinweis';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { SeitenLeer } from '../components/SeitenZustand';
 import {
   Paneel,
@@ -232,17 +233,37 @@ export default function AbloesungPage() {
       message.success(`Schicht von ${a.einheit_name} begonnen`);
     },
   });
+  /*
+   * Die Rücknahme hat zwei Wege mit je eigenem Fehlerort (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): der Knopf an der abgelösten Karte meldet an der Karte, Rückgängig aus
+   * dem Toast im Hinweis der Seite — die Karte ist dann meist nicht zu sehen. Beide Gründe kommen
+   * aus den Callbacks, nicht aus `mutation.error`: der kennt nur den letzten Aufruf.
+   */
+  const kartenFehler = useZeilenFehler<number>();
+  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
+  const ruecknahmeErfolg = (a: Abloesung) => {
+    // Die zurückgenommene Schicht kehrt in die laufenden zurück — als eigene Handlung.
+    merkeEigene(a.id);
+    invalidiere();
+    message.success(`Vollzug der Ablösung ${a.einheit_name} zurückgenommen`);
+  };
   const zuruecknehmenMut = useMutation({
     mutationFn: (abloesungId: number) => nimmVollzugZurueck(einsatzId, abloesungId),
-    onSuccess: (a) => {
-      // Die zurückgenommene Schicht kehrt in die laufenden zurück — als eigene Handlung.
-      merkeEigene(a.id);
+    onMutate: (abloesungId) => kartenFehler.beginne(abloesungId),
+    onSuccess: ruecknahmeErfolg,
+    onError: (e, abloesungId) => {
+      kartenFehler.melde(abloesungId, e, 'Rücknahme fehlgeschlagen');
       invalidiere();
-      message.success(`Vollzug der Ablösung ${a.einheit_name} zurückgenommen`);
     },
+  });
+  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
+  const rueckgaengigMut = useMutation({
+    mutationFn: (abloesungId: number) => nimmVollzugZurueck(einsatzId, abloesungId),
+    onMutate: () => setRueckgaengigFehler(null),
+    onSuccess: ruecknahmeErfolg,
     onError: (e) => {
+      setRueckgaengigFehler(e);
       invalidiere();
-      message.error(e instanceof Error ? e.message : 'Rücknahme fehlgeschlagen');
     },
   });
   const vollzugMut = useMutation({
@@ -261,7 +282,7 @@ export default function AbloesungPage() {
       const text = v.folgeschicht
         ? `Ablösung vollzogen: ${v.abgeloest.einheit_name} durch ${v.folgeschicht.einheit_name}`
         : `Ablösung vollzogen: ${v.abgeloest.einheit_name}`;
-      zeigeRueckgaengig(message, text, () => zuruecknehmenMut.mutate(v.abgeloest.id));
+      zeigeRueckgaengig(message, text, () => rueckgaengigMut.mutate(v.abgeloest.id));
     },
   });
   const aendernMut = useMutation({
@@ -346,8 +367,17 @@ export default function AbloesungPage() {
         </Button>
       }
       neueZeile={darfSchreiben ? oeffneBeginnen : undefined}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        !darfSchreiben && <RechteHinweis sichtbar text={abloesungRechteText(einsatz.status)} />
+        (!darfSchreiben || rueckgaengigFehler != null) && (
+          <SeitenHinweise
+            rechteFehlt={!darfSchreiben}
+            rechteText={abloesungRechteText(einsatz.status)}
+            fehler={rueckgaengigFehler}
+            fehlerTitel="Nicht zurückgenommen"
+            fehlerFallback="Rücknahme fehlgeschlagen"
+          />
+        )
       }
     >
       {/* Die Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen
@@ -432,6 +462,7 @@ export default function AbloesungPage() {
                 setRhythmusZiel({ art: 'schicht', schicht: x, vorgabe: v ?? undefined });
               }}
               onZuruecknehmen={(x) => zuruecknehmenMut.mutate(x.id)}
+              fehlerGrund={kartenFehler.grund(s.id)}
             />
           ))}
         </section>

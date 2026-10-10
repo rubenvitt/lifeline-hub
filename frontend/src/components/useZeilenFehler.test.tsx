@@ -44,6 +44,17 @@ describe('useZeilenFehler (LFH-1077)', () => {
     expect(result.current.grund('b')).toBeNull();
   });
 
+  it('nennt die Schlüssel mit Grund, damit ein Grund ohne gezeigte Zeile einen Ort findet', () => {
+    const { result } = renderHook(() => useZeilenFehler<number>());
+    expect(result.current.gemeldet()).toEqual([]);
+    act(() => {
+      result.current.melde(7, abgelehnt);
+      result.current.melde(8, abgelehnt);
+    });
+    act(() => result.current.beginne(7));
+    expect(result.current.gemeldet()).toEqual([8]);
+  });
+
   it('behält stabile Funktionen über Renderläufe (taugt als Effekt-Abhängigkeit)', () => {
     const { result, rerender } = renderHook(() => useZeilenFehler<number>());
     const { beginne, melde, leere } = result.current;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
@@ -951,5 +951,107 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
       .getByRole('link', { name: 'Nord' })
       .closest('[data-lfh="org-knoten"]') as HTMLElement;
     expect(within(knoten).getByText('—')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Speichern und
+ * Auflösen melden im Detailpaneel des Abschnitts, kein Fehler-Toast. Der Grund bleibt bis zum
+ * nächsten Absenden; Abbrechen und der Wechsel des Abschnitts räumen ihn.
+ */
+describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
+  const sued = { ...funkAbschnitt, id: 6, name: 'Süd', sprechgruppen: [] };
+  const detail = (name: string) => screen.getByRole('region', { name: `Abschnitt: ${name}` });
+
+  async function bearbeiteUndSpeichere() {
+    await userEvent.click(await screen.findByText('Nord'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+  }
+  async function loeseAuf(name: string) {
+    await userEvent.click(await screen.findByText(name));
+    await userEvent.click(await within(detail(name)).findByRole('button', { name: 'Auflösen' }));
+    const rueckfrage = await offeneRueckfrage();
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' }));
+  }
+
+  it('Speichern: der Grund steht im Detailpaneel, das Formular bleibt, kein Toast', async () => {
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
+      http.patch('/api/einsaetze/1/abschnitte/5', () =>
+        HttpResponse.json({ error: 'Kurzbezeichnung schon vergeben' }, { status: 422 }),
+      ),
+    );
+    renderPage();
+    await bearbeiteUndSpeichere();
+
+    expect(await within(detail('Nord')).findByRole('alert')).toHaveTextContent(
+      'Kurzbezeichnung schon vergeben',
+    );
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Speichern: das nächste Speichern räumt den Grund', async () => {
+    let erster = true;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
+      http.patch('/api/einsaetze/1/abschnitte/5', async () => {
+        if (erster) {
+          erster = false;
+          return HttpResponse.json({ error: 'Kurzbezeichnung schon vergeben' }, { status: 422 });
+        }
+        await delay('infinite');
+        return HttpResponse.json(funkAbschnitt);
+      }),
+    );
+    renderPage();
+    await bearbeiteUndSpeichere();
+    await within(detail('Nord')).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(within(detail('Nord')).queryByRole('alert')).toBeNull());
+  });
+
+  it('Speichern: Abbrechen und erneutes Bearbeiten zeigen keinen alten Grund', async () => {
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
+      http.patch('/api/einsaetze/1/abschnitte/5', () =>
+        HttpResponse.json({ error: 'Kurzbezeichnung schon vergeben' }, { status: 422 }),
+      ),
+    );
+    renderPage();
+    await bearbeiteUndSpeichere();
+    await within(detail('Nord')).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('button', { name: 'Speichern' });
+    expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
+  });
+
+  it('Auflösen: der Grund steht im Detailpaneel, der Wechsel des Abschnitts räumt ihn', async () => {
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt, sued]),
+      http.delete('/api/einsaetze/1/abschnitte/5', () =>
+        HttpResponse.json({ error: 'Abschnitt hat aktive Aufträge' }, { status: 409 }),
+      ),
+    );
+    renderPage();
+    await loeseAuf('Nord');
+
+    expect(await within(detail('Nord')).findByRole('alert')).toHaveTextContent(
+      'Abschnitt hat aktive Aufträge',
+    );
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    // Der Grund gehört zu „Nord“: im nächsten Abschnitt stünde er falsch.
+    await userEvent.click(screen.getByText('Süd'));
+    await screen.findByRole('region', { name: 'Abschnitt: Süd' });
+    expect(within(detail('Süd')).queryByRole('alert')).toBeNull();
+    await userEvent.click(screen.getByText('Nord'));
+    await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
   });
 });

@@ -45,7 +45,7 @@ import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
 import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -72,18 +72,38 @@ const STATUS_FILTER_WERTE = STATUS_REIHENFOLGE.map((s) => ({
   text: materialStatus[s].label,
 }));
 
-/** Inline-Mengen-Editor: lokaler Zustand, committet erst bei Blur/Enter (min 1). */
-function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: number) => void }) {
+/**
+ * Inline-Mengen-Editor: lokaler Zustand, committet erst bei Blur/Enter (min 1). Der Riegel hält
+ * bis zum neuen Serverstand; eine Ablehnung löst ihn (LFH-1077): sonst bliebe das Feld nach dem
+ * ersten Fehler stumm, weil `em.menge` sich nie ändert. Der getippte Wert bleibt stehen, den
+ * Grund zeigt die Zeile.
+ */
+function MengeZelle({
+  em,
+  onChange,
+}: {
+  em: EinsatzMaterial;
+  onChange: (menge: number) => Promise<unknown>;
+}) {
   const [wert, setWert] = useState<number>(em.menge);
   const pendingRef = useRef(false);
+  // Abgelehnte Menge: das Verlassen schickt sie nicht noch einmal (sonst ginge sie bei jedem Klick
+  // in eine andere Zelle erneut hinaus), Enter als ausdrücklicher Wiederholungsweg schon.
+  const abgelehntRef = useRef<number | null>(null);
   useEffect(() => {
     setWert(em.menge);
     pendingRef.current = false;
+    abgelehntRef.current = null;
   }, [em.menge]);
-  const commit = () => {
+  const commit = (perEnter: boolean) => {
     if (pendingRef.current || wert < 1 || wert === em.menge) return;
+    if (!perEnter && wert === abgelehntRef.current) return;
+    const gesendet = wert;
     pendingRef.current = true;
-    onChange(wert);
+    onChange(gesendet).catch(() => {
+      pendingRef.current = false;
+      abgelehntRef.current = gesendet;
+    });
   };
   return (
     // Die Höhe kommt aus `controlHeight` und zieht mit der Dichtestufe mit. Die Breite bleibt fest:
@@ -94,8 +114,8 @@ function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: n
       style={{ width: 80 }}
       value={wert}
       onChange={(v) => setWert(v ?? 1)}
-      onBlur={commit}
-      onPressEnter={commit}
+      onBlur={() => commit(false)}
+      onPressEnter={() => commit(true)}
     />
   );
 }
@@ -134,7 +154,10 @@ export default function MaterialPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = useFehlerMeldung();
+  // Ablehnungen an der Zeile, je Disposition gemerkt; alle Zeilenaktionen teilen den Speicher, die
+  // zuletzt begonnene zählt (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1077). Die Dialoge
+  // zeigen ihren Fehler über `speicherung` selbst.
+  const zeilen = useZeilenFehler<number>();
 
   const disponiereMutation = useMutation({
     mutationFn: (v: { materialId: number; menge: number }) =>
@@ -144,7 +167,6 @@ export default function MaterialPage() {
       message.success('Material disponiert');
       invalidate();
     },
-    onError: fehler,
   });
   const adhocMutation = useMutation({
     mutationFn: (w: MaterialAdhocEingabe & { menge: number }) =>
@@ -164,13 +186,13 @@ export default function MaterialPage() {
       invalidate();
       message.success('Ad-hoc-Material disponiert');
     },
-    onError: fehler,
   });
   const mengeMutation = useMutation({
     mutationFn: (v: { emId: number; menge: number }) =>
       aktualisiereDisposition(einsatzId, v.emId, { menge: v.menge }),
+    onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, v) => zeilen.melde(v.emId, e, 'Menge nicht gespeichert'),
   });
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzMaterial,
@@ -182,19 +204,22 @@ export default function MaterialPage() {
     anwenden: (em, v) => ({ ...em, status: v.status }),
     nochOptimistisch: (em, v) => em.status === v.status,
     zuruecknehmen: (em, vorher) => ({ ...em, status: vorher.status }),
-    onFehler: fehler,
+    onBeginn: (v) => zeilen.beginne(v.emId),
+    onFehler: (e, v) => zeilen.melde(v.emId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
   const bemerkungMutation = useMutation({
     mutationFn: (v: { emId: number; bemerkung: string }) =>
       aktualisiereDisposition(einsatzId, v.emId, { bemerkung: v.bemerkung }),
+    onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, v) => zeilen.melde(v.emId, e, 'Bemerkung nicht gespeichert'),
   });
   const entfernenMutation = useMutation({
     mutationFn: (emId: number) => entferneDisposition(einsatzId, emId),
+    onMutate: (emId) => zeilen.beginne(emId),
     onSuccess: invalidate,
-    onError: fehler,
+    onError: (e, emId) => zeilen.melde(emId, e, 'Entfernen fehlgeschlagen'),
   });
 
   // Seitenzustand: nur `einsatzQuery` — ohne sie tragen weder Breadcrumb noch
@@ -316,8 +341,10 @@ export default function MaterialPage() {
       sortWert: (m) => m.menge,
       render: (_, em) =>
         darfSchreiben ? (
-          // `MengeZelle` bleibt, wie sie ist.
-          <MengeZelle em={em} onChange={(menge) => mengeMutation.mutate({ emId: em.id, menge })} />
+          <MengeZelle
+            em={em}
+            onChange={(menge) => mengeMutation.mutateAsync({ emId: em.id, menge })}
+          />
         ) : (
           em.menge
         ),
@@ -344,7 +371,8 @@ export default function MaterialPage() {
           wert={em.bemerkung}
           kennung={em.bezeichnung}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(val) => bemerkungMutation.mutate({ emId: em.id, bemerkung: val })}
+          // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
+          onSpeichern={(val) => bemerkungMutation.mutateAsync({ emId: em.id, bemerkung: val })}
         />
       ),
     },
@@ -435,6 +463,7 @@ export default function MaterialPage() {
             leerText="Noch kein Material disponiert"
             suche={{ platzhalter: 'Bezeichnung, Kategorie' }}
             standardSortierung={{ spalte: 'bezeichnung', richtung: 'auf' }}
+            zeilenFehler={(em) => zeilen.grund(em.id)}
             gruppen={{
               schluessel: (m) => m.status,
               etikett: (w) => materialStatus[w as MaterialStatus]?.label ?? w,
@@ -472,6 +501,9 @@ export default function MaterialPage() {
         serie
         initialValues={{ menge: 1 }}
         laeuft={disponiereMutation.isPending}
+        speicherung={disponiereMutation}
+        speicherFehlerTitel="Nicht disponiert"
+        speicherFehlerFallback="Disponieren fehlgeschlagen"
         onErfassen={async (w) => {
           await disponiereMutation.mutateAsync({ materialId: w.material_id, menge: w.menge });
         }}
@@ -511,8 +543,11 @@ export default function MaterialPage() {
         uebernahme={['kategorie', 'traegerorganisation']}
         initialValues={{ menge: 1 }}
         laeuft={adhocMutation.isPending}
+        speicherung={adhocMutation}
+        speicherFehlerTitel="Nicht disponiert"
+        speicherFehlerFallback="Disponieren fehlgeschlagen"
         // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage lässt die Hülle die Werte
-        // stehen. Den Fehlertext meldet `onError`.
+        // stehen. Den Grund zeigt die Hülle über `speicherung`.
         onErfassen={async (w) => {
           await adhocMutation.mutateAsync(w);
         }}

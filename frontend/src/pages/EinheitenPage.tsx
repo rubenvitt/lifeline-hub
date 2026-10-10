@@ -34,7 +34,6 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import { einheitDetailPfad, kraefteuebersichtPfad, parseRouteId } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { ErfassungsModal } from '../components/Erfassung';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { KennungsLink } from '../components/kennungsLink';
@@ -163,8 +162,6 @@ export default function EinheitenPage() {
   const [searchParams] = useSearchParams();
   const deeplinkZiel = parseRouteId(searchParams.get('einheit') ?? undefined);
 
-  const fehler = useFehlerMeldung();
-
   /**
    * „Einheit bilden" fragt zuerst: ein sofort geschriebener Platzhalter stünde nach einem Fehlklick
    * in jedem Baum, jeder Zuordnungsliste und jeder Stärkeaggregation.
@@ -183,7 +180,6 @@ export default function EinheitenPage() {
       // wurden.
       void navigate(einheitDetailPfad(einsatzId, e.id));
     },
-    onError: fehler,
   });
 
   const baumDaten = useMemo(
@@ -315,6 +311,11 @@ export default function EinheitenPage() {
         form={bildenForm}
         erfassenText="Bilden"
         laeuft={bilden.isPending}
+        // Grund einer Ablehnung im Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen
+        // ihn (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
+        speicherung={bilden}
+        speicherFehlerTitel="Einheit nicht gebildet"
+        speicherFehlerFallback="Bilden fehlgeschlagen"
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
         // ankam. Ein 422 kostete sonst den eingegebenen Namen.
         onErfassen={(w) => bilden.mutateAsync(w)}
