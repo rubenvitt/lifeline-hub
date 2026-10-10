@@ -51,8 +51,9 @@ wire_enum! {
     try_from = |s| format!("Ungültige Warnstufe: {s}");
 }
 
-/// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
-/// `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
+/// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
+/// auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
+/// eine Zelle ohne Eintrag als „nicht bewertet".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct GefahrBewertungAnzeige {
     pub id: i64,
