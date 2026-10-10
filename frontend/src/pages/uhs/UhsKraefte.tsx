@@ -19,7 +19,8 @@ import KatalogTabelle from '../../components/KatalogTabelle';
 import { Select } from '../../components/Select';
 import { teilwortSuche } from '../../components/teilwortSuche';
 import { Datenfeld, Datenraster } from '../../components/instrument';
-import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { ZeilenFehler } from '../../components/SpeicherHinweis';
+import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { freieEinheiten, kraftAuswahlText, zaehleQualifikationen } from './uhsKraefteKern';
 
 interface Props {
@@ -51,7 +52,9 @@ interface AdhocWerte {
 export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZuordnen }: Props) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const fehler = useFehlerMeldung();
+  // Ablehnungen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): die
+  // Dialoge tragen ihre Mutation als `speicherung`, Abziehen meldet an der Zeile der Kraft.
+  const abziehenZeilen = useZeilenFehler<number>();
   const bedienbar = !schreibgeschuetzt && uhs.status !== 'aufgeloest' && !uhs.storniert_at;
   const [offen, setOffen] = useState<'kraft' | 'einheit' | 'adhoc' | null>(null);
   const [kraftForm] = Form.useForm<KraftWerte>();
@@ -80,7 +83,6 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
       message.success('Kraft zugeordnet');
       invalidate();
     },
-    onError: fehler,
   });
   const einheitMut = useMutation({
     mutationFn: (einheitId: number) => ordneEinheitZu(einsatzId, uhs.id, einheitId),
@@ -88,7 +90,6 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
       message.success('Einheit zugeordnet');
       invalidate();
     },
-    onError: fehler,
   });
   const adhocMut = useMutation({
     mutationFn: (daten: AdhocKraftEingabe) => erfasseAdhocKraft(einsatzId, uhs.id, daten),
@@ -96,15 +97,15 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
       message.success('Kraft erfasst');
       invalidate();
     },
-    onError: fehler,
   });
   const abziehenMut = useMutation({
     mutationFn: (kraftId: number) => zieheKraftAb(einsatzId, uhs.id, kraftId),
+    onMutate: (kraftId) => abziehenZeilen.beginne(kraftId),
     onSuccess: () => {
       message.success('Kraft abgezogen');
       invalidate();
     },
-    onError: fehler,
+    onError: (e, kraftId) => abziehenZeilen.melde(kraftId, e, 'Abziehen fehlgeschlagen'),
   });
 
   const keineFreie = ohneUhsQuery.isSuccess && ohneUhs.length === 0;
@@ -136,16 +137,22 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
             key: 'aktion',
             // Keine Rückfrage: die Kraft bleibt im Einsatz und lässt sich wieder zuordnen
             // (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“).
-            render: (_: unknown, k: UhsKraft) => (
-              <Button
-                danger
-                aria-label={`${k.name} abziehen`}
-                loading={abziehenMut.isPending && abziehenMut.variables === k.id}
-                onClick={() => abziehenMut.mutate(k.id)}
-              >
-                Abziehen
-              </Button>
-            ),
+            render: (_: unknown, k: UhsKraft) => {
+              const grund = abziehenZeilen.grund(k.id);
+              return (
+                <Space orientation="vertical" size={4}>
+                  <Button
+                    danger
+                    aria-label={`${k.name} abziehen`}
+                    loading={abziehenMut.isPending && abziehenMut.variables === k.id}
+                    onClick={() => abziehenMut.mutate(k.id)}
+                  >
+                    Abziehen
+                  </Button>
+                  {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
+                </Space>
+              );
+            },
           },
         ]
       : []),
@@ -209,6 +216,9 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         form={kraftForm}
         erfassenText="Zuordnen"
         laeuft={zuordnenMut.isPending}
+        speicherung={zuordnenMut}
+        speicherFehlerTitel="Nicht zugeordnet"
+        speicherFehlerFallback="Zuordnen fehlgeschlagen"
         onErfassen={(w) => zuordnenMut.mutateAsync(w.kraft_id)}
         onFertig={() => setOffen(null)}
         onAbbrechen={() => setOffen(null)}
@@ -233,6 +243,9 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           form={einheitForm}
           erfassenText="Zuordnen"
           laeuft={einheitMut.isPending}
+          speicherung={einheitMut}
+          speicherFehlerTitel="Nicht zugeordnet"
+          speicherFehlerFallback="Zuordnen fehlgeschlagen"
           onErfassen={(w) => einheitMut.mutateAsync(w.einheit_id)}
           onFertig={() => setOffen(null)}
           onAbbrechen={() => setOffen(null)}
@@ -259,6 +272,9 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         form={adhocForm}
         erfassenText="Erfassen"
         laeuft={adhocMut.isPending}
+        speicherung={adhocMut}
+        speicherFehlerTitel="Nicht erfasst"
+        speicherFehlerFallback="Erfassen fehlgeschlagen"
         onErfassen={(w) =>
           adhocMut.mutateAsync({
             name: w.name,

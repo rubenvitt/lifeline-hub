@@ -1,11 +1,12 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import SchaedenDetailPage from './SchaedenDetailPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -251,7 +252,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
-    // Die Servermeldung erscheint — der else-Zweig (`fehler`) lief, nicht erneut der
+    // Die Servermeldung erscheint (am Formular, LFH-1077), nicht erneut der
     // Konfliktdialog.
     expect(
       await screen.findByText('Stornierter Schaden kann nicht geändert werden'),
@@ -499,5 +500,208 @@ describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
       await screen.findByText('Kontakt zu lang: höchstens 500 Zeichen (jetzt 501)'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Als externen Kontakt/)).toBeNull();
+  });
+});
+
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Bearbeiten am
+ * Formular, Übergeben und Abschließen im Dialog, Storno im Seitenhinweis. Kein Fehler-Toast.
+ */
+describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
+  const abgelehnt =
+    (text: string, status = 422) =>
+    () =>
+      HttpResponse.json({ error: text }, { status });
+
+  /** Einmal ablehnen, danach ohne Antwort: geprüft wird der Zustand, solange sie aussteht. */
+  function erstAblehnenDannWarten(text: string) {
+    let erster = true;
+    return async () => {
+      if (erster) {
+        erster = false;
+        return HttpResponse.json({ error: text }, { status: 422 });
+      }
+      await delay('infinite');
+      return HttpResponse.json({});
+    };
+  }
+
+  const seitenHinweis = () =>
+    document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+  const formular = () => screen.getByRole('button', { name: 'Speichern' }).closest('form')!;
+  const keinToast = () => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+  async function storniere() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Stornieren' }),
+    );
+  }
+
+  it('Bearbeiten: der Grund steht am Formular, das nächste Speichern räumt ihn', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.patch('/api/einsaetze/1/schaeden/10', erstAblehnenDannWarten('Ort zu lang')),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    // Vorher greifen: solange gespeichert wird, heißt der Knopf anders (Ladesymbol).
+    const form = formular();
+    expect(await within(form).findByRole('alert')).toHaveTextContent('Ort zu lang');
+    keinToast();
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(within(form).queryByRole('alert')).toBeNull());
+    // Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort.
+    expect(within(form).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('Bearbeiten: Abbrechen und erneutes Bearbeiten zeigen keinen alten Grund', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.patch('/api/einsaetze/1/schaeden/10', abgelehnt('Ort zu lang')),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await within(formular()).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('button', { name: 'Speichern' });
+    expect(within(formular()).queryByRole('alert')).toBeNull();
+  });
+
+  it('Bearbeiten: der Sperrkonflikt bleibt beim Konfliktdialog, ein 409 danach am Formular', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.patch(
+        '/api/einsaetze/1/schaeden/10',
+        abgelehnt('Stornierter Schaden kann nicht geändert werden', 409),
+      ),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    const ueberschreiben = await screen.findByRole('button', { name: 'Überschreiben' });
+    expect(within(formular()).queryByRole('alert')).toBeNull();
+
+    await userEvent.click(ueberschreiben);
+    expect(await within(formular()).findByRole('alert')).toHaveTextContent(
+      'Stornierter Schaden kann nicht geändert werden',
+    );
+    keinToast();
+  });
+
+  it('Übergeben: der Grund steht im Dialog, das nächste Absenden räumt ihn', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.post(
+        '/api/einsaetze/1/schaeden/10/uebergeben',
+        erstAblehnenDannWarten('Schaden ist bereits übergeben'),
+      ),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Schaden ist bereits übergeben',
+    );
+    expect(within(dialog).getByLabelText('Übergeben an')).toHaveValue('Stadtwerke');
+    keinToast();
+
+    // Solange das nächste Absenden läuft, ist Abbrechen gesperrt.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('Übergeben: nach Abbrechen und erneutem Öffnen kein alter Grund', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.post(
+        '/api/einsaetze/1/schaeden/10/uebergeben',
+        abgelehnt('Schaden ist bereits übergeben'),
+      ),
+    ]);
+    const oeffnen = await screen.findByRole('button', { name: 'Übergeben' });
+    await userEvent.click(oeffnen);
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(oeffnen);
+    const wieder = (await screen.findAllByRole('dialog'))[0];
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
+  });
+
+  it('Abschließen: der Grund steht im Dialog, kein Toast', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.post(
+        '/api/einsaetze/1/schaeden/10/abschliessen',
+        abgelehnt('Schaden ist storniert', 409),
+      ),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    await userEvent.click(within(dialog).getByRole('combobox'));
+    const option = (await screen.findAllByText('behoben')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    await userEvent.click(option!);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Schaden ist storniert');
+    expect(within(dialog).getByText('Nicht abgeschlossen')).toBeInTheDocument();
+    keinToast();
+  });
+
+  it('Stornieren: der Grund steht im Seitenhinweis, das nächste Storno räumt ihn', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.delete('/api/einsaetze/1/schaeden/10', erstAblehnenDannWarten('Schaden ist verknüpft')),
+    ]);
+    await storniere();
+
+    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Schaden ist verknüpft'));
+    expect(seitenHinweis()).toHaveTextContent('Nicht storniert');
+    expect(screen.queryByText('LISTE')).toBeNull();
+    keinToast();
+
+    await storniere();
+    await waitFor(() => expect(screen.queryByText('Schaden ist verknüpft')).toBeNull());
+  });
+
+  it('der Wechsel zu einem anderen Schaden räumt die Gründe', async () => {
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/1/schaeden/11')}>
+          Zum zweiten Schaden
+        </button>
+      );
+    }
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(basisSchaden())),
+      http.get('/api/einsaetze/1/schaeden/11', () =>
+        HttpResponse.json(basisSchaden({ id: 11, registrier_nr: 2 })),
+      ),
+      http.get('/api/einsaetze/1/schaeden/:sid/anhaenge', () => HttpResponse.json([])),
+      http.delete('/api/einsaetze/1/schaeden/10', abgelehnt('Schaden ist verknüpft')),
+    );
+    renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/schaeden/:schadenId" element={<SchaedenDetailPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/schaeden/10' },
+    );
+    await storniere();
+    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Schaden ist verknüpft'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Schaden' }));
+    await screen.findByRole('heading', { name: /Schaden S-002/ });
+    expect(screen.queryByText('Schaden ist verknüpft')).toBeNull();
   });
 });

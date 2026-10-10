@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import {
   App,
   Button,
+  Flex,
   Form,
   InputNumber,
   Popconfirm,
@@ -59,6 +60,9 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
   });
   const bilder = (anhaenge.data ?? []).filter((a) => PLAN_MIME.has(a.mime));
   const [auswahl, setAuswahl] = useState<number | null>(null);
+  // Zu große Datei: eine Prüfung ohne Server, sie steht am Hochladen, nicht im Toast (LFH-1077).
+  // Die nächste Wahl räumt sie.
+  const [zuGross, setZuGross] = useState(false);
 
   function uebernimm(neu: UhsPlan | null) {
     qc.setQueryData<UhsDetail>(einsatzKeys.uhsDetail(einsatzId, uhs.id), (alt) =>
@@ -111,34 +115,37 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
         </Typography.Text>
         <SpeicherFehler fehler={fehler} />
         <Space wrap size="middle" align="end">
-          <Upload
-            accept={PLAN_ACCEPT}
-            maxCount={1}
-            showUploadList={false}
-            disabled={laeuft}
-            beforeUpload={(datei) => {
-              if (datei.size > UPLOAD_MAX_GROESSE) {
-                message.error(
-                  `Datei ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`,
-                );
-              } else {
-                hochladen.mutate(datei);
-              }
-              // Gesendet wird über `hinterlegePlan`, nie über antds eigenen Upload.
-              return false;
-            }}
-          >
-            <Button
-              loading={hochladen.isPending}
-              icon={
-                <span aria-hidden="true">
-                  <IconHochladen />
-                </span>
-              }
+          <Flex vertical gap={4} data-lfh="plan-datei">
+            <Upload
+              accept={PLAN_ACCEPT}
+              maxCount={1}
+              showUploadList={false}
+              disabled={laeuft}
+              beforeUpload={(datei) => {
+                const gross = datei.size > UPLOAD_MAX_GROESSE;
+                setZuGross(gross);
+                if (!gross) hochladen.mutate(datei);
+                // Gesendet wird über `hinterlegePlan`, nie über antds eigenen Upload.
+                return false;
+              }}
             >
-              {plan ? 'Plan ersetzen' : 'Plan hochladen'}
-            </Button>
-          </Upload>
+              <Button
+                loading={hochladen.isPending}
+                icon={
+                  <span aria-hidden="true">
+                    <IconHochladen />
+                  </span>
+                }
+              >
+                {plan ? 'Plan ersetzen' : 'Plan hochladen'}
+              </Button>
+            </Upload>
+            {zuGross && (
+              <Typography.Text type="danger" role="alert">
+                {`Datei ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`}
+              </Typography.Text>
+            )}
+          </Flex>
           <UebernahmeAuswahl
             optionen={bilder.map((a) => ({ value: a.id, label: a.dateiname }))}
             wert={auswahl}

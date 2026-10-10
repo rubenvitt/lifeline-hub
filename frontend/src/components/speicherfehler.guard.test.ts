@@ -61,21 +61,6 @@ const OFFEN: Record<string, number> = {
   'pages/EtbPage.tsx': 3,
   'pages/LagekartePage.tsx': 1,
   'pages/MeldungenPage.tsx': 1,
-  'pages/PersonenDetailPage.tsx': 1,
-  'pages/PersonenPage.tsx': 1,
-  'pages/SchaedenDetailPage.tsx': 1,
-  'pages/TiereDetailPage.tsx': 1,
-  'pages/TierePage.tsx': 1,
-  'pages/bereitstellungsraum/BrDetailPage.tsx': 1,
-  'pages/personen/AufnahmePage.tsx': 1,
-  'pages/schaeden/SchadenErfassenModal.tsx': 1,
-  'pages/uhs/Grundriss.tsx': 2,
-  'pages/uhs/MaterialTab.tsx': 1,
-  'pages/uhs/UhsDetailPage.tsx': 1,
-  'pages/uhs/UhsKraefte.tsx': 1,
-  'pages/uhs/UhsPlanPaneel.tsx': 1,
-  'personen/SichtungDialog.tsx': 1,
-  'personen/ZuweisungsDialoge.tsx': 3,
 };
 
 const TOAST_OBJEKTE = new Set(['message', 'meldung', 'notification']);

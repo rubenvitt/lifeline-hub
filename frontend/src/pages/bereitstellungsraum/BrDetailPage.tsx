@@ -1,7 +1,18 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Breadcrumb,
+  Button,
+  Flex,
+  Popconfirm,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
@@ -23,7 +34,10 @@ import type {
   Einheit,
   EinsatzFahrzeug,
 } from '../../api/types';
-import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
+import KraefteOhneBrSidebar, {
+  brObjektSchluessel,
+  freieKraefteOhneBr,
+} from './KraefteOhneBrSidebar';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import SektionHeader from '../../components/SektionHeader';
 import {
@@ -44,7 +58,8 @@ import BrSwitcher from './BrSwitcher';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { summiereStaerke } from '../../anzeige/staerke';
-import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
+import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { useDruckModus } from '../../components/druck/useDruckModus';
 import {
@@ -67,11 +82,24 @@ type BelegungMitName = { daten: Parameters<typeof belegeBr>[2]; bezeichnung: str
  * entfernt; ein bloßes „Erfolgreich“ sagte nicht, was geschehen ist.
  */
 export function belegungsQuittung(b: BelegungMitName): string {
-  const objekt = `${b.daten.objekt_typ === 'einheit' ? 'Einheit' : 'Fahrzeug'} „${b.bezeichnung}“`;
+  const objekt = belegungsObjekt(b);
   return b.daten.art === 'eintritt'
     ? `${objekt} dem BR zugewiesen`
     : `${objekt} aus dem BR entfernt`;
 }
+
+function belegungsObjekt(b: BelegungMitName): string {
+  return `${b.daten.objekt_typ === 'einheit' ? 'Einheit' : 'Fahrzeug'} „${b.bezeichnung}“`;
+}
+
+/** Überschrift einer abgelehnten Belegung, deren Zeile nicht mehr steht. */
+function belegungsAblehnung(b: BelegungMitName): string {
+  const nicht = b.daten.art === 'eintritt' ? 'nicht zugewiesen' : 'nicht entfernt';
+  return `${belegungsObjekt(b)} ${nicht}`;
+}
+
+const schluesselVon = (b: BelegungMitName) =>
+  brObjektSchluessel(b.daten.objekt_typ, b.daten.objekt_id);
 
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
@@ -143,15 +171,19 @@ export default function BrDetailPage() {
     brId,
   );
 
-  const fehler = useFehlerMeldung();
-
+  /*
+   * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): Status und Storno im Seitenhinweis, Zuweisen und Entfernen an der Zeile
+   * der Kraft (Seitenleiste bzw. Raum). Die Gründe je Zeile kommen aus den Callbacks, nicht aus
+   * `mutation.variables` (`components/useZeilenFehler.ts`): zwei schnelle Klicks hintereinander,
+   * und die Ablehnung des ersten ginge verloren.
+   */
   const statusMut = useMutation({
     mutationFn: (status: BrStatus) => setzeBrStatus(einsatzId, brId, status),
     onSuccess: () => {
       message.success('Status gewechselt');
       invalidate();
     },
-    onError: fehler,
   });
 
   const stornoMut = useMutation({
@@ -160,11 +192,19 @@ export default function BrDetailPage() {
       message.success('BR storniert');
       invalidate();
     },
-    onError: fehler,
   });
 
+  const zeilen = useZeilenFehler<string>();
+  // Die zuletzt begonnene Belegung je Zeile: nennt eine Ablehnung, deren Zeile nicht mehr steht.
+  const [belegungen, setBelegungen] = useState<ReadonlyMap<string, BelegungMitName>>(
+    () => new Map(),
+  );
   const belegungMut = useMutation({
     mutationFn: ({ daten }: BelegungMitName) => belegeBr(einsatzId, brId, daten),
+    onMutate: (belegung) => {
+      zeilen.beginne(schluesselVon(belegung));
+      setBelegungen((alt) => new Map(alt).set(schluesselVon(belegung), belegung));
+    },
     // Fester Schlüssel: ein serieller Lauf ersetzt den stehenden Toast statt ihn zu stapeln (wie
     // `kommunikation/rueckgaengig.tsx`).
     onSuccess: (_antwort, belegung) => {
@@ -176,8 +216,39 @@ export default function BrDetailPage() {
       }
       invalidate();
     },
-    onError: fehler,
+    onError: (e, belegung) =>
+      zeilen.melde(
+        schluesselVon(belegung),
+        e,
+        belegung.daten.art === 'eintritt' ? 'Zuweisen fehlgeschlagen' : 'Entfernen fehlgeschlagen',
+      ),
   });
+
+  // Status und Storno teilen sich den Seitenhinweis: die zuletzt begonnene Handlung zählt, ihr
+  // Start räumt den Grund der anderen. Eine laufende bleibt unberührt.
+  const kopfFehler = statusMut.error ?? stornoMut.error;
+  const raeume = (andere: typeof statusMut | typeof stornoMut) => {
+    if (!andere.isPending && andere.error != null) andere.reset();
+  };
+  const setzeStatus = (status: BrStatus) => {
+    raeume(stornoMut);
+    statusMut.mutate(status);
+  };
+  const storniere = () => {
+    raeume(statusMut);
+    stornoMut.mutate();
+  };
+
+  // Die Route hat keinen `key`: der Umschalter behält diese Seite. Die Gründe des vorigen Raums
+  // gehören nicht an den nächsten. `reset` und `leere` sind stabil, der Effekt läuft mit `brId`.
+  const { reset: statusReset } = statusMut;
+  const { reset: stornoReset } = stornoMut;
+  const { leere: leereZeilen } = zeilen;
+  useEffect(() => {
+    statusReset();
+    stornoReset();
+    leereZeilen();
+  }, [brId, statusReset, stornoReset, leereZeilen]);
 
   // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
   if (!idGueltig) {
@@ -274,6 +345,29 @@ export default function BrDetailPage() {
   // Wie `aktive_belegungen_tx` im Server: belegte Einheiten und Fahrzeuge.
   const belegt = br.einheiten.length + fahrzeugZahl;
 
+  // Zeilen, die gerade stehen (Raum und Seitenleiste; was deren Suche ausblendet, zeigt die Leiste
+  // selbst über der Liste). Ein Grund ohne Zeile, etwa weil die Kraft inzwischen in einem anderen
+  // Raum steht, gehört in den Seitenhinweis.
+  const frei = freieKraefteOhneBr({
+    alleEinheiten: einheitenQuery.data ?? [],
+    alleFahrzeuge: fahrzeugeQuery.data ?? [],
+    brEinheiten: br.einheiten,
+    brFahrzeuge: br.fahrzeuge,
+  });
+  const stehend = new Set([
+    ...[...br.einheiten, ...frei.einheiten].map((e) => brObjektSchluessel('einheit', e.id)),
+    ...[...br.fahrzeuge, ...frei.fahrzeuge].map((f) => brObjektSchluessel('fahrzeug', f.id)),
+  ]);
+  const ohneZeile = zeilen.gemeldet().filter((k) => !stehend.has(k));
+  const laeuft = (typ: 'einheit' | 'fahrzeug', objektId: number) =>
+    belegungMut.isPending &&
+    belegungMut.variables?.daten.objekt_typ === typ &&
+    belegungMut.variables.daten.objekt_id === objektId;
+  const zeilenGrund = (typ: 'einheit' | 'fahrzeug', objektId: number) => {
+    const g = zeilen.grund(brObjektSchluessel(typ, objektId));
+    return g && <ZeilenFehler fehler={g.fehler} fallback={g.fallback} />;
+  };
+
   return (
     <EinsatzSeite
       titel={
@@ -287,6 +381,36 @@ export default function BrDetailPage() {
           )}
           <StatusTag darstellung={brStatus[br.status]} />
         </Space>
+      }
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        (kopfFehler != null || ohneZeile.length > 0) && (
+          <Flex vertical gap={token.marginSM}>
+            <SeitenHinweise
+              fehler={kopfFehler}
+              fehlerTitel={statusMut.error != null ? 'Status nicht geändert' : 'Nicht storniert'}
+              fehlerFallback={
+                statusMut.error != null
+                  ? 'Statuswechsel fehlgeschlagen'
+                  : 'Stornieren fehlgeschlagen'
+              }
+            />
+            {ohneZeile.map((k) => {
+              const g = zeilen.grund(k);
+              const b = belegungen.get(k);
+              return (
+                g && (
+                  <SpeicherFehler
+                    key={k}
+                    fehler={g.fehler}
+                    titel={b ? belegungsAblehnung(b) : undefined}
+                    fallback={g.fallback}
+                  />
+                )
+              );
+            })}
+          </Flex>
+        )
       }
       breadcrumb={
         darf('fremde-module') && (
@@ -319,7 +443,7 @@ export default function BrDetailPage() {
               title="BR auflösen?"
               okText="BR auflösen"
               okButtonProps={{ danger: true }}
-              onConfirm={() => statusMut.mutate('aufgeloest')}
+              onConfirm={() => setzeStatus('aufgeloest')}
             >
               <Button danger loading={statusMut.isPending}>
                 Auflösen
@@ -330,7 +454,7 @@ export default function BrDetailPage() {
             <>
               <Button
                 type="primary"
-                onClick={() => statusMut.mutate('aktiv')}
+                onClick={() => setzeStatus('aktiv')}
                 loading={statusMut.isPending}
               >
                 In Betrieb nehmen
@@ -340,7 +464,7 @@ export default function BrDetailPage() {
                   title="BR stornieren?"
                   okText="BR stornieren"
                   okButtonProps={{ danger: true }}
-                  onConfirm={() => stornoMut.mutate()}
+                  onConfirm={storniere}
                 >
                   <Button danger loading={stornoMut.isPending}>
                     Stornieren
@@ -412,7 +536,7 @@ export default function BrDetailPage() {
                             key="entfernen"
                             danger
                             onClick={() => onEntfernenEinheit(e)}
-                            loading={belegungMut.isPending}
+                            loading={laeuft('einheit', e.id)}
                           >
                             entfernen
                           </Button>,
@@ -429,6 +553,7 @@ export default function BrDetailPage() {
                       <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
                     </span>
                   </Space>
+                  {zeilenGrund('einheit', e.id)}
                 </ListenEintrag>
               )}
             />
@@ -449,7 +574,7 @@ export default function BrDetailPage() {
                             key="entfernen"
                             danger
                             onClick={() => onEntfernenFahrzeug(f)}
-                            loading={belegungMut.isPending}
+                            loading={laeuft('fahrzeug', f.id)}
                           >
                             entfernen
                           </Button>,
@@ -463,6 +588,7 @@ export default function BrDetailPage() {
                       <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>
                     )}
                   </Space>
+                  {zeilenGrund('fahrzeug', f.id)}
                 </ListenEintrag>
               )}
             />
@@ -477,6 +603,7 @@ export default function BrDetailPage() {
           schreibgeschuetzt={schreibgeschuetzt}
           onZuweisenEinheit={onZuweisenEinheit}
           onZuweisenFahrzeug={onZuweisenFahrzeug}
+          zeilenFehler={zeilen.grund}
         />
       </div>
     </EinsatzSeite>

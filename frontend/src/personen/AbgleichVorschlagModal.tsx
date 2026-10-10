@@ -1,6 +1,7 @@
 import { Modal, Typography, theme } from 'antd';
 import { useEffect, useId, useState } from 'react';
 import { Select } from '../components/Select';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
 
@@ -8,11 +9,15 @@ import type { Person } from '../api/types';
  * Abgleich-Vorschlag für eine vermisste Person. Das Auswahlfeld der Tabellenspalte trägt auf
  * einer 390-px-Karte nicht (Trefffläche, Überlauf); der Kartenzweig ersetzt es durch einen
  * Knopf, der diesen Dialog öffnet. Die Höhe des Felds kommt aus `controlHeight`.
+ *
+ * Der Dialog wartet auf die Antwort (LFH-1077, design.md D3): der Aufrufer schließt ihn erst beim
+ * Erfolg, bis dahin sind seine Auswege gesperrt, und eine Ablehnung steht in ihm (`fehler`).
  */
 export default function AbgleichVorschlagModal({
   vermisst,
   gefundene,
   isPending,
+  fehler,
   onCancel,
   onFinish,
 }: {
@@ -20,6 +25,8 @@ export default function AbgleichVorschlagModal({
   vermisst: Person | null;
   gefundene: readonly Person[];
   isPending?: boolean;
+  /** Grund der letzten Ablehnung aus diesem Dialog; der Aufrufer räumt ihn beim Öffnen. */
+  fehler?: unknown;
   onCancel: () => void;
   onFinish: (gefundenId: number) => void;
 }) {
@@ -40,10 +47,17 @@ export default function AbgleichVorschlagModal({
           : 'Abgleich vorschlagen'
       }
       okText="Vorschlagen"
+      cancelText="Abbrechen"
       okButtonProps={{ disabled: gewaehlt === undefined }}
       confirmLoading={isPending}
+      cancelButtonProps={{ disabled: isPending }}
+      closable={isPending ? { disabled: true } : true}
+      mask={{ closable: !isPending }}
+      keyboard={!isPending}
       onOk={() => gewaehlt !== undefined && onFinish(gewaehlt)}
-      onCancel={onCancel}
+      onCancel={() => {
+        if (!isPending) onCancel();
+      }}
       destroyOnHidden
     >
       <label htmlFor={feldId} style={{ display: 'block', marginBlockEnd: token.marginXS }}>
@@ -65,6 +79,15 @@ export default function AbgleichVorschlagModal({
         <Typography.Paragraph type="secondary" style={{ marginBlockStart: 8, marginBlockEnd: 0 }}>
           Keine gefundenen Personen
         </Typography.Paragraph>
+      )}
+      {fehler != null && (
+        <div style={{ marginBlockStart: token.marginSM }}>
+          <SpeicherFehler
+            fehler={fehler}
+            titel="Nicht vorgeschlagen"
+            fallback="Vorschlagen fehlgeschlagen"
+          />
+        </div>
       )}
     </Modal>
   );

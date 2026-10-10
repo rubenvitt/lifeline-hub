@@ -1,8 +1,8 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
@@ -193,7 +193,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
-    // Die Servermeldung erscheint — der else-Zweig (`fehler`) lief, nicht erneut der
+    // Die Servermeldung erscheint (am Formular, LFH-1077), nicht erneut der
     // Konfliktdialog.
     expect(
       await screen.findByText('Storniertes Tier kann nicht geändert werden'),
@@ -439,5 +439,248 @@ describe('TiereDetailPage — Abschluss auf der Erfassungshülle (LFH-796)', () 
     const knopf = within(dialog).getByRole('button', { name: 'Abschließen' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
+  });
+});
+
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Bearbeiten am
+ * Formular, Status und Storno im Seitenhinweis, Abschließen im Dialog. Kein Fehler-Toast.
+ */
+describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
+  const abgelehnt =
+    (text: string, status = 422) =>
+    () =>
+      HttpResponse.json({ error: text }, { status });
+
+  /** Einmal ablehnen, danach ohne Antwort: geprüft wird der Zustand, solange sie aussteht. */
+  function erstAblehnenDannWarten(text: string) {
+    let erster = true;
+    return async () => {
+      if (erster) {
+        erster = false;
+        return HttpResponse.json({ error: text }, { status: 422 });
+      }
+      await delay('infinite');
+      return HttpResponse.json({});
+    };
+  }
+
+  const seitenHinweis = () =>
+    document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+  const formular = () => screen.getByRole('button', { name: 'Speichern' }).closest('form')!;
+  const keinToast = () => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+  it('Bearbeiten: der Grund steht am Formular, kein Toast', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Rufname zu lang')),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    expect(await within(formular()).findByRole('alert')).toHaveTextContent('Rufname zu lang');
+    keinToast();
+  });
+
+  it('Bearbeiten: das nächste Speichern räumt den Grund', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', erstAblehnenDannWarten('Rufname zu lang')),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    // Vorher greifen: solange gespeichert wird, heißt der Knopf anders (Ladesymbol).
+    const form = formular();
+    await within(form).findByRole('alert');
+
+    await userEvent.click(within(form).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(within(form).queryByRole('alert')).toBeNull());
+    // Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort.
+    expect(within(form).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('Bearbeiten: Abbrechen und erneutes Bearbeiten zeigen keinen alten Grund', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Rufname zu lang')),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await within(formular()).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('button', { name: 'Speichern' });
+    expect(within(formular()).queryByRole('alert')).toBeNull();
+  });
+
+  it('Bearbeiten: der Sperrkonflikt bleibt beim Konfliktdialog, nicht am Formular', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Zwischenzeitlich geändert', 409)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    expect(await screen.findByRole('button', { name: 'Überschreiben' })).toBeInTheDocument();
+    expect(within(formular()).queryByRole('alert')).toBeNull();
+    keinToast();
+  });
+
+  it('Bearbeiten: ein 409 auf das Überschreiben steht am Formular', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.patch(
+        '/api/einsaetze/1/tiere/10',
+        abgelehnt('Storniertes Tier kann nicht geändert werden', 409),
+      ),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+
+    expect(await within(formular()).findByRole('alert')).toHaveTextContent(
+      'Storniertes Tier kann nicht geändert werden',
+    );
+    keinToast();
+  });
+
+  it('Status: der Grund steht im Seitenhinweis, der nächste Wechsel räumt ihn', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.post(
+        '/api/einsaetze/1/tiere/10/status',
+        erstAblehnenDannWarten('Übergang nicht erlaubt'),
+      ),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Als vermisst markieren' }));
+
+    const hinweis = await waitFor(() => {
+      const h = seitenHinweis();
+      expect(h).not.toBeNull();
+      return h!;
+    });
+    expect(await within(hinweis).findByRole('alert')).toHaveTextContent('Übergang nicht erlaubt');
+    expect(hinweis).toHaveTextContent('Status nicht geändert');
+    keinToast();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Als vermisst markieren' }));
+    await waitFor(() =>
+      expect(seitenHinweis()?.querySelector('[role="alert"]') ?? null).toBeNull(),
+    );
+  });
+
+  it('Stornieren: der Grund steht im Seitenhinweis und räumt den Grund des Status', async () => {
+    let stornoAntwort: () => void = () => {};
+    const stornoGehalten = new Promise<void>((r) => (stornoAntwort = r));
+    render(einsatzAktiv, tierBasis, [
+      http.post('/api/einsaetze/1/tiere/10/status', abgelehnt('Übergang nicht erlaubt')),
+      http.delete('/api/einsaetze/1/tiere/10', async () => {
+        await stornoGehalten;
+        return HttpResponse.json({ error: 'Tier ist einer UHS zugeordnet' }, { status: 409 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Als vermisst markieren' }));
+    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Übergang nicht erlaubt'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Stornieren' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Tier stornieren' }),
+    );
+    // Solange das Storno läuft, steht der alte Grund des Status nicht mehr da.
+    await waitFor(() => expect(screen.queryByText('Übergang nicht erlaubt')).toBeNull());
+
+    await act(async () => stornoAntwort());
+    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Tier ist einer UHS zugeordnet'));
+    expect(seitenHinweis()).toHaveTextContent('Nicht storniert');
+    expect(screen.queryByText('LISTE')).toBeNull();
+    keinToast();
+  });
+
+  it('Status: der Wechsel räumt den Grund eines gescheiterten Stornos', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.delete('/api/einsaetze/1/tiere/10', abgelehnt('Tier ist einer UHS zugeordnet', 409)),
+      http.post('/api/einsaetze/1/tiere/10/status', async () => {
+        await delay('infinite');
+        return HttpResponse.json({});
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Tier stornieren' }),
+    );
+    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Tier ist einer UHS zugeordnet'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Als vermisst markieren' }));
+    await waitFor(() => expect(screen.queryByText('Tier ist einer UHS zugeordnet')).toBeNull());
+  });
+
+  it('Abschließen: der Grund steht im Dialog, der Dialog bleibt offen, kein Toast', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.post('/api/einsaetze/1/tiere/10/status', erstAblehnenDannWarten('Tier ist vermisst')),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    await userEvent.click(within(dialog).getByRole('combobox'));
+    await userEvent.click(await screen.findByText('Freilauf'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Tier ist vermisst');
+    expect(seitenHinweis()?.querySelector('[role="alert"]') ?? null).toBeNull();
+    keinToast();
+
+    // Das nächste Absenden räumt den Grund; solange es läuft, ist Abbrechen gesperrt.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('Abschließen: nach Abbrechen und erneutem Öffnen kein alter Grund', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.post('/api/einsaetze/1/tiere/10/status', abgelehnt('Tier ist vermisst')),
+    ]);
+    const oeffnen = await screen.findByRole('button', { name: 'Abschließen' });
+    await userEvent.click(oeffnen);
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    await userEvent.click(within(dialog).getByRole('combobox'));
+    await userEvent.click(await screen.findByText('Freilauf'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(oeffnen);
+    const wieder = (await screen.findAllByRole('dialog'))[0];
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
+  });
+
+  it('der Wechsel zu einem anderen Tier räumt die Gründe', async () => {
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/1/tiere/11')}>
+          Zum zweiten Tier
+        </button>
+      );
+    }
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tierBasis)),
+      http.get('/api/einsaetze/1/tiere/11', () =>
+        HttpResponse.json({ ...tierBasis, id: 11, registrier_nr: 2 }),
+      ),
+      http.get('/api/einsaetze/1/tiere/:tid/anhaenge', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/tiere/10/status', abgelehnt('Übergang nicht erlaubt')),
+    );
+    renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/tiere/10' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Als vermisst markieren' }));
+    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Übergang nicht erlaubt'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Tier' }));
+    await screen.findByRole('heading', { name: /Tier T-002/ });
+    expect(screen.queryByText('Übergang nicht erlaubt')).toBeNull();
   });
 });

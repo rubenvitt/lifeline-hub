@@ -14,6 +14,7 @@ import {
   App,
   Button,
   Dropdown,
+  Flex,
   Form,
   Input,
   InputNumber,
@@ -55,7 +56,6 @@ import type {
   VerbleibArt,
   Verfuegbarkeit,
 } from '../../api/types';
-import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladePlanBild, type UhsPlan } from '../../api/uhsPlan';
 import UhsPlanPaneel from './UhsPlanPaneel';
@@ -64,7 +64,8 @@ import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
 import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
-import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
+import { useZeilenFehler, type ZeilenGrund } from '../../components/useZeilenFehler';
 import { ZugPointerSensor } from '../../components/zugPointerSensor';
 import {
   SEITENSPALTE_BREITE,
@@ -409,6 +410,11 @@ interface PlatzKarteProps {
   niemandWartet?: boolean;
   /** Nur gesetzt, wenn der Platz belegt ist — sonst gibt es nichts zurückzustellen. */
   onZurueckInWartebereich?: () => void;
+  /**
+   * Eine Aktion an diesem Platz wurde abgelehnt. Der Grund steht über der Fläche (die Karte hat
+   * keinen Platz für einen Satz), die Karte trägt die Marke `data-fehler`.
+   */
+  abgelehnt?: boolean;
 }
 
 function PlatzKarte({
@@ -425,6 +431,7 @@ function PlatzKarte({
   onZuweisen,
   niemandWartet,
   onZurueckInWartebereich,
+  abgelehnt = false,
 }: PlatzKarteProps) {
   // Die Platzkarte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus — Drag-Source
   // (Layout verschieben).
@@ -476,6 +483,11 @@ function PlatzKarte({
   // Cursor (bei `autoFocus` fiele der Fokus auf `<body>`). Der Wurzelklick hat keinen sichtbaren
   // Sperrzustand; er ruht.
   const zuweisenGesperrt = belegungLaeuft;
+  // Eine abgelehnte Aktion färbt den Rand in `colorError` (eine Farbe, Gefahr gewinnt): der Grund
+  // steht über der Fläche, die Karte zeigt, wo. Die Verfügbarkeit nennt dann ihr Tag.
+  const randFarbe = abgelehnt
+    ? token.colorError
+    : rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token);
   const style: React.CSSProperties = {
     position: 'absolute',
     left: platz.pos_x ?? 10,
@@ -489,7 +501,7 @@ function PlatzKarte({
     cursor: bearbeitbar ? 'grab' : zuweisbar || (karte && belegtVon) ? 'pointer' : 'default',
     // Rand und Polsterung aus den Konstanten: `AKTIONSZEILE_BREITE` rechnet mit genau diesen
     // Werten.
-    border: `${PLATZ_KARTE_RAND}px solid ${rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token)}`,
+    border: `${PLATZ_KARTE_RAND}px solid ${randFarbe}`,
     // Belegt: Fläche `bedienFlaeche` + „belegt"-Tag; „frei" und „belegt" schließen sich aus, andere
     // Verfügbarkeiten bleiben sichtbar. Nur Farbe und Ecke kommen aus dem Neuentwurf — Höhe, Rand
     // und Polsterung bleiben an die Konstanten gebunden. Das Drop-Ziel ist die Auswahlfläche
@@ -580,6 +592,7 @@ function PlatzKarte({
     <div
       ref={setRef}
       data-testid="platz-karte"
+      data-fehler={abgelehnt ? 'true' : undefined}
       style={style}
       {...dragProps}
       {...(karte
@@ -732,6 +745,7 @@ function PersonenSpalte({
   leerText,
   onOeffnen,
   onVerbleib,
+  fehler,
 }: {
   titel: string;
   personen: Person[];
@@ -751,6 +765,8 @@ function PersonenSpalte({
    * Verbleib ohne Schreibrecht ist keine Aktion, ein gesperrter Knopf kostete nur Platz.
    */
   onVerbleib?: (person: Person) => void;
+  /** Grund einer abgelehnten Ablage in dieser Spalte (Ziehen in den Wartebereich). */
+  fehler?: ZeilenGrund | null;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({
@@ -808,6 +824,7 @@ function PersonenSpalte({
           </div>
         ))}
         {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
+        {fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />}
       </div>
     </Paneel>
   );
@@ -928,6 +945,12 @@ type VerbleibWerte = { art: VerbleibArt; ziel?: string; transportmittel?: string
 
 /** Einziges Feld des Klick-Zuweisungswegs. */
 type ZuweisenWerte = { personId: number };
+
+/** Eine Belegung: `platzId` null heißt Wartebereich. */
+type Belegung = { personId: number; platzId: number | null };
+
+/** Ort einer abgelehnten Aktion im Grundriss: ein Platz oder der Wartebereich. */
+type PlatzOrt = number | 'warte';
 
 /**
  * CSS-Filter des Plans (LFH-999, design.md D8). Im dunklen Thema mit `nacht_umkehren` erst
@@ -1137,12 +1160,22 @@ export default function Grundriss({
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) }),
     ]);
   }
-  const fehler = useFehlerMeldung();
+  /*
+   * Ablehnungen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). Jede
+   * Aktion an einem Platz (verschieben, belegen per Ziehen oder Menü, zurückweisen, Verfügbarkeit,
+   * löschen) meldet je Platz; der Grund steht über der Fläche, die Karte trägt die Marke. Das
+   * Ziehen in den Wartebereich meldet dort. Die Gründe kommen aus den Callbacks, nicht aus
+   * `mutation.variables` (`components/useZeilenFehler.ts`): zwei Plätze schnell hintereinander,
+   * und die Ablehnung des ersten ginge verloren. Alle Platz-Aktionen teilen einen Speicher, die
+   * zuletzt begonnene zählt. Die Dialoge (Verbleib, Zuweisen per Auswahl) tragen ihre Mutation.
+   */
+  const platzFehler = useZeilenFehler<PlatzOrt>();
 
   const layoutMut = useMutation({
     mutationFn: ({ pid, pos_x, pos_y }: { pid: number; pos_x: number; pos_y: number }) =>
       aktualisierePlatz(einsatzId, uhs.id, pid, { pos_x, pos_y }),
     onMutate: async (v) => {
+      platzFehler.beginne(v.pid);
       const queryKey = einsatzKeys.uhsDetail(einsatzId, uhs.id);
       await qc.cancelQueries({ queryKey });
       const vorher = qc
@@ -1192,75 +1225,89 @@ export default function Grundriss({
           };
         });
       }
-      fehler(e);
+      platzFehler.melde(variablen.pid, e, 'Verschieben fehlgeschlagen');
     },
     onSettled: invalidate,
   });
-  const belegMut = useMutation({
-    mutationFn: ({ personId, platzId }: { personId: number; platzId: number | null }) => {
-      const aktuell = personen.find((p) => p.id === personId);
-      const art = aktuell?.aktuelle_uhs_id ? 'wechsel' : 'eintritt';
-      return aenderePersonBelegung(einsatzId, personId, { art, uhs_id: uhs.id, platz_id: platzId });
-    },
-    onMutate: async (v) => {
-      const queryKey = einsatzKeys.personen(einsatzId);
-      await qc.cancelQueries({ queryKey });
-      const vorher = qc
-        .getQueryData<Person[]>(queryKey)
-        ?.find((person) => person.id === v.personId);
-      qc.setQueryData<Person[]>(queryKey, (alt) =>
-        alt?.map((person) =>
-          person.id === v.personId
-            ? { ...person, aktuelle_uhs_id: uhs.id, aktueller_platz_id: v.platzId }
-            : person,
-        ),
-      );
-      return { vorher };
-    },
-    onSuccess: (serverStand) => {
-      qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) =>
-        alt?.map((person) =>
-          person.id === serverStand.person_id
-            ? {
-                ...person,
-                aktuelle_uhs_id: serverStand.uhs_id,
-                aktueller_platz_id: serverStand.platz_id,
-              }
-            : person,
-        ),
-      );
-    },
-    onError: (e, variablen, kontext) => {
-      const vorher = kontext?.vorher;
-      if (vorher) {
-        qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) =>
-          alt?.map((person) => {
-            if (person.id !== variablen.personId) return person;
-            // Nur den eigenen optimistischen Stand rückgängig machen; hat ein neuerer Stand die
-            // Person weiterbewegt, bleibt er.
-            if (
-              person.aktuelle_uhs_id !== uhs.id ||
-              person.aktueller_platz_id !== variablen.platzId
-            ) {
-              return person;
-            }
-            return {
+
+  // Belegen hat zwei Wege mit je eigenem Ort: Ziehen und Platzmenü melden an der Fläche, die
+  // Auswahl im Dialog im Dialog. Deshalb zwei Mutationen über denselben Ablauf.
+  function belege({ personId, platzId }: Belegung) {
+    const aktuell = personen.find((p) => p.id === personId);
+    const art = aktuell?.aktuelle_uhs_id ? 'wechsel' : 'eintritt';
+    return aenderePersonBelegung(einsatzId, personId, { art, uhs_id: uhs.id, platz_id: platzId });
+  }
+  async function belegeOptimistisch(v: Belegung) {
+    const queryKey = einsatzKeys.personen(einsatzId);
+    await qc.cancelQueries({ queryKey });
+    const vorher = qc.getQueryData<Person[]>(queryKey)?.find((person) => person.id === v.personId);
+    qc.setQueryData<Person[]>(queryKey, (alt) =>
+      alt?.map((person) =>
+        person.id === v.personId
+          ? { ...person, aktuelle_uhs_id: uhs.id, aktueller_platz_id: v.platzId }
+          : person,
+      ),
+    );
+    return { vorher };
+  }
+  function uebernimmBelegung(serverStand: Awaited<ReturnType<typeof aenderePersonBelegung>>) {
+    qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) =>
+      alt?.map((person) =>
+        person.id === serverStand.person_id
+          ? {
               ...person,
-              aktuelle_uhs_id: vorher.aktuelle_uhs_id,
-              aktueller_platz_id: vorher.aktueller_platz_id,
-            };
-          }),
-        );
-      }
-      fehler(e);
+              aktuelle_uhs_id: serverStand.uhs_id,
+              aktueller_platz_id: serverStand.platz_id,
+            }
+          : person,
+      ),
+    );
+  }
+  function rolleBelegungZurueck(variablen: Belegung, vorher: Person | undefined) {
+    if (!vorher) return;
+    qc.setQueryData<Person[]>(einsatzKeys.personen(einsatzId), (alt) =>
+      alt?.map((person) => {
+        if (person.id !== variablen.personId) return person;
+        // Nur den eigenen optimistischen Stand rückgängig machen; hat ein neuerer Stand die
+        // Person weiterbewegt, bleibt er.
+        if (person.aktuelle_uhs_id !== uhs.id || person.aktueller_platz_id !== variablen.platzId) {
+          return person;
+        }
+        return {
+          ...person,
+          aktuelle_uhs_id: vorher.aktuelle_uhs_id,
+          aktueller_platz_id: vorher.aktueller_platz_id,
+        };
+      }),
+    );
+  }
+  const belegMut = useMutation({
+    mutationFn: (v: Belegung & { ort: PlatzOrt }) => belege(v),
+    onMutate: (v) => {
+      platzFehler.beginne(v.ort);
+      return belegeOptimistisch(v);
+    },
+    onSuccess: uebernimmBelegung,
+    onError: (e, variablen, kontext) => {
+      rolleBelegungZurueck(variablen, kontext?.vorher);
+      platzFehler.melde(variablen.ort, e, 'Belegen fehlgeschlagen');
     },
     onSettled: invalidate,
   });
+  const zuweisenMut = useMutation({
+    mutationFn: belege,
+    onMutate: belegeOptimistisch,
+    onSuccess: uebernimmBelegung,
+    onError: (_e, variablen, kontext) => rolleBelegungZurueck(variablen, kontext?.vorher),
+    onSettled: invalidate,
+  });
+  const belegungLaeuft = belegMut.isPending || zuweisenMut.isPending;
   const austrittMut = useMutation({
-    mutationFn: (personId: number) =>
+    mutationFn: ({ personId }: { personId: number; platzId: number }) =>
       aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
+    onMutate: ({ platzId }) => platzFehler.beginne(platzId),
     onSuccess: () => invalidate(),
-    onError: fehler,
+    onError: (e, { platzId }) => platzFehler.melde(platzId, e, 'Zurückweisen fehlgeschlagen'),
   });
   // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben). Der Server trägt die Person
   // aus der UHS aus (Auto-Austritt); bei Transport wandert sie nach rechts.
@@ -1280,26 +1327,34 @@ export default function Grundriss({
         status: art === 'transport' ? 'abtransportiert' : null,
         notiz: notiz ?? null,
       }),
-    // Schließen und Leeren macht die Erfassungshülle.
+    // Schließen und Leeren macht die Erfassungshülle, sie zeigt auch die Ablehnung.
     onSuccess: () => {
       message.success('Verbleib erfasst');
       invalidate();
     },
-    onError: fehler,
   });
   const verfMut = useMutation({
     mutationFn: ({ platzId, verf }: { platzId: number; verf: Verfuegbarkeit }) =>
       setzePlatzVerfuegbarkeit(einsatzId, uhs.id, platzId, verf, null),
+    onMutate: ({ platzId }) => platzFehler.beginne(platzId),
     onSuccess: () => invalidate(),
-    onError: fehler,
+    onError: (e, { platzId }) => platzFehler.melde(platzId, e, 'Verfügbarkeit nicht gesetzt'),
   });
   const stornoMut = useMutation({
     mutationFn: (platzId: number) => stornierePlatz(einsatzId, uhs.id, platzId),
+    onMutate: (platzId) => platzFehler.beginne(platzId),
     onSuccess: () => {
       message.success('Platz gelöscht');
       invalidate();
     },
-    onError: fehler,
+    onError: (e, platzId) => platzFehler.melde(platzId, e, 'Löschen fehlgeschlagen'),
+  });
+  // Gründe je Platz für den Hinweis über der Fläche. Ein Platz, den es nicht mehr gibt, zeigt
+  // keinen: ohne Karte und Namen wiese der Grund auf nichts.
+  const platzGruende = platzFehler.gemeldet().flatMap((pid) => {
+    const platz = pid === 'warte' ? undefined : uhs.plaetze.find((p) => p.id === pid);
+    const grund = platzFehler.grund(pid);
+    return platz && grund ? [{ pid: platz.id, bezeichnung: platz.bezeichnung, grund }] : [];
   });
 
   function onDragStart(event: DragStartEvent) {
@@ -1335,12 +1390,13 @@ export default function Grundriss({
     }
     // Person-Drop: braucht ein Drop-Target (Platz, Wartebereich oder Transport).
     if (data.kind === 'person' && data.personId != null) {
-      if (belegMut.isPending) return;
+      if (belegungLaeuft) return;
       const target = over?.data.current as { kind: string; platzId?: number } | undefined;
       if (!target) return;
-      if (target.kind === 'inbox') belegMut.mutate({ personId: data.personId, platzId: null });
-      else if (target.kind === 'platz' && target.platzId != null) {
-        belegMut.mutate({ personId: data.personId, platzId: target.platzId });
+      if (target.kind === 'inbox') {
+        belegMut.mutate({ personId: data.personId, platzId: null, ort: 'warte' });
+      } else if (target.kind === 'platz' && target.platzId != null) {
+        belegMut.mutate({ personId: data.personId, platzId: target.platzId, ort: target.platzId });
       } else if (target.kind === 'transport') {
         // Transport ändert Patientendaten → Abschluss-Screen öffnen statt sofort buchen.
         const person = personen.find((p) => p.id === data.personId);
@@ -1375,7 +1431,7 @@ export default function Grundriss({
         titel="Noch nicht aufgenommen"
         personen={nichtAufgenommen}
         schreibgeschuetzt={schreibgeschuetzt}
-        belegungLaeuft={belegMut.isPending}
+        belegungLaeuft={belegungLaeuft}
         leerText="keine"
         onOeffnen={setDetailPersonId}
         onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
@@ -1384,11 +1440,12 @@ export default function Grundriss({
         titel="Wartebereich (Eingang)"
         personen={wartebereichPersonen}
         schreibgeschuetzt={schreibgeschuetzt}
-        belegungLaeuft={belegMut.isPending}
+        belegungLaeuft={belegungLaeuft}
         droppableId="drop-inbox"
         leerText="leer"
         onOeffnen={setDetailPersonId}
         onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
+        fehler={platzFehler.grund('warte')}
       />
     </div>
   );
@@ -1445,6 +1502,18 @@ export default function Grundriss({
           <UhsPlanPaneel einsatzId={einsatzId} uhs={uhs} />
         </div>
       )}
+      {/* Gründe abgelehnter Platz-Aktionen, je Platz eine Zeile: die Karte hat feste 140 × 116 px
+          (Raster im Backend) und keinen Platz für einen Satz. */}
+      {platzGruende.length > 0 && (
+        <Flex vertical gap={4} style={{ marginBottom: 8 }}>
+          {platzGruende.map(({ pid, bezeichnung, grund }) => (
+            <div key={pid} data-lfh="platz-fehler">
+              {/* Der Platzname steht IN der Meldung: vorgelesen wird, wo abgelehnt wurde. */}
+              <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} kennung={bezeichnung} />
+            </div>
+          ))}
+        </Flex>
+      )}
       {/* Hülle für den Überlaufhinweis: er liegt über dem Bildlauf, nicht in ihm, sonst liefe er
           mit. */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', position: 'relative' }}>
@@ -1471,12 +1540,13 @@ export default function Grundriss({
                   platz={p}
                   belegtVon={belegt}
                   schreibgeschuetzt={schreibgeschuetzt}
-                  belegungLaeuft={belegMut.isPending}
+                  belegungLaeuft={belegungLaeuft}
                   bearbeitbar={platzEditAktiv && !layoutMut.isPending}
+                  abgelehnt={platzFehler.grund(p.id) != null}
                   onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                   onAustritt={() => {
                     const b = belegtAn(p.id);
-                    if (b) austrittMut.mutate(b.id);
+                    if (b) austrittMut.mutate({ personId: b.id, platzId: p.id });
                   }}
                   onTransport={() => {
                     const b = belegtAn(p.id);
@@ -1496,12 +1566,13 @@ export default function Grundriss({
                   niemandWartet={zuweisbarePersonen.length === 0}
                   onZurueckInWartebereich={
                     // Nur bei belegtem Platz und mit Schreibrecht. `belegMut` errechnet `art` selbst
-                    // — für eine Person an dieser UHS `'wechsel'`. Nicht an `belegMut.isPending`
+                    // — für eine Person an dieser UHS `'wechsel'`. Nicht an `belegungLaeuft`
                     // hängen: ein fehlender Callback nähme den Eintrag aus dem Menü; gesperrt wird er
                     // über `belegungLaeuft` in der Karte.
                     (() => {
                       if (!belegt || schreibgeschuetzt) return undefined;
-                      return () => belegMut.mutate({ personId: belegt.id, platzId: null });
+                      return () =>
+                        belegMut.mutate({ personId: belegt.id, platzId: null, ort: p.id });
                     })()
                   }
                 />
@@ -1529,7 +1600,7 @@ export default function Grundriss({
       <TransportSpalte
         personen={transportiert}
         schreibgeschuetzt={schreibgeschuetzt}
-        belegungLaeuft={belegMut.isPending}
+        belegungLaeuft={belegungLaeuft}
         onOeffnen={setDetailPersonId}
       />
     </div>
@@ -1631,6 +1702,8 @@ export default function Grundriss({
         form={transportForm}
         initialValues={{ art: 'transport' }}
         laeuft={transportMut.isPending}
+        speicherung={transportMut}
+        speicherFehlerTitel="Verbleib nicht erfasst"
         onErfassen={async (werte) => {
           // Der Dialog ist nur offen, solange eine Zielperson steht; die Prüfung engt den Typ ein.
           if (!transportPerson) return;
@@ -1670,11 +1743,14 @@ export default function Grundriss({
           zuweisenPlatz ? `Patient zuweisen — ${zuweisenPlatz.bezeichnung}` : 'Patient zuweisen'
         }
         form={zuweisenForm}
-        laeuft={belegMut.isPending}
+        laeuft={zuweisenMut.isPending}
+        speicherung={zuweisenMut}
+        speicherFehlerTitel="Nicht zugewiesen"
+        speicherFehlerFallback="Zuweisen fehlgeschlagen"
         onErfassen={async (werte) => {
           // `mutateAsync`: ein abgelehnter Serverruf lässt die Auswahl stehen.
           if (!zuweisenPlatz || werte.personId == null) return;
-          await belegMut.mutateAsync({ personId: werte.personId, platzId: zuweisenPlatz.id });
+          await zuweisenMut.mutateAsync({ personId: werte.personId, platzId: zuweisenPlatz.id });
         }}
         onFertig={() => setZuweisenPlatz(null)}
         onAbbrechen={() => setZuweisenPlatz(null)}
@@ -1722,6 +1798,8 @@ function NeuerPlatzKnopf({
   const [open, setOpen] = useState(false);
   const [typ, setTyp] = useState<PlatzTyp>('bett');
   const [menge, setMenge] = useState(1);
+  // Die Ablehnung steht am Block, bis zum nächsten Anlegen; Öffnen und Abbrechen räumen sie
+  // (LFH-1077). Solange die Anfrage läuft, ist Abbrechen gesperrt.
   const mut = useMutation({
     mutationFn: () => legePlaetzeAn(einsatzId, uhsId, { typ, menge }),
     onSuccess: (plaetze) => {
@@ -1732,35 +1810,43 @@ function NeuerPlatzKnopf({
       setOpen(false);
       onSuccess();
     },
-    onError: (e: unknown) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
+  const umschalten = (offen: boolean) => {
+    mut.reset();
+    setOpen(offen);
+  };
   if (!open) {
     return (
-      <Button type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>
+      <Button type={primaer ? 'primary' : 'default'} onClick={() => umschalten(true)}>
         Plätze anlegen
       </Button>
     );
   }
   return (
-    <Space align="center" wrap>
-      <Select<PlatzTyp>
-        value={typ}
-        onChange={setTyp}
-        options={PLATZ_TYPEN}
-        style={{ width: 200 }}
-        aria-label="Platz-Typ"
-      />
-      <InputNumber
-        min={1}
-        max={50}
-        value={menge}
-        onChange={(v) => setMenge(v ?? 1)}
-        aria-label="Menge"
-      />
-      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>
-        Anlegen
-      </Button>
-      <Button onClick={() => setOpen(false)}>Abbrechen</Button>
-    </Space>
+    <Flex vertical gap={4} data-lfh="plaetze-anlegen">
+      <Space align="center" wrap>
+        <Select<PlatzTyp>
+          value={typ}
+          onChange={setTyp}
+          options={PLATZ_TYPEN}
+          style={{ width: 200 }}
+          aria-label="Platz-Typ"
+        />
+        <InputNumber
+          min={1}
+          max={50}
+          value={menge}
+          onChange={(v) => setMenge(v ?? 1)}
+          aria-label="Menge"
+        />
+        <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>
+          Anlegen
+        </Button>
+        <Button disabled={mut.isPending} onClick={() => umschalten(false)}>
+          Abbrechen
+        </Button>
+      </Space>
+      <SpeicherFehler fehler={mut.error} titel="Nicht angelegt" fallback="Anlegen fehlgeschlagen" />
+    </Flex>
   );
 }

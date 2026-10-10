@@ -608,7 +608,12 @@ describe('SchaedenPage', () => {
     expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBeNull();
   });
 
-  it('merkt den Ort nach Schließen während des POST nicht', async () => {
+  /**
+   * Der Dialog wartet auf die Antwort (LFH-1077, design.md D3): solange angelegt wird, sind Kreuz
+   * und Abbrechen gesperrt, sonst hätte eine Ablehnung keinen Ort mehr. Erst der Erfolg schließt
+   * und merkt den Ort.
+   */
+  it('sperrt das Schließen, solange angelegt wird; erst der Erfolg schließt und merkt den Ort', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
     let postBeantwortet = false;
@@ -621,13 +626,13 @@ describe('SchaedenPage', () => {
     render(einsatzAktiv, []);
     server.use(
       ...schaedenAttrappe(1, () =>
-        postBeantwortet ? [basisSchaden({ id: 99, ort: 'Abbruchort Schaden' })] : [],
+        postBeantwortet ? [basisSchaden({ id: 99, ort: 'Wartort Schaden' })] : [],
       ).handler,
       http.post('/api/einsaetze/1/schaeden', async () => {
         postGestartet();
         await antwortGate;
         postBeantwortet = true;
-        return HttpResponse.json(basisSchaden({ id: 99, ort: 'Abbruchort Schaden' }), {
+        return HttpResponse.json(basisSchaden({ id: 99, ort: 'Wartort Schaden' }), {
           status: 201,
         });
       }),
@@ -635,17 +640,20 @@ describe('SchaedenPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialog = await modalDialog();
-    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Abbruchort Schaden');
+    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Wartort Schaden');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await postStart;
-    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-    await warteBisDialogWeg();
+    expect(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBeNull();
+
     await act(async () => {
       antwortFreigeben();
     });
-    await screen.findByText('Abbruchort Schaden');
-
-    expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBeNull();
+    await warteBisDialogWeg();
+    await waitFor(() =>
+      expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBe('Wartort Schaden'),
+    );
   });
 
   it('setzt beim Einsatzwechsel alle Schadenwerte zurück und lädt nur den B-Sitzungsort', async () => {

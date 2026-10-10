@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { delay, http, HttpResponse } from 'msw';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
 import { freigabenFixture } from '../../test/fixtures';
@@ -359,5 +359,93 @@ describe('MaterialTab · Sperrgrund „Material zuordnen" (LFH-970)', () => {
     expect(grund).toHaveTextContent('Material konnte nicht geladen werden');
     expect(within(grund).queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Material zuordnen' })).toBeDisabled();
+  });
+});
+
+describe('MaterialTab · Speicherfehler am Ort (LFH-1077)', () => {
+  const toasts = () => document.querySelectorAll('.ant-message-notice').length;
+  const zweitesVerortet = {
+    ...verortet,
+    id: 13,
+    bezeichnung: 'Vakuummatratze',
+  } as unknown as EinsatzMaterial;
+
+  function mitPatch(antwort: Parameters<typeof http.patch>[1]) {
+    server.use(http.patch('/api/einsaetze/1/material/:emId', antwort));
+  }
+
+  it('Zuordnen: der Grund steht im Dialog, das nächste Absenden räumt ihn, Abbrechen und Öffnen zeigen ihn nicht', async () => {
+    const user = userEvent.setup();
+    render([frei, verortet]);
+    let versuche = 0;
+    let frei2: () => void = () => {};
+    const zweiter = new Promise<void>((r) => (frei2 = r));
+    mitPatch(async () => {
+      versuche += 1;
+      if (versuche > 1) await zweiter;
+      return HttpResponse.json({ error: 'Material ist ausgegeben' }, { status: 409 });
+    });
+    const dialog = await oeffnenUndWaehlen(user, 'Wolldecke (Betreuung) — 50×');
+    await user.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
+
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht zugeordnet');
+    expect(grund).toHaveTextContent('Material ist ausgegeben');
+    expect(toasts()).toBe(0);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Zuordnen' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    await act(async () => frei2());
+    await within(dialog).findByRole('alert');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await user.click(screen.getByRole('button', { name: 'Material zuordnen' }));
+    await screen.findAllByRole('dialog');
+    expect(within(screen.getAllByRole('dialog').pop()!).queryByRole('alert')).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Lösen: zwei Zeilen nebenläufig, die späte Ablehnung der ersten steht an ihr', async () => {
+    render([verortet, zweitesVerortet]);
+    let lehneAb: () => void = () => {};
+    const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
+    mitPatch(async ({ params }) => {
+      if (params.emId === '12') {
+        await ersteAblehnung;
+        return HttpResponse.json({ error: 'Material wird gerade verlegt' }, { status: 409 });
+      }
+      await delay('infinite');
+      return HttpResponse.json({});
+    });
+    const trage = await screen.findByRole('row', { name: /Trage/ });
+    const matratze = screen.getByRole('row', { name: /Vakuummatratze/ });
+    await userEvent.click(within(trage).getByRole('button', { name: 'Lösen' }));
+    await userEvent.click(within(matratze).getByRole('button', { name: 'Lösen' }));
+    await act(async () => lehneAb());
+
+    expect(await within(trage).findByRole('alert')).toHaveTextContent(
+      'Material wird gerade verlegt',
+    );
+    expect(within(matratze).queryByRole('alert')).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Lösen: das nächste Lösen an der Zeile räumt den Grund', async () => {
+    render([verortet]);
+    let erster = true;
+    mitPatch(async () => {
+      if (erster) {
+        erster = false;
+        return HttpResponse.json({ error: 'Material wird gerade verlegt' }, { status: 409 });
+      }
+      await delay('infinite');
+      return HttpResponse.json({});
+    });
+    const trage = await screen.findByRole('row', { name: /Trage/ });
+    await userEvent.click(within(trage).getByRole('button', { name: 'Lösen' }));
+    await within(trage).findByRole('alert');
+
+    await userEvent.click(within(trage).getByRole('button', { name: /Lösen/ }));
+    await waitFor(() => expect(within(trage).queryByRole('alert')).toBeNull());
   });
 });

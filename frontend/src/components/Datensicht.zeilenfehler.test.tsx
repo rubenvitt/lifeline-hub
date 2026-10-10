@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { ApiError } from '../api/client';
@@ -185,3 +186,86 @@ describe('Datensicht-Zeilenfehler in der Tabelle (LFH-1077)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+describe.each(['tabelle', 'karte'] as const)(
+  'Datensicht-Zeilenfehler hinter Suche und Filter (%s, LFH-1077)',
+  (form) => {
+    beforeEach(() => setzeViewportBreite(form === 'tabelle' ? 1440 : 390));
+
+    interface Mitglied {
+      id: number;
+      name: string;
+      gruppe: 'A' | 'B';
+    }
+    const mitglieder: Mitglied[] = [
+      { id: 1, name: 'Anna', gruppe: 'A' },
+      { id: 2, name: 'Bert', gruppe: 'B' },
+      { id: 3, name: 'Cora', gruppe: 'B' },
+    ];
+    const mitgliederSpalten = spaltenFuer<Mitglied>()([
+      {
+        key: 'name',
+        title: 'Name',
+        dataIndex: 'name',
+        immerSichtbar: true,
+        suchText: (m) => m.name,
+      },
+      {
+        key: 'gruppe',
+        title: 'Gruppe',
+        dataIndex: 'gruppe',
+        filter: {
+          werte: [
+            { text: 'Gruppe A', value: 'A' },
+            { text: 'Gruppe B', value: 'B' },
+          ],
+          trifft: (m, wert) => m.gruppe === wert,
+        },
+      },
+    ]);
+    type MitgliedKey = (typeof mitgliederSpalten)[number]['key'];
+
+    const rendere = (gruende: ReadonlyMap<number, ZeilenGrund>) =>
+      renderMitProviders(
+        <Datensicht<Mitglied, MitgliedKey>
+          bezeichnung="Mitglieder"
+          spalten={mitgliederSpalten}
+          daten={mitglieder}
+          zeilenSchluessel="id"
+          karte={{ art: 'plan', titel: { spalte: 'name' } }}
+          form={form}
+          suche={{ platzhalter: 'Name' }}
+          zeilenFehler={(m) => gruende.get(m.id) ?? null}
+        />,
+      );
+    const verdeckt = () => document.querySelector('[data-lfh="datensicht-verdeckte-fehler"]');
+
+    it('die Suche blendet die Zeile aus: der Grund steht mit Kennung über der Liste', () => {
+      rendere(new Map([[2, abgelehnt]]));
+      expect(verdeckt()).toBeNull();
+      const suche = screen.getByRole('searchbox', { name: 'Suche in Mitglieder' });
+
+      fireEvent.change(suche, { target: { value: 'Anna' } });
+      const block = verdeckt() as HTMLElement | null;
+      expect(block).not.toBeNull();
+      // Kennung und Grund in EINER Meldung: vorgelesen wird, welche Zeile abgelehnt wurde.
+      expect(within(block!).getByRole('alert')).toHaveTextContent('Bert · Status abgelehnt');
+      // Genau einmal: die verborgene Zeile zeigt ihn nicht zusätzlich.
+      expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+
+      // Wieder sichtbar: der Grund steht an der Zeile, der Block ist weg.
+      fireEvent.change(suche, { target: { value: '' } });
+      expect(verdeckt()).toBeNull();
+      expect(document.querySelectorAll('[data-fehler]')).toHaveLength(1);
+    });
+
+    it('ein Spaltenfilter blendet die Zeile aus: der Grund steht über der Liste', async () => {
+      rendere(new Map([[1, abgelehnt]]));
+      await userEvent.click(screen.getByRole('combobox', { name: 'Gruppe' }));
+      await userEvent.click(await screen.findByTitle('Gruppe B'));
+      const block = verdeckt() as HTMLElement | null;
+      expect(block).not.toBeNull();
+      expect(within(block!).getByRole('alert')).toHaveTextContent('Anna · Status abgelehnt');
+    });
+  },
+);

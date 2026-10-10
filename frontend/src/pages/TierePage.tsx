@@ -21,7 +21,7 @@ import Datensicht, {
   type Kartenplan,
 } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { ErfassungsModal } from '../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 import {
@@ -40,7 +40,6 @@ import {
   type TiereSicht,
 } from './tiere/tierHelfer';
 import type { Spezies, Tier } from '../api/types';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -165,8 +164,6 @@ export default function TierePage() {
     {},
   );
   const [highlight, setHighlight] = useState<{ einsatzId: number; tierId: number } | null>(null);
-  const aktuellerEinsatzRef = useRef(einsatzId);
-  aktuellerEinsatzRef.current = einsatzId;
   const sicht = sichtNachEinsatz[einsatzId] ?? 'aktiv';
   const speziesFilter = speziesNachEinsatz[einsatzId];
 
@@ -234,7 +231,6 @@ export default function TierePage() {
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
 
-  const fehler = useFehlerMeldung();
   const csvExport = useCsvExport(einsatzId, 'tiere', ladeTiereExport);
 
   useEffect(() => {
@@ -245,8 +241,7 @@ export default function TierePage() {
   /**
    * Anlegen. `onSuccess` invalidiert nur — Schließen macht `onFertig` der Erfassungshülle, Leeren
    * die Hülle auf allen Wegen; ein `resetFields` hier leerte im Serienlauf auch die übernommenen
-   * Werte. `onError` bleibt: die Fehlermeldung kommt von der Mutation, die Hülle sieht nur die
-   * Ablehnung und lässt den Wortlaut stehen.
+   * Werte. Kein `onError`: den Grund zeigt die Hülle im Dialog (`speicherung`, LFH-1077).
    */
   const anlegenMutation = useMutation({
     mutationFn: (v: { einsatzId: number; daten: TierEingabe }) => legeTierAn(v.einsatzId, v.daten),
@@ -263,10 +258,17 @@ export default function TierePage() {
       qc.invalidateQueries({ queryKey: einsatzKeys.tiere(variablen.einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(variablen.einsatzId) });
     },
-    onError: (e, variablen) => {
-      if (aktuellerEinsatzRef.current === variablen.einsatzId) fehler(e);
-    },
   });
+  /*
+   * Nur das Anlegen DIESES Einsatzes gehört in den Dialog: ein laufendes aus dem vorigen sperrt
+   * hier kein Abbrechen, seine Ablehnung steht hier nicht.
+   */
+  const diesesAnlegen = anlegenMutation.variables?.einsatzId === einsatzId;
+  const anlegenSpeicherung: Speicherung = {
+    error: diesesAnlegen ? anlegenMutation.error : null,
+    isPending: diesesAnlegen && anlegenMutation.isPending,
+    reset: anlegenMutation.reset,
+  };
 
   /**
    * Seitenzustand — nur `einsatzQuery`: Breadcrumb, Titelzeile und `darfImEinsatzSchreiben(...)`
@@ -461,7 +463,10 @@ export default function TierePage() {
         offen={aktuellerModus !== null}
         titel={aktuellerModus === 'vermisst' ? 'Vermisst melden' : 'Tier erfassen'}
         form={form}
-        laeuft={anlegenMutation.isPending && anlegenMutation.variables?.einsatzId === einsatzId}
+        laeuft={anlegenSpeicherung.isPending}
+        speicherung={anlegenSpeicherung}
+        speicherFehlerTitel="Nicht erfasst"
+        speicherFehlerFallback="Erfassen fehlgeschlagen"
         initialValues={{ spezies: 'hund' }}
         serie
         uebernahme={['spezies', 'antreff_ort']}

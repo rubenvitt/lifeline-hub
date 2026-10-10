@@ -7,7 +7,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -38,7 +38,7 @@ import {
   geschaedigtAusSchaden,
   geschaedigtFelder,
 } from './schaeden/schadenHelfer';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { ErfassungsModal } from '../components/Erfassung';
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
@@ -75,8 +75,6 @@ export default function SchaedenDetailPage() {
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
   const [abschlussForm] = Form.useForm<{ abschluss_grund: string; notiz?: string }>();
-
-  const fehler = useFehlerMeldung();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
@@ -126,8 +124,6 @@ export default function SchaedenDetailPage() {
             editSitzung.beende();
           },
         });
-      } else {
-        fehler(e);
       }
     },
   });
@@ -135,13 +131,11 @@ export default function SchaedenDetailPage() {
     mutationFn: (an: string) => uebergebeSchaden(einsatzId, schadenId, an),
     // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`).
     onSuccess: invalidateDetail,
-    onError: fehler,
   });
   const abschlussMutation = useMutation({
     mutationFn: (v: { abschluss_grund: string; notiz?: string }) =>
       schliesseSchadenAb(einsatzId, schadenId, v.abschluss_grund, v.notiz),
     onSuccess: invalidateDetail,
-    onError: fehler,
   });
   const stornoMutation = useMutation({
     mutationFn: () => storniereSchaden(einsatzId, schadenId),
@@ -149,8 +143,24 @@ export default function SchaedenDetailPage() {
       invalidate();
       navigate(schaedenPfad(einsatzId));
     },
-    onError: fehler,
   });
+
+  /*
+   * Jede Ablehnung steht an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+   * Fehler“): Bearbeiten am Formular, Übergeben und Abschließen im Dialog, Storno im
+   * Seitenhinweis. Den Sperrkonflikt beantwortet weiter der Konfliktdialog.
+   */
+  const sperrkonflikt = istKonflikt(editMutation.error) && !editMutation.variables?.overwrite;
+  const editFehler = sperrkonflikt ? null : editMutation.error;
+
+  // Die Route hat keinen `key`: der Wechsel zu einem anderen Schaden behält die Seite, nicht die
+  // Gründe.
+  const { reset: editReset } = editMutation;
+  const { reset: stornoReset } = stornoMutation;
+  useEffect(() => {
+    editReset();
+    stornoReset();
+  }, [schadenId, editReset, stornoReset]);
 
   // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
@@ -274,6 +284,7 @@ export default function SchaedenDetailPage() {
               </Button>
               <Button
                 onClick={() => {
+                  if (!editMutation.isPending) editMutation.reset();
                   editSitzung.starte(s, {
                     typ: s.typ,
                     ausmass: s.ausmass,
@@ -298,6 +309,16 @@ export default function SchaedenDetailPage() {
           <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
         </Space>
       }
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        stornoMutation.error != null && (
+          <SeitenHinweise
+            fehler={stornoMutation.error}
+            fehlerTitel="Nicht storniert"
+            fehlerFallback="Stornieren fehlgeschlagen"
+          />
+        )
+      }
     >
       {sitzung ? (
         <Form
@@ -315,11 +336,19 @@ export default function SchaedenDetailPage() {
           }}
         >
           {detailAnsicht}
+          {editFehler != null && (
+            <div style={{ marginTop: 16 }}>
+              <SpeicherFehler fehler={editFehler} />
+            </div>
+          )}
           <Space style={{ marginTop: 16 }}>
             <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
               Speichern
             </Button>
-            <Button onClick={editSitzung.beende}>Abbrechen</Button>
+            {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+            <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
+              Abbrechen
+            </Button>
           </Space>
         </Form>
       ) : (
@@ -340,6 +369,9 @@ export default function SchaedenDetailPage() {
         form={uebergebForm}
         erfassenText="Übergeben"
         laeuft={uebergebMutation.isPending}
+        speicherung={uebergebMutation}
+        speicherFehlerTitel="Nicht übergeben"
+        speicherFehlerFallback="Übergeben fehlgeschlagen"
         onErfassen={(v) => uebergebMutation.mutateAsync(v.uebergeben_an)}
         onFertig={() => setUebergebenOffen(false)}
         onAbbrechen={() => setUebergebenOffen(false)}
@@ -359,6 +391,9 @@ export default function SchaedenDetailPage() {
         form={abschlussForm}
         erfassenText="Abschließen"
         laeuft={abschlussMutation.isPending}
+        speicherung={abschlussMutation}
+        speicherFehlerTitel="Nicht abgeschlossen"
+        speicherFehlerFallback="Abschließen fehlgeschlagen"
         onErfassen={(v) => abschlussMutation.mutateAsync(v)}
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}

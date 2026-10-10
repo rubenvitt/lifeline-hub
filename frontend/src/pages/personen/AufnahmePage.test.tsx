@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
-import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../../test/server';
 import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -376,5 +376,115 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
 
     expect(await screen.findByText('UHS-DETAIL')).toBeInTheDocument();
     expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7');
+  });
+});
+
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): eine Ablehnung
+ * steht am Formular, bis zum nächsten Absenden, kein Toast. Eine Quittung der vorigen Person
+ * stünde sonst neben der Ablehnung der nächsten und behauptete Erfolg.
+ */
+describe('AufnahmePage — Ablehnung am Formular (LFH-1077)', () => {
+  const abgelehnt = () =>
+    HttpResponse.json({ error: 'Sichtung passt nicht zum Status' }, { status: 422 });
+
+  it('nennt den Grund am Formular, behält die Eingabe und zeigt keinen Toast', async () => {
+    render(einsatzAktiv, [http.post('/api/einsaetze/1/personen', abgelehnt)]);
+    await screen.findByRole('radiogroup');
+    await userEvent.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    const grund = await screen.findByRole('alert');
+    expect(grund).toHaveTextContent('Person nicht erfasst');
+    expect(grund).toHaveTextContent('Sichtung passt nicht zum Status');
+    expect(grund.closest('form')).not.toBeNull();
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('das nächste Absenden räumt den Grund, solange die Antwort aussteht', async () => {
+    let zweiter = false;
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', async () => {
+        if (zweiter) return new Promise<never>(() => {});
+        zweiter = true;
+        return abgelehnt();
+      }),
+    ]);
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await screen.findByText('Sichtung passt nicht zum Status');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Sichtung passt nicht zum Status')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('räumt die Quittung der vorigen Person beim nächsten Absenden', async () => {
+    let zweiter = false;
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => {
+        if (zweiter) return abgelehnt();
+        zweiter = true;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    ]);
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await screen.findByText(/Erfasst als R-047/);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await screen.findByText('Sichtung passt nicht zum Status');
+    expect(screen.queryByText(/Erfasst als R-047/)).not.toBeInTheDocument();
+  });
+});
+
+describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () => {
+  /** Das Layout keyt sein `Outlet` nicht: nach dem Wechsel bleibt es dieselbe Seite. */
+  function EinsatzWechsel() {
+    const navigate = useNavigate();
+    return (
+      <button type="button" onClick={() => void navigate('/einsaetze/2/personen/aufnahme')}>
+        Zu Einsatz B
+      </button>
+    );
+  }
+
+  it('ein laufendes Anlegen aus Einsatz A dreht in B nicht und meldet dort nichts', async () => {
+    let antwortFreigeben!: () => void;
+    const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/:eid', ({ params }) =>
+        HttpResponse.json({ ...einsatzAktiv, id: Number(params.eid) }),
+      ),
+      http.get('/api/einsaetze/:eid/personen', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/personen', async () => {
+        await antwortGate;
+        return HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 });
+      }),
+    );
+    const { client } = renderMitProviders(
+      <>
+        <EinsatzWechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/personen/aufnahme" element={<AufnahmePage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/personen/aufnahme' },
+    );
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(client.isMutating()).toBe(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.einsatz(2))).toBeDefined());
+    const knopf = await screen.findByRole('button', { name: /Speichern und nächste/ });
+    expect(knopf).not.toHaveClass('ant-btn-loading');
+
+    await act(async () => antwortFreigeben());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+    expect(screen.queryByText('Einsatz ist abgeschlossen')).toBeNull();
   });
 });

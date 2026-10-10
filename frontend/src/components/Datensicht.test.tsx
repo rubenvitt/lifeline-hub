@@ -1306,6 +1306,38 @@ describe('Datensicht · Tabellenzweig', () => {
     expect(zeileGeklickt).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * Ein React-Portal (Auswahlliste eines Selects in der Zeile) reicht seinen Klick an die Zeile
+   * weiter, liegt im DOM aber woanders: die Wahl darf nicht navigieren (wie der Baum-Riegel).
+   */
+  it('ein Klick aus einem Portal in der Zeile löst onZeileKlick nicht aus', async () => {
+    const zeileGeklickt = vi.fn();
+    const mitPortal = spaltenFuer<Fahrzeug>()([
+      ...spalten,
+      {
+        key: 'wahl',
+        title: 'Wahl',
+        // In einem Fragment: ein nacktes Portal hielte antd für eine Zellbeschreibung.
+        render: (_t, f) => (
+          <>{createPortal(<div role="option">Wahl {f.funkrufname}</div>, document.body)}</>
+        ),
+      },
+    ]);
+    renderMitProviders(
+      <Datensicht<Fahrzeug, (typeof mitPortal)[number]['key']>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={mitPortal}
+        daten={DREI}
+        zeilenSchluessel="id"
+        karte={karte}
+        form="tabelle"
+        onZeileKlick={zeileGeklickt}
+      />,
+    );
+    await userEvent.click(screen.getByText('Wahl Florian 1'));
+    expect(zeileGeklickt).not.toHaveBeenCalled();
+  });
+
   it('rendert durch KatalogTabelle: Scrollcontainer, stehende Kopfzeile, fixierte Kennung', () => {
     const { container } = rendere();
     expect(container.querySelector('.ant-table-sticky-holder')).not.toBeNull();

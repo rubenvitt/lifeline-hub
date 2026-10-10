@@ -33,7 +33,7 @@ import BewegungenTab from './BewegungenTab';
 import UhsAnhaenge from './UhsAnhaenge';
 import UhsKraefte from './UhsKraefte';
 import { staerkeText } from '../../anzeige/staerke';
-import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { SeitenHinweise } from '../../components/SpeicherHinweis';
 
 const REITER_NAME = {
   material: 'Material',
@@ -114,15 +114,14 @@ export default function UhsDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = useFehlerMeldung();
-
+  // Status und Storno sind Kopfaktionen: ihre Ablehnung steht im Seitenhinweis, kein Toast
+  // (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
   const statusMut = useMutation({
     mutationFn: (status: UhsStatus) => setzeUhsStatus(einsatzId, uhsId, status),
     onSuccess: () => {
       message.success('Status gewechselt');
       invalidate();
     },
-    onError: fehler,
   });
   const stornoMut = useMutation({
     mutationFn: () => storniereUhs(einsatzId, uhsId),
@@ -130,8 +129,30 @@ export default function UhsDetailPage() {
       message.success('UHS storniert');
       invalidate();
     },
-    onError: fehler,
   });
+  // Ein Slot für beide: die zuletzt begonnene Handlung zählt, ihr Start räumt den Grund der
+  // anderen. Eine laufende bleibt unberührt.
+  const kopfFehler = statusMut.error ?? stornoMut.error;
+  const raeume = (andere: typeof statusMut | typeof stornoMut) => {
+    if (!andere.isPending && andere.error != null) andere.reset();
+  };
+  const setzeStatus = (status: UhsStatus) => {
+    raeume(stornoMut);
+    statusMut.mutate(status);
+  };
+  const storniere = () => {
+    raeume(statusMut);
+    stornoMut.mutate();
+  };
+
+  // Die Route hat keinen `key`: der Umschalter behält diese Seite. Der Grund der vorigen UHS
+  // gehört nicht an die nächste. `reset` ist stabil, der Effekt läuft nur mit `uhsId`.
+  const { reset: statusReset } = statusMut;
+  const { reset: stornoReset } = stornoMut;
+  useEffect(() => {
+    statusReset();
+    stornoReset();
+  }, [uhsId, statusReset, stornoReset]);
 
   // Ungültige UHS-ID → zurück zur Liste (nach allen Hooks).
   if (!idGueltig) {
@@ -182,6 +203,18 @@ export default function UhsDetailPage() {
       }
       meta={meta}
       beschreibung={uhs.notiz ? `Notiz: ${uhs.notiz}` : undefined}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        kopfFehler != null && (
+          <SeitenHinweise
+            fehler={kopfFehler}
+            fehlerTitel={statusMut.error != null ? 'Status nicht geändert' : 'Nicht storniert'}
+            fehlerFallback={
+              statusMut.error != null ? 'Statuswechsel fehlgeschlagen' : 'Stornieren fehlgeschlagen'
+            }
+          />
+        )
+      }
       /* Datenstand im Kopf über das Primitiv — der Grundriss läuft live mit. */
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       breadcrumb={
@@ -219,7 +252,7 @@ export default function UhsDetailPage() {
             <>
               <Button
                 type="primary"
-                onClick={() => statusMut.mutate('aktiv')}
+                onClick={() => setzeStatus('aktiv')}
                 loading={statusMut.isPending}
               >
                 In Betrieb nehmen
@@ -227,7 +260,7 @@ export default function UhsDetailPage() {
               <Popconfirm
                 title="Unfallhilfsstelle stornieren?"
                 okText="Unfallhilfsstelle stornieren"
-                onConfirm={() => stornoMut.mutate()}
+                onConfirm={storniere}
                 okButtonProps={{ danger: true }}
               >
                 <Button danger>Stornieren</Button>
@@ -238,7 +271,7 @@ export default function UhsDetailPage() {
             <Popconfirm
               title="Unfallhilfsstelle auflösen?"
               okText="Unfallhilfsstelle auflösen"
-              onConfirm={() => statusMut.mutate('aufgeloest')}
+              onConfirm={() => setzeStatus('aufgeloest')}
               okButtonProps={{ danger: true }}
             >
               {/* Gesperrt mit Grund im Wort (LFH-1078), solange jemand in der UHS steht. */}
@@ -255,8 +288,11 @@ export default function UhsDetailPage() {
         // Mindest-Arbeitsfläche: unter einem langen Kopf scrollt die Seite, statt Grundriss und
         // Reiter zu überlagern. 380 px beschreiben die Fläche, keine Kopfhöhe.
         mindestHoehe: 380,
+        // `key` an der UHS, auch an den Reitern: die Route hat keinen `key`, der Umschalter behält
+        // die Seite. Gründe abgelehnter Aktionen der vorigen UHS gehören nicht an die nächste.
         inhalt: (
           <Grundriss
+            key={uhs.id}
             einsatzId={einsatzId}
             uhs={uhs}
             schreibgeschuetzt={schreibgeschuetzt}
@@ -290,13 +326,19 @@ export default function UhsDetailPage() {
       >
         {reiter === 'kraefte' ? (
           <UhsKraefte
+            key={uhs.id}
             einsatzId={einsatzId}
             uhs={uhs}
             schreibgeschuetzt={schreibgeschuetzt}
             einheitZuordnen
           />
         ) : reiter === 'material' ? (
-          <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+          <MaterialTab
+            key={uhs.id}
+            einsatzId={einsatzId}
+            uhs={uhs}
+            schreibgeschuetzt={schreibgeschuetzt}
+          />
         ) : reiter === 'bewegungen' ? (
           <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />
         ) : (

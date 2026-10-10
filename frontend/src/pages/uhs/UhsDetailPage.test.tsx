@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import UhsDetailPage from './UhsDetailPage';
@@ -11,6 +11,7 @@ import { freigabenFixture } from '../../test/fixtures';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { listePersonen } from '../../api/einsatzPerson';
 import type { Person } from '../../api/types';
+import { ApiError } from '../../api/client';
 
 // Auto-Mocks: bei ungültiger ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
 vi.mock('../../api/einsaetze');
@@ -19,7 +20,21 @@ vi.mock('../../api/einsatzUhs');
 vi.mock('../../api/einsatzPerson', () => ({ listePersonen: vi.fn(async () => []) }));
 // Kind-Komponenten gestubbt: geprüft wird die Seiten-Komposition, nicht Grundriss/Material/
 // Bewegungen.
-vi.mock('./Grundriss', () => ({ default: () => <div>GRUNDRISS</div> }));
+// Die Instanz zählt mit: ein Wechsel der UHS baut den Grundriss neu (Gründe der vorigen weg).
+vi.mock('./Grundriss', async () => {
+  const { useState } = await import('react');
+  let instanzen = 0;
+  return {
+    default: function GrundrissAttrappe() {
+      const [instanz] = useState(() => ++instanzen);
+      return (
+        <div data-testid="grundriss" data-instanz={instanz}>
+          GRUNDRISS
+        </div>
+      );
+    },
+  };
+});
 vi.mock('./MaterialTab', () => ({ default: () => <div>MATERIAL-TAB</div> }));
 vi.mock('./BewegungenTab', () => ({ default: () => <div>BEWEGUNGEN-TAB</div> }));
 vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
@@ -385,5 +400,133 @@ describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     expect(storniereUhs).not.toHaveBeenCalled();
     await userEvent.click(ok);
     await waitFor(() => expect(storniereUhs).toHaveBeenCalledWith(1, 9));
+  });
+});
+
+describe('UhsDetailPage — Ablehnung im Seitenhinweis (LFH-1077)', () => {
+  const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
+  const uhsBasis = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    typ: 'patientenablage',
+    standort: 'Halle 1',
+    notiz: null,
+  };
+  /** Der Hinweis-Slot des Seitenkopfs. */
+  const hinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
+
+  function geplant() {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'geplant' } as Awaited<
+      ReturnType<typeof ladeUhs>
+    >);
+  }
+
+  it('Status: der Grund steht im Seitenhinweis, kein Toast', async () => {
+    geplant();
+    vi.mocked(setzeUhsStatus).mockReset();
+    vi.mocked(setzeUhsStatus).mockRejectedValueOnce(new ApiError(409, 'Keine Plätze angelegt'));
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'In Betrieb nehmen' }));
+
+    const grund = await within(hinweis()!).findByRole('alert');
+    expect(grund).toHaveTextContent('Keine Plätze angelegt');
+    expect(grund).toHaveTextContent('Status nicht geändert');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('Status: das nächste Absenden räumt den Grund, solange die Antwort aussteht', async () => {
+    geplant();
+    vi.mocked(setzeUhsStatus).mockReset();
+    vi.mocked(setzeUhsStatus)
+      .mockRejectedValueOnce(new ApiError(409, 'Keine Plätze angelegt'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'In Betrieb nehmen' }));
+    await within(hinweis()!).findByRole('alert');
+    await userEvent.click(screen.getByRole('button', { name: 'In Betrieb nehmen' }));
+
+    await waitFor(() => expect(hinweis()).toBeNull());
+  });
+
+  it('Storno: der Grund steht im Seitenhinweis, „In Betrieb nehmen“ räumt ihn', async () => {
+    geplant();
+    vi.mocked(storniereUhs).mockReset();
+    vi.mocked(storniereUhs).mockRejectedValueOnce(new ApiError(409, 'UHS hat Belegungen'));
+    vi.mocked(setzeUhsStatus).mockReset();
+    vi.mocked(setzeUhsStatus).mockImplementationOnce(() => new Promise(() => {}));
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Unfallhilfsstelle stornieren' }),
+    );
+
+    const grund = await within(hinweis()!).findByRole('alert');
+    expect(grund).toHaveTextContent('UHS hat Belegungen');
+    expect(grund).toHaveTextContent('Nicht storniert');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    // Derselbe Slot, die zuletzt begonnene Handlung zählt.
+    await userEvent.click(screen.getByRole('button', { name: 'In Betrieb nehmen' }));
+    await waitFor(() => expect(hinweis()).toBeNull());
+  });
+
+  it('Wechsel zu einer anderen UHS: der Grund der vorigen bleibt nicht stehen', async () => {
+    /** Die Route hat keinen `key`: dieselbe Seite zeigt nach dem Wechsel die nächste UHS. */
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button type="button" onClick={() => void navigate('/einsaetze/1/unfallhilfsstellen/8')}>
+            Zur zweiten UHS
+          </button>
+          <button type="button" onClick={() => void navigate('/einsaetze/1/unfallhilfsstellen/9')}>
+            Zur ersten UHS
+          </button>
+        </>
+      );
+    }
+    geplant();
+    vi.mocked(ladeUhs).mockImplementation(
+      async (_einsatz, id) =>
+        ({ ...uhsBasis, id, status: 'geplant' }) as Awaited<ReturnType<typeof ladeUhs>>,
+    );
+    vi.mocked(setzeUhsStatus).mockReset();
+    vi.mocked(setzeUhsStatus).mockRejectedValueOnce(new ApiError(409, 'Keine Plätze angelegt'));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <AuthProvider>
+            <MemoryRouter initialEntries={['/einsaetze/1/unfallhilfsstellen/9']}>
+              <Wechsel />
+              <Routes>
+                <Route
+                  path="/einsaetze/:id/unfallhilfsstellen/:uhsId"
+                  element={<UhsDetailPage />}
+                />
+              </Routes>
+            </MemoryRouter>
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'In Betrieb nehmen' }));
+    await within(hinweis()!).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten UHS' }));
+    await waitFor(() => expect(vi.mocked(ladeUhs)).toHaveBeenCalledWith(1, 8));
+    await screen.findByRole('button', { name: 'In Betrieb nehmen' });
+    expect(hinweis()).toBeNull();
+
+    // Zurück zur ersten, deren Daten im Cache liegen: kein Ladezustand dazwischen. Der Grundriss
+    // (und die Reiter) tragen die UHS als `key` und werden trotzdem neu gebaut; ihre Gründe gehen.
+    const vorher = screen.getByTestId('grundriss').dataset.instanz;
+    await userEvent.click(screen.getByRole('button', { name: 'Zur ersten UHS' }));
+    await waitFor(() => expect(screen.getByTestId('grundriss').dataset.instanz).not.toBe(vorher));
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { delay, http, HttpResponse } from 'msw';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
@@ -127,5 +127,151 @@ describe('UhsKraefte', () => {
     expect(screen.getByTestId('uhs-staerke')).toHaveTextContent('0/0/0//0');
     expect(screen.queryByRole('button', { name: 'Kraft zuordnen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /abziehen/ })).toBeNull();
+  });
+});
+
+describe('UhsKraefte · Speicherfehler am Ort (LFH-1077)', () => {
+  const toasts = () => document.querySelectorAll('.ant-message-notice').length;
+  /** Der zuletzt geöffnete Dialog: rc-dialog friert schließende Dialoge in jsdom ein. */
+  const dialog = async () => {
+    await screen.findAllByRole('dialog');
+    return screen.getAllByRole('dialog').pop()!;
+  };
+
+  it('Kraft erfassen: der Grund steht im Dialog, das nächste Absenden räumt ihn, Abbrechen und Öffnen zeigen ihn nicht', async () => {
+    mitFreien();
+    let versuche = 0;
+    let frei: () => void = () => {};
+    const zweiter = new Promise<void>((r) => (frei = r));
+    server.use(
+      http.post('/api/einsaetze/1/uhs/2/kraefte', async () => {
+        versuche += 1;
+        if (versuche > 1) await zweiter;
+        return HttpResponse.json({ error: 'Name bereits an der UHS' }, { status: 409 });
+      }),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Kraft erfassen' }));
+    const d = await dialog();
+    await userEvent.type(within(d).getByRole('textbox', { name: 'Name' }), 'Dora Dienst');
+    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+
+    const grund = await within(d).findByRole('alert');
+    expect(grund).toHaveTextContent('Name bereits an der UHS');
+    expect(within(d).getByRole('textbox', { name: 'Name' })).toHaveValue('Dora Dienst');
+    expect(toasts()).toBe(0);
+
+    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(within(d).queryByRole('alert')).toBeNull());
+    // Solange die Antwort aussteht, bleibt der Dialog: Abbrechen ist gesperrt.
+    expect(within(d).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    await act(async () => frei());
+    await within(d).findByRole('alert');
+
+    await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Kraft erfassen' }));
+    expect(within(await dialog()).queryByRole('alert')).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Kraft zuordnen: der Grund steht im Dialog, kein Toast', async () => {
+    mitFreien();
+    server.use(
+      http.put('/api/einsaetze/1/uhs/2/kraefte/:kid', () =>
+        HttpResponse.json({ error: 'Kraft ist an einer anderen UHS' }, { status: 409 }),
+      ),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Kraft zuordnen' })).toBeEnabled(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Kraft zuordnen' }));
+    const d = await dialog();
+    await userEvent.click(within(d).getByRole('combobox', { name: 'Kraft' }));
+    await userEvent.click(await screen.findByText(/Clara Frei/));
+    await userEvent.click(within(d).getByRole('button', { name: 'Zuordnen' }));
+
+    const grund = await within(d).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht zugeordnet');
+    expect(grund).toHaveTextContent('Kraft ist an einer anderen UHS');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Einheit zuordnen: der Grund steht im Dialog, kein Toast', async () => {
+    mitFreien();
+    server.use(
+      http.put('/api/einsaetze/1/uhs/2/kraefte/einheit/:eid', () =>
+        HttpResponse.json({ error: 'Einheit ist aufgelöst' }, { status: 409 }),
+      ),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Einheit zuordnen' })).toBeEnabled(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Einheit zuordnen' }));
+    const d = await dialog();
+    await userEvent.click(within(d).getByRole('combobox', { name: 'Einheit' }));
+    await userEvent.click(await screen.findByText(/SEG 1 \(1 Kraft\)/));
+    await userEvent.click(within(d).getByRole('button', { name: 'Zuordnen' }));
+
+    expect(await within(d).findByRole('alert')).toHaveTextContent('Einheit ist aufgelöst');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Abziehen: zwei Zeilen nebenläufig, die späte Ablehnung der ersten steht an ihr', async () => {
+    mitFreien();
+    let lehneAb: () => void = () => {};
+    const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
+    server.use(
+      http.delete('/api/einsaetze/1/uhs/2/kraefte/:kid', async ({ params }) => {
+        if (params.kid === '11') {
+          await ersteAblehnung;
+          return HttpResponse.json({ error: 'Kraft führt die UHS' }, { status: 409 });
+        }
+        await delay('infinite');
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Anna Arzt abziehen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bernd Berg abziehen' }));
+    await act(async () => lehneAb());
+
+    const anna = screen.getByRole('row', { name: /Anna Arzt/ });
+    expect(await within(anna).findByRole('alert')).toHaveTextContent('Kraft führt die UHS');
+    expect(within(screen.getByRole('row', { name: /Bernd Berg/ })).queryByRole('alert')).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Abziehen: das nächste Abziehen an der Zeile räumt den Grund', async () => {
+    mitFreien();
+    let erster = true;
+    server.use(
+      http.delete('/api/einsaetze/1/uhs/2/kraefte/:kid', async () => {
+        if (erster) {
+          erster = false;
+          return HttpResponse.json({ error: 'Kraft führt die UHS' }, { status: 409 });
+        }
+        await delay('infinite');
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Anna Arzt abziehen' }));
+    const anna = () => screen.getByRole('row', { name: /Anna Arzt/ });
+    await within(anna()).findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: /Anna Arzt abziehen/ }));
+    await waitFor(() => expect(within(anna()).queryByRole('alert')).toBeNull());
   });
 });

@@ -1,5 +1,5 @@
 import { IconKreuz } from '../icons';
-import { Alert, App, Breadcrumb, Button, type InputRef } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -60,10 +60,10 @@ import {
   personErfassungsQuittungEntfernen,
   personErfassungsQuittungenLaden,
 } from '../offline/queue';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
-import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -203,8 +203,6 @@ export default function PersonenPage() {
   const [dokumentSichtbar, setDokumentSichtbar] = useState(
     () => typeof document === 'undefined' || document.visibilityState === 'visible',
   );
-  const aktuellerEinsatzRef = useRef(einsatzId);
-  aktuellerEinsatzRef.current = einsatzId;
   const quittungKontextRef = useRef({ benutzerId: benutzer?.id, einsatzId });
   quittungKontextRef.current = { benutzerId: benutzer?.id, einsatzId };
   const quittungLadeFolge = useRef(0);
@@ -229,13 +227,22 @@ export default function PersonenPage() {
   };
   /** `null` = kein Abgleich-Dialog offen. Trägt die vermisste Person, zu der gesucht wird. */
   const [abgleichFuer, setAbgleichFuer] = useState<Person | null>(null);
+  /*
+   * Ablehnungen stehen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
+   * Die Anlage teilt sich Maske und Zeile, der Abgleich-Vorschlag Spalte und Dialog; jeder Weg
+   * merkt seinen Grund selbst, aus `onMutate`/`onError`: die Mutation verfolgt nur den letzten
+   * Aufruf. Die Erfassungszeile nimmt ihren Grund aus der abgelehnten Zusage.
+   */
+  const [maskeFehler, setMaskeFehler] = useState<{ einsatzId: number; fehler: unknown } | null>(
+    null,
+  );
+  const abgleichZeilen = useZeilenFehler<number>();
+  const [abgleichDialogFehler, setAbgleichDialogFehler] = useState<unknown>(null);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = useFehlerMeldung();
-
   const anlegenMutation = useMutation({
     // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
     // (LFH-705, design.md D6).
@@ -254,6 +261,7 @@ export default function PersonenPage() {
       });
     },
     onMutate: async (v) => {
+      if (v.quelle === 'maske') setMaskeFehler(null);
       await qc.cancelQueries({ queryKey: einsatzKeys.personen(v.einsatzId) });
     },
     // Geschlossen wird über `onFertig` des Erfassungs-Primitivs: im Serienmodus ist ein
@@ -313,10 +321,10 @@ export default function PersonenPage() {
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(zielEinsatzId) });
     },
     onError: (e, variablen) => {
-      // Die Zeile zeigt 400/422 mit dem Wortlaut des Servers an sich selbst (role=alert); ein Toast
-      // daneben wäre dieselbe Meldung zweimal.
-      if (variablen.quelle === 'zeile') return;
-      if (aktuellerEinsatzRef.current === variablen.einsatzId) fehler(e);
+      // Die Zeile zeigt 400/422 mit dem Wortlaut des Servers an sich selbst (role=alert); die
+      // Maske im Dialog, nur in ihrem Einsatz.
+      if (variablen.quelle === 'maske')
+        setMaskeFehler({ einsatzId: variablen.einsatzId, fehler: e });
     },
   });
 
@@ -522,16 +530,36 @@ export default function PersonenPage() {
   const csvExport = useCsvExport(einsatzId, 'personen', ladePersonenExport);
 
   const abgleichVorschlagMutation = useMutation({
-    mutationFn: (v: { vermisstId: number; gefundenId: number }) =>
+    mutationFn: (v: { vermisstId: number; gefundenId: number; quelle: 'zeile' | 'dialog' }) =>
       schlageAbgleichVor(einsatzId, v.vermisstId, v.gefundenId),
-    onSuccess: () => {
+    onMutate: (v) => {
+      if (v.quelle === 'zeile') abgleichZeilen.beginne(v.vermisstId);
+      else setAbgleichDialogFehler(null);
+    },
+    // Der Dialog schließt erst hier (design.md D3), und nur auf seinen eigenen Vorschlag: ein
+    // Zeilenvorschlag, der während des offenen Dialogs ankommt, schlösse ihn sonst mit.
+    onSuccess: (_abgleich, v) => {
       invalidate();
-      setAbgleichFuer(null);
+      if (v.quelle === 'dialog') setAbgleichFuer(null);
       message.success('Verdachts-Abgleich angelegt');
     },
-    onError: fehler,
+    onError: (e, v) => {
+      if (v.quelle === 'zeile') abgleichZeilen.melde(v.vermisstId, e, 'Vorschlagen fehlgeschlagen');
+      else setAbgleichDialogFehler(e);
+    },
   });
   const abgleichVorschlagen = abgleichVorschlagMutation.mutate;
+  // Die Gründe der Zeilen gehören zum Einsatz: das Layout keyt sein `Outlet` nicht, ein Wechsel
+  // behält diese Seite. `leere` ist stabil, der Effekt läuft mit dem Einsatz.
+  const { leere: leereAbgleichZeilen } = abgleichZeilen;
+  useEffect(() => {
+    leereAbgleichZeilen();
+  }, [einsatzId, leereAbgleichZeilen]);
+  /** Öffnen und Abbrechen räumen den Grund einer früheren Ablehnung im Dialog. */
+  const oeffneAbgleich = useCallback((p: Person | null) => {
+    setAbgleichDialogFehler(null);
+    setAbgleichFuer(p);
+  }, []);
 
   /**
    * Spalten und Kartenplan GEMERKT (LFH-949, D4): `Datensicht` rendert eine Zelle nur bei
@@ -564,7 +592,7 @@ export default function PersonenPage() {
         ...register,
         ...(darfAbgleichenListe
           ? abgleichSpalten(gefundeneListe, (vermisstId, gefundenId) =>
-              abgleichVorschlagen({ vermisstId, gefundenId }),
+              abgleichVorschlagen({ vermisstId, gefundenId, quelle: 'zeile' }),
             )
           : []),
       ]),
@@ -577,10 +605,10 @@ export default function PersonenPage() {
       // Der Kartenzweig trägt das Auswahlfeld der Abgleichspalte nicht (200 px fest) —
       // der Deskriptor ersetzt es durch Knopf plus Dialog.
       aktion: darfAbgleichenListe
-        ? { etikett: 'Abgleich vorschlagen …', onKlick: (p: Person) => setAbgleichFuer(p) }
+        ? { etikett: 'Abgleich vorschlagen …', onKlick: (p: Person) => oeffneAbgleich(p) }
         : undefined,
     }),
-    [einsatzId, darfAbgleichenListe],
+    [einsatzId, darfAbgleichenListe, oeffneAbgleich],
   );
 
   /**
@@ -616,12 +644,36 @@ export default function PersonenPage() {
   const listeGescheitert = personenQuery.isError && alle.length === 0;
   const standVeraltet = personenQuery.isError && alle.length > 0;
   const zeilen = filterPersonen(alle, sicht);
+  /*
+   * Der Grund eines abgelehnten Vorschlags steht an der Zeile, solange sie mit der Abgleichspalte
+   * dasteht; ist sie weggefiltert oder die Ansicht gewechselt, im Seitenhinweis.
+   */
+  const abgleichSpalteDa = darfAbgleichenListe && sicht.ansicht === 'zeilen';
+  const abgleichFort = abgleichZeilen
+    .gemeldet()
+    .filter((id) => !abgleichSpalteDa || !zeilen.some((p) => p.id === id))
+    .map((id) => {
+      const nr = alle.find((p) => p.id === id)?.registrier_nr;
+      return {
+        id,
+        titel:
+          nr != null
+            ? `Abgleich für ${registrierAnzeige(nr)} nicht vorgeschlagen`
+            : 'Abgleich nicht vorgeschlagen',
+        ...abgleichZeilen.grund(id),
+      };
+    });
   const uhsNamen = new Map(uhsListe.map((u) => [u.id, u.bezeichnung]));
   const uhsName = (id: number) => uhsNamen.get(id);
 
   /** Eine Klasse für beide Zweige: Hervorhebung vor Lückentönung. */
   const zeilenKlasse = (p: Person) =>
     p.id === highlightPersonId ? 'zeile-hervorgehoben' : hatLuecke(p) ? 'zeile-luecke' : undefined;
+
+  const maskeLaeuft =
+    anlegenMutation.isPending &&
+    anlegenMutation.variables?.einsatzId === einsatzId &&
+    anlegenMutation.variables?.quelle === 'maske';
 
   const leerText = sicht.nurLuecken
     ? 'Keine Datensätze mit offenen Feldern in dieser Sicht.'
@@ -715,14 +767,19 @@ export default function PersonenPage() {
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (nurAnsicht || csvExport.fehler != null) && (
-          <SeitenHinweise
-            rechteText={EINSATZ_ABGESCHLOSSEN}
-            rechteFehlt={nurAnsicht}
-            fehler={csvExport.fehler}
-            fehlerTitel="Export fehlgeschlagen"
-            fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
-          />
+        (nurAnsicht || csvExport.fehler != null || abgleichFort.length > 0) && (
+          <Flex vertical gap={token.marginSM}>
+            <SeitenHinweise
+              rechteText={EINSATZ_ABGESCHLOSSEN}
+              rechteFehlt={nurAnsicht}
+              fehler={csvExport.fehler}
+              fehlerTitel="Export fehlgeschlagen"
+              fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
+            />
+            {abgleichFort.map((g) => (
+              <SpeicherFehler key={g.id} fehler={g.fehler} titel={g.titel} fallback={g.fallback} />
+            ))}
+          </Flex>
         )
       }
     >
@@ -885,6 +942,7 @@ export default function PersonenPage() {
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
                 karte={listenKarte}
+                zeilenFehler={abgleichSpalteDa ? (p) => abgleichZeilen.grund(p.id) : undefined}
               />
             )}
           </div>
@@ -910,11 +968,19 @@ export default function PersonenPage() {
       <AbgleichVorschlagModal
         vermisst={abgleichFuer}
         gefundene={gefundene}
-        isPending={abgleichVorschlagMutation.isPending}
-        onCancel={() => setAbgleichFuer(null)}
+        isPending={
+          abgleichVorschlagMutation.isPending &&
+          abgleichVorschlagMutation.variables?.quelle === 'dialog'
+        }
+        fehler={abgleichDialogFehler}
+        onCancel={() => oeffneAbgleich(null)}
         onFinish={(gefundenId) =>
           abgleichFuer &&
-          abgleichVorschlagMutation.mutate({ vermisstId: abgleichFuer.id, gefundenId })
+          abgleichVorschlagMutation.mutate({
+            vermisstId: abgleichFuer.id,
+            gefundenId,
+            quelle: 'dialog',
+          })
         }
       />
 
@@ -922,15 +988,16 @@ export default function PersonenPage() {
         key={einsatzId}
         einsatzId={einsatzId}
         modus={modus}
-        isPending={
-          anlegenMutation.isPending &&
-          anlegenMutation.variables?.einsatzId === einsatzId &&
-          anlegenMutation.variables?.quelle === 'maske'
-        }
+        isPending={maskeLaeuft}
+        speicherung={{
+          error: maskeFehler?.einsatzId === einsatzId ? maskeFehler.fehler : null,
+          isPending: maskeLaeuft,
+          reset: () => setMaskeFehler(null),
+        }}
         onCancel={() => setModusFuer(einsatzId, null)}
         onFertig={() => setModusFuer(einsatzId, null)}
         // `mutateAsync`, nicht `mutate`: die Hülle darf die Felder nur leeren, wenn der Datensatz
-        // ankam. Den Fehler-Toast wirft `onError`.
+        // ankam. Den Grund nennt sie im Dialog (`speicherung`).
         onErfassen={(daten) => {
           if (!benutzer) return Promise.reject(new Error('Nicht angemeldet'));
           return anlegenMutation.mutateAsync({
