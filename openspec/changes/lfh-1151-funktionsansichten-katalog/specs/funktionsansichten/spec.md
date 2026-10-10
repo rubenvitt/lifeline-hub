@@ -57,8 +57,8 @@ Einsatzabschnitt“, „Ansicht Verpflegung“).
 | `personen`: Export, Druck, Abgleich, Anhänge | — | — | — |
 | `material`: Material der eigenen UHS | — | L | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | — | L/S | — |
-| Lagemonitor-Lagebild (verdichtete Zahlen, Kartenpunkte ohne Personenbezug) | — | — | L |
-| `lagekarte`, `gefahrenzonen`, `einsatzabschnitte` über ihre eigenen Routen | — | — | — |
+| Lagemonitor-Lagebild (verdichtete Zahlen) | — | — | L |
+| `lagekarte`, `gefahrenzonen`, `einsatzabschnitte` ohne personenbezogene Ebenen | — | — | L |
 | alle übrigen Module, Einstellungen, Verwaltung | — | — | — |
 
 Der Lagemonitor MUST NOT schreiben dürfen, in keinem Modul.
@@ -91,11 +91,6 @@ Der Lagemonitor MUST NOT schreiben dürfen, in keinem Modul.
 #### Scenario: Lagemonitor liest keine Personen
 
 - **WHEN** ein Lagemonitor die Personenliste oder eine UHS-Detailseite abruft
-- **THEN** antwortet der Server mit 403
-
-#### Scenario: Lagemonitor liest Zonen nur im Lagebild
-
-- **WHEN** ein Lagemonitor die Zonen oder die Einsatzabschnitte seines Einsatzes über deren eigene Routen abruft
 - **THEN** antwortet der Server mit 403
 
 ### Requirement: Stellenbindung

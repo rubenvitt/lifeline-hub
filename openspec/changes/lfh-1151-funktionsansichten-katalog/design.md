@@ -44,9 +44,18 @@ Einsatzabschnitt, keine). Die Rechte stehen in Matrix bzw. Einzelanforderung. Da
 Die neuen Szenarien übernehmen die Codes aus den Tests (404 für Fremdes, 403 für Verbotenes),
 auch wo sie von der älteren Matrix abweichen sollten. Die Spec rät nicht.
 
+**D4 — Eine Ausnahme: der Lagemonitor bleibt beim Soll.**
+Die Matrix gibt dem Lagemonitor Leserecht auf Lagekarte, Gefahrenzonen und Abschnitte ohne
+personenbezogene Ebenen. Der Code liefert ihm nur sein verdichtetes Lagebild; `/zonen` und
+`/abschnitte` sind für ihn 403. Entscheidung Ruben (10.10.2026, Freigabe dieser Change): der Code
+wird nachgezogen (LFH-1296), die Zeile bleibt unverändert stehen. Verworfen: die Zeile auf den
+Ist-Stand senken; damit verlöre die Anforderung ihr Ziel.
+
 ## Risks / Trade-offs
 
 - [Ein nachgetragener Satz beschreibt Wunsch statt Ist] → je Szenario den Test nennen, der ihn
   belegt (`tasks.md`), und vor dem Archiv gegen den Code gegenlesen.
+- [Bis LFH-1296 weicht der Lagemonitor von seiner Zeile ab] → der Task nennt Zeile, Code und
+  Akzeptanzkriterien; die Abweichung ist bekannt, nicht übersehen.
 - [Die Matrix-Einleitung wird missverstanden, als gälte sie für alle Ansichten] → der
   geänderte Einleitungssatz grenzt sie ausdrücklich auf die drei LFH-892-Ansichten ein.

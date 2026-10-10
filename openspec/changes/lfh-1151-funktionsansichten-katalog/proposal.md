@@ -15,7 +15,9 @@ Aufgefallen beim Nachklicken für die Anwenderdoku (LFH-1127, Befund in LFH-1151
   samt Stellenbindung je Ansicht. Das Beispiel für einen unbekannten Wert ist ein Wert, den es
   nicht gibt.
 - **Scope-Matrix:** Die Einleitung sagt, dass die Tabelle die drei Ansichten aus LFH-892 regelt
-  und die übrigen je eine eigene Anforderung haben. Die Tabelle selbst bleibt.
+  und die übrigen je eine eigene Anforderung haben. Die Tabelle bekommt die Zeile für die
+  Kräfte der eigenen UHS am Laptop (LFH-1045). Die Lagemonitor-Zeile bleibt das Soll; der Code
+  zieht in LFH-1296 nach.
 - **Stellenbindung:** Die Anforderung bleibt für die UHS-Ansichten wörtlich; ein Satz verweist
   für die übrigen Stellenarten auf deren Anforderungen.
 - **Neu: Ansicht Betreuungsstelle** (LFH-1041) mit Rechtetabelle und Szenarien, im Stil der

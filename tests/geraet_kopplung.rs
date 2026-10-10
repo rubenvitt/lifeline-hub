@@ -297,8 +297,8 @@ async fn stelle_id_bindet_wie_uhs_id() {
 }
 
 /// Wird der Abschnitt eines Abschnittsgeräts aufgelöst, endet die Kopplung wie bei einem
-/// Widerruf: die nächste Anfrage ist 401, das ETB nennt das Gerät. Die Ansicht ist noch nicht
-/// koppelbar; die Kopplung entsteht deshalb direkt im Repository.
+/// Widerruf: die nächste Anfrage ist 401, das ETB nennt das Gerät. Die Kopplung entsteht direkt
+/// im Repository; der Weg über Kopplungscode und Einlösen ist hier nicht Gegenstand.
 #[tokio::test]
 async fn aufgeloester_abschnitt_beendet_seine_kopplung() {
     use lifeline_hub::geraet::repo::{self, NeueKopplung};
