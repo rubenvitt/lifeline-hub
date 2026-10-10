@@ -80,9 +80,18 @@ describe('GefahrenMatrixAuszug (LFH-664, Entscheidung 5a)', () => {
   });
 
   it('sagt „Keine Gefahren bewertet." statt einer leeren Tabelle', () => {
-    renderMitProviders(<GefahrenMatrixAuszug matrix={[bewertung({ warnstufe: 'keine' })]} />);
+    renderMitProviders(<GefahrenMatrixAuszug matrix={[]} />);
 
     expect(screen.getByText('Keine Gefahren bewertet.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('nennt nur „Keine" vergebene Stufen nicht „nicht bewertet" (LFH-1153)', () => {
+    // „Keine" ist eine Bewertung (LFH-969): der Satz darf sie nicht als Lücke ausgeben.
+    renderMitProviders(<GefahrenMatrixAuszug matrix={[bewertung({ warnstufe: 'keine' })]} />);
+
+    expect(screen.getByText('Keine Gefahr über Stufe „Keine“ bewertet.')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Gefahren bewertet.')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 

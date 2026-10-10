@@ -5991,7 +5991,7 @@
       },
       "GefahrBewertungAnzeige": {
         "type": "object",
-        "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit\n`warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.",
+        "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,\nauch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt\neine Zelle ohne Eintrag als „nicht bewertet\".",
         "required": [
           "id",
           "gefahrengebiet_id",

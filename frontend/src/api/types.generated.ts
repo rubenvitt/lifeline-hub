@@ -2253,8 +2253,9 @@ export interface components {
          */
         Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
         /**
-         * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
-         *     `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
+         * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
+         *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
+         *     eine Zelle ohne Eintrag als „nicht bewertet".
          */
         GefahrBewertungAnzeige: {
             /** Format: int64 */
