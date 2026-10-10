@@ -470,11 +470,13 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
 
   zeilen.push('## Lagebild gesamt');
   zeilen.push('');
-  zeilen.push(`**Gesamtstärke (F/UF/M//Ges):** ${staerkeText(v.staerke)}`);
+  // Als Liste: Markdown kennt keinen harten Umbruch, Zeilen ohne Leerzeile liefen in der Anzeige
+  // zu einem Absatz zusammen (LFH-1153).
+  zeilen.push(`- **Gesamtstärke (F/UF/M//Ges):** ${staerkeText(v.staerke)}`);
   zeilen.push(
-    `**Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, n.v.: ${v.fahrzeugStatus.nicht_verfuegbar})`,
+    `- **Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, n.v.: ${v.fahrzeugStatus.nicht_verfuegbar})`,
   );
-  zeilen.push(`**Material (Positionen):** ${v.anzahlMaterialPositionen}`);
+  let material = `- **Material (Positionen):** ${v.anzahlMaterialPositionen}`;
   if (v.anzahlMaterialPositionen > 0) {
     const matTeile: string[] = [];
     if (v.materialStatus.einsatzbereit > 0)
@@ -486,8 +488,9 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
       matTeile.push(`verbraucht: ${v.materialStatus.verbraucht}`);
     if (v.materialStatus.desinfektion_noetig > 0)
       matTeile.push(`Desinfektion nötig: ${v.materialStatus.desinfektion_noetig}`);
-    if (matTeile.length > 0) zeilen.push(`  (${matTeile.join(', ')})`);
+    if (matTeile.length > 0) material += ` (${matTeile.join(', ')})`;
   }
+  zeilen.push(material);
   zeilen.push('');
 
   if (bild.baum.length > 0) {
