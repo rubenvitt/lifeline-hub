@@ -25,8 +25,9 @@ fn pool_merken(pool: &sqlx::SqlitePool) {
 /// Hebt den Änderungszwang eines per `POST /api/benutzer` angelegten Kontos auf (LFH-1121): Die
 /// Anlage stellt jedes Konto unter Zwang, sein erster Passwort-Login führte sonst in den Schritt
 /// „Neues Passwort festlegen“. Direkt in der Datenbank statt über den Wechsel per API, damit kein
-/// Test eine zusätzliche Sitzung oder Audit-Zeile sieht (Design D8 von
-/// `lfh-1121-einmalpasswort`). Wirkt auf den Pool des zuletzt aufgebauten Routers.
+/// Test eine zusätzliche Sitzung oder Audit-Zeile sieht (Design D8 in
+/// `openspec/changes/archive/2026-10-10-lfh-1121-einmalpasswort/design.md`). Wirkt auf den Pool
+/// des zuletzt aufgebauten Routers.
 pub async fn zwang_aufheben(benutzername: &str) {
     let pool = TEST_POOL
         .with(|p| p.borrow().clone())

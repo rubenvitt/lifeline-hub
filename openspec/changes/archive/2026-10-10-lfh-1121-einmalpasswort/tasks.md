@@ -124,16 +124,16 @@ höchsten auf `origin/alpha`.
 
 ## 6. Anwenderdoku (Mitänderungsregel)
 
-- [ ] 6.1 `docs/anwender/kapitel/anmelden-abmelden.md`: Der Abschnitt „Erste Anmeldung und
+- [x] 6.1 `docs/anwender/kapitel/anmelden-abmelden.md`: Der Abschnitt „Erste Anmeldung und
       vergessenes Passwort“ beschreibt Einmalpasswort und Wechselschritt, und die Liste der
       Sitzungsenden bekommt „Administration vergibt ein Einmalpasswort“. Das Bild des neuen Schritts
       kommt per `anmelden-abmelden.bilder.ts`. Prüfung: `hilfe/anwenderdoku.guard.test.ts` ist grün,
       und `pnpm doku:bilder --grep anmelden-abmelden` erzeugt das Bild.
-- [ ] 6.2 `docs/anwender/kapitel/benutzer.md`: Die Anlage nennt den Wechsel bei der ersten Anmeldung,
+- [x] 6.2 `docs/anwender/kapitel/benutzer.md`: Die Anlage nennt den Wechsel bei der ersten Anmeldung,
       die neue Handlungsfolge „Einmalpasswort vergeben“ kommt dazu, und der Abschnitt „Passwort und
       zweiter Faktor“ wird berichtigt. Bilder per `benutzer.bilder.ts` (Bearbeiten-Dialog), Prüfung
       wie in 6.1.
-- [ ] 6.3 `docs/anwender/kapitel/zugangsprotokoll.md`: Die Liste der Admin-Aktionen bekommt
+- [x] 6.3 `docs/anwender/kapitel/zugangsprotokoll.md`: Die Liste der Admin-Aktionen bekommt
       „Einmalpasswort vergeben“. Prüfung: Der Guard ist grün.
 
 ## 7. Abschluss
@@ -142,8 +142,13 @@ höchsten auf `origin/alpha`.
       `totp_reset` und die Oberfläche für den TOTP-Reset. Prüfung: Die Ticketnummern stehen in der
       PR-Beschreibung. Beide gibt es schon: LFH-1123 (Org-Prüfung der Benutzerverwaltung, im Review)
       und LFH-1122 (TOTP-Reset bedienbar, in Arbeit).
-- [ ] 7.2 `./scripts/check-all.sh` grün, lokal oder ersatzweise in der CI des PRs. Prüfung: Exit 0
-      bzw. ein grüner CI-Lauf.
+- [x] 7.2 `./scripts/check-all.sh` grün, lokal oder ersatzweise in der CI des PRs. Prüfung: Exit 0
+      bzw. ein grüner CI-Lauf. Lokal (10.10.2026): Bündel `schnell` grün bis auf die Typ-Drift vor
+      dem Commit der generierten Dateien. Die Rust-Suite lief komplett grün (ohne Debug-Info, wegen
+      des Plattenkontingents der Sitzung), nach den Review-Fixes die betroffenen Suiten erneut.
+      Vitest lief komplett, die drei damals roten Fälle (fehlende Bilder, Antworttyp-Wächter) sind
+      danach grün. e2e lokal nur die betroffenen Specs (Chromium der Sitzung). Den vollen Lauf
+      belegt die CI des PRs.
 
 ## Workflow follow-up
 

@@ -44,7 +44,7 @@ im 5-min-Takt.
 
 ## Einmalpasswort mit Änderungszwang (LFH-1121)
 
-Herleitung: `openspec/changes/lfh-1121-einmalpasswort/design.md`, Spec `konto-einmalpasswort`.
+Herleitung: `openspec/changes/archive/2026-10-10-lfh-1121-einmalpasswort/design.md`, Spec `konto-einmalpasswort`.
 
 - **Vor dem Festlegen gibt es keine Sitzung:** ein Passwort-Login (und `totp/finish`) auf ein Konto
   unter `passwort_wechsel_pflicht` liefert `{passwort_wechsel_erforderlich: true}` und nur das
