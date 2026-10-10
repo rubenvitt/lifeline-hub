@@ -1,4 +1,4 @@
-import { Modal, Spin, Tabs, Typography, theme } from 'antd';
+import { Alert, Modal, Spin, Tabs, Typography, theme } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
@@ -101,6 +101,8 @@ export default function EtbEntwurfsTabs({
     aktiverId,
     neuerEntwurf,
     entwurfSchliessen,
+    schliessFehler,
+    schliessFehlerVerwerfen,
     entwurfAktualisieren,
     entwurfFesthalten,
     entwurfNeuAusweisen,
@@ -244,12 +246,9 @@ export default function EtbEntwurfsTabs({
             // Nur ein NEUER Folgeentwurf erhält die Übernahme. Ein bestehender Entwurf
             // bleibt auch mit bewusst leerem An maßgeblich (LFH-461).
             // Der Eintrag steht schon: scheitert nur das Räumen des Entwurfs (Plattenfehler), ist
-            // das kein Sendefehler und darf an der Erfassung nicht als Ablehnung erscheinen.
-            try {
-              await entwurfSchliessen(e.id, naechsteMetadaten);
-            } catch (fehler) {
-              console.warn('ETB-Entwürfe: Entwurf ließ sich nach dem Senden nicht räumen', fehler);
-            }
+            // das kein Sendefehler. `entwurfSchliessen` wirft dann nicht, der Grund steht an der
+            // Leiste statt als Ablehnung an der Erfassung (LFH-1139).
+            await entwurfSchliessen(e.id, naechsteMetadaten);
           }}
           berichtigungZu={null}
           onBerichtigungAbbrechen={() => {}}
@@ -285,6 +284,19 @@ export default function EtbEntwurfsTabs({
 
   return (
     <>
+      {schliessFehler != null && (
+        // Der Reiter ist schon zu, der Ort des Grundes kommt nie wieder: deshalb schließbar
+        // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1139).
+        <Alert
+          type="error"
+          showIcon
+          closable={{ 'aria-label': 'Hinweis schließen' }}
+          onClose={schliessFehlerVerwerfen}
+          title="Entwurf nicht aus dem Gerätespeicher entfernt"
+          description="Der Reiter ist geschlossen. Taucht der Entwurf nach dem Neuladen wieder auf, lässt er sich erneut verwerfen."
+          style={{ marginBlockEnd: token.marginXS }}
+        />
+      )}
       <Tabs
         type="editable-card"
         locale={REITER_TEXTE}

@@ -41,6 +41,8 @@ function leererEntwurf(
 export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
   const [entwuerfe, setEntwuerfe] = useState<EtbEntwurf[]>([]);
   const [aktiverId, setAktiverId] = useState<string | null>(null);
+  /** Grund, aus dem das letzte Schließen den Entwurf nicht aus dem Gerätespeicher bekam (LFH-1139). */
+  const [schliessFehler, setSchliessFehler] = useState<unknown>(null);
   const initialisiert = useRef(false);
   // Spiegel des aktuellen State, damit Callbacks den Bestand lesen können, ohne ihn im
   // setEntwuerfe-Updater zu berechnen (der bliebe sonst seiteneffektbehaftet). Render-Phase-
@@ -153,7 +155,17 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
   const entwurfSchliessen = useCallback(
     async (id: string, metadaten: MetadatenWerte = {}) => {
       if (benutzerId === null) return;
-      await entwurfEntfernen(id);
+      setSchliessFehler(null);
+      // Scheitert das Entfernen, schließt der Reiter trotzdem (LFH-1139): `entwurfEntfernen` hat
+      // den Auftrag vor dem ersten `await` im Vorlauf vermerkt, `entwuerfeLaden` holt ihn beim
+      // nächsten Laden nach (LFH-521). Ein offen gebliebener Reiter zeigte dagegen einen Entwurf,
+      // den die Person verworfen oder schon gesendet hat. Der Grund steht an der Entwurfsleiste;
+      // gefangen wird hier, weil die Aufrufer mit `void` rufen.
+      try {
+        await entwurfEntfernen(id);
+      } catch (fehler) {
+        setSchliessFehler(fehler);
+      }
       // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode laufen
       // Updater doppelt, eine darin erzeugte randomUUID divergierte zwischen entwuerfe und
       // aktiverId (LFH-214). Beide Setter bleiben FUNKTIONAL (lesen den frisch committeten State)
@@ -177,11 +189,15 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
     [benutzerId, einsatzId],
   );
 
+  const schliessFehlerVerwerfen = useCallback(() => setSchliessFehler(null), []);
+
   return {
     entwuerfe,
     aktiverId,
     neuerEntwurf,
     entwurfSchliessen,
+    schliessFehler,
+    schliessFehlerVerwerfen,
     entwurfAktualisieren,
     entwurfFesthalten,
     entwurfNeuAusweisen,

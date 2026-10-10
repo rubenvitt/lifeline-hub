@@ -125,6 +125,40 @@ describe('useEtbEntwuerfe', () => {
     expect(result.current.entwuerfe[0].inhalt).toBe('');
   });
 
+  it('LFH-1139: scheitert das Entfernen, schließt der Reiter trotzdem und hält den Grund', async () => {
+    await entwurfSpeichern(entwurf({ id: 'A', inhalt: 'A' }));
+    await entwurfSpeichern(entwurf({ id: 'B', inhalt: 'B' }));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(2));
+    const grund = new Error('Speicher gesperrt');
+    vi.spyOn(entwurfStore, 'entwurfEntfernen').mockRejectedValueOnce(grund);
+
+    // Verwirft ohne Ablehnung: der Aufrufer ruft mit `void`, ein Wurf bliebe unbehandelt.
+    await act(async () => {
+      await expect(result.current.entwurfSchliessen('B')).resolves.toBeUndefined();
+    });
+    expect(result.current.entwuerfe.map((e) => e.id)).toEqual(['A']);
+    expect(result.current.schliessFehler).toBe(grund);
+
+    // Das nächste Schließen räumt den Grund.
+    await act(async () => {
+      await result.current.entwurfSchliessen('A');
+    });
+    expect(result.current.schliessFehler).toBeNull();
+  });
+
+  it('LFH-1139: der Grund lässt sich verwerfen', async () => {
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    vi.spyOn(entwurfStore, 'entwurfEntfernen').mockRejectedValueOnce(new Error('voll'));
+    await act(async () => {
+      await result.current.entwurfSchliessen(result.current.entwuerfe[0].id);
+    });
+    expect(result.current.schliessFehler).not.toBeNull();
+    act(() => result.current.schliessFehlerVerwerfen());
+    expect(result.current.schliessFehler).toBeNull();
+  });
+
   it('persistiert unter StrictMode nur einmal — keine idb-Writes im setEntwuerfe-Updater (LFH-216)', async () => {
     const speichernSpy = vi.spyOn(entwurfStore, 'entwurfSpeichern');
     const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7), { wrapper: StrictMode });
