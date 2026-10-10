@@ -100,6 +100,22 @@
   font-size: 9pt;
 }
 
+/* Bildschirmfotos der Kapitel (LFH-1128): Breite aus `.markdown img` (nie breiter als die
+   Lesespalte), dazu ein Rahmen, weil das helle Foto sonst auf hellem Grund zerfließt; Radius 0
+   wie die übrige App. Ohne Netz und ohne Cache zeigt der Browser den Alt-Text an seiner Stelle.
+   Im Druck gelten Breite und Umbruch aus `druck/druck.css` (Bilder in der Druckwurzel). */
+.hilfe-bild {
+  display: block;
+  margin: 8px 0;
+  border: 1px solid var(--lfh-linie);
+  border-radius: 0;
+}
+
+.hilfe-bild--fehlt {
+  padding: 8px;
+  color: var(--lfh-text-2);
+}
+
 @media print {
   .hilfe-kapitel + .hilfe-kapitel {
     margin-top: 0;

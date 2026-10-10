@@ -37,5 +37,6 @@ Erkennen direkt dorthin.
 - [ ] `./scripts/check-all.sh` grün
 - [ ] Bei Backend-Typänderungen: `openapi.json` + `types.generated.ts` mitcommittet
 - [ ] Bei neuer/umgebauter Seite: Prüfliste Einsatztauglichkeit ausgefüllt (15 Kriterien)
-- [ ] Anwenderdoku (`docs/anwender/`) nachgezogen oder nicht betroffen (Mitänderungsregel in
-      `docs/anwender/AGENTS.md`)
+- [ ] Anwenderdoku (`docs/anwender/`) nachgezogen oder nicht betroffen, Bilder neu erzeugt
+      (`pnpm doku:bilder --grep <kapitel>`) oder keine fotografierte Ansicht geändert
+      (Mitänderungsregel in `docs/anwender/AGENTS.md`)

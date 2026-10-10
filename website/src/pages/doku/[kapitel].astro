@@ -7,7 +7,15 @@
  * rendert Markdown mit Sätteri, Remark-Plugins bräuchten ein weiteres Paket. `set:html` ist
  * sicher, weil die Kapitel kein HTML enthalten dürfen (Wächter
  * `frontend/src/hilfe/anwenderdoku.guard.test.ts`) und aus dem Repo stammen.
+ *
+ * Bilder (LFH-1128): Ein Kapitel zeigt `![Alt](../bilder/<kapitel>/<name>.png)` aus
+ * `docs/anwender/bilder/`. Die Content-Collection erkennt sie und gibt sie über die Bildpipeline
+ * aus (`/_astro/<name>.<hash>.png`, dieselbe Datei). Im gerenderten HTML steht dafür nur ein
+ * Platzhalter, den erst `<Content />` auflöst; weil diese Seite das HTML für die Kapitel-Links
+ * umschreibt, setzt sie das Bild hier selbst ein, mit Adresse und Maßen aus demselben Glob. Ein
+ * Bild, das es nicht gibt, bricht den Build.
  */
+import type { ImageMetadata } from 'astro';
 import { getCollection } from 'astro:content';
 import Grundriss from '../../layouts/Grundriss.astro';
 import { GRUPPEN } from '../../daten/gruppen';
@@ -20,11 +28,34 @@ export async function getStaticPaths() {
   return kapitel.map((eintrag) => ({ params: { kapitel: eintrag.id }, props: { eintrag, kapitel } }));
 }
 
-const { eintrag, kapitel } = Astro.props;
-const html = (eintrag.rendered?.html ?? '').replace(
-  /href="([a-z0-9-]+)\.md"/g,
-  (_m, name: string) => `href="/doku/${name}/"`,
+const BILDER = import.meta.glob<{ default: ImageMetadata }>(
+  '../../../../docs/anwender/bilder/**/*.png',
+  { eager: true },
 );
+
+const entschluesselt = (text: string) =>
+  text
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+const attribut = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+/** Ersetzt den Bild-Platzhalter der Content-Collection durch das fertige `<img>`. */
+function bild(platzhalter: string): string {
+  const { alt, src } = JSON.parse(entschluesselt(platzhalter)) as { alt: string; src: string };
+  const datei = BILDER[`../../../../docs/anwender/bilder/${src.replace(/^\.\.\/bilder\//, '')}`];
+  if (!datei) throw new Error(`Bild ${src} fehlt unter docs/anwender/bilder/`);
+  const { src: adresse, width, height } = datei.default;
+  return `<img src="${adresse}" width="${width}" height="${height}" alt="${attribut(alt)}" loading="lazy" decoding="async">`;
+}
+
+const { eintrag, kapitel } = Astro.props;
+const html = (eintrag.rendered?.html ?? '')
+  .replace(/href="([a-z0-9-]+)\.md"/g, (_m, name: string) => `href="/doku/${name}/"`)
+  .replace(/<img __ASTRO_IMAGE_="([^"]*)">/g, (_m, platzhalter: string) => bild(platzhalter));
 const gruppen = GRUPPEN.filter((g) => eintrag.data.gruppen.includes(g.key)).map((g) => g.name);
 ---
 

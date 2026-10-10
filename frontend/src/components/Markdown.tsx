@@ -4,9 +4,11 @@ import {
   useContext,
   useMemo,
   type ComponentPropsWithoutRef,
+  type ComponentType,
+  type JSX,
   type ReactNode,
 } from 'react';
-import ReactMarkdown, { type Components, type Options } from 'react-markdown';
+import ReactMarkdown, { type Components, type ExtraProps, type Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import titelbloecke, { TITELPLATZ } from './markdownTitelbloecke';
 import fundstellenMarkieren from './markdownFundstellen';
@@ -38,6 +40,13 @@ interface Props {
    * `markdownFundstellen.ts`). Fehlt er, rendert der Text wie immer, auch im Druck.
    */
   fundstellen?: string;
+  /**
+   * Renderer für Bilder (`![Alt](pfad)`), nur für Einbauorte, deren Texte Bilder tragen dürfen
+   * (die Hilfe, LFH-1128: setzt die gebaute Adresse ein, lädt verzögert). Fehlt er, bleibt das
+   * Bild ein bloßes `<img>` mit dem Pfad aus dem Text. Eine stabile Komponente übergeben (Modul-
+   * ebene), sonst baut jeder Render die Komponententabelle neu.
+   */
+  bild?: ComponentType<JSX.IntrinsicElements['img'] & ExtraProps>;
 }
 
 /** Ebene einer Überschrift, die über einem Markdown-Text stehen kann (h1 … h5). */
@@ -118,7 +127,14 @@ const REHYPE_PLUGINS_MIT_KOPF: PluggableList = [[titelbloecke, { kopf: true }]];
  * über seine eingebaute URL-Transformation. Damit ist die Anzeige XSS-sicher,
  * ohne dass wir selbst sanitisieren müssen.
  */
-function Markdown({ children, variante = 'dokument', unterEbene, titel, fundstellen }: Props) {
+function Markdown({
+  children,
+  variante = 'dokument',
+  unterEbene,
+  titel,
+  fundstellen,
+  bild,
+}: Props) {
   const mitKopf = titel !== undefined && titel !== null;
   const basis = mitKopf ? REHYPE_PLUGINS_MIT_KOPF : REHYPE_PLUGINS;
   // Je Begriff EINE Liste: eine neue je Render stieße den Parse an (s. `REMARK_PLUGINS`).
@@ -126,13 +142,18 @@ function Markdown({ children, variante = 'dokument', unterEbene, titel, fundstel
     const phrasen = fundstellen ? suchphrasen(fundstellen) : [];
     return phrasen.length > 0 ? [...basis, [fundstellenMarkieren, { phrasen }]] : basis;
   }, [basis, fundstellen]);
+  // Ohne Bild-Renderer die feste Tabelle der Ebene; mit ihm eine je Renderer (s. `KOMPONENTEN`).
+  const komponenten = useMemo<Components>(
+    () => (bild ? { ...KOMPONENTEN[unterEbene], img: bild } : KOMPONENTEN[unterEbene]),
+    [bild, unterEbene],
+  );
   return (
     <div className={`markdown markdown--${variante}`}>
       <TitelKontext.Provider value={titel}>
         <ReactMarkdown
           remarkPlugins={REMARK_PLUGINS}
           rehypePlugins={rehypePlugins}
-          components={KOMPONENTEN[unterEbene]}
+          components={komponenten}
         >
           {children}
         </ReactMarkdown>
@@ -145,6 +166,6 @@ function Markdown({ children, variante = 'dokument', unterEbene, titel, fundstel
  * Gemerkt (LFH-947): alle Eigenschaften sind Werte, ein Rerender des Aufrufers mit demselben
  * Text parst nicht neu. Die Zeitachse rendert hunderte davon. Ausnahme ist `titel`, ein
  * Element; das reichen nur die Lesefassungen der Vorlagendokumente und der Einsatzbericht herein,
- * nicht die Zeitachse.
+ * nicht die Zeitachse. `bild` ist eine Komponente auf Modulebene (nur die Hilfe), also stabil.
  */
 export default memo(Markdown);

@@ -2,20 +2,55 @@
 titel: Rechte im Einsatz
 gruppen: [fuehrung, administration]
 reihenfolge: 40
-quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts]
+quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, src/routes/benutzer.rs]
 ---
 
-## Rolle im Einsatz
+## Überblick
 
-Was eine Person in einem Einsatz darf, hängt an ihrer Rolle in diesem Einsatz:
+Was eine Person in einem Einsatz darf, hängt an ihrer Rolle in diesem Einsatz: **Einsatzleitung**,
+**Führungspersonal** oder **Beobachter**. Die Rollen vergibt die Einsatzleitung eines laufenden
+Einsatzes in den Einsatzdaten. Ohne Rolle lesen Führungskräfte der Organisation und System-Admins
+mit; schreiben dürfen sie dort nur eingeschränkt.
+
+## Abläufe
+
+### Eine Person in den Einsatz aufnehmen
+
+1. Im Einsatz unter „Führung“ die „Einsatzdaten“ öffnen.
+2. Im Abschnitt „Zugriff“ unter „Benutzer …“ die Person wählen und daneben ihre Rolle;
+   vorgewählt ist „Führungspersonal“.
+3. „Hinzufügen“ wählen. Die Person steht danach in der Liste, mit ihrer Rolle in einem
+   Auswahlfeld.
+
+   ![Abschnitt „Zugriff“ mit der Zeile zum Aufnehmen und zwei Mitgliedern: die Einsatzleitung mit „Gesperrt: letzte Einsatzleitung“ und eine neu aufgenommene Person als Führungspersonal](../bilder/rechte-im-einsatz/zugriff.png)
+
+### Eine Rolle ändern oder entziehen
+
+1. Im Abschnitt „Zugriff“ der Einsatzdaten bei der Person eine andere Rolle wählen.
+2. Zum Entziehen „Entfernen“ wählen und die Rückfrage „Mitglied entfernen?“ mit „Entfernen“
+   bestätigen.
+
+Wer die eigene Rolle herabstuft, bestätigt das zuerst mit „Rolle herabstufen“: danach endet das
+Recht, den Zugriff des Einsatzes zu verwalten.
+
+## Hintergrund
+
+### Was die Rollen dürfen
 
 - **Einsatzleitung** und **Führungspersonal** schreiben in den Modulen, ändern Kopfdaten,
   Einstellungen und die eigene Führungsstelle.
 - **Beobachter** lesen nur.
+- Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte.
 
-Die Rolle gilt auch, wenn die Person zu einer anderen Organisation gehört als der Einsatz.
+Die Rolle gilt auch, wenn die Person zu einer anderen Organisation gehört als der Einsatz. Die
+letzte Einsatzleitung eines Einsatzes lässt sich nicht entfernen („Gesperrt: letzte
+Einsatzleitung“).
 
-## Ohne Rolle im Einsatz
+Die Auswahl „Benutzer …“ füllt sich nur für System-Admins („Benutzerliste nur für Admins“). Eine
+Einsatzleitung ohne diese Rolle ändert die Rollen der eingetragenen Mitglieder, nimmt aber
+niemanden neu auf.
+
+### Ohne Rolle im Einsatz
 
 - Eine **Führungskraft der Organisation** liest jeden Einsatz der eigenen Organisation, schreibt
   darin aber nichts.
@@ -28,7 +63,7 @@ Die Rolle gilt auch, wenn die Person zu einer anderen Organisation gehört als d
 
 Wo ein Recht fehlt, steht die Seite auf „Nur Ansicht“ und nennt, wer schreiben darf.
 
-## Abgeschlossener Einsatz
+### Abgeschlossener Einsatz
 
 Ein abgeschlossener Einsatz ist schreibgeschützt, auch für Einsatzleitung und System-Admin; nur
 die Aufbewahrungsfrist lässt sich noch ändern. Mitglieder lesen ihn noch 24 Stunden nach dem
