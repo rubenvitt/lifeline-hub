@@ -162,6 +162,11 @@ async fn eine_eigene_beenden_laesst_das_konto_unveraendert() {
     let ipad = anmelden(&app, "marlene", "marlenepw1", IPAD).await;
     let vorher = konto(&pool, marlene_id).await;
 
+    // Die iPad-Sitzung entstand per SSO; die Spur nennt diesen Weg, nicht „passwort“ (LFH-1152).
+    sqlx::query("UPDATE session SET anmeldeweg = 'oidc' WHERE geraet = 'Safari · iPadOS'")
+        .execute(&pool)
+        .await
+        .unwrap();
     let k = kennung(
         &liste(&app, &firefox, "/api/auth/sitzungen").await,
         "Safari · iPadOS",
@@ -176,6 +181,12 @@ async fn eine_eigene_beenden_laesst_das_konto_unveraendert() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["beendet"], 1);
+    let weg: String =
+        sqlx::query_scalar("SELECT provider FROM auth_audit WHERE ereignis = 'sitzung_beendet'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(weg, "oidc");
 
     assert_eq!(me(&app, &ipad).await, StatusCode::UNAUTHORIZED);
     assert_eq!(me(&app, &firefox).await, StatusCode::OK);
@@ -394,9 +405,12 @@ async fn admin_sieht_und_beendet_sitzungen_einer_person() {
     assert_eq!(spur.len(), 1);
     assert_eq!(spur[0].1.as_deref(), Some("admin"));
     assert_eq!(spur[0].2, "marlene");
-    let detail = spur[0].3.as_deref().unwrap();
+    // Strukturiert (LFH-1152): die Verwaltung zeigt die Anmeldezeit in Zone und Format der
+    // Organisation, deshalb liegt sie hier als UTC-Wert und nicht als fertiger Text.
+    let detail: Value = serde_json::from_str(spur[0].3.as_deref().unwrap()).unwrap();
+    assert_eq!(detail["geraet"], "Safari · iPadOS");
     assert!(
-        detail.starts_with("Safari · iPadOS, angemeldet 20"),
+        detail["angemeldet_at"].as_str().unwrap().starts_with("20"),
         "{detail}"
     );
     assert!(anmeldespur(&pool).await.is_empty(), "keine Selbst-Spur");

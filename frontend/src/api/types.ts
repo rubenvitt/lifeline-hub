@@ -877,6 +877,10 @@ export type AnmeldeEintrag = S['AnmeldeEintragAnzeige'];
 export type AdminAktion = S['AdminAktion'];
 /** Zeile der Admin-Spur (`GET /api/zugangsprotokoll/zugangsaenderungen`). */
 export type Zugangsaenderung = S['ZugangsaenderungAnzeige'];
+/** Anmeldeweg eines Eintrags der Anmeldespur und einer Sitzung (LFH-1152). */
+export type Anmeldeweg = S['Anmeldeweg'];
+/** Strukturiertes Detail einer Zugangsänderung: Rollen bzw. beendete Sitzung (LFH-1152). */
+export type ZugangsAngaben = S['ZugangsAngaben'];
 
 // ============================== Aufbewahrung (Archiv des Org-Admins) ==============================
 /** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sieben Werte, `retention::zustand`). */

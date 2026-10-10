@@ -502,14 +502,28 @@
             ]
           },
           "provider": {
-            "type": "string",
-            "description": "Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`."
+            "$ref": "#/components/schemas/Anmeldeweg",
+            "description": "Anmeldeweg ([`crate::auth::provider::Anmeldeweg`])."
           },
           "zeitpunkt": {
             "type": "string",
             "description": "UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`."
           }
         }
+      },
+      "Anmeldeweg": {
+        "type": "string",
+        "description": "Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung\n(`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des\nZugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120). Die\n`&str`-Konstanten der Wege bleiben; der Test unten hält sie mit dem Enum gleich.",
+        "enum": [
+          "passwort",
+          "dev",
+          "oidc",
+          "webauthn",
+          "totp",
+          "geraetecode",
+          "systembrowser",
+          "unbekannt"
+        ]
       },
       "AnsichtAuswahl": {
         "type": "object",
@@ -13324,6 +13338,66 @@
           "12h"
         ]
       },
+      "ZugangsAngaben": {
+        "type": "object",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.",
+        "properties": {
+          "angemeldet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`."
+          },
+          "geraet": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Grobe Gerätebezeichnung der beendeten Sitzung."
+          },
+          "org_rolle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrgRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "org_rolle_vorher": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrgRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "system_rolle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SystemRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "system_rolle_vorher": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SystemRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "ZugangsaenderungAnzeige": {
         "type": "object",
         "description": "Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097).",
@@ -13351,11 +13425,22 @@
           "aktion": {
             "$ref": "#/components/schemas/AdminAktion"
           },
+          "angaben": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZugangsAngaben"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "detail": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Freier Text, nur noch bei Einträgen von vor LFH-1152; neuere tragen `angaben`."
           },
           "id": {
             "type": "integer",

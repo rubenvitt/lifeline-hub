@@ -82,16 +82,21 @@ typgeprüft.
 
 ### D3 Detail strukturiert, Klartext im Frontend
 
-Die drei Schreiber legen in `admin_audit.detail` statt Prosa ein JSON ab, ein mit `art`
-getaggtes Serde-Enum `ZugangsAngaben`:
+Die drei Schreiber legen in `admin_audit.detail` statt Prosa ein JSON ab, eine flache Struktur
+`ZugangsAngaben` mit optionalen Feldern; welche stehen, folgt aus der Aktion:
 
-- `anlage { system_rolle: SystemRolle, org_rolle: OrgRolle }`
-- `rollenwechsel { system_rolle?: { vorher, nachher }, org_rolle?: { vorher, nachher } }`
-- `sitzung { geraet?: String, angemeldet_at: String }` (UTC, SQLite-Format wie `zeitpunkt`)
+- `benutzer_angelegt`: `system_rolle`, `org_rolle`
+- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue
+- `sitzung_beendet`: `geraet?`, `angemeldet_at` (UTC, SQLite-Format wie `zeitpunkt`)
 
-Beim Lesen versucht `admin_audit::liste`, `detail` als `ZugangsAngaben` zu lesen. Gelingt es,
+Flach statt eines mit `art` getaggten Enums (so noch im ersten Entwurf): im Projekt gibt es kein
+getaggtes Serde-Enum, und der Enum-Wächter (`tests/enum_wire_kontrakt.rs`) erwartet für jedes
+registrierte Enum feldlose Varianten. Die Aktion steht ohnehin in derselben Zeile.
+
+Beim Lesen versucht `admin_audit::liste`, `detail` als `ZugangsAngaben` zu lesen (ein leeres
+Objekt zählt nicht). Gelingt es,
 steht es im neuen Antwortfeld `angaben`, und `detail` fehlt; sonst bleibt `detail` der Text
-(Altbestand). Das Frontend rendert `angaben` je `art`: Rollen mit den Bezeichnungen des
+(Altbestand). Das Frontend rendert `angaben`: Rollen mit den Bezeichnungen des
 Benutzer-Dialogs (die wandern aus `pages/BenutzerPage.tsx` als exhaustive `Record<SystemRolle>`
 bzw. `Record<OrgRolle>` nach `stammdaten/rechteText.ts`; der Dialog hängt bei „Führungskraft“
 weiter seinen Hinweis an), den Zeitpunkt über `ZeitAnzeige` wie die Spalte „Zeitpunkt“.

@@ -151,6 +151,23 @@ fn jetzt_unix() -> u64 {
         .as_secs()
 }
 
+/// Meldet die Sitzung aus `cookies` ab und liefert den Anmeldeweg ihrer Zeile `logout`
+/// (LFH-1152): die Sitzung merkt sich, wie sie entstand, statt fest „passwort“ zu schreiben.
+async fn anmeldeweg_der_abmeldung(
+    app: &axum::Router,
+    pool: &sqlx::SqlitePool,
+    cookies: &[String],
+) -> String {
+    let sitzung = cookie_paar(cookies, lifeline_hub::auth::session::SESSION_COOKIE);
+    spur_leeren(pool).await;
+    let antwort = sende(app, "POST", "/api/auth/logout", Some(&sitzung), None).await;
+    assert_eq!(antwort.status, StatusCode::NO_CONTENT);
+    let spur = spur(pool).await;
+    assert_eq!(spur.len(), 1, "genau eine Zeile erwartet: {spur:?}");
+    assert_eq!(spur[0].ereignis, "logout");
+    spur[0].provider.clone()
+}
+
 // ===== TOTP =====
 
 /// Aktiviert TOTP für den admin über den regulären Enroll-Flow; liefert das Secret.
@@ -217,6 +234,28 @@ async fn totp_anmeldung_hinterlaesst_genau_einen_login_ok() {
     assert_eq!(antwort.status, StatusCode::OK);
 
     assert_eq!(spur(&pool).await, vec![erfolg("totp", "admin", id)]);
+}
+
+#[tokio::test]
+async fn abmeldung_nach_totp_nennt_den_zweiten_faktor() {
+    let (app, pool) = setup_mit_pool().await;
+    let secret = totp_fuer_admin(&app).await;
+    let pending = passwortschritt(&app).await;
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix() + 30).unwrap();
+    let antwort = sende(
+        &app,
+        "POST",
+        "/api/auth/totp/finish",
+        Some(&pending),
+        Some(format!(r#"{{"code":"{code}"}}"#)),
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::OK);
+
+    assert_eq!(
+        anmeldeweg_der_abmeldung(&app, &pool, &antwort.cookies).await,
+        "totp"
+    );
 }
 
 #[tokio::test]
@@ -507,6 +546,29 @@ async fn passkey_anmeldung_hinterlaesst_genau_einen_login_ok() {
     assert_eq!(antwort.status, StatusCode::OK, "{:?}", antwort.json);
 
     assert_eq!(spur(&pool).await, vec![erfolg("webauthn", "admin", id)]);
+}
+
+#[tokio::test]
+async fn abmeldung_nach_passkey_nennt_den_passkey() {
+    webauthn_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+    let (passkey, challenge, cookie) = passkey_zeremonie(&app, &pool, b"passkey-abmeldung").await;
+
+    let body = passkey.assertion(&challenge, &passkey.schluessel, None);
+    let antwort = sende(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/finish",
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::OK, "{:?}", antwort.json);
+
+    assert_eq!(
+        anmeldeweg_der_abmeldung(&app, &pool, &antwort.cookies).await,
+        "webauthn"
+    );
 }
 
 #[tokio::test]
@@ -878,6 +940,20 @@ async fn oidc_anmeldung_hinterlaesst_genau_einen_login_ok() {
     // Das Konto entsteht erst beim Callback (JIT-Provisioning).
     let id = benutzer_id(&pool, "sso.nutzer").await;
     assert_eq!(spur(&pool).await, vec![erfolg("oidc", "sso.nutzer", id)]);
+}
+
+#[tokio::test]
+async fn abmeldung_nach_sso_nennt_sso() {
+    oidc_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+
+    let antwort = oidc_callback(&app, "state-abmeldung", GUTER_CODE).await;
+    assert_eq!(antwort.location.as_deref(), Some("/einsaetze"));
+
+    assert_eq!(
+        anmeldeweg_der_abmeldung(&app, &pool, &antwort.cookies).await,
+        "oidc"
+    );
 }
 
 #[tokio::test]

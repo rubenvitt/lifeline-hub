@@ -106,11 +106,53 @@ describe('ZugangsprotokollPage', () => {
     const t = await tabelle();
     expect(await within(t).findByText('Rolle geändert')).toBeInTheDocument();
     expect(within(t).getByText('marlene')).toBeInTheDocument();
+    // Ein Detail von vor LFH-1152 steht unverändert.
     expect(within(t).getByText('system_rolle: keiner → admin')).toBeInTheDocument();
     // Ein Anmeldeweg als Ziel steht mit seinem Namen, nicht als id.
     expect(within(t).getByText('SSO')).toBeInTheDocument();
     expect(t).not.toHaveTextContent('anmeldeweg_deaktiviert');
     expect(screen.queryByText('Ältere laden')).not.toBeInTheDocument();
+  });
+
+  it('zeigt Angaben in Klartext: Rollen wie im Dialog, Anmeldezeit als DTG der Org (LFH-1152)', async () => {
+    zeige(ME_ADMIN, '/admin/zugangsprotokoll', [
+      {
+        id: 22,
+        zeitpunkt: '2026-10-10 12:20:00',
+        aktion: 'sitzung_beendet',
+        akteur_name: 'admin',
+        ziel_benutzer_id: 5,
+        ziel: 'marlene',
+        angaben: { geraet: 'Safari · iPadOS', angemeldet_at: '2026-10-10 12:13:34' },
+      },
+      {
+        id: 21,
+        zeitpunkt: '2026-10-09 09:00:00',
+        aktion: 'rolle_geaendert',
+        akteur_name: 'admin',
+        ziel_benutzer_id: 5,
+        ziel: 'marlene',
+        angaben: { org_rolle_vorher: 'keine', org_rolle: 'fuehrungskraft' },
+      },
+      {
+        id: 20,
+        zeitpunkt: '2026-10-08 09:00:00',
+        aktion: 'benutzer_angelegt',
+        akteur_name: 'admin',
+        ziel_benutzer_id: 5,
+        ziel: 'marlene',
+        angaben: { system_rolle: 'keiner', org_rolle: 'keine' },
+      },
+    ]);
+    const t = await tabelle();
+    // Europe/Berlin (TZ des Testlaufs): 12:13:34 UTC ist 14:13 Ortszeit.
+    expect(
+      await within(t).findByText('Safari · iPadOS, angemeldet 101413OKT2026'),
+    ).toBeInTheDocument();
+    expect(within(t).getByText('Org-Rolle: Keine → Führungskraft')).toBeInTheDocument();
+    expect(within(t).getByText('System-Rolle: Benutzer, Org-Rolle: Keine')).toBeInTheDocument();
+    expect(t).not.toHaveTextContent('fuehrungskraft');
+    expect(t).not.toHaveTextContent('2026-10-10 12:13:34');
   });
 
   it('wechselt über die Segmentleiste auf die Anmeldespur und schreibt sie in die URL', async () => {
@@ -178,6 +220,8 @@ describe('ZugangsprotokollPage', () => {
     const volle = Array.from({ length: ZUGANGSPROTOKOLL_SEITE }, (_, i) => ({
       ...AENDERUNGEN[1],
       id: 500 - i,
+      // Konten als Ziel: ein Anmeldeweg mit unbekannter id stünde als „—“ (LFH-1152).
+      ziel_benutzer_id: 1000 + i,
       ziel: `k${i}`,
     }));
     const gesehen = zeige(ME_ADMIN, '/admin/zugangsprotokoll', volle);

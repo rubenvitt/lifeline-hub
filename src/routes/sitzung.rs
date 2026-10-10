@@ -7,7 +7,7 @@
 //! offenen Live-Ströme sofort. Herleitung: `/mnt/project-files/lfh-1092/design.md`.
 
 use crate::app::AppState;
-use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel};
+use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
 use crate::auth::session::{
     self, AdminUser, AktuelleSitzung, Auswahl, BeendeteSitzung, CurrentUser, SitzungAnzeige,
 };
@@ -184,11 +184,11 @@ async fn nach_dem_beenden(
                             id: person.id,
                             benutzername: &person.benutzername,
                         },
-                        detail: Some(format!(
-                            "{}, angemeldet {}",
-                            sitzung.geraet.as_deref().unwrap_or("unbekanntes Gerät"),
-                            sitzung.angemeldet_at
-                        )),
+                        angaben: Some(ZugangsAngaben {
+                            geraet: sitzung.geraet.clone(),
+                            angemeldet_at: Some(sitzung.angemeldet_at.clone()),
+                            ..ZugangsAngaben::default()
+                        }),
                         peer_ip,
                     },
                 )
@@ -202,9 +202,11 @@ async fn nach_dem_beenden(
                         benutzername: Some(&person.benutzername),
                         benutzer_id: Some(person.id),
                         peer_ip: peer_ip.map(|ip| ip.to_string()),
-                        // Wie beim Logout: die Spalte ist NOT NULL, die Sitzung kennt ihren
-                        // Anmeldeweg nicht.
-                        provider: crate::auth::provider::ID_PASSWORT,
+                        // Der Weg, auf dem die beendete Sitzung entstand (LFH-1152).
+                        provider: crate::auth::provider::Anmeldeweg::aus_gespeichert(
+                            sitzung.anmeldeweg.as_deref(),
+                        )
+                        .as_str(),
                     },
                 )
                 .await;

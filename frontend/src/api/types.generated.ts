@@ -199,11 +199,19 @@ export interface components {
             /** Format: int64 */
             id: number;
             peer_ip?: string | null;
-            /** @description Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`. */
-            provider: string;
+            /** @description Anmeldeweg ([`crate::auth::provider::Anmeldeweg`]). */
+            provider: components["schemas"]["Anmeldeweg"];
             /** @description UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`. */
             zeitpunkt: string;
         };
+        /**
+         * @description Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung
+         *     (`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des
+         *     Zugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120). Die
+         *     `&str`-Konstanten der Wege bleiben; der Test unten hält sie mit dem Enum gleich.
+         * @enum {string}
+         */
+        Anmeldeweg: "passwort" | "dev" | "oidc" | "webauthn" | "totp" | "geraetecode" | "systembrowser" | "unbekannt";
         /** @description Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle. */
         AnsichtAuswahl: {
             ansicht: components["schemas"]["Funktionsansicht"];
@@ -5098,6 +5106,26 @@ export interface components {
          * @enum {string}
          */
         Zeitformat: "24h" | "12h";
+        /**
+         * @description Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
+         *     `admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren
+         *     Konventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.
+         *     Flach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:
+         *
+         *     - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
+         *     - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
+         *     - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
+         */
+        ZugangsAngaben: {
+            /** @description Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`. */
+            angemeldet_at?: string | null;
+            /** @description Grobe Gerätebezeichnung der beendeten Sitzung. */
+            geraet?: string | null;
+            org_rolle?: components["schemas"]["OrgRolle"] | null;
+            org_rolle_vorher?: components["schemas"]["OrgRolle"] | null;
+            system_rolle?: components["schemas"]["SystemRolle"] | null;
+            system_rolle_vorher?: components["schemas"]["SystemRolle"] | null;
+        };
         /** @description Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097). */
         ZugangsaenderungAnzeige: {
             /** Format: int64 */
@@ -5105,6 +5133,8 @@ export interface components {
             /** @description Benutzername der handelnden Person zum Zeitpunkt der Aktion, gekürzt. */
             akteur_name?: string | null;
             aktion: components["schemas"]["AdminAktion"];
+            angaben?: components["schemas"]["ZugangsAngaben"] | null;
+            /** @description Freier Text, nur noch bei Einträgen von vor LFH-1152; neuere tragen `angaben`. */
             detail?: string | null;
             /** Format: int64 */
             id: number;

@@ -45,3 +45,72 @@ pub struct AuthProviderAnzeige {
     pub anzeigename: String,
     pub aktiviert: bool,
 }
+
+wire_enum! {
+    /// Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung
+    /// (`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des
+    /// Zugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120). Die
+    /// `&str`-Konstanten der Wege bleiben; der Test unten hält sie mit dem Enum gleich.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Anmeldeweg {
+        Passwort => "passwort",
+        Dev => "dev",
+        Oidc => "oidc",
+        Webauthn => "webauthn",
+        /// Anmeldung, die mit dem Zweitfaktor abschließt ([`crate::auth::totp::PROVIDER`]).
+        Totp => "totp",
+        /// Code-Einlösung eines gekoppelten Geräts ([`crate::geraet::PROVIDER`]).
+        Geraetecode => "geraetecode",
+        /// Anmeldung der macOS-Hülle über den Systembrowser ([`crate::auth::huelle::PROVIDER`]).
+        Systembrowser => "systembrowser",
+        /// Der Weg ist nicht bekannt: Abmeldung oder Beenden einer Sitzung, die vor LFH-1152
+        /// angelegt wurde und sich ihren Weg deshalb nicht gemerkt hat.
+        Unbekannt => "unbekannt",
+    }
+}
+
+impl Anmeldeweg {
+    /// Liest einen gespeicherten Anmeldeweg; fehlt er oder ist er fremd, [`Anmeldeweg::Unbekannt`].
+    pub fn aus_gespeichert(wert: Option<&str>) -> Anmeldeweg {
+        wert.and_then(Anmeldeweg::parse)
+            .unwrap_or(Anmeldeweg::Unbekannt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Jede Kennung, die ein Anmeldeweg in die Spur schreibt, ist ein [`Anmeldeweg`] (LFH-1152).
+    /// Fehlt hier eine, stünde sie im Zugangsprotokoll roh.
+    #[test]
+    fn jede_geschriebene_kennung_ist_ein_anmeldeweg() {
+        for kennung in [
+            ID_PASSWORT,
+            ID_DEV,
+            ID_OIDC,
+            ID_WEBAUTHN,
+            crate::auth::totp::PROVIDER,
+            crate::geraet::PROVIDER,
+            crate::auth::huelle::PROVIDER,
+        ] {
+            assert!(
+                Anmeldeweg::parse(kennung).is_some(),
+                "Anmeldeweg `{kennung}` fehlt im Enum"
+            );
+        }
+    }
+
+    #[test]
+    fn fehlender_oder_fremder_weg_ist_unbekannt() {
+        assert_eq!(Anmeldeweg::aus_gespeichert(None), Anmeldeweg::Unbekannt);
+        assert_eq!(
+            Anmeldeweg::aus_gespeichert(Some("faxgeraet")),
+            Anmeldeweg::Unbekannt
+        );
+        assert_eq!(
+            Anmeldeweg::aus_gespeichert(Some("webauthn")),
+            Anmeldeweg::Webauthn
+        );
+    }
+}

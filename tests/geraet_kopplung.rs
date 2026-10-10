@@ -1437,6 +1437,14 @@ async fn kopplung_ist_auditiert() {
         koppeln(&app, &code, Some(peer)).await.status,
         StatusCode::OK
     );
+    // Die Gerätesitzung merkt sich ihren Weg wie die der Personen (LFH-1152).
+    let weg: Option<String> =
+        sqlx::query_scalar("SELECT anmeldeweg FROM session WHERE benutzer_id = ?")
+            .bind(konto)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(weg.as_deref(), Some("geraetecode"));
     widerrufen(&app, &admin, einsatz, id).await;
 
     let audit: Vec<(String, String, Option<i64>, Option<String>)> = sqlx::query_as(
