@@ -2,7 +2,7 @@
 titel: Arbeiten ohne Netz
 gruppen: [alle, fuehrung]
 reihenfolge: 20
-quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx]
+quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx]
 ---
 
 ## Überblick
@@ -16,15 +16,22 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 
 ### Erkennen, ob Netz da ist
 
-1. Auf den Seitenkopf achten: Ohne Netz steht dort „Stand HH:MM · offline“.
-2. Auf die Betriebszeile achten: Sie meldet „Offline — keine Verbindung zum Server.“ und die Zahl
-   der Einträge, die noch „ausstehend“ sind.
+1. Auf die Kopfzeile achten: Ohne Netz steht rechts „OFFLINE“ statt „SYNC“.
+2. Auf den Seitenkopf achten: Dort steht „Stand HH:MM · offline“, die Uhrzeit der letzten
+   Verbindung.
+3. Auf die Betriebszeile ganz oben achten: Sie meldet „Offline — keine Verbindung zum Server.“
+   und die Zahl der Einträge, die noch „ausstehend“ sind.
 
 ### Ohne Netz erfassen
 
 1. Wie mit Netz erfassen und speichern, etwa eine Meldung oder einen Eintrag im
    Einsatztagebuch.
-2. Die App meldet „Offline vorgemerkt“, die Betriebszeile zählt den Eintrag als „ausstehend“.
+2. Die App merkt den Eintrag vor. Im Einsatztagebuch steht er oben mit „vorgemerkt“, darüber
+   „1 Eintrag offline vorgemerkt“; andere Erfassungen melden „Offline vorgemerkt …“, etwa
+   „Offline vorgemerkt: Meldung von …“. Die Betriebszeile zählt den Eintrag als „ausstehend“.
+
+   ![Einsatztagebuch ohne Netz: Betriebszeile „Offline — keine Verbindung zum Server.“ mit „1 ausstehend“, „OFFLINE“ in der Kopfzeile, „Stand · offline“ im Seitenkopf und der vorgemerkte Eintrag oben in der Zeitachse](../bilder/ohne-netz/etb-ohne-netz.png)
+
 3. Nichts weiter tun: Sobald wieder Netz da ist, geht der Eintrag von selbst hinaus.
 
 ### Abgelehnte Einträge prüfen
@@ -66,6 +73,8 @@ ist.
 - Ausgaben der Verpflegung
 - Einträge im Einsatztagebuch
 
+Anhänge brauchen Netz: Im Einsatztagebuch ist „Anhang“ ohne Netz gesperrt und trägt „offline“.
+
 Ein vorgemerkter Eintrag liegt auf dem Gerät und geht hinaus, sobald wieder Netz da ist, ohne
 weiteres Zutun und in der Reihenfolge der Erfassung. Eine erfasste Person trägt bis dahin „R-…“
 statt ihrer Registriernummer; die Nummer vergibt der Server.
@@ -81,6 +90,11 @@ oder ein Pflichtfeld fehlt. Im Einsatztagebuch steht der Grund direkt am Eintrag
 Abgelehnte Einträge löscht die App erst **30 Tage nach der Ablehnung** von selbst: Sie können das
 einzige Zeugnis einer Erfassung sein. Wer sie vorher nicht mehr braucht, verwirft sie. Ausstehende
 Einträge haben keine Frist.
+
+Liegen auf dem Gerät vorgemerkte Einträge aus einer älteren Version der App, die keiner Person
+zugeordnet sind, zeigt die Betriebszeile „Alte Offline-Daten ansehen“. Ihr Inhalt ist nicht
+einsehbar und nicht übernehmbar; unter „Alte Offline-Daten ohne Zuordnung“ verwirft „Alle alten
+Offline-Daten verwerfen“ sie nach einer Rückfrage. Zugeordnete Einträge bleiben dabei erhalten.
 
 ### Was dabei auf dem Gerät liegt
 

@@ -2,7 +2,7 @@
 titel: Gerät verloren
 gruppen: [alle, administration]
 reihenfolge: 30
-quellen: [src/auth/session.rs, src/routes/benutzer.rs, src/routes/geraet.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/offline/lagebildStart.ts, frontend/src/pages/ProfilPage.tsx, frontend/src/pages/BenutzerPage.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx]
+quellen: [src/auth/session.rs, src/routes/benutzer.rs, src/routes/geraet.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/offline/lagebildStart.ts, frontend/src/pages/ProfilPage.tsx, frontend/src/pages/BenutzerPage.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/auth/SitzungsListe.tsx, src/routes/sitzung.rs]
 ---
 
 ## Überblick
@@ -16,19 +16,34 @@ Gerät beenden, jede auf ihrem Weg.
 
 ### Eigene Anmeldungen beenden
 
-Für Personen, die an einem anderen Gerät noch angemeldet sind und sich mit Passwort anmelden:
+Für Personen, die an einem anderen Gerät noch angemeldet sind:
 
 1. Im „Benutzermenü“ „Profil“ öffnen.
-2. Unter „Sicherheit“ „Passwort ändern“ wählen und ein neues Passwort setzen.
+2. Unter „Anmeldungen“ beim verlorenen Gerät „Beenden“ wählen. Ist unklar, welche Zeile es ist,
+   beendet „Alle anderen beenden“ alle Anmeldungen außer der eigenen.
 
-Das beendet alle anderen Anmeldungen dieses Kontos, also auch die auf dem verlorenen Gerät.
+Ein neues Passwort („Passwort ändern“ unter „Sicherheit“) beendet ebenfalls alle anderen
+Anmeldungen des Kontos (siehe [Profil und Sicherheit](profil-sicherheit.md)).
+
+### Anmeldungen einer Person beenden
+
+Für die Administration:
+
+1. In der Verwaltung „Benutzer“ öffnen und die Person über „Name oder Benutzername“ suchen.
+2. In ihrer Zeile „Anmeldungen“ wählen. Auf schmalen Bildschirmen steht der Punkt im
+   Aktionsmenü der Zeile.
+3. Im Dialog „Anmeldungen · …“ beim verlorenen Gerät „Beenden“ wählen. „Alle beenden“ beendet
+   jede Anmeldung der Person.
+
+   ![Dialog „Anmeldungen“ einer Person mit zwei Geräten, je mit „Beenden“, darunter „Alle beenden“](../bilder/geraet-verloren/anmeldungen-einer-person.png)
 
 ### Person deaktivieren
 
 Für die Administration:
 
 1. In der Verwaltung „Benutzer“ öffnen.
-2. Bei der Person das Aktionsmenü öffnen und „Deaktivieren“ wählen.
+2. In der Zeile der Person „Deaktivieren“ wählen; eine Rückfrage gibt es nicht. Auf schmalen
+   Bildschirmen steht der Punkt im Aktionsmenü der Zeile.
 3. Sobald die Person wieder ein sicheres Gerät hat, an derselben Stelle „Reaktivieren“ wählen.
 
 ### Gekoppeltes Gerät widerrufen
@@ -49,6 +64,9 @@ schreiben. Das ist das größere Risiko; die vorgehaltenen Daten auf dem Gerät 
 
 ### Was die einzelnen Wege bewirken
 
+- **Anmeldung beenden** (im Profil oder in der Verwaltung) wirkt sofort und nur auf diese
+  Anmeldung. Konto, Passwort und zweiter Faktor bleiben unverändert; die Person meldet sich auf
+  einem sicheren Gerät normal wieder an.
 - **Passwort ändern** beendet alle anderen Anmeldungen des Kontos; das Gerät, an dem geändert
   wurde, bleibt angemeldet.
 - **Person deaktivieren** beendet sofort jede Anmeldung der Person auf allen Geräten.

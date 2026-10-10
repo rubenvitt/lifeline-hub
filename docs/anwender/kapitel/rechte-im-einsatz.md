@@ -16,9 +16,13 @@ mit; schreiben dürfen sie dort nur eingeschränkt.
 
 ### Eine Person in den Einsatz aufnehmen
 
-1. „Einsatzdaten“ öffnen.
-2. Im Abschnitt „Zugriff“ unter „Benutzer …“ die Person wählen und daneben ihre Rolle.
-3. „Hinzufügen“ wählen.
+1. Im Einsatz unter „Führung“ die „Einsatzdaten“ öffnen.
+2. Im Abschnitt „Zugriff“ unter „Benutzer …“ die Person wählen und daneben ihre Rolle;
+   vorgewählt ist „Führungspersonal“.
+3. „Hinzufügen“ wählen. Die Person steht danach in der Liste, mit ihrer Rolle in einem
+   Auswahlfeld.
+
+   ![Abschnitt „Zugriff“ mit der Zeile zum Aufnehmen und zwei Mitgliedern: die Einsatzleitung mit „Gesperrt: letzte Einsatzleitung“ und eine neu aufgenommene Person als Führungspersonal](../bilder/rechte-im-einsatz/zugriff.png)
 
 ### Eine Rolle ändern oder entziehen
 
