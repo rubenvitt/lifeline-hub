@@ -1,3 +1,13 @@
+## [1.0.0-alpha.101](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.100...v1.0.0-alpha.101) (2026-10-10)
+
+### Kommunikation
+
+- **Verbesserte Fehlerbehandlung bei Aufträgen**: Fehlermeldungen beim Speichern von Aufträgen werden jetzt direkt im Bearbeitungsdialog angezeigt, statt nur kurz als Toast-Nachricht aufzublinken. Das gilt auch für das Anlegen neuer Aufträge, das Fortschreiben bestehender Aufträge und beim Hinzufügen von Anlagen. Dialoge können während des Speichervorgangs nicht mehr versehentlich geschlossen werden.
+
+### Kräfte und Mittel
+
+- **Verbesserte Fehlerbehandlung bei Geräten**: Fehler beim Speichern von Geräten werden jetzt direkt an der betreffenden Stelle angezeigt, nicht mehr nur als flüchtige Meldung.
+
 ## [1.0.0-alpha.100](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.99...v1.0.0-alpha.100) (2026-10-09)
 
 ### Benutzerschnittstelle und Bedienung
