@@ -822,10 +822,18 @@ jobs:
   # Kopf von deployment.yml). Erst nach der Freigabe, und nur, wenn release.yml den Lauf
   # gestartet hat (oder jemand ausdrücklich `freigeben` setzt): ein Nachbau soll nicht nebenbei
   # ein älteres Release ausrollen.
+  #
+  # `!cancelled()` plus `needs.freigeben.result` statt der Vorgabe `success()`: die prüft ALLE
+  # Vorgänger bis zur Wurzel, nicht nur `needs`. Bei Vorabversionen sind die Desktop-Jobs
+  # `skipped`, und `freigeben` hängt an ihnen — mit der Vorgabe fiel das Deployment still aus,
+  # obwohl `freigeben` grün war (alpha.99 und alpha.100, LFH-1137).
   deployment:
     name: Deployment alpha anlegen
     needs: [vorbereiten, freigeben]
-    if: inputs.freigeben && contains(needs.vorbereiten.outputs.tag, '-alpha.')
+    if: >-
+      ${{ !cancelled() && inputs.freigeben
+      && needs.freigeben.result == 'success'
+      && contains(needs.vorbereiten.outputs.tag, '-alpha.') }}
     permissions:
       deployments: write
     uses: ./.github/workflows/deployment.yml
