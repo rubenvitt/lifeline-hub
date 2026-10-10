@@ -725,10 +725,10 @@ describe('MitgliederAbschnitt', () => {
       await waitFor(() => expect(auswahlAbrufe).toBe(1));
       await userEvent.click(screen.getByRole('combobox', { name: 'Rolle von Lea' }));
       const treffer = await screen.findAllByTitle('Beobachter');
-      const option = treffer
-        .filter((el) => el.closest('.ant-select-item-option'))
-        .at(-1)!
-        .closest('.ant-select-item-option') as HTMLElement;
+      const sichtbar = treffer.filter((el) => el.closest('.ant-select-item-option'));
+      const option = sichtbar[sichtbar.length - 1].closest(
+        '.ant-select-item-option',
+      ) as HTMLElement;
       await userEvent.click(option);
       const frage = (await screen.findByText('Eigene Rolle herabstufen?')).closest(
         '[role="dialog"]',
