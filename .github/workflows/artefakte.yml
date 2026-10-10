@@ -825,7 +825,12 @@ jobs:
   deployment:
     name: Deployment alpha anlegen
     needs: [vorbereiten, freigeben]
-    if: inputs.freigeben && contains(needs.vorbereiten.outputs.tag, '-alpha.')
+    # `!cancelled()` und das Ergebnis von `freigeben` ausdrücklich: ohne Statusfunktion gilt
+    # `success()`, und das wertet die GANZE Kette — bei Vorabversionen sind die Desktop-Jobs vor
+    # `freigeben` übersprungen, und das Deployment fiel still mit aus (alpha.99, alpha.100).
+    if: >-
+      ${{ !cancelled() && inputs.freigeben && needs.freigeben.result == 'success'
+      && contains(needs.vorbereiten.outputs.tag, '-alpha.') }}
     permissions:
       deployments: write
     uses: ./.github/workflows/deployment.yml
