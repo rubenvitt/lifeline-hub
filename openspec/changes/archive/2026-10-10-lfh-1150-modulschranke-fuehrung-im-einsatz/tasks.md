@@ -30,8 +30,8 @@ der Code.
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh` grün (Verweis auf den CI-Lauf des PRs, falls lokal ein Schritt nicht läuft)
-- [ ] 4.2 Review nach `superpowers:requesting-code-review`, bestätigte Findings eingearbeitet
+- [x] 4.1 `./scripts/check-all.sh` grün (Verweis auf den CI-Lauf des PRs, falls lokal ein Schritt nicht läuft) — lokal grün: `schnell`, Rust-Suite und Dev-Seed; die Desktop-Hülle (kein GTK in der Sitzung), e2e (Browser-Version) und 13 Vitest-Fälle, die unter Node 22 auch auf `origin/alpha` scheitern, belegt der CI-Lauf des PRs
+- [x] 4.2 Review nach `superpowers:requesting-code-review`, bestätigte Findings eingearbeitet (Gerätesatz, Doku, Tests für Lageberichte und Stab-Besetzung; Nachzüge LFH-1301, LFH-1302)
 
 ## Workflow follow-up
 
