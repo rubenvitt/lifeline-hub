@@ -13,7 +13,6 @@ import { auftraegePfad, einheitenPfad, lageberichtDetailPfad } from '../routing/
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -645,7 +644,6 @@ export default function KraefteuebersichtPage() {
   const sprungGesperrt = useSprungSperre(einsatzId);
   const einheitenGesperrt = sprungGesperrt('einheiten');
   const lageberichtGesperrt = sprungGesperrt('lageberichte');
-  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const qc = useQueryClient();
@@ -815,9 +813,7 @@ export default function KraefteuebersichtPage() {
     }
     return m;
   }, [periodenQuery.data, jetztMs]);
-  const darfSchreibenFrueh = einsatzQuery.data
-    ? darfImEinsatzSchreiben(einsatzQuery.data, benutzer)
-    : false;
+  const darfSchreibenFrueh = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
   const statusOptionen = useMemo(
     () => handStatusOptionen(statusKatalogQuery.data ?? []),
     [statusKatalogQuery.data],
@@ -939,7 +935,7 @@ export default function KraefteuebersichtPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   /** Ältester erfolgreicher Listenabruf — trägt Kopfzeile UND Druckstand. */
   const datenstand = gemeinsamerDatenstand(

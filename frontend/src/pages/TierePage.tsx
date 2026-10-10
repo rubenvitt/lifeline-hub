@@ -6,7 +6,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import {
   ladeTiereExport,
   legeTierAn,
@@ -157,7 +156,6 @@ const tierKarte = (einsatzId: number): Kartenplan<Tier, TierSpaltenKey> => ({
 export default function TierePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
   const [speziesNachEinsatz, setSpeziesNachEinsatz] = useState<Record<number, Spezies | undefined>>(
@@ -221,7 +219,7 @@ export default function TierePage() {
   // Einsatz geladen ist; Param immer löschen, Maske nur bei Schreibrecht. Eine Kopie statt
   // In-place-Mutation, sonst sähe der zweite StrictMode-Durchlauf den Parameter nicht mehr.
   const [searchParams, setSearchParams] = useSearchParams();
-  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
@@ -287,7 +285,7 @@ export default function TierePage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
 
   const alle = frischAngelegt.alle;

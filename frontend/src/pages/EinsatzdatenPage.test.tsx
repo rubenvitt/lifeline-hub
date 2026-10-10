@@ -405,6 +405,30 @@ describe('EinsatzdatenPage', () => {
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
+  it('LFH-1066: sperrt den Admin einer fremden Org und nennt den Grund', async () => {
+    setup({ einsatz: { meine_rolle: null }, benutzer: { ...admin, org_id: 2 } });
+    expect(
+      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /eintragen$|bearbeiten$/ })).toBeNull();
+    const fs = within(await screen.findByRole('region', { name: 'Eigene Führungsstelle' }));
+    expect(fs.queryByRole('button', { name: 'Rufname eintragen' })).toBeNull();
+  });
+
+  it('LFH-1066: der Admin der Einsatz-Org bearbeitet ohne Mitgliedschaft, ohne Grund-Zeile', async () => {
+    setup({ einsatz: { meine_rolle: null } });
+    expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+    const fs = within(await screen.findByRole('region', { name: 'Eigene Führungsstelle' }));
+    expect(await fs.findByRole('button', { name: 'Rufname eintragen' })).toBeInTheDocument();
+    expect(screen.queryByText('nur Einsatzleitung, Führungspersonal oder Org-Admin')).toBeNull();
+  });
+
+  it('LFH-1066: ein Admin einer fremden Org als Führungspersonal bearbeitet weiter', async () => {
+    setup({ einsatz: { meine_rolle: 'fuehrungspersonal' }, benutzer: { ...admin, org_id: 2 } });
+    expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+  });
+
   it('versteckt den Bearbeiten-Button bei abgeschlossenem Einsatz', async () => {
     setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
     await screen.findByText('Realeinsatz');
@@ -455,8 +479,7 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('blendet Verwaltungs-Aktionen für Führungspersonal aus', async () => {
-    // Benutzer ohne System-Admin: sonst gewährte der admin-globale Zweig die Leitungsrechte auch
-    // dem Führungspersonal-Konto.
+    // Benutzer ohne System-Admin: so prüft der Fall allein die Einsatzrolle.
     setup({
       einsatz: { meine_rolle: 'fuehrungspersonal' },
       benutzer: { ...admin, system_rolle: 'keiner' },

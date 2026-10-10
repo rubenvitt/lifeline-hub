@@ -17,6 +17,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | [Anmelden und Abmelden](kapitel/anmelden-abmelden.md) | Alle, Gekoppelte Geräte |
 | [Arbeiten ohne Netz](kapitel/ohne-netz.md) | Alle, Führung |
 | [Gerät verloren](kapitel/geraet-verloren.md) | Alle, Administration |
+| [Rechte im Einsatz](kapitel/rechte-im-einsatz.md) | Führung, Administration |
 
 ## Lesergruppen
 

@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import { bereitstellungsraumDetailPfad, einsaetzePfad, einsatzPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
-import { useAuth } from '../../auth/AuthContext';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
@@ -26,7 +25,6 @@ import { modulName } from '../../einsatz/modulRegistry';
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const navigate = useNavigate();
 
   const einsatzQuery = useQuery({
@@ -40,7 +38,7 @@ export default function BereitstellungsraeumePage() {
 
   const [anlegen, setAnlegen] = useState(false);
 
-  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data);
 
   // Schnellaktion: ?neu=1 öffnet den Anlege-Drawer (Sprungpalette, LFH-506). Gelesen auf der
   // LISTEN-Route — `BereitstellungsraeumeDefault` am baren Modulpfad liest den Parameter nicht,

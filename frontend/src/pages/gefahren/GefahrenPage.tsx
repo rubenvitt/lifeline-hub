@@ -14,7 +14,6 @@ import {
 } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
-import { useAuth } from '../../auth/AuthContext';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
 import { warnstufeKarte } from '../../theme/statusFarben';
@@ -61,7 +60,6 @@ export default function GefahrenPage() {
   const einsatzId = Number(id);
   // Sprünge auf die Lagekarte nur, wenn sie frei ist (LFH-888, design.md D4).
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
 
   const { token } = theme.useToken();
@@ -144,7 +142,7 @@ export default function GefahrenPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
 
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   // Seitenkopf für alle Zweige unterhalb des Einsatzes (Laden, Fehler, leer, Matrix).
   const seite = (inhalt: ReactNode, dataUpdatedAt?: number) => (

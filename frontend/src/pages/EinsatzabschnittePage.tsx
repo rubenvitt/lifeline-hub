@@ -18,7 +18,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
@@ -120,7 +119,6 @@ interface AbschnittWerte {
 export default function EinsatzabschnittePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
@@ -173,7 +171,7 @@ export default function EinsatzabschnittePage() {
   // entsteht. Warten bis der Einsatz geladen ist; Param immer löschen, Entwurf nur bei
   // Schreibrecht.
   const [searchParams, setSearchParams] = useSearchParams();
-  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
@@ -362,7 +360,7 @@ export default function EinsatzabschnittePage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   /**
    * Listenzustand der Gliederungs-Karte — der Fehler allein reicht als Bedingung nicht. Ohne

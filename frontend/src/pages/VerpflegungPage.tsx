@@ -166,7 +166,7 @@ export default function VerpflegungPage() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const freigaben = freigabenQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
 
   // Nachforderungen nur bei bedienbarem Modul — und erst, wenn die Freigaben bekannt sind
   // (`istKeyFreigegeben` gibt bei unbekannten Freigaben nichts frei). Ein 403 bleibt still.

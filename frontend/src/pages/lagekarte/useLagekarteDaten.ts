@@ -9,7 +9,6 @@ import { ladeBetreuung } from '../../api/betreuung';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
-import { useAuth } from '../../auth/AuthContext';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { ladeKarteConfig } from '../../api/karte';
@@ -84,7 +83,6 @@ export function useLagekarteDaten({
   aktiveAnsichtId,
   quelle = { typ: 'live' },
 }: LagekarteDatenArgs) {
-  const { benutzer } = useAuth();
   // Kartenstil-Module (`marker.ts`, `zonenStil.ts`) erzeugen MapLibre-`paint`-Werte und haben
   // keinen `useToken()`-Zugang; diese Ebene reicht den Token des aktiven Modus durch, statt ihn aus
   // `document.documentElement` zu raten.
@@ -300,7 +298,7 @@ export function useLagekarteDaten({
   const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
 
   // Schreibsperre im Historien-Modus: hart `false` → alle UI-Schreibpfade (prop-gegatet) fallen weg.
-  const darfSchreiben = istSnapshot ? false : darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = istSnapshot ? false : darfImEinsatzSchreiben(einsatz);
 
   // Ansichts-Filter (client-seitig): Objekte der aktiven Ansicht plus die ansichtslosen. `== null`
   // fängt `null` und das per skip_serializing_if weggelassene Feld.

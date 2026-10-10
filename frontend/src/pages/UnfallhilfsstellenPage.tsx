@@ -5,7 +5,6 @@ import { einsaetzePfad, einsatzPfad, uhsDetailPfad } from '../routing/deeplinks'
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
@@ -26,7 +25,6 @@ import { modulName } from '../einsatz/modulRegistry';
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   // Live-Updates über useEinsatzLiveStream im EinsatzLayout.
 
   const einsatzQuery = useQuery({
@@ -40,7 +38,7 @@ export default function UnfallhilfsstellenPage() {
 
   const [anlegen, setAnlegen] = useState(false);
 
-  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data);
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen.

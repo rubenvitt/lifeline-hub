@@ -6,7 +6,6 @@ import { Breadcrumb, Button, Skeleton } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
-import { useAuth } from '../../auth/AuthContext';
 import {
   istKeyFreigegeben,
   istSprungGesperrt,
@@ -289,7 +288,6 @@ export default function UeberblickPage() {
   const breit = abBreite('lg');
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useJetzt();
-  const { benutzer } = useAuth();
 
   const einsatzQ = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -408,7 +406,7 @@ export default function UeberblickPage() {
    * Schreibwege hängen am Einsatz-Schreibrecht. Solange der Einsatz lädt: gesperrt, aber ohne
    * Hinweis — ein beim Laden aufblitzender Grund wäre falsch.
    */
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   // Daten nur aus freien Quellen: der Cache eines gesperrten Moduls kann einen Altstand tragen.
   const personen = personenFrei ? personenQ.data : undefined;
   const personal = personalFrei ? personalQ.data : undefined;

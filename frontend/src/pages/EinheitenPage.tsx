@@ -25,7 +25,6 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { bildeEinheit, listeEinheiten } from '../api/einheiten';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -125,7 +124,6 @@ interface BildenWerte {
 export default function EinheitenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { message } = App.useApp();
@@ -202,7 +200,7 @@ export default function EinheitenPage() {
     );
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   // Erst nach dem Laden weiterleiten: vorher ist „gibt es die Einheit?" nicht beantwortbar.
   if (deeplinkZiel != null && einheiten.some((e) => e.id === deeplinkZiel)) {

@@ -35,9 +35,10 @@ import type {
 } from '../api/types';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import {
+  darfEinsatzVerwalten,
   darfImEinsatzSchreiben,
-  type BenutzerSchreibkontext,
-  type EinsatzSchreibkontext,
+  type BenutzerOrgKontext,
+  type EinsatzOrgKontext,
 } from '../einsatz/schreibrecht';
 import type { NetzRechte } from './fernmeldeskizze';
 import type { SkizzenAktionen } from './skizzenAktionen';
@@ -62,17 +63,18 @@ import type { SkizzenAktionen } from './skizzenAktionen';
 
 /** Das Recht je Quelle (D5, D8): Schreibrecht im Einsatz und, wo es eins gibt, das Modul frei. */
 export function skizzenRechte(
-  einsatz: EinsatzSchreibkontext,
-  benutzer: BenutzerSchreibkontext,
+  einsatz: EinsatzOrgKontext,
+  benutzer: BenutzerOrgKontext,
   freigaben: ModulFreigaben | undefined,
 ): NetzRechte {
-  const schreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const schreiben = darfImEinsatzSchreiben(einsatz);
   const frei = (key: string) => schreiben && istKeyFreigegeben(key, freigaben);
   return {
     einsatzabschnitte: frei('einsatzabschnitte'),
     einheiten: frei('einheiten'),
-    // `EinsatzVerwaltungszugriff`: Schreibrecht oder Admin im aktiven Einsatz, kein Modul.
-    verwaltung: schreiben,
+    // `EinsatzVerwaltungszugriff`: Schreibrecht oder Admin der Einsatz-Org im aktiven Einsatz, kein
+    // Modul (LFH-1066).
+    verwaltung: darfEinsatzVerwalten(einsatz, benutzer),
     stab: frei('stab'),
   };
 }

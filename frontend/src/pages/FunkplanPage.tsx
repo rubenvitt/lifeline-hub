@@ -548,8 +548,7 @@ export default function FunkplanPage() {
 
   // Das Netz EINMAL (LFH-893): Skizze, Lücken-Paneel und Übernahme lesen dasselbe. Die Rechte je
   // Quelle bestimmen, was die Fläche anbietet; ohne Verbindung bietet sie nichts an.
-  const darfSkizzeSchreiben =
-    darfImEinsatzSchreiben(einsatzQuery.data, benutzer) && !ohneVerbindung;
+  const darfSkizzeSchreiben = darfImEinsatzSchreiben(einsatzQuery.data) && !ohneVerbindung;
   const rechte = useMemo(
     () => (darfSkizzeSchreiben ? skizzenRechte(einsatzQuery.data, benutzer, freigaben) : undefined),
     [darfSkizzeSchreiben, einsatzQuery.data, benutzer, freigaben],
@@ -706,12 +705,10 @@ export default function FunkplanPage() {
   // freigegeben (Freigaben vom Server, LFH-669). Solange eine Quelle lädt, stünde „lädt“ im
   // unveränderlichen Bericht.
   const darfUebernehmen =
-    darfImEinsatzSchreiben(einsatz, benutzer) &&
-    istKeyFreigegeben('lageberichte', stabFreigabe.freigaben);
+    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('lageberichte', stabFreigabe.freigaben);
   // Befehle hängen am Modul Aufträge (`src/routes/befehl.rs`, `MODUL_KEY`).
   const darfInBefehl =
-    darfImEinsatzSchreiben(einsatz, benutzer) &&
-    istKeyFreigegeben('auftraege', stabFreigabe.freigaben);
+    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('auftraege', stabFreigabe.freigaben);
   const quellenLaden = [...Object.values(quellen), stellen, skizzenDaten].some(
     (q) => q.zustand === 'laden',
   );

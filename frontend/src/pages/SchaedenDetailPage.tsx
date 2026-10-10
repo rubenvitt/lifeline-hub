@@ -12,7 +12,6 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import {
   aktualisiereSchaden,
   ladeSchaden,
@@ -57,7 +56,6 @@ export default function SchaedenDetailPage() {
   const einsatzId = Number(id);
   // Verortungsauftrag nur in eine freie Lagekarte (LFH-888, design.md D4).
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
-  const { benutzer } = useAuth();
   const schadenId = Number(schadenIdParam);
   const idGueltig = parseRouteId(schadenIdParam) != null;
   const navigate = useNavigate();
@@ -194,7 +192,7 @@ export default function SchaedenDetailPage() {
   const s = detailQuery.data;
   const orgId = einsatz.org_id ?? 0;
 
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   // Eine Eingabe-Zelle: im Edit-Modus ein noStyle-Form.Item an der Stelle der Anzeige — dasselbe
   // Datenraster bleibt stehen. Die Regeln bleiben am Formular der Seite.

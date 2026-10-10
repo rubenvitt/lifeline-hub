@@ -27,7 +27,6 @@ import type {
   SkizzenVerbindung,
   VerbindungPatch,
 } from '../api/types';
-import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -297,7 +296,6 @@ type Dialog =
 export default function KommunikationsplanPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const { token } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const druckt = useDruckModus();
@@ -437,7 +435,7 @@ export default function KommunikationsplanPage() {
     setDialog(d);
   };
 
-  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
   const mitAktionen = darfSchreiben && !druckt;
   const spalten = useMemo(
     () =>

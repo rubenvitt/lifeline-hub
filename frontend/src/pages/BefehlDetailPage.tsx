@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, befehlDetailPfad, auftraegePfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
@@ -43,7 +42,6 @@ export default function BefehlDetailPage() {
 function BefehlDetail() {
   const { id, befehlId: befehlIdParam } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const befehlId = Number(befehlIdParam);
   const idGueltig = parseRouteId(befehlIdParam) != null;
   const { message } = App.useApp();
@@ -214,7 +212,7 @@ function BefehlDetail() {
   const befehl = befehlQuery.data;
   const v = vorlage(befehl.vorlage);
   const istEntwurf = befehl.status === 'entwurf';
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   /**
    * Druckkopf im Entwurf aus dem Formular (LFH-731): das Titel-Feld ist im Druck ausgeblendet, das
    * Papier trägt den Titel nur noch im Kopf. Der gespeicherte Titel verlöre dort eine ungespeicherte

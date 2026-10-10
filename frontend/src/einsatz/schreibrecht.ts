@@ -10,8 +10,10 @@ import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
  * Aufrufort und werden dort mit `lokal && darfImEinsatzSchreiben(...)` verknüpft. Die ORG-Achse
  * (`darfVerwaltung`) steht am Dateiende mit eigenem Kontext-Typ.
  *
- * Norm: `aktiv && (EL || FüPers || System-Admin)`. Reine UI-Schranke; die verbindliche
- * Autorisierung erzwingt das Backend.
+ * Norm: `aktiv && (EL || FüPers)`. Die System-Rolle Admin schreibt in Modulen nur mit
+ * Einsatzrolle, wie der Server (`EinsatzSchreibzugriff`, LFH-1118); ohne Rolle bleiben ihm nur die
+ * Verwaltungswege der eigenen Org (`darfEinsatzVerwalten`, `darfModuleVerwalten`). Reine
+ * UI-Schranke; die verbindliche Autorisierung erzwingt das Backend.
  */
 
 /** Nur die zwei Einsatz-Felder, die die Regel braucht — `Pick` + nullable, damit
@@ -38,13 +40,12 @@ export function istEinsatzLeitung(einsatz?: EinsatzSchreibkontext): boolean {
   return einsatz?.meine_rolle === 'einsatzleitung';
 }
 
-/** Leitungs-Schreibrecht: aktiver Einsatz UND (Einsatzleitung ODER System-Admin) — für
-    Leitungsaktionen (Mitglieder/Module verwalten, ETB abschließen, Abgleich entscheiden). */
-export function darfEinsatzLeiten(
-  einsatz?: EinsatzSchreibkontext,
-  benutzer?: BenutzerSchreibkontext,
-): boolean {
-  return einsatz?.status === 'aktiv' && (istEinsatzLeitung(einsatz) || istAdmin(benutzer));
+/** Leitungs-Schreibrecht: aktiver Einsatz UND Einsatzleitung — für Leitungsaktionen (Mitglieder
+    verwalten, Einsatz abschließen, Abgleich entscheiden, Pressemitteilung freigeben). Kein
+    Admin-Zweig und darum kein Benutzer-Parameter: der Server (`EinsatzLeitungszugriff`) fragt
+    allein die Einsatzrolle (LFH-1118). */
+export function darfEinsatzLeiten(einsatz?: EinsatzSchreibkontext): boolean {
+  return einsatz?.status === 'aktiv' && istEinsatzLeitung(einsatz);
 }
 
 /** Einsatz-Kontext mit Org — nur für Rechte, deren Admin-Zweig an der Einsatz-Org hängt. Eigener
@@ -68,17 +69,29 @@ export function darfModuleVerwalten(
   return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
 }
 
-/** Allgemeines Einsatz-Schreibrecht: aktiver Einsatz UND (Einsatzleitung ODER Führungspersonal
-    ODER System-Admin) — die Norm für die Schreib-UI aller Einsatz-Module. */
-export function darfImEinsatzSchreiben(
-  einsatz?: EinsatzSchreibkontext,
-  benutzer?: BenutzerSchreibkontext,
+/** Verwaltungsangaben des Einsatzes ändern (LFH-1066): Kopfdaten, Einstellungen und
+    Führungsstelle. Aktiver Einsatz UND (Einsatzleitung ODER Führungspersonal ODER System-Admin der
+    Einsatz-Org) — wie der Server (`EinsatzVerwaltungszugriff`). Der Admin einer fremden Org liest
+    nur; eine Mitgliedschaft trägt auch über die Org-Grenze. */
+export function darfEinsatzVerwalten(
+  einsatz: EinsatzOrgKontext,
+  benutzer: BenutzerOrgKontext,
 ): boolean {
+  if (einsatz?.status !== 'aktiv') return false;
+  if (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal') {
+    return true;
+  }
+  return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
+}
+
+/** Allgemeines Einsatz-Schreibrecht: aktiver Einsatz UND (Einsatzleitung ODER Führungspersonal)
+    — die Norm für die Schreib-UI aller Einsatz-Module. Kein Admin-Zweig und darum kein
+    Benutzer-Parameter: der Server (`EinsatzSchreibzugriff`) lehnt den Admin ohne Schreibrolle mit
+    403 ab (LFH-1118). */
+export function darfImEinsatzSchreiben(einsatz?: EinsatzSchreibkontext): boolean {
   return (
     einsatz?.status === 'aktiv' &&
-    (einsatz?.meine_rolle === 'einsatzleitung' ||
-      einsatz?.meine_rolle === 'fuehrungspersonal' ||
-      istAdmin(benutzer))
+    (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal')
   );
 }
 

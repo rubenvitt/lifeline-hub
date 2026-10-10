@@ -542,7 +542,7 @@ export default function EtbPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   /**
    * Der Zustandsraum des Tagebuchs, dritter und vierter Teil: leer mit und ohne Filter. Laden und

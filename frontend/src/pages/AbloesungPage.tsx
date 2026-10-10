@@ -36,7 +36,6 @@ import {
   zuflussText,
   type Zuflussstand,
 } from '../abloesung/zufluss';
-import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -88,7 +87,6 @@ type Rhythmusziel =
 export default function AbloesungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token } = useRollen();
@@ -124,9 +122,7 @@ export default function AbloesungPage() {
     queryKey: einsatzKeys.abloesungVorgaben(einsatzId),
     queryFn: () => listeAbloesungVorgaben(einsatzId),
   });
-  const darfSchreiben = einsatzQuery.data
-    ? darfImEinsatzSchreiben(einsatzQuery.data, benutzer)
-    : false;
+  const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
   // Die Einheiten braucht nur, wer Schichten beginnen oder Ablöser wählen darf.
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),

@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
-import type { BenutzerAnzeige, EinsatzAnzeige, ModulFreigaben, Stab } from '../api/types';
+import type { EinsatzAnzeige, ModulFreigaben, Stab } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -37,7 +37,6 @@ function alsWire(ms: number): string {
 interface Props {
   einsatzId: number;
   einsatz: EinsatzAnzeige;
-  benutzer: BenutzerAnzeige | null;
   freigaben: ModulFreigaben | undefined;
   stab: Stab | undefined;
   stabZustand: AbrufZustand;
@@ -56,7 +55,6 @@ interface Props {
 export default function VorbereitungPaneel({
   einsatzId,
   einsatz,
-  benutzer,
   freigaben,
   stab,
   stabZustand,
@@ -124,7 +122,7 @@ export default function VorbereitungPaneel({
   // (Freigabe vom Server; solange sie fehlt, gilt das Modul als nicht frei).
   // Solange eine Quelle lädt, stünde „lädt" im Bericht — der Knopf ist dann gesperrt.
   const darfUebernehmen =
-    darfImEinsatzSchreiben(einsatz, benutzer) && istKeyFreigegeben('lageberichte', freigaben);
+    darfImEinsatzSchreiben(einsatz) && istKeyFreigegeben('lageberichte', freigaben);
 
   const uebernehmen = useMutation({
     mutationFn: async () => {

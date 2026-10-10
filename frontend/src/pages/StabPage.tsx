@@ -7,7 +7,6 @@ import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
 import type { Sachgebiet } from '../api/types';
-import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { Paneel } from '../components/instrument';
@@ -59,7 +58,6 @@ import { stabZeilenzielStil } from '../stab/zeilenziel';
 export default function StabPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const { token } = theme.useToken();
   const { istSchmal } = useViewport();
   const { message } = App.useApp();
@@ -91,7 +89,7 @@ export default function StabPage() {
 
   // Vor den frühen Returns (Hook-Reihenfolge): der `?neu=1`-Leser darunter braucht das Recht, bevor
   // der Einsatz sicher geladen ist. `darfImEinsatzSchreiben` liefert für `undefined` false.
-  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
   const stabDa = stabQuery.data != null;
   // Ohne Stand fehlte der bestehende Termin zur Vorbelegung — ein unverändertes Absenden schickte
   // `naechste_at: null` und löschte ihn.
@@ -198,7 +196,6 @@ export default function StabPage() {
       <VorbereitungPaneel
         einsatzId={einsatzId}
         einsatz={einsatz}
-        benutzer={benutzer}
         freigaben={freigabenQuery.data}
         stab={stabQuery.data}
         stabZustand={abrufZustand(stabQuery)}

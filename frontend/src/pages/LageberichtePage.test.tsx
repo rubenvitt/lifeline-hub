@@ -147,10 +147,12 @@ describe('LageberichtDetailPage', () => {
   it('Entwurf-Editor stellt die Abschnitts-Felder mit autoSize statt fixer Mini-Höhe dar', async () => {
     setupDetail(lagebericht7Abschnitte);
     const feld = (await screen.findByLabelText('Auftrag')) as HTMLTextAreaElement;
-    // autoSize lässt das Feld mit dem Inhalt wachsen und schaltet den nativen Resize-Griff ab.
-    // autoSize löst in rc-textarea eine Resize-Messung aus, die overflowY:hidden setzt; ein fixer
-    // rows-Kasten hat kein Inline-Style.
-    expect(feld.style.overflowY).toBe('hidden');
+    // autoSize lässt das Feld mit dem Inhalt wachsen und schaltet den nativen Resize-Griff ab:
+    // rc-textarea setzt dafür `resize: none` und eine gemessene Höhe als Inline-Style; ein fixer
+    // rows-Kasten hat keins. (Das frühere `overflowY: hidden` steht nur während der Messung und
+    // hing am Zeitpunkt des Renderns.)
+    await waitFor(() => expect(feld.style.resize).toBe('none'));
+    expect(feld.style.height).not.toBe('');
     expect(feld).not.toHaveAttribute('rows', '4');
   });
 

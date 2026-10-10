@@ -258,6 +258,24 @@ Spec `passwort-anmeldung`, Herleitung
   Kontofilter wird wie beim Schreiben gekürzt (`benutzername::fuer_protokoll`) und mit
   `COLLATE NOCASE` verglichen; Nachweis `tests/zugangsprotokoll.rs`.
 
+## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
+
+- **Ein System-Admin schreibt ohne Mitgliedschaft nur an Einsätzen seiner eigenen Org**; lesen
+  darf er serverweit (Org-Floor, `darf_fremdeinsatz_lesen`). Eine Mitgliedschaft mit
+  Schreibrolle trägt über die Org-Grenze. Fremd ohne Mitgliedschaft: 403, vor dem 409 des
+  Freeze.
+- Kopfdaten, Einstellungen und Führungsstelle tragen das zentral über
+  `EinsatzVerwaltungszugriff` (`fordere_schreibrecht_oder_admin`); Frist-PUT, Kategorien-Frist,
+  Original-Abruf und Modul-Override prüfen `benutzer.org_id == einsatz.org_id` im Handler. Ein
+  neuer Admin-Schreibweg nimmt den Extractor oder dieselbe Prüfung, nie `ist_admin()` allein.
+- Der Client spiegelt das über `BenutzerAnzeige.org_id` (`darfEinsatzVerwalten`,
+  `darfModuleVerwalten` in `frontend/src/einsatz/schreibrecht.ts`). Nachweis
+  `tests/einsatz_verwaltungsrecht.rs`.
+- **Modul-Schreibwege nur mit Einsatzrolle, auch für den Admin** (LFH-1118):
+  `EinsatzSchreibzugriff`, `EinsatzLeitungszugriff` und `fordere_schreibrecht` fragen allein die
+  Rolle. Ihr Client-Spiegel `darfImEinsatzSchreiben`/`darfEinsatzLeiten` nimmt darum keinen
+  Benutzer; eine Admin-Ausnahme gehört in eine Verwaltungsprüfung, nie in diese beiden.
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und

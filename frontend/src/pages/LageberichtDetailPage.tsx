@@ -17,7 +17,6 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, lageberichtePfad, lageberichtDetailPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import {
@@ -70,7 +69,6 @@ export default function LageberichtDetailPage() {
 function LageberichtDetail() {
   const { id, lbId } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const berichtId = Number(lbId);
   const idGueltig = parseRouteId(lbId) != null;
   const { message } = App.useApp();
@@ -291,7 +289,7 @@ function LageberichtDetail() {
   const bericht = berichtQuery.data;
   const v = vorlage(bericht.vorlage);
   const istEntwurf = bericht.status === 'entwurf';
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   /**
    * Druckkopf im Entwurf aus dem Formular (LFH-731): Titel- und Zeitstand-Feld sind im Druck
    * ausgeblendet, das Papier trägt beide nur noch im Kopf. Der gespeicherte Stand verlöre dort eine

@@ -115,9 +115,7 @@ export default function BetreuungPage() {
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),
   });
-  const darfSchreiben = einsatzQuery.data
-    ? darfImEinsatzSchreiben(einsatzQuery.data, benutzer)
-    : false;
+  const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
   // Die Abschnitte braucht nur, wer anlegen oder bearbeiten darf.
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),

@@ -6,7 +6,6 @@ import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import {
   ERINNERUNGEN_SEITE,
@@ -33,7 +32,6 @@ import { modulName } from '../einsatz/modulRegistry';
 export default function ErinnerungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { token } = useRollen();
@@ -127,7 +125,7 @@ export default function ErinnerungenPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const offene = offeneQuery.data ?? [];
   const offenZahl = kennzahlenQuery.data?.offen ?? offene.length;
   const abgeschlossenZahl = kennzahlenQuery.data?.abgeschlossen ?? abgeschlossene.length;

@@ -62,7 +62,7 @@ export default function UhsDetailPage() {
   const pfade = useEinsatzPfade();
   // Am Gerät stehen Material und Dateien im Bereich „UHS“ des Laptops (`geraet/GeraetStellePage`),
   // nicht unter dem Grundriss; hier bleibt dort nur der Verlauf.
-  const { benutzer, geraet } = useAuth();
+  const { geraet } = useAuth();
   const reiterListe: Reiter[] = [
     ...(!geraet && darf('uhs-material') ? (['material'] as const) : []),
     // LFH-1045: die Kräfte der UHS; der Laptop führt sie im Bereich „UHS“.
@@ -174,7 +174,7 @@ export default function UhsDetailPage() {
 
   const einsatz = einsatzQuery.data;
   const uhs = detailQuery.data;
-  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer);
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz);
   const verwalten = !schreibgeschuetzt && darf('uhs-verwalten');
 
   // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
