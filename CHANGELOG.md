@@ -1,3 +1,49 @@
+## [1.0.0-alpha.102](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.101...v1.0.0-alpha.102) (2026-10-10)
+
+### Wichtige Änderungen
+
+**Zugriffsrechte:** System-Administratoren können jetzt nur noch Einsätze der eigenen Organisation verwalten. Administratoren ohne Einsatzrolle (Einsatzleitung oder Führungspersonal) können in Einsätzen nicht mehr schreiben – auch nicht an Modulen wie Einsatztagebuch, Meldungen oder Betroffenen.
+
+### Verwaltung
+
+**Zugangsprotokoll:** Neue Seite „Zugangsprotokoll" für System-Administratoren mit zwei Spuren: Anmeldungen/Abmeldungen und administrative Zugangsänderungen (Rechte, Sperren, Passwörter). Filter nach Zeitraum, Konto und Ereignis. Rechtliche Prüfpunkte (Beschäftigtendaten, Speicherdauer, Mitbestimmung) sind in der Betriebsdokumentation beschrieben.
+
+**Datenträgerverschlüsselung:** Der Server prüft beim Start und stündlich, ob Datenverzeichnis, Sicherungsverzeichnis und Auslagerung auf verschlüsselten Datenträgern liegen (Linux: dm-crypt, macOS: FileVault, Windows: BitLocker). Bei unverschlüsselten oder unbekannten Datenträgern erscheint eine Warnleiste für System-Administratoren. Der Betrieb wird dadurch nicht blockiert.
+
+**Zugriffsrechte:** Die Seiten „Einsatzdaten", „Einstellungen" und „Führungsstelle" (in der Fernmeldeskizze) können nur noch von Einsatzleitung, Führungspersonal oder Administratoren der Einsatz-Organisation bearbeitet werden. Administratoren anderer Organisationen können weiterhin lesen.
+
+### Einsatztagebuch
+
+**Fehlermeldungen:** Abgelehnte Speichervorgänge erscheinen jetzt direkt im Eingabefeld oder Dialog mit Begründung, nicht mehr nur als Toast-Benachrichtigung. Dialoge schließen sich erst nach erfolgreichem Speichern. Betrifft: ETB-Erfassung, Zeitachse, Lesemarke, Wiedervorlage und Aufträge.
+
+### Meldungen, Erinnerungen und Chat
+
+**Fehlermeldungen:** Abgelehnte Speichervorgänge zeigen den Grund direkt im Dialog, an der Karte oder als Seitenhinweis. Dialoge warten auf die Antwort und schließen erst bei Erfolg. Betrifft auch Karten, die durch Filter oder Suche ausgeblendet sind.
+
+### Kräfte und Mittel
+
+**Fehlermeldungen:** Abgelehnte Speichervorgänge erscheinen jetzt direkt im Dialog, an der Zeile, Karte oder als Seitenhinweis statt als Toast. Betrifft: Fahrzeuge, Material, Personal, Einheiten, Abschnitte, Kräfteübersicht, Ablösung, Ad-hoc-Personen, Nachforderungen und Verpflegung. Bemerkungen und Mengenangaben warten auf die Antwort und senden abgelehnte Werte nicht erneut.
+
+**Meldebild drucken:** Das gedruckte Meldebild zeigt jetzt nur noch die Grundspalten für bessere Lesbarkeit auf A4. Zusatzspalten bleiben am Bildschirm sichtbar.
+
+### Betroffene und Schäden
+
+**Datenschutz offline:** Betroffenen-Listen speichern beim Übergang in den Offline-Betrieb keine Freitextfelder mehr auf dem Gerät: Adresse, Melderkontakt, Notiz, Zustand und Fundort bleiben weg. Ohne Netzverbindung werden diese Felder als „nicht geladen" angezeigt.
+
+**Fehlermeldungen:** Abgelehnte Speichervorgänge erscheinen direkt im Dialog, am Formular, an der Zeile oder als Seitenhinweis. Rückfragen warten auf die Antwort. Betrifft: Personen, Unterkünfte und Hilfestellen, Bedarfs- und Ressourcenmeldungen, Tiere und Schäden.
+
+### Drucken
+
+**Safari-Kompatibilität:** Druckstücke (Lagebericht-Entwurf, Befehl, Meldebild, Einsatztagebuch) werden in Safari nicht mehr abgeschnitten. Schriften werden jetzt über die FontFace-API geladen, wodurch WebKit die Seiten korrekt zählt.
+
+### Betrieb und Installation
+
+**Eingabebegrenzung:** Anfragen werden ab sofort auf maximal 256 KiB begrenzt (bisher 2 MiB). Zu große Anfragen werden mit Statuscode 413 und dem Hinweis „Anfrage ist zu groß" abgelehnt. Ausnahmen: Zonen anlegen und Abschnittsflächen (320 KiB), damit die Geometrieprüfung die wirksame Grenze bleibt.
+
+**Einstellungen:** Die Pegel-Sektion zeigt Beobachtern jetzt die korrekte Begründung „nur Einsatzleitung und Führungspersonal", wenn sie keine Schreibrechte haben.
+
+**Kopfzeile:** Die Alarmmarke „Ton blockiert" bricht auf Handschirmen jetzt zeilenweise um, statt die Kopfzeile zu verdoppeln und die Seite springen zu lassen.
+
 ## [1.0.0-alpha.101](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.100...v1.0.0-alpha.101) (2026-10-10)
 
 ### Kommunikation
