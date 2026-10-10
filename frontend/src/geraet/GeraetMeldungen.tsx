@@ -9,7 +9,6 @@ import type { Meldung, MeldungPrioritaet, NeueMeldung } from '../api/types';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { Paneel, Segmentleiste } from '../components/instrument';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import MeldungKarte from '../meldungen/MeldungKarte';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
@@ -72,7 +71,6 @@ export default function GeraetMeldungen({
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const fehler = useFehlerMeldung();
   const [form] = Form.useForm<MeldungWerte>();
 
   // Erst mit eingehängtem Formular: ohne Schreibrecht (oder solange es unbekannt ist) fehlt es.
@@ -93,7 +91,9 @@ export default function GeraetMeldungen({
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);
     },
-    // Leeren übernimmt `ErfassungsFormular`, und nur nach Erfolg; abgelehnt bleibt der Wortlaut.
+    // Leeren übernimmt `ErfassungsFormular`, und nur nach Erfolg; abgelehnt bleibt der Wortlaut,
+    // und der Grund steht über „Meldung senden“ (`speicherung`, LFH-1077). Kein `onError`-Toast:
+    // Netz- und Leitungsfehler merkt die Funktion vor, nur eine fachliche Ablehnung kommt an.
     onSuccess: (ergebnis) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning('Offline vorgemerkt');
@@ -102,7 +102,6 @@ export default function GeraetMeldungen({
       qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
       message.success(`Meldung #${ergebnis.daten.lfd_nr} gesendet`);
     },
-    onError: fehler,
   });
 
   const absenden = (w: MeldungWerte) =>
@@ -132,6 +131,9 @@ export default function GeraetMeldungen({
             onFertig={() => {}}
             laeuft={senden.isPending}
             erfassenText="Meldung senden"
+            speicherung={senden}
+            speicherFehlerTitel="Meldung nicht gesendet"
+            speicherFehlerFallback="Senden fehlgeschlagen"
           >
             <Form.Item<MeldungWerte>
               name="inhalt"

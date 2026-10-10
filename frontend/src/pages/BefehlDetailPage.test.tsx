@@ -174,6 +174,64 @@ describe('BefehlDetailPage', () => {
     expect(await screen.findByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
   });
 
+  /**
+   * Speicherfehler an die Seite (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): der Grund
+   * steht über dem Inhalt, wo auch ein gescheitertes Speichern steht, nicht im Toast, und geht mit
+   * dem nächsten Versuch.
+   */
+  it('Fortschreiben abgelehnt: der Grund steht über dem Inhalt, ohne Toast, bis zum nächsten Versuch', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    vi.mocked(befehleApi.schreibeBefehlFort)
+      .mockRejectedValueOnce(new ApiError(409, 'Befehl ist schon fortgeschrieben'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderAt(7);
+    await userEvent.click(await screen.findByRole('button', { name: 'Fortschreiben' }));
+
+    const treffer = await screen.findByText('Befehl ist schon fortgeschrieben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    const alarm = treffer.closest('[role="alert"]') as HTMLElement;
+    expect(alarm).toHaveTextContent('Nicht fortgeschrieben');
+    // Über dem Inhalt, nicht im wandernden Aktionsblock; nicht auf Papier.
+    expect(alarm.closest('[data-lfh="befehl-aktionen"]')).toBeNull();
+    expect(alarm.closest('.befehl-no-print')).not.toBeNull();
+    expect(
+      alarm.compareDocumentPosition(screen.getByText(/^Zeitstand:/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Fortschreiben' }));
+    await waitFor(() => expect(screen.queryByText('Befehl ist schon fortgeschrieben')).toBeNull());
+    expect(befehleApi.schreibeBefehlFort).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * Auf schmalem Bildschirm klebt „Fortschreiben“ unten, der Grund steht oben außer Sicht: ein
+   * neuer Grund holt seinen Block in den Blick.
+   */
+  it('Fortschreiben abgelehnt: der Grund wird in den Blick geholt', async () => {
+    const zeige = vi.fn();
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = zeige;
+    try {
+      vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+      vi.mocked(befehleApi.schreibeBefehlFort).mockRejectedValueOnce(
+        new ApiError(409, 'Befehl ist schon fortgeschrieben'),
+      );
+      renderAt(7);
+      await userEvent.click(await screen.findByRole('button', { name: 'Fortschreiben' }));
+      const alarm = (await screen.findByText('Befehl ist schon fortgeschrieben')).closest(
+        '[role="alert"]',
+      ) as HTMLElement;
+
+      await waitFor(() => expect(zeige).toHaveBeenCalledWith({ block: 'nearest' }));
+      const ziel = zeige.mock.contexts[zeige.mock.calls.length - 1] as HTMLElement;
+      expect(ziel).toContainElement(alarm);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
   it('leitet bei ungültiger Befehl-ID auf den Reiter Befehle um (LFH-25, LFH-972)', async () => {
     const { router } = renderAt('abc');
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { Alert, Breadcrumb, Spin, Tabs } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -8,6 +9,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { parseAuftraegeReiter } from '../routing/deeplinks';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -30,6 +32,10 @@ export default function AuftraegePage() {
       // Kein History-Eintrag je Reiterwechsel: Zurück führt aus der Seite, nicht durch die Reiter.
       { replace: true },
     );
+
+  // Grund einer abgelehnten Rücknahme aus dem Rückgängig-Toast der Einzelaufträge: die Karte ist
+  // dann oft nicht mehr zu sehen, der Grund steht im Hinweis der Seite (LFH-1077).
+  const [seitenFehler, setSeitenFehler] = useState<unknown>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -54,6 +60,16 @@ export default function AuftraegePage() {
     // gehören dem jeweiligen Reiter (`Bereichskopf`) — die zwei Bereiche zählen Verschiedenes.
     <EinsatzSeite
       titel={modulName('auftraege')}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        seitenFehler != null && (
+          <SeitenHinweise
+            fehler={seitenFehler}
+            fehlerTitel="Nicht zurückgenommen"
+            fehlerFallback="Rücknahme fehlgeschlagen"
+          />
+        )
+      }
       breadcrumb={
         <Breadcrumb
           items={[
@@ -74,7 +90,13 @@ export default function AuftraegePage() {
           {
             key: 'auftraege',
             label: 'Einzelaufträge',
-            children: <AuftraegeListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />,
+            children: (
+              <AuftraegeListe
+                einsatzId={einsatzId}
+                darfSchreiben={darfSchreiben}
+                onSeitenFehler={setSeitenFehler}
+              />
+            ),
           },
           {
             key: 'befehle',

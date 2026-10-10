@@ -13,7 +13,6 @@ import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { ErfassungsModal } from '../components/Erfassung';
 import { anzahl } from '../anzeige/anzahl';
 
@@ -103,14 +102,13 @@ export default function BefehlListe({
     queryFn: () => listeBefehle(einsatzId),
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
-  const fehler = useFehlerMeldung();
 
   const navigate = useNavigate();
+  // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`), den Grund einer Ablehnung zeigt
+  // sie über `speicherung` im Dialog; kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“).
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeuerBefehl) => legeBefehlAn(einsatzId, daten),
-    // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`).
     onSuccess: invalidate,
-    onError: fehler,
   });
   /*
    * Angelegt ist nur ein ENTWURF; bearbeitet und freigegeben wird er auf der Detailseite (LFH-972).
@@ -192,6 +190,9 @@ export default function BefehlListe({
         form={form}
         erfassenText="Entwurf anlegen"
         laeuft={anlegenMutation.isPending}
+        speicherung={anlegenMutation}
+        speicherFehlerTitel="Entwurf nicht angelegt"
+        speicherFehlerFallback="Anlegen fehlgeschlagen"
         initialValues={{ vorlage: 'befehl_lad' }}
         onErfassen={async (w) => {
           neuerEntwurf.current = (await anlegenMutation.mutateAsync(w)).id;

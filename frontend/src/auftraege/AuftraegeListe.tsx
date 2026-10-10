@@ -39,7 +39,7 @@ import AuftragFormular from './AuftragFormular';
 import VollzugMeldenModal from './VollzugMeldenModal';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 
 /** Abgeschlossen nach der gemeinsamen Phasen-Semantik. */
 function istAuftragAbgeschlossen(a: Auftrag): boolean {
@@ -56,9 +56,16 @@ function vergleicheOffen(a: Auftrag, b: Auftrag): number {
 export default function AuftraegeListe({
   einsatzId,
   darfSchreiben,
+  onSeitenFehler,
 }: {
   einsatzId: number;
   darfSchreiben: boolean;
+  /**
+   * Grund einer abgelehnten Rücknahme für den Hinweis der Seite, `null` räumt ihn. Rückgängig kommt
+   * aus dem Toast, die Karte ist dann oft nicht mehr zu sehen (`frontend/AGENTS.md`, „Rückwege und
+   * Fehler“).
+   */
+  onSeitenFehler?: (fehler: unknown) => void;
 }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -159,7 +166,14 @@ export default function AuftraegeListe({
   // Inline-Anlegen-Formular: per Kopf-Button auf-/zugeklappt, kein Drawer/Modal.
   const [formOffen, setFormOffen] = useState(false);
 
-  const fehler = useFehlerMeldung();
+  /*
+   * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): Anlegen am Paneel, Quittieren an der Empfängerzeile, Statuswechsel und
+   * Abnahme an der Karte, Vollzug melden im Dialog. Die Gründe je Karte kommen aus den Callbacks
+   * der Mutationen, nicht aus `mutation.variables` (`components/useZeilenFehler.ts`).
+   */
+  const kartenFehler = useZeilenFehler<number>();
+  const quittierFehler = useZeilenFehler<number>();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
   // Optimistische Updates treffen jede Form unter dem Prefix, nie die Kennzahlen (D5).
   const aendere = (fn: (a: Auftrag) => Auftrag) =>
@@ -175,12 +189,21 @@ export default function AuftraegeListe({
       invalidiere();
       message.success('Auftrag erteilt');
     },
-    onError: fehler,
   });
+  // Auf- und Zuklappen räumen den Grund einer Ablehnung (Abbrechen räumt die Hülle); eine laufende
+  // Mutation bleibt unberührt.
+  const raeumeAnlegen = () => {
+    if (!anlegenMutation.isPending && anlegenMutation.error != null) anlegenMutation.reset();
+  };
+  const schalteFormular = (offen: boolean) => {
+    raeumeAnlegen();
+    setFormOffen(offen);
+  };
   const quittierenMutation = useMutation({
     mutationFn: ({ auftragId, empfaengerId }: { auftragId: number; empfaengerId: number }) =>
       quittiereEmpfaenger(einsatzId, auftragId, empfaengerId),
     onMutate: async ({ auftragId, empfaengerId }) => {
+      quittierFehler.beginne(auftragId);
       const queryKey = einsatzKeys.auftraege(einsatzId);
       await qc.cancelQueries({ queryKey });
       const vorher = qc.getQueriesData<unknown>({ queryKey }).flatMap(([cacheKey, daten]) => {
@@ -247,42 +270,53 @@ export default function AuftraegeListe({
           }),
         );
       }
-      fehler(e);
+      quittierFehler.melde(variablen.auftragId, e, 'Quittieren fehlgeschlagen');
     },
     onSettled: invalidiere,
   });
   const [vollzugFuer, setVollzugFuer] = useState<number | null>(null);
   /**
-   * Fortschaltung und Rücknahme laufen durch DIESELBE Mutation. Der Rückgängig-Toast erscheint
-   * nur bei `in_arbeit`: „Vollzogen" geht ins ETB (append-only) und ist über diese Achse nicht
-   * rücknehmbar — ein Knopf dafür liefe in ein 422.
+   * Der Rückgängig-Toast erscheint nur bei `in_arbeit`: „Vollzogen" geht ins ETB (append-only) und
+   * ist über diese Achse nicht rücknehmbar — ein Knopf dafür liefe in ein 422. Fortschalten,
+   * Rücknahme und „Vollzogen“ haben je eine Mutation, weil ihr Fehler an verschiedenen Orten steht:
+   * an der Karte, im Seitenhinweis, im Dialog.
    */
   // „Heute fällig“ nach dem Kalendertag der Anzeigezone (LFH-692).
   const { konventionen } = useAnzeigeKonventionen();
-  const vollzugMutation = useMutation({
-    mutationFn: ({
-      auftragId,
-      status,
-      text,
-    }: {
-      auftragId: number;
-      status: 'offen' | 'in_arbeit' | 'vollzogen';
-      text?: string;
-    }) => setzeVollzug(einsatzId, auftragId, status, text),
-    onSuccess: (_daten, { auftragId, status }) => {
+  // Die nächste Rücknahme räumt den Grund der vorigen.
+  const ruecknahmeMutation = useMutation({
+    mutationFn: (auftragId: number) => setzeVollzug(einsatzId, auftragId, 'offen'),
+    onMutate: () => onSeitenFehler?.(null),
+    onSuccess: invalidiere,
+    onError: (e) => onSeitenFehler?.(e),
+  });
+  const inArbeitMutation = useMutation({
+    mutationFn: (auftragId: number) => setzeVollzug(einsatzId, auftragId, 'in_arbeit'),
+    onMutate: (auftragId) => kartenFehler.beginne(auftragId),
+    onSuccess: (_daten, auftragId) => {
       invalidiere();
-      setVollzugFuer(null);
-      if (status !== 'in_arbeit') return;
       zeigeRueckgaengig(message, 'Auftrag in Bearbeitung', () =>
-        vollzugMutation.mutate({ auftragId, status: 'offen' }),
+        ruecknahmeMutation.mutate(auftragId),
       );
     },
-    onError: fehler,
+    onError: (e, auftragId) => kartenFehler.melde(auftragId, e, 'Statuswechsel fehlgeschlagen'),
+  });
+  const vollzugMeldenMutation = useMutation({
+    mutationFn: ({ auftragId, text }: { auftragId: number; text: string }) =>
+      setzeVollzug(einsatzId, auftragId, 'vollzogen', text),
+    // Eine neue Handlung an der Karte räumt deren alten Grund.
+    onMutate: ({ auftragId }) => kartenFehler.beginne(auftragId),
+    // Nur den eigenen Dialog schließen: steht er inzwischen für einen anderen Auftrag, bleibt er.
+    onSuccess: (_daten, { auftragId }) => {
+      invalidiere();
+      setVollzugFuer((f) => (f === auftragId ? null : f));
+    },
   });
   const abnahmeMutation = useMutation({
     mutationFn: (auftragId: number) => nimmAb(einsatzId, auftragId),
+    onMutate: (auftragId) => kartenFehler.beginne(auftragId),
     onSuccess: invalidiere,
-    onError: fehler,
+    onError: (e, auftragId) => kartenFehler.melde(auftragId, e, 'Abnahme fehlgeschlagen'),
   });
 
   /*
@@ -355,17 +389,16 @@ export default function AuftraegeListe({
    * Stabile Handler über einen Ref-Bündel (LFH-949, D6): ein je Render neuer Pfeil machte jede
    * `memo`-Karte bei jedem Render neu. Der Bündel trägt die jüngsten Mutationen.
    */
-  const mutationen = useRef({ quittierenMutation, vollzugMutation, abnahmeMutation });
+  const mutationen = useRef({ quittierenMutation, inArbeitMutation, abnahmeMutation });
   useLayoutEffect(() => {
-    mutationen.current = { quittierenMutation, vollzugMutation, abnahmeMutation };
+    mutationen.current = { quittierenMutation, inArbeitMutation, abnahmeMutation };
   });
   const onQuittieren = useCallback((auftragId: number, empfaengerId: number) => {
     const m = mutationen.current.quittierenMutation;
     if (!m.isPending) m.mutate({ auftragId, empfaengerId });
   }, []);
   const onInArbeit = useCallback(
-    (auftragId: number) =>
-      mutationen.current.vollzugMutation.mutate({ auftragId, status: 'in_arbeit' as const }),
+    (auftragId: number) => mutationen.current.inArbeitMutation.mutate(auftragId),
     [],
   );
   const onAbnehmen = useCallback(
@@ -383,6 +416,8 @@ export default function AuftraegeListe({
     onInArbeit,
     onVollzugMelden: setVollzugFuer,
     onAbnehmen,
+    kartenFehler: kartenFehler.grund,
+    quittierFehler: quittierFehler.grund,
   };
 
   return (
@@ -393,10 +428,13 @@ export default function AuftraegeListe({
         dataUpdatedAt={offeneQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (
+            // Solange ein Auftrag unterwegs ist, bleibt das Paneel offen: die Antwort braucht ihren
+            // Ort (design.md D3).
             <Button
               type="primary"
               icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
-              onClick={() => setFormOffen((o) => !o)}
+              disabled={formOffen && anlegenMutation.isPending}
+              onClick={() => schalteFormular(!formOffen)}
             >
               {formOffen ? 'Formular schließen' : 'Auftrag erteilen'}
             </Button>
@@ -413,7 +451,8 @@ export default function AuftraegeListe({
             <Button
               type="text"
               icon={<IconKreuz />}
-              onClick={() => setFormOffen(false)}
+              disabled={anlegenMutation.isPending}
+              onClick={() => schalteFormular(false)}
               aria-label="Formular schließen"
             />
           }
@@ -428,6 +467,10 @@ export default function AuftraegeListe({
             serie
             // mutateAsync: die Hülle darf die Felder nur leeren, wenn der Auftrag angekommen ist.
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
+            // Grund einer Ablehnung im Formular, bis zum nächsten Absenden; Abbrechen räumt ihn.
+            speicherung={anlegenMutation}
+            speicherFehlerTitel="Auftrag nicht erteilt"
+            speicherFehlerFallback="Erteilen fehlgeschlagen"
           />
         </Paneel>
       )}
@@ -537,9 +580,12 @@ export default function AuftraegeListe({
       <VollzugMeldenModal
         offen={vollzugFuer !== null}
         onAbbrechen={() => setVollzugFuer(null)}
+        speicherung={vollzugMeldenMutation}
+        // mutateAsync: der Dialog leert seinen Text erst, wenn die Meldung angekommen ist.
         onBestaetigen={(text) =>
-          vollzugFuer != null &&
-          vollzugMutation.mutate({ auftragId: vollzugFuer, status: 'vollzogen', text })
+          vollzugFuer == null
+            ? Promise.resolve()
+            : vollzugMeldenMutation.mutateAsync({ auftragId: vollzugFuer, text })
         }
       />
     </>

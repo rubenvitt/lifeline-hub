@@ -259,6 +259,143 @@ describe('Abschnittsgerät — Aufträge und Melden', () => {
   });
 });
 
+/**
+ * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): am Gerät wie
+ * am Board — Quittung und Statuswechsel an der Karte, Vollzug melden im Dialog; kein Toast.
+ */
+describe('Abschnittsgerät — Speicherfehler am Ort (LFH-1077)', () => {
+  const zweiter = {
+    ...auftrag,
+    id: 32,
+    lfd_nr: 10,
+    auftrag_text: 'Pegel Nord messen',
+    empfaenger: [empfaenger(3, { auftrag_id: 32, abschnitt_id: 21, snap_anzeige: 'UA Nord' })],
+    empfaenger_anzahl: 1,
+  } as Auftrag;
+  const karte = (id: number) =>
+    document.querySelector<HTMLElement>(`[data-auftrag-id="${id}"]`) as HTMLElement;
+
+  function mitZweiAuftraegen() {
+    stelleBereit();
+    server.use(http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json([auftrag, zweiter])));
+  }
+
+  it('Quittieren: der Grund steht an der Karte, die andere bleibt leer', async () => {
+    mitZweiAuftraegen();
+    server.use(
+      http.post('/api/einsaetze/7/auftraege/31/empfaenger/1/quittieren', () =>
+        HttpResponse.json({ error: 'Bereits quittiert' }, { status: 409 }),
+      ),
+    );
+    renderApp('/geraet/7/auftraege');
+    await screen.findByText('Pegel Nord messen');
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Empfang für UA Nord-Ost quittieren' }),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
+
+    expect(await within(karte(31)).findByText('Bereits quittiert')).toHaveAttribute('data-fehler');
+    expect(karte(32).querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('In Bearbeitung: der Grund steht an der Karte', async () => {
+    mitZweiAuftraegen();
+    server.use(
+      http.post('/api/einsaetze/7/auftraege/31/vollzug', () =>
+        HttpResponse.json({ error: 'Auftrag ist bereits vollzogen' }, { status: 422 }),
+      ),
+    );
+    renderApp('/geraet/7/auftraege');
+    await screen.findByText('Pegel Nord messen');
+    const user = userEvent.setup();
+    await user.click(within(karte(31)).getByRole('button', { name: 'Bearbeitung beginnen' }));
+
+    expect(await within(karte(31)).findByText('Auftrag ist bereits vollzogen')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(karte(32).querySelector('[data-fehler]')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('In Bearbeitung: die nächste Aktion an der Karte räumt ihren Grund', async () => {
+    mitZweiAuftraegen();
+    let versuch = 0;
+    server.use(
+      http.post('/api/einsaetze/7/auftraege/31/vollzug', () => {
+        versuch += 1;
+        // Der zweite Versuch bleibt offen: geräumt wird beim Absenden, nicht erst beim Erfolg.
+        return versuch === 1
+          ? HttpResponse.json({ error: 'Auftrag ist bereits vollzogen' }, { status: 422 })
+          : new Promise<Response>(() => {});
+      }),
+    );
+    renderApp('/geraet/7/auftraege');
+    await screen.findByText('Pegel Nord messen');
+    const user = userEvent.setup();
+    await user.click(within(karte(31)).getByRole('button', { name: 'Bearbeitung beginnen' }));
+    await within(karte(31)).findByText('Auftrag ist bereits vollzogen');
+
+    await user.click(within(karte(31)).getByRole('button', { name: 'Bearbeitung beginnen' }));
+    await waitFor(() => expect(versuch).toBe(2));
+    await waitFor(() => expect(karte(31).querySelector('[data-fehler]')).toBeNull());
+  });
+
+  it('Vollzug melden: der Erfolg schließt nur den Dialog seines Auftrags', async () => {
+    mitZweiAuftraegen();
+    let gibFrei: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (gibFrei = r));
+    server.use(
+      http.post('/api/einsaetze/7/auftraege/31/vollzug', async () => {
+        await freigabe;
+        return HttpResponse.json({ ...auftrag, bearbeitungsstatus: 'vollzogen' });
+      }),
+    );
+    renderApp('/geraet/7/auftraege');
+    await screen.findByText('Pegel Nord messen');
+    const user = userEvent.setup();
+    await user.click(within(karte(31)).getByRole('button', { name: 'Vollzug melden' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(
+      within(dialog).getByPlaceholderText('Rückmeldung zur Erledigung'),
+      'Deich gehalten',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Vollzug melden' }));
+    // Der Dialog wechselt den Auftrag, bevor die erste Meldung angekommen ist.
+    await user.click(within(karte(32)).getByRole('button', { name: 'Vollzug melden' }));
+    gibFrei();
+    await screen.findByText('Vollzug gemeldet');
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(document.querySelector('.ant-zoom-leave')).toBeNull();
+  });
+
+  it('Vollzug melden: der Grund steht im Dialog, der Text bleibt', async () => {
+    mitZweiAuftraegen();
+    server.use(
+      http.post('/api/einsaetze/7/auftraege/31/vollzug', () =>
+        HttpResponse.json({ error: 'Auftrag ist bereits abgenommen' }, { status: 422 }),
+      ),
+    );
+    renderApp('/geraet/7/auftraege');
+    await screen.findByText('Pegel Nord messen');
+    const user = userEvent.setup();
+    await user.click(within(karte(31)).getByRole('button', { name: 'Vollzug melden' }));
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByPlaceholderText('Rückmeldung zur Erledigung');
+    await user.type(feld, 'Deich gehalten');
+    await user.click(within(dialog).getByRole('button', { name: 'Vollzug melden' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Auftrag ist bereits abgenommen',
+    );
+    expect(feld).toHaveValue('Deich gehalten');
+    expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+});
+
 describe('Bausteine', () => {
   it('ordneEinheiten: der eigene Abschnitt zuerst, dann nach Abschnitt, Sortierung und Name', () => {
     const liste = ordneEinheiten(

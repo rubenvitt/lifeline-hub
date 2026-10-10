@@ -17,7 +17,8 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
   Paneel, auf Papier je Anlage ein Blatt A4 quer (`entwurf/dokumentAnlagen.css`; das Bild bleibt
   inline, als Block schob Chromium es auf ein eigenes Blatt). Die Druckfassung hängt immer im DOM,
   damit das Bild zum Druck geladen ist. Anfügen und Entfernen nur im Entwurf mit Schreibrecht; ohne
-  Anlage und ohne Anfügen steht nichts (Höhe der Entwurfsseite, `e2e/lagebericht-schmal.spec.ts`).
+  Anlage und ohne Anfügen steht nichts außer dem Grund eines gescheiterten Anfügens (Höhe der
+  Entwurfsseite, `e2e/lagebericht-schmal.spec.ts`).
   Live über `anlagen` am Ereignis des Dokuments, eigene Keys außerhalb des Offline-Lagebilds.
 - Lagebericht: Abschnitte als Akkordeon (`lageberichte/AbschnittsAkkordeon.tsx`, `memo`, alle
   Props identitätsstabil; Gate ist der Render-Zähler im Test, `rerender` mit neuem Element).

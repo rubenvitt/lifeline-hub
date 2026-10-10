@@ -8,6 +8,7 @@ import BefehlListe from './BefehlListe';
 import * as befehleApi from '../api/befehle';
 import { setzeViewportBreite } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
+import { ApiError } from '../api/client';
 import { server } from '../test/server';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
@@ -353,5 +354,59 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Titel')).toHaveValue('Befehl X');
     expect(screen.getByTestId('pfad')).toHaveTextContent(/^\/einsaetze\/1\/auftraege$/);
+  });
+
+  /**
+   * Der Grund steht IM Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
+   * Fehler“), bis zum nächsten Absenden; Abbrechen und erneutes Öffnen räumen ihn.
+   */
+  it('nennt den Grund einer Ablehnung im Dialog, nicht als Toast', async () => {
+    vi.mocked(befehleApi.legeBefehlAn).mockRejectedValue(
+      new ApiError(422, 'Titel ist bereits vergeben'),
+    );
+    const nutzer = userEvent.setup();
+    renderListe();
+    const dialog = await oeffneDialog(nutzer);
+    await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl X');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Entwurf anlegen' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Titel ist bereits vergeben',
+    );
+    expect(within(dialog).getByLabelText('Titel')).toHaveValue('Befehl X');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('das nächste Absenden räumt den Grund', async () => {
+    let gibFrei: (b: unknown) => void = () => {};
+    vi.mocked(befehleApi.legeBefehlAn)
+      .mockRejectedValueOnce(new ApiError(422, 'Titel ist bereits vergeben'))
+      .mockImplementationOnce(() => new Promise((r) => (gibFrei = r)) as never);
+    const nutzer = userEvent.setup();
+    renderListe();
+    const dialog = await oeffneDialog(nutzer);
+    await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl X');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Entwurf anlegen' }));
+    await within(dialog).findByRole('alert');
+
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Entwurf anlegen' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    gibFrei({ ...KETTE[2], id: 11 });
+  });
+
+  it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
+    vi.mocked(befehleApi.legeBefehlAn).mockRejectedValue(
+      new ApiError(422, 'Titel ist bereits vergeben'),
+    );
+    const nutzer = userEvent.setup();
+    renderListe();
+    const dialog = await oeffneDialog(nutzer);
+    await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl X');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Entwurf anlegen' }));
+    await within(dialog).findByRole('alert');
+
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    const wieder = await oeffneDialog(nutzer);
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 });

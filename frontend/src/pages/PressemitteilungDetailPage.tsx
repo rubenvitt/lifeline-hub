@@ -40,7 +40,6 @@ import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
 import { pressemitteilungStatus } from '../theme/statusFarben';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { NUR_LEITUNG } from '../components/nurAnsicht';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 // Dieselben Druck-Eigenheiten wie der Lagebericht: Akkordeon-Entwurf, Bedienung ausgeblendet.
@@ -147,7 +146,6 @@ function PressemitteilungDetail() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.presse(einsatzId) });
   };
-  const fehler = useFehlerMeldung();
 
   const speichern = (w: FormWerte) => {
     const v = mitteilungVorlage(pmQuery.data!.vorlage)!;
@@ -189,13 +187,16 @@ function PressemitteilungDetail() {
     },
   });
 
+  /**
+   * Kein `onError`: der Grund steht über dem Inhalt, im Block des Speicherfehlers (LFH-1077,
+   * `frontend/AGENTS.md`, „Rückwege und Fehler“), bis zum nächsten Versuch.
+   */
   const fortschreibenMutation = useMutation({
     mutationFn: () => schreibePressemitteilungFort(einsatzId, pmId),
     onSuccess: (neu: Pressemitteilung) => {
       invalidate();
       navigate(pressemitteilungPfad(einsatzId, neu.id));
     },
-    onError: fehler,
   });
 
   if (!idGueltig) return <Navigate to={pressePfad(einsatzId)} replace />;
@@ -343,9 +344,16 @@ function PressemitteilungDetail() {
           </div>
         }
       >
-        {schutz.speicherFehler != null && (
+        {/* Speichern gibt es nur im Entwurf, die Folgemeldung nur nach der Freigabe: es steht
+            höchstens ein Grund da. */}
+        {(schutz.speicherFehler ?? fortschreibenMutation.error) != null && (
           <div className="lagebericht-no-print" style={{ marginBottom: token.marginSM }}>
             <SpeicherFehler fehler={schutz.speicherFehler} />
+            <SpeicherFehler
+              fehler={fortschreibenMutation.error}
+              titel="Folgemeldung nicht angelegt"
+              fallback="Folgemeldung fehlgeschlagen"
+            />
           </div>
         )}
         {!(istEntwurf && darfSchreiben) && (

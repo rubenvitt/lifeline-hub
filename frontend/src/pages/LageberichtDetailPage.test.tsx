@@ -102,6 +102,47 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 });
 
 /**
+ * Speicherfehler an die Seite (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“) — Zwilling
+ * in `BefehlDetailPage.test.tsx`.
+ */
+describe('LageberichtDetailPage — gescheitertes Fortschreiben (LFH-1077)', () => {
+  it('der Grund steht über dem Inhalt, ohne Toast, bis zum nächsten Versuch', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+    vi.mocked(lageberichteApi.schreibeLageberichtFort)
+      .mockReset()
+      .mockRejectedValueOnce(new ApiError(409, 'Bericht ist schon fortgeschrieben'))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    renderBei('/einsaetze/1/lageberichte/9');
+    const knopf = await screen.findByRole('button', { name: 'Fortschreiben' });
+    await userEvent.click(knopf);
+
+    const treffer = await screen.findByText('Bericht ist schon fortgeschrieben');
+    expect(treffer.closest('.ant-message')).toBeNull();
+    const alarm = treffer.closest('[role="alert"]') as HTMLElement;
+    expect(alarm).toHaveTextContent('Nicht fortgeschrieben');
+    // Über dem Inhalt, nicht im Aktionsblock des Kopfes; nicht auf Papier.
+    const block = alarm.closest('.lagebericht-no-print');
+    expect(block).not.toBeNull();
+    expect(block).not.toContainElement(knopf);
+    expect(
+      alarm.compareDocumentPosition(screen.getByText(/^Zeitstand:/)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(knopf);
+    await waitFor(() => expect(screen.queryByText('Bericht ist schon fortgeschrieben')).toBeNull());
+    expect(lageberichteApi.schreibeLageberichtFort).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
  * ── Zeitstand in der Anzeigezone (LFH-350) ──
  *
  * `zeitstand` ist ein UTC-Wirestring ohne Zonenkennung; roh ausgegeben stünde er um den

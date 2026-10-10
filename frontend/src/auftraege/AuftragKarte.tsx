@@ -10,6 +10,8 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 const { Text } = Typography;
 
@@ -55,6 +57,13 @@ interface AuftragKarteProps {
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
   onAbnehmen?: (auftragId: number) => void;
+  /**
+   * Grund der zuletzt abgelehnten Karten-Aktion (In Bearbeitung, Rücknahme, Abnahme), aus
+   * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
+   */
+  fehlerGrund?: ZeilenGrund | null;
+  /** Grund der zuletzt abgelehnten Quittung an dieser Karte; steht an der Empfängerzeile. */
+  quittierFehlerGrund?: ZeilenGrund | null;
 }
 
 /**
@@ -76,6 +85,8 @@ function AuftragKarte({
   onInArbeit,
   onVollzugMelden,
   onAbnehmen,
+  fehlerGrund,
+  quittierFehlerGrund,
 }: AuftragKarteProps) {
   const { rollen } = useRollen();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
@@ -262,6 +273,17 @@ function AuftragKarte({
           ))}
         </Flex>
       )}
+      {/* Grund einer abgelehnten Quittung an der Empfängerzeile (LFH-1077, `frontend/AGENTS.md`,
+         „Rückwege und Fehler“). Außerhalb der Zeile, weil sie fehlt, sobald alle quittiert sind:
+         gerade „bereits quittiert“ bliebe sonst ungesagt. */}
+      {quittierFehlerGrund && (
+        <div style={{ marginBottom: 8 }}>
+          <ZeilenFehler
+            fehler={quittierFehlerGrund.fehler}
+            fallback={quittierFehlerGrund.fallback}
+          />
+        </div>
+      )}
 
       {ansicht === 'abgeschlossen' && (
         <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
@@ -313,6 +335,13 @@ function AuftragKarte({
         />
       )}
 
+      {/* Grund einer abgelehnten Karten-Aktion über ihren Knöpfen, bis zur nächsten Aktion an
+         dieser Karte (LFH-1077). */}
+      {fehlerGrund && (
+        <div style={{ marginTop: 8 }}>
+          <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
+        </div>
+      )}
       {aktionen.length > 0 && (
         <Flex justify="flex-end" gap={8} wrap style={{ marginTop: 8 }}>
           {aktionen}
