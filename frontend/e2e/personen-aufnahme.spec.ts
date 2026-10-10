@@ -107,6 +107,34 @@ test('die Aufnahme-Route zeigt dieselbe Maske und erfasst in Serie', async ({ pa
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/aufnahme`));
 });
 
+test('LFH-1142: nach „Speichern und nächste" sind beide Knöpfe sofort wieder bedienbar', async ({
+  page,
+}) => {
+  // Die Quittung allein belegt nicht, dass die nächste Person erfasst werden kann: sie steht schon,
+  // während die Knöpfe noch laden könnten. Belegt wird es, indem beide Knöpfe danach wirken —
+  // antd verschluckt den Klick auf einen ladenden Knopf, die zweite Quittung bliebe dann aus.
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Aufnahme bedienbar ${Date.now()}`);
+  await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
+  const serie = page.getByRole('button', { name: 'Speichern und nächste' });
+  const erfassen = page.getByRole('button', { name: 'Erfassen', exact: true });
+
+  await skFlaeche(page, 'SK I').click();
+  await serie.click();
+  await expect(page.getByText(/Erfasst als R-001 · SK I$/)).toBeVisible();
+  await expect(serie, 'Speichern und nächste lädt nicht mehr').not.toHaveClass(/ant-btn-loading/);
+  await expect(erfassen, 'Erfassen lädt nicht mehr').not.toHaveClass(/ant-btn-loading/);
+
+  await skFlaeche(page, 'SK II').click();
+  await serie.click();
+  await expect(page.getByText(/Erfasst als R-002 · SK II$/)).toBeVisible();
+  await expect(page.getByText(/Erfasst: 2/)).toBeVisible();
+
+  await skFlaeche(page, 'SK III').click();
+  await erfassen.click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
+});
+
 test('S7: die Erfassungszeile erfasst per Kürzel in Serie, ohne Dialog', async ({ page }) => {
   // Die Kurzeingabe: EINE Eingabe, Enter erfasst, das Feld ist danach leer und fokussiert, die
   // Quittung steht an der Zeile und kommt aus der ANTWORT.
