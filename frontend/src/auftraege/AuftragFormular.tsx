@@ -242,8 +242,7 @@ export default function AuftragFormular({
   onFertig?: () => void;
   /**
    * Die Anlege-Mutation, an die Erfassungshülle durchgereicht (LFH-1077): sie zeigt den Grund einer
-   * Ablehnung im Formular und räumt ihn beim Einhängen und Abbrechen (Escape). Die Modal-Einbettungen
-   * lassen sie weg.
+   * Ablehnung im Formular und räumt ihn beim Einhängen und Abbrechen (Escape).
    */
   speicherung?: Speicherung;
   speicherFehlerTitel?: string;

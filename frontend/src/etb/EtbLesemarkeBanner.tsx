@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App } from 'antd';
-import { fehlerText } from '../api/client';
 import { ladeEtbLesemarke, setzeEtbLesemarke } from '../api/etb';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Sammelbanner, useRollen } from '../components/instrument';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { lesemarkeText } from './lesemarkeModell';
 
 /**
@@ -28,12 +27,19 @@ import { lesemarkeText } from './lesemarkeModell';
  * Live: der Key hängt unter dem ETB-Prefix, jedes `etb`-Ereignis zieht die Zahl nach.
  *
  * Laden und Fehler schweigen: das Banner ist ein Hinweis, keine Datenquelle der Liste. Ein
- * fehlgeschlagenes MARKIEREN meldet sich dagegen — sonst sähe der Klick wirkungslos aus.
+ * fehlgeschlagenes MARKIEREN meldet sich dagegen am Banner, bis zum nächsten Klick — sonst sähe
+ * der Klick wirkungslos aus (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
+ *
+ * Je Einsatz neu montiert: die Seite bleibt beim Einsatzwechsel stehen, ein alter Grund oder eine
+ * spät scheiternde Markierung des vorigen Einsatzes gehört nicht an dieses Banner.
  */
 export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number }) {
+  return <LesemarkeBanner key={einsatzId} einsatzId={einsatzId} />;
+}
+
+function LesemarkeBanner({ einsatzId }: { einsatzId: number }) {
   const { konventionen } = useAnzeigeKonventionen();
-  const { rollen } = useRollen();
-  const { message } = App.useApp();
+  const { token, rollen } = useRollen();
   const qc = useQueryClient();
 
   const query = useQuery({
@@ -50,7 +56,6 @@ export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number })
      */
     onMutate: () => qc.cancelQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
     onSuccess: (neu) => qc.setQueryData(einsatzKeys.etbLesemarke(einsatzId), neu),
-    onError: (e) => message.error(fehlerText(e, 'Markieren als gesichtet fehlgeschlagen')),
     onSettled: () => qc.invalidateQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
   });
 
@@ -61,18 +66,31 @@ export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number })
   if (text == null || bis == null) return null;
 
   return (
-    <Sammelbanner
-      aktion={{
-        label: 'alle als gesichtet markieren',
-        // Riegel gegen den Doppelklick: der Knopf des Banners kennt kein `loading`.
-        onKlick: () => {
-          if (!markieren.isPending) markieren.mutate(bis);
-        },
-      }}
-      // Im Rahmen der Zeitachse: nur die Trennlinie nach unten, der Rahmen trägt den Rest.
-      style={{ border: 'none', borderBlockEnd: `1px solid ${rollen.bannerLinie}` }}
-    >
-      {text}
-    </Sammelbanner>
+    <>
+      <Sammelbanner
+        aktion={{
+          label: 'alle als gesichtet markieren',
+          // Riegel gegen den Doppelklick: der Knopf des Banners kennt kein `loading`.
+          onKlick: () => {
+            if (!markieren.isPending) markieren.mutate(bis);
+          },
+        }}
+        // Im Rahmen der Zeitachse: nur die Trennlinie nach unten, der Rahmen trägt den Rest.
+        style={{ border: 'none', borderBlockEnd: `1px solid ${rollen.bannerLinie}` }}
+      >
+        {text}
+      </Sammelbanner>
+      {markieren.error != null && (
+        <div
+          style={{ padding: token.paddingXS, borderBlockEnd: `1px solid ${rollen.bannerLinie}` }}
+        >
+          <SpeicherFehler
+            fehler={markieren.error}
+            titel="Nicht als gesichtet markiert"
+            fallback="Markieren fehlgeschlagen"
+          />
+        </div>
+      )}
+    </>
   );
 }

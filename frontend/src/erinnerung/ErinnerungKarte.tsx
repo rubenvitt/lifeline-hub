@@ -17,6 +17,8 @@ import { StatusChip, monoStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 const { Text } = Typography;
 
@@ -62,6 +64,8 @@ interface ErinnerungKarteProps {
   onErledigen?: (id: number) => void;
   /** „Erübrigt (zur Kenntnis)": schließt über den Drahtweg `…/quittieren` (Status `quittiert`). */
   onQuittieren?: (id: number) => void;
+  /** Grund der zuletzt abgelehnten Aktion an dieser Karte (`components/useZeilenFehler.ts`). */
+  fehlerGrund?: ZeilenGrund | null;
 }
 
 /**
@@ -76,6 +80,7 @@ export default function ErinnerungKarte({
   darfSchreiben,
   onErledigen,
   onQuittieren,
+  fehlerGrund,
 }: ErinnerungKarteProps) {
   const { id: einsatzId } = useParams();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
@@ -160,6 +165,13 @@ export default function ErinnerungKarte({
         )}
       </Space>
 
+      {/* Grund einer abgelehnten Aktion über ihren Knöpfen, bis zur nächsten Aktion an dieser
+         Karte (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). */}
+      {fehlerGrund && (
+        <div style={{ marginTop: 8 }}>
+          <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
+        </div>
+      )}
       {aktionen.length > 0 && (
         <Flex justify="flex-end" gap={8} wrap style={{ marginTop: 8 }}>
           {aktionen}

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -73,6 +73,83 @@ describe('EtbLesemarkeBanner', () => {
     );
     expect(await screen.findByText('kaputt')).toBeTruthy();
     expect(screen.getByText('2 Einträge, die Sie noch nicht gesichtet haben')).toBeTruthy();
+  });
+
+  /** Der Grund steht am Banner, kein Toast (LFH-1077, `frontend/AGENTS.md`, Rückwege). */
+  describe('Ablehnung am Banner (LFH-1077)', () => {
+    /** Erste Antwort lehnt ab, jede weitere bleibt aus, bis `freigeben` sie beantwortet. */
+    function ablehnenDannHalten() {
+      let aufrufe = 0;
+      const warten: (() => void)[] = [];
+      server.use(
+        http.post(URL, async () => {
+          aufrufe += 1;
+          if (aufrufe > 1) await new Promise<void>((r) => warten.push(r));
+          return HttpResponse.json({ error: 'Marke nicht gesetzt' }, { status: 409 });
+        }),
+      );
+      return { freigeben: () => warten.splice(0).forEach((r) => r()) };
+    }
+
+    it('nennt den Grund am Banner und zeigt keinen Toast', async () => {
+      stand({ neue_anzahl: 2, hoechste_lfd_nr: 5 });
+      ablehnenDannHalten();
+      renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'alle als gesichtet markieren' }),
+      );
+
+      const fehler = await screen.findByRole('alert');
+      expect(fehler).toHaveTextContent('Nicht als gesichtet markiert');
+      expect(fehler).toHaveTextContent('Marke nicht gesetzt');
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('das nächste Markieren räumt den Grund, solange die Antwort aussteht', async () => {
+      stand({ neue_anzahl: 2, hoechste_lfd_nr: 5 });
+      const { freigeben } = ablehnenDannHalten();
+      renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
+      const knopf = await screen.findByRole('button', { name: 'alle als gesichtet markieren' });
+      await userEvent.click(knopf);
+      await screen.findByRole('alert');
+
+      await userEvent.click(knopf);
+      await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+      await act(async () => freigeben());
+      expect(await screen.findByRole('alert')).toHaveTextContent('Marke nicht gesetzt');
+    });
+
+    it('ein Einsatzwechsel räumt den Grund, ein späteres Scheitern meldet dort nicht', async () => {
+      server.use(
+        http.get('/api/einsaetze/8/etb/lesemarke', () =>
+          HttpResponse.json({ neue_anzahl: 4, hoechste_lfd_nr: 9 }),
+        ),
+      );
+      stand({ neue_anzahl: 2, hoechste_lfd_nr: 5 });
+      const { freigeben } = ablehnenDannHalten();
+      const { rerender } = renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
+      const knopf = await screen.findByRole('button', { name: 'alle als gesichtet markieren' });
+      await userEvent.click(knopf);
+      await screen.findByRole('alert');
+
+      rerender(<EtbLesemarkeBanner einsatzId={8} />);
+      await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+      expect(screen.queryByRole('alert')).toBeNull();
+
+      // Zurück in Einsatz 7: der alte Grund ist geräumt. Erneut markieren, dann wechseln: die
+      // späte Ablehnung bleibt aus 8.
+      rerender(<EtbLesemarkeBanner einsatzId={7} />);
+      await screen.findByText('2 Einträge, die Sie noch nicht gesichtet haben');
+      expect(screen.queryByRole('alert')).toBeNull();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'alle als gesichtet markieren' }),
+      );
+      rerender(<EtbLesemarkeBanner einsatzId={8} />);
+      await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+      await act(async () => freigeben());
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 
   it('zieht die Zahl nach, wenn das ETB invalidiert wird (Live-Ereignis `etb`)', async () => {

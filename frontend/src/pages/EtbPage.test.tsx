@@ -1362,6 +1362,162 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
 });
 
 /**
+ * ── Ablehnungen am Ort (LFH-1077) ──
+ *
+ * Der Grund einer Ablehnung steht dort, wo gehandelt wurde, bis zum nächsten Absenden; kein
+ * Fehler-Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“).
+ */
+describe('EtbPage — Ablehnungen am Ort (LFH-1077)', () => {
+  const notizen = () => document.querySelectorAll('.ant-message-notice');
+
+  it('Schnellerfassung: Ablehnung in der Leiste, ein 409 genau einmal, kein Toast', async () => {
+    const konflikt = 'Einsatz ist abgeschlossen: dieser Wortlaut ist nicht erfasst.';
+    let aufrufe = 0;
+    let freigeben: () => void = () => {};
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/etb', async () => {
+        aufrufe += 1;
+        if (aufrufe > 1) await new Promise<void>((r) => (freigeben = r));
+        return HttpResponse.json({ error: konflikt }, { status: 409 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Wird abgelehnt{Enter}');
+
+    const leiste = document.querySelector<HTMLElement>('.etb-erfassung-sticky')!;
+    expect(await within(leiste).findByText(konflikt)).toBeInTheDocument();
+    expect(screen.getAllByText(konflikt)).toHaveLength(1);
+    expect(notizen()).toHaveLength(0);
+    expect(feld).toHaveValue('Wird abgelehnt');
+
+    // Das nächste Absenden räumt den Grund, solange die Antwort aussteht.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Erfassen$/ })).not.toHaveClass('ant-btn-loading'),
+    );
+    await user.click(screen.getByRole('button', { name: /Erfassen$/ }));
+    await waitFor(() => expect(aufrufe).toBe(2));
+    await waitFor(() => expect(within(leiste).queryByText(konflikt)).toBeNull());
+    await act(async () => freigeben());
+    expect(await within(leiste).findByText(konflikt)).toBeInTheDocument();
+    expect(notizen()).toHaveLength(0);
+  });
+
+  /**
+   * Zwei abgelehnte Einträge, beide erneut gesendet, bevor eine Antwort kommt: jede Ablehnung steht
+   * an ihrer Zeile, auch die der zuerst gesendeten (Speicher je Zeile, nicht die letzte Anfrage).
+   */
+  it('„Erneut senden“ nennt eine Ablehnung an genau dieser Zeile, je Zeile', async () => {
+    await queueEinreihen(admin.id, 7, { typ: 'meldung', inhalt: 'Wortlaut A', client_id: 'alt-a' });
+    await queueEinreihen(admin.id, 7, { typ: 'meldung', inhalt: 'Wortlaut B', client_id: 'alt-b' });
+    const warten = new Map<string, () => void>();
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/etb', async ({ request }) => {
+        const body = (await request.json()) as { client_id?: string; inhalt: string };
+        if (body.client_id?.startsWith('alt-')) {
+          return HttpResponse.json({ error: 'erster Grund' }, { status: 422 });
+        }
+        await new Promise<void>((r) => warten.set(body.inhalt, r));
+        return HttpResponse.json({ error: `Grund zu ${body.inhalt}` }, { status: 422 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const zeile = (inhalt: string) =>
+      [...document.querySelectorAll<HTMLElement>('li.etb-abgelehnt')].find((li) =>
+        li.textContent?.includes(inhalt),
+      )!;
+    await waitFor(() => expect(document.querySelectorAll('li.etb-abgelehnt')).toHaveLength(2));
+
+    await user.click(within(zeile('Wortlaut A')).getByRole('button', { name: 'Erneut senden' }));
+    await user.click(within(zeile('Wortlaut B')).getByRole('button', { name: 'Erneut senden' }));
+    await waitFor(() => expect(warten.size).toBe(2));
+
+    await act(async () => warten.get('Wortlaut A')!());
+    await waitFor(() =>
+      expect(zeile('Wortlaut A').querySelector('[data-fehler]')).toHaveTextContent(
+        'Grund zu Wortlaut A',
+      ),
+    );
+    expect(zeile('Wortlaut B').querySelector('[data-fehler]')).toBeNull();
+    await act(async () => warten.get('Wortlaut B')!());
+    await waitFor(() =>
+      expect(zeile('Wortlaut B').querySelector('[data-fehler]')).toHaveTextContent(
+        'Grund zu Wortlaut B',
+      ),
+    );
+    expect(zeile('Wortlaut A').querySelector('[data-fehler]')).toHaveTextContent(
+      'Grund zu Wortlaut A',
+    );
+    expect(notizen()).toHaveLength(0);
+
+    // Ein neuer Versuch an A räumt nur A, solange die Antwort aussteht.
+    warten.clear();
+    await user.click(within(zeile('Wortlaut A')).getByRole('button', { name: 'Erneut senden' }));
+    await waitFor(() => expect(zeile('Wortlaut A').querySelector('[data-fehler]')).toBeNull());
+    expect(zeile('Wortlaut B').querySelector('[data-fehler]')).not.toBeNull();
+    await waitFor(() => expect(warten.size).toBe(1));
+    await act(async () => warten.get('Wortlaut A')!());
+  });
+
+  describe('Auftrag aus ETB', () => {
+    async function oeffneUndSende(user: ReturnType<typeof userEvent.setup>) {
+      await waehleZeilenaktion(user, 'Auftrag erteilen');
+      const dialog = (await screen.findAllByRole('dialog')).slice(-1)[0];
+      await within(dialog).findByDisplayValue('Erste Meldung');
+      await user.type(within(dialog).getByLabelText('Empfänger'), 'S3{Enter}');
+      await user.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+      return dialog;
+    }
+
+    it('nennt die Ablehnung im offenen Dialog; das nächste Absenden räumt sie', async () => {
+      let aufrufe = 0;
+      let freigeben: () => void = () => {};
+      setup('/einsaetze/7/etb', [
+        http.post('/api/einsaetze/7/etb/1/auftrag', async () => {
+          aufrufe += 1;
+          if (aufrufe > 1) await new Promise<void>((r) => (freigeben = r));
+          return HttpResponse.json({ error: 'Abschnitt aufgelöst' }, { status: 422 });
+        }),
+      ]);
+      const user = userEvent.setup();
+      const dialog = await oeffneUndSende(user);
+
+      const fehler = await within(dialog).findByRole('alert');
+      expect(fehler).toHaveTextContent('Auftrag nicht erteilt');
+      expect(fehler).toHaveTextContent('Abschnitt aufgelöst');
+      expect(notizen()).toHaveLength(0);
+      expect(within(dialog).getByLabelText('Auftrag / Was')).toHaveValue('Erste Meldung');
+
+      await user.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+      await waitFor(() => expect(aufrufe).toBe(2));
+      await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+      // Solange die Antwort aussteht, schließt der Dialog nicht.
+      expect(dialog.querySelector('.ant-modal-close')).toBeDisabled();
+      await act(async () => freigeben());
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent('Abschnitt aufgelöst');
+    });
+
+    it('zeigt nach Schließen und erneutem Öffnen keinen alten Grund', async () => {
+      setup('/einsaetze/7/etb', [
+        http.post('/api/einsaetze/7/etb/1/auftrag', () =>
+          HttpResponse.json({ error: 'Abschnitt aufgelöst' }, { status: 422 }),
+        ),
+      ]);
+      const user = userEvent.setup();
+      const dialog = await oeffneUndSende(user);
+      await within(dialog).findByRole('alert');
+
+      // rc-dialog friert den schließenden Dialog in jsdom ein: am neuen Dialog prüfen.
+      await user.click(dialog.querySelector<HTMLElement>('.ant-modal-close')!);
+      await waehleZeilenaktion(user, 'Auftrag erteilen');
+      const wieder = (await screen.findAllByRole('dialog')).slice(-1)[0];
+      await within(wieder).findByDisplayValue('Erste Meldung');
+      expect(within(wieder).queryByRole('alert')).toBeNull();
+    });
+  });
+});
+
+/**
  * ── Einstieg in den Druck (LFH-22) ──
  *
  * „Drucken / als PDF" öffnet die Druckansicht und sendet nichts ab — deshalb im Kopf-Slot, als Link

@@ -7,7 +7,7 @@ import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
-import { ErfassungsFormular } from '../components/Erfassung';
+import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import { useEffect, useRef, useState } from 'react';
 import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
@@ -121,6 +121,7 @@ export default function MeldungFormular({
   card = true,
   einheiten = [],
   abschnitte = [],
+  speicherung,
 }: {
   senden: boolean;
   /**
@@ -133,6 +134,11 @@ export default function MeldungFormular({
   /** Auswahl für den strukturierten Absender. Leer ⇒ das Feld entfällt. */
   einheiten?: Einheit[];
   abschnitte?: Einsatzabschnitt[];
+  /**
+   * Die Anlege-Mutation, an die Erfassungshülle durchgereicht (LFH-1077): sie zeigt den Grund einer
+   * Ablehnung im Formular und räumt ihn beim Einhängen und Abbrechen.
+   */
+  speicherung?: Speicherung;
 }) {
   const [form] = Form.useForm<MeldungFormWerte>();
   const meldungsart = Form.useWatch('meldungsart', form);
@@ -236,6 +242,9 @@ export default function MeldungFormular({
       // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat.
       onFertig={() => {}}
       laeuft={senden}
+      speicherung={speicherung}
+      speicherFehlerTitel="Meldung nicht erfasst"
+      speicherFehlerFallback="Erfassen fehlgeschlagen"
       erfassenText="Meldung erfassen"
       serie
       uebernahme={UEBERNAHME}

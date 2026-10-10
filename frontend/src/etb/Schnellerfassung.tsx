@@ -13,7 +13,7 @@ import {
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
-import { ApiError, AusgangUnbekannt, type UploadFortschritt } from '../api/client';
+import { ApiError, AusgangUnbekannt, fehlerText, type UploadFortschritt } from '../api/client';
 import { ETB_ANHAENGE_MAX, ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import { useOnline } from '../offline/useOnline';
@@ -126,9 +126,20 @@ export interface Versand {
   fortschritt: { n: number; von: number; stand: UploadFortschritt } | null;
   /** Hinweis an der Dateiliste — bleibt stehen bis zur nächsten Wahl oder zum nächsten Absenden. */
   hinweis: string | null;
+  /**
+   * Grund, aus dem der Server den Eintrag abgelehnt hat (LFH-1077, `frontend/AGENTS.md`, „Rückwege
+   * und Fehler“). Eigenes Feld: eine Dateiwahl räumt den Dateihinweis, nicht diesen; er bleibt
+   * bis zum nächsten Absenden.
+   */
+  ablehnung: string | null;
 }
 
-export const VERSAND_RUHE: Versand = { sendet: false, fortschritt: null, hinweis: null };
+export const VERSAND_RUHE: Versand = {
+  sendet: false,
+  fortschritt: null,
+  hinweis: null,
+  ablehnung: null,
+};
 
 /**
  * Welche Datei schon oben liegt: nach einem Teilausfall lädt der nächste Versuch nur den
@@ -283,7 +294,12 @@ export default function Schnellerfassung({
     else setEigeneDateien(neu);
   }
   const [eigenerVersand, setEigenerVersand] = useState<Versand>(VERSAND_RUHE);
-  const { sendet, fortschritt, hinweis: versandHinweis } = versandVonAussen ?? eigenerVersand;
+  const {
+    sendet,
+    fortschritt,
+    hinweis: versandHinweis,
+    ablehnung,
+  } = versandVonAussen ?? eigenerVersand;
   /** Funktional gemergt: der laufende Versand schreibt aus einer alten Closure heraus. */
   function aendereVersand(aenderung: Partial<Versand>) {
     if (onVersandChange) onVersandChange(aenderung);
@@ -633,7 +649,7 @@ export default function Schnellerfassung({
     // bekannt ist: eine vorgehende Geräteuhr datierte den Eintrag sonst zu spät (LFH-895,
     // `openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`, D1/D2).
     const jetztIso = serverJetzt().toISOString();
-    aendereVersand({ sendet: true, hinweis: null });
+    aendereVersand({ sendet: true, hinweis: null, ablehnung: null });
     try {
       const anhangIds = await ladeAnhaengeHoch();
       setFortschritt(null);
@@ -659,13 +675,12 @@ export default function Schnellerfassung({
           for (const d of dateien) hochgeladeneIds.delete(d);
         }
         // 409: die client_id steht schon für einen anderen Eintrag (zweiter Browser-Tab), oder der
-        // Einsatz ist abgeschlossen. Der Wortlaut bleibt, der Grund steht AN der Erfassung, und der
-        // nächste Versuch nimmt einen neuen Schlüssel; mit Aufrufer-id gibt `EtbEntwurfsTabs` dem
-        // Entwurf eine neue.
-        if (e instanceof ApiError && e.status === 409) {
-          eigeneClientId.current = neueClientId();
-          setAnhangHinweis(e.message);
-        }
+        // Einsatz ist abgeschlossen. Der nächste Versuch nimmt einen neuen Schlüssel; mit
+        // Aufrufer-id gibt `EtbEntwurfsTabs` dem Entwurf eine neue.
+        if (e instanceof ApiError && e.status === 409) eigeneClientId.current = neueClientId();
+        // Jede Ablehnung: der Wortlaut bleibt, der Grund steht AN der Erfassung, kein Toast
+        // (LFH-1077). Netzfehler kommen hier nicht an, die nimmt die Offline-Queue.
+        aendereVersand({ ablehnung: fehlerText(e, 'Senden fehlgeschlagen') });
         throw e;
       }
       eigeneClientId.current = neueClientId();
@@ -683,9 +698,9 @@ export default function Schnellerfassung({
       if (berichtigungZu) onBerichtigungAbbrechen();
       fokusInsFeld();
     } catch {
-      // Abgelehnt: die Meldung zeigt der Aufrufer (`EtbPage`, `message.error`), der
-      // Wortlaut bleibt im Feld stehen (Erfassungs-Norm, `onErfassen` muss ablehnen).
-      // Weiterwerfen hieße hier nur eine unbehandelte Zurückweisung aus `void absenden()`.
+      // Abgelehnt: der Grund steht schon an der Erfassung (`ablehnung`), der Wortlaut bleibt im
+      // Feld (Erfassungs-Norm, `onErfassen` muss ablehnen). Weiterwerfen hieße hier nur eine
+      // unbehandelte Zurückweisung aus `void absenden()`.
     } finally {
       aendereVersand({ sendet: false, fortschritt: null });
     }
@@ -1125,6 +1140,16 @@ export default function Schnellerfassung({
               </Button>
             ) : undefined
           }
+        />
+      )}
+      {ablehnung && (
+        // Eine Zeile wie der Dateihinweis: die angepinnte Leiste hat ein Höhenbudget (≤ 50 %).
+        <Alert
+          type="error"
+          showIcon
+          data-lfh="etb-ablehnung"
+          style={{ marginTop: token.marginXS }}
+          title={ablehnung}
         />
       )}
       {pflichtHinweis && (

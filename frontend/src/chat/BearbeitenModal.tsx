@@ -2,7 +2,7 @@ import { Form, Input } from 'antd';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { useEffect } from 'react';
-import { ErfassungsModal } from '../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import type { ChatNachricht } from '../api/types';
 
 interface FormWerte {
@@ -16,6 +16,11 @@ interface Props {
   onAbbrechen: () => void;
   /** Speichern. Muss bei Ablehnung ablehnen (`mutateAsync`), sonst leert die Hülle. */
   onBestaetigen: (inhalt: string) => Promise<unknown>;
+  /**
+   * Die Speicher-Mutation (LFH-1077), an die Erfassungshülle durchgereicht: ihr Grund steht im
+   * Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen ihn.
+   */
+  speicherung?: Speicherung;
 }
 
 /** Nachricht bearbeiten, auf der Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). */
@@ -25,6 +30,7 @@ export default function BearbeitenModal({
   senden,
   onAbbrechen,
   onBestaetigen,
+  speicherung,
 }: Props) {
   const [form] = Form.useForm<FormWerte>();
 
@@ -42,6 +48,8 @@ export default function BearbeitenModal({
       form={form}
       erfassenText="Speichern"
       laeuft={senden}
+      speicherung={speicherung}
+      speicherFehlerTitel="Nachricht nicht gespeichert"
       onErfassen={(w) => onBestaetigen(w.inhalt.trim())}
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}

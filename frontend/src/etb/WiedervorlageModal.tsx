@@ -6,9 +6,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { legeErinnerungAn } from '../api/erinnerungen';
-import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { ErfassungsModal } from '../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { serverJetzt } from '../offline/serveruhr';
 import { SCHNELLWAHL_TERMIN, schnellwahlTermin } from '../components/terminSchnellwahl';
 import { abstand } from '../theme/tokens';
@@ -84,21 +83,32 @@ export default function WiedervorlageModal({
     return () => window.clearTimeout(timer);
   }, [offen, naechsteLagebesprechungAt, zeitPruefung]);
 
+  /*
+   * Kein `onError`: den Grund zeigt die Hülle im Dialog (`speicherung`, LFH-1077). Der Einsatz
+   * reist in den `variables` mit, die Seite bleibt beim Einsatzwechsel montiert.
+   */
   const mutation = useMutation({
-    mutationFn: (werte: FormWerte) =>
-      legeErinnerungAn(einsatzId, {
-        titel: werte.titel.trim(),
-        faellig_at: alsBackendZeit(werte.faellig),
-        beschreibung: werte.beschreibung?.trim() || undefined,
+    mutationFn: (v: { einsatzId: number; eintragId: number; werte: FormWerte }) =>
+      legeErinnerungAn(v.einsatzId, {
+        titel: v.werte.titel.trim(),
+        faellig_at: alsBackendZeit(v.werte.faellig),
+        beschreibung: v.werte.beschreibung?.trim() || undefined,
         bezug_typ: 'etb',
-        bezug_id: eintrag!.id,
+        bezug_id: v.eintragId,
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(v.einsatzId) });
       message.success('Wiedervorlage angelegt');
     },
-    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
+  // Nur der Versand DIESES Einsatzes gehört in den Dialog: ein laufender aus dem vorigen sperrt
+  // hier kein Abbrechen, seine Ablehnung steht hier nicht.
+  const diesesAnlegen = mutation.variables?.einsatzId === einsatzId;
+  const speicherung: Speicherung = {
+    error: diesesAnlegen ? mutation.error : null,
+    isPending: diesesAnlegen && mutation.isPending,
+    reset: mutation.reset,
+  };
 
   return (
     <ErfassungsModal<FormWerte>
@@ -106,12 +116,15 @@ export default function WiedervorlageModal({
       titel="Wiedervorlage anlegen"
       form={form}
       erfassenText="Anlegen"
-      laeuft={mutation.isPending}
+      laeuft={speicherung.isPending}
       // `mutateAsync`, nicht `mutate`: bei Ablehnung muss die Zusage brechen, sonst räumt die Hülle
-      // die Felder trotz Fehler-Toast.
-      onErfassen={(werte) => mutation.mutateAsync(werte)}
+      // die Felder trotz Fehler.
+      onErfassen={(werte) => mutation.mutateAsync({ einsatzId, eintragId: eintrag!.id, werte })}
       onFertig={onClose}
       onAbbrechen={onClose}
+      speicherung={speicherung}
+      speicherFehlerTitel="Wiedervorlage nicht angelegt"
+      speicherFehlerFallback="Anlegen fehlgeschlagen"
       initialValues={
         eintrag
           ? {

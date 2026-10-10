@@ -12,6 +12,9 @@ import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 import { formatGroesse } from '../karten/formatGroesse';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import type { Speicherung } from '../components/Erfassung';
+import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 /**
  * Restweg zum unteren Rand, der noch als „der Lesende steht unten" gilt.
@@ -31,7 +34,15 @@ interface Props {
   eigeneBenutzerId: number | null;
   darfSchreiben: boolean;
   onBearbeiten: (n: ChatNachricht) => void;
-  onLoeschen: (n: ChatNachricht) => void;
+  /**
+   * Löschen nach der Rückfrage. Gibt der Aufrufer ein Promise zurück (`mutateAsync`), wartet die
+   * Rückfrage darauf und schließt erst beim Erfolg (LFH-1077, design.md D3).
+   */
+  onLoeschen: (n: ChatNachricht) => Promise<unknown> | void;
+  /** Die Lösch-Mutation: ihr Grund steht in der Rückfrage, solange sie läuft, ist sie gesperrt. */
+  loeschung?: Speicherung;
+  /** Grund der zuletzt abgelehnten Aktion an einer Nachricht (Bezug lösen), je id. */
+  zeilenFehler?: (id: number) => ZeilenGrund | null;
   onHeraufstufen: (n: ChatNachricht) => void;
   onHeraufstufenAuftrag: (n: ChatNachricht) => void;
   /**
@@ -74,6 +85,8 @@ export default function NachrichtenStrom({
   darfSchreiben,
   onBearbeiten,
   onLoeschen,
+  loeschung,
+  zeilenFehler,
   onHeraufstufen,
   onHeraufstufenAuftrag,
   etbGesperrt = false,
@@ -122,6 +135,12 @@ export default function NachrichtenStrom({
     loeschFrageId == null
       ? undefined
       : nachrichten.find((n) => n.id === loeschFrageId && n.geloescht_at === null);
+  const loeschLaeuft = loeschung?.isPending === true;
+  // Öffnen und Abbrechen räumen den Grund der letzten Ablehnung; eine laufende Anfrage bleibt.
+  const fragLoeschen = (id: number | null) => {
+    if (loeschung && !loeschung.isPending && loeschung.error != null) loeschung.reset();
+    setLoeschFrageId(id);
+  };
   const namen = useMemo(
     () => aktionsNamen(nachrichten, formatZeitKurz),
     [nachrichten, formatZeitKurz],
@@ -201,6 +220,7 @@ export default function NachrichtenStrom({
           const heraufgestuft = n.etb_eintrag_id !== null;
           const heraufgestuftZuAuftrag = n.auftrag_id !== null;
           const hatBezug = n.bezug_typ !== null && n.bezug_id !== null;
+          const grund = zeilenFehler?.(n.id) ?? null;
           // Aktionen im Menü; gelöschte Nachrichten zeigen keine, und ohne Eintrag gibt es keinen
           // Auslöser.
           type Aktion = 'hoch' | 'auftrag' | 'bezug' | 'edit' | 'del';
@@ -228,7 +248,7 @@ export default function NachrichtenStrom({
             else if (key === 'auftrag') onHeraufstufenAuftrag(n);
             else if (key === 'bezug') onBezugSetzen?.(n);
             else if (key === 'edit') onBearbeiten(n);
-            else if (key === 'del') setLoeschFrageId(n.id);
+            else if (key === 'del') fragLoeschen(n.id);
           };
           return (
             <ListenEintrag
@@ -346,6 +366,8 @@ export default function NachrichtenStrom({
                           );
                         })}
                       </Space>
+                      {/* Grund einer abgelehnten Aktion an dieser Nachricht (LFH-1077). */}
+                      {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
                     </AnhangVorschauGruppe>
                   )
                 }
@@ -360,13 +382,36 @@ export default function NachrichtenStrom({
         okText="Ja, löschen"
         cancelText="Abbrechen"
         okButtonProps={{ danger: true }}
-        onOk={() => {
-          if (loeschZiel) onLoeschen(loeschZiel);
-          setLoeschFrageId(null);
+        // Die Rückfrage wartet auf die Antwort und schließt erst beim Erfolg (design.md D3);
+        // bis dahin sind ihre Auswege gesperrt, eine Ablehnung steht in ihr.
+        confirmLoading={loeschLaeuft}
+        cancelButtonProps={{ disabled: loeschLaeuft }}
+        closable={loeschLaeuft ? { disabled: true } : true}
+        mask={{ closable: !loeschLaeuft }}
+        keyboard={!loeschLaeuft}
+        onOk={async () => {
+          if (!loeschZiel || loeschLaeuft) return;
+          try {
+            await onLoeschen(loeschZiel);
+            setLoeschFrageId(null);
+          } catch {
+            // Abgelehnt: die Rückfrage bleibt offen, den Grund zeigt `loeschung`.
+          }
         }}
-        onCancel={() => setLoeschFrageId(null)}
+        onCancel={() => {
+          if (!loeschLaeuft) fragLoeschen(null);
+        }}
       >
         Die Nachricht bleibt als „Nachricht gelöscht“ im Verlauf stehen.
+        {loeschung?.error != null && (
+          <div style={{ marginTop: token.marginSM }}>
+            <SpeicherFehler
+              fehler={loeschung.error}
+              titel="Nicht gelöscht"
+              fallback="Löschen fehlgeschlagen"
+            />
+          </div>
+        )}
       </Modal>
       {/* Die Pille klebt am unteren Rand des Scroll-Containers (`sticky`, sie gehört in den Strom).
          Der Wrapper ist reine Positionierschale und lässt Zeiger durch. Die Pille ist ein echter

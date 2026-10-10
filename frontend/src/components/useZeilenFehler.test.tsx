@@ -55,13 +55,25 @@ describe('useZeilenFehler (LFH-1077)', () => {
     expect(result.current.gemeldet()).toEqual([8]);
   });
 
+  it('verwirft den Grund einer Zeile ohne neue Aktion, die anderen bleiben', () => {
+    const { result } = renderHook(() => useZeilenFehler<number>());
+    act(() => {
+      result.current.melde(7, abgelehnt);
+      result.current.melde(8, abgelehnt);
+    });
+    act(() => result.current.verwirf(7));
+    expect(result.current.grund(7)).toBeNull();
+    expect(result.current.gemeldet()).toEqual([8]);
+  });
+
   it('behält stabile Funktionen über Renderläufe (taugt als Effekt-Abhängigkeit)', () => {
     const { result, rerender } = renderHook(() => useZeilenFehler<number>());
-    const { beginne, melde, leere } = result.current;
+    const { beginne, melde, leere, verwirf } = result.current;
     act(() => melde(1, abgelehnt));
     rerender();
     expect(result.current.beginne).toBe(beginne);
     expect(result.current.melde).toBe(melde);
     expect(result.current.leere).toBe(leere);
+    expect(result.current.verwirf).toBe(verwirf);
   });
 });

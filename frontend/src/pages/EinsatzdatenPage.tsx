@@ -43,7 +43,6 @@ import {
   schliesseEinsatzAb,
   type KopfdatenPatch,
 } from '../api/einsaetze';
-import { fehlerText } from '../api/client';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -1038,7 +1037,10 @@ export default function EinsatzdatenPage() {
       {/* Zuletzt und nicht im Kopf (LFH-960): Unumkehrbares für den ganzen Einsatz steht nicht im
           Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“).
           Während des Bearbeitens fehlt er, das Formular hat den Fokus. */}
-      {darfAbschliessen && !bearbeiten && <EinsatzAbschluss einsatzId={einsatzId} />}
+      {/* `key`: ein Einsatzwechsel räumt den Grund, eine spätere Antwort meldet nicht hier. */}
+      {darfAbschliessen && !bearbeiten && (
+        <EinsatzAbschluss key={einsatzId} einsatzId={einsatzId} />
+      )}
     </EinsatzSeite>
   );
 }
@@ -1048,7 +1050,8 @@ const ABSCHLIESSEN_FOLGE = 'Danach sind keine neuen Einträge oder Berichtigunge
 
 /**
  * Einsatzabschluss (LFH-960, Spec `bedien-wortlaut`): aktiv → abgeschlossen, ohne Rückweg im
- * Frontend. Rückfrage als `Popconfirm`, deren roter Knopf die Handlung nennt.
+ * Frontend. Rückfrage als `Popconfirm`, deren roter Knopf die Handlung nennt. Eine Ablehnung steht
+ * am Paneel bis zum nächsten Abschließen, kein Toast (LFH-1077).
  */
 function EinsatzAbschluss({ einsatzId }: { einsatzId: number }) {
   const { token } = useRollen();
@@ -1061,7 +1064,6 @@ function EinsatzAbschluss({ einsatzId }: { einsatzId: number }) {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       message.success('Einsatz abgeschlossen');
     },
-    onError: (e) => message.error(fehlerText(e, 'Abschließen fehlgeschlagen')),
   });
   return (
     <Paneel titel="Einsatzabschluss" koerperPolster style={{ marginTop: token.marginLG }}>
@@ -1077,6 +1079,15 @@ function EinsatzAbschluss({ einsatzId }: { einsatzId: number }) {
           Einsatz abschließen
         </Button>
       </Popconfirm>
+      {mutation.error != null && (
+        <div style={{ marginTop: token.marginSM }}>
+          <SpeicherFehler
+            fehler={mutation.error}
+            titel="Nicht abgeschlossen"
+            fallback="Abschließen fehlgeschlagen"
+          />
+        </div>
+      )}
     </Paneel>
   );
 }

@@ -49,18 +49,9 @@ const ERLAUBT: Record<string, { anzahl: number; grund: string }> = {
  * neuer Treffer ist rot und wird an den Ort gebracht, nicht hier eingetragen.
  */
 const OFFEN: Record<string, number> = {
-  'components/AnlegenDrawer.tsx': 1,
-  'components/SprechgruppenPicker.tsx': 1,
   'components/useFehlerMeldung.ts': 1,
-  'etb/EtbLesemarkeBanner.tsx': 1,
-  'etb/WiedervorlageModal.tsx': 1,
   'offline/OfflineRecoveryDrawer.tsx': 2,
-  'pages/ChatPage.tsx': 1,
-  'pages/EinsatzdatenPage.tsx': 1,
-  'pages/ErinnerungenPage.tsx': 1,
-  'pages/EtbPage.tsx': 3,
   'pages/LagekartePage.tsx': 1,
-  'pages/MeldungenPage.tsx': 1,
 };
 
 const TOAST_OBJEKTE = new Set(['message', 'meldung', 'notification']);

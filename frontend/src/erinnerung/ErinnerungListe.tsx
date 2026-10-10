@@ -1,6 +1,7 @@
 import { SeitenLeer } from '../components/SeitenZustand';
 import type { Erinnerung } from '../api/types';
 import ErinnerungKarte from './ErinnerungKarte';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 interface ErinnerungListeProps {
   erinnerungen: Erinnerung[];
@@ -9,6 +10,8 @@ interface ErinnerungListeProps {
   darfSchreiben: boolean;
   onErledigen: (id: number) => void;
   onQuittieren: (id: number) => void;
+  /** Grund der zuletzt abgelehnten Aktion je Erinnerung (`grund` aus `useZeilenFehler`). */
+  zeilenFehler?: (id: number) => ZeilenGrund | null;
 }
 
 /** Kartenboard der Erinnerungen; Darstellung und Logik liegen in der Karte. */
@@ -18,6 +21,7 @@ export default function ErinnerungListe({
   darfSchreiben,
   onErledigen,
   onQuittieren,
+  zeilenFehler,
 }: ErinnerungListeProps) {
   if (erinnerungen.length === 0) return <SeitenLeer titel="Keine Erinnerungen" />;
   return (
@@ -30,6 +34,7 @@ export default function ErinnerungListe({
           darfSchreiben={darfSchreiben}
           onErledigen={onErledigen}
           onQuittieren={onQuittieren}
+          fehlerGrund={zeilenFehler?.(e.id) ?? null}
         />
       ))}
     </>

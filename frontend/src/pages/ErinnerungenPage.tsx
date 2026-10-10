@@ -1,7 +1,7 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
-import { useMemo, useState } from 'react';
+import { Alert, App, Breadcrumb, Button, Flex, Spin } from 'antd';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -26,7 +26,10 @@ import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import type { Speicherung } from '../components/Erfassung';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { GewanderteGruende } from '../components/GewanderteGruende';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
 
 export default function ErinnerungenPage() {
@@ -74,44 +77,87 @@ export default function ErinnerungenPage() {
 
   // „Heute fällig“ nach dem Kalendertag der Anzeigezone (LFH-692).
   const { konventionen } = useAnzeigeKonventionen();
-  const fehler = useFehlerMeldung();
-  const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
+  const invalidiere = (eid: number) =>
+    qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(eid) });
+
+  /*
+   * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): Anlegen im Paneel, Erledigt und Erübrigt an der Karte (ein Speicher,
+   * die zuletzt begonnene Aktion zählt), Rückgängig aus dem Toast im Seitenhinweis. Jede Aktion
+   * trägt ihren Einsatz: die Route hat keinen `key`, eine Antwort nach einem Einsatzwechsel meldet
+   * nicht am neuen Ort.
+   */
+  const kartenFehler = useZeilenFehler<number>();
+  const [seitenFehler, setSeitenFehler] = useState<{ einsatzId: number; fehler: unknown } | null>(
+    null,
+  );
+  const einsatzJetzt = useRef(einsatzId);
+  useLayoutEffect(() => {
+    einsatzJetzt.current = einsatzId;
+  });
+  const nochDa = (eid: number) => eid === einsatzJetzt.current;
+  const { leere: leereKarten } = kartenFehler;
+  useEffect(() => leereKarten(), [einsatzId, leereKarten]);
+  // Titel jeder je gezeigten Karte: eine gewanderte steht oft in keiner geladenen Liste mehr.
+  const titelJe = useRef(new Map<number, string>());
+  useLayoutEffect(() => {
+    for (const e of [...(offeneQuery.data ?? []), ...abgeschlossene]) {
+      titelJe.current.set(e.id, e.titel);
+    }
+  }, [offeneQuery.data, abgeschlossene]);
 
   const anlegenMutation = useMutation({
-    mutationFn: (daten: NeueErinnerung) => legeErinnerungAn(einsatzId, daten),
+    mutationFn: (v: { einsatzId: number; daten: NeueErinnerung }) =>
+      legeErinnerungAn(v.einsatzId, v.daten),
     // Das Inline-Formular bleibt nach dem Anlegen offen, damit die nächste Erinnerung ohne
     // Aufklappen folgt; ein Schließen unmountete es samt Serienzähler und Wertübernahme.
-    onSuccess: () => {
-      invalidiere();
+    onSuccess: (_daten, v) => {
+      invalidiere(v.einsatzId);
       message.success('Erinnerung angelegt');
     },
-    onError: fehler,
   });
+  // Nur das Anlegen DIESES Einsatzes gehört ins Paneel; eines aus dem vorigen hält es nicht.
+  const diesesAnlegen = anlegenMutation.variables?.einsatzId === einsatzId;
+  const anlegenSpeicherung: Speicherung = {
+    error: diesesAnlegen ? anlegenMutation.error : null,
+    isPending: diesesAnlegen && anlegenMutation.isPending,
+    reset: anlegenMutation.reset,
+  };
+  // Zuklappen hängt das Formular aus; beim Aufklappen räumt die Erfassungshülle den alten Grund.
   /**
    * Der Rückweg beider Abschluss-Aktionen: „Erledigt" und „Erübrigt" schalten mit einem Klick
    * statt mit Rückfrage; `POST …/erinnerungen/{eid}/oeffnen` räumt dafür alle drei Achsen (Status,
-   * Vollzug, Quittung).
+   * Vollzug, Quittung). Die nächste Rücknahme räumt den Grund der vorigen.
    */
   const oeffnenMutation = useMutation({
-    mutationFn: (eid: number) => oeffneErinnerung(einsatzId, eid),
-    onSuccess: invalidiere,
-    onError: fehler,
+    mutationFn: (v: { einsatzId: number; eid: number }) => oeffneErinnerung(v.einsatzId, v.eid),
+    onMutate: () => setSeitenFehler(null),
+    onSuccess: (_daten, v) => invalidiere(v.einsatzId),
+    onError: (e, v) => {
+      if (nochDa(v.einsatzId)) setSeitenFehler({ einsatzId: v.einsatzId, fehler: e });
+    },
   });
   const erledigenMutation = useMutation({
-    mutationFn: (eid: number) => erledigeErinnerung(einsatzId, eid),
-    onSuccess: (_daten, eid) => {
-      invalidiere();
-      zeigeRueckgaengig(message, 'Erinnerung erledigt', () => oeffnenMutation.mutate(eid));
+    mutationFn: (v: { einsatzId: number; eid: number }) => erledigeErinnerung(v.einsatzId, v.eid),
+    onMutate: (v) => kartenFehler.beginne(v.eid),
+    onSuccess: (_daten, v) => {
+      invalidiere(v.einsatzId);
+      zeigeRueckgaengig(message, 'Erinnerung erledigt', () => oeffnenMutation.mutate(v));
     },
-    onError: fehler,
+    onError: (e, v) => {
+      if (nochDa(v.einsatzId)) kartenFehler.melde(v.eid, e, 'Erledigen fehlgeschlagen');
+    },
   });
   const quittierenMutation = useMutation({
-    mutationFn: (eid: number) => quittiereErinnerung(einsatzId, eid),
-    onSuccess: (_daten, eid) => {
-      invalidiere();
-      zeigeRueckgaengig(message, 'Erinnerung erübrigt', () => oeffnenMutation.mutate(eid));
+    mutationFn: (v: { einsatzId: number; eid: number }) => quittiereErinnerung(v.einsatzId, v.eid),
+    onMutate: (v) => kartenFehler.beginne(v.eid),
+    onSuccess: (_daten, v) => {
+      invalidiere(v.einsatzId);
+      zeigeRueckgaengig(message, 'Erinnerung erübrigt', () => oeffnenMutation.mutate(v));
     },
-    onError: fehler,
+    onError: (e, v) => {
+      if (nochDa(v.einsatzId)) kartenFehler.melde(v.eid, e, 'Erübrigen fehlgeschlagen');
+    },
   });
 
   if (einsatzQuery.isLoading) {
@@ -142,9 +188,26 @@ export default function ErinnerungenPage() {
 
   const listenProps = {
     darfSchreiben,
-    onErledigen: (eid: number) => erledigenMutation.mutate(eid),
-    onQuittieren: (eid: number) => quittierenMutation.mutate(eid),
+    onErledigen: (eid: number) => erledigenMutation.mutate({ einsatzId, eid }),
+    onQuittieren: (eid: number) => quittierenMutation.mutate({ einsatzId, eid }),
+    zeilenFehler: kartenFehler.grund,
   };
+  /*
+   * Steht die Karte eines Grundes in der gezeigten Ansicht nicht (Ansicht gewechselt, Karte
+   * gewandert), hätte er keinen Ort mehr: dann steht er im Seitenhinweis, schließbar. Solange die
+   * Ansicht noch lädt, hat kein Grund seinen Ort verloren.
+   */
+  const gezeigt = ansicht === 'offen' ? offene : abgeschlossene;
+  const ansichtLaedt = ansicht === 'offen' ? offeneQuery.isPending : abgeschlosseneQuery.isPending;
+  const gewanderte = ansichtLaedt
+    ? []
+    : kartenFehler.gemeldet().flatMap((eid) => {
+        const grund = kartenFehler.grund(eid);
+        if (grund == null || gezeigt.some((e) => e.id === eid)) return [];
+        const titel = titelJe.current.get(eid);
+        return [{ schluessel: eid, kennung: titel ? `„${titel}“` : undefined, grund }];
+      });
+  const rueckFehler = seitenFehler?.einsatzId === einsatzId ? seitenFehler.fehler : null;
 
   return (
     <EinsatzSeite
@@ -152,6 +215,22 @@ export default function ErinnerungenPage() {
 
       meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
       dataUpdatedAt={offeneQuery.dataUpdatedAt}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        (rueckFehler != null || gewanderte.length > 0) && (
+          <Flex vertical gap={token.marginSM}>
+            <SeitenHinweise
+              fehler={rueckFehler}
+              fehlerTitel="Nicht wieder geöffnet"
+              fehlerFallback="Öffnen fehlgeschlagen"
+            />
+            <GewanderteGruende
+              gruende={gewanderte}
+              onSchliessen={() => gewanderte.forEach((g) => kartenFehler.verwirf(g.schluessel))}
+            />
+          </Flex>
+        )
+      }
       breadcrumb={
         <Breadcrumb
           items={[
@@ -163,10 +242,13 @@ export default function ErinnerungenPage() {
       }
       aktionen={
         darfSchreiben && (
+          // Solange eine Erinnerung unterwegs ist, bleibt das Paneel offen: die Antwort braucht
+          // ihren Ort (design.md D3).
           <Button
             type="primary"
             icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
-            onClick={() => setFormOffen((o) => !o)}
+            disabled={formOffen && anlegenSpeicherung.isPending}
+            onClick={() => setFormOffen(!formOffen)}
           >
             {formOffen ? 'Formular schließen' : 'Erinnerung anlegen'}
           </Button>
@@ -182,6 +264,7 @@ export default function ErinnerungenPage() {
             <Button
               type="text"
               icon={<IconKreuz />}
+              disabled={anlegenSpeicherung.isPending}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />
@@ -192,8 +275,9 @@ export default function ErinnerungenPage() {
           <ErinnerungFormular
             einsatzId={einsatzId}
             card={false}
-            senden={anlegenMutation.isPending}
-            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
+            senden={anlegenSpeicherung.isPending}
+            onAnlegen={(daten) => anlegenMutation.mutateAsync({ einsatzId, daten })}
+            speicherung={anlegenSpeicherung}
           />
         </Paneel>
       )}

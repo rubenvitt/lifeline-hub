@@ -20,6 +20,8 @@ import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { KennungsLink } from '../components/kennungsLink';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { ZeilenFehler } from '../components/SpeicherHinweis';
+import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 const { Text } = Typography;
 
@@ -64,6 +66,11 @@ interface MeldungKarteProps {
    * mit Grund, wie „Zu Auftrag“ im Chat.
    */
   auftragGesperrt?: boolean;
+  /**
+   * Grund der zuletzt abgelehnten Karten-Aktion (Status, Bearbeiter, Bestätigen), aus
+   * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
+   */
+  fehlerGrund?: ZeilenGrund | null;
 }
 
 /**
@@ -119,6 +126,7 @@ function MeldungKarte({
   onBestaetigen,
   onAuftragErteilen,
   auftragGesperrt = false,
+  fehlerGrund,
 }: MeldungKarteProps) {
   const { rollen, token } = useRollen();
   // Ein Gerät (UHS-Laptop) springt nicht in die Aufträge (LFH-892).
@@ -276,6 +284,13 @@ function MeldungKarte({
         )}
       </Flex>
 
+      {/* Grund einer abgelehnten Karten-Aktion über der Aktionszeile, bis zur nächsten Aktion an
+         dieser Karte (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). */}
+      {fehlerGrund && (
+        <div style={{ marginTop: 8 }}>
+          <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
+        </div>
+      )}
       {/* Aktionszeile: die Zuweisung links (ein Griff, Triage-Tempo), die Knöpfe rechts. Unter `md`
          bricht die Auswahl in eine eigene Zeile. „Bestätigen" ist der Primärknopf, nicht `danger`
          (LFH-962): die Kenntnisnahme löscht nichts, und Rot bedient nichts. Der weite Abstand
