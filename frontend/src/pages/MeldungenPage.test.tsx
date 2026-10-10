@@ -146,11 +146,11 @@ function LocationProbe() {
 }
 
 /** Wechselt in einen anderen Einsatz, ohne die Seite neu einzuhängen (Route ohne `key`). */
-function ZuEinsatz2() {
+function ZuEinsatz({ id }: { id: number }) {
   const navigate = useNavigate();
   return (
-    <button type="button" onClick={() => navigate('/einsaetze/2/meldungen')}>
-      Zu Einsatz 2
+    <button type="button" onClick={() => navigate(`/einsaetze/${id}/meldungen`)}>
+      Zu Einsatz {id}
     </button>
   );
 }
@@ -166,7 +166,8 @@ function renderPage(
         <AuthProvider>
           <MemoryRouter initialEntries={[route]}>
             <LocationProbe />
-            <ZuEinsatz2 />
+            <ZuEinsatz id={1} />
+            <ZuEinsatz id={2} />
             <Routes>
               <Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} />
             </Routes>
@@ -1246,4 +1247,143 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     // Das laufende Erfassen des vorigen Einsatzes hält das Paneel hier nicht offen.
     expect(paneel().getByRole('button', { name: 'Formular schließen' })).toBeEnabled();
   });
+
+  // ── Mutationsproben (LFH-1140) ───────────────────────────────────────────────────
+
+  /**
+   * Die vorläufige Liste nach einem Richtungswechsel ist noch die alte (`placeholderData`): fehlt die
+   * Karte dort, hat ihr Grund trotzdem keinen Ort verloren.
+   */
+  it('Status: solange die neue Richtung vorläufig die alte Liste zeigt, springt kein Grund in den Seitenhinweis', async () => {
+    const intern = meldung();
+    const extern = meldung({ id: 2, lfd_nr: 2, absender: 'Pumpe Süd', richtung: 'extern' });
+    // Offene Liste und Kennzahlen fragen je einmal; beide warten auf dieselbe Antwort.
+    const wartende: ((l: Meldung[]) => void)[] = [];
+    listeMeldungen.mockImplementation((_id: number, f: { richtung?: string }) =>
+      f.richtung === 'extern'
+        ? Promise.resolve([extern])
+        : f.richtung === 'intern'
+          ? new Promise<Meldung[]>((r) => {
+              wartende.push(r);
+            })
+          : Promise.resolve([intern, extern]),
+    );
+    setzeMeldungStatus.mockRejectedValue(new ApiError(422, 'Übergang nicht erlaubt'));
+    renderPage();
+    await screen.findByText('Pumpe Süd');
+    await userEvent.click(within(karte(1)).getByRole('button', { name: 'Sichten' }));
+    await within(karte(1)).findByText('Übergang nicht erlaubt');
+
+    // In „Extern“ fehlt die Karte wirklich: der Grund steht im Seitenhinweis.
+    await userEvent.click(screen.getByRole('radio', { name: 'Extern' }));
+    await waitFor(() => expect(karte(1)).toBeNull());
+    await within(await seitenHinweis()).findByRole('alert');
+
+    // „Intern“ lädt, bis dahin steht die Liste aus „Extern“ — ohne die Karte, aber nur vorläufig.
+    await userEvent.click(screen.getByRole('radio', { name: 'Intern' }));
+    await waitFor(() =>
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ richtung: 'intern' }),
+      ),
+    );
+    expect(karte(2)).not.toBeNull();
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+
+    await act(async () => wartende.forEach((r) => r([intern])));
+    await waitFor(() => expect(karte(1)).not.toBeNull());
+    expect(await within(karte(1)).findByText('Übergang nicht erlaubt')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+  });
+
+  /**
+   * Ein Erfolg schließt nur den Dialog, aus dem er kam (`ohneDialogZu`). Abbrechen ist während des
+   * Laufs gesperrt; ein anderer Dialog öffnet sich nur über einen Einsatzwechsel. Zwei Wege, je
+   * einer für die beiden Hälften der Prüfung: dieselbe Meldungsnummer im anderen Einsatz und eine
+   * andere Meldung nach der Rückkehr in den alten Einsatz.
+   */
+  describe.each([
+    {
+      dialog: 'Lage',
+      mutation: markiereLagerelevant,
+      oeffne: async (lfdNr: number) => {
+        await userEvent.click(
+          within(await oeffneAktionsmenue(lfdNr)).getByRole('menuitem', {
+            name: /An Lage übergeben/,
+          }),
+        );
+        return offenerDialog();
+      },
+      sende: (dialog: HTMLElement) =>
+        userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' })),
+      ergebnis: () => meldung({ lagerelevant: true }),
+    },
+    {
+      dialog: 'Auftrag',
+      mutation: erteileAuftragAusMeldung,
+      oeffne: async (lfdNr: number) => {
+        await userEvent.click(
+          within(await oeffneAktionsmenue(lfdNr)).getByText(/Auftrag erteilen/),
+        );
+        return offenerDialog();
+      },
+      sende: async (dialog: HTMLElement) => {
+        await userEvent.type(within(dialog).getByLabelText('Auftrag / Was'), 'Riegelstellung');
+        await userEvent.type(within(dialog).getByLabelText('Empfänger'), 'EA Nord{Enter}');
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Auftrag erteilen' }));
+      },
+      ergebnis: () => ({ id: 30 }),
+    },
+  ])(
+    '$dialog: eine späte Antwort schließt keinen fremden Dialog',
+    ({ mutation, oeffne, sende, ergebnis }) => {
+      async function sendeUndWechsle() {
+        let liefere: (() => void) | null = null;
+        mutation.mockImplementationOnce(() => new Promise((r) => (liefere = () => r(ergebnis()))));
+        setzeMeldungStatus.mockResolvedValue(meldung({ status: 'in_bearbeitung' }));
+        listeMeldungen.mockResolvedValue([
+          meldung(),
+          meldung({ id: 2, lfd_nr: 2, absender: 'Pumpe Süd' }),
+        ]);
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        renderPage(undefined, client);
+        await screen.findByText('Pumpe Süd');
+        await sende(await oeffne(1));
+        await waitFor(() => expect(liefere).not.toBeNull());
+        await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
+        await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(2, expect.anything()));
+        await screen.findByText('Pumpe Süd');
+        return { liefere: () => liefere!(), client };
+      }
+
+      async function nachDerAntwort(client: QueryClient, dialog: HTMLElement) {
+        await waitFor(() =>
+          expect(client.getMutationCache().getAll()[0]?.state.status).toBe('success'),
+        );
+        await act(() => new Promise((r) => setTimeout(r, 20)));
+        expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+        expect(
+          screen.queryAllByRole('dialog').filter((d) => d.closest('.ant-zoom-leave') == null),
+        ).toHaveLength(1);
+      }
+
+      it('dieselbe Meldungsnummer im anderen Einsatz bleibt offen', async () => {
+        const { liefere, client } = await sendeUndWechsle();
+        const dialog = await oeffne(1);
+        act(() => liefere());
+        await nachDerAntwort(client, dialog);
+      });
+
+      it('eine andere Meldung nach der Rückkehr bleibt offen', async () => {
+        const { liefere, client } = await sendeUndWechsle();
+        await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 1' }));
+        await screen.findByText('Pumpe Süd');
+        const dialog = await oeffne(2);
+        act(() => liefere());
+        await nachDerAntwort(client, dialog);
+      });
+    },
+  );
 });
