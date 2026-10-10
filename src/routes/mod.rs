@@ -66,6 +66,7 @@ pub mod sprechgruppe;
 pub mod stab;
 pub mod stichwort;
 pub mod support;
+pub mod system;
 pub mod tier_anhang;
 pub mod uhs_anhang;
 pub mod uhs_plan;

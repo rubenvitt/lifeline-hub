@@ -713,6 +713,7 @@ mod tests {
             auto_aktualisierung: auto,
             backup_download: Default::default(),
             backup_empfaenger: Default::default(),
+            datentraeger: Default::default(),
         }
     }
 

@@ -194,6 +194,25 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         stopp_empfang,
     );
 
+    // Datenträgerprüfung (LFH-1100): sofort im Hintergrund, danach stündlich; der Start wartet
+    // nicht, und kein Ergebnis hält den Betrieb an.
+    if config.datentraeger_verschluesselung_extern {
+        tracing::warn!(
+            "Datenträgerverschlüsselung laut --datentraeger-verschluesselung-extern \
+             (LIFELINE_DATENTRAEGER_VERSCHLUESSELUNG_EXTERN) außerhalb der Sicht des Servers: \
+             ein nicht prüfbarer Datenträger löst keine Warnung aus"
+        );
+    }
+    let datentraeger =
+        lifeline_hub::datentraeger::Stand::neu(config.datentraeger_verschluesselung_extern);
+    lifeline_hub::datentraeger::starte(
+        datentraeger.clone(),
+        lifeline_hub::datentraeger::Eingabe::aus_config(
+            &config.db_path,
+            config.backup_verzeichnis.as_deref(),
+        ),
+    );
+
     // AV-Scan-Konfiguration prozessweit setzen (nicht in `AppState`, wegen der
     // Test-Konstruktionen).
     if config.clamav_addr.is_some() && !cfg!(feature = "clamav") {
@@ -360,6 +379,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         auto_aktualisierung,
         backup_download: Default::default(),
         backup_empfaenger,
+        datentraeger: datentraeger.clone(),
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());

@@ -345,7 +345,10 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         // Nach dem Scrollen ganz im Blick — also auch nicht seitlich abgeschnitten.
         for (const name of ['Person suchen und schwärzen', 'Einsatz sofort schwärzen']) {
           const knopf = page.getByRole('button', { name });
-          await knopf.scrollIntoViewIfNeeded();
+          // Mittig statt `scrollIntoViewIfNeeded`: steht der Knopf um Bruchteile eines Pixels
+          // über dem unteren Rand (etwa unter der Warnleiste der Datenträgerprüfung, LFH-1100),
+          // gilt er Chromium als sichtbar und es scrollt nicht.
+          await knopf.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' }));
           await expect(knopf).toBeInViewport({ ratio: 1 });
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
