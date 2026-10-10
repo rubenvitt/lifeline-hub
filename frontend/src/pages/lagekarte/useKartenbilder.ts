@@ -16,6 +16,7 @@ import type { BildOverlay } from './bildLayer';
 import type { BildUploadZustand } from './Sidebar';
 import type { KartenHandle } from './Kartenflaeche';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
+import type { BeginneKartenHandlung } from './useKartenFehler';
 
 /** Seitenverhältnis (Breite/Höhe) eines Bilds aus der Datei lesen; Fallback 1 (quadratisch). */
 function leseBildSeitenverhaeltnis(datei: File): Promise<number> {
@@ -47,8 +48,16 @@ interface KartenbilderArgs {
    * Blob-Bytes werden live geladen (ein gelöschtes Bild → Hinweis).
    */
   quelle?: Standquelle;
-  /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
-  fehler: (e: unknown) => void;
+  /**
+   * Meldet ein Bild, das im Hintergrund nicht nachlädt (stabiler `useCallback`, er steht in den
+   * Effekt-Deps). Nur dafür: diese Ladung hat keine Handlung und keinen Ort.
+   */
+  ladeFehler: (e: unknown) => void;
+  /**
+   * Beginnt eine Bildaktion und liefert die Meldung ihrer Ablehnung für den Hinweis über der Karte
+   * (`useKartenFehler`, LFH-1077), je Bild ein Schlüssel.
+   */
+  beginneHandlung: BeginneKartenHandlung;
 }
 
 /**
@@ -62,7 +71,8 @@ export function useKartenbilder({
   bildPlatzierenId,
   aktiveAnsichtId,
   quelle = { typ: 'live' },
-  fehler,
+  ladeFehler,
+  beginneHandlung,
 }: KartenbilderArgs) {
   const qc = useQueryClient();
   const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
@@ -136,7 +146,7 @@ export function useKartenbilder({
         })
         .catch((e) => {
           // Lade-Fehler sichtbar machen statt schlucken; ein Abbruch ist keiner.
-          if (!abbruch.aborted && aktiveIdsRef.current.has(b.id)) fehler(e);
+          if (!abbruch.aborted && aktiveIdsRef.current.has(b.id)) ladeFehler(e);
         })
         .finally(() => imFlug.delete(b.id));
     }
@@ -152,8 +162,8 @@ export function useKartenbilder({
         setBlobUrls(blobUrlsRef.current);
       }
     }
-    // `fehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus.
-  }, [bilderRoh, einsatzId, fehler]);
+    // `ladeFehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus.
+  }, [bilderRoh, einsatzId, ladeFehler]);
 
   // Unmount-only: beim Verlassen der Karte alle dann aktuellen Blob-URLs freigeben.
   useEffect(
@@ -213,38 +223,63 @@ export function useKartenbilder({
   const onBildUpload = (datei: File) => {
     if (!uploadMutation.isPending) uploadMutation.mutate(datei);
   };
-  const onBildToggle = async (id: number, sichtbar: boolean) => {
-    await aktualisiereHintergrundbild(einsatzId, id, { sichtbar });
-    invalidiereBilder();
+  /**
+   * Eine Bildaktion: Erfolg frischt die Liste auf, eine Ablehnung steht im Hinweis über der Karte
+   * (LFH-1077). Die Zusage löst immer auf: Leiste und Ziehgriffe rufen ohne `catch` auf.
+   */
+  const bildAktion = async (
+    id: number,
+    titel: string,
+    aufruf: () => Promise<unknown>,
+    fallback?: string,
+  ) => {
+    const name = (bilderRoh ?? []).find((b) => b.id === id)?.name;
+    const melde = beginneHandlung(`bild:${id}`, name ? `${titel} · ${name}` : titel, fallback);
+    try {
+      await aufruf();
+      void invalidiereBilder();
+    } catch (e) {
+      melde(e);
+    }
   };
-  const onBildOpazitaet = async (id: number, opazitaet: number) => {
-    await aktualisiereHintergrundbild(einsatzId, id, { opazitaet });
-    invalidiereBilder();
-  };
-  const onBildLoeschen = async (id: number) => {
-    await loescheHintergrundbild(einsatzId, id);
-    invalidiereBilder();
-  };
+  const onBildToggle = (id: number, sichtbar: boolean) =>
+    bildAktion(id, 'Bild nicht geändert', () =>
+      aktualisiereHintergrundbild(einsatzId, id, { sichtbar }),
+    );
+  const onBildOpazitaet = (id: number, opazitaet: number) =>
+    bildAktion(id, 'Bild nicht geändert', () =>
+      aktualisiereHintergrundbild(einsatzId, id, { opazitaet }),
+    );
+  const onBildLoeschen = (id: number) =>
+    bildAktion(
+      id,
+      'Bild nicht entfernt',
+      () => loescheHintergrundbild(einsatzId, id),
+      'Entfernen fehlgeschlagen',
+    );
   // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch.
-  const onBildVerschieben = async (id: number, ansichtId: number | null) => {
-    await aktualisiereHintergrundbild(einsatzId, id, { ansicht_id: ansichtId });
-    invalidiereBilder();
-  };
+  const onBildVerschieben = (id: number, ansichtId: number | null) =>
+    bildAktion(
+      id,
+      'Bild nicht verschoben',
+      () => aktualisiereHintergrundbild(einsatzId, id, { ansicht_id: ansichtId }),
+      'Verschieben fehlgeschlagen',
+    );
   const onPlatzierGeometrie = async (ecken: Ecken) => {
     if (bildPlatzierenId == null) return;
-    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, {
-      ecken_json: JSON.stringify(ecken),
-    });
-    invalidiereBilder();
+    const id = bildPlatzierenId;
+    await bildAktion(id, 'Bild nicht platziert', () =>
+      aktualisiereHintergrundbild(einsatzId, id, { ecken_json: JSON.stringify(ecken) }),
+    );
   };
   const onBildZentrieren = (id: number) => {
     const b = (bilderRoh ?? []).find((x) => x.id === id);
     if (b) kartenRef.current?.zentriereAufEcken(JSON.parse(b.ecken_json) as Ecken);
   };
-  const onBildUmbenennen = async (id: number, name: string) => {
-    await aktualisiereHintergrundbild(einsatzId, id, { name });
-    invalidiereBilder();
-  };
+  const onBildUmbenennen = (id: number, name: string) =>
+    bildAktion(id, 'Bild nicht umbenannt', () =>
+      aktualisiereHintergrundbild(einsatzId, id, { name }),
+    );
   // Mittelpunkt des Platzier-Bilds numerisch setzen: Ecken um die Differenz verschieben.
   const onBildMittelpunkt = async (lat: number, lon: number) => {
     if (bildPlatzierenId == null) return;
@@ -253,10 +288,9 @@ export function useKartenbilder({
     const ecken = JSON.parse(b.ecken_json) as Ecken;
     const [clng, clat] = zentroid(ecken);
     const neu = verschiebeEcken(ecken, lon - clng, lat - clat);
-    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, {
-      ecken_json: JSON.stringify(neu),
-    });
-    invalidiereBilder();
+    await bildAktion(b.id, 'Bild nicht platziert', () =>
+      aktualisiereHintergrundbild(einsatzId, b.id, { ecken_json: JSON.stringify(neu) }),
+    );
   };
 
   const aktivesPlatzierBild = useMemo(() => {

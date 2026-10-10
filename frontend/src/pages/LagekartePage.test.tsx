@@ -2683,3 +2683,464 @@ describe('LFH-825: Zeichnen per Link', () => {
     );
   });
 });
+
+/**
+ * Speicherfehler an der Karte (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Zeichnen,
+ * Verorten und die Inspektoren melden eine Ablehnung im Hinweis über der Karte, Dialoge in sich,
+ * das Paneel „Kartenansicht“ am Paneel. Kein Fehler-Toast; der nächste Versuch räumt.
+ */
+describe('LFH-1077: Speicherfehler an der Karte', () => {
+  const ablehnen = (text: string) => HttpResponse.json({ error: text }, { status: 422 });
+  const hinweis = () => screen.queryByTestId('karten-speicherfehler');
+  const toasts = () => document.querySelectorAll('.ant-message-notice').length;
+  const fehlerToasts = () => document.querySelectorAll('.ant-message-error').length;
+
+  it('Zone anlegen abgelehnt: Grund über der Karte, kein Toast; der nächste Versuch räumt', async () => {
+    let versuch = 0;
+    let freigeben: () => void = () => {};
+    basisHandler([
+      http.post('/api/einsaetze/1/zonen', async () => {
+        versuch += 1;
+        if (versuch === 1) return ablehnen('Geometrie ungültig');
+        await new Promise<void>((r) => (freigeben = r));
+        return HttpResponse.json({ id: 5 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Geometrie ungültig'));
+    expect(hinweis()).toHaveTextContent('Zone nicht angelegt');
+    expect(toasts()).toBe(0);
+
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(versuch).toBe(2));
+    expect(hinweis()).toBeNull();
+    act(() => freigeben());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull());
+    expect(fehlerToasts()).toBe(0);
+  });
+
+  it('Verorten abgelehnt: Grund über der Karte, kein Toast', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/einsaetze/1/einheiten/2/position', () => ablehnen('Einheit aufgelöst')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    const item = (await screen.findByText('Einheit: Zug 1')).closest(
+      '.listen-eintrag',
+    ) as HTMLElement;
+    await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
+    await user.click(await screen.findByText('karte-klick'));
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Einheit aufgelöst'));
+    expect(hinweis()).toHaveTextContent('Nicht verortet');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Abschnittsfläche abgelehnt: Grund über der Karte, kein Toast', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([ABSCHNITT_OHNE_FLAECHE])),
+      http.patch('/api/einsaetze/1/abschnitte/3/flaeche', () => ablehnen('Fläche zu groß')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Fläche zeichnen' }));
+    await user.click(await screen.findByText('flaeche-fertig'));
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Fläche zu groß'));
+    expect(hinweis()).toHaveTextContent('Fläche nicht gespeichert');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Zone aufheben abgelehnt: Grund über der Karte, kein Toast', async () => {
+    const ZONE_FREI = {
+      id: 7,
+      einsatz_id: 1,
+      typ: 'freie_skizze',
+      geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: 'Skizze',
+      farbe: '#00ff00',
+      notiz: null,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_FREI])),
+      http.delete('/api/einsaetze/1/zonen/7', () => ablehnen('Zone gehört zu einem Gebiet')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('zone-7'));
+    await user.click(await screen.findByRole('button', { name: 'Zone aufheben' }));
+    const rueckfrage = await offeneRueckfrage();
+    await user.click(within(rueckfrage).getByRole('button', { name: 'Zone aufheben' }));
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Zone gehört zu einem Gebiet'));
+    expect(hinweis()).toHaveTextContent('Zone nicht aufgehoben');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Zeichen hier setzen abgelehnt: Grund im Dialog; erneut räumt; wieder öffnen ohne Grund', async () => {
+    let versuch = 0;
+    let freigeben: () => void = () => {};
+    basisHandler([
+      http.post('/api/einsaetze/1/freie-zeichen', async () => {
+        versuch += 1;
+        if (versuch !== 2) return ablehnen('Ansicht gelöscht');
+        await new Promise<void>((r) => (freigeben = r));
+        return ablehnen('Ansicht gelöscht');
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    const letzterDialog = async () =>
+      waitFor(() => {
+        const alle = [...document.querySelectorAll<HTMLElement>('.ant-modal')].filter((m) =>
+          m.textContent?.includes('Zeichen hier setzen'),
+        );
+        expect(alle.length).toBeGreaterThan(0);
+        return alle[alle.length - 1];
+      });
+    await user.click(await screen.findByText('kontext-zeichen'));
+    const dialog = await letzterDialog();
+    await user.click(within(dialog).getByRole('button', { name: 'Setzen', hidden: true }));
+    await waitFor(() => expect(dialog).toHaveTextContent('Ansicht gelöscht'));
+    expect(dialog).toHaveTextContent('Zeichen nicht angelegt');
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+    expect(hinweis()).toBeNull();
+    expect(toasts()).toBe(0);
+
+    // Zweiter Versuch mit zurückgehaltener Antwort: der alte Grund ist weg.
+    await user.click(within(dialog).getByRole('button', { name: /Setzen/, hidden: true }));
+    await waitFor(() => expect(versuch).toBe(2));
+    expect(dialog).not.toHaveTextContent('Ansicht gelöscht');
+    act(() => freigeben());
+    await waitFor(() => expect(dialog).toHaveTextContent('Ansicht gelöscht'));
+
+    // Abbrechen und wieder öffnen: kein alter Grund.
+    await user.click(within(dialog).getByRole('button', { name: 'Abbrechen', hidden: true }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    await user.click(screen.getByText('kontext-zeichen'));
+    // rc-dialog nimmt dasselbe Element wieder auf: offen heißt, nicht mehr im Verlassen-Zustand.
+    await waitFor(() => expect(dialog).not.toHaveClass('ant-zoom-leave'));
+    const neu = await letzterDialog();
+    expect(neu).not.toHaveTextContent('Ansicht gelöscht');
+  });
+
+  // Die Ausnahme: ein Kartenbild lädt ohne Handlung im Hintergrund nach, ohne Ort (ERLAUBT im
+  // Wächter). Es bleibt beim Toast und nicht im Hinweis über der Karte.
+  it('Kartenbild lädt nicht nach: Toast, kein Kartenhinweis', async () => {
+    const BILD = {
+      id: 3,
+      einsatz_id: 1,
+      name: 'lageplan.png',
+      mime: 'image/png',
+      groesse: 1,
+      ecken_json: JSON.stringify([
+        [9.0, 50.0],
+        [9.1, 50.0],
+        [9.1, 49.9],
+        [9.0, 49.9],
+      ]),
+      opazitaet: 80,
+      sichtbar: true,
+      reihenfolge: 1,
+      hochgeladen_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([BILD])),
+      http.get(
+        '/api/einsaetze/1/karte/hintergrundbilder/3/download',
+        () => new HttpResponse(null, { status: 404 }),
+      ),
+    ]);
+    renderSeite();
+    await waitFor(() =>
+      expect(document.querySelector('.ant-message-error')).toHaveTextContent(
+        'Kartenbild nicht geladen',
+      ),
+    );
+    expect(hinweis()).toBeNull();
+  });
+
+  it('Neue Ansicht abgelehnt: Grund im Dialog, kein Toast', async () => {
+    basisHandler([http.post('/api/einsaetze/1/karten-ansichten', () => ablehnen('Name vergeben'))]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Neue Ansicht/ }));
+    const dialog = await waitFor(() => {
+      const el = [...document.querySelectorAll<HTMLElement>('.ant-modal')].find((m) =>
+        m.textContent?.includes('Neue Ansicht'),
+      );
+      expect(el).toBeDefined();
+      return el!;
+    });
+    await user.type(within(dialog).getByLabelText('Ansichts-Name', { selector: 'input' }), 'Nord');
+    await user.click(within(dialog).getByRole('button', { name: /Speichern/, hidden: true }));
+    await waitFor(() => expect(dialog).toHaveTextContent('Name vergeben'));
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Als Standard abgelehnt: Grund im Paneel „Kartenansicht“, kein Toast', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/karten-ansichten', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            einsatz_id: 1,
+            name: 'Standard',
+            reihenfolge: 0,
+            ist_standard: true,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+          {
+            id: 2,
+            einsatz_id: 1,
+            name: 'Nord',
+            reihenfolge: 1,
+            ist_standard: false,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+        ]),
+      ),
+      http.patch('/api/einsaetze/1/karten-ansichten/2', () => ablehnen('Keine Berechtigung')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite('/einsaetze/1/lagekarte?ansicht=2');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Als Standard/ }));
+    const paneel = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="ansicht-fehler"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(paneel).toHaveTextContent('Keine Berechtigung');
+    expect(paneel).toHaveTextContent('Nicht als Standardansicht gesetzt');
+    expect(hinweis()).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('In dieser Ansicht speichern abgelehnt: Grund im Paneel, der nächste Versuch räumt', async () => {
+    let versuch = 0;
+    let freigeben: () => void = () => {};
+    basisHandler([
+      http.patch('/api/einsaetze/1/karten-ansichten/1', async () => {
+        versuch += 1;
+        if (versuch === 1) return ablehnen('Ansicht gesperrt');
+        await new Promise<void>((r) => (freigeben = r));
+        return ablehnen('Ansicht gesperrt');
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    const fehler = () => document.querySelector('[data-lfh="ansicht-fehler"]');
+    await waitFor(() => expect(fehler()).toHaveTextContent('Ansicht gesperrt'));
+    expect(fehler()).toHaveTextContent('Ansicht nicht gespeichert');
+    expect(toasts()).toBe(0);
+    await user.click(screen.getByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(versuch).toBe(2));
+    expect(fehler()).toBeNull();
+    act(() => freigeben());
+    await waitFor(() => expect(fehler()).toHaveTextContent('Ansicht gesperrt'));
+  });
+});
+
+/**
+ * Kartenhinweis und Paneel „Kartenansicht“ nach dem Review (LFH-1077): jeder Grund lässt sich
+ * schließen, Bildaktionen melden am Kartenhinweis, ein Ansichtsgrund gehört seiner Ansicht und
+ * wandert bei ausgeblendeter Leiste in den Kartenhinweis.
+ */
+describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
+  const ablehnen = (text: string, status = 422) => HttpResponse.json({ error: text }, { status });
+  const hinweis = () => screen.queryByTestId('karten-speicherfehler');
+  const paneelFehler = () => document.querySelector('[data-lfh="ansicht-fehler"]');
+  const toasts = () => document.querySelectorAll('.ant-message-notice').length;
+  const ZWEI_ANSICHTEN = http.get('/api/einsaetze/1/karten-ansichten', () =>
+    HttpResponse.json([
+      {
+        id: 1,
+        einsatz_id: 1,
+        name: 'Standard',
+        reihenfolge: 0,
+        ist_standard: true,
+        erstellt_at: '',
+        geaendert_at: '',
+      },
+      {
+        id: 2,
+        einsatz_id: 1,
+        name: 'Nord',
+        reihenfolge: 1,
+        ist_standard: false,
+        erstellt_at: '',
+        geaendert_at: '',
+      },
+    ]),
+  );
+
+  it('ein Grund über der Karte lässt sich schließen', async () => {
+    basisHandler([http.post('/api/einsaetze/1/zonen', () => ablehnen('Geometrie ungültig'))]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Geometrie ungültig'));
+
+    await user.click(within(hinweis()!).getByRole('button', { name: 'Hinweis schließen' }));
+    await waitFor(() => expect(hinweis()).toBeNull());
+    expect(toasts()).toBe(0);
+  });
+
+  it('Verorten abgelehnt, Platzieren abgebrochen: der Grund geht mit', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/einsaetze/1/einheiten/2/position', () => ablehnen('Einheit aufgelöst')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    const item = (await screen.findByText('Einheit: Zug 1')).closest(
+      '.listen-eintrag',
+    ) as HTMLElement;
+    await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
+    await user.click(await screen.findByText('karte-klick'));
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Einheit aufgelöst'));
+    await user.click(screen.getAllByRole('button', { name: 'Abbrechen' })[0]);
+    await waitFor(() => expect(hinweis()).toBeNull());
+  });
+
+  it('Bildsichtbarkeit abgelehnt: Grund über der Karte, kein Toast', async () => {
+    const BILD = {
+      id: 3,
+      einsatz_id: 1,
+      name: 'lageplan.png',
+      mime: 'image/png',
+      groesse: 1,
+      ecken_json: JSON.stringify([
+        [9.0, 50.0],
+        [9.1, 50.0],
+        [9.1, 49.9],
+        [9.0, 49.9],
+      ]),
+      opazitaet: 80,
+      sichtbar: true,
+      reihenfolge: 1,
+      hochgeladen_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([BILD])),
+      http.get(
+        '/api/einsaetze/1/karte/hintergrundbilder/3/download',
+        () =>
+          new HttpResponse(new TextEncoder().encode('pixeldata'), {
+            status: 200,
+            headers: { 'Content-Type': 'image/png' },
+          }),
+      ),
+      http.patch('/api/einsaetze/1/karte/hintergrundbilder/3', () =>
+        ablehnen('Keine Berechtigung', 403),
+      ),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: /Bild-Hintergründe/ }));
+    await user.click(await screen.findByRole('switch', { name: 'lageplan.png' }));
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Keine Berechtigung'));
+    expect(hinweis()).toHaveTextContent('Bild nicht geändert · lageplan.png');
+    expect(toasts()).toBe(0);
+  });
+
+  it('Ansicht nicht gespeichert, dann Ansicht gewechselt: kein alter Grund, Paneel klappt zu', async () => {
+    basisHandler([
+      ZWEI_ANSICHTEN,
+      http.patch('/api/einsaetze/1/karten-ansichten/1', () => ablehnen('Ansicht gesperrt')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(paneelFehler()).toHaveTextContent('Ansicht gesperrt'));
+    expect(paneelFehler()).toHaveTextContent('Ansicht nicht gespeichert · Standard');
+
+    await user.click(screen.getByRole('combobox', { name: 'Kartenansicht wählen' }));
+    await user.click(
+      await screen.findByText(
+        (_, el) => el?.className === 'ant-select-item-option-content' && el?.textContent === 'Nord',
+      ),
+    );
+    await waitFor(() => expect(paneelFehler()).toBeNull());
+    expect(hinweis()).toBeNull();
+    const kopf = screen.getByRole('button', { name: /^Kartenansicht/, expanded: true });
+    await user.click(kopf);
+    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('Ablehnung erst nach dem Ansichtswechsel: Grund über der Karte, nicht im neuen Paneel', async () => {
+    let freigeben: () => void = () => {};
+    basisHandler([
+      ZWEI_ANSICHTEN,
+      http.patch('/api/einsaetze/1/karten-ansichten/1', async () => {
+        await new Promise<void>((r) => (freigeben = r));
+        return ablehnen('Ansicht gesperrt');
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Kartenansicht wählen' }));
+    await user.click(
+      await screen.findByText(
+        (_, el) => el?.className === 'ant-select-item-option-content' && el?.textContent === 'Nord',
+      ),
+    );
+    act(() => freigeben());
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Ansicht gesperrt'));
+    expect(hinweis()).toHaveTextContent('Ansicht nicht gespeichert · Standard');
+    expect(paneelFehler()).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
+  it('Ansicht nicht gespeichert, Leiste ausgeblendet: der Grund steht über der Karte', async () => {
+    setzeViewportBreite(768);
+    basisHandler([http.patch('/api/einsaetze/1/karten-ansichten/1', () => ablehnen('Gesperrt'))]);
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(paneelFehler()).toHaveTextContent('Gesperrt'));
+    expect(hinweis()).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Leiste ausblenden' }));
+    await waitFor(() => expect(hinweis()).toHaveTextContent('Gesperrt'));
+    expect(hinweis()).toHaveTextContent('Ansicht nicht gespeichert');
+    expect(paneelFehler()).toBeNull();
+
+    // Geschlossen über der Karte: auch eingeblendet steht er nicht mehr im Paneel.
+    await user.click(within(hinweis()!).getByRole('button', { name: 'Hinweis schließen' }));
+    await waitFor(() => expect(hinweis()).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Leiste einblenden' }));
+    expect(paneelFehler()).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+});
