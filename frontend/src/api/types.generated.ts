@@ -3165,6 +3165,16 @@ export interface components {
             zugewiesen_at: string;
         };
         /**
+         * @description Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec
+         *     `einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),
+         *     keine Rollen, kein Aktiv- oder MFA-Status.
+         */
+        MitgliedAuswahl: {
+            anzeigename: string;
+            /** Format: int64 */
+            benutzer_id: number;
+        };
+        /**
          * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
          *     `GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter
          *     [`fordere_modul_zugriff`] und [`erlaubte_module`].
