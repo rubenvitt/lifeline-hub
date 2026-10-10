@@ -513,7 +513,7 @@
       },
       "Anmeldeweg": {
         "type": "string",
-        "description": "Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung\n(`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des\nZugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120). Die\n`&str`-Konstanten der Wege bleiben; der Test unten hält sie mit dem Enum gleich.",
+        "description": "Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung\n(`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des\nZugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120).",
         "enum": [
           "passwort",
           "dev",
