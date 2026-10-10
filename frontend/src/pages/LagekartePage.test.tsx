@@ -3093,6 +3093,32 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     expect(kopf).toHaveAttribute('aria-expanded', 'false');
   });
 
+  // LFH-1140: Mutationsprobe für das Räumen am Schlüssel `standard` beim Verlassen der Ansicht.
+  it('Als Standard abgelehnt, dann Ansicht gewechselt: der Grund geht mit, auch nicht über die Karte', async () => {
+    basisHandler([
+      ZWEI_ANSICHTEN,
+      http.patch('/api/einsaetze/1/karten-ansichten/2', () => ablehnen('Keine Berechtigung')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite('/einsaetze/1/lagekarte?ansicht=2');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Als Standard/ }));
+    await waitFor(() => expect(paneelFehler()).toHaveTextContent('Keine Berechtigung'));
+    expect(paneelFehler()).toHaveTextContent('Nicht als Standardansicht gesetzt · Nord');
+
+    await user.click(screen.getByRole('combobox', { name: 'Kartenansicht wählen' }));
+    await user.click(
+      await screen.findByText(
+        (_, el) =>
+          el?.className === 'ant-select-item-option-content' && el?.textContent === 'Standard',
+      ),
+    );
+    await waitFor(() => expect(paneelFehler()).toBeNull());
+    // Ohne das Räumen wanderte der Grund der verlassenen Ansicht in den Kartenhinweis.
+    expect(hinweis()).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
   it('Ablehnung erst nach dem Ansichtswechsel: Grund über der Karte, nicht im neuen Paneel', async () => {
     let freigeben: () => void = () => {};
     basisHandler([
