@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   Einheit,
   Einsatzabschnitt,
+  Fuehrungsstelle,
   KommunikationsStelle,
   SkizzenVerbindung,
   Sprechgruppe,
@@ -62,8 +63,13 @@ function quellen(p: Partial<KommunikationsplanQuellen> = {}): Kommunikationsplan
     abschnitte: daten([]),
     einheiten: daten([]),
     stab: { zustand: 'daten', daten: stab([]) },
+    fuehrungsstelle: { zustand: 'daten', daten: null },
     ...p,
   };
+}
+
+function fs(p: Partial<Fuehrungsstelle> = {}): KommunikationsplanQuellen['fuehrungsstelle'] {
+  return { zustand: 'daten', daten: { sprechgruppen: [], fahrzeug_ids: [], ...p } };
 }
 
 describe('baueKommunikationsplan', () => {
@@ -269,10 +275,96 @@ describe('baueKommunikationsplan', () => {
     expect(plan[2].zeilen).toEqual([]);
   });
 
-  it('erfindet keine Zeile für die eigene Führungsstelle', () => {
-    const plan = baueKommunikationsplan(quellen());
-    expect(plan.flatMap((g) => g.zeilen)).toEqual([]);
-    expect(JSON.stringify(plan)).not.toMatch(/Führungsstelle/);
+  it('erfindet keine Zeile für eine nicht erfasste Führungsstelle', () => {
+    for (const fuehrungsstelle of [
+      { zustand: 'daten', daten: null },
+      fs({ rufname: '  ', erreichbarkeit: '' }),
+    ] as const) {
+      const plan = baueKommunikationsplan(quellen({ fuehrungsstelle }));
+      expect(plan.flatMap((g) => g.zeilen)).toEqual([]);
+      expect(JSON.stringify(plan)).not.toMatch(/Führungsstelle/);
+    }
+  });
+
+  // LFH-1148: wie im Funkplan steht die erfasste Führungsstelle vor den Funktionen (LFH-848 D7).
+  it('stellt die erfasste Führungsstelle als erste Zeile vor die Funktionen', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(3, {
+            stellenart: 'funktion',
+            funktion: 'el',
+            funktion_label: 'Einsatzleitung',
+            bezeichnung: undefined,
+          }),
+        ]),
+        fuehrungsstelle: fs({
+          rufname: 'Florian Bremen 11/1',
+          kommunikationsmittel: 'mobil',
+          erreichbarkeit: '0170 1234567',
+        }),
+      }),
+    );
+    expect(plan[0].zeilen.map((z) => z.kennung)).toEqual(['Führungsstelle', 'Einsatzleitung']);
+    expect(plan[0].zeilen[0]).toEqual({
+      art: 'fuehrungsstelle',
+      schluessel: 'fs',
+      kennung: 'Führungsstelle',
+      nebentext: 'Florian Bremen 11/1',
+      kanaele: [],
+      ziel: '/einsaetze/7/einsatzdaten',
+      verbindungen: [
+        {
+          schluessel: 'fs-v',
+          mittel: 'mobil',
+          mittelLabel: 'Mobil',
+          wert: '0170 1234567',
+          hinweis: null,
+          verweis: 'tel:01701234567',
+        },
+      ],
+    });
+  });
+
+  it('zeigt die Führungsstelle auch ohne gepflegte Stellen und ohne Verbindung', () => {
+    const plan = baueKommunikationsplan(
+      quellen({ fuehrungsstelle: fs({ sprechgruppen: [{ id: 5 } as Sprechgruppe] }) }),
+    );
+    expect(plan[0].zeilen).toHaveLength(1);
+    expect(plan[0].zeilen[0]).toMatchObject({ kennung: 'Führungsstelle', nebentext: null });
+    expect(plan[0].zeilen[0].verbindungen).toEqual([]);
+  });
+
+  it('nennt eine nicht geladene Führungsstelle mit Grund statt sie wegzulassen', () => {
+    for (const [zustand, grund] of [
+      ['fehler', 'nicht geladen'],
+      ['gesperrt', 'nicht freigegeben'],
+    ] as const) {
+      const plan = baueKommunikationsplan(quellen({ fuehrungsstelle: { zustand, daten: null } }));
+      expect(plan[0].zustand).toBe('daten');
+      expect(plan[0].zeilen).toHaveLength(1);
+      expect(plan[0].zeilen[0]).toMatchObject({
+        kennung: 'Führungsstelle',
+        nebentext: grund,
+        verbindungen: [],
+      });
+    }
+    // Lädt sie noch, steht keine Zeile: kein Flackern einer Lücke beim Seitenaufbau.
+    const laedt = baueKommunikationsplan(
+      quellen({ fuehrungsstelle: { zustand: 'laden', daten: null } }),
+    );
+    expect(laedt[0].zeilen).toEqual([]);
+  });
+
+  it('folgt dem Zustand der Gruppe, wenn die Stellen fehlen', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: { zustand: 'fehler', daten: [] },
+        fuehrungsstelle: fs({ rufname: 'Florian Bremen 11/1' }),
+      }),
+    );
+    expect(plan[0].zustand).toBe('fehler');
+    expect(plan[0].zeilen).toEqual([]);
   });
 
   it('übernimmt gepflegte Verbindungen in Serverfolge mit Label, Hinweis und Verweis', () => {

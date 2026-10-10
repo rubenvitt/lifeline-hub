@@ -94,9 +94,12 @@ Sprechgruppe zu, schreibt sie das in den Datensatz der Stelle; Funkplan und Skiz
 dasselbe. Die Skizze speichert selbst nur Lage, Komponenten, Verbindungen, Bereiche und das
 Schriftfeld. Externe Stellen der Skizze sind die des Kommunikationsplans.
 
-Auch im Kommunikationsplan stehen Abschnitte und Einheiten nur abgeleitet; ihre Angaben pflegt man
-an ihrem Datensatz. Gepflegt werden dort nur Stellen ohne eigenen Datensatz. Jede
-Führungsfunktion kommt je Einsatz einmal vor.
+Auch im Kommunikationsplan stehen Abschnitte, Einheiten und die eigene Führungsstelle nur
+abgeleitet; ihre Angaben pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
+(siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Die Führungsstelle steht dort als
+erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist. Gepflegt werden im
+Kommunikationsplan nur Stellen ohne eigenen Datensatz. Jede Führungsfunktion kommt je Einsatz
+einmal vor.
 
 ### Lücken
 
@@ -122,8 +125,9 @@ mitnehmen. Gedruckt wird die Skizze mit dem Funkplan als Anlage.
 
 ### Ohne Netz
 
-Der Kommunikationsplan bleibt ohne Netz lesbar, seine Bedienung ist dann gesperrt. Die Daten der
-Skizze werden nicht vorgehalten; der Funkplan nennt sie ohne Netz „nicht geladen“ (siehe
+Der Kommunikationsplan bleibt ohne Netz lesbar, seine Bedienung ist dann gesperrt. Die eigene
+Führungsstelle steht dort ohne Netz als „nicht geladen“. Die Daten der Skizze werden nicht
+vorgehalten; der Funkplan nennt sie ohne Netz „nicht geladen“ (siehe
 [Arbeiten ohne Netz](ohne-netz.md)).
 
 ## Grundlagen und Quellen

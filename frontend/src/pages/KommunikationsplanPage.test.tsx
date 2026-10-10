@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import KommunikationsplanPage from './KommunikationsplanPage';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { ladeStab } from '../api/stab';
@@ -32,7 +32,11 @@ import type {
   Stab,
 } from '../api/types';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({
+  ladeEinsatz: vi.fn(),
+  ladeFuehrungsstelle: vi.fn(),
+  ladeModulFreigaben: vi.fn(),
+}));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
@@ -199,6 +203,7 @@ beforeEach(() => {
   vi.mocked(ladeFuehrungsfunktionen).mockResolvedValue(KATALOG);
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, POLIZEI]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
+  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({ sprechgruppen: [], fahrzeug_ids: [] });
   for (const f of [
     legeKommunikationsStelleAn,
     entferneKommunikationsStelle,
@@ -262,6 +267,44 @@ describe('KommunikationsplanPage — Anzeige', () => {
       '/einsaetze/1/einheiten/10',
     );
     expect(within(zug).queryByRole('button')).toBeNull();
+  });
+
+  // LFH-1148: die eigene Führungsstelle steht wie im Funkplan, gepflegt wird auf Einsatzdaten.
+  it('zeigt die erfasste Führungsstelle als erste Zeile mit Verbindung und Weg zu Einsatzdaten', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      rufname: 'Florian Bremen 11/1',
+      kommunikationsmittel: 'festnetz',
+      erreichbarkeit: '0421 999',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+    });
+    const { container } = setup();
+    const fs = await waitFor(() => {
+      const z = zeile(container, 'fs');
+      expect(z).not.toBeNull();
+      return z;
+    });
+    expect(within(fs).getByRole('link', { name: /Führungsstelle/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einsatzdaten',
+    );
+    expect(within(fs).getByText('Florian Bremen 11/1')).toBeInTheDocument();
+    expect(within(fs).getByRole('link', { name: '0421 999' })).toHaveAttribute(
+      'href',
+      'tel:0421999',
+    );
+    expect(within(fs).queryByRole('button')).toBeNull();
+    // Erste Zeile der Gruppe, vor den Funktionen.
+    const schluessel = [...container.querySelectorAll('tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+    expect(schluessel.indexOf('fs')).toBe(schluessel.indexOf('gruppe-stab') + 1);
+  });
+
+  it('zeigt keine Zeile für eine nicht erfasste Führungsstelle', async () => {
+    const { container } = setup();
+    await screen.findByText('Polizei PI Nord');
+    expect(zeile(container, 'fs')).toBeNull();
   });
 
   it('nennt die Lücke „Leitstelle“, solange keine Leitstelle eine Verbindung trägt', async () => {
@@ -470,6 +513,18 @@ describe('KommunikationsplanPage — Besetzung ohne Netz', () => {
     expect(
       await within(zeile(container, 'st-1')).findByText('Besetzung nicht geladen'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('KommunikationsplanPage — Führungsstelle ohne Netz', () => {
+  it('sagt „nicht geladen“ statt die Führungsstelle wegzulassen', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockReturnValue(new Promise(() => {}));
+    const { container } = setup();
+    await screen.findByText('Polizei PI Nord');
+    expect(zeile(container, 'fs')).toBeNull();
+    setzeOnline(false);
+    await waitFor(() => expect(zeile(container, 'fs')).not.toBeNull());
+    expect(within(zeile(container, 'fs')).getByText('nicht geladen')).toBeInTheDocument();
   });
 });
 
