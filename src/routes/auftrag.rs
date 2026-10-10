@@ -119,6 +119,7 @@ pub async fn liste(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         &mut liste,
     )
     .await?;
@@ -162,6 +163,7 @@ pub async fn detail(
         ctx.einsatz.id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         std::slice::from_mut(&mut d),
     )
     .await?;
@@ -235,6 +237,7 @@ pub async fn anlegen(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         std::slice::from_mut(&mut d),
     )
     .await?;
@@ -316,6 +319,7 @@ pub async fn quittieren(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         std::slice::from_mut(&mut d),
     )
     .await?;
@@ -419,6 +423,7 @@ pub async fn vollzug(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         std::slice::from_mut(&mut d),
     )
     .await?;
@@ -448,6 +453,7 @@ pub async fn abnehmen(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         std::slice::from_mut(&mut d),
     )
     .await?;

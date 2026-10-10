@@ -9,6 +9,7 @@ import { quittiereModulGespeichert } from './modulQuittung';
 import { ladeModulOverrides, setzeModulOverride } from '../../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
 import { orgVorgabe } from '../../components/vorgabeText';
+import { rollenName } from './optionen';
 import { EINSATZ_ABGESCHLOSSEN, NUR_LEITUNG_ORG_ADMIN } from '../../components/nurAnsicht';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
@@ -16,14 +17,11 @@ import { darfModuleVerwalten } from '../../einsatz/schreibrecht';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import type { ModulOverrideUpdate, OrgModulEinstellungen } from '../../api/types';
 
-/** Org-Rollen-Hinweis im Modul-Override („Vorgabe der Organisation: Führungskraft“, LFH-944). */
-function orgRollenHinweis(
-  rolle: 'admin' | 'fuehrungskraft' | null | undefined,
-): string | undefined {
-  if (rolle == null) return undefined;
-  if (rolle === 'fuehrungskraft') return orgVorgabe('Führungskraft');
-  if (rolle === 'admin') return orgVorgabe('Admin');
-  return undefined;
+/** Org-Rollen-Hinweis im Modul-Override („Vorgabe der Organisation: Führung im Einsatz“, LFH-944);
+ *  der Name kommt aus der Auswahl, damit er nur einmal steht (LFH-1150). */
+function orgRollenHinweis(rolle: string | null | undefined): string | undefined {
+  const name = rollenName(rolle);
+  return name === undefined ? undefined : orgVorgabe(name);
 }
 
 /**

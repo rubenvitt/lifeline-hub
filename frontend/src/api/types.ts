@@ -122,10 +122,14 @@ export interface OrgEinstellungenUpdate {
   aufbewahrung_kategorien?: KategorieVorgabe[];
 }
 
+/** Benötigte Rolle eines Moduls (Spec `modul-freigabe`, LFH-1150); `null` = frei. Der Server
+ *  typisiert das Feld als freien String und weist andere Werte mit 400 ab. */
+export type BenoetigteRolle = 'admin' | 'fuehrungskraft' | 'einsatzfuehrung';
+
 /** Org-weite Modul-Rollen-Defaults (GET /api/org-modul-einstellungen).
  *  Map modul_key → benoetigte_rolle; fehlt ein Key = kein Org-Default (frei).
  *  Kein Backend-Schema, FE-lokal. */
-export type OrgModulEinstellungen = Record<string, 'admin' | 'fuehrungskraft' | null>;
+export type OrgModulEinstellungen = Record<string, BenoetigteRolle | null>;
 
 export type EinsatzEinstellungen = S['EinstellungenMitOrgDefaults'];
 
@@ -171,7 +175,7 @@ export type ModulFreigaben = Record<string, ModulFreigabe>;
 /** PUT-Eingabe eines einzelnen Modul-Overrides. Kein Backend-Schema, FE-lokal. */
 export interface ModulOverrideUpdate {
   sichtbar: boolean;
-  benoetigte_rolle: 'admin' | 'fuehrungskraft' | null;
+  benoetigte_rolle: BenoetigteRolle | null;
 }
 
 // ============================== ETB ==============================

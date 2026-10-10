@@ -19,8 +19,14 @@ pub async fn liste(
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<ModulZaehlerAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let mut erlaubt =
-        erlaubte_module(&state.pool, einsatz_id, ctx.einsatz.org_id, &ctx.benutzer).await?;
+    let mut erlaubt = erlaubte_module(
+        &state.pool,
+        einsatz_id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+    )
+    .await?;
     // Ein Gerät (LFH-892) zählt nur die Module seiner Ansicht.
     if let Some(g) = &ctx.geraet {
         erlaubt = g.schneide_module(erlaubt);

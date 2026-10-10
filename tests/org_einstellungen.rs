@@ -329,6 +329,31 @@ async fn modul_put_ungueltige_rolle_ist_400() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+/// PUT mit der Stufe „Führung im Einsatz“ (LFH-1150) → 200; die Vorgabe trägt den Wert.
+#[tokio::test]
+async fn modul_put_einsatzfuehrung_ist_gueltig() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = put_modul_einstellung(
+        &app,
+        &admin_cookie,
+        "schaeden",
+        serde_json::json!({"benoetigte_rolle": "einsatzfuehrung"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    let (_, get_body) = anfrage(
+        &app,
+        "GET",
+        "/api/org-modul-einstellungen",
+        &admin_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(get_body["schaeden"], "einsatzfuehrung", "body={get_body}");
+}
+
 /// GET /api/org-einstellungen als Benutzer mit org_rolle=keine → 403.
 #[tokio::test]
 async fn get_als_keine_liefert_403() {

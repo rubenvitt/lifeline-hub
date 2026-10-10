@@ -333,6 +333,17 @@ describe('EinsatzDefaults', () => {
     await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'admin'));
   });
 
+  it('setzt die Org-Vorgabe „Führung im Einsatz“ als einsatzfuehrung (LFH-1150)', async () => {
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
+    fireEvent.click(await screen.findByText('Führung im Einsatz'));
+
+    await waitFor(() =>
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'einsatzfuehrung'),
+    );
+  });
+
   it('stapelt die Quittung beim Serienschalten nicht (LFH-478)', async () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 

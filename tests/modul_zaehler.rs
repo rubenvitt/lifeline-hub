@@ -666,3 +666,28 @@ async fn zaehlen_legt_keinen_chat_kanal_an() {
         .unwrap();
     assert_eq!(kanaele, 0, "der Zähler hat einen Kanal angelegt");
 }
+
+/// LFH-1150: Unter „Führung im Einsatz“ zählt die Einsatzleitung ohne Org-Rolle das Modul, die
+/// Beobachterin nicht — der Zähler rechnet mit derselben Einsatzrolle wie die Liste.
+#[tokio::test]
+async fn einsatzfuehrung_zaehlt_fuer_die_einsatzleitung() {
+    let (app, admin, einsatz) = aufbau().await;
+    let erika = erika(&app, &admin, einsatz).await;
+    let lid = benutzer_anlegen(&app, &admin, "leonie", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, lid, "einsatzleitung").await;
+    let lena = login_cookie(&app, "leonie", "leoniepw1").await;
+    let (status, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &lena,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
+    )
+    .await;
+    assert!(status.is_success(), "Override: {status} {v:?}");
+
+    let v = zaehler(&app, &lena, einsatz).await;
+    assert!(v.as_object().unwrap().contains_key("personen"), "{v:?}");
+    let v = zaehler(&app, &erika, einsatz).await;
+    assert!(!v.as_object().unwrap().contains_key("personen"), "{v:?}");
+}
