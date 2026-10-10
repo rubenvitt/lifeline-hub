@@ -14,7 +14,8 @@ Die Einsatzrolle liegt an jedem Aufrufer schon vor:
   dort die Ansichtsrolle (`Funktionsansicht::rolle()`), daneben `EinsatzKontext.geraet`.
 - `routes/vorlagendokument.rs` lädt sie selbst per `einsatz_repo::rolle_von`.
 - `fuehrung/aufloesung.rs::laden_fuer` bekommt nur den `Benutzer` und muss die Rolle durchreichen.
-- `gesperrt_fuer_einfaches_mitglied` simuliert ein Gerät als Mitglied ohne Rollen.
+- `gesperrt_fuer_einfaches_mitglied` (mit dieser Change umbenannt in `gesperrt_fuer_geraet`)
+  simuliert ein Gerät als Mitglied ohne Rollen.
 
 Motivation und Entscheidung des Menschen: siehe `proposal.md`, „Why“.
 
@@ -75,9 +76,11 @@ aussperrt, wäre die nächste Falle. Die Org-Isolation trägt weiter das Lese-Ga
 `self.rolle` liefert. Alle Modul-Gates des Kontexts benutzen sie. Die Ansichtsrolle eines Geräts
 (`Fuehrungspersonal` für UHS-Tablet, Betreuungsstelle usw.) ist ein technisches Schreibrecht an
 einer Stelle, keine Person in Führung; ein Modul, das die Einsatzleitung auf die Führung
-beschränkt, soll kein Stationsgerät öffnen. `gesperrt_fuer_einfaches_mitglied` gibt deshalb
+beschränkt, soll kein Stationsgerät öffnen. `gesperrt_fuer_geraet` gibt deshalb
 `None` weiter und nennt die neue Stufe in der Geräteverwaltung als Sperre, wie heute
-`fuehrungskraft`.
+`fuehrungskraft`. Der alte Name „…einfaches_mitglied“ und der Warnsatz „für einfache Mitglieder
+gesperrt“ stimmen mit der neuen Stufe nicht mehr (Führungspersonal ohne Org-Rolle kommt hinein,
+das Gerät nicht); Funktion, Schema-Beschreibung und Warnsatz heißen deshalb nach dem Gerät.
 
 - *Verworfen: Gerät mit Ansichtsrolle.* Konsistent zur Schreibberechtigung, öffnet aber jedes
   Führungs-Modul für Geräte, die die Einsatzleitung als Station und nicht als Führung gekoppelt

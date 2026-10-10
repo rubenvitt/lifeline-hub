@@ -63,8 +63,8 @@ Auf schmalen Bildschirmen liegen die Aktionen einer Zeile in einem Aktionsmenü.
   Aufbewahrung, liest jeden Einsatz und ändert an Einsätzen der eigenen Organisation die
   Verwaltungsangaben.
 - **Org-Rolle „Führungskraft (darf Einsätze anlegen)“**: legt Einsätze an, liest jeden Einsatz
-  der eigenen Organisation und sieht die Verwaltung zum Nachschlagen. In Modulen, die eine
-  „Führungskraft“ verlangen, ist sie zugelassen.
+  der eigenen Organisation und sieht die Verwaltung zum Nachschlagen. In Modulen, die
+  „Führungskraft der Organisation“ oder „Führung im Einsatz“ verlangen, ist sie zugelassen.
 - **System-Rolle „Benutzer“ und Org-Rolle „Keine“** (die Vorgabe): arbeitet nur in Einsätzen,
   in die die Einsatzleitung die Person aufgenommen hat.
 

@@ -337,6 +337,15 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
+    // Dieselben vier Stufen wie im Einsatz, in derselben Reihenfolge (`ROLLEN_OPTIONEN`).
+    await screen.findByText('Führung im Einsatz');
+    const optionen = [...document.querySelectorAll('.ant-select-item-option-content')];
+    expect(optionen.map((o) => o.textContent)).toEqual([
+      'Frei (alle)',
+      'Führung im Einsatz',
+      'Führungskraft der Organisation',
+      'Admin',
+    ]);
     fireEvent.click(await screen.findByText('Führung im Einsatz'));
 
     await waitFor(() =>

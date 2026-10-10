@@ -119,9 +119,9 @@ Zur Wahl stehen nur Stellen, die noch arbeiten: keine stornierte oder aufgelöst
 Unfallhilfsstelle, kein aufgelöster Bereitstellungsraum. Eine geschlossene Betreuungsstelle
 bleibt wählbar.
 
-Ist ein Modul, das die Ansicht braucht, im Einsatz für einfache Mitglieder gesperrt, warnt die
-Maske: „… für einfache Mitglieder gesperrt – fehlt auf dem …“. Das Gerät arbeitet dann ohne
-dieses Modul.
+Ist ein Modul, das die Ansicht braucht, im Einsatz auf eine Rolle beschränkt, warnt die Maske:
+„… für gekoppelte Geräte gesperrt – fehlt auf dem …“. Das Gerät arbeitet dann ohne dieses Modul.
+Ein Gerät zählt dabei weder als Führungskraft der Organisation noch als Führung im Einsatz.
 
 ### Fristen
 

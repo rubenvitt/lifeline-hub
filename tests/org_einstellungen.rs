@@ -327,6 +327,16 @@ async fn modul_put_ungueltige_rolle_ist_400() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+    // Nichts gespeichert (Spec `modul-freigabe`, LFH-1150): die Map bleibt ohne `etb`.
+    let (_, map) = anfrage(
+        &app,
+        "GET",
+        "/api/org-modul-einstellungen",
+        &admin_cookie,
+        None,
+    )
+    .await;
+    assert!(map.get("etb").is_none(), "map={map}");
 }
 
 /// PUT mit der Stufe „Führung im Einsatz“ (LFH-1150) → 200; die Vorgabe trägt den Wert.

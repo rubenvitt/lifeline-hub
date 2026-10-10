@@ -282,7 +282,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       expect(h).not.toBeNull();
       return h!;
     });
-    expect(hinweis.textContent).toMatch(/für einfache Mitglieder gesperrt/);
+    expect(hinweis.textContent).toMatch(/für gekoppelte Geräte gesperrt/);
   });
 
   it('widerruft erst nach Rückfrage', async () => {

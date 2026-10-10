@@ -317,10 +317,11 @@ async fn lade_modul_regeln(
     Ok((overrides, org_defaults))
 }
 
-/// Welche der `module` in diesem Einsatz einem Mitglied ohne System- und Org-Rolle gesperrt
-/// sind (LFH-892): so behandelt der Server ein gekoppeltes Gerät. Die Kopplungsmaske nennt sie,
-/// bevor ein Gerät gekoppelt wird, das seine Ansicht nicht nutzen könnte.
-pub async fn gesperrt_fuer_einfaches_mitglied(
+/// Welche der `module` in diesem Einsatz einem gekoppelten Gerät gesperrt sind (LFH-892): ein
+/// Konto ohne System- und Org-Rolle und ohne Einsatzrolle für die Modulfreigabe (LFH-1150,
+/// [`super::kontext::EinsatzKontext::modul_rolle`]). Die Kopplungsmaske nennt sie, bevor ein
+/// Gerät gekoppelt wird, das seine Ansicht nicht nutzen könnte.
+pub async fn gesperrt_fuer_geraet(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
