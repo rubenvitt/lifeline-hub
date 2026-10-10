@@ -731,6 +731,30 @@ async fn discoverable_passkey_anmeldung_hinterlaesst_genau_einen_login_ok() {
 }
 
 #[tokio::test]
+async fn abmeldung_nach_discoverable_passkey_nennt_den_passkey() {
+    webauthn_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+    let (passkey, handle, challenge, cookie) =
+        discoverable_zeremonie(&app, &pool, b"disc-abmeldung").await;
+
+    let body = passkey.assertion(&challenge, &passkey.schluessel, Some(&handle));
+    let antwort = sende(
+        &app,
+        "POST",
+        "/api/auth/webauthn/discoverable/finish",
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::OK, "{:?}", antwort.json);
+
+    assert_eq!(
+        anmeldeweg_der_abmeldung(&app, &pool, &antwort.cookies).await,
+        "webauthn"
+    );
+}
+
+#[tokio::test]
 async fn discoverable_passkey_mit_falscher_signatur_hinterlaesst_genau_einen_fehlschlag() {
     webauthn_aktivieren();
     let (app, pool) = setup_mit_pool().await;

@@ -406,6 +406,59 @@ mod tests {
         );
     }
 
+    /// Anlage und beendete Sitzung kommen ebenso strukturiert zurück (LFH-1152).
+    #[tokio::test]
+    async fn angaben_von_anlage_und_sitzung_kommen_zurueck() {
+        let pool = db::test_pool().await;
+        let akteur = admin(&pool).await;
+        let anlage = ZugangsAngaben {
+            system_rolle: Some(SystemRolle::Keiner),
+            org_rolle: Some(OrgRolle::Keine),
+            ..ZugangsAngaben::default()
+        };
+        let sitzung = ZugangsAngaben {
+            geraet: Some("Safari · iPadOS".to_string()),
+            angemeldet_at: Some("2026-10-10 12:13:34".to_string()),
+            ..ZugangsAngaben::default()
+        };
+        for (aktion, angaben) in [
+            (AdminAktion::BenutzerAngelegt, &anlage),
+            (AdminAktion::SitzungBeendet, &sitzung),
+        ] {
+            schreibe(
+                &pool,
+                AdminEintrag {
+                    aktion,
+                    akteur: &akteur,
+                    ziel: Ziel::Benutzer {
+                        id: akteur.id,
+                        benutzername: "admin",
+                    },
+                    angaben: Some(angaben.clone()),
+                    peer_ip: None,
+                },
+            )
+            .await;
+        }
+
+        let filter = SpurFilter {
+            limit: 10,
+            ..SpurFilter::default()
+        };
+        let zeilen = liste(&pool, &filter, None).await.unwrap();
+        let gelesen: Vec<(&str, Option<&str>, Option<&ZugangsAngaben>)> = zeilen
+            .iter()
+            .map(|z| (z.aktion.as_str(), z.detail.as_deref(), z.angaben.as_ref()))
+            .collect();
+        assert_eq!(
+            gelesen,
+            vec![
+                ("sitzung_beendet", None, Some(&sitzung)),
+                ("benutzer_angelegt", None, Some(&anlage)),
+            ]
+        );
+    }
+
     #[tokio::test]
     async fn purge_loescht_nur_abgelaufene() {
         let pool = db::test_pool().await;

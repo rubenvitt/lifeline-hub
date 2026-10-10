@@ -13,8 +13,8 @@ pub const STANDARD_LIMIT: i64 = 100;
 pub const MAX_LIMIT: i64 = 500;
 
 /// Gemeinsamer Filter beider Spuren. Die Werte sind schon geprüft: Zeiten im SQLite-Format
-/// (`etb::normalisiere_zeit`), `konto` normalisiert und so gekürzt wie beim Schreiben
-/// (`benutzername::fuer_protokoll`), `limit` geklemmt.
+/// (`etb::normalisiere_zeit`), `konto` normalisiert und auf die Länge gekürzt, mit der Namen
+/// gespeichert sind (`benutzername::PROTOKOLL_LAENGE`, ohne „…“), `limit` geklemmt.
 #[derive(Debug, Clone, Default)]
 pub struct SpurFilter {
     /// Untere Grenze von `zeitpunkt`, einschließlich.

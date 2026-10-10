@@ -49,8 +49,8 @@ pub struct AuthProviderAnzeige {
 wire_enum! {
     /// Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung
     /// (`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des
-    /// Zugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120). Die
-    /// `&str`-Konstanten der Wege bleiben; der Test unten hält sie mit dem Enum gleich.
+    /// Zugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120).
+    // Die `&str`-Konstanten der Wege bleiben; der Test unten hält sie mit dem Enum gleich.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum Anmeldeweg {
         Passwort => "passwort",

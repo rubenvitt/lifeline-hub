@@ -214,6 +214,40 @@ async fn eine_eigene_beenden_laesst_das_konto_unveraendert() {
     assert_eq!(anmeldespur(&pool).await.len(), 1);
 }
 
+/// Eine Sitzung von vor LFH-1152 kennt ihren Weg nicht: ihr Beenden schreibt `unbekannt`.
+#[tokio::test]
+async fn beenden_einer_sitzung_ohne_anmeldeweg_schreibt_unbekannt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
+    anmelden(&app, "marlene", "marlenepw1", IPAD).await;
+    sqlx::query("UPDATE session SET anmeldeweg = NULL WHERE geraet = 'Safari · iPadOS'")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let k = kennung(
+        &liste(&app, &firefox, "/api/auth/sitzungen").await,
+        "Safari · iPadOS",
+    );
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/auth/sitzungen/{k}"),
+        &firefox,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let weg: String =
+        sqlx::query_scalar("SELECT provider FROM auth_audit WHERE ereignis = 'sitzung_beendet'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(weg, "unbekannt");
+}
+
 /// Die Spur schlägt nie nach außen durch: das Beenden ist schon geschehen, wenn sie schreibt.
 #[tokio::test]
 async fn fehlende_spur_verhindert_das_beenden_nicht() {

@@ -260,7 +260,7 @@ async fn kontofilter_trifft_akteur_und_ziel() {
     assert_eq!(feld(&nur_rolle, "ziel"), ["doris"]);
 }
 
-/// Der Filterwert wird gekürzt wie beim Schreiben, sonst träfe ein langer Name nie.
+/// Der Filterwert wird auf die gespeicherte Länge gekürzt (ohne „…“), sonst träfe ein langer Name nie.
 #[tokio::test]
 async fn langer_kontoname_trifft_seinen_gekuerzten_eintrag() {
     let (app, pool) = setup_mit_pool().await;

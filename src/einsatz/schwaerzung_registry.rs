@@ -2365,6 +2365,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "geraet",
                 "Grobe Geräteklasse wie „Safari · iPadOS“, nie der User-Agent (kein Personenbezug)",
             ),
+            retain(
+                "anmeldeweg",
+                "Anmeldeweg der Sitzung, Wire-Wert von auth::provider::Anmeldeweg (technisch, \
+                 kein Personenbezug)",
+            ),
         ],
     },
 ];

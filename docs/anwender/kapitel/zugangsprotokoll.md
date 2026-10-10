@@ -41,7 +41,8 @@ Für System-Admins:
 
 3. Bei Bedarf mit „von“ und „bis“ den Zeitraum eingrenzen.
 
-Mit dem Konto im Feld zeigt auch die Spur „Zugangsänderungen“ nur noch Einträge dieses Kontos.
+Mit dem Text im Feld „Konto“ zeigt auch die Spur „Zugangsänderungen“ nur noch Einträge der
+Konten, deren Name ihn enthält.
 
 ### Fehlgeschlagene Anmeldeversuche finden
 
