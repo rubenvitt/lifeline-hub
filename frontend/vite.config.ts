@@ -93,6 +93,14 @@ const libheifBibliothek = (): Plugin => {
   };
 };
 
+// Bilder der Anwenderdoku (LFH-1128, `src/hilfe/bilder.ts`): eigener Ordner im Build, damit der
+// Service Worker sie an der Adresse erkennt. Nicht im Precache (rund hundert Bilder lüde jeder Client
+// bei jedem Update), sondern im Laufzeit-Cache: einmal angesehen, ohne Netz wieder da. Die Namen
+// tragen den Inhalts-Hash, `CacheFirst` liefert also nie einen alten Stand unter neuem Namen.
+const DOKU_BILDER_ORDNER = 'assets/doku';
+const DOKU_BILDER_CACHE = 'lifeline-doku-bilder';
+const DOKU_BILDER_QUELLE = '/docs/anwender/bilder/';
+
 // Vite 8 bündelt Pakete immer mit Sourcemap vor und hängt sie beim Ausliefern als Base64 an:
 // `antd.js` wuchs so von 3,2 auf 11,3 MB. An einem String dieser Größe bricht Node 26 den
 // Dev-Server gelegentlich ab („Lazy deopt after a fast API call …“ in `Buffer.byteLength`), und
@@ -145,7 +153,18 @@ export default defineConfig(({ mode }) => {
           // Der HEIC-Decoder (LFH-759, 1,5 MB) kommt nicht in den Vorrat: ohne Netz gibt es auch
           // keine HEIC-Bytes zu dekodieren, und jeder Client lüde ihn sonst bei jedem Update vor.
           // Ein vom Betreiber ersetzter Decoder (LFH-1000) käme sonst auch nie an.
-          globIgnores: [`${LIBHEIF_ZIEL}/**`],
+          globIgnores: [`${LIBHEIF_ZIEL}/**`, `${DOKU_BILDER_ORDNER}/**`],
+          runtimeCaching: [
+            {
+              urlPattern: new RegExp(`/${DOKU_BILDER_ORDNER}/[^/]+\\.png$`),
+              handler: 'CacheFirst',
+              options: {
+                cacheName: DOKU_BILDER_CACHE,
+                expiration: { maxAgeSeconds: 30 * 24 * 60 * 60, maxEntries: 500 },
+                cacheableResponse: { statuses: [200] },
+              },
+            },
+          ],
           // Seitenwechsel auf /api/ MÜSSEN zum Server: der OIDC-Login ist ein Full-Page-Redirect
           // über `/api/auth/oidc/…`. Sonst antwortet der Service Worker mit dem gecachten
           // `index.html`, und der Login endet stumm wieder auf der Login-Seite.
@@ -161,6 +180,19 @@ export default defineConfig(({ mode }) => {
     ],
     define: {
       __APP_VERSION__: JSON.stringify(frontendVersion),
+    },
+    build: {
+      rolldownOptions: {
+        output: {
+          // Vites Vorgabe, nur die Bilder der Anwenderdoku in ihrem eigenen Ordner (s. oben).
+          assetFileNames: (asset) =>
+            asset.originalFileNames.some((pfad) =>
+              pfad.split('\\').join('/').includes(DOKU_BILDER_QUELLE),
+            )
+              ? `${DOKU_BILDER_ORDNER}/[name]-[hash][extname]`
+              : 'assets/[name]-[hash][extname]',
+        },
+      },
     },
     // maplibre-gl nicht vorbündeln (nur Dev-Server): maplibre baut seine Worker-URL relativ zu
     // `import.meta.url` und suchte den Worker sonst unter `node_modules/.vite/deps/`, wo er nicht

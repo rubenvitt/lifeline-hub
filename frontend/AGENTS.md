@@ -53,7 +53,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   als `EinsatzstatusMarke` neben dem Titel, nur bei nicht aktivem Einsatz (Rahmenkontext
   `einsatz/EinsatzRahmenKontext.tsx`). Im Ortspfad kürzt unter `md` nur der mittlere Eintrag.
 - **Markdown** (`components/Markdown.tsx`, `MarkdownEditor`): Pflicht-Prop `unterEbene` (Ebene der
-  nächsten Überschrift darüber, Boden `h6`, kein fester Versatz).
+  nächsten Überschrift darüber, Boden `h6`, kein fester Versatz). Der optionale Bild-Renderer
+  `bild` gehört nur der Hilfe (`docs/anwender/AGENTS.md`, „Bilder“).
 - **Liste** (`components/Liste.tsx`): Kopf `kopf.unterEbene` (Pflicht im Kopf), Eintragstitel
   (`ListenEintragMeta`) eine Ebene unter dem Kopf, ohne Kopf aus `unterEbene` an der Liste,
   ohne beides keine Überschrift. `unterEbene` nur bei eigenständigen Gegenständen, nie bei

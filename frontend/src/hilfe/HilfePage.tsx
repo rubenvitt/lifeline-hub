@@ -14,6 +14,7 @@ import {
   parseHilfeGruppe,
 } from '../routing/deeplinks';
 import { GRUPPEN, gruppenName, type Gruppe } from './gruppen';
+import HilfeBild from './HilfeBild';
 import { findeKapitel, kapitelDerGruppe, verlinke, type Kapitel } from './kapitel';
 import './Hilfe.css';
 
@@ -24,8 +25,9 @@ import './Hilfe.css';
  * der gewählten Lesergruppe hintereinander: das ist zugleich die Einweisungsmappe zum Drucken.
  *
  * Offen ohne Anmeldung (das Kapitel „Anmelden“ braucht man davor) und ohne Netz (die Texte stecken
- * im Chunk dieser Seite, den der Service Worker vorhält). Der Rückweg folgt der Sitzung: Person,
- * Gerät oder Anmeldung.
+ * im Chunk dieser Seite, den der Service Worker vorhält). Bilder lädt die Seite erst beim Ansehen
+ * und hält sie danach im Laufzeit-Cache (`HilfeBild`, `bilder.ts`, LFH-1128). Der Rückweg folgt
+ * der Sitzung: Person, Gerät oder Anmeldung.
  */
 export default function HilfePage() {
   const { kapitel: slug } = useParams();
@@ -103,6 +105,7 @@ export default function HilfePage() {
                 <Markdown
                   unterEbene={1}
                   titel={<h2 className="hilfe-kapitel__titel">{k.titel}</h2>}
+                  bild={HilfeBild}
                 >
                   {verlinke(k.text, (s) => hilfePfad({ kapitel: s, gruppe }))}
                 </Markdown>

@@ -85,6 +85,22 @@ describe('HilfePage', () => {
     expect(screen.getByTestId('ort')).toHaveTextContent('/hilfe/ohne-netz?gruppe=administration');
   });
 
+  it('zeigt die Bilder eines Kapitels aus dem Bundle, verzögert geladen (LFH-1128)', async () => {
+    const k = KAPITEL.find((k) => /!\[[^\]]+\]\(\.\.\/bilder\//.test(k.text));
+    expect(k, 'kein Kapitel mit Bild (Muster „Anmelden und Abmelden“)').toBeDefined();
+    const verweise = [...k!.text.matchAll(/!\[([^\]]+)\]\(([^)]+)\)/g)];
+    zeige(`/hilfe/${k!.slug}`);
+    const bilder = await within(inhalt()).findAllByRole('img');
+    expect(bilder.map((b) => b.getAttribute('alt'))).toEqual(verweise.map((v) => v[1]));
+    for (const b of bilder) {
+      expect(b.getAttribute('src'), 'gebaute Adresse statt des Pfads aus dem Kapitel').not.toMatch(
+        /^\.\.\/bilder\//,
+      );
+      expect(b).toHaveAttribute('loading', 'lazy');
+      expect(b).toHaveClass('hilfe-bild');
+    }
+  });
+
   it('nennt ein unbekanntes Kapitel und führt zurück zur Mappe', async () => {
     zeige('/hilfe/gibt-es-nicht');
     expect(await screen.findByText('Kapitel nicht gefunden')).toBeInTheDocument();

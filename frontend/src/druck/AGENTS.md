@@ -28,7 +28,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nicht auf Kopf und Logo und fragt `/api/organisation` gar nicht (die Hilfe ist ohne Anmeldung
   offen). Jedes Druckstück einer Organisation oder eines Einsatzes bleibt beim Druckkopf. Die
   Mappe der Hilfe beginnt jedes weitere Kapitel auf neuer Seite (`data-lfh="druck-kapitel"`),
-  Nachweis `e2e/hilfe-druck.spec.ts`.
+  Nachweis `e2e/hilfe-druck.spec.ts`; dort auch die Bilder der Kapitel (LFH-1128): Breite und
+  Umbruch nur über die `img`-Regeln der Druckwurzel hier, keine eigene Druckregel der Hilfe.
 - **Schriften nur über die FontFace-API** (LFH-1108, `theme/schriften.ts`): WebKit baut
   `@font-face`-Schnitte beim Druckstart neu auf und lädt sie nach. Safari zählt die Seiten im
   ersten Durchlauf mit der Ersatzschrift und schneidet ab, was mit der Webschrift danach wächst.

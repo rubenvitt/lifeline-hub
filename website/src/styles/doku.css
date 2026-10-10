@@ -138,3 +138,13 @@
   border: 1px solid var(--lfh-linie);
   text-align: left;
 }
+
+/* Bildschirmfotos der Kapitel (LFH-1128): nie breiter als die Lesespalte, mit Haarlinie, weil das
+   helle Foto sonst auf hellem Grund zerfließt. */
+.doku-text img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  border: 1px solid var(--lfh-linie);
+}

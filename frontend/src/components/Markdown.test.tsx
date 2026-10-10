@@ -78,6 +78,33 @@ describe('Markdown', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 
+  // --- Bilder (LFH-1128): nur die Hilfe reicht einen eigenen Renderer herein ---
+
+  it('gibt ein Markdown-Bild ohne Renderer unverändert aus', () => {
+    const { container } = render(
+      <Markdown unterEbene={3}>{'![Maske](../bilder/a/m.png)'}</Markdown>,
+    );
+    const bild = container.querySelector('img');
+    expect(bild).toHaveAttribute('src', '../bilder/a/m.png');
+    expect(bild).toHaveAttribute('alt', 'Maske');
+    expect(bild).not.toHaveAttribute('loading');
+  });
+
+  it('rendert Bilder über den Renderer des Einbauorts, sonst nichts anders', () => {
+    function Bild({ src, alt }: { src?: string; alt?: string }) {
+      return <img src={`/gebaut/${src?.split('/').pop()}`} alt={alt} data-testid="eigen" />;
+    }
+    const { container } = render(
+      <Markdown unterEbene={3} bild={Bild}>
+        {'## Kopf\n\n![Maske](../bilder/a/m.png)'}
+      </Markdown>,
+    );
+    expect(screen.getByTestId('eigen')).toHaveAttribute('src', '/gebaut/m.png');
+    expect(screen.getByRole('img', { name: 'Maske' })).toBeInTheDocument();
+    // Die übrigen Elemente bleiben die des Einbauorts (Ebene, Klasse).
+    expect(container.querySelector('h5.md-h2')).toHaveTextContent('Kopf');
+  });
+
   it('sanitisiert javascript:-Links (kein gefährliches href)', () => {
     const { container } = render(
       <Markdown unterEbene={3}>{'[klick](javascript:alert(1))'}</Markdown>,
