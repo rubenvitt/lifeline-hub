@@ -68,8 +68,8 @@ pub fn build_router(state: AppState) -> Router {
 }
 
 /// Body-Grenze der öffentlichen Anmelde-Starts mit Body (Passwort-Login, Passkey-Start mit Namen;
-/// LFH-921): ohne sie gälte axums Vorgabe von 2 MiB, und ein Unangemeldeter schickte
-/// Megabyte-Namen. Der discoverable Start liest keinen Body.
+/// LFH-921): ohne sie gälte `JSON_BODY_MAX` (256 KiB), und ein Unangemeldeter schickte
+/// Namen in dieser Größe. Der discoverable Start liest keinen Body.
 const AUTH_START_BODY_MAX: usize = 4 * 1024;
 
 /// Body-Grenze der Passkey-Abschlüsse: eine Assertion liegt meist unter 2 KiB, mit Erweiterungen
@@ -82,6 +82,16 @@ const AUTH_FINISH_BODY_MAX: usize = 16 * 1024;
 /// LFH-1061): sie tragen nur einen kurzen Code (TOTP- oder Recovery-Code, Einmalcode samt
 /// PKCE-`verifier` bis 128 Zeichen, Kopplungscode). Bemessen wie die Anmelde-Starts.
 const AUTH_CODE_BODY_MAX: usize = 4 * 1024;
+
+/// Body-Limit jeder Route ohne eigenes (LFH-1074, `src/AGENTS.md`, Eingabegrenzen). Kein
+/// legitimer JSON-Body erreicht es: ETB-Eingänge tragen höchstens 80 KB, die übrigen weniger.
+/// Darüber lehnt `JsonBody` mit 413 ab, bevor der Handler läuft.
+const JSON_BODY_MAX: usize = 256 * 1024;
+
+/// Zone anlegen und Abschnittsfläche setzen (LFH-1074): Geometrie bis 256 KiB
+/// (`lage_zone::pruefe_geometrie_groesse`) plus Rahmen. So bleibt die Geometrieprüfung (400 mit
+/// Feldmeldung) die wirksame Grenze.
+const GEOMETRIE_BODY_MAX: usize = 256 * 1024 + 64 * 1024;
 
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
 pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
@@ -1212,7 +1222,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/abschnitte/{aid}/flaeche",
-            patch(routes::einsatzabschnitt::flaeche),
+            patch(routes::einsatzabschnitt::flaeche)
+                .layer(DefaultBodyLimit::max(GEOMETRIE_BODY_MAX)),
         )
         .route(
             "/api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg}",
@@ -1324,7 +1335,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/einsaetze/{id}/zonen", get(routes::lage_zone::liste))
         .route(
             "/api/einsaetze/{id}/zonen",
-            post(routes::lage_zone::anlegen),
+            post(routes::lage_zone::anlegen).layer(DefaultBodyLimit::max(GEOMETRIE_BODY_MAX)),
         )
         .route(
             "/api/einsaetze/{id}/zonen/{zid}",
@@ -1807,6 +1818,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // greift
         // nur, wenn der Pfad existiert, die Methode aber nicht.
         .method_not_allowed_fallback(methode_nicht_erlaubt)
+        // Body-Limit für alle Routen (LFH-1074); ein `.layer(DefaultBodyLimit…)` an der Route liegt
+        // innen und gilt stattdessen.
+        .layer(DefaultBodyLimit::max(JSON_BODY_MAX))
         // Antwortkompression nur für JSON (LFH-940, Spec `antwortkompression`): Listen gehen über
         // LTE. SSE darf nicht puffern, Anhänge und Kacheln sind schon gepackt oder tragen ETags,
         // die eingebetteten Frontend-Dateien bleiben unberührt. Innen, damit Zulassung und Trace

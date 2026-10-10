@@ -43,6 +43,9 @@ pub enum AppError {
     /// je Konto am zweiten Faktor (`auth::totp::schutz`). Anders als 503: dieser eine Aufrufer
     /// darf gerade nicht, vorübergehend und selbstheilend.
     TooManyRequests(String),
+    /// Body über dem Limit der Route (413, LFH-1074): abgewiesen beim Lesen, vor dem Handler
+    /// (`crate::extract::JsonBody`).
+    PayloadTooLarge(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -66,6 +69,7 @@ impl std::fmt::Display for AppError {
             AppError::BadGateway(m) => write!(f, "{m}"),
             AppError::ServiceUnavailable(m) => write!(f, "{m}"),
             AppError::TooManyRequests(m) => write!(f, "{m}"),
+            AppError::PayloadTooLarge(m) => write!(f, "{m}"),
         }
     }
 }
@@ -109,6 +113,7 @@ impl AppError {
             AppError::BadGateway(_) => StatusCode::BAD_GATEWAY,
             AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
+            AppError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         }
     }
 
@@ -210,6 +215,15 @@ impl IntoResponse for AppError {
 mod tests {
     use super::*;
     use axum::body::to_bytes;
+
+    #[tokio::test]
+    async fn zu_grosser_body_ist_413_mit_meldung() {
+        let resp = AppError::PayloadTooLarge("Anfrage ist zu groß.".into()).into_response();
+        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Anfrage ist zu groß.");
+    }
 
     #[test]
     fn offline_queue_benutzerwechsel_ist_412_ohne_auth_401_umzudeuten() {
