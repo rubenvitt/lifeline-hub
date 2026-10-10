@@ -302,8 +302,16 @@ describe('KommunikationsplanPage — Anzeige', () => {
   });
 
   it('zeigt keine Zeile für eine nicht erfasste Führungsstelle', async () => {
+    let geladen = false;
+    vi.mocked(ladeFuehrungsstelle).mockImplementation(async () => {
+      geladen = true;
+      return { rufname: '  ', sprechgruppen: [], fahrzeug_ids: [] };
+    });
     const { container } = setup();
     await screen.findByText('Polizei PI Nord');
+    // Erst prüfen, wenn die Führungsstelle geladen ist; vorher stünde ohnehin keine Zeile.
+    await waitFor(() => expect(geladen).toBe(true));
+    await new Promise((r) => setTimeout(r, 0));
     expect(zeile(container, 'fs')).toBeNull();
   });
 

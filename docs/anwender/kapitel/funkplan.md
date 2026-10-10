@@ -2,7 +2,7 @@
 titel: Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs]
 ---
 
 ## Überblick
@@ -126,7 +126,8 @@ mitnehmen. Gedruckt wird die Skizze mit dem Funkplan als Anlage.
 ### Ohne Netz
 
 Der Kommunikationsplan bleibt ohne Netz lesbar, seine Bedienung ist dann gesperrt. Die eigene
-Führungsstelle steht dort ohne Netz als „nicht geladen“. Die Daten der Skizze werden nicht
+Führungsstelle wird nicht vorgehalten; nach einem Neuladen ohne Netz steht sie dort als „nicht
+geladen“. Die Daten der Skizze werden nicht
 vorgehalten; der Funkplan nennt sie ohne Netz „nicht geladen“ (siehe
 [Arbeiten ohne Netz](ohne-netz.md)).
 
