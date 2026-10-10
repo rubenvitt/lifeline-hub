@@ -81,6 +81,15 @@ impl EinsatzRolle {
         matches!(self, EinsatzRolle::Einsatzleitung)
     }
 
+    /// Ob diese Rolle zur Führung im Einsatz gehört (Modulstufe `einsatzfuehrung`, LFH-1150):
+    /// Einsatzleitung und Führungspersonal, nicht Beobachter.
+    pub fn gehoert_zur_fuehrung(&self) -> bool {
+        matches!(
+            self,
+            EinsatzRolle::Einsatzleitung | EinsatzRolle::Fuehrungspersonal
+        )
+    }
+
     /// Ob diese Rolle ETB-Einträge erfassen/berichtigen darf
     /// (Einsatzleitung und Führungspersonal; Beobachter ist nur lesend).
     pub fn darf_schreiben(&self) -> bool {

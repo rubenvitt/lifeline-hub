@@ -116,6 +116,17 @@ impl EinsatzKontext {
         berechtigung::fordere_aktiv(&self.einsatz)
     }
 
+    /// Die Einsatzrolle, mit der die Modulfreigabe rechnet (LFH-1150, design.md D4): bei einem
+    /// gekoppelten Gerät keine, denn seine Ansichtsrolle ist ein Schreibrecht an einer Stelle und
+    /// keine Person in Führung; sonst die Rolle der Mitgliedschaft.
+    pub fn modul_rolle(&self) -> Option<EinsatzRolle> {
+        if self.geraet.is_some() {
+            None
+        } else {
+            self.rolle
+        }
+    }
+
     /// Modul-Sichtbarkeit/-Rolle (LFH-132) für `modul_key` prüfen (lädt Override-Maps).
     pub async fn fordere_modul_zugriff(
         &self,
@@ -128,6 +139,7 @@ impl EinsatzKontext {
             self.einsatz.org_id,
             modul_key,
             &self.benutzer,
+            self.modul_rolle(),
         )
         .await
     }

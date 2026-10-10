@@ -209,7 +209,7 @@ export interface components {
             ansicht: components["schemas"]["Funktionsansicht"];
             stellenart?: components["schemas"]["Bindungsart"] | null;
         };
-        /** @description Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind. */
+        /** @description Module einer Ansicht, die in diesem Einsatz einem gekoppelten Gerät gesperrt sind. */
         AnsichtSperre: {
             ansicht: components["schemas"]["Funktionsansicht"];
             /** @description Modul-Keys, die das Gerät nicht nutzen könnte. Leer: die Ansicht ist voll nutzbar. */

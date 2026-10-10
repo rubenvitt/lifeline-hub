@@ -15,7 +15,9 @@ use crate::einsatz::einstellungen::{
     ist_gueltige_skelett_dauer, ist_gueltige_zeitzone, ist_gueltiges_einheiten_system,
     ist_gueltiges_koordinatenformat, ist_gueltiges_nummer_praefix, ist_gueltiges_zeitformat,
 };
-use crate::einsatz::modul::{ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key};
+use crate::einsatz::modul::{
+    ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key, BENOETIGTE_ROLLEN,
+};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -272,7 +274,8 @@ pub async fn modul_einstellung_setzen(
     if let Some(r) = rolle.as_deref() {
         if !ist_gueltige_benoetigte_rolle(r) {
             return Err(AppError::Validation(format!(
-                "Ungültige benoetigte_rolle '{r}' (erlaubt: admin, fuehrungskraft)"
+                "Ungültige benoetigte_rolle '{r}' (erlaubt: {})",
+                BENOETIGTE_ROLLEN.join(", ")
             )));
         }
     }

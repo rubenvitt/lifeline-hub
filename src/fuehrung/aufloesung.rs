@@ -11,6 +11,7 @@
 
 use super::Fuehrungsfunktion;
 use crate::auth::Benutzer;
+use crate::einsatz::EinsatzRolle;
 use crate::error::AppError;
 use crate::stab::{BesetzungArt, Sachgebiet};
 use crate::wire_enum::wire_enum;
@@ -95,8 +96,9 @@ impl Aufloeser {
         einsatz_id: i64,
         org_id: i64,
         benutzer: &Benutzer,
+        einsatz_rolle: Option<EinsatzRolle>,
     ) -> Result<Self, AppError> {
-        let darf = darf_stab_lesen(pool, einsatz_id, org_id, benutzer).await?;
+        let darf = darf_stab_lesen(pool, einsatz_id, org_id, benutzer, einsatz_rolle).await?;
         let mut conn = pool.acquire().await?;
         Self::laden(&mut conn, einsatz_id, darf).await
     }
@@ -119,9 +121,16 @@ pub async fn darf_stab_lesen(
     einsatz_id: i64,
     org_id: i64,
     benutzer: &Benutzer,
+    einsatz_rolle: Option<EinsatzRolle>,
 ) -> Result<bool, AppError> {
-    let erlaubt =
-        crate::einsatz::berechtigung::erlaubte_module(pool, einsatz_id, org_id, benutzer).await?;
+    let erlaubt = crate::einsatz::berechtigung::erlaubte_module(
+        pool,
+        einsatz_id,
+        org_id,
+        benutzer,
+        einsatz_rolle,
+    )
+    .await?;
     use crate::einsatz::modul::{ModulMarker, Stab};
     Ok(Stab::KEY.is_some_and(|key| erlaubt.contains(key)))
 }

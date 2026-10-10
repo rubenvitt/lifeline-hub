@@ -151,7 +151,7 @@ export function sperrSatz(
   if (module.length === 0) return null;
   const namen = module.map(modulName).join(', ');
   const fehlt = module.length === 1 ? 'fehlt' : 'fehlen';
-  return `${namen} für einfache Mitglieder gesperrt – ${fehlt} auf dem ${ANSICHT_LABEL[ansicht]}`;
+  return `${namen} für gekoppelte Geräte gesperrt – ${fehlt} auf dem ${ANSICHT_LABEL[ansicht]}`;
 }
 
 /** Code in Vierergruppen („ABCD-1234"), wie er sich vorlesen lässt. */

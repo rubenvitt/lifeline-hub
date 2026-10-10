@@ -133,7 +133,33 @@ describe('EinsatzModule', () => {
 
     rendern();
 
-    expect(await screen.findByText('Vorgabe der Organisation: Führungskraft')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Vorgabe der Organisation: Führungskraft der Organisation'),
+    ).toBeInTheDocument();
+  });
+
+  it('nennt eine Org-Vorgabe „Führung im Einsatz“ mit diesem Namen (LFH-1150)', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({ etb: 'einsatzfuehrung' });
+
+    rendern();
+
+    expect(
+      await screen.findByText('Vorgabe der Organisation: Führung im Einsatz'),
+    ).toBeInTheDocument();
+  });
+
+  it('speichert die Stufe „Führung im Einsatz“ als einsatzfuehrung (LFH-1150)', async () => {
+    rendern();
+
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
+    fireEvent.click(await screen.findByText('Führung im Einsatz'));
+
+    await waitFor(() =>
+      expect(setzeModulOverride).toHaveBeenCalledWith(1, 'etb', {
+        sichtbar: true,
+        benoetigte_rolle: 'einsatzfuehrung',
+      }),
+    );
   });
 
   it('traegt KEINE Speicher-Leiste — jede Zeile speichert sofort (H15)', async () => {

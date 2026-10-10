@@ -67,10 +67,10 @@ describe('geraeteKern (LFH-892)', () => {
     expect(sperrSatz(sperren, undefined, name)).toBeNull();
     expect(sperrSatz(sperren, 'uhs-laptop', name)).toBeNull();
     expect(sperrSatz(sperren, 'uhs-tablet', name)).toBe(
-      'PERSONEN für einfache Mitglieder gesperrt – fehlt auf dem UHS-Tablet',
+      'PERSONEN für gekoppelte Geräte gesperrt – fehlt auf dem UHS-Tablet',
     );
     expect(sperrSatz(sperren, 'lagemonitor', name)).toBe(
-      'ETB, LAGEKARTE für einfache Mitglieder gesperrt – fehlen auf dem Lagemonitor',
+      'ETB, LAGEKARTE für gekoppelte Geräte gesperrt – fehlen auf dem Lagemonitor',
     );
   });
 

@@ -735,6 +735,7 @@ pub async fn modul_freigaben_laden(
         ctx.einsatz.id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
     )
     .await?;
     crate::geraet::verenge_freigaben(ctx.geraet.as_ref(), &mut freigaben);
@@ -744,7 +745,7 @@ pub async fn modul_freigaben_laden(
 #[derive(Debug, Deserialize)]
 pub struct ModulOverrideUpdate {
     pub sichtbar: bool,
-    /// 'admin' | 'fuehrungskraft' | null (= frei).
+    /// 'admin' | 'fuehrungskraft' | 'einsatzfuehrung' | null (= frei); Spec `modul-freigabe`.
     pub benoetigte_rolle: Option<String>,
 }
 

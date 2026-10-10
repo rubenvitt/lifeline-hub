@@ -536,7 +536,7 @@
       },
       "AnsichtSperre": {
         "type": "object",
-        "description": "Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.",
+        "description": "Module einer Ansicht, die in diesem Einsatz einem gekoppelten Gerät gesperrt sind.",
         "required": [
           "ansicht",
           "gesperrte_module"

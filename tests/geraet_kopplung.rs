@@ -1346,6 +1346,62 @@ async fn modulfreigabe_sperrt_zusaetzlich() {
     assert_eq!(tablet["gesperrte_module"], json!(["personen"]));
 }
 
+/// LFH-1150 (design.md D4): Ein Gerät zählt nicht als Führung im Einsatz, obwohl das Tablet als
+/// Führungspersonal schreibt. Liste, Freigabe und Kopplungsmaske sagen dasselbe.
+#[tokio::test]
+async fn einsatzfuehrung_sperrt_das_geraet() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let (_, geraet) = tablet(&app, &admin, einsatz, uhs).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &admin,
+        Some(&json!({"sichtbar": true, "benoetigte_rolle": "einsatzfuehrung"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (_, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-freigaben"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(v["personen"]["zugriff"], false, "{v}");
+
+    let (_, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &admin,
+        None,
+    )
+    .await;
+    let tablet = v["sperren"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["ansicht"] == "uhs-tablet")
+        .unwrap();
+    assert_eq!(tablet["gesperrte_module"], json!(["personen"]));
+}
+
 // ---------- Gerätekonto ----------
 
 #[tokio::test]

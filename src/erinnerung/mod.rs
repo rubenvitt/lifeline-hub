@@ -83,11 +83,17 @@ pub async fn anreichern_alle(
     einsatz_id: i64,
     org_id: i64,
     benutzer: &crate::auth::Benutzer,
+    einsatz_rolle: Option<crate::einsatz::EinsatzRolle>,
     erinnerungen: &mut [ErinnerungAnzeige],
 ) -> Result<(), crate::error::AppError> {
-    let aufloeser =
-        crate::fuehrung::aufloesung::Aufloeser::laden_fuer(pool, einsatz_id, org_id, benutzer)
-            .await?;
+    let aufloeser = crate::fuehrung::aufloesung::Aufloeser::laden_fuer(
+        pool,
+        einsatz_id,
+        org_id,
+        benutzer,
+        einsatz_rolle,
+    )
+    .await?;
     let mut conn = pool.acquire().await?;
     let karte = crate::fuehrung::repo::labelkarte(&mut conn, org_id).await?;
     for e in erinnerungen.iter_mut() {
