@@ -263,6 +263,10 @@ test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf �
  * den Anteil der ersten Spalte auf `auto` (208 bzw. in WebKit 227 px). In
  * `pages/KraefteuebersichtPage.tsx` `flexShrink: 0` am Mittelkürzel streichen → (b) rot in Chromium
  * und Firefox („Pers“ über „.“).
+ *
+ * Zweiter Fall mit eingeblendeten Zusatzspalten (LFH-1109): so druckte Safari, und mit zehn Spalten
+ * blieben der ersten 112 px. Mutationsprobe: in `KraefteuebersichtPage.tsx` den Filter über
+ * `NUR_AM_SCHIRM` streichen → (a) rot in Chromium, Firefox und WebKit (123 px).
  */
 const KRAEFTE_LESBAR = 40;
 /** Mindestbreite der ersten Spalte auf A4 hoch, in CSS-Pixeln (gut ein Drittel der Nutzbreite). */
@@ -327,10 +331,11 @@ async function lesbarkeit(page: Page) {
   });
 }
 
-test(`Lesbarkeit auf A4: ${KRAEFTE_LESBAR} Kräfte, Name höchstens zwei Zeilen, kein Kopf bricht im Wort, höchstens ${MAX_SEITEN} Seiten`, async ({
-  page,
-  browserName,
-}) => {
+/**
+ * Gemeinsamer Ablauf beider Lesbarkeitsfälle. `zusatz`: Funkrufname und „Fahrzeuge und Personal“
+ * stehen am Schirm, wie ab `xxl` oder per Handwahl (LFH-1109).
+ */
+async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean) {
   test.setTimeout(120_000);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Meldebild lesbar ${Date.now()}`);
@@ -356,6 +361,17 @@ test(`Lesbarkeit auf A4: ${KRAEFTE_LESBAR} Kräfte, Name höchstens zwei Zeilen,
   const zeilen = page.locator('tr.ant-table-row');
   await expect(zeilen).toHaveCount(2);
   await expect(page.getByText('Verletztenablage', { exact: false })).toHaveCount(1);
+  if (zusatz) {
+    for (const [knopf, spalte] of [
+      [/^Spalten · 2 ausgeblendet/, 'Funkrufname'],
+      [/^Spalten · 1 ausgeblendet/, 'Fahrzeuge und Personal'],
+    ] as const) {
+      await page.getByRole('button', { name: knopf }).click();
+      await page.getByRole('menuitem', { name: spalte }).click();
+      await page.keyboard.press('Escape');
+    }
+    await expect(page.getByRole('columnheader', { name: 'Funkrufname' })).toHaveCount(1);
+  }
 
   await page.evaluate(() => {
     window.print = () => {
@@ -390,6 +406,11 @@ test(`Lesbarkeit auf A4: ${KRAEFTE_LESBAR} Kräfte, Name höchstens zwei Zeilen,
       `Reihe „${reihe.text}“ höher als ${MAX_ZEILEN_JE_REIHE} Textzeilen`,
     ).toBeLessThanOrEqual(MAX_ZEILEN_JE_REIHE * blatt.zeilenhoehe);
   }
+  // (b2) Die Zusatzspalten stehen nie auf dem Blatt (LFH-1109): mit ihnen blieben der
+  //      Einheitenspalte neben den Mindestbreiten der übrigen neun Spalten gut 120 px.
+  expect(blatt.koepfe.map((k) => k.text).join(' | ')).not.toMatch(
+    /Funkrufname|Fahrzeuge und Personal/,
+  );
   // (c) Spaltenköpfe brechen nicht im Wort.
   expect(blatt.koepfe.length, 'Vorbedingung: Spaltenköpfe gefunden').toBeGreaterThan(5);
   expect(
@@ -415,4 +436,22 @@ test(`Lesbarkeit auf A4: ${KRAEFTE_LESBAR} Kräfte, Name höchstens zwei Zeilen,
 
   await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
   await page.emulateMedia({ media: null });
+  if (zusatz) {
+    // Am Bildschirm stehen sie nach dem Druck wieder.
+    await expect(page.getByRole('columnheader', { name: 'Funkrufname' })).toHaveCount(1);
+  }
+}
+
+test(`Lesbarkeit auf A4: ${KRAEFTE_LESBAR} Kräfte, Name höchstens zwei Zeilen, kein Kopf bricht im Wort, höchstens ${MAX_SEITEN} Seiten`, async ({
+  page,
+  browserName,
+}) => {
+  await pruefeLesbarkeit(page, browserName, false);
+});
+
+test('Lesbarkeit auf A4 mit eingeblendeten Zusatzspalten: das Blatt bleibt bei den Grundspalten', async ({
+  page,
+  browserName,
+}) => {
+  await pruefeLesbarkeit(page, browserName, true);
 });

@@ -39,6 +39,9 @@
      - Spaltenköpfe brechen nur zwischen Wörtern (die Zellregel `overflow-wrap: anywhere` in
        `druck/druck.css` bleibt für die Datenzellen), dafür ohne Sperrung und Großschrift;
      - das Zellpolster ist auf Papier knapp.
+     Der Anteil trägt nur mit den acht Grundspalten: mit Funkrufname und „Fahrzeuge und Personal“
+     kürzen alle Engines ihn auf den Rest neben den Mindestbreiten (gut 120 px). Die beiden lässt
+     `KraefteuebersichtPage` deshalb im Druckmodus weg (LFH-1109).
      Gemessen in `e2e/meldebild-druck.spec.ts`, NACHWEIS 3. */
   .kraefte-print-root .ant-table col {
     width: auto !important;
