@@ -1806,6 +1806,13 @@ export interface components {
             beschreibung?: string | null;
             /** Format: int64 */
             bezug_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis
+             *     (LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei
+             *     Bezügen ohne laufende Nummer (Ablösung).
+             */
+            bezug_lfd_nr?: number | null;
             bezug_typ?: string | null;
             /** Format: int64 */
             einsatz_id: number;

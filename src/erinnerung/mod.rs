@@ -35,6 +35,11 @@ pub struct ErinnerungAnzeige {
     pub aktuelle_besetzung: Option<crate::fuehrung::aufloesung::AktuelleBesetzung>,
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
+    /// Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis
+    /// (LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei
+    /// Bezügen ohne laufende Nummer (Ablösung).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bezug_lfd_nr: Option<i64>,
     pub quelle: String,
     #[schema(value_type = ErinnerungStatus)]
     pub status: String,

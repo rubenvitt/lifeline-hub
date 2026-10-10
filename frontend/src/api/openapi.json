@@ -4850,6 +4850,14 @@
             ],
             "format": "int64"
           },
+          "bezug_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis\n(LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei\nBezügen ohne laufende Nummer (Ablösung)."
+          },
           "bezug_typ": {
             "type": [
               "string",
