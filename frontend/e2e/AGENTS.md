@@ -39,3 +39,8 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   `einsatzDialogOeffnen` wartet, bis der Dialog „Neuen Einsatz anlegen“ ausgezoomt ist; ein
   früherer Klick fiel unter Last neben „Anlegen“ (kein POST, Dialog offen). Wer die Oberfläche
   nicht prüft, legt über die API an. Riegel `no-restricted-syntax` für `e2e/**`.
+- **Der Bildlauf der Anwenderdoku ist kein e2e-Lauf** (LFH-1128): `e2e/doku-bilder/*.bilder.ts`
+  laufen nur über `playwright.doku.config.ts` (`pnpm doku:bilder`, Backend mit Demo-Daten,
+  eigene Temp-DB); `playwright.config.ts` schließt den Ordner aus. Regeln:
+  `docs/anwender/AGENTS.md`, „Bilder“. Backend-Binary, Ports, Env-Hygiene und Vite-Start teilen
+  beide Konfigurationen über `e2e/lauf-kern.ts`.
