@@ -25,7 +25,7 @@ entsprechenden Dateien dieser Paketversionen. Lizenztexte aus dem
 Google-Fonts-Repository (`github.com/google/fonts/ofl/<familie>/OFL.txt`).
 
 **Arimo 500** (LFH-1033) liegt nicht hier, sondern kommt aus dem Paket `@einsatzzeichen/core`
-(Subpfad `fonts/`, `theme/schriften.css`): Das Paket misst die Breite des Bedingungszeichens an
+(Subpfad `fonts/`, `theme/schriften.ts`): Das Paket misst die Breite des Bedingungszeichens an
 den Metriken genau dieser Datei, und so wandert sie mit jedem Update des Pakets mit. Der
 Lizenztext `lizenzen/OFL-Arimo.txt` ist byte-gleich mit `fonts/OFL.txt` des Pakets.
 

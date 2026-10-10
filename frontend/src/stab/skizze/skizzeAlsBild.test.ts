@@ -7,6 +7,7 @@ import {
   schriftRegeln,
   serialisiereSvg,
 } from './skizzeAlsBild';
+import { SCHRIFTSCHNITTE } from '../../theme/schriften';
 
 function svgAus(markup: string): SVGSVGElement {
   const huelle = document.createElement('div');
@@ -87,25 +88,11 @@ describe('serialisiereSvg', () => {
 });
 
 describe('schriftFlaechen', () => {
-  const regel = (css: Record<string, string>) => ({
-    cssText: '@font-face { … }',
-    style: { getPropertyValue: (p: string) => css[p] ?? '' },
-  });
-  const blatt = (regeln: unknown[], href: string | null = null) =>
-    ({ cssRules: regeln, href }) as unknown as CSSStyleSheet;
-
   it('findet die Schnitte der genannten Familien samt absoluter Adresse', () => {
     const funde = schriftFlaechen(
       [
-        blatt([
-          regel({
-            'font-family': '"LFH Archivo"',
-            src: 'url("/assets/archivo-500-abc.woff2") format("woff2")',
-            'font-weight': '500',
-          }),
-          regel({ 'font-family': 'Fremd', src: 'url(/fremd.woff2)' }),
-          { cssText: '.x { color: red }' },
-        ]),
+        { familie: 'LFH Archivo', gewicht: 500, datei: '/assets/archivo-500-abc.woff2' },
+        { familie: 'Fremd', gewicht: 400, datei: '/fremd.woff2' },
       ],
       new Set(['LFH Archivo']),
     );
@@ -117,15 +104,6 @@ describe('schriftFlaechen', () => {
         url: new URL('/assets/archivo-500-abc.woff2', document.baseURI).href,
       },
     ]);
-  });
-
-  it('überspringt ein Blatt, das seine Regeln nicht herausgibt', () => {
-    const verschlossen = {
-      get cssRules(): never {
-        throw new DOMException('fremd', 'SecurityError');
-      },
-    } as unknown as CSSStyleSheet;
-    expect(schriftFlaechen([verschlossen], new Set(['LFH Archivo']))).toEqual([]);
   });
 });
 
@@ -148,17 +126,6 @@ describe('bildMasse', () => {
 });
 
 describe('schriftRegeln', () => {
-  /** jsdom verwirft `src` in `@font-face`; die Blätter stehen deshalb als Attrappe da. */
-  function blaetter(regeln: Record<string, string>[]) {
-    const blatt = {
-      href: null,
-      cssRules: regeln.map((css) => ({
-        cssText: '@font-face { … }',
-        style: { getPropertyValue: (p: string) => css[p] ?? '' },
-      })),
-    };
-    vi.spyOn(document, 'styleSheets', 'get').mockReturnValue([blatt] as unknown as StyleSheetList);
-  }
   function skizze(schrift: string) {
     const svg = svgAus(
       `<svg viewBox="0 0 10 10"><text style="font-family: ${schrift}">A</text></svg>`,
@@ -174,32 +141,25 @@ describe('schriftRegeln', () => {
   });
 
   it('bettet die Schriften der Skizze als Daten-URL ein, fremde nicht', async () => {
-    blaetter([
-      {
-        'font-family': '"LFH Archivo"',
-        src: 'url("/assets/archivo-500.woff2") format("woff2")',
-        'font-weight': '500',
-      },
-      { 'font-family': 'Fremd', src: 'url(/assets/fremd.woff2)' },
-    ]);
+    const narrow = SCHRIFTSCHNITTE.filter((s) => s.familie === 'LFH Archivo Narrow');
+    expect(narrow).toHaveLength(1);
     const abruf = vi.fn(async () => new Response(new Blob(['woff2'], { type: 'font/woff2' })));
     vi.stubGlobal('fetch', abruf);
 
-    const regeln = await schriftRegeln(skizze(`'LFH Archivo', sans-serif`));
+    const regeln = await schriftRegeln(skizze(`'LFH Archivo Narrow', Fremd, sans-serif`));
 
     expect(abruf).toHaveBeenCalledTimes(1);
-    expect(abruf).toHaveBeenCalledWith(new URL('/assets/archivo-500.woff2', document.baseURI).href);
+    expect(abruf).toHaveBeenCalledWith(new URL(narrow[0].datei, document.baseURI).href);
     expect(regeln).toMatch(
-      /^@font-face\{font-family:"LFH Archivo";src:url\("data:[^"]*;base64,[^"]+"\);font-weight:500;font-style:normal;\}$/,
+      /^@font-face\{font-family:"LFH Archivo Narrow";src:url\("data:[^"]*;base64,[^"]+"\);font-weight:600;font-style:normal;\}$/,
     );
   });
 
   it('lässt eine Schrift weg, die sich nicht laden lässt', async () => {
-    blaetter([{ 'font-family': 'LFH Archivo', src: 'url(/weg.woff2)' }]);
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(null, { status: 404 })),
     );
-    expect(await schriftRegeln(skizze(`'LFH Archivo'`))).toBe('');
+    expect(await schriftRegeln(skizze(`'LFH Archivo Narrow'`))).toBe('');
   });
 });
