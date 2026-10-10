@@ -83,7 +83,7 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/schaeden`);
-    await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+    await page.getByRole('button', { name: 'Schaden erfassen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Schaden erfassen' });
     await waehleIn(dialog.getByRole('combobox', { name: 'Typ' }), 'Sachschaden');
     await waehleIn(dialog.getByRole('combobox', { name: 'Ausmaß' }), 'mittel');

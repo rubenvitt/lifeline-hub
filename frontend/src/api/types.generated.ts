@@ -1806,6 +1806,13 @@ export interface components {
             beschreibung?: string | null;
             /** Format: int64 */
             bezug_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis
+             *     (LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei
+             *     Bezügen ohne laufende Nummer (Ablösung).
+             */
+            bezug_lfd_nr?: number | null;
             bezug_typ?: string | null;
             /** Format: int64 */
             einsatz_id: number;
@@ -3156,6 +3163,16 @@ export interface components {
             /** @description Anzeige der Führungsstelle: „S2 Lage“, „Fachberater: THW“ oder der Freitext. */
             fuehrungsstelle_anzeige?: string | null;
             zugewiesen_at: string;
+        };
+        /**
+         * @description Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec
+         *     `einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),
+         *     keine Rollen, kein Aktiv- oder MFA-Status.
+         */
+        MitgliedAuswahl: {
+            anzeigename: string;
+            /** Format: int64 */
+            benutzer_id: number;
         };
         /**
          * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von

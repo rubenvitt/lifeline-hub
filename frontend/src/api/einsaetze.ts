@@ -4,6 +4,7 @@ import type {
   EinsatzAnzeige,
   EinsatzRolle,
   MitgliedAnzeige,
+  MitgliedAuswahl,
   EinsatzEinstellungen,
   EinstellungenUpdate,
   Fuehrungsstelle,
@@ -45,6 +46,11 @@ export function schliesseEinsatzAb(id: number): Promise<EinsatzAnzeige> {
 
 export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
   return apiGet<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder`);
+}
+
+/** Personen, die die Einsatzleitung aufnehmen kann (LFH-1141): nur Kennung und Anzeigename. */
+export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
+  return apiGet<MitgliedAuswahl[]>(`/api/einsaetze/${id}/mitglieder/auswahl`);
 }
 
 /**

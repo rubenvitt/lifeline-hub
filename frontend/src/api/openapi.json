@@ -4850,6 +4850,14 @@
             ],
             "format": "int64"
           },
+          "bezug_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis\n(LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei\nBezügen ohne laufende Nummer (Ablösung)."
+          },
           "bezug_typ": {
             "type": [
               "string",
@@ -8350,6 +8358,23 @@
           },
           "zugewiesen_at": {
             "type": "string"
+          }
+        }
+      },
+      "MitgliedAuswahl": {
+        "type": "object",
+        "description": "Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec\n`einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),\nkeine Rollen, kein Aktiv- oder MFA-Status.",
+        "required": [
+          "benutzer_id",
+          "anzeigename"
+        ],
+        "properties": {
+          "anzeigename": {
+            "type": "string"
+          },
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

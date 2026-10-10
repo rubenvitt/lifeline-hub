@@ -104,18 +104,21 @@ export default function EinsatzVerhalten() {
                 {
                   key: 'etb',
                   label: 'ETB',
+                  beispiel: 'EB-',
                   eingefroren: einstellungen.etb_nummer_eingefroren,
                   orgPraefix: orgDefaults?.etb_nummer_praefix,
                 },
                 {
                   key: 'meldung',
                   label: 'Meldungen',
+                  beispiel: 'M-',
                   eingefroren: einstellungen.meldung_nummer_eingefroren,
                   orgPraefix: orgDefaults?.meldung_nummer_praefix,
                 },
                 {
                   key: 'auftrag',
                   label: 'Aufträge',
+                  beispiel: 'A-',
                   eingefroren: einstellungen.auftrag_nummer_eingefroren,
                   orgPraefix: orgDefaults?.auftrag_nummer_praefix,
                 },
@@ -137,7 +140,11 @@ export default function EinsatzVerhalten() {
                       : orgHinweisWert(nk.orgPraefix)
                   }
                 >
-                  <Input maxLength={8} placeholder="z. B. EB-" disabled={nk.eingefroren} />
+                  <Input
+                    maxLength={8}
+                    placeholder={`z. B. ${nk.beispiel}`}
+                    disabled={nk.eingefroren}
+                  />
                 </Form.Item>
                 <Form.Item
                   label={`Startwert ${nk.label}`}

@@ -129,9 +129,9 @@ dieses Modul.
   Dialog „Code für …“ sichtbar. Gespeichert wird er nur unkenntlich.
 - Eine **Kopplung** gilt 24 Stunden ab dem Anlegen. Verlängern geht bis höchstens 72 Stunden ab
   dem Zeitpunkt des Verlängerns, beliebig oft, solange die Kopplung läuft.
-- Eine **abgelaufene** Kopplung lässt sich nicht mehr verlängern und bekommt keinen neuen Code.
-  Das Aktionsmenü bietet beides noch an, der Server lehnt mit „Die Kopplung ist widerrufen oder
-  abgelaufen“ ab. Für das Gerät dann eine neue Kopplung anlegen.
+- Eine **abgelaufene** Kopplung lässt sich nicht mehr verlängern und bekommt keinen neuen Code;
+  wie eine widerrufene hat sie kein Aktionsmenü mehr. Für das Gerät dann eine neue Kopplung
+  anlegen.
 
 ### Wann eine Kopplung endet
 
@@ -140,7 +140,7 @@ dieses Modul.
 - mit dem Abschluss des Einsatzes: alle Geräte verlieren den Zugriff,
 - wenn der Einsatzabschnitt aufgelöst wird, an den sie gebunden ist.
 
-Am Gerät steht dann „Kopplung beendet“; zurück kommt es nur mit einem neuen Code.
+Am Gerät steht dann „Kopplung beendet“; zurück kommt es nur über eine neue Kopplung.
 
 ### Was das Einsatztagebuch festhält
 

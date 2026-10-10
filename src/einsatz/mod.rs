@@ -255,6 +255,15 @@ pub struct EinsatzAnzeige {
     pub teilschwaerzungen: Option<i64>,
 }
 
+/// Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec
+/// `einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),
+/// keine Rollen, kein Aktiv- oder MFA-Status.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct MitgliedAuswahl {
+    pub benutzer_id: i64,
+    pub anzeigename: String,
+}
+
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct MitgliedAnzeige {

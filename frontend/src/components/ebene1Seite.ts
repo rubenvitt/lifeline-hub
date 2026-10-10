@@ -1,4 +1,10 @@
-import { adminAufbewahrung, adminBenutzer, adminDemoDaten, adminGruppen } from '../admin/adminNav';
+import {
+  adminAufbewahrung,
+  adminBenutzer,
+  adminDemoDaten,
+  adminGruppen,
+  adminZugangsprotokoll,
+} from '../admin/adminNav';
 
 /**
  * Wo eine Person auf Ebene 1 steht (LFH-954, Spec `seiten-orientierung`) — rein und exportiert.
@@ -15,7 +21,7 @@ export interface Ebene1Ort {
 }
 
 const VERWALTUNG = 'Verwaltung';
-const SONDEREINTRAEGE = [adminBenutzer, adminDemoDaten, adminAufbewahrung];
+const SONDEREINTRAEGE = [adminBenutzer, adminDemoDaten, adminAufbewahrung, adminZugangsprotokoll];
 
 function verwaltungsSektion(teile: string[]): string | null {
   const [gruppe, sektion] = teile;

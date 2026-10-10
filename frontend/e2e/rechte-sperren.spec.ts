@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../src/stammdaten/rechteText';
-import { stehendeAuswahl } from './auswahl-kern';
+import { stehendeAuswahl, waehleStehend, zeigtWahl } from './auswahl-kern';
 import { oeffneMenue, waehleImMenue } from './menue-kern';
 import {
   ADMIN,
@@ -144,6 +144,34 @@ test('LFH-966 Zweite Einsatzleitung ohne Systemrolle: eigene Herabstufung fragt 
   await frage.getByRole('button', { name: 'Rolle herabstufen' }).click();
   await expect.poll(() => puts.anzahl).toBe(1);
   await expect(eigene).toContainText('Beobachter');
+  await keinToast(page);
+});
+
+test('LFH-1141 Einsatzleitung ohne Systemrolle nimmt eine Person der Organisation auf', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const id = await einsatzAnlegen(page);
+  const leitung = await benutzerAnlegen(page, 'fuehrungspersonal', 'Leitung ohne Admin');
+  await mitgliedEintragen(page, String(id), leitung.id, 'einsatzleitung');
+  // Kurzer, eindeutiger Name: die Temp-DB lebt über den ganzen Lauf (LFH-819).
+  const name = `Neu ${Date.now() % 100000}`;
+  await benutzerAnlegen(page, 'beobachter', name);
+  await wechsleZu(page, leitung);
+  await page.goto(einsatzdatenPfad(id));
+
+  // Vorbedingung: diese Sitzung verwaltet den Zugriff, ist aber kein System-Admin.
+  await expect(zugriff(page).getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
+  // Suchen statt Scrollen: die Liste ist virtuell, in einer vollen Temp-DB steht die Person
+  // unterhalb des gerenderten Ausschnitts.
+  const auswahl = zugriff(page).getByRole('combobox', { name: 'Person zum Aufnehmen' });
+  await auswahl.click();
+  await auswahl.fill(name);
+  await waehleStehend(page, name);
+  await zeigtWahl(auswahl, name);
+  await zugriff(page).getByRole('button', { name: 'Hinzufügen' }).click();
+  await expect(zugriff(page).getByRole('combobox', { name: `Rolle von ${name}` })).toBeVisible();
+  await expect(page.getByText('Benutzerliste nur für Admins')).toHaveCount(0);
   await keinToast(page);
 });
 

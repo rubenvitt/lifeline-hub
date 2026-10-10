@@ -487,4 +487,61 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
     await waitFor(() => expect(client.isMutating()).toBe(0));
     expect(screen.queryByText('Einsatz ist abgeschlossen')).toBeNull();
   });
+
+  /**
+   * LFH-1138: eine Antwort, die erst in B eintrifft, gehört A. Ihre Quittung trüge die
+   * Registriernummer aus A, ihr Serien-Reset leerte die Felder von B, ihr Rückweg führte nach A.
+   */
+  async function spaeterErfolgNachWechsel(knopf: 'Erfassen' | 'Speichern und nächste') {
+    let antwortFreigeben!: () => void;
+    const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/:eid', ({ params }) =>
+        HttpResponse.json({ ...einsatzAktiv, id: Number(params.eid) }),
+      ),
+      http.get('/api/einsaetze/:eid/personen', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/personen', async () => {
+        await antwortGate;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    );
+    const { client } = renderMitProviders(
+      <>
+        <EinsatzWechsel />
+        <LocationProbe />
+        <Routes>
+          <Route path="/einsaetze/:id/personen/aufnahme" element={<AufnahmePage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/personen/aufnahme' },
+    );
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: knopf }));
+    await waitFor(() => expect(client.isMutating()).toBe(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.einsatz(2))).toBeDefined());
+    await userEvent.type(await screen.findByLabelText('Antreffort'), 'Turnhalle B');
+
+    await act(async () => antwortFreigeben());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+  }
+
+  it('ein spät erfolgreiches Anlegen aus Einsatz A quittiert in B nicht', async () => {
+    await spaeterErfolgNachWechsel('Speichern und nächste');
+    expect(screen.queryByText(/Erfasst als/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('die Serie aus Einsatz A leert die Felder von B nicht', async () => {
+    await spaeterErfolgNachWechsel('Speichern und nächste');
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('Turnhalle B');
+  });
+
+  it('der Rückweg aus Einsatz A führt nicht aus B heraus', async () => {
+    await spaeterErfolgNachWechsel('Erfassen');
+    expect(aktuellerPfad()).toBe('/einsaetze/2/personen/aufnahme');
+    expect(screen.getByLabelText('Antreffort')).toHaveValue('Turnhalle B');
+  });
 });

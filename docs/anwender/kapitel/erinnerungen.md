@@ -71,7 +71,8 @@ auf den nächsten Termin nach jetzt.
 ### Automatische Erinnerungen
 
 Einige Erinnerungen legt die App selbst an; sie tragen „automatisch“ und einen Verweis auf ihren
-Anlass, etwa „↗ Auftrag #…“, „↗ Meldung #…“ oder „↗ Ablösung #…“:
+Anlass, etwa „↗ Auftrag #…“ oder „↗ Meldung #…“ mit der laufenden Nummer im Einsatz, bei einer
+Ablösung nur „↗ Ablösung“:
 
 - „Sofortmeldung #… unbestätigt“ zu einer Sofortmeldung (Kapitel [Meldungen](meldungen.md)),
 - „Auftrag #… Quittierfrist“ zu einem Auftrag mit Frist (Kapitel

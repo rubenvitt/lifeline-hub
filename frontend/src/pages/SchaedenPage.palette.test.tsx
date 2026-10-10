@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -116,7 +116,7 @@ async function oeffnePalette(u: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('SchaedenPage · „Neue Zeile" in der Kommandopalette', () => {
-  it('bietet „Neue Zeile" mit Schreibrecht an und öffnet damit die Schnellerfassung', async () => {
+  it('bietet „Neue Zeile" mit Schreibrecht an und öffnet damit die Erfassung', async () => {
     const u = userEvent.setup();
     render(einsatzAktiv);
     await screen.findByText('S-001');
@@ -127,7 +127,9 @@ describe('SchaedenPage · „Neue Zeile" in der Kommandopalette', () => {
 
     await u.click(option!);
     // Dieselbe Wirkung wie der Knopf daneben — die Palette ruft den echten Callback der Seite.
-    expect(await screen.findByText('Schaden erfassen')).toBeInTheDocument();
+    // Im Dialog gesucht: der Kopfknopf trägt denselben Wortlaut (LFH-1151).
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Schaden erfassen')).toBeInTheDocument();
   });
 
   it('bietet sie dem Beobachter NICHT an', async () => {
@@ -136,7 +138,7 @@ describe('SchaedenPage · „Neue Zeile" in der Kommandopalette', () => {
     await screen.findByText('S-001');
     await oeffnePalette(u);
 
-    expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Schaden erfassen' })).not.toBeInTheDocument();
     expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
   });
 });

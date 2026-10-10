@@ -344,7 +344,12 @@ export default function NachrichtenStrom({
                         data-lfh="chat-nachricht-text"
                         style={{ width: '100%', maxWidth: NACHRICHT_LESEBREITE }}
                       >
-                        {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
+                        {/* `pre-wrap`: Umschalt+Enter setzt in der Eingabe Umbrüche (LFH-1145). */}
+                        {n.inhalt && (
+                          <Typography.Text style={{ whiteSpace: 'pre-wrap' }}>
+                            {n.inhalt}
+                          </Typography.Text>
+                        )}
                         {/* Nativer Download wie ETB und Schaden, kein neuer Tab: `target="_blank"`
                          läuft in der Desktop-Hülle ins Leere (LFH-782). */}
                         {n.anhaenge.map((a) => {

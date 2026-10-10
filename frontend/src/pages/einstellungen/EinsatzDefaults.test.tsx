@@ -357,12 +357,10 @@ describe('EinsatzDefaults', () => {
     expect(
       screen.getByLabelText('Vorgabe-Bestätigungsfrist Meldungen (Minuten)'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText('Vorgabe-Quittierungsfrist Aufträge (Minuten)'),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Vorgabe-Quittierfrist Aufträge (Minuten)')).toBeInTheDocument();
     // Leere Meldungsfrist heißt 5 Minuten (System), leere Auftragsfrist heißt keine Frist.
     expect(screen.getByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Vorgabe-Quittierungsfrist Aufträge (Minuten)')).toHaveAttribute(
+    expect(screen.getByLabelText('Vorgabe-Quittierfrist Aufträge (Minuten)')).toHaveAttribute(
       'placeholder',
       'keine Frist (Vorgabe)',
     );
