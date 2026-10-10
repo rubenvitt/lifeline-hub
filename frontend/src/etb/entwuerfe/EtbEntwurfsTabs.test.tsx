@@ -668,6 +668,7 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
     await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
     vi.mocked(entwurfEntfernen).mockRejectedValueOnce(new Error('Speicher gesperrt'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await verwerfenKlicken(1);
 
     await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1));
@@ -681,6 +682,7 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
       within(hinweis as HTMLElement).getByRole('button', { name: 'Hinweis schließen' }),
     );
     await waitFor(() => expect(screen.queryByText(ENTFERNEN_GESCHEITERT)).toBeNull());
+    warn.mockRestore();
   });
 
   it('die Knöpfe tragen deutsche Namen, kein „Add tab“ und kein „remove“', async () => {

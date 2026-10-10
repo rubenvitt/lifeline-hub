@@ -164,6 +164,10 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
       try {
         await entwurfEntfernen(id);
       } catch (fehler) {
+        console.warn(
+          'ETB-Entwürfe: Entwurf ließ sich nicht aus dem Gerätespeicher entfernen',
+          fehler,
+        );
         setSchliessFehler(fehler);
       }
       // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode laufen

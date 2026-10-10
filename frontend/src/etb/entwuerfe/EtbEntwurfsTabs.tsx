@@ -286,14 +286,14 @@ export default function EtbEntwurfsTabs({
     <>
       {schliessFehler != null && (
         // Der Reiter ist schon zu, der Ort des Grundes kommt nie wieder: deshalb schließbar
-        // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1139).
+        // (`frontend/AGENTS.md`, „Rückwege und Fehler“, LFH-1139). Eine Zeile wie die übrigen
+        // Hinweise der Leiste: die angepinnte Leiste hat ein Höhenbudget (`etb/AGENTS.md`).
         <Alert
           type="error"
           showIcon
           closable={{ 'aria-label': 'Hinweis schließen' }}
           onClose={schliessFehlerVerwerfen}
           title="Entwurf nicht aus dem Gerätespeicher entfernt"
-          description="Der Reiter ist geschlossen. Taucht der Entwurf nach dem Neuladen wieder auf, lässt er sich erneut verwerfen."
           style={{ marginBlockEnd: token.marginXS }}
         />
       )}
