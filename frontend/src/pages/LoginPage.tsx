@@ -278,7 +278,7 @@ export default function LoginPage() {
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         zurueckZumPasswort();
-        setFehler('Die Anmeldung ist abgelaufen. Bitte erneut mit dem Einmalpasswort anmelden.');
+        setFehler('Die Anmeldung ist abgelaufen. Bitte erneut anmelden.');
       } else {
         setFehler(fehlerText(e, 'Passwort nicht festgelegt'));
       }

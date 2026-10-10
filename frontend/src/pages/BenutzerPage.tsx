@@ -20,6 +20,7 @@ import {
   deaktiviereBenutzer,
   legeBenutzerAn,
   listeBenutzer,
+  vergibEinmalpasswort,
   type NeuerBenutzer,
   type PatchBenutzer,
 } from '../api/benutzer';
@@ -83,6 +84,14 @@ export default function BenutzerPage() {
   const bearbeiten = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) =>
       bearbeiteBenutzer(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+  });
+
+  // „Einmalpasswort vergeben“ im Bearbeiten-Dialog (LFH-1121). Hier statt in der Komponente:
+  // solange sie läuft, darf der Dialog nicht schließen, und beim Schließen räumt `reset()` das
+  // angezeigte Passwort. Nur die Liste neu laden: die Antwort gehört in keinen Cache.
+  const einmalpasswort = useMutation({
+    mutationFn: (id: number) => vergibEinmalpasswort(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
   });
 
@@ -220,6 +229,7 @@ export default function BenutzerPage() {
         const grund = sperrGrund(b);
         const onBearbeiten = () => {
           bearbeiten.reset();
+          einmalpasswort.reset();
           setZuBearbeiten(b);
         };
         if (istSchmal) {
@@ -410,15 +420,27 @@ export default function BenutzerPage() {
         form={editForm}
         erfassenText="Speichern"
         laeuft={bearbeiten.isPending}
+        // Sperrt jeden Ausweg, solange gespeichert oder ein Einmalpasswort vergeben wird (LFH-1121):
+        // schlösse der Dialog vorher, ginge das schon gesetzte Passwort verloren. Die Fehler
+        // stehen an ihren eigenen Stellen, deshalb hier keiner.
+        speicherung={{
+          isPending: bearbeiten.isPending || einmalpasswort.isPending,
+          error: null,
+          reset: () => {},
+        }}
         // Werfen statt stillem `return`: ein aufgelöstes Versprechen läse die Hülle als Erfolg und
         // schlösse den Dialog, ohne dass etwas gesendet wurde.
         onErfassen={async (w) => {
           if (!zuBearbeiten) throw new Error('Kein Benutzer zum Bearbeiten');
           await bearbeiten.mutateAsync({ id: zuBearbeiten.id, patch: w });
         }}
-        onFertig={() => setZuBearbeiten(null)}
+        onFertig={() => {
+          einmalpasswort.reset();
+          setZuBearbeiten(null);
+        }}
         onAbbrechen={() => {
           bearbeiten.reset();
+          einmalpasswort.reset();
           setZuBearbeiten(null);
         }}
       >
@@ -443,6 +465,7 @@ export default function BenutzerPage() {
             <EinmalpasswortVergeben
               benutzer={zuBearbeiten}
               eigenesKonto={zuBearbeiten.id === angemeldeterBenutzer?.id}
+              vergeben={einmalpasswort}
             />
           </Form.Item>
         )}

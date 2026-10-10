@@ -1074,9 +1074,7 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Passwort festlegen' }));
 
       expect(
-        await screen.findByText(
-          'Die Anmeldung ist abgelaufen. Bitte erneut mit dem Einmalpasswort anmelden.',
-        ),
+        await screen.findByText('Die Anmeldung ist abgelaufen. Bitte erneut anmelden.'),
       ).toBeInTheDocument();
       expect(screen.getByLabelText('Passwort')).toBeInTheDocument();
     });

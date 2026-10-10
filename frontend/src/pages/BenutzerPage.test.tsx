@@ -1001,6 +1001,35 @@ describe('BenutzerPage', () => {
       expect(cache).not.toContain('kx7m-p4qr-9tzw');
     });
 
+    it('lässt den Dialog nicht schließen, solange das Passwort vergeben wird', async () => {
+      let antworten: (() => void) | null = null;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+        http.post(
+          '/api/benutzer/:id/einmalpasswort',
+          () =>
+            new Promise<Response>((fertig) => {
+              antworten = () => fertig(HttpResponse.json({ einmalpasswort: 'kx7m-p4qr-9tzw' }));
+            }),
+        ),
+      );
+      seite();
+      const dialog = await bearbeitenVon('@eva');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Einmalpasswort vergeben' }),
+      );
+      await userEvent.click(
+        document.querySelector('.ant-popconfirm .ant-btn-dangerous') as HTMLElement,
+      );
+      await waitFor(() => expect(antworten).not.toBeNull());
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+
+      antworten!();
+      expect(await within(dialog).findByText('kx7m-p4qr-9tzw')).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+    });
+
     it('sperrt das eigene Konto und nennt den Grund', async () => {
       server.use(
         meHandler(benutzer()),

@@ -104,7 +104,8 @@ entstehen, MUST NOT unter Änderungszwang stehen.
 Besteht ein Konto unter Änderungszwang die Passwortprüfung, MUST der Server ohne Sitzung und ohne
 Sitzungs-Cookie mit `{"passwort_wechsel_erforderlich": true}` antworten. Dazu setzt er ein
 kurzlebiges, einmal einlösbares HttpOnly-Cookie. Hat das Konto TOTP, MUST erst der zweite Faktor
-bestehen, dann folgt der Wechsel. Der Zwischenschritt MUST NOT einen Eintrag `login_ok` schreiben.
+bestehen, dann folgt der Wechsel. Der Passwortschritt MUST NOT einen Eintrag `login_ok` schreiben;
+nur ein bestandener zweiter Faktor protokolliert die Anmeldung wie sonst auch.
 
 #### Scenario: Anmeldung mit dem Einmalpasswort
 
@@ -118,6 +119,11 @@ bestehen, dann folgt der Wechsel. Der Zwischenschritt MUST NOT einen Eintrag `lo
 - **THEN** antwortet der Login mit `{"mfa_erforderlich": "totp"}`
 - **AND** der TOTP-Abschluss antwortet mit `{"passwort_wechsel_erforderlich": true}` statt mit einer Sitzung
 
+#### Scenario: Konto mit TOTP, Einmalpasswort vor dem Code ersetzt
+
+- **WHEN** `max` mit TOTP sich mit dem ersten Einmalpasswort anmeldet, ein Admin ihm ein zweites vergibt und `max` danach einen gültigen Code eingibt
+- **THEN** antwortet der TOTP-Abschluss mit 401 ohne Wechsel-Cookie
+
 #### Scenario: Falsches Einmalpasswort
 
 - **WHEN** `max` sich mit einem falschen Passwort anmeldet
@@ -128,8 +134,8 @@ bestehen, dann folgt der Wechsel. Der Zwischenschritt MUST NOT einen Eintrag `lo
 `POST /api/auth/passwort/festlegen` MUST mit gültigem Wechsel-Cookie das neue Passwort setzen, den
 Zwang aufheben und eine Sitzung anlegen. Es gelten die Längengrenzen jedes neuen Passworts. Ohne
 gültiges Cookie MUST der Server mit 401 antworten. Gleicht das neue Passwort dem bisherigen, MUST er
-mit 422 antworten, und das Cookie bleibt gültig. Der Erfolg schreibt `passwort_geaendert` und
-`login_ok`.
+mit 422 antworten, und das Cookie bleibt gültig. Der Erfolg schreibt `passwort_geaendert`, dazu
+`login_ok`, wenn nicht schon der zweite Faktor die Anmeldung protokolliert hat.
 
 #### Scenario: Neues Passwort festlegen
 

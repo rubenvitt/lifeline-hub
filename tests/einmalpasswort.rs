@@ -9,7 +9,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, fremde_org_anlegen, login_cookie,
-    setup_mit_pool,
+    setup_mit_pool, setup_mit_pool_und_live,
 };
 
 /// Antwort mit Status, JSON-Body, allen `Set-Cookie`-Paaren (`name=wert`) und Kopfzeilen.
@@ -201,6 +201,32 @@ async fn admin_vergibt_einmalpasswort_alte_anmeldungen_und_passwort_enden() {
         !spur_text.contains(pw),
         "das Passwort steht nie in der Spur"
     );
+}
+
+#[tokio::test]
+async fn offene_live_stroeme_der_person_enden() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let max = benutzer_anlegen(&app, &admin, "maxim", "keine").await;
+    login_cookie(&app, "maxim", "maximpw1").await;
+    login_cookie(&app, "maxim", "maximpw1").await;
+    let mut kennungen: Vec<String> =
+        sqlx::query_scalar("SELECT kennung FROM session WHERE benutzer_id = ? ORDER BY kennung")
+            .bind(max)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    let mut ende = live.abonniere_sitzung_ende();
+
+    einmalpasswort_fuer_max(&app, &admin, max).await;
+
+    let mut gemeldet = Vec::new();
+    while let Ok(k) = ende.try_recv() {
+        gemeldet.push(k);
+    }
+    gemeldet.sort();
+    kennungen.sort();
+    assert_eq!(gemeldet, kennungen, "jede beendete Sitzung wird gemeldet");
 }
 
 #[tokio::test]
@@ -534,12 +560,12 @@ async fn neues_einmalpasswort_waehrend_des_zwischenschritts_macht_ihn_ungueltig(
     );
 }
 
-#[tokio::test]
-async fn mit_totp_erst_der_code_dann_der_wechsel() {
-    let (app, pool, admin, max) = ausgangslage().await;
-    let max_cookie = login_cookie(&app, "maxim", "maximpw1").await;
+/// Richtet für `maxim` TOTP ein und liefert die Recovery-Codes. Recovery-Codes statt eines zweiten
+/// TOTP-Codes: der Zeitschritt des Enrollments ist verbraucht.
+async fn totp_einrichten(app: &axum::Router) -> Vec<String> {
+    let max_cookie = login_cookie(app, "maxim", "maximpw1").await;
     let (s, start) = anfrage_json(
-        &app,
+        app,
         "POST",
         "/api/auth/totp/enroll/start",
         &max_cookie,
@@ -555,7 +581,7 @@ async fn mit_totp_erst_der_code_dann_der_wechsel() {
         lifeline_hub::auth::totp::generiere_code(start["secret_base32"].as_str().unwrap(), jetzt)
             .unwrap();
     let (s, fertig) = anfrage_json(
-        &app,
+        app,
         "POST",
         "/api/auth/totp/enroll/finish",
         &max_cookie,
@@ -563,8 +589,56 @@ async fn mit_totp_erst_der_code_dann_der_wechsel() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    // Ein Recovery-Code statt eines zweiten TOTP-Codes: der Zeitschritt des Enrollments ist verbraucht.
-    let recovery = fertig["recovery_codes"][0].as_str().unwrap().to_string();
+    fertig["recovery_codes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap().to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn mit_totp_gilt_ein_ersetztes_einmalpasswort_auch_nach_dem_code_nicht() {
+    let (app, _pool, admin, max) = ausgangslage().await;
+    let recovery = totp_einrichten(&app).await;
+    let erstes = einmalpasswort_fuer_max(&app, &admin, max).await;
+
+    let a = login(&app, "maxim", &erstes).await;
+    assert_eq!(a.json, json!({"mfa_erforderlich": "totp"}));
+    let mfa = a.cookie("mfa_pending").unwrap();
+    // Die Administration ersetzt das erste Einmalpasswort, bevor der Code kommt.
+    let zweites = einmalpasswort_fuer_max(&app, &admin, max).await;
+
+    let b = senden(
+        &app,
+        "POST",
+        "/api/auth/totp/finish",
+        &mfa,
+        Some(json!({"code": recovery[0]})),
+    )
+    .await;
+    assert_eq!(b.status, StatusCode::UNAUTHORIZED, "{}", b.json);
+    assert!(b.cookie("passwort_wechsel").is_none());
+    assert!(b.cookie("lifeline_sid").is_none());
+
+    // Mit dem aktuellen Einmalpasswort geht es weiter.
+    let c = login(&app, "maxim", &zweites).await;
+    let mfa = c.cookie("mfa_pending").unwrap();
+    let d = senden(
+        &app,
+        "POST",
+        "/api/auth/totp/finish",
+        &mfa,
+        Some(json!({"code": recovery[1]})),
+    )
+    .await;
+    assert_eq!(d.json, json!({"passwort_wechsel_erforderlich": true}));
+}
+
+#[tokio::test]
+async fn mit_totp_erst_der_code_dann_der_wechsel() {
+    let (app, pool, admin, max) = ausgangslage().await;
+    let recovery = totp_einrichten(&app).await.remove(0);
     let pw = einmalpasswort_fuer_max(&app, &admin, max).await;
 
     let a = login(&app, "maxim", &pw).await;

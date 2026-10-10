@@ -1,9 +1,7 @@
 import { Alert, Button, Flex, Popconfirm } from 'antd';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { useId } from 'react';
-import { vergibEinmalpasswort } from '../api/benutzer';
-import { globalKeys } from '../api/queryKeys';
-import type { BenutzerAnzeige } from '../api/types';
+import type { BenutzerAnzeige, Einmalpasswort } from '../api/types';
 import KopierbarerText from '../components/KopierbarerText';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { monoStil, useRollen } from '../components/instrument';
@@ -19,25 +17,22 @@ import { EIGENES_PASSWORT, SSO_KONTO } from '../stammdaten/rechteText';
  *   die Handlung.
  * - **Was der Server sicher ablehnt, steht gesperrt mit Grund:** das eigene Konto (das Passwort
  *   wechselt der Admin im Profil) und ein SSO-Konto ohne lokales Passwort.
- * - **Das Passwort lebt nur im Zustand dieser Mutation**, nie im Query-Cache; mit dem Dialog
- *   (`destroyOnHidden`) ist es weg.
+ * - **Das Passwort lebt nur im Zustand der Mutation**, nie im Query-Cache. Die Mutation hält
+ *   `BenutzerPage`: solange sie läuft, sperrt der Dialog jeden Ausweg (sonst ginge das schon
+ *   gesetzte Passwort mit dem Dialog verloren), und beim Schließen räumt sie `reset()`.
  */
 export default function EinmalpasswortVergeben({
   benutzer,
   eigenesKonto,
+  vergeben,
 }: {
   benutzer: BenutzerAnzeige;
   eigenesKonto: boolean;
+  /** `POST /api/benutzer/{id}/einmalpasswort`, Variable ist die Benutzer-id. */
+  vergeben: UseMutationResult<Einmalpasswort, Error, number>;
 }) {
   const { token, rollen } = useRollen();
-  const qc = useQueryClient();
   const grundId = useId();
-
-  const vergeben = useMutation({
-    mutationFn: () => vergibEinmalpasswort(benutzer.id),
-    // Nur die Liste neu laden: die Antwort selbst gehört in keinen Cache.
-    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-  });
 
   const sperrGrund = eigenesKonto
     ? EIGENES_PASSWORT
@@ -70,7 +65,7 @@ export default function EinmalpasswortVergeben({
         description={`Das bisherige Passwort gilt nicht mehr, und alle Anmeldungen von ${benutzer.anzeigename} enden.`}
         okText="Einmalpasswort vergeben"
         okButtonProps={{ danger: true }}
-        onConfirm={() => vergeben.mutate()}
+        onConfirm={() => vergeben.mutate(benutzer.id)}
         disabled={sperrGrund !== null || vergeben.isPending}
       >
         <Button

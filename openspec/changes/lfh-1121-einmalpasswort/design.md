@@ -87,7 +87,10 @@ keine Sitzung. `totp_finish` prüft danach den Zwang:
 - Sonst legt es wie bisher die Sitzung an.
 
 Die Antwort von `totp_finish` wird dafür ein untagged Enum wie `LoginAntwort`, weiterhin außerhalb
-des Codegens. Erst nach bestandenem zweitem Faktor darf jemand ein neues Passwort setzen. Sonst
+des Codegens. Der TOTP-Zwischenspeicher (`auth/totp/state.rs`) hält dafür neben der `benutzer_id` den
+geprüften Passwort-Hash; hat er sich bis zum Code geändert (ein neues Einmalpasswort), antwortet
+`totp_finish` mit 401 (Befund aus dem Review). Erst nach bestandenem zweitem Faktor darf jemand ein
+neues Passwort setzen. Sonst
 reichte das Einmalpasswort allein, um den Zugang zu übernehmen.
 
 **Audit:** Der TOTP-Erfolg schreibt wie bisher seinen Eintrag über `audit_anmeldung`, also `login_ok`

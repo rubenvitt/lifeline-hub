@@ -319,7 +319,14 @@ pub async fn login(
         // Anlauf `login` → `totp/finish` den Zähler zurück, und der Code ließe sich ungebremst
         // raten. Geräumt wird in `totp_finish`.
         let key = session::neuer_token();
-        crate::auth::totp::state::speichere(key.clone(), benutzer.id).map_err(anmeldungen_voll)?;
+        crate::auth::totp::state::speichere(
+            key.clone(),
+            crate::auth::totp::state::Offen {
+                benutzer_id: benutzer.id,
+                passwort_hash: benutzer.passwort_hash.clone(),
+            },
+        )
+        .map_err(anmeldungen_voll)?;
         let jar = jar.add(mfa_pending_cookie(key, secure));
         return Ok((
             jar,
@@ -1984,7 +1991,8 @@ async fn totp_pruefen(
     let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
 
     // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 1).
-    let benutzer_id = crate::auth::totp::state::entnehme(&key).ok_or_else(Abgewiesen::ohne_spur)?;
+    let offen = crate::auth::totp::state::entnehme(&key).ok_or_else(Abgewiesen::ohne_spur)?;
+    let benutzer_id = offen.benutzer_id;
 
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
@@ -1997,6 +2005,12 @@ async fn totp_pruefen(
         return Err(Abgewiesen::anonym());
     };
     if !benutzer.aktiv {
+        return Err(Abgewiesen::fuer(benutzer));
+    }
+    // Das Passwort, das der erste Schritt geprüft hat, gilt nicht mehr (LFH-1121): etwa weil die
+    // Administration dazwischen ein neues Einmalpasswort vergeben hat. Sonst führte ein ersetztes
+    // Einmalpasswort samt zweitem Faktor doch noch in den Wechsel.
+    if benutzer.passwort_hash != offen.passwort_hash {
         return Err(Abgewiesen::fuer(benutzer));
     }
 

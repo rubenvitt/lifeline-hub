@@ -99,8 +99,8 @@ die erste Anmeldung: Danach legt die Person ein eigenes fest.
 Ein vergessenes Passwort lässt sich nicht selbst zurücksetzen. Die Administration vergibt dann
 ein **Einmalpasswort** (siehe [Benutzer](benutzer.md)). Damit meldet sich die Person an und legt
 sofort ein eigenes Passwort fest. Bis dahin gibt es keine Anmeldung, auch nicht für andere
-Fenster oder die Arbeit ohne Netz. Das Einmalpasswort gilt, bis die Person es benutzt; ein
-zweites ersetzt das erste. Wer sich mit Passkey oder über die Organisation anmeldet, braucht das
+Fenster oder die Arbeit ohne Netz. Das Einmalpasswort gilt, bis die Person ein eigenes Passwort
+festlegt; ein zweites ersetzt das erste. Wer sich mit Passkey oder über die Organisation anmeldet, braucht das
 Passwort nicht und wird nicht nach einem neuen gefragt; ein Wechsel im Profil ersetzt das
 Einmalpasswort ebenfalls.
 
