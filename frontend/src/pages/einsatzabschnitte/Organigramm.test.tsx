@@ -19,6 +19,7 @@ import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
+import { ZEICHEN_UNTERLAGE_KLASSE } from '../../zeichen/EinsatzZeichen';
 
 vi.mock('../../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
@@ -157,6 +158,14 @@ describe('OrganigrammBild — Knoten', () => {
     const zeichen = container.querySelectorAll('[data-lfh="org-zeichen"]');
     expect(zeichen.length).toBeGreaterThan(0);
     zeichen.forEach((z) => expect(z).toHaveAttribute('aria-hidden', 'true'));
+  });
+
+  // LFH-1120: Zeichen ohne Organisation hätten im Nachtbetrieb keinen Grund, der sie trägt.
+  it('legt jedes Zeichen auf die helle Unterlage', () => {
+    const { container } = bild();
+    const zeichen = container.querySelectorAll('[data-lfh="org-zeichen"] svg');
+    expect(zeichen.length).toBeGreaterThan(0);
+    zeichen.forEach((z) => expect(z).toHaveClass(ZEICHEN_UNTERLAGE_KLASSE));
   });
 
   it('stellt Einheiten ohne Abschnitt unter „Ohne Abschnitt“', () => {

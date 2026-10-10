@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
+import { ZEICHEN_UNTERLAGE_KLASSE } from '../zeichen/EinsatzZeichen';
 import EinheitZeichen from './EinheitZeichen';
 
 // Die Spalte „TZ“ im Meldebild (LFH-835): @einsatzzeichen, und ein gespeicherter Unsinnswert
@@ -37,5 +38,17 @@ describe('EinheitZeichen', () => {
   it('bleibt ohne Zeichendaten ein leerer Rahmen', () => {
     renderMitProviders(<EinheitZeichen tz={null} />);
     expect(document.querySelector('[data-lfh="einheit-zeichen"] svg')).toBeNull();
+  });
+
+  // LFH-1120: die Organisations-Vorgabe der Karte fehlt hier bewusst, also zeichnet die Bibliothek
+  // jede Einheit ohne eigene Organisation mit schwarzem Umriss ohne Fläche — im Nachtbetrieb ohne
+  // Unterlage schwarz auf schwarz.
+  it('legt das Zeichen auf die helle Unterlage', () => {
+    renderMitProviders(
+      <EinheitZeichen tz={{ typLabel: 'Zug', fachaufgabe: null, organisation: null }} />,
+    );
+    expect(document.querySelector('[data-lfh="einheit-zeichen"] svg')).toHaveClass(
+      ZEICHEN_UNTERLAGE_KLASSE,
+    );
   });
 });
