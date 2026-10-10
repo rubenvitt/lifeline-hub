@@ -173,13 +173,6 @@ const VORHERSAGE = {
   },
 };
 
-/** Siehe `lagebild.bilder.ts`: der Testbrowser meldet Benachrichtigungen sonst als gesperrt. */
-async function benachrichtigungErlaubt(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-  });
-}
-
 /**
  * Stellt alle externen Daten auf die Literale oben; Schreibwege gehen an den Server. Ohne
  * `pegelListe` liest die Seite die festgelegten Pegel vom Server (für einen Schreibweg, dessen
@@ -224,7 +217,6 @@ async function unwetterHinweisSchliessen(page: Page) {
 
 test.describe(KAPITEL, () => {
   test('Seite Wetter und Pegel', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     const id = await vorbereiten(page);
     await page.goto(`/einsaetze/${id}/wetter-pegel`);
     await expect(page.locator('[data-lfh="pegel-zeile"]')).toHaveCount(2);

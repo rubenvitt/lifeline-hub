@@ -30,13 +30,6 @@ const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
 const KACHEL_LAYER = 'strassen';
 const GRUNDKARTE = { name: 'Grundkarte', stil: '/api/karte/proxy/9/a/style.json', quelle: 'grund' };
 
-/** Siehe `lagebild.bilder.ts`: der Testbrowser meldet Benachrichtigungen sonst als gesperrt. */
-async function benachrichtigungErlaubt(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-  });
-}
-
 /** Einheiten des Demo-Szenarios und ihr Ort (lon, lat) für das Bild. */
 const EINHEITEN_ORT: Record<string, [number, number]> = {
   'Sanitätszug Musterstadt': [10.2478, 50.9562],
@@ -108,7 +101,6 @@ async function tippe(page: Page, canvas: Locator, dx: number, dy: number) {
 // folgenden. Deshalb erst Überblick und Messen, das Anlegen am Schluss.
 test.describe(KAPITEL, () => {
   test('Lagekarte des Demo-Einsatzes', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     const canvas = await oeffneKarte(page);
     await expect(page.getByRole('group', { name: 'Kartensteuerung' })).toBeVisible();
     await fotografiere(page, KAPITEL, 'lagekarte');

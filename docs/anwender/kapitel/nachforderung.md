@@ -76,7 +76,7 @@ immer, unabhängig von „Automatische ETB-Einträge“ (siehe [Einsatztagebuch]
 ### Aus der Verpflegung nachfordern
 
 Fehlt in einem Zeitfenster der Verpflegung etwas, öffnet „Nachfordern“ an dessen Karte dieses
-Formular mit vorbelegten Feldern (Kapitel „Verpflegung“). Die Felder bleiben vor dem Absetzen
+Formular mit vorbelegten Feldern ([Verpflegung](verpflegung.md)). Die Felder bleiben vor dem Absetzen
 änderbar.
 
 ### Ablauf der Stufen

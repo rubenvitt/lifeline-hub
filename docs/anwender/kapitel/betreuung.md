@@ -117,7 +117,7 @@ Stand- und Belegungsmeldungen als Meldung, eine Rücknahme als Berichtigung.
 ### Verpflegung
 
 Die Belegung der Betreuungsstellen ergibt die Zahl „in Betreuung“, mit der das Modul
-„Verpflegung“ den Bedarf der Betreuten rechnet (Kapitel „Verpflegung“). Unterkünfte für
+„Verpflegung“ den Bedarf der Betreuten rechnet ([Verpflegung](verpflegung.md)). Unterkünfte für
 Einsatzkräfte gehören deshalb nicht als Betreuungsstelle hierher.
 
 ### Rechte
@@ -125,7 +125,7 @@ Einsatzkräfte gehören deshalb nicht als Betreuungsstelle hierher.
 Anlegen und melden dürfen Einsatzleitung und Führungspersonal eines laufenden Einsatzes
 ([Rechte im Einsatz](rechte-im-einsatz.md)); ohne dieses Recht steht ein Hinweis über der Seite,
 und die Knöpfe sind gesperrt. Die Bedienung am gekoppelten Gerät einer Betreuungsstelle beschreibt
-das Kapitel zu den gekoppelten Geräten.
+[Betreuungsstelle am Gerät](geraet-betreuungsstelle.md).
 
 ### Ohne Netz
 

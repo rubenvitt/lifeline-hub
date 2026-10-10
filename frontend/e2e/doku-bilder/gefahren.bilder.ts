@@ -17,13 +17,6 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
 
 const KAPITEL = 'gefahren';
 
-/** Siehe `lagebild.bilder.ts`: der Testbrowser meldet Benachrichtigungen sonst als gesperrt. */
-async function benachrichtigungErlaubt(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-  });
-}
-
 /** Füllt die Matrix der „Überflutung Unterstadt“ und gibt die Kennung des Gebiets zurück. */
 async function gebietMitBewertungen(page: Page, einsatzId: number): Promise<number> {
   const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/gefahrengebiete`);
@@ -63,7 +56,6 @@ async function oeffneGefahren(page: Page) {
 
 test.describe(KAPITEL, () => {
   test('Gefahrengebiete und Matrix der Bewertung', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     await oeffneGefahren(page);
     await fotografiere(page, KAPITEL, 'gefahren');
     // Ablauf weiter: das Gebiet auf der Lagekarte zeigen.

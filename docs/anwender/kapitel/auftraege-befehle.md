@@ -86,7 +86,7 @@ Für Einsatzleitung und Führungspersonal:
    …“.
 5. Bei Bedarf „Fernmeldeskizze anfügen“ wählen. Die App nimmt die aktuelle Fernmeldeskizze als
    Bild auf und hängt sie unter „Anlagen“ an. Das geht nur mit Verbindung und nur, wenn der Stab
-   im Einsatz freigegeben ist (Kapitel „Funkplan, Fernmeldeskizze, Kommunikationsplan“).
+   im Einsatz freigegeben ist ([Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)).
 
 ### Einen Einsatzbefehl freigeben und fortschreiben
 

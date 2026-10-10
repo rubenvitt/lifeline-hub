@@ -117,7 +117,10 @@ Ein PR ändert das betroffene Kapitel **im selben PR**, wenn er
 3. eine Sonderlage neu schafft: neue Daten auf dem Gerät, ein neues Ende einer Anmeldung, eine
    neue Rechte- oder Fristgrenze, oder
 4. eine Ansicht ändert, die ein Bild zeigt (welche, nennt der Kopf der Bilder-Spec): er erzeugt
-   die Bilder des Kapitels neu (`pnpm doku:bilder --grep <kapitel>`) und committet sie.
+   die Bilder des Kapitels neu (`pnpm doku:bilder --grep <kapitel>`) und committet sie. `--grep`
+   trifft Teilstrings ohne Rücksicht auf Groß- und Kleinschreibung; trifft er fremde Kapitel mit
+   (etwa `geraet` oder `betreuung`), den Pfad der Spec übergeben
+   (`pnpm doku:bilder e2e/doku-bilder/<kapitel>.bilder.ts`).
 
 Ein neues Kapitel bekommt eine Zeile in `README.md`. Das PR-Template fragt danach. Kein Gate auf
 Änderungen unter `quellen:` oder an fotografierten Ansichten: es wäre bei jedem Bugfix rot und
@@ -128,7 +131,8 @@ würde abgeschaltet.
 Jedes Modul bekommt ein Kapitel, geschrieben in acht Paketen. Jedes Paket vergibt `reihenfolge`
 nur in seinem Block, damit parallele PRs nicht kollidieren: 1 Einstieg 0–99, 2 Führungsmittel
 100–199, 3 Lage 200–299, 4 Kräfte 300–399, 5 Stab 400–499, 6 Betroffene 500–599, 7 Einstellungen
-und Verwaltung 600–699, 8 Gekoppelte Geräte 700–799. Kapitelplan: `README.md`.
+und Verwaltung 600–699, 8 Gekoppelte Geräte 700–799. Die Kapitelübersicht steht in
+`README.md`, nach `reihenfolge` geordnet.
 
 ## Lesergruppen (D8)
 

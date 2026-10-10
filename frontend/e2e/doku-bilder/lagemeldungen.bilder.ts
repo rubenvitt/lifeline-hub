@@ -25,13 +25,6 @@ interface Meldung {
   meldungsart: string;
 }
 
-/** Siehe `lagebild.bilder.ts`: der Testbrowser meldet Benachrichtigungen sonst als gesperrt. */
-async function benachrichtigungErlaubt(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-  });
-}
-
 /**
  * Offene Meldungen der Demo, die noch nicht an die Lage übergeben sind: Lagemeldungen zuerst, dann
  * nach laufender Nummer.
@@ -77,7 +70,6 @@ test.describe(KAPITEL, () => {
   });
 
   test('Zeitleiste der Lagemeldungen', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const offen = await offeneMeldungen(page, demo.id);

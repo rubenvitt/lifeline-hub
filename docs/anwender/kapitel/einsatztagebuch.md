@@ -67,7 +67,7 @@ erscheinen wird.
 
 Die Chips „Von“ und „An“ bieten eine Buchstabierhilfe mit den Tafeln „Deutsch“ und „NATO“. Bei
 Typ „Lage“ führt der Verweis „Als strukturierten Lagebericht erfassen →“ zu den Lageberichten
-(Kapitel „Lageberichte“).
+([Lageberichte](lageberichte.md)).
 
 ### Eine Datei anhängen
 
@@ -166,7 +166,7 @@ Weitere Module schreiben selbst ins ETB:
 
 Ob Meldungen und erteilte Aufträge einen Eintrag erzeugen, legt in den Einstellungen des
 Einsatzes unter „Verhalten & Automatik“ das Feld „Automatische ETB-Einträge“ fest; ohne Angabe gilt die Vorgabe
-der Organisation, sonst „An“ (Kapitel „Einstellungen des Einsatzes und Module“). Ein
+der Organisation, sonst „An“ ([Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Ein
 automatischer Eintrag zeigt einen Verweis auf seinen Ursprung, etwa „Auftrag ↗“ oder „Befehl ↗“.
 
 ### Entwürfe auf dem Gerät
@@ -185,7 +185,7 @@ Kapitel [Arbeiten ohne Netz](ohne-netz.md).
 ### Abgeschlossener Einsatz
 
 Nach dem Abschluss des Einsatzes ist das ETB nur noch lesbar. Abgeschlossen wird in den
-Einsatzdaten (Kapitel „Einsatz abschließen und Einsatzbericht“). Drucken lässt sich das ETB
+Einsatzdaten ([Einsatz abschließen und Einsatzbericht](einsatzabschluss.md)). Drucken lässt sich das ETB
 jederzeit, siehe [Drucken und Export](drucken-export.md).
 
 ## Grundlagen und Quellen

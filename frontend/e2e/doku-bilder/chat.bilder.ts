@@ -31,11 +31,6 @@ const KAPITEL = 'chat';
 
 test.describe(KAPITEL, () => {
   test('Chat eines Einsatzes', async ({ page }) => {
-    // Benachrichtigungen erlaubt wie an einem eingerichteten Gerät (Headless-Chromium verweigert
-    // sie stets; die Kopfzeile zeigte sonst „Benachrichtigung blockiert“).
-    await page.addInitScript(() => {
-      Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-    });
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const basis = `/api/einsaetze/${demo.id}`;

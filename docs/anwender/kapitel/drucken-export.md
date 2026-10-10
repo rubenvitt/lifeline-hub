@@ -80,7 +80,7 @@ Für System-Admins:
 3. Mit „Logo hochladen“ (oder „Logo ersetzen“) ein Logo als PNG oder JPEG mit höchstens 1 MiB
    wählen. Das Logo wird sofort hochgeladen; „Logo entfernen“ nimmt es wieder heraus.
 
-Name und Logo stehen ab dem nächsten Druck im Druckkopf (Kapitel „Stammdaten“).
+Name und Logo stehen ab dem nächsten Druck im Druckkopf ([Stammdaten](stammdaten.md)).
 
 ## Hintergrund
 
@@ -104,4 +104,4 @@ und Erfasser. Berichtigungen und Nachträge sind wie in der Zeitachse gekennzeic
 
 Drucken und Exportieren ist Lesen: Wer eine Liste sehen darf, darf sie auch drucken und
 exportieren, ohne Schreibrecht. Das Zugriffsprotokoll der Betroffenen sieht nur die
-Einsatzleitung, unter „Listenzugriffe“ (Kapitel „Betroffene und Sichtung“).
+Einsatzleitung, unter „Listenzugriffe“ ([Betroffene und Sichtung](betroffene.md)).

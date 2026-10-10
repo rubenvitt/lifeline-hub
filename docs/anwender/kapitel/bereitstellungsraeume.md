@@ -13,8 +13,8 @@ keinem Raum zugewiesen sind.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
 Räume an, nehmen sie in Betrieb, weisen Kräfte zu und lösen Räume wieder auf. Die Bedienung am
-gekoppelten Tablet eines Bereitstellungsraums beschreibt das Kapitel „Bereitstellungsraum“ unter den
-gekoppelten Geräten.
+gekoppelten Tablet eines Bereitstellungsraums beschreibt
+[Bereitstellungsraum am Gerät](geraet-bereitstellungsraum.md).
 
 ## Abläufe
 

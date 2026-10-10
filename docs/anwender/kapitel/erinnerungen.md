@@ -76,7 +76,7 @@ Anlass, etwa „↗ Auftrag #…“, „↗ Meldung #…“ oder „↗ Ablösun
 - „Sofortmeldung #… unbestätigt“ zu einer Sofortmeldung (Kapitel [Meldungen](meldungen.md)),
 - „Auftrag #… Quittierfrist“ zu einem Auftrag mit Frist (Kapitel
   [Aufträge und Befehle](auftraege-befehle.md)),
-- Hinweise zu fälligen Ablösungen (Kapitel „Ablösung“).
+- Hinweise zu fälligen Ablösungen ([Ablösung](abloesung.md)).
 
 Sie schließen sich selbst, wenn ihr Anlass erledigt ist, etwa wenn die Sofortmeldung bestätigt
 ist oder alle Empfänger den Auftrag quittiert haben.

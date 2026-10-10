@@ -23,13 +23,6 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
 const KAPITEL = 'lageberichte';
 const ENTWURF = 'Lagevortrag 13. Stunde';
 
-/** Siehe `lagebild.bilder.ts`: der Testbrowser meldet Benachrichtigungen sonst als gesperrt. */
-async function benachrichtigungErlaubt(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-  });
-}
-
 /** Legt einen Entwurf „Lagevortrag zur Information“ mit gefülltem Auftrag an. */
 async function entwurfAnlegen(page: Page, einsatzId: number): Promise<number> {
   const bericht = await fuelle<{ id: number }>(
@@ -65,7 +58,6 @@ async function freigegebenerBericht(page: Page, einsatzId: number): Promise<numb
 
 test.describe(KAPITEL, () => {
   test('Liste der Lageberichte', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await entwurfAnlegen(page, demo.id);
@@ -99,7 +91,6 @@ test.describe(KAPITEL, () => {
   });
 
   test('Entwurf mit Übernahme in die Eigene Lage', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const id = await entwurfAnlegen(page, demo.id);
@@ -144,7 +135,6 @@ test.describe(KAPITEL, () => {
   });
 
   test('Freigegebener Bericht mit Fortschreiben', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const id = await freigegebenerBericht(page, demo.id);

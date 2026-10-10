@@ -37,7 +37,10 @@ export const test = basis.extend({
   context: async ({ context }, weiter) => {
     await context.addInitScript(() => {
       if (typeof Notification !== 'undefined') {
-        Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
+        Object.defineProperty(Notification, 'permission', {
+          get: () => 'granted',
+          configurable: true,
+        });
       }
     });
     await weiter(context);

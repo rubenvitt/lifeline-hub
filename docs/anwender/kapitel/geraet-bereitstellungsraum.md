@@ -1,5 +1,5 @@
 ---
-titel: Bereitstellungsraum
+titel: Bereitstellungsraum am Gerät
 gruppen: [geraete]
 reihenfolge: 740
 quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs]

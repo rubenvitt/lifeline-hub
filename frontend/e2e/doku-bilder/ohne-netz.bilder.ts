@@ -17,11 +17,6 @@ const KAPITEL = 'ohne-netz';
 
 test.describe(KAPITEL, () => {
   test('Einsatztagebuch ohne Netz mit vorgemerktem Eintrag', async ({ page, context }) => {
-    // Benachrichtigungen erlaubt wie an einem eingerichteten Gerät (Headless-Chromium verweigert
-    // sie stets; die Kopfzeile zeigte sonst „Benachrichtigung blockiert“).
-    await page.addInitScript(() => {
-      Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-    });
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);

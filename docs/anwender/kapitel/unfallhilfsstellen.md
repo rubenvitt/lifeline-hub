@@ -122,8 +122,8 @@ im Modul „Material“.
 
 Anlegen, Plätze einrichten, Patienten aufnehmen und bewegen dürfen Einsatzleitung und
 Führungspersonal eines laufenden Einsatzes ([Rechte im Einsatz](rechte-im-einsatz.md)). Die
-Bedienung an gekoppelten Tablets und Laptops einer Unfallhilfsstelle beschreibt das Kapitel zu
-den gekoppelten Geräten.
+Bedienung an gekoppelten Tablets und Laptops einer Unfallhilfsstelle beschreibt
+[UHS-Tablet und UHS-Laptop](geraet-uhs.md).
 
 ### Ohne Netz
 

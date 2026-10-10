@@ -81,7 +81,7 @@ Für Einsatzleitung und Führungspersonal:
 4. „Übergeben“ wählen.
 
 Die Meldung trägt danach „Lagerelevant ✓“ und erscheint in den Lagemeldungen (Kapitel
-„Lagemeldungen“); verortet auch auf der Lagekarte.
+[Lagemeldungen](lagemeldungen.md)); verortet auch auf der Lagekarte.
 
 ### Aus einer Meldung einen Auftrag erteilen
 

@@ -1,5 +1,5 @@
 ---
-titel: Einsatzabschnitt
+titel: Einsatzabschnitt am Gerät
 gruppen: [geraete]
 reihenfolge: 750
 quellen: [frontend/src/geraet/GeraetAbschnittPage.tsx, frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraetAbschnittKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, src/geraet/mod.rs]

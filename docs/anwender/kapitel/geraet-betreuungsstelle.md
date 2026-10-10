@@ -1,5 +1,5 @@
 ---
-titel: Betreuungsstelle
+titel: Betreuungsstelle am Gerät
 gruppen: [geraete]
 reihenfolge: 730
 quellen: [frontend/src/geraet/GeraetBetroffenePage.tsx, frontend/src/geraet/GeraetBetreuungsstellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/StellenBlock.tsx, src/geraet/mod.rs]

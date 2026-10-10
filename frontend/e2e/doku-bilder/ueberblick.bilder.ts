@@ -1,4 +1,3 @@
-import type { Page } from '@playwright/test';
 import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from './kern';
 
 /**
@@ -11,20 +10,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
 
 const KAPITEL = 'ueberblick';
 
-/**
- * Der Testbrowser meldet Benachrichtigungen als gesperrt, auch mit `permissions`; die Kopfleiste
- * zeigte dann „Benachrichtigung blockiert“, ein Zustand des Testgeräts, nicht des Einsatzes. Für
- * ganze Seiten gilt deshalb die Erlaubnis wie an einem eingerichteten Gerät.
- */
-async function benachrichtigungErlaubt(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-  });
-}
-
 test.describe(KAPITEL, () => {
   test('Überblick des Demo-Einsatzes', async ({ page }) => {
-    await benachrichtigungErlaubt(page);
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);

@@ -14,7 +14,8 @@ und stuft es als „gedeckt“, „offen“ oder „Unterdeckung“ ein.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
 Zeitfenster an, erfassen Ausgaben und fordern nach, wenn etwas fehlt. Die Bedienung am gekoppelten
-Gerät einer Verpflegungsstelle beschreibt das Kapitel „Verpflegung“ unter den gekoppelten Geräten.
+Gerät einer Verpflegungsstelle beschreibt
+[Verpflegung am Gerät](geraet-verpflegung.md).
 
 ## Abläufe
 
@@ -112,7 +113,7 @@ die Zahl steht dann als „Aktuell …“ unter dem Feld.
 
 Eine Ausgabe wird nicht bearbeitet, sondern zurückgenommen und neu erfasst. Ihr Zeitpunkt darf
 außerhalb des Zeitfensters liegen, etwa bei einer Anlieferung vor Beginn. Beschafft wird über das
-Modul Nachforderungen (Kapitel „Nachforderung“); eine Ausgabe kann auf eine Nachforderung verweisen,
+Modul Nachforderungen ([Nachforderung](nachforderung.md)); eine Ausgabe kann auf eine Nachforderung verweisen,
 ohne deren Status zu ändern. „Nachfordern“ steht nur bereit, wenn etwas fehlt und das Modul
 Nachforderungen bedient werden kann.
 

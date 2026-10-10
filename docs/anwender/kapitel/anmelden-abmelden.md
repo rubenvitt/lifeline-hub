@@ -80,8 +80,9 @@ Am Gerät, das gekoppelt wird:
 Wer sich zum ersten Mal über SSO anmeldet, bekommt ein Konto mit den geringsten Rechten; weitere
 Rechte vergibt die Administration.
 
-Ein vergessenes Passwort lässt sich nicht selbst zurücksetzen. Ansprechpartner ist die
-Administration der Organisation.
+Ein vergessenes Passwort lässt sich nicht selbst zurücksetzen. Auch die Administration kann in
+der App derzeit kein neues Passwort setzen; Ansprechpartner bleibt sie trotzdem, weil sie das
+Konto verwaltet.
 
 ### Zweiter Faktor
 
