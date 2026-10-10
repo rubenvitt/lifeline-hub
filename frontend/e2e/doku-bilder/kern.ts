@@ -1,7 +1,7 @@
 import {
   expect,
   request,
-  test,
+  test as basis,
   type APIRequestContext,
   type Locator,
   type Page,
@@ -25,7 +25,24 @@ import { ADMIN, ADMIN_PW, type Konto } from '../rollen-kern';
  *   5. `fotografiere(locator, '<kapitel>', '<name>')`.
  */
 
-export { expect, test };
+export { expect };
+
+/**
+ * Das kopflose Chromium meldet `Notification.permission` als `'denied'`, auch mit der Berechtigung
+ * `notifications`; die Kopfleiste zeigte dann in jedem Bild „Benachrichtigung blockiert“. Die
+ * Aufnahmen zeigen den Zustand eines Geräts, auf dem die Benachrichtigung erlaubt ist. Gilt für
+ * jede Seite des Kontexts; einen eigenen Kontext (`browser.newContext()`) deckt es nicht ab.
+ */
+export const test = basis.extend({
+  context: async ({ context }, weiter) => {
+    await context.addInitScript(() => {
+      if (typeof Notification !== 'undefined') {
+        Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
+      }
+    });
+    await weiter(context);
+  },
+});
 export { KONTEXTE, type Kontext } from './kontexte';
 
 /** `docs/anwender/` dieses Checkouts: relativ zur Datei, damit ein Worktree in sich schreibt. */

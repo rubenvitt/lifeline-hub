@@ -12,7 +12,7 @@ import { backendBinaer, freiePorts, umgebungRaeumen, viteServer } from './e2e/la
  * Bildlauf der Anwenderdokumentation (LFH-1128, `docs/anwender/AGENTS.md`, „Bilder“): fotografiert
  * die App für die Kapitel unter `docs/anwender/kapitel/`. Aufruf in `frontend/`:
  *
- *   mise exec -- pnpm doku:bilder                         alle Kapitel
+ *   mise exec -- pnpm doku:bilder                         alle Kapitel, je eines in eigenem Lauf
  *   mise exec -- pnpm doku:bilder --grep <kapitel>        nur ein Kapitel
  *
  * Kein Test: die Bilder sind Doku, ihre Frische trägt die Mitänderungsregel, kein Pixelvergleich.

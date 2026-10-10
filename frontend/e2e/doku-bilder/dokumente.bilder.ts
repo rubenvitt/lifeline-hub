@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 import { deflateSync } from 'node:zlib';
 import { waehleIn } from '../auswahl-kern';
 import {
@@ -94,19 +94,6 @@ async function ablegen(
   );
 }
 
-/**
- * Meldet der Seite die Benachrichtigungs-Freigabe als erteilt. Der kopflose Chromium sagt sonst
- * „denied“ (auch mit `permissions: ['notifications']`), und die Kopfleiste zeigte „Benachrichtigung
- * blockiert“ — ein Zustand des Bildlaufs, nicht der Arbeitsplätze, die das Bild zeigen soll.
- */
-async function benachrichtigungErlaubt(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    if (typeof Notification !== 'undefined') {
-      Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-    }
-  });
-}
-
 test.describe(KAPITEL, () => {
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
@@ -153,7 +140,6 @@ test.describe(KAPITEL, () => {
   test('Liste der Dokumente', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/dokumente`);
     await expect(page.getByText('Lageplan Ortsteil Nord').first()).toBeVisible();

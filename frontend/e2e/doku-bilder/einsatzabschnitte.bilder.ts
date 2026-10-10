@@ -1,4 +1,3 @@
-import type { Page } from '@playwright/test';
 import { waehleIn } from '../auswahl-kern';
 import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from './kern';
 
@@ -19,24 +18,10 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
 
 const KAPITEL = 'einsatzabschnitte';
 
-/**
- * Meldet der Seite die Benachrichtigungs-Freigabe als erteilt. Der kopflose Chromium sagt sonst
- * „denied“ (auch mit `permissions: ['notifications']`), und die Kopfleiste zeigte „Benachrichtigung
- * blockiert“ — ein Zustand des Bildlaufs, nicht der Arbeitsplätze, die das Bild zeigen soll.
- */
-async function benachrichtigungErlaubt(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    if (typeof Notification !== 'undefined') {
-      Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-    }
-  });
-}
-
 test.describe(KAPITEL, () => {
   test('Gliederung mit gewähltem Abschnitt', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einsatzabschnitte`);
     const gliederung = page.getByRole('region', { name: 'Gliederung' });

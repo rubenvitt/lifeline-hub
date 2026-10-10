@@ -67,9 +67,10 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
 - **Nur per Skript, nie von Hand:** je Kapitel eine Bilder-Spec
   `frontend/e2e/doku-bilder/<kapitel>.bilder.ts` (`test.describe('<kapitel>', …)`), Helfer in
   `e2e/doku-bilder/kern.ts`. Ihr Kopfkommentar nennt je Bild die gezeigten Komponenten-Pfade.
-  Erzeugen in `frontend/`: `mise exec -- pnpm doku:bilder --grep <kapitel>` (ohne `--`
-  dazwischen: pnpm reichte es durch, und Playwright filterte nichts). Alle Kapitel: ohne
-  `--grep`.
+  Erzeugen in `frontend/`: `mise exec -- pnpm doku:bilder --grep <kapitel>`. Alle Kapitel:
+  ohne `--grep`; dann fährt `scripts/doku-bilder.mjs` jedes Kapitel in einem eigenen Lauf mit
+  eigener Temp-DB, weil die Bilder-Specs den Demo-Einsatz über die API füllen und sich sonst
+  gegenseitig in die Bilder kämen.
 - **Gleiche Aufnahmen:** eigener Lauf (`playwright.doku.config.ts`, getrennt vom e2e-Lauf), eigene
   Temp-DB und Ports je Lauf, Backend mit `--demo-daten`, Demo-Import vorab
   (`e2e/doku-bilder/vorbereitung.ts`), Chromium, ein Worker, helles Theme, Dichte `kompakt`,

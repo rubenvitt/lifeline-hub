@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 import {
   apiAlsAdmin,
   anmelden,
@@ -54,19 +54,6 @@ async function sprechgruppe(
   );
 }
 
-/**
- * Meldet der Seite die Benachrichtigungs-Freigabe als erteilt. Der kopflose Chromium sagt sonst
- * „denied“ (auch mit `permissions: ['notifications']`), und die Kopfleiste zeigte „Benachrichtigung
- * blockiert“ — ein Zustand des Bildlaufs, nicht der Arbeitsplätze, die das Bild zeigen soll.
- */
-async function benachrichtigungErlaubt(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    if (typeof Notification !== 'undefined') {
-      Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-    }
-  });
-}
-
 test.describe(KAPITEL, () => {
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
@@ -109,7 +96,6 @@ test.describe(KAPITEL, () => {
   test('Einsatzdaten mit Kopfleiste und Lagedaten', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);

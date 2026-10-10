@@ -19,7 +19,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "doku:bilder": "playwright test -c playwright.doku.config.ts"
+    "doku:bilder": "node scripts/doku-bilder.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

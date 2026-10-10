@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 import { waehleIn } from '../auswahl-kern';
 import {
   apiAlsAdmin,
@@ -63,19 +63,6 @@ async function idNachName(api: APIRequestContext, pfad: string, name: string): P
   const treffer = liste.find((x) => x.name === name);
   expect(treffer, `${pfad}: „${name}“`).toBeDefined();
   return treffer!.id;
-}
-
-/**
- * Meldet der Seite die Benachrichtigungs-Freigabe als erteilt. Der kopflose Chromium sagt sonst
- * „denied“ (auch mit `permissions: ['notifications']`), und die Kopfleiste zeigte „Benachrichtigung
- * blockiert“ — ein Zustand des Bildlaufs, nicht der Arbeitsplätze, die das Bild zeigen soll.
- */
-async function benachrichtigungErlaubt(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    if (typeof Notification !== 'undefined') {
-      Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-    }
-  });
 }
 
 test.describe(KAPITEL, () => {
@@ -171,7 +158,6 @@ test.describe(KAPITEL, () => {
   test('Funkplan als Tabelle mit Lücken', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/stab/funkplan`);
     await expect(page.getByRole('region', { name: 'Lücken' })).toBeVisible();
@@ -187,7 +173,6 @@ test.describe(KAPITEL, () => {
   test('Fernmeldeskizze', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/stab/funkplan?ansicht=skizze`);
     const blatt = page.locator('[data-lfh="funkplan-blatt"]');
@@ -199,7 +184,6 @@ test.describe(KAPITEL, () => {
   test('Kommunikationsplan', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/stab/kommunikationsplan`);
     await expect(page.getByText('0561 7000 112')).toBeVisible();

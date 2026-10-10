@@ -1,4 +1,3 @@
-import type { Page } from '@playwright/test';
 import { waehleIn } from '../auswahl-kern';
 import {
   apiAlsAdmin,
@@ -29,19 +28,6 @@ import {
 
 const KAPITEL = 'presse-infotelefon';
 const MITTEILUNG = 'Starkregen Musterstadt – Evakuierung Ortsteil Nord';
-
-/**
- * Meldet der Seite die Benachrichtigungs-Freigabe als erteilt. Der kopflose Chromium sagt sonst
- * „denied“ (auch mit `permissions: ['notifications']`), und die Kopfleiste zeigte „Benachrichtigung
- * blockiert“ — ein Zustand des Bildlaufs, nicht der Arbeitsplätze, die das Bild zeigen soll.
- */
-async function benachrichtigungErlaubt(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    if (typeof Notification !== 'undefined') {
-      Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
-    }
-  });
-}
 
 test.describe(KAPITEL, () => {
   let mitteilungId = 0;
@@ -127,7 +113,6 @@ test.describe(KAPITEL, () => {
   test('Seite „Pressearbeit“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/stab/presse`);
     await expect(page.getByText('Zahl der Evakuierten').first()).toBeVisible();
@@ -153,7 +138,6 @@ test.describe(KAPITEL, () => {
   test('Pressemitteilung im Entwurf', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/stab/presse/mitteilungen/${mitteilungId}`);
     await expect(page.getByRole('button', { name: 'Freigeben' })).toBeVisible();
@@ -169,7 +153,6 @@ test.describe(KAPITEL, () => {
   test('Seite „Informationstelefon“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await benachrichtigungErlaubt(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/stab/infotelefon`);
     const protokoll = page.getByRole('list', { name: 'Anrufprotokoll' });
