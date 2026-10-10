@@ -1,4 +1,6 @@
 import { request } from '@playwright/test';
+import { oeffneMenue, waehleImMenue } from '../menue-kern';
+import { zweitenFaktorEinrichten } from '../totp-kern';
 import { anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
@@ -6,7 +8,8 @@ import { anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './ker
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep geraet-verloren`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   anmeldungen-einer-person.png  frontend/src/pages/BenutzerPage.tsx, auth/SitzungsListe.tsx
+ *   anmeldungen-einer-person.png       frontend/src/pages/BenutzerPage.tsx, auth/SitzungsListe.tsx
+ *   zweiten-faktor-zuruecksetzen.png   frontend/src/pages/BenutzerPage.tsx
  *
  * Eigene Person statt des Admins: „Alle beenden“ träfe sonst die Anmeldung dieses Laufs.
  */
@@ -37,7 +40,8 @@ test.describe(KAPITEL, () => {
     await page.goto('/admin/benutzer');
     await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
     const zeile = page.getByRole('row').filter({ hasText: `@${person.benutzername}` });
-    await zeile.getByRole('button', { name: 'Anmeldungen' }).click();
+    const ausloeser = zeile.getByRole('button', { name: 'Aktionen zu Benutzer Max Beispiel' });
+    await waehleImMenue(page, ausloeser, 'Anmeldungen');
     const dialog = page.getByRole('dialog', { name: 'Anmeldungen · Max Beispiel' });
     const liste = dialog.locator('[data-lfh="sitzungsliste"]');
     await expect(liste.locator('[data-lfh="sitzung"]')).toHaveCount(2);
@@ -63,7 +67,7 @@ test.describe(KAPITEL, () => {
     // Neu laden: der Dialog zeigt sonst die zwischengespeicherte Liste von eben.
     await page.reload();
     await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
-    await zeile.getByRole('button', { name: 'Anmeldungen' }).click();
+    await waehleImMenue(page, ausloeser, 'Anmeldungen');
     await expect(liste.locator('[data-lfh="sitzung"]')).toHaveCount(2);
     await liste.getByRole('button', { name: 'Alle beenden' }).click();
     await expect(dialog.getByText('Keine Anmeldungen')).toBeVisible();
@@ -72,12 +76,45 @@ test.describe(KAPITEL, () => {
     await expect(dialog).toBeHidden();
 
     // Deaktivieren ohne Rückfrage, Reaktivieren an derselben Stelle.
-    await zeile.getByRole('button', { name: 'Deaktivieren' }).click();
-    await expect(zeile.getByRole('button', { name: 'Reaktivieren' })).toBeVisible();
+    await waehleImMenue(page, ausloeser, 'Deaktivieren');
+    await expect(zeile.getByText('deaktiviert', { exact: true })).toBeVisible();
     expect((await geraete[1].post('/api/auth/login', { data: person })).ok()).toBe(false);
-    await zeile.getByRole('button', { name: 'Reaktivieren' }).click();
-    await expect(zeile.getByRole('button', { name: 'Deaktivieren' })).toBeVisible();
+    await waehleImMenue(page, ausloeser, 'Reaktivieren');
+    await expect(zeile.getByText('aktiv', { exact: true })).toBeVisible();
     expect((await geraete[1].post('/api/auth/login', { data: person })).ok()).toBe(true);
     for (const api of geraete) await api.dispose();
+  });
+
+  test('Zweiten Faktor einer Person zurücksetzen', async ({ page }) => {
+    await anmelden(page);
+    const person = { benutzername: 'e.beispiel', passwort: 'doku-passwort-123' };
+    await fuelle(page, 'post', '/api/benutzer', { anzeigename: 'Erik Beispiel', ...person });
+    // Die Person hat den zweiten Faktor eingerichtet und ist an ihrem Telefon angemeldet.
+    const telefon = await request.newContext({ baseURL: test.info().project.use.baseURL });
+    expect((await telefon.post('/api/auth/login', { data: person })).ok()).toBe(true);
+    await zweitenFaktorEinrichten(telefon, person.passwort);
+
+    await uhrAnhalten(page);
+    await page.goto('/admin/benutzer');
+    await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
+    const ausloeser = page.getByRole('button', { name: 'Aktionen zu Benutzer Erik Beispiel' });
+    await waehleImMenue(page, ausloeser, 'Zweiten Faktor zurücksetzen …');
+    const dialog = page.getByRole('dialog', {
+      name: 'Zweiten Faktor von Erik Beispiel zurücksetzen?',
+    });
+    const bestaetigen = dialog.getByRole('button', { name: 'Zweiten Faktor zurücksetzen' });
+    await expect(bestaetigen).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(dialog, KAPITEL, 'zweiten-faktor-zuruecksetzen');
+
+    // Nachgeklickt: die Anmeldung am Telefon endet, das Passwort allein meldet wieder an.
+    await bestaetigen.click();
+    await expect(dialog).toBeHidden();
+    expect((await telefon.get('/api/auth/me')).status()).toBe(401);
+    const neu = await telefon.post('/api/auth/login', { data: person });
+    expect(await neu.json()).toMatchObject({ totp_aktiviert: false });
+    const menue = await oeffneMenue(page, ausloeser);
+    await expect(menue.getByRole('menuitem', { name: /Zweiten Faktor/ })).toHaveCount(0);
+    await telefon.dispose();
   });
 });

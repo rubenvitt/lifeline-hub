@@ -2,7 +2,7 @@
 titel: Profil und Sicherheit
 gruppen: [alle]
 reihenfolge: 60
-quellen: [frontend/src/pages/ProfilPage.tsx, frontend/src/auth/PasswortAendernDialog.tsx, frontend/src/auth/TotpPasswortDialog.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/api/auth.ts, frontend/src/pages/LoginPage.tsx, src/routes/auth.rs, src/routes/sitzung.rs, src/routes/benutzer.rs, src/auth/session.rs, src/auth/totp/, src/auth/geraet_bezeichnung.rs]
+quellen: [frontend/src/pages/ProfilPage.tsx, frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/PasswortAendernDialog.tsx, frontend/src/auth/TotpPasswortDialog.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/api/auth.ts, frontend/src/pages/LoginPage.tsx, src/routes/auth.rs, src/routes/sitzung.rs, src/routes/benutzer.rs, src/auth/session.rs, src/auth/totp/, src/auth/geraet_bezeichnung.rs]
 ---
 
 ## Überblick
@@ -101,9 +101,9 @@ Organisation fragen ihn nicht ab.
   fehlt.
 - Abschalten oder auf ein neues Telefon umziehen kann die Person den zweiten Faktor nicht selbst:
   Ist er aktiv, lehnt die App eine neue Einrichtung ab. Zurücksetzen kann ihn nur ein
-  System-Admin; dabei enden alle Anmeldungen der Person, und die alten Wiederherstellungscodes
-  verfallen. Einen Knopf dafür hat die Verwaltung derzeit nicht; Ansprechpartner ist die
-  Administration der Instanz.
+  System-Admin in der Benutzerverwaltung (siehe [Gerät verloren](geraet-verloren.md)); dabei
+  enden alle Anmeldungen der Person, und die alten Wiederherstellungscodes verfallen. Danach
+  richtet die Person ihn hier neu ein.
 
 ### Anmeldungen
 

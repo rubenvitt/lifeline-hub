@@ -1,16 +1,15 @@
-import { Button, Collapse, Flex, Form, Input, Modal, Space } from 'antd';
+import { App, Button, Collapse, Form, Input, Modal, Space } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
 } from '../components/KatalogTabelle';
-import { MenueAusloeser } from '../components/MenueAusloeser';
-import { useViewport } from '../components/useViewport';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
-import { useEffect, useId, useState } from 'react';
+import { StatusChip, monoStil } from '../components/instrument';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
@@ -20,6 +19,7 @@ import {
   deaktiviereBenutzer,
   legeBenutzerAn,
   listeBenutzer,
+  setzeZweitfaktorZurueck,
   type NeuerBenutzer,
   type PatchBenutzer,
 } from '../api/benutzer';
@@ -40,6 +40,12 @@ const SYSTEM_ROLLEN = [
   { value: 'keiner', label: 'Benutzer' },
   { value: 'admin', label: 'Admin' },
 ];
+/** Die Einträge des Aktionsmenüs einer Zeile. */
+type ZeilenAktion = 'bearbeiten' | 'anmeldungen' | 'zweitfaktor' | 'aktiv';
+
+/** Nur der Menüauslöser: Steuerhöhe plus Zellpolster. */
+const AKTIONEN_BREITE = 80;
+
 const ORG_ROLLEN = [
   { value: 'keine', label: 'Keine' },
   { value: 'fuehrungskraft', label: 'Führungskraft (darf Einsätze anlegen)' },
@@ -54,7 +60,9 @@ export default function BenutzerPage() {
   const [editForm] = Form.useForm<BearbeitenWerte>();
   // Die Anmeldungen einer Person (LFH-1092), im Dialog außerhalb der Zeilen.
   const [anmeldungenVon, setAnmeldungenVon] = useState<BenutzerAnzeige | null>(null);
-  const { istSchmal } = useViewport();
+  // Die offene Rückfrage vor dem Zurücksetzen des zweiten Faktors (LFH-1122).
+  const [zweitfaktorVon, setZweitfaktorVon] = useState<BenutzerAnzeige | null>(null);
+  const { message } = App.useApp();
 
   const benutzerQuery = useQuery({
     queryKey: globalKeys.benutzer(),
@@ -92,6 +100,19 @@ export default function BenutzerPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
   });
 
+  /*
+   * Unumkehrbar (LFH-363): Secret und Wiederherstellungscodes sind fort, die Person richtet im
+   * Profil neu ein. Deshalb Rückfrage; ihr Fehler steht im Dialog, der Erfolg im Toast.
+   */
+  const zweitfaktor = useMutation({
+    mutationFn: (b: BenutzerAnzeige) => setzeZweitfaktorZurueck(b.id),
+    onSuccess: (_, b) => {
+      setZweitfaktorVon(null);
+      message.success(`Zweiter Faktor von ${b.anzeigename} zurückgesetzt`);
+      return qc.invalidateQueries({ queryKey: globalKeys.benutzer() });
+    },
+  });
+
   /** Zeilenaktionen teilen EINEN Hinweis: die neue räumt den Fehler der anderen. */
   const zeilenAktion = (aktion: 'deaktivieren' | 'reaktivieren', id: number) => {
     if (aktion === 'deaktivieren') {
@@ -106,10 +127,11 @@ export default function BenutzerPage() {
   /**
    * Gesperrtes „Deaktivieren" (LFH-966): beim letzten aktiven Admin lehnte der Server ab
    * (`routes/benutzer.rs`, `verweigere_admin_lockout`), beim eigenen Konto endete die eigene
-   * Sitzung ohne Rückweg. Statt einer Aktion, die nie gelingt, steht der Grund in der Zeile.
+   * Sitzung ohne Rückweg. Statt einer Aktion, die nie gelingt, steht der Grund im gesperrten
+   * Menüeintrag.
    */
   const aktiveAdmins = benutzerListe.filter((b) => b.aktiv && b.system_rolle === 'admin').length;
-  const sperrGrund = (b: BenutzerAnzeige): { kurz: string; text: string } | null => {
+  const sperrGrund = (b: BenutzerAnzeige): string | null => {
     if (b.aktiv && b.system_rolle === 'admin' && aktiveAdmins <= 1) return LETZTER_ADMIN;
     if (b.id === angemeldeterBenutzer?.id) return EIGENES_KONTO;
     return null;
@@ -144,8 +166,9 @@ export default function BenutzerPage() {
    * werden — die menschenlesbare Kennung bleibt ganz lesbar.
    *
    * Unter `md` fallen Benutzername und Rollen weg (der Spaltenschalter zählt sie), Status und
-   * Aktionen stehen rechts fixiert, die Aktionen dort im Menü (LFH-980): Name, Status und Menü
-   * passen in 390 px, zwei Knöpfe nicht.
+   * Aktionen stehen rechts fixiert (LFH-980): Name, Status und Menü passen in 390 px. Die Aktionen
+   * stehen auf jeder Breite im Menü (LFH-1122): mit „Zweiten Faktor zurücksetzen …“ sind es bis
+   * zu vier, ab drei wird gebündelt (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“).
    */
   const spalten: KatalogSpalte<BenutzerAnzeige>[] = [
     {
@@ -211,57 +234,62 @@ export default function BenutzerPage() {
     {
       title: 'Aktionen',
       key: 'aktionen',
-      // Unter `md` nur der Menüauslöser: Steuerhöhe plus Zellpolster.
-      width: istSchmal ? 80 : 376,
+      width: AKTIONEN_BREITE,
       immerSichtbar: true,
       fixed: 'right',
       render: (_, b) => {
         const grund = sperrGrund(b);
-        const onBearbeiten = () => {
-          bearbeiten.reset();
-          setZuBearbeiten(b);
-        };
-        if (istSchmal) {
-          return (
-            <MenueAusloeser
-              eintraege={[
-                { key: 'bearbeiten', label: 'Bearbeiten' },
-                ...(b.aktiv ? [{ key: 'anmeldungen', label: 'Anmeldungen' }] : []),
-                b.aktiv
-                  ? grund
-                    ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
-                      {
-                        key: 'aktiv',
-                        label: `Deaktivieren gesperrt: ${grund.kurz}`,
-                        gesperrt: true,
-                      }
-                    : { key: 'aktiv', label: 'Deaktivieren', gefahr: true }
-                  : { key: 'aktiv', label: 'Reaktivieren' },
-              ]}
-              zugaenglicherName={`Aktionen zu Benutzer ${b.anzeigename}`}
-              laeuft={
-                (deaktivieren.isPending && deaktivieren.variables === b.id) ||
-                (reaktivieren.isPending && reaktivieren.variables === b.id)
-              }
-              onWahl={(aktion) => {
-                if (aktion === 'bearbeiten') onBearbeiten();
-                else if (aktion === 'anmeldungen') setAnmeldungenVon(b);
-                else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
-                else zeilenAktion('reaktivieren', b.id);
-              }}
-            />
-          );
-        }
+        // Umkehrbares zuerst, Unumkehrbares und Entfernendes rot hinter dem Trenner (Spec
+        // `datensatz-aktionsmenue`). Deaktivieren bleibt ohne Rückfrage (LFH-966, umkehrbar über
+        // „Reaktivieren“), steht aber als entfernende Aktion rot.
+        const eintraege: MenueEintrag<ZeilenAktion>[] = [
+          { key: 'bearbeiten', label: 'Bearbeiten' },
+          // Öffnet nur die Liste; ein deaktiviertes Konto hat keine Anmeldungen.
+          ...(b.aktiv ? [{ key: 'anmeldungen' as const, label: 'Anmeldungen' }] : []),
+          ...(b.aktiv ? [] : [{ key: 'aktiv' as const, label: 'Reaktivieren' }]),
+          // Nur bei aktivem zweiten Faktor: sonst gibt es nichts zurückzusetzen (LFH-1122).
+          ...(b.totp_aktiviert
+            ? [
+                {
+                  key: 'zweitfaktor' as const,
+                  label: 'Zweiten Faktor zurücksetzen …',
+                  gefahr: true as const,
+                },
+              ]
+            : []),
+          ...(b.aktiv
+            ? [
+                grund
+                  ? // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
+                    {
+                      key: 'aktiv' as const,
+                      label: `Deaktivieren gesperrt: ${grund}`,
+                      gesperrt: true as const,
+                    }
+                  : { key: 'aktiv' as const, label: 'Deaktivieren', gefahr: true as const },
+              ]
+            : []),
+        ];
         return (
-          <BenutzerAktionen
-            benutzer={b}
-            sperrGrund={grund?.text ?? null}
-            deaktiviert={deaktivieren.isPending && deaktivieren.variables === b.id}
-            reaktiviert={reaktivieren.isPending && reaktivieren.variables === b.id}
-            onBearbeiten={onBearbeiten}
-            onAnmeldungen={() => setAnmeldungenVon(b)}
-            onDeaktivieren={() => zeilenAktion('deaktivieren', b.id)}
-            onReaktivieren={() => zeilenAktion('reaktivieren', b.id)}
+          <MenueAusloeser
+            eintraege={eintraege}
+            zugaenglicherName={`Aktionen zu Benutzer ${b.anzeigename}`}
+            // Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
+            laeuft={
+              (deaktivieren.isPending && deaktivieren.variables === b.id) ||
+              (reaktivieren.isPending && reaktivieren.variables === b.id)
+            }
+            onWahl={(aktion) => {
+              if (aktion === 'bearbeiten') {
+                bearbeiten.reset();
+                setZuBearbeiten(b);
+              } else if (aktion === 'anmeldungen') setAnmeldungenVon(b);
+              else if (aktion === 'zweitfaktor') {
+                zweitfaktor.reset();
+                setZweitfaktorVon(b);
+              } else if (b.aktiv) zeilenAktion('deaktivieren', b.id);
+              else zeilenAktion('reaktivieren', b.id);
+            }}
           />
         );
       },
@@ -460,73 +488,40 @@ export default function BenutzerPage() {
           />
         )}
       </Modal>
-    </AdminPage>
-  );
-}
 
-/**
- * Die Aktionszelle einer Zeile. Eigene Komponente, weil der Sperrgrund eine `useId` braucht:
- * der gesperrte Knopf verweist per `aria-describedby` auf seinen sichtbaren Grund.
- */
-function BenutzerAktionen({
-  benutzer: b,
-  sperrGrund,
-  deaktiviert,
-  reaktiviert,
-  onBearbeiten,
-  onAnmeldungen,
-  onDeaktivieren,
-  onReaktivieren,
-}: {
-  benutzer: BenutzerAnzeige;
-  sperrGrund: string | null;
-  deaktiviert: boolean;
-  reaktiviert: boolean;
-  onBearbeiten: () => void;
-  onAnmeldungen: () => void;
-  onDeaktivieren: () => void;
-  onReaktivieren: () => void;
-}) {
-  const { token, rollen } = useRollen();
-  const grundId = useId();
-  return (
-    <Flex vertical gap={token.marginXXS} align="flex-start">
-      <Space size="middle">
-        <Button onClick={onBearbeiten}>Bearbeiten</Button>
-        {/* Öffnet nur die Liste; ein deaktiviertes Konto hat keine Anmeldungen. */}
-        {b.aktiv && <Button onClick={onAnmeldungen}>Anmeldungen</Button>}
-        {b.aktiv ? (
-          // KEINE Rückfrage (LFH-966, Linie aus LFH-363 wie „Außer Dienst“ in
-          // `stammdaten/dienststatus.tsx`): Deaktivieren ist über „Reaktivieren“ umkehrbar.
-          // `danger` und Abstand (`size="middle"`) bleiben. Zeilengescopte Ladeanzeige: ohne
-          // Rückmeldung lädt der Klick zum zweiten ein.
-          <Button
-            danger
-            loading={deaktiviert}
-            disabled={sperrGrund !== null}
-            aria-describedby={sperrGrund !== null ? grundId : undefined}
-            onClick={() => {
-              if (!deaktiviert) onDeaktivieren();
-            }}
-          >
-            Deaktivieren
-          </Button>
-        ) : (
-          <Button
-            loading={reaktiviert}
-            onClick={() => {
-              if (!reaktiviert) onReaktivieren();
-            }}
-          >
-            Reaktivieren
-          </Button>
+      {/* Rückfrage im Dialog, nicht am Menüeintrag (Spec `datensatz-aktionsmenue`). Abbrechen ist
+          gesperrt, solange gesendet wird: sonst käme eine Ablehnung unsichtbar an (LFH-1077). */}
+      <Modal
+        open={zweitfaktorVon !== null}
+        title={
+          zweitfaktorVon
+            ? `Zweiten Faktor von ${zweitfaktorVon.anzeigename} zurücksetzen?`
+            : 'Zweiten Faktor zurücksetzen?'
+        }
+        okText="Zweiten Faktor zurücksetzen"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true, loading: zweitfaktor.isPending }}
+        cancelButtonProps={{ disabled: zweitfaktor.isPending }}
+        closable={zweitfaktor.isPending ? { disabled: true } : true}
+        mask={{ closable: !zweitfaktor.isPending }}
+        onOk={() => zweitfaktorVon && zweitfaktor.mutate(zweitfaktorVon)}
+        // Escape landet auch hier: der Riegel gilt für jeden Ausweg.
+        onCancel={() => {
+          if (!zweitfaktor.isPending) setZweitfaktorVon(null);
+        }}
+        destroyOnHidden
+      >
+        {zweitfaktorVon && (
+          <p>
+            {`Alle Anmeldungen von ${zweitfaktorVon.anzeigename} enden, ${
+              zweitfaktorVon.id === angemeldeterBenutzer?.id
+                ? 'auch die Anmeldung an diesem Gerät, '
+                : ''
+            }und die Wiederherstellungscodes verfallen. Danach genügt das Passwort; einen neuen zweiten Faktor richtet die Person im Profil ein.`}
+          </p>
         )}
-      </Space>
-      {b.aktiv && sperrGrund !== null && (
-        <span id={grundId} style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
-          {sperrGrund}
-        </span>
-      )}
-    </Flex>
+        <SpeicherFehler fehler={zweitfaktor.error} titel="Nicht zurückgesetzt" />
+      </Modal>
+    </AdminPage>
   );
 }

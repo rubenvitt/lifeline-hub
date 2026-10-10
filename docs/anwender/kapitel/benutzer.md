@@ -9,7 +9,8 @@ quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/SitzungsListe.t
 
 Unter „Benutzer“ in der Verwaltung legen System-Admins die Konten der Personen an, die mit
 Lifeline Hub arbeiten, vergeben ihre Rollen in System und Organisation, sehen ihre laufenden
-Anmeldungen und deaktivieren Konten, die nicht mehr gebraucht werden. Was eine Person in einem
+Anmeldungen, setzen einen verlorenen zweiten Faktor zurück und deaktivieren Konten, die nicht
+mehr gebraucht werden. Was eine Person in einem
 einzelnen Einsatz darf, regelt dagegen die Einsatzleitung, siehe
 [Rechte im Einsatz](rechte-im-einsatz.md).
 
@@ -30,7 +31,7 @@ Für System-Admins:
 
 ### Rollen eines Benutzers ändern
 
-1. Unter „Benutzer“ in der Zeile der Person „Bearbeiten“ wählen.
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Bearbeiten“ wählen.
 2. Im Dialog „Benutzer bearbeiten“ „Anzeigename“, „System-Rolle“ oder „Org-Rolle“ ändern.
 3. „Speichern“ wählen.
 
@@ -38,7 +39,7 @@ Benutzername und Passwort lassen sich hier nicht ändern.
 
 ### Anmeldungen einer Person beenden
 
-1. Unter „Benutzer“ in der Zeile der Person „Anmeldungen“ wählen.
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Anmeldungen“ wählen.
 2. Bei einem Gerät „Beenden“ wählen, oder „Alle beenden“, um die Person überall abzumelden.
 
    ![Dialog „Anmeldungen · Kim Beispiel“ mit zwei Geräten, je einem Knopf „Beenden“ und dem Knopf „Alle beenden“](../bilder/benutzer/anmeldungen.png)
@@ -47,13 +48,19 @@ Benutzername und Passwort lassen sich hier nicht ändern.
 
 ### Einen Benutzer deaktivieren
 
-1. Unter „Benutzer“ in der Zeile der Person „Deaktivieren“ wählen.
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Deaktivieren“ wählen.
 
-   ![Liste der Benutzer: beim Administrator ist „Deaktivieren“ gesperrt mit „Gesperrt: letzter aktiver Admin“, bei Kim Beispiel bedienbar](../bilder/benutzer/benutzerliste.png)
+   ![Liste der Benutzer mit dem offenen Aktionsmenü bei Kim Beispiel: „Bearbeiten“, „Anmeldungen“ und, rot hinter einem Trenner, „Deaktivieren“](../bilder/benutzer/benutzerliste.png)
 
-2. Soll die Person wieder arbeiten, an derselben Stelle „Reaktivieren“ wählen.
+2. Soll die Person wieder arbeiten, im selben Menü „Reaktivieren“ wählen.
 
-Auf schmalen Bildschirmen liegen die Aktionen einer Zeile in einem Aktionsmenü.
+### Den zweiten Faktor zurücksetzen
+
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Zweiten Faktor zurücksetzen …“ wählen.
+   Der Eintrag steht nur, wenn die Person einen zweiten Faktor eingerichtet hat.
+2. Die Rückfrage mit „Zweiten Faktor zurücksetzen“ bestätigen.
+
+Wann das nötig ist und was danach zu tun ist, beschreibt [Gerät verloren](geraet-verloren.md).
 
 ## Hintergrund
 
@@ -92,9 +99,9 @@ das bei einem verlorenen Gerät hilft, beschreibt [Gerät verloren](geraet-verlo
 
 Nicht deaktivieren lassen sich:
 
-- der letzte aktive System-Admin („Gesperrt: letzter aktiver Admin“), damit die Verwaltung nie
-  ohne Admin bleibt,
-- das eigene Konto („Gesperrt: eigenes Konto“).
+- der letzte aktive System-Admin („Deaktivieren gesperrt: letzter aktiver Admin“), damit die
+  Verwaltung nie ohne Admin bleibt,
+- das eigene Konto („Deaktivieren gesperrt: eigenes Konto“).
 
 Für ein deaktiviertes Konto gibt es keine „Anmeldungen“. Konten gekoppelter Geräte erscheinen
 nicht in der Liste.
@@ -103,12 +110,14 @@ nicht in der Liste.
 
 Die Anmeldeseite sagt „Passwort vergessen? Die Administration deiner Organisation setzt es
 zurück.“ In der Oberfläche der Verwaltung gibt es dafür derzeit keinen Weg: das Passwort setzt
-nur die Person selbst in ihrem Profil. Auch einen eingerichteten zweiten Faktor kann die
-Verwaltung in der Oberfläche nicht zurücksetzen.
+nur die Person selbst in ihrem Profil. Einen eingerichteten zweiten Faktor dagegen setzt die
+Verwaltung zurück (oben). Dabei enden alle Anmeldungen der Person, auch die eigene, wenn ein
+System-Admin das eigene Konto zurücksetzt, und alle Wiederherstellungscodes verfallen. Bis zur
+neuen Einrichtung im Profil genügt das Passwort.
 
 ### Nachvollziehbarkeit
 
-Anlegen, Rollenwechsel, Deaktivieren, Reaktivieren und jedes Beenden einer Anmeldung hält der
-Server in der Admin-Spur fest; System-Admins lesen sie im „Zugangsprotokoll“ der Verwaltung.
+Anlegen, Rollenwechsel, Deaktivieren, Reaktivieren, das Zurücksetzen des zweiten Faktors und
+jedes Beenden einer Anmeldung hält der Server in der Admin-Spur fest; System-Admins lesen sie im „Zugangsprotokoll“ der Verwaltung.
 
 Die Seite „Benutzer“ erreichen nur System-Admins.

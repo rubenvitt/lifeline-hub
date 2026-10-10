@@ -12,6 +12,34 @@ import { EIGENES_KONTO, LETZTER_ADMIN } from '../stammdaten/rechteText';
 
 const benutzer = adminFixture;
 
+/**
+ * Das OFFENE Menü, sonst `null`. antd lässt geschlossene Portale im Baum stehen, und jsdom kennt
+ * kein `transitionend`: ein schließendes Menü bleibt in `ant-slide-up-leave` stehen, ohne je
+ * `ant-dropdown-hidden` zu werden.
+ */
+const menueOffen = () =>
+  document.querySelector<HTMLElement>(
+    '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave) [role="menu"]',
+  );
+
+function offenesMenue(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const m = menueOffen();
+    if (!m) throw new Error('kein offenes Menü');
+    return m;
+  });
+}
+
+/** Der Auslöser des Aktionsmenüs einer Zeile, auf jeder Breite (LFH-1122). */
+const ausloeser = (anzeigename: string) =>
+  screen.findByRole('button', { name: `Aktionen zu Benutzer ${anzeigename}` });
+
+/** Wählt im Aktionsmenü der Zeile `anzeigename` den Eintrag `eintrag`. */
+async function waehle(anzeigename: string, eintrag: string) {
+  await userEvent.click(await ausloeser(anzeigename));
+  await userEvent.click(within(await offenesMenue()).getByRole('menuitem', { name: eintrag }));
+}
+
 describe('BenutzerPage', () => {
   it('listet Benutzer', async () => {
     server.use(
@@ -104,8 +132,7 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaItem = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
-    await userEvent.click(within(evaItem).getByRole('button', { name: 'Bearbeiten' }));
+    await waehle('Eva', 'Bearbeiten');
 
     const input = await screen.findByLabelText('Anzeigename');
     await userEvent.clear(input);
@@ -150,9 +177,8 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaItem = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
-    // Deaktivierter Nutzer zeigt keinen Deaktivieren-Button, aber Reaktivieren.
-    await userEvent.click(within(evaItem).getByRole('button', { name: 'Reaktivieren' }));
+    // Deaktivierter Nutzer zeigt kein „Deaktivieren", aber „Reaktivieren".
+    await waehle('Eva', 'Reaktivieren');
 
     await waitFor(() => expect(patchBody).toEqual({ aktiv: true }));
     // Nach dem Refetch rendert die Tabelle neu — Zeile frisch holen statt stale Referenz.
@@ -204,11 +230,9 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaItem = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
-    const maxItem = (await screen.findByText('Max')).closest('tr') as HTMLElement;
-    await userEvent.click(within(evaItem).getByRole('button', { name: 'Reaktivieren' }));
-    // Trotz laufender erster Reaktivierung muss die zweite Zeile klickbar bleiben.
-    await userEvent.click(within(maxItem).getByRole('button', { name: 'Reaktivieren' }));
+    await waehle('Eva', 'Reaktivieren');
+    // Trotz laufender erster Reaktivierung muss die zweite Zeile bedienbar bleiben.
+    await waehle('Max', 'Reaktivieren');
 
     await waitFor(() => expect(patchIds).toEqual([2, 3]));
     freigeben();
@@ -239,19 +263,11 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
-    const maxZeile = (await screen.findByText('Max')).closest('tr') as HTMLElement;
     // Ohne Rückfrage (LFH-966): Deaktivieren ist über „Reaktivieren" umkehrbar (LFH-363).
-    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Deaktivieren' }));
+    await waehle('Eva', 'Deaktivieren');
 
-    await waitFor(() =>
-      expect(within(evaZeile).getByRole('button', { name: /Deaktivieren/ })).toHaveClass(
-        'ant-btn-loading',
-      ),
-    );
-    expect(within(maxZeile).getByRole('button', { name: 'Deaktivieren' })).not.toHaveClass(
-      'ant-btn-loading',
-    );
+    await waitFor(async () => expect(await ausloeser('Eva')).toHaveClass('ant-btn-loading'));
+    expect(await ausloeser('Max')).not.toHaveClass('ant-btn-loading');
   });
 
   // Geprüft wird, was Suche, Sortierung und Statusfilter mit den Zeilen tun. Die stehende Kopfzeile
@@ -377,7 +393,7 @@ describe('BenutzerPage', () => {
     const koerper = container.querySelector<HTMLTableElement>('.ant-table-body table')!;
     // Σ der Zahlbreiten + Mindestmaß der Fließspalte, als Literal (zurückgerechnet prüfte die Zahl
     // die Rechnung gegen sich selbst).
-    expect(koerper.style.width).toBe('940px');
+    expect(koerper.style.width).toBe('644px');
     expect(koerper.style.tableLayout).toBe('auto');
     // Spalte 0 trägt ihre Zahl; unter `auto` ist sie Vorzugsbreite, der Umbruch hält sie dort.
     expect(koerper.querySelector('col')).toHaveStyle({ width: '136px' });
@@ -432,8 +448,7 @@ describe('BenutzerPage', () => {
       </Routes>,
       { route: '/admin/benutzer' },
     );
-    const zeile = (await screen.findByText('@eva')).closest('tr')!;
-    await userEvent.click(within(zeile).getByRole('button', { name: 'Anmeldungen' }));
+    await waehle('Eva', 'Anmeldungen');
     const dialog = await screen.findByRole('dialog', { name: 'Anmeldungen · Eva' });
     expect(await within(dialog).findByText('Safari · iPadOS')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Alle beenden' }));
@@ -513,8 +528,7 @@ describe('BenutzerPage', () => {
     expect(within(anlegen).getByRole('button', { name: 'Anlegen' }).closest('form')).not.toBeNull();
     await userEvent.click(within(anlegen).getByRole('button', { name: 'Abbrechen' }));
 
-    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
-    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Bearbeiten' }));
+    await waehle('Eva', 'Bearbeiten');
     const bearbeiten = dialogMitTitel('Benutzer bearbeiten');
     expect(bearbeiten.querySelector('.ant-modal-footer')).toBeNull();
     expect(
@@ -539,8 +553,7 @@ describe('BenutzerPage', () => {
 
   it('setzt im Bearbeiten-Dialog den Fokus ins erste Feld', async () => {
     renderMitZwei();
-    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
-    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Bearbeiten' }));
+    await waehle('Eva', 'Bearbeiten');
     const bearbeiten = await screen.findByRole('dialog');
     await waitFor(() => expect(within(bearbeiten).getByLabelText('Anzeigename')).toHaveFocus());
   });
@@ -581,8 +594,7 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaZeile = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
-    await userEvent.click(within(evaZeile).getByRole('button', { name: 'Bearbeiten' }));
+    await waehle('Eva', 'Bearbeiten');
     await screen.findByRole('dialog');
     const ersterDialog = dialogMitTitel('Benutzer bearbeiten');
     expect(within(ersterDialog).getByLabelText('Anzeigename')).toHaveValue('Eva');
@@ -592,8 +604,7 @@ describe('BenutzerPage', () => {
     expect(within(ersterDialog).getByText(/Führungskraft/)).toBeInTheDocument();
     await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Abbrechen' }));
 
-    const benZeile = (await screen.findByText('Ben')).closest('tr') as HTMLElement;
-    await userEvent.click(within(benZeile).getByRole('button', { name: 'Bearbeiten' }));
+    await waehle('Ben', 'Bearbeiten');
     const zweiterDialog = dialogMitTitel('Benutzer bearbeiten');
     await waitFor(() =>
       expect(within(zweiterDialog).getByLabelText('Anzeigename')).toHaveValue('Ben'),
@@ -741,8 +752,6 @@ describe('BenutzerPage', () => {
         </Routes>,
         { route: '/admin/benutzer' },
       );
-    const zeile = async (name: string) =>
-      (await screen.findByText(name)).closest('tr') as HTMLElement;
     const keinToast = () =>
       expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 
@@ -762,9 +771,7 @@ describe('BenutzerPage', () => {
         }),
       );
       seite();
-      await userEvent.click(
-        within(await zeile('Eva')).getByRole('button', { name: 'Deaktivieren' }),
-      );
+      await waehle('Eva', 'Deaktivieren');
       await waitFor(() => expect(deaktiviert).toBe('2'));
       expect(screen.queryByRole('tooltip')).toBeNull();
     });
@@ -781,11 +788,12 @@ describe('BenutzerPage', () => {
         ),
       );
       seite();
-      const eigene = await zeile('@admin');
-      const knopf = within(eigene).getByRole('button', { name: 'Deaktivieren' });
-      expect(knopf).toBeDisabled();
-      const grund = within(eigene).getByText(LETZTER_ADMIN.text);
-      expect(knopf).toHaveAttribute('aria-describedby', grund.id);
+      await userEvent.click(await ausloeser('Admin'));
+      // Der Grund steht im Eintrag selbst: im Menü gibt es keine Zeile darunter.
+      const eintrag = within(await offenesMenue()).getByRole('menuitem', {
+        name: `Deaktivieren gesperrt: ${LETZTER_ADMIN}`,
+      });
+      expect(eintrag).toHaveAttribute('aria-disabled', 'true');
     });
 
     it('sperrt Deaktivieren am eigenen Konto, nicht am zweiten Admin', async () => {
@@ -799,12 +807,21 @@ describe('BenutzerPage', () => {
         ),
       );
       seite();
-      const eigene = await zeile('@admin');
-      expect(within(eigene).getByRole('button', { name: 'Deaktivieren' })).toBeDisabled();
-      expect(within(eigene).getByText(EIGENES_KONTO.text)).toBeInTheDocument();
-      const zweit = await zeile('Zweit');
-      expect(within(zweit).getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
-      expect(within(zweit).queryByText(/^Gesperrt/)).toBeNull();
+      await userEvent.click(await ausloeser('Admin'));
+      expect(
+        within(await offenesMenue()).getByRole('menuitem', {
+          name: `Deaktivieren gesperrt: ${EIGENES_KONTO}`,
+        }),
+      ).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(menueOffen()).toBeNull());
+      await userEvent.click(await ausloeser('Zweit'));
+      const menue = await offenesMenue();
+      expect(within(menue).getByRole('menuitem', { name: 'Deaktivieren' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+      expect(within(menue).queryByText(/gesperrt/)).toBeNull();
     });
 
     it('unter md: der Menüeintrag ist gesperrt und nennt den Grund', async () => {
@@ -814,17 +831,9 @@ describe('BenutzerPage', () => {
         http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
       );
       seite();
-      await screen.findByText('Admin', { selector: 'span' });
-      await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Benutzer Admin' }));
-      const menue = await waitFor(() => {
-        const m = document.querySelector<HTMLElement>(
-          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-        );
-        if (!m) throw new Error('kein offenes Menü');
-        return m;
-      });
-      const eintrag = within(menue).getByRole('menuitem', {
-        name: `Deaktivieren gesperrt: ${LETZTER_ADMIN.kurz}`,
+      await userEvent.click(await ausloeser('Admin'));
+      const eintrag = within(await offenesMenue()).getByRole('menuitem', {
+        name: `Deaktivieren gesperrt: ${LETZTER_ADMIN}`,
       });
       expect(eintrag).toHaveAttribute('aria-disabled', 'true');
     });
@@ -848,15 +857,11 @@ describe('BenutzerPage', () => {
         http.post('/api/benutzer/3/deaktivieren', () => new Promise(() => {})),
       );
       seite();
-      await userEvent.click(
-        within(await zeile('Eva')).getByRole('button', { name: 'Deaktivieren' }),
-      );
+      await waehle('Eva', 'Deaktivieren');
       const hinweis = await screen.findByText('Gerätekonten werden unter Geräte verwaltet');
       expect(hinweis.closest('[role="alert"]')).not.toBeNull();
       keinToast();
-      await userEvent.click(
-        within(await zeile('Max')).getByRole('button', { name: 'Deaktivieren' }),
-      );
+      await waehle('Max', 'Deaktivieren');
       await waitFor(() =>
         expect(screen.queryByText('Gerätekonten werden unter Geräte verwaltet')).toBeNull(),
       );
@@ -876,9 +881,7 @@ describe('BenutzerPage', () => {
         ),
       );
       seite();
-      await userEvent.click(
-        within(await zeile('Eva')).getByRole('button', { name: 'Reaktivieren' }),
-      );
+      await waehle('Eva', 'Reaktivieren');
       const hinweis = await screen.findByText('Reaktivieren abgelehnt');
       expect(hinweis.closest('[role="dialog"]')).toBeNull();
       keinToast();
@@ -892,20 +895,138 @@ describe('BenutzerPage', () => {
         http.patch('/api/benutzer/1', () => HttpResponse.json({ error: grund }, { status: 409 })),
       );
       seite();
-      const eigene = await zeile('@admin');
-      await userEvent.click(within(eigene).getByRole('button', { name: 'Bearbeiten' }));
+      await waehle('Admin', 'Bearbeiten');
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const dialog = dialogMitTitel('Benutzer bearbeiten');
       expect(await within(dialog).findByText(grund)).toBeInTheDocument();
       keinToast();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
-      await userEvent.click(within(eigene).getByRole('button', { name: 'Bearbeiten' }));
+      await waehle('Admin', 'Bearbeiten');
       await waitFor(() =>
         expect(
           within(dialogMitTitel('Benutzer bearbeiten')).getByLabelText('Anzeigename'),
         ).toHaveValue('Admin'),
       );
       expect(screen.queryByText(grund)).toBeNull();
+    });
+  });
+
+  describe('LFH-1122: zweiten Faktor zurücksetzen', () => {
+    const seite = () =>
+      renderMitProviders(
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        </Routes>,
+        { route: '/admin/benutzer' },
+      );
+    const RUECKFRAGE = 'Zweiten Faktor von Eva zurücksetzen?';
+    const EINTRAG = 'Zweiten Faktor zurücksetzen …';
+    const eva = (totp: boolean) =>
+      benutzer({
+        id: 2,
+        anzeigename: 'Eva',
+        benutzername: 'eva',
+        system_rolle: 'keiner',
+        totp_aktiviert: totp,
+      });
+
+    it('bietet die Aktion nur bei aktivem zweiten Faktor an, rot hinter dem Trenner', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer(),
+            eva(true),
+            benutzer({ id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner' }),
+          ]),
+        ),
+      );
+      seite();
+      await userEvent.click(await ausloeser('Eva'));
+      const menue = await offenesMenue();
+      const eintrag = within(menue).getByRole('menuitem', { name: EINTRAG });
+      expect(eintrag).toHaveClass('ant-dropdown-menu-item-danger');
+      // Unumkehrbar: hinter dem Trenner, nach den umkehrbaren Einträgen.
+      const reihe = [...menue.querySelectorAll('li')].map((li) =>
+        li.getAttribute('role') === 'separator' ? '—' : li.textContent?.trim(),
+      );
+      expect(reihe).toEqual(['Bearbeiten', 'Anmeldungen', '—', EINTRAG, 'Deaktivieren']);
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(menueOffen()).toBeNull());
+
+      await userEvent.click(await ausloeser('Max'));
+      expect(within(await offenesMenue()).queryByRole('menuitem', { name: EINTRAG })).toBeNull();
+    });
+
+    it('fragt zurück; erst die Bestätigung setzt zurück, Abbrechen sendet nichts', async () => {
+      const gesendet: string[] = [];
+      let zurueckgesetzt = false;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva(!zurueckgesetzt)])),
+        http.post('/api/benutzer/:id/totp/reset', ({ params }) => {
+          gesendet.push(String(params.id));
+          zurueckgesetzt = true;
+          return HttpResponse.json(eva(false));
+        }),
+      );
+      seite();
+      await waehle('Eva', EINTRAG);
+      const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+      // Die Folgen stehen in der Rückfrage: alle Anmeldungen enden.
+      expect(within(dialog).getByText(/Alle Anmeldungen von Eva enden/)).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      expect(gesendet).toEqual([]);
+
+      await waehle('Eva', EINTRAG);
+      const zweiter = await screen.findByRole('dialog', { name: RUECKFRAGE });
+      // Der Knopf nennt die Handlung, nicht „OK".
+      await userEvent.click(
+        within(zweiter).getByRole('button', { name: 'Zweiten Faktor zurücksetzen' }),
+      );
+      await waitFor(() => expect(gesendet).toEqual(['2']));
+      expect(await screen.findByText('Zweiter Faktor von Eva zurückgesetzt')).toBeInTheDocument();
+      // Nach dem Neuladen hat Eva keinen zweiten Faktor mehr: die Aktion fällt weg.
+      await waitFor(async () => {
+        await userEvent.click(await ausloeser('Eva'));
+        expect(within(await offenesMenue()).queryByRole('menuitem', { name: EINTRAG })).toBeNull();
+      });
+    });
+
+    it('eine Ablehnung steht im Dialog, der Dialog bleibt offen', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva(true)])),
+        http.post('/api/benutzer/2/totp/reset', () =>
+          HttpResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 }),
+        ),
+      );
+      seite();
+      await waehle('Eva', EINTRAG);
+      const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Zweiten Faktor zurücksetzen' }),
+      );
+      expect(await within(dialog).findByText('Nicht zurückgesetzt')).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('nennt beim eigenen Konto, dass auch diese Anmeldung endet', async () => {
+      server.use(
+        meHandler(benutzer({ totp_aktiviert: true })),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([
+            benutzer({ totp_aktiviert: true }),
+            benutzer({ id: 4, anzeigename: 'Zweit', benutzername: 'zweit' }),
+          ]),
+        ),
+      );
+      seite();
+      await waehle('Admin', EINTRAG);
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Zweiten Faktor von Admin zurücksetzen?',
+      });
+      expect(within(dialog).getByText(/auch die Anmeldung an diesem Gerät/)).toBeInTheDocument();
     });
   });
 });
