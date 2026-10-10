@@ -204,7 +204,7 @@ describe('Bloecke: Deckel vor einer langen Tabelle (LFH-1124)', () => {
     expect(reihen[0].getAttribute('data-lfh')).toBeNull();
     expect(reihen.slice(1).every((r) => r.getAttribute('data-lfh') === 'masszeile')).toBe(true);
     // Die Maßzeile trägt ihren Text in einer Hülle, die im Firefox-Druck keine Höhe hat.
-    expect(texte(reihen[1].querySelectorAll('td > div'))).toEqual(['2', 'Zeile 2']);
+    expect(texte(reihen[1].querySelectorAll('td > span'))).toEqual(['2', 'Zeile 2']);
     // Der Deckel hat keinen Abstand unter der Tabelle: die echte Tabelle schließt direkt an.
     expect((kopie as HTMLElement).style.marginBlockEnd).toBe('0px');
   });
@@ -223,7 +223,7 @@ describe('Bloecke: Deckel vor einer langen Tabelle (LFH-1124)', () => {
     const reihen = [...unter.querySelectorAll('tbody tr')];
     expect(texte(reihen)).toEqual(Array.from({ length: N }, (_, i) => `${i + 1}Zeile ${i + 1}`));
     expect(reihen[0].getAttribute('data-lfh')).toBe('deckel-erste-zeile');
-    expect(texte(reihen[0].querySelectorAll('td > div'))).toEqual(['1', 'Zeile 1']);
+    expect(texte(reihen[0].querySelectorAll('td > span'))).toEqual(['1', 'Zeile 1']);
     expect(reihen.slice(1).every((r) => r.getAttribute('data-lfh') === null)).toBe(true);
     // Zeilenhöhe 14 × 1,5714 = 22, Polster 2 × 4, Rand 1 (antds Vorgabe-Tokens im Test).
     expect(unter.style.getPropertyValue('--druck-kopfhoehe')).toBe('31px');

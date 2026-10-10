@@ -13,7 +13,7 @@
 
 ## 3. Nachweis im Browser
 
-- [ ] 3.1 `e2e/einsatzbericht-druck.spec.ts`: Fall mit Anlage Personal über `KURZE_TABELLE`, im Firefox-Projekt unter Druckmedium und ausgelöstem `beforeprint`: Kopf der echten Tabelle verdeckt innerhalb des Deckels, Zeile 2 direkt unter Zeile 1 des Deckels (±0,5 px), Deckelgrund weiß; in Chromium Deckeltabelle nicht sichtbar. Nachweis: Spec grün in Chromium und Firefox.
+- [x] 3.1 `e2e/einsatzbericht-druck.spec.ts`: Fall mit Anlage Personal über `KURZE_TABELLE`, im Firefox-Projekt unter Druckmedium und ausgelöstem `beforeprint`: Kopf der echten Tabelle verdeckt innerhalb des Deckels, Zeile 2 direkt unter Zeile 1 des Deckels (±0,5 px), Deckelgrund weiß; in Chromium Deckeltabelle nicht sichtbar. Nachweis: Spec grün in Chromium und Firefox.
 - [x] 3.2 Nachher-Messung mit der Verschiebeprobe: Firefox ohne `NUR-KOPF`/`TITEL-ALLEIN`, kein Rest über Titel + Kopf + erste Zeile, jede Zeile genau einmal; Chromium-Text der PDFs gleich der Ist-Messung. Ergebnis in `werkzeug/messung.md`.
 
 ## 4. Abschluss

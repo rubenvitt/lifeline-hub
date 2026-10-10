@@ -302,7 +302,8 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
       const zelle = nurFirefox(`${WURZEL} ${MASS} > td`);
       expect(zelle).toMatch(/padding-block:\s*0\s*!important/);
       expect(zelle).toMatch(/border:\s*0\s*!important/);
-      const huelle = nurFirefox(`${WURZEL} ${MASS} > td > div`);
+      const huelle = nurFirefox(`${WURZEL} ${MASS} > td > span`);
+      expect(huelle).toMatch(/display:\s*block/);
       expect(huelle).toMatch(/height:\s*0/);
       expect(huelle).toMatch(/overflow:\s*hidden/);
       expect(huelle).not.toMatch(/width/);

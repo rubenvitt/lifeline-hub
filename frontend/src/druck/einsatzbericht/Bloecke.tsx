@@ -256,8 +256,9 @@ function TabellenAnzeige({
                     ...(BEGINNT_MIT_ZIFFER.test(wert) ? monoStil(token.fontSize) : {}),
                   }}
                 >
-                  {/* Die Hülle verliert im Firefox-Druck ihre Höhe, nicht ihre Breite. */}
-                  {m ? <div>{wert}</div> : wert}
+                  {/* Die Hülle verliert im Firefox-Druck ihre Höhe, nicht ihre Breite. Inline,
+                      damit Text und Kopieren am Bildschirm bleiben, wie sie waren. */}
+                  {m ? <span>{wert}</span> : wert}
                 </td>
               ))}
             </tr>

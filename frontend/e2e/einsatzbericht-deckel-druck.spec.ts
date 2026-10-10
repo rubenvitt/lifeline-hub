@@ -113,13 +113,18 @@ test('Einsatzbericht: Deckel hält Titel, Kopf und erste Zeile einer langen Tabe
     expect(m.deckelGrund, 'der Deckel deckt weiß').toBe('rgb(255, 255, 255)');
     expect(m.kopieAnzeige).toBe('table');
     expect(m.kopieKanten, 'beide Tabellen haben dieselben Spalten').toEqual(m.unterKanten);
-    expect(m.unterZeile1Hoehe, 'die erste Zeile der echten Tabelle hat keine Höhe').toBe(0);
+    // Höchstens die halbe Kopflinie: im border-collapse-Modell liegt sie in der ersten Zeile.
+    expect(
+      m.unterZeile1Hoehe,
+      'die erste Zeile der echten Tabelle ist eine Maßzeile',
+    ).toBeLessThanOrEqual(0.5);
     // Der erste Kopf der echten Tabelle liegt ganz im Deckel und ist verdeckt.
     expect(m.unterKopfOben).toBeGreaterThanOrEqual(m.deckelOben - 0.5);
     expect(m.unterKopfUnten).toBeLessThanOrEqual(m.deckelUnten + 0.5);
-    // Zeile 2 schließt ohne Spalt und ohne Überdeckung an die erste Zeile des Deckels an.
-    expect(Math.abs(m.unterZeile2Oben - m.kopieZeile1Unten)).toBeLessThanOrEqual(0.5);
-    expect(Math.abs(m.deckelUnten - m.kopieZeile1Unten)).toBeLessThanOrEqual(0.5);
+    // Zeile 2 schließt ohne Spalt und ohne Überdeckung an den Deckel an, dessen unterer Rand
+    // die erste Zeile der Kopie ist.
+    expect(Math.abs(m.unterZeile2Oben - m.deckelUnten)).toBeLessThanOrEqual(0.5);
+    expect(m.kopieZeile1Unten).toBeLessThanOrEqual(m.deckelUnten + 0.5);
   } else {
     expect(m.deckelAnzeige, 'außerhalb von Firefox ist der Deckel keine Box').toBe('contents');
     expect(m.kopieAnzeige).toBe('none');

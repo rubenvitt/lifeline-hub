@@ -79,11 +79,14 @@ Im Firefox-Druck (`@supports (-moz-appearance: none)` unter `@media print`, `dru
 Überall sonst (Bildschirm, Chromium, WebKit): Deckeltabelle `display: none`, Deckel ohne
 Wirkung, keine Maßzeile, kein Rand — das bisherige Blatt.
 
-**Maßzeile:** Zellen ohne senkrechtes Polster und ohne Rahmen, Inhalt in einer Hülle mit
-`height: 0; overflow: hidden`, Zeile `visibility: hidden`. Sie hat keine Höhe, trägt aber ihre
-Textbreite in die automatische Spaltenbreite. Deckeltabelle (Kopf, Zeile 1, Maßzeilen 2…n) und
-echte Tabelle (Kopf, Maßzeile 1, Zeilen 2…n) sehen dieselben Inhalte und bekommen dieselben
-Spalten. Der Inhalt jeder Zelle steht deshalb in beiden Tabellen in einer Hülle.
+**Maßzeile:** Zellen ohne senkrechtes Polster und ohne Rahmen, Inhalt in einer `span`-Hülle,
+die nur im Firefox-Druck `display: block; height: 0; overflow: hidden` bekommt (`druck.css`
+fasst `visibility` nicht an; der abgeschnittene Inhalt ist ohnehin unsichtbar). Sie hat keine
+Höhe, trägt aber ihre Textbreite in die automatische Spaltenbreite. Deckeltabelle (Kopf,
+Zeile 1, Maßzeilen 2…n) und echte Tabelle (Kopf, Maßzeile 1, Zeilen 2…n) sehen dieselben Inhalte
+und bekommen dieselben Spalten. Die Hülle ist inline, damit Text und Kopieren am Bildschirm
+bleiben, wie sie waren; im border-collapse-Modell behält die Maßzeile die halbe Kopflinie
+(0,5 px), die in `--druck-kopfhoehe` mitgerechnet ist.
 
 **Kopfhöhe:** Die Kopfzellen brechen im Firefox-Druck nicht um (`white-space: nowrap`) und
 bekommen dort eine feste Zeilenhöhe (`--druck-kopfzeile`, gerundet aus Schriftgröße und

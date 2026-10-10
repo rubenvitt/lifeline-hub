@@ -56,9 +56,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Firefox-Druck bricht er nicht, deckt weiß (`print-color-adjust: exact`) und liegt über der
   echten Tabelle, die um `--druck-kopfhoehe` hochgezogen ist und deren erste Zeile dort eine
   Maßzeile ist. Im Markup ist der Deckel `display: contents` und die Kopie `display: none` ohne
-  eigene Hülle: jede Box zwischen Titel und Tabelle trennte in Chromium den Titel ab. Spaltenköpfe
-  brechen dort nicht um, sie müssen kurz bleiben. Nachweis `e2e/einsatzbericht-deckel-druck.spec.ts`,
-  Umbruch mit der Verschiebeprobe im `werkzeug/` der Change.
+  eigene Hülle: jede Box zwischen Titel und Tabelle trennte in Chromium den Titel ab. Im
+  Firefox-Druck brechen Spaltenköpfe am Deckel nicht um, sie müssen kurz bleiben. Nachweis
+  `e2e/einsatzbericht-deckel-druck.spec.ts`, Umbruch mit der Verschiebeprobe im `werkzeug/` der
+  Change.
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
   brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur
