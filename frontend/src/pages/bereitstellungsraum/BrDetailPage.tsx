@@ -106,8 +106,8 @@ export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
   const { geraet } = useAuth();
-  // Ein BR-Gerät (LFH-1042) führt nur seinen Raum: kein Umschalter, kein Auflösen und Stornieren,
-  // keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
+  // Ein BR-Gerät (LFH-1042) führt nur seinen Raum: kein Umschalter, kein Bearbeiten, kein Auflösen
+  // und Stornieren, keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
   const darf = useGeraetDarf();
   const verwalten = darf('br-verwalten');
   const { token, rollen } = useRollen();
@@ -251,6 +251,7 @@ export default function BrDetailPage() {
     statusReset();
     stornoReset();
     leereZeilen();
+    setBearbeitenOffen(false);
   }, [brId, statusReset, stornoReset, leereZeilen]);
 
   // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
@@ -441,7 +442,6 @@ export default function BrDetailPage() {
               In Betrieb nehmen
             </Button>
           )}
-          {bearbeitbar && <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>}
           {/* Belegt, lehnt der Server das Auflösen ab (409): der Knopf ist dann gesperrt, der
               Grund steht in wenigen Wörtern daneben, nicht als Satz in der Rückfrage (LFH-1078). */}
           {verwalten && !schreibgeschuetzt && br.status === 'aktiv' && belegt > 0 && (
@@ -479,6 +479,12 @@ export default function BrDetailPage() {
         </Space>
       }
     >
+      {/* „Bearbeiten“ an den Raumdaten, nicht im Kopf: dort stünden im Zustand „geplant“ drei
+          Datensatz-Aktionen, und ab drei bündelt der Kopf (`frontend/AGENTS.md`, „Aktionen“). */}
+      <SektionHeader
+        titel="Raumdaten"
+        extra={bearbeitbar && <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>}
+      />
       <Datenraster spalten={2} beschriftung="Raumdaten" style={{ marginBottom: abstand.lg }}>
         <Datenfeld label="Standort">{br.standort ?? '—'}</Datenfeld>
         <Datenfeld label="Notiz">{br.notiz ?? '—'}</Datenfeld>
@@ -610,8 +616,10 @@ export default function BrDetailPage() {
         />
       </div>
 
-      {/* `offen` statt `{offen && …}`: der Dialog bleibt für die Schließanimation im Baum. */}
-      {bearbeitbar && (
+      {/* `offen` statt `{offen && …}`: der Dialog bleibt für die Schließanimation im Baum. Er
+          hängt an `verwalten`, nicht an `bearbeitbar`: löst ein anderer Arbeitsplatz den Raum
+          auf, während hier geschrieben wird, verschwände sonst die Eingabe ohne Grund. */}
+      {verwalten && (
         <BrBearbeitenModal
           einsatzId={einsatzId}
           br={br}

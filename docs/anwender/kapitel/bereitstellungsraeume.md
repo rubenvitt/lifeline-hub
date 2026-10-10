@@ -13,8 +13,7 @@ keinem Raum zugewiesen sind.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
 Räume an, ändern ihre Raumdaten, nehmen sie in Betrieb, weisen Kräfte zu und lösen Räume wieder
-auf. Die Bedienung am
-gekoppelten Tablet eines Bereitstellungsraums beschreibt
+auf. Die Bedienung am gekoppelten Tablet eines Bereitstellungsraums beschreibt
 [Bereitstellungsraum am Gerät](geraet-bereitstellungsraum.md).
 
 ## Abläufe
@@ -46,13 +45,14 @@ Für Einsatzleitung und Führungspersonal:
 
 Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv ist:
 
-1. Den Raum öffnen und im Seitenkopf „Bearbeiten“ wählen.
+1. Den Raum öffnen und bei „Raumdaten“ „Bearbeiten“ wählen.
 2. Im Dialog „Bereitstellungsraum bearbeiten“ „Bezeichnung“, „Standort (optional)“ oder
    „Notiz (optional)“ ändern. Ein geleertes Feld löscht die Angabe; die Bezeichnung bleibt Pflicht.
 
    ![Dialog „Bereitstellungsraum bearbeiten“ mit Bezeichnung „Parkplatz Stadion Nord“, Standort und Notiz](../bilder/bereitstellungsraeume/bearbeiten.png)
 
-3. „Speichern“ wählen. Der Seitenkopf, die Übersicht und der Umschalter zeigen die neuen Angaben.
+3. „Speichern“ wählen. Die neue Bezeichnung steht im Seitenkopf, im Umschalter und in der
+   Übersicht, Standort und Notiz stehen unter „Raumdaten“; die Übersicht zeigt auch den Standort.
 
 ### Kräfte zuweisen und entfernen
 

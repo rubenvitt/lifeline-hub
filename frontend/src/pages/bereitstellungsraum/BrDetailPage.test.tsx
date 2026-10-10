@@ -965,95 +965,201 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
 });
 
 describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
+  /** Der Raum liegt beim „Server“: PATCH ändert ihn, jedes GET liefert den aktuellen Stand. */
   function seite(
-    br: BrDetail,
-    patch: Parameters<typeof http.patch>[1] = () => HttpResponse.json(br),
-    rolle: EinsatzAnzeige['meine_rolle'] = 'fuehrungspersonal',
+    start: BrDetail,
+    {
+      patch,
+      rolle = 'fuehrungspersonal',
+    }: {
+      patch?: (body: Record<string, unknown>) => Response | Promise<Response>;
+      rolle?: EinsatzAnzeige['meine_rolle'];
+    } = {},
   ) {
+    const stand = { br: start, gets: 0, bodies: [] as Record<string, unknown>[] };
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => {
+        stand.gets += 1;
+        return HttpResponse.json(stand.br);
+      }),
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
-      http.patch('/api/einsaetze/1/bereitstellungsraeume/1', patch),
+      http.patch('/api/einsaetze/1/bereitstellungsraeume/1', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        stand.bodies.push(body);
+        if (patch) return patch(body);
+        stand.br = { ...stand.br, ...body };
+        return HttpResponse.json(stand.br);
+      }),
     );
-    renderBrDetail();
+    const qc = renderBrDetail();
+    return { stand, qc };
   }
   const dialog = () => screen.getByRole('dialog', { name: 'Bereitstellungsraum bearbeiten' });
+  const feld = (name: string) => within(dialog()).getByLabelText(name);
   // jsdom kennt kein `transitionend`: antd beginnt das Ausblenden (`ant-zoom-leave`) und bleibt
   // dort stehen (Muster `stammdaten/verwaltungstabellen.test.tsx`).
-  const zu = () =>
-    [...document.querySelectorAll('.ant-modal')].every((m) =>
-      m.classList.contains('ant-zoom-leave'),
-    );
+  const zu = () => {
+    const modale = [...document.querySelectorAll('.ant-modal')];
+    return modale.length > 0 && modale.every((m) => m.classList.contains('ant-zoom-leave'));
+  };
+  const raumdaten = () =>
+    document.querySelector<HTMLElement>('dl[data-lfh="datenraster"][aria-label="Raumdaten"]')!;
 
-  it('öffnet vorbelegt und schickt nur die geänderten Felder, Leeren als null', async () => {
-    const bodies: unknown[] = [];
-    seite(
+  it('öffnet vorbelegt, schickt nur die geänderten Felder und zeigt danach den neuen Stand', async () => {
+    const { stand } = seite(
       brDetail({ status: 'aktiv', standort: 'Marktplatz', notiz: 'Zufahrt Nord' }),
-      async ({ request }) => {
-        bodies.push(await request.json());
-        return HttpResponse.json(brDetail({ standort: 'Festplatz', notiz: null }));
-      },
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    const d = dialog();
-    expect(within(d).getByLabelText('Bezeichnung')).toHaveValue('BR Alpha');
-    expect(within(d).getByLabelText('Standort (optional)')).toHaveValue('Marktplatz');
-    expect(within(d).getByLabelText('Notiz (optional)')).toHaveValue('Zufahrt Nord');
+    expect(feld('Bezeichnung')).toHaveValue('BR Alpha');
+    expect(feld('Standort (optional)')).toHaveValue('Marktplatz');
+    expect(feld('Notiz (optional)')).toHaveValue('Zufahrt Nord');
 
-    await userEvent.clear(within(d).getByLabelText('Standort (optional)'));
-    await userEvent.type(within(d).getByLabelText('Standort (optional)'), ' Festplatz ');
-    await userEvent.clear(within(d).getByLabelText('Notiz (optional)'));
-    await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
+    await userEvent.clear(feld('Standort (optional)'));
+    await userEvent.type(feld('Standort (optional)'), ' Festplatz ');
+    await userEvent.clear(feld('Notiz (optional)'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
 
-    await waitFor(() => expect(bodies).toEqual([{ standort: 'Festplatz', notiz: null }]));
+    await waitFor(() => expect(stand.bodies).toEqual([{ standort: 'Festplatz', notiz: null }]));
     expect(await screen.findByText('Bereitstellungsraum gespeichert')).toBeInTheDocument();
     await waitFor(() => expect(zu()).toBe(true));
+    // Neu geladen, nicht nur geschlossen: die Raumdaten zeigen den Stand des Servers.
+    expect(await within(raumdaten()).findByText('Festplatz')).toBeInTheDocument();
+    expect(within(raumdaten()).queryByText('Zufahrt Nord')).toBeNull();
+  });
+
+  it('eine Live-Aktualisierung während des Schreibens überschreibt die Eingabe nicht', async () => {
+    const { stand, qc } = seite(brDetail({ standort: 'Marktplatz' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(feld('Notiz (optional)'), 'Tor 3');
+
+    // Ein anderer Arbeitsplatz setzt den Standort; die Seite lädt den Raum neu (wie per SSE).
+    const vorher = stand.gets;
+    stand.br = { ...stand.br, standort: 'Anderswo' };
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(1, 1) }));
+    await waitFor(() => expect(stand.gets).toBeGreaterThan(vorher));
+    await waitFor(() => expect(within(raumdaten()).getByText('Anderswo')).toBeInTheDocument());
+
+    expect(feld('Notiz (optional)')).toHaveValue('Tor 3');
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
+    // Der unberührte Standort geht nicht mit: „Anderswo“ bleibt stehen.
+    await waitFor(() => expect(stand.bodies).toEqual([{ notiz: 'Tor 3' }]));
+  });
+
+  it('Abbrechen verwirft die Eingabe, erneutes Öffnen zeigt den Stand des Servers', async () => {
+    seite(brDetail({ notiz: 'Zufahrt Nord' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(feld('Notiz (optional)'), ' geändert');
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(zu()).toBe(true));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await waitFor(() => expect(feld('Notiz (optional)')).toHaveValue('Zufahrt Nord'));
   });
 
   it('ohne Änderung geht nichts an den Server, der Dialog schließt', async () => {
-    let patches = 0;
-    seite(brDetail({ status: 'geplant' }), () => {
-      patches += 1;
-      return HttpResponse.json(brDetail());
-    });
+    const { stand } = seite(brDetail({ status: 'geplant' }));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(zu()).toBe(true));
-    expect(patches).toBe(0);
+    expect(stand.bodies).toEqual([]);
   });
 
   it('leere Bezeichnung: Hinweis am Feld, kein PATCH', async () => {
-    let patches = 0;
-    seite(brDetail(), () => {
-      patches += 1;
-      return HttpResponse.json(brDetail());
-    });
+    const { stand } = seite(brDetail());
 
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await userEvent.clear(within(dialog()).getByLabelText('Bezeichnung'));
+    await userEvent.clear(feld('Bezeichnung'));
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
     expect(await within(dialog()).findByText('Bezeichnung erforderlich')).toBeInTheDocument();
-    expect(patches).toBe(0);
+    expect(stand.bodies).toEqual([]);
   });
 
   it('Ablehnung: der Grund steht im Dialog, der bleibt offen, kein Toast', async () => {
-    seite(brDetail(), () =>
-      HttpResponse.json({ error: 'Stornierter BR kann nicht geändert werden' }, { status: 409 }),
-    );
+    seite(brDetail(), {
+      patch: () =>
+        HttpResponse.json({ error: 'Stornierter BR kann nicht geändert werden' }, { status: 409 }),
+    });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await userEvent.type(within(dialog()).getByLabelText('Notiz (optional)'), 'neu');
+    await userEvent.type(feld('Notiz (optional)'), 'neu');
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
 
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
       'Stornierter BR kann nicht geändert werden',
     );
-    expect(within(dialog()).getByLabelText('Notiz (optional)')).toHaveValue('neu');
+    expect(feld('Notiz (optional)')).toHaveValue('neu');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('steht an den Raumdaten, nicht im Seitenkopf: geplant trägt der Kopf zwei Aktionen', async () => {
+    seite(brDetail({ status: 'geplant' }));
+    const knopf = await screen.findByRole('button', { name: 'Bearbeiten' });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(kopf).not.toContainElement(knopf);
+    expect(
+      within(kopf)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['In Betrieb nehmen', 'Stornieren']);
+  });
+
+  it('Wechsel zu einem anderen Raum: der Dialog geht nicht für den nächsten Raum auf', async () => {
+    // Die Route hat keinen `key` (Zurück im Browser, Umschalter): dieselbe Seite zeigt den nächsten.
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/1/bereitstellungsraeume/2')}>
+          Zum zweiten Raum
+        </button>
+      );
+    }
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/:brId', ({ params }) =>
+        HttpResponse.json(
+          brDetail({ id: Number(params.brId), bezeichnung: `BR ${String(params.brId)}` }),
+        ),
+      ),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <AuthProvider>
+            <MemoryRouter initialEntries={['/einsaetze/1/bereitstellungsraeume/1']}>
+              <Wechsel />
+              <Routes>
+                <Route
+                  path="/einsaetze/:id/bereitstellungsraeume/:brId"
+                  element={<BrDetailPage />}
+                />
+              </Routes>
+            </MemoryRouter>
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(feld('Bezeichnung')).toHaveValue('BR 1');
+
+    // `fireEvent`: die Maske des Dialogs fängt den Zeiger, die Navigation kommt von außen.
+    fireEvent.click(screen.getByRole('button', { name: 'Zum zweiten Raum' }));
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Bereitstellungsräume' })).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(screen.getAllByText('BR 2').length).toBeGreaterThan(0));
+    const offen = [...document.querySelectorAll('.ant-modal')].filter(
+      (m) => !m.classList.contains('ant-zoom-leave'),
+    );
+    expect(offen).toHaveLength(0);
   });
 
   it('kein „Bearbeiten“ nach dem Auflösen', async () => {
@@ -1063,7 +1169,7 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
   });
 
   it('kein „Bearbeiten“ für Beobachter', async () => {
-    seite(brDetail({ status: 'aktiv' }), undefined, 'beobachter');
+    seite(brDetail({ status: 'aktiv' }), { rolle: 'beobachter' });
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
