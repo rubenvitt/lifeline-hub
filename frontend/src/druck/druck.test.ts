@@ -251,6 +251,64 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     expect(alle[0].koerper).toMatch(/break-inside:\s*avoid/);
   });
 
+  /**
+   * LFH-1124: vor einer langen Tabelle hält ein Deckel Titel, Kopf und erste Zeile in Firefox
+   * zusammen (`druck/einsatzbericht/Bloecke.tsx`). Jede Regel dazu steht in der Firefox-Weiche;
+   * Chromium und WebKit sehen nur die Kopie mit ihrem `display: none` aus dem Markup.
+   */
+  describe('Deckel vor einer langen Tabelle, nur in Firefox (LFH-1124)', () => {
+    const FIREFOX = '@supports (-moz-appearance: none)';
+    const DECKEL = `${WURZEL} [data-lfh='titelblock-deckel']`;
+    const MASS = `:is(tr[data-lfh='masszeile'], tr[data-lfh='deckel-erste-zeile'])`;
+    const nurFirefox = (sel: string) => {
+      const alle = druckRegeln.filter((r) => einzeln(r.selektor).includes(sel));
+      expect(alle, `Regeln für ${sel}`).toHaveLength(1);
+      expect(alle[0].kontext).toContain(FIREFOX);
+      return alle[0].koerper;
+    };
+
+    it('der Deckel bricht nicht, liegt über der Tabelle und deckt mit Papiergrund', () => {
+      const k = nurFirefox(DECKEL);
+      // Im Markup `display: contents`: außerhalb von Firefox ist der Deckel keine Box.
+      expect(k).toMatch(/display:\s*block\s*!important/);
+      expect(k).toMatch(/break-inside:\s*avoid/);
+      expect(k).toMatch(/position:\s*relative/);
+      expect(k).toMatch(/z-index:\s*1/);
+      // Die Wurzel setzt jeden Grund durchsichtig (`!important`); ohne `exact` ließe der
+      // Druckdialog den Grund weg, und der verdeckte Kopf schiene durch.
+      expect(k).toMatch(/background:\s*white\s*!important/);
+      expect(k).toMatch(/print-color-adjust:\s*exact/);
+    });
+
+    it('die Kopie im Deckel erscheint nur im Firefox-Druck', () => {
+      expect(nurFirefox(`${WURZEL} [data-lfh='deckel-tabelle']`)).toMatch(
+        /display:\s*table\s*!important/,
+      );
+    });
+
+    it('die echte Tabelle ist um ihre Kopfhöhe unter den Deckel gezogen', () => {
+      expect(nurFirefox(`${WURZEL} [data-lfh='unter-deckel']`)).toMatch(
+        /margin-top:\s*calc\(-1 \* var\(--druck-kopfhoehe\)\)/,
+      );
+    });
+
+    it('der Kopf beider Tabellen bricht nicht um: seine Höhe ist gerechnet', () => {
+      expect(
+        nurFirefox(`${WURZEL} :is([data-lfh='deckel-tabelle'], [data-lfh='unter-deckel']) th`),
+      ).toMatch(/white-space:\s*nowrap; line-height:\s*var\(--druck-kopfzeile\)/);
+    });
+
+    it('Maßzeilen haben keine Höhe, behalten aber ihre Breite', () => {
+      const zelle = nurFirefox(`${WURZEL} ${MASS} > td`);
+      expect(zelle).toMatch(/padding-block:\s*0\s*!important/);
+      expect(zelle).toMatch(/border:\s*0\s*!important/);
+      const huelle = nurFirefox(`${WURZEL} ${MASS} > td > div`);
+      expect(huelle).toMatch(/height:\s*0/);
+      expect(huelle).toMatch(/overflow:\s*hidden/);
+      expect(huelle).not.toMatch(/width/);
+    });
+  });
+
   /** Auf Papier gibt es keinen Bildlauf: eine lange Codezeile wäre rechts abgeschnitten. */
   it('bricht Codeblöcke im Druck um, statt sie abzuschneiden', () => {
     const r = regelFuer(`${WURZEL} .markdown pre`);

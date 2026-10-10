@@ -155,18 +155,124 @@ describe('Bloecke: Titel im Titelblock (LFH-1098)', () => {
         .join(' ')}`,
     ]);
   });
+});
 
-  it('eine lange Tabelle steht ohne Titelblock: ganz mitgenommen ließe sie eine Seite fast leer', () => {
-    const { container } = render(
+/**
+ * LFH-1124: Vor einer langen Tabelle steht ein Deckel mit den Titeln und einer Kopie der Tabelle,
+ * von der nur Kopf und erste Zeile Höhe haben; die übrigen Zeilen sind Maßzeilen, damit beide
+ * Tabellen dieselben Spalten bekommen. Die echte Tabelle folgt, ihre erste Zeile ist markiert.
+ * Sichtbar und wirksam ist der Deckel nur im Firefox-Druck (`druck/druck.css`).
+ */
+describe('Bloecke: Deckel vor einer langen Tabelle (LFH-1124)', () => {
+  const N = KURZE_TABELLE + 3;
+  const lang = () =>
+    render(
       <Bloecke
         bericht={bericht({
           schluessel: 'personal-kopf',
           titel: 'Anlage Personal je Kopf',
-          abschnitte: [{ inhalt: [tabelle(KURZE_TABELLE + 1)] }],
+          abschnitte: [{ inhalt: [tabelle(N), zeilen(1)] }],
         })}
       />,
     );
-    expect(titelbloecke(container)).toEqual([]);
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(KURZE_TABELLE + 1);
+  const texte = (zeilen: Iterable<Element>) => [...zeilen].map((z) => z.textContent);
+
+  it('die Titel stehen im Deckel, vor der echten Tabelle', () => {
+    const { container } = lang();
+    const deckel = container.querySelector('[data-lfh="titelblock-deckel"]');
+    expect(deckel).not.toBeNull();
+    expect(freieTitel(container)).toEqual([]);
+    expect(texte(deckel!.querySelectorAll('h3'))).toEqual(['Anlage Personal je Kopf']);
+    const unter = container.querySelector('[data-lfh="unter-deckel"]');
+    expect(unter).not.toBeNull();
+    expect(deckel!.compareDocumentPosition(unter!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(deckel!.contains(unter)).toBe(false);
+    // Außerhalb des Firefox-Drucks keine Box: sonst trennte Chromium den Titel von der Tabelle.
+    expect((deckel as HTMLElement).style.display).toBe('contents');
+    expect(container.querySelector<HTMLElement>('[data-lfh="deckel-tabelle"]')!.style.display).toBe(
+      'none',
+    );
+  });
+
+  it('die Deckeltabelle hat Kopf und erste Zeile, alle übrigen Zeilen als Maßzeilen', () => {
+    const { container } = lang();
+    const kopie = container.querySelector('[data-lfh="titelblock-deckel"] table')!;
+    expect(kopie.getAttribute('data-lfh')).toBe('deckel-tabelle');
+    expect(texte(kopie.querySelectorAll('th'))).toEqual(['Nr.', 'Inhalt']);
+    const reihen = [...kopie.querySelectorAll('tbody tr')];
+    expect(reihen).toHaveLength(N);
+    expect(reihen[0].getAttribute('data-lfh')).toBeNull();
+    expect(reihen.slice(1).every((r) => r.getAttribute('data-lfh') === 'masszeile')).toBe(true);
+    // Die Maßzeile trägt ihren Text in einer Hülle, die im Firefox-Druck keine Höhe hat.
+    expect(texte(reihen[1].querySelectorAll('td > div'))).toEqual(['2', 'Zeile 2']);
+    // Der Deckel hat keinen Abstand unter der Tabelle: die echte Tabelle schließt direkt an.
+    expect((kopie as HTMLElement).style.marginBlockEnd).toBe('0px');
+  });
+
+  it('die Kopie ist für Hilfstechnik verborgen, die echte Tabelle steht genau einmal', () => {
+    const { container, getAllByRole } = lang();
+    expect(
+      container.querySelector('[data-lfh="deckel-tabelle"]')!.getAttribute('aria-hidden'),
+    ).toBe('true');
+    expect(getAllByRole('table')).toHaveLength(1);
+  });
+
+  it('die echte Tabelle hat alle Zeilen, die erste markiert, und trägt ihre Kopfhöhe', () => {
+    const { container } = lang();
+    const unter = container.querySelector<HTMLElement>('[data-lfh="unter-deckel"]')!;
+    const reihen = [...unter.querySelectorAll('tbody tr')];
+    expect(texte(reihen)).toEqual(Array.from({ length: N }, (_, i) => `${i + 1}Zeile ${i + 1}`));
+    expect(reihen[0].getAttribute('data-lfh')).toBe('deckel-erste-zeile');
+    expect(texte(reihen[0].querySelectorAll('td > div'))).toEqual(['1', 'Zeile 1']);
+    expect(reihen.slice(1).every((r) => r.getAttribute('data-lfh') === null)).toBe(true);
+    // Zeilenhöhe 14 × 1,5714 = 22, Polster 2 × 4, Rand 1 (antds Vorgabe-Tokens im Test).
+    expect(unter.style.getPropertyValue('--druck-kopfhoehe')).toBe('31px');
+  });
+
+  it('beide Tabellen tragen die Zeilenhöhe des Kopfes, aus der die Kopfhöhe gerechnet ist', () => {
+    const { container } = lang();
+    const kopie = container.querySelector<HTMLElement>('[data-lfh="deckel-tabelle"]')!;
+    const unter = container.querySelector<HTMLElement>('[data-lfh="unter-deckel"]')!;
+    expect(kopie.style.getPropertyValue('--druck-kopfzeile')).toBe('22px');
+    expect(unter.style.getPropertyValue('--druck-kopfzeile')).toBe('22px');
+    // Am Bildschirm und in Chromium bleibt der Kopf, wie er war.
+    expect(
+      [...container.querySelectorAll<HTMLElement>('th')].map((th) => th.style.lineHeight),
+    ).toEqual(['', '', '', '']);
+  });
+
+  it('die Kopie steht ohne eigene Hülle direkt hinter den Titeln', () => {
+    const { container } = lang();
+    const kopie = container.querySelector('[data-lfh="deckel-tabelle"]')!;
+    expect(kopie.parentElement!.getAttribute('data-lfh')).toBe('titelblock-deckel');
+  });
+
+  it('eine lange Tabelle ohne Titel (nicht erstes Inhaltsstück) bekommt keinen Deckel', () => {
+    const { container } = render(
+      <Bloecke
+        bericht={bericht({
+          schluessel: 'etb',
+          titel: 'ETB-Auszug',
+          abschnitte: [{ titel: 'Entscheidungen', inhalt: [zeilen(2), tabelle(N)] }],
+        })}
+      />,
+    );
+    expect(container.querySelector('[data-lfh="titelblock-deckel"]')).toBeNull();
+    expect(container.querySelectorAll('table')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-lfh="deckel-erste-zeile"]')).toHaveLength(0);
+  });
+
+  it(`eine kurze Tabelle (bis ${KURZE_TABELLE} Zeilen) bekommt keinen Deckel`, () => {
+    const { container } = render(
+      <Bloecke
+        bericht={bericht({
+          schluessel: 'fuehrung',
+          titel: 'Führung',
+          abschnitte: [{ titel: 'Lagebesprechungen', inhalt: [tabelle(KURZE_TABELLE)] }],
+        })}
+      />,
+    );
+    expect(container.querySelector('[data-lfh="titelblock-deckel"]')).toBeNull();
+    expect(container.querySelectorAll('table')).toHaveLength(1);
   });
 });

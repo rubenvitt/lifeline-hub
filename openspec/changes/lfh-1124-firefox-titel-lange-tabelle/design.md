@@ -52,18 +52,25 @@ Probe (Firefox 157, A4, Titel h3 + h4 vor einer Tabelle mit 40 Zeilen, Titel in 
 Vor einer Tabelle mit Titeln und mehr als `KURZE_TABELLE` Zeilen rendert `Bloecke.tsx`:
 
 1. **Deckel** `data-lfh="titelblock-deckel"`: die Titel (`Titelfolge`) und eine **Deckeltabelle**
-   (`aria-hidden`): Kopf, erste Zeile und die Zeilen 2…n als **Maßzeilen**.
+   (`aria-hidden`, ohne eigene Hülle): Kopf, erste Zeile und die Zeilen 2…n als **Maßzeilen**.
 2. Die **echte Tabelle** wie bisher (`TabellenAnzeige`), ihre erste Zeile mit
    `data-lfh="deckel-erste-zeile"`.
 
+Im Markup trägt der Deckel `display: contents` und die Kopie `display: none`. Die erste Messung
+mit dem Deckel als Block und der Kopie in ihrer Bildlauf-Hülle machte Chromium schlechter
+(44/51 und 43/51, Titel allein): zwischen Titel und Tabelle stand eine Box, und `break-after:
+avoid` am Titel griff nicht mehr. Ohne Box ist der Baum in Chromium und WebKit der alte.
+
 Im Firefox-Druck (`@supports (-moz-appearance: none)` unter `@media print`, `druck.css`):
 
-- Der Deckel bricht nicht (`break-inside: avoid`), liegt über der Tabelle (`position: relative;
-  z-index: 1`) und hat deckenden Papiergrund (`background: white !important;
+- Der Deckel wird zum Block (`display: block !important`), bricht nicht (`break-inside: avoid`),
+  liegt über der Tabelle (`position: relative; z-index: 1`) und hat deckenden Papiergrund (`background: white !important;
   print-color-adjust: exact`), denn die Druckwurzel setzt jeden Grund durchsichtig.
+- Die Kopie erscheint (`display: table !important`).
 - Die echte Tabelle ist um ihre Kopfhöhe hochgezogen (`margin-top: calc(-1 * Kopfhöhe)`): ihr
-  erster Kopf liegt deckungsgleich unter dem Kopf der Deckeltabelle. Ihre erste Zeile ist eine
-  Maßzeile, Zeile 2 schließt also unmittelbar an die erste Zeile des Deckels an.
+  erster Kopf liegt unter dem unteren Rand des Deckels (über dessen erster Zeile) und ist
+  verdeckt. Ihre erste Zeile ist eine Maßzeile, Zeile 2 schließt also unmittelbar an die erste
+  Zeile des Deckels an.
 - Bricht die Seite nach dem Deckel, stehen auf der Folgeseite der wiederholte Kopf und Zeile 2.
   Passt der Deckel nicht mehr, rückt er ganz weiter; der Rest der Seite ist höchstens so hoch wie
   Titel, Kopf und erste Zeile. Am Seitenanfang stutzt Firefox den negativen Rand nicht weg, weil
@@ -78,9 +85,11 @@ Textbreite in die automatische Spaltenbreite. Deckeltabelle (Kopf, Zeile 1, Maß
 echte Tabelle (Kopf, Maßzeile 1, Zeilen 2…n) sehen dieselben Inhalte und bekommen dieselben
 Spalten. Der Inhalt jeder Zelle steht deshalb in beiden Tabellen in einer Hülle.
 
-**Kopfhöhe:** Die Kopfzellen brechen im Firefox-Druck nicht um (`white-space: nowrap`), ihre
-Höhe ergibt sich aus Zeilenhöhe, Polster und Rand aus den Tokens. `Bloecke.tsx` setzt sie als
-CSS-Variable an die echte Tabelle (`--druck-kopfhoehe`); die Regel in `druck.css` liest sie.
+**Kopfhöhe:** Die Kopfzellen brechen im Firefox-Druck nicht um (`white-space: nowrap`) und
+bekommen dort eine feste Zeilenhöhe (`--druck-kopfzeile`, gerundet aus Schriftgröße und
+Zeilenhöhe der Tokens); ihre Höhe ergibt sich daraus mit Polster und Rand. `Bloecke.tsx` setzt
+beide Werte als CSS-Variablen (`--druck-kopfhoehe` an die echte Tabelle); `druck.css` liest sie.
+Am Bildschirm und in Chromium bleibt der Kopf, wie er war.
 Die Spaltenköpfe des Berichts sind kurz („Name“, „Funktion“, „Einsatzzeit“, „Freigegeben von“).
 
 Alternativen:
@@ -101,8 +110,8 @@ Alternativen:
 
 Die Firefox-Weiche bleibt `@supports (-moz-appearance: none)`. Das DOM ist in allen Engines
 gleich, nur `druck.css` schaltet. Tests im Vitest prüfen die Struktur, `druck.test.ts` die
-Regeln, das e2e im Firefox-Projekt die Deckung (Kopf der echten Tabelle auf dem Kopf des
-Deckels, Zeile 2 direkt unter Zeile 1 des Deckels) unter Druckmedium und `beforeprint`.
+Regeln, das e2e im Firefox-Projekt die Deckung (Kopf der echten Tabelle innerhalb des Deckels,
+Zeile 2 direkt unter Zeile 1 des Deckels) unter Druckmedium und `beforeprint`.
 
 ### D3 Messung
 
