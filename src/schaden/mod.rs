@@ -63,6 +63,21 @@ wire_enum! {
     }
 }
 
+impl SchadenTyp {
+    /// Beschriftung im ETB-Text, dieselbe wie `TYP_LABEL` in
+    /// `frontend/src/pages/schaeden/schadenHelfer.tsx` (LFH-1144: das ETB nennt keine Schlüssel).
+    pub fn etb_label(&self) -> &'static str {
+        match self {
+            SchadenTyp::Sachschaden => "Sachschaden",
+            SchadenTyp::Verkehrshindernis => "Verkehrshindernis",
+            SchadenTyp::Infrastruktur => "Infrastruktur",
+            SchadenTyp::Umweltschaden => "Umweltschaden",
+            SchadenTyp::Tierkadaver => "Tierkadaver",
+            SchadenTyp::Sonstige => "Sonstige",
+        }
+    }
+}
+
 // `typ` ist in `SchadenAnzeige` non-null — gleiches einheitliches `Type`/`Decode`-
 // Muster wie `SchadenStatus` (s. o.).
 impl<DB: sqlx::Database> sqlx::Type<DB> for SchadenTyp
@@ -98,6 +113,19 @@ wire_enum! {
     }
 }
 
+impl Ausmass {
+    /// Beschriftung im ETB-Text, dieselbe wie `schadenAusmass` in
+    /// `frontend/src/theme/statusFarben.ts` (LFH-1144).
+    pub fn etb_label(&self) -> &'static str {
+        match self {
+            Ausmass::Gering => "gering",
+            Ausmass::Mittel => "mittel",
+            Ausmass::Gross => "groß",
+            Ausmass::Katastrophal => "katastrophal",
+        }
+    }
+}
+
 // `ausmass` ist in `SchadenAnzeige` non-null — gleiches einheitliches `Type`/
 // `Decode`-Muster wie `SchadenStatus` (s. o.).
 impl<DB: sqlx::Database> sqlx::Type<DB> for Ausmass
@@ -130,6 +158,18 @@ wire_enum! {
         Behoben => "behoben",
         KeinHandlungsbedarf => "kein_handlungsbedarf",
         Abgewiesen => "abgewiesen",
+    }
+}
+
+impl AbschlussGrund {
+    /// Beschriftung im ETB-Text, dieselbe wie `ABSCHLUSS_LABEL` in
+    /// `frontend/src/pages/schaeden/schadenHelfer.tsx` (LFH-1144).
+    pub fn etb_label(&self) -> &'static str {
+        match self {
+            AbschlussGrund::Behoben => "behoben",
+            AbschlussGrund::KeinHandlungsbedarf => "kein Handlungsbedarf",
+            AbschlussGrund::Abgewiesen => "abgewiesen",
+        }
     }
 }
 
@@ -289,6 +329,22 @@ mod tests {
             assert_eq!(AbschlussGrund::parse(s).unwrap().as_str(), s);
         }
         assert!(AbschlussGrund::parse("uebergabe").is_none());
+    }
+
+    #[test]
+    fn etb_labels_sind_die_woerter_der_oberflaeche() {
+        assert_eq!(SchadenTyp::Umweltschaden.etb_label(), "Umweltschaden");
+        assert_eq!(
+            SchadenTyp::Verkehrshindernis.etb_label(),
+            "Verkehrshindernis"
+        );
+        assert_eq!(Ausmass::Gross.etb_label(), "groß");
+        assert_eq!(Ausmass::Katastrophal.etb_label(), "katastrophal");
+        assert_eq!(
+            AbschlussGrund::KeinHandlungsbedarf.etb_label(),
+            "kein Handlungsbedarf"
+        );
+        assert_eq!(AbschlussGrund::Behoben.etb_label(), "behoben");
     }
 
     #[test]
