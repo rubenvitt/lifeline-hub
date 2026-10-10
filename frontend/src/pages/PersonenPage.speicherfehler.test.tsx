@@ -295,6 +295,92 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
     expect(seitenGrund()).toBeNull();
   });
 
+  /**
+   * Eine Antwort, die erst nach dem Wechsel eintrifft, gehört dem alten Einsatz (LFH-1138,
+   * `frontend/AGENTS.md`, „Rückwege und Fehler“): weder an einer Zeile noch im Seitenhinweis des
+   * neuen, und auch kein Erfolgs-Toast dort.
+   */
+  describe('späte Antwort nach dem Einsatzwechsel (LFH-1138)', () => {
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/2/personen')}>
+          Zu Einsatz B
+        </button>
+      );
+    }
+    function renderMitWechsel(antwort: () => Response) {
+      let gibFrei: () => void = () => {};
+      let angefragt = false;
+      server.use(
+        meHandler(benutzerFixture()),
+        http.get('/api/einsaetze/:eid', ({ params }) =>
+          HttpResponse.json(einsatzFixture({ id: Number(params.eid) })),
+        ),
+        http.get('/api/einsaetze/1/personen', () =>
+          HttpResponse.json([vermisstA, vermisstB, gefunden]),
+        ),
+        http.get('/api/einsaetze/2/personen', () =>
+          HttpResponse.json([{ ...vermisstB, einsatz_id: 2 }, gefunden]),
+        ),
+        http.post('/api/einsaetze/1/personen/11/abgleich', async () => {
+          angefragt = true;
+          await new Promise<void>((r) => (gibFrei = r));
+          return antwort();
+        }),
+      );
+      renderMitProviders(
+        <>
+          <Wechsel />
+          <Routes>
+            <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+          </Routes>
+        </>,
+        { route: '/einsaetze/1/personen' },
+      );
+      return {
+        gibFrei: () => gibFrei(),
+        angefragt: () => angefragt,
+      };
+    }
+    async function wechsleNachB() {
+      await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+      await waitFor(() => expect(screen.queryByText('R-002')).toBeNull());
+      await screen.findByText('R-003');
+    }
+
+    it('eine Ablehnung aus Zeile meldet im neuen Einsatz nichts', async () => {
+      const lauf = renderMitWechsel(() => abgelehnt('Abgleich besteht schon', 409));
+      await zeigeVermisste();
+      await schlageVorInZeile('R-002');
+      await waitFor(() => expect(lauf.angefragt()).toBe(true));
+
+      await wechsleNachB();
+      await act(async () => lauf.gibFrei());
+      // Die Antwort ist da: ohne Riegel stünde ihr Grund jetzt im Seitenhinweis von B.
+      await act(async () => {});
+
+      expect(screen.queryByText('Abgleich besteht schon')).toBeNull();
+      expect(seitenGrund()).toBeNull();
+      expect(document.querySelectorAll('[data-fehler]')).toHaveLength(0);
+      keinFehlerToast();
+    });
+
+    it('ein Erfolg aus Zeile quittiert im neuen Einsatz nicht', async () => {
+      const lauf = renderMitWechsel(() => HttpResponse.json(abgleich(11), { status: 201 }));
+      await zeigeVermisste();
+      await schlageVorInZeile('R-002');
+      await waitFor(() => expect(lauf.angefragt()).toBe(true));
+
+      await wechsleNachB();
+      await act(async () => lauf.gibFrei());
+      await act(async () => {});
+
+      expect(screen.queryByText('Verdachts-Abgleich angelegt')).toBeNull();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+  });
+
   it('der Erfolg eines Zeilenvorschlags schließt keinen offenen Dialog', async () => {
     let gibFrei: () => void = () => {};
     server.use(

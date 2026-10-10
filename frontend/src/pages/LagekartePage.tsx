@@ -379,9 +379,17 @@ export default function LagekartePage() {
 
   // Neu, Umbenennen, Löschen: die Zusage bricht bei Ablehnung, der Dialog im `AnsichtSwitcher`
   // bleibt dann offen und nennt den Grund (design.md D3).
+  //
+  // Eine Antwort, die erst nach dem Einsatzwechsel eintrifft, wählt und räumt keine Ansicht
+  // (LFH-1138, `frontend/AGENTS.md`, „Rückwege und Fehler“): ihr `setSearchParams` stammt aus dem
+  // alten Render und führte zurück in den alten Einsatz.
+  const einsatzRef = useRef(einsatzId);
+  einsatzRef.current = einsatzId;
   const onAnsichtNeu = useCallback(
     async (name: string) => {
+      const einsatz = einsatzRef.current;
       const neu = await neueAnsicht(name);
+      if (einsatzRef.current !== einsatz) return;
       waehleAnsicht(neu.id);
       message.success(`Ansicht „${name}" angelegt`);
     },
@@ -412,7 +420,9 @@ export default function LagekartePage() {
 
   const onAnsichtLoeschen = useCallback(
     async (id: number, objekte: 'freigeben' | 'loeschen') => {
+      const einsatz = einsatzRef.current;
       await loeschen({ id, objekte });
+      if (einsatzRef.current !== einsatz) return;
       message.success('Ansicht gelöscht');
       // War die gelöschte Ansicht aktiv, ?ansicht= räumen → Fallback auf die Standardansicht.
       if (id === aktiveAnsichtId) {

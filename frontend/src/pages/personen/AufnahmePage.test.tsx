@@ -487,4 +487,43 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
     await waitFor(() => expect(client.isMutating()).toBe(0));
     expect(screen.queryByText('Einsatz ist abgeschlossen')).toBeNull();
   });
+
+  // LFH-1138: die Quittung trägt die Registriernummer aus Einsatz A; in B abgeschrieben, wäre
+  // sie eine falsche Nummer.
+  it('ein spät erfolgreiches Anlegen aus Einsatz A quittiert in B nicht', async () => {
+    let antwortFreigeben!: () => void;
+    const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/:eid', ({ params }) =>
+        HttpResponse.json({ ...einsatzAktiv, id: Number(params.eid) }),
+      ),
+      http.get('/api/einsaetze/:eid/personen', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/personen', async () => {
+        await antwortGate;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    );
+    const { client } = renderMitProviders(
+      <>
+        <EinsatzWechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/personen/aufnahme" element={<AufnahmePage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/personen/aufnahme' },
+    );
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(client.isMutating()).toBe(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.einsatz(2))).toBeDefined());
+    await screen.findByRole('button', { name: /Speichern und nächste/ });
+
+    await act(async () => antwortFreigeben());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+    expect(screen.queryByText(/Erfasst als/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });

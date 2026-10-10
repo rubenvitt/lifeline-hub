@@ -53,7 +53,9 @@ export default function AufnahmePage() {
   const darf = useGeraetDarf();
   const qc = useQueryClient();
   const [form] = Form.useForm<AufnahmeWerte>();
-  const [quittung, setQuittung] = useState<string | null>(null);
+  // Am Einsatz festgemacht: eine Antwort, die erst nach dem Wechsel eintrifft, quittiert nicht im
+  // neuen (LFH-1138); dort abgeschrieben, wäre ihre Registriernummer falsch.
+  const [quittung, setQuittung] = useState<{ einsatzId: number; text: string } | null>(null);
   const sitzungsortGeladen = useRef<number | null>(null);
   const [searchParams] = useSearchParams();
   /**
@@ -96,7 +98,7 @@ export default function AufnahmePage() {
     onMutate: () => setQuittung(null),
     onSuccess: (ergebnis, { einsatzId }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
-        setQuittung('Offline vorgemerkt · R-…');
+        setQuittung({ einsatzId, text: 'Offline vorgemerkt · R-…' });
       } else {
         const person = ergebnis.daten;
         const zusatz =
@@ -115,11 +117,13 @@ export default function AufnahmePage() {
         }
         // Aus der ANTWORT gelesen, nicht aus den gesendeten Werten: das Backend schreibt
         // die Sichtung in derselben Transaktion und kann sie verwerfen.
-        setQuittung(
-          (person.aktuelle_sichtung
-            ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
-            : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`) + zusatz,
-        );
+        setQuittung({
+          einsatzId,
+          text:
+            (person.aktuelle_sichtung
+              ? `Erfasst als ${registrierAnzeige(person.registrier_nr)} · ${SK_META[person.aktuelle_sichtung].label}`
+              : `Erfasst als ${registrierAnzeige(person.registrier_nr)}`) + zusatz,
+        });
       }
       void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
@@ -181,9 +185,9 @@ export default function AufnahmePage() {
         !darfSchreiben && <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
       }
     >
-      {quittung && (
+      {quittung?.einsatzId === einsatzId && (
         // Stehende Quittung statt Toast: an ihr wird die Registriernummer abgelesen.
-        <Alert style={{ marginBottom: 16 }} type="success" showIcon title={quittung} />
+        <Alert style={{ marginBottom: 16 }} type="success" showIcon title={quittung.text} />
       )}
 
       {darfSchreiben && (
