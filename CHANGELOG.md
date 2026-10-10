@@ -1,3 +1,11 @@
+## [1.0.0-alpha.103](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.102...v1.0.0-alpha.103) (2026-10-10)
+
+### Lagekarte
+
+- **Verbesserte Fehlermeldungen:** Fehler bei Kartenaktionen (Zeichnen, Verorten, Verschieben, Inspektoren, Kartenbilder) werden nun direkt über der Karte in einem schließbaren Hinweis angezeigt. Fehler in Ansichten erscheinen im jeweiligen Ansichts-Panel oder – falls die Leiste verborgen ist – ebenfalls im Kartenhinweis. Während längerer Operationen (Snapshot erstellen, Ansicht anlegen/umbenennen/löschen, "Zeichen hier setzen") wird ein Dialog mit Wartehinweis eingeblendet.
+
+- **Zuverlässigere Offline-Wiederherstellung:** Die Offline-Wiederherstellung der Lagekarte zeigt bei Problemen den Fehlergrund direkt an der Karte an und lädt die Ansicht automatisch neu, wenn der Fehler behoben wurde.
+
 ## [1.0.0-alpha.102](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.101...v1.0.0-alpha.102) (2026-10-10)
 
 ### Wichtige Änderungen
