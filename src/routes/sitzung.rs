@@ -81,29 +81,6 @@ pub async fn eigene_andere_beenden(
     ))
 }
 
-/// Das Zielkonto einer Admin-Route: eine Person der eigenen Organisation. Ein Konto einer
-/// fremden Organisation und ein Gerätekonto sind 404 wie ein unbekanntes.
-pub(crate) async fn ziel_laden(
-    state: &AppState,
-    admin: &Benutzer,
-    id: i64,
-) -> Result<Benutzer, AppError> {
-    let ziel = sqlx::query_as::<_, Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
-                aktiv, erstellt_at \
-         FROM benutzer WHERE id = ? AND org_id = ?",
-    )
-    .bind(id)
-    .bind(admin.org_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    if crate::geraet::repo::ist_geraetekonto(&state.pool, id).await? {
-        return Err(AppError::NotFound);
-    }
-    Ok(ziel)
-}
-
 /// Die eigene Kennung, wenn der Admin sein eigenes Konto meint; sonst keine.
 fn eigene_kennung(admin: &Benutzer, ziel: &Benutzer, aktuell: Option<String>) -> Option<String> {
     aktuell.filter(|_| admin.id == ziel.id)
@@ -116,7 +93,7 @@ pub async fn admin_liste(
     AktuelleSitzung(aktuell): AktuelleSitzung,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<Vec<SitzungAnzeige>>, AppError> {
-    let ziel = ziel_laden(&state, &admin, id).await?;
+    let ziel = crate::routes::benutzer::ziel_laden(&state.pool, &admin, id).await?;
     let aktuell = eigene_kennung(&admin, &ziel, aktuell.map(|k| k.0));
     Ok(Json(
         session::liste(&state.pool, ziel.id, aktuell.as_deref()).await?,
@@ -132,7 +109,7 @@ pub async fn admin_beenden(
     AktuelleSitzung(aktuell): AktuelleSitzung,
     PfadParam((id, kennung)): PfadParam<(i64, String)>,
 ) -> Result<Json<SitzungenBeendet>, AppError> {
-    let ziel = ziel_laden(&state, &admin, id).await?;
+    let ziel = crate::routes::benutzer::ziel_laden(&state.pool, &admin, id).await?;
     if eigene_kennung(&admin, &ziel, aktuell.map(|k| k.0)).as_deref() == Some(kennung.as_str()) {
         return Err(AppError::UnprocessableEntity(AKTUELLE_SITZUNG.into()));
     }
@@ -154,7 +131,7 @@ pub async fn admin_alle_beenden(
     AktuelleSitzung(aktuell): AktuelleSitzung,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<SitzungenBeendet>, AppError> {
-    let ziel = ziel_laden(&state, &admin, id).await?;
+    let ziel = crate::routes::benutzer::ziel_laden(&state.pool, &admin, id).await?;
     let ausser = eigene_kennung(&admin, &ziel, aktuell.map(|k| k.0));
     let beendet =
         session::beenden(&state.pool, ziel.id, Auswahl::AlleAusser(ausser.as_deref())).await?;

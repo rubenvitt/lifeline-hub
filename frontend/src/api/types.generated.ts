@@ -100,8 +100,8 @@ export interface components {
         };
         /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
-         *     `etb_label` erscheint in Klammern in der ETB-Spur (Spec: "abgeschlossen
-         *     (uebergabe_tierarzt)") — daher identisch zum DB-String.
+         *     `etb_label` erscheint in Klammern in der ETB-Spur ("abgeschlossen (Übergabe an
+         *     Tierarzt)").
          * @enum {string}
          */
         AbschlussGrund: "uebergabe_halter" | "uebergabe_tierarzt" | "uebergabe_tierheim" | "verstorben" | "freilauf" | "sonstiges";

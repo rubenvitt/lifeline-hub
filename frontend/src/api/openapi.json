@@ -259,7 +259,7 @@
       },
       "AbschlussGrund": {
         "type": "string",
-        "description": "Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.\n`etb_label` erscheint in Klammern in der ETB-Spur (Spec: \"abgeschlossen\n(uebergabe_tierarzt)\") — daher identisch zum DB-String.",
+        "description": "Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.\n`etb_label` erscheint in Klammern in der ETB-Spur (\"abgeschlossen (Übergabe an\nTierarzt)\").",
         "enum": [
           "uebergabe_halter",
           "uebergabe_tierarzt",

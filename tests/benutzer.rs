@@ -3,7 +3,7 @@ use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, login_cookie, setup, setup_mit_pool};
+use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup, setup_mit_pool};
 
 #[tokio::test]
 async fn liste_ohne_admin_session_ist_401() {
@@ -836,4 +836,104 @@ async fn admin_endpunkte_liefern_passwort_gesetzt() {
     .await;
     assert_eq!(status, StatusCode::OK, "{einzeln}");
     assert_eq!(einzeln["passwort_gesetzt"], false, "{einzeln}");
+}
+
+// ===== Organisation des Zielkontos (LFH-1123) =====
+
+/// Die Liste zeigt nur Konten der eigenen Organisation; ein Konto einer fremden Org fehlt.
+#[tokio::test]
+async fn liste_zeigt_nur_konten_der_eigenen_org() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+    let (_, fremd_id) = fremde_org_anlegen(&pool, "Fremd", "fremd", "fremdpw12", "keine").await;
+
+    let (status, json) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let ids: Vec<i64> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["id"].as_i64().unwrap())
+        .collect();
+    assert!(ids.contains(&erika_id), "eigenes Konto fehlt: {ids:?}");
+    assert!(!ids.contains(&fremd_id), "fremdes Konto sichtbar: {ids:?}");
+}
+
+/// Jede Route mit `{id}` behandelt ein Konto einer fremden Org wie ein unbekanntes (404): sie
+/// ändert nichts, beendet keine Sitzung und schreibt keine Admin-Spur.
+#[tokio::test]
+async fn konto_einer_fremden_org_ist_in_jeder_route_404() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let (_, fremd_id) = fremde_org_anlegen(&pool, "Fremd", "fremd", "fremdpw12", "keine").await;
+    let fremd_cookie = login_cookie(&app, "fremd", "fremdpw12").await;
+
+    for (methode, uri, body) in [
+        (
+            "PATCH",
+            format!("/api/benutzer/{fremd_id}"),
+            Some(r#"{"anzeigename":"Übernommen","system_rolle":"admin","aktiv":false}"#),
+        ),
+        (
+            "POST",
+            format!("/api/benutzer/{fremd_id}/deaktivieren"),
+            None,
+        ),
+        ("POST", format!("/api/benutzer/{fremd_id}/totp/reset"), None),
+    ] {
+        let (status, _) = anfrage(&app, methode, &uri, &admin_cookie, body).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{methode} {uri}");
+    }
+
+    let (anzeigename, system_rolle, aktiv): (String, String, bool) =
+        sqlx::query_as("SELECT anzeigename, system_rolle, aktiv FROM benutzer WHERE id = ?")
+            .bind(fremd_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (anzeigename.as_str(), system_rolle.as_str(), aktiv),
+        ("fremd", "keiner", true)
+    );
+    let (status, _) = anfrage(&app, "GET", "/api/auth/me", &fremd_cookie, None).await;
+    assert_eq!(status, StatusCode::OK, "Sitzung des fremden Kontos beendet");
+    let spur: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admin_audit")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(spur, 0);
+}
+
+/// Der Aussperr-Schutz zählt die aktiven Admins der Org des Zielkontos: ein Admin einer fremden
+/// Org kann die eigene nicht verwalten und darf deshalb nicht mitzählen.
+#[tokio::test]
+async fn letzter_admin_zaehlt_nur_in_der_eigenen_org() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let (_, fremd_id) = fremde_org_anlegen(&pool, "Fremd", "fremd", "fremdpw12", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
+        .bind(fremd_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        "/api/benutzer/1",
+        &admin_cookie,
+        Some(r#"{"system_rolle":"keiner"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/benutzer/1/deaktivieren",
+        &admin_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
 }
