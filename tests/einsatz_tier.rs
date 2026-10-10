@@ -550,12 +550,16 @@ async fn lifecycle_etb_kein_leak_von_ziel_und_kennzeichnung() {
             .any(|i| i.contains("T-001") && i.contains("aufgefunden")),
         "vermisst→aktiv (aufgefunden)"
     );
+    // LFH-1144: der Grund im Wort der Oberfläche, kein Schlüssel im ETB.
     assert!(
         inhalte
             .iter()
-            .any(|i| i.contains("abgeschlossen (uebergabe_tierarzt)")),
-        "Abschluss nennt nur den Grund"
+            .any(|i| i.as_str() == "Tier T-001: abgeschlossen (Übergabe an Tierarzt)"),
+        "Abschluss nennt nur den Grund: {inhalte:?}"
     );
+    for i in &inhalte {
+        assert!(!i.contains('_'), "Schlüssel im ETB: {i}");
+    }
     assert!(inhalte.iter().any(|i| i.contains("T-001 storniert")));
 }
 

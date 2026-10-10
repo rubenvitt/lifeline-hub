@@ -2,7 +2,7 @@
 titel: Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs]
 ---
 
 ## Überblick
@@ -94,9 +94,12 @@ Sprechgruppe zu, schreibt sie das in den Datensatz der Stelle; Funkplan und Skiz
 dasselbe. Die Skizze speichert selbst nur Lage, Komponenten, Verbindungen, Bereiche und das
 Schriftfeld. Externe Stellen der Skizze sind die des Kommunikationsplans.
 
-Auch im Kommunikationsplan stehen Abschnitte und Einheiten nur abgeleitet; ihre Angaben pflegt man
-an ihrem Datensatz. Gepflegt werden dort nur Stellen ohne eigenen Datensatz. Jede
-Führungsfunktion kommt je Einsatz einmal vor.
+Auch im Kommunikationsplan stehen Abschnitte, Einheiten und die eigene Führungsstelle nur
+abgeleitet; ihre Angaben pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
+(siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Die Führungsstelle steht dort als
+erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist. Gepflegt werden im
+Kommunikationsplan nur Stellen ohne eigenen Datensatz. Jede Führungsfunktion kommt je Einsatz
+einmal vor.
 
 ### Lücken
 
@@ -122,8 +125,10 @@ mitnehmen. Gedruckt wird die Skizze mit dem Funkplan als Anlage.
 
 ### Ohne Netz
 
-Der Kommunikationsplan bleibt ohne Netz lesbar, seine Bedienung ist dann gesperrt. Die Daten der
-Skizze werden nicht vorgehalten; der Funkplan nennt sie ohne Netz „nicht geladen“ (siehe
+Der Kommunikationsplan bleibt ohne Netz lesbar, seine Bedienung ist dann gesperrt. Die eigene
+Führungsstelle wird nicht vorgehalten; nach einem Neuladen ohne Netz steht sie dort als „nicht
+geladen“. Die Daten der Skizze werden nicht
+vorgehalten; der Funkplan nennt sie ohne Netz „nicht geladen“ (siehe
 [Arbeiten ohne Netz](ohne-netz.md)).
 
 ## Grundlagen und Quellen

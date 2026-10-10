@@ -93,7 +93,7 @@ deshalb zurzeit keine Mitglieder hinzufügen und bittet die Administration darum
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie
   schreiben keinen Eintrag ins Einsatztagebuch.
 - Die „Einsatznummer“ unter „Technische Angaben“ vergibt das System; sie lässt sich nicht ändern.
-- Die **eigene Führungsstelle** speist Funkplan und Fernmeldeskizze (siehe
+- Die **eigene Führungsstelle** speist Funkplan, Fernmeldeskizze und Kommunikationsplan (siehe
   [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); dort wird sie nicht
   bearbeitet. „Fahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.

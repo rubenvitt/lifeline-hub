@@ -108,19 +108,21 @@ async fn anzeige_laden(pool: &sqlx::SqlitePool, id: i64) -> Result<BenutzerAnzei
     )
 }
 
-/// GET /api/benutzer — Liste aller Benutzer (ohne Passwort-Hashes). Admin-only. Enthält den
-/// MFA-Status (`totp_aktiviert`, LFH-43 Increment 5 Task 6) und `passwort_gesetzt` (LFH-828).
+/// GET /api/benutzer — Liste der Benutzer der eigenen Organisation (ohne Passwort-Hashes,
+/// LFH-1123). Admin-only. Enthält den MFA-Status (`totp_aktiviert`, LFH-43 Increment 5 Task 6)
+/// und `passwort_gesetzt` (LFH-828).
 pub async fn liste(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(admin): AdminUser,
 ) -> Result<Json<Vec<BenutzerAnzeige>>, AppError> {
     // Gerätekonten (LFH-892) sind keine Personen: sie erscheinen nicht in der Verwaltung.
     let sql = format!(
-        "{ANZEIGE_SPALTEN} WHERE {} ORDER BY id",
+        "{ANZEIGE_SPALTEN} WHERE org_id = ? AND {} ORDER BY id",
         crate::geraet::repo::OHNE_GERAETEKONTEN
     );
     let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
         .bind(PASSWORT_HASH_SSO_ONLY)
+        .bind(admin.org_id)
         .fetch_all(&state.pool)
         .await?;
     Ok(Json(benutzer))
@@ -198,20 +200,37 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(angelegt)))
 }
 
-/// Ein Gerätekonto (LFH-892) verwaltet die Einsatzleitung über seine Kopplung, nicht der Admin:
-/// für die Benutzerverwaltung existiert es nicht (404).
-async fn verweigere_geraetekonto(pool: &sqlx::SqlitePool, id: i64) -> Result<(), AppError> {
+/// Das Zielkonto einer Admin-Route unter `/api/benutzer/{id}…`: eine Person der Organisation des
+/// Admins (LFH-1123). Ein Konto einer fremden Organisation ist 404 wie ein unbekanntes, sonst
+/// sähe und änderte der Admin einer Org die Konten aller anderen. Ein Gerätekonto (LFH-892)
+/// verwaltet die Einsatzleitung über seine Kopplung, nicht der Admin: auch 404. Geteilt mit den
+/// Sitzungsrouten (`routes::sitzung`, LFH-1092).
+pub(crate) async fn ziel_laden(
+    pool: &sqlx::SqlitePool,
+    admin: &crate::auth::Benutzer,
+    id: i64,
+) -> Result<crate::auth::Benutzer, AppError> {
+    let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
+         FROM benutzer WHERE id = ? AND org_id = ?",
+    )
+    .bind(id)
+    .bind(admin.org_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
     if crate::geraet::repo::ist_geraetekonto(pool, id).await? {
         return Err(AppError::NotFound);
     }
-    Ok(())
+    Ok(ziel)
 }
 
 /// Verweigert eine Änderung, die den **letzten aktiven Admin** aus der Menge der aktiven
 /// Admins entfernen würde — sei es durch Deaktivieren oder durch Entzug der Admin-Rolle.
 /// `bleibt_aktiver_admin` beschreibt den Zielzustand NACH der Änderung. Nur brisant, wenn
-/// `ziel` aktuell ein aktiver Admin ist. Geteilt von `deaktivieren` und `bearbeiten`
-/// (LFH-286) — eine Quelle der Wahrheit für den Aussperr-Schutz.
+/// `ziel` aktuell ein aktiver Admin ist; gezählt wird in der Org des Ziels (LFH-1123). Geteilt
+/// von `deaktivieren` und `bearbeiten` (LFH-286) — eine Quelle der Wahrheit für den
+/// Aussperr-Schutz.
 ///
 /// LIMITIERUNG (LFH-287, gehört in die SSO-Admin-Härtung LFH-277): gezählt wird nach ROLLE
 /// (`system_rolle=admin AND aktiv=1`), NICHT nach tatsächlich authentifizierbarem Login-Weg.
@@ -236,11 +255,15 @@ async fn verweigere_admin_lockout(
     if !(ziel.ist_admin() && ziel.aktiv) || bleibt_aktiver_admin {
         return Ok(());
     }
-    let aktive_admins: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM benutzer WHERE system_rolle = ? AND aktiv = 1")
-            .bind(ROLLE_ADMIN)
-            .fetch_one(pool)
-            .await?;
+    // Gezählt wird in der Org des Ziels (LFH-1123): ein Admin einer fremden Org kann sie nicht
+    // verwalten und hält sie deshalb nicht offen.
+    let aktive_admins: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM benutzer WHERE system_rolle = ? AND aktiv = 1 AND org_id = ?",
+    )
+    .bind(ROLLE_ADMIN)
+    .bind(ziel.org_id)
+    .fetch_one(pool)
+    .await?;
     if aktive_admins <= 1 {
         return Err(AppError::Conflict(
             "Der letzte aktive Admin kann nicht deaktiviert oder herabgestuft werden".into(),
@@ -258,15 +281,7 @@ pub async fn deaktivieren(
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
-    let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    verweigere_geraetekonto(&state.pool, id).await?;
+    let ziel = ziel_laden(&state.pool, &admin, id).await?;
 
     // Letzten aktiven Admin schützen: Deaktivieren setzt aktiv=0, der Nutzer bliebe also
     // kein aktiver Admin (geteilter Guard mit `bearbeiten`, LFH-286).
@@ -320,15 +335,7 @@ pub async fn bearbeiten(
     PfadParam(id): PfadParam<i64>,
     JsonBody(req): JsonBody<PatchBenutzer>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
-    let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    verweigere_geraetekonto(&state.pool, id).await?;
+    let ziel = ziel_laden(&state.pool, &admin, id).await?;
 
     // Zielwerte auflösen: mitgeschickt → validieren; sonst Bestandswert (partielle PATCH-Semantik).
     let anzeigename = match &req.anzeigename {
@@ -427,20 +434,15 @@ pub async fn bearbeiten(
 /// oben — ein laufender zweiter Faktor bzw. eine laufende Session sollen den Reset nicht
 /// überleben). Alle drei Schreiboperationen laufen in EINER Transaktion.
 ///
-/// `404`, falls kein Benutzer mit `id` existiert (geprüft VOR der Transaktion, analog
-/// `deaktivieren`s Existenz-Check). Steht in der Admin-Spur (LFH-1005).
+/// `404`, falls kein Benutzer mit `id` in der Org des Admins existiert (geprüft VOR der
+/// Transaktion über [`ziel_laden`], analog `deaktivieren`). Steht in der Admin-Spur (LFH-1005).
 pub async fn totp_reset(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
-    let benutzername: String = sqlx::query_scalar("SELECT benutzername FROM benutzer WHERE id = ?")
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or(AppError::NotFound)?;
-    verweigere_geraetekonto(&state.pool, id).await?;
+    let benutzername = ziel_laden(&state.pool, &admin, id).await?.benutzername;
 
     let mut tx = state.pool.begin().await?;
     // Mit dem Secret gehen auch Replay-Merker und Sperre des zweiten Faktors (LFH-791): ein
