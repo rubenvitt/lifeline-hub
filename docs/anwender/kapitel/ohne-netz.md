@@ -5,17 +5,41 @@ reihenfolge: 20
 quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx]
 ---
 
-## Voraussetzung
+## Überblick
 
-Ohne Netz arbeitet nur ein Gerät, auf dem die App **vorher mit Netz geöffnet** war und auf dem
-eine Person angemeldet ist. Die App selbst liegt dann auf dem Gerät, die Daten des Einsatzes hält
-sie für die Arbeit ohne Netz vor.
+Fällt das Netz aus, bleibt die Lage lesbar und das Erfassen möglich. Das gilt nur auf einem
+Gerät, auf dem die App **vorher mit Netz geöffnet** war und auf dem eine Person angemeldet ist.
+Die App selbst liegt dann auf dem Gerät, die Daten des Einsatzes hält sie für die Arbeit ohne Netz
+vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht die aktuelle Lage.
 
-Ob Netz da ist, zeigt der Seitenkopf („Stand HH:MM · offline“) und die Betriebszeile („Offline —
-keine Verbindung zum Server.“). Was dann angezeigt wird, ist der Stand der letzten Verbindung,
-nicht die aktuelle Lage.
+## Abläufe
 
-## Was ohne Netz lesbar bleibt
+### Erkennen, ob Netz da ist
+
+1. Auf den Seitenkopf achten: Ohne Netz steht dort „Stand HH:MM · offline“.
+2. Auf die Betriebszeile achten: Sie meldet „Offline — keine Verbindung zum Server.“ und die Zahl
+   der Einträge, die noch „ausstehend“ sind.
+
+### Ohne Netz erfassen
+
+1. Wie mit Netz erfassen und speichern, etwa eine Meldung oder einen Eintrag im
+   Einsatztagebuch.
+2. Die App meldet „Offline vorgemerkt“, die Betriebszeile zählt den Eintrag als „ausstehend“.
+3. Nichts weiter tun: Sobald wieder Netz da ist, geht der Eintrag von selbst hinaus.
+
+### Abgelehnte Einträge prüfen
+
+1. In der Betriebszeile „abgelehnt – prüfen“ wählen. Es öffnet sich „Offline-Aktionen
+   wiederherstellen“.
+2. Je Eintrag wählen:
+   - „Erneut versuchen“, wenn der Grund behoben ist;
+   - „Ohne Anhänge senden“, wenn die Anhänge fehlen, und mit „Nur den Text senden“ bestätigen;
+   - „Verwerfen“, wenn der Eintrag nicht mehr gebraucht wird, und mit „Endgültig verwerfen“
+     bestätigen.
+
+## Hintergrund
+
+### Was ohne Netz lesbar bleibt
 
 - Einsatzliste, Einsatzkopf und Einstellungen des Einsatzes
 - Einsatztagebuch in seinen festen Ansichten; die Ergebnisse einer Suche (Volltext, Zeitraum,
@@ -34,7 +58,7 @@ Verbindung zum Server. Startet die App ohne Netz mit einem älteren Stand, verwi
 einem Update der App gilt der alte Stand ebenfalls nicht mehr; die App lädt ihn neu, sobald Netz da
 ist.
 
-## Was sich ohne Netz erfassen lässt
+### Was sich ohne Netz erfassen lässt
 
 - Personen (Betroffene, Patienten), auch über die Aufnahme
 - Meldungen
@@ -42,25 +66,23 @@ ist.
 - Ausgaben der Verpflegung
 - Einträge im Einsatztagebuch
 
-Ein solcher Eintrag ist **„Offline vorgemerkt“**: Er liegt auf dem Gerät und geht hinaus, sobald
-wieder Netz da ist, ohne weiteres Zutun und in der Reihenfolge der Erfassung. Bis dahin zeigt die
-Betriebszeile die Zahl der ausstehenden Einträge. Eine erfasste Person trägt bis dahin „R-…“ statt
-ihrer Registriernummer; die Nummer vergibt der Server.
+Ein vorgemerkter Eintrag liegt auf dem Gerät und geht hinaus, sobald wieder Netz da ist, ohne
+weiteres Zutun und in der Reihenfolge der Erfassung. Eine erfasste Person trägt bis dahin „R-…“
+statt ihrer Registriernummer; die Nummer vergibt der Server.
 
 Als Zeitpunkt zählt der Moment der **Erfassung**, nicht der des Sendens. Die App gleicht dafür die
 Uhr des Geräts mit der des Servers ab, solange Netz da ist.
 
-## Abgelehnte Einträge
+### Abgelehnte Einträge
 
-Lehnt der Server einen vorgemerkten Eintrag ab (etwa weil der Einsatz inzwischen abgeschlossen ist
-oder ein Pflichtfeld fehlt), zeigt die Betriebszeile „abgelehnt – prüfen“. Dort lässt sich der
-Eintrag erneut senden, ohne Anhänge senden oder endgültig verwerfen; im Einsatztagebuch steht der
-Grund direkt am Eintrag.
+Der Server lehnt einen vorgemerkten Eintrag etwa ab, weil der Einsatz inzwischen abgeschlossen ist
+oder ein Pflichtfeld fehlt. Im Einsatztagebuch steht der Grund direkt am Eintrag.
 
-Abgelehnte Einträge löscht die App **nie von selbst**: Sie können das einzige Zeugnis einer
-Erfassung sein. Wer sie nicht mehr braucht, verwirft sie.
+Abgelehnte Einträge löscht die App erst **30 Tage nach der Ablehnung** von selbst: Sie können das
+einzige Zeugnis einer Erfassung sein. Wer sie vorher nicht mehr braucht, verwirft sie. Ausstehende
+Einträge haben keine Frist.
 
-## Was dabei auf dem Gerät liegt
+### Was dabei auf dem Gerät liegt
 
 Für die Arbeit ohne Netz liegen Daten des Einsatzes auf dem Gerät, bei Betroffenen auch
 Gesundheitsdaten. Geschützt sind sie durch die Bildschirmsperre und die Verschlüsselung des

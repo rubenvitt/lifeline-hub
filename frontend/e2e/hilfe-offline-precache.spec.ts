@@ -64,6 +64,6 @@ test('Hilfe: Kaltstart ohne Netz und ohne Anmeldung zeigt das Kapitel', async ({
 
   const inhalt = page.locator('[data-lfh="druckwurzel"]');
   await expect(inhalt.getByRole('heading', { level: 2, name: 'Gerät verloren' })).toBeVisible();
-  await expect(inhalt.getByRole('heading', { name: 'Sofort melden' })).toBeVisible();
+  await expect(inhalt.getByRole('heading', { name: 'Warum sofort' })).toBeVisible();
   await page.context().setOffline(false);
 });

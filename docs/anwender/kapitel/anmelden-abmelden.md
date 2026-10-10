@@ -2,15 +2,88 @@
 titel: Anmelden und Abmelden
 gruppen: [alle, geraete]
 reihenfolge: 10
-quellen: [frontend/src/pages/LoginPage.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/pages/LoginPage.tsx, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
 ---
 
-## Anmeldewege
+## Überblick
 
-Welche Wege die Anmeldeseite anbietet, legt der Betrieb der Instanz fest: Benutzername und
-Passwort, Passkey oder die Anmeldung über die eigene Organisation (SSO). Wer sich zum ersten Mal
-über SSO anmeldet, bekommt ein Konto mit den geringsten Rechten; weitere Rechte vergibt die
-Administration.
+Lifeline Hub arbeitet mit persönlichen Konten: Jeder Eintrag trägt den Namen der Person, die
+angemeldet ist. Welche Wege die Anmeldeseite anbietet, legt der Betrieb der Instanz fest:
+Benutzername und Passwort, Passkey oder die Anmeldung über die eigene Organisation (SSO).
+
+Tablets und Monitore an einer Stelle (Unfallhilfsstelle, Betreuungsstelle, Bereitstellungsraum,
+Einsatzabschnitt, Lagemonitor) arbeiten ohne persönliches Konto. Sie werden mit dem Einsatz
+**gekoppelt**. Einen Kopplungscode stellt nur die Einsatzleitung eines laufenden Einsatzes aus.
+
+## Abläufe
+
+### Mit Passwort anmelden
+
+1. Auf der Anmeldeseite „Benutzername“ und „Passwort“ eingeben.
+
+   ![Anmeldeseite mit den Feldern „Benutzername“ und „Passwort“ und dem Knopf „Anmelden“](../bilder/anmelden-abmelden/anmeldeseite.png)
+
+2. „Anmelden“ wählen.
+3. Ist ein zweiter Faktor eingerichtet, den Code aus der Authenticator-App eingeben; mit der
+   sechsten Ziffer meldet die Seite selbst an. Ohne das Telefon führt „Wiederherstellungscode
+   verwenden“ zur Eingabe eines Wiederherstellungscodes.
+
+Danach zeigt die App die Einsatzliste.
+
+### Mit Passkey oder über die Organisation anmelden
+
+1. Auf der Anmeldeseite „Mit Passkey anmelden“ oder „Mit … anmelden“ (Name der Organisation)
+   wählen.
+2. Den Passkey am Gerät bestätigen oder sich bei der Organisation anmelden.
+
+### In der Mac-App anmelden
+
+1. In der Mac-App „Im Browser anmelden (Passkey, SSO)“ wählen. Der Browser des Systems öffnet
+   sich.
+2. Im Browser auf einem der angebotenen Wege anmelden.
+3. Die Seite „In der Mac-App anmelden als …“ nennt die Person und ihr Konto. Stimmt beides, „In
+   der App anmelden“ wählen, sonst „Mit anderem Konto“.
+
+### Abmelden
+
+1. Oben rechts das „Benutzermenü“ (Kachel mit den Initialen) öffnen.
+
+   ![Geöffnetes Benutzermenü mit „Profil“ und „Abmelden“ unter dem Namen der Person](../bilder/anmelden-abmelden/benutzermenue.png)
+
+2. „Abmelden“ wählen. Die App kehrt zur Anmeldeseite zurück.
+
+„Abmelden“ steht auch in der Sprungpalette.
+
+### Ein Gerät koppeln
+
+Die Einsatzleitung am eigenen Gerät:
+
+1. In den Einstellungen des Einsatzes „Geräte“ öffnen.
+2. „Gerät koppeln“ wählen.
+3. Unter „Ansicht“ wählen, was das Gerät zeigen soll (etwa „UHS-Tablet“), dazu die Stelle und
+   eine „Gerätebezeichnung“.
+
+   ![Dialog „Gerät koppeln“ mit Ansicht, Unfallhilfsstelle und Gerätebezeichnung](../bilder/anmelden-abmelden/geraet-koppeln.png)
+
+4. „Koppeln“ wählen. Der Code erscheint als Text und als QR-Code.
+
+Am Gerät, das gekoppelt wird:
+
+5. Den QR-Code scannen oder die Seite „Gerät koppeln“ öffnen und den „Kopplungscode“ eingeben.
+   Ist dort noch eine Person angemeldet, zuerst „Abmelden zum Koppeln“ wählen.
+6. „Gerät koppeln“ wählen. Das Gerät zeigt danach nur seine Ansicht.
+
+## Hintergrund
+
+### Erste Anmeldung und vergessenes Passwort
+
+Wer sich zum ersten Mal über SSO anmeldet, bekommt ein Konto mit den geringsten Rechten; weitere
+Rechte vergibt die Administration.
+
+Ein vergessenes Passwort lässt sich nicht selbst zurücksetzen. Ansprechpartner ist die
+Administration der Organisation.
+
+### Zweiter Faktor
 
 Ein **zweiter Faktor** (Code aus einer Authenticator-App) ist freiwillig und schützt die
 Anmeldung mit Passwort. Eingerichtet wird er im Profil unter „Sicherheit“, mit dem aktuellen
@@ -18,13 +91,7 @@ Passwort als Bestätigung. Die Wiederherstellungscodes gehören an einen sichere
 Geräts: Sie sind der einzige eigene Weg hinein, wenn das Telefon mit der App fehlt. Abschalten
 kann den zweiten Faktor nur die Administration.
 
-Ein vergessenes Passwort lässt sich nicht selbst zurücksetzen. Ansprechpartner ist die
-Administration der Organisation.
-
-In der **Mac-App** läuft die Anmeldung über den Browser des Systems („Im Browser anmelden“). Dort
-bestätigt eine Seite, als wer die App angemeldet wird.
-
-## Wie lange eine Anmeldung gilt
+### Wie lange eine Anmeldung gilt
 
 Eine Anmeldung gilt **sieben Tage ab dem Anmelden**, auch über Neustarts des Geräts hinweg. Sie
 verlängert sich nicht durch Benutzung; nach Ablauf geht es zurück zur Anmeldeseite.
@@ -35,10 +102,10 @@ Eine Anmeldung endet außerdem, wenn
 - die Person ihr Passwort ändert: alle **anderen** Anmeldungen dieses Kontos enden, das Gerät,
   an dem geändert wurde, bleibt angemeldet.
 
-## Abmelden
+### Was das Abmelden löscht
 
-„Abmelden“ steht im Benutzermenü und in der Sprungpalette. Beim Abmelden löscht das Gerät, was
-der Server wieder liefern kann oder was nur dieser Person gehört:
+Beim Abmelden löscht das Gerät, was der Server wieder liefern kann oder was nur dieser Person
+gehört:
 
 - das vorgehaltene Lagebild für die Arbeit ohne Netz,
 - zwischengespeicherte Orte und Erfassungshilfen,
@@ -52,7 +119,7 @@ warten, bis nichts mehr aussteht, dann abmelden.
 
 Ebenfalls bleiben die Einstellungen des Geräts: Darstellung, Bediendichte, Helligkeit.
 
-## Gemeinsam genutzte Geräte
+### Gemeinsam genutzte Geräte
 
 An einem Gerät, das mehrere Personen nutzen (Einsatzleitwagen, Stelle mit Schichtbetrieb), gilt:
 **nach jeder Schicht abmelden.** Wer an einem Gerät mit fremder, laufender Anmeldung
@@ -64,20 +131,14 @@ Fenster „Anderer Benutzer angemeldet“. Es speichert dann nichts mehr unter d
 Vorgemerkte Einträge der bisherigen Person bleiben für sie liegen, ungesicherte Eingaben in diesem
 Fenster gehen verloren.
 
-## Gekoppelte Geräte
+### Gekoppelte Geräte
 
-Tablets und Monitore an einer Stelle (Unfallhilfsstelle, Betreuungsstelle, Bereitstellungsraum,
-Einsatzabschnitt, Lagemonitor) arbeiten ohne persönliches Konto. Sie werden mit dem Einsatz
-**gekoppelt**:
-
-- Die Einsatzleitung stellt in den Einstellungen des Einsatzes unter „Geräte“ einen
-  Kopplungscode aus. Er gilt **10 Minuten und nur einmal** und erscheint auch als QR-Code.
-- Am Gerät wird der Code auf der Seite „Gerät koppeln“ eingegeben oder per QR-Code geöffnet. Ist
-  dort noch eine Person angemeldet, meldet sie sich zuerst ab.
+- Ein Kopplungscode gilt **10 Minuten und nur einmal** und ist nur beim Ausstellen sichtbar.
 - Eine Kopplung gilt **24 Stunden**. Die Einsatzleitung kann sie verlängern, höchstens bis
   72 Stunden ab dem Zeitpunkt der Verlängerung.
+- Ein gekoppeltes Gerät zeigt nur seine Ansicht in diesem einen Einsatz.
 
-Ein gekoppeltes Gerät zeigt nur seine Ansicht in diesem einen Einsatz. Die Kopplung endet mit dem
-Widerruf durch die Einsatzleitung, mit ihrem Ablauf und mit dem Abschluss des Einsatzes; das Gerät
-zeigt dann „Kopplung beendet“. „Gerät abmelden …“ im Gerätemenü nimmt das Gerät ebenfalls aus dem
-Einsatz. Zurück kommt es in jedem Fall nur mit einem neuen Code.
+Die Kopplung endet mit dem Widerruf durch die Einsatzleitung, mit ihrem Ablauf und mit dem
+Abschluss des Einsatzes; das Gerät zeigt dann „Kopplung beendet“. „Gerät abmelden …“ im
+Gerätemenü nimmt das Gerät ebenfalls aus dem Einsatz. Zurück kommt es in jedem Fall nur mit einem
+neuen Code.
