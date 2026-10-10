@@ -157,7 +157,7 @@ async function waehleOption(label: string) {
   await userEvent.click(option!);
 }
 
-/** Modal-Dialog isolieren (auf der Listenseite gibt es nur die Schnellerfassung). */
+/** Modal-Dialog isolieren (auf der Listenseite gibt es nur die Erfassung). */
 async function modalDialog() {
   return (await screen.findAllByRole('dialog'))[0];
 }
@@ -185,7 +185,7 @@ async function warteBisDialogWeg() {
   });
 }
 
-/** Die drei Pflichtfelder der Schnellerfassung füllen (Typ, Ausmaß, Ort). */
+/** Die drei Pflichtfelder der Erfassung füllen (Typ, Ausmaß, Ort). */
 async function fuelleSchaden(dialog: HTMLElement, typ: string, ausmass: string, ort: string) {
   await userEvent.click(within(dialog).getAllByRole('combobox')[0]); // Typ
   await waehleOption(typ);
@@ -285,7 +285,7 @@ describe('SchaedenPage', () => {
         }),
       );
       render(einsatzAktiv, schaeden);
-      await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
       const dialog = await modalDialog();
       await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
       if (mitKoordinate) {
@@ -317,7 +317,7 @@ describe('SchaedenPage', () => {
 
   it('Feldbudget: zeigt vier Kernfelder und zählt die optionalen Angaben nur aufgeklappt', async () => {
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     const sichtbareFelder = () =>
       [...dialog.querySelectorAll<HTMLElement>('.ant-form-item')].filter(
@@ -385,7 +385,7 @@ describe('SchaedenPage', () => {
   it('versteckt Schreib-Buttons für Beobachter', async () => {
     render(einsatzBeobachter, [basisSchaden()]);
     await screen.findByText('S-001');
-    expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Schaden erfassen' })).not.toBeInTheDocument();
   });
 
   it('Zeilen-Klick navigiert auf die Schaden-Detailseite', async () => {
@@ -394,7 +394,7 @@ describe('SchaedenPage', () => {
     expect(await screen.findByText('SCHADEN-DETAIL')).toBeInTheDocument();
   });
 
-  it('Schnellerfassung schickt Pflichtfelder', async () => {
+  it('Erfassung schickt Pflichtfelder', async () => {
     let body: Record<string, unknown> = {};
     server.use(
       http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
@@ -403,7 +403,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     // Typ + Ausmaß sind Pflicht ohne Default → beide antd-Selects bedienen, dann Ort tippen.
     await userEvent.click(within(dialog).getAllByRole('combobox')[0]); // Typ
@@ -435,7 +435,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     // Der Schalter steht per Vorgabe aus — ohne ihn gäbe es keine Übernahme.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
@@ -470,7 +470,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     // „Werte behalten" an: der Ort wandert mit (Übernahme), der Geschädigte nicht (lokaler State).
     // Ohne den Schalter bewiese die zweite Hälfte nichts.
@@ -513,7 +513,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
     await oeffneWeitereAngaben(dialog);
@@ -545,7 +545,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
@@ -563,7 +563,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const ersterDialog = await modalDialog();
     await oeffneWeitereAngaben(ersterDialog);
     expect(within(ersterDialog).getAllByRole('combobox')[2]).toHaveValue('');
@@ -576,7 +576,7 @@ describe('SchaedenPage', () => {
     await waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Schaden erfassen' }));
     const zweiterDialog = await modalDialog();
     await oeffneWeitereAngaben(zweiterDialog);
     await waitFor(() =>
@@ -598,7 +598,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Fehlerort Schaden');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
@@ -638,7 +638,7 @@ describe('SchaedenPage', () => {
       }),
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Wartort Schaden');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
@@ -689,7 +689,7 @@ describe('SchaedenPage', () => {
       { route: '/einsaetze/1/schaeden' },
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialogA = await modalDialog();
     await waitFor(() => expect(within(dialogA).getByLabelText('Ort')).toHaveValue('Schadenort A'));
     await userEvent.click(within(dialogA).getAllByRole('combobox')[0]);
@@ -713,7 +713,7 @@ describe('SchaedenPage', () => {
     expect(within(dialogB).getByPlaceholderText('Koordinate eingeben')).toHaveValue('');
   });
 
-  it('Schnellerfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {
+  it('Erfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {
     let body: Record<string, unknown> = {};
     server.use(
       http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
@@ -722,7 +722,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await userEvent.click(within(dialog).getAllByRole('combobox')[0]); // Typ
     await waehleOption('Sachschaden');
@@ -740,7 +740,7 @@ describe('SchaedenPage', () => {
     expect(body.geschaedigt_kontakt).toBeNull();
   });
 
-  it('Schnellerfassung: Einsatzkraft aus Combobox → geschaedigt_personal_id', async () => {
+  it('Erfassung: Einsatzkraft aus Combobox → geschaedigt_personal_id', async () => {
     let body: Record<string, unknown> = {};
     server.use(
       http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
@@ -749,7 +749,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await userEvent.click(within(dialog).getAllByRole('combobox')[0]);
     await waehleOption('Sachschaden');
@@ -766,7 +766,7 @@ describe('SchaedenPage', () => {
     expect(body.geschaedigt_kontakt).toBeNull();
   });
 
-  it('Schnellerfassung: Freitext → externer Kontakt (geschaedigt_kontakt)', async () => {
+  it('Erfassung: Freitext → externer Kontakt (geschaedigt_kontakt)', async () => {
     let body: Record<string, unknown> = {};
     server.use(
       http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
@@ -775,7 +775,7 @@ describe('SchaedenPage', () => {
       }),
     );
     render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const dialog = await modalDialog();
     await userEvent.click(within(dialog).getAllByRole('combobox')[0]);
     await waehleOption('Sachschaden');
@@ -801,7 +801,9 @@ describe('SchaedenPage', () => {
 
   it('öffnet via ?neu=1 die Schadens-Erfassung', async () => {
     renderSchaedenPage('/einsaetze/1/schaeden?neu=1');
-    expect(await screen.findByText('Schaden erfassen')).toBeInTheDocument();
+    // Im Dialog gesucht: der Kopfknopf trägt denselben Wortlaut (LFH-1151).
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Schaden erfassen')).toBeInTheDocument();
   });
 
   it('öffnet via ?neu=1 die Erfassungsmaske NICHT für Beobachter', async () => {

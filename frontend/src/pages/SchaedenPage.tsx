@@ -352,7 +352,7 @@ export default function SchaedenPage() {
       aktionen={
         darfSchreiben && (
           <Button type="primary" onClick={() => setErfassenOffen(true)}>
-            Schnellerfassung
+            Schaden erfassen
           </Button>
         )
       }

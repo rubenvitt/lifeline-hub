@@ -222,7 +222,7 @@ export default function EinsatzDefaults() {
             />
           </Form.Item>
           <Form.Item
-            label="Vorgabe-Quittierungsfrist Aufträge (Minuten)"
+            label="Vorgabe-Quittierfrist Aufträge (Minuten)"
             name="auftrag_quittierung_frist_min"
           >
             <InputNumber
