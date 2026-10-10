@@ -35,21 +35,37 @@ test('ein Admin setzt den zweiten Faktor einer Person zurück', async ({ page })
   await suche.fill(ohne.benutzername);
   const ohneMenue = await oeffneMenue(
     page,
-    page.getByRole('button', { name: 'Aktionen zu Benutzer E2E Ohne Faktor' }),
+    page.getByRole('button', {
+      name: `Aktionen zu Benutzer E2E Ohne Faktor (@${ohne.benutzername})`,
+    }),
   );
   await expect(ohneMenue.getByRole('menuitem', { name: 'Bearbeiten' })).toBeVisible();
   await expect(ohneMenue.getByRole('menuitem', { name: /Zweiten Faktor/ })).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   await suche.fill(person.benutzername);
-  const ausloeser = page.getByRole('button', { name: 'Aktionen zu Benutzer E2E Telefon weg' });
+  const ausloeser = page.getByRole('button', {
+    name: `Aktionen zu Benutzer E2E Telefon weg (@${person.benutzername})`,
+  });
   const menue = await oeffneMenue(page, ausloeser);
   await menue.getByRole('menuitem', { name: 'Zweiten Faktor zurücksetzen …' }).click();
   const dialog = page.getByRole('dialog', {
     name: 'Zweiten Faktor von E2E Telefon weg zurücksetzen?',
   });
   await expect(dialog).toBeVisible();
+  // Die Anfrage wird angehalten: solange sie läuft, schließt nichts die Rückfrage, auch Escape
+  // nicht. Sonst käme eine Ablehnung unsichtbar an (LFH-1077).
+  let freigeben: () => void = () => {};
+  const freigabe = new Promise<void>((fertig) => (freigeben = fertig));
+  await page.route('**/api/benutzer/*/totp/reset', async (route) => {
+    await freigabe;
+    await route.continue();
+  });
   await dialog.getByRole('button', { name: 'Zweiten Faktor zurücksetzen' }).click();
+  await expect(dialog.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  freigeben();
   await expect(dialog).toBeHidden();
   await expect(page.getByText('Zweiter Faktor von E2E Telefon weg zurückgesetzt')).toBeVisible();
 

@@ -273,7 +273,9 @@ export default function BenutzerPage() {
         return (
           <MenueAusloeser
             eintraege={eintraege}
-            zugaenglicherName={`Aktionen zu Benutzer ${b.anzeigename}`}
+            // Mit Benutzername: Anzeigenamen sind nicht eindeutig, zwei „Kim Beispiel“ trügen sonst
+            // zwei gleichnamige Auslöser (Spec `datensatz-aktionsmenue`).
+            zugaenglicherName={`Aktionen zu Benutzer ${b.anzeigename} (@${b.benutzername})`}
             // Zeilengescopte Ladeanzeige: ohne Rückmeldung lädt der Klick zum zweiten ein.
             laeuft={
               (deaktivieren.isPending && deaktivieren.variables === b.id) ||

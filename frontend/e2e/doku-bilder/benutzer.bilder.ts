@@ -47,7 +47,7 @@ test.describe(KAPITEL, () => {
     await expect(page.locator('.ant-table-wrapper').getByText('Kim Beispiel')).toBeVisible();
     const menue = await oeffneMenue(
       page,
-      page.getByRole('button', { name: 'Aktionen zu Benutzer Kim Beispiel' }),
+      page.getByRole('button', { name: 'Aktionen zu Benutzer Kim Beispiel (@k.beispiel)' }),
     );
     await expect(menue.getByRole('menuitem', { name: 'Deaktivieren' })).toBeVisible();
     // Ausschnitt: der Seiteninhalt um Werkzeugzeile und Tabelle, samt Kopf mit „Benutzer anlegen“.
@@ -99,7 +99,7 @@ test.describe(KAPITEL, () => {
       await page.goto('/admin/benutzer');
       await waehleImMenue(
         page,
-        page.getByRole('button', { name: 'Aktionen zu Benutzer Kim Beispiel' }),
+        page.getByRole('button', { name: 'Aktionen zu Benutzer Kim Beispiel (@k.beispiel)' }),
         'Anmeldungen',
       );
       const dialog = page.getByRole('dialog', { name: 'Anmeldungen · Kim Beispiel' });

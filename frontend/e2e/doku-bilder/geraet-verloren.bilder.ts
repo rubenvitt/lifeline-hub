@@ -40,7 +40,9 @@ test.describe(KAPITEL, () => {
     await page.goto('/admin/benutzer');
     await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
     const zeile = page.getByRole('row').filter({ hasText: `@${person.benutzername}` });
-    const ausloeser = zeile.getByRole('button', { name: 'Aktionen zu Benutzer Max Beispiel' });
+    const ausloeser = zeile.getByRole('button', {
+      name: 'Aktionen zu Benutzer Max Beispiel (@m.beispiel)',
+    });
     await waehleImMenue(page, ausloeser, 'Anmeldungen');
     const dialog = page.getByRole('dialog', { name: 'Anmeldungen · Max Beispiel' });
     const liste = dialog.locator('[data-lfh="sitzungsliste"]');
@@ -97,7 +99,9 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     await page.goto('/admin/benutzer');
     await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
-    const ausloeser = page.getByRole('button', { name: 'Aktionen zu Benutzer Erik Beispiel' });
+    const ausloeser = page.getByRole('button', {
+      name: 'Aktionen zu Benutzer Erik Beispiel (@e.beispiel)',
+    });
     await waehleImMenue(page, ausloeser, 'Zweiten Faktor zurücksetzen …');
     const dialog = page.getByRole('dialog', {
       name: 'Zweiten Faktor von Erik Beispiel zurücksetzen?',

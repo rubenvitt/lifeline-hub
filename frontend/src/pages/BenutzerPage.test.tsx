@@ -30,14 +30,26 @@ function offenesMenue(): Promise<HTMLElement> {
   });
 }
 
-/** Der Auslöser des Aktionsmenüs einer Zeile, auf jeder Breite (LFH-1122). */
+/**
+ * Der Auslöser des Aktionsmenüs einer Zeile, auf jeder Breite (LFH-1122). Die Fixtures tragen den
+ * Anzeigenamen klein als Benutzernamen („Eva“, `eva`).
+ */
 const ausloeser = (anzeigename: string) =>
-  screen.findByRole('button', { name: `Aktionen zu Benutzer ${anzeigename}` });
+  screen.findByRole('button', {
+    name: `Aktionen zu Benutzer ${anzeigename} (@${anzeigename.toLowerCase()})`,
+  });
 
-/** Wählt im Aktionsmenü der Zeile `anzeigename` den Eintrag `eintrag`. */
+/**
+ * Wählt im Aktionsmenü der Zeile `anzeigename` den Eintrag `eintrag`. Erst wenn ein Menü den Fokus
+ * hat: `Dropdown autoFocus` zieht ihn drei Frames nach dem Öffnen ins Menü und bricht das beim
+ * Schließen nicht ab. Ein früherer Klick ließe ihn dem Dialog danach wieder wegnehmen. „Ein“
+ * Menü, nicht das neue: beim zweiten Öffnen hält jsdom den Fokus noch im ausblendenden ersten.
+ */
 async function waehle(anzeigename: string, eintrag: string) {
   await userEvent.click(await ausloeser(anzeigename));
-  await userEvent.click(within(await offenesMenue()).getByRole('menuitem', { name: eintrag }));
+  const menue = await offenesMenue();
+  await waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull());
+  await userEvent.click(within(menue).getByRole('menuitem', { name: eintrag }));
 }
 
 describe('BenutzerPage', () => {
@@ -973,8 +985,10 @@ describe('BenutzerPage', () => {
       seite();
       await waehle('Eva', EINTRAG);
       const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
-      // Die Folgen stehen in der Rückfrage: alle Anmeldungen enden.
+      // Die Folgen stehen in der Rückfrage: alle Anmeldungen enden. Der Satz zum eigenen Gerät
+      // gilt nur beim eigenen Konto.
       expect(within(dialog).getByText(/Alle Anmeldungen von Eva enden/)).toBeInTheDocument();
+      expect(within(dialog).queryByText(/auch die Anmeldung an diesem Gerät/)).toBeNull();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
       expect(gesendet).toEqual([]);
 
@@ -991,6 +1005,43 @@ describe('BenutzerPage', () => {
         await userEvent.click(await ausloeser('Eva'));
         expect(within(await offenesMenue()).queryByRole('menuitem', { name: EINTRAG })).toBeNull();
       });
+    });
+
+    // Escape belegt `e2e/zweitfaktor-zuruecksetzen.spec.ts`: in jsdom bleibt das ausblendende Menü
+    // oben auf antds Escape-Stapel, der Dialog bekäme die Taste nie.
+    it('solange gesendet wird, lassen Abbrechen, Kreuz und Maske die Rückfrage offen', async () => {
+      // Auch gesperrte Knöpfe anklicken: der Klick darf nichts bewirken, nicht nur nicht ankommen.
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      let lehneAb: () => void = () => {};
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva(true)])),
+        http.post(
+          '/api/benutzer/2/totp/reset',
+          () =>
+            new Promise((fertig) => {
+              lehneAb = () =>
+                fertig(HttpResponse.json({ error: 'Benutzer nicht gefunden' }, { status: 404 }));
+            }),
+        ),
+      );
+      seite();
+      await waehle('Eva', EINTRAG);
+      const dialog = await screen.findByRole('dialog', { name: RUECKFRAGE });
+      await user.click(within(dialog).getByRole('button', { name: 'Zweiten Faktor zurücksetzen' }));
+      const abbrechen = within(dialog).getByRole('button', { name: 'Abbrechen' });
+      await waitFor(() => expect(abbrechen).toBeDisabled());
+
+      await user.click(abbrechen);
+      await user.click(within(dialog).getByRole('button', { name: /Close|Schlie(ss|ß)en/i }));
+      await user.click(document.querySelector<HTMLElement>('.ant-modal-wrap')!);
+      // Geschlossen fiele der Titel auf den Ersatz ohne Namen zurück (der Zustand ist leer).
+      expect(screen.getByRole('dialog', { name: RUECKFRAGE })).toBe(dialog);
+
+      lehneAb();
+      // Die Ablehnung kommt im noch offenen Dialog an, nicht unsichtbar (LFH-1077).
+      expect(await within(dialog).findByText('Nicht zurückgesetzt')).toBeInTheDocument();
+      expect(abbrechen).toBeEnabled();
     });
 
     it('eine Ablehnung steht im Dialog, der Dialog bleibt offen', async () => {

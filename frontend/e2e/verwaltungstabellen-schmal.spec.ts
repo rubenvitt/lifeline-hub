@@ -65,7 +65,8 @@ const TABELLEN: Tabelle[] = [
       return kennung;
     },
     status: 'aktiv',
-    menue: (k) => `Aktionen zu Benutzer ${k}`,
+    // Der Benutzername steht mit im Namen; `saeen` bildet ihn aus der Marke am Ende der Kennung.
+    menue: (k) => `Aktionen zu Benutzer ${k} (@e2e-verwaltung-${k.split(' ').pop()})`,
     zweiteAktion: 'Deaktivieren',
     immerMenue: true,
   },
