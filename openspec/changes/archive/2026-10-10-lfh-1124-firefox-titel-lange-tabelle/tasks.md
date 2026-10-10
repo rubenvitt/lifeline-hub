@@ -18,7 +18,7 @@
 
 ## 4. Abschluss
 
-- [ ] 4.1 Gates: `tsc`, Lint, Prettier, Vitest komplett, `./scripts/check-all.sh --nur schnell` grün (volle Suite über die CI des PRs).
+- [x] 4.1 Gates: `tsc`, Lint, Prettier, Vitest komplett, `./scripts/check-all.sh --nur schnell` grün (volle Suite über die CI des PRs).
 
 ## Workflow follow-up
 

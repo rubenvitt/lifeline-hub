@@ -298,7 +298,7 @@ function TabellenAnzeige({
  * erste Zeile dort keine Höhe hat; sie bricht zwischen ihren Zeilen und wiederholt den Kopf.
  * Überall sonst ist die Kopie ausgeblendet und die echte Tabelle steht wie ohne Deckel
  * (`druck/druck.css`, Herleitung
- * `openspec/changes/lfh-1124-firefox-titel-lange-tabelle/design.md`).
+ * `openspec/changes/archive/2026-10-10-lfh-1124-firefox-titel-lange-tabelle/design.md`).
  */
 function Deckel({
   titel,

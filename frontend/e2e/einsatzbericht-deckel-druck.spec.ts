@@ -11,7 +11,7 @@ import { expect, test, type APIResponse, type Page } from '@playwright/test';
  * Zeile des Deckels an, die Spalten beider Tabellen stehen an denselben Kanten und der Deckel deckt
  * weiß. In Chromium und WebKit ist der Deckel keine Box und die Kopie unsichtbar. Den Umbruch
  * selbst zeigt nur das Blatt: Verschiebeprobe unter
- * `openspec/changes/lfh-1124-firefox-titel-lange-tabelle/werkzeug/`.
+ * `openspec/changes/archive/2026-10-10-lfh-1124-firefox-titel-lange-tabelle/werkzeug/`.
  *
  * Läuft in allen drei Engines (`DRUCK_SPECS` in `playwright.config.ts`).
  */

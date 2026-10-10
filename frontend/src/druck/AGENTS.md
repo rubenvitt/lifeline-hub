@@ -50,7 +50,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `KURZE_TABELLE` Zeilen ganz, aber nur in Firefox (`titelblock-tabelle` unter
   `@supports (-moz-appearance: none)`): Chromium hält Titel, Kopf und erste Zeile selbst
   zusammen, eine Hülle rückte dort die ganze Tabelle weiter. Vor einer längeren steht der
-  **Deckel** (LFH-1124, `openspec/changes/lfh-1124-firefox-titel-lange-tabelle/design.md`): Titel
+  **Deckel** (LFH-1124, Herleitung
+  `openspec/changes/archive/2026-10-10-lfh-1124-firefox-titel-lange-tabelle/design.md`): Titel
   und eine Kopie der Tabelle (`aria-hidden`), von der nur Kopf und erste Zeile Höhe haben, die
   übrigen Zeilen sind Maßzeilen der Höhe 0 und halten die Spalten beider Tabellen gleich. Im
   Firefox-Druck bricht er nicht, deckt weiß (`print-color-adjust: exact`) und liegt über der
