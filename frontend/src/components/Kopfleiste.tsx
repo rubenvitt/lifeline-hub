@@ -92,9 +92,12 @@ export function kopfZelleStil(
  * Die Summe 340 + 180 = 520 px hält den Umbruchpunkt (≈ 1100 px in `kompakt`); kleiner würde der
  * Name bei mittleren Breiten auf 0 px gedrückt.
  *
- * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}: dort gibt es keine Suchzelle. `minWidth: 0`
- * bleibt an allen Aufrufstellen Pflicht — ohne sie kürzt ein Flex-Kind nicht, sondern läuft
- * über (Gate 1).
+ * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}: dort gibt es keine Suchzelle. Ein Flex-Kind
+ * mit Text braucht einen Boden, sonst kürzt es nicht, sondern läuft über (Gate 1): die
+ * Namensgruppe `minWidth: 'min-content'`, die Namenszelle darin `contain: inline-size` mit der
+ * Trefffläche als Boden (`EinsatzLayout`, LFH-1126). So zählt der Umbruch den festen Teil der
+ * Gruppe, der in `handschuh` breiter ist als die Basis; die Basis allein ließ den Wechsler über
+ * die Suche laufen.
  */
 export const KOPF_NAME_FLEX = '3 1 340px';
 export const KOPF_NAME_FLEX_SCHMAL = '1 1 240px';

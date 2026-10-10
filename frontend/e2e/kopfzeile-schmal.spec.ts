@@ -21,6 +21,38 @@ async function anmelden(page: Page) {
   await anmeldenAlsAdmin(page);
 }
 
+/**
+ * Der Einsatz-Wechsler hält im Kopf seine Trefffläche (72 px in `handschuh`), und kein Bedienziel
+ * des Kopfs liegt über einem anderen (LFH-1126). Gemessen wie in Gate 1.
+ */
+async function pruefeNameUeberdecktNichts(page: Page, fall: string) {
+  const ziele = await page.locator('header').evaluate((el) =>
+    Array.from(el.querySelectorAll('button, a[href]')).map((ziel) => {
+      const r = ziel.getBoundingClientRect();
+      return {
+        name: ziel.getAttribute('aria-label') ?? ziel.textContent ?? '',
+        x: r.x,
+        y: r.y,
+        rechts: r.right,
+        unten: r.bottom,
+        breite: r.width,
+      };
+    }),
+  );
+  const wechsler = ziele.find((z) => z.name.startsWith('LFH-460 Hochwasser'));
+  expect(wechsler, `${fall}: der Einsatz-Wechsler steht im Kopf`).toBeDefined();
+  expect(wechsler!.breite, `${fall}: Trefffläche des Namens`).toBeGreaterThanOrEqual(72);
+  for (const ziel of ziele) {
+    for (const nachbar of ziele) {
+      if (nachbar === ziel) continue;
+      const ueberlappt =
+        Math.min(ziel.rechts, nachbar.rechts) > Math.max(ziel.x, nachbar.x) &&
+        Math.min(ziel.unten, nachbar.unten) > Math.max(ziel.y, nachbar.y);
+      expect.soft(ueberlappt, `${fall}: ${ziel.name} überdeckt ${nachbar.name}`).toBe(false);
+    }
+  }
+}
+
 test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste auf 390 px', async ({
   page,
 }) => {
@@ -263,14 +295,19 @@ test('die Alarmzentrale steht ab lg sichtbar abgesetzt von den Aktionen', async 
   expect(suchenDrin, 'die Suche liegt NICHT in der Alarmzelle').toBe(false);
 });
 
-test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf EINE Zeile', async ({
+test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand höchstens zwei Zeilen, und der Name überdeckt nichts', async ({
   page,
 }) => {
   /**
    * Der RUHEZUSTAND, für den die Verdichtung gebaut ist (die Störungswörter misst
    * `gate1-ueberlauf.spec.ts`): Benachrichtigungen erlaubt und Ton bereit (beide headless
-   * nachgebildet), Strom verbunden. Dann stehen die Zustände nur als Icon, und auch die
-   * breiteste Stufe hält eine Zeile.
+   * nachgebildet), Strom verbunden. Dann stehen die Zustände nur als Icon.
+   *
+   * Eine Zeile hält `handschuh` hier NICHT (LFH-1126, Entscheidung 10.10.2026): Marke,
+   * Wortmarke, Nummer und 72 px Name (≈ 436 px), die Suche und die rechte Gruppe (488 px)
+   * brauchen über 1024 px. Bis LFH-1126 stand der Kopf trotzdem einzeilig, weil die Namenszelle
+   * auf 0 px schrumpfte und der Wechsler über „Suchen“ lag; diese Spec maß nur die Höhe. Jetzt
+   * bricht die rechte Gruppe um, in jedem Alarmzustand gleich, und gemessen wird die Überdeckung.
    *
    * Warum der Ton nachgebildet wird (LFH-809): ob der AudioContext ohne Nutzergeste
    * `running` meldet, entscheidet die Audio-Umgebung der Maschine, nicht die App. Im
@@ -332,5 +369,69 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
   // Ruhezustand ohne Wort — aber benannt: beide Ziele stehen mit Zustand im Namen da.
   await expect(alarm).toHaveText('');
   const hoehe = await page.locator('header').evaluate((h) => h.clientHeight);
-  expect(hoehe, 'eine Zeile in handschuh (72 px)').toBeLessThanOrEqual(72);
+  expect(hoehe, 'höchstens zwei Zeilen in handschuh (2 × 72 px)').toBeLessThanOrEqual(144);
+  await pruefeNameUeberdecktNichts(page, 'Ruhezustand');
+});
+
+/**
+ * Führungs-Tablet 1024 px, handschuh, Benachrichtigung verweigert (LFH-1126): der Einsatzname
+ * behält in JEDEM Wortlaut der Alarmmarke seine Trefffläche und liegt nicht über „Suchen“.
+ *
+ * Mit „Benachrichtigung blockiert“ bricht die rechte Gruppe um; wechselt die Marke auf „Ton
+ * blockiert“, passt sie in die erste Zeile. Dann schrumpfte die Namensgruppe auf ihre Basis
+ * (`KOPF_NAME_FLEX`, auf `kompakt` gerechnet), der feste Teil in `handschuh` ist aber breiter,
+ * und der Wechsler (Boden 72 px) lief über die Suche. Beide Wortlaute werden hier gezielt
+ * nachgebildet, statt auf den Zeitpunkt der Tonprüfung zu hoffen (`gate1-ueberlauf.spec.ts`
+ * misst den echten Ablauf und war deshalb nur zeitweise rot).
+ */
+test.describe('LFH-1126 Name und Alarmmarke am Führungs-Tablet', () => {
+  // Mit Finger bündelt die Alarmzentrale zu EINER Marke (`buendeln`), wie in Gate 1.
+  test.use({ hasTouch: true });
+  for (const ton of ['bereit', 'blockiert'] as const) {
+    test(`Führungs-Tablet 1024 px, handschuh, Benachrichtigung verweigert, Ton ${ton}: der Name überdeckt nichts`, async ({
+      page,
+    }) => {
+      test.setTimeout(60_000);
+      await page.addInitScript((tonBereit) => {
+        localStorage.setItem('lifeline-hub.dichte', 'handschuh');
+        class VerweigerteBenachrichtigung {
+          static permission = 'denied';
+          static requestPermission = async () => 'denied';
+        }
+        Object.defineProperty(window, 'Notification', {
+          value: VerweigerteBenachrichtigung,
+          configurable: true,
+        });
+        // Ton nachgebildet wie im Ruhezustands-Test oben: bereit meldet `running`; gesperrt
+        // bleibt `suspended`, und `resume()` löst nie auf, bis die Frist „blockiert“ setzt.
+        const AC = window.AudioContext;
+        if (AC) {
+          Object.defineProperty(AC.prototype, 'state', {
+            configurable: true,
+            get: () => (tonBereit ? 'running' : 'suspended'),
+          });
+          AC.prototype.resume = () =>
+            tonBereit ? Promise.resolve() : new Promise<void>(() => undefined);
+        }
+      }, ton === 'bereit');
+      await page.setViewportSize({ width: 1024, height: 800 });
+      await anmelden(page);
+      const einsatzId = await einsatzAnlegen(
+        page,
+        `LFH-460 Hochwasser Abschnitt Nordwest ${Date.now()}`,
+      );
+      await page.goto(`/einsaetze/${einsatzId}/etb`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+      await expect(page.getByPlaceholder('Inhalt …')).toBeVisible();
+      // Vorbedingung VOR der Messung: die Marke trägt genau den Wortlaut dieses Falls.
+      const marke = ton === 'bereit' ? 'Benachrichtigung blockiert' : 'Ton blockiert';
+      await expect(
+        page
+          .locator('header [data-lfh="kopf-alarm"]')
+          .getByRole('button', { name: `Alarmzentrale: ${marke}`, exact: true }),
+      ).toBeVisible({ timeout: 10_000 });
+
+      await pruefeNameUeberdecktNichts(page, marke);
+    });
+  }
 });
