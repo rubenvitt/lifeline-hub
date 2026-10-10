@@ -53,6 +53,34 @@ async function pruefeNameUeberdecktNichts(page: Page, fall: string) {
   }
 }
 
+/**
+ * Ruhezustand der Alarmzentrale headless nachgebildet, in `handschuh`: Benachrichtigungen
+ * erlaubt, Ton bereit. Warum der Ton nachgebildet wird, steht am Ruhezustands-Test (LFH-809).
+ */
+async function ruhezustandNachbilden(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('lifeline-hub.dichte', 'handschuh');
+    class ErlaubteBenachrichtigung {
+      static permission = 'granted';
+      static requestPermission = async () => 'granted';
+    }
+    Object.defineProperty(window, 'Notification', {
+      value: ErlaubteBenachrichtigung,
+      configurable: true,
+    });
+    // Ton bereit: `state` meldet `running`, `resume()` löst sofort auf. Der echte `resume()`
+    // bleibt unberührt liegen, er könnte in einer gesperrten Umgebung nie auflösen.
+    const AC = window.AudioContext;
+    if (AC) {
+      Object.defineProperty(AC.prototype, 'state', {
+        configurable: true,
+        get: () => 'running',
+      });
+      AC.prototype.resume = () => Promise.resolve();
+    }
+  });
+}
+
 test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste auf 390 px', async ({
   page,
 }) => {
@@ -321,27 +349,7 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand höchstens zwei Zeilen
    * und `kopfzeile-start-cls.spec.ts` ab.
    */
   test.setTimeout(60_000);
-  await page.addInitScript(() => {
-    localStorage.setItem('lifeline-hub.dichte', 'handschuh');
-    class ErlaubteBenachrichtigung {
-      static permission = 'granted';
-      static requestPermission = async () => 'granted';
-    }
-    Object.defineProperty(window, 'Notification', {
-      value: ErlaubteBenachrichtigung,
-      configurable: true,
-    });
-    // Ton bereit: `state` meldet `running`, `resume()` löst sofort auf. Der echte `resume()`
-    // bleibt unberührt liegen, er könnte in einer gesperrten Umgebung nie auflösen.
-    const AC = window.AudioContext;
-    if (AC) {
-      Object.defineProperty(AC.prototype, 'state', {
-        configurable: true,
-        get: () => 'running',
-      });
-      AC.prototype.resume = () => Promise.resolve();
-    }
-  });
+  await ruhezustandNachbilden(page);
   await page.setViewportSize({ width: 1024, height: 800 });
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(
@@ -434,4 +442,58 @@ test.describe('LFH-1126 Name und Alarmmarke am Führungs-Tablet', () => {
       await pruefeNameUeberdecktNichts(page, marke);
     });
   }
+});
+
+/**
+ * Führungs-Tablet 1024 px, handschuh, Ruhezustand: der Kopf hat beim Laden schon seine endgültige
+ * Höhe (LFH-1126). Die Einsatznummer trägt den Boden der Namensgruppe mit; ohne ihren
+ * Platzhalter stand der Kopf beim Laden in einer Zeile und brach erst mit der Nummer um, und
+ * alles darunter sprang 72 px.
+ */
+test.describe('LFH-1126 Kopfhöhe über das Laden', () => {
+  // Ohne Finger wie der Ruhezustands-Test: zwei Alarmziele, nur als Icon (rechte Gruppe 488 px).
+  test('Führungs-Tablet 1024 px, handschuh: der Kopf springt nicht, wenn der Einsatz lädt', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await ruhezustandNachbilden(page);
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(
+      page,
+      `LFH-460 Hochwasser Abschnitt Nordwest ${Date.now()}`,
+    );
+    // Nur der Kopf-GET des Einsatzes wird gehalten; alles andere läuft.
+    let loslassen!: () => void;
+    const tor = new Promise<void>((f) => (loslassen = f));
+    let gehalten = 0;
+    await page.route(`**/api/einsaetze/${einsatzId}`, async (route) => {
+      if (route.request().method() === 'GET') {
+        gehalten += 1;
+        await tor;
+      }
+      await route.continue();
+    });
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+    const kopf = page.locator('header');
+    const name = kopf.locator('[data-lfh="kopf-einsatzname"]');
+    // Vorbedingung: der Einsatz lädt noch, der Name steht nicht.
+    await expect(name).toBeVisible();
+    await expect(name.getByRole('button')).toHaveCount(0);
+    await expect(
+      kopf
+        .locator('[data-lfh="kopf-alarm"]')
+        .getByRole('button', { name: 'Ton bereit – stummschalten' }),
+    ).toBeVisible();
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    const vorher = await kopf.evaluate((h) => h.clientHeight);
+    expect(gehalten, 'gehaltene Abfragen').toBeGreaterThan(0);
+    loslassen();
+    await expect(name.getByRole('button', { name: /LFH-460 Hochwasser/ })).toBeVisible();
+    await expect(kopf.locator('[data-lfh="kopf-einsatznummer"]')).toBeVisible();
+    const nachher = await kopf.evaluate((h) => h.clientHeight);
+    expect(nachher, `Kopfhöhe ${vorher} → ${nachher}`).toBe(vorher);
+    await pruefeNameUeberdecktNichts(page, 'nach dem Laden');
+  });
 });

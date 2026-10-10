@@ -124,6 +124,22 @@ function nameZelleStil(token: { controlHeight: number }): CSSProperties {
 
 const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
 
+const EINSATZNUMMER_STIL = {
+  fontFamily: schrift.zahl,
+  fontSize: 12,
+  color: rahmenFarben.text,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
+} as const;
+
+/**
+ * Platzhalter der Einsatznummer, solange der Einsatz lädt: dieselbe Form, die das System beim
+ * Anlegen vergibt (`E-<Jahr>-<lfd. Nr.>`, Mono, also gleich breit), unsichtbar. Die Nummer
+ * trägt den Boden der Namensgruppe mit (LFH-1126); ohne Platzhalter brach der Kopf in
+ * `handschuh` erst nach dem Laden um, und die Seite sprang 72 px.
+ */
+const EINSATZNUMMER_PLATZHALTER = 'E-0000-0000';
+
 /**
  * Statuspunkt vor der Einsatznummer: `normal` bei aktivem Einsatz, sonst neutral. Das Wort
  * steht als zugänglicher Name (`role="img"`) und `title` am Punkt (WCAG 1.4.1).
@@ -403,17 +419,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               einsatzQuery.isLoading && <span aria-hidden="true" style={STATUSPUNKT_PLATZ} />
             )}
             {mittel && einsatzKennung(einsatz) && (
-              <span
-                data-lfh="kopf-einsatznummer"
-                style={{
-                  fontFamily: schrift.zahl,
-                  fontSize: 12,
-                  color: rahmenFarben.text,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
+              <span data-lfh="kopf-einsatznummer" style={EINSATZNUMMER_STIL}>
                 {einsatzKennung(einsatz)}
+              </span>
+            )}
+            {mittel && !einsatz && einsatzQuery.isLoading && (
+              <span aria-hidden="true" style={{ ...EINSATZNUMMER_STIL, visibility: 'hidden' }}>
+                {EINSATZNUMMER_PLATZHALTER}
               </span>
             )}
             <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
