@@ -35,7 +35,7 @@ Jede Aufgabe per `superpowers:test-driven-development`: erst der rote Test, dann
 
 ## 6. Gesamtprüfung
 
-- [ ] 6.1 `./scripts/check-all.sh` grün (Format, Lint, Typecheck, Rust- und Vitest-Suite, Migrationsnummern, OpenSpec-Archiv)
+- [x] 6.1 `./scripts/check-all.sh` grün (Format, Lint, Typecheck, Rust- und Vitest-Suite, Migrationsnummern, OpenSpec-Archiv) — lokal: Bündel `schnell` grün, `cargo test` (Lib und alle Integrationstests paketweise) grün, `cargo check --features dev-seeds --tests` grün, Vitest der abhängigen Dateien (`vitest related`, 695 Tests) grün; der volle Lauf samt e2e belegt die CI des PRs
 
 ## Workflow follow-up
 
