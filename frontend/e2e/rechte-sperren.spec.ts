@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../src/stammdaten/rechteText';
-import { stehendeAuswahl, waehleIn } from './auswahl-kern';
+import { stehendeAuswahl, waehleStehend, zeigtWahl } from './auswahl-kern';
 import {
   ADMIN,
   anmeldenAlsAdmin,
@@ -161,7 +161,13 @@ test('LFH-1141 Einsatzleitung ohne Systemrolle nimmt eine Person der Organisatio
 
   // Vorbedingung: diese Sitzung verwaltet den Zugriff, ist aber kein System-Admin.
   await expect(zugriff(page).getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
-  await waehleIn(zugriff(page).getByRole('combobox', { name: 'Person zum Aufnehmen' }), name);
+  // Suchen statt Scrollen: die Liste ist virtuell, in einer vollen Temp-DB steht die Person
+  // unterhalb des gerenderten Ausschnitts.
+  const auswahl = zugriff(page).getByRole('combobox', { name: 'Person zum Aufnehmen' });
+  await auswahl.click();
+  await auswahl.fill(name);
+  await waehleStehend(page, name);
+  await zeigtWahl(auswahl, name);
   await zugriff(page).getByRole('button', { name: 'Hinzufügen' }).click();
   await expect(zugriff(page).getByRole('combobox', { name: `Rolle von ${name}` })).toBeVisible();
   await expect(page.getByText('Benutzerliste nur für Admins')).toHaveCount(0);
