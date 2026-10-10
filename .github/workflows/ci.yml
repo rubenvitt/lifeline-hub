@@ -475,13 +475,15 @@ jobs:
       # Hier entsteht dieselbe Tabelle aus diesem Lauf, als Artefakt `e2e-laufzeiten`; die
       # Zusammenfassung zeigt, wie die bisherige Tabelle unter den neuen Messwerten trägt. Liegt
       # der langsamste Anteil spürbar über dem Mittel, die Datei aus dem Artefakt einchecken.
-      # Nur bei vier Blobs: ein Teilbericht ergäbe eine Tabelle ohne die fehlenden Dateien.
+      # Nur bei vier Blobs: ein Teilbericht ergäbe eine Tabelle ohne die fehlenden Dateien. Gezählt
+      # nur `report-k.zip` auf oberster Ebene: der HTML-Bericht davor entpackt die Traces roter
+      # Tests als `resources/*.zip` in dasselbe Verzeichnis.
       - name: e2e-Laufzeiten
         if: ${{ !cancelled() }}
         continue-on-error: true
         run: |
           set -euo pipefail
-          [ "$(find frontend/all-blob-reports -name '*.zip' | wc -l | tr -d ' ')" -eq 4 ] || {
+          [ "$(find frontend/all-blob-reports -maxdepth 1 -name 'report-*.zip' | wc -l | tr -d ' ')" -eq 4 ] || {
             echo "Nicht alle vier e2e-Blobs da: keine Laufzeittabelle."; exit 0; }
           mise exec -- pnpm -C frontend exec playwright merge-reports --reporter json ./all-blob-reports > e2e-bericht.json
           cp frontend/e2e/laufzeiten.json laufzeiten.json
