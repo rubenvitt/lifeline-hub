@@ -138,7 +138,7 @@ async fn auswahl_traegt_nur_kennung_und_anzeigename() {
 
 #[tokio::test]
 async fn jeder_angebotene_eintrag_laesst_sich_aufnehmen() {
-    // Auswahl und Schreibweg halten dieselbe Menge (design.md D2).
+    // Auswahl und Schreibweg halten dieselbe Menge (LFH-1141, design.md D2).
     let (app, pool, admin, leitung, einsatz, _) = einsatz_mit_leitung_ohne_systemrolle().await;
     benutzer_anlegen(&app, &admin, "bertha", "keine").await;
     benutzer_anlegen(&app, &admin, "zorana", "keine").await;

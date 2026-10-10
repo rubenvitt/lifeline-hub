@@ -18,7 +18,7 @@
 
 ## 4. Integration
 
-- [ ] 4.1 `cargo test` der berührten Tests, Vitest der berührten Dateien, `./scripts/check-all.sh --nur schnell` grün; e2e-Specs, die „Zugriff“ bedienen, gezielt laufen lassen (`rg -l "Benutzer …" frontend/e2e`).
+- [x] 4.1 `cargo test` der berührten Tests, Vitest der berührten Dateien, `./scripts/check-all.sh --nur schnell` grün; e2e-Specs, die „Zugriff“ bedienen, gezielt laufen lassen (`rg -l "Benutzer …" frontend/e2e`).
 
 ## Workflow follow-up
 
