@@ -57,6 +57,8 @@ export default function AufnahmePage() {
   // neuen (LFH-1138); dort abgeschrieben, wäre ihre Registriernummer falsch.
   const [quittung, setQuittung] = useState<{ einsatzId: number; text: string } | null>(null);
   const sitzungsortGeladen = useRef<number | null>(null);
+  const einsatzRef = useRef(einsatzId);
+  einsatzRef.current = einsatzId;
   const [searchParams] = useSearchParams();
   /**
    * UHS-Auftrag. Unbrauchbares wird ganz verworfen, nicht halb übernommen (wie
@@ -201,9 +203,14 @@ export default function AufnahmePage() {
           speicherung={anlegenSpeicherung}
           speicherFehlerTitel="Person nicht erfasst"
           // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
-          onErfassen={(werte) =>
-            anlegenMutation.mutateAsync({ einsatzId, daten: aufnahmeZuEingabe(werte) })
-          }
+          // Kommt die Antwort erst nach dem Einsatzwechsel, gilt sie hier als abgelehnt: sonst
+          // leerte die Serie die Felder des neuen Einsatzes, und der Rückweg führte in den alten
+          // (LFH-1138). Ihre Quittung bleibt am alten Einsatz.
+          onErfassen={async (werte) => {
+            const ziel = einsatzId;
+            await anlegenMutation.mutateAsync({ einsatzId: ziel, daten: aufnahmeZuEingabe(werte) });
+            if (einsatzRef.current !== ziel) throw new Error('Einsatz gewechselt');
+          }}
           // Erst die Post-Acceptance-Stufe darf den Sitzungswert ändern: ein Abbruch während des
           // POST besteht die Generation davor nicht.
           onErfasst={(daten) => {

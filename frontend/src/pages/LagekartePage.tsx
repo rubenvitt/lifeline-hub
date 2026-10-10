@@ -322,6 +322,13 @@ export default function LagekartePage() {
     [message],
   );
 
+  // Eine Antwort, die erst nach dem Einsatzwechsel eintrifft, quittiert dort nicht und wählt oder
+  // räumt keine Ansicht (LFH-1138, `frontend/AGENTS.md`, „Rückwege und Fehler“): ihr
+  // `setSearchParams` stammt aus dem alten Render und führte zurück in den alten Einsatz. Die
+  // Gründe hält `useKartenFehler` selbst fern.
+  const einsatzRef = useRef(einsatzId);
+  einsatzRef.current = einsatzId;
+
   // „In dieser Ansicht speichern": den Karten-Zustand in die aktive Ansicht schreiben (nicht
   // einsatzweit); Erfolg als Toast, eine Ablehnung im Paneel (die Mutation wirft, hier gefangen).
   // Der Grund gehört seiner Ansicht (Schlüssel `ansicht:<id>:…`, der Titel nennt sie): nur deren
@@ -333,9 +340,10 @@ export default function LagekartePage() {
         ? `Ansicht nicht gespeichert · ${aktiveAnsicht.name}`
         : 'Ansicht nicht gespeichert',
     );
+    const einsatz = einsatzRef.current;
     try {
       await speichern();
-      message.success('In der Ansicht gespeichert');
+      if (einsatzRef.current === einsatz) message.success('In der Ansicht gespeichert');
     } catch (e) {
       melde(e);
     }
@@ -379,12 +387,6 @@ export default function LagekartePage() {
 
   // Neu, Umbenennen, Löschen: die Zusage bricht bei Ablehnung, der Dialog im `AnsichtSwitcher`
   // bleibt dann offen und nennt den Grund (design.md D3).
-  //
-  // Eine Antwort, die erst nach dem Einsatzwechsel eintrifft, wählt und räumt keine Ansicht
-  // (LFH-1138, `frontend/AGENTS.md`, „Rückwege und Fehler“): ihr `setSearchParams` stammt aus dem
-  // alten Render und führte zurück in den alten Einsatz.
-  const einsatzRef = useRef(einsatzId);
-  einsatzRef.current = einsatzId;
   const onAnsichtNeu = useCallback(
     async (name: string) => {
       const einsatz = einsatzRef.current;
@@ -408,9 +410,10 @@ export default function LagekartePage() {
         `ansicht:${id}:standard`,
         name ? `Nicht als Standardansicht gesetzt · ${name}` : 'Nicht als Standardansicht gesetzt',
       );
+      const einsatz = einsatzRef.current;
       try {
         await setzeStandard(id);
-        message.success('Als Standardansicht gesetzt');
+        if (einsatzRef.current === einsatz) message.success('Als Standardansicht gesetzt');
       } catch (e) {
         melde(e);
       }

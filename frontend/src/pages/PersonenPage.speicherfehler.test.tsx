@@ -329,7 +329,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
           return antwort();
         }),
       );
-      renderMitProviders(
+      const { client } = renderMitProviders(
         <>
           <Wechsel />
           <Routes>
@@ -339,8 +339,12 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
         { route: '/einsaetze/1/personen' },
       );
       return {
-        gibFrei: () => gibFrei(),
         angefragt: () => angefragt,
+        /** Gibt die Antwort frei und wartet, bis die Mutation durch ist. */
+        antworte: async () => {
+          await act(async () => gibFrei());
+          await waitFor(() => expect(client.isMutating()).toBe(0));
+        },
       };
     }
     async function wechsleNachB() {
@@ -356,9 +360,8 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
       await waitFor(() => expect(lauf.angefragt()).toBe(true));
 
       await wechsleNachB();
-      await act(async () => lauf.gibFrei());
-      // Die Antwort ist da: ohne Riegel stünde ihr Grund jetzt im Seitenhinweis von B.
-      await act(async () => {});
+      // Ohne Riegel stünde der Grund jetzt im Seitenhinweis von B.
+      await lauf.antworte();
 
       expect(screen.queryByText('Abgleich besteht schon')).toBeNull();
       expect(seitenGrund()).toBeNull();
@@ -373,11 +376,39 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
       await waitFor(() => expect(lauf.angefragt()).toBe(true));
 
       await wechsleNachB();
-      await act(async () => lauf.gibFrei());
-      await act(async () => {});
+      await lauf.antworte();
 
       expect(screen.queryByText('Verdachts-Abgleich angelegt')).toBeNull();
       expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('der Dialog aus A steht in B nicht, auch nicht mit seiner Ablehnung', async () => {
+      setzeViewportBreite(390);
+      const lauf = renderMitWechsel(() => abgelehnt('Abgleich besteht schon', 409));
+      await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+      const karte = (await screen.findByText('R-002')).closest<HTMLElement>(
+        '[data-lfh="datensicht-karte"]',
+      )!;
+      await userEvent.click(within(karte).getByRole('button', { name: /Abgleich vorschlagen/ }));
+      const dialog = await offenerDialog();
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Gefundene Person' }));
+      await userEvent.click(await screen.findByTitle('R-007 Funde'));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Vorschlagen' }));
+      await waitFor(() => expect(lauf.angefragt()).toBe(true));
+
+      await wechsleNachB();
+      await waitFor(() =>
+        expect(
+          screen.queryAllByRole('dialog').filter((d) => !d.closest('.ant-zoom-leave')),
+        ).toHaveLength(0),
+      );
+      await lauf.antworte();
+
+      expect(
+        screen.queryAllByRole('dialog').filter((d) => !d.closest('.ant-zoom-leave')),
+      ).toHaveLength(0);
+      expect(screen.queryByText('Abgleich besteht schon')).toBeNull();
+      keinFehlerToast();
     });
   });
 
