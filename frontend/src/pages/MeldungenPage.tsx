@@ -1,5 +1,5 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
-import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Spin } from 'antd';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,7 +41,10 @@ import {
   Segmentleiste,
   useRollen,
 } from '../components/instrument';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import type { Speicherung } from '../components/Erfassung';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { GewanderteGruende } from '../components/GewanderteGruende';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useViewport } from '../components/useViewport';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
 import { modulName } from '../einsatz/modulRegistry';
@@ -67,6 +70,16 @@ function istErledigt(m: Meldung): boolean {
 
 /** Stabile Vorgabe, damit `memo` an `MeldungKarte` bei fehlenden Mitgliedern greift. */
 const KEINE_MITGLIEDER: { benutzer_id: number; anzeigename: string }[] = [];
+
+/** Meldung eines offenen Dialogs samt dem Einsatz, in dem er geöffnet wurde. */
+interface DialogAuswahl {
+  einsatzId: number;
+  meldung: Meldung;
+}
+
+/** Schließt nach einem Erfolg nur den Dialog, aus dem er kam, keinen inzwischen geöffneten. */
+const ohneDialogZu = (v: { einsatzId: number; meldungId: number }) => (a: DialogAuswahl | null) =>
+  a?.einsatzId === v.einsatzId && a.meldung.id === v.meldungId ? null : a;
 
 export default function MeldungenPage() {
   const { id } = useParams();
@@ -101,8 +114,12 @@ export default function MeldungenPage() {
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   const richtungsKey = richtungFilter ?? 'alle';
   const richtungWaehlen = (v: string) => setRichtungFilter(v === 'alle' ? undefined : v);
-  const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
-  const [lageMeldung, setLageMeldung] = useState<Meldung | null>(null);
+  // Ein Dialog gehört zu seinem Einsatz: die Route hat keinen `key`, nach einem Wechsel schriebe
+  // er sonst mit der Meldung des vorigen Einsatzes in den neuen. Der Wechsel schließt ihn.
+  const [auftragAuswahl, setAuftragAuswahl] = useState<DialogAuswahl | null>(null);
+  const [lageAuswahl, setLageAuswahl] = useState<DialogAuswahl | null>(null);
+  const auftragMeldung = auftragAuswahl?.einsatzId === einsatzId ? auftragAuswahl.meldung : null;
+  const lageMeldung = lageAuswahl?.einsatzId === einsatzId ? lageAuswahl.meldung : null;
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
 
@@ -227,28 +244,56 @@ export default function MeldungenPage() {
   // Die Rückrufe lesen den Bestand über einen Ref, damit sie über Live-Abgleiche stabil bleiben
   // und `memo` an `MeldungKarte` auch dann trägt, wenn sich nur eine Meldung ändert.
   const geladeneRef = useRef(geladene);
+  // Nummer jeder je gezeigten Meldung: eine gewanderte steht oft in keiner geladenen Liste mehr.
+  const nummerJe = useRef(new Map<number, number>());
   useLayoutEffect(() => {
     geladeneRef.current = geladene;
+    for (const m of geladene.values()) nummerJe.current.set(m.id, m.lfd_nr);
   }, [geladene]);
 
-  const fehler = useFehlerMeldung();
   const invalidiere = useCallback(
-    () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) }),
-    [qc, einsatzId],
+    (eid: number) => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(eid) }),
+    [qc],
+  );
+
+  /*
+   * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): Erfassen im Paneel, Status, Bearbeiter und Bestätigen an der Karte
+   * (ein Speicher, die zuletzt begonnene Aktion zählt), Lage-Übergabe und Auftrag im Dialog,
+   * Rückgängig im Seitenhinweis. Jede Aktion trägt ihren Einsatz: die Route hat keinen `key`, eine
+   * Antwort nach einem Einsatzwechsel meldet nicht am neuen Ort.
+   */
+  const kartenFehler = useZeilenFehler<number>();
+  const [seitenFehler, setSeitenFehler] = useState<{ einsatzId: number; fehler: unknown } | null>(
+    null,
+  );
+  const einsatzJetzt = useRef(einsatzId);
+  useLayoutEffect(() => {
+    einsatzJetzt.current = einsatzId;
+  });
+  const { beginne: beginneKarte, melde: meldeKarte, leere: leereKarten } = kartenFehler;
+  useEffect(() => leereKarten(), [einsatzId, leereKarten]);
+  // Stabil, damit die Rückrufe an `MeldungKarte` es bleiben.
+  const meldeAnKarte = useCallback(
+    (eid: number, meldungId: number, e: unknown, fallback: string) => {
+      if (eid === einsatzJetzt.current) meldeKarte(meldungId, e, fallback);
+    },
+    [meldeKarte],
   );
 
   // Das Inline-Formular bleibt nach dem Senden offen, damit die nächste Meldung ohne Aufklappen
   // folgt; Zuklappen ist ausdrückliche Nutzeraktion. Ein Zuklappen unmountete es samt Serienzähler
-  // und Wertübernahme.
+  // und Wertübernahme. Kein `onError`: den Grund zeigt das Formular (`speicherung`); Netzfehler
+  // merkt die Funktion vor, nur eine fachliche Ablehnung kommt an.
   const anlegenMutation = useMutation({
     // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
     // (LFH-705, design.md D6).
     networkMode: 'always',
-    mutationFn: (d: NeueMeldung) => {
+    mutationFn: ({ einsatzId: eid, daten }: { einsatzId: number; daten: NeueMeldung }) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
-      return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);
+      return erfasseMeldungOfflineFaehig(benutzer.id, eid, daten);
     },
-    onSuccess: (ergebnis, d) => {
+    onSuccess: (ergebnis, { einsatzId: eid, daten: d }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning(`Offline vorgemerkt: Meldung von ${d.absender}`);
         return;
@@ -258,90 +303,129 @@ export default function MeldungenPage() {
       // abgeschlossenen, die Kennzahlen und der Einzelabruf haben eine andere Form.
       qc.setQueriesData<Meldung[]>(
         {
-          queryKey: einsatzKeys.meldungen(einsatzId),
+          queryKey: einsatzKeys.meldungen(eid),
           predicate: ({ queryKey: k }) =>
             k[2] === 'offen' && (k[3] === 'alle' || k[3] === meldung.richtung),
         },
         (alt) => (alt ? [meldung, ...alt.filter((m) => m.id !== meldung.id)] : alt),
       );
-      invalidiere();
+      invalidiere(eid);
       message.success(`Meldung #${meldung.lfd_nr} erfasst`);
     },
-    onError: fehler,
+  });
+  // Nur das Erfassen DIESES Einsatzes gehört ins Paneel; eines aus dem vorigen hält es nicht.
+  const diesesAnlegen = anlegenMutation.variables?.einsatzId === einsatzId;
+  const anlegenSpeicherung: Speicherung = {
+    error: diesesAnlegen ? anlegenMutation.error : null,
+    isPending: diesesAnlegen && anlegenMutation.isPending,
+    reset: anlegenMutation.reset,
+  };
+  // Zuklappen hängt das Formular aus; beim Aufklappen räumt die Erfassungshülle den alten Grund.
+  /**
+   * Der Rückweg aus dem Toast: eigene Mutation, weil sein Grund im Seitenhinweis steht (die Karte
+   * ist dann oft gewandert), und ohne eigenen Rückgängig-Toast, sonst schaukelte sich das Paar
+   * endlos auf. Die nächste Rücknahme räumt den Grund der vorigen.
+   */
+  const ruecknahmeMutation = useMutation({
+    mutationFn: (v: { einsatzId: number; meldungId: number; status: MeldungStatus }) =>
+      setzeMeldungStatus(v.einsatzId, v.meldungId, v.status),
+    onMutate: () => setSeitenFehler(null),
+    onSuccess: (_daten, v) => invalidiere(v.einsatzId),
+    onError: (e, v) => {
+      if (v.einsatzId === einsatzJetzt.current)
+        setSeitenFehler({ einsatzId: v.einsatzId, fehler: e });
+    },
   });
   /**
-   * Triage-Schritt und Rücknahme laufen durch dieselbe Mutation. `vorher` ist der Stand vor dem
-   * Klick und damit das Ziel des Rückwegs; `setze_status` nimmt jeden gültigen Status an.
-   *
-   * `zurueck` unterscheidet die Richtungen: die Rücknahme darf keinen eigenen Rückgängig-Toast
-   * erzeugen, sonst schaukelte sich das Paar endlos auf.
+   * Triage-Schritt. `vorher` ist der Stand vor dem Klick und damit das Ziel des Rückwegs;
+   * `setze_status` nimmt jeden gültigen Status an.
    */
   const statusMutation = useMutation({
-    mutationFn: ({
-      meldungId,
-      status,
-    }: {
+    mutationFn: (v: {
+      einsatzId: number;
       meldungId: number;
       status: MeldungStatus;
       vorher?: MeldungStatus;
-      zurueck?: boolean;
-    }) => setzeMeldungStatus(einsatzId, meldungId, status),
-    onSuccess: (_daten, { meldungId, status, vorher, zurueck }) => {
-      invalidiere();
-      if (zurueck || !vorher) return;
+    }) => setzeMeldungStatus(v.einsatzId, v.meldungId, v.status),
+    onMutate: (v) => beginneKarte(v.meldungId),
+    onSuccess: (_daten, { einsatzId: eid, meldungId, status, vorher }) => {
+      invalidiere(eid);
+      if (!vorher) return;
       zeigeRueckgaengig(message, `Meldung ${MELDUNG_STATUS[status]?.label ?? status}`, () =>
-        statusMutation.mutate({ meldungId, status: vorher, zurueck: true }),
+        ruecknahmeMutation.mutate({ einsatzId: eid, meldungId, status: vorher }),
       );
     },
-    onError: fehler,
+    onError: (e, v) => meldeAnKarte(v.einsatzId, v.meldungId, e, 'Statuswechsel fehlgeschlagen'),
   });
   const zuweisenMutation = useMutation({
-    mutationFn: ({ meldungId, bearbeiterId }: { meldungId: number; bearbeiterId: number | null }) =>
-      weiseBearbeiterZu(einsatzId, meldungId, bearbeiterId),
-    onSuccess: invalidiere,
-    onError: fehler,
+    mutationFn: (v: { einsatzId: number; meldungId: number; bearbeiterId: number | null }) =>
+      weiseBearbeiterZu(v.einsatzId, v.meldungId, v.bearbeiterId),
+    onMutate: (v) => beginneKarte(v.meldungId),
+    onSuccess: (_daten, v) => invalidiere(v.einsatzId),
+    onError: (e, v) => meldeAnKarte(v.einsatzId, v.meldungId, e, 'Zuweisen fehlgeschlagen'),
   });
+  // Der Dialog schließt erst hier; eine Ablehnung steht in ihm (`speicherung`).
   const lageMutation = useMutation({
-    mutationFn: ({ meldungId, daten }: { meldungId: number; daten: LagerelevantDaten }) =>
-      markiereLagerelevant(einsatzId, meldungId, daten),
-    onSuccess: () => {
-      invalidiere();
-      qc.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(einsatzId) });
-      setLageMeldung(null);
+    mutationFn: (v: { einsatzId: number; meldungId: number; daten: LagerelevantDaten }) =>
+      markiereLagerelevant(v.einsatzId, v.meldungId, v.daten),
+    onSuccess: (_daten, v) => {
+      invalidiere(v.einsatzId);
+      qc.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(v.einsatzId) });
+      setLageAuswahl(ohneDialogZu(v));
       message.success('An die Lage übergeben');
     },
-    onError: fehler,
   });
   const bestaetigenMutation = useMutation({
-    mutationFn: (meldungId: number) => bestaetigeMeldung(einsatzId, meldungId),
-    onSuccess: () => {
-      invalidiere();
+    mutationFn: (v: { einsatzId: number; meldungId: number }) =>
+      bestaetigeMeldung(v.einsatzId, v.meldungId),
+    onMutate: (v) => beginneKarte(v.meldungId),
+    onSuccess: (_daten, v) => {
+      invalidiere(v.einsatzId);
       message.success('Sofortmeldung bestätigt');
     },
-    onError: fehler,
+    onError: (e, v) => meldeAnKarte(v.einsatzId, v.meldungId, e, 'Bestätigen fehlgeschlagen'),
   });
+  // Der Dialog schließt erst hier; eine Ablehnung steht im Formular (`speicherung`).
   const auftragMutation = useMutation({
-    mutationFn: ({ meldungId, daten }: { meldungId: number; daten: NeuerAuftrag }) =>
-      erteileAuftragAusMeldung(einsatzId, meldungId, daten),
-    onSuccess: (_daten, { meldungId }) => {
-      invalidiere();
-      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
-      setAuftragMeldung(null);
+    mutationFn: (v: { einsatzId: number; meldungId: number; daten: NeuerAuftrag }) =>
+      erteileAuftragAusMeldung(v.einsatzId, v.meldungId, v.daten),
+    onSuccess: (_daten, { einsatzId: eid, meldungId }) => {
+      invalidiere(eid);
+      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(eid) });
+      setAuftragAuswahl(ohneDialogZu({ einsatzId: eid, meldungId }));
       // Wer aus einer Meldung einen Auftrag erteilt, hat sie bearbeitet — sonst stünde sie weiter
       // auf „neu". Der Riegel auf den Ausgangsstatus ist tragend: ohne ihn schriebe die Seite bei
-      // einer laufenden Meldung denselben Status noch einmal.
+      // einer laufenden Meldung denselben Status noch einmal. Eine Ablehnung steht an der Karte.
       //
       // Bewusst ohne Rückgängig-Toast (`vorher` bleibt leer): ein Rückweg, der nur den
       // Meldungsstatus zurückdreht, ließe den Auftrag stehen und verspräche eine Rücknahme, die
       // keine ist.
       const quelle = geladeneRef.current.get(meldungId);
-      if (quelle && quelle.status !== 'in_bearbeitung' && quelle.status !== 'erledigt') {
-        statusMutation.mutate({ meldungId, status: 'in_bearbeitung' });
+      if (
+        eid === einsatzJetzt.current &&
+        quelle &&
+        quelle.status !== 'in_bearbeitung' &&
+        quelle.status !== 'erledigt'
+      ) {
+        statusMutation.mutate({ einsatzId: eid, meldungId, status: 'in_bearbeitung' });
       }
       message.success('Auftrag aus Meldung erteilt');
     },
-    onError: fehler,
   });
+  /** Nur die Mutation DIESES Einsatzes gehört in seine Dialoge. */
+  const imEinsatz = (m: {
+    variables?: { einsatzId: number };
+    error: unknown;
+    isPending: boolean;
+    reset: () => void;
+  }): Speicherung => {
+    const dieser = m.variables?.einsatzId === einsatzId;
+    return {
+      error: dieser ? m.error : null,
+      isPending: dieser && m.isPending,
+      reset: m.reset,
+    };
+  };
 
   // Stabile Rückrufe, sonst wirkt `memo` an `MeldungKarte` nicht (D6). `mutate` ist je Mutation
   // stabil, das Mutationsobjekt nicht.
@@ -350,18 +434,34 @@ export default function MeldungenPage() {
   const { mutate: bestaetigen } = bestaetigenMutation;
   const onStatus = useCallback(
     (meldungId: number, status: MeldungStatus) =>
-      statusSetzen({ meldungId, status, vorher: geladeneRef.current.get(meldungId)?.status }),
-    [statusSetzen],
+      statusSetzen({
+        einsatzId,
+        meldungId,
+        status,
+        vorher: geladeneRef.current.get(meldungId)?.status,
+      }),
+    [statusSetzen, einsatzId],
   );
   const onZuweisen = useCallback(
-    (meldungId: number, bearbeiterId: number | null) => zuweisen({ meldungId, bearbeiterId }),
-    [zuweisen],
+    (meldungId: number, bearbeiterId: number | null) =>
+      zuweisen({ einsatzId, meldungId, bearbeiterId }),
+    [zuweisen, einsatzId],
   );
   const onLagerelevant = useCallback(
-    (meldungId: number) => setLageMeldung(geladeneRef.current.get(meldungId) ?? null),
-    [],
+    (meldungId: number) => {
+      const meldung = geladeneRef.current.get(meldungId);
+      setLageAuswahl(meldung ? { einsatzId, meldung } : null);
+    },
+    [einsatzId],
   );
-  const onBestaetigen = useCallback((meldungId: number) => bestaetigen(meldungId), [bestaetigen]);
+  const onAuftragErteilen = useCallback(
+    (meldung: Meldung) => setAuftragAuswahl({ einsatzId, meldung }),
+    [einsatzId],
+  );
+  const onBestaetigen = useCallback(
+    (meldungId: number) => bestaetigen({ einsatzId, meldungId }),
+    [bestaetigen, einsatzId],
+  );
   const mitglieder = mitgliederQuery.data ?? KEINE_MITGLIEDER;
   // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
   const auftragGesperrt = useSprungSperre(einsatzId)('auftraege');
@@ -379,6 +479,9 @@ export default function MeldungenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
+  const lageSpeicherung = imEinsatz(lageMutation);
+  const auftragSpeicherung = imEinsatz(auftragMutation);
+
   const listenProps = {
     einsatzId,
     darfSchreiben,
@@ -388,8 +491,9 @@ export default function MeldungenPage() {
     onZuweisen,
     onLagerelevant,
     onBestaetigen,
-    onAuftragErteilen: setAuftragMeldung,
+    onAuftragErteilen,
     auftragGesperrt,
+    kartenFehler: kartenFehler.grund,
   };
 
   const auftragsZiele = {
@@ -400,6 +504,29 @@ export default function MeldungenPage() {
   const kennzahlen = kennzahlenQuery.data;
   const offenZahl = kennzahlen ? kennzahlen.unbearbeitet + kennzahlen.in_arbeit : offene.length;
   const abgeschlossenZahl = kennzahlen?.erledigt ?? abgeschlossene.length;
+  /*
+   * Steht die Karte eines Grundes in der gezeigten Ansicht nicht (Ansicht gewechselt, Karte
+   * gewandert), hätte er keinen Ort mehr: dann steht er im Seitenhinweis, schließbar. Solange die
+   * Ansicht ohne eigene Daten lädt, hat kein Grund seinen Ort verloren.
+   */
+  const gezeigt =
+    ansicht === 'offen'
+      ? offene
+      : verlinkteAngeheftet
+        ? [verlinkteAngeheftet, ...abgeschlossene]
+        : abgeschlossene;
+  const ansichtsQuery = ansicht === 'offen' ? offeneQuery : abgeschlosseneQuery;
+  const ansichtLaedt = ansichtsQuery.isPending || ansichtsQuery.isPlaceholderData;
+  const gewanderte = ansichtLaedt
+    ? []
+    : kartenFehler.gemeldet().flatMap((mid) => {
+        const grund = kartenFehler.grund(mid);
+        if (grund == null || gezeigt.some((m) => m.id === mid)) return [];
+        const nr = nummerJe.current.get(mid);
+        return [{ schluessel: mid, kennung: nr != null ? `Meldung #${nr}` : undefined, grund }];
+      });
+  const rueckFehler = seitenFehler?.einsatzId === einsatzId ? seitenFehler.fehler : null;
+
   const kennzahlZustand = kennzahlenQuery.isLoading
     ? 'laden'
     : kennzahlenQuery.isError
@@ -412,6 +539,22 @@ export default function MeldungenPage() {
 
       meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
       dataUpdatedAt={offeneQuery.dataUpdatedAt}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={
+        (rueckFehler != null || gewanderte.length > 0) && (
+          <Flex vertical gap={token.marginSM}>
+            <SeitenHinweise
+              fehler={rueckFehler}
+              fehlerTitel="Nicht zurückgenommen"
+              fehlerFallback="Rücknahme fehlgeschlagen"
+            />
+            <GewanderteGruende
+              gruende={gewanderte}
+              onSchliessen={() => gewanderte.forEach((g) => kartenFehler.verwirf(g.schluessel))}
+            />
+          </Flex>
+        )
+      }
       breadcrumb={
         <Breadcrumb
           items={[
@@ -423,10 +566,13 @@ export default function MeldungenPage() {
       }
       aktionen={
         darfSchreiben && (
+          // Solange eine Meldung unterwegs ist, bleibt das Paneel offen: die Antwort braucht ihren
+          // Ort (design.md D3).
           <Button
             type="primary"
             icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
-            onClick={() => setFormOffen((o) => !o)}
+            disabled={formOffen && anlegenSpeicherung.isPending}
+            onClick={() => setFormOffen(!formOffen)}
           >
             {formOffen ? 'Formular schließen' : 'Meldung erfassen'}
           </Button>
@@ -482,6 +628,7 @@ export default function MeldungenPage() {
             <Button
               type="text"
               icon={<IconKreuz />}
+              disabled={anlegenSpeicherung.isPending}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />
@@ -489,10 +636,11 @@ export default function MeldungenPage() {
         >
           <MeldungFormular
             card={false}
-            senden={anlegenMutation.isPending}
+            senden={anlegenSpeicherung.isPending}
             // mutateAsync, nicht mutate: die Erfassungshülle darf die Felder nur leeren, wenn der
-            // Datensatz angekommen ist. Den Fehler-Toast wirft `onError`.
-            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
+            // Datensatz angekommen ist. Den Grund einer Ablehnung zeigt sie über `speicherung`.
+            onAnlegen={(daten) => anlegenMutation.mutateAsync({ einsatzId, daten })}
+            speicherung={anlegenSpeicherung}
             einheiten={einheitenQuery.data}
             abschnitte={abschnitteQuery.data}
           />
@@ -595,27 +743,29 @@ export default function MeldungenPage() {
       <LagerelevantModal
         offen={lageMeldung !== null}
         meldung={lageMeldung}
-        senden={lageMutation.isPending}
+        senden={lageSpeicherung.isPending}
         einsatzId={einsatzId}
-        onAbbrechen={() => setLageMeldung(null)}
+        onAbbrechen={() => setLageAuswahl(null)}
         onUebergeben={(daten) => {
-          if (lageMeldung) lageMutation.mutate({ meldungId: lageMeldung.id, daten });
+          if (lageMeldung) lageMutation.mutate({ einsatzId, meldungId: lageMeldung.id, daten });
         }}
+        speicherung={lageSpeicherung}
       />
       <AuftragErteilenModal
         einsatzId={einsatzId}
         meldung={auftragMeldung}
         abschnitte={auftragsZiele.abschnitte}
         einheiten={auftragsZiele.einheiten}
-        senden={auftragMutation.isPending}
-        onAbbrechen={() => setAuftragMeldung(null)}
+        senden={auftragSpeicherung.isPending}
+        onAbbrechen={() => setAuftragAuswahl(null)}
         // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Auftrag angekommen
         // ist.
         onAnlegen={(daten) =>
           auftragMeldung
-            ? auftragMutation.mutateAsync({ meldungId: auftragMeldung.id, daten })
+            ? auftragMutation.mutateAsync({ einsatzId, meldungId: auftragMeldung.id, daten })
             : Promise.reject(new Error('Keine Quellmeldung'))
         }
+        speicherung={auftragSpeicherung}
       />
     </EinsatzSeite>
   );

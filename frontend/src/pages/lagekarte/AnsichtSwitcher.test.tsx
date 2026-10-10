@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import type { KartenAnsicht } from '../../api/types';
+import { ApiError } from '../../api/client';
 import {
   antdAlgorithmus,
   antdKomponenten,
@@ -78,6 +79,87 @@ describe('AnsichtSwitcher', () => {
   it('ohne Schreibrecht gibt es kein Aktions-Menü', () => {
     baue({ darfSchreiben: false });
     expect(screen.queryByLabelText('Ansichts-Aktionen')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Speicherfehler im Dialog (LFH-1077, design.md D3): Namens- und Löschdialog warten auf die
+ * Antwort, schließen nur beim Erfolg und nennen eine Ablehnung in sich. rc-dialog friert einen
+ * schließenden Dialog in jsdom ein: nach dem Wiederöffnen zählt der zuletzt eingehängte.
+ */
+describe('AnsichtSwitcher · Ablehnung im Dialog (LFH-1077)', () => {
+  const ablehnung = () => Promise.reject(new ApiError(422, 'Name schon vergeben'));
+  const letzterDialog = () => {
+    const alle = document.querySelectorAll<HTMLElement>('.ant-modal');
+    return alle[alle.length - 1];
+  };
+  async function oeffne(user: ReturnType<typeof userEvent.setup>, eintrag: RegExp) {
+    await user.click(screen.getByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: eintrag }));
+    await waitFor(() => expect(letzterDialog()).toBeDefined());
+    return letzterDialog();
+  }
+
+  it('Neue Ansicht: Grund und Wortlaut bleiben, erneutes Speichern räumt, Erfolg schließt', async () => {
+    const user = userEvent.setup();
+    let freigeben: () => void = () => {};
+    const onNeu = vi
+      .fn()
+      .mockImplementationOnce(ablehnung)
+      .mockImplementationOnce(() => new Promise<void>((r) => (freigeben = r)));
+    baue({ onNeu });
+    const dialog = await oeffne(user, /Neue Ansicht/);
+    await user.type(within(dialog).getByLabelText('Ansichts-Name'), 'Gefahrstoff');
+    await user.click(within(dialog).getByRole('button', { name: /Speichern/ }));
+
+    expect(await within(dialog).findByText('Name schon vergeben')).toBeInTheDocument();
+    expect(within(dialog).getByText('Nicht angelegt')).toBeInTheDocument();
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+    expect(within(dialog).getByLabelText('Ansichts-Name')).toHaveValue('Gefahrstoff');
+
+    // Zweiter Versuch, Antwort zurückgehalten: der alte Grund ist weg, Abbrechen gesperrt.
+    await user.click(within(dialog).getByRole('button', { name: /Speichern/ }));
+    await waitFor(() => expect(within(dialog).queryByText('Name schon vergeben')).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
+    expect(onNeu).toHaveBeenCalledTimes(2);
+
+    act(() => freigeben());
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+  });
+
+  it('Umbenennen: Abbrechen nach einer Ablehnung, wieder öffnen — kein alter Grund', async () => {
+    const user = userEvent.setup();
+    const onUmbenennen = vi.fn().mockImplementation(ablehnung);
+    baue({ onUmbenennen });
+    const erster = await oeffne(user, /Umbenennen/);
+    await user.click(within(erster).getByRole('button', { name: /Speichern/ }));
+    expect(await within(erster).findByText('Name schon vergeben')).toBeInTheDocument();
+    expect(within(erster).getByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(onUmbenennen).toHaveBeenCalledWith(2, 'Abschnitt Nord');
+
+    await user.click(within(erster).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(erster).toHaveClass('ant-zoom-leave'));
+    const zweiter = await oeffne(user, /Umbenennen/);
+    expect(within(zweiter).queryByText('Name schon vergeben')).toBeNull();
+  });
+
+  it('Löschen: der Dialog bleibt bei Ablehnung offen und nennt sie', async () => {
+    const user = userEvent.setup();
+    let ablehnen: (e: unknown) => void = () => {};
+    const onLoeschen = vi
+      .fn()
+      .mockImplementation(() => new Promise<void>((_, rej) => (ablehnen = rej)));
+    baue({ onLoeschen });
+    const dialog = await oeffne(user, /Löschen/);
+    await user.click(within(dialog).getByRole('button', { name: /Löschen/ }));
+    expect(onLoeschen).toHaveBeenCalledWith(2, 'freigeben');
+    // Während des Laufs gibt es kein Zurück.
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    act(() => ablehnen(new ApiError(422, 'Ansicht hat Bilder')));
+    expect(await within(dialog).findByText('Ansicht hat Bilder')).toBeInTheDocument();
+    expect(within(dialog).getByText('Nicht gelöscht')).toBeInTheDocument();
+    expect(dialog).not.toHaveClass('ant-zoom-leave');
   });
 });
 

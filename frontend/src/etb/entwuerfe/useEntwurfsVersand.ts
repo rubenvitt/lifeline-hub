@@ -23,7 +23,9 @@ export function useEntwurfsVersand(): EntwurfsVersand {
     setJe((alt) => {
       const neu = { ...(alt[id] ?? VERSAND_RUHE), ...aenderung };
       const rest = { ...alt };
-      if (!neu.sendet && neu.fortschritt == null && neu.hinweis == null) delete rest[id];
+      const ruhe =
+        !neu.sendet && neu.fortschritt == null && neu.hinweis == null && neu.ablehnung == null;
+      if (ruhe) delete rest[id];
       else rest[id] = neu;
       return rest;
     });

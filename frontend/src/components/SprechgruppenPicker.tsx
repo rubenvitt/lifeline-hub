@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeEinsatzSprechgruppeAn, listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
-import { fehlerText } from '../api/client';
+import { SpeicherFehler } from './SpeicherHinweis';
 
 interface SprechgruppenPickerProps {
   einsatzId: number;
@@ -65,25 +65,39 @@ export default function SprechgruppenPicker({
 
   const kannAnlegen = neuBezeichnung.trim().length > 0 && !!neuBetriebsart;
 
+  // Kein `onError`: der Grund steht unter der Zeile, bis zum nächsten Anlegen (LFH-1077).
   const mutation = useMutation({
-    mutationFn: () =>
-      legeEinsatzSprechgruppeAn(einsatzId, {
-        bezeichnung: neuBezeichnung.trim(),
-        betriebsart: neuBetriebsart as Betriebsart,
+    mutationFn: (v: { einsatzId: number; bezeichnung: string; betriebsart: Betriebsart }) =>
+      legeEinsatzSprechgruppeAn(v.einsatzId, {
+        bezeichnung: v.bezeichnung,
+        betriebsart: v.betriebsart,
       }),
-    onSuccess: (neu: Sprechgruppe) => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.sprechgruppen(einsatzId) });
+    onSuccess: (neu: Sprechgruppe, v) => {
+      qc.invalidateQueries({ queryKey: einsatzKeys.sprechgruppen(v.einsatzId) });
       onChange?.([...value, neu.id]);
       setNeuBezeichnung('');
       setNeuBetriebsart(undefined);
       setAnlegenOffen(false);
       message.success(`Sprechgruppe „${neu.bezeichnung}" angelegt`);
     },
-    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
+  // Nur das Anlegen DIESES Einsatzes zählt hier: eine Antwort aus dem vorigen meldet sich nicht.
+  const diesesAnlegen = mutation.variables?.einsatzId === einsatzId;
+  const laeuft = diesesAnlegen && mutation.isPending;
+  const fehler = diesesAnlegen ? mutation.error : null;
 
   const anlegen = () => {
-    if (kannAnlegen && !mutation.isPending) mutation.mutate();
+    if (kannAnlegen && !laeuft)
+      mutation.mutate({
+        einsatzId,
+        bezeichnung: neuBezeichnung.trim(),
+        betriebsart: neuBetriebsart as Betriebsart,
+      });
+  };
+  // Öffnen und Abbrechen räumen den Grund; eine laufende Anfrage bleibt unberührt.
+  const schalteAnlegen = (offen: boolean) => {
+    if (!mutation.isPending && mutation.error != null) mutation.reset();
+    setAnlegenOffen(offen);
   };
 
   return (
@@ -104,7 +118,7 @@ export default function SprechgruppenPicker({
           type="link"
           icon={<IconPlus />}
           style={{ padding: 0, marginTop: token.marginSM }}
-          onClick={() => setAnlegenOffen(true)}
+          onClick={() => schalteAnlegen(true)}
         >
           neue Sprechgruppe anlegen
         </Button>
@@ -137,24 +151,30 @@ export default function SprechgruppenPicker({
               { value: 'DMO', label: 'DMO' },
             ]}
           />
-          <Button
-            type="primary"
-            onClick={anlegen}
-            loading={mutation.isPending}
-            disabled={!kannAnlegen}
-          >
+          <Button type="primary" onClick={anlegen} loading={laeuft} disabled={!kannAnlegen}>
             Anlegen
           </Button>
+          {/* Gesperrt, solange die Antwort aussteht: eine Ablehnung braucht ihre Zeile. */}
           <Button
+            disabled={laeuft}
             onClick={() => {
               setNeuBezeichnung('');
               setNeuBetriebsart(undefined);
-              setAnlegenOffen(false);
+              schalteAnlegen(false);
             }}
           >
             Abbrechen
           </Button>
         </Space>
+      )}
+      {anlegenOffen && fehler != null && (
+        <div style={{ marginTop: token.marginSM }}>
+          <SpeicherFehler
+            fehler={fehler}
+            titel="Sprechgruppe nicht angelegt"
+            fallback="Anlegen fehlgeschlagen"
+          />
+        </div>
       )}
     </div>
   );

@@ -565,12 +565,20 @@ und `pages/personen/`.
   der Erfassungs-Hülle oder `SpeicherFehler` (Öffnen und Abbrechen räumen), am Formular oder
   Paneel als `SpeicherFehler`, an der Zeile als `ZeilenFehler` (Grund je Zeile aus
   `components/useZeilenFehler.ts`, gefüttert aus `onMutate`/`onError`, nicht aus
-  `mutation.variables`: die Mutation verfolgt nur den letzten Aufruf), Kopfaktionen und
-  Rückgängig aus dem Toast über `SeitenHinweise` (EIN Slot); die Anzeigen in
-  `components/SpeicherHinweis.tsx`. Kein `onError`-Toast: ein Fehler-Toast
-  bleibt nur ohne Ort (Zwischenablage, Hintergrund) und steht mit Grund in
-  `components/speicherfehler.guard.test.ts`. Ein Dialog schließt erst beim Erfolg; Prüfungen
-  ohne Server stehen am Feld.
+  `mutation.variables`: die Mutation verfolgt nur den letzten Aufruf; in einer `Datensicht` über
+  `zeilenFehler`), auf der Lagekarte als Kartenhinweis (`pages/lagekarte/useKartenFehler.ts`),
+  Kopfaktionen und Rückgängig aus dem Toast über `SeitenHinweise` (EIN Slot); die Anzeigen in
+  `components/SpeicherHinweis.tsx`.
+  - Ein Dialog schließt erst beim Erfolg; solange gespeichert wird, ist Abbrechen gesperrt (sonst
+    käme die Ablehnung unsichtbar an). Prüfungen ohne Server stehen am Feld.
+  - Ist der Ort nach der Antwort nicht mehr sichtbar (Zeile gewandert, Ansicht gewechselt), steht
+    der Grund im Seitenhinweis; blendet nur Suche oder Filter die Zeile aus, zeigt ihn die
+    `Datensicht` über der Liste. Ein Grund, dessen Ort nie wiederkommt, lässt sich schließen
+    (Seiten- und Kartenhinweis). Ein Wechsel von Einsatz oder Detail-Route räumt die Gründe, und
+    eine danach scheiternde Anfrage meldet nicht am neuen Ort (Einsatz bzw. Kennung in den
+    `variables` mitführen und am Ort mit dem aktuellen vergleichen).
+  - Kein `onError`-Toast: ein Fehler-Toast bleibt nur ohne Ort (Zwischenablage, Hintergrund) und
+    steht mit Grund in `components/speicherfehler.guard.test.ts`.
 - **Gescheiterter Zustandsübergang meldet sich im Dialog** (LFH-535):
   `entwurf/FreigabeDialog.tsx`, kein `modal.confirm`; `freigabeGrund`, Vorrang Speicherfehler;
   Öffnen ruft `freigebenMutation.reset()`. Test zählt `.ant-message`, offen/zu über `ant-zoom-leave`.

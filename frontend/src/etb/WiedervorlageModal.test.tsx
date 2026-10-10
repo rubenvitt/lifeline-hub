@@ -1,7 +1,9 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import dayjs from 'dayjs';
+import { Button } from 'antd';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { mitProzessZone } from '../test/prozessZone';
@@ -188,6 +190,111 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     // Wortlaut nicht kosten — hier steht er in einer beweissichernden Anwendung.
     await waitFor(() => expect(titel).toHaveValue('Kellerpumpe nachfragen'));
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Der Grund einer Ablehnung steht im Dialog, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+ * „Rückwege und Fehler“). Der Dialog wartet auf die Antwort.
+ */
+describe('WiedervorlageModal — Ablehnung im Dialog (LFH-1077)', () => {
+  const URL = '/api/einsaetze/7/erinnerungen';
+
+  /** Erste Antwort lehnt ab, jede weitere bleibt aus, bis `freigeben` sie beantwortet. */
+  function ablehnenDannHalten() {
+    let aufrufe = 0;
+    const warten: (() => void)[] = [];
+    server.use(
+      http.post(URL, async () => {
+        aufrufe += 1;
+        if (aufrufe > 1) await new Promise<void>((r) => warten.push(r));
+        return HttpResponse.json({ error: 'Fälligkeit liegt zu weit zurück' }, { status: 422 });
+      }),
+    );
+    return { freigeben: () => warten.splice(0).forEach((r) => r()) };
+  }
+
+  function Harness({ einsatzId = 7 }: { einsatzId?: number }) {
+    const [offen, setOffen] = useState(true);
+    return (
+      <>
+        <Button onClick={() => setOffen(true)}>Wieder öffnen</Button>
+        <WiedervorlageModal
+          einsatzId={einsatzId}
+          eintrag={offen ? EINTRAG : null}
+          onClose={() => setOffen(false)}
+        />
+      </>
+    );
+  }
+
+  it('nennt den Grund im Dialog, bleibt offen und zeigt keinen Toast', async () => {
+    ablehnenDannHalten();
+    const onClose = vi.fn();
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    zeige(onClose);
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Fälligkeit liegt zu weit zurück',
+    );
+    expect(within(dialog).getByText('Wiedervorlage nicht angelegt')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('das nächste Absenden räumt den Grund, Abbrechen ist solange gesperrt', async () => {
+    const { freigeben } = ablehnenDannHalten();
+    const onClose = vi.fn();
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    zeige(onClose);
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await within(dialog).findByRole('alert');
+
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    await act(async () => freigeben());
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Fälligkeit liegt zu weit zurück',
+    );
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
+    ablehnenDannHalten();
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderMitProviders(<Harness />);
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await within(dialog).findByRole('alert');
+
+    // rc-dialog friert den schließenden Dialog in jsdom ein: am neuen Dialog prüfen.
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await nutzer.click(screen.getByRole('button', { name: 'Wieder öffnen' }));
+    const wieder = (await screen.findAllByRole('dialog')).slice(-1)[0];
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
+  });
+
+  it('eine nach dem Einsatzwechsel scheiternde Anfrage meldet nicht im neuen Einsatz', async () => {
+    const { freigeben } = ablehnenDannHalten();
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { rerender } = renderMitProviders(<Harness />);
+    const dialog = await screen.findByRole('dialog');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await within(dialog).findByRole('alert');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+
+    rerender(<Harness einsatzId={8} />);
+    // Der laufende Versand gehört zu Einsatz 7: er sperrt hier kein Abbrechen.
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+    await act(async () => freigeben());
+    await act(() => vi.advanceTimersByTimeAsync(50));
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 });
 

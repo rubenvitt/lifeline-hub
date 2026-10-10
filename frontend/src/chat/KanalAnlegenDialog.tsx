@@ -1,5 +1,5 @@
 import { Form, Input } from 'antd';
-import { ErfassungsModal } from '../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 
 interface KanalFormWerte {
   name: string;
@@ -12,6 +12,11 @@ interface Props {
   onSchliessen: () => void;
   /** Lehnt bei Ablehnung ab (`mutateAsync`); dann bleibt der Dialog mit den Eingaben offen. */
   onKanalAnlegen: (name: string, beschreibung?: string) => Promise<unknown>;
+  /**
+   * Die Speicher-Mutation (LFH-1077), an die Erfassungshülle durchgereicht: ihr Grund steht im
+   * Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen ihn.
+   */
+  speicherung?: Speicherung;
 }
 
 /**
@@ -19,7 +24,12 @@ interface Props {
  * (LFH-976): die Kopfaktion der `KanalListe` ab `md` und der Knopf neben der Kanal-Leiste
  * darunter. Name und Beschreibung kommen getrimmt an, eine leere Beschreibung als `undefined`.
  */
-export default function KanalAnlegenDialog({ offen, onSchliessen, onKanalAnlegen }: Props) {
+export default function KanalAnlegenDialog({
+  offen,
+  onSchliessen,
+  onKanalAnlegen,
+  speicherung,
+}: Props) {
   const [form] = Form.useForm<KanalFormWerte>();
   return (
     <ErfassungsModal<KanalFormWerte>
@@ -27,6 +37,10 @@ export default function KanalAnlegenDialog({ offen, onSchliessen, onKanalAnlegen
       titel="Neuer Kanal"
       form={form}
       erfassenText="Anlegen"
+      laeuft={speicherung?.isPending}
+      speicherung={speicherung}
+      speicherFehlerTitel="Kanal nicht angelegt"
+      speicherFehlerFallback="Anlegen fehlgeschlagen"
       onErfassen={(w) => onKanalAnlegen(w.name.trim(), w.beschreibung?.trim() || undefined)}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}

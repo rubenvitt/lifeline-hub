@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import SprechgruppenPicker from './SprechgruppenPicker';
 import type { Sprechgruppe } from '../api/types';
+import { ApiError } from '../api/client';
 
 vi.mock('../api/sprechgruppen', () => ({
   listeEinsatzSprechgruppen: vi.fn(),
@@ -110,6 +111,100 @@ describe('SprechgruppenPicker', () => {
         betriebsart: 'DMO',
       });
       expect(onChange).toHaveBeenCalledWith(expect.arrayContaining([9]));
+    });
+  });
+
+  /** Öffnet die Anlegen-Zeile, füllt sie und legt an. */
+  async function legeSonderAn() {
+    await userEvent.click(
+      await screen.findByRole('button', { name: /neue sprechgruppe anlegen/i }),
+    );
+    await userEvent.type(screen.getByLabelText('Neue Bezeichnung'), 'Sonder 1');
+    await userEvent.click(screen.getAllByRole('combobox')[1]);
+    await userEvent.click(
+      await screen.findByText(
+        (_, el) => el?.className === 'ant-select-item-option-content' && el?.textContent === 'DMO',
+      ),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^anlegen$/i }));
+  }
+
+  describe('Ablehnung am Ort (LFH-1077)', () => {
+    it('zeigt den Grund unter der Zeile, die Eingabe bleibt, kein Toast', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+      vi.mocked(legeEinsatzSprechgruppeAn).mockRejectedValue(
+        new ApiError(409, 'Bezeichnung schon vergeben'),
+      );
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+      await legeSonderAn();
+
+      const grund = await screen.findByRole('alert');
+      expect(grund).toHaveTextContent('Sprechgruppe nicht angelegt');
+      expect(grund).toHaveTextContent('Bezeichnung schon vergeben');
+      expect(screen.getByLabelText('Neue Bezeichnung')).toHaveValue('Sonder 1');
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('räumt den Grund beim nächsten Anlegen', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+      vi.mocked(legeEinsatzSprechgruppeAn)
+        .mockRejectedValueOnce(new ApiError(409, 'Bezeichnung schon vergeben'))
+        .mockImplementationOnce(() => new Promise(() => {}));
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+      await legeSonderAn();
+      await screen.findByText('Bezeichnung schon vergeben');
+
+      await userEvent.click(screen.getByRole('button', { name: /^anlegen$/i }));
+      await waitFor(() => expect(legeEinsatzSprechgruppeAn).toHaveBeenCalledTimes(2));
+      expect(screen.queryByText('Bezeichnung schon vergeben')).toBeNull();
+    });
+
+    it('sperrt Abbrechen, solange das Anlegen läuft', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+      vi.mocked(legeEinsatzSprechgruppeAn).mockImplementation(() => new Promise(() => {}));
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+      await legeSonderAn();
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled());
+    });
+
+    it('zeigt nach Abbrechen und erneutem Öffnen keinen alten Grund', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+      vi.mocked(legeEinsatzSprechgruppeAn).mockRejectedValue(
+        new ApiError(409, 'Bezeichnung schon vergeben'),
+      );
+      renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+      await legeSonderAn();
+      await screen.findByText('Bezeichnung schon vergeben');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+      await userEvent.click(screen.getByRole('button', { name: /neue sprechgruppe anlegen/i }));
+      expect(screen.getByLabelText('Neue Bezeichnung')).toHaveValue('');
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('meldet eine Ablehnung aus dem vorigen Einsatz nicht im neuen', async () => {
+      vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+      let lehneAb: (e: Error) => void = () => {};
+      vi.mocked(legeEinsatzSprechgruppeAn).mockImplementation(
+        () => new Promise((_r, reject) => (lehneAb = reject)),
+      );
+      const client = neuerQueryClient();
+      const { rerender } = renderMitProviders(
+        <SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />,
+        { client },
+      );
+      await legeSonderAn();
+      await waitFor(() => expect(legeEinsatzSprechgruppeAn).toHaveBeenCalledTimes(1));
+
+      rerender(<SprechgruppenPicker einsatzId={6} value={[]} onChange={vi.fn()} />);
+      act(() => lehneAb(new ApiError(409, 'Bezeichnung schon vergeben')));
+      // Erst prüfen, wenn die Ablehnung angekommen ist und die Beobachter sie gesehen haben.
+      await waitFor(() =>
+        expect(client.getMutationCache().getAll()[0]?.state.status).toBe('error'),
+      );
+      await act(() => new Promise((r) => setTimeout(r, 20)));
+      expect(screen.queryByRole('alert')).toBeNull();
     });
   });
 });

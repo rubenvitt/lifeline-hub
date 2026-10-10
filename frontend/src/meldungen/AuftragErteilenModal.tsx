@@ -1,6 +1,8 @@
 import { Modal, Typography } from 'antd';
+import { useEffect, useRef } from 'react';
 import type { Meldung, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
+import type { Speicherung } from '../components/Erfassung';
 
 interface Props {
   meldung: Meldung | null;
@@ -11,6 +13,12 @@ interface Props {
   senden: boolean;
   onAbbrechen: () => void;
   onAnlegen: (d: NeuerAuftrag) => Promise<unknown>;
+  /**
+   * Die Erteilen-Mutation (LFH-1077): ihr Fehler steht im Formular, bis zum nächsten Absenden; das
+   * Formular hängt je Öffnen neu ein und räumt ihn dabei. Solange sie läuft, ist jeder Ausweg
+   * gesperrt.
+   */
+  speicherung?: Speicherung;
 }
 
 /** Vorbelegung des Auftragstexts aus der Meldung (Absender + Inhalt, LFH-113). */
@@ -32,13 +40,29 @@ export default function AuftragErteilenModal({
   senden,
   onAbbrechen,
   onAnlegen,
+  speicherung,
 }: Props) {
+  const offen = meldung !== null;
+  const sperrt = speicherung?.isPending === true;
+  // Öffnen und Schließen räumen den Grund: ein schließender Dialog bleibt bis zum Ende seiner
+  // Animation eingehängt, ein schnelles Wiederöffnen hängt das Formular nicht neu ein.
+  const speicherungRef = useRef(speicherung);
+  speicherungRef.current = speicherung;
+  useEffect(() => {
+    const s = speicherungRef.current;
+    if (s && !s.isPending && s.error != null) s.reset();
+  }, [offen]);
   return (
     <Modal
-      open={meldung !== null}
+      open={offen}
       title="Aus Meldung Auftrag erteilen"
       footer={null}
-      onCancel={onAbbrechen}
+      onCancel={() => {
+        if (!sperrt) onAbbrechen();
+      }}
+      closable={sperrt ? { disabled: true } : true}
+      mask={{ closable: !sperrt }}
+      keyboard={!sperrt}
       destroyOnHidden
       width={520}
     >
@@ -59,6 +83,9 @@ export default function AuftragErteilenModal({
           )
         }
         onAnlegen={onAnlegen}
+        speicherung={speicherung}
+        speicherFehlerTitel="Auftrag nicht erteilt"
+        speicherFehlerFallback="Erteilen fehlgeschlagen"
       />
     </Modal>
   );

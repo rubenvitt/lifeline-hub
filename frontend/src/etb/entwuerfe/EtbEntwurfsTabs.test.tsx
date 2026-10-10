@@ -8,10 +8,16 @@ import type { NeuerEintrag } from '../../api/etb';
 import type { EtbBaustein } from '../../api/types';
 import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { entwuerfeLaden, entwuerfeLeerenFuerTests } from './entwurfStore';
+import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfEntfernen } from './entwurfStore';
 import EtbEntwurfsTabs, { entfernenStil } from './EtbEntwurfsTabs';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 import { rufnameZugriff } from '../../test/standardRufname';
+
+// Durchgereicht; ein Test lässt das Räumen nach dem Senden einmal scheitern.
+vi.mock('./entwurfStore', async (echt) => {
+  const modul = await echt<typeof import('./entwurfStore')>();
+  return { ...modul, entwurfEntfernen: vi.fn(modul.entwurfEntfernen) };
+});
 
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
 /** Angemeldete Person (LFH-767): Die Reiter zeigen nur ihre Entwürfe. */
@@ -106,6 +112,23 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Fertig{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
+  });
+
+  it('meldet kein „Senden fehlgeschlagen“, wenn nach dem Senden nur das Räumen scheitert', async () => {
+    const p = props();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Fertig');
+    vi.mocked(entwurfEntfernen).mockRejectedValueOnce(new Error('Speicher gesperrt'));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+
+    // Der Eintrag steht: das Feld leert sich, ein Sendegrund erscheint nicht.
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    expect(document.querySelector('[data-lfh="etb-ablehnung"]')).toBeNull();
+    expect(screen.queryByText('Senden fehlgeschlagen')).toBeNull();
+    warn.mockRestore();
   });
 
   it('behält das Erfassungsfeld nach dem Absenden — auch unter StrictMode (LFH-214)', async () => {
@@ -468,7 +491,14 @@ describe('EtbEntwurfsTabs', () => {
   it('LFH-748: ein sendender Entwurf eines anderen Einsatzes meldet hier kein Senden', async () => {
     const onSendetChange = vi.fn();
     const versand = {
-      je: { 'entwurf-aus-einsatz-8': { sendet: true, fortschritt: null, hinweis: null } },
+      je: {
+        'entwurf-aus-einsatz-8': {
+          sendet: true,
+          fortschritt: null,
+          hinweis: null,
+          ablehnung: null,
+        },
+      },
       aendern: vi.fn(),
       umhaengen: vi.fn(),
     };

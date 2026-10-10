@@ -43,7 +43,7 @@ interface EtbEntwurfsTabsProps {
 
 /** Kein Versand, kein Fortschritt, kein stehender Grund. */
 function istRuhe(v: Versand) {
-  return !v.sendet && v.fortschritt == null && v.hinweis == null;
+  return !v.sendet && v.fortschritt == null && v.hinweis == null && v.ablehnung == null;
 }
 
 /** Stabile leere Liste: ein frisches `[]` je Render wäre für die Schnellerfassung jedes Mal neu. */
@@ -243,7 +243,13 @@ export default function EtbEntwurfsTabs({
             dateienVerwerfen(e.id);
             // Nur ein NEUER Folgeentwurf erhält die Übernahme. Ein bestehender Entwurf
             // bleibt auch mit bewusst leerem An maßgeblich (LFH-461).
-            await entwurfSchliessen(e.id, naechsteMetadaten);
+            // Der Eintrag steht schon: scheitert nur das Räumen des Entwurfs (Plattenfehler), ist
+            // das kein Sendefehler und darf an der Erfassung nicht als Ablehnung erscheinen.
+            try {
+              await entwurfSchliessen(e.id, naechsteMetadaten);
+            } catch (fehler) {
+              console.warn('ETB-Entwürfe: Entwurf ließ sich nach dem Senden nicht räumen', fehler);
+            }
           }}
           berichtigungZu={null}
           onBerichtigungAbbrechen={() => {}}

@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
+import { ApiError } from '../../api/client';
 
 const ladeLageSnapshots = vi.fn();
 const erzeugeLageSnapshot = vi.fn();
@@ -67,13 +68,7 @@ function renderLeiste(
     </QueryClientProvider>
   );
   return render(
-    <SnapshotLeiste
-      einsatzId={5}
-      darfSichern={false}
-      onWaehle={vi.fn()}
-      fehler={vi.fn()}
-      {...props}
-    />,
+    <SnapshotLeiste einsatzId={5} darfSichern={false} onWaehle={vi.fn()} {...props} />,
     { wrapper: Wrapper },
   );
 }
@@ -144,15 +139,43 @@ describe('SnapshotLeiste', () => {
     await waitFor(() => expect(erzeugeLageSnapshot).toHaveBeenCalledWith(5, { bezeichnung: null }));
   });
 
-  it('ein abgelehntes Sichern meldet den Fehler und lässt Dialog und Wortlaut stehen', async () => {
-    const fehler = vi.fn();
-    erzeugeLageSnapshot.mockRejectedValue(new Error('kaputt'));
-    renderLeiste([], { darfSichern: true, fehler });
+  /*
+   * Speicherfehler im Dialog (LFH-1077): der Grund steht im Dialog, kein Toast; das nächste
+   * Sichern räumt ihn, solange die Antwort aussteht; Abbrechen und Wiederöffnen zeigt keinen.
+   */
+  it('ein abgelehntes Sichern nennt den Grund im Dialog und lässt Dialog und Wortlaut stehen', async () => {
+    let freigeben: () => void = () => {};
+    erzeugeLageSnapshot
+      .mockRejectedValueOnce(new ApiError(422, 'Stand zu groß'))
+      .mockImplementationOnce(
+        () => new Promise((_, rej) => (freigeben = () => rej(new ApiError(422, 'Stand zu groß')))),
+      );
+    renderLeiste([], { darfSichern: true });
     await userEvent.click(screen.getByRole('button', { name: 'Stand sichern' }));
     const dialog = await screen.findByRole('dialog', { name: 'Stand sichern' });
     await userEvent.type(within(dialog).getByLabelText('Snapshot-Bezeichnung'), 'Lage{Enter}');
-    await waitFor(() => expect(fehler).toHaveBeenCalled());
+    expect(await within(dialog).findByText('Stand zu groß')).toBeInTheDocument();
+    expect(within(dialog).getByText('Stand nicht gesichert')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Snapshot-Bezeichnung')).toHaveValue('Lage');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: /Sichern/ }));
+    await waitFor(() => expect(within(dialog).queryByText('Stand zu groß')).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    freigeben();
+    expect(await within(dialog).findByText('Stand zu groß')).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(dialog.closest('.ant-modal')).toHaveClass('ant-zoom-leave'));
+    await userEvent.click(screen.getByRole('button', { name: 'Stand sichern' }));
+    // Wieder offen (nicht mehr im Verlassen-Zustand), und ohne den alten Grund.
+    const zweiter = await waitFor(() => {
+      const alle = screen.getAllByRole('dialog', { name: 'Stand sichern', hidden: true });
+      const letzter = alle[alle.length - 1];
+      expect(letzter.closest('.ant-modal')).not.toHaveClass('ant-zoom-leave');
+      return letzter;
+    });
+    expect(within(zweiter).queryByText('Stand zu groß')).toBeNull();
   });
 
   it('die Auswahl „Stand“ bietet Live und die Stände an, die neuesten oben', async () => {
@@ -304,7 +327,6 @@ describe('SnapshotLeiste', () => {
         darfSichern={false}
         aktiverSnapshotId={10}
         onWaehle={onWaehle}
-        fehler={vi.fn()}
       />,
     );
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS);
@@ -329,7 +351,6 @@ describe('SnapshotLeiste', () => {
         darfSichern={false}
         aktiverSnapshotId={10}
         onWaehle={onWaehle}
-        fehler={vi.fn()}
       />,
     );
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS);
@@ -344,7 +365,6 @@ describe('SnapshotLeiste', () => {
         darfSichern={false}
         aktiverSnapshotId={20}
         onWaehle={onWaehle}
-        fehler={vi.fn()}
       />,
     );
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS * 2);

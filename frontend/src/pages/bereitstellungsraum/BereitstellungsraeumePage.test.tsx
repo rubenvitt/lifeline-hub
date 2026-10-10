@@ -316,7 +316,8 @@ describe('BereitstellungsraeumePage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('navigiert nach Schließen während des Anlegens nicht verspätet', async () => {
+  // Schließen wartet auf die Antwort (LFH-1077, design.md D3): eine Ablehnung braucht den Drawer.
+  it('sperrt das Schließen, solange das Anlegen läuft, und öffnet dann den Raum', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
     const postStart = new Promise<void>((resolve) => {
@@ -339,14 +340,14 @@ describe('BereitstellungsraeumePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
     await userEvent.type(screen.getByPlaceholderText('z. B. BR Ost'), 'BR West{Enter}');
     await postStart;
-    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    expect(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeDisabled();
     await act(async () => {
       antwortFreigeben();
     });
     await screen.findByText('Bereitstellungsraum angelegt');
 
-    expect(screen.getByTestId('pfad')).toHaveTextContent(
-      '/einsaetze/1/bereitstellungsraeume/liste',
+    await waitFor(() =>
+      expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/1/bereitstellungsraeume/22'),
     );
   });
 

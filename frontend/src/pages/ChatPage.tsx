@@ -1,5 +1,5 @@
 import { Alert, App, Breadcrumb, Button, Col, Row, Spin } from 'antd';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -69,7 +69,8 @@ import { Segmentleiste, useRollen } from '../components/instrument';
  */
 const CHAT_MINDESTHOEHE = 320;
 import { useViewport } from '../components/useViewport';
-import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import type { Speicherung } from '../components/Erfassung';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useUploadFortschritt } from '../components/useUploadFortschritt';
 import { anzahl } from '../anzeige/anzahl';
 import { modulName } from '../einsatz/modulRegistry';
@@ -258,9 +259,23 @@ export default function ChatPage() {
     enabled: typAktiv('auftrag'),
   });
 
-  const fehler = useFehlerMeldung();
-  const invalidiereNachrichten = () =>
-    qc.invalidateQueries({ queryKey: einsatzKeys.chatNachrichten(einsatzId) });
+  const invalidiereNachrichten = (eid: number) =>
+    qc.invalidateQueries({ queryKey: einsatzKeys.chatNachrichten(eid) });
+
+  /*
+   * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“): jeder Dialog trägt den Grund seiner Mutation, die Lösch-Rückfrage
+   * wartet auf die Antwort, „Bezug lösen“ meldet an der Nachricht. Jede Aktion trägt ihren
+   * Einsatz: die Route hat keinen `key`, eine Antwort nach einem Einsatzwechsel meldet nicht am
+   * neuen Ort.
+   */
+  const nachrichtFehler = useZeilenFehler<number>();
+  const einsatzJetzt = useRef(einsatzId);
+  useLayoutEffect(() => {
+    einsatzJetzt.current = einsatzId;
+  });
+  const { leere: leereNachrichtFehler } = nachrichtFehler;
+  useEffect(() => leereNachrichtFehler(), [einsatzId, leereNachrichtFehler]);
 
   const anhangFortschritt = useUploadFortschritt();
   const sendenMutation = useMutation({
@@ -281,7 +296,7 @@ export default function ChatPage() {
       );
     },
     onSuccess: () => {
-      invalidiereNachrichten();
+      invalidiereNachrichten(einsatzId);
       // Wer selbst absendet, will seinen Satz sehen, auch wenn er gerade weiter oben las. Der
       // Zähler unterscheidet die eigene Absendung vom Live-Ereignis und hängt bewusst nicht am
       // Autor: sonst führte jede fremde Nachricht desselben Kontos zum Sprung.
@@ -289,73 +304,89 @@ export default function ChatPage() {
     },
     // Kein Toast: der Fehler steht an der Eingabe (`NachrichtEingabe`), bis zum nächsten Senden.
   });
+  // Die Dialoge schließen erst in `onSuccess`; eine Ablehnung steht in ihnen (`speicherung`).
   const bearbeitenMutation = useMutation({
-    mutationFn: ({ id: nid, text }: { id: number; text: string }) =>
-      bearbeiteNachricht(einsatzId, nid, text),
-    onSuccess: () => {
-      invalidiereNachrichten();
+    mutationFn: (v: { einsatzId: number; id: number; text: string }) =>
+      bearbeiteNachricht(v.einsatzId, v.id, v.text),
+    onSuccess: (_daten, v) => {
+      invalidiereNachrichten(v.einsatzId);
       setBearbeitenAuswahl(null);
     },
-    onError: fehler,
   });
   const loeschenMutation = useMutation({
-    mutationFn: (nid: number) => loescheNachricht(einsatzId, nid),
-    onSuccess: invalidiereNachrichten,
-    onError: fehler,
+    mutationFn: (v: { einsatzId: number; nid: number }) => loescheNachricht(v.einsatzId, v.nid),
+    onSuccess: (_daten, v) => invalidiereNachrichten(v.einsatzId),
   });
   const kanalMutation = useMutation({
-    mutationFn: (daten: { name: string; beschreibung?: string }) => legeKanalAn(einsatzId, daten),
-    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.chatKanaele(einsatzId) }),
-    onError: fehler,
+    mutationFn: (v: { einsatzId: number; name: string; beschreibung?: string }) =>
+      legeKanalAn(v.einsatzId, { name: v.name, beschreibung: v.beschreibung }),
+    onSuccess: (_daten, v) =>
+      qc.invalidateQueries({ queryKey: einsatzKeys.chatKanaele(v.einsatzId) }),
   });
   const heraufstufenMutation = useMutation({
-    mutationFn: ({
-      nid,
-      typ,
-      text,
-      anhangIds,
-    }: {
+    mutationFn: (v: {
+      einsatzId: number;
       nid: number;
       typ: EtbTyp;
       text: string;
       anhangIds: number[];
-    }) => heraufstufenZuEtb(einsatzId, nid, typ, text, anhangIds),
-    onSuccess: () => {
-      invalidiereNachrichten();
+    }) => heraufstufenZuEtb(v.einsatzId, v.nid, v.typ, v.text, v.anhangIds),
+    onSuccess: (_daten, v) => {
+      invalidiereNachrichten(v.einsatzId);
       setHeraufstufenAuswahl(null);
       message.success('Zu ETB heraufgestuft');
     },
-    onError: fehler,
   });
   const heraufstufenAuftragMutation = useMutation({
-    mutationFn: ({ nid, daten }: { nid: number; daten: NeuerAuftrag }) =>
-      heraufstufenZuAuftrag(einsatzId, nid, daten),
-    onSuccess: () => {
-      invalidiereNachrichten();
-      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
+    mutationFn: (v: { einsatzId: number; nid: number; daten: NeuerAuftrag }) =>
+      heraufstufenZuAuftrag(v.einsatzId, v.nid, v.daten),
+    onSuccess: (_daten, v) => {
+      invalidiereNachrichten(v.einsatzId);
+      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(v.einsatzId) });
       setHeraufstufenAuftragAuswahl(null);
       message.success('Zu Auftrag heraufgestuft');
     },
-    onError: fehler,
   });
   const bezugMutation = useMutation({
-    mutationFn: ({ nid, typ, zielId }: { nid: number; typ: BezugTyp; zielId: number }) =>
-      setzeBezug(einsatzId, nid, typ, zielId),
-    onSuccess: () => {
-      invalidiereNachrichten();
+    mutationFn: (v: { einsatzId: number; nid: number; typ: BezugTyp; zielId: number }) =>
+      setzeBezug(v.einsatzId, v.nid, v.typ, v.zielId),
+    onSuccess: (_daten, v) => {
+      invalidiereNachrichten(v.einsatzId);
       setBezugAuswahl(null);
       message.success('Bezug gesetzt');
     },
-    onError: fehler,
   });
+  // Eine neue Aktion an der Nachricht räumt ihren alten Grund.
   const bezugLoeschenMutation = useMutation({
-    mutationFn: (nid: number) => loescheBezug(einsatzId, nid),
-    onSuccess: () => {
-      invalidiereNachrichten();
+    mutationFn: (v: { einsatzId: number; nid: number }) => loescheBezug(v.einsatzId, v.nid),
+    onMutate: (v) => nachrichtFehler.beginne(v.nid),
+    onSuccess: (_daten, v) => {
+      invalidiereNachrichten(v.einsatzId);
       message.success('Bezug entfernt');
     },
-    onError: fehler,
+    onError: (e, v) => {
+      if (v.einsatzId === einsatzJetzt.current)
+        nachrichtFehler.melde(v.nid, e, 'Lösen fehlgeschlagen');
+    },
   });
+  /** Nur die Mutation DIESES Einsatzes gehört in seine Dialoge. */
+  const imEinsatz = (m: {
+    variables?: { einsatzId: number };
+    error: unknown;
+    isPending: boolean;
+    reset: () => void;
+  }): Speicherung => {
+    const dieser = m.variables?.einsatzId === einsatzId;
+    return { error: dieser ? m.error : null, isPending: dieser && m.isPending, reset: m.reset };
+  };
+  const bearbeitenSpeicherung = imEinsatz(bearbeitenMutation);
+  const loeschSpeicherung = imEinsatz(loeschenMutation);
+  const kanalSpeicherung = imEinsatz(kanalMutation);
+  const heraufstufenSpeicherung = imEinsatz(heraufstufenMutation);
+  const heraufstufenAuftragSpeicherung = imEinsatz(heraufstufenAuftragMutation);
+  const bezugSpeicherung = imEinsatz(bezugMutation);
+  const kanalAnlegen = (name: string, beschreibung?: string) =>
+    kanalMutation.mutateAsync({ einsatzId, name, beschreibung });
 
   if (einsatzQuery.isLoading) {
     return (
@@ -478,9 +509,8 @@ export default function ChatPage() {
                 })
               }
               darfSchreiben={darfSchreiben}
-              onKanalAnlegen={(name, beschreibung) =>
-                kanalMutation.mutateAsync({ name, beschreibung })
-              }
+              onKanalAnlegen={kanalAnlegen}
+              kanalSpeicherung={kanalSpeicherung}
             />
           </Col>
         )}
@@ -522,7 +552,10 @@ export default function ChatPage() {
             darfSchreiben={darfSchreiben}
             darfOriginal={darfOriginalLaden(einsatz, benutzer)}
             onBearbeiten={(n) => setBearbeitenAuswahl({ einsatzId, nachricht: n })}
-            onLoeschen={(n) => loeschenMutation.mutate(n.id)}
+            // mutateAsync: die Rückfrage schließt erst, wenn das Löschen angekommen ist.
+            onLoeschen={(n) => loeschenMutation.mutateAsync({ einsatzId, nid: n.id })}
+            loeschung={loeschSpeicherung}
+            zeilenFehler={nachrichtFehler.grund}
             etbGesperrt={istGesperrt('etb')}
             auftragGesperrt={istGesperrt('auftraege')}
             onHeraufstufen={(n) => setHeraufstufenAuswahl({ einsatzId, nachricht: n })}
@@ -533,7 +566,7 @@ export default function ChatPage() {
               })
             }
             onBezugSetzen={(n) => setBezugAuswahl({ einsatzId, nachricht: n })}
-            onBezugLoeschen={(n) => bezugLoeschenMutation.mutate(n.id)}
+            onBezugLoeschen={(n) => bezugLoeschenMutation.mutate({ einsatzId, nid: n.id })}
             bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
             bezugInfo={bezugInfo}
           />
@@ -580,45 +613,55 @@ export default function ChatPage() {
         <KanalAnlegenDialog
           offen={kanalAnlageOffen}
           onSchliessen={() => setKanalAnlageOffen(false)}
-          onKanalAnlegen={(name, beschreibung) => kanalMutation.mutateAsync({ name, beschreibung })}
+          onKanalAnlegen={kanalAnlegen}
+          speicherung={kanalSpeicherung}
         />
       )}
       <BezugDialog
         offen={bezugNachricht !== null}
         nachricht={bezugNachricht}
         optionen={bezugOptionen}
-        senden={bezugMutation.isPending}
+        senden={bezugSpeicherung.isPending}
         onAbbrechen={() => setBezugAuswahl(null)}
         // mutateAsync: die Erfassungshülle leert nur, wenn der Bezug angekommen ist.
         onBestaetigen={(typ, zielId) =>
           bezugNachricht
-            ? bezugMutation.mutateAsync({ nid: bezugNachricht.id, typ, zielId })
+            ? bezugMutation.mutateAsync({ einsatzId, nid: bezugNachricht.id, typ, zielId })
             : Promise.reject(new Error('Keine Nachricht'))
         }
+        speicherung={bezugSpeicherung}
       />
       <BearbeitenModal
         offen={bearbeiten !== null}
         nachricht={bearbeiten}
-        senden={bearbeitenMutation.isPending}
+        senden={bearbeitenSpeicherung.isPending}
         onAbbrechen={() => setBearbeitenAuswahl(null)}
         onBestaetigen={(text) =>
           bearbeiten
-            ? bearbeitenMutation.mutateAsync({ id: bearbeiten.id, text })
+            ? bearbeitenMutation.mutateAsync({ einsatzId, id: bearbeiten.id, text })
             : Promise.reject(new Error('Keine Nachricht'))
         }
+        speicherung={bearbeitenSpeicherung}
       />
       <HeraufstufenModal
         offen={heraufstufen !== null}
         nachricht={heraufstufen}
-        senden={heraufstufenMutation.isPending}
+        senden={heraufstufenSpeicherung.isPending}
         onAbbrechen={() => setHeraufstufenAuswahl(null)}
         // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Eintrag angekommen
         // ist.
         onHeraufstufen={(typ, text, anhangIds) =>
           heraufstufen
-            ? heraufstufenMutation.mutateAsync({ nid: heraufstufen.id, typ, text, anhangIds })
+            ? heraufstufenMutation.mutateAsync({
+                einsatzId,
+                nid: heraufstufen.id,
+                typ,
+                text,
+                anhangIds,
+              })
             : Promise.reject(new Error('Keine Quellnachricht'))
         }
+        speicherung={heraufstufenSpeicherung}
       />
       <HeraufstufenAuftragModal
         einsatzId={einsatzId}
@@ -626,15 +669,20 @@ export default function ChatPage() {
         nachricht={heraufstufenAuftrag}
         abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
         einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
-        senden={heraufstufenAuftragMutation.isPending}
+        senden={heraufstufenAuftragSpeicherung.isPending}
         onAbbrechen={() => setHeraufstufenAuftragAuswahl(null)}
         // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Auftrag angekommen
         // ist.
         onAnlegen={(daten) =>
           heraufstufenAuftrag
-            ? heraufstufenAuftragMutation.mutateAsync({ nid: heraufstufenAuftrag.id, daten })
+            ? heraufstufenAuftragMutation.mutateAsync({
+                einsatzId,
+                nid: heraufstufenAuftrag.id,
+                daten,
+              })
             : Promise.reject(new Error('Keine Quellnachricht'))
         }
+        speicherung={heraufstufenAuftragSpeicherung}
       />
     </EinsatzSeite>
   );

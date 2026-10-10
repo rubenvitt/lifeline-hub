@@ -11,13 +11,14 @@ import { describe, expect, it } from 'vitest';
  * Ein Fehler-Toast ist nach rund drei Sekunden weg; danach steht Dialog, Formular oder Zeile
  * unverändert da und wirkt gespeichert. Der Grund einer Ablehnung gehört an den Ort der Handlung
  * (`SpeicherFehler`, `ZeilenFehler`, `SeitenHinweise`, die `speicherung` der Erfassungs-Hülle).
- * Dieser Guard hält neue Fehler-Toasts fern, während die Wellen P1–P5 den Bestand abbauen.
+ * Seit P5 ist der Bestand abgebaut; dieser Guard hält neue Fehler-Toasts fern.
  *
  * ── Wie ───────────────────────────────────────────────────────────────────────
  * Gezählt werden Aufrufe (TypeScript-AST, keine Kommentare) von `message.error(…)`,
  * `meldung.error(…)`, `notification.error(…)` und `useFehlerMeldung(…)` je Datei außerhalb der
- * Tests. Erlaubt sind die Einträge in {@link ERLAUBT} (Toast ohne Ort, mit Grund) und die Schuld
- * in {@link OFFEN}. Mehr Treffer → rot; eine Schuld größer als der Fund → ebenfalls rot: wer eine
+ * Tests. Den Toast-Hook `useFehlerMeldung` gibt es seit P5 nicht mehr; er zählt weiter, damit ein
+ * Wiedereinführen rot wird. Erlaubt sind nur die Einträge in {@link ERLAUBT} (Toast ohne Ort,
+ * mit Grund). Mehr Treffer → rot; ein Eintrag größer als der Fund → ebenfalls rot: wer eine
  * Stelle umstellt, verkleinert den Eintrag im selben Commit.
  *
  * ── Warum ein Vitest-Guard und keine ESLint-Regel ───────────────────────────────
@@ -37,30 +38,15 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ERLAUBT: Record<string, { anzahl: number; grund: string }> = {
   'components/KopierbarerText.tsx': { anzahl: 1, grund: 'Zwischenablage abgelehnt' },
   'pages/ProfilPage.tsx': { anzahl: 1, grund: 'Zwischenablage abgelehnt' },
+  'pages/LagekartePage.tsx': {
+    anzahl: 1,
+    grund: 'Kartenbilder laden ohne Handlung im Hintergrund nach, kein Ort sichtbar',
+  },
   'pages/lagekarte/kontextmenue.ts': { anzahl: 1, grund: 'Zwischenablage abgelehnt' },
   'karten/OfflineRegionPicker.tsx': {
     anzahl: 2,
     grund: 'Kartenbau oder Download scheitert bei geschlossenem Dialog, kein Ort sichtbar',
   },
-};
-
-/**
- * Schuldmenge: Datei (relativ zu `src/`) → erlaubte Trefferzahl. Mit P5 aus LFH-1077 leer; ein
- * neuer Treffer ist rot und wird an den Ort gebracht, nicht hier eingetragen.
- */
-const OFFEN: Record<string, number> = {
-  'components/AnlegenDrawer.tsx': 1,
-  'components/SprechgruppenPicker.tsx': 1,
-  'components/useFehlerMeldung.ts': 1,
-  'etb/EtbLesemarkeBanner.tsx': 1,
-  'etb/WiedervorlageModal.tsx': 1,
-  'offline/OfflineRecoveryDrawer.tsx': 2,
-  'pages/ChatPage.tsx': 1,
-  'pages/EinsatzdatenPage.tsx': 1,
-  'pages/ErinnerungenPage.tsx': 1,
-  'pages/EtbPage.tsx': 3,
-  'pages/LagekartePage.tsx': 1,
-  'pages/MeldungenPage.tsx': 1,
 };
 
 const TOAST_OBJEKTE = new Set(['message', 'meldung', 'notification']);
@@ -131,11 +117,11 @@ describe('Speicherfehler-Guard (LFH-1077)', () => {
       ist[datei] = treffer.length;
       fundorte.push(...treffer.map((z) => `${datei}:${z}`));
     }
-    const grenze = (datei: string) => (ERLAUBT[datei]?.anzahl ?? 0) + (OFFEN[datei] ?? 0);
+    const grenze = (datei: string) => ERLAUBT[datei]?.anzahl ?? 0;
     const neu = Object.entries(ist)
       .filter(([datei, n]) => n > grenze(datei))
       .map(([datei, n]) => `${datei}: ${n} statt höchstens ${grenze(datei)}`);
-    const zuGross = [...new Set([...Object.keys(OFFEN), ...Object.keys(ERLAUBT)])]
+    const zuGross = Object.keys(ERLAUBT)
       .filter((datei) => grenze(datei) > (ist[datei] ?? 0))
       .map(
         (datei) =>

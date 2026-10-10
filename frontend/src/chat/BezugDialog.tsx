@@ -1,7 +1,7 @@
 import { Form } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
-import { ErfassungsModal } from '../components/Erfassung';
+import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { BEZUG_TYP_OPTIONEN, type BezugOptionen } from './bezug';
 
@@ -19,6 +19,11 @@ interface Props {
   onAbbrechen: () => void;
   /** Speichern. Muss bei Ablehnung ablehnen (`mutateAsync`), sonst leert die Hülle. */
   onBestaetigen: (typ: BezugTyp, zielId: number) => Promise<unknown>;
+  /**
+   * Die Speicher-Mutation (LFH-1077), an die Erfassungshülle durchgereicht: ihr Grund steht im
+   * Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen ihn.
+   */
+  speicherung?: Speicherung;
 }
 
 /** Dialog zum nachträglichen Setzen/Ändern des polymorphen Sachbezugs: Typ wählen, dann ein
@@ -30,6 +35,7 @@ export default function BezugDialog({
   senden,
   onAbbrechen,
   onBestaetigen,
+  speicherung,
 }: Props) {
   const [form] = Form.useForm<FormWerte>();
   const typ = Form.useWatch('typ', form);
@@ -54,6 +60,8 @@ export default function BezugDialog({
       form={form}
       erfassenText="Speichern"
       laeuft={senden}
+      speicherung={speicherung}
+      speicherFehlerTitel="Bezug nicht gesetzt"
       // Die Pflichtregeln sichern beide Felder; der Typ von `FormWerte` kennt sie nur optional.
       onErfassen={(w) =>
         w.typ && w.ziel_id != null

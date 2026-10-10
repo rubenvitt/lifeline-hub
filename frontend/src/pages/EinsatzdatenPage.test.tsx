@@ -2,11 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { einsatzKeys } from '../api/queryKeys';
 import type {
   BenutzerAnzeige,
   EinsatzAnzeige,
@@ -1368,5 +1369,114 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
     setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
     await screen.findByText('Frank Führung');
     expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
+  });
+
+  const abschlussPaneel = async () =>
+    within(await screen.findByRole('region', { name: 'Einsatzabschluss' }));
+
+  async function schliesseAb(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      (await abschlussPaneel()).getByRole('button', { name: 'Einsatz abschließen' }),
+    );
+    await user.click(await screen.findByRole('button', { name: 'Einsatz endgültig abschließen' }));
+  }
+
+  // LFH-1077: der Grund steht am Paneel, nicht im Toast.
+  it('zeigt eine Ablehnung am Paneel „Einsatzabschluss“, ohne Toast', async () => {
+    setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
+    server.use(
+      http.post('/api/einsaetze/7/abschliessen', () =>
+        HttpResponse.json({ error: 'Offene Aufträge vorhanden' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    await schliesseAb(user);
+
+    const grund = await (await abschlussPaneel()).findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht abgeschlossen');
+    expect(grund).toHaveTextContent('Offene Aufträge vorhanden');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('räumt den Grund beim nächsten Abschließen', async () => {
+    let aufrufe = 0;
+    setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
+    server.use(
+      http.post('/api/einsaetze/7/abschliessen', async () => {
+        aufrufe += 1;
+        if (aufrufe === 1)
+          return HttpResponse.json({ error: 'Offene Aufträge vorhanden' }, { status: 409 });
+        return new Promise<never>(() => {});
+      }),
+    );
+    const user = userEvent.setup();
+    await schliesseAb(user);
+    await (await abschlussPaneel()).findByText('Offene Aufträge vorhanden');
+
+    await schliesseAb(user);
+    await waitFor(() => expect(aufrufe).toBe(2));
+    expect((await abschlussPaneel()).queryByRole('alert')).toBeNull();
+  });
+
+  it('meldet eine Ablehnung aus dem vorigen Einsatz nicht im neuen', async () => {
+    let lehneAb: (() => void) | null = null;
+    const leitungEinsatz = { ...basisEinsatz, meine_rolle: 'einsatzleitung' as const };
+    server.use(
+      meHandler(leitung),
+      http.get('/api/einsaetze/:id', ({ params }) =>
+        HttpResponse.json({ ...leitungEinsatz, id: Number(params.id) }),
+      ),
+      http.get('/api/einsaetze/:id/mitglieder', () => HttpResponse.json(mitglieder)),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+      http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
+        HttpResponse.json({ sprechgruppen: [], fahrzeug_ids: [] } satisfies Fuehrungsstelle),
+      ),
+      http.get('/api/einsaetze/:id/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
+      http.post(
+        '/api/einsaetze/7/abschliessen',
+        () =>
+          new Promise<Response>((r) => {
+            lehneAb = () =>
+              r(HttpResponse.json({ error: 'Offene Aufträge vorhanden' }, { status: 409 }));
+          }),
+      ),
+    );
+    function ZuEinsatz8() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/einsaetze/8/einsatzdaten')}>
+          Zu Einsatz 8
+        </button>
+      );
+    }
+    const client = neuerQueryClient();
+    // Einsatz 8 liegt schon im Cache: die Seite wechselt ohne Ladeansicht, das Paneel bleibt stehen.
+    client.setQueryDefaults(einsatzKeys.einsatz(8), { gcTime: Infinity, staleTime: Infinity });
+    client.setQueryData(einsatzKeys.einsatz(8), { ...leitungEinsatz, id: 8 });
+    renderMitProviders(
+      <>
+        <ZuEinsatz8 />
+        <Routes>
+          <Route path="/einsaetze/:id/einsatzdaten" element={<EinsatzdatenPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/7/einsatzdaten', client },
+    );
+    const user = userEvent.setup();
+    await schliesseAb(user);
+    // Erst wechseln, wenn die Anfrage des vorigen Einsatzes beim Server liegt.
+    await waitFor(() => expect(lehneAb).not.toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Zu Einsatz 8' }));
+    const paneel8 = await abschlussPaneel();
+    act(() => lehneAb?.());
+    // Erst prüfen, wenn die Ablehnung angekommen ist und die Beobachter sie gesehen haben.
+    await waitFor(() => expect(client.getMutationCache().getAll()[0]?.state.status).toBe('error'));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(paneel8.queryByRole('alert')).toBeNull();
+    expect((await abschlussPaneel()).queryByRole('alert')).toBeNull();
   });
 });

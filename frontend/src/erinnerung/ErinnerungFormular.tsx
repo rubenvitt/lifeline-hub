@@ -4,7 +4,7 @@ import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { serverJetzt } from '../offline/serveruhr';
 import { Paneel } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
-import { ErfassungsFormular } from '../components/Erfassung';
+import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import type { NeueErinnerung } from '../api/types';
 import { EinWertAuswahl, letzterWert } from '../fuehrung/EinWertAuswahl';
 import { dekodiere } from '../fuehrung/funktionsOptionenKern';
@@ -46,9 +46,20 @@ interface Props {
   card?: boolean;
   /** Einsatz für die Katalogauswahl samt lesbarer Besetzung (LFH-549); ohne nur Freitext. */
   einsatzId?: number;
+  /**
+   * Die Anlege-Mutation, an die Erfassungshülle durchgereicht (LFH-1077): sie zeigt den Grund einer
+   * Ablehnung im Formular und räumt ihn beim Einhängen und Abbrechen.
+   */
+  speicherung?: Speicherung;
 }
 
-export default function ErinnerungFormular({ senden, onAnlegen, card = true, einsatzId }: Props) {
+export default function ErinnerungFormular({
+  senden,
+  onAnlegen,
+  card = true,
+  einsatzId,
+  speicherung,
+}: Props) {
   const [form] = Form.useForm<FormWerte>();
   const funktionen = useFunktionsVorschlaege(einsatzId);
 
@@ -82,6 +93,9 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true, ein
       // Das Inline-Formular schließt nach dem Anlegen NICHT — Zuklappen ist ausdrückliche Nutzeraktion.
       onFertig={() => {}}
       laeuft={senden}
+      speicherung={speicherung}
+      speicherFehlerTitel="Erinnerung nicht angelegt"
+      speicherFehlerFallback="Anlegen fehlgeschlagen"
       erfassenText="Anlegen"
       serie
       uebernahme={UEBERNAHME}

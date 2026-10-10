@@ -314,7 +314,8 @@ describe('UnfallhilfsstellenPage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('meldet nach Schließen während des Anlegens keinen verspäteten Abschluss', async () => {
+  // Schließen wartet auf die Antwort (LFH-1077, design.md D3): eine Ablehnung braucht den Drawer.
+  it('sperrt das Schließen, solange das Anlegen läuft, und schließt beim Erfolg', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
     const postStart = new Promise<void>((resolve) => {
@@ -336,14 +337,16 @@ describe('UnfallhilfsstellenPage', () => {
 
     await userEvent.type(screen.getByPlaceholderText('z. B. BHP 50'), 'PA 1{Enter}');
     await postStart;
-    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    expect(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i })).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
     await act(async () => {
       antwortFreigeben();
     });
     await screen.findByText('UHS angelegt');
 
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onAngelegt).not.toHaveBeenCalled();
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onAngelegt).toHaveBeenCalledTimes(1);
   });
 });
 
