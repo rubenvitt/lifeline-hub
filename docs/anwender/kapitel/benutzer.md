@@ -68,7 +68,9 @@ Auf schmalen Bildschirmen liegen die Aktionen einer Zeile in einem Aktionsmenü.
 - **System-Rolle „Benutzer“ und Org-Rolle „Keine“** (die Vorgabe): arbeitet nur in Einsätzen,
   in die die Einsatzleitung die Person aufgenommen hat.
 
-Ein neues Konto gehört zur Organisation des System-Admins, der es anlegt.
+Ein neues Konto gehört zur Organisation des System-Admins, der es anlegt. Die Liste zeigt nur
+die Konten der eigenen Organisation; Konten anderer Organisationen kann ein System-Admin weder
+sehen noch ändern.
 
 ### Anmeldungen beenden
 
@@ -92,8 +94,8 @@ das bei einem verlorenen Gerät hilft, beschreibt [Gerät verloren](geraet-verlo
 
 Nicht deaktivieren lassen sich:
 
-- der letzte aktive System-Admin („Gesperrt: letzter aktiver Admin“), damit die Verwaltung nie
-  ohne Admin bleibt,
+- der letzte aktive System-Admin der Organisation („Gesperrt: letzter aktiver Admin“), damit
+  ihre Verwaltung nie ohne Admin bleibt,
 - das eigene Konto („Gesperrt: eigenes Konto“).
 
 Für ein deaktiviertes Konto gibt es keine „Anmeldungen“. Konten gekoppelter Geräte erscheinen
