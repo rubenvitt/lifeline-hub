@@ -69,6 +69,8 @@ abgewiesene Aktion hinterlässt nichts.
 - **„Konto deaktiviert“** und **„Konto reaktiviert“**: unter „Benutzer“.
 - **„Sitzung beendet“**: eine Anmeldung der Person unter „Benutzer“, „Anmeldungen“ beendet, eine
   Zeile je Anmeldung. „Detail“ nennt das Gerät und den Zeitpunkt der Anmeldung.
+- **„Einmalpasswort vergeben“**: im Dialog „Benutzer bearbeiten“. Ohne „Detail“, das Passwort
+  steht nie in der Spur. Die Anmeldungen, die dabei enden, stehen nicht einzeln da.
 - **„Anmeldeweg aktiviert“** und **„Anmeldeweg deaktiviert“**: jedes Schalten unter
   „Einstellungen“, „Anmeldeverfahren“, auch wenn der Weg schon so stand. „Ziel“ ist dann der
   Anmeldeweg, etwa „Passwort“ oder „SSO“.
@@ -87,7 +89,8 @@ Wie die Aktionen selbst gehen, beschreiben [Benutzer](benutzer.md) und
 - **„Anmeldung“**: eine Anmeldung ist gelungen, mit Passwort, SSO, Passkey oder zweitem Faktor,
   ebenso das Koppeln eines Geräts und die Anmeldung der Mac-App über den Browser. Wer einen
   zweiten Faktor eingerichtet hat, ist erst nach dem Code angemeldet; das Passwort allein
-  schreibt noch keine Zeile.
+  schreibt noch keine Zeile. Ebenso schreibt ein Einmalpasswort allein noch keine Zeile: Mit dem
+  Festlegen des eigenen Passworts entstehen „Passwort geändert“ und „Anmeldung“.
 - **„Anmeldung fehlgeschlagen“**: falsches Passwort, unbekannter Name, falscher Code des zweiten
   Faktors, abgewiesener Passkey oder SSO-Rücksprung, ungültiger Kopplungscode.
 - **„Abmeldung“**: die Person hat „Abmelden“ gewählt.

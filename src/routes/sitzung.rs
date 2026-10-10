@@ -83,7 +83,11 @@ pub async fn eigene_andere_beenden(
 
 /// Das Zielkonto einer Admin-Route: eine Person der eigenen Organisation. Ein Konto einer
 /// fremden Organisation und ein Gerätekonto sind 404 wie ein unbekanntes.
-async fn ziel_laden(state: &AppState, admin: &Benutzer, id: i64) -> Result<Benutzer, AppError> {
+pub(crate) async fn ziel_laden(
+    state: &AppState,
+    admin: &Benutzer,
+    id: i64,
+) -> Result<Benutzer, AppError> {
     let ziel = sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
                 aktiv, erstellt_at \

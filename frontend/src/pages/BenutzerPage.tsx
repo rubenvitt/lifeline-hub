@@ -25,6 +25,7 @@ import {
 } from '../api/benutzer';
 import { useAuth } from '../auth/AuthContext';
 import SitzungsListe from '../auth/SitzungsListe';
+import EinmalpasswortVergeben from '../auth/EinmalpasswortVergeben';
 import { beendeAlleSitzungenVon, beendeSitzungVon, ladeSitzungenVon } from '../api/sitzungen';
 import { globalKeys } from '../api/queryKeys';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -436,6 +437,15 @@ export default function BenutzerPage() {
         </Form.Item>
         {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}
         <SpeicherFehler fehler={bearbeiten.error} />
+        {/* Passwort vergessen (LFH-1121): eine eigene Aktion neben dem Formular, kein Feld. */}
+        {zuBearbeiten && (
+          <Form.Item label="Passwort">
+            <EinmalpasswortVergeben
+              benutzer={zuBearbeiten}
+              eigenesKonto={zuBearbeiten.id === angemeldeterBenutzer?.id}
+            />
+          </Form.Item>
+        )}
       </ErfassungsModal>
 
       <Modal

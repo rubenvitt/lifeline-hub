@@ -11,9 +11,10 @@ use crate::extract::PeerIp;
 use crate::extract::PfadParam;
 use crate::routes::support::{parse_enum, pflicht};
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
 use axum::Json;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Mindestlänge für Passwörter (siehe Plan-Design-Entscheidungen). Gilt beim Anlegen durch den
 /// Admin und beim Self-Service-Wechsel (LFH-471) — beide prüfen über [`pruefe_passwort_laenge`].
@@ -55,7 +56,9 @@ pub struct NeuerBenutzer {
 
 /// Partielle Änderung eines bestehenden Benutzers (PATCH, LFH-286). `None` = Feld nicht
 /// ändern. `benutzername` (Login-Identität) und Passwort sind hier bewusst nicht änderbar; das
-/// Passwort wechselt nur sein Inhaber selbst, mit dem alten (`POST /api/auth/passwort`, LFH-471).
+/// Passwort wechselt sein Inhaber selbst, mit dem alten (`POST /api/auth/passwort`, LFH-471), oder
+/// die Administration vergibt ein Einmalpasswort (`POST /api/benutzer/{id}/einmalpasswort`,
+/// LFH-1121).
 #[derive(Debug, Deserialize)]
 pub struct PatchBenutzer {
     pub anzeigename: Option<String>,
@@ -127,6 +130,9 @@ pub async fn liste(
 }
 
 /// POST /api/benutzer — neuen Benutzer anlegen. Admin-only. Steht in der Admin-Spur (LFH-1005).
+///
+/// Das Konto steht danach unter Änderungszwang (LFH-1121): Das Passwort aus der Anlage gilt wie
+/// ein Einmalpasswort, der erste Passwort-Login führt in den Schritt „Neues Passwort festlegen“.
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -154,8 +160,9 @@ pub async fn anlegen(
     let org_id = admin.org_id;
 
     let ergebnis = sqlx::query(
-        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+                               passwort_wechsel_pflicht) \
+         VALUES (?, ?, ?, ?, ?, ?, 1)",
     )
     .bind(org_id)
     .bind(req.anzeigename.trim())
@@ -474,4 +481,80 @@ pub async fn totp_reset(
     let aktualisiert = anzeige_laden(&state.pool, id).await?;
 
     Ok(Json(aktualisiert))
+}
+
+/// Antwort von `POST /api/benutzer/{id}/einmalpasswort` (LFH-1121): das erzeugte Einmalpasswort,
+/// genau dieses eine Mal.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct Einmalpasswort {
+    pub einmalpasswort: String,
+}
+
+/// POST /api/benutzer/{id}/einmalpasswort — die Administration vergibt einer Person ein
+/// Einmalpasswort (LFH-1121, Spec `konto-einmalpasswort`). Der Server erzeugt es, setzt es als
+/// Passwort, stellt das Konto unter Änderungszwang und beendet alle Sitzungen der Person; der
+/// nächste Passwort-Login führt in den Schritt „Neues Passwort festlegen“.
+///
+/// Abweisungen, jeweils ohne Änderung und ohne Spur: Passwort-Provider aus 403; fremde
+/// Organisation, Gerätekonto oder unbekannt 404 (`sitzung::ziel_laden`); das eigene Konto 422
+/// (das wechselt der Admin im Profil, mit dem alten Passwort); ein SSO-only-Konto 422.
+///
+/// Die Antwort trägt `Cache-Control: no-store`; das Passwort steht weder in der Spur noch im Log.
+pub async fn einmalpasswort(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PeerIp(peer_ip): PeerIp,
+    PfadParam(id): PfadParam<i64>,
+) -> Result<
+    (
+        [(header::HeaderName, &'static str); 1],
+        Json<Einmalpasswort>,
+    ),
+    AppError,
+> {
+    crate::routes::auth::passwort_provider_aktiv(&state.pool).await?;
+    let ziel = crate::routes::sitzung::ziel_laden(&state, &admin, id).await?;
+    if ziel.id == admin.id {
+        return Err(AppError::UnprocessableEntity(
+            "Das eigene Passwort wird im Profil geändert.".into(),
+        ));
+    }
+    if ziel.passwort_hash == PASSWORT_HASH_SSO_ONLY {
+        return Err(AppError::UnprocessableEntity(
+            "Dieses Konto meldet sich über SSO an und hat kein Passwort.".into(),
+        ));
+    }
+
+    let einmalpasswort = crate::auth::passwort_wechsel::erzeuge_einmalpasswort();
+    let hash = crate::auth::provider::password::hash_gedrosselt(&einmalpasswort).await?;
+
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("UPDATE benutzer SET passwort_hash = ?, passwort_wechsel_pflicht = 1 WHERE id = ?")
+        .bind(&hash)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    let beendet = session::alle_loeschen(&mut tx, id).await?;
+    tx.commit().await?;
+    state.live.melde_sitzung_ende(beendet);
+
+    admin_audit::schreibe(
+        &state.pool,
+        AdminEintrag {
+            aktion: AdminAktion::EinmalpasswortVergeben,
+            akteur: &admin,
+            ziel: Ziel::Benutzer {
+                id,
+                benutzername: &ziel.benutzername,
+            },
+            detail: None,
+            peer_ip,
+        },
+    )
+    .await;
+
+    Ok((
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(Einmalpasswort { einmalpasswort }),
+    ))
 }

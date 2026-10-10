@@ -30,7 +30,7 @@ Herleitung: `/mnt/project-files/lfh-1092/design.md`. Eine Sitzung trägt eine ö
 im 5-min-Takt.
 
 - **Jeder Weg, der Sitzungszeilen löscht, meldet ihre Kennungen an `live.melde_sitzung_ende`**
-  (Logout, Passwort, Deaktivieren, Zweitfaktor-Reset, Neuanmeldung, Beenden): offene Live-Ströme
+  (Logout, Passwort, Deaktivieren, Zweitfaktor-Reset, Einmalpasswort, Neuanmeldung, Beenden): offene Live-Ströme
   enden dann sofort, und das Gerät räumt über `/me` → 401 sein Lagebild. Die Löschfunktionen im
   Backend-Modul `src/auth/session.rs` liefern die Kennungen dafür. Nachweis `tests/sitzungen.rs`,
   `e2e/sitzung-beenden.spec.ts`.
@@ -41,3 +41,18 @@ im 5-min-Takt.
   Admin `admin_audit`, beide `sitzung_beendet`.
 - `SitzungsListe` fragt nicht nach (umkehrbar durch erneutes Anmelden), „Alle … beenden“ steht
   erst ab zwei beendbaren Sitzungen. Der Query-Key `sitzungen` ist nicht live.
+
+## Einmalpasswort mit Änderungszwang (LFH-1121)
+
+Herleitung: `openspec/changes/lfh-1121-einmalpasswort/design.md`, Spec `konto-einmalpasswort`.
+
+- **Vor dem Festlegen gibt es keine Sitzung:** ein Passwort-Login (und `totp/finish`) auf ein Konto
+  unter `passwort_wechsel_pflicht` liefert `{passwort_wechsel_erforderlich: true}` und nur das
+  Cookie `passwort_wechsel`; erst `POST /api/auth/passwort/festlegen` legt die Sitzung an. Der
+  Client übernimmt erst danach (`AuthContext.passwortFestlegen`), sonst schriebe er den
+  Offline-Schnappschuss und andere Tabs übernähmen eine Person ohne Sitzung.
+- Den Zwang setzen „Benutzer anlegen“ und „Einmalpasswort vergeben“; aufgehoben wird er nur durch
+  ein neues eigenes Passwort (Festlegen oder Self-Service-Wechsel). Passkey, SSO und App-Code
+  bleiben unberührt.
+- Das Einmalpasswort steht nur in der Antwort an den Admin (`no-store`), nie in Spur, Log oder
+  Query-Cache.

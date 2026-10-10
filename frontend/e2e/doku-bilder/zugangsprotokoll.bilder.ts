@@ -1,6 +1,7 @@
 import { request, type APIRequestContext, type Page } from '@playwright/test';
 import { waehleIn } from '../auswahl-kern';
 import { anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
+import { kontoAnlegen } from '../konto-anlegen';
 
 /**
  * Bilder des Kapitels „Zugangsprotokoll“ (`docs/anwender/kapitel/zugangsprotokoll.md`).
@@ -50,10 +51,7 @@ async function zugangsgeschichte(page: Page): Promise<void> {
   );
   if (vorhanden) return;
 
-  const { id } = await fuelle<{ id: number }>(page, 'post', '/api/benutzer', {
-    ...PERSON,
-    passwort: PASSWORT,
-  });
+  const { id } = await kontoAnlegen(page.request, { ...PERSON, passwort: PASSWORT });
 
   const ipad = await geraet(IPAD);
   const windows = await geraet(WINDOWS);

@@ -149,6 +149,21 @@ pub(crate) async fn hash_gedrosselt_mit_schranken(
     .map_err(|e| AppError::Internal(format!("KDF-Task abgebrochen: {e}")))?
 }
 
+/// Prüft ein Klartext-Passwort gegen einen gespeicherten Hash unter denselben Schranken wie der
+/// Login. Gerufen vom Festlegen nach einem Einmalpasswort (LFH-1121): das neue Passwort darf dem
+/// bisherigen nicht gleichen. 503, wenn nach [`WARTEFRIST`] kein KDF-Platz frei wurde.
+pub async fn gleicht_gedrosselt(passwort: &str, hash: &str) -> Result<bool, AppError> {
+    let (_andrang, platz) = platz_holen(&Schranken::produktiv()).await?;
+    let passwort = passwort.to_string();
+    let hash = hash.to_string();
+    tokio::task::spawn_blocking(move || {
+        let _platz = platz;
+        password::verifizieren(&passwort, &hash)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("KDF-Task abgebrochen: {e}")))
+}
+
 /// Erwirbt erst einen Andrangsplatz ohne Warten, dann den KDF-Platz mit gedeckelter Wartezeit;
 /// beide Abweisungen sind 503. Der Aufrufer hält den Andrangsplatz bis zum Ende seines Futures
 /// und gibt den KDF-Platz in die Blocking-Closure (s. Modul-Doku).

@@ -1,5 +1,6 @@
 import { request } from '@playwright/test';
-import { anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
+import { anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
+import { kontoAnlegen } from '../konto-anlegen';
 
 /**
  * Bilder des Kapitels „Gerät verloren“ (`docs/anwender/kapitel/geraet-verloren.md`, LFH-1129).
@@ -23,7 +24,7 @@ test.describe(KAPITEL, () => {
   test('Anmeldungen einer Person in der Verwaltung', async ({ page }) => {
     await anmelden(page);
     const person = { benutzername: 'm.beispiel', passwort: 'doku-passwort-123' };
-    await fuelle(page, 'post', '/api/benutzer', { anzeigename: 'Max Beispiel', ...person });
+    await kontoAnlegen(page.request, { anzeigename: 'Max Beispiel', ...person });
     // Zwei Geräte der Person: das verlorene Tablet und ein Arbeitsplatzrechner.
     const baseURL = test.info().project.use.baseURL;
     const geraete = [];

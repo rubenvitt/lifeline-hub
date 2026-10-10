@@ -57,7 +57,7 @@ Zur Motivation siehe `proposal.md`, „Why“. Für den Weg sind diese Stellen w
 ### D1: Der Zwischenzustand hat keine Sitzung (TOTP-Muster)
 
 **Gewählt:** Der Passwort-Login auf ein Konto mit `passwort_wechsel_pflicht = 1` ergibt keine Sitzung.
-Er legt einen Schlüssel in einen neuen Pending-Speicher `auth/passwort_wechsel/state.rs`. Das ist
+Er legt einen Schlüssel in einen neuen Pending-Speicher `auth/passwort_wechsel.rs` (dort steht auch der Erzeuger aus D5). Das ist
 dasselbe Muster wie `totp/state.rs`: `BegrenzterAblaufSpeicher`, TTL 10 min, Obergrenze wie dort.
 Der Eintrag hält die `benutzer_id` **und den Passwort-Hash zum Zeitpunkt der Prüfung** (D3, Schritt
 7). Dazu setzt er das HttpOnly-Cookie `passwort_wechsel` (Lax, Pfad `/api/auth`, `Secure` nach
@@ -184,15 +184,20 @@ Anmeldung mit dem selbst gewählten Passwort verlangte dann einen zweiten Wechse
 
 ### D8: Die Testhelfer erledigen den Erstwechsel
 
-- **Rust** (`tests/common/mod.rs`):
-  - `benutzer_anlegen` legt mit dem Startpasswort `{name}pw0` an und führt danach
-    `login` → `passwort/festlegen` auf `{name}pw1` aus. Die 274 Aufrufer bleiben dadurch unverändert.
-  - Ein neuer Helfer `erstwechsel(app, name, start, neu)` dient den rund 35 Stellen, die
-    `POST /api/benutzer` direkt rufen und sich danach anmelden. Sie werden einzeln geprüft. Wer sich
-    nicht anmeldet, braucht nichts.
-- **e2e:** Ein gemeinsamer Helfer `e2e/konto-anlegen.ts` legt das Konto an und erledigt den
-  Erstwechsel per API. Die Specs und Bildskripte, die heute selbst `POST /api/benutzer` senden,
-  nutzen ihn.
+- **Rust** (`tests/common/mod.rs`): `benutzer_anlegen` legt wie bisher mit `{name}pw1` an und hebt
+  den Zwang danach mit `zwang_aufheben(name)` **direkt in der Test-Datenbank** auf. Den Pool kennt
+  der Helfer über ein `thread_local`, das jedes `setup*` setzt. Die 274 Aufrufer bleiben
+  unverändert. `login_cookie` bricht mit einer klaren Meldung ab, wenn ein Konto noch unter Zwang
+  steht. Stellen, die `POST /api/benutzer` direkt rufen und sich danach anmelden, rufen
+  `zwang_aufheben` selbst.
+  - *Umsetzung abweichend vom ersten Plan* (Erstwechsel per API mit `{name}pw0` → `{name}pw1`):
+    Jeder API-Wechsel hätte eine zusätzliche Sitzung und drei Spureinträge erzeugt
+    (`passwort_geaendert`, `login_ok`, `logout`). Tests, die Sitzungen oder Spurzeilen zählen,
+    wären dadurch verfälscht worden. Den Weg selbst prüft `tests/einmalpasswort.rs`.
+- **e2e:** `e2e/konto-anlegen.ts` legt das Konto an und erledigt den Erstwechsel per API, in einem
+  eigenen API-Kontext, und meldet die dabei entstandene Sitzung wieder ab. Die e2e-Suite hat keinen
+  Zugriff auf die Datenbank. Die Specs und Bildskripte, die sich mit dem angelegten Konto anmelden,
+  nutzen ihn. Konten, die nur als Listenzeilen gebraucht werden, brauchen ihn nicht.
 
 **Verworfen: Ein Feld `passwort_wechsel_erzwingen: false` in der Anlage.** Damit gäbe es einen
 Produktionsweg um die Entscheidung herum, nur damit Tests einfacher werden.
@@ -206,25 +211,28 @@ zuerst unter „Bearbeiten“. Bisher sagt die Doku genau dort, dass es nicht ge
 
 - **Sperren mit Grund:** eigenes Konto mit „Eigenes Passwort im Profil ändern.“ und SSO-only-Konto
   (`!passwort_gesetzt`) mit „Meldet sich über SSO an.“
-- **Rückfrage** per `<Modal>` mit einem Satz zur Folge: „Das bisherige Passwort gilt nicht mehr, und
-  alle Anmeldungen von {Name} enden.“ Der Bestätigungsknopf heißt „Einmalpasswort vergeben“.
-- **Ergebnis:** eine Anzeige in Monospace mit dem Knopf „Kopieren“ und „Fertig“. Das Passwort steht
+- **Rückfrage** per `Popconfirm`, rot und mit benanntem `okText`, wie es `frontend/AGENTS.md` für
+  Unumkehrbares vorgibt („Destruktiv ist nicht gleich destruktiv“). Sie enthält einen Satz zur
+  Folge: „Das bisherige Passwort gilt nicht mehr, und alle Anmeldungen von {Name} enden.“ Der
+  Bestätigungsknopf heißt „Einmalpasswort vergeben“.
+- **Ergebnis:** eine Anzeige in Monospace mit Kopierknopf (`components/KopierbarerText.tsx`). Der
+  Dialog bleibt mit „Abbrechen“ bzw. „Speichern“ offen, wie er war. Das Passwort steht
   nur im lokalen Zustand der Komponente, nie im Query-Cache. Es geht über `useMutation` ohne
   `onSuccess`-Cache-Schreiben, und nach dem Erfolg wird `globalKeys.benutzer()` invalidiert.
 - **Anmeldeseite:** Der Schritt „Neues Passwort festlegen“ ersetzt das Formular wie der TOTP-Schritt.
   Die Felder „Neues Passwort“ und „Neues Passwort wiederholen“ samt Regeln kommen aus einem
   gemeinsamen Baustein mit `PasswortAendernDialog`, damit dieselbe Eingabe nicht zweimal gebaut
   wird.
-- **AuthContext:** `login()` und `totpFinish()` bekommen das Ergebnis `{status:'passwort_wechsel'}`,
-  das Neue ist `passwortFestlegen()`. Erst `passwortFestlegen()` ruft `vorhaltungAnmelden`,
+- **AuthContext:** `login()` bekommt das Ergebnis `{status:'passwort_wechsel'}`, `totpFinish`
+  (`api/totp.ts`) liefert die schmale Antwort an `LoginPage` durch, und neu kommt
+  `passwortFestlegen()` dazu. Erst `passwortFestlegen()` ruft `vorhaltungAnmelden`,
   `uebernimm` und `meldeAuthWechsel`.
 
 ## Risks / Trade-offs
 
-- **[Risiko] Testhelfer kosten Laufzeit:** Jeder `benutzer_anlegen`-Aufruf braucht jetzt drei
-  Argon2-Läufe statt einem (Anlage, Login, Festlegen). → In den Tests stehen die KDF-Parameter
-  ohnehin niedrig. Wird die Suite messbar langsamer, setzt der Helfer stattdessen das Flag direkt in
-  der Datenbank zurück, denn `setup_mit_pool` gibt den Pool heraus.
+- **[Risiko] Testhelfer verdecken den Weg:** Ein Helfer, der den Zwang direkt in der Datenbank
+  aufhebt, prüft den Erstwechsel nicht mit. → Den Weg prüfen `tests/einmalpasswort.rs` und
+  `e2e/einmalpasswort.spec.ts` eigens, und die e2e-Helfer gehen ihn per API.
 - **[Risiko] Übersehene Testpfade:** Ein e2e-Spec, das ein Konto anlegt und sich über die
   Oberfläche anmeldet, landet im neuen Schritt statt auf `/einsaetze`. → Ein Grep auf
   `/api/benutzer` in `frontend/e2e/` liefert die Liste der Dateien, und der volle e2e-Lauf des Gates

@@ -2,7 +2,8 @@ import { App, Form, Input, theme } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { PASSWORT_MIN_LAENGE, passwortAendern } from '../api/auth';
+import { passwortAendern } from '../api/auth';
+import NeuesPasswortFelder from './NeuesPasswortFelder';
 
 interface PasswortWerte {
   altes_passwort: string;
@@ -19,8 +20,8 @@ interface PasswortWerte {
  *
  * **Die Ablehnung steht im Dialog, nicht im Toast** (`SpeicherFehler`): ein falsches bisheriges
  * Passwort (422) lässt den Dialog offen und die Felder stehen, ein Toast wäre weg, bevor jemand
- * ihn liest. Der Erfolg geht an den Toast. Die Wiederholung prüft nur der Client — der Server
- * bekommt sie nie; die Mindestlänge prüfen beide, entscheidend ist der Server.
+ * ihn liest. Der Erfolg geht an den Toast. Die beiden Felder für das neue Passwort teilt der
+ * Dialog mit der Anmeldeseite (`NeuesPasswortFelder`, LFH-1121).
  */
 export default function PasswortAendernDialog({
   offen,
@@ -71,35 +72,7 @@ export default function PasswortAendernDialog({
       >
         <Input.Password autoComplete="current-password" />
       </Form.Item>
-      <Form.Item
-        label="Neues Passwort"
-        name="neues_passwort"
-        rules={[
-          {
-            required: true,
-            min: PASSWORT_MIN_LAENGE,
-            message: `Mindestens ${PASSWORT_MIN_LAENGE} Zeichen`,
-          },
-        ]}
-      >
-        <Input.Password autoComplete="new-password" />
-      </Form.Item>
-      <Form.Item
-        label="Neues Passwort wiederholen"
-        name="wiederholung"
-        dependencies={['neues_passwort']}
-        rules={[
-          { required: true, message: 'Bitte das neue Passwort wiederholen' },
-          ({ getFieldValue }) => ({
-            validator: (_, wert: string | undefined) =>
-              !wert || wert === getFieldValue('neues_passwort')
-                ? Promise.resolve()
-                : Promise.reject(new Error('Die Wiederholung weicht vom neuen Passwort ab')),
-          }),
-        ]}
-      >
-        <Input.Password autoComplete="new-password" />
-      </Form.Item>
+      <NeuesPasswortFelder />
     </ErfassungsModal>
   );
 }

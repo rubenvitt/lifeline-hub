@@ -98,6 +98,7 @@ async fn patch_als_nicht_admin_ist_403() {
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
     nicht_admin_anlegen(&app, &admin_cookie).await;
 
+    common::zwang_aufheben("erika").await;
     let erika_cookie = login_cookie(&app, "erika", "erikapw1").await;
     let resp = app
         .oneshot(
@@ -223,6 +224,7 @@ async fn patch_name_als_nicht_admin_ist_403() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     nicht_admin_anlegen(&app, &admin).await;
+    common::zwang_aufheben("erika").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
     let (status, _) = anfrage(

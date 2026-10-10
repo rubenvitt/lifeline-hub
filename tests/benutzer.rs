@@ -44,6 +44,7 @@ async fn nicht_admin_bekommt_403_auf_benutzerliste() {
     assert_eq!(resp.status(), StatusCode::CREATED);
 
     // Dieser meldet sich an und versucht die Liste zu lesen → 403.
+    common::zwang_aufheben("erika").await;
     let erika_cookie = login_cookie(&app, "erika", "erikapw1").await;
     let resp = app
         .oneshot(

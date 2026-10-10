@@ -77,6 +77,7 @@ export function authWertFixture(benutzer: MeAntwort | null): ReturnType<typeof u
     geraet: benutzer?.geraet ?? null,
     laedt: false,
     login: vi.fn(),
+    passwortFestlegen: vi.fn(),
     logout: vi.fn(),
     aktualisiere: vi.fn(),
     abmeldenLokal: vi.fn(),
