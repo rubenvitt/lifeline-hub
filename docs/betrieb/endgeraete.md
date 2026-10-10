@@ -10,8 +10,10 @@ Damit die Arbeit ohne Netz weitergeht, hält das Gerät im Browserprofil (bzw. i
 Desktop-App) **im Klartext**:
 
 - das **Lagebild**: ETB, Meldebild, Aufträge, Lagekarte, Betreuung, UHS, Kommunikationsplan und
-  die **Betroffenen mit Personen- und Gesundheitsdaten**;
-- die **Offline-Warteschlange**: noch nicht gesendete Eingaben, auch abgelehnte;
+  die **Betroffenen mit Personen- und Gesundheitsdaten** (Name, Geburtsdatum, Sichtung,
+  Verbleib; ohne Adresse, Melderkontakt, Notiz, Zustand und Fundort, LFH-1095);
+- die **Offline-Warteschlange**: noch nicht gesendete Eingaben mit allen Feldern, auch
+  abgelehnte (diese höchstens 30 Tage, LFH-1093);
 - ungesendete **ETB-Entwürfe**;
 - das **Sitzungs-Cookie**, gültig bis zu 7 Tage.
 
@@ -78,15 +80,16 @@ lässt sich angeben, wer ihn bestätigt.
 ## Gerät verloren oder gestohlen
 
 1. **Sofort melden** an die Einsatzleitung bzw. eine Person mit Admin-Rechten.
-2. **Sitzungen beenden.** Bis es dafür einen eigenen Knopf gibt:
-   - **Persönliches Konto:** Ein Admin **deaktiviert** die Person unter Verwaltung → Benutzer.
-     Das beendet alle ihre Sitzungen sofort; sie kann sich danach nicht mehr anmelden, bis sie
-     wieder **reaktiviert** wird. Danach meldet sie sich auf ihren übrigen Geräten neu an.
-     Hat die Person ein lokales Passwort und noch ein Gerät in der Hand, beendet auch ein
-     **eigener Passwortwechsel** (Profil → Passwort ändern) alle anderen Sitzungen, ohne sie
-     zu sperren.
-   - **Gekoppeltes Gerät:** in den Einsatzeinstellungen unter „Gekoppelte Geräte“
-     **Widerrufen …**.
+2. **Sitzung beenden** (LFH-1092). Konto, Passwort und zweiter Faktor bleiben dabei
+   unverändert:
+   - **Selbst:** Hat die Person noch ein Gerät in der Hand, beendet sie unter Profil →
+     „Anmeldungen“ die Zeile des verlorenen Geräts (**Beenden**) oder alle anderen
+     (**Alle anderen beenden**).
+   - **Admin:** Verwaltung → Benutzer → in der Zeile der Person **Anmeldungen** → beim
+     verlorenen Gerät **Beenden**, im Zweifel **Alle beenden**.
+   - **Deaktivieren** ist nur noch nötig, wenn die Person sich vorerst gar nicht mehr anmelden
+     soll (etwa weil auch ihre Zugangsdaten verloren sind).
+   - **Gekoppeltes Gerät:** in den Einstellungen des Einsatzes unter „Geräte“ **Widerrufen …**.
 3. Bekommt das verlorene Gerät wieder Netz, erhält es beim nächsten Kontakt eine Absage vom
    Server und **löscht sein Lagebild selbst**. Ohne Netz bleibt es auf der Platte; dann schützt
    nur die Geräteverschlüsselung (Vorgabe 1).
@@ -95,10 +98,13 @@ lässt sich angeben, wer ihn bestätigt.
    das Risiko in der Regel gering; das hält die Organisation mit dieser Begründung fest.
 
 Ein Gerät, das wieder auftaucht, braucht eine neue Anmeldung. Seine Warteschlange bleibt dabei
-erhalten (Beweissicherung); abgelehnte Einträge darin verwirft die Person nach Prüfung von Hand.
+erhalten (Beweissicherung); abgelehnte Einträge darin verwirft die Person nach Prüfung von Hand,
+spätestens räumt das Gerät sie 30 Tage nach der Ablehnung selbst.
 
 ## Einweisung
 
 Die Vorgaben 1–3 und der Ablauf bei Verlust gehören in die Einweisung jeder Person, die Lifeline
-Hub nutzt, und in die Gerätecheckliste der Organisation. Eine Anwenderdokumentation dafür gibt es
-noch nicht; bis dahin ist dieses Dokument die Quelle.
+Hub nutzt, und in die Gerätecheckliste der Organisation. Für Anwender stehen die Abläufe in der
+Anwenderdokumentation: [Gerät verloren](../anwender/kapitel/geraet-verloren.md),
+[Arbeiten ohne Netz](../anwender/kapitel/ohne-netz.md),
+[Anmelden und Abmelden](../anwender/kapitel/anmelden-abmelden.md).
