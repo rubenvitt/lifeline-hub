@@ -1,4 +1,4 @@
-import { theme } from 'antd';
+import { theme, type GlobalToken } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import Markdown from '../../components/Markdown';
 import { monoStil } from '../../components/instrument';
@@ -19,7 +19,8 @@ import '../druckansichtSchmal.css';
  * Titel an das erste Inhaltsstück weiter ({@link Titel}), und das stellt sie mit seinem ersten Teil
  * in eine Hülle `data-lfh="titelblock"`: die erste Zeile einer Liste, den Vermerk, den ersten Block
  * des Lageberichtstexts (über `Markdown titel`) oder, nur in Firefox, eine kurze Tabelle ganz. Eine
- * lange Tabelle wanderte ganz mit und ließe davor eine fast leere Seite; ihr Titel bleibt davor.
+ * lange Tabelle wanderte ganz mit und ließe davor eine fast leere Seite; vor ihr stehen die Titel
+ * mit Kopf und erster Zeile in einem Deckel ({@link Deckel}, LFH-1124).
  *
  * Tabellen sind schlichtes HTML wie im ETB-Druck (`etb/EtbDruckTabelle.tsx`, benannte Ausnahme):
  * ein Vordruck ohne Sortierung, Filter oder Zeilenaktion, kein Bedienort. Am schmalen Schirm
@@ -172,44 +173,79 @@ function ZeilenListe({ titel, zeilen }: { titel: readonly Titel[]; zeilen: Zeile
   );
 }
 
-function TabellenAnzeige({ inhalt }: { inhalt: Extract<Inhalt, { art: 'tabelle' }> }) {
+/**
+ * Rolle einer Tabelle am Deckel (LFH-1124): `einfach` ohne Deckel; `deckel` die Kopie im Deckel
+ * (Kopf, erste Zeile, Maßzeilen); `unter-deckel` die echte Tabelle dahinter.
+ */
+type TabellenRolle = 'einfach' | 'deckel' | 'unter-deckel';
+
+/**
+ * Zeilenhöhe des Kopfes in px. Am Deckel setzt `druck.css` sie im Firefox-Druck an den Kopf beider
+ * Tabellen, und aus ihr ist die Kopfhöhe gerechnet, um die die echte Tabelle unter den Deckel rückt.
+ */
+function kopfZeilenhoehe(token: GlobalToken): number {
+  return Math.round(token.fontSize * token.lineHeight);
+}
+
+function TabellenAnzeige({
+  inhalt,
+  rolle = 'einfach',
+}: {
+  inhalt: Extract<Inhalt, { art: 'tabelle' }>;
+  rolle?: TabellenRolle;
+}) {
   const { token } = theme.useToken();
   const zelle: CSSProperties = {
     textAlign: 'start',
     verticalAlign: 'top',
     padding: `${token.paddingXXS}px ${token.paddingXS}px`,
-    borderBlockEnd: `1px solid ${token.colorBorderSecondary}`,
+    borderBlockEnd: `${token.lineWidth}px solid ${token.colorBorderSecondary}`,
   };
-  return (
-    <div className="druckansicht-bildlauf">
-      <table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          fontSize: token.fontSize,
-          marginBlockEnd: token.marginXS,
-        }}
-      >
-        <thead>
-          <tr>
-            {inhalt.kopf.map((k) => (
-              <th
-                key={k}
-                scope="col"
-                style={{
-                  ...zelle,
-                  borderBlockEnd: `1px solid ${token.colorBorder}`,
-                  fontWeight: 600,
-                }}
-              >
-                {k}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {inhalt.zeilen.map((zeile, i) => (
-            <tr key={i}>
+  const zeilenhoehe = kopfZeilenhoehe(token);
+  /** Markierung einer Zeile: Maßzeile im Deckel, erste Zeile der echten Tabelle. */
+  const marke = (i: number): string | undefined =>
+    rolle === 'deckel' && i > 0
+      ? 'masszeile'
+      : rolle === 'unter-deckel' && i === 0
+        ? 'deckel-erste-zeile'
+        : undefined;
+  // Zeilenhöhe des Kopfes für `druck.css`; außerhalb des Firefox-Drucks liest sie niemand.
+  const kopfzeile = { '--druck-kopfzeile': `${zeilenhoehe}px` } as CSSProperties;
+  const tabelle = (
+    <table
+      data-lfh={rolle === 'deckel' ? 'deckel-tabelle' : undefined}
+      aria-hidden={rolle === 'deckel' ? true : undefined}
+      style={{
+        // Die Kopie zeigt nur der Firefox-Druck (`druck/druck.css`).
+        ...(rolle === 'deckel' ? { display: 'none', ...kopfzeile } : {}),
+        width: '100%',
+        borderCollapse: 'collapse',
+        fontSize: token.fontSize,
+        marginBlockEnd: rolle === 'deckel' ? 0 : token.marginXS,
+      }}
+    >
+      <thead>
+        <tr>
+          {inhalt.kopf.map((k) => (
+            <th
+              key={k}
+              scope="col"
+              style={{
+                ...zelle,
+                borderBlockEnd: `${token.lineWidth}px solid ${token.colorBorder}`,
+                fontWeight: 600,
+              }}
+            >
+              {k}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {inhalt.zeilen.map((zeile, i) => {
+          const m = marke(i);
+          return (
+            <tr key={i} data-lfh={m}>
               {zeile.map((wert, j) => (
                 <td
                   key={j}
@@ -220,14 +256,67 @@ function TabellenAnzeige({ inhalt }: { inhalt: Extract<Inhalt, { art: 'tabelle' 
                     ...(BEGINNT_MIT_ZIFFER.test(wert) ? monoStil(token.fontSize) : {}),
                   }}
                 >
-                  {wert}
+                  {/* Die Hülle verliert im Firefox-Druck ihre Höhe, nicht ihre Breite. Inline,
+                      damit Text und Kopieren am Bildschirm bleiben, wie sie waren. */}
+                  {m ? <span>{wert}</span> : wert}
                 </td>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+  // Die Kopie ohne eigene Hülle: ein leerer Block zwischen Titel und Tabelle trennte in Chromium
+  // den Titel von der Tabelle.
+  if (rolle === 'deckel') return tabelle;
+  return (
+    <div
+      className="druckansicht-bildlauf"
+      data-lfh={rolle === 'unter-deckel' ? 'unter-deckel' : undefined}
+      style={
+        rolle === 'unter-deckel'
+          ? ({
+              ...kopfzeile,
+              '--druck-kopfhoehe': `${zeilenhoehe + 2 * token.paddingXXS + token.lineWidth}px`,
+            } as CSSProperties)
+          : undefined
+      }
+    >
+      {tabelle}
     </div>
+  );
+}
+
+/**
+ * Titel vor einer langen Tabelle (LFH-1124). Firefox lässt einen Titel und selbst den Spaltenkopf
+ * allein am Seitenende; nähme eine Hülle die ganze Tabelle mit, bliebe davor fast eine Seite leer.
+ * Der Deckel trägt deshalb die Titel und eine Kopie der Tabelle, von der nur Kopf und erste Zeile
+ * Höhe haben; die übrigen Zeilen stehen als Maßzeilen darin, damit beide Tabellen dieselben
+ * Spalten bekommen. Die echte Tabelle folgt. Im Firefox-Druck bricht der Deckel nicht, deckt mit
+ * Papiergrund und liegt über der echten Tabelle, die um ihre Kopfhöhe hochgezogen ist und deren
+ * erste Zeile dort keine Höhe hat; sie bricht zwischen ihren Zeilen und wiederholt den Kopf.
+ * Überall sonst ist die Kopie ausgeblendet und die echte Tabelle steht wie ohne Deckel
+ * (`druck/druck.css`, Herleitung
+ * `openspec/changes/archive/2026-10-10-lfh-1124-firefox-titel-lange-tabelle/design.md`).
+ */
+function Deckel({
+  titel,
+  inhalt,
+}: {
+  titel: readonly Titel[];
+  inhalt: Extract<Inhalt, { art: 'tabelle' }>;
+}) {
+  return (
+    <>
+      {/* Ohne Box außerhalb des Firefox-Drucks: dort hielte Chromium den Titel über
+          `break-after: avoid` nicht mehr bei der Tabelle, wenn eine Hülle dazwischen stünde. */}
+      <div data-lfh="titelblock-deckel" style={{ display: 'contents' }}>
+        <Titelfolge titel={titel} />
+        <TabellenAnzeige inhalt={inhalt} rolle="deckel" />
+      </div>
+      <TabellenAnzeige inhalt={inhalt} rolle="unter-deckel" />
+    </>
   );
 }
 
@@ -251,12 +340,8 @@ function InhaltAnzeige({ inhalt, titel }: { inhalt: Inhalt; titel: readonly Tite
     }
     case 'tabelle':
       if (inhalt.zeilen.length > KURZE_TABELLE) {
-        return (
-          <>
-            <Titelfolge titel={titel} />
-            <TabellenAnzeige inhalt={inhalt} />
-          </>
-        );
+        if (titel.length === 0) return <TabellenAnzeige inhalt={inhalt} />;
+        return <Deckel titel={titel} inhalt={inhalt} />;
       }
       return (
         <Titelblock titel={titel} tabelle>
