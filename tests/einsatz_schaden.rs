@@ -717,11 +717,12 @@ async fn anlegen_etb_nennt_weder_ort_noch_geschaedigt_oder_beschreibung() {
     let inhalte = system_etb_inhalte(&app, &admin, e).await;
     assert_eq!(inhalte.len(), 1);
     assert!(inhalte[0].contains("S-001"), "ETB nennt Registriernummer");
-    assert!(inhalte[0].contains("umweltschaden"), "ETB nennt Typ");
-    assert!(inhalte[0].contains("gross"), "ETB nennt Ausmaß");
+    // LFH-1144: Typ und Ausmaß in den Wörtern der Oberfläche, nicht als Schlüssel.
+    assert!(inhalte[0].contains("Umweltschaden"), "ETB nennt Typ");
+    assert!(inhalte[0].contains("groß"), "ETB nennt Ausmaß");
     // LFH-752: Der Ort ist Scrub der Schadenszeile und bleibt aus dem ETB (Spec `aufbewahrung`,
     // „Kein Scrub-Wert von Betroffenen und Dokumenten im ETB“).
-    assert_eq!(inhalte[0], "Schaden S-001 angelegt: umweltschaden (gross)");
+    assert_eq!(inhalte[0], "Schaden S-001 angelegt: Umweltschaden (groß)");
     assert!(!inhalte[0].contains("Hauptstr"), "ETB-Leak: Schadensort");
     assert!(
         !inhalte[0].contains("GEHEIM"),
@@ -740,7 +741,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
         &admin,
         e,
         &json!({
-            "typ":"sachschaden","ausmass":"mittel","ort":"Wald hinter Müllers Hof",
+            "typ":"verkehrshindernis","ausmass":"mittel","ort":"Wald hinter Müllers Hof",
             "geschaedigt_person_id": p
         }),
     )
@@ -758,7 +759,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
         &admin,
-        Some(&json!({"abschluss_grund":"behoben","notiz":"GEHEIM_NOTIZ"})),
+        Some(&json!({"abschluss_grund":"kein_handlungsbedarf","notiz":"GEHEIM_NOTIZ"})),
     )
     .await;
     anfrage_json(
@@ -798,9 +799,16 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
         assert!(!i.contains("Bauhof"), "Leak: Übergabe-Adressat im ETB: {i}");
         assert!(!i.contains("Müllers Hof"), "Leak: Schadensort im ETB: {i}");
     }
+    // LFH-1144: der Abschlussgrund im Wort der Oberfläche, kein Schlüssel im ETB.
     assert!(schaden_eintraege
         .iter()
-        .any(|i| i.contains("abgeschlossen (behoben)")));
+        .any(|i| i.as_str() == "Schaden S-001 angelegt: Verkehrshindernis (mittel)"));
+    assert!(schaden_eintraege
+        .iter()
+        .any(|i| i.as_str() == "Schaden S-001 abgeschlossen (kein Handlungsbedarf)"));
+    for i in &schaden_eintraege {
+        assert!(!i.contains('_'), "Schlüssel im ETB: {i}");
+    }
     assert!(schaden_eintraege
         .iter()
         .any(|i| i.contains("S-001 storniert")));
