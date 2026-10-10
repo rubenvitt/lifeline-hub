@@ -146,7 +146,10 @@ describe('AuthContext — Lagebild ohne Netz (LFH-723)', () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.error()));
     const { client } = rendern();
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Admin'));
-    expect(client.getQueryData(einsatzKeys.personen(3))).toEqual(personen);
+    // Gekürzt wiederhergestellt (LFH-1095): die Felder der Positivliste, ohne Freitexte.
+    expect(client.getQueryData(einsatzKeys.personen(3))).toEqual([
+      expect.objectContaining({ id: 1, name: 'Vorgehalten' }),
+    ]);
   });
 
   it('behandelt ein Gateway „nicht erreichbar" (503) wie einen Netzfehler', async () => {

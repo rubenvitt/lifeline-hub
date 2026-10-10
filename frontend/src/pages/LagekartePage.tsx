@@ -234,6 +234,7 @@ export default function LagekartePage() {
     personenZugriff,
     personenVerortet,
     personenFehler,
+    personenNichtGeladen,
     betreuungZugriff,
     datenstand,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
@@ -1308,6 +1309,7 @@ export default function LagekartePage() {
           zugriff: personenZugriff,
           anzahl: personenVerortet.length,
           fehler: personenFehler,
+          nichtGeladen: personenNichtGeladen,
         }}
         betreuung={{ zugriff: betreuungZugriff }}
         basemap={basemap}

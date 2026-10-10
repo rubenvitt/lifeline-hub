@@ -11,6 +11,8 @@ import {
   verbleibKlasse,
   verbleibZaehlung,
 } from './personenBilanz';
+import { einsatzKeys } from '../api/queryKeys';
+import { lagebildKuerzen } from '../offline/lagebildKuerzung';
 
 /** Die Zählungen der Seitenleiste — ohne Rendern, gegen handgezählte Literale. */
 
@@ -81,6 +83,17 @@ describe('Lücken', () => {
     expect(lueckenVon(p({ ...ohne, antreff_lat: 52.2691 })).fundort).toBe(true);
   });
 
+  it('führt einen ohne Netz nicht geladenen Fundort NICHT als Lücke (LFH-1095)', () => {
+    const voll = p({ antreff_ort: null, aktuelle_verbleib_art: undefined });
+    expect(lueckenVon(voll)).toEqual({ verbleib: true, fundort: true });
+    const [gekuerzt] = lagebildKuerzen({
+      queryKey: [...einsatzKeys.personen(1)],
+      state: { data: [voll] },
+    }).state.data as Person[];
+    // Der Fundort ist unbekannt, nicht leer; der Verbleib liegt vor und bleibt eine Lücke.
+    expect(lueckenVon(gekuerzt)).toEqual({ verbleib: true, fundort: false });
+  });
+
   it('zählt eine Person in einer UHS nicht als „Verbleib offen"', () => {
     expect(lueckenVon(p({ aktuelle_verbleib_art: undefined, aktuelle_uhs_id: 7 })).verbleib).toBe(
       false,
@@ -108,7 +121,31 @@ describe('offeneFelder', () => {
       p({ antreff_ort: null }),
       p({ status: 'vermisst', aktuelle_verbleib_art: undefined, antreff_ort: null }),
     ];
-    expect(offeneFelder(alle)).toEqual({ ohneVerbleib: 2, ohneFundort: 2, datensaetze: 3 });
+    expect(offeneFelder(alle)).toEqual({
+      ohneVerbleib: 2,
+      ohneFundort: 2,
+      fundortNichtGeladen: 0,
+      datensaetze: 3,
+    });
+  });
+
+  it('zählt ohne Netz nicht geladene Fundorte getrennt, nicht als offen (LFH-1095)', () => {
+    const alle = lagebildKuerzen({
+      queryKey: [...einsatzKeys.personen(1)],
+      state: {
+        data: [
+          p({ antreff_ort: null }),
+          p({ aktuelle_verbleib_art: undefined }),
+          p({ status: 'vermisst', antreff_ort: null }),
+        ],
+      },
+    }).state.data as Person[];
+    expect(offeneFelder(alle)).toEqual({
+      ohneVerbleib: 1,
+      ohneFundort: 0,
+      fundortNichtGeladen: 2,
+      datensaetze: 1,
+    });
   });
 });
 

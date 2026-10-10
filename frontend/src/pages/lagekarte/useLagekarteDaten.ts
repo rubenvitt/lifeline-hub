@@ -534,10 +534,13 @@ export function useLagekarteDaten({
   // statt der stehengebliebenen Altdaten.
   const personenDaten =
     personenZugriff === 'frei' && !personenQuery.isError ? personenQuery.data : undefined;
-  const personenVerortet = useMemo(
-    () => (personenDaten ? personenMarker(personenDaten, token).marker : []),
+  const personenKarte = useMemo(
+    () => (personenDaten ? personenMarker(personenDaten, token) : null),
     [personenDaten, token],
   );
+  const personenVerortet = useMemo(() => personenKarte?.marker ?? [], [personenKarte]);
+  // Ohne Netz liegen die Fundorte nicht vor (LFH-1095): die Ebene zählt dann nicht.
+  const personenNichtGeladen = (personenKarte?.nichtGeladen ?? 0) > 0;
 
   const nichtVerortetAlle = useMemo(
     () => [
@@ -641,6 +644,7 @@ export function useLagekarteDaten({
     // Ebene „Betroffene": Zugriffszustand für Zeile/Legende, Marker getrennt.
     personenZugriff,
     personenVerortet,
+    personenNichtGeladen,
     /**
      * Die Personenliste scheiterte bei freiem Modul (kein 403). Steht zugleich als
      * `QUELLE_BETROFFENE` in `fehlerhafteQuellen`; die Seite trennt beides, weil Personen weder

@@ -9,6 +9,8 @@ import { renderMitProviders } from '../test/utils';
 import { koordinatenText } from './koordinate';
 import { pruefeKartenplan, type Kartenplan } from '../components/Datensicht';
 import type { Person } from '../api/types';
+import { einsatzKeys } from '../api/queryKeys';
+import { lagebildKuerzen } from '../offline/lagebildKuerzung';
 import {
   SkTag,
   abgleichSpalten,
@@ -412,6 +414,44 @@ describe('Zustand-Spalte (LFH-613)', () => {
   it('ist ohne Bedienung (Fabrik mit nur uhsName) ebenfalls nur Anzeige', () => {
     renderMitProviders(<>{zelle(personenSpalten, basis)}</>);
     expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+describe('ohne Netz nicht geladene Felder (LFH-1095)', () => {
+  const mitSchreibrecht = spaltenFabrik(() => undefined, { einsatzId: 1, darfSchreiben: true });
+  const voll: Person = {
+    ...basis,
+    zustand: 'unterkühlt',
+    notiz: 'Diabetiker',
+    antreff_lat: 52.2691,
+    antreff_lon: 9.1342,
+  };
+  const [gekuerzt] = lagebildKuerzen({
+    queryKey: [...einsatzKeys.personen(1)],
+    state: { data: [voll] },
+  }).state.data as Person[];
+  const zelle = (key: string, p: Person, spalten = personenSpalten) =>
+    spalten.find((s) => s.key === key)!.render!(undefined, p, 0) as ReactNode;
+
+  it('zeigt Fundort, Zustand und Vermerk als „nicht geladen", nicht als leer', () => {
+    for (const key of ['fundort', 'zustand', 'vermerk']) {
+      const { container, unmount } = renderMitProviders(<>{zelle(key, gekuerzt)}</>);
+      expect(container.textContent).toBe('nicht geladen');
+      unmount();
+    }
+  });
+
+  it('bietet den nicht geladenen Zustand nicht zum Bearbeiten an — auch mit Schreibrecht', () => {
+    renderMitProviders(<>{zelle('zustand', gekuerzt, mitSchreibrecht)}</>);
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByText('nicht geladen')).toBeInTheDocument();
+  });
+
+  it('nennt einen nicht geladenen Fundort nicht „offen"', () => {
+    const { container } = renderMitProviders(
+      <>{zelle('person', { ...gekuerzt, aktuelle_verbleib_art: 'transport' })}</>,
+    );
+    expect(container.querySelector('[data-lfh="luecke"]')).toBeNull();
   });
 });
 

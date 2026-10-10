@@ -104,6 +104,8 @@ export interface PersonenEbenenAngabe {
   anzahl: number;
   /** Die Personenliste scheiterte: „—" an dieser Zeile, die übrigen zählen weiter. */
   fehler?: boolean;
+  /** Ohne Netz liegen die Fundorte nicht vor (LFH-1095): „—" statt einer ungeprüften Zahl. */
+  nichtGeladen?: boolean;
 }
 
 /**
@@ -157,11 +159,12 @@ function personenZeile(
   name: string,
   an: boolean,
   quellenFehler: boolean,
-  { zugriff, anzahl, fehler }: PersonenEbenenAngabe,
+  { zugriff, anzahl, fehler, nichtGeladen }: PersonenEbenenAngabe,
 ): EbenenZeile[] {
   if (zugriff === 'ausgeblendet') return [];
   if (zugriff === 'frei') {
-    return [{ key: 'person', name, anzahl: quellenFehler || fehler ? '—' : anzahl, sichtbar: an }];
+    const ungeprueft = quellenFehler || fehler || nichtGeladen;
+    return [{ key: 'person', name, anzahl: ungeprueft ? '—' : anzahl, sichtbar: an }];
   }
   return [
     {

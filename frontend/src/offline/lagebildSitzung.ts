@@ -4,6 +4,7 @@ import type { BenutzerAnzeige, MeAntwort } from '../api/types';
 import { warGeraet } from '../geraet/geraetMarke';
 import { fetchErfolgeVerfolgen } from './lagebildBestaetigung';
 import { lagebildDehydrierOptionen, lagebildStandZulaessig } from './lagebildFilter';
+import { lagebildKuerzen } from './lagebildKuerzung';
 import { erzeugeLagebildPersister, type LagebildPersister } from './lagebildPersister';
 import {
   lagebildAnlegen,
@@ -61,12 +62,13 @@ function leererClient(buster: string) {
 type VorratEintrag = PersistedClient['clientState']['queries'][number];
 
 /** Die Einträge eines gelesenen Stands, die jetzt noch gelten dürfen (Allowlist, Sperrmarke,
- *  24 h je Einzelstand). Wirft bei einem unlesbaren Stand. */
+ *  24 h je Einzelstand), gekürzt (LFH-1095): ein Stand aus der Zeit davor geht so weder in den
+ *  Speicher noch über `lagebildAnlegen` zurück auf die Platte. Wirft bei einem unlesbaren Stand. */
 function zulaessigeEintraege(qc: QueryClient, eintraege: VorratEintrag[]): VorratEintrag[] {
   const jetzt = Date.now();
-  return eintraege.filter((q) =>
-    lagebildStandZulaessig(qc, q.queryKey, q.state.dataUpdatedAt, jetzt),
-  );
+  return eintraege
+    .filter((q) => lagebildStandZulaessig(qc, q.queryKey, q.state.dataUpdatedAt, jetzt))
+    .map(lagebildKuerzen);
 }
 
 /**
@@ -106,7 +108,12 @@ function abonnieren(
     return {
       timestamp: Date.now(),
       buster,
-      clientState: { ...clientState, queries: [...clientState.queries, ...rest] },
+      // Gekürzt wird der Live-Stand (LFH-1095, D1); der Vorrat ist es schon
+      // (`zulaessigeEintraege`).
+      clientState: {
+        ...clientState,
+        queries: [...clientState.queries.map(lagebildKuerzen), ...rest],
+      },
     };
   };
   // Nur der Query-Cache (LFH-939 D1): Mutationen werden nie geschrieben

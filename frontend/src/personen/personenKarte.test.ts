@@ -3,6 +3,8 @@ import { theme } from 'antd';
 import type { Person } from '../api/types';
 import { sichtungsfarben } from '../theme/tokens';
 import { personenMarker } from './personenKarte';
+import { einsatzKeys } from '../api/queryKeys';
+import { lagebildKuerzen } from '../offline/lagebildKuerzung';
 
 const token = theme.getDesignToken({});
 
@@ -165,5 +167,23 @@ describe('personenMarker', () => {
     const { marker, ohneKoordinate } = personenMarker([p({ id: 1, antreff_lat: 50 })], token);
     expect(marker).toHaveLength(0);
     expect(ohneKoordinate).toBe(1);
+  });
+
+  it('ohne Netz nicht geladene Fundorte: kein Marker, nicht „ohne Koordinate" (LFH-1095)', () => {
+    const personen = [
+      p({ id: 1, antreff_lat: 50.1, antreff_lon: 8.6 }),
+      p({ id: 2 }),
+      p({ id: 3, status: 'vermisst' }),
+    ];
+    const gekuerzt = lagebildKuerzen({
+      queryKey: [...einsatzKeys.personen(1)],
+      state: { data: personen },
+    }).state.data as Person[];
+    const { marker, ohneKoordinate, nichtGeladen } = personenMarker(gekuerzt, token);
+    expect(marker).toHaveLength(0);
+    expect(ohneKoordinate).toBe(0);
+    // Gezählt wie „ohne Koordinate": nur angetroffene Personen.
+    expect(nichtGeladen).toBe(2);
+    expect(personenMarker(personen, token).nichtGeladen).toBe(0);
   });
 });

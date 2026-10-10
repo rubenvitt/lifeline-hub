@@ -1080,7 +1080,7 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.kraefteZeitachse,
     // Aufträge
     EINSATZ_KEYS.befehle,
-    // Betroffene
+    // Betroffene — ohne Freitexte und Fundort (LFH-1095, `offline/lagebildKuerzung.ts`).
     EINSATZ_KEYS.personen,
     // Auswahl ohne Freitexte (LFH-940, D8): hält die Personensuche der Palette ohne Netz.
     EINSATZ_KEYS.personenAuswahl,

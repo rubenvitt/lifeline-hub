@@ -41,7 +41,9 @@ describe('Lagebild-Sitzung: Drossel vor dem Dehydrieren (LFH-939)', () => {
     await warte(DROSSEL * 3);
     expect(dehydriert.anzahl).toBe(1);
     const satz = await lagebildLesen();
-    expect(satz?.client.clientState.queries[0].state.data).toEqual([{ id: 24 }]);
+    expect(satz?.client.clientState.queries[0].state.data).toEqual([
+      expect.objectContaining({ id: 24 }),
+    ]);
   });
 
   it('löst mit einem Ereignis des Mutations-Cache keinen Durchlauf aus', async () => {

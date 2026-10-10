@@ -1,5 +1,6 @@
 import type { Person, Sichtungskategorie, VerbleibArt } from '../api/types';
 import { hatKoordinate } from './koordinate';
+import { nichtGeladen } from '../offline/lagebildKuerzung';
 
 /**
  * Ableitungen der Betroffenen-Seitenleiste („Sichtungsbild", „Verbleib", „Offene Felder") und
@@ -10,7 +11,8 @@ import { hatKoordinate } from './koordinate';
  * vermisste hat naturgemäß weder Fundort noch Verbleib; Abgemeldete sind abgeschlossen.
  *  · ohne Verbleib — keine Verbleib-Art UND keine aktuelle UHS. Wer in einer UHS liegt, ist
  *    verortet.
- *  · ohne Fundort  — weder `antreff_ort` noch eine Fundort-Koordinate; eine genügt.
+ *  · ohne Fundort  — weder `antreff_ort` noch eine Fundort-Koordinate; eine genügt. Ein ohne
+ *    Netz nicht geladener Fundort (LFH-1095) ist unbekannt, keine Lücke.
  *
  * ── VERBLEIB IST STRUKTUR, NICHT DIE KURZFORM ───────────────────────────────────────────
  * Gezählt wird nach `aktuelle_verbleib_art`; die Kurzform `aktueller_verbleib` bleibt
@@ -47,7 +49,7 @@ export function lueckenVon(p: LueckenFelder): Luecken {
   if (!istAngetroffen(p)) return { verbleib: false, fundort: false };
   return {
     verbleib: verbleibKlasse(p) === 'offen',
-    fundort: leer(p.antreff_ort) && !hatKoordinate(p),
+    fundort: !nichtGeladen(p, 'antreff_ort') && leer(p.antreff_ort) && !hatKoordinate(p),
   };
 }
 
@@ -157,6 +159,9 @@ export function transportBilanz(
 interface OffeneFelder {
   ohneVerbleib: number;
   ohneFundort: number;
+  /** Angetroffene Personen, deren Fundort ohne Netz nicht geladen ist (LFH-1095): weder offen
+   *  noch vorhanden. */
+  fundortNichtGeladen: number;
   /** Datensätze mit mindestens einer Lücke — die Menge, die „Nur Lücken zeigen" zeigt. */
   datensaetze: number;
 }
@@ -164,14 +169,16 @@ interface OffeneFelder {
 export function offeneFelder(alle: readonly Person[]): OffeneFelder {
   let ohneVerbleib = 0;
   let ohneFundort = 0;
+  let fundortNichtGeladen = 0;
   let datensaetze = 0;
   for (const p of alle) {
     const l = lueckenVon(p);
     if (l.verbleib) ohneVerbleib++;
     if (l.fundort) ohneFundort++;
+    if (istAngetroffen(p) && nichtGeladen(p, 'antreff_ort')) fundortNichtGeladen++;
     if (l.verbleib || l.fundort) datensaetze++;
   }
-  return { ohneVerbleib, ohneFundort, datensaetze };
+  return { ohneVerbleib, ohneFundort, fundortNichtGeladen, datensaetze };
 }
 
 // ── Sichtungsbild ───────────────────────────────────────────────────────────────────────
