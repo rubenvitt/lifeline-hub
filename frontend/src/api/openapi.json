@@ -8353,6 +8353,23 @@
           }
         }
       },
+      "MitgliedAuswahl": {
+        "type": "object",
+        "description": "Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec\n`einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),\nkeine Rollen, kein Aktiv- oder MFA-Status.",
+        "required": [
+          "benutzer_id",
+          "anzeigename"
+        ],
+        "properties": {
+          "anzeigename": {
+            "type": "string"
+          },
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ModulFreigabe": {
         "type": "object",
         "description": "Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von\n`GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter\n[`fordere_modul_zugriff`] und [`erlaubte_module`].",

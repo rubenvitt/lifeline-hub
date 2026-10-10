@@ -52,6 +52,7 @@ export type Einsatzart = S['Einsatzart'];
 export type Lagekennzahl = S['Lagekennzahl'];
 export type EinsatzAnzeige = S['EinsatzAnzeige'];
 export type MitgliedAnzeige = S['MitgliedAnzeige'];
+export type MitgliedAuswahl = S['MitgliedAuswahl'];
 export type StichwortVorschlag = S['StichwortVorschlag'];
 /** Präferenzen des angemeldeten Benutzers. `eintraege` ist SPARSE: ein fehlender Schlüssel
  *  heißt „nie geschrieben“; der Wert ist ein opaker Text, dessen Form nur der Besitzer des

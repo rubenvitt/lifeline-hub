@@ -100,6 +100,7 @@ use utoipa::OpenApi;
         crate::einsatz::EinsatzStatus,
         crate::einsatz::Einsatzart,
         crate::einsatz::MitgliedAnzeige,
+        crate::einsatz::MitgliedAuswahl,
         crate::einsatz::lagekennzahl::Lagekennzahl,
         crate::einsatz::retention::AufbewahrungZustand,
         crate::einsatz::retention::Datenkategorie,
