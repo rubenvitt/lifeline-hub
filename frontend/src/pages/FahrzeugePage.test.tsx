@@ -562,39 +562,44 @@ describe('FahrzeugePage', () => {
      * Leeres Bemerkungsfeld an der Fahrzeugseite. Die Spalte ist per Voreinstellung abgewählt; die
      * Vorprüfung auf „kein Auslöser" macht die zweite Hälfte aussagekräftig.
      *
-     * Der Zähler ist hier empfindlicher, weil die Seite `kennzeichen` per `abBreite: 'lg'` führt:
-     * nach dem Einschalten der Bemerkung muss er bei 1024 px auf „nichts ausgeblendet" fallen.
+     * Der Zähler ist hier empfindlicher, weil die Seite `kennzeichen` und `traeger` per
+     * `abBreite: 'xxl'` führt (LFH-1149): nach dem Einschalten der Bemerkung muss er bei 1024 px
+     * von drei auf genau diese zwei fallen.
      */
     const { container } = render(einsatz());
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(
       within(zeile).getByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
   });
 
   it('der Spaltenschalter zählt Handauswahl UND Breitenausblendung in EINEM Zähler', async () => {
     /**
-     * Gate 2 verlangt den Zähler ausgeblendeter Spalten, nicht `aus.length`: bei 1024 px ist nur
-     * `bemerkung` abgewählt (1), bei 800 px fällt `kennzeichen` über `abBreite: 'lg'` zusätzlich
-     * weg (2). Ein Zähler, der nur die Handauswahl kennt, meldete beide Male „1".
+     * Gate 2 verlangt den Zähler ausgeblendeter Spalten, nicht `aus.length`: ab 1600 px ist nur
+     * `bemerkung` abgewählt (1), bei 1024 px fallen `kennzeichen` und `traeger` über
+     * `abBreite: 'xxl'` zusätzlich weg (3, LFH-1149). Ein Zähler, der nur die Handauswahl kennt,
+     * meldete beide Male „1".
      */
+    setzeViewportBreite(1600);
     const { unmount } = render(einsatz());
     await screen.findByText('Florian 1');
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Kennzeichen' })).toBeInTheDocument();
     unmount();
 
-    setzeViewportBreite(800);
+    setzeViewportBreite(1024);
     render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Kennzeichen' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Träger' })).toBeNull();
   });
 
   describe('unter md', () => {

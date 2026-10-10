@@ -30,6 +30,12 @@ import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
  * bliebe das Opt-in wirkungslos. Der Zustand steht neben der fixierten Nummer, damit er bei
  * 390 px ohne Querscrollen lesbar ist.
  *
+ * Gemessen gegen 1440 (LFH-1149, `e2e/gate1-ueberlauf.spec.ts`, „Tabellen am
+ * Führungsarbeitsplatz“): zehn Spalten passen dort nicht. Unter `xxl` weichen „Vorgemerkt am“,
+ * „Schwärzung auf Antrag ab“ und „Geschwärzt am“ in den Spaltenschalter: ihren Stand nennt schon
+ * die Zustandsmarke. Im Bild bleiben die Fristen, nach denen verglichen wird (Entscheidung Ruben,
+ * 10.10.2026).
+ *
  * Ein endgültig gelöschter Einsatz (LFH-750) ist nur noch eine Zeile des Löschprotokolls: ohne
  * Bezeichnung und ohne Akte, also ohne Link und ohne Zeilenklick.
  */
@@ -62,7 +68,7 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'nummer',
     title: 'Einsatznummer',
-    width: 190,
+    width: 150,
     zahl: true,
     sortWert: (e) => kennung(e),
     suchText: (e) => kennung(e),
@@ -78,7 +84,7 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'bezeichnung',
     title: 'Bezeichnung',
-    mindestBreite: 200,
+    mindestBreite: 180,
     sortWert: (e) => e.bezeichnung ?? GELOESCHT,
     suchText: (e) => e.bezeichnung ?? GELOESCHT,
     render: (_, e) =>
@@ -87,7 +93,7 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'abgeschlossen',
     title: 'Abgeschlossen',
-    width: 160,
+    width: 150,
     zahl: true,
     sortWert: (e) => e.abgeschlossen_at,
     render: (_, e) => (e.abgeschlossen_at ? <ZeitAnzeige wert={e.abgeschlossen_at} /> : leer),
@@ -95,7 +101,7 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'frist',
     title: 'Frist',
-    width: 160,
+    width: 130,
     zahl: true,
     sortWert: (e) => e.retention_bis,
     render: (_, e) => (e.retention_bis ? <ZeitAnzeige wert={e.retention_bis} /> : leer),
@@ -103,7 +109,8 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'vorgemerkt',
     title: 'Vorgemerkt am',
-    width: 160,
+    width: 130,
+    abBreite: 'xxl',
     zahl: true,
     sortWert: (e) => e.geloescht_at,
     render: (_, e) => (e.geloescht_at ? <ZeitAnzeige wert={e.geloescht_at} /> : leer),
@@ -111,7 +118,7 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'karenz',
     title: 'Karenz-Ende',
-    width: 160,
+    width: 130,
     zahl: true,
     sortWert: (e) => e.karenz_ende,
     render: (_, e) => (e.karenz_ende ? <ZeitAnzeige wert={e.karenz_ende} /> : leer),
@@ -120,7 +127,8 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     // LFH-751: Fälligkeit eines offenen Einsatz-Antrags (Löschersuchen nach Art. 17).
     key: 'antrag',
     title: 'Schwärzung auf Antrag ab',
-    width: 190,
+    width: 130,
+    abBreite: 'xxl',
     zahl: true,
     sortWert: (e) => e.antrag_faellig_at,
     render: (_, e) => (e.antrag_faellig_at ? <ZeitAnzeige wert={e.antrag_faellig_at} /> : leer),
@@ -128,7 +136,8 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'geschwaerzt',
     title: 'Geschwärzt am',
-    width: 160,
+    width: 130,
+    abBreite: 'xxl',
     zahl: true,
     sortWert: (e) => e.geschwaerzt_at,
     render: (_, e) => (e.geschwaerzt_at ? <ZeitAnzeige wert={e.geschwaerzt_at} /> : leer),
@@ -136,7 +145,7 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'loeschung',
     title: 'Löschung am',
-    width: 160,
+    width: 130,
     zahl: true,
     sortWert: (e) => loeschung(e),
     render: (_, e) => {

@@ -59,7 +59,9 @@ Für System-Admins:
 
    ![Übersicht „Aufbewahrung“ mit zwei abgeschlossenen Einsätzen, einer ohne Frist, einer mit laufender Frist](../bilder/aufbewahrung/uebersicht.png)
 
-3. Eine Zeile wählen, um die Archivakte des Einsatzes zu öffnen.
+3. Unter 1600 px Bildbreite stehen „Vorgemerkt am“, „Schwärzung auf Antrag ab“ und „Geschwärzt am“
+   nicht in der Tabelle; bei Bedarf unter „Spalten“ einblenden.
+4. Eine Zeile wählen, um die Archivakte des Einsatzes zu öffnen.
 
 Die Archivakte zeigt Aufbewahrung, Datenkategorien, Löschersuchen, Register und das
 Einsatztagebuch, alles pseudonym: „ohne Namen, Kontakte, Orte und Sachverhalt“. Oben steht je
