@@ -963,3 +963,108 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
     await waitFor(() => expect(hinweis()).toBeNull());
   });
 });
+
+describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
+  function seite(
+    br: BrDetail,
+    patch: Parameters<typeof http.patch>[1] = () => HttpResponse.json(br),
+    rolle: EinsatzAnzeige['meine_rolle'] = 'fuehrungspersonal',
+  ) {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.patch('/api/einsaetze/1/bereitstellungsraeume/1', patch),
+    );
+    renderBrDetail();
+  }
+  const dialog = () => screen.getByRole('dialog', { name: 'Bereitstellungsraum bearbeiten' });
+  // jsdom kennt kein `transitionend`: antd beginnt das Ausblenden (`ant-zoom-leave`) und bleibt
+  // dort stehen (Muster `stammdaten/verwaltungstabellen.test.tsx`).
+  const zu = () =>
+    [...document.querySelectorAll('.ant-modal')].every((m) =>
+      m.classList.contains('ant-zoom-leave'),
+    );
+
+  it('öffnet vorbelegt und schickt nur die geänderten Felder, Leeren als null', async () => {
+    const bodies: unknown[] = [];
+    seite(
+      brDetail({ status: 'aktiv', standort: 'Marktplatz', notiz: 'Zufahrt Nord' }),
+      async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(brDetail({ standort: 'Festplatz', notiz: null }));
+      },
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const d = dialog();
+    expect(within(d).getByLabelText('Bezeichnung')).toHaveValue('BR Alpha');
+    expect(within(d).getByLabelText('Standort (optional)')).toHaveValue('Marktplatz');
+    expect(within(d).getByLabelText('Notiz (optional)')).toHaveValue('Zufahrt Nord');
+
+    await userEvent.clear(within(d).getByLabelText('Standort (optional)'));
+    await userEvent.type(within(d).getByLabelText('Standort (optional)'), ' Festplatz ');
+    await userEvent.clear(within(d).getByLabelText('Notiz (optional)'));
+    await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(bodies).toEqual([{ standort: 'Festplatz', notiz: null }]));
+    expect(await screen.findByText('Bereitstellungsraum gespeichert')).toBeInTheDocument();
+    await waitFor(() => expect(zu()).toBe(true));
+  });
+
+  it('ohne Änderung geht nichts an den Server, der Dialog schließt', async () => {
+    let patches = 0;
+    seite(brDetail({ status: 'geplant' }), () => {
+      patches += 1;
+      return HttpResponse.json(brDetail());
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(zu()).toBe(true));
+    expect(patches).toBe(0);
+  });
+
+  it('leere Bezeichnung: Hinweis am Feld, kein PATCH', async () => {
+    let patches = 0;
+    seite(brDetail(), () => {
+      patches += 1;
+      return HttpResponse.json(brDetail());
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.clear(within(dialog()).getByLabelText('Bezeichnung'));
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
+    expect(await within(dialog()).findByText('Bezeichnung erforderlich')).toBeInTheDocument();
+    expect(patches).toBe(0);
+  });
+
+  it('Ablehnung: der Grund steht im Dialog, der bleibt offen, kein Toast', async () => {
+    seite(brDetail(), () =>
+      HttpResponse.json({ error: 'Stornierter BR kann nicht geändert werden' }, { status: 409 }),
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(within(dialog()).getByLabelText('Notiz (optional)'), 'neu');
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Speichern' }));
+
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
+      'Stornierter BR kann nicht geändert werden',
+    );
+    expect(within(dialog()).getByLabelText('Notiz (optional)')).toHaveValue('neu');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('kein „Bearbeiten“ nach dem Auflösen', async () => {
+    seite(brDetail({ status: 'aufgeloest' }));
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+
+  it('kein „Bearbeiten“ für Beobachter', async () => {
+    seite(brDetail({ status: 'aktiv' }), undefined, 'beobachter');
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+});

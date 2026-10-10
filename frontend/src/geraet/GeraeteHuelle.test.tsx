@@ -589,7 +589,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     expect(belegt[1]).toEqual({ objekt_typ: 'einheit', objekt_id: 31, art: 'austritt' });
   });
 
-  it('nimmt einen geplanten Raum in Betrieb, ohne „Stornieren“ anzubieten', async () => {
+  it('nimmt einen geplanten Raum in Betrieb, ohne „Stornieren“ und „Bearbeiten“ anzubieten', async () => {
     vi.useRealTimers();
     const { status } = brBereit({ ...raum, status: 'geplant', einheiten: [] });
     renderApp('/geraet/7/br/4');
@@ -597,6 +597,8 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     await user.click(await screen.findByRole('button', { name: 'In Betrieb nehmen' }));
     await waitFor(() => expect(status).toEqual([{ status: 'aktiv' }]));
     expect(screen.queryByRole('button', { name: 'Stornieren' })).toBeNull();
+    // Raumdaten ändert die Einsatzleitung, nicht das Tablet (LFH-1147).
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
   });
 
   it('ein fremder Raum und die Patientenliste führen auf den eigenen Raum', async () => {

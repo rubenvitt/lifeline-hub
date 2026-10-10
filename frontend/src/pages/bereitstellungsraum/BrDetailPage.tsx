@@ -55,6 +55,7 @@ import { useViewport } from '../../components/useViewport';
 import { brStatus } from '../../theme/statusFarben';
 import { abstand } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
+import BrBearbeitenModal from './BrBearbeitenModal';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { summiereStaerke } from '../../anzeige/staerke';
@@ -194,6 +195,8 @@ export default function BrDetailPage() {
     },
   });
 
+  const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
+
   const zeilen = useZeilenFehler<string>();
   // Die zuletzt begonnene Belegung je Zeile: nennt eine Ablehnung, deren Zeile nicht mehr steht.
   const [belegungen, setBelegungen] = useState<ReadonlyMap<string, BelegungMitName>>(
@@ -272,6 +275,9 @@ export default function BrDetailPage() {
   const br = detailQuery.data;
   const schreibgeschuetzt =
     !darfImEinsatzSchreiben(einsatz) || br.status === 'geplant' || br.status === 'aufgeloest';
+  // Raumdaten ändern (LFH-1147): geplant und aktiv, nicht mehr nach dem Auflösen. Ein BR-Gerät
+  // führt seinen Raum, verwaltet ihn aber nicht.
+  const bearbeitbar = verwalten && darfImEinsatzSchreiben(einsatz) && br.status !== 'aufgeloest';
 
   function onZuweisenEinheit(einheit: Einheit) {
     belegungMut.mutate({
@@ -426,6 +432,16 @@ export default function BrDetailPage() {
         // `size="middle"`: „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“
         // (`frontend/AGENTS.md`, „Rot steht nicht bündig neben Neutralem“).
         <Space wrap size="middle">
+          {darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
+            <Button
+              type="primary"
+              onClick={() => setzeStatus('aktiv')}
+              loading={statusMut.isPending}
+            >
+              In Betrieb nehmen
+            </Button>
+          )}
+          {bearbeitbar && <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>}
           {/* Belegt, lehnt der Server das Auflösen ab (409): der Knopf ist dann gesperrt, der
               Grund steht in wenigen Wörtern daneben, nicht als Satz in der Rückfrage (LFH-1078). */}
           {verwalten && !schreibgeschuetzt && br.status === 'aktiv' && belegt > 0 && (
@@ -448,28 +464,17 @@ export default function BrDetailPage() {
               </Button>
             </Popconfirm>
           )}
-          {darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
-            <>
-              <Button
-                type="primary"
-                onClick={() => setzeStatus('aktiv')}
-                loading={statusMut.isPending}
-              >
-                In Betrieb nehmen
+          {verwalten && darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
+            <Popconfirm
+              title="BR stornieren?"
+              okText="BR stornieren"
+              okButtonProps={{ danger: true }}
+              onConfirm={storniere}
+            >
+              <Button danger loading={stornoMut.isPending}>
+                Stornieren
               </Button>
-              {verwalten && (
-                <Popconfirm
-                  title="BR stornieren?"
-                  okText="BR stornieren"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={storniere}
-                >
-                  <Button danger loading={stornoMut.isPending}>
-                    Stornieren
-                  </Button>
-                </Popconfirm>
-              )}
-            </>
+            </Popconfirm>
           )}
         </Space>
       }
@@ -604,6 +609,16 @@ export default function BrDetailPage() {
           zeilenFehler={zeilen.grund}
         />
       </div>
+
+      {/* `offen` statt `{offen && …}`: der Dialog bleibt für die Schließanimation im Baum. */}
+      {bearbeitbar && (
+        <BrBearbeitenModal
+          einsatzId={einsatzId}
+          br={br}
+          offen={bearbeitenOffen}
+          onClose={() => setBearbeitenOffen(false)}
+        />
+      )}
     </EinsatzSeite>
   );
 }
