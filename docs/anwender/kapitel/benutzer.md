@@ -10,9 +10,8 @@ quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/SitzungsListe.t
 Unter „Benutzer“ in der Verwaltung legen System-Admins die Konten der Personen an, die mit
 Lifeline Hub arbeiten, vergeben ihre Rollen in System und Organisation, sehen ihre laufenden
 Anmeldungen, setzen einen verlorenen zweiten Faktor zurück und deaktivieren Konten, die nicht
-mehr gebraucht werden. Was eine Person in einem
-einzelnen Einsatz darf, regelt dagegen die Einsatzleitung, siehe
-[Rechte im Einsatz](rechte-im-einsatz.md).
+mehr gebraucht werden. Was eine Person in einem einzelnen Einsatz darf, regelt dagegen die
+Einsatzleitung, siehe [Rechte im Einsatz](rechte-im-einsatz.md).
 
 ## Abläufe
 
@@ -75,7 +74,9 @@ Wann das nötig ist und was danach zu tun ist, beschreibt [Gerät verloren](gera
 - **System-Rolle „Benutzer“ und Org-Rolle „Keine“** (die Vorgabe): arbeitet nur in Einsätzen,
   in die die Einsatzleitung die Person aufgenommen hat.
 
-Ein neues Konto gehört zur Organisation des System-Admins, der es anlegt.
+Ein neues Konto gehört zur Organisation des System-Admins, der es anlegt. Die Liste zeigt nur
+die Konten der eigenen Organisation; Konten anderer Organisationen kann ein System-Admin weder
+sehen noch ändern.
 
 ### Anmeldungen beenden
 
@@ -99,8 +100,8 @@ das bei einem verlorenen Gerät hilft, beschreibt [Gerät verloren](geraet-verlo
 
 Nicht deaktivieren lassen sich:
 
-- der letzte aktive System-Admin („Deaktivieren gesperrt: letzter aktiver Admin“), damit die
-  Verwaltung nie ohne Admin bleibt,
+- der letzte aktive System-Admin der Organisation („Deaktivieren gesperrt: letzter aktiver
+  Admin“), damit ihre Verwaltung nie ohne Admin bleibt,
 - das eigene Konto („Deaktivieren gesperrt: eigenes Konto“).
 
 Für ein deaktiviertes Konto gibt es keine „Anmeldungen“. Konten gekoppelter Geräte erscheinen

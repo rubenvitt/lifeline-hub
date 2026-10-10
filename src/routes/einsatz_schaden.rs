@@ -418,8 +418,8 @@ pub async fn anlegen(
         let text = format!(
             "Schaden {} angelegt: {} ({})",
             registrier_anzeige(schaden.registrier_nr),
-            typ.as_str(),
-            ausmass.as_str(),
+            typ.etb_label(),
+            ausmass.etb_label(),
         );
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
@@ -728,7 +728,7 @@ pub async fn abschliessen(
     let text = format!(
         "Schaden {} abgeschlossen ({})",
         registrier_anzeige(vorher.registrier_nr),
-        grund.as_str()
+        grund.etb_label()
     );
     // F06/LFH-244 Tier-A: Abschluss-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
     // ist aus `vorher` + `grund` VOR der Tx berechenbar. SSE + Response-Reload erst nach Commit.

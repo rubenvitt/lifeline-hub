@@ -134,8 +134,8 @@ where
 
 wire_enum! {
     /// Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
-    /// `etb_label` erscheint in Klammern in der ETB-Spur (Spec: "abgeschlossen
-    /// (uebergabe_tierarzt)") — daher identisch zum DB-String.
+    /// `etb_label` erscheint in Klammern in der ETB-Spur ("abgeschlossen (Übergabe an
+    /// Tierarzt)").
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AbschlussGrund {
         UebergabeHalter => "uebergabe_halter",
@@ -144,6 +144,21 @@ wire_enum! {
         Verstorben => "verstorben",
         Freilauf => "freilauf",
         Sonstiges => "sonstiges",
+    }
+}
+
+impl AbschlussGrund {
+    /// Beschriftung im ETB-Text, dieselbe wie `TIER_ABSCHLUSS` in
+    /// `frontend/src/pages/tiere/tierHelfer.ts` (LFH-1144: das ETB nennt keine Schlüssel).
+    pub fn etb_label(&self) -> &'static str {
+        match self {
+            AbschlussGrund::UebergabeHalter => "Übergabe an Halter",
+            AbschlussGrund::UebergabeTierarzt => "Übergabe an Tierarzt",
+            AbschlussGrund::UebergabeTierheim => "Übergabe an Tierheim",
+            AbschlussGrund::Verstorben => "verstorben",
+            AbschlussGrund::Freilauf => "Freilauf",
+            AbschlussGrund::Sonstiges => "Sonstiges",
+        }
     }
 }
 
@@ -286,6 +301,11 @@ mod tests {
             assert_eq!(AbschlussGrund::parse(g).unwrap().as_str(), g);
         }
         assert!(AbschlussGrund::parse("vergessen").is_none());
+        assert_eq!(
+            AbschlussGrund::UebergabeTierheim.etb_label(),
+            "Übergabe an Tierheim"
+        );
+        assert_eq!(AbschlussGrund::Verstorben.etb_label(), "verstorben");
     }
 
     #[test]
