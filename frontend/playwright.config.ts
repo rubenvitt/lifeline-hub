@@ -1,10 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { accessSync, constants, existsSync, mkdtempSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { leseAnteil, verteile } from '../scripts/e2e-anteile.mjs';
 
 // Die Suite ist selbsttragend: `pnpm e2e` startet Backend UND Vite selbst.
 
@@ -124,13 +126,61 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * Eine weitere Druck-Spec kommt hier hinein, nicht als eigenes Projekt. Die Druckfälle von
  * Meldebild, Funkplan und Führungsorganisation stehen deshalb in eigenen `*-druck.spec.ts`
  * (Hilfen in `*-kern.ts`): sonst liefe jeweils die ganze Spec dreifach (LFH-915). Die CI fährt
- * alle drei Projekte in jedem der vier Pflicht-Shards (`.github/workflows/ci.yml`); Playwright
- * teilt nach Testzahl in Projektreihenfolge, die Firefox- und WebKit-Fälle landen dabei alle im
- * letzten Shard (gemessen in LFH-915). Lokal wählt `PW_PROJEKTE` in `scripts/check-all.sh` eine
- * Teilmenge.
+ * alle drei Projekte in jedem der vier Pflicht-Shards (`.github/workflows/ci.yml`); in welchem
+ * Anteil die Firefox- und WebKit-Fälle landen, entscheidet die Verteilung unten. Lokal wählt
+ * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
  */
 const DRUCK_SPECS =
   /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck|dokument-anlage-druck|hilfe-druck)\.spec\.ts$/;
+
+/*
+ * ANTEILE NACH LAUFZEIT (LFH-1117): `PW_SHARD=k/n` wählt die Spec-Dateien des Anteils k, verteilt
+ * nach den Messwerten in `e2e/laufzeiten.json` (`scripts/e2e-anteile.mjs`). Playwrights eigenes
+ * `--shard` schneidet nach Testzahl in Dateireihenfolge, und die langsamen Layout-Gates stehen
+ * alphabetisch beieinander: e2e 2/4 brauchte 33–36 min, die übrigen 19–26. Eine Datei ohne
+ * Messwert zählt mit dem Median; die Tabelle frischt der Job „Testberichte zusammenführen" auf.
+ * Die Rechnung ist deterministisch, jeder Worker-Prozess kommt auf dieselbe Menge.
+ */
+const SPEC_DATEI = /\.spec\.ts$/;
+const anteilText = process.env.PW_SHARD;
+const anteil = anteilText ? leseAnteil(anteilText) : undefined;
+if (anteil && !vorbelegt && process.argv.some((a) => a.startsWith('--shard'))) {
+  // Beides zusammen schnitte die Teilmenge ein zweites Mal: Tests fielen still heraus.
+  throw new Error('PW_SHARD und --shard schließen sich aus; PW_SHARD verteilt nach Laufzeit.');
+}
+const projektMuster: Record<string, RegExp | undefined> = {
+  chromium: undefined,
+  firefox: DRUCK_SPECS,
+  webkit: DRUCK_SPECS,
+};
+const anteilDateien: Record<string, string[]> | undefined = anteil
+  ? (() => {
+      const testDir = join(frontendVerzeichnis, 'e2e');
+      const dateien = (readdirSync(testDir, { recursive: true }) as string[])
+        .map((d) => d.split(sep).join('/'))
+        .filter((d) => SPEC_DATEI.test(d));
+      const einheiten = Object.entries(projektMuster).flatMap(([projekt, muster]) =>
+        dateien.filter((d) => !muster || muster.test(`/${d}`)).map((datei) => ({ projekt, datei })),
+      );
+      const laufzeiten = JSON.parse(readFileSync(join(testDir, 'laufzeiten.json'), 'utf8'));
+      const meine = verteile(einheiten, laufzeiten, anteil.gesamt)[anteil.nummer - 1];
+      return Object.fromEntries(
+        Object.keys(projektMuster).map((projekt) => [
+          projekt,
+          meine.filter((e) => e.projekt === projekt).map((e) => e.datei),
+        ]),
+      );
+    })()
+  : undefined;
+
+/** Ohne Anteil das Muster des Projekts, mit Anteil genau dessen Dateien (leer: keine). */
+function testMatch(projekt: string): RegExp | undefined {
+  if (!anteilDateien) return projektMuster[projekt];
+  const dateien = anteilDateien[projekt];
+  if (dateien.length === 0) return /(?!)/;
+  const flucht = (d: string) => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`/(?:${dateien.map(flucht).join('|')})$`);
+}
 
 const { backendPort, frontendPort, datenbank } = lauf;
 const backendUrl = `http://127.0.0.1:${backendPort}`;
@@ -187,12 +237,16 @@ export default defineConfig({
    * HTML-Bericht zusammen); `github` schreibt Fehler als Annotationen an die PR-Zeile.
    * Lokal `list`.
    */
-  reporter: process.env.CI ? [['blob'], ['github']] : 'list',
+  // Der Name trägt den Anteil wie bei `--shard` (`report-2.zip`): ohne ihn hießen alle vier
+  // `report.zip` und überschrieben sich beim Einsammeln.
+  reporter: process.env.CI
+    ? [['blob', anteil ? { fileName: `report-${anteil.nummer}.zip` } : {}], ['github']]
+    : 'list',
   use: { baseURL, trace: 'on-first-retry' },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', testMatch: DRUCK_SPECS, use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', testMatch: DRUCK_SPECS, use: { ...devices['Desktop Safari'] } },
+    { name: 'chromium', testMatch: testMatch('chromium'), use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', testMatch: testMatch('firefox'), use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', testMatch: testMatch('webkit'), use: { ...devices['Desktop Safari'] } },
   ],
   webServer: [
     {

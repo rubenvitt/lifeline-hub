@@ -6,8 +6,9 @@
 #
 # Geteilt, weil die drei schweren Suiten (Rust, Vitest, Playwright) nicht voneinander abhängen;
 # der kritische Pfad ist die Rust-Suite allein. Sie bleibt EIN Job, weil Compile nur einen
-# kleinen Teil ihrer Laufzeit ausmacht und jeder Shard ihn erneut zahlte. Playwright verteilt
-# nach Testzahl in Dateireihenfolge, mehr als vier Shards würden ungleicher statt schneller.
+# kleinen Teil ihrer Laufzeit ausmacht und jeder Shard ihn erneut zahlte. Die e2e-Shards teilen
+# nach gemessener Laufzeit je Spec-Datei (LFH-1117, `scripts/e2e-anteile.mjs`), Vitest nach
+# Dateizahl.
 # Die e2e-Shards fahren alle drei Playwright-Projekte (Firefox und WebKit nur die Druck-Specs,
 # LFH-729): ein roter Druckfall in Firefox oder WebKit sperrt so den PR über die gepinnten
 # Pflicht-Checks, ohne eigenen Job, der erst im Ruleset eingetragen werden müsste.
@@ -370,7 +371,7 @@ jobs:
             echo "Aus dem Cache: $(ls "$HOME"/.cache/apt-playwright/*.deb | wc -l) Pakete"
           fi
       # ALLE DREI in jedem Shard: welcher Shard die Firefox- und WebKit-Fälle bekommt, entscheidet
-      # Playwright nach Testzahl, das steht vorher nicht fest.
+      # die Verteilung nach Laufzeit, und die verschiebt sich mit jeder aufgefrischten Tabelle.
       # `--with-deps` ruft apt-get selbst: Frist und Wiederholung wie `scripts/apt-pakete.sh`
       # (LFH-1101). 15 min je Versuch, weil ein Lauf ohne Paket-Cache am langsamen Spiegel schon
       # 24 min brauchte (s. o.); was ein abgebrochener Versuch geladen hat, bleibt im Archiv.
@@ -470,6 +471,30 @@ jobs:
         if: ${{ !cancelled() }}
         run: mise exec -- pnpm -C frontend exec playwright merge-reports --reporter html ./all-blob-reports
         continue-on-error: true
+      # LAUFZEITEN DER e2e-ANTEILE (LFH-1117): die Shards verteilen nach `frontend/e2e/laufzeiten.json`.
+      # Hier entsteht dieselbe Tabelle aus diesem Lauf, als Artefakt `e2e-laufzeiten`; die
+      # Zusammenfassung zeigt, wie die bisherige Tabelle unter den neuen Messwerten trägt. Liegt
+      # der langsamste Anteil spürbar über dem Mittel, die Datei aus dem Artefakt einchecken.
+      # Nur bei vier Blobs: ein Teilbericht ergäbe eine Tabelle ohne die fehlenden Dateien. Gezählt
+      # nur `report-k.zip` auf oberster Ebene: der HTML-Bericht davor entpackt die Traces roter
+      # Tests als `resources/*.zip` in dasselbe Verzeichnis.
+      - name: e2e-Laufzeiten
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          [ "$(find frontend/all-blob-reports -maxdepth 1 -name 'report-*.zip' | wc -l | tr -d ' ')" -eq 4 ] || {
+            echo "Nicht alle vier e2e-Blobs da: keine Laufzeittabelle."; exit 0; }
+          mise exec -- pnpm -C frontend exec playwright merge-reports --reporter json ./all-blob-reports > e2e-bericht.json
+          cp frontend/e2e/laufzeiten.json laufzeiten.json
+          mise exec -- node scripts/e2e-anteile.mjs aktualisieren --aus e2e-bericht.json --nach laufzeiten.json \
+            >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() && hashFiles('laufzeiten.json') != '' }}
+        with:
+          name: e2e-laufzeiten
+          path: laufzeiten.json
+          retention-days: 7
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
