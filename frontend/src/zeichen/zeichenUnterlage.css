@@ -1,8 +1,0 @@
-@media print {
-  /* Die helle Unterlage hinter einem taktischen Zeichen gilt nur dem Schirm (LFH-1120,
-     `ZEICHEN_UNTERLAGE` in `EinsatzZeichen.tsx`); auf Papier steht das Zeichen auf dem Papier.
-     Als CSS, damit sie auf jedem Druckweg fällt, auch ohne `beforeprint`. */
-  .lfh-zeichen-unterlage {
-    background: none !important;
-  }
-}

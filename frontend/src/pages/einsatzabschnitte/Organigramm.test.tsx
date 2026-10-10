@@ -19,7 +19,7 @@ import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
-import { ZEICHEN_UNTERLAGE_KLASSE } from '../../zeichen/EinsatzZeichen';
+import { ZEICHEN_UNTERLAGE } from '../../zeichen/EinsatzZeichen';
 
 vi.mock('../../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
@@ -165,7 +165,7 @@ describe('OrganigrammBild — Knoten', () => {
     const { container } = bild();
     const zeichen = container.querySelectorAll('[data-lfh="org-zeichen"] svg');
     expect(zeichen.length).toBeGreaterThan(0);
-    zeichen.forEach((z) => expect(z).toHaveClass(ZEICHEN_UNTERLAGE_KLASSE));
+    zeichen.forEach((z) => expect(z).toHaveStyle({ backgroundColor: ZEICHEN_UNTERLAGE }));
   });
 
   it('stellt Einheiten ohne Abschnitt unter „Ohne Abschnitt“', () => {

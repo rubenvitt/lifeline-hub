@@ -1,34 +1,20 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen } from './fernmeldeskizze-kern';
+import { FUEKW, anmelden, post } from './fuehrungsorganisation-kern';
 
 /**
  * Zeichenkontrast in Meldebild und Organigramm (LFH-1120): jedes taktische Zeichen hält am Schirm
  * in beiden Modi 3 : 1 gegen seinen Grund, im Druck steht es ohne Unterlage auf dem Papier.
  * Muster: „Zeichenkontrast“ der Fernmeldeskizze (`fernmeldeskizze-ausstattung.spec.ts`), dort im
- * SVG, hier in HTML. jsdom rechnet keine Farben und kennt kein `@media print`.
+ * SVG, hier in HTML. jsdom rechnet keine Farben und kennt kein `@media print`. Der Einsatz entsteht
+ * über die API: der Test prüft den Anlegedialog nicht (`e2e/AGENTS.md`, LFH-1114).
  *
- * Ohne Unterlage (Mutationsprobe: `unterlage` an `EinheitZeichen` bzw. im Organigramm weg) hält
- * der schwarze Umriss eines Zeichens ohne Organisation im Nachtbetrieb rund 1,1 : 1, der Test
- * wird rot.
+ * Mutationsprobe: ohne `unterlage` an `EinheitZeichen` bzw. im Organigramm hält der schwarze
+ * Umriss eines Zeichens ohne Organisation im Nachtbetrieb 1,10 : 1, der Test wird rot (mit
+ * Unterlage 21 : 1 in beiden Modi). Den Druck trägt keine eigene Regel des Zeichens, sondern
+ * `druck/druck.css` (kein Hintergrund in der Druckwurzel); die Druckprobe belegt, dass beide
+ * Seiten darunter fallen.
  */
-
-const ADMIN = 'admin';
-const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const FUEKW = { width: 1366, height: 768 };
-
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function post(page: Page, einsatzId: string, pfad: string, data: unknown) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
-  expect(antwort.ok(), `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
-  return ((await antwort.json()) as { id: number }).id;
-}
 
 /**
  * Ein Abschnitt mit zwei Einheiten: eine ohne Organisation (der schwarze Umriss, um den es geht)
@@ -168,8 +154,9 @@ for (const modus of ['dark', 'light'] as const) {
       await page.mouse.move(0, 0);
       await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
       const zeichen = seite.zeichen(page);
-      await expect(zeichen.first()).toBeVisible();
-      expect(await zeichen.count(), `${seite.name}: Zeichen`).toBeGreaterThanOrEqual(seite.anzahl);
+      // Datenanker: im Organigramm kommen Abschnitte und Einheiten aus getrennten Abfragen, das
+      // Zeichen des Abschnitts steht vor denen der Einheiten.
+      await expect(zeichen, `${seite.name}: Zeichen`).toHaveCount(seite.anzahl);
 
       const umrisse = await zeichenUmrisse(zeichen);
       test.info().annotations.push({

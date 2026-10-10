@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { ZEICHEN_UNTERLAGE_KLASSE } from '../zeichen/EinsatzZeichen';
+import { ZEICHEN_UNTERLAGE } from '../zeichen/EinsatzZeichen';
 import EinheitZeichen from './EinheitZeichen';
 
 // Die Spalte „TZ“ im Meldebild (LFH-835): @einsatzzeichen, und ein gespeicherter Unsinnswert
@@ -47,8 +47,8 @@ describe('EinheitZeichen', () => {
     renderMitProviders(
       <EinheitZeichen tz={{ typLabel: 'Zug', fachaufgabe: null, organisation: null }} />,
     );
-    expect(document.querySelector('[data-lfh="einheit-zeichen"] svg')).toHaveClass(
-      ZEICHEN_UNTERLAGE_KLASSE,
-    );
+    expect(document.querySelector('[data-lfh="einheit-zeichen"] svg')).toHaveStyle({
+      backgroundColor: ZEICHEN_UNTERLAGE,
+    });
   });
 });

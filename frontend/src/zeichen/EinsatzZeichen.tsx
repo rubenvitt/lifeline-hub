@@ -7,23 +7,17 @@ import {
   funktionsZeichen,
   type FunktionsZeichenEingabe,
 } from './fachobjektZeichen';
-import './zeichenUnterlage.css';
 
 /**
  * Helle Unterlage hinter einem taktischen Zeichen am Schirm (LFH-1107, als Baustein LFH-1120):
  * Zeichen ohne Organisation zeichnet die Bibliothek mit schwarzem Umriss ohne Fläche, auf dem
  * Grund des Nachtbetriebs hielt er nur rund 1,1 : 1. Die Unterlage ist Papier
  * (`farbenHell.flaeche`), das Zeichen steht darauf wie im Druck, seine Farben nach DV 102 bleiben
- * unverfälscht; am Tag verschwindet sie im Grund. Gemessen in beiden Modi im e2e
- * „Zeichenkontrast“ (`fernmeldeskizze-ausstattung.spec.ts`, `zeichen-kontrast.spec.ts`).
+ * unverfälscht; am Tag hebt sie sich vom Weiß kaum ab, von getönten Flächen als helles Quadrat.
+ * Gemessen in beiden Modi im e2e „Zeichenkontrast“ (`fernmeldeskizze-ausstattung.spec.ts`,
+ * `zeichen-kontrast.spec.ts`).
  */
 export const ZEICHEN_UNTERLAGE = farbenHell.flaeche;
-
-/**
- * Klasse des Zeichens mit Unterlage: `zeichenUnterlage.css` nimmt die Unterlage im Druck weg, auf
- * jedem Druckweg (auch `page.pdf` und `emulateMedia` ohne `beforeprint`).
- */
-export const ZEICHEN_UNTERLAGE_KLASSE = 'lfh-zeichen-unterlage';
 
 /**
  * Das taktische Zeichen eines Fachobjekts als Inline-SVG über @einsatzzeichen (LFH-835). Übersetzt
@@ -43,9 +37,10 @@ export default function EinsatzZeichen({
   size: number;
   style?: CSSProperties;
   /**
-   * Helle Unterlage ({@link ZEICHEN_UNTERLAGE}) am Schirm, nie im Druck. Sie deckt genau das
-   * Quadrat des Zeichens (die Bibliothek lässt darin rund 3 % Rand um den Umriss), das Zeichen
-   * wird nicht größer. Nur in HTML: im SVG einer Skizze malt ein inneres `svg` keinen
+   * Helle Unterlage ({@link ZEICHEN_UNTERLAGE}) am Schirm. Sie deckt genau das Quadrat des
+   * Zeichens (die Bibliothek lässt darin rund 3 % Rand um den Umriss), das Zeichen wird nicht
+   * größer. Im Druck fällt sie ohne eigene Regel: in der Druckwurzel nimmt `druck/druck.css` jeden
+   * Hintergrund weg, außerhalb steht nichts auf dem Blatt. Nur in HTML: im SVG einer Skizze malt ein inneres `svg` keinen
    * Hintergrund, dort trägt ein `rect` die Unterlage (`stab/skizze/SkizzenElemente.tsx`).
    */
   unterlage?: boolean;
@@ -58,7 +53,6 @@ export default function EinsatzZeichen({
       drawing={zeichen.drawing}
       size={size}
       idPrefix={idPrefix}
-      className={unterlage ? ZEICHEN_UNTERLAGE_KLASSE : undefined}
       style={unterlage ? { ...style, backgroundColor: ZEICHEN_UNTERLAGE } : style}
     />
   );

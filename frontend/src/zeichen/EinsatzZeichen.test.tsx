@@ -1,10 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { farbenHell } from '../theme/tokens';
-import EinsatzZeichen, { ZEICHEN_UNTERLAGE, ZEICHEN_UNTERLAGE_KLASSE } from './EinsatzZeichen';
+import EinsatzZeichen, { ZEICHEN_UNTERLAGE } from './EinsatzZeichen';
 
 describe('EinsatzZeichen', () => {
   it('rendert für ein darstellbares Fachobjekt genau ein svg in der verlangten Größe', () => {
@@ -47,7 +44,6 @@ describe('EinsatzZeichen', () => {
     );
     const svg = container.querySelector('svg')!;
     expect(ZEICHEN_UNTERLAGE).toBe(farbenHell.flaeche);
-    expect(svg).toHaveClass(ZEICHEN_UNTERLAGE_KLASSE);
     expect(svg).toHaveStyle({ backgroundColor: farbenHell.flaeche });
     expect(svg.getAttribute('width')).toBe('22');
   });
@@ -57,22 +53,6 @@ describe('EinsatzZeichen', () => {
       <EinsatzZeichen tz={{ grundzeichen: 'taktische-formation' }} size={22} />,
     );
     const svg = container.querySelector('svg')!;
-    expect(svg).not.toHaveClass(ZEICHEN_UNTERLAGE_KLASSE);
     expect(svg.style.backgroundColor).toBe('');
-  });
-
-  it('nimmt die Unterlage im Druck weg, auf jedem Druckweg (CSS statt `beforeprint`)', () => {
-    const css = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), 'zeichenUnterlage.css'),
-      'utf8',
-    ).replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(css.trim().startsWith('@media print')).toBe(true);
-    const regel = new RegExp(`\\.${ZEICHEN_UNTERLAGE_KLASSE}\\s*\\{([^}]*)\\}`).exec(css);
-    expect(regel?.[1]).toMatch(/background:\s*none\s*!important/);
-    const quelle = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), 'EinsatzZeichen.tsx'),
-      'utf8',
-    );
-    expect(quelle).toContain("import './zeichenUnterlage.css';");
   });
 });
