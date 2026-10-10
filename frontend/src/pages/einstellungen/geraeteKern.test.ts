@@ -51,9 +51,10 @@ describe('geraeteKern (LFH-892)', () => {
     expect(stellenOptionen({}, 'uhs')).toEqual([]);
   });
 
-  it('lässt eine abgelaufene Kopplung bearbeitbar, eine widerrufene nicht', () => {
-    expect(istBeendet({ status: 'abgelaufen' })).toBe(false);
+  it('lässt eine laufende Kopplung bearbeitbar, eine abgelaufene oder widerrufene nicht (LFH-1143)', () => {
+    expect(istBeendet({ status: 'wartend' })).toBe(false);
     expect(istBeendet({ status: 'aktiv' })).toBe(false);
+    expect(istBeendet({ status: 'abgelaufen' })).toBe(true);
     expect(istBeendet({ status: 'widerrufen' })).toBe(true);
   });
 
