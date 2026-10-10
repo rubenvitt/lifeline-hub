@@ -679,6 +679,67 @@ describe('MitgliederAbschnitt', () => {
       expect(await within(liste).findByText('Eva Einsatz')).toBeInTheDocument();
     });
 
+    it('eine Suche ohne Treffer behauptet nicht, die Organisation sei aufgenommen', async () => {
+      server.use(
+        http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
+        http.get('/api/einsaetze/7/mitglieder/auswahl', () =>
+          HttpResponse.json([{ benutzer_id: 5, anzeigename: 'Zoe Zug' }]),
+        ),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await screen.findByText('Eva Einsatz');
+      const liste = await offeneListe();
+      await within(liste).findByText('Zoe Zug');
+      await userEvent.type(auswahlFeld(), 'xyz', { skipClick: true });
+      await waitFor(() => expect(within(liste).queryByText('Zoe Zug')).toBeNull());
+      expect(within(liste).queryByText('Keine weitere Person der Organisation')).toBeNull();
+    });
+
+    it('die eigene Herabstufung lädt die Auswahl nicht neu (danach fehlt das Recht)', async () => {
+      let auswahlAbrufe = 0;
+      server.use(
+        meHandler(benutzerFixture({ id: 1, anzeigename: 'Lea' })),
+        http.get('/api/einsaetze/7/mitglieder', () =>
+          HttpResponse.json([
+            mitglied({ benutzer_id: 1, anzeigename: 'Lea', einsatz_rolle: 'einsatzleitung' }),
+            mitglied({ benutzer_id: 3, anzeigename: 'Leo', einsatz_rolle: 'einsatzleitung' }),
+          ]),
+        ),
+        http.get('/api/einsaetze/7/mitglieder/auswahl', () => {
+          auswahlAbrufe += 1;
+          return HttpResponse.json([]);
+        }),
+        http.put('/api/einsaetze/7/mitglieder/1', () =>
+          HttpResponse.json([
+            mitglied({ benutzer_id: 1, anzeigename: 'Lea', einsatz_rolle: 'beobachter' }),
+            mitglied({ benutzer_id: 3, anzeigename: 'Leo', einsatz_rolle: 'einsatzleitung' }),
+          ]),
+        ),
+      );
+      renderMitProviders(
+        <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+      );
+      await screen.findByText('Leo');
+      await waitFor(() => expect(auswahlAbrufe).toBe(1));
+      await userEvent.click(screen.getByRole('combobox', { name: 'Rolle von Lea' }));
+      const treffer = await screen.findAllByTitle('Beobachter');
+      const option = treffer
+        .filter((el) => el.closest('.ant-select-item-option'))
+        .at(-1)!
+        .closest('.ant-select-item-option') as HTMLElement;
+      await userEvent.click(option);
+      const frage = (await screen.findByText('Eigene Rolle herabstufen?')).closest(
+        '[role="dialog"]',
+      ) as HTMLElement;
+      await userEvent.click(within(frage).getByRole('button', { name: 'Rolle herabstufen' }));
+      await waitFor(() =>
+        expect(screen.getByText('Lea').closest('tr')).toHaveTextContent('Beobachter'),
+      );
+      expect(auswahlAbrufe).toBe(1);
+    });
+
     it('leere Auswahl sagt, dass niemand mehr aufzunehmen ist', async () => {
       server.use(
         http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),

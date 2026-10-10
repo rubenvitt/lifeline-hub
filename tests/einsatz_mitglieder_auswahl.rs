@@ -100,6 +100,19 @@ async fn einsatzleitung_ohne_systemrolle_bekommt_genau_die_aufnehmbaren() {
 }
 
 #[tokio::test]
+async fn system_admin_mit_einsatzleitung_sieht_keine_fremde_org() {
+    let (app, pool, admin, leitung, einsatz, _) = einsatz_mit_leitung_ohne_systemrolle().await;
+    rolle_setzen(&app, &leitung, einsatz, 1, "einsatzleitung").await;
+    let bertha = benutzer_anlegen(&app, &admin, "bertha", "keine").await;
+    let (_, fremd) = fremde_org_anlegen(&pool, "Fremd", "fritz", "fritzpw12", "keine").await;
+
+    let (status, json) = anfrage(&app, "GET", &auswahl_uri(einsatz), &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(kennungen(&json), vec![bertha], "{json:?}");
+    assert!(!kennungen(&json).contains(&fremd));
+}
+
+#[tokio::test]
 async fn auswahl_traegt_nur_kennung_und_anzeigename() {
     let (app, _pool, admin, leitung, einsatz, _) = einsatz_mit_leitung_ohne_systemrolle().await;
     let berta = benutzer_anlegen(&app, &admin, "bertha", "keine").await;

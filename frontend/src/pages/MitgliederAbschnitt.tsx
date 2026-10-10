@@ -188,24 +188,31 @@ export default function MitgliederAbschnitt({
     queryFn: () => ladeMitgliedAuswahl(einsatzId),
     enabled: darfVerwalten,
   });
-  // Wer aufgenommen ist, fällt aus der Auswahl; wer entfernt ist, kommt zurück.
+  /*
+   * Wer aufgenommen ist, fällt aus der Auswahl; wer entfernt ist, kommt zurück. Ein bloßer
+   * Rollenwechsel ändert die Menge nicht, und nach der eigenen Herabstufung oder Entfernung
+   * fehlt das Recht: dort liefe der Abruf in ein 403.
+   */
   const auswahlNeuLaden = () =>
     void qc.invalidateQueries({ queryKey: einsatzKeys.mitgliedAuswahl(einsatzId) });
 
   const setzen = useMutation({
     mutationFn: (v: { benutzerId: number; rolle: EinsatzRolle }) =>
       setzeMitglied(einsatzId, v.benutzerId, v.rolle),
-    onSuccess: (liste) => {
+    onSuccess: (liste, v) => {
+      const warMitglied = qc
+        .getQueryData<MitgliedAnzeige[]>(einsatzKeys.mitglieder(einsatzId))
+        ?.some((m) => m.benutzer_id === v.benutzerId);
       qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste);
       setNeuerBenutzer(undefined);
-      auswahlNeuLaden();
+      if (!warMitglied) auswahlNeuLaden();
     },
   });
   const entfernen = useMutation({
     mutationFn: (benutzerId: number) => entferneMitglied(einsatzId, benutzerId),
-    onSuccess: (liste) => {
+    onSuccess: (liste, benutzerId) => {
       qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste);
-      auswahlNeuLaden();
+      if (benutzerId !== ich?.id) auswahlNeuLaden();
     },
   });
   /*
@@ -396,10 +403,12 @@ export default function MitgliederAbschnitt({
             value={neuerBenutzer}
             options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}
             onChange={(v) => setNeuerBenutzer(v)}
+            // „Keine weitere Person“ nur, wenn wirklich niemand übrig ist; eine Suche ohne Treffer
+            // behält den Leerhinweis von antd.
             notFoundContent={
               auswahlQuery.isError
                 ? 'Personenauswahl nicht verfügbar'
-                : auswahlQuery.isSuccess
+                : auswahlQuery.isSuccess && verfuegbar.length === 0
                   ? 'Keine weitere Person der Organisation'
                   : undefined
             }
