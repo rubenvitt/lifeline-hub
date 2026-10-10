@@ -333,7 +333,8 @@ Lagemonitor).
 Die Funktionsansicht `betreuungsstelle` SHALL an genau eine Betreuungsstelle gebunden sein, die
 Einsatzrolle Führungspersonal tragen und genau diese Rechte haben; was die Tabelle nicht nennt,
 MUST verboten sein. Sichtbar MUST eine Person sein, die je mit Verbleib „Notunterkunft“ an der
-eigenen Stelle war, auch nach ihrer Entlassung.
+eigenen Stelle war, auch nach ihrer Entlassung. Einsatzweite Modulzähler für `betreuung`,
+`personen` und `meldungen` MUST das Gerät nicht erhalten.
 
 | Modul / Bereich | Betreuungsstelle |
 | --- | --- |
@@ -356,6 +357,11 @@ eigenen Stelle war, auch nach ihrer Entlassung.
 
 - **WHEN** das Gerät der Notunterkunft Nord eine Belegung der Notunterkunft Süd meldet, deren Meldeverlauf abruft oder eine ihrer Belegungsmeldungen zurücknimmt
 - **THEN** antwortet der Server mit 404
+
+#### Scenario: Keine einsatzweiten Zähler
+
+- **WHEN** das Gerät der Notunterkunft Nord die Modulzähler abruft
+- **THEN** fehlen die Zähler für `betreuung`, `personen` und `meldungen`
 
 #### Scenario: Stelle verwalten
 
@@ -395,7 +401,9 @@ Die Funktionsansicht `einsatzabschnitt` SHALL an genau einen Einsatzabschnitt ge
 die Einsatzrolle Führungspersonal tragen und genau diese Rechte haben; was die Tabelle nicht
 nennt, MUST verboten sein. Der Bereich MUST der Teilbaum des eigenen Abschnitts samt seiner
 Einheiten sein, bei jeder Anfrage neu bestimmt. Löst die Einsatzleitung den Abschnitt auf, MUST
-die Kopplung enden.
+die Kopplung enden. Einsatzweite Modulzähler für `einsatzabschnitte`, `einheiten`, `auftraege`,
+`betreuung`, `personen` und `meldungen` MUST das Gerät nicht erhalten; sie verrieten den Rest
+des Einsatzes.
 
 | Modul / Bereich | Einsatzabschnitt |
 | --- | --- |
@@ -421,6 +429,11 @@ die Kopplung enden.
 
 - **WHEN** die Einsatzleitung einen Unterabschnitt von Nord unter Süd hängt
 - **THEN** sieht das Gerät des Abschnitts Nord dessen Einheiten bei der nächsten Anfrage nicht mehr
+
+#### Scenario: Keine einsatzweiten Zähler
+
+- **WHEN** das Gerät des Abschnitts Nord die Modulzähler abruft
+- **THEN** fehlen die Zähler für `einsatzabschnitte`, `einheiten`, `auftraege` und `meldungen`
 
 #### Scenario: Verwaltung am Gerät
 

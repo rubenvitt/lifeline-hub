@@ -23,6 +23,10 @@
   `widerrufenes_abschnittsgeraet_verliert_jeden_zugriff` grün
 - [x] 1.5 Veralteten Doc-Kommentar an `aufgeloester_abschnitt_beendet_seine_kopplung`
   („noch nicht koppelbar“) berichtigen; Nachweis: `cargo test --test geraet_kopplung` grün
+- [x] 1.6 Fehlende Zählerregel der stellengebundenen Ansichten (Review): je ein Szenario „Keine
+  einsatzweiten Zähler“ für Betreuungsstelle und Einsatzabschnitt; Beleg
+  `src/routes/modul_zaehler.rs`, Nachweis: Zählerprüfungen in
+  `betreuungsstelle_kennt_nur_die_eigene_stelle` und `abschnittsgeraet_sieht_nur_seinen_teilbaum` grün
 
 ## 2. Abschluss
 
