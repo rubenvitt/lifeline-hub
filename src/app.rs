@@ -208,6 +208,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/benutzer/{id}/totp/reset",
             post(routes::benutzer::totp_reset),
         )
+        // Zugangsprotokoll (LFH-1097): Anmelde- und Admin-Spur lesen, nur System-Admin, das
+        // Lesen selbst unprotokolliert. Nachweis tests/zugangsprotokoll.rs.
+        .route(
+            "/api/zugangsprotokoll/anmeldungen",
+            get(routes::zugangsprotokoll::anmeldungen),
+        )
+        .route(
+            "/api/zugangsprotokoll/zugangsaenderungen",
+            get(routes::zugangsprotokoll::zugangsaenderungen),
+        )
         .route(
             "/api/benutzer/{id}/sitzungen",
             get(routes::sitzung::admin_liste),

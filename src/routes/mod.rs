@@ -74,6 +74,7 @@ pub mod verpflegung;
 pub mod vorlagendokument;
 pub mod wetter;
 pub mod zeitachse;
+pub mod zugangsprotokoll;
 
 use crate::app::AppState;
 

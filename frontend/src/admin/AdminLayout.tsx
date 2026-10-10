@@ -7,7 +7,13 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { useViewport } from '../components/useViewport';
-import { adminAufbewahrung, adminBenutzer, adminDemoDaten, adminGruppen } from './adminNav';
+import {
+  adminAufbewahrung,
+  adminBenutzer,
+  adminDemoDaten,
+  adminGruppen,
+  adminZugangsprotokoll,
+} from './adminNav';
 import { useDemoDatenStatus } from './useDemoDaten';
 import DatentraegerWarnung from './DatentraegerWarnung';
 
@@ -16,9 +22,10 @@ const { Sider, Content } = Layout;
 /**
  * Admin-Shell: eine linke Sidebar (gruppiertes `Menu`) als EINZIGE Nav-Ebene für `/admin`, plus
  * `<Outlet>`. Menü und Routen stammen aus der `adminNav`-Registry; die aktive Sektion folgt der
- * URL. Gate `darfVerwaltung` (sonst Redirect zu /einsaetze). „Benutzer" und „Aufbewahrung" nur
- * für System-Admins, „Demo-Daten“ zusätzlich nur bei 200 von `GET /api/demo-daten`. Über dem
- * Inhalt steht für System-Admins die Warnleiste der Datenträgerprüfung (LFH-1100).
+ * URL. Gate `darfVerwaltung` (sonst Redirect zu /einsaetze). „Benutzer", „Aufbewahrung" und
+ * „Zugangsprotokoll" nur für System-Admins, „Demo-Daten“ zusätzlich nur bei 200 von
+ * `GET /api/demo-daten`. Über dem Inhalt steht für System-Admins die Warnleiste der
+ * Datenträgerprüfung (LFH-1100).
  */
 /**
  * Menü-Key einer Sektion — EINE Quelle für Eintrag und Präfix-Match, sonst verlöre eine
@@ -159,6 +166,7 @@ export default function AdminLayout() {
   const sonderEintraege = [
     ...(istSystemAdmin ? [adminBenutzer] : []),
     ...(istSystemAdmin ? [adminAufbewahrung] : []),
+    ...(istSystemAdmin ? [adminZugangsprotokoll] : []),
     ...(istSystemAdmin && demoFreigeschaltet ? [adminDemoDaten] : []),
   ];
   // '/admin/stammdaten/fahrzeuge' → 'stammdaten/fahrzeuge'; '/admin/benutzer' → 'benutzer'.

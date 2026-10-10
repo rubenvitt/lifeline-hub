@@ -253,6 +253,10 @@ Spec `passwort-anmeldung`, Herleitung
 - Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Eine neue Aktion braucht eine
   Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
 - Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
+- **Gelesen werden Anmelde- und Admin-Spur nur über `routes::zugangsprotokoll`** (LFH-1097,
+  `/mnt/project-files/lfh-1097/design.md`): nur System-Admin, das Lesen schreibt keine Spur, der
+  Kontofilter wird wie beim Schreiben gekürzt (`benutzername::fuer_protokoll`) und mit
+  `COLLATE NOCASE` verglichen; Nachweis `tests/zugangsprotokoll.rs`.
 
 ## Backend — Org-Ereignisse (LFH-734)
 

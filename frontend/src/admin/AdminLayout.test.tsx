@@ -64,12 +64,15 @@ describe('AdminLayout — Sidebar', () => {
     expect(screen.queryByRole('menuitem', { name: 'Benutzer' })).not.toBeInTheDocument();
     // Das Archiv gesperrter Einsätze ist dem System-Admin vorbehalten.
     expect(screen.queryByRole('menuitem', { name: 'Aufbewahrung' })).not.toBeInTheDocument();
+    // Anmelde- und Admin-Spur ebenso (LFH-1097).
+    expect(screen.queryByRole('menuitem', { name: 'Zugangsprotokoll' })).not.toBeInTheDocument();
   });
 
   it('Admin: Benutzer-Eintrag zusätzlich sichtbar', async () => {
     setup(admin);
     expect(await screen.findByRole('menuitem', { name: 'Benutzer' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Aufbewahrung' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Zugangsprotokoll' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Anzeige' })).toBeInTheDocument();
   });
 

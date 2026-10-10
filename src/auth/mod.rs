@@ -10,6 +10,7 @@ pub mod password;
 pub mod provider;
 pub mod rate_limit;
 pub mod session;
+pub mod spur;
 pub mod start_drossel;
 pub mod totp;
 pub mod webauthn;

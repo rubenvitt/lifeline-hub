@@ -11,6 +11,8 @@ import {
   adminAufbewahrung,
   adminAufbewahrungPfad,
   adminAufbewahrungAktePfad,
+  adminZugangsprotokoll,
+  adminZugangsprotokollPfad,
   adminSektionPfad,
   adminBenutzerPfad,
   adminDemoDatenPfad,
@@ -28,6 +30,7 @@ describe('adminNav — Pfad-Builder', () => {
     // Übersicht und Akte mit eigener, neuladefester Adresse.
     expect(adminAufbewahrungPfad()).toBe('/admin/aufbewahrung');
     expect(adminAufbewahrungAktePfad(42)).toBe('/admin/aufbewahrung/42');
+    expect(adminZugangsprotokollPfad()).toBe('/admin/zugangsprotokoll');
   });
 
   it('Default- und Gruppen-Erst-Pfade', () => {
@@ -39,12 +42,12 @@ describe('adminNav — Pfad-Builder', () => {
 
 describe('adminNav — Registry', () => {
   /**
-   * „Demo-Daten“ und „Aufbewahrung“ sind Sonder-Einträge neben „Benutzer“, NICHT in
+   * „Demo-Daten“, „Aufbewahrung“ und „Zugangsprotokoll“ sind Sonder-Einträge neben „Benutzer“, NICHT in
    * `adminGruppen`: die Gruppen kennen kein Rollenprädikat, eine Sektion dort sähe jede
    * Führungskraft. Die Zahl 16 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
    * gepinnt, samt Eindeutigkeit gegenüber den Gruppen-Keys (gleiche Ebene `/admin/<key>`).
    */
-  it('drei Gruppen mit 17 Sektionen gesamt (Stammdaten 12), dazu drei Sonder-Einträge', () => {
+  it('drei Gruppen mit 17 Sektionen gesamt (Stammdaten 12), dazu vier Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
     expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(17);
     expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(12);
@@ -57,11 +60,14 @@ describe('adminNav — Registry', () => {
     expect(einsatz.label).toBe('Einsatz-Vorgaben');
     // Nur für den System-Admin (die Führungskraft liest die Verwaltung, dieses Archiv nicht).
     expect(adminAufbewahrung).toEqual({ key: 'aufbewahrung', label: 'Aufbewahrung' });
+    // Anmelde- und Admin-Spur (LFH-1097): Beschäftigtendaten, nur für den System-Admin.
+    expect(adminZugangsprotokoll).toEqual({ key: 'zugangsprotokoll', label: 'Zugangsprotokoll' });
     const ersteEbene = [
       ...adminGruppen.map((g) => g.key),
       adminBenutzer.key,
       adminDemoDaten.key,
       adminAufbewahrung.key,
+      adminZugangsprotokoll.key,
     ];
     expect(new Set(ersteEbene).size).toBe(ersteEbene.length);
   });
