@@ -119,6 +119,8 @@ const O_OBJEKT: &str = "beschreibt Abschnitt bzw. Einheit, nicht die führende P
 const O_BESTAETIGT: &str = "Name der bestätigenden Einsatzkraft, nicht der betroffenen Person";
 const O_BEHANDELT: &str = "beschreibt die betroffene Person, nicht die bestätigende Kraft";
 const O_FUEHRUNGSSTELLE: &str = "Erreichbarkeit der Führungsstelle, nicht des Einsatzleiters";
+const O_FUEHRUNGSSTELLE_ORT: &str =
+    "Standort der Führungsstelle (LFH-1181), nicht des Einsatzleiters";
 const KEINE: &[(&str, Markierung)] = &[];
 
 /// Alle Personenbezüge. Reihenfolge = Ausführungsreihenfolge (reihenfolgeunabhängig korrekt).
@@ -260,6 +262,9 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         spalten: &[
             ("einsatzleiter_name", Mit),
             ("erreichbarkeit", Ohne(O_FUEHRUNGSSTELLE)),
+            ("standort_adresse", Ohne(O_FUEHRUNGSSTELLE_ORT)),
+            ("standort_lat", Ohne(O_FUEHRUNGSSTELLE_ORT)),
+            ("standort_lon", Ohne(O_FUEHRUNGSSTELLE_ORT)),
         ],
     },
     // Namentliche Bestätigung am Gerät (LFH-1046).

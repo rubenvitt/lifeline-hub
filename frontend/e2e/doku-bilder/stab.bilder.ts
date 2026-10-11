@@ -5,6 +5,7 @@ import {
   demoEinsatz,
   expect,
   fotografiere,
+  fuehrungsstelleOrtFuellen,
   fuelle,
   test,
   uhrAnhalten,
@@ -59,8 +60,10 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'put', `${stab}/checkliste/${punkt}`, { erledigt: true });
     }
     await fuelle(api, 'put', `${stab}/checkliste/aufstellort`, {
-      bemerkung: 'Parkplatz Feuerwehrhaus Nord',
+      bemerkung: 'Zufahrt über das Nordtor',
     });
+    // Der erste Punkt zeigt den Standort der Führungsstelle (LFH-1181).
+    await fuehrungsstelleOrtFuellen(api, id);
     const stand = (await (await api.get(stab)).json()) as { anzahl_lagebesprechungen: number };
     if (stand.anzahl_lagebesprechungen === 0) {
       await fuelle(api, 'post', `${stab}/lagebesprechungen`, {

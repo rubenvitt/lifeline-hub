@@ -130,6 +130,7 @@ export function rohBericht(
       }),
     ),
     fuehrungsstelle: daten({
+      art: 'mobil',
       sprechgruppen: [],
       fahrzeug_ids: [],
       einsatzleiter: {

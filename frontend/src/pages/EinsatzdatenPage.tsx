@@ -26,11 +26,16 @@ import {
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
-import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
+import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
+import {
+  alsLatLon,
+  istUngueltigeKoordinate,
+  type KoordinatenWert,
+} from '../anzeige/koordinatenWert';
 import { Link, useNavigate, useParams } from 'react-router';
 import { einsatzberichtPfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
@@ -62,8 +67,16 @@ import type {
   Einsatzart,
   EinsatzFahrzeug,
   Fuehrungsstelle,
+  FuehrungsstellenArt,
   FuehrungsstellePatch,
 } from '../api/types';
+import Segmentleiste from '../components/instrument/Segmentleiste';
+import { mitVorgabe } from '../components/vorgabeText';
+import { fuehrungsstelleErfasst } from '../stab/fuehrungsstelle';
+import {
+  FUEHRUNGSSTELLE_ADRESSE_MAX,
+  FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+} from '../api/eingabegrenzen';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
@@ -360,14 +373,14 @@ function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
   return b.every((id) => menge.has(id));
 }
 
-/** Ein Fahrzeug, wie die Zeile „Fahrzeuge“ es nennt: „Florian 10/1 (ELW 2)“. */
+/** Ein Fahrzeug, wie die Zeile „Führungsfahrzeuge“ es nennt: „Florian 10/1 (ELW 2)“. */
 function fahrzeugText(f: EinsatzFahrzeug): string {
   const typ = f.fahrzeugtyp?.trim();
   return typ ? `${f.funkrufname} (${typ})` : f.funkrufname;
 }
 
 /**
- * Die disponierten Fahrzeuge für die Zeile „Fahrzeuge“ (LFH-1106). Die Führungsstelle liefert nur
+ * Die disponierten Fahrzeuge für die Zeile „Führungsfahrzeuge“ (LFH-1106). Die Führungsstelle liefert nur
  * IDs; Namen kommen aus dem Modul Fahrzeuge, abgerufen nur mit dessen Freigabe.
  */
 function useFahrzeugeQuelle(einsatzId: number): {
@@ -400,19 +413,42 @@ function useFahrzeugeQuelle(einsatzId: number): {
   };
 }
 
+const ART_OPTIONEN: { wert: FuehrungsstellenArt; label: string }[] = [
+  { wert: 'mobil', label: 'mobil' },
+  { wert: 'ortsfest', label: 'ortsfest' },
+];
+
+/** Entwurf der Zeile „Standort“: Adresse und Koordinate gehen zusammen hinaus (LFH-1181, D4). */
+interface StandortEntwurf {
+  adresse: string;
+  koord: KoordinatenWert;
+}
+
+function gleicherStandort(a: StandortEntwurf, b: StandortEntwurf): boolean {
+  // Eine unlesbare Koordinate ist nie „unverändert“: sie geht bis `onSpeichern` und steht dort als
+  // Fehler an der Zeile (`alsLatLon` würfe hier, vor dem Fehlerpfad der Zeile).
+  if (istUngueltigeKoordinate(a.koord) || istUngueltigeKoordinate(b.koord)) return false;
+  const la = alsLatLon(a.koord);
+  const lb = alsLatLon(b.koord);
+  return a.adresse.trim() === b.adresse.trim() && la?.lat === lb?.lat && la?.lon === lb?.lon;
+}
+
 /**
  * Eigene Führungsstelle des Einsatzes (LFH-849, Spec `einsatz-fuehrungsstelle`): die Gegenstelle
- * des Funkplans. Sechs Zeilen, zuerst der Einsatzleiter (LFH-1199); jede schickt nur ihr Feld an
- * `…/fuehrungsstelle`, mit dem Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und
- * bearbeitet selbst nichts.
+ * des Funkplans, seit LFH-1181 ein Ort mit Ausstattung. Zuerst der Einsatzleiter (LFH-1199),
+ * dann Art, Bezeichnung und Standort vor den Funkangaben, denn wer die Führungsstelle sucht, braucht
+ * den Ort vor dem Funk (LFH-1181, design.md D5). Jede Zeile schickt nur ihr Feld an
+ * `…/fuehrungsstelle`, der Standort Adresse und Koordinate zusammen, mit dem Schreibrecht der
+ * Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
  */
 function FuehrungsstellePaneel({
-  einsatzId,
+  einsatz,
   darfSchreiben,
 }: {
-  einsatzId: number;
+  einsatz: EinsatzAnzeige;
   darfSchreiben: boolean;
 }) {
+  const einsatzId = einsatz.id;
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token } = useRollen();
@@ -435,17 +471,27 @@ function FuehrungsstellePaneel({
   const fahrzeugQuelle = useFahrzeugeQuelle(einsatzId);
 
   const fs = query.data;
-  const erreichbarkeit = (wert: string | null | undefined) => (
+  const text = (
+    etikett: string,
+    wert: string | null | undefined,
+    schluessel: 'bezeichnung' | 'erreichbarkeit',
+    maxLength?: number,
+  ) => (
     <InlineAngabe<string>
-      etikett="Erreichbarkeit"
+      etikett={etikett}
       wert={wert ?? ''}
       anzeige={wert}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(w) => speichern('Erreichbarkeit', { erreichbarkeit: leerZuNull(w) })}
+      onSpeichern={(w) => speichern(etikett, { [schluessel]: leerZuNull(w) })}
       eingabe={({ feld, value, onChange }) => (
-        <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+        <Input
+          {...feld}
+          value={value}
+          maxLength={maxLength}
+          onChange={(e) => onChange(e.target.value)}
+        />
       )}
     />
   );
@@ -469,6 +515,37 @@ function FuehrungsstellePaneel({
                     fs={fs}
                     darfSchreiben={darfSchreiben}
                     onSpeichern={(einsatzleiter) => speichern('Einsatzleiter', { einsatzleiter })}
+                  />
+                ),
+              },
+              {
+                etikett: 'Art',
+                wert: (
+                  <ArtAngabe
+                    art={fs.art}
+                    erfasst={fuehrungsstelleErfasst(fs)}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(art) => speichern('Art', { art })}
+                  />
+                ),
+              },
+              {
+                etikett: 'Bezeichnung',
+                wert: text(
+                  'Bezeichnung',
+                  fs.bezeichnung,
+                  'bezeichnung',
+                  FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+                ),
+              },
+              {
+                etikett: 'Standort',
+                wert: (
+                  <StandortAngabe
+                    fs={fs}
+                    einsatz={einsatz}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(patch) => speichern('Standort', patch)}
                   />
                 ),
               },
@@ -533,16 +610,17 @@ function FuehrungsstellePaneel({
               },
               {
                 etikett: 'Erreichbarkeit',
-                wert: erreichbarkeit(fs.erreichbarkeit),
+                wert: text('Erreichbarkeit', fs.erreichbarkeit, 'erreichbarkeit'),
               },
               {
-                etikett: 'Fahrzeuge',
+                etikett: 'Führungsfahrzeuge',
                 wert: (
-                  <FahrzeugeAngabe
+                  <FuehrungsfahrzeugeZeile
+                    art={fs.art}
                     ids={fs.fahrzeug_ids}
                     quelle={fahrzeugQuelle}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(ids) => speichern('Fahrzeuge', { fahrzeug_ids: ids })}
+                    onSpeichern={(ids) => speichern('Führungsfahrzeuge', { fahrzeug_ids: ids })}
                   />
                 ),
               },
@@ -551,6 +629,169 @@ function FuehrungsstellePaneel({
         )}
       </PaneelZustand>
     </Paneel>
+  );
+}
+
+/**
+ * Zeile „Art“ (LFH-1181, D1/D5): mit Schreibrecht eine Segmentleiste, deren Wahl sofort nur die Art
+ * schickt; ohne Schreibrecht der Wert. Die Art ist nie leer; solange sonst nichts erfasst ist,
+ * gilt `mobil` als Vorgabe und heißt so.
+ */
+function ArtAngabe({
+  art,
+  erfasst,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  art: FuehrungsstellenArt;
+  erfasst: boolean;
+  darfSchreiben: boolean;
+  onSpeichern: (art: FuehrungsstellenArt) => Promise<unknown>;
+}) {
+  const [fehler, setFehler] = useState<unknown>(null);
+  // Die zuletzt gewählte Art steht sofort, bis ihre Antwort da ist; eine frühere Antwort setzt sie
+  // nicht zurück (zwei schnelle Wechsel: es gilt der letzte).
+  const [gewaehlt, setGewaehlt] = useState<FuehrungsstellenArt | null>(null);
+  const letzte = useRef(0);
+  if (!darfSchreiben) {
+    // „Vorgabe“ heißt nur der Wert, der ohne Wahl gilt (`components/vorgabeText.ts`).
+    return <>{art === 'mobil' && !erfasst ? mitVorgabe(art) : art}</>;
+  }
+  const wert = gewaehlt ?? art;
+  return (
+    <>
+      <Segmentleiste<FuehrungsstellenArt>
+        optionen={ART_OPTIONEN}
+        wert={wert}
+        beschriftung="Art"
+        onWechsel={(neu) => {
+          if (neu === wert) return;
+          const nr = ++letzte.current;
+          setFehler(null);
+          setGewaehlt(neu);
+          onSpeichern(neu).then(
+            () => {
+              if (nr === letzte.current) setGewaehlt(null);
+            },
+            (e: unknown) => {
+              if (nr !== letzte.current) return;
+              setGewaehlt(null);
+              setFehler(e);
+            },
+          );
+        }}
+      />
+      <SpeicherFehler fehler={fehler} />
+    </>
+  );
+}
+
+/**
+ * Zeile „Standort“ (LFH-1181, D3/D4): Adresse als Text und Koordinate über die Koordinateneingabe
+ * mit Ortsvorschau. „wie Einsatzort“ übernimmt beides einmalig in den Entwurf; gespeichert wird erst
+ * mit der Zeile. Eine Adresssuche bringt erst der Ortsfeld-Baustein (LFH-1248).
+ */
+function StandortAngabe({
+  fs,
+  einsatz,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  fs: Fuehrungsstelle;
+  einsatz: EinsatzAnzeige;
+  darfSchreiben: boolean;
+  onSpeichern: (patch: FuehrungsstellePatch) => Promise<unknown>;
+}) {
+  const { token } = useRollen();
+  const koord =
+    fs.standort_lat != null && fs.standort_lon != null
+      ? { lat: fs.standort_lat, lon: fs.standort_lon }
+      : null;
+  const ortKoord =
+    einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
+      ? { lat: einsatz.einsatzort_lat, lon: einsatz.einsatzort_lon }
+      : null;
+  const hatEinsatzort = !!einsatz.einsatzort?.trim() || ortKoord != null;
+  const exclude = `fuehrungsstelle:${einsatz.id}`;
+  const koordId = useId();
+  return (
+    <InlineAngabe<StandortEntwurf>
+      etikett="Standort"
+      wert={{ adresse: fs.standort_adresse ?? '', koord }}
+      anzeige={
+        <span>
+          {fs.standort_adresse && <span style={{ display: 'block' }}>{fs.standort_adresse}</span>}
+          {koord && (
+            <KoordinatenAnzeige
+              lat={koord.lat}
+              lon={koord.lon}
+              einsatzId={einsatz.id}
+              exclude={exclude}
+            />
+          )}
+        </span>
+      }
+      leer={(w) => w.adresse.trim() === '' && w.koord == null}
+      gleich={gleicherStandort}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={(w) => {
+        if (istUngueltigeKoordinate(w.koord)) {
+          return Promise.reject(new Error('Koordinate nicht lesbar'));
+        }
+        const ll = alsLatLon(w.koord);
+        return onSpeichern({
+          standort_adresse: leerZuNull(w.adresse),
+          standort_lat: ll?.lat ?? null,
+          standort_lon: ll?.lon ?? null,
+        });
+      }}
+      eingabe={({ feld, value, onChange }) => (
+        <Space orientation="vertical" style={{ width: '100%' }} size={token.marginXS}>
+          <Input
+            {...feld}
+            aria-label="Adresse des Standorts"
+            value={value.adresse}
+            maxLength={FUEHRUNGSSTELLE_ADRESSE_MAX}
+            onChange={(e) => onChange({ ...value, adresse: e.target.value })}
+          />
+          <label htmlFor={koordId}>Koordinate</label>
+          <KoordinatenEingabe
+            id={koordId}
+            value={value.koord}
+            onChange={(k) => onChange({ ...value, koord: k })}
+            einsatzId={einsatz.id}
+            exclude={exclude}
+          />
+          {hatEinsatzort && (
+            <Button
+              onClick={() => onChange({ adresse: einsatz.einsatzort ?? '', koord: ortKoord })}
+            >
+              wie Einsatzort
+            </Button>
+          )}
+        </Space>
+      )}
+    />
+  );
+}
+
+/**
+ * Zeile „Führungsfahrzeuge“ (LFH-1181, D5): bei `mobil` offen, bei `ortsfest` eingeklappt mit der
+ * Anzahl im Kopf. Keine Art verlangt ein Fahrzeug; die Zuordnung bleibt beim Einklappen erhalten.
+ */
+function FuehrungsfahrzeugeZeile({
+  art,
+  ...props
+}: { art: FuehrungsstellenArt } & Parameters<typeof FahrzeugeAngabe>[0]) {
+  if (art !== 'ortsfest') return <FahrzeugeAngabe {...props} />;
+  const n = props.ids.length;
+  const kopf =
+    n === 0 ? 'kein Führungsfahrzeug' : n === 1 ? '1 Führungsfahrzeug' : `${n} Führungsfahrzeuge`;
+  return (
+    <Collapse
+      ghost
+      items={[{ key: 'fahrzeuge', label: kopf, children: <FahrzeugeAngabe {...props} /> }]}
+    />
   );
 }
 
@@ -643,8 +884,8 @@ function RufnameInput({
 }
 
 /**
- * Zeile „Fahrzeuge“ der Führungsstelle (LFH-1106): welche disponierten Fahrzeuge sie tragen.
- * Ohne Freigabe für Fahrzeuge gesperrt, mit dem Grund statt eines leeren Werts.
+ * Zeile „Führungsfahrzeuge“ der Führungsstelle (LFH-1106): welche disponierten Fahrzeuge sie
+ * tragen. Ohne Freigabe für Fahrzeuge gesperrt, mit dem Grund statt eines leeren Werts.
  */
 function FahrzeugeAngabe({
   ids,
@@ -662,7 +903,7 @@ function FahrzeugeAngabe({
   const gewaehlt = quelle.fahrzeuge.filter((f) => ids.includes(f.id));
   return (
     <InlineAngabe<number[]>
-      etikett="Fahrzeuge"
+      etikett="Führungsfahrzeuge"
       wert={gewaehlt.map((f) => f.id)}
       anzeige={gewaehlt.map(fahrzeugText).join(', ')}
       leer={(w) => w.length === 0}
@@ -1138,7 +1379,7 @@ export default function EinsatzdatenPage() {
             />
           </Paneel>
 
-          <FuehrungsstellePaneel einsatzId={einsatzId} darfSchreiben={darfBearbeiten} />
+          <FuehrungsstellePaneel einsatz={einsatz} darfSchreiben={darfBearbeiten} />
 
           {/* Technische Angaben — Aktenzeichen und Anlege-Zeitstempel: gebraucht beim
               Nachweisen, nicht beim Führen, deshalb eingeklappt. Kein `forceRender`: der

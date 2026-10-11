@@ -144,7 +144,10 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
   it('Führung: ohne Einsatzleiter „nicht erfasst“, nie die App-Rolle (LFH-1199)', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({
-        fuehrungsstelle: { zustand: 'daten', daten: { sprechgruppen: [], fahrzeug_ids: [] } },
+        fuehrungsstelle: {
+          zustand: 'daten',
+          daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] },
+        },
       }),
       konv,
     );

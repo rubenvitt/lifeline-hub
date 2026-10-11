@@ -83,8 +83,8 @@ async fn neuer_einsatz_hat_leere_fuehrungsstelle() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"sprechgruppen": [], "fahrzeug_ids": []}),
-        "leere Angaben fehlen im JSON"
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
+        "leere Angaben fehlen im JSON, die Art steht mit ihrer Vorgabe (LFH-1181)"
     );
 }
 
@@ -240,7 +240,7 @@ async fn fremde_sprechgruppe_ist_422_und_speichert_nichts() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"sprechgruppen": [], "fahrzeug_ids": []}),
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
         "auch der Rufname aus demselben Aufruf ist nicht gespeichert"
     );
 }
@@ -281,7 +281,10 @@ async fn null_leert_die_sprechgruppen() {
 
     let (status, json) = patchen(&app, &admin, einsatz, json!({"sprechgruppe_ids": null})).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
-    assert_eq!(json, json!({"sprechgruppen": [], "fahrzeug_ids": []}));
+    assert_eq!(
+        json,
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
+    );
 }
 
 #[tokio::test]
@@ -293,7 +296,10 @@ async fn leerer_patch_legt_nichts_an() {
 
     let (status, json) = patchen(&app, &admin, einsatz, json!({})).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
-    assert_eq!(json, json!({"sprechgruppen": [], "fahrzeug_ids": []}));
+    assert_eq!(
+        json,
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
+    );
     let zeilen: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?")
             .bind(einsatz)
@@ -334,7 +340,7 @@ async fn ein_fehler_im_schreiben_hinterlaesst_nichts() {
 
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"sprechgruppen": [], "fahrzeug_ids": []})
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
     );
 }
 
@@ -406,7 +412,7 @@ async fn fahrzeuge_ersetzen_die_zuordnung_und_liefern_nur_ids() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"sprechgruppen": [], "fahrzeug_ids": [elw.min(kdow), elw.max(kdow)]}),
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": [elw.min(kdow), elw.max(kdow)]}),
         "nur IDs, aufsteigend, entdoppelt"
     );
 
@@ -442,7 +448,7 @@ async fn fahrzeug_eines_anderen_einsatzes_ist_422_und_speichert_nichts() {
     }
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"sprechgruppen": [], "fahrzeug_ids": []}),
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []}),
         "auch der Rufname bleibt ungespeichert"
     );
 }
@@ -636,6 +642,282 @@ async fn schwaerzung_nullt_nur_die_erreichbarkeit() {
     assert_eq!(nachher.rufname.as_deref(), Some("Florian 10/1"));
     assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("digitalfunk"));
     assert_eq!(nachher.sprechgruppen.len(), 1);
+}
+
+#[tokio::test]
+async fn schwaerzung_nullt_den_standort_und_laesst_art_und_bezeichnung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, vorher) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({
+            "art": "ortsfest",
+            "bezeichnung": "ELW 2 Musterstadt",
+            "standort_adresse": "Hauptstraße 1, Musterstadt",
+            "standort_lat": 52.1,
+            "standort_lon": 9.9,
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{vorher:?}");
+
+    let mut tx = pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        einsatz,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let nachher = lifeline_hub::einsatz::fuehrungsstelle::load(&pool, einsatz)
+        .await
+        .unwrap();
+    assert_eq!(nachher.standort_adresse, None);
+    assert_eq!(nachher.standort_lat, None);
+    assert_eq!(nachher.standort_lon, None);
+    assert_eq!(nachher.bezeichnung.as_deref(), Some("ELW 2 Musterstadt"));
+    assert_eq!(
+        nachher.art,
+        lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellenArt::Ortsfest
+    );
+}
+
+// ---------- Art, Bezeichnung, Standort (LFH-1181) ----------
+
+#[tokio::test]
+async fn nur_die_art_macht_die_stelle_nicht_erfasst() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, json) = patchen(&app, &admin, einsatz, json!({"art": "ortsfest"})).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(
+        json,
+        json!({"art": "ortsfest", "sprechgruppen": [], "fahrzeug_ids": []}),
+        "keine weitere Angabe gesetzt"
+    );
+    assert_eq!(lesen(&app, &admin, einsatz).await.1["art"], "ortsfest");
+}
+
+#[tokio::test]
+async fn unbekannte_art_ist_400_und_speichert_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"art": "stationaer", "rufname": "Florian 10/1"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let json = lesen(&app, &admin, einsatz).await.1;
+    assert!(json.get("rufname").is_none(), "{json:?}");
+    assert_eq!(json["art"], "mobil");
+}
+
+#[tokio::test]
+async fn art_laesst_sich_nicht_leeren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    patchen(&app, &admin, einsatz, json!({"art": "ortsfest"})).await;
+
+    for leer in [json!(null), json!(""), json!("  ")] {
+        let (status, _) = patchen(&app, &admin, einsatz, json!({ "art": leer })).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "art = {leer}");
+    }
+    assert_eq!(lesen(&app, &admin, einsatz).await.1["art"], "ortsfest");
+}
+
+#[tokio::test]
+async fn bezeichnung_und_standort_einzeln_und_leeren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, json) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"bezeichnung": "  TEL Rathaus  "}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["bezeichnung"], "TEL Rathaus", "getrimmt");
+    assert!(json.get("standort_adresse").is_none());
+
+    let (status, json) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({
+            "standort_adresse": "Hauptstraße 1, Musterstadt",
+            "standort_lat": 52.1,
+            "standort_lon": 9.9,
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["bezeichnung"], "TEL Rathaus", "unverändert");
+    assert_eq!(json["standort_adresse"], "Hauptstraße 1, Musterstadt");
+    assert_eq!(json["standort_lat"], 52.1);
+    assert_eq!(json["standort_lon"], 9.9);
+
+    let (status, json) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"standort_lat": null, "standort_lon": null, "bezeichnung": ""}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert!(json.get("standort_lat").is_none(), "{json:?}");
+    assert!(json.get("standort_lon").is_none(), "{json:?}");
+    assert!(json.get("bezeichnung").is_none(), "{json:?}");
+    assert_eq!(json["standort_adresse"], "Hauptstraße 1, Musterstadt");
+}
+
+#[tokio::test]
+async fn bezeichnung_und_adresse_haben_grenzen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"bezeichnung": "x".repeat(201), "rufname": "Florian"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"standort_adresse": "x".repeat(501)}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(lesen(&app, &admin, einsatz)
+        .await
+        .1
+        .get("rufname")
+        .is_none());
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"bezeichnung": "x".repeat(200), "standort_adresse": "y".repeat(500)}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "genau an der Grenze");
+}
+
+#[tokio::test]
+async fn halbe_koordinate_ist_422_am_stand_nach_der_aenderung() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"standort_lat": 52.1, "bezeichnung": "ELW 2"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(lesen(&app, &admin, einsatz)
+        .await
+        .1
+        .get("bezeichnung")
+        .is_none());
+    assert_eq!(kopf_events(&mut rx), 0);
+
+    // Mit gespeicherter Koordinate ändert ein einzelner Wert nur seine Hälfte.
+    patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"standort_lat": 52.1, "standort_lon": 9.9}),
+    )
+    .await;
+    let (status, json) = patchen(&app, &admin, einsatz, json!({"standort_lat": 52.2})).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["standort_lat"], 52.2);
+    assert_eq!(json["standort_lon"], 9.9);
+
+    let (status, _) = patchen(&app, &admin, einsatz, json!({"standort_lon": null})).await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "nur eine Hälfte leeren"
+    );
+}
+
+#[tokio::test]
+async fn koordinate_ausserhalb_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    for (lat, lon) in [(95.0, 9.9), (52.1, 181.0), (-90.5, 0.0)] {
+        let (status, _) = patchen(
+            &app,
+            &admin,
+            einsatz,
+            json!({"standort_lat": lat, "standort_lon": lon}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{lat}/{lon}");
+    }
+}
+
+#[tokio::test]
+async fn nur_die_adresse_wird_gespeichert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"standort_adresse": "Rathaus, Marktplatz 1"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let json = lesen(&app, &admin, einsatz).await.1;
+    assert_eq!(json["standort_adresse"], "Rathaus, Marktplatz 1");
+    assert!(json.get("standort_lat").is_none(), "{json:?}");
+}
+
+#[tokio::test]
+async fn feldfehler_400_geht_vor_dem_zusammenhang_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"art": "stationaer", "standort_lat": 95.0, "standort_lon": 0.0}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 // ---------- Einsatzleiter (LFH-1199) ----------
@@ -1030,7 +1312,7 @@ async fn scheitert_der_etb_eintrag_scheitert_die_aenderung() {
 
     assert_eq!(
         lesen(&app, &admin, einsatz).await.1,
-        json!({"sprechgruppen": [], "fahrzeug_ids": []})
+        json!({"art": "mobil", "sprechgruppen": [], "fahrzeug_ids": []})
     );
 }
 

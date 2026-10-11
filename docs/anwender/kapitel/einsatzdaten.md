@@ -44,12 +44,17 @@ anderer Text eintragen.
 
 1. In „Einsatzdaten“ zum Paneel „Eigene Führungsstelle“ gehen.
 
-   ![Paneel „Eigene Führungsstelle“ mit Einsatzleiter, Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und Fahrzeug](../bilder/einsatzdaten/fuehrungsstelle.png)
+   ![Paneel „Eigene Führungsstelle“ mit Einsatzleiter, Art, Bezeichnung, Standort, Funkangaben und Führungsfahrzeug](../bilder/einsatzdaten/fuehrungsstelle.png)
 
-2. „Rufname“, „Sprechgruppen“, „Kommunikationsmittel“, „Erreichbarkeit“ und „Fahrzeuge“ Zeile
-   für Zeile eintragen und speichern wie jede andere Angabe. Beim „Rufname“ schlägt die Liste
-   die Funkrufnamen der Führungsfahrzeuge vor; Tippen grenzt sie ein, ein Eintrag übernimmt den
-   Funkrufnamen unverändert, freier Text bleibt möglich.
+2. Unter „Art“ „mobil“ oder „ortsfest“ wählen. Die Wahl gilt sofort.
+3. „Bezeichnung“ eintragen, etwa „ELW 2 Musterstadt“ oder „TEL Rathaus“.
+4. Bei „Standort“ die Adresse und die Koordinate eintragen. „wie Einsatzort“ übernimmt beides
+   vom Einsatzort; danach „Speichern“ wählen.
+5. „Rufname“, „Sprechgruppen“, „Kommunikationsmittel“, „Erreichbarkeit“ und
+   „Führungsfahrzeuge“ Zeile für Zeile eintragen und speichern wie jede andere Angabe. Bei
+   „ortsfest“ stehen die Führungsfahrzeuge eingeklappt; ein Klick auf die Anzahl öffnet sie.
+   Beim „Rufname“ schlägt die Liste die Funkrufnamen der Führungsfahrzeuge vor; Tippen grenzt
+   sie ein, ein Eintrag übernimmt den Funkrufnamen unverändert, freier Text bleibt möglich.
 
 ### Den Einsatzleiter festlegen oder übergeben
 
@@ -111,9 +116,12 @@ aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder d
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie
   schreiben keinen Eintrag ins Einsatztagebuch, mit einer Ausnahme: der Einsatzleiter.
 - Die „Einsatznummer“ unter „Technische Angaben“ vergibt das System; sie lässt sich nicht ändern.
-- Die **eigene Führungsstelle** speist Funkplan, Fernmeldeskizze und Kommunikationsplan (siehe
-  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); dort wird sie nicht
-  bearbeitet. „Fahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
+- Die **eigene Führungsstelle** ist der Ort, an dem die Einsatzleitung arbeitet: mobil in einem
+  Führungsfahrzeug oder ortsfest in einem Gebäude. Ihre Bezeichnung erscheint in Funkplan,
+  Fernmeldeskizze und Organigramm, ihr Standort auf der Lagekarte und am Punkt „Standort der
+  Führungsstelle festgelegt“ der Checkliste Arbeitsaufnahme (siehe
+  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); bearbeitet wird sie nur hier.
+  „Führungsfahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.
 - Der **Einsatzleiter** ist die Person, die den Einsatz nach FwDV 100 führt. Die Rolle
   Einsatzleitung im „Zugriff“ ist nur ein Recht und macht niemanden zum Einsatzleiter. Die
@@ -127,6 +135,11 @@ aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder d
   ist; sonst steht „Personal nicht freigegeben — nur Freitext“. Wird die Person aus dem Einsatz
   entlassen, bleibt ihr Name mit „nicht mehr disponiert“ stehen. Bei der Schwärzung des Einsatzes
   wird der Name gelöscht.
+- „wie Einsatzort“ übernimmt Adresse und Koordinate einmal. Wird der Einsatzort danach
+  geändert, bleibt der Standort der Führungsstelle, wo er ist.
+- Die Adresse gehört ins Feld „Standort“, nicht in die „Bezeichnung“: Beim Löschen der
+  personenbezogenen Daten nach Ablauf der Frist werden Adresse und Koordinate der Führungsstelle
+  geleert, Art und Bezeichnung bleiben stehen.
 - Die Vorschläge für den **Rufname** stehen in Gruppen, in dieser Folge: die Fahrzeuge, die der
   Führungsstelle zugeordnet sind, die übrigen disponierten Führungsfahrzeuge, dann die
   Führungsfahrzeuge der Organisation, die im Dienst und nicht disponiert sind, und zuletzt deren

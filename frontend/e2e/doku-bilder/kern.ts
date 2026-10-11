@@ -213,6 +213,28 @@ export async function fuelle<T = unknown>(
 }
 
 /**
+ * Bezeichnung und Standort der eigenen Führungsstelle des Demo-Einsatzes (LFH-1181), nur wenn sie
+ * fehlen. Eine Quelle für alle Kapitel, die sie zeigen (Einsatzdaten, Funkplan, Stab,
+ * Organigramm, Lagekarte): der Lauf teilt eine Datenbank, und jedes Kapitel soll dieselbe Stelle
+ * zeigen, gleich in welcher Reihenfolge die Kapitel laufen. Der ELW steht neben der Einsatzstelle.
+ */
+export async function fuehrungsstelleOrtFuellen(
+  quelle: Page | APIRequestContext,
+  einsatzId: number,
+): Promise<void> {
+  const pfad = `/api/einsaetze/${einsatzId}/fuehrungsstelle`;
+  const fs = (await (await apiVon(quelle).get(pfad)).json()) as { bezeichnung?: string };
+  if (fs.bezeichnung) return;
+  await fuelle(quelle, 'patch', pfad, {
+    art: 'mobil',
+    bezeichnung: 'ELW 2 Musterstadt',
+    standort_adresse: 'Musterstadt, Parkplatz Feuerwehrhaus Nord',
+    standort_lat: 50.9531,
+    standort_lon: 10.2452,
+  });
+}
+
+/**
  * Setzt den Einsatzleiter der Führungsstelle (LFH-1199), falls noch keiner erfasst ist: der
  * Zugführer der Demo-Daten, seit dem Import. Wer Einsatzdaten, Organigramm oder Funkplan
  * fotografiert, ruft es, damit alle Bilder denselben Einsatzleiter zeigen.

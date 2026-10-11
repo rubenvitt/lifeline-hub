@@ -111,7 +111,7 @@ beforeEach(() => {
   vi.mocked(ladeStab).mockReset().mockResolvedValue(STAB);
   vi.mocked(ladeFuehrungsstelle)
     .mockReset()
-    .mockResolvedValue({ sprechgruppen: [], fahrzeug_ids: [] });
+    .mockResolvedValue({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] });
 });
 
 const MELDEBILD = () =>
@@ -166,6 +166,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
 
   it('nennt den Einsatzleiter der Führungsstelle (LFH-1199)', async () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
       sprechgruppen: [],
       fahrzeug_ids: [],
       einsatzleiter: {
@@ -193,6 +194,27 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     expect(ladeStab).not.toHaveBeenCalled();
     expect(text).toBe(`${MELDEBILD()}\n${ORG({ stab: null })}`);
     expect(text).not.toContain('Stab:');
+  });
+
+  it('nennt die erfasste Führungsstelle wie die Einzelübernahme; gescheitert bleibt sie weg (LFH-1181)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
+      bezeichnung: 'ELW 2 Musterstadt',
+      rufname: 'Florian 10/1',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+    });
+    const text = await erzeuge();
+    expect(text).toBe(
+      `${MELDEBILD()}\n${ORG({ fuehrungsstelle: { bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian 10/1' } })}`,
+    );
+    expect(text).toContain('- Führungsstelle ELW 2 Musterstadt · Rufname Florian 10/1\n');
+
+    // Gescheitert: keine Zeile der Führungsstelle, die Leitung nennt den Grund (LFH-1199).
+    vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new Error('500'));
+    expect(await erzeuge()).toBe(
+      `${MELDEBILD()}\n${ORG({ einsatzleiter: { art: 'zustand', grund: 'nicht geladen' } })}`,
+    );
   });
 
   it('überlässt fehlende Einheiten dem Renderer der Führungsorganisation', async () => {

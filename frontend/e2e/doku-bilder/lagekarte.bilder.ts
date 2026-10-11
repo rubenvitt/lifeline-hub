@@ -4,7 +4,16 @@ import {
   kartenConfigBeantworten,
   vektorStilBeantworten,
 } from '../kartenFixture';
-import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
+import {
+  anmelden,
+  demoEinsatz,
+  expect,
+  fotografiere,
+  fuehrungsstelleOrtFuellen,
+  fuelle,
+  test,
+  uhrAnhalten,
+} from './kern';
 
 /**
  * Bilder des Kapitels „Lagekarte, Zeichnen und Messen“ (`docs/anwender/kapitel/lagekarte.md`).
@@ -72,6 +81,8 @@ async function oeffneKarte(page: Page): Promise<Locator> {
   await anmelden(page);
   const demo = await demoEinsatz(page);
   await lageVerorten(page, demo.id);
+  // Die eigene Führungsstelle steht als Befehlsstelle neben der Einsatzstelle (LFH-1181).
+  await fuehrungsstelleOrtFuellen(page, demo.id);
   await uhrAnhalten(page);
   await page.goto(`/einsaetze/${demo.id}/lagekarte`);
   const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');

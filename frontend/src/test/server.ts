@@ -24,6 +24,14 @@ export const server = setupServer(
    */
   http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
   /**
+   * Eigene Führungsstelle (LFH-849/LFH-1181) — nicht erfasst als Default, der echte Zustand eines
+   * neuen Einsatzes. Checkliste, Organigramm und Lagekarte lesen sie mit; Tests mit Angaben
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
+    HttpResponse.json({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] }),
+  ),
+  /**
    * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,
    * also keine Hinweiskarte und kein Punkt). Tests der Neuigkeiten überschreiben per `server.use()`.
    */

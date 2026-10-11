@@ -2303,8 +2303,18 @@ export interface components {
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
-        /** @description Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON. */
+        /**
+         * @description Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON; die Art steht
+         *     immer.
+         */
         FuehrungsstelleAnzeige: {
+            /**
+             * @description Ohne gespeicherte Zeile die Vorgabe `mobil`. Zählt nicht dafür, ob die Führungsstelle
+             *     erfasst ist (Spec `einsatz-fuehrungsstelle`).
+             */
+            art: components["schemas"]["FuehrungsstellenArt"];
+            /** @description Name der Stelle, z. B. „ELW 2 Musterstadt“ oder „TEL Rathaus“. */
+            bezeichnung?: string | null;
             einsatzleiter?: components["schemas"]["EinsatzleiterAnzeige"] | null;
             /** @description Personenbezogen: wird geschwärzt und steht nie im Lagebericht. */
             erreichbarkeit?: string | null;
@@ -2323,7 +2333,26 @@ export interface components {
              *     Einheit.
              */
             sprechgruppen: components["schemas"]["SprechgruppeAnzeige"][];
+            /** @description Adresse des Standorts. Wird geschwärzt (kann eine Privatadresse sein). */
+            standort_adresse?: string | null;
+            /**
+             * Format: double
+             * @description Koordinate des Standorts, nur als Paar gesetzt. Wird mit der Adresse geschwärzt.
+             */
+            standort_lat?: number | null;
+            /**
+             * Format: double
+             * @description Länge zur Breite `standort_lat`, nur als Paar gesetzt.
+             */
+            standort_lon?: number | null;
         };
+        /**
+         * @description Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`
+         *     (Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in
+         *     `migrations/0179_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+         * @enum {string}
+         */
+        FuehrungsstellenArt: "mobil" | "ortsfest";
         /**
          * @description Art der Führungsfunktion nach FwDV 100 Anlage 1 (Nr. 1.1.4/1.1.5). Aus dem Code
          *     abgeleitet, nie gespeichert und nie vom Client gesetzt.

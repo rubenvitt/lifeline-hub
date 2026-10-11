@@ -152,6 +152,11 @@ export type NetzStelle =
       art: 'fuehrungsstelle';
       id: null;
       erfasst: boolean;
+      /**
+       * Bezeichnung der Führungsstelle („TEL Rathaus“, LFH-1181) als eigene Zeile unter der
+       * Überschrift „Einsatzleitung“; nur bei Erfassung, sonst `null`. Nie abgeleitet.
+       */
+      zusatz: string | null;
       /** Warum keine Gegenstelle dasteht, sonst `null`. */
       hinweis: string | null;
       tz: TzProps;
@@ -484,6 +489,7 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
     id: null,
     bezeichnung: EINSATZLEITUNG,
     rufname: fsErfasst ? (fsDaten?.rufname ?? null) : null,
+    zusatz: fsErfasst ? fsDaten?.bezeichnung?.trim() || null : null,
     ziel: einsatzdatenPfad(q.einsatzId),
     recht: 'verwaltung',
     schreibbar: schreibbar('verwaltung'),

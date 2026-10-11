@@ -244,6 +244,14 @@ export function einsatzortTz(): TzProps {
 }
 
 /**
+ * Eigene Führungsstelle (LFH-1181): DV-102-Grundzeichen „Befehlsstelle“ (BABZ D.1.1), die Stelle,
+ * an der die Einsatzleitung arbeitet — mobil wie ortsfest dasselbe Zeichen.
+ */
+export function fuehrungsstelleTz(): TzProps {
+  return { grundzeichen: 'befehlsstelle' };
+}
+
+/**
  * Schaden: Warn-Dreieck „gefahr"; das Ausmaß steuert nur die Farbe (die Form trägt die Bedeutung,
  * farbenblind-tauglich). Die Farbe ist immer gesetzt.
  */

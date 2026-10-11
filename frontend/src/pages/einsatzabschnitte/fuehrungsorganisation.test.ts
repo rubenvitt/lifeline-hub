@@ -298,6 +298,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(md.startsWith('# Führungsorganisation\n')).toBe(true);
     expect(md).toContain('**Stand:** 011200Okt26');
     expect(md).toContain('## Einsatzleitung\n\n- Leitung nicht erfasst\n');
+    expect(md).not.toContain('Führungsstelle');
     expect(md).not.toContain('Stab:');
     expect(md).not.toContain('## Quellen');
     expect(md).toContain('- **EA Nord** · Rufname EA-N · Leitung Anna Leiter · Stärke 1/2/6//9');
@@ -442,5 +443,31 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(container.querySelector('a')).toBeNull();
     const text = (container.textContent ?? '').replace(/\u2060/g, '');
     for (const wert of roh) expect(text, wert).toContain(wert);
+  });
+});
+
+describe('rendereFuehrungsorganisationMarkdown · Führungsstelle (LFH-1181)', () => {
+  it('nennt Bezeichnung und Rufname vor der Leitung, ohne Bezeichnung nur den Rufnamen', () => {
+    const org = baueFuehrungsorganisation([], []);
+    const mit = rendereFuehrungsorganisationMarkdown(org, {
+      stand: 'x',
+      stab: null,
+      einheitenZustand: 'daten',
+      einsatzleiter: { art: 'nicht-erfasst' },
+      dtg: (utc) => utc,
+      fuehrungsstelle: { bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian 10/1' },
+    });
+    expect(mit).toContain(
+      '## Einsatzleitung\n\n- Führungsstelle ELW 2 Musterstadt · Rufname Florian 10/1\n- Leitung nicht erfasst\n',
+    );
+    const ohne = rendereFuehrungsorganisationMarkdown(org, {
+      stand: 'x',
+      stab: null,
+      einheitenZustand: 'daten',
+      einsatzleiter: { art: 'nicht-erfasst' },
+      dtg: (utc) => utc,
+      fuehrungsstelle: { bezeichnung: null, rufname: 'Florian 10/1' },
+    });
+    expect(ohne).toContain('- Führungsstelle · Rufname Florian 10/1\n');
   });
 });

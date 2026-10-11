@@ -1709,7 +1709,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Eigene Führungsstelle (LFH-849): Rufname und Kommunikationsmittel sind Führungsstruktur wie
-    // an Abschnitt und Einheit, die Erreichbarkeit eine mögliche Rufnummer (Scrub).
+    // an Abschnitt und Einheit, die Erreichbarkeit eine mögliche Rufnummer (Scrub). Art und
+    // Bezeichnung (LFH-1181) sind Struktur wie an UHS und Bereitstellungsraum; der Standort kann
+    // eine Privatadresse sein („wie Einsatzort“), GPS mit-nullen wie beim Einsatzort.
     TabellenRegel {
         tabelle: "einsatz_fuehrungsstelle",
         scoping: Scoping::EinsatzId,
@@ -1723,6 +1725,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
+            retain("art", G_ENUM),
+            retain("bezeichnung", G_OP_LABEL),
+            scrub("standort_adresse", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("standort_lat", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("standort_lon", Strategie::NullSetzen, Z_EINSATZ),
             // Einsatzleiter (LFH-1199): Art, Person (FK) und „seit“ bleiben als anonymer
             // Führungsnachweis wie bei der Stab-Besetzung; der Name ist PII.
             retain("einsatzleiter_art", G_ENUM),

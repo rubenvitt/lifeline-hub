@@ -29,6 +29,7 @@ import {
 
 const ALLE_AN: LayerSichtbar = {
   einsatzort: true,
+  fuehrungsstelle: true,
   uhs: true,
   schaden: true,
   einheit: true,
@@ -81,6 +82,22 @@ describe('ebenenZeilen', () => {
     expect(zone.sichtbar).toBe(false);
   });
 
+  it('führt die Führungsstelle als eigene Zeile mit ihrer Zahl, gleich nach dem Einsatzort (LFH-1181)', () => {
+    const zeilen = ebenenZeilen(
+      [marker('einsatzort'), marker('fuehrungsstelle')],
+      0,
+      ALLE_AN,
+      false,
+    );
+    expect(zeilen.slice(0, 2)).toMatchObject([
+      { key: 'einsatzort', anzahl: 1 },
+      { key: 'fuehrungsstelle', name: 'Führungsstelle', anzahl: 1, sichtbar: true },
+    ]);
+    expect(verortetAnzahl([marker('einsatzort'), marker('fuehrungsstelle'), marker('uhs')])).toBe(
+      1,
+    );
+  });
+
   it('zeigt im Fehlerfall „—" statt einer Null, die niemand geprüft hat', () => {
     const zeilen = ebenenZeilen([marker('uhs')], 2, ALLE_AN, true);
     expect(zeilen.every((z) => z.anzahl === '—')).toBe(true);
@@ -90,7 +107,7 @@ describe('ebenenZeilen', () => {
   it('„Betroffene" ohne Personenangabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
     const zeilen = ebenenZeilen([], 0, ALLE_AN, false);
     expect(zeilen.map((z) => z.key)).not.toContain('person');
-    expect(zeilen).toHaveLength(10);
+    expect(zeilen).toHaveLength(11);
   });
 
   it('„Betroffene" frei: Zeile mit der Zahl der übergebenen Personen-Marker, Schaltzustand vom Schalter', () => {
@@ -101,7 +118,7 @@ describe('ebenenZeilen', () => {
     const person = zeilen.find((z) => z.key === 'person')!;
     expect(person).toMatchObject({ name: 'Betroffene', anzahl: 3, sichtbar: false });
     expect(person.sperrgrund).toBeUndefined();
-    expect(zeilen).toHaveLength(11);
+    expect(zeilen).toHaveLength(12);
   });
 
   it('„Betroffene" gesperrt: Zeile mit Grund und OHNE Zahl — auch bei eingeschaltetem Schalter', () => {

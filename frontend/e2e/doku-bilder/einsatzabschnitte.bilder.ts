@@ -5,6 +5,7 @@ import {
   einsatzleiterFuellen,
   expect,
   fotografiere,
+  fuehrungsstelleOrtFuellen,
   test,
   uhrAnhalten,
 } from './kern';
@@ -83,13 +84,15 @@ test.describe(KAPITEL, () => {
   test('Organigramm der Führungsorganisation', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
+    // Die Wurzel nennt die eigene Führungsstelle (LFH-1181) und den Einsatzleiter (LFH-1199).
+    await fuehrungsstelleOrtFuellen(page, demo.id);
     await einsatzleiterFuellen(page.request, demo);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einsatzabschnitte?ansicht=organigramm`);
     const organigramm = page.locator('.organigramm-print-root');
-    await expect(organigramm.getByRole('group', { name: 'Einsatzleitung' })).toContainText(
-      'Max Mustermann',
-    );
+    const wurzel = organigramm.getByRole('group', { name: 'Einsatzleitung' });
+    await expect(wurzel.getByText('ELW 2 Musterstadt')).toBeVisible();
+    await expect(wurzel).toContainText('Max Mustermann');
     await expect(organigramm.getByText('UHS Turnhalle').first()).toBeVisible();
     await fotografiere(organigramm, KAPITEL, 'organigramm');
   });

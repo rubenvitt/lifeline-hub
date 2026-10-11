@@ -46,6 +46,7 @@ const basisProps: SidebarProps = {
   onEinsatzortPlatzieren: vi.fn(),
   layer: {
     einsatzort: true,
+    fuehrungsstelle: true,
     uhs: true,
     schaden: true,
     einheit: true,
@@ -1243,16 +1244,17 @@ describe('Sidebar: Paneel „Ebenen"', () => {
     const zeilen = within(
       screen.getByRole('group', { name: 'Ebenen ein- und ausblenden' }),
     ).getAllByRole('switch');
-    expect(zeilen).toHaveLength(10);
+    // Zehn Ebenen und die Führungsstelle (LFH-1181).
+    expect(zeilen).toHaveLength(11);
     for (const z of zeilen) expect(z).toHaveTextContent('—');
     expect(screen.getByRole('switch', { name: 'UHS' })).not.toHaveTextContent('1');
   });
 
   // Ebene „Betroffene" — die Zeile folgt dem Zugriff, gepaart gegen die Vorgabe.
-  it('„Betroffene" frei: elfte schaltbare Zeile mit Anzahl; ohne Angabe bleibt es bei zehn', () => {
+  it('„Betroffene" frei: zwölfte schaltbare Zeile mit Anzahl; ohne Angabe bleibt es bei elf', () => {
     const { unmount } = renderMitProviders(<Sidebar {...basisProps} />);
     const gruppe = () => screen.getByRole('group', { name: 'Ebenen ein- und ausblenden' });
-    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(10);
+    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(11);
     expect(within(gruppe()).queryByRole('switch', { name: 'Betroffene' })).toBeNull();
     unmount();
 
@@ -1264,7 +1266,7 @@ describe('Sidebar: Paneel „Ebenen"', () => {
         personen={{ zugriff: 'frei', anzahl: 3 }}
       />,
     );
-    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(11);
+    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(12);
     const zeile = screen.getByRole('switch', { name: 'Betroffene' });
     expect(zeile).toHaveTextContent('Betroffene3');
     expect(zeile).toHaveAttribute('aria-checked', 'false');

@@ -6065,12 +6065,24 @@
       },
       "FuehrungsstelleAnzeige": {
         "type": "object",
-        "description": "Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON.",
+        "description": "Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON; die Art steht\nimmer.",
         "required": [
+          "art",
           "sprechgruppen",
           "fahrzeug_ids"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/FuehrungsstellenArt",
+            "description": "Ohne gespeicherte Zeile die Vorgabe `mobil`. Zählt nicht dafür, ob die Führungsstelle\nerfasst ist (Spec `einsatz-fuehrungsstelle`)."
+          },
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Stelle, z. B. „ELW 2 Musterstadt“ oder „TEL Rathaus“."
+          },
           "einsatzleiter": {
             "oneOf": [
               {
@@ -6117,8 +6129,39 @@
               "$ref": "#/components/schemas/SprechgruppeAnzeige"
             },
             "description": "Zugeordnete Sprechgruppen (Katalog oder einsatzlokal), sortiert wie an Abschnitt und\nEinheit."
+          },
+          "standort_adresse": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Adresse des Standorts. Wird geschwärzt (kann eine Privatadresse sein)."
+          },
+          "standort_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Koordinate des Standorts, nur als Paar gesetzt. Wird mit der Adresse geschwärzt."
+          },
+          "standort_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Länge zur Breite `standort_lat`, nur als Paar gesetzt."
           }
         }
+      },
+      "FuehrungsstellenArt": {
+        "type": "string",
+        "description": "Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`\n(Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in\n`migrations/0179_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.",
+        "enum": [
+          "mobil",
+          "ortsfest"
+        ]
       },
       "FunktionsArt": {
         "type": "string",

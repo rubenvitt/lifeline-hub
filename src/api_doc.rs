@@ -109,6 +109,7 @@ use utoipa::OpenApi;
         crate::einsatz::retention::Datenkategorie,
         crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige,
         crate::einsatz::fuehrungsstelle::FuehrungsstelleAnzeige,
+        crate::einsatz::fuehrungsstelle::FuehrungsstellenArt,
         crate::einsatz::fuehrungsstelle::EinsatzleiterAnzeige,
         crate::einsatz::fuehrungsstelle::EinsatzleiterArt,
         crate::einsatz::einstellungen::BasemapModus,

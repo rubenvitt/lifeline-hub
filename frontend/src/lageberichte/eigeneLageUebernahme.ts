@@ -14,6 +14,7 @@ import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebil
 import {
   baueFuehrungsorganisation,
   rendereFuehrungsorganisationMarkdown,
+  wurzelFuehrungsstelle,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
 import { einsatzleiterDarstellung } from '../stab/einsatzleiter';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
@@ -96,7 +97,8 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
         stabFrei
           ? ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
           : Promise.resolve(null),
-        // Die Führungsstelle braucht kein Modul (LFH-849); sie trägt den Einsatzleiter (LFH-1199).
+        // Die Führungsstelle braucht kein Modul (LFH-849); sie trägt den Einsatzleiter (LFH-1199)
+        // und die Wurzel (LFH-1181). Gescheitert bleibt die Wurzel wie ohne sie, wie im Organigramm.
         ladeListe(
           qc,
           einsatzKeys.fuehrungsstelle(einsatzId),
@@ -148,6 +150,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
                     ? stab.daten.besetzung
                     : 'fehler',
               einheitenZustand: einheiten.zustand,
+              fuehrungsstelle: wurzelFuehrungsstelle(fuehrungsstelle.daten),
               einsatzleiter: einsatzleiterDarstellung(fuehrungsstelle),
               dtg,
             },

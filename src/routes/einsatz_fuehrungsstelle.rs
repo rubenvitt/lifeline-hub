@@ -6,17 +6,22 @@
 //! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3).
 //! Der Einsatzleiter (LFH-1199) schreibt bei einem Wechsel zusätzlich einen Übergabe-Eintrag ins
 //! ETB und meldet ihn nach dem Commit: `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md`
-//! (D2, D3).
+//! (D2, D3). Art, Bezeichnung und Standort:
+//! `openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md` (D1, D2).
 
 use crate::app::AppState;
 use crate::einsatz::fuehrungsstelle::{
     self, EinsatzleiterArt, EinsatzleiterEingabe, FuehrungsstelleAnzeige, FuehrungsstellePatch,
-    Schreiber, EINSATZLEITER_NAME_MAX,
+    FuehrungsstellenArt, Schreiber, EINSATZLEITER_NAME_MAX, FUEHRUNGSSTELLE_ADRESSE_MAX,
+    FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
 };
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
-use crate::routes::support::{deserialize_optional_field, pruefe_kommunikationsmittel, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, hoechstens, parse_enum, pruefe_kommunikationsmittel,
+    pruefe_koordinate, trimme_tri,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -25,6 +30,18 @@ use serde::Deserialize;
 /// PATCH-Body, Tri-State je Feld: absent = unverändert, `null`/`""` = leeren.
 #[derive(Debug, Deserialize)]
 pub struct FuehrungsstellePatchBody {
+    /// `mobil` | `ortsfest`; `null` oder leer ist 400, denn die Art ist nie leer (D1).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub art: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bezeichnung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_adresse: Option<Option<String>>,
+    /// Koordinate des Standorts; geprüft als Paar am Stand nach der Änderung (422).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_lon: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub rufname: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -156,6 +173,26 @@ pub async fn aendern(
         .map(Option::unwrap_or_default)
         .map(fuehrungsstelle::normalisiere_fahrzeug_ids)
         .transpose()?;
+    // 400 je Feld vor jedem 422 des Zusammenhangs (`src/AGENTS.md`, Statuscode-Konvention).
+    let art = trimme_tri(body.art)
+        .map(|wert| {
+            let wert =
+                wert.ok_or_else(|| AppError::Validation("Art darf nicht leer sein".into()))?;
+            parse_enum(
+                FuehrungsstellenArt::parse,
+                &wert,
+                format!("Unbekannte Art der Führungsstelle: {wert}"),
+            )
+        })
+        .transpose()?;
+    let bezeichnung = trimme_tri(body.bezeichnung);
+    if let Some(Some(b)) = &bezeichnung {
+        hoechstens(b, "Bezeichnung", FUEHRUNGSSTELLE_BEZEICHNUNG_MAX)?;
+    }
+    let adresse = trimme_tri(body.standort_adresse);
+    if let Some(Some(a)) = &adresse {
+        hoechstens(a, "Adresse", FUEHRUNGSSTELLE_ADRESSE_MAX)?;
+    }
     let rufname = trimme_tri(body.rufname);
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
@@ -165,7 +202,12 @@ pub async fn aendern(
         .map(|e| e.map(check_einsatzleiter).transpose())
         .transpose()?;
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
-    if rufname.is_none()
+    if art.is_none()
+        && bezeichnung.is_none()
+        && adresse.is_none()
+        && body.standort_lat.is_none()
+        && body.standort_lon.is_none()
+        && rufname.is_none()
         && mittel.is_none()
         && erreichbarkeit.is_none()
         && ids.is_none()
@@ -187,6 +229,11 @@ pub async fn aendern(
         fuehrungsstelle::pruefe_fahrzeuge(&state.pool, einsatz_id, ids).await?;
     }
     let patch = FuehrungsstellePatch {
+        art,
+        bezeichnung: bezeichnung.as_ref().map(|v| v.as_deref()),
+        standort_adresse: adresse.as_ref().map(|v| v.as_deref()),
+        standort_lat: body.standort_lat,
+        standort_lon: body.standort_lon,
         rufname: rufname.as_ref().map(|v| v.as_deref()),
         kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
         erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
@@ -213,8 +260,16 @@ pub async fn aendern(
         etb_startwert: crate::einsatz::einstellungen::etb_startwert(&state.pool, einsatz_id)
             .await?,
     };
+    let koordinate_gesendet = body.standort_lat.is_some() || body.standort_lon.is_some();
     let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
-        fuehrungsstelle::patch_tx(conn, einsatz_id, schreiber, &patch).await
+        let (neu, etb_id) = fuehrungsstelle::patch_tx(conn, einsatz_id, schreiber, &patch).await?;
+        // Koordinate als Paar am Stand nach der Änderung, in derselben Transaktion (design.md
+        // D2): zwei Teiländerungen nacheinander hinterlassen nie eine halbe Koordinate, und ein
+        // Fehler rollt alles zurück, auch einen Übergabe-Eintrag im ETB.
+        if koordinate_gesendet {
+            pruefe_koordinate(neu.standort_lat, neu.standort_lon, "Breite", "Länge")?;
+        }
+        Ok((neu, etb_id))
     })?;
     // Erst nach dem Commit (Reinheits-Kontrakt), wie jeder `einsatz`-Emitter; der Übergabe-Eintrag
     // braucht seinen eigenen Kurzruf, sonst bliebe das ETB anderer Schirme still veraltet.

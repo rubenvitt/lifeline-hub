@@ -37,8 +37,10 @@ import {
   baueFuehrungsorganisation,
   rendereFuehrungsorganisationMarkdown,
   stabZeilen,
+  wurzelFuehrungsstelle,
   type Fuehrungsorganisation,
   type OrgKnoten,
+  type WurzelFuehrungsstelle,
 } from './fuehrungsorganisation';
 import './organigrammPrint.css';
 
@@ -52,8 +54,9 @@ import './organigrammPrint.css';
  *   Fernmeldeskizze des S6 (LFH-625 D4).
  * - **Einsatzleitung ohne erfundene Leitung** (D5, LFH-1199): die Wurzel zeigt den Einsatzleiter,
  *   der an der eigenen Führungsstelle erfasst ist (`stab/einsatzleiter.ts`), sonst die benannte
- *   Lücke — nie die App-Rolle. Der Stab steht nur mit Stab-Freigabe daneben — fail-closed über
- *   `useStabFreigabe`.
+ *   Lücke — nie die App-Rolle. Darüber stehen Bezeichnung und Rufname der Führungsstelle
+ *   (`openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md`, D6). Der Stab
+ *   steht nur mit Stab-Freigabe daneben — fail-closed über `useStabFreigabe`.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
  */
 
@@ -70,6 +73,7 @@ interface BildProps {
   /** Aus der Führungsstelle (LFH-1199); der Aufrufer lädt sie. */
   einsatzleiter: EinsatzleiterDarstellung;
   stab: StabsstelleZustand;
+  fuehrungsstelle?: WurzelFuehrungsstelle | null;
   zugeklappt: ReadonlySet<string>;
   onUmschalten: (key: string) => void;
 }
@@ -82,9 +86,11 @@ interface BildProps {
 function OrganigrammKopf({
   einsatzleiter,
   stab,
+  fuehrungsstelle,
 }: {
   einsatzleiter: EinsatzleiterDarstellung;
   stab: StabsstelleZustand;
+  fuehrungsstelle: WurzelFuehrungsstelle | null;
 }) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
@@ -114,6 +120,10 @@ function OrganigrammKopf({
         style={{ ...kasten, borderWidth: 2 }}
       >
         <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
+        {fuehrungsstelle?.bezeichnung && <div>{fuehrungsstelle.bezeichnung}</div>}
+        {fuehrungsstelle?.rufname && (
+          <div style={monoStil(token.fontSize)}>{fuehrungsstelle.rufname}</div>
+        )}
         {/* Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke: keine
             erfundene Leitung aus App-Rolle oder Stab. */}
         {einsatzleiter.art === 'erfasst' ? (
@@ -160,6 +170,7 @@ export function OrganigrammBild({
   org,
   einsatzleiter,
   stab,
+  fuehrungsstelle = null,
   zugeklappt,
   onUmschalten,
 }: BildProps) {
@@ -169,7 +180,13 @@ export function OrganigrammBild({
     <HaengenderBaum<OrgKnoten>
       bezeichnung="Organigramm"
       lfh="organigramm"
-      kopf={<OrganigrammKopf einsatzleiter={einsatzleiter} stab={stab} />}
+      kopf={
+        <OrganigrammKopf
+          einsatzleiter={einsatzleiter}
+          stab={stab}
+          fuehrungsstelle={fuehrungsstelle}
+        />
+      }
       wurzeln={org.wurzeln}
       zugeklappt={zugeklappt}
       onUmschalten={onUmschalten}
@@ -313,7 +330,8 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   const klappbar = useMemo(() => klappbareSchluessel(org.wurzeln), [org]);
 
   // Die Führungsstelle liest jeder mit dem Einsatz, ohne Modul (LFH-849); sie trägt den
-  // Einsatzleiter (LFH-1199).
+  // Einsatzleiter (LFH-1199) und Bezeichnung und Rufname der Wurzel (LFH-1181). Gescheitert
+  // oder nicht erfasst bleibt die Wurzel ohne diese Zeilen.
   const fuehrungsstelleQuery = useQuery({
     queryKey: einsatzKeys.fuehrungsstelle(einsatz.id),
     queryFn: () => ladeFuehrungsstelle(einsatz.id),
@@ -322,6 +340,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
     zustand: abrufZustand(fuehrungsstelleQuery),
     daten: fuehrungsstelleQuery.data ?? null,
   });
+  const fuehrungsstelle = wurzelFuehrungsstelle(fuehrungsstelleQuery.data);
 
   const stabFreigabe = useStabFreigabe(einsatz.id);
   const stabFrei = stabFreigabe.zustand === 'frei';
@@ -378,6 +397,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
                     ? 'fehler'
                     : null,
               einheitenZustand: einheiten.zustand,
+              fuehrungsstelle,
               einsatzleiter,
               dtg: (utc) => taktischeDtgVoll(utc, konventionen),
             }),
@@ -456,6 +476,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
         org={org}
         einsatzleiter={einsatzleiter}
         stab={stab}
+        fuehrungsstelle={fuehrungsstelle}
         zugeklappt={zugeklappt}
         onUmschalten={umschalten}
       />

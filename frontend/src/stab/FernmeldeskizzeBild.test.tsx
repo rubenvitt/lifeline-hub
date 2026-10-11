@@ -152,6 +152,26 @@ function bild(
 const element = (key: string) =>
   document.querySelector<SVGGElement>(`[data-lfh="skizze-element"][data-key="${key}"]`);
 const svg = () => document.querySelector<SVGSVGElement>('[data-lfh="skizze-flaeche"] svg')!;
+
+describe('FernmeldeskizzeBild · Bezeichnung der Führungsstelle (LFH-1181)', () => {
+  it('steht im Kasten „Einsatzleitung“ zwischen Überschrift und Rufname', () => {
+    const n = netz();
+    const fsStelle = n.stellen.find((s) => s.key === 'fs')!;
+    bild({
+      ...n,
+      stellen: n.stellen.map((s) =>
+        s.key === 'fs'
+          ? ({ ...fsStelle, zusatz: 'TEL Rathaus', rufname: 'Florian 10/1' } as typeof s)
+          : s,
+      ),
+    });
+    const texte = [...element('fs')!.querySelectorAll('text')].map((t) => t.textContent);
+    const i = (t: string) => texte.findIndex((x) => x?.includes(t));
+    expect(i('Einsatzleitung')).toBeGreaterThanOrEqual(0);
+    expect(i('TEL Rathaus')).toBeGreaterThan(i('Einsatzleitung'));
+    expect(i('Florian 10/1')).toBeGreaterThan(i('TEL Rathaus'));
+  });
+});
 /** Tritt das Element zurück? Die Deckkraft trägt sein Bild, die Gruppe nur die Marke. */
 const zurueck = (key: string) => element(key)?.hasAttribute('data-zurueck') ?? false;
 /** Deckkraft, mit der ein Teil der Skizze steht: Produkt der `opacity` bis zum `svg`. */

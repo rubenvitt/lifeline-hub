@@ -134,8 +134,9 @@ sofort.
 ### Das Organigramm
 
 Das Organigramm wird nicht gepflegt, es entsteht aus Abschnitten, Einheiten, der eigenen
-Führungsstelle und der Besetzung des Stabs. Im Kasten der Einsatzleitung steht der Einsatzleiter
-mit „seit“, wie er in „Einsatzdaten“ festgelegt ist (siehe
+Führungsstelle und der Besetzung des Stabs. Im Kasten der Einsatzleitung stehen Bezeichnung und
+Rufname der eigenen Führungsstelle, sobald sie in den Einsatzdaten erfasst sind, und darunter der
+Einsatzleiter mit „seit“, wie er in „Einsatzdaten“ festgelegt ist (siehe
 [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Ist keiner festgelegt, steht dort „Leitung
 nicht erfasst“; die Rolle Einsatzleitung im „Zugriff“ macht niemanden zum Einsatzleiter. An der
 Wurzel steht keine Stärke; die Gesamtstärke zeigt das Meldebild.

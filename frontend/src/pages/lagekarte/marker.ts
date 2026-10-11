@@ -8,6 +8,7 @@ import type {
   EinsatzFahrzeug,
   FreiesZeichen,
   FuehrungskraftKarte,
+  Fuehrungsstelle,
   LageMeldung,
   SchadenMarker,
   Sichtungskategorie,
@@ -16,6 +17,7 @@ import type {
 import {
   baueTzProps,
   einsatzortTz,
+  fuehrungsstelleTz,
   schadenTz,
   uhsTz,
   betreuungsstelleTz,
@@ -31,6 +33,11 @@ import {
 
 export type MarkerTyp =
   | 'einsatzort'
+  /**
+   * Eigene Führungsstelle (LFH-1181, `baueFuehrungsstelleMarker`): nur lesend wie der Einsatzort,
+   * in dessen fester Quelle, ohne Cluster, ohne Ziehen und Platzieren.
+   */
+  | 'fuehrungsstelle'
   | 'uhs'
   | 'schaden'
   | 'einheit'
@@ -122,6 +129,29 @@ export interface NichtVerortet {
  */
 const EINSATZORT_ROLLE = 'marke' as const;
 const UHS_ROLLE = 'bedien' as const;
+
+/**
+ * Die eigene Führungsstelle als lesender Marker (LFH-1181, design.md D7): nur mit Koordinate,
+ * beschriftet mit ihrer Bezeichnung, sonst „Führungsstelle“. Farbe wie der Einsatzort (`marke`):
+ * ein Ankerpunkt des eigenen Einsatzes. Bearbeitet wird im Paneel der Einsatzdaten.
+ */
+export function baueFuehrungsstelleMarker(
+  fs: Fuehrungsstelle | undefined | null,
+  token: GlobalToken,
+): KarteMarker | null {
+  if (fs?.standort_lat == null || fs.standort_lon == null) return null;
+  return {
+    schluessel: 'fuehrungsstelle',
+    typ: 'fuehrungsstelle',
+    id: 0,
+    lat: fs.standort_lat,
+    lon: fs.standort_lon,
+    label: fs.bezeichnung?.trim() || 'Führungsstelle',
+    farbe: rollenFarbe(EINSATZORT_ROLLE, token),
+    tz: fuehrungsstelleTz(),
+    trefferDurchmesser: token.controlHeight,
+  };
+}
 
 /** Leitet verortete Marker + Nicht-verortet-Liste aus den geladenen Objekten ab. */
 export function baueMarker(

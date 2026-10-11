@@ -29,7 +29,12 @@ const weber: Einsatzleiter = {
 };
 
 function fs(einsatzleiter?: Einsatzleiter): Fuehrungsstelle {
-  return { sprechgruppen: [], fahrzeug_ids: [], ...(einsatzleiter ? { einsatzleiter } : {}) };
+  return {
+    art: 'mobil',
+    sprechgruppen: [],
+    fahrzeug_ids: [],
+    ...(einsatzleiter ? { einsatzleiter } : {}),
+  };
 }
 
 describe('einsatzleiterName', () => {

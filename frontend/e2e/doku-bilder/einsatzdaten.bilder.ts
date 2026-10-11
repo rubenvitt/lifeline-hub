@@ -6,6 +6,7 @@ import {
   einsatzleiterFuellen,
   expect,
   fotografiere,
+  fuehrungsstelleOrtFuellen,
   fuelle,
   test,
   uhrAnhalten,
@@ -21,7 +22,8 @@ import {
  *   mitglied-stelle.png       frontend/src/pages/MitgliederAbschnitt.tsx (FuehrungsstelleModal)
  *
  * Füllung (D3): der Demo-Einsatz trägt nur Bezeichnung, Stichwort, Art und Alarmzeit. Einsatzort,
- * Koordinate, Lagedaten, die eigene Führungsstelle samt zwei einsatzlokalen Sprechgruppen und die
+ * Koordinate, Lagedaten, die eigene Führungsstelle samt Bezeichnung, Standort (LFH-1181) und zwei
+ * einsatzlokalen Sprechgruppen und die
  * Führungsstelle der Einsatzleitung kommen über die API, jeweils nur, wenn sie noch fehlen (ein
  * Lauf aller Kapitel teilt eine Datenbank).
  */
@@ -91,6 +93,7 @@ test.describe(KAPITEL, () => {
         fahrzeug_ids: elw ? [elw.id] : [],
       });
     }
+    await fuehrungsstelleOrtFuellen(api, id);
     await einsatzleiterFuellen(api, demo);
     await api.dispose();
   });
@@ -116,6 +119,7 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
     const paneel = page.getByRole('region', { name: 'Eigene Führungsstelle' });
     await expect(paneel.getByText('Florian Musterstadt 11-1')).toBeVisible();
+    await expect(paneel.getByText('ELW 2 Musterstadt')).toBeVisible();
     await expect(paneel.getByText('Max Mustermann')).toBeVisible();
     await expect(paneel.getByText('Musterstadt 11-1', { exact: false }).last()).toBeVisible();
     await fotografiere(paneel, KAPITEL, 'fuehrungsstelle');

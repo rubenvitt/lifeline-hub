@@ -25,7 +25,7 @@ import { ZEICHEN_UNTERLAGE } from '../../zeichen/EinsatzZeichen';
 
 vi.mock('../../api/einsaetze', () => ({
   ladeModulFreigaben: vi.fn(),
-  ladeFuehrungsstelle: vi.fn(() => Promise.resolve({ sprechgruppen: [], fahrzeug_ids: [] })),
+  ladeFuehrungsstelle: vi.fn(async () => ({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] })),
 }));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../../api/lageberichte', () => ({
@@ -118,6 +118,45 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
     expect(within(wurzel).getByText('Leitung nicht erfasst')).toBeInTheDocument();
     expect(wurzel.textContent).not.toMatch(/\d+\/\d+\/\d+\/\/\d+/);
+  });
+
+  it('nennt Bezeichnung und Rufname der Führungsstelle; die Leitung bleibt offen (LFH-1181)', () => {
+    renderMitProviders(
+      <OrganigrammBild
+        einsatzId={1}
+        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
+        stab={{ zustand: 'aus' }}
+        fuehrungsstelle={{ bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian Musterstadt 10/1' }}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('ELW 2 Musterstadt')).toBeInTheDocument();
+    expect(within(wurzel).getByText('Florian Musterstadt 10/1')).toBeInTheDocument();
+    expect(within(wurzel).getByText('Leitung nicht erfasst')).toBeInTheDocument();
+  });
+
+  it('ohne Bezeichnung nur der Rufname, nichts erfunden (LFH-1181)', () => {
+    renderMitProviders(
+      <OrganigrammBild
+        einsatzId={1}
+        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
+        stab={{ zustand: 'aus' }}
+        fuehrungsstelle={{ bezeichnung: null, rufname: 'Florian 10/1' }}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('Florian 10/1')).toBeInTheDocument();
+    expect(
+      within(wurzel)
+        .getAllByText(/./)
+        .map((e) => e.textContent),
+    ).not.toContain('—');
   });
 
   it('zeigt den erfassten Einsatzleiter mit „seit“ (LFH-1199)', () => {
@@ -272,6 +311,26 @@ describe('Organigramm — Klappzustand im Container', () => {
     );
   }
 
+  it('liest die Führungsstelle für die Wurzel; gescheitert ohne ihre Zeilen, mit Grund (LFH-1181, LFH-1199)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValueOnce({
+      art: 'ortsfest',
+      bezeichnung: 'TEL Rathaus',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+    });
+    const { unmount } = container();
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(await within(wurzel).findByText('TEL Rathaus')).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(ladeFuehrungsstelle).mockRejectedValueOnce(new Error('kaputt'));
+    container();
+    const neu = screen.getByRole('group', { name: 'Einsatzleitung' });
+    await waitFor(() => expect(ladeFuehrungsstelle).toHaveBeenCalledTimes(2));
+    // Keine Bezeichnung, kein Rufname; die Leitung nennt den Grund statt „nicht erfasst“ (LFH-1199).
+    await waitFor(() => expect(neu.textContent).toBe('EinsatzleitungLeitung: nicht geladen'));
+  });
+
   it('startet aufgeklappt; „Alle zuklappen“ und „Alle aufklappen“ wirken auf jede Ebene', async () => {
     container();
     expect(screen.getByRole('link', { name: '1. Zug' })).toBeInTheDocument();
@@ -421,6 +480,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
 
   it('übernimmt den erfassten Einsatzleiter (LFH-1199)', async () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValueOnce({
+      art: 'mobil',
       sprechgruppen: [],
       fahrzeug_ids: [],
       einsatzleiter: {

@@ -54,6 +54,56 @@ function rendere({
 const paneel = () => screen.findByRole('region', { name: 'Arbeitsaufnahme' });
 const box = (name: string) => screen.findByRole('checkbox', { name });
 
+describe('ChecklistePaneel · Standort der Führungsstelle (LFH-1181)', () => {
+  const zeileStandort = async () =>
+    (await box('Standort der Führungsstelle festgelegt')).closest('li') as HTMLElement;
+
+  it('zeigt Bezeichnung und Adresse mit Verweis auf die Einsatzdaten; der Punkt bleibt offen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/fuehrungsstelle', () =>
+        HttpResponse.json({
+          art: 'mobil',
+          bezeichnung: 'ELW 2 Musterstadt',
+          standort_adresse: 'Parkplatz Feuerwehrhaus Nord',
+          sprechgruppen: [],
+          fahrzeug_ids: [],
+        }),
+      ),
+    );
+    rendere();
+    const zeile = await zeileStandort();
+    expect(
+      await within(zeile).findByText('ELW 2 Musterstadt · Parkplatz Feuerwehrhaus Nord'),
+    ).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('link', { name: 'Standort der Führungsstelle in Einsatzdaten' }),
+    ).toHaveAttribute('href', expect.stringContaining('/einsaetze/1/einsatzdaten'));
+    expect(await box('Standort der Führungsstelle festgelegt')).not.toBeChecked();
+  });
+
+  it('ohne Standort: „Standort nicht erfasst“', async () => {
+    rendere();
+    const zeile = await zeileStandort();
+    expect(await within(zeile).findByText('Standort nicht erfasst')).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('link', { name: 'Standort der Führungsstelle in Einsatzdaten' }),
+    ).toBeInTheDocument();
+  });
+
+  it('Abruf gescheitert: nennt den Grund, Haken bleibt bedienbar', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/fuehrungsstelle', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    rendere();
+    const zeile = await zeileStandort();
+    expect(await within(zeile).findByText('nicht geladen')).toBeInTheDocument();
+    expect(within(zeile).queryByText('Standort nicht erfasst')).toBeNull();
+    expect(await box('Standort der Führungsstelle festgelegt')).toBeEnabled();
+  });
+});
+
 describe('ChecklistePaneel', () => {
   it('zeigt die sieben Punkte in Reihenfolge, jeden mit Quelle', async () => {
     rendere();
@@ -67,7 +117,7 @@ describe('ChecklistePaneel', () => {
     const namen = within(r)
       .getAllByRole('checkbox')
       .map((b) => b.closest('label')?.textContent ?? '');
-    expect(namen[0]).toContain('Aufstellort des ELW festgelegt');
+    expect(namen[0]).toContain('Standort der Führungsstelle festgelegt');
     expect(namen[6]).toContain('Einsatzbereitschaft an die Leitstelle gemeldet');
     expect(within(r).getAllByText(/LFS-BW F5-I Kap\. 5/)).toHaveLength(7);
   });
@@ -155,18 +205,20 @@ describe('ChecklistePaneel', () => {
     );
     renderMitProviders(<ChecklistePaneel einsatzId={1} darfSchreiben />);
 
-    const a = await box('Aufstellort des ELW festgelegt');
+    const a = await box('Standort der Führungsstelle festgelegt');
     await userEvent.click(a);
     await userEvent.click(await box('Lageskizze begonnen'));
     await waitFor(async () => expect(await box('Lageskizze begonnen')).toBeChecked());
-    expect(await box('Aufstellort des ELW festgelegt'), 'A läuft noch').toBeDisabled();
+    expect(await box('Standort der Führungsstelle festgelegt'), 'A läuft noch').toBeDisabled();
 
     gibAFrei();
-    const zeileA = (await box('Aufstellort des ELW festgelegt')).closest('li') as HTMLElement;
+    const zeileA = (await box('Standort der Führungsstelle festgelegt')).closest(
+      'li',
+    ) as HTMLElement;
     await waitFor(() => expect(zeileA.querySelector('[data-fehler]')).not.toBeNull());
     expect(zeileA).toHaveTextContent('Einsatz ist abgeschlossen');
-    expect(await box('Aufstellort des ELW festgelegt')).not.toBeChecked();
-    expect(await box('Aufstellort des ELW festgelegt')).toBeEnabled();
+    expect(await box('Standort der Führungsstelle festgelegt')).not.toBeChecked();
+    expect(await box('Standort der Führungsstelle festgelegt')).toBeEnabled();
     expect(await box('Lageskizze begonnen'), 'B bleibt erledigt').toBeChecked();
     const zeileB = (await box('Lageskizze begonnen')).closest('li') as HTMLElement;
     expect(zeileB.querySelector('[data-fehler]')).toBeNull();
