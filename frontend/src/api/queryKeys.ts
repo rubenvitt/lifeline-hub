@@ -105,6 +105,8 @@ export const EINSATZ_KEYS = {
   anhangHeicVorschau: 'einsatz-anhang-heic-vorschau',
   // Adresssuche der Lagekarte (LFH-638): Suchtext → Treffer des Geocoders.
   ortSuche: 'ort-suche',
+  // Ortssuche des Ortsfelds im Einsatz (LFH-1175): andere Route, eigenes Fach.
+  einsatzortSuche: 'einsatzort-suche',
   // Singular-Detail-Keys: der SSE-Fan-out invalidiert die Listen-Prefixe, nicht diese (eigenes
   // erstes Element, kein Prefix-Match). Bewusst NICHT_LIVE.
   uhsDetail: 'einsatz-uhs-detail',
@@ -398,7 +400,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   das 403 der Server-Gates bleibt das Netz.
  * - `ortVorschau`: abgeleiteter Geo-Lookup mit Debounce + Client-Cache; live zu invalidieren
  *   wäre schädlich (Nominatim-ToS).
- * - `ortSuche`: Adresssuche auf Enter (LFH-638), aus demselben Grund nie live; bewusst auch
+ * - `ortSuche`, `einsatzortSuche`: Adresssuche auf Enter (LFH-638, LFH-1175), aus demselben
+ *   Grund nie live; bewusst auch
  *   nicht im Lagebild offline (der Suchtext kann eine Personenadresse sein).
  * - `pegel`: kein Live-Ereignis; die Abfrage fragt alle 5 min nach (`PEGEL_ABRUF_MS`), die
  *   Mutationen setzen die Antwort per `setQueryData`.
@@ -433,6 +436,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.ortSuche,
+  EINSATZ_KEYS.einsatzortSuche,
   EINSATZ_KEYS.anhangHeicVorschau,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
@@ -783,6 +787,8 @@ export const einsatzKeys = {
   // Der getrimmte Suchtext ist der Key: gleiche Begriffe treffen den Client-Cache (LFH-638).
   ortSuche: (einsatzId: number, begriff: string) =>
     [EINSATZ_KEYS.ortSuche, einsatzId, begriff] as const,
+  einsatzortSuche: (einsatzId: number, begriff: string) =>
+    [EINSATZ_KEYS.einsatzortSuche, einsatzId, begriff] as const,
   // Download-Adresse der bereinigten Fassung ist der Key: ein Anhang ändert sich nie (LFH-759).
   anhangHeicVorschau: (einsatzId: number, href: string) =>
     [EINSATZ_KEYS.anhangHeicVorschau, einsatzId, href] as const,
@@ -841,6 +847,9 @@ export const GLOBAL_KEYS = {
   einheitTypen: 'einheit-typen',
   etbBausteine: 'etb-bausteine',
   stichwortVorschlaege: 'stichwort-vorschlaege',
+  // Ortssuche ohne Einsatz (LFH-1175), etwa beim Anlegen. Nicht `ort-suche`: das ist der
+  // Einsatz-Prefix der Lagekarte, ein gleicher Wire-String träfe dessen Fach.
+  orgOrtSuche: 'org-ort-suche',
   // Katalog der Führungsfunktionen mit Mandantenlabels (LFH-549). Nicht im Lagebild: gelesen
   // werden Snapshot und Auflösung, die im Auftrag stecken.
   fuehrungsfunktionen: 'fuehrungsfunktionen',
@@ -973,6 +982,7 @@ export const globalKeys = {
   adminKarte: () => [GLOBAL_KEYS.adminKarte] as const,
   adminKarteBereich: (bereich: AdminKarteBereich) => [GLOBAL_KEYS.adminKarte, bereich] as const,
   karteConfig: () => [GLOBAL_KEYS.karteConfig] as const,
+  orgOrtSuche: (begriff: string) => [GLOBAL_KEYS.orgOrtSuche, begriff] as const,
 
   // Externe Fachebenen. `kritis` und `energie` tragen eine BBox im Key und haben einen eigenen
   // Accessor, sonst entstünden zwei Cache-Fächer für denselben Zustand. `bbox` ist
@@ -1040,6 +1050,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `adminKarte`, `karteConfig`, `datentraeger`: instanzweit, nicht mandantenbezogen.
  * - `fachebene`: externe Quellen mit eigener Nachfrage.
  * - `zugangsprotokoll`: geladen beim Öffnen und bei Filterwechsel, nie live (LFH-1097).
+ * - `orgOrtSuche`: Adresssuche auf Enter wie `ortSuche` (LFH-1175); nie live, nie offline (der
+ *   Suchtext kann eine Personenadresse sein).
  */
 export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
@@ -1054,6 +1066,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.datentraeger,
   GLOBAL_KEYS.fachebene,
   GLOBAL_KEYS.zugangsprotokoll,
+  GLOBAL_KEYS.orgOrtSuche,
 ] as const satisfies readonly GlobalKey[];
 
 /**

@@ -19,9 +19,9 @@
 
 ## 4. Frontend: API und Bausteine
 
-- [ ] 4.1 `api/ortSuche.ts` (`sucheOrtImEinsatz`, `sucheOrtInOrg`), Query-Keys `einsatzKeys.einsatzortSuche` und `globalKeys.ortSuche` in `api/queryKeys.ts` als nicht live und nicht offline eingeordnet; `api/einsaetze.ts` `NeuerEinsatz` um den Einsatzort; Guard-Tests der Query-Keys grün
-- [ ] 4.2 `anzeige/Ortsfeld.tsx` mit Vitest (MSW): Tippen fragt nicht, Enter sucht ohne Formular-Submit, „Ort suchen“ sucht, < 3 Zeichen fragt nicht, Treffer setzt Text = Kurzadresse und Koordinate, Textänderung verwirft Koordinate und Treffer, Zustände „ausgelastet“/„nicht erreichbar“ mit „Erneut suchen“, „Keine Adresse zu …“, offline gesperrt mit Wortlaut; jeder Test zuerst rot
-- [ ] 4.3 `anzeige/Kartenausschnitt.tsx` nach dem Muster der Lagemonitor-Karte; Vitest mit gemocktem `maplibre-gl`: ohne Punkt „Nicht verortet“ und keine Karte, mit Punkt eine Karte und eine Nadel mit `aria-label`
+- [x] 4.1 `api/ortSuche.ts` (`sucheOrtImEinsatz`, `sucheOrtInOrg`), Query-Keys `einsatzKeys.einsatzortSuche` und `globalKeys.ortSuche` in `api/queryKeys.ts` als nicht live und nicht offline eingeordnet; `api/einsaetze.ts` `NeuerEinsatz` um den Einsatzort; Guard-Tests der Query-Keys grün
+- [x] 4.2 `anzeige/Ortsfeld.tsx` mit Vitest (MSW): Tippen fragt nicht, Enter sucht ohne Formular-Submit, „Ort suchen“ sucht, < 3 Zeichen fragt nicht, Treffer setzt Text = Kurzadresse und Koordinate, Textänderung verwirft Koordinate und Treffer, Zustände „ausgelastet“/„nicht erreichbar“ mit „Erneut suchen“, „Keine Adresse zu …“, offline gesperrt mit Wortlaut; jeder Test zuerst rot
+- [x] 4.3 `anzeige/Kartenausschnitt.tsx` nach dem Muster der Lagemonitor-Karte; Vitest mit gemocktem `maplibre-gl`: ohne Punkt „Nicht verortet“ und keine Karte, mit Punkt eine Karte und eine Nadel mit `aria-label`
 
 ## 5. Frontend: Einsatzdaten
 
