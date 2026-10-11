@@ -99,7 +99,7 @@ export function DragHandle({ daten }: { daten: DragDaten }) {
       }}
       {...listeners}
       aria-hidden="true"
-      data-lfh="drag-griff"
+      data-lfh="drag-handle"
       data-drag={dragKey(daten)}
       style={{
         display: 'inline-flex',

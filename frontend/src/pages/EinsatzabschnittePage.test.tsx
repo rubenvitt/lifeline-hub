@@ -1140,6 +1140,8 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       const { abschnittPatches } = mitPatches();
       renderPage();
       await userEvent.click(await screen.findByText('Nord-Ost'));
+      // Gegenprobe zum Rechtefall unten: mit Schreibrecht trägt jeder Abschnitt einen Griff.
+      expect(document.querySelectorAll('[data-lfh="drag-handle"]')).toHaveLength(3);
       await weitereAktion('Nord-Ost', 'Verschieben unter …');
 
       const dialog = await screen.findByRole('dialog', { name: '„Nord-Ost“ verschieben unter …' });
