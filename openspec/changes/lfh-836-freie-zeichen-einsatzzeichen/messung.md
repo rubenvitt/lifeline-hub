@@ -26,6 +26,54 @@ dist/assets/fachobjektZeichen-CFMOh0en.js               1,189.79 kB │ gzip: 37
 dist/assets/index-DBEX7dpL.js                           2,709.16 kB │ gzip: 778.11 kB
 ```
 
+## Nachher (Task 6.3, Branch mit @einsatzzeichen 5.2.0, ohne taktische-zeichen-react, 11.10.2026)
+
+Gemessen mit `mise exec -- pnpm -C frontend build` (Node 26.7.0, pnpm 11.10.0), Stand
+`dad371704`.
+
+```
+precache  34 entries (6655.61 KiB)
+dist/assets/heicWorker-C7ycdFvg.js                          2.26 kB
+dist/assets/maplibre-gl-worker-CRiIRpYb.js                509.70 kB
+dist/assets/lagezonen-VWxjAjrc.js                           0.34 kB │ gzip:   0.19 kB
+dist/assets/rolldown-runtime-hePW80VL.js                    0.71 kB │ gzip:   0.42 kB
+dist/assets/dekodiereHeic-Dymt6-Sp.js                       0.99 kB │ gzip:   0.60 kB
+dist/assets/GeraetAbschnittKarte-WGHGgFbl.js                3.05 kB │ gzip:   1.56 kB
+dist/assets/useKartenAnsicht-6tE42Rpo.js                    4.58 kB │ gzip:   1.85 kB
+dist/assets/BetroffeneKarte-CKMY17yz.js                     5.08 kB │ gzip:   2.34 kB
+dist/assets/workbox-window.prod.es5-Bd17z0YL.js             5.65 kB │ gzip:   2.20 kB
+dist/assets/KraefteuebersichtPage-EOlNhauT.js              18.10 kB │ gzip:   6.57 kB
+dist/assets/LagekartePage-DokGQYQX.js                     134.83 kB │ gzip:  42.29 kB
+dist/assets/useBasemap-mxo8_63l.js                        214.94 kB │ gzip:  57.15 kB
+dist/assets/organisation-BW-MbE7x.js                      277.72 kB │ gzip:  87.04 kB
+dist/assets/HilfePage-CJH16OHi.js                         364.70 kB │ gzip: 106.30 kB
+dist/assets/EinsatzSeite-Bfzb0p66.js                      536.06 kB │ gzip: 171.09 kB
+dist/assets/SeitenZustand-CDqLGjpJ.js                     730.17 kB │ gzip: 236.88 kB
+dist/assets/fachobjektZeichen-DZe0u0Hm.js               1,166.93 kB │ gzip: 362.16 kB
+dist/assets/index-CXaeTCtQ.js                           2,717.71 kB │ gzip: 780.77 kB
+```
+
+Zwischenstand zum Vergleich (`6c3c35511`, nach Upgrade auf 5.2.0 und Merge von `alpha`, vor
+Gruppe 4–6; gebaut mit `vite build`): Precache 6689.14 KiB, `LagekartePage` 130.03 kB (gzip
+40.53), `useBasemap` 222.62 kB, `fachobjektZeichen` 1,198.53 kB (gzip 381.29), `index`
+2,717.58 kB.
+
+| Größe | Vorher (1.1) | Nachher | Differenz |
+| --- | ---: | ---: | ---: |
+| Precache | 6660.63 KiB | 6655.61 KiB | −5.02 KiB |
+| `LagekartePage` (Lagekarten-Chunk) | 129.87 kB (gzip 40.48) | 134.83 kB (gzip 42.29) | **+4.96 kB (gzip +1.81)** |
+| `useBasemap` | 222.62 kB | 214.94 kB | −7.68 kB |
+| `fachobjektZeichen` (geteilt, Zeichen) | 1,189.79 kB | 1,166.93 kB | −22.86 kB |
+| Summe der drei Chunks der Lagekarte | 1,542.28 kB | 1,516.70 kB | −25.58 kB |
+
+**Befund:** Der Precache ist kleiner, der Chunk `LagekartePage` allein ist größer. Ursache: Der
+Katalog des Altpakets lag im geteilten Chunk `fachobjektZeichen` (dort fanden sich die Namen
+„Stelle, Einrichtung“ usw.), der neue Picker mit `zeichenWahl.ts` (Vokabular-Aufrufe,
+Namen-Tabellen für Grundzeichen und Palettenfarben, Optionen-Merker), `zuletztVerwendet.ts` v2
+und der Inspector-Kachel liegt im Chunk `LagekartePage`. Über die Chunks, die die Lagekarte lädt,
+ist der Umbau kleiner; die Vorgabe „Lagekarten-Chunk nicht größer“ ist für `LagekartePage` allein
+nicht erfüllt. Gemeldet als Blocker.
+
 ## Kosten des Vokabulars im Picker (Task 5.2, 11.10.2026)
 
 Gemessen mit `frontend/src/pages/lagekarte/FreiesZeichenPicker.kosten.test.tsx`
