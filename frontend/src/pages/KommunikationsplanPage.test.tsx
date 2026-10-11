@@ -203,7 +203,11 @@ beforeEach(() => {
   vi.mocked(ladeFuehrungsfunktionen).mockResolvedValue(KATALOG);
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, POLIZEI]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
-  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({ sprechgruppen: [], fahrzeug_ids: [] });
+  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+    art: 'mobil',
+    sprechgruppen: [],
+    fahrzeug_ids: [],
+  });
   for (const f of [
     legeKommunikationsStelleAn,
     entferneKommunikationsStelle,
@@ -272,6 +276,7 @@ describe('KommunikationsplanPage — Anzeige', () => {
   // LFH-1148: die eigene Führungsstelle steht wie im Funkplan, gepflegt wird auf Einsatzdaten.
   it('zeigt die erfasste Führungsstelle als erste Zeile mit Verbindung und Weg zu Einsatzdaten', async () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
       rufname: 'Florian Bremen 11/1',
       kommunikationsmittel: 'festnetz',
       erreichbarkeit: '0421 999',
@@ -305,7 +310,7 @@ describe('KommunikationsplanPage — Anzeige', () => {
     let geladen = false;
     vi.mocked(ladeFuehrungsstelle).mockImplementation(async () => {
       geladen = true;
-      return { rufname: '  ', sprechgruppen: [], fahrzeug_ids: [] };
+      return { art: 'mobil', rufname: '  ', sprechgruppen: [], fahrzeug_ids: [] };
     });
     const { container } = setup();
     await screen.findByText('Polizei PI Nord');

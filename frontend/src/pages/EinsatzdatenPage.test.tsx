@@ -124,7 +124,11 @@ function setup(opts: SetupOpts = {}) {
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
     http.get('/api/einsaetze/7/fuehrungsstelle', () =>
-      HttpResponse.json({ sprechgruppen: [], fahrzeug_ids: [] } satisfies Fuehrungsstelle),
+      HttpResponse.json({
+        art: 'mobil',
+        sprechgruppen: [],
+        fahrzeug_ids: [],
+      } satisfies Fuehrungsstelle),
     ),
     http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeugListe)),
@@ -1134,13 +1138,13 @@ describe('EinsatzdatenPage — Einstieg in den Einsatzbericht (LFH-726)', () => 
 });
 
 /**
- * Eigene Führungsstelle (LFH-849, Spec `einsatz-fuehrungsstelle`): ein Paneel mit vier Zeilen,
- * jede schickt nur ihr Feld an `…/fuehrungsstelle`.
+ * Eigene Führungsstelle (LFH-849, Spec `einsatz-fuehrungsstelle`): ein Paneel mit Art und sieben
+ * Angaben (LFH-1181), jede schickt nur ihr Feld an `…/fuehrungsstelle`.
  */
 describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   /** Nimmt jeden PATCH-Body auf und legt ihn wie der Server über den Stand. */
   function fuehrungsstelleMitschnitt(
-    start: Fuehrungsstelle = { sprechgruppen: [], fahrzeug_ids: [] },
+    start: Fuehrungsstelle = { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] },
   ) {
     const bodies: FuehrungsstellePatch[] = [];
     let stand: Fuehrungsstelle = start;
@@ -1150,10 +1154,11 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
         const body = (await request.json()) as FuehrungsstellePatch;
         bodies.push(body);
         const { sprechgruppe_ids, fahrzeug_ids, ...felder } = body;
-        const naechster: Fuehrungsstelle = { ...stand };
+        // Wie der Server: `null` leert, ein Wert ersetzt (die Art ist nie `null`).
+        const naechster = { ...stand } as Record<string, unknown>;
         for (const [k, v] of Object.entries(felder)) {
-          if (v == null) delete naechster[k as keyof typeof felder];
-          else naechster[k as keyof typeof felder] = v;
+          if (v == null) delete naechster[k];
+          else naechster[k] = v;
         }
         if (fahrzeug_ids) naechster.fahrzeug_ids = [...fahrzeug_ids].sort((a, b) => a - b);
         if (sprechgruppe_ids) {
@@ -1161,7 +1166,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
             sprechgruppe_ids.includes(g.id),
           );
         }
-        stand = naechster;
+        stand = naechster as unknown as Fuehrungsstelle;
         return HttpResponse.json(stand);
       }),
     );
@@ -1172,19 +1177,108 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     return within(await screen.findByRole('region', { name: 'Eigene Führungsstelle' }));
   }
 
-  it('zeigt fünf Angaben; leer mit Aufforderung', async () => {
+  it('zeigt Art und sieben Angaben; leer mit Aufforderung (LFH-1181)', async () => {
     setup();
     fuehrungsstelleMitschnitt();
     const p = await paneel();
+    const art = await p.findByRole('radiogroup', { name: 'Art' });
+    expect(within(art).getByRole('radio', { name: 'mobil' })).toBeChecked();
     for (const etikett of [
+      'Bezeichnung',
+      'Standort',
       'Rufname',
       'Sprechgruppen',
       'Kommunikationsmittel',
       'Erreichbarkeit',
-      'Fahrzeuge',
+      'Führungsfahrzeuge',
     ]) {
       expect(await p.findByRole('button', { name: `${etikett} eintragen` })).toBeInTheDocument();
     }
+  });
+
+  it('Art wählen: nur die Art geht hinaus (LFH-1181)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('radio', { name: 'ortsfest' }));
+    await waitFor(() => expect(bodies).toEqual([{ art: 'ortsfest' }]));
+    await waitFor(() => expect(p.getByRole('radio', { name: 'ortsfest' })).toBeChecked());
+  });
+
+  it('Bezeichnung: nur dieses Feld geht hinaus (LFH-1181)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Bezeichnung eintragen' }));
+    await user.type(p.getByRole('textbox', { name: 'Bezeichnung' }), 'ELW 2 Musterstadt{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ bezeichnung: 'ELW 2 Musterstadt' }]));
+    expect(
+      await p.findByRole('button', { name: 'Bezeichnung bearbeiten' }),
+    ).toHaveAccessibleDescription('ELW 2 Musterstadt');
+  });
+
+  it('Standort „wie Einsatzort“: Adresse und Koordinate gehen einmalig hinaus (LFH-1181)', async () => {
+    setup({
+      einsatz: {
+        einsatzort: 'Industriestraße 4',
+        einsatzort_lat: 48.1234,
+        einsatzort_lon: 11.5678,
+      },
+    });
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Standort eintragen' }));
+    await user.click(p.getByRole('button', { name: 'wie Einsatzort' }));
+    expect(p.getByRole('textbox', { name: 'Standort' })).toHaveValue('Industriestraße 4');
+    await user.click(p.getByRole('button', { name: 'Standort speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { standort_adresse: 'Industriestraße 4', standort_lat: 48.1234, standort_lon: 11.5678 },
+      ]),
+    );
+    expect(
+      await p.findByRole('button', { name: 'Standort bearbeiten' }),
+    ).toHaveAccessibleDescription(/Industriestraße 4/);
+  });
+
+  it('Standort: ohne Einsatzort kein „wie Einsatzort“, Adresse allein geht hinaus (LFH-1181)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Standort eintragen' }));
+    expect(p.queryByRole('button', { name: 'wie Einsatzort' })).toBeNull();
+    await user.type(p.getByRole('textbox', { name: 'Standort' }), 'Rathaus, Marktplatz 1');
+    await user.click(p.getByRole('button', { name: 'Standort speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { standort_adresse: 'Rathaus, Marktplatz 1', standort_lat: null, standort_lon: null },
+      ]),
+    );
+  });
+
+  it('Ortsfest: Führungsfahrzeuge eingeklappt mit Anzahl, aufklappbar (LFH-1181)', async () => {
+    setup();
+    fuehrungsstelleMitschnitt({ art: 'ortsfest', sprechgruppen: [], fahrzeug_ids: [41] });
+    const user = userEvent.setup();
+    const p = await paneel();
+    const kopf = await p.findByRole('button', { name: /1 Führungsfahrzeug/ });
+    expect(p.queryByRole('button', { name: 'Führungsfahrzeuge bearbeiten' })).toBeNull();
+    await user.click(kopf);
+    expect(
+      await p.findByRole('button', { name: 'Führungsfahrzeuge bearbeiten' }),
+    ).toHaveAccessibleDescription('Florian Musterstadt 10/1 (ELW 2)');
+  });
+
+  it('Ortsfest ohne Fahrzeug: eingeklappt, keine Angabe verlangt (LFH-1181)', async () => {
+    setup();
+    fuehrungsstelleMitschnitt({ art: 'ortsfest', sprechgruppen: [], fahrzeug_ids: [] });
+    const p = await paneel();
+    expect(await p.findByRole('button', { name: /kein Führungsfahrzeug/ })).toBeInTheDocument();
+    expect(p.queryByRole('button', { name: 'Führungsfahrzeuge eintragen' })).toBeNull();
   });
 
   it('Rufname: nur dieses Feld geht hinaus, die Zeile zeigt den Wert', async () => {
@@ -1221,22 +1315,22 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     const bodies = fuehrungsstelleMitschnitt();
     const user = userEvent.setup();
     const p = await paneel();
-    await user.click(await p.findByRole('button', { name: 'Fahrzeuge eintragen' }));
-    await user.click(p.getByRole('combobox', { name: 'Fahrzeuge' }));
+    await user.click(await p.findByRole('button', { name: 'Führungsfahrzeuge eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Führungsfahrzeuge' }));
     await user.click(await screen.findByText('Florian Musterstadt 10/1 (ELW 2)'));
-    await user.click(p.getByRole('button', { name: 'Fahrzeuge speichern' }));
+    await user.click(p.getByRole('button', { name: 'Führungsfahrzeuge speichern' }));
     await waitFor(() => expect(bodies).toEqual([{ fahrzeug_ids: [41] }]));
     expect(
-      await p.findByRole('button', { name: 'Fahrzeuge bearbeiten' }),
+      await p.findByRole('button', { name: 'Führungsfahrzeuge bearbeiten' }),
     ).toHaveAccessibleDescription('Florian Musterstadt 10/1 (ELW 2)');
   });
 
   it('Fahrzeuge: ein entlassenes Fahrzeug fällt still weg', async () => {
     setup();
-    fuehrungsstelleMitschnitt({ sprechgruppen: [], fahrzeug_ids: [42, 999] });
+    fuehrungsstelleMitschnitt({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [42, 999] });
     const p = await paneel();
     expect(
-      await p.findByRole('button', { name: 'Fahrzeuge bearbeiten' }),
+      await p.findByRole('button', { name: 'Führungsfahrzeuge bearbeiten' }),
     ).toHaveAccessibleDescription('Florian Musterstadt 19/1 (MTW)');
   });
 
@@ -1247,10 +1341,10 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
         HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
       ),
     );
-    fuehrungsstelleMitschnitt({ sprechgruppen: [], fahrzeug_ids: [41] });
+    fuehrungsstelleMitschnitt({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [41] });
     const p = await paneel();
     expect(await p.findByText('nicht freigegeben')).toBeInTheDocument();
-    expect(p.queryByRole('button', { name: /^Fahrzeuge / })).toBeNull();
+    expect(p.queryByRole('button', { name: /^Führungsfahrzeuge / })).toBeNull();
     expect(p.getByRole('button', { name: 'Rufname eintragen' })).toBeInTheDocument();
   });
 
@@ -1272,6 +1366,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
   it('Erreichbarkeit: unverändert sendet nichts, geleert sendet null', async () => {
     setup();
     const bodies = fuehrungsstelleMitschnitt({
+      art: 'mobil',
       sprechgruppen: [],
       fahrzeug_ids: [],
       erreichbarkeit: '0171 1234567',
@@ -1295,11 +1390,18 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
       einsatz: { meine_rolle: 'beobachter' },
       benutzer: { ...admin, system_rolle: 'keiner' },
     });
-    fuehrungsstelleMitschnitt({ sprechgruppen: [], fahrzeug_ids: [], rufname: 'Florian 10/1' });
+    fuehrungsstelleMitschnitt({
+      art: 'mobil',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      rufname: 'Florian 10/1',
+    });
     const p = await paneel();
     expect(await p.findByText('Florian 10/1')).toBeInTheDocument();
     expect(p.queryByRole('button', { name: /eintragen|bearbeiten/ })).toBeNull();
-    expect(p.getAllByText('—')).toHaveLength(4);
+    expect(p.queryByRole('radiogroup', { name: 'Art' })).toBeNull();
+    expect(p.getByText('mobil')).toBeInTheDocument();
+    expect(p.getAllByText('—')).toHaveLength(6);
   });
 
   it('Speicherfehler steht an der Zeile, die Eingabe bleibt offen', async () => {
@@ -1433,7 +1535,11 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
       http.get('/api/einsaetze/:id/fuehrungsstelle', () =>
-        HttpResponse.json({ sprechgruppen: [], fahrzeug_ids: [] } satisfies Fuehrungsstelle),
+        HttpResponse.json({
+          art: 'mobil',
+          sprechgruppen: [],
+          fahrzeug_ids: [],
+        } satisfies Fuehrungsstelle),
       ),
       http.get('/api/einsaetze/:id/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
       http.post(

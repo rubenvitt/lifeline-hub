@@ -245,14 +245,23 @@ export type EinheitStatus = S['EinheitStatus'];
 export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
-/** Eigene Führungsstelle des Einsatzes (LFH-849). */
+/** Eigene Führungsstelle des Einsatzes (LFH-849), seit LFH-1181 ein Ort mit Art und Standort. */
 export type Fuehrungsstelle = S['FuehrungsstelleAnzeige'];
+/** `mobil` (ELW) oder `ortsfest` (TEL im Rathaus), nie leer (LFH-1181). */
+export type FuehrungsstellenArt = S['FuehrungsstellenArt'];
 
 /**
  * Teiländerung der Führungsstelle (kein Backend-Schema, `routes/einsatz_fuehrungsstelle.rs`):
  * fehlender Schlüssel = unverändert, `null` = leeren; `sprechgruppe_ids` ersetzt vollständig.
  */
 export interface FuehrungsstellePatch {
+  /** Nie `null`: die Art lässt sich nicht leeren (400). */
+  art?: FuehrungsstellenArt;
+  bezeichnung?: string | null;
+  standort_adresse?: string | null;
+  /** Koordinate des Standorts, nur als Paar (sonst 422). */
+  standort_lat?: number | null;
+  standort_lon?: number | null;
   rufname?: string | null;
   kommunikationsmittel?: string | null;
   erreichbarkeit?: string | null;

@@ -17,12 +17,16 @@ export const FUEHRUNGSSTELLE_STELLE = 'Führungsstelle';
 
 /**
  * Die eine Erfasst-Regel: eine der Angaben ist nicht leer, oder ihr ist mindestens eine
- * Sprechgruppe oder ein Fahrzeug zugeordnet (LFH-1106). Tabelle, Lücken-Hinweis, Bericht und
- * Skizze fragen nur hier.
+ * Sprechgruppe oder ein Fahrzeug zugeordnet (LFH-1106). Bezeichnung und Standort zählen mit, die
+ * Art nicht: sie hat immer einen Wert (LFH-1181, design.md D1). Tabelle, Lücken-Hinweis, Bericht,
+ * Skizze, Organigramm und Lagekarte fragen nur hier.
  */
 export function fuehrungsstelleErfasst(fs: Fuehrungsstelle | null): boolean {
   if (!fs) return false;
   return (
+    !!fs.bezeichnung?.trim() ||
+    !!fs.standort_adresse?.trim() ||
+    fs.standort_lat != null ||
     !!fs.rufname?.trim() ||
     !!fs.kommunikationsmittel?.trim() ||
     !!fs.erreichbarkeit?.trim() ||

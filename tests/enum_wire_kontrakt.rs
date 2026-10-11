@@ -524,6 +524,12 @@ fn orphan_enums_wire() {
         NichtErreichbar => "nicht_erreichbar",
     });
 
+    // einsatz::fuehrungsstelle (LFH-1181)
+    enum_wire!(lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellenArt {
+        Mobil => "mobil",
+        Ortsfest => "ortsfest",
+    });
+
     // einsatz::einstellungen
     enum_wire!(lifeline_hub::einsatz::einstellungen::BasemapModus {
         Online => "online",

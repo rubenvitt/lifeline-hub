@@ -122,7 +122,8 @@ function fuehrungsstelleZeile(q: FuehrungsstelleQuelle): FunkplanZeile | null {
     art: 'fuehrungsstelle',
     id: null,
     stelle: FUEHRUNGSSTELLE_STELLE,
-    stelleZusatz: null,
+    // Die Bezeichnung (LFH-1181) steht wie der Typ einer Fahrzeugzeile im Zusatz; nie abgeleitet.
+    stelleZusatz: fs.bezeichnung?.trim() || null,
     rufname: fs.rufname ?? null,
     // Wer die Führungsstelle besetzt, steht in der Besetzung des Stabs, nicht hier.
     leitung: { art: 'leer' },

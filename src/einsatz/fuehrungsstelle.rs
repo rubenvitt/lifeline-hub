@@ -1,23 +1,57 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): die Gegenstelle des Funkplans (ELW,
 //! Einsatzleitung) mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und den
-//! Fahrzeugen, die sie tragen (LFH-1106).
+//! Fahrzeugen, die sie tragen (LFH-1106). Seit LFH-1181 ein Ort mit Ausstattung: Art (mobil,
+//! ortsfest), Bezeichnung und Standort (Adresse, Koordinate; Migration 0176).
 //!
 //! Eine Zeile je Einsatz (Migration 0145), lazy beim ersten Schreiben; fehlt sie, gilt die
 //! Führungsstelle als nicht erfasst und der Abruf liefert alle Angaben leer. Sprechgruppen (0145)
 //! und Fahrzeuge (0171) hängen in eigenen Zuordnungstabellen. Nicht zu verwechseln
 //! mit `einsatz_mitgliedschaft.fuehrungsstelle` (Freitext je Person, LFH-461).
 //!
-//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2).
+//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2),
+//! `openspec/changes/lfh-1181-fuehrungsstelle-ort/design.md` (D1, D2).
 
 use crate::error::AppError;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
-/// Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+wire_enum! {
+    /// Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`
+    /// (Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in
+    /// `migrations/0176_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum FuehrungsstellenArt {
+        Mobil => "mobil",
+        Ortsfest => "ortsfest",
+    }
+}
+
+/// Höchstlänge der Bezeichnung (LFH-1181, `src/AGENTS.md`, „Eingabegrenzen“).
+pub const FUEHRUNGSSTELLE_BEZEICHNUNG_MAX: usize = 200;
+/// Höchstlänge der Standort-Adresse, wie der Ort eines Schadens (`schaden::ORT_MAX`).
+pub const FUEHRUNGSSTELLE_ADRESSE_MAX: usize = 500;
+
+/// Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON; die Art steht
+/// immer.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct FuehrungsstelleAnzeige {
+    /// Ohne gespeicherte Zeile die Vorgabe `mobil`. Zählt nicht dafür, ob die Führungsstelle
+    /// erfasst ist (Spec `einsatz-fuehrungsstelle`).
+    pub art: FuehrungsstellenArt,
+    /// Name der Stelle, z. B. „ELW 2 Musterstadt“ oder „TEL Rathaus“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bezeichnung: Option<String>,
+    /// Adresse des Standorts. Wird geschwärzt (kann eine Privatadresse sein).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub standort_adresse: Option<String>,
+    /// Koordinate des Standorts, nur als Paar gesetzt. Wird mit der Adresse geschwärzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub standort_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub standort_lon: Option<f64>,
     /// Funkrufname der Führungsstelle, z. B. „Florian Musterstadt 10/1“.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rufname: Option<String>,
@@ -102,6 +136,13 @@ fn ids_json(ids: &[i64]) -> Result<String, AppError> {
 /// geprüft (Route).
 #[derive(Debug, Default)]
 pub struct FuehrungsstellePatch<'a> {
+    /// Nie leer: die Route lehnt `null` ab.
+    pub art: Option<FuehrungsstellenArt>,
+    pub bezeichnung: Option<Option<&'a str>>,
+    pub standort_adresse: Option<Option<&'a str>>,
+    /// Die Route prüft das Paar am Stand nach der Änderung.
+    pub standort_lat: Option<Option<f64>>,
+    pub standort_lon: Option<Option<f64>>,
     pub rufname: Option<Option<&'a str>>,
     pub kommunikationsmittel: Option<Option<&'a str>>,
     pub erreichbarkeit: Option<Option<&'a str>>,
@@ -115,6 +156,11 @@ pub struct FuehrungsstellePatch<'a> {
 
 #[derive(sqlx::FromRow)]
 struct Zeile {
+    art: String,
+    bezeichnung: Option<String>,
+    standort_adresse: Option<String>,
+    standort_lat: Option<f64>,
+    standort_lon: Option<f64>,
     rufname: Option<String>,
     kommunikationsmittel: Option<String>,
     erreichbarkeit: Option<String>,
@@ -131,7 +177,8 @@ async fn laden_tx(
     einsatz_id: i64,
 ) -> Result<FuehrungsstelleAnzeige, AppError> {
     let zeile = sqlx::query_as::<_, Zeile>(
-        "SELECT rufname, kommunikationsmittel, erreichbarkeit \
+        "SELECT art, bezeichnung, standort_adresse, standort_lat, standort_lon, \
+                rufname, kommunikationsmittel, erreichbarkeit \
          FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?",
     )
     .bind(einsatz_id)
@@ -155,15 +202,29 @@ async fn laden_tx(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
-    let (rufname, kommunikationsmittel, erreichbarkeit) = match zeile {
-        Some(z) => (z.rufname, z.kommunikationsmittel, z.erreichbarkeit),
-        None => (None, None, None),
-    };
+    let z = zeile.unwrap_or(Zeile {
+        art: FuehrungsstellenArt::Mobil.as_str().to_string(),
+        bezeichnung: None,
+        standort_adresse: None,
+        standort_lat: None,
+        standort_lon: None,
+        rufname: None,
+        kommunikationsmittel: None,
+        erreichbarkeit: None,
+    });
+    let art = FuehrungsstellenArt::parse(&z.art).ok_or_else(|| {
+        AppError::Internal(format!("Unbekannte Art der Führungsstelle: {}", z.art))
+    })?;
     Ok(FuehrungsstelleAnzeige {
-        rufname,
+        art,
+        bezeichnung: z.bezeichnung,
+        standort_adresse: z.standort_adresse,
+        standort_lat: z.standort_lat,
+        standort_lon: z.standort_lon,
+        rufname: z.rufname,
         sprechgruppen: sprechgruppen.iter().map(Sprechgruppe::anzeige).collect(),
-        kommunikationsmittel,
-        erreichbarkeit,
+        kommunikationsmittel: z.kommunikationsmittel,
+        erreichbarkeit: z.erreichbarkeit,
         fahrzeug_ids,
     })
 }
@@ -179,8 +240,30 @@ pub async fn patchen_tx(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
-    // Je Feld ein UPDATE: drei feste Statements statt eines zusammengesetzten SQL-Texts.
+    // Je Feld ein UPDATE: feste Statements statt eines zusammengesetzten SQL-Texts.
+    if let Some(art) = patch.art {
+        sqlx::query("UPDATE einsatz_fuehrungsstelle SET art = ? WHERE einsatz_id = ?")
+            .bind(art.as_str())
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+    }
     for (spalte, wert) in [
+        ("standort_lat", patch.standort_lat),
+        ("standort_lon", patch.standort_lon),
+    ] {
+        let Some(wert) = wert else { continue };
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE einsatz_fuehrungsstelle SET {spalte} = ? WHERE einsatz_id = ?"
+        )))
+        .bind(wert)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    }
+    for (spalte, wert) in [
+        ("bezeichnung", patch.bezeichnung),
+        ("standort_adresse", patch.standort_adresse),
         ("rufname", patch.rufname),
         ("kommunikationsmittel", patch.kommunikationsmittel),
         ("erreichbarkeit", patch.erreichbarkeit),

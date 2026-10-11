@@ -124,7 +124,7 @@ const LEER_SKIZZE: Fernmeldeskizze = {
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const fs = (p: Partial<Fuehrungsstelle> = {}): FernmeldenetzQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { sprechgruppen: [], fahrzeug_ids: [], ...p },
+  daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p },
 });
 
 function quellen(

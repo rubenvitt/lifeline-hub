@@ -3,14 +3,21 @@
 //!
 //! Lesen mit dem Einsatz (kein Modul), Schreiben mit den Rechten der Kopfdaten. Eine Änderung
 //! meldet das Ereignis `einsatz` über `routes::einsatz::kopf_geaendert` (Spec `einsatzkopf-live`).
-//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3).
+//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3),
+//! Art, Bezeichnung und Standort: `openspec/changes/lfh-1181-fuehrungsstelle-ort/design.md` (D1, D2).
 
 use crate::app::AppState;
-use crate::einsatz::fuehrungsstelle::{self, FuehrungsstelleAnzeige, FuehrungsstellePatch};
+use crate::einsatz::fuehrungsstelle::{
+    self, FuehrungsstelleAnzeige, FuehrungsstellePatch, FuehrungsstellenArt,
+    FUEHRUNGSSTELLE_ADRESSE_MAX, FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
-use crate::routes::support::{deserialize_optional_field, pruefe_kommunikationsmittel, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, hoechstens, parse_enum, pruefe_kommunikationsmittel,
+    pruefe_koordinate, trimme_tri,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -19,6 +26,18 @@ use serde::Deserialize;
 /// PATCH-Body, Tri-State je Feld: absent = unverändert, `null`/`""` = leeren.
 #[derive(Debug, Deserialize)]
 pub struct FuehrungsstellePatchBody {
+    /// `mobil` | `ortsfest`; `null` oder leer ist 400, denn die Art ist nie leer (D1).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub art: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bezeichnung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_adresse: Option<Option<String>>,
+    /// Koordinate des Standorts; geprüft als Paar am Stand nach der Änderung (422).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_lon: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub rufname: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -64,18 +83,53 @@ pub async fn aendern(
         .map(Option::unwrap_or_default)
         .map(fuehrungsstelle::normalisiere_fahrzeug_ids)
         .transpose()?;
+    // 400 je Feld vor jedem 422 des Zusammenhangs (`src/AGENTS.md`, Statuscode-Konvention).
+    let art = trimme_tri(body.art)
+        .map(|wert| {
+            let wert =
+                wert.ok_or_else(|| AppError::Validation("Art darf nicht leer sein".into()))?;
+            parse_enum(
+                FuehrungsstellenArt::parse,
+                &wert,
+                format!("Unbekannte Art der Führungsstelle: {wert}"),
+            )
+        })
+        .transpose()?;
+    let bezeichnung = trimme_tri(body.bezeichnung);
+    if let Some(Some(b)) = &bezeichnung {
+        hoechstens(b, "Bezeichnung", FUEHRUNGSSTELLE_BEZEICHNUNG_MAX)?;
+    }
+    let adresse = trimme_tri(body.standort_adresse);
+    if let Some(Some(a)) = &adresse {
+        hoechstens(a, "Adresse", FUEHRUNGSSTELLE_ADRESSE_MAX)?;
+    }
     let rufname = trimme_tri(body.rufname);
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
-    if rufname.is_none()
+    if art.is_none()
+        && bezeichnung.is_none()
+        && adresse.is_none()
+        && body.standort_lat.is_none()
+        && body.standort_lon.is_none()
+        && rufname.is_none()
         && mittel.is_none()
         && erreichbarkeit.is_none()
         && ids.is_none()
         && fahrzeug_ids.is_none()
     {
         return Ok(Json(fuehrungsstelle::laden(&state.pool, einsatz_id).await?));
+    }
+    // Koordinate als Paar am Stand nach der Änderung (Muster `einsatz_uhs.rs`, design.md D2).
+    if body.standort_lat.is_some() || body.standort_lon.is_some() {
+        let vorher = fuehrungsstelle::laden(&state.pool, einsatz_id).await?;
+        pruefe_koordinate(
+            body.standort_lat.unwrap_or(vorher.standort_lat),
+            body.standort_lon.unwrap_or(vorher.standort_lon),
+            "Breite",
+            "Länge",
+        )?;
     }
     if let Some(ids) = &ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(
@@ -90,6 +144,11 @@ pub async fn aendern(
         fuehrungsstelle::pruefe_fahrzeuge(&state.pool, einsatz_id, ids).await?;
     }
     let patch = FuehrungsstellePatch {
+        art,
+        bezeichnung: bezeichnung.as_ref().map(|v| v.as_deref()),
+        standort_adresse: adresse.as_ref().map(|v| v.as_deref()),
+        standort_lat: body.standort_lat,
+        standort_lon: body.standort_lon,
         rufname: rufname.as_ref().map(|v| v.as_deref()),
         kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
         erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
