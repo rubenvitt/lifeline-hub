@@ -52,3 +52,5 @@ export const EXTERNE_STELLE_BEZEICHNUNG_MAX = 200;
 export const EXTERNE_STELLE_KURZ_MAX = 100;
 /** Meldende Stelle eines Einsatzes (LFH-1194). */
 export const MELDENDE_STELLE_MAX = 200;
+/** Freitext eines externen Einsatzleiters an der eigenen Führungsstelle (LFH-1199). */
+export const EINSATZLEITER_NAME_MAX = 200;

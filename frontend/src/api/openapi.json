@@ -4561,6 +4561,51 @@
           "bereitstellung"
         ]
       },
+      "EinsatzleiterAnzeige": {
+        "type": "object",
+        "description": "Der Einsatzleiter, wie der Client ihn liest.",
+        "required": [
+          "art",
+          "personal_noch_disponiert",
+          "seit"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/EinsatzleiterArt"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bei `personal` der beim Setzen eingefrorene Name, bei `extern` der Freitext. Fehlt nur nach\nder Schwärzung des Einsatzes."
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Dispositionszeile (`einsatz_personal.id`); fehlt bei `extern` und nach dem Entlassen."
+          },
+          "personal_noch_disponiert": {
+            "type": "boolean",
+            "description": "`false`, wenn die Person aus dem Einsatz entlassen ist (Name bleibt, `ON DELETE SET NULL`);\nbei `extern` immer `false`."
+          },
+          "seit": {
+            "type": "string",
+            "description": "Seit wann er die Einsatzleitung hat (UTC `YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
+      },
+      "EinsatzleiterArt": {
+        "type": "string",
+        "description": "Woher der Einsatzleiter kommt (LFH-1199). Wire == `as_str()`.",
+        "enum": [
+          "personal",
+          "extern"
+        ]
+      },
       "Einsatzperiode": {
         "type": "object",
         "description": "Eine Einsatzperiode einer Kraft. Offen, solange `ende_at` fehlt.",
@@ -6026,6 +6071,17 @@
           "fahrzeug_ids"
         ],
         "properties": {
+          "einsatzleiter": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzleiterAnzeige",
+                "description": "Der Einsatzleiter nach FwDV 100 (LFH-1199); fehlt, solange keiner erfasst ist. Den Namen\nliefert der Server jedem, der den Einsatz lesen darf: er ist eingefroren, kein Abruf des\nPersonals."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "erreichbarkeit": {
             "type": [
               "string",

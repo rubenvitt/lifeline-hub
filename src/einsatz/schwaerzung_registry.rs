@@ -1723,6 +1723,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
+            // Einsatzleiter (LFH-1199): Art, Person (FK) und „seit“ bleiben als anonymer
+            // Führungsnachweis wie bei der Stab-Besetzung; der Name ist PII.
+            retain("einsatzleiter_art", G_ENUM),
+            retain("einsatzleiter_personal_id", G_FK),
+            scrub("einsatzleiter_name", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name der Person bzw. des externen Einsatzleiters
+            retain("einsatzleiter_seit", G_ZEIT),
         ],
     },
     TabellenRegel {

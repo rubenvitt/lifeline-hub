@@ -1,16 +1,18 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): die Gegenstelle des Funkplans (ELW,
 //! Einsatzleitung) mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und den
-//! Fahrzeugen, die sie tragen (LFH-1106).
+//! Fahrzeugen, die sie tragen (LFH-1106), dazu der Einsatzleiter nach FwDV 100 (LFH-1199).
 //!
 //! Eine Zeile je Einsatz (Migration 0145), lazy beim ersten Schreiben; fehlt sie, gilt die
 //! Führungsstelle als nicht erfasst und der Abruf liefert alle Angaben leer. Sprechgruppen (0145)
 //! und Fahrzeuge (0171) hängen in eigenen Zuordnungstabellen. Nicht zu verwechseln
 //! mit `einsatz_mitgliedschaft.fuehrungsstelle` (Freitext je Person, LFH-461).
 //!
-//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2).
+//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2);
+//! Einsatzleiter: `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md` (D1–D3).
 
 use crate::error::AppError;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
@@ -34,6 +36,45 @@ pub struct FuehrungsstelleAnzeige {
     /// Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
     /// Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
     pub fahrzeug_ids: Vec<i64>,
+    /// Der Einsatzleiter nach FwDV 100 (LFH-1199); fehlt, solange keiner erfasst ist. Den Namen
+    /// liefert der Server jedem, der den Einsatz lesen darf: er ist eingefroren, kein Abruf des
+    /// Personals.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzleiter: Option<EinsatzleiterAnzeige>,
+}
+
+wire_enum! {
+    /// Woher der Einsatzleiter kommt (LFH-1199). Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum EinsatzleiterArt {
+        /// Eine disponierte Person dieses Einsatzes (`einsatz_personal`).
+        Personal => "personal",
+        /// Ein externer Einsatzleiter als Freitext, etwa der Kreisbrandmeister.
+        Extern => "extern",
+    }
+    try_from = |s| format!("Ungültige Art des Einsatzleiters: {s}");
+}
+
+/// Höchstlänge des Freitexts eines externen Einsatzleiters, wie `stab::BEZEICHNUNG_MAX`
+/// (`src/AGENTS.md`, „Eingabegrenzen“). Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const EINSATZLEITER_NAME_MAX: usize = 200;
+
+/// Der Einsatzleiter, wie der Client ihn liest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct EinsatzleiterAnzeige {
+    pub art: EinsatzleiterArt,
+    /// Bei `personal` der beim Setzen eingefrorene Name, bei `extern` der Freitext. Fehlt nur nach
+    /// der Schwärzung des Einsatzes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Die Dispositionszeile (`einsatz_personal.id`); fehlt bei `extern` und nach dem Entlassen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub personal_id: Option<i64>,
+    /// `false`, wenn die Person aus dem Einsatz entlassen ist (Name bleibt, `ON DELETE SET NULL`);
+    /// bei `extern` immer `false`.
+    pub personal_noch_disponiert: bool,
+    /// Seit wann er die Einsatzleitung hat (UTC `YYYY-MM-DD HH:MM:SS`).
+    pub seit: String,
 }
 
 /// Höchstzahl der Fahrzeuge einer Führungsstelle (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
@@ -111,6 +152,24 @@ pub struct FuehrungsstellePatch<'a> {
     /// Ersetzt die Fahrzeuge vollständig. Die IDs prüft der Aufrufer vorher
     /// ([`pruefe_fahrzeuge`]).
     pub fahrzeug_ids: Option<&'a [i64]>,
+    /// Setzt (`Some(Some)`) oder leert (`Some(None)`) den Einsatzleiter; schreibt bei einem
+    /// fachlichen Wechsel den Übergabe-Eintrag ins ETB (D3).
+    pub einsatzleiter: Option<Option<EinsatzleiterEingabe<'a>>>,
+}
+
+/// Ein neuer Einsatzleiter; Name getrimmt und geprüft, `seit` normalisiert (Route).
+#[derive(Debug, Clone, Copy)]
+pub enum EinsatzleiterEingabe<'a> {
+    Personal { personal_id: i64, seit: &'a str },
+    Extern { name: &'a str, seit: &'a str },
+}
+
+/// Wer den Patch schreibt, für den Übergabe-Eintrag im ETB.
+#[derive(Debug, Clone, Copy)]
+pub struct Schreiber {
+    pub benutzer_id: i64,
+    /// `etb_startwert` des Einsatzes, vor der Transaktion geladen (LFH-133).
+    pub etb_startwert: i64,
 }
 
 #[derive(sqlx::FromRow)]
@@ -118,21 +177,30 @@ struct Zeile {
     rufname: Option<String>,
     kommunikationsmittel: Option<String>,
     erreichbarkeit: Option<String>,
+    einsatzleiter_art: Option<String>,
+    einsatzleiter_personal_id: Option<i64>,
+    einsatzleiter_name: Option<String>,
+    einsatzleiter_seit: Option<String>,
+    personal_noch_disponiert: bool,
 }
 
 /// Lädt die Führungsstelle; ohne Zeile alle Angaben leer.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<FuehrungsstelleAnzeige, AppError> {
+pub async fn load(pool: &SqlitePool, einsatz_id: i64) -> Result<FuehrungsstelleAnzeige, AppError> {
     let mut conn = pool.acquire().await?;
-    laden_tx(&mut conn, einsatz_id).await
+    load_tx(&mut conn, einsatz_id).await
 }
 
-async fn laden_tx(
+async fn load_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
 ) -> Result<FuehrungsstelleAnzeige, AppError> {
     let zeile = sqlx::query_as::<_, Zeile>(
-        "SELECT rufname, kommunikationsmittel, erreichbarkeit \
-         FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?",
+        "SELECT fs.rufname, fs.kommunikationsmittel, fs.erreichbarkeit, \
+                fs.einsatzleiter_art, fs.einsatzleiter_personal_id, fs.einsatzleiter_name, \
+                fs.einsatzleiter_seit, ep.id IS NOT NULL AS personal_noch_disponiert \
+         FROM einsatz_fuehrungsstelle fs \
+         LEFT JOIN einsatz_personal ep ON ep.id = fs.einsatzleiter_personal_id \
+         WHERE fs.einsatz_id = ?",
     )
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
@@ -155,26 +223,200 @@ async fn laden_tx(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
-    let (rufname, kommunikationsmittel, erreichbarkeit) = match zeile {
-        Some(z) => (z.rufname, z.kommunikationsmittel, z.erreichbarkeit),
-        None => (None, None, None),
+    let Some(z) = zeile else {
+        return Ok(FuehrungsstelleAnzeige {
+            rufname: None,
+            sprechgruppen: sprechgruppen.iter().map(Sprechgruppe::anzeige).collect(),
+            kommunikationsmittel: None,
+            erreichbarkeit: None,
+            fahrzeug_ids,
+            einsatzleiter: None,
+        });
+    };
+    // Art und seit stehen nur gemeinsam (D1); eine unbekannte Art kann der CHECK nicht liefern.
+    let einsatzleiter = match (
+        z.einsatzleiter_art
+            .as_deref()
+            .and_then(EinsatzleiterArt::parse),
+        z.einsatzleiter_seit,
+    ) {
+        (Some(art), Some(seit)) => Some(EinsatzleiterAnzeige {
+            art,
+            name: z.einsatzleiter_name,
+            personal_id: z.einsatzleiter_personal_id,
+            personal_noch_disponiert: art == EinsatzleiterArt::Personal
+                && z.personal_noch_disponiert,
+            seit,
+        }),
+        _ => None,
     };
     Ok(FuehrungsstelleAnzeige {
-        rufname,
+        rufname: z.rufname,
         sprechgruppen: sprechgruppen.iter().map(Sprechgruppe::anzeige).collect(),
-        kommunikationsmittel,
-        erreichbarkeit,
+        kommunikationsmittel: z.kommunikationsmittel,
+        erreichbarkeit: z.erreichbarkeit,
         fahrzeug_ids,
+        einsatzleiter,
     })
+}
+
+/// Der fachliche Stand des Einsatzleiters: Art, Person, Name. `seit` gehört nicht dazu — eine
+/// geänderte Zeit allein ist keine Übergabe (Spec, „Übergabe der Einsatzleitung im ETB“).
+type Stand = Option<(EinsatzleiterArt, Option<i64>, Option<String>)>;
+
+async fn einsatzleiter_stand(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Stand, AppError> {
+    let row: Option<(Option<String>, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT einsatzleiter_art, einsatzleiter_personal_id, einsatzleiter_name \
+         FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(row
+        .and_then(|(art, pid, name)| Some((EinsatzleiterArt::parse(art.as_deref()?)?, pid, name))))
+}
+
+/// Der Name, wie ihn Anzeige und ETB-Text führen: extern mit Zusatz „(extern)“.
+fn stand_name(stand: &(EinsatzleiterArt, Option<i64>, Option<String>)) -> String {
+    let name = stand.2.as_deref().unwrap_or("unbekannt");
+    match stand.0 {
+        EinsatzleiterArt::Personal => name.to_string(),
+        EinsatzleiterArt::Extern => format!("{name} (extern)"),
+    }
+}
+
+/// Der Wortlaut des Übergabe-Eintrags; `None`, wenn sich fachlich nichts geändert hat.
+fn uebergabe_text(vorher: &Stand, nachher: &Stand) -> Option<String> {
+    let gleich = match (vorher, nachher) {
+        // Eine Person ist dieselbe, wenn die Dispositionszeile gleich ist (der Name ist ihr
+        // Abbild); eine entlassene Person (`None`) ist nie dieselbe wie eine neu gewählte.
+        (Some((EinsatzleiterArt::Personal, a, _)), Some((EinsatzleiterArt::Personal, b, _))) => {
+            a.is_some() && a == b
+        }
+        (a, b) => a == b,
+    };
+    if gleich {
+        return None;
+    }
+    Some(match (vorher, nachher) {
+        (None, Some(n)) => format!("Einsatzleitung übernommen: {}", stand_name(n)),
+        (Some(v), Some(n)) => format!(
+            "Übergabe der Einsatzleitung von {} an {}",
+            stand_name(v),
+            stand_name(n)
+        ),
+        (Some(v), None) => format!(
+            "Einsatzleitung nicht mehr erfasst (vorher: {})",
+            stand_name(v)
+        ),
+        (None, None) => return None,
+    })
+}
+
+/// Prüft, dass `personal_id` eine Disposition **dieses** Einsatzes ist (sonst 422), und liefert
+/// ihren `snap_name` zum Einfrieren — Muster `stab::repo::snap_name_von`.
+async fn load_snap_name(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    personal_id: i64,
+) -> Result<String, AppError> {
+    let name: Option<String> = sqlx::query_scalar(
+        "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(personal_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    name.ok_or_else(|| {
+        AppError::UnprocessableEntity(format!(
+            "Person {personal_id} ist in diesem Einsatz nicht disponiert"
+        ))
+    })
+}
+
+/// Schreibt den Einsatzleiter und, bei einem fachlichen Wechsel, den Übergabe-Eintrag ins ETB —
+/// in der offenen Transaktion des Aufrufers. Liefert die id des Eintrags.
+async fn save_einsatzleiter_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    schreiber: Schreiber,
+    eingabe: Option<EinsatzleiterEingabe<'_>>,
+) -> Result<Option<i64>, AppError> {
+    // Ein abgeschlossener Einsatz bekommt keinen Eintrag mehr: der Extractor prüft vor der
+    // Transaktion, ein konkurrierender Abschluss kann dazwischenliegen (D3).
+    crate::stab::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+    let vorher = einsatzleiter_stand(conn, einsatz_id).await?;
+    let (nachher, seit): (Stand, Option<&str>) = match eingabe {
+        None => (None, None),
+        Some(EinsatzleiterEingabe::Personal { personal_id, seit }) => {
+            let name = load_snap_name(conn, einsatz_id, personal_id).await?;
+            (
+                Some((EinsatzleiterArt::Personal, Some(personal_id), Some(name))),
+                Some(seit),
+            )
+        }
+        Some(EinsatzleiterEingabe::Extern { name, seit }) => (
+            Some((EinsatzleiterArt::Extern, None, Some(name.to_string()))),
+            Some(seit),
+        ),
+    };
+    let (art, pid, name) = match &nachher {
+        Some((art, pid, name)) => (Some(art.as_str()), *pid, name.as_deref()),
+        None => (None, None, None),
+    };
+    sqlx::query(
+        "UPDATE einsatz_fuehrungsstelle SET einsatzleiter_art = ?, \
+            einsatzleiter_personal_id = ?, einsatzleiter_name = ?, einsatzleiter_seit = ? \
+         WHERE einsatz_id = ?",
+    )
+    .bind(art)
+    .bind(pid)
+    .bind(name)
+    .bind(seit)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+
+    let Some(inhalt) = uebergabe_text(&vorher, &nachher) else {
+        return Ok(None);
+    };
+    let daten = crate::etb::repo::EintragDaten {
+        typ: crate::etb::TYP_SYSTEM,
+        inhalt: &inhalt,
+        von: None,
+        an: None,
+        meldeweg: None,
+        veranlassung: None,
+        // Die Übergabe gilt ab „seit“; beim Leeren gilt die Zeit des Speicherns.
+        ereigniszeit: seit,
+        erfasst_lokal_at: None,
+        berichtigt_eintrag_id: None,
+    };
+    crate::etb::repo::anlegen_tx(
+        conn,
+        einsatz_id,
+        schreiber.benutzer_id,
+        schreiber.etb_startwert,
+        daten,
+    )
+    .await
+    .map(Some)
 }
 
 /// Schreibt die Teiländerung und liefert den neuen Stand — alles in der offenen Transaktion des
 /// Aufrufers (`write_retry!`), damit ein Fehler nichts teilweise speichert.
-pub async fn patchen_tx(
+///
+/// Liefert dazu die id eines Übergabe-Eintrags im ETB; den Live-Kurzruf macht der Aufrufer nach
+/// dem Commit.
+pub async fn patch_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
+    schreiber: Schreiber,
     patch: &FuehrungsstellePatch<'_>,
-) -> Result<FuehrungsstelleAnzeige, AppError> {
+) -> Result<(FuehrungsstelleAnzeige, Option<i64>), AppError> {
     sqlx::query("INSERT OR IGNORE INTO einsatz_fuehrungsstelle (einsatz_id) VALUES (?)")
         .bind(einsatz_id)
         .execute(&mut *conn)
@@ -223,5 +465,9 @@ pub async fn patchen_tx(
         .execute(&mut *conn)
         .await?;
     }
-    laden_tx(conn, einsatz_id).await
+    let etb_id = match patch.einsatzleiter {
+        Some(eingabe) => save_einsatzleiter_tx(conn, einsatz_id, schreiber, eingabe).await?,
+        None => None,
+    };
+    Ok((load_tx(conn, einsatz_id).await?, etb_id))
 }
