@@ -1,7 +1,7 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): die Gegenstelle des Funkplans (ELW,
 //! Einsatzleitung) mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und den
 //! Fahrzeugen, die sie tragen (LFH-1106). Seit LFH-1181 ein Ort mit Ausstattung: Art (mobil,
-//! ortsfest), Bezeichnung und Standort (Adresse, Koordinate; Migration 0176).
+//! ortsfest), Bezeichnung und Standort (Adresse, Koordinate; Migration 0177).
 //!
 //! Eine Zeile je Einsatz (Migration 0145), lazy beim ersten Schreiben; fehlt sie, gilt die
 //! Führungsstelle als nicht erfasst und der Abruf liefert alle Angaben leer. Sprechgruppen (0145)
@@ -21,7 +21,7 @@ use utoipa::ToSchema;
 wire_enum! {
     /// Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`
     /// (Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in
-    /// `migrations/0176_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+    /// `migrations/0177_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum FuehrungsstellenArt {
         Mobil => "mobil",

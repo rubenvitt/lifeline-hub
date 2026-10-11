@@ -43,7 +43,8 @@ import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
-import FreiesZeichenPicker from './FreiesZeichenPicker';
+import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
+import { START_ZEICHEN_SPEC } from './zeichenWahl';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
@@ -611,8 +612,8 @@ export default function Sidebar(props: SidebarProps) {
   // Freies-Zeichen-Schnellerfassung: der Picker erscheint erst auf Klick, der Entwurf bleibt über
   // Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
-  const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
-    grundzeichen: 'taktische-formation',
+  const [zeichenEntwurf, setZeichenEntwurf] = useState<ZeichenEntwurf>({
+    zeichen_spec: START_ZEICHEN_SPEC,
   });
   /**
    * Knopf „Platzieren" und Enter im Picker: der Entwurf übernimmt die Spec, damit der wieder
@@ -1019,7 +1020,14 @@ export default function Sidebar(props: SidebarProps) {
                       onAbsenden={platziereZeichen}
                     />
                     <Space>
-                      <Button type="primary" onClick={() => platziereZeichen(zeichenEntwurf)}>
+                      {/* Ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl) gesperrt. */}
+                      <Button
+                        type="primary"
+                        disabled={!hatZeichen(zeichenEntwurf)}
+                        onClick={() => {
+                          if (hatZeichen(zeichenEntwurf)) platziereZeichen(zeichenEntwurf);
+                        }}
+                      >
                         Platzieren
                       </Button>
                       <Button onClick={() => setZeichenPickerOffen(false)}>Abbrechen</Button>

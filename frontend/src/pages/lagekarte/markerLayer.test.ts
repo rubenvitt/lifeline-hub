@@ -56,11 +56,15 @@ describe('baueMarkerFc', () => {
     expect(fc.features[0].properties.statusFarbe).toBe('#00ff00');
   });
 
-  it('setzt für freie Zeichen den Bildschlüssel des Altpakets (bis LFH-836)', () => {
+  it('setzt für freie Zeichen den ez|-Bildschlüssel des Leseadapters (LFH-836)', () => {
     const fc = baueMarkerFc([
-      mk({ schluessel: 'freies_zeichen-1', typ: 'freies_zeichen', tz: { grundzeichen: 'person' } }),
+      mk({
+        schluessel: 'freies_zeichen-1',
+        typ: 'freies_zeichen',
+        freiesZeichen: { grundzeichen: 'person' },
+      }),
     ]);
-    expect(fc.features[0].properties.icon?.startsWith('tz|')).toBe(true);
+    expect(fc.features[0].properties.icon).toBe('ez|{"v":1,"spec":{"kind":"person"}}');
   });
 
   it('lässt icon bei Lagemeldung (kein tz) weg → wird als Kreis gerendert', () => {

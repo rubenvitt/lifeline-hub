@@ -275,7 +275,7 @@ test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck m
   await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
   const paneel = page.getByRole('region', { name: 'Eigene Führungsstelle' });
   await paneel.getByRole('button', { name: 'Rufname eintragen', exact: true }).click();
-  const ruf = paneel.getByRole('textbox', { name: 'Rufname', exact: true });
+  const ruf = paneel.getByRole('combobox', { name: 'Rufname', exact: true });
   await ruf.fill(FS_RUF);
   await ruf.press('Enter');
   await expect(paneel.getByRole('button', { name: 'Rufname bearbeiten' })).toContainText(FS_RUF);

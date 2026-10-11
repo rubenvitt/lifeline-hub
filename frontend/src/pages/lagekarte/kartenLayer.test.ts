@@ -359,7 +359,7 @@ describe('plakettenBild', () => {
   });
 
   it('liefert für fremde oder unlesbare Ids nichts, statt zu werfen', () => {
-    expect(plakettenBild('tz|irgendwas')).toBeNull();
+    expect(plakettenBild('ez|irgendwas')).toBeNull();
     expect(plakettenBild('plakette|rot|blau')).toBeNull();
   });
 });

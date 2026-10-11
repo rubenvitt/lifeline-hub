@@ -18,6 +18,7 @@ import {
   switchMasse,
 } from './tokens';
 import { farbenDunkel } from './tokens';
+import { kontrast } from '../test/farbmass';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -478,5 +479,19 @@ describe('Feldmeldung: Text in alarmText (LFH-667)', () => {
     ['Nacht', farbenDunkel],
   ])('%s: das globale colorError bleibt die Füllfarbe alarm', (_modus, farben) => {
     expect(antdToken(farben)?.colorError).toBe(farben.alarm);
+  });
+});
+
+describe('Zeichenplatte (LFH-836)', () => {
+  // Die Zeichen der Bibliothek tragen schwarze Tinte (`ink`); nachts verschwände sie auf dem
+  // dunklen Paneel. Picker-Kacheln und Inspector-Kachel legen das Zeichen deshalb auf die Platte.
+  it('ist am Tag durchsichtig: Kachel und Paneel sehen aus wie zuvor', () => {
+    expect(farbenHell.zeichenPlatte).toBe('transparent');
+  });
+
+  it('trägt nachts schwarze Tinte mit mindestens 7 : 1 und hebt sich vom Paneel ab', () => {
+    expect(kontrast('#000000', farbenDunkel.zeichenPlatte)).toBeGreaterThanOrEqual(7);
+    expect(kontrast(farbenDunkel.zeichenPlatte, farbenDunkel.paneel)).toBeGreaterThanOrEqual(3);
+    expect(kontrast(farbenDunkel.zeichenPlatte, farbenDunkel.flaeche3)).toBeGreaterThanOrEqual(3);
   });
 });

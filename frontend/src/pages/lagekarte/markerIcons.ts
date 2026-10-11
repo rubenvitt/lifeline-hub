@@ -1,60 +1,42 @@
 import type { Drawing } from '@einsatzzeichen/schema';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
+import { freiesZeichen } from '../../zeichen/freiesZeichen';
 import type { KarteMarker } from './marker';
-import type { TzProps } from './taktischesZeichen';
 
-/**
- * Deterministischer, eindeutiger MapLibre-Image-Key für ein taktisches Zeichen.
- * Gleicher TZ → gleicher Key (Icon wird genau einmal registriert und mehrfach genutzt).
- * Am `tz|`-Präfix erkennt der Bild-Resolver (`kartenbildResolver.ts`) den Weg über das Altpaket.
- */
-export function tzIconKey(tz: TzProps): string {
-  return [
-    'tz',
-    tz.grundzeichen ?? '',
-    tz.organisation ?? '',
-    tz.fachaufgabe ?? '',
-    tz.einheit ?? '',
-    tz.symbol ?? '',
-    tz.farbe ?? '',
-    tz.funktion ?? '',
-  ].join('|');
+type MitZeichen = Pick<KarteMarker, 'typ' | 'tz' | 'freiesZeichen'>;
+
+/** Das Zeichen eines Markers aus seiner einen Quelle: Leseadapter oder Fachobjekt-Übersetzung. */
+function zeichenVon(mk: MitZeichen): { schluessel: string; drawing: Drawing } | null {
+  if (mk.typ === 'freies_zeichen') return mk.freiesZeichen ? freiesZeichen(mk.freiesZeichen) : null;
+  return mk.tz ? fachobjektZeichen(mk.tz) : null;
 }
 
 /**
  * Der Bildschlüssel eines Markers — die eine Quelle für die Feature-Property `icon` und die Registry
- * des Bild-Resolvers (`kartenbildResolver.ts`; LFH-835, design.md D5). Freie Zeichen zeichnet bis LFH-836 das
- * Altpaket (`tz|`), alle übrigen Marker @einsatzzeichen (`ez|` + wirksame Spec). Ohne `tz` oder
- * ohne darstellbaren Körper kein Schlüssel: der Marker bleibt ein Kreis.
+ * des Bild-Resolvers (`kartenbildResolver.ts`; LFH-835 design.md D5, LFH-836 design.md D8). Alle
+ * Zeichen zeichnet @einsatzzeichen: `ez|` + wirksame Spec, freie Zeichen über den Leseadapter
+ * (`zeichen/freiesZeichen.ts`), Fachobjekte über `fachobjektZeichen`. Gleiche Spec heißt gleicher
+ * Schlüssel, auch über Fachobjekte und freie Zeichen hinweg. Ohne Zeichen oder ohne darstellbaren
+ * Körper eines Fachobjekts kein Schlüssel: der Marker bleibt ein Kreis. Ein freies Zeichen hat
+ * immer einen (zur Not den Platzhalter).
  */
-export function markerIconKey(mk: Pick<KarteMarker, 'typ' | 'tz'>): string | undefined {
-  if (!mk.tz) return undefined;
-  if (mk.typ === 'freies_zeichen') return tzIconKey(mk.tz);
-  return fachobjektZeichen(mk.tz)?.schluessel;
+export function markerIconKey(mk: MitZeichen): string | undefined {
+  return zeichenVon(mk)?.schluessel;
 }
 
-/** Woraus der Bild-Resolver (`kartenbildResolver.ts`) ein Kartenbild erzeugt. */
-export type ZeichenQuelle = { art: 'ez'; drawing: Drawing } | { art: 'tz'; tz: TzProps };
-
-/** Bildschlüssel → Quelle, für alle Marker mit Zeichen; gleiche Zeichen einmal. */
-export function baueZeichenRegistry(
-  markers: ReadonlyArray<Pick<KarteMarker, 'typ' | 'tz'>>,
-): Map<string, ZeichenQuelle> {
-  const registry = new Map<string, ZeichenQuelle>();
+/** Bildschlüssel → Zeichnung, für alle Marker mit Zeichen; gleiche Zeichen einmal. */
+export function baueZeichenRegistry(markers: ReadonlyArray<MitZeichen>): Map<string, Drawing> {
+  const registry = new Map<string, Drawing>();
   for (const mk of markers) {
-    const key = markerIconKey(mk);
-    if (!key || !mk.tz || registry.has(key)) continue;
-    if (mk.typ === 'freies_zeichen') {
-      registry.set(key, { art: 'tz', tz: mk.tz });
-    } else {
-      const zeichen = fachobjektZeichen(mk.tz);
-      if (zeichen) registry.set(key, { art: 'ez', drawing: zeichen.drawing });
+    const zeichen = zeichenVon(mk);
+    if (zeichen && !registry.has(zeichen.schluessel)) {
+      registry.set(zeichen.schluessel, zeichen.drawing);
     }
   }
   return registry;
 }
 
-/** Kantenlänge eines Fachobjekt-Zeichens auf der Karte in CSS-px; der Statusring ist darauf abgestimmt. */
+/** Kantenlänge eines Zeichens auf der Karte in CSS-px; der Statusring ist darauf abgestimmt. */
 export const ZEICHEN_KARTEN_PX = 34;
 
 /**

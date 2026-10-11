@@ -136,7 +136,7 @@ export function baueFuehrungsorganisation(
       name: a.name,
       rufname: a.kurzbezeichnung ?? null,
       leitung: a.leiter_name ?? null,
-      // Derselbe Aufruf wie der Gliederungsbaum (`baueBaum`): inklusive aller Unterabschnitte.
+      // Derselbe Aufruf wie der Gliederungsbaum (`buildBaum`): inklusive aller Unterabschnitte.
       staerke: einheitenFehlen
         ? null
         : abschnittStaerken([...abschnitte], [...alleEinheiten], a.id).inklUnter,

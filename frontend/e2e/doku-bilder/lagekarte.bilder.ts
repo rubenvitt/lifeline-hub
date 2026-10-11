@@ -24,7 +24,8 @@ import {
  *                          frontend/src/pages/lagekarte/Sidebar.tsx,
  *                          frontend/src/pages/lagekarte/KartenUeberlagerung.tsx
  *   taktisches-zeichen.png frontend/src/pages/lagekarte/Sidebar.tsx (Paneel „Zeichnen“),
- *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx
+ *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx,
+ *                          frontend/src/pages/lagekarte/zeichenWahl.ts
  *   zone-zeichnen.png      frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx
  *   messen.png             frontend/src/pages/lagekarte/MessSteuerung.tsx
  *
@@ -168,7 +169,7 @@ test.describe(KAPITEL, () => {
     const zeichnen = page.locator('section[data-paneel="zeichnen"]');
     await zeichnen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
     const grundzeichen = zeichnen.getByRole('radiogroup', { name: 'Grundzeichen' });
-    await grundzeichen.getByRole('radio', { name: 'Fahrzeug', exact: true }).click();
+    await grundzeichen.getByRole('radio', { name: 'Landfahrzeug', exact: true }).click();
     await expect(zeichnen.getByRole('button', { name: 'Platzieren' })).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(zeichnen, KAPITEL, 'taktisches-zeichen');

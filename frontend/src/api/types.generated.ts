@@ -2172,7 +2172,13 @@ export interface components {
              */
             lfd_nr?: number | null;
         };
-        /** @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170). */
+        /**
+         * @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).
+         *
+         *     Genau eine Form ist gesetzt (DB-CHECK, LFH-836): `zeichen_spec` (neu) ODER `grundzeichen` mit
+         *     den Overlays (Altform aus der Zeit vor LFH-836 bzw. von einem veralteten Client). Der Client
+         *     übersetzt die Altform beim Lesen (design.md D5).
+         */
         FreiesZeichenAnzeige: {
             /**
              * Format: int64
@@ -2189,7 +2195,8 @@ export interface components {
             farbe?: string | null;
             funktion?: string | null;
             geaendert_at: string;
-            grundzeichen: string;
+            /** @description Altform: fehlt bei einem Zeichen mit `zeichen_spec`. */
+            grundzeichen?: string | null;
             /** Format: int64 */
             id: number;
             label?: string | null;
@@ -2199,6 +2206,11 @@ export interface components {
             lon: number;
             organisation?: string | null;
             symbol?: string | null;
+            /**
+             * @description Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie
+             *     gesendet; fehlt bei einem Zeichen in Altform.
+             */
+            zeichen_spec?: string | null;
         };
         /**
          * @description Führungsfunktion aus dem Katalog. Wire == `as_str()`.
@@ -2286,7 +2298,7 @@ export interface components {
         /**
          * @description Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`
          *     (Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in
-         *     `migrations/0176_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+         *     `migrations/0177_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
          * @enum {string}
          */
         FuehrungsstellenArt: "mobil" | "ortsfest";

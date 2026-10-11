@@ -83,7 +83,10 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über
   `scripts/release/ki-notizen.mjs` (Rückfall auf konventionelle Notizen, `maxTurns: 1`, Vorlage
-  `KI_PROMPT` in `release.config.mjs`).
+  `KI_PROMPT` in `release.config.mjs`). Claude meldet sich per Workload Identity Federation an
+  (GitHub-OIDC, Schritt „Claude-Anmeldung“ in `release.yml`, IDs als Repo-Variablen), **kein
+  `ANTHROPIC_API_KEY`**; dafür hebt ein Override in der Wurzel-`pnpm-workspace.yaml` das Agent
+  SDK über die `^0.1`-Sperre des Plugins.
 - **Release erst nach grünem Bau aller Plattformen** (LFH-1054): semantic-release legt einen
   Entwurf an (`draftRelease`), `release.yml` startet `artefakte.yml` per Dispatch, dessen Job
   `freigeben` veröffentlicht, `latest` an die Abbilder hängt, die PRs kommentiert

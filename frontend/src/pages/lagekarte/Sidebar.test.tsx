@@ -742,8 +742,38 @@ describe('Sidebar Bild-Hintergründe', () => {
     // Jetzt ist der Picker offen …
     expect(screen.getAllByLabelText('Grundzeichen').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Platzieren' }));
+    // Startentwurf ist die taktische Formation, gesendet als Zeichenbeschreibung (LFH-836).
     expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
-      expect.objectContaining({ grundzeichen: 'taktische-formation' }),
+      expect.objectContaining({ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }),
+    );
+  });
+
+  it('sperrt „Platzieren“ nach „Kein Grundzeichen“, bis ein Symbol gewählt ist (LFH-836)', () => {
+    const onZeichenPlatzierenStart = vi.fn();
+    renderMitProviders(
+      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole('radio', {
+        name: 'Kein Grundzeichen',
+      }),
+    );
+    const knopf = screen.getByRole('button', { name: 'Platzieren' });
+    expect(knopf).toBeDisabled();
+    fireEvent.click(knopf);
+    expect(onZeichenPlatzierenStart).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Symbol' })).getByRole('radio', {
+        name: 'Angeschlagen',
+      }),
+    );
+    expect(knopf).toBeEnabled();
+    fireEvent.click(knopf);
+    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        zeichen_spec: '{"v":1,"freestanding":{"kind":"state","state":"damaged"}}',
+      }),
     );
   });
 
@@ -761,7 +791,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     fireEvent.keyDown(kachel, { key: 'Enter' });
     // Die Spec der Enter-Kachel, nicht der Entwurf von vorher.
     expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
-      expect.objectContaining({ grundzeichen: 'person' }),
+      expect.objectContaining({ zeichen_spec: '{"v":1,"spec":{"kind":"person"}}' }),
     );
     expect(screen.queryByRole('radiogroup', { name: 'Grundzeichen' })).not.toBeInTheDocument();
   });
@@ -771,7 +801,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
         onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
       />,
     );
@@ -789,7 +819,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
         zeichenSerie
         onZeichenSerieWechsel={onZeichenSerieWechsel}
       />,
@@ -805,7 +835,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
         zeichenSerie
         zeichenSerieAnzahl={2}
         onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
@@ -1673,7 +1703,7 @@ describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {
       <Sidebar
         {...basisProps}
         darfSchreiben
-        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
         zeichenSerie
         zeichenSerieAnzahl={2}
         modusBedienungImFuss

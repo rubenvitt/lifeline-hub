@@ -67,7 +67,7 @@ Keine.
 ## Impact
 
 - **Backend:**
-  - Migration `0176` mit den neuen Spalten.
+  - Migration `0177` mit den neuen Spalten.
   - Domänen- und Routenlogik: `src/einsatz/fuehrungsstelle.rs`, `src/routes/einsatz_fuehrungsstelle.rs`.
   - Neues `wire_enum!` für die Art, eingetragen in `src/api_doc.rs` und `tests/enum_wire_kontrakt.rs`.
   - Schwärzungsregister `src/einsatz/schwaerzung_registry.rs`.

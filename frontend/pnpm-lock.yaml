@@ -22,17 +22,17 @@ importers:
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@einsatzzeichen/core':
-        specifier: 4.3.0
-        version: 4.3.0
+        specifier: 5.2.0
+        version: 5.2.0
       '@einsatzzeichen/maplibre':
-        specifier: 4.3.0
-        version: 4.3.0
+        specifier: 5.2.0
+        version: 5.2.0
       '@einsatzzeichen/react':
-        specifier: 4.3.0
-        version: 4.3.0(react@19.3.0)
+        specifier: 5.2.0
+        version: 5.2.0(react@19.3.0)
       '@einsatzzeichen/schema':
-        specifier: 4.3.0
-        version: 4.3.0
+        specifier: 5.2.0
+        version: 5.2.0
       '@simplewebauthn/browser':
         specifier: 14.0.0
         version: 14.0.0
@@ -84,9 +84,6 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
-      taktische-zeichen-react:
-        specifier: ^0.10.0
-        version: 0.10.0(react@19.3.0)
       terra-draw:
         specifier: ^1.35.0
         version: 1.35.0
@@ -808,19 +805,19 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
 
-  '@einsatzzeichen/core@4.3.0':
-    resolution: {integrity: sha512-sB6ccqSLHpfAeB0l4IR3KGp0OLJFsa5y4+/Huq4kECqhayX55nnUCDcubC6OCOjTD9ddLSnpUbz4oq/6Lp2UBw==}
+  '@einsatzzeichen/core@5.2.0':
+    resolution: {integrity: sha512-6Tgx+TN5WSrayt5XfpQugVyN0ttAjeBmfH2HKPUPtv6Rnvm+CVvL+VVEgu6oGNQAsaEVIUDqDiZfmATIJwsQRw==}
 
-  '@einsatzzeichen/maplibre@4.3.0':
-    resolution: {integrity: sha512-RA0xdAcKtjn4mp28X77KujFDtotIBknkXqD+Met7rdpxndo+2/tlI5lBZXBFPj62AJ+cFQGEQBUZzeSg1ES5gQ==}
+  '@einsatzzeichen/maplibre@5.2.0':
+    resolution: {integrity: sha512-Vqjc+lPJgJwOraO3bxWfKVxDdKj9JwrXBinnjIuRKnb/Vsd4GzUO18HcP15mVTp0SzQun0/qhmI74OzYTgNqKQ==}
 
-  '@einsatzzeichen/react@4.3.0':
-    resolution: {integrity: sha512-taUI8e6g+BtLSyJEnRMdmPsX8jM15v2wT0sLpUVPE/gunr6b8gEi6ebkh/2F8C0VqGezkWsDPouPeGkbZop/Sw==}
+  '@einsatzzeichen/react@5.2.0':
+    resolution: {integrity: sha512-Clic6b7QHAJRxHBLjl3uUfe+Ksj1cXwiDWr4d5wyGhYIzUhJHjJSfhMYMq5kMVssEfAVoZO3nfwpBKCZaVTaCQ==}
     peerDependencies:
       react: '>=18'
 
-  '@einsatzzeichen/schema@4.3.0':
-    resolution: {integrity: sha512-DZQ7tmctvLfchhg5e891QihB50gdSPy+PTk3wjLewVlw0wcQs7gxzsCFa7HnOP8lZORdeY1lBI+dITJzzld5Zw==}
+  '@einsatzzeichen/schema@5.2.0':
+    resolution: {integrity: sha512-NIDSyrA+u2xZfm2D4sw18Rbzl3WKFlFrS4iTwA+rKs5clQvNFXB06uRCXauMeeQSQgf2w20XUjfxoJwdD0ZxHg==}
 
   '@emotion/hash@0.8.0':
     resolution: {integrity: sha512-kBJtf7PH6aWwZ6fka3zQ0p6SBYzx4fl1LoZXE2RrnYST9Xljm7WfKJrU4g/Xr3Beg72MLrp1AWNUmuYJTL7Cow==}
@@ -2110,9 +2107,6 @@ packages:
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
-
-  base64-js@1.5.1:
-    resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
   baseline-browser-mapping@2.11.20:
     resolution: {integrity: sha512-H0ulySigv6icDJ1F7SjtdCD6PrhTpdYCmP0CactWy1+ekh0AFd0o1Wn5T8b+hnTmdBx19u9yhL6wvCylXMY7zw==}
@@ -3705,16 +3699,6 @@ packages:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
     engines: {node: '>=20'}
 
-  taktische-zeichen-core@0.10.0:
-    resolution: {integrity: sha512-jo4jZmAuBbAsKJrDppHY1hSprnZGmC8f8fRI1GwpZ6fOKDXXEaxVrNWJDfvywnjYXwEfOsRl7obbLW/LT77J9g==}
-    deprecated: 'Moved to @taktische-zeichen/core: https://github.com/phjardas/taktische-zeichen'
-
-  taktische-zeichen-react@0.10.0:
-    resolution: {integrity: sha512-tVoFQ7fmpBEC7eRL93oc0itJ4uX/eCmCkobHqZlj2nChRrDz7k9O/jksmVlTnnsy0eHZ4gd1V72AP4C/QpAraA==}
-    deprecated: 'Moved to @taktische-zeichen/react: https://github.com/phjardas/taktische-zeichen'
-    peerDependencies:
-      react: '>= 17.0.0'
-
   temp-dir@2.0.0:
     resolution: {integrity: sha512-aoBAniQmmwtcKp/7BzsH8Cxzv8OL736p7v1ihGb5e9DJ9kTwGWHrQrVB5+lfVDzfGrdRzXch+ig7LHaY1JTOrg==}
     engines: {node: '>=8'}
@@ -4974,22 +4958,22 @@ snapshots:
       react: 19.3.0
       tslib: 2.8.1
 
-  '@einsatzzeichen/core@4.3.0':
+  '@einsatzzeichen/core@5.2.0':
     dependencies:
-      '@einsatzzeichen/schema': 4.3.0
+      '@einsatzzeichen/schema': 5.2.0
 
-  '@einsatzzeichen/maplibre@4.3.0':
+  '@einsatzzeichen/maplibre@5.2.0':
     dependencies:
-      '@einsatzzeichen/core': 4.3.0
-      '@einsatzzeichen/schema': 4.3.0
+      '@einsatzzeichen/core': 5.2.0
+      '@einsatzzeichen/schema': 5.2.0
 
-  '@einsatzzeichen/react@4.3.0(react@19.3.0)':
+  '@einsatzzeichen/react@5.2.0(react@19.3.0)':
     dependencies:
-      '@einsatzzeichen/core': 4.3.0
-      '@einsatzzeichen/schema': 4.3.0
+      '@einsatzzeichen/core': 5.2.0
+      '@einsatzzeichen/schema': 5.2.0
       react: 19.3.0
 
-  '@einsatzzeichen/schema@4.3.0': {}
+  '@einsatzzeichen/schema@5.2.0': {}
 
   '@emotion/hash@0.8.0': {}
 
@@ -6300,8 +6284,6 @@ snapshots:
   balanced-match@1.0.2: {}
 
   balanced-match@4.0.4: {}
-
-  base64-js@1.5.1: {}
 
   baseline-browser-mapping@2.11.20: {}
 
@@ -8255,15 +8237,6 @@ snapshots:
   symbol-tree@3.2.4: {}
 
   tagged-tag@1.0.0: {}
-
-  taktische-zeichen-core@0.10.0:
-    dependencies:
-      base64-js: 1.5.1
-
-  taktische-zeichen-react@0.10.0(react@19.3.0):
-    dependencies:
-      react: 19.3.0
-      taktische-zeichen-core: 0.10.0
 
   temp-dir@2.0.0: {}
 

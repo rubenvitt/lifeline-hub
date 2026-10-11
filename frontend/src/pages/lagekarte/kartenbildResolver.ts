@@ -1,7 +1,5 @@
 import type { Drawing } from '@einsatzzeichen/schema';
-import type { ZeichenQuelle } from './markerIcons';
 import { PLAKETTE_PRAEFIX, plakettenBild } from './plakette';
-import type { TzProps } from './taktischesZeichen';
 
 /** Der Ausschnitt der Karte, den der Resolver braucht (jsdom hat keine echte). */
 export interface KartenbildZiel {
@@ -14,12 +12,10 @@ export interface KartenbildZiel {
 }
 
 export interface KartenbildQuellen {
-  /** Bildschlüssel → Zeichenquelle der aktuellen Marker (`baueZeichenRegistry`). */
-  zeichen: () => ReadonlyMap<string, ZeichenQuelle>;
-  /** Fachobjekt-Zeichen synchron anlegen (`addSymbolImage`). */
+  /** Bildschlüssel → Zeichnung der aktuellen Marker (`baueZeichenRegistry`). */
+  zeichen: () => ReadonlyMap<string, Drawing>;
+  /** Zeichen synchron anlegen (`addSymbolImage`). */
   zeichneEz: (id: string, drawing: Drawing) => void;
-  /** Freies Zeichen über das Altpaket laden; darf synchron werfen. */
-  ladeTz: (tz: TzProps) => Promise<{ bild: HTMLImageElement; pixelRatio: number }>;
 }
 
 /**
@@ -29,9 +25,8 @@ export interface KartenbildQuellen {
  * erschiene erst beim nächsten Neu-Layout, nach einem Stilwechsel ohne neue Daten nie. Den Resolver
  * (samt Promise) wartet MapLibre ab, und er überlebt `setStyle`.
  *
- * - `plakette|` (Beschriftung, 9-Slice) und `ez|` (Fachobjekt) synchron.
- * - `tz|` (freie Zeichen, Altpaket) asynchron über ein Promise, bis LFH-836 sie auf `ez|` umstellt;
- *   fragen zwei Kacheln gleichzeitig, teilen sie sich das Laden.
+ * - `plakette|` (Beschriftung, 9-Slice) und `ez|` (Fachobjekte und freie Zeichen, seit LFH-836
+ *   design.md D8 ein Weg) synchron. Den asynchronen `tz|`-Weg des Altpakets gibt es nicht mehr.
  *
  * Nichts wirft: ein fehlendes Bild ist besser als ein Fehler im MapLibre-Callback (der Marker
  * bleibt klickbar, die Beschriftung steht ohne Plakette).
@@ -39,9 +34,7 @@ export interface KartenbildQuellen {
 export function kartenbildResolver(
   karte: KartenbildZiel,
   quellen: KartenbildQuellen,
-): (id: string) => void | Promise<void> {
-  const ladend = new Map<string, Promise<void>>();
-
+): (id: string) => void {
   return (id) => {
     if (karte.hasImage(id)) return;
 
@@ -54,37 +47,14 @@ export function kartenbildResolver(
     }
 
     if (id.startsWith('ez|')) {
-      const quelle = quellen.zeichen().get(id);
-      if (quelle?.art !== 'ez') return;
+      const drawing = quellen.zeichen().get(id);
+      if (!drawing) return;
       try {
-        quellen.zeichneEz(id, quelle.drawing);
+        quellen.zeichneEz(id, drawing);
       } catch {
         // Kein Bild; der Marker bleibt klickbar.
       }
       return;
-    }
-
-    if (id.startsWith('tz|')) {
-      const laufend = ladend.get(id);
-      if (laufend) return laufend;
-      const quelle = quellen.zeichen().get(id);
-      if (quelle?.art !== 'tz') return;
-      let laden: ReturnType<KartenbildQuellen['ladeTz']>;
-      try {
-        // `erzeugeTaktischesZeichen` wirft bei nicht DV-102-konformen Werten synchron.
-        laden = quellen.ladeTz(quelle.tz);
-      } catch {
-        return;
-      }
-      const fertig = laden
-        .then(({ bild, pixelRatio }) => {
-          if (!karte.hasImage(id)) karte.addImage(id, bild, { pixelRatio });
-        })
-        // Ladefehler oder schon abgebaute Karte: ohne Bild weiter, das nächste Layout fragt neu.
-        .catch(() => {})
-        .finally(() => ladend.delete(id));
-      ladend.set(id, fertig);
-      return fertig;
     }
   };
 }

@@ -1,9 +1,9 @@
 import { addSymbolImage, type MapLike, type SymbolImageOptions } from '@einsatzzeichen/maplibre';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { ZEICHEN_KARTEN_PX, type ZeichenQuelle } from './markerIcons';
+import { ZEICHEN_KARTEN_PX } from './markerIcons';
 
 /**
- * Die Fachobjekt-Zeichen folgen der Pixeldichte des Bildschirms (LFH-842). Der Resolver in
+ * Die Zeichen (Fachobjekte und freie Zeichen) folgen der Pixeldichte des Bildschirms (LFH-842). Der Resolver in
  * `Kartenflaeche.tsx` rastert ein `ez|`-Bild beim ersten Bedarf in `kartenPixelRatio(dpr)`; wandert
  * das Fenster auf einen Monitor anderer Dichte oder ändert sich der Browser-Zoom, blieben die schon
  * registrierten Bilder sonst bis zum nächsten Stilwechsel in der alten Dichte (unscharf).
@@ -65,7 +65,7 @@ type Zeichne = (
  */
 export function rastereZeichenNeu(
   karte: ZeichenKarte,
-  registry: ReadonlyMap<string, ZeichenQuelle>,
+  registry: ReadonlyMap<string, Drawing>,
   pixelRatio: number,
   zeichne: Zeichne = addSymbolImage,
 ): void {
@@ -77,11 +77,11 @@ export function rastereZeichenNeu(
   }
   for (const id of ids) {
     if (!id.startsWith('ez|')) continue;
-    const quelle = registry.get(id);
-    if (quelle?.art !== 'ez') continue;
+    const drawing = registry.get(id);
+    if (!drawing) continue;
     karte.removeImage(id);
     try {
-      zeichne(karte, id, quelle.drawing, { size: ZEICHEN_KARTEN_PX, pixelRatio });
+      zeichne(karte, id, drawing, { size: ZEICHEN_KARTEN_PX, pixelRatio });
     } catch {
       // Wie im Resolver: kein Bild ist besser als ein Fehler; beim nächsten Layout fragt MapLibre
       // das fehlende Bild erneut beim Resolver an.
