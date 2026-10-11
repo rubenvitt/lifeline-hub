@@ -52,7 +52,7 @@ Person, den ETB-Wortlaut und den Einsatzbericht. Stand im Code am 11.10.2026:
 
 ## Decisions
 
-### D1 · Datenhaltung: vier Spalten an `einsatz_fuehrungsstelle` (Migration 0176)
+### D1 · Datenhaltung: vier Spalten an `einsatz_fuehrungsstelle` (Migration 0177)
 
 ```sql
 ALTER TABLE einsatz_fuehrungsstelle ADD COLUMN einsatzleiter_art TEXT
@@ -220,7 +220,7 @@ Paneel, und zwei Felder passen in die Zeile.
 
 ## Risks / Trade-offs
 
-- [Migrationsnummer 0176 vergibt ein paralleler Thread auch] → vor dem Push `git fetch` und
+- [Migrationsnummer 0176 vergibt ein paralleler Thread auch; so geschehen, umgelegt auf 0177] → vor dem Push `git fetch` und
   `scripts/check-migrationen.sh`. Ein reiner Konflikt wird per Autofix auf dem PR-Branch umgelegt.
 - [Die Demo zeigt in der Kopfleiste jetzt „nicht erfasst“ statt „Administrator“] → gewollt. Die
   Demo-Daten setzen keinen Einsatzleiter, ein Nachzug ist möglich.
@@ -235,7 +235,7 @@ Paneel, und zwei Felder passen in die Zeile.
 
 ## Migration Plan
 
-- Migration 0176 ist nur additiv. Bestehende Zeilen haben keinen Einsatzleiter, und Einsätze ohne
+- Migration 0177 ist nur additiv. Bestehende Zeilen haben keinen Einsatzleiter, und Einsätze ohne
   Zeile bleiben „nicht erfasst“.
 - Rollback: Commit zurücknehmen. Die Spalten bleiben ungenutzt stehen, Migrationen werden nie
   gelöscht.

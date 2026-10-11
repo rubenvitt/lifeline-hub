@@ -14,7 +14,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, rot belegt, dann die Umsetzung.
 
 ## 2. Backend: Datenhaltung und API (D1, D2)
 
-- [x] 2.1 Migration `0176_einsatz_fuehrungsstelle_einsatzleiter.sql` nach D1 anlegen. Nachweis:
+- [x] 2.1 Migration `0177_einsatz_fuehrungsstelle_einsatzleiter.sql` nach D1 anlegen. Nachweis:
   `scripts/check-migrationen.sh` grün gegen `origin/alpha`, und `db::tests` grün.
 - [x] 2.2 Test zuerst in `tests/einsatz_fuehrungsstelle.rs`. Abgedeckt sind:
   - Setzen als Person und als Freitext, Leeren mit `null`, fehlendes Feld lässt den Wert stehen,

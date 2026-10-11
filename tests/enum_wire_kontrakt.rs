@@ -728,7 +728,7 @@ fn stab_fernmeldeskizze_wire() {
 }
 
 /// LFH-1199: Art des Einsatzleiters an der eigenen Führungsstelle; die Werte trägt der CHECK von
-/// `migrations/0176_einsatz_fuehrungsstelle_einsatzleiter.sql`.
+/// `migrations/0177_einsatz_fuehrungsstelle_einsatzleiter.sql`.
 #[test]
 fn einsatzleiter_art_wire() {
     enum_wire!(lifeline_hub::einsatz::fuehrungsstelle::EinsatzleiterArt {

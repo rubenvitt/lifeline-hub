@@ -60,7 +60,7 @@ Keine.
 ## Impact
 
 - **Backend:**
-  - Migration `0176` mit vier Spalten an `einsatz_fuehrungsstelle`.
+  - Migration `0177` (geplant 0176) mit vier Spalten an `einsatz_fuehrungsstelle`.
   - Code: `src/einsatz/fuehrungsstelle.rs` und `src/routes/einsatz_fuehrungsstelle.rs` (PATCH-Feld
     `einsatzleiter`, Prüfung 400/422, ETB in der Transaktion, Live-Ereignis `etb`).
   - Schwärzung: Schwärzungs-Register, `PERSONENBEZUEGE`, `AUSNAHMEN_SYSTEM_ETB`.
