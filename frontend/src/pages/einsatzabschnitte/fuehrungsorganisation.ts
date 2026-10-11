@@ -221,8 +221,20 @@ export function rendereFuehrungsorganisationMarkdown(
     /** `null`: nicht freigegeben (kein Wort darüber) · `'fehler'`: Abruf gescheitert. */
     stab: readonly Stabsfunktion[] | 'fehler' | null;
     einheitenZustand: AbrufZustand;
+    /** Die erfasste eigene Führungsstelle (LFH-1181); fehlt sie, steht keine Zeile dafür da. */
+    fuehrungsstelle?: { bezeichnung: string | null; rufname: string | null } | null;
   },
 ): string {
+  const fs = opts.fuehrungsstelle;
+  const fuehrungsstelle =
+    fs && (fs.bezeichnung || fs.rufname)
+      ? [
+          `- ${[
+            fs.bezeichnung ? `Führungsstelle ${md(fs.bezeichnung)}` : 'Führungsstelle',
+            ...(fs.rufname ? [`Rufname ${md(fs.rufname)}`] : []),
+          ].join(' · ')}`,
+        ]
+      : [];
   const stab =
     opts.stab == null
       ? []
@@ -258,8 +270,8 @@ export function rendereFuehrungsorganisationMarkdown(
     '',
     '## Einsatzleitung',
     '',
-    // Wer die Einsatzleitung führt, ist kein Datum (die Führungsstelle, LFH-849, trägt nur
-    // Funkangaben).
+    ...fuehrungsstelle,
+    // Wer die Einsatzleitung führt, ist kein Datum: die Führungsstelle nennt keine Person.
     '- Leitung nicht erfasst',
     ...stab,
     '',

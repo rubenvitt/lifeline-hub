@@ -4,7 +4,8 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
+import { fuehrungsstelleErfasst } from '../../stab/fuehrungsstelle';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { ladeStab } from '../../api/stab';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -48,9 +49,11 @@ import './organigrammPrint.css';
  * - **Hängendes Layout ohne Bibliothek** (D3): das Gerüst `components/organigramm/HaengenderBaum`
  *   (Spalten der ersten Ebene, senkrechte Zweige, Klappziele, Druckregeln), geteilt mit der
  *   Fernmeldeskizze des S6 (LFH-625 D4).
- * - **Einsatzleitung ohne erfundene Leitung** (D5): wer die Einsatzleitung führt, ist kein Datum;
- *   die eigene Führungsstelle (LFH-849) trägt nur Funkangaben und steht im Funkplan. Der Stab
- *   steht nur mit Stab-Freigabe daneben — fail-closed über `useStabFreigabe`.
+ * - **Einsatzleitung ohne erfundene Leitung** (D5): wer die Einsatzleitung führt, ist kein Datum.
+ *   Seit LFH-1181 trägt die eigene Führungsstelle einen Namen; die Wurzel nennt ihre Bezeichnung
+ *   und ihren Rufnamen (`openspec/changes/lfh-1181-fuehrungsstelle-ort/design.md`, D6), die
+ *   Leitung bleibt die benannte Lücke. Der Stab steht nur mit Stab-Freigabe daneben — fail-closed
+ *   über `useStabFreigabe`.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
  */
 
@@ -61,10 +64,17 @@ export type StabsstelleZustand =
   | { zustand: 'fehler' }
   | { zustand: 'daten'; besetzung: readonly Stabsfunktion[] };
 
+/** Die erfasste eigene Führungsstelle an der Wurzel (LFH-1181); `null`, wenn nicht erfasst. */
+export interface WurzelFuehrungsstelle {
+  bezeichnung: string | null;
+  rufname: string | null;
+}
+
 interface BildProps {
   einsatzId: number;
   org: Fuehrungsorganisation;
   stab: StabsstelleZustand;
+  fuehrungsstelle?: WurzelFuehrungsstelle | null;
   zugeklappt: ReadonlySet<string>;
   onUmschalten: (key: string) => void;
 }
@@ -74,7 +84,13 @@ interface BildProps {
  * Gerüsts (LFH-867) hält das Element mit seinem Inhalt, die Anordnung folgt der Breite trotzdem —
  * `useViewport` rendert das gehaltene Element bei einem Wechsel neu.
  */
-function OrganigrammKopf({ stab }: { stab: StabsstelleZustand }) {
+function OrganigrammKopf({
+  stab,
+  fuehrungsstelle,
+}: {
+  stab: StabsstelleZustand;
+  fuehrungsstelle: WurzelFuehrungsstelle | null;
+}) {
   const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const breit = abBreite('md');
@@ -102,8 +118,12 @@ function OrganigrammKopf({ stab }: { stab: StabsstelleZustand }) {
         style={{ ...kasten, borderWidth: 2 }}
       >
         <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
-        {/* Wer die Einsatzleitung führt, ist kein Datum (die Führungsstelle, LFH-849, trägt nur
-            Funkangaben). Keine erfundene Leitung, sondern die benannte Lücke. */}
+        {fuehrungsstelle?.bezeichnung && <div>{fuehrungsstelle.bezeichnung}</div>}
+        {fuehrungsstelle?.rufname && (
+          <div style={monoStil(token.fontSize)}>{fuehrungsstelle.rufname}</div>
+        )}
+        {/* Wer die Einsatzleitung führt, ist kein Datum: die Führungsstelle nennt keine Person.
+            Keine erfundene Leitung, sondern die benannte Lücke. */}
         <div style={{ color: rollen.gedaempft }}>Leitung nicht erfasst</div>
       </div>
       {stab.zustand !== 'aus' && (
@@ -129,14 +149,21 @@ function OrganigrammKopf({ stab }: { stab: StabsstelleZustand }) {
 }
 
 /** Reine Darstellung — der Klappzustand und die Stabsstelle kommen von außen. */
-export function OrganigrammBild({ einsatzId, org, stab, zugeklappt, onUmschalten }: BildProps) {
+export function OrganigrammBild({
+  einsatzId,
+  org,
+  stab,
+  fuehrungsstelle = null,
+  zugeklappt,
+  onUmschalten,
+}: BildProps) {
   const { token } = useRollen();
 
   return (
     <HaengenderBaum<OrgKnoten>
       bezeichnung="Organigramm"
       lfh="organigramm"
-      kopf={<OrganigrammKopf stab={stab} />}
+      kopf={<OrganigrammKopf stab={stab} fuehrungsstelle={fuehrungsstelle} />}
       wurzeln={org.wurzeln}
       zugeklappt={zugeklappt}
       onUmschalten={onUmschalten}
@@ -295,6 +322,21 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
         ? { zustand: 'fehler' }
         : { zustand: 'aus' };
 
+  // Die eigene Führungsstelle (LFH-1181) liest jeder mit dem Einsatz; gescheitert oder nicht
+  // erfasst bleibt die Wurzel wie vorher.
+  const fsQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatz.id),
+    queryFn: () => ladeFuehrungsstelle(einsatz.id),
+  });
+  const fsDaten = fsQuery.data ?? null;
+  const fuehrungsstelle: WurzelFuehrungsstelle | null =
+    fsDaten && fuehrungsstelleErfasst(fsDaten)
+      ? {
+          bezeichnung: fsDaten.bezeichnung?.trim() || null,
+          rufname: fsDaten.rufname?.trim() || null,
+        }
+      : null;
+
   // Dieselbe Abfrage wie `useStabFreigabe` (gemeinsamer Cache): die Übernahme legt einen
   // Lagebericht an, also braucht es Schreibrecht UND das freigegebene Modul Lageberichte.
   const freigabenQuery = useQuery({
@@ -331,6 +373,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
                     ? 'fehler'
                     : null,
               einheitenZustand: einheiten.zustand,
+              fuehrungsstelle,
             }),
           },
         ],
@@ -406,6 +449,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
         einsatzId={einsatz.id}
         org={org}
         stab={stab}
+        fuehrungsstelle={fuehrungsstelle}
         zugeklappt={zugeklappt}
         onUmschalten={umschalten}
       />

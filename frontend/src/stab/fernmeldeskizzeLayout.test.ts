@@ -456,6 +456,19 @@ describe('stellenMasse', () => {
     expect(stellenMasse(lang).hoehe % RASTER).toBe(0);
   });
 
+  it('lässt den Kasten „Einsatzleitung“ um die Bezeichnung wachsen, ohne sie bleibt er gleich (LFH-1181)', () => {
+    const ohne = netz({ fs: [] }).stellen.find((s) => s.key === 'fs')!;
+    expect(ohne).toMatchObject({ art: 'fuehrungsstelle', zusatz: null });
+    const mit = { ...ohne, zusatz: 'TEL Rathaus' } as typeof ohne;
+    const lang = {
+      ...ohne,
+      zusatz: 'Technische Einsatzleitung im Rathaus der Stadt Musterhausen, Sitzungssaal 2',
+    } as typeof ohne;
+    expect(stellenMasse(mit).hoehe).toBeGreaterThan(stellenMasse(ohne).hoehe);
+    expect(stellenMasse(lang).hoehe).toBeGreaterThan(stellenMasse(mit).hoehe);
+    expect(stellenMasse(mit).breite).toBe(stellenMasse(ohne).breite);
+  });
+
   // Messung 1.1 (e2e `fernmeldeskizze.spec.ts`): ein Rufname mit 30 Zeichen ist breiter als der
   // Platz einer Einheit; er bricht um und der Platz wächst mit, statt dass der Text übersteht.
   it('lässt eine Einheit mit langem Rufname mitwachsen', () => {

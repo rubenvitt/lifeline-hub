@@ -23,8 +23,8 @@
 ## 3. Abnehmer im Stab: Funkplan, Fernmeldeskizze, Checkliste
 
 - [x] 3.1 Funkplan (D6): `stelleZusatz = bezeichnung` in der Zeile `fs`; Vitest „Führungsstelle mit Bezeichnung“ / „ohne Bezeichnung“ in `funkplan.test.tsx` zuerst rot, dann grün; Markdown und Druck zeigen den Zusatz (Test)
-- [ ] 3.2 Fernmeldeskizze (D6): `zusatz` an der `NetzStelle` der Führungsstelle, Zeile im Kasten zwischen Überschrift und Rufname, Höhe aus derselben Rechnung in `fernmeldeskizzeLayout.ts`; Tests in `fernmeldenetz.test.ts`/`fernmeldeskizzeLayout.test.ts`: „Kasten mit Bezeichnung“ und unveränderte Höhe ohne Bezeichnung grün; bestehende e2e `fernmeldeskizze.spec.ts` grün
-- [ ] 3.3 Checkliste (D8): Wortlaut „Standort der Führungsstelle festgelegt“ in `stab/checkliste.ts`; Wertzeile mit Bezeichnung · Adresse, „Standort nicht erfasst“, Grund bei Abruffehler, Link zu Einsatzdaten in `ChecklistePaneel.tsx`; Vitest der drei Spec-Szenarien grün, Haken bleibt unverändert (Test); `stab.bilder.ts`-Wortlaut nachgezogen
+- [x] 3.2 Fernmeldeskizze (D6): `zusatz` an der `NetzStelle` der Führungsstelle, Zeile im Kasten zwischen Überschrift und Rufname, Höhe aus derselben Rechnung in `fernmeldeskizzeLayout.ts`; Tests in `fernmeldenetz.test.ts`/`fernmeldeskizzeLayout.test.ts`: „Kasten mit Bezeichnung“ und unveränderte Höhe ohne Bezeichnung grün; bestehende e2e `fernmeldeskizze.spec.ts` grün
+- [x] 3.3 Checkliste (D8): Wortlaut „Standort der Führungsstelle festgelegt“ in `stab/checkliste.ts`; Wertzeile mit Bezeichnung · Adresse, „Standort nicht erfasst“, Grund bei Abruffehler, Link zu Einsatzdaten in `ChecklistePaneel.tsx`; Vitest der drei Spec-Szenarien grün, Haken bleibt unverändert (Test); `stab.bilder.ts`-Wortlaut nachgezogen
 - [ ] 3.4 Doku `docs/anwender/kapitel/funkplan.md` (Zusatz in der Zeile, Bezeichnung im Kasten „Einsatzleitung“) und `stab.md` (neuer Wortlaut, Wert am Punkt); Bilder der betroffenen Abläufe neu erzeugt; `anwenderdoku.guard.test.ts` grün
 
 ## 4. Organigramm

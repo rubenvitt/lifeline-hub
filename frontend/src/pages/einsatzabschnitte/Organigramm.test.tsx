@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import { ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
 import { freigabenFixture } from '../../test/fixtures';
 import { ladeStab } from '../../api/stab';
 import { legeLageberichtAn } from '../../api/lageberichte';
@@ -21,7 +21,10 @@ import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
 import { ZEICHEN_UNTERLAGE } from '../../zeichen/EinsatzZeichen';
 
-vi.mock('../../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
+vi.mock('../../api/einsaetze', () => ({
+  ladeModulFreigaben: vi.fn(),
+  ladeFuehrungsstelle: vi.fn(async () => ({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] })),
+}));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 77 })),
@@ -106,6 +109,43 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
     expect(within(wurzel).getByText('Leitung nicht erfasst')).toBeInTheDocument();
     expect(wurzel.textContent).not.toMatch(/\d+\/\d+\/\d+\/\/\d+/);
+  });
+
+  it('nennt Bezeichnung und Rufname der Führungsstelle; die Leitung bleibt offen (LFH-1181)', () => {
+    renderMitProviders(
+      <OrganigrammBild
+        einsatzId={1}
+        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        stab={{ zustand: 'aus' }}
+        fuehrungsstelle={{ bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian Musterstadt 10/1' }}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('ELW 2 Musterstadt')).toBeInTheDocument();
+    expect(within(wurzel).getByText('Florian Musterstadt 10/1')).toBeInTheDocument();
+    expect(within(wurzel).getByText('Leitung nicht erfasst')).toBeInTheDocument();
+  });
+
+  it('ohne Bezeichnung nur der Rufname, nichts erfunden (LFH-1181)', () => {
+    renderMitProviders(
+      <OrganigrammBild
+        einsatzId={1}
+        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        stab={{ zustand: 'aus' }}
+        fuehrungsstelle={{ bezeichnung: null, rufname: 'Florian 10/1' }}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('Florian 10/1')).toBeInTheDocument();
+    expect(
+      within(wurzel)
+        .getAllByText(/./)
+        .map((e) => e.textContent),
+    ).not.toContain('—');
   });
 });
 
@@ -237,6 +277,25 @@ describe('Organigramm — Klappzustand im Container', () => {
       <Organigramm einsatz={EINSATZ} abschnitte={abschnitte} einheiten={daten(einheiten)} />,
     );
   }
+
+  it('liest die Führungsstelle für die Wurzel; gescheitert bleibt die Wurzel wie vorher (LFH-1181)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValueOnce({
+      art: 'ortsfest',
+      bezeichnung: 'TEL Rathaus',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+    });
+    const { unmount } = container();
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(await within(wurzel).findByText('TEL Rathaus')).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(ladeFuehrungsstelle).mockRejectedValueOnce(new Error('kaputt'));
+    container();
+    const neu = screen.getByRole('group', { name: 'Einsatzleitung' });
+    await waitFor(() => expect(ladeFuehrungsstelle).toHaveBeenCalledTimes(2));
+    expect(neu.textContent).toBe('EinsatzleitungLeitung nicht erfasst');
+  });
 
   it('startet aufgeklappt; „Alle zuklappen“ und „Alle aufklappen“ wirken auf jede Ebene', async () => {
     container();

@@ -257,6 +257,21 @@ describe('baueFernmeldenetz · Stellen', () => {
     expect(JSON.stringify(netz.stellen)).not.toContain('GEHEIM');
   });
 
+  it('Wurzel mit Bezeichnung: Überschrift bleibt „Einsatzleitung“, die Bezeichnung ist Zusatz (LFH-1181)', () => {
+    const netz = baueFernmeldenetz(
+      quellen({ fuehrungsstelle: fs({ bezeichnung: 'TEL Rathaus', rufname: 'Florian 10/1' }) }),
+    );
+    expect(stelleMit(netz, 'fs')).toMatchObject({
+      bezeichnung: EINSATZLEITUNG,
+      zusatz: 'TEL Rathaus',
+      rufname: 'Florian 10/1',
+    });
+    const ohne = baueFernmeldenetz(quellen({ fuehrungsstelle: fs({ rufname: 'Florian 10/1' }) }));
+    expect(stelleMit(ohne, 'fs')).toMatchObject({ zusatz: null });
+    const nichtErfasst = baueFernmeldenetz(quellen({ fuehrungsstelle: fs() }));
+    expect(stelleMit(nichtErfasst, 'fs')).toMatchObject({ zusatz: null, erfasst: false });
+  });
+
   it('nennt den Grund, wenn die Führungsstelle nicht geladen ist', () => {
     const netz = baueFernmeldenetz(
       quellen({ fuehrungsstelle: { zustand: 'fehler', daten: null } }),

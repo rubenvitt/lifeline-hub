@@ -4,6 +4,12 @@ import { useCallback, useId, useRef, type CSSProperties } from 'react';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeCheckliste, setzeChecklistenPunkt } from '../api/stab';
+import { ladeFuehrungsstelle } from '../api/einsaetze';
+import { abrufZustand } from '../api/abrufZustand';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { einsatzdatenPfad } from '../routing/deeplinks';
+import { Link } from 'react-router';
+import { ZUSTAND_GRUND } from './funkplan';
 import type { ChecklistenEintrag, ChecklistenPunkt, ChecklistenPunktBody } from '../api/types';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Liste, ListenEintrag } from '../components/Liste';
@@ -200,6 +206,11 @@ function ChecklistenZeile({
             </>
           )}
         </div>
+        {vorlage.punkt === 'aufstellort' && (
+          <div style={{ paddingInlineStart: einzug }}>
+            <FuehrungsstellenStandort einsatzId={einsatzId} />
+          </div>
+        )}
         <div style={{ paddingInlineStart: einzug }}>
           <BemerkungZelle
             // Während des Speicherns den NEUEN Wert zeigen (Vertrag von `laeuft`).
@@ -222,5 +233,40 @@ function ChecklistenZeile({
         )}
       </Flex>
     </ListenEintrag>
+  );
+}
+
+/**
+ * Wert am Punkt „Standort der Führungsstelle festgelegt“ (LFH-1181, design.md D8): Bezeichnung und
+ * Standort der eigenen Führungsstelle mit Verweis auf ihr Paneel in den Einsatzdaten. Nur Anzeige:
+ * der Haken bleibt Handarbeit, kein Punkt wird aus einem anderen Modul abgeleitet.
+ */
+function FuehrungsstellenStandort({ einsatzId }: { einsatzId: number }) {
+  const { token } = useRollen();
+  const { formatKoordinate } = useAnzeigeKonventionen();
+  const query = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+  });
+  const zustand = abrufZustand(query);
+  const fs = query.data;
+  let wert: string;
+  if (zustand !== 'daten' || !fs) {
+    wert = ZUSTAND_GRUND[zustand === 'daten' ? 'laden' : zustand];
+  } else {
+    const ort =
+      fs.standort_adresse?.trim() ||
+      (fs.standort_lat != null && fs.standort_lon != null
+        ? formatKoordinate(fs.standort_lat, fs.standort_lon)
+        : null);
+    wert = [fs.bezeichnung?.trim() || null, ort ?? 'Standort nicht erfasst']
+      .filter((t): t is string => t != null)
+      .join(' · ');
+  }
+  return (
+    <Flex gap={token.marginXS} wrap align="baseline">
+      <span>{wert}</span>
+      <Link to={einsatzdatenPfad(einsatzId)}>Einsatzdaten</Link>
+    </Flex>
   );
 }

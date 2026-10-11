@@ -206,6 +206,16 @@ function rufnamenHoehe(s: NetzStelle, breite: number): number {
   return zeilen(s.rufname ?? '', NAME_SCHRIFT, breite) * RUFNAME_ZEILE;
 }
 
+/**
+ * Höhe der Zusatzzeile(n) im Kasten „Einsatzleitung“: die Bezeichnung der Führungsstelle (LFH-1181)
+ * bricht um wie der Rufname. Ohne Zusatz 0, der Kasten bleibt so hoch wie vorher. Bild und
+ * Layout lesen beide hier.
+ */
+export function zusatzHoehe(s: NetzStelle, breite: number): number {
+  if (s.art !== 'fuehrungsstelle' || !s.zusatz) return 0;
+  return zeilen(s.zusatz, NAME_SCHRIFT, breite) * NAME_ZEILE;
+}
+
 /** Breite und Höhe des Platzes einer Stelle; lange Bezeichnungen wachsen nach unten mit. */
 export function stellenMasse(s: NetzStelle): { breite: number; hoehe: number } {
   switch (s.art) {
@@ -220,6 +230,7 @@ export function stellenMasse(s: NetzStelle): { breite: number; hoehe: number } {
         TZ_HOEHE +
         ZEICHEN_ABSTAND +
         zeilen(text, KASTEN_SCHRIFT, innen) * KASTEN_ZEILE +
+        zusatzHoehe(s, innen) +
         rufnamenHoehe(s, innen) +
         ausstattungsZeilen(s.ausstattung, innen).hoehe +
         LUECKE_ZEILE;
