@@ -8,10 +8,11 @@ vi.mock('@einsatzzeichen/core', async (original) => {
     ...echt,
     vocabulary: vi.fn(echt.vocabulary),
     freestandingVocabulary: vi.fn(echt.freestandingVocabulary),
+    drawAnySpec: vi.fn(echt.drawAnySpec),
   };
 });
 
-const { vocabulary, freestandingVocabulary } = await import('@einsatzzeichen/core');
+const { vocabulary, freestandingVocabulary, drawAnySpec } = await import('@einsatzzeichen/core');
 const {
   GRUNDZEICHEN_NAMEN,
   detailOptionen,
@@ -51,17 +52,24 @@ describe('waermeVokabularAuf (Picker-Kosten, design.md Risiko „Picker-Kosten�
       geplant.push(schritt);
       return () => {};
     });
+    const zeichnungen = () => vi.mocked(drawAnySpec).mock.calls.length;
+    let meisteBilder = 0;
     while (geplant.length > 0) {
       const vorher = fragen();
+      const bilderVorher = zeichnungen();
       geplant.shift()!();
       schritte++;
+      meisteBilder = Math.max(meisteBilder, zeichnungen() - bilderVorher);
       // Häppchen: ein Schritt fragt höchstens die Felder EINES Rasters ab.
       expect(fragen() - vorher).toBeLessThanOrEqual(8);
     }
+    // Auch die Kachelbilder kommen in Scheiben: kein Schritt zeichnet mehr als eine Scheibe.
+    expect(meisteBilder).toBeLessThanOrEqual(30);
     const arten = Object.keys(GRUNDZEICHEN_NAMEN).length;
     expect(schritte).toBeGreaterThanOrEqual(arten);
 
     const nachher = fragen();
+    const bilder = vi.mocked(drawAnySpec).mock.calls.length;
     grundzeichenOptionen();
     symbolOptionen(null);
     for (const o of grundzeichenOptionen()) {
@@ -69,5 +77,7 @@ describe('waermeVokabularAuf (Picker-Kosten, design.md Risiko „Picker-Kosten�
       detailOptionen(o.spec);
     }
     expect(fragen()).toBe(nachher);
+    // Auch kein Kachelbild wird neu gezeichnet: der Merker hält alle vorgezeichneten.
+    expect(vi.mocked(drawAnySpec).mock.calls.length).toBe(bilder);
   }, 120_000);
 });

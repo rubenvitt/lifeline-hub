@@ -363,25 +363,38 @@ export interface GrundzeichenOption extends KachelOption {
 // Gemerkt je Eingang: die Bibliothek zeichnet jeden Kandidaten probeweise (D7). Die Menge der
 // Entwürfe einer Sitzung ist klein; ein Deckel hält sie trotzdem endlich.
 const MERKER_DECKEL = 200;
-function gemerkt<T>(merker: Map<string, T>, schluessel: string, rechne: () => T): T {
+function gemerkt<T>(
+  merker: Map<string, T>,
+  schluessel: string,
+  rechne: () => T,
+  deckel = MERKER_DECKEL,
+): T {
   const vorhanden = merker.get(schluessel);
   if (vorhanden !== undefined) return vorhanden;
   const wert = rechne();
-  if (merker.size >= MERKER_DECKEL) merker.delete(merker.keys().next().value!);
+  if (merker.size >= deckel) merker.delete(merker.keys().next().value!);
   merker.set(schluessel, wert);
   return wert;
 }
 
 const KACHEL_BILDER = new Map<string, Drawing | null>();
+/** Kachelbilder sind durch das Vokabular begrenzt (rund 330 freistehende plus die Zustände an
+ *  Grundzeichen); der Deckel muss sie alle halten, sonst verdrängte das Aufwärmen sich selbst. */
+const KACHEL_BILDER_DECKEL = 1000;
 /** Das Bild einer Kachel, gemerkt je Spec (die Kacheln eines Rasters wechseln selten). */
 function kachelBild(spec: AnySpec): Drawing | null {
-  return gemerkt(KACHEL_BILDER, serializeAnySpec(spec), () => {
-    try {
-      return drawAnySpec(spec);
-    } catch {
-      return null;
-    }
-  });
+  return gemerkt(
+    KACHEL_BILDER,
+    serializeAnySpec(spec),
+    () => {
+      try {
+        return drawAnySpec(spec);
+      } catch {
+        return null;
+      }
+    },
+    KACHEL_BILDER_DECKEL,
+  );
 }
 
 let GRUNDZEICHEN: GrundzeichenOption[] | null = null;
@@ -590,15 +603,47 @@ export const leerlaufPlaner: Planer = (schritt) => {
  * Grundzeichen, dann je Art das Symbolraster und die Auswahlen unter „Details“.
  */
 function aufwaermSchritte(): (() => void)[] {
+  const faehigkeiten = SPEC_FIELD_VALUES.capabilities.values;
+  // Die Kachelbilder ohne Grundzeichen (rund 240) zeichnet der Merker in Scheiben vor; danach
+  // setzt `symbolOptionen(null)` sie nur noch zusammen. Nicht Zeichenbares merkt er als `null`.
+  const freiBilder: AnySpec[] = [
+    ...FREESTANDING_FIELD_VALUES.state.state.values.map(
+      (state) => ({ kind: 'state', state }) as const,
+    ),
+    ...FREESTANDING_FIELD_VALUES.pictogram.pictogram.values.map(
+      (pictogram) => ({ kind: 'pictogram', pictogram }) as const,
+    ),
+    ...FREESTANDING_FIELD_VALUES['animal-state'].state.values.map(
+      (state) => ({ kind: 'animal-state', state }) as const,
+    ),
+  ];
+  const bildScheiben: (() => void)[] = [];
+  for (let i = 0; i < freiBilder.length; i += AUFWAERM_BILDER) {
+    const scheibe = freiBilder.slice(i, i + AUFWAERM_BILDER);
+    bildScheiben.push(() => scheibe.forEach((spec) => void kachelBild(spec)));
+  }
   return [
     () => void grundzeichenOptionen(),
+    ...bildScheiben,
     () => void symbolOptionen(null),
     ...Object.keys(GRUNDZEICHEN_NAMEN).flatMap((kind) => {
       const spec: SymbolSpec = { kind: kind as SymbolKind };
-      return [() => void symbolOptionen(spec), () => void detailOptionen(spec)];
+      // Die Fähigkeiten sind der teure Teil (je Kandidat eine Fassung, im Browser bis 0,6 s je
+      // Art): in Scheiben vorweg gefragt, das Ergebnis merkt sich die Bibliothek je Art und
+      // Fähigkeit. Danach rechnet das Symbolraster aus ihrem Merker.
+      const scheiben: (() => void)[] = [];
+      for (let i = 0; i < faehigkeiten.length; i += AUFWAERM_SCHEIBE) {
+        const candidates = faehigkeiten.slice(i, i + AUFWAERM_SCHEIBE);
+        scheiben.push(() => void vocabulary(spec, 'capabilities', { candidates }));
+      }
+      return [...scheiben, () => void symbolOptionen(spec), () => void detailOptionen(spec)];
     }),
   ];
 }
+
+/** Fähigkeiten bzw. Kachelbilder je Aufwärmschritt: hält ein Häppchen im Browser kurz. */
+const AUFWAERM_SCHEIBE = 10;
+const AUFWAERM_BILDER = 30;
 
 /**
  * Rechnet die Optionen des Pickers im Leerlauf vor (design.md, Risiko „Picker-Kosten“;
