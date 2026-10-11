@@ -84,7 +84,7 @@ import {
   ohneEntfallenes,
   verschiebeText,
   type GliederungKnoten,
-} from './einsatzabschnitte/gliederungZug';
+} from './einsatzabschnitte/gliederungZugKern';
 import {
   WurzelZone,
   ZUG_ANLEITUNG,

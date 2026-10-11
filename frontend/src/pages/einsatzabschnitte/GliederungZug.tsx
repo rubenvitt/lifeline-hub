@@ -9,7 +9,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import { useRollen } from '../../components/instrument';
 import { IconMenue } from '../../icons';
-import { OBERSTE_EBENE, abschnittZielGueltig, einheitZielGueltig } from './gliederungZug';
+import { OBERSTE_EBENE, abschnittZielGueltig, einheitZielGueltig } from './gliederungZugKern';
 
 /**
  * Umhängen in der Gliederung per Zeiger (LFH-1212): ein Abschnitt auf einen anderen Abschnitt
@@ -69,7 +69,7 @@ export function useLaufenderZug(): ZugDaten | null {
   return (active?.data.current as ZugDaten | undefined) ?? null;
 }
 
-/** Nimmt das Ziel den laufenden Zug an? Dieselbe Regel wie das Menü (`gliederungZug.ts`). */
+/** Nimmt das Ziel den laufenden Zug an? Dieselbe Regel wie das Menü (`gliederungZugKern.ts`). */
 function nimmtAn(
   zug: ZugDaten | null,
   abschnitte: readonly Einsatzabschnitt[],

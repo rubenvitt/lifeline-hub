@@ -9,7 +9,7 @@ import {
   ohneEntfallenes,
   verschiebeText,
   verschiebeZiele,
-} from './gliederungZug';
+} from './gliederungZugKern';
 
 function abschnitt(id: number, name: string, ueber: number | null): Einsatzabschnitt {
   return { id, name, ueber_abschnitt_id: ueber } as unknown as Einsatzabschnitt;

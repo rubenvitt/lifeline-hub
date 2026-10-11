@@ -2,7 +2,7 @@ import { Button, Modal } from 'antd';
 import type { Einsatzabschnitt } from '../../api/types';
 import { useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { verschiebeZiele } from './gliederungZug';
+import { verschiebeZiele } from './gliederungZugKern';
 
 interface Props {
   /** Der zu verschiebende Abschnitt; `null` = zu. */
