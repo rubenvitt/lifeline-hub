@@ -20,18 +20,18 @@
 - [x] 3.2 Test zuerst `stammdaten/ExterneStelleFormModal.test.tsx`: Bezeichnung und Art sichtbar, Checkbox „Zuständige Leitstelle“ nur bei Art Leitstelle, Rufnummer und Funkrufname im Klappteil (Feldbudget mit `forceRender` und Gegenprobe), `maxLength` aus `eingabegrenzen.ts`, Enter sendet. Dann das Modal mit `ErfassungsModal` (D10). Prüfung: Tests grün.
 - [x] 3.3 Test zuerst `stammdaten/ExterneStellenTab.test.tsx`: Tabelle mit Art-Gruppen-Reihenfolge, Marke „zuständig“ als Wort, Filter Art und aktiv/inaktiv, Deaktivieren und Reaktivieren über das Aktionsmenü, ohne Admin-Recht gesperrt mit Grund. Dann den Tab mit `KatalogTabelle`. Prüfung: Tests grün.
 - [x] 3.4 Eintrag in `admin/adminNav.tsx` nach den Stichworten, nachgezogen in `adminNav.test.tsx`, `stammdaten/rechteGate.test.tsx` und `components/katalogTabelle.guard.test.ts` (`KATALOGE`). Prüfung: die drei Tests grün, Route `/admin/…/externe-stellen` erreichbar.
-- [ ] 3.5 Anwenderkapitel `docs/anwender/kapitel/stammdaten.md`: Katalog in der Aufzählung, Abschnitt zur zuständigen Leitstelle, `quellen:` ergänzt, Bild nach `docs/anwender/AGENTS.md` falls die fotografierte Ansicht sich ändert. Prüfung: `hilfe/anwenderdoku.guard.test.ts` grün.
+- [x] 3.5 Anwenderkapitel `docs/anwender/kapitel/stammdaten.md`: Katalog in der Aufzählung, Abschnitt zur zuständigen Leitstelle, `quellen:` ergänzt, Bild nach `docs/anwender/AGENTS.md` falls die fotografierte Ansicht sich ändert. Prüfung: `hilfe/anwenderdoku.guard.test.ts` grün.
 
 ## 4. Vorschläge in Einsatzdaten und Nachforderung
 
 - [x] 4.1 Test zuerst für `stammdaten/externeStellenVorschlaege` (D6): Gruppen in der Reihenfolge nach D2, zuständige Leitstelle vorn mit Marke, nur aktive Stellen, Teilwortsuche ohne Groß-/Kleinschreibung, `zustaendigeLeitstelle`. Dann das Modul. Prüfung: Tests grün.
 - [x] 4.2 Test zuerst in `pages/EinsatzdatenPage.test.tsx`: Zeile „Meldende Stelle“ zeigt gruppierte Vorschläge, Wahl sendet genau `{ meldende_stelle: "ILS Musterkreis" }`, Freitext wird gespeichert, unverändert sendet nichts, Vollformular mit denselben Vorschlägen, `maxLength` 200. Dann Umbau nach D7. Prüfung: Tests grün, bestehende Szenarien der Spec `einsatzdaten-bearbeitung` weiter grün.
 - [x] 4.3 Test zuerst in `nachforderungen/NachforderungFormular.test.tsx`: Vorbelegung mit der zuständigen Leitstelle beim Öffnen und nach dem Absetzen, auch wenn die Liste erst später kommt; eigene Eingabe bleibt bei Kategoriewechsel; ohne zuständige Leitstelle leer; Vorschläge vorhanden. Dann Umbau nach D8. Prüfung: Tests grün, Erfassungs-Norm-Tests (`Erfassung.test.tsx`) grün.
-- [ ] 4.4 Anwenderkapitel `einsatzdaten.md` (Vorschläge, Freitext bleibt) und `nachforderung.md` (Vorbelegung) samt `quellen:`. Prüfung: `hilfe/anwenderdoku.guard.test.ts` grün.
+- [x] 4.4 Anwenderkapitel `einsatzdaten.md` (Vorschläge, Freitext bleibt) und `nachforderung.md` (Vorbelegung) samt `quellen:`. Prüfung: `hilfe/anwenderdoku.guard.test.ts` grün.
 
 ## 5. Integration
 
-- [ ] 5.1 Playwright-Prüfung am laufenden Stack: Admin legt „ILS Musterkreis“ als zuständige Leitstelle an, ein zweiter Tab zeigt sie in den Einsatzdaten ohne Neuladen, die Nachforderung ist vorbelegt. Prüfung: Screenshot und Ablauf im PR.
+- [x] 5.1 Playwright-Prüfung am laufenden Stack: Admin legt „ILS Musterkreis“ als zuständige Leitstelle an, ein zweiter Tab zeigt sie in den Einsatzdaten ohne Neuladen, die Nachforderung ist vorbelegt. Prüfung: Screenshot und Ablauf im PR.
 - [ ] 5.2 `./scripts/check-all.sh` vollständig grün. Prüfung: Gesamtstatus aus dem Lauf (bzw. CI des PRs).
 
 ## Workflow follow-up
