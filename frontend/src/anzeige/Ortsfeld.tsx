@@ -86,8 +86,11 @@ export function Ortsfeld({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}>
-      <Space.Compact style={{ width: '100%' }}>
+      {/* `minWidth: 0` am Feld: antds Eingabe bringt eine Mindestbreite mit und weitete am Handy
+          das Raster der Zeile über 390 px (e2e `einsatzort-ortssuche.spec.ts`). */}
+      <Space.Compact style={{ width: '100%', display: 'flex' }}>
         <Input
+          style={{ flex: '1 1 auto', minWidth: 0 }}
           id={id}
           aria-label={ariaLabel}
           autoFocus={autoFocus}
@@ -198,6 +201,8 @@ function OrtsfeldTreffer({
             onClick={() => onWaehlen(t)}
             style={{
               height: 'auto',
+              minWidth: 0,
+              maxWidth: '100%',
               minHeight: token.controlHeight,
               paddingBlock: token.paddingXXS,
               display: 'flex',
@@ -211,13 +216,12 @@ function OrtsfeldTreffer({
             <span style={{ overflowWrap: 'anywhere' }}>{t.kurz ?? t.name}</span>
             {t.kurz && (
               <span
+                // Umbrechen statt abschneiden: eine Zeile ohne Umbruch ginge mit voller Breite in die
+                // Mindestbreite des Rasters ein und weitete die Seite am Handy.
                 style={{
                   color: rollen.text2,
                   fontSize: token.fontSizeSM,
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  overflowWrap: 'anywhere',
                 }}
               >
                 {t.name}

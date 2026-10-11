@@ -34,9 +34,9 @@
 
 ## 7. Regeln, e2e, Doku
 
-- [ ] 7.1 `frontend/AGENTS.md`, „Inline-Bearbeitung und Status“: Einsatzort und Koordinate als Zeilen im Paneel „Einsatzort“, Bezeichnung weiter nur im Vollformular; Hinweis auf `anzeige/Ortsfeld.tsx` (Suche auf Enter/Knopf, Spec `ortsfeld`); Prettier grün
-- [ ] 7.2 e2e `e2e/einsatzort-ortssuche.spec.ts`: Einsatzdaten → Einsatzort suchen (Geocoder per `page.route` gemockt), Treffer wählen, speichern, Ausschnitt mit Nadel sichtbar, Kopfleiste zeigt die Kurzadresse; Anlegen mit Treffer; Handy 390 px ohne Überlauf
-- [ ] 7.3 `docs/anwender/kapitel/einsatzdaten.md` (Paneel Einsatzort, Suche auf Enter/Knopf, Freitext, Koordinate von Hand, ohne Netz) und `einsatz-oberflaeche.md` (Feld beim Anlegen); Bilder nach `docs/anwender/AGENTS.md` nachgezogen; Doku-Wächter grün
+- [x] 7.1 `frontend/AGENTS.md`, „Inline-Bearbeitung und Status“: Einsatzort und Koordinate als Zeilen im Paneel „Einsatzort“, Bezeichnung weiter nur im Vollformular; Hinweis auf `anzeige/Ortsfeld.tsx` (Suche auf Enter/Knopf, Spec `ortsfeld`); Prettier grün
+- [x] 7.2 e2e `e2e/einsatzort-ortssuche.spec.ts`: Einsatzdaten → Einsatzort suchen (Geocoder per `page.route` gemockt), Treffer wählen, speichern, Ausschnitt mit Nadel sichtbar, Kopfleiste zeigt die Kurzadresse; Anlegen mit Treffer; Handy 390 px ohne Überlauf
+- [x] 7.3 `docs/anwender/kapitel/einsatzdaten.md` (Paneel Einsatzort, Suche auf Enter/Knopf, Freitext, Koordinate von Hand, ohne Netz) und `einsatz-oberflaeche.md` (Feld beim Anlegen); Bilder nach `docs/anwender/AGENTS.md` nachgezogen; Doku-Wächter grün
 
 ## 8. Nachweis
 

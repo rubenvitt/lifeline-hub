@@ -104,9 +104,11 @@ MapLibre ohne Bedienung, Stil wie `LagemonitorKarte` (`baueBasemapStyle(defaultM
 `absolutiereProxyAnfrage`), `PUNKT_ZOOM`, eine Nadel als DOM-Marker mit `aria-label`. Ohne Punkt
 „Nicht verortet“. Die Lagemonitor-Karte bleibt (mehrere Punkte, Monitor-Maße); eine Vereinigung
 wäre ein eigener Refactor. Seiten-Tests mocken den Baustein, wie `LagemonitorPage.test.tsx` die
-Monitorkarte; der Baustein selbst wird für „Nicht verortet“ und den Marker geprüft. „Offline“
-heißt hier dasselbe wie auf der Lagekarte: installierte Offline-Karten oder der Kachel-Cache des
-Servers; ohne beides zeigt der Blindstil die Nadel auf leerem Grund.
+Monitorkarte; der Baustein selbst wird für „Nicht verortet“ und den Marker geprüft. Die
+Kartengrundlage folgt `defaultModus` wie die Lagemonitor-Karte (online → offline → blind), ohne
+den Laufzeitwechsel der Lagekarte: Kacheln kommen online über den Kachelspeicher des Servers,
+sonst aus den installierten Offline-Karten; ohne beides zeigt der Blindstil die Nadel auf
+leerem Grund.
 
 ### D8 Sprung zur Lagekarte
 „Auf Lagekarte zeigen ↗“ über `lagekartePfad(id, { zentrum })`, nur wenn der Einsatzort verortet

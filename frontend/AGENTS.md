@@ -445,8 +445,15 @@ anwendbar), „nicht geprüft" ist keins.
   eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
   Hinweis per `data-fehler`; Zeitpunkte über `ZeitpunktEingabe` und Gleichheit am Instant. Die
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
-  Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung und Koordinate nur
-  im Vollformular.
+  Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung nur im
+  Vollformular. Ausnahmen (LFH-1175, Spec `einsatzdaten-bearbeitung`): die Zeile „Koordinate“
+  schickt das Paar, die Zeile „Adresse“ mit gewähltem Treffer Adresse und Koordinate zusammen;
+  beide stehen im Paneel „Einsatzort“, die Kopfleiste zeigt den Einsatzort nur an.
+- **Ortsangaben mit Suche nehmen `anzeige/Ortsfeld.tsx`** (LFH-1175, Spec `ortsfeld`): Suche nur
+  auf Enter oder „Ort suchen“, nie beim Tippen (Nominatim-Regeln, ein Takt für alle); Enter im
+  Feld sendet das umgebende Formular nicht ab. Die Suche wird hineingereicht (im Einsatz
+  `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide ohne Lagekarten-Recht; den Punkt zeigt
+  `anzeige/Kartenausschnitt.tsx`. Personenadressen bekommen keine Suche (folgt mit LFH-1248).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
