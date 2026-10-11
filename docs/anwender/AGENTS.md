@@ -141,6 +141,9 @@ stehen im Hintergrund jedes Kapitels.
 
 ## Hilfe in der App
 
+- Gliederung nach Bereichen (`hilfe/bereiche.ts`: je Hunderterblock der `reihenfolge` ein Bereich),
+  Suche über Titel und Überblick, Übersichtskarten mit dem Kurztext des Überblicks. Ein Kapitel
+  endet mit Zurück/Weiter. Die Mappe zum Drucken ist die gefilterte Liste der Lesergruppe.
 - Route `/hilfe` und `/hilfe/<kapitel>` **ohne** `RequireAuth` (das Kapitel „Anmelden“ braucht man
   davor), Gruppe als `?gruppe=` (`hilfePfad`, `parseHilfeGruppe` in `routing/deeplinks.ts`).
   Ohne Kapitel zeigt die Seite die Mappe der Gruppe.

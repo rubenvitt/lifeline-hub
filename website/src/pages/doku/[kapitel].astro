@@ -19,6 +19,7 @@ import type { ImageMetadata } from 'astro';
 import { getCollection } from 'astro:content';
 import Grundriss from '../../layouts/Grundriss.astro';
 import { GRUPPEN } from '../../daten/gruppen';
+import { BEREICHE, bereichVon } from '../../daten/bereiche';
 import '../../styles/doku.css';
 
 export async function getStaticPaths() {
@@ -57,31 +58,111 @@ const html = (eintrag.rendered?.html ?? '')
   .replace(/href="([a-z0-9-]+)\.md"/g, (_m, name: string) => `href="/doku/${name}/"`)
   .replace(/<img __ASTRO_IMAGE_="([^"]*)">/g, (_m, platzhalter: string) => bild(platzhalter));
 const gruppen = GRUPPEN.filter((g) => eintrag.data.gruppen.includes(g.key)).map((g) => g.name);
+const bereich = bereichVon(eintrag.data.reihenfolge);
+const bereiche = BEREICHE.map((name) => ({
+  name,
+  kapitel: kapitel.filter((k) => bereichVon(k.data.reihenfolge) === name),
+})).filter((b) => b.kapitel.length > 0);
+const stelle = kapitel.findIndex((k) => k.id === eintrag.id);
+const zurueck = stelle > 0 ? kapitel[stelle - 1] : undefined;
+const weiter = kapitel[stelle + 1];
+/** Abschnitte des Kapitels (`## …`) mit den IDs, die der Renderer setzt. */
+const abschnitte = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => ({
+  id: m[1],
+  titel: m[2].replace(/<[^>]+>/g, ''),
+}));
 ---
 
 <Grundriss
   titel={`${eintrag.data.titel} · Anwenderdokumentation · Lifeline Hub`}
   beschreibung={`Anwenderdokumentation Lifeline Hub: ${eintrag.data.titel}.`}
 >
-  <div class="abschnitt doku-kapitelseite">
+  <div class="abschnitt doku-seite">
     <nav class="doku-navi" aria-label="Kapitel">
-      <a class="doku-navi__zurueck" href="/doku/">Alle Kapitel</a>
-      <ul class="doku-liste">
+      <details class="doku-navi__klappe" open>
+        <summary class="doku-navi__summary mono">Alle Kapitel</summary>
+        <a class="doku-navi__uebersicht" href="/doku/">Zur Übersicht</a>
         {
-          kapitel.map((k) => (
-            <li>
-              <a href={`/doku/${k.id}/`} aria-current={k.id === eintrag.id ? 'page' : undefined}>
-                {k.data.titel}
-              </a>
-            </li>
+          bereiche.map((b) => (
+            <div class="doku-navi__bereich">
+              <p class="doku-label">{b.name}</p>
+              <ul class="doku-liste">
+                {b.kapitel.map((k) => (
+                  <li>
+                    <a
+                      href={`/doku/${k.id}/`}
+                      aria-current={k.id === eintrag.id ? 'page' : undefined}
+                    >
+                      {k.data.titel}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))
         }
-      </ul>
+      </details>
     </nav>
-    <article class="doku-text">
-      <p class="doku-gruppen-zeile mono">Für: {gruppen.join(' · ')}</p>
-      <h1 class="ueberschrift">{eintrag.data.titel}</h1>
-      <Fragment set:html={html} />
+
+    <article class="doku-kapitel">
+      <p class="doku-pfad mono">
+        <a href="/doku/">Anwenderdokumentation</a>
+        <span aria-hidden="true">/</span>
+        {bereich}
+      </p>
+      <header class="doku-kapitel__kopf">
+        <h1 class="doku-kapitel__titel">{eintrag.data.titel}</h1>
+        <p class="doku-fuer">
+          <span class="doku-label">Für</span>
+          {gruppen.map((g) => <span class="doku-marke mono">{g}</span>)}
+        </p>
+      </header>
+
+      {
+        abschnitte.length > 1 && (
+          <nav class="doku-inhalt" aria-label="Auf dieser Seite">
+            <p class="doku-label">Auf dieser Seite</p>
+            <ol>
+              {abschnitte.map((a) => (
+                <li>
+                  <a href={`#${a.id}`}>{a.titel}</a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        )
+      }
+
+      <div class="doku-text">
+        <Fragment set:html={html} />
+      </div>
+
+      <nav class="doku-blaettern" aria-label="Kapitel blättern">
+        {
+          zurueck ? (
+            <a class="doku-blaettern__link doku-blaettern__link--zurueck" href={`/doku/${zurueck.id}/`}>
+              <span class="doku-label">← Zurück</span>
+              <span>{zurueck.data.titel}</span>
+            </a>
+          ) : (
+            <span />
+          )
+        }
+        {
+          weiter && (
+            <a class="doku-blaettern__link doku-blaettern__link--weiter" href={`/doku/${weiter.id}/`}>
+              <span class="doku-label">Weiter →</span>
+              <span>{weiter.data.titel}</span>
+            </a>
+          )
+        }
+      </nav>
     </article>
   </div>
 </Grundriss>
+
+<script>
+  // Unter 960 px startet die Kapitelliste zu, damit der Text oben steht; darüber bleibt sie offen.
+  const klappe = document.querySelector<HTMLDetailsElement>('.doku-navi__klappe');
+  if (klappe && !matchMedia('(min-width: 960px)').matches) klappe.open = false;
+</script>

@@ -1,25 +1,322 @@
-/* Anwenderdokumentation (LFH-1096): Lesespalte, Kapitelliste, Satz für gerendertes Markdown.
-   Radius 0, Haarlinien, Farben nur aus den Rollen. */
+/* Anwenderdokumentation (LFH-1096): Übersicht mit Suche und Bereichen,
+   Kapitelseite mit Navigation, Abschnittsübersicht und Blättern. Radius 0, Haarlinien, Farben nur
+   aus den Rollen, Zahlen und Nummern in Mono. Das Satzbild der Kapitel steht hier, nicht im Text. */
 
-.doku-gruppe {
-  padding: 20px;
-  background: var(--lfh-grund);
+/* ── Etiketten und Marken ───────────────────────────────────────────────── */
+
+.doku-label {
+  margin: 0;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  letter-spacing: var(--lfh-typo-augenbraue-sperrung);
+  text-transform: uppercase;
+  color: var(--lfh-gedaempft);
 }
 
-.doku-gruppen {
-  grid-template-columns: minmax(0, 1fr);
+.doku-marke {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--lfh-linie);
+  font-size: 11px;
+  color: var(--lfh-text-2);
+}
+
+/* ── Übersicht ──────────────────────────────────────────────────────────── */
+
+.doku-start {
+  padding-bottom: 40px;
+}
+
+.doku-kopf {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+}
+
+.doku-kopf__titel {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
 }
 
 @media (min-width: 768px) {
-  .doku-gruppen {
+  .doku-kopf__titel {
+    font-size: 40px;
+  }
+}
+
+.doku-kopf__text {
+  max-width: 62ch;
+}
+
+.doku-werkzeuge {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 36px;
+  padding: 20px;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+@media (min-width: 1100px) {
+  .doku-werkzeuge {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}
+
+.doku-suche {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  max-width: 520px;
+}
+
+@media (min-width: 1100px) {
+  .doku-suche {
+    flex: 1 1 360px;
+  }
+}
+
+.doku-suche input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--lfh-steuer-rahmen);
+  background: var(--lfh-grund);
+  color: var(--lfh-text);
+  font: 400 15px var(--lfh-schrift-text);
+}
+
+.doku-suche input::placeholder {
+  color: var(--lfh-gedaempft);
+}
+
+.doku-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doku-filter button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-grund);
+  color: var(--lfh-text-2);
+  font: 500 14px var(--lfh-schrift-text);
+  cursor: pointer;
+}
+
+.doku-filter button:hover {
+  color: var(--lfh-text);
+}
+
+.doku-filter button[aria-pressed="true"] {
+  border-color: var(--lfh-bedien);
+  background: var(--lfh-bedien);
+  color: var(--lfh-auf-bedien);
+}
+
+.doku-stand {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lfh-gedaempft);
+}
+
+.doku-bereiche {
+  padding-top: 8px;
+}
+
+.doku-bereich {
+  padding: 36px 0 8px;
+}
+
+.doku-bereich + .doku-bereich {
+  border-top: 1px solid var(--lfh-linie);
+}
+
+.doku-bereich[hidden],
+.doku-karten li[hidden] {
+  display: none;
+}
+
+.doku-bereich__titel {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 0 0 20px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.doku-bereich__nummer {
+  font-size: 13px;
+  color: var(--lfh-bedien-text);
+}
+
+.doku-karten {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .doku-karten {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-.doku-gruppe__titel {
-  margin: 0 0 12px;
-  font-size: 18px;
+@media (min-width: 1100px) {
+  .doku-karten {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.doku-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 132px;
+  padding: 18px 20px;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+  color: var(--lfh-text);
+  text-decoration: none;
+  transition: border-color var(--lfh-uebergang, 120ms) ease;
+}
+
+.doku-karte:hover {
+  border-color: var(--lfh-bedien-text);
+  color: var(--lfh-text);
+}
+
+.doku-karte__titel {
+  font-size: 16px;
   font-weight: 600;
+  line-height: 1.3;
+}
+
+.doku-karte__kurz {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--lfh-gedaempft);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.doku-karte__fuss {
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--lfh-gedaempft);
+}
+
+.doku-leer {
+  margin: 40px 0 0;
+}
+
+.doku-leer button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lfh-bedien-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── Kapitelseite ───────────────────────────────────────────────────────── */
+
+.doku-seite {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 32px;
+}
+
+@media (min-width: 960px) {
+  .doku-seite {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 56px;
+  }
+}
+
+.doku-navi {
+  min-width: 0;
+}
+
+.doku-navi__klappe {
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+.doku-navi__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+
+.doku-navi__summary::-webkit-details-marker {
+  display: none;
+}
+
+.doku-navi__summary::after {
+  content: "+";
+  font-size: 16px;
+}
+
+.doku-navi__klappe[open] > .doku-navi__summary::after {
+  content: "–";
+}
+
+.doku-navi__klappe > *:not(summary) {
+  padding-inline: 14px;
+}
+
+.doku-navi__uebersicht {
+  display: inline-block;
+  margin: 12px 0 4px;
+  font-size: 13px;
+}
+
+.doku-navi__bereich {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--lfh-linie);
+}
+
+.doku-navi__bereich .doku-label {
+  margin-bottom: 4px;
+}
+
+.doku-navi__klappe > .doku-navi__bereich:first-of-type {
+  margin-top: 8px;
+}
+
+.doku-navi__klappe > *:last-child {
+  padding-bottom: 14px;
 }
 
 .doku-liste {
@@ -28,76 +325,188 @@
   list-style: none;
 }
 
-.doku-liste li + li {
-  margin-top: 4px;
-}
-
 .doku-liste a {
   display: block;
-  padding: 8px 0;
+  padding: 6px 10px;
+  margin-inline: -10px;
+  border-left: 2px solid transparent;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--lfh-text-2);
+  text-decoration: none;
 }
 
-.doku-liste a[aria-current='page'] {
+.doku-liste a:hover {
+  color: var(--lfh-text);
+  background: var(--lfh-flaeche-2);
+}
+
+.doku-liste a[aria-current="page"] {
+  border-left-color: var(--lfh-bedien);
   color: var(--lfh-text);
   font-weight: 600;
-}
-
-.doku-kapitelseite {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-}
-
-@media (min-width: 960px) {
-  .doku-kapitelseite {
-    grid-template-columns: 240px minmax(0, 1fr);
-    gap: 48px;
-  }
-}
-
-.doku-navi {
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--lfh-linie);
+  background: var(--lfh-flaeche-2);
 }
 
 @media (min-width: 960px) {
   .doku-navi {
+    position: sticky;
+    top: 76px;
+    align-self: start;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    padding-bottom: 24px;
+  }
+
+  .doku-navi__klappe {
+    border: 0;
+    background: none;
+  }
+
+  .doku-navi__summary {
+    display: none;
+  }
+
+  .doku-navi__klappe > *:not(summary) {
+    padding-inline: 0;
+  }
+
+  .doku-navi__klappe > *:last-child {
     padding-bottom: 0;
-    border-bottom: 0;
-    border-right: 1px solid var(--lfh-linie);
-    padding-right: 24px;
+  }
+
+  .doku-liste a {
+    margin-inline: -10px;
   }
 }
 
-.doku-navi__zurueck {
-  display: inline-block;
-  margin-bottom: 8px;
-  font-size: 13px;
+.doku-kapitel {
+  min-width: 0;
+  max-width: 76ch;
 }
 
-.doku-gruppen-zeile {
-  margin: 0 0 8px;
+.doku-pfad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
   font-size: 12px;
   color: var(--lfh-gedaempft);
 }
 
+.doku-kapitel__kopf {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--lfh-linie);
+}
+
+.doku-kapitel__titel {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+@media (min-width: 768px) {
+  .doku-kapitel__titel {
+    font-size: 36px;
+  }
+}
+
+.doku-fuer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.doku-fuer .doku-label {
+  margin-right: 4px;
+}
+
+/* „Auf dieser Seite“: die Abschnitte des Kapitels, nummeriert wie im Text. */
+.doku-inhalt {
+  margin: 24px 0 0;
+  padding: 16px 20px;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+.doku-inhalt ol {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: inhalt;
+}
+
+.doku-inhalt li {
+  counter-increment: inhalt;
+}
+
+.doku-inhalt li + li {
+  margin-top: 2px;
+}
+
+.doku-inhalt li::before {
+  content: counter(inhalt, decimal-leading-zero);
+  display: inline-block;
+  width: 2.2em;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 12px;
+  color: var(--lfh-gedaempft);
+}
+
+.doku-inhalt a {
+  font-size: 14px;
+  color: var(--lfh-text);
+}
+
+/* ── Kapiteltext ────────────────────────────────────────────────────────── */
+
 .doku-text {
   min-width: 0;
-  max-width: 72ch;
+  padding-top: 8px;
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.65;
+  counter-reset: abschnitt;
+}
+
+.doku-text > * {
+  max-width: 100%;
 }
 
 .doku-text h2 {
-  margin: 36px 0 12px;
-  font-size: 20px;
+  counter-increment: abschnitt;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 48px 0 16px;
+  padding-top: 24px;
+  border-top: 1px solid var(--lfh-linie);
+  font-size: 22px;
   font-weight: 600;
+  letter-spacing: -0.01em;
+  scroll-margin-top: 76px;
+}
+
+.doku-text h2::before {
+  content: counter(abschnitt, decimal-leading-zero);
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lfh-bedien-text);
 }
 
 .doku-text h3 {
-  margin: 24px 0 8px;
-  font-size: 17px;
+  margin: 28px 0 10px;
+  font-size: 18px;
   font-weight: 600;
+  scroll-margin-top: 76px;
 }
 
 .doku-text p,
@@ -106,13 +515,50 @@
   margin: 0 0 14px;
 }
 
-.doku-text ul,
-.doku-text ol {
+.doku-text ul {
   padding-left: 22px;
 }
 
 .doku-text li + li {
-  margin-top: 4px;
+  margin-top: 6px;
+}
+
+/* Abläufe: nummerierte Schritte mit Kreis-Zähler in Mono. */
+.doku-text ol {
+  counter-reset: schritt;
+  list-style: none;
+  padding: 0;
+}
+
+.doku-text ol > li {
+  counter-increment: schritt;
+  position: relative;
+  min-height: 28px;
+  padding-left: 44px;
+}
+
+.doku-text ol > li::before {
+  content: counter(schritt);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lfh-steuer-rahmen);
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--lfh-text-2);
+}
+
+.doku-text ol > li > p:first-child {
+  margin-top: 2px;
+}
+
+.doku-text ol > li + li {
+  margin-top: 12px;
 }
 
 .doku-text code {
@@ -128,23 +574,104 @@
 }
 
 .doku-text table {
+  display: block;
   width: 100%;
-  border-collapse: collapse;
   margin: 0 0 14px;
+  overflow-x: auto;
+  border-collapse: collapse;
 }
 
 .doku-text :is(th, td) {
-  padding: 6px 8px;
+  padding: 8px 10px;
   border: 1px solid var(--lfh-linie);
   text-align: left;
+  vertical-align: top;
 }
 
-/* Bildschirmfotos der Kapitel (LFH-1128): nie breiter als die Lesespalte, mit Haarlinie, weil das
-   helle Foto sonst auf hellem Grund zerfließt. */
+.doku-text th {
+  background: var(--lfh-paneel);
+  font-weight: 600;
+}
+
+/* Bildschirmfotos (LFH-1128): nie breiter als die Lesespalte, Haarlinie, damit das helle Foto
+   auf dem dunklen Grund nicht zerfließt. */
 .doku-text img {
   display: block;
   max-width: 100%;
   height: auto;
-  margin: 8px 0;
+  margin: 14px 0 18px;
   border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+/* Die Fotos sind im hellen Modus aufgenommen (docs/anwender/AGENTS.md, „Gleiche Aufnahmen“).
+   Im Nachtmodus dreht ein Filter Helligkeit und Kontrast um; der Farbton bleibt dank der
+   zweiten Drehung erhalten. Ein Dunkel-Foto gibt es nicht. */
+:root[data-theme='dark'] .doku-text img {
+  filter: invert(0.92) hue-rotate(180deg);
+}
+
+/* Quellen am Ende stehen klein und gedämpft: sie belegen, sie lenken nicht. */
+.doku-text h2[id^="grundlagen"] ~ * {
+  font-size: 14px;
+  color: var(--lfh-gedaempft);
+}
+
+/* ── Blättern ───────────────────────────────────────────────────────────── */
+
+.doku-blaettern {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin-top: 56px;
+  background: var(--lfh-linie);
+  border: 1px solid var(--lfh-linie);
+}
+
+@media (min-width: 640px) {
+  .doku-blaettern {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.doku-blaettern > span {
+  background: var(--lfh-grund);
+}
+
+.doku-blaettern__link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 84px;
+  padding: 16px 18px;
+  background: var(--lfh-paneel);
+  color: var(--lfh-text);
+  text-decoration: none;
+}
+
+.doku-blaettern__link:hover {
+  background: var(--lfh-flaeche-2);
+  color: var(--lfh-text);
+}
+
+.doku-blaettern__link--weiter {
+  text-align: right;
+}
+
+.doku-blaettern__link > span:last-child {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+@media print {
+  .doku-navi,
+  .doku-blaettern,
+  .doku-inhalt {
+    display: none;
+  }
+
+  .doku-seite {
+    display: block;
+  }
 }
