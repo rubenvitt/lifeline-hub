@@ -100,6 +100,24 @@ describe('baueEinsatzortFc', () => {
     expect(fc.features[0].properties.icon?.startsWith('ez|')).toBe(true);
   });
 
+  it('trägt auch die Führungsstelle, nie im Cluster (LFH-1181)', () => {
+    const marker = [
+      mk({ schluessel: 'einsatzort', typ: 'einsatzort', tz: { grundzeichen: 'anlass' } }),
+      mk({
+        schluessel: 'fuehrungsstelle',
+        typ: 'fuehrungsstelle',
+        label: 'ELW 2',
+        tz: { grundzeichen: 'befehlsstelle' },
+      }),
+      mk({ schluessel: 'uhs-5' }),
+    ];
+    expect(baueEinsatzortFc(marker).features.map((f) => f.properties.schluessel)).toEqual([
+      'einsatzort',
+      'fuehrungsstelle',
+    ]);
+    expect(baueMarkerFc(marker).features.map((f) => f.properties.schluessel)).toEqual(['uhs-5']);
+  });
+
   it('ist leer, wenn kein Einsatzort verortet ist', () => {
     expect(baueEinsatzortFc([mk({ schluessel: 'uhs-5' })]).features).toHaveLength(0);
   });

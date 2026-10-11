@@ -2,7 +2,12 @@ import { useMemo } from 'react';
 import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
-import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../../api/einsaetze';
+import {
+  ladeEinsatz,
+  ladeEinstellungen,
+  ladeFuehrungsstelle,
+  ladeModulFreigaben,
+} from '../../api/einsaetze';
 import { ApiError } from '../../api/client';
 import { listePersonen } from '../../api/einsatzPerson';
 import { ladeBetreuung } from '../../api/betreuung';
@@ -24,6 +29,7 @@ import { ladeOrganisation } from '../../api/organisation';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import type { Warnstufe } from '../../api/types';
 import {
+  baueFuehrungsstelleMarker,
   baueMarker,
   baueTaktischeMarker,
   baueLageMeldungMarker,
@@ -102,6 +108,14 @@ export function useLagekarteDaten({
     queryFn: () => ladeEinsatz(einsatzId),
     enabled: liveAn,
   });
+  // Die eigene Führungsstelle (LFH-1181, design.md D7) liest jeder mit dem Einsatz, ohne Modul-
+  // Gate. Nur live: ein Lage-Snapshot kennt sie nicht, im Historien-Modus fehlt ihr Marker.
+  const fuehrungsstelleQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+    enabled: liveAn,
+  });
+  const fuehrungsstelleRoh = liveAn ? fuehrungsstelleQuery.data : undefined;
   // Modulgrenze der Kartenquellen (LFH-669, Spec `modul-freigabe`): eine Quelle eines fremden
   // Moduls läuft nur, wenn der Server das Modul freigibt — ohne bekannte Freigaben (Laden,
   // Fehler) gar nicht. Gesperrt ist kein Ausfall: ihre Rohdaten bleiben leer, auch mit Altstand
@@ -319,9 +333,17 @@ export function useLagekarteDaten({
     [einsatz, uhsRoh, schaedenRoh, token],
   );
   const stellen = useMemo(() => baueBetreuungMarker(stellenRoh ?? [], token), [stellenRoh, token]);
+  const fuehrungsstelleMarker = useMemo(
+    () => baueFuehrungsstelleMarker(fuehrungsstelleRoh, token),
+    [fuehrungsstelleRoh, token],
+  );
   const verortet = useMemo(
-    () => [...basisVerortet, ...stellen.verortet],
-    [basisVerortet, stellen.verortet],
+    () => [
+      ...basisVerortet,
+      ...(fuehrungsstelleMarker ? [fuehrungsstelleMarker] : []),
+      ...stellen.verortet,
+    ],
+    [basisVerortet, fuehrungsstelleMarker, stellen.verortet],
   );
   const nichtVerortet = useMemo(
     () => [...basisNichtVerortet, ...stellen.nichtVerortet],
@@ -626,6 +648,7 @@ export function useLagekarteDaten({
       schaeden: schaedenRoh ?? [],
       abschnitte: abschnitteRoh ?? [],
       betreuungsstellen: stellenRoh ?? [],
+      fuehrungsstelle: fuehrungsstelleRoh ?? null,
       // Nur ein erfolgreicher Live-Abruf; nach Fehler bliebe `data` als stiller Altstand stehen.
       rueckmeldungen:
         !rueckmeldungenFrei || rueckmeldungenQuery.isError ? undefined : rueckmeldungenQuery.data,

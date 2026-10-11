@@ -40,10 +40,15 @@ Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial) ändern
 
 1. In „Einsatzdaten“ zum Paneel „Eigene Führungsstelle“ gehen.
 
-   ![Paneel „Eigene Führungsstelle“ mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und Fahrzeug](../bilder/einsatzdaten/fuehrungsstelle.png)
+   ![Paneel „Eigene Führungsstelle“ mit Art, Bezeichnung, Standort, Funkangaben und Führungsfahrzeug](../bilder/einsatzdaten/fuehrungsstelle.png)
 
-2. „Rufname“, „Sprechgruppen“, „Kommunikationsmittel“, „Erreichbarkeit“ und „Fahrzeuge“ Zeile
-   für Zeile eintragen und speichern wie jede andere Angabe.
+2. Unter „Art“ „mobil“ oder „ortsfest“ wählen. Die Wahl gilt sofort.
+3. „Bezeichnung“ eintragen, etwa „ELW 2 Musterstadt“ oder „TEL Rathaus“.
+4. Bei „Standort“ die Adresse und die Koordinate eintragen. „wie Einsatzort“ übernimmt beides
+   vom Einsatzort; danach „Speichern“ wählen.
+5. „Rufname“, „Sprechgruppen“, „Kommunikationsmittel“, „Erreichbarkeit“ und
+   „Führungsfahrzeuge“ Zeile für Zeile eintragen und speichern wie jede andere Angabe. Bei
+   „ortsfest“ stehen die Führungsfahrzeuge eingeklappt; ein Klick auf die Anzahl öffnet sie.
 
 ### Ein Mitglied hinzufügen
 
@@ -95,10 +100,18 @@ aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder d
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie
   schreiben keinen Eintrag ins Einsatztagebuch.
 - Die „Einsatznummer“ unter „Technische Angaben“ vergibt das System; sie lässt sich nicht ändern.
-- Die **eigene Führungsstelle** speist Funkplan, Fernmeldeskizze und Kommunikationsplan (siehe
-  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); dort wird sie nicht
-  bearbeitet. „Fahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
+- Die **eigene Führungsstelle** ist der Ort, an dem die Einsatzleitung arbeitet: mobil in einem
+  Führungsfahrzeug oder ortsfest in einem Gebäude. Ihre Bezeichnung erscheint in Funkplan,
+  Fernmeldeskizze und Organigramm, ihr Standort auf der Lagekarte und am Punkt „Standort der
+  Führungsstelle festgelegt“ der Checkliste Arbeitsaufnahme (siehe
+  [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); bearbeitet wird sie nur hier.
+  „Führungsfahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.
+- „wie Einsatzort“ übernimmt Adresse und Koordinate einmal. Wird der Einsatzort danach
+  geändert, bleibt der Standort der Führungsstelle, wo er ist.
+- Die Adresse gehört ins Feld „Standort“, nicht in die „Bezeichnung“: Beim Löschen der
+  personenbezogenen Daten nach Ablauf der Frist werden Adresse und Koordinate der Führungsstelle
+  geleert, Art und Bezeichnung bleiben stehen.
 - Die **Führungsstelle eines Mitglieds** ist der erste Vorschlag, wenn das Einsatztagebuch die
   Person nach ihrem Rufnamen fragt, noch vor ihrem eigenen Sachgebiet im Stab.
 

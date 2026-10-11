@@ -695,7 +695,7 @@ function StandortAngabe({
         });
       }}
       eingabe={({ feld, value, onChange }) => (
-        <Space direction="vertical" style={{ width: '100%' }} size={token.marginXS}>
+        <Space orientation="vertical" style={{ width: '100%' }} size={token.marginXS}>
           <Input
             {...feld}
             value={value.adresse}

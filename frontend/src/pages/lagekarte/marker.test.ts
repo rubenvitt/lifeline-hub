@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import {
+  baueFuehrungsstelleMarker,
   baueMarker,
   baueBetreuungMarker,
   baueTaktischeMarker,
@@ -16,6 +17,7 @@ import type {
   Betreuungsstelle,
   EinsatzAnzeige,
   FreiesZeichen,
+  Fuehrungsstelle,
   LageMeldung,
   Schaden,
   Uhs,
@@ -540,5 +542,41 @@ describe('Trefferzone je Dichtestufe (LFH-711)', () => {
     const k = alleLagekartenMarker(tokenFuer('kompakt'))[0].trefferDurchmesser!;
     const h = alleLagekartenMarker(tokenFuer('handschuh'))[0].trefferDurchmesser!;
     expect(k).toBeLessThan(h);
+  });
+});
+
+describe('baueFuehrungsstelleMarker (LFH-1181)', () => {
+  const fs = (p: Partial<Fuehrungsstelle> = {}): Fuehrungsstelle => ({
+    art: 'mobil',
+    sprechgruppen: [],
+    fahrzeug_ids: [],
+    ...p,
+  });
+
+  it('setzt mit Koordinate das Zeichen „Befehlsstelle“ und die Bezeichnung', () => {
+    const m = baueFuehrungsstelleMarker(
+      fs({ bezeichnung: 'ELW 2 Musterstadt', standort_lat: 52.1, standort_lon: 9.9 }),
+      token,
+    );
+    expect(m).toMatchObject({
+      schluessel: 'fuehrungsstelle',
+      typ: 'fuehrungsstelle',
+      id: 0,
+      lat: 52.1,
+      lon: 9.9,
+      label: 'ELW 2 Musterstadt',
+      tz: { grundzeichen: 'befehlsstelle' },
+      trefferDurchmesser: token.controlHeight,
+    });
+  });
+
+  it('heißt ohne Bezeichnung „Führungsstelle“', () => {
+    const m = baueFuehrungsstelleMarker(fs({ standort_lat: 52.1, standort_lon: 9.9 }), token);
+    expect(m?.label).toBe('Führungsstelle');
+  });
+
+  it('fehlt ohne Koordinate, auch mit Adresse', () => {
+    expect(baueFuehrungsstelleMarker(fs({ standort_adresse: 'Rathaus' }), token)).toBeNull();
+    expect(baueFuehrungsstelleMarker(undefined, token)).toBeNull();
   });
 });

@@ -1,5 +1,13 @@
 import { waehleIn } from '../auswahl-kern';
-import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from './kern';
+import {
+  anmelden,
+  demoEinsatz,
+  expect,
+  fotografiere,
+  fuehrungsstelleOrtFuellen,
+  test,
+  uhrAnhalten,
+} from './kern';
 
 /**
  * Bilder des Kapitels „Einsatzabschnitte und Führungsorganisation“
@@ -53,10 +61,13 @@ test.describe(KAPITEL, () => {
   test('Organigramm der Führungsorganisation', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
+    // Die Wurzel nennt die eigene Führungsstelle (LFH-1181).
+    await fuehrungsstelleOrtFuellen(page, demo.id);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einsatzabschnitte?ansicht=organigramm`);
     const organigramm = page.locator('.organigramm-print-root');
-    await expect(organigramm.getByRole('group', { name: 'Einsatzleitung' })).toBeVisible();
+    const wurzel = organigramm.getByRole('group', { name: 'Einsatzleitung' });
+    await expect(wurzel.getByText('ELW 2 Musterstadt')).toBeVisible();
     await expect(organigramm.getByText('UHS Turnhalle').first()).toBeVisible();
     await fotografiere(organigramm, KAPITEL, 'organigramm');
   });

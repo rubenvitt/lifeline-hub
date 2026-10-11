@@ -98,7 +98,15 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
 }
 
 /**
- * Clusterbare Marker (alle außer dem Einsatzort) als FeatureCollection. `plakette` trägt die
+ * Die festen Anker des eigenen Einsatzes: Einsatzort und eigene Führungsstelle (LFH-1181, D7). Sie
+ * clustern nie und teilen die Quelle `marker-einsatzort` samt Trefferzone und Klickebene.
+ */
+function istAnker(m: Pick<KarteMarker, 'typ'>): boolean {
+  return m.typ === 'einsatzort' || m.typ === 'fuehrungsstelle';
+}
+
+/**
+ * Clusterbare Marker (alle außer den festen Ankern) als FeatureCollection. `plakette` trägt die
  * aufgelösten Rollen des aktiven Modus; ohne Angabe Nacht.
  */
 export function baueMarkerFc(
@@ -107,18 +115,18 @@ export function baueMarkerFc(
 ): MarkerFeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: markers.filter((m) => m.typ !== 'einsatzort').map((m) => toFeature(m, plakette)),
+    features: markers.filter((m) => !istAnker(m)).map((m) => toFeature(m, plakette)),
   };
 }
 
-/** Der Einsatzort-Marker (0 oder 1 Feature) für die eigene, ungeclusterte Source. */
+/** Einsatzort und Führungsstelle (je 0 oder 1 Feature) für die eigene, ungeclusterte Source. */
 export function baueEinsatzortFc(
   markers: KarteMarker[],
   plakette: Plakette = zonenPlakette(farbenDunkel),
 ): MarkerFeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: markers.filter((m) => m.typ === 'einsatzort').map((m) => toFeature(m, plakette)),
+    features: markers.filter(istAnker).map((m) => toFeature(m, plakette)),
   };
 }
 

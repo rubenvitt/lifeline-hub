@@ -90,8 +90,9 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 ### Das Organigramm
 
 Das Organigramm wird nicht gepflegt, es entsteht aus Abschnitten, Einheiten und der Besetzung des
-Stabs. Den Kasten der Einsatzleitung beschriftet es mit „Leitung nicht erfasst“, weil die App die
-Person der Einsatzleitung nicht als Angabe führt. An der Wurzel steht keine Stärke; die
+Stabs. Im Kasten der Einsatzleitung stehen Bezeichnung und Rufname der eigenen Führungsstelle,
+sobald sie in den Einsatzdaten erfasst sind, und „Leitung nicht erfasst“, weil die App die Person
+der Einsatzleitung nicht als Angabe führt. An der Wurzel steht keine Stärke; die
 Gesamtstärke zeigt das Meldebild.
 
 ### Führungsfunktionen

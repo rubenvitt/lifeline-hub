@@ -6,6 +6,7 @@ import {
   demoEinsatz,
   expect,
   fotografiere,
+  fuehrungsstelleOrtFuellen,
   fuelle,
   test,
   uhrAnhalten,
@@ -89,6 +90,7 @@ test.describe(KAPITEL, () => {
         fahrzeug_ids: elw ? [elw.id] : [],
       });
     }
+    await fuehrungsstelleOrtFuellen(api, id);
 
     // Die Zuordnung ersetzt die Menge: wiederholt ist sie dieselbe.
     const abschnitte = `${e}/abschnitte`;

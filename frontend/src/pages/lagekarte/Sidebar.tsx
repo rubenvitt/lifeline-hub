@@ -64,6 +64,8 @@ import AnsichtZuordnung from './AnsichtZuordnung';
 
 export interface LayerSichtbar {
   einsatzort: boolean;
+  /** Eigene Führungsstelle (LFH-1181), nur lesend; an wie der Einsatzort. */
+  fuehrungsstelle: boolean;
   uhs: boolean;
   schaden: boolean;
   einheit: boolean;

@@ -79,6 +79,9 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
   switch (m.typ) {
     case 'einsatzort':
       return `einsatzort:${einsatzId}`;
+    // Die Ort-Vorschau kennt die Führungsstelle nicht als Peilungsquelle.
+    case 'fuehrungsstelle':
+      return undefined;
     case 'uhs':
       return `uhs:${m.id}`;
     case 'schaden':
@@ -326,9 +329,11 @@ export default function Inspector({
             </Link>
           )}
         </div>
-        {/* Lagemeldungen sind auf der Karte read-only: verortet wird nur beim Übergeben. */}
+        {/* Lagemeldungen sind auf der Karte read-only: verortet wird nur beim Übergeben. Die
+            Führungsstelle ebenso: sie wird in den Einsatzdaten gepflegt (LFH-1181). */}
         {darfSchreiben &&
           marker.typ !== 'einsatzort' &&
+          marker.typ !== 'fuehrungsstelle' &&
           marker.typ !== 'lagemeldung' &&
           (marker.typ === 'abschnitt' ? (
             // Ein Abschnitt steht nur mit Fläche auf der Karte, sein Löschen schickt
