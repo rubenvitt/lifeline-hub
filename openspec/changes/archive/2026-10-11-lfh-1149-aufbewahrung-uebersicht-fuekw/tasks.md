@@ -3,7 +3,7 @@
 ## 1. Übersicht (im Branch schon umgesetzt, Commit 7ef4bd6)
 
 - [x] 1.1 `AufbewahrungUebersicht.tsx`: Vormerkung, Antrags-Fälligkeit und Schwärzung tragen `abBreite: 'xxl'`, die Bezeichnung fließt, alle übrigen Spalten tragen eine Zahlbreite; nachgeprüft am Diff und am Dateikopf (Verweis auf das Gate)
-- [ ] 1.2 e2e „Tabellen am Führungsarbeitsplatz“ in `e2e/gate1-ueberlauf.spec.ts`: Aufbewahrung bei 1440 px ohne Tabellenüberlauf, „Spalten · 3 ausgeblendet“ als Vorbedingung; grün, vorher rot mit 586 px
+- [x] 1.2 e2e „Tabellen am Führungsarbeitsplatz“ in `e2e/gate1-ueberlauf.spec.ts`: Aufbewahrung bei 1440 px ohne Tabellenüberlauf, „Spalten · 3 ausgeblendet“ als Vorbedingung; grün, vorher rot mit 586 px
 
 ## 2. Tests auf die Spec ziehen
 
@@ -17,7 +17,7 @@
 
 ## 4. Nachweis
 
-- [ ] 4.1 Gates: tsc, Lint, Prettier, Vitest komplett, `scripts/check-all.sh --nur schnell` (inkl. `check-openspec-archiv.sh`), e2e `gate1-ueberlauf.spec.ts` und `aufbewahrung.spec.ts`
+- [x] 4.1 Gates: tsc, Lint, Prettier, Vitest komplett, `scripts/check-all.sh --nur schnell` (inkl. `check-openspec-archiv.sh`), e2e `gate1-ueberlauf.spec.ts` und `aufbewahrung.spec.ts`
 
 ## Workflow follow-up
 
