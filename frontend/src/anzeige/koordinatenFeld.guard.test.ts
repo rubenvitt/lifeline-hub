@@ -23,12 +23,16 @@ const dateien = import.meta.glob('/src/**/*.tsx', {
 }) as Record<string, string>;
 
 /**
- * Direkte Einbindungen außerhalb eines Formulars; jede prüft den Wert per `istLatLon`
- * (Verhalten belegt in `Sidebar.test.tsx`).
+ * Direkte Einbindungen außerhalb eines Formulars; jede prüft den Wert selbst, bevor sie ihn
+ * wandelt (Verhalten belegt in `Sidebar.test.tsx` und `EinsatzdatenPage.test.tsx`, „unlesbare
+ * Koordinate“).
  */
 const DIREKT = new Set([
   '/src/anzeige/KoordinatenFeld.tsx', // die Formularhülle selbst
   '/src/pages/lagekarte/Sidebar.tsx', // „Übernehmen“ und „Mittelpunkt setzen“, kein Form
+  // Standort der eigenen Führungsstelle (LFH-1181): `InlineAngabe`, kein Form; ein ungültiger
+  // Wert wird vor `alsLatLon` abgefangen und steht als Fehler an der Zeile.
+  '/src/pages/EinsatzdatenPage.tsx',
 ]);
 
 const IMPORT = /import\s+KoordinatenEingabe\s+from\s+['"][^'"]*\/KoordinatenEingabe['"]/;
