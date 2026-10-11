@@ -286,7 +286,9 @@ async fn providers_admin_lesen_fuehrungskraft_ja_ohne_rolle_nein_schalten_nur_ad
         let (status, _) = anfrage(&app, "POST", "/api/benutzer", &admin, Some(body)).await;
         assert_eq!(status, StatusCode::CREATED);
     }
+    common::zwang_aufheben("frieda").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    common::zwang_aufheben("otto").await;
     let otto = login_cookie(&app, "otto", "ottopw123").await;
 
     let (status, json) = anfrage(&app, "GET", "/api/auth/providers/admin", &frieda, None).await;

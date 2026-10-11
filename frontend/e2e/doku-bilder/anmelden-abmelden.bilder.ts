@@ -1,5 +1,5 @@
 import { waehleIn } from '../auswahl-kern';
-import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from './kern';
+import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
  * Bilder des Kapitels „Anmelden und Abmelden“ (`docs/anwender/kapitel/anmelden-abmelden.md`),
@@ -10,6 +10,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  *   anmeldeseite.png    frontend/src/pages/LoginPage.tsx
  *   benutzermenue.png   frontend/src/components/BenutzerMenu.tsx
  *   geraet-koppeln.png  frontend/src/pages/einstellungen/EinsatzGeraete.tsx
+ *   passwort-festlegen.png  frontend/src/pages/LoginPage.tsx,
+ *                           frontend/src/auth/NeuesPasswortFelder.tsx
  */
 
 const KAPITEL = 'anmelden-abmelden';
@@ -54,5 +56,33 @@ test.describe(KAPITEL, () => {
     await dialog.getByLabel('Gerätebezeichnung').fill('Tablet Aufnahme');
     await dialog.getByLabel('Gerätebezeichnung').blur();
     await fotografiere(dialog, KAPITEL, 'geraet-koppeln');
+  });
+
+  test('Stufe „Neues Passwort festlegen“', async ({ page }) => {
+    // Ein frisch angelegtes Konto steht unter Änderungszwang (LFH-1121): wie nach einem
+    // Einmalpasswort führt die erste Anmeldung in die Stufe. Der Admin legt an und meldet ab.
+    await anmelden(page);
+    const person = { benutzername: 'n.beispiel', passwort: 'anfangs-passwort-123' };
+    const liste = await page.request.get('/api/benutzer');
+    const vorhanden = ((await liste.json()) as { benutzername: string }[]).some(
+      (b) => b.benutzername === person.benutzername,
+    );
+    if (!vorhanden) {
+      await fuelle(page, 'post', '/api/benutzer', { anzeigename: 'Nora Beispiel', ...person });
+    }
+    expect((await page.request.post('/api/auth/logout')).ok()).toBe(true);
+
+    await uhrAnhalten(page);
+    await page.goto('/login');
+    const karte = page.locator('.login-karte');
+    await karte.getByLabel('Benutzername').fill(person.benutzername);
+    await karte.getByLabel('Passwort').fill(person.passwort);
+    await karte.getByRole('button', { name: 'Anmelden', exact: true }).click();
+    await expect(karte.getByText('Neues Passwort festlegen')).toBeVisible();
+    await karte.getByLabel('Neues Passwort', { exact: true }).fill('eigenes-passwort-1');
+    await karte.getByLabel('Neues Passwort wiederholen').fill('eigenes-passwort-1');
+    // Der Fokus stünde sonst im Feld (Fokusring und Cursor im Bild).
+    await karte.getByLabel('Neues Passwort wiederholen').blur();
+    await fotografiere(karte, KAPITEL, 'passwort-festlegen');
   });
 });

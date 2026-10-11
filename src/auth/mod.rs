@@ -7,6 +7,7 @@ pub mod geraet_bezeichnung;
 pub mod huelle;
 pub mod oidc;
 pub mod password;
+pub mod passwort_wechsel;
 pub mod provider;
 pub mod rate_limit;
 pub mod session;

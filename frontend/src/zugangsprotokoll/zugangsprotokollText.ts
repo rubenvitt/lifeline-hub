@@ -30,6 +30,7 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   anmeldeweg_aktiviert: 'Anmeldeweg aktiviert',
   anmeldeweg_deaktiviert: 'Anmeldeweg deaktiviert',
   sitzung_beendet: 'Sitzung beendet',
+  einmalpasswort_vergeben: 'Einmalpasswort vergeben',
 };
 
 /**

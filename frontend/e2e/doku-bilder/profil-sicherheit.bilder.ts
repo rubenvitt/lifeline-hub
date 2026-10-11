@@ -1,6 +1,7 @@
 import { request, type Page } from '@playwright/test';
 import { totpCode } from '../totp-kern';
 import { KONTEXTE, anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
+import { kontoAnlegen } from '../konto-anlegen';
 
 /**
  * Bilder des Kapitels „Profil und Sicherheit“ (`docs/anwender/kapitel/profil-sicherheit.md`,
@@ -33,10 +34,7 @@ interface Person {
 async function alsNeuePerson(page: Page, anzeigename: string, benutzername: string) {
   await anmelden(page);
   const person: Person = { benutzername, passwort: 'doku-passwort-123' };
-  const antwort = await page.request.post('/api/benutzer', {
-    data: { anzeigename, ...person },
-  });
-  expect(antwort.ok(), `Benutzer ${benutzername}: ${antwort.status()}`).toBe(true);
+  await kontoAnlegen(page.request, { anzeigename, ...person });
   expect((await page.request.post('/api/auth/logout')).ok()).toBe(true);
   await anmelden(page, person);
   return person;

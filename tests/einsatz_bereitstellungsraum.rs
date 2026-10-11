@@ -527,6 +527,7 @@ async fn beobachter_kann_nicht_schreiben_403() {
     .await;
     assert_eq!(s, StatusCode::OK);
 
+    common::zwang_aufheben("beob").await;
     let cookie_beob = login_cookie(&app, "beob", "startpw12").await;
 
     let (s, _) = anfrage_json(

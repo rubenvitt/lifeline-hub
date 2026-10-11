@@ -4,11 +4,16 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import BenutzerPage from './BenutzerPage';
 import { adminFixture } from '../test/fixtures';
-import { EIGENES_KONTO, LETZTER_ADMIN } from '../stammdaten/rechteText';
+import {
+  EIGENES_KONTO,
+  EIGENES_PASSWORT,
+  LETZTER_ADMIN,
+  SSO_KONTO,
+} from '../stammdaten/rechteText';
 
 const benutzer = adminFixture;
 
@@ -1078,6 +1083,177 @@ describe('BenutzerPage', () => {
         name: 'Zweiten Faktor von Admin zurücksetzen?',
       });
       expect(within(dialog).getByText(/auch die Anmeldung an diesem Gerät/)).toBeInTheDocument();
+    });
+  });
+
+  /** LFH-1121: Passwort vergessen — die Administration vergibt ein Einmalpasswort. */
+  describe('Einmalpasswort vergeben (LFH-1121)', () => {
+    const seite = () =>
+      renderMitProviders(
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        </Routes>,
+        { route: '/admin/benutzer' },
+      );
+    const eva = (abweichend: Record<string, unknown> = {}) =>
+      benutzer({
+        id: 2,
+        anzeigename: 'Eva',
+        benutzername: 'eva',
+        system_rolle: 'keiner',
+        ...abweichend,
+      });
+    async function bearbeitenVon(anzeigename: string) {
+      await waehle(anzeigename, 'Bearbeiten');
+      return dialogMitTitel('Benutzer bearbeiten');
+    }
+
+    it('fragt nach, vergibt und zeigt das Passwort einmal', async () => {
+      const vergeben: string[] = [];
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+        http.post('/api/benutzer/:id/einmalpasswort', ({ params }) => {
+          vergeben.push(String(params.id));
+          return HttpResponse.json({ einmalpasswort: 'kx7m-p4qr-9tzw' });
+        }),
+      );
+      seite();
+      const dialog = await bearbeitenVon('Eva');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Einmalpasswort vergeben' }),
+      );
+      expect(vergeben).toEqual([]);
+      expect(
+        await screen.findByText(
+          'Das bisherige Passwort gilt nicht mehr, und alle Anmeldungen von Eva enden.',
+        ),
+      ).toBeInTheDocument();
+      const bestaetigen = document.querySelector(
+        '.ant-popconfirm .ant-btn-dangerous',
+      ) as HTMLElement;
+      expect(bestaetigen).toHaveTextContent('Einmalpasswort vergeben');
+      await userEvent.click(bestaetigen);
+
+      expect(await within(dialog).findByText('kx7m-p4qr-9tzw')).toBeInTheDocument();
+      expect(vergeben).toEqual(['2']);
+    });
+
+    it('legt das Passwort in keinen Query-Cache', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+        http.post('/api/benutzer/:id/einmalpasswort', () =>
+          HttpResponse.json({ einmalpasswort: 'kx7m-p4qr-9tzw' }),
+        ),
+      );
+      const client = neuerQueryClient();
+      renderMitProviders(
+        <Routes>
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        </Routes>,
+        { route: '/admin/benutzer', client },
+      );
+      const dialog = await bearbeitenVon('Eva');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Einmalpasswort vergeben' }),
+      );
+      await userEvent.click(
+        document.querySelector('.ant-popconfirm .ant-btn-dangerous') as HTMLElement,
+      );
+      await within(dialog).findByText('kx7m-p4qr-9tzw');
+      const cache = JSON.stringify(
+        client
+          .getQueryCache()
+          .getAll()
+          .map((q) => q.state.data),
+      );
+      expect(cache).toContain('@eva'.slice(1));
+      expect(cache).not.toContain('kx7m-p4qr-9tzw');
+    });
+
+    it('lässt den Dialog nicht schließen, solange das Passwort vergeben wird', async () => {
+      let antworten: (() => void) | null = null;
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+        http.post(
+          '/api/benutzer/:id/einmalpasswort',
+          () =>
+            new Promise<Response>((fertig) => {
+              antworten = () => fertig(HttpResponse.json({ einmalpasswort: 'kx7m-p4qr-9tzw' }));
+            }),
+        ),
+      );
+      seite();
+      const dialog = await bearbeitenVon('Eva');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Einmalpasswort vergeben' }),
+      );
+      await userEvent.click(
+        document.querySelector('.ant-popconfirm .ant-btn-dangerous') as HTMLElement,
+      );
+      await waitFor(() => expect(antworten).not.toBeNull());
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+
+      antworten!();
+      expect(await within(dialog).findByText('kx7m-p4qr-9tzw')).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+    });
+
+    it('sperrt das eigene Konto und nennt den Grund', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+      );
+      seite();
+      const dialog = await bearbeitenVon('Admin');
+      expect(
+        within(dialog).getByRole('button', { name: 'Einmalpasswort vergeben' }),
+      ).toBeDisabled();
+      expect(within(dialog).getByText(EIGENES_PASSWORT)).toBeInTheDocument();
+    });
+
+    it('sperrt ein SSO-Konto und nennt den Grund', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () =>
+          HttpResponse.json([benutzer(), eva({ passwort_gesetzt: false })]),
+        ),
+      );
+      seite();
+      const dialog = await bearbeitenVon('Eva');
+      expect(
+        within(dialog).getByRole('button', { name: 'Einmalpasswort vergeben' }),
+      ).toBeDisabled();
+      expect(within(dialog).getByText(SSO_KONTO)).toBeInTheDocument();
+    });
+
+    it('zeigt eine Ablehnung des Servers im Dialog', async () => {
+      server.use(
+        meHandler(benutzer()),
+        http.get('/api/benutzer', () => HttpResponse.json([benutzer(), eva()])),
+        http.post('/api/benutzer/:id/einmalpasswort', () =>
+          HttpResponse.json(
+            { error: 'Dieses Konto meldet sich über SSO an und hat kein Passwort.' },
+            { status: 422 },
+          ),
+        ),
+      );
+      seite();
+      const dialog = await bearbeitenVon('Eva');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Einmalpasswort vergeben' }),
+      );
+      await userEvent.click(
+        document.querySelector('.ant-popconfirm .ant-btn-dangerous') as HTMLElement,
+      );
+      expect(
+        await within(dialog).findByText(
+          'Dieses Konto meldet sich über SSO an und hat kein Passwort.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByText('Kein Einmalpasswort vergeben')).toBeInTheDocument();
     });
   });
 });

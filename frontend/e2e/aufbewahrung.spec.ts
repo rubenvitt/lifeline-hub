@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { DatabaseSync } from 'node:sqlite';
 import { kontrast, randKontrast } from './kontrast-kern';
+import { kontoAnlegen } from './konto-anlegen';
 
 /**
  * Aufbewahrung in der Verwaltung und am Einsatz.
@@ -150,15 +151,12 @@ test.describe('Aufbewahrung (LFH-23)', () => {
   }) => {
     await anmelden(page);
     const name = `fk${Date.now()}`;
-    const r = await page.request.post('/api/benutzer', {
-      data: {
-        anzeigename: name,
-        benutzername: name,
-        passwort: `${name}pw1`,
-        org_rolle: 'fuehrungskraft',
-      },
+    await kontoAnlegen(page.request, {
+      anzeigename: name,
+      benutzername: name,
+      passwort: `${name}pw1`,
+      org_rolle: 'fuehrungskraft',
     });
-    expect(r.ok(), await r.text()).toBeTruthy();
     const fk = await (browser as Browser).newPage();
     try {
       await anmelden(fk, name, `${name}pw1`);

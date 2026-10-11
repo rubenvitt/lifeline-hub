@@ -2,7 +2,7 @@
 titel: Anmelden und Abmelden
 gruppen: [alle, geraete]
 reihenfolge: 10
-quellen: [frontend/src/pages/LoginPage.tsx, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/pages/LoginPage.tsx, src/auth/passwort_wechsel.rs, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -29,6 +29,19 @@ Einsatzabschnitt, Lagemonitor) arbeiten ohne persönliches Konto. Sie werden mit
    verwenden“ zur Eingabe eines Wiederherstellungscodes.
 
 Danach zeigt die App die Einsatzliste.
+
+### Ein eigenes Passwort festlegen
+
+Bei der ersten Anmeldung mit einem neuen Konto und nach einem Einmalpasswort der Administration
+folgt auf „Anmelden“ (und gegebenenfalls den Code) noch ein Schritt:
+
+1. Unter „Neues Passwort festlegen“ ein eigenes Passwort in „Neues Passwort“ und „Neues Passwort
+   wiederholen“ eingeben, mindestens acht Zeichen, anders als das bisherige.
+
+   ![Anmeldeseite mit „Neues Passwort festlegen“, den Feldern „Neues Passwort“ und „Neues Passwort wiederholen“ und dem Knopf „Passwort festlegen“](../bilder/anmelden-abmelden/passwort-festlegen.png)
+
+2. „Passwort festlegen“ wählen. Erst jetzt ist die Person angemeldet, die App zeigt die
+   Einsatzliste.
 
 ### Mit Passkey oder über die Organisation anmelden
 
@@ -80,9 +93,16 @@ Am Gerät, das gekoppelt wird:
 Wer sich zum ersten Mal über SSO anmeldet, bekommt ein Konto mit den geringsten Rechten; weitere
 Rechte vergibt die Administration.
 
-Ein vergessenes Passwort lässt sich nicht selbst zurücksetzen. Auch die Administration kann in
-der App derzeit kein neues Passwort setzen; Ansprechpartner bleibt sie trotzdem, weil sie das
-Konto verwaltet.
+Ein Konto, das die Administration anlegt, startet mit dem Passwort aus der Anlage. Es gilt nur für
+die erste Anmeldung: Danach legt die Person ein eigenes fest.
+
+Ein vergessenes Passwort lässt sich nicht selbst zurücksetzen. Die Administration vergibt dann
+ein **Einmalpasswort** (siehe [Benutzer](benutzer.md)). Damit meldet sich die Person an und legt
+sofort ein eigenes Passwort fest. Bis dahin gibt es keine Anmeldung, auch nicht für andere
+Fenster oder die Arbeit ohne Netz. Das Einmalpasswort gilt, bis die Person ein eigenes Passwort
+festlegt; ein zweites ersetzt das erste. Wer sich mit Passkey oder über die Organisation anmeldet, braucht das
+Passwort nicht und wird nicht nach einem neuen gefragt; ein Wechsel im Profil ersetzt das
+Einmalpasswort ebenfalls.
 
 ### Zweiter Faktor
 
@@ -100,6 +120,7 @@ verlängert sich nicht durch Benutzung; nach Ablauf geht es zurück zur Anmeldes
 Eine Anmeldung endet außerdem, wenn
 
 - die Administration die Person deaktiviert: sofort, auf allen Geräten;
+- die Administration ein Einmalpasswort vergibt: sofort, auf allen Geräten;
 - die Person ihr Passwort ändert: alle **anderen** Anmeldungen dieses Kontos enden, das Gerät,
   an dem geändert wurde, bleibt angemeldet.
 

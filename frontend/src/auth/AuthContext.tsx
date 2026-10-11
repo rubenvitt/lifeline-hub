@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { GeraetAnzeige, MeAntwort } from '../api/types';
+import type { BenutzerAnzeige, GeraetAnzeige, MeAntwort } from '../api/types';
 import { ApiError, NetzFehler, setzeErwartetenBenutzer } from '../api/client';
 import * as authApi from '../api/auth';
 import { abonniereAuthWechsel, meldeAuthWechsel } from './authKanal';
@@ -39,11 +39,14 @@ import {
 } from '../offline/verbindung';
 
 /**
- * Ergebnis von `login()`: Sofort-Erfolg oder TOTP-Zweitfaktor (`mfa_erforderlich`), bei dem
- * `LoginPage` auf die Code-Eingabe umschaltet. `benutzer` bleibt dann `null`: es gibt noch
- * keine Session.
+ * Ergebnis von `login()`: Sofort-Erfolg, TOTP-Zweitfaktor (`mfa_erforderlich`), bei dem
+ * `LoginPage` auf die Code-Eingabe umschaltet, oder Änderungszwang nach einem Einmalpasswort
+ * (`passwort_wechsel`, LFH-1121), bei dem sie auf „Neues Passwort festlegen“ umschaltet.
+ * `benutzer` bleibt in beiden Zwischenschritten `null`: es gibt noch keine Session, also auch
+ * keinen Offline-Schnappschuss und keine Übernahme in anderen Tabs.
  */
-export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
+export type LoginErgebnis =
+  { status: 'ok' } | { status: 'mfa_erforderlich' } | { status: 'passwort_wechsel' };
 
 /** Die Sitzung gehört einem anderen Benutzer als dem, den dieser Tab zeigt (LFH-387): in einem
  *  anderen Tab hat sich `jetzt` angemeldet. Der Tab bleibt bei `bisher` — seine
@@ -61,6 +64,9 @@ interface AuthWert {
   geraet: GeraetAnzeige | null;
   laedt: boolean;
   login: (benutzername: string, passwort: string) => Promise<LoginErgebnis>;
+  /** Legt nach einem Login mit Einmalpasswort das eigene Passwort fest (LFH-1121); erst danach
+   *  ist die Person angemeldet und wird übernommen. Wirft {@link ApiError} wie der Server. */
+  passwortFestlegen: (neuesPasswort: string) => Promise<void>;
   /** Meldet über den Server ab. `false`, wenn der Server mit 412 ablehnte (die Sitzung gehört
    *  inzwischen einem anderen Benutzer, LFH-387): dann bleibt der Tab angemeldet. */
   logout: () => Promise<boolean>;
@@ -333,14 +339,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [pruefe]);
 
-  const login = useCallback(
-    async (benutzername: string, passwort: string): Promise<LoginErgebnis> => {
-      const antwort = await authApi.login(benutzername, passwort);
-      // Untagged Union: der MFA-Zweig ist am Feld `mfa_erforderlich` erkennbar. KEIN Benutzer
-      // — es gibt noch keine Session.
-      if ('mfa_erforderlich' in antwort) {
-        return { status: 'mfa_erforderlich' };
-      }
+  /** Übernimmt die Antwort einer frisch angelegten Sitzung (Login, Festlegen nach Einmalpasswort). */
+  const angemeldet = useCallback(
+    async (antwort: BenutzerAnzeige) => {
       // Eine andere Person als die vorherige räumt deren Lagebild und Gerätedaten (LFH-767),
       // bevor der Benutzer wechselt.
       await vorhaltungAnmelden(antwort);
@@ -349,9 +350,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Neue gültige Sitzung → Melde-Sperre lösen, damit ein späterer Ablauf wieder gemeldet wird.
       sitzungsMeldungZuruecksetzen();
       meldeAuthWechsel({ art: 'angemeldet' });
-      return { status: 'ok' };
     },
     [uebernimm, vorhaltungAnmelden],
+  );
+
+  const login = useCallback(
+    async (benutzername: string, passwort: string): Promise<LoginErgebnis> => {
+      const antwort = await authApi.login(benutzername, passwort);
+      // Untagged Union: der MFA-Zweig ist am Feld `mfa_erforderlich` erkennbar. KEIN Benutzer
+      // — es gibt noch keine Session.
+      if ('mfa_erforderlich' in antwort) {
+        return { status: 'mfa_erforderlich' };
+      }
+      // Ebenso der Änderungszwang (LFH-1121): noch keine Session, niemand wird übernommen.
+      if ('passwort_wechsel_erforderlich' in antwort) {
+        return { status: 'passwort_wechsel' };
+      }
+      await angemeldet(antwort);
+      return { status: 'ok' };
+    },
+    [angemeldet],
+  );
+
+  const passwortFestlegen = useCallback(
+    async (neuesPasswort: string): Promise<void> => {
+      await angemeldet(await authApi.passwortFestlegen(neuesPasswort));
+    },
+    [angemeldet],
   );
 
   /**
@@ -385,8 +410,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const geraet = benutzer?.geraet ?? null;
   const wert = useMemo<AuthWert>(
-    () => ({ benutzer, geraet, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt }),
-    [benutzer, geraet, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt],
+    () => ({
+      benutzer,
+      geraet,
+      laedt,
+      login,
+      passwortFestlegen,
+      logout,
+      aktualisiere,
+      abmeldenLokal,
+      konflikt,
+    }),
+    [
+      benutzer,
+      geraet,
+      laedt,
+      login,
+      passwortFestlegen,
+      logout,
+      aktualisiere,
+      abmeldenLokal,
+      konflikt,
+    ],
   );
 
   return <AuthContext.Provider value={wert}>{children}</AuthContext.Provider>;

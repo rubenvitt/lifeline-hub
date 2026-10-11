@@ -7,9 +7,43 @@ use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
 use lifeline_hub::live::{LiveHub, LiveNachricht};
 use serde_json::Value;
+use std::cell::RefCell;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 use tower::ServiceExt;
+
+thread_local! {
+    /// Pool des zuletzt aufgebauten Test-Routers dieses Threads, für [`zwang_aufheben`]. Der
+    /// Testkörper läuft im `block_on` des Test-Threads, auch bei `flavor = "multi_thread"`.
+    static TEST_POOL: RefCell<Option<sqlx::SqlitePool>> = const { RefCell::new(None) };
+}
+
+fn pool_merken(pool: &sqlx::SqlitePool) {
+    TEST_POOL.with(|p| *p.borrow_mut() = Some(pool.clone()));
+}
+
+/// Hebt den Änderungszwang eines per `POST /api/benutzer` angelegten Kontos auf (LFH-1121): Die
+/// Anlage stellt jedes Konto unter Zwang, sein erster Passwort-Login führte sonst in den Schritt
+/// „Neues Passwort festlegen“. Direkt in der Datenbank statt über den Wechsel per API, damit kein
+/// Test eine zusätzliche Sitzung oder Audit-Zeile sieht (Design D8 in
+/// `openspec/changes/archive/2026-10-10-lfh-1121-einmalpasswort/design.md`). Wirkt auf den Pool
+/// des zuletzt aufgebauten Routers.
+pub async fn zwang_aufheben(benutzername: &str) {
+    let pool = TEST_POOL
+        .with(|p| p.borrow().clone())
+        .expect("zwang_aufheben braucht einen Router aus common::setup*");
+    let geaendert =
+        sqlx::query("UPDATE benutzer SET passwort_wechsel_pflicht = 0 WHERE benutzername = ?")
+            .bind(benutzername)
+            .execute(&pool)
+            .await
+            .expect("Änderungszwang aufheben")
+            .rows_affected();
+    assert_eq!(
+        geaendert, 1,
+        "zwang_aufheben: kein Konto `{benutzername}` im Pool des zuletzt aufgebauten Routers"
+    );
+}
 
 pub async fn setup() -> axum::Router {
     setup_mit_pool().await.0
@@ -30,6 +64,7 @@ pub async fn setup_mit_pool_und_live() -> (axum::Router, sqlx::SqlitePool, LiveH
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
+    pool_merken(&pool);
     let live = LiveHub::new();
     let router = build_router(test_state(&pool, &live));
     (router, pool, live)
@@ -44,6 +79,7 @@ pub async fn setup_mit_state(
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
+    pool_merken(&pool);
     let mut state = test_state(&pool, &LiveHub::new());
     anpassen(&mut state);
     (build_router(state), pool)
@@ -80,6 +116,7 @@ pub async fn setup_mit_optionen_auf(
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
+    pool_merken(&pool);
     let live = LiveHub::new();
     let router = build_router_mit(test_state(&pool, &live), opt);
     (router, pool, live)
@@ -167,6 +204,15 @@ pub async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+    assert!(
+        !resp
+            .headers()
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .any(|c| c.as_bytes().starts_with(b"passwort_wechsel=")),
+        "`{benutzername}` steht unter Änderungszwang (LFH-1121): nach einer Anlage per \
+         POST /api/benutzer erst common::zwang_aufheben rufen"
+    );
     resp.headers()
         .get(header::SET_COOKIE)
         .unwrap()
@@ -178,7 +224,8 @@ pub async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str
         .to_string()
 }
 
-/// Admin legt einen Nicht-Admin-Benutzer an; gibt dessen id zurück.
+/// Admin legt einen Nicht-Admin-Benutzer an (Passwort `{name}pw1`, ohne Änderungszwang); gibt
+/// dessen id zurück.
 pub async fn benutzer_anlegen(
     app: &axum::Router,
     admin_cookie: &str,
@@ -203,9 +250,13 @@ pub async fn benutzer_anlegen(
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+    let id = serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
         .as_i64()
-        .unwrap()
+        .unwrap();
+    // Die Anlage stellt unter Änderungszwang (LFH-1121); die Aufrufer melden sich danach direkt
+    // mit `{name}pw1` an.
+    zwang_aufheben(name).await;
+    id
 }
 
 /// Generischer Request-Helfer: liefert (Status, JSON-Body).

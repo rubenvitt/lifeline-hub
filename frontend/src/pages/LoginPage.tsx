@@ -6,6 +6,7 @@ import { hilfePfad } from '../routing/deeplinks';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError, fehlerText } from '../api/client';
 import OtpEingabe from '../components/OtpEingabe';
+import NeuesPasswortFelder from '../auth/NeuesPasswortFelder';
 import { useDokumentTitel } from '../components/useDokumentTitel';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
@@ -34,13 +35,19 @@ interface TotpFormWerte {
   code: string;
 }
 
+interface WechselFormWerte {
+  neues_passwort: string;
+  wiederholung: string;
+}
+
 export default function LoginPage() {
   useDokumentTitel(['Anmelden']);
-  const { login, aktualisiere, benutzer, laedt: authLaedt } = useAuth();
+  const { login, passwortFestlegen, aktualisiere, benutzer, laedt: authLaedt } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form] = Form.useForm<FormWerte>();
   const [totpForm] = Form.useForm<TotpFormWerte>();
+  const [wechselForm] = Form.useForm<WechselFormWerte>();
   // Der OIDC-Callback leitet jeden Fehlschlag generisch auf `/login?fehler=oidc` (bewusst ohne
   // IdP-Detail) — ohne diese Auswertung sähe ein gescheiterter SSO-Login aus, als wäre nichts
   // passiert.
@@ -53,7 +60,9 @@ export default function LoginPage() {
   );
   // Welche Aktion gerade läuft — steuert den Spinner gezielt (nur der geklickte Knopf lädt),
   // während `disabled` über das Form alle Wege sperrt (kein paralleler Doppel-Login).
-  const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | 'browser' | null>(null);
+  const [laedt, setLaedt] = useState<
+    'passwort' | 'passkey' | 'totp' | 'wechsel' | 'browser' | null
+  >(null);
   /** Riegel gegen zwei gleichzeitige `totp/finish` — s. `totpAbsenden`. */
   const sendetRef = useRef(false);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
@@ -62,6 +71,10 @@ export default function LoginPage() {
   // `AuthContext.LoginErgebnis`) → die erste Stufe weicht einer Code-Eingabe. Ein Session-Cookie
   // gibt es an dieser Stelle noch nicht.
   const [mfaAktiv, setMfaAktiv] = useState(false);
+  // Dritte Stufe (LFH-1121): nach einem Einmalpasswort meldet `login()` bzw. `totp/finish`
+  // „Passwort festlegen" statt eines Benutzers. Auch hier gibt es noch keine Session; erst
+  // `passwortFestlegen` meldet an.
+  const [wechselAktiv, setWechselAktiv] = useState(false);
   // In der TOTP-Stufe: Recovery-Code statt Authenticator-Code. Beide landen im selben Endpoint
   // (`totp/finish` unterscheidet nicht); der Umschalter trennt nur die Eingabe-Ergonomie
   // (6-stellig-numerisch vs. freies Recovery-Format).
@@ -192,6 +205,10 @@ export default function LoginPage() {
         setMfaAktiv(true);
         return;
       }
+      if (ergebnis.status === 'passwort_wechsel') {
+        setWechselAktiv(true);
+        return;
+      }
       navigate(zielPfad, { replace: true });
     } catch (e) {
       if (e instanceof ApiError) {
@@ -226,7 +243,15 @@ export default function LoginPage() {
     setFehler(null);
     setLaedt('totp');
     try {
-      await totpFinish(werte.code);
+      const antwort = await totpFinish(werte.code);
+      // Erst der zweite Faktor, dann das eigene Passwort (LFH-1121): noch keine Session.
+      if ('passwort_wechsel_erforderlich' in antwort) {
+        setMfaAktiv(false);
+        setRecoveryModus(false);
+        totpForm.resetFields();
+        setWechselAktiv(true);
+        return;
+      }
       await aktualisiere();
       navigate(zielPfad, { replace: true });
     } catch (e) {
@@ -239,11 +264,38 @@ export default function LoginPage() {
     }
   }
 
+  // Dritte Stufe (LFH-1121): das eigene Passwort nach einem Einmalpasswort. Der Server prüft Länge
+  // und „anders als das bisherige“; eine Ablehnung lässt die Stufe stehen, der Zwischenschritt
+  // gilt weiter. Nach Ablauf (401) geht es zurück zur Anmeldung.
+  async function wechselAbsenden(werte: WechselFormWerte) {
+    if (sendetRef.current) return;
+    sendetRef.current = true;
+    setFehler(null);
+    setLaedt('wechsel');
+    try {
+      await passwortFestlegen(werte.neues_passwort);
+      navigate(zielPfad, { replace: true });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        zurueckZumPasswort();
+        setFehler('Die Anmeldung ist abgelaufen. Bitte erneut anmelden.');
+      } else {
+        setFehler(fehlerText(e, 'Passwort nicht festgelegt'));
+      }
+    } finally {
+      sendetRef.current = false;
+      setLaedt(null);
+    }
+  }
+
   function zurueckZumPasswort() {
     setFehler(null);
     setMfaAktiv(false);
+    setWechselAktiv(false);
     setRecoveryModus(false);
     totpForm.resetFields();
+    wechselForm.resetFields();
+    form.resetFields(['passwort']);
   }
 
   function wechsleRecoveryModus() {
@@ -291,7 +343,31 @@ export default function LoginPage() {
         </div>
         {fehler && <Alert type="error" title={fehler} style={{ marginBottom: 20 }} showIcon />}
         {hinweis && <Alert type="info" title={hinweis} style={{ marginBottom: 20 }} showIcon />}
-        {mfaAktiv ? (
+        {wechselAktiv ? (
+          <Form
+            layout="vertical"
+            form={wechselForm}
+            onFinish={wechselAbsenden}
+            disabled={laedt !== null}
+            requiredMark={false}
+          >
+            <h2 className="login-stufe__titel">Neues Passwort festlegen</h2>
+            <NeuesPasswortFelder autoFocus />
+            <Button
+              className="login-absenden"
+              type="primary"
+              htmlType="submit"
+              size="large"
+              block
+              loading={laedt === 'wechsel'}
+            >
+              Passwort festlegen
+            </Button>
+            <Button type="link" block onClick={zurueckZumPasswort}>
+              Zurück
+            </Button>
+          </Form>
+        ) : mfaAktiv ? (
           <Form
             layout="vertical"
             form={totpForm}

@@ -114,12 +114,12 @@ export interface components {
         AbschnittLagezustand: "planmaessig" | "angespannt" | "kritisch";
         /**
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
-         *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` —
-         *     beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
+         *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` und
+         *     `0174_admin_audit_einmalpasswort.sql` — beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -1408,6 +1408,13 @@ export interface components {
          * @enum {string}
          */
         EinheitenSystem: "metrisch" | "imperial";
+        /**
+         * @description Antwort von `POST /api/benutzer/{id}/einmalpasswort` (LFH-1121): das erzeugte Einmalpasswort,
+         *     genau dieses eine Mal.
+         */
+        Einmalpasswort: {
+            einmalpasswort: string;
+        };
         /**
          * @description Öffentliche Einsatz-Darstellung für API-Antworten,
          *     inklusive Org-Angaben und der Rolle des abfragenden Benutzers.

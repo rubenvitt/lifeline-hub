@@ -33,8 +33,8 @@ pub const AUFBEWAHRUNG_TAGE: i64 = 365;
 
 wire_enum! {
     /// Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
-    /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` —
-    /// beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
+    /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` und
+    /// `0174_admin_audit_einmalpasswort.sql` — beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
     /// Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AdminAktion {
@@ -49,6 +49,9 @@ wire_enum! {
         /// Eine Sitzung des Zielkontos beendet (LFH-1092), ein Eintrag je Sitzung; die Angaben
         /// nennen Gerät und Anmeldezeit.
         SitzungBeendet => "sitzung_beendet",
+        /// Einmalpasswort vergeben (LFH-1121): neues Passwort mit Änderungszwang, alle Sitzungen
+        /// beendet. Ohne Detail; das Passwort steht nie in der Spur.
+        EinmalpasswortVergeben => "einmalpasswort_vergeben",
     }
 }
 

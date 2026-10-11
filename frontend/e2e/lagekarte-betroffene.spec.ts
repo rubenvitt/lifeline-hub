@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { kontoAnlegen } from './konto-anlegen';
 
 // Ebene „Betroffene" auf der Lagekarte. Ob Personen in IHRER Quelle `marker-personen` landen,
 // dort untereinander clustern statt Kräfte-Marker zu schlucken, und ob ein Personen-Donut
@@ -158,7 +159,7 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
     },
   });
   // Ohne `system_rolle`/`org_rolle` gilt „keiner"/„keine" — ein Mitglied ohne Sonderrechte.
-  const { id: nutzerId } = await senden(page, 'post', '/api/benutzer', {
+  const { id: nutzerId } = await kontoAnlegen(page.request, {
     anzeigename: `E2E Betroffene ${LAUF}`,
     benutzername: NUTZER,
     passwort: NUTZER_PW,

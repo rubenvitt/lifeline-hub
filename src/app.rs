@@ -188,6 +188,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::auth::totp_finish).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
         .route("/api/auth/passwort", post(routes::auth::passwort_aendern))
+        // LFH-1121: der Schritt nach einem Login mit Einmalpasswort (öffentlich, trägt das
+        // Wechsel-Cookie statt einer Sitzung). Body-Grenze wie der Login: ein neues Passwort hat
+        // höchstens 128 Zeichen.
+        .route(
+            "/api/auth/passwort/festlegen",
+            post(routes::auth::passwort_festlegen)
+                .layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
+        )
         .route("/api/auth/sitzungen", get(routes::sitzung::eigene_liste))
         .route(
             "/api/auth/sitzungen/andere-beenden",
@@ -207,6 +215,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/benutzer/{id}/totp/reset",
             post(routes::benutzer::totp_reset),
+        )
+        // LFH-1121: Einmalpasswort mit Änderungszwang. Nachweis tests/einmalpasswort.rs.
+        .route(
+            "/api/benutzer/{id}/einmalpasswort",
+            post(routes::benutzer::einmalpasswort),
         )
         // Zugangsprotokoll (LFH-1097): Anmelde- und Admin-Spur lesen, nur System-Admin, das
         // Lesen selbst unprotokolliert. Nachweis tests/zugangsprotokoll.rs.

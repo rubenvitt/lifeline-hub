@@ -1,5 +1,8 @@
 //! Kurzlebiger, prozessweiter State-Store für den zweistufigen Passwort→TOTP-Login (LFH-43):
-//! hält die `benutzer_id` zwischen `POST /api/auth/login` und `POST /api/auth/totp/finish`.
+//! hält die `benutzer_id` zwischen `POST /api/auth/login` und `POST /api/auth/totp/finish`, dazu
+//! den Passwort-Hash, gegen den der Passwortschritt geprüft hat (LFH-1121): hat sich das Passwort
+//! dazwischen geändert (etwa ein neues Einmalpasswort der Administration), gilt der Schritt nicht
+//! mehr.
 //! Dasselbe Muster wie `oidc/state.rs`. Der Client bekommt nur einen hochentropischen Key im
 //! HttpOnly-Cookie `mfa_pending`, nie die `benutzer_id`.
 //!
@@ -29,59 +32,74 @@ const TTL: Duration = Duration::from_secs(5 * 60);
 pub const OBERGRENZE: usize = 10_000;
 
 /// Prozessweiter State-Store; kurzlebig, ohne Persistenzbedarf.
-static STORE: LazyLock<Mutex<BegrenzterAblaufSpeicher<i64>>> =
+/// Ein offener Zwischenschritt nach bestandenem Passwort.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Offen {
+    pub benutzer_id: i64,
+    /// `passwort_hash` des Kontos zum Zeitpunkt der Passwortprüfung.
+    pub passwort_hash: String,
+}
+
+static STORE: LazyLock<Mutex<BegrenzterAblaufSpeicher<Offen>>> =
     LazyLock::new(|| Mutex::new(neuer_speicher()));
 
-fn neuer_speicher() -> BegrenzterAblaufSpeicher<i64> {
+fn neuer_speicher() -> BegrenzterAblaufSpeicher<Offen> {
     BegrenzterAblaufSpeicher::neu(TTL, OBERGRENZE)
 }
 
-fn store() -> MutexGuard<'static, BegrenzterAblaufSpeicher<i64>> {
+fn store() -> MutexGuard<'static, BegrenzterAblaufSpeicher<Offen>> {
     STORE.lock().unwrap_or_else(|poison| poison.into_inner())
 }
 
-/// Speichert `benutzer_id` unter `key` mit Ablauf `TTL`; ein vorhandener Eintrag wird
+/// Speichert den Zwischenschritt unter `key` mit Ablauf `TTL`; ein vorhandener Eintrag wird
 /// überschrieben. Bei [`OBERGRENZE`] offenen Anmeldungen wird nicht eingefügt ([`Voll`]).
-pub fn speichere(key: String, benutzer_id: i64) -> Result<(), Voll> {
-    store().einfuegen(key, benutzer_id, Instant::now())
+pub fn speichere(key: String, offen: Offen) -> Result<(), Voll> {
+    store().einfuegen(key, offen, Instant::now())
 }
 
 /// Entnimmt die `benutzer_id` zu `key` **einmalig**; ein zweiter Aufruf liefert `None`, ebenso
 /// ein unbekannter oder abgelaufener Key. Der Guard ist bei der Rückkehr freigegeben.
-pub fn entnehme(key: &str) -> Option<i64> {
+pub fn entnehme(key: &str) -> Option<Offen> {
     store().entnehmen(key, Instant::now())
 }
 
 /// Test-only: Eintrag mit vorgegebener Ablaufzeit, um einen abgelaufenen Eintrag ohne Warten zu
 /// erzeugen.
 #[cfg(test)]
-fn speichere_mit_ablauf(key: String, benutzer_id: i64, ablauf: Instant) {
-    store().einfuegen_mit_ablauf(key, benutzer_id, ablauf);
+fn speichere_mit_ablauf(key: String, offen: Offen, ablauf: Instant) {
+    store().einfuegen_mit_ablauf(key, offen, ablauf);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn offen(benutzer_id: i64) -> Offen {
+        Offen {
+            benutzer_id,
+            passwort_hash: format!("hash-{benutzer_id}"),
+        }
+    }
+
     #[test]
     fn speichere_dann_entnehme_liefert_dieselbe_benutzer_id() {
         let key = "mfa-roundtrip".to_string();
 
-        speichere(key.clone(), 42).unwrap();
+        speichere(key.clone(), offen(42)).unwrap();
         let entnommen = entnehme(&key);
 
-        assert_eq!(entnommen, Some(42));
+        assert_eq!(entnommen, Some(offen(42)));
     }
 
     #[test]
     fn zweites_entnehme_desselben_keys_liefert_none() {
         let key = "mfa-einmalig".to_string();
-        speichere(key.clone(), 7).unwrap();
+        speichere(key.clone(), offen(7)).unwrap();
 
         let erstes = entnehme(&key);
         let zweites = entnehme(&key);
 
-        assert_eq!(erstes, Some(7));
+        assert_eq!(erstes, Some(offen(7)));
         assert_eq!(zweites, None);
     }
 
@@ -98,7 +116,7 @@ mod tests {
         // Ablauf
         // von „jetzt“ ist einen Moment später bereits abgelaufen.
         let ablauf_in_der_vergangenheit = Instant::now();
-        speichere_mit_ablauf(key.clone(), 99, ablauf_in_der_vergangenheit);
+        speichere_mit_ablauf(key.clone(), offen(99), ablauf_in_der_vergangenheit);
 
         let entnommen = entnehme(&key);
 
@@ -111,8 +129,8 @@ mod tests {
         let mut s = neuer_speicher();
         let jetzt = Instant::now();
         for n in 0..OBERGRENZE {
-            s.einfuegen(format!("k{n}"), 1, jetzt).unwrap();
+            s.einfuegen(format!("k{n}"), offen(1), jetzt).unwrap();
         }
-        assert_eq!(s.einfuegen("zuviel".into(), 1, jetzt), Err(Voll));
+        assert_eq!(s.einfuegen("zuviel".into(), offen(1), jetzt), Err(Voll));
     }
 }

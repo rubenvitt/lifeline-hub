@@ -1760,6 +1760,7 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
+    common::zwang_aufheben("frieda").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
 
     // Lesen erlaubt (read-only-Einblick, Muster GlobalEinstellungen/org_einstellungen).
@@ -1960,6 +1961,7 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
+    common::zwang_aufheben("frieda").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
     let liste = json(
         anfrage(
