@@ -216,7 +216,7 @@ export interface components {
             ansicht: components["schemas"]["Funktionsansicht"];
             stellenart?: components["schemas"]["Bindungsart"] | null;
         };
-        /** @description Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind. */
+        /** @description Module einer Ansicht, die in diesem Einsatz einem gekoppelten Gerät gesperrt sind. */
         AnsichtSperre: {
             ansicht: components["schemas"]["Funktionsansicht"];
             /** @description Modul-Keys, die das Gerät nicht nutzen könnte. Leer: die Ansicht ist voll nutzbar. */
@@ -1813,6 +1813,13 @@ export interface components {
             beschreibung?: string | null;
             /** Format: int64 */
             bezug_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis
+             *     (LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei
+             *     Bezügen ohne laufende Nummer (Ablösung).
+             */
+            bezug_lfd_nr?: number | null;
             bezug_typ?: string | null;
             /** Format: int64 */
             einsatz_id: number;
@@ -2260,8 +2267,9 @@ export interface components {
          */
         Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
         /**
-         * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
-         *     `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
+         * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
+         *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
+         *     eine Zelle ohne Eintrag als „nicht bewertet".
          */
         GefahrBewertungAnzeige: {
             /** Format: int64 */
@@ -3163,6 +3171,16 @@ export interface components {
             /** @description Anzeige der Führungsstelle: „S2 Lage“, „Fachberater: THW“ oder der Freitext. */
             fuehrungsstelle_anzeige?: string | null;
             zugewiesen_at: string;
+        };
+        /**
+         * @description Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec
+         *     `einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),
+         *     keine Rollen, kein Aktiv- oder MFA-Status.
+         */
+        MitgliedAuswahl: {
+            anzeigename: string;
+            /** Format: int64 */
+            benutzer_id: number;
         };
         /**
          * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von

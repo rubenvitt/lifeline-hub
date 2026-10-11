@@ -66,14 +66,15 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 - „n. a.“ steht in Zellen, deren Paar nicht anwendbar ist; sie lassen sich nicht bewerten.
 - Die höchste Stufe aller Zellen ist die Warnstufe des Gebiets. Sie steht in der Liste, als Text
   an der Fläche auf der Lagekarte und, über alle Gebiete, im Überblick und im Lagebild.
-- „– · Keine“ hebt eine Bewertung auf: Die Zelle steht danach wieder leer und zählt als
-  unbewertet.
+- „– · Keine“ ist eine Bewertung: Die Zelle zeigt „–“ und zählt als bewertet. Eine bewertete
+  Zelle wird nicht wieder leer.
 
 ### Einsatztagebuch
 
 Jede geänderte Warnstufe schreibt einen Systemeintrag ins Einsatztagebuch, etwa „Gefahr «Elektrizität» für
-«Menschen» in «Überflutung Unterstadt» auf Warnstufe «hoch» gesetzt.“; eine aufgehobene endet mit
-„… aufgehoben.“
+«Menschen» in «Überflutung Unterstadt» auf Warnstufe «hoch» gesetzt.“; eine auf „Keine“
+gesenkte endet mit „… aufgehoben.“ Eine unbewertete Zelle auf „Keine“ zu setzen, schreibt keinen
+Eintrag.
 
 ### Ein Gebiet anlegen
 

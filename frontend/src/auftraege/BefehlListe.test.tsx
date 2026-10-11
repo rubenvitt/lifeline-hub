@@ -126,10 +126,12 @@ describe('BefehlListe', () => {
 
     // Gruppenköpfe mit Zähler, Entwürfe zuerst; die Zählerform (Zahl vor Wort) gehört dem
     // Primitiv (`gruppenZahl`).
-    expect(sicht).toHaveTextContent(/1\s*Entwürfe/);
+    // Einzahl bei einem (LFH-1153): „1 Entwürfe“ war falsch.
+    expect(sicht).toHaveTextContent(/1\s*Entwurf(?!e)/);
+    expect(sicht).not.toHaveTextContent(/Entwürfe/);
     expect(sicht).toHaveTextContent(/2\s*Freigegeben/);
     const text = sicht.textContent ?? '';
-    expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
+    expect(text.indexOf('Entwurf')).toBeLessThan(text.indexOf('Freigegeben'));
 
     // Innerhalb der Gruppe absteigend nach Zeitstand: 7 (10:00) vor 4 (09:00), obwohl 4 zuerst
     // geliefert wird.

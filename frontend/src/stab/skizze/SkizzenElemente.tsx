@@ -15,8 +15,7 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useRollen } from '../../components/instrument';
-import { farbenHell } from '../../theme/tokens';
-import EinsatzZeichen, { FunktionsZeichen } from '../../zeichen/EinsatzZeichen';
+import EinsatzZeichen, { FunktionsZeichen, ZEICHEN_UNTERLAGE } from '../../zeichen/EinsatzZeichen';
 import type {
   AusstattungsZeichen,
   NetzBereich,
@@ -68,16 +67,13 @@ const MARKE = 10;
 const TZ_PX = TZ_HOEHE;
 
 /**
- * Helle Unterlage hinter jedem taktischen Zeichen am Schirm (LFH-1107): Zeichen ohne Organisation
- * zeichnet die Bibliothek mit schwarzem Umriss ohne Fläche, auf dem Grund des Nachtbetriebs hielt
- * er nur rund 1,1 : 1. Die Unterlage ist Papier (`farbenHell.flaeche`), das Zeichen steht darauf wie
- * im Druck, seine Farben nach DV 102 bleiben unverfälscht; am Tag verschwindet sie im Grund. Im
- * Druck und in der Anlage steht keine (`unterlage` aus der Fläche, dazu `skizzeDruck.css`).
- * Gemessen in beiden Modi im e2e „Zeichenkontrast“ (`fernmeldeskizze-ausstattung.spec.ts`).
- */
-export const ZEICHEN_UNTERLAGE = farbenHell.flaeche;
-
-/**
+ * Helle Unterlage hinter jedem taktischen Zeichen am Schirm (LFH-1107): dieselbe Farbe wie der
+ * Baustein `ZEICHEN_UNTERLAGE` (`zeichen/EinsatzZeichen.tsx`, Begründung dort). In der Skizze
+ * steht das Zeichen als inneres `svg` im SVG der Fläche, das keinen Hintergrund malt; deshalb
+ * trägt hier ein `rect` die Unterlage. Im Druck und in der Anlage steht keine (`unterlage` aus
+ * der Fläche, dazu `skizzeDruck.css`). Gemessen in beiden Modi im e2e „Zeichenkontrast“
+ * (`fernmeldeskizze-ausstattung.spec.ts`).
+ *
  * Die Unterlage deckt genau das Quadrat des Zeichens: die Bibliothek lässt darin rund 3 % Rand um
  * den Umriss, und das Element wird nicht größer (Plätze, Treffläche und Abstände bleiben).
  */

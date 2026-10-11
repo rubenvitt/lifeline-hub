@@ -251,7 +251,7 @@ export default function LageberichtePage() {
         standardSortierung={{ spalte: 'fassung', richtung: 'ab' }}
         gruppen={{
           schluessel: (k) => k.kopf.status,
-          etikett: (w) => (w === 'entwurf' ? 'Entwürfe' : 'Freigegeben'),
+          etikett: (w, n) => (w === 'entwurf' ? (n === 1 ? 'Entwurf' : 'Entwürfe') : 'Freigegeben'),
           reihenfolge: ['entwurf', 'freigegeben'],
           // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
           unterEbene: 1,

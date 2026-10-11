@@ -293,6 +293,7 @@ pub async fn auftrag_erteilen(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         std::slice::from_mut(&mut detail),
     )
     .await?;

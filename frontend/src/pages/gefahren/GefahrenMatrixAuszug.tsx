@@ -16,7 +16,8 @@ import {
  * Auszug der Gefahrenmatrix zum Lesen, für die Gefahrengebiet-Vorschau der Sprungpalette.
  *
  * Zeilen: nur Gefahrentypen mit mindestens einer Zelle über „keine"; Spalten: alle fünf
- * Schutzobjekte. Ohne solche Zeile steht ein Satz statt einer leeren Tabelle. Keine Bedienung — die
+ * Schutzobjekte. Ohne solche Zeile steht ein Satz statt einer leeren Tabelle; er trennt „nur ‚keine'
+ * vergeben" von „nichts bewertet". Keine Bedienung — die
  * volle `GefahrenMatrix` zeigte 13 Zeilen gesperrter Knöpfe. Kopf und Zellfläche kommen aus
  * `GefahrenMatrix`, damit beide dieselbe Zelle zeigen.
  *
@@ -39,7 +40,14 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
   );
 
   if (zeilen.length === 0) {
-    return <Typography.Paragraph>Keine Gefahren bewertet.</Typography.Paragraph>;
+    // „Keine" ist eine Bewertung, keine Lücke (LFH-969/LFH-1153): ohne höhere Stufe sagt der Satz,
+    // ob überhaupt bewertet wurde.
+    const nurKeine = matrix.some((m) => kombinationGueltig(m.gefahrentyp, m.schutzobjekt));
+    return (
+      <Typography.Paragraph>
+        {nurKeine ? 'Keine Gefahr über Stufe „Keine“ bewertet.' : 'Keine Gefahren bewertet.'}
+      </Typography.Paragraph>
+    );
   }
 
   const rand = `1px solid ${rollen.linie}`;

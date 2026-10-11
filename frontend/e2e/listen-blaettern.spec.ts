@@ -84,7 +84,7 @@ test.describe('Schadenliste seitenweise', () => {
 
     await wechsleZuRolle(page, 'beobachter', einsatzId);
     await pruefeSchaeden(page, einsatzId, schwerNr);
-    await expect(page.getByRole('button', { name: 'Schnellerfassung' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Schaden erfassen' })).toHaveCount(0);
   });
 });
 

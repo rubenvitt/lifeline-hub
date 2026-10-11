@@ -6,7 +6,7 @@
 
 use crate::app::AppState;
 use crate::auth::session::{self, SichererTransport, SESSION_COOKIE};
-use crate::einsatz::berechtigung::gesperrt_fuer_einfaches_mitglied;
+use crate::einsatz::berechtigung::gesperrt_fuer_geraet;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLeitungszugriff, EinsatzLesezugriff};
 use crate::error::AppError;
@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
-/// Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.
+/// Module einer Ansicht, die in diesem Einsatz einem gekoppelten Gerät gesperrt sind.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AnsichtSperre {
     pub ansicht: Funktionsansicht,
@@ -75,7 +75,7 @@ pub async fn liste(
     let kopplungen = repo::liste(&state.pool, ctx.einsatz.id).await?;
     let mut sperren = Vec::new();
     for ansicht in Funktionsansicht::ALLE {
-        let gesperrt = gesperrt_fuer_einfaches_mitglied(
+        let gesperrt = gesperrt_fuer_geraet(
             &state.pool,
             ctx.einsatz.id,
             ctx.einsatz.org_id,

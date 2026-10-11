@@ -7,7 +7,9 @@ import type { TzEinheit } from './meldebildRaster';
  * Der Symbolplatz „TZ" der Einheitenzeile: das taktische Zeichen der Einheit, 26 × 26 px.
  * Dieselbe Ableitung wie auf der Lagekarte (`baueTzProps`) und dieselbe Zeichnung
  * (`EinsatzZeichen`, @einsatzzeichen, LFH-835). Der Organisations-Vorgabewert der Karte fehlt
- * bewusst — eine weitere Query für einen Zierrahmen wäre zu teuer.
+ * bewusst — eine weitere Query für einen Zierrahmen wäre zu teuer. Deshalb steht das Zeichen auf
+ * der hellen Unterlage (LFH-1120): ohne eigene Organisation zeichnet die Bibliothek nur einen
+ * schwarzen Umriss, im Nachtbetrieb sonst schwarz auf schwarz.
  * Reine Zierde, `aria-hidden`: die Bezeichnung daneben benennt die Einheit.
  */
 export default function EinheitZeichen({ tz }: { tz: TzEinheit | null }) {
@@ -35,6 +37,7 @@ export default function EinheitZeichen({ tz }: { tz: TzEinheit | null }) {
             organisation: tz.organisation,
           })}
           size={22}
+          unterlage
         />
       )}
     </span>

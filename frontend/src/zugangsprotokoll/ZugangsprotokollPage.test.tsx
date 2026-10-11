@@ -232,6 +232,43 @@ describe('ZugangsprotokollPage', () => {
     );
   });
 
+  /**
+   * Mutationsprobe für den Stand `vorläufig` (LFH-1140): bis die Antwort auf einen Filterwechsel da
+   * ist, stehen die alten Zeilen. Wäre schon das der neue Stand, fröre die Sicht unter dem Zeiger die
+   * alte Folge ein, und die Antwort käme als Zufluss hinter dem Sammelbanner an.
+   */
+  it('zeigt die Antwort auf einen Filterwechsel sofort, auch mit dem Zeiger über der Tabelle', async () => {
+    const NEU: Zugangsaenderung = { ...AENDERUNGEN[0], id: 14, ziel: 'kurt', detail: 'neu' };
+    let freigeben: () => void = () => {};
+    const gesehen = zeige();
+    server.use(
+      http.get('/api/zugangsprotokoll/zugangsaenderungen', async ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        gesehen.aenderungen.push(p);
+        if (p.get('konto') !== 'kurt') return HttpResponse.json(AENDERUNGEN);
+        await new Promise<void>((r) => (freigeben = r));
+        return HttpResponse.json([NEU]);
+      }),
+    );
+    const t = await tabelle();
+    await within(t).findByText('Rolle geändert');
+    // Die Maus zielt auf die Liste, getippt wird oben im Kontofeld.
+    fireEvent.pointerMove(screen.getByRole('region', { name: 'Zugangsänderungen' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Konto' }), {
+      target: { value: 'kurt' },
+    });
+    await waitFor(() =>
+      expect(gesehen.aenderungen.some((p) => p.get('konto') === 'kurt')).toBe(true),
+    );
+    // Vorläufig: die alten Zeilen stehen noch.
+    expect(within(t).getByText('marlene')).toBeInTheDocument();
+
+    freigeben();
+    expect(await within(t).findByText('kurt')).toBeInTheDocument();
+    expect(within(t).queryByText('marlene')).toBeNull();
+    expect(screen.queryByRole('button', { name: /neue[rn]? Eintr/ })).toBeNull();
+  });
+
   it('leitet die Führungskraft in die Verwaltung zurück', async () => {
     zeige(ME_FK);
     expect(await screen.findByText('Stichworte')).toBeInTheDocument();
