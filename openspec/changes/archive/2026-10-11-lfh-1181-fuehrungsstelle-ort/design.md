@@ -243,7 +243,7 @@ Standort.
 
 ## Migration Plan
 
-- `migrations/0178_einsatz_fuehrungsstelle_ort.sql`: fünf `ALTER TABLE … ADD COLUMN`. SQLite kann
+- `migrations/0179_einsatz_fuehrungsstelle_ort.sql`: fünf `ALTER TABLE … ADD COLUMN`. SQLite kann
   `NOT NULL DEFAULT` mit CHECK bei `ADD COLUMN`, und bestehende Zeilen bekommen `mobil`.
 - Vor dem Push `scripts/check-migrationen.sh` gegen `origin/alpha`. Hat `alpha` inzwischen eine
   0176, wird mit `--umnummerieren` umgelegt.
