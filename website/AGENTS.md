@@ -11,6 +11,11 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   `pnpm build`, Ausgabe `dist`; Cloudflare installiert selbst aus dem Lockfile. Node und pnpm
   setzen dort die Umgebungsvariablen `NODE_VERSION` und `PNPM_VERSION`: wer `engines` oder
   `packageManager` in `website/package.json` hebt, zieht beide im Pages-Projekt nach.
+- **Unbekannte Adressen und Cache:** `src/pages/404.astro` muss bleiben. Ohne `404.html`
+  beantwortet Pages jede unbekannte Adresse mit der Startseite und Status 200, auch eine
+  CSS-Adresse; ein Browser, der während eines Rollouts zu früh anfragt, hielte dieses HTML bis zu
+  vier Stunden als Stylesheet fest, und die Seite stünde ungestaltet da (11.10.2026, iOS-Safari).
+  `public/_headers` setzt die gehashten Dateien unter `/_astro/` auf `immutable`.
 - **CI:** `website/` löst keine schwere Suite aus; ein PR, der nur hier ändert, fährt nur die
   Schnellprüfungen (Bereichs-Erkennung, `scripts/AGENTS.md`).
 - **Kopien statt zweiter Quelle:** `src/styles/rollen.css` (aus `frontend/src/theme/rollen.css`),
