@@ -727,6 +727,16 @@ fn stab_fernmeldeskizze_wire() {
     } in lifeline_hub::stab::fernmeldeskizze::SkizzenBezugArt::ALLE);
 }
 
+/// LFH-1199: Art des Einsatzleiters an der eigenen Führungsstelle; die Werte trägt der CHECK von
+/// `migrations/0177_einsatz_fuehrungsstelle_einsatzleiter.sql`.
+#[test]
+fn einsatzleiter_art_wire() {
+    enum_wire!(lifeline_hub::einsatz::fuehrungsstelle::EinsatzleiterArt {
+        Personal => "personal",
+        Extern => "extern",
+    } in lifeline_hub::einsatz::fuehrungsstelle::EinsatzleiterArt::ALLE);
+}
+
 #[test]
 fn stab_besetzung_art_wire() {
     enum_wire_as_str!(lifeline_hub::stab::BesetzungArt {

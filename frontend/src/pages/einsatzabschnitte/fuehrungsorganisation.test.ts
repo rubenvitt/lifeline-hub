@@ -4,6 +4,8 @@ import { render } from '@testing-library/react';
 import Markdown from '../../components/Markdown';
 import type { Einheit, Einsatzabschnitt, Stabsfunktion } from '../../api/types';
 import { baueFunkplan, type FunkplanZeile } from '../../stab/funkplan';
+import type { EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
+import { taktischeDtgVoll } from '../../anzeige/format';
 import { abschnittStaerken } from './abschnittStaerke';
 import {
   baueFuehrungsorganisation,
@@ -54,6 +56,9 @@ function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined
   }
   return undefined;
 }
+
+const DTG = (utc: string) => taktischeDtgVoll(utc, { zeitzone: 'Europe/Berlin' });
+const OHNE_EL: EinsatzleiterDarstellung = { art: 'nicht-erfasst' };
 
 describe('baueFuehrungsorganisation — Knotenaufbau', () => {
   it('stellt oberste Abschnitte an die Wurzel, Unterabschnitte vor Einheiten', () => {
@@ -286,6 +291,8 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
         stand: '011200Okt26',
         stab: null,
         einheitenZustand: 'daten',
+        einsatzleiter: OHNE_EL,
+        dtg: DTG,
       },
     );
     expect(md.startsWith('# Führungsorganisation\n')).toBe(true);
@@ -307,6 +314,34 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(md).not.toContain('GEHEIM');
   });
 
+  it('nennt den erfassten Einsatzleiter statt der Lücke (LFH-1199)', () => {
+    const org = baueFuehrungsorganisation(abschnitte, einheiten);
+    const mit = rendereFuehrungsorganisationMarkdown(org, {
+      stand: 'x',
+      stab: null,
+      einheitenZustand: 'daten',
+      einsatzleiter: {
+        art: 'erfasst',
+        name: '*KBM* Weber (extern)',
+        seit: '2026-10-11 12:30:00',
+        nichtMehrDisponiert: false,
+      },
+      dtg: DTG,
+    });
+    expect(mit).toContain(
+      '## Einsatzleitung\n\n- Einsatzleiter: \\*KBM\\* Weber (extern) (seit 111430OKT2026)\n',
+    );
+    expect(mit).not.toContain('Leitung nicht erfasst');
+    const grund = rendereFuehrungsorganisationMarkdown(org, {
+      stand: 'x',
+      stab: null,
+      einheitenZustand: 'daten',
+      einsatzleiter: { art: 'zustand', grund: 'nicht geladen' },
+      dtg: DTG,
+    });
+    expect(grund).toContain('## Einsatzleitung\n\n- Einsatzleiter: nicht geladen\n');
+  });
+
   it('nennt den Stab nur, wenn er übergeben wird, in S-Folge mit Besetzung', () => {
     const org = baueFuehrungsorganisation(abschnitte, einheiten);
     const besetzung = [
@@ -322,12 +357,16 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       stand: 'x',
       stab: besetzung,
       einheitenZustand: 'daten',
+      einsatzleiter: OHNE_EL,
+      dtg: DTG,
     });
     expect(md).toContain('- Stab: S1 Einsatzleitung · S2 Clara Lage\n');
     const leer = rendereFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       stab: [],
       einheitenZustand: 'daten',
+      einsatzleiter: OHNE_EL,
+      dtg: DTG,
     });
     expect(leer).toContain('- Stab: kein Sachgebiet besetzt\n');
     // Was fehlt, steht darin: ein gescheiterter Abruf ist kein leerer Stab.
@@ -335,6 +374,8 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       stand: 'x',
       stab: 'fehler',
       einheitenZustand: 'daten',
+      einsatzleiter: OHNE_EL,
+      dtg: DTG,
     });
     expect(fehler).toContain('- Stab: Besetzung nicht geladen\n');
   });
@@ -344,6 +385,8 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       stand: 'x',
       stab: null,
       einheitenZustand: 'gesperrt',
+      einsatzleiter: OHNE_EL,
+      dtg: DTG,
     });
     expect(md).toContain(
       '## Quellen\n\n- Einheiten: nicht freigegeben — Einheiten und Stärken fehlen',
@@ -356,6 +399,8 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       stand: 'x',
       stab: null,
       einheitenZustand: 'daten',
+      einsatzleiter: OHNE_EL,
+      dtg: DTG,
     });
     expect(md).toContain('## Gliederung\n\n_(keine Abschnitte und keine Einheiten erfasst)_');
   });
@@ -363,7 +408,13 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   it('übernimmt Namen als Text, nie als Auszeichnung', () => {
     const md = rendereFuehrungsorganisationMarkdown(
       baueFuehrungsorganisation([abschnitt(1, { name: '*Nord* [alt]', leiter_name: '_Kai_' })], []),
-      { stand: 'x', stab: null, einheitenZustand: 'daten' },
+      {
+        stand: 'x',
+        stab: null,
+        einheitenZustand: 'daten',
+        einsatzleiter: OHNE_EL,
+        dtg: DTG,
+      },
     );
     const { container } = render(createElement(Markdown, { unterEbene: 1, children: md }));
     expect(container.textContent).toContain('*Nord* [alt]');
@@ -379,7 +430,13 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
         [abschnitt(1, { name: roh[0], leiter_name: roh[3] })],
         [einheit(10, { name: roh[1], abschnitt_id: 1 }), einheit(11, { name: roh[2] })],
       ),
-      { stand: 'x', stab: null, einheitenZustand: 'daten' },
+      {
+        stand: 'x',
+        stab: null,
+        einheitenZustand: 'daten',
+        einsatzleiter: OHNE_EL,
+        dtg: DTG,
+      },
     );
     const { container } = render(createElement(Markdown, { unterEbene: 1, children: md }));
     expect(container.querySelector('a')).toBeNull();

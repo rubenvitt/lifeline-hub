@@ -363,7 +363,7 @@ fn zustand_text(art: Option<BesetzungArt>, name: Option<&str>) -> String {
 ///
 /// 409 wie `fordere_aktiv` am Route-Gate (Lebenszyklus, src/AGENTS.md) — zwei Codes für dieselbe
 /// Tatsache, unterschieden nur durch Timing, könnte ein Client nicht auseinanderhalten.
-pub(super) async fn fordere_aktiv_in_tx(
+pub(crate) async fn fordere_aktiv_in_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
 ) -> Result<(), AppError> {

@@ -2,14 +2,14 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs]
 ---
 
 ## Überblick
 
 Die Seite „Einsatzdaten“ hält die Stammangaben des Einsatzes: die Kopfleiste mit Stichwort,
 Alarmzeit, Einsatzort und Einsatzleitung, darunter die „Lagedaten“, die „Eigene Führungsstelle“
-und den „Zugriff“ auf den Einsatz. Lesen können alle Mitglieder des Einsatzes. Ändern dürfen
+mit dem Einsatzleiter und den „Zugriff“ auf den Einsatz. Lesen können alle Mitglieder des Einsatzes. Ändern dürfen
 Einsatzleitung und Führungspersonal sowie die Administration der Organisation, der der Einsatz
 gehört. Den Zugriff verwaltet nur die Einsatzleitung.
 
@@ -40,12 +40,22 @@ Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial) ändern
 
 1. In „Einsatzdaten“ zum Paneel „Eigene Führungsstelle“ gehen.
 
-   ![Paneel „Eigene Führungsstelle“ mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und Fahrzeug](../bilder/einsatzdaten/fuehrungsstelle.png)
+   ![Paneel „Eigene Führungsstelle“ mit Einsatzleiter, Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und Fahrzeug](../bilder/einsatzdaten/fuehrungsstelle.png)
 
 2. „Rufname“, „Sprechgruppen“, „Kommunikationsmittel“, „Erreichbarkeit“ und „Fahrzeuge“ Zeile
    für Zeile eintragen und speichern wie jede andere Angabe. Beim „Rufname“ schlägt die Liste
    die Funkrufnamen der Führungsfahrzeuge vor; Tippen grenzt sie ein, ein Eintrag übernimmt den
    Funkrufnamen unverändert, freier Text bleibt möglich.
+
+### Den Einsatzleiter festlegen oder übergeben
+
+1. Im Paneel „Eigene Führungsstelle“ „Einsatzleiter eintragen“ oder den bisherigen Einsatzleiter
+   wählen.
+2. Eine Person aus dem disponierten Personal wählen. Für einen Einsatzleiter, der nicht im
+   Personal steht, den Namen eintippen und den Vorschlag „… als externen Einsatzleiter
+   übernehmen“ wählen.
+3. Unter „seit“ die Uhrzeit der Übernahme eintragen. Leer gilt die Zeit des Speicherns.
+4. „Speichern“ wählen. „Einsatzleiter leeren“ und dann „Speichern“ nimmt die Angabe zurück.
 
 ### Ein Mitglied hinzufügen
 
@@ -95,12 +105,24 @@ aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder d
 - Jede Zeile speichert nur ihren eigenen Wert, das Formular „Bearbeiten“ nur die geänderten
   Felder. Wer eine Zeile verlässt, ohne zu speichern, behält den alten Wert.
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie
-  schreiben keinen Eintrag ins Einsatztagebuch.
+  schreiben keinen Eintrag ins Einsatztagebuch, mit einer Ausnahme: der Einsatzleiter.
 - Die „Einsatznummer“ unter „Technische Angaben“ vergibt das System; sie lässt sich nicht ändern.
 - Die **eigene Führungsstelle** speist Funkplan, Fernmeldeskizze und Kommunikationsplan (siehe
   [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); dort wird sie nicht
   bearbeitet. „Fahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.
+- Der **Einsatzleiter** ist die Person, die den Einsatz nach FwDV 100 führt. Die Rolle
+  Einsatzleitung im „Zugriff“ ist nur ein Recht und macht niemanden zum Einsatzleiter. Die
+  Kopfleiste, die Wurzel des Organigramms, die Zeile der Führungsstelle im Funkplan, die
+  Lagebericht-Übernahmen und der Einsatzbericht zeigen alle denselben Einsatzleiter. Ist keiner
+  festgelegt, steht dort „nicht erfasst“.
+- Jedes Festlegen, Übergeben und Leeren schreibt genau einen Eintrag ins Einsatztagebuch, etwa
+  „Übergabe der Einsatzleitung von … an …“, mit der Zeit aus „seit“. Dieselbe Person mit anderer
+  Uhrzeit schreibt keinen.
+- Eine Person als Einsatzleiter anbieten kann die Zeile nur, wenn das Modul Personal freigegeben
+  ist; sonst steht „Personal nicht freigegeben — nur Freitext“. Wird die Person aus dem Einsatz
+  entlassen, bleibt ihr Name mit „nicht mehr disponiert“ stehen. Bei der Schwärzung des Einsatzes
+  wird der Name gelöscht.
 - Die Vorschläge für den **Rufname** stehen in Gruppen, in dieser Folge: die Fahrzeuge, die der
   Führungsstelle zugeordnet sind, die übrigen disponierten Führungsfahrzeuge, dann die
   Führungsfahrzeuge der Organisation, die im Dienst und nicht disponiert sind, und zuletzt deren
