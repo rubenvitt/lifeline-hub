@@ -76,7 +76,7 @@ angemeldeten Abonnenten der Organisation erreichen und keinen anderer Organisati
 
 Stammdaten-Kataloge im Sinne dieser Anforderung sind Fahrzeuge, Fahrzeug-Status, Personal,
 Personal-Status, Material, Material-Kategorien, Qualifikationen, Einheit-Typen, Sprechgruppen der
-Organisation, ETB-Bausteine, Stichwort-Vorschläge, Führungsfunktionen und die Organisation selbst
+Organisation, ETB-Bausteine, Stichwort-Vorschläge, Führungsfunktionen, externe Stellen und die Organisation selbst
 (Name, Logo). Import, Neu-Import und Entfernen der Demo-Daten MUST `stammdaten` ebenfalls auslösen.
 
 #### Scenario: Fahrzeug außer Dienst
@@ -90,6 +90,10 @@ Organisation, ETB-Bausteine, Stichwort-Vorschläge, Führungsfunktionen und die 
 #### Scenario: Abgelehnte Änderung
 - **WHEN** eine Katalog-Schreibanfrage mit 400, 403, 409 oder 422 abgelehnt wird
 - **THEN** wird kein Ereignis `stammdaten` verteilt
+
+#### Scenario: Externe Stelle angelegt
+- **WHEN** der Admin auf Schirm A eine externe Stelle anlegt und Schirm B derselben Organisation die Einsatzdaten offen hat
+- **THEN** schlägt Schirm B die neue Stelle bei der meldenden Stelle vor, ohne neu zu laden
 
 ### Requirement: Eine Live-Verbindung je Tab
 Ein angemeldeter Tab SHALL zu jedem Zeitpunkt höchstens eine Live-Verbindung offen halten. Innerhalb

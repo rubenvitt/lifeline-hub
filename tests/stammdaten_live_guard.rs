@@ -27,6 +27,7 @@ const KATALOG_MODULE: &[&str] = &[
     "sprechgruppe",
     "etb_baustein",
     "stichwort",
+    "externe_stelle",
     "fuehrungsfunktion",
     "organisation",
 ];

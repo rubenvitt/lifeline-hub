@@ -608,6 +608,11 @@ const KATALOG_SCHREIBEN: &[(&str, &str, &str)] = &[
     ),
     ("POST", "/api/stichwort-vorschlaege", r#"{"text":"Sturm"}"#),
     (
+        "POST",
+        "/api/externe-stellen",
+        r#"{"bezeichnung":"ILS Musterkreis","art":"leitstelle"}"#,
+    ),
+    (
         "PUT",
         "/api/org-fuehrungsfunktionen/s4",
         r#"{"label":"Versorgung (Logistik)"}"#,
@@ -682,6 +687,23 @@ async fn lesen_und_abgelehnte_katalog_anfragen_melden_nichts() {
     )
     .await;
     assert!(status.is_client_error(), "{status}");
+    // Doppelte externe Stelle (409) und Markierung an einer Nicht-Leitstelle (422, LFH-1194).
+    let rumpf = r#"{"bezeichnung":"Polizei","art":"polizei"}"#;
+    let (status, json) = anfrage(&app, "POST", "/api/externe-stellen", &admin, Some(rumpf)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let polizei = json["id"].as_i64().unwrap();
+    org_eingegangen(&mut rx);
+    let (status, _) = anfrage(&app, "POST", "/api/externe-stellen", &admin, Some(rumpf)).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/externe-stellen/{polizei}"),
+        &admin,
+        Some(r#"{"zustaendig":true}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 
     let alle = org_eingegangen(&mut rx);
     assert!(alle.is_empty(), "{alle:?}");

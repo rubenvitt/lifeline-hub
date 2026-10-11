@@ -5501,6 +5501,59 @@
           }
         }
       },
+      "ExterneStelle": {
+        "type": "object",
+        "description": "Eine externe Stelle des Katalogs.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "art",
+          "aktiv",
+          "zustaendig"
+        ],
+        "properties": {
+          "aktiv": {
+            "type": "boolean"
+          },
+          "art": {
+            "$ref": "#/components/schemas/ExterneStelleArt"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rufnummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustaendig": {
+            "type": "boolean",
+            "description": "Die zuständige Leitstelle der Organisation; höchstens eine, nur aktiv und Art\n`leitstelle`."
+          }
+        }
+      },
+      "ExterneStelleArt": {
+        "type": "string",
+        "description": "Art einer externen Stelle (Schema-Anker für die OpenAPI-Union, LFH-120). Bewusst nicht\ndie `Stellenart` des Kommunikationsplans: die beschreibt die Rolle im Plan und kennt weder\nPolizei noch Hilfsorganisation (design.md D2).\n\nDie Reihenfolge der Varianten ist die Anzeigereihenfolge der Gruppen.",
+        "enum": [
+          "leitstelle",
+          "polizei",
+          "behoerde",
+          "hilfsorganisation",
+          "sonstige"
+        ]
+      },
       "FachebeneAntwort": {
         "type": "object",
         "description": "Einheitlicher Umschlag für jede Fachebene.",

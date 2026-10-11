@@ -47,10 +47,10 @@ describe('adminNav — Registry', () => {
    * Führungskraft. Die Zahl 16 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
    * gepinnt, samt Eindeutigkeit gegenüber den Gruppen-Keys (gleiche Ebene `/admin/<key>`).
    */
-  it('drei Gruppen mit 17 Sektionen gesamt (Stammdaten 12), dazu vier Sonder-Einträge', () => {
+  it('drei Gruppen mit 18 Sektionen gesamt (Stammdaten 13), dazu vier Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
-    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(17);
-    expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(12);
+    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(18);
+    expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(13);
     expect(adminBenutzer.key).toBe('benutzer');
     expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
     // Voreingestellte Werte heißen „Vorgabe“ (LFH-944), auch im Menü.
@@ -113,6 +113,7 @@ function stammdatenHandler() {
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     http.get('/api/einheit-typen', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
     http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([])),
     http.get('/api/organisation', () =>
@@ -124,9 +125,9 @@ function stammdatenHandler() {
 const STAMMDATEN = adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen;
 
 describe('adminNav — Seitenkopf trägt den Registry-Titel', () => {
-  it('deckt alle zwölf Stammdaten-Sektionen ab', () => {
+  it('deckt alle dreizehn Stammdaten-Sektionen ab', () => {
     // Ohne diese Zahl wäre die Schleife darunter auch bei leerer Menge grün.
-    expect(STAMMDATEN).toHaveLength(12);
+    expect(STAMMDATEN).toHaveLength(13);
   });
 
   it.each(STAMMDATEN.map((s) => [s.label, s.element] as const))(

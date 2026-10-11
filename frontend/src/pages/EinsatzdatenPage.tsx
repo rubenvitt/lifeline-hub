@@ -48,6 +48,9 @@ import {
   type KopfdatenPatch,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
+import { externeStellenOptions, useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
+import { teilwortSuche } from '../components/teilwortSuche';
+import { MELDENDE_STELLE_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
@@ -122,7 +125,7 @@ function leererText(w: string): boolean {
  */
 type FeldSpeichern = (etikett: string, patch: KopfdatenPatch) => Promise<EinsatzAnzeige>;
 
-/** Eine freie Textangabe als Zeile (Stichwort ausgenommen: es hat Vorschläge). */
+/** Eine freie Textangabe als Zeile (Stichwort und meldende Stelle ausgenommen: sie haben Vorschläge). */
 function TextAngabe({
   etikett,
   wert,
@@ -951,6 +954,8 @@ export default function EinsatzdatenPage() {
     queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
   });
+  // Katalog „Externe Stellen“ (LFH-1194): Vorschläge für die meldende Stelle, Freitext bleibt.
+  const stellenQuery = useExterneStellen();
 
   const speichernMutation = useMutation({
     mutationFn: (patch: KopfdatenPatch) => patcheEinsatz(einsatzId, patch),
@@ -1008,6 +1013,7 @@ export default function EinsatzdatenPage() {
   const darfAbschliessen = darfEinsatzLeiten(einsatz);
 
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
+  const stellenOptionen = externeStellenOptions(stellenQuery.data ?? []);
 
   function bearbeitenStarten() {
     const werte: FormWerte = {
@@ -1134,7 +1140,13 @@ export default function EinsatzdatenPage() {
               exclude={`einsatzort:${einsatzId}`}
             />
             <Form.Item label="Meldende/anfordernde Stelle" name="meldende_stelle">
-              <Input />
+              <AutoComplete
+                options={stellenOptionen}
+                showSearch={teilwortSuche}
+                allowClear
+                maxLength={MELDENDE_STELLE_MAX}
+                placeholder="z. B. ILS Musterkreis"
+              />
             </Form.Item>
             <Form.Item label="Sachverhalt / Meldebild" name="sachverhalt">
               <Input.TextArea rows={3} />
@@ -1292,13 +1304,32 @@ export default function EinsatzdatenPage() {
                 },
                 {
                   etikett: 'Meldende Stelle',
+                  // Vorschläge aus dem Katalog „Externe Stellen“ (LFH-1194); gespeichert wird nur
+                  // der Text (Speicherform A), Freitext bleibt.
                   wert: (
-                    <TextAngabe
+                    <InlineAngabe<string>
                       etikett="Meldende Stelle"
-                      wert={einsatz.meldende_stelle}
+                      wert={einsatz.meldende_stelle ?? ''}
+                      anzeige={einsatz.meldende_stelle}
+                      leer={leererText}
+                      gleich={(a, b) => a.trim() === b.trim()}
                       darfSchreiben={darfBearbeiten}
-                      speichern={feldSpeichern}
-                      zuPatch={(w) => ({ meldende_stelle: w })}
+                      onSpeichern={(w) =>
+                        feldSpeichern('Meldende Stelle', { meldende_stelle: leerZuNull(w) })
+                      }
+                      eingabe={({ feld, popup, value, onChange }) => (
+                        <AutoComplete
+                          {...feld}
+                          {...popup}
+                          options={stellenOptionen}
+                          showSearch={teilwortSuche}
+                          allowClear
+                          maxLength={MELDENDE_STELLE_MAX}
+                          placeholder="z. B. ILS Musterkreis"
+                          value={value}
+                          onChange={(v?: string) => onChange(v ?? '')}
+                        />
+                      )}
                     />
                   ),
                 },
