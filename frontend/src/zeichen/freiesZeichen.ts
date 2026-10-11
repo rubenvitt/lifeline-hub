@@ -45,6 +45,7 @@ import {
   type TendencyId,
 } from '@einsatzzeichen/schema';
 import {
+  eigen,
   KOERPER,
   STAERKE,
   fassungen,
@@ -428,13 +429,13 @@ function farbTeil(farbe: string | undefined, koerper: Teil): { teil: Teil; verlo
 
 function ausAltspalten(e: FreiesZeichenEingabe, verloren: boolean): FreiesZeichenBild {
   const gz = e.grundzeichen || 'ohne';
-  const annahme = ANNAHME[gz];
-  if (!annahme || !(gz in GRUNDZEICHEN)) return platzhalter();
+  const annahme = eigen(ANNAHME, gz);
+  if (!annahme || eigen(GRUNDZEICHEN, gz) === undefined) return platzhalter();
   const nimm = (m: Merkmal, wert: string | null | undefined) =>
     wert && annahme.includes(m) ? wert : undefined;
   const symbolId = nimm('symbol', e.symbol);
-  const nutzlast = symbolId ? SYMBOL[symbolId] : undefined;
-  const koerper = GRUNDZEICHEN[gz];
+  const nutzlast = eigen(SYMBOL, symbolId);
+  const koerper = eigen(GRUNDZEICHEN, gz) ?? null;
 
   if (!koerper) {
     const frei = nutzlast ? symbolFrei(nutzlast) : null;
@@ -444,7 +445,7 @@ function ausAltspalten(e: FreiesZeichenEingabe, verloren: boolean): FreiesZeiche
   const orgId = nimm('organisation', e.organisation);
   const org: Teil = { organization: koerper.organization ?? organisation(orgId) };
   const einheitId = nimm('einheit', e.einheit);
-  const staerke = einheitId ? EINHEIT[einheitId] : undefined;
+  const staerke = eigen(EINHEIT, einheitId);
   const fachaufgabe = nimm('fachaufgabe', e.fachaufgabe);
   const fach = fassungen(fachaufgabe, koerper);
   const symbol = nutzlast ? symbolImKoerper(nutzlast) : null;
@@ -518,6 +519,7 @@ function ausSpec(spec: AnySpec): FreiesZeichenBild {
   return kaskade([[spec], ...FELDSTUFEN.map((f) => [auswahl(f)])], false);
 }
 
+const CACHE_DECKEL = 1000;
 const CACHE = new Map<string, FreiesZeichenBild>();
 
 function eingangsSchluessel(e: FreiesZeichenEingabe): string {
@@ -555,7 +557,16 @@ export function freiesZeichen(e: FreiesZeichenEingabe): FreiesZeichenBild {
   const key = eingangsSchluessel(e);
   const vorhanden = CACHE.get(key);
   if (vorhanden) return vorhanden;
-  const ergebnis = uebersetze(e);
+  let ergebnis: FreiesZeichenBild;
+  try {
+    ergebnis = uebersetze(e);
+  } catch {
+    // Letztes Netz: ein gespeicherter Wert darf die Karte nicht zum Absturz bringen (Spec
+    // `lagekarte-taktische-zeichen`, „Definierter Rückfall statt Ausfall“).
+    ergebnis = platzhalter();
+  }
+  // Deckel wie bei den Merkern der Zeichenwahl: Jede Vorschau im Picker legt einen Eintrag an.
+  if (CACHE.size >= CACHE_DECKEL) CACHE.delete(CACHE.keys().next().value!);
   CACHE.set(key, ergebnis);
   return ergebnis;
 }

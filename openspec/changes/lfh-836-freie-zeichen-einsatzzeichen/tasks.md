@@ -60,7 +60,7 @@
   Prüfen: Die Tests in `FreiesZeichenPicker.test.tsx` sind auf die Spec-Szenarien umgestellt und grün. Dazu gehören „Nur Zeichenbares“, „Piktogramm ohne Grundzeichen“ und „Farbe aus der Palette“; Tastatur, Suche und Enter sind unverändert. Jede angebotene Kombination zeichnet ohne Wurf (Eigenschaftstest über die Optionen).
 - [x] 5.2 Kosten des Vokabulars messen: Test oder Benchmark für das Öffnen des Pickers und einen Grundzeichenwechsel. Ergebnis in `messung.md`. Optionen per `useMemo`.
 - [x] 5.3 Aufrufer auf `zeichen_spec` umstellen: `Sidebar.tsx`, `ZeichenHierDialog.tsx` (Startentwurf), `useKartenInteraktion.ts` (POST-Body), `LagekartePage.tsx`, `api/types.ts` (Input-DTOs). Die Tests in `Sidebar.test.tsx`, `ZeichenHierDialog.test.tsx` und `useKartenInteraktion.test.tsx` sind umgestellt und grün.
-- [x] 5.4 `zuletztVerwendet.ts` nach D10: neuer Schlüssel v2, Übernahme des alten Schlüssels über den Adapter, nicht Übersetzbares entfällt. `offline/geraetRaeumung.ts` räumt beide Schlüssel. Tests in `zuletztVerwendet.test.ts`:
+- [x] 5.4 `zuletztVerwendet.ts` nach D10: neuer Schlüssel v2, Übernahme des alten Schlüssels über den Adapter, nicht Übersetzbares entfällt. `offline/geraetRaeumung.ts` führt beide Schlüssel als persönliche Vorliebe (`bleibt`); den alten löscht das erste Lesen. Tests in `zuletztVerwendet.test.ts`:
   - Übernahme in Reihenfolge
   - kaputter Alteintrag entfällt
   - kaputter Speicher → leere Leiste

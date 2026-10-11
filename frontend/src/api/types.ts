@@ -352,6 +352,10 @@ export interface NeuesFreiesZeichen {
  *  die Altspalten; eine Altzeile wird so beim nächsten Ändern zur Spec. */
 export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 
+/** Teil-PATCH: Nur eine Umbenennung schickt bloß `label`, dann bleibt die gespeicherte Form —
+ *  auch eine Altzeile mit Alt-Kennung und Alt-Farbe — unverändert (LFH-836, Review). */
+export type FreiesZeichenPatch = Partial<FreiesZeichenUpdate>;
+
 // ============================== LFH-319 Kartenansichten ==============================
 export type KartenAnsicht = S['KartenAnsichtAnzeige'];
 export type KartenTheme = S['KartenTheme'];

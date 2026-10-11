@@ -100,6 +100,12 @@ Art die erlaubten Felder und je Feld die Wertemengen (`SPEC_FIELD_VALUES`,
 - Ob sich eine gültige Spec zeichnen lässt, prüft nur der Client. Was nicht zeichnet, fällt beim
   Lesen in die Kaskade (D5).
 - Pfade (`movement`, `line`) prüft der Server nur der Form nach. Der Picker bietet sie nicht an.
+- Der Prüfer ist bewusst strenger als die Bibliothek: Er lehnt Dubletten in Listen ab und die
+  Schrifttoken `funktionslauf-kontrast` und `koerperlauf-kontrast` als `technicalFill`. Der Picker
+  erzeugt beides nicht.
+- Eine reine Umbenennung schickt nur `label` (Teil-PATCH). Die gespeicherte Form bleibt dann
+  stehen, auch eine Altzeile mit Alt-Kennung und Alt-Farbe und eine unlesbare Spec aus einer
+  neueren Bibliothek (Review vom 11.10.2026).
 
 *Verworfen:*
 - Nur die Struktur prüfen: das ließe Müllwerte in die DB.
@@ -228,7 +234,7 @@ eine zweite Farbquelle widerspräche „eine Spec je Bild“.
   Farbe ist in der Spec enthalten.
 - Beim ersten Lesen, wenn v2 fehlt, werden die Einträge des alten Schlüssels über D5 übersetzt
   (nicht übersetzbare entfallen), in v2 geschrieben und der alte Schlüssel gelöscht.
-- `offline/geraetRaeumung.ts` räumt beide Schlüssel.
+- `offline/geraetRaeumung.ts` führt beide Schlüssel als persönliche Vorliebe (`bleibt`); den alten löscht das erste Lesen.
 
 ## Risks / Trade-offs
 

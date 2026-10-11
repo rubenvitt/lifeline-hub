@@ -1,7 +1,12 @@
 import { Button, Popconfirm, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
-import type { FreiesZeichen, FreiesZeichenUpdate, KartenAnsicht } from '../../api/types';
+import type {
+  FreiesZeichen,
+  FreiesZeichenPatch,
+  FreiesZeichenUpdate,
+  KartenAnsicht,
+} from '../../api/types';
 import KartenDetailCard from './KartenDetailCard';
 import FreiesZeichenPicker, {
   hatZeichen,
@@ -19,7 +24,7 @@ export interface FreiesZeichenInspectorProps {
   darfSchreiben: boolean;
   onSchliessen: () => void;
   /** Zeichen und Bezeichnung als Ganzes (lat/lon unveränderbar in v1). */
-  onAendern: (spec: FreiesZeichenUpdate) => void;
+  onAendern: (spec: FreiesZeichenPatch) => void;
   onLoeschen: () => void;
   ansichten: KartenAnsicht[];
   onVerschieben: (ansichtId: number | null) => void;
@@ -72,6 +77,16 @@ function baueWert(z: FreiesZeichen): FreiesZeichenUpdate {
   };
 }
 
+/**
+ * Was gesendet wird: Bleibt das Zeichen gleich und ändert sich nur die Bezeichnung, geht nur
+ * `label` raus. Sonst würde schon eine Umbenennung eine Altzeile (oder eine unlesbare Spec aus
+ * einer neueren Bibliothek) durch ihre wirksame, womöglich vereinfachte Fassung ersetzen und die
+ * Alt-Kennung samt Alt-Farbe verlieren (design.md D6, LFH-836 Review).
+ */
+function sendung(entwurf: FreiesZeichenUpdate, server: FreiesZeichenUpdate): FreiesZeichenPatch {
+  return entwurf.zeichen_spec === server.zeichen_spec ? { label: entwurf.label } : entwurf;
+}
+
 /** Die Alt-Kennung eines Altzeichens (`gefahr · abc · #cc0000`), sonst `null`. */
 function altKennung(z: FreiesZeichen): string | null {
   if (z.zeichen_spec) return null;
@@ -118,8 +133,10 @@ export default function FreiesZeichenInspector({
   if (eigeneAenderung && entwurfText === serverStand) setEigeneAenderung(false);
 
   const onAendernRef = useRef(onAendern);
+  const serverRef = useRef<FreiesZeichenUpdate>(JSON.parse(serverStand) as FreiesZeichenUpdate);
   useEffect(() => {
     onAendernRef.current = onAendern;
+    serverRef.current = JSON.parse(serverStand) as FreiesZeichenUpdate;
   });
   /**
    * Wer den Inspector innerhalb der Frist schließt, verlöre seine Änderung (der Cleanup räumt den
@@ -136,7 +153,9 @@ export default function FreiesZeichenInspector({
     const t = setTimeout(() => {
       offenerStand.current = null;
       setEigeneAenderung(false);
-      onAendernRef.current(JSON.parse(entwurfText) as FreiesZeichenUpdate);
+      onAendernRef.current(
+        sendung(JSON.parse(entwurfText) as FreiesZeichenUpdate, serverRef.current),
+      );
     }, SCHREIB_FRIST_MS);
     return () => clearTimeout(t);
   }, [eigeneAenderung, entwurf, entwurfText, serverStand]);
@@ -146,7 +165,9 @@ export default function FreiesZeichenInspector({
   useEffect(
     () => () => {
       const rest = offenerStand.current;
-      if (rest) onAendernRef.current(JSON.parse(rest) as FreiesZeichenUpdate);
+      if (rest) {
+        onAendernRef.current(sendung(JSON.parse(rest) as FreiesZeichenUpdate, serverRef.current));
+      }
     },
     [],
   );

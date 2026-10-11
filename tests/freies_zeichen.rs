@@ -275,6 +275,16 @@ async fn beide_formen_ist_400() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
+    // Auch Spec plus ein Overlay-Wert der Altform ist „beide Formen“ (Review LFH-836).
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"zeichen_spec": DREHLEITER, "organisation": "thw"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
     let (_, liste) = anfrage(
         &app,
         "GET",

@@ -10,7 +10,7 @@ import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
 import { PALETTE, type AnySpec } from '@einsatzzeichen/schema';
 import { FREIES_ZEICHEN_TINTE } from './marker';
 import { antdToken, farbenDunkel } from '../../theme/tokens';
-import type { FreiesZeichenUpdate } from '../../api/types';
+import type { FreiesZeichenPatch } from '../../api/types';
 
 /** Ein Altzeichen (Altspalten, kein `zeichen_spec`): der Bestand vor LFH-836. */
 const basis: FreiesZeichen = {
@@ -50,7 +50,7 @@ const specZeile = (spec: AnySpec, rest: Partial<FreiesZeichen> = {}): FreiesZeic
 });
 
 /** Der Stand nach dem eigenen PATCH: der Server schreibt die Spec und leert die Altspalten. */
-const nachPatch = (gesendet: FreiesZeichenUpdate, geaendert_at: string): FreiesZeichen => ({
+const nachPatch = (gesendet: FreiesZeichenPatch, geaendert_at: string): FreiesZeichen => ({
   ...basis,
   ...OHNE_ALTFELDER,
   ...gesendet,
@@ -58,7 +58,10 @@ const nachPatch = (gesendet: FreiesZeichenUpdate, geaendert_at: string): FreiesZ
 });
 
 /** Die Zeichenbeschreibung eines gesendeten PATCH. */
-const gesendeteSpec = (aufruf: FreiesZeichenUpdate): AnySpec => parseAnySpec(aufruf.zeichen_spec);
+const gesendeteSpec = (aufruf: FreiesZeichenPatch): AnySpec => {
+  if (!aufruf.zeichen_spec) throw new Error('PATCH ohne zeichen_spec');
+  return parseAnySpec(aufruf.zeichen_spec);
+};
 
 function renderInspector(
   opts: {
@@ -429,6 +432,34 @@ describe('FreiesZeichenInspector — Altzeichen (LFH-836)', () => {
     // Nur `zeichen_spec` und Bezeichnung: keine Altfelder mehr im Body.
     expect(Object.keys(gesendet).sort()).toEqual(['label', 'zeichen_spec']);
     expect(gesendeteSpec(gesendet)).toMatchObject({ kind: 'person', organization: 'feuerwehr' });
+  });
+
+  // Review LFH-836: Eine Umbenennung ist keine Änderung am Zeichen. Schickte sie die wirksame
+  // Spec mit, verlöre eine Altzeile ihre Alt-Kennung und Alt-Farbe (design.md D6).
+  it('eine reine Umbenennung eines Altzeichens sendet nur die Bezeichnung', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    const feld = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'Zug 2' } });
+    fireEvent.blur(feld);
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(onAendern).toHaveBeenCalledWith({ label: 'Zug 2' });
+  });
+
+  it('eine Umbenennung lässt auch eine unlesbare Spec aus einer neueren Bibliothek stehen', () => {
+    vi.useFakeTimers();
+    const zeichen: FreiesZeichen = {
+      ...basis,
+      ...OHNE_ALTFELDER,
+      zeichen_spec: '{"v":1,"freestanding":{"kind":"aus-der-zukunft"}}',
+    };
+    const { onAendern } = renderInspector({ zeichen });
+    const feld = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'Neu' } });
+    fireEvent.blur(feld);
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledWith({ label: 'Neu' });
   });
 
   it('nennt bei einem vereinfacht dargestellten Altzeichen die Alt-Kennung', () => {

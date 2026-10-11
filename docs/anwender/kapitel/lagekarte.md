@@ -82,7 +82,8 @@ Grundzeichen nicht trägt. Die Farbe kommt aus einer festen Palette und steht nu
 zur Wahl, die eine Füllung tragen, etwa bei der Gefahr; eine freie Farbe und eine Angabe
 „Funktion“ gibt es nicht. Führt die DV 102 für ein Symbol zwei Darstellungen, stehen beide als
 eigene Kachel da: bei den Fernmeldezeichen „(Funk)“ für die drahtlose und „(Draht)“ für die
-leitergebundene Form, sonst heißt die zweite „(zweite Darstellung)“.
+leitergebundene Form. Sonst trägt die zweite ihren eigenen Namen, etwa „Gefährliche Stoffe
+(Chlor)“, oder, wo die DV 102 keinen führt, „(zweite Darstellung)“.
 
 Nach „Kein Grundzeichen“ ist noch kein Zeichen gewählt: Die Vorschau zeigt „Symbol wählen“,
 „Platzieren“ ist gesperrt, und am gewählten Zeichen wird nichts gespeichert, bis ein Symbol

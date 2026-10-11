@@ -868,3 +868,36 @@ describe('fuellfarbe — Palettenfarbe einer wirksamen Spec (D6)', () => {
     expect(fuellfarbe({ kind: 'pictogram', pictogram: 'capability.lighting' })).toBeNull();
   });
 });
+
+describe('freiesZeichen — Prototyp-Schlüssel als gespeicherte Kennung (LFH-836, Review)', () => {
+  // Der Server nimmt im alten Format jeden String an. `constructor` oder `__proto__` dürfen keine
+  // Prototyp-Eigenschaft der Tabellen liefern, sonst stürzt die Lagekarte für alle im Einsatz ab.
+  const SCHLUESSEL = ['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty'];
+
+  it.each(SCHLUESSEL)(
+    'Grundzeichen „%s“ mit Overlays wirft nicht und wird zum Platzhalter',
+    (k) => {
+      for (const e of [
+        { grundzeichen: k, organisation: 'feuerwehr' },
+        { grundzeichen: k, symbol: 'drehleiter' },
+        { grundzeichen: k, farbe: '#ff0000' },
+        { grundzeichen: k, einheit: 'zug', fachaufgabe: 'brandbekaempfung' },
+      ]) {
+        const bild = freiesZeichen(e);
+        expect(bild.spec).toEqual({ kind: 'point' });
+        expect(bild.vereinfacht).toBe(true);
+      }
+    },
+  );
+
+  it.each(SCHLUESSEL)(
+    'Overlay „%s“ an einem gültigen Grundzeichen gilt als ohne Nachfolger',
+    (k) => {
+      for (const feld of ['symbol', 'einheit', 'fachaufgabe', 'organisation'] as const) {
+        const bild = freiesZeichen({ grundzeichen: 'taktische-formation', [feld]: k });
+        expect(() => bild.drawing).not.toThrow();
+        expect(bild.vereinfacht).toBe(true);
+      }
+    },
+  );
+});

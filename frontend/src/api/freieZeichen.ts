@@ -1,4 +1,4 @@
-import type { FreiesZeichen, NeuesFreiesZeichen, FreiesZeichenUpdate } from './types';
+import type { FreiesZeichen, NeuesFreiesZeichen, FreiesZeichenPatch } from './types';
 import { apiGet, apiSend } from './client';
 
 /** Freie taktische Zeichen eines Einsatzes (LFH-170). */
@@ -16,7 +16,7 @@ export function legeFreiesZeichenAn(
 export function aktualisiereFreiesZeichen(
   einsatzId: number,
   id: number,
-  daten: FreiesZeichenUpdate,
+  daten: FreiesZeichenPatch,
 ): Promise<FreiesZeichen> {
   return apiSend<FreiesZeichen>(`/api/einsaetze/${einsatzId}/freie-zeichen/${id}`, 'PATCH', daten);
 }
