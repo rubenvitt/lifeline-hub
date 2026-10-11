@@ -6031,7 +6031,8 @@
               "number",
               "null"
             ],
-            "format": "double"
+            "format": "double",
+            "description": "Länge zur Breite `standort_lat`, nur als Paar gesetzt."
           }
         }
       },

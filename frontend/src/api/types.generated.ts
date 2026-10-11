@@ -2277,7 +2277,10 @@ export interface components {
              * @description Koordinate des Standorts, nur als Paar gesetzt. Wird mit der Adresse geschwärzt.
              */
             standort_lat?: number | null;
-            /** Format: double */
+            /**
+             * Format: double
+             * @description Länge zur Breite `standort_lat`, nur als Paar gesetzt.
+             */
             standort_lon?: number | null;
         };
         /**
