@@ -138,3 +138,38 @@ Vorausberechnen je Art (Risiko „Picker-Kosten“ in design.md) liegt beim Main
 
 Nebenbefund Bundle: Mit den beiden Picker-Fixes (zweite Darstellungen, Entwurf ohne Zeichen) liegt
 `LagekartePage` bei 135.74 kB (gzip 42.72), Precache 6657.96 KiB (34 Einträge).
+
+## Nachmessung mit Aufwärmen im Leerlauf (11.10.2026)
+
+Entscheidung (Main-Loop): Die Optionen des Pickers werden im Leerlauf vorab berechnet
+(`waermeVokabularAuf` in `zeichenWahl.ts`, gestartet von `LagekartePage`, sobald die Karte steht
+und Schreibrecht besteht; Abbruch beim Verlassen). Je Schritt ein Raster einer Art, die
+Fähigkeitsfrage in Scheiben zu zehn Kandidaten, die Kachelbilder ohne Grundzeichen in Scheiben zu
+dreißig. Methode wie oben (Prod-Bundle vom Stand `812fec76f`, frischer Kontext je Runde, fünf
+Runden); vor der Messung lag die Karte die genannte Zeit im Leerlauf.
+
+| Messpunkt (Median ms, min–max) | 1,5 s Leerlauf | 5 s Leerlauf | 15 s Leerlauf | vorher (ohne Aufwärmen) |
+| --- | ---: | ---: | ---: | ---: |
+| Öffnen | 108 (90–118) | 99 (91–137) | 96 (86–131) | 829 |
+| erster Wechsel Formation → Landfahrzeug | 596 (564–675) | 21 (18–24) | 19 (18–27) | 620 |
+| wiederholter Wechsel | 19 | 20 | 26 | 21 |
+| „Kein Grundzeichen“ | 105 | 117 | 132 | 105 |
+| erster Wechsel auf die Gefahr | 414 | 307 (270–370) | 60 (57–97) | 430 |
+
+**Ergebnis:** Ziel erreicht. Nach 5 s Leerlauf liegen Öffnen (≈ 100 ms) und der erste Wechsel
+auf das Landfahrzeug (≈ 20 ms) unter 300 ms. Das Aufwärmen braucht im Ganzen rund 13 s nach dem
+Laden: 223 Leerlauf-Schritte, zusammen 8,6 s Rechenzeit. Wer früher wechselt, trifft eine Art,
+die noch nicht vorgerechnet ist. Die Gefahr ist die elfte Art und liegt nach 5 s noch bei
+≈ 300 ms, nach 15 s bei ≈ 60 ms. Unter 1,5 s ist nur das Öffnen schnell.
+
+**Blockade der Karte:** Die Schritte laufen nur im Leerlauf (`requestIdleCallback`, Frist
+2 s), einer je Rückruf. Long Tasks in den ersten 20 s nach dem Laden (über 50 ms): vor den Scheiben
+26, bis zu 643 ms, meist 200–460 ms; mit Scheiben meist 50–110 ms. Fünf Leerlauf-Schritte liegen
+über 100 ms, die längsten bei 381, 221 und 123 ms. Welcher Schritt das ist, ist nicht
+zugeordnet. Vermutlich sind es Raster, die noch als Ganzes gerechnet werden (der Satz ohne
+Grundzeichen, die Grundzeichenarten). Ein Zug oder Tipp auf der Karte
+kann in diesem Fenster einmal bis zu rund 0,4 s warten.
+
+Bundle nach den Nachbesserungen (`pnpm run build`, Stand `812fec76f`): `LagekartePage` 137.76 kB
+(gzip 43.46), Precache 6660.05 KiB (34 Einträge). Gegenüber Task 6.3 (134.83 kB) +2.93 kB, durch
+die Picker-Fixes, das Aufwärmen und die Zeichenplatte.
