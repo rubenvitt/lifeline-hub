@@ -1,3 +1,4 @@
+import type { OrgRolle, SystemRolle } from '../api/types';
 import { NUR_ADMIN } from '../components/nurAnsicht';
 
 /**
@@ -28,3 +29,19 @@ export const LETZTE_EINSATZLEITUNG_TEXT = 'Gesperrt: letzte Einsatzleitung';
 export const EIGENES_KONTO = 'eigenes Konto';
 /** Der letzte aktive Admin (Server: 409, `routes/benutzer.rs`). */
 export const LETZTER_ADMIN = 'letzter aktiver Admin';
+
+/**
+ * Rollen, wie der Benutzer-Dialog sie benennt (LFH-1152): eine Quelle für Dialog und
+ * Zugangsprotokoll, damit „keiner“ oder „fuehrungskraft“ nirgends roh erscheint. Der Dialog hängt
+ * bei der Führungskraft ihren Hinweis an.
+ */
+export const SYSTEM_ROLLE_FELD = 'System-Rolle';
+export const ORG_ROLLE_FELD = 'Org-Rolle';
+export const SYSTEM_ROLLE_TEXT: Record<SystemRolle, string> = {
+  keiner: 'Benutzer',
+  admin: 'Admin',
+};
+export const ORG_ROLLE_TEXT: Record<OrgRolle, string> = {
+  keine: 'Keine',
+  fuehrungskraft: 'Führungskraft',
+};

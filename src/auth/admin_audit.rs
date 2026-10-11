@@ -17,9 +17,9 @@
 //! [`liste`]); das Lesen selbst schreibt keinen Eintrag.
 
 use crate::auth::spur::SpurFilter;
-use crate::auth::Benutzer;
+use crate::auth::{Benutzer, OrgRolle, SystemRolle};
 use crate::wire_enum::wire_enum;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 use std::net::IpAddr;
 use utoipa::ToSchema;
@@ -41,13 +41,13 @@ wire_enum! {
         BenutzerAngelegt => "benutzer_angelegt",
         BenutzerDeaktiviert => "benutzer_deaktiviert",
         BenutzerReaktiviert => "benutzer_reaktiviert",
-        /// System- oder Org-Rolle geändert; das Detail nennt alt → neu.
+        /// System- oder Org-Rolle geändert; die Angaben nennen alt → neu.
         RolleGeaendert => "rolle_geaendert",
         ZweitfaktorZurueckgesetzt => "zweitfaktor_zurueckgesetzt",
         AnmeldewegAktiviert => "anmeldeweg_aktiviert",
         AnmeldewegDeaktiviert => "anmeldeweg_deaktiviert",
-        /// Eine Sitzung des Zielkontos beendet (LFH-1092), ein Eintrag je Sitzung; das Detail
-        /// nennt Gerät und Anmeldezeit.
+        /// Eine Sitzung des Zielkontos beendet (LFH-1092), ein Eintrag je Sitzung; die Angaben
+        /// nennen Gerät und Anmeldezeit.
         SitzungBeendet => "sitzung_beendet",
     }
 }
@@ -61,13 +61,49 @@ pub enum Ziel<'a> {
     Anmeldeweg(&'a str),
 }
 
+/// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
+/// `admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren
+/// Konventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.
+/// Flach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:
+///
+/// - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
+/// - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
+/// - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ZugangsAngaben {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system_rolle_vorher: Option<SystemRolle>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system_rolle: Option<SystemRolle>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub org_rolle_vorher: Option<OrgRolle>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub org_rolle: Option<OrgRolle>,
+    /// Grobe Gerätebezeichnung der beendeten Sitzung.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geraet: Option<String>,
+    /// Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub angemeldet_at: Option<String>,
+}
+
+impl ZugangsAngaben {
+    /// Liest gespeicherte Angaben; ein Text von vor LFH-1152 (oder sonst kein Objekt mit
+    /// mindestens einem bekannten Feld) ist keine.
+    fn aus_detail(detail: &str) -> Option<ZugangsAngaben> {
+        serde_json::from_str::<ZugangsAngaben>(detail)
+            .ok()
+            .filter(|a| *a != ZugangsAngaben::default())
+    }
+}
+
 /// Ein Eintrag der Admin-Spur.
 #[derive(Debug, Clone)]
 pub struct AdminEintrag<'a> {
     pub aktion: AdminAktion,
     pub akteur: &'a Benutzer,
     pub ziel: Ziel<'a>,
-    pub detail: Option<String>,
+    pub angaben: Option<ZugangsAngaben>,
     pub peer_ip: Option<IpAddr>,
 }
 
@@ -87,6 +123,10 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
+    let detail = eintrag
+        .angaben
+        .as_ref()
+        .map(|a| serde_json::to_string(a).expect("ZugangsAngaben sind serialisierbar"));
 
     tracing::info!(
         aktion = eintrag.aktion.as_str(),
@@ -94,7 +134,7 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
         akteur = %akteur_name,
         ziel_benutzer_id = ?ziel_benutzer_id,
         ziel = %ziel,
-        detail = ?eintrag.detail,
+        detail = ?detail,
         peer_ip = ?peer_ip,
         "Zugang durch Admin geändert"
     );
@@ -108,7 +148,7 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
     .bind(&akteur_name)
     .bind(ziel_benutzer_id)
     .bind(&ziel)
-    .bind(eintrag.detail.as_deref())
+    .bind(detail.as_deref())
     .bind(peer_ip.as_deref())
     .execute(pool)
     .await;
@@ -139,8 +179,12 @@ pub struct ZugangsaenderungAnzeige {
     pub ziel_benutzer_id: Option<i64>,
     /// Benutzername des Zielkontos oder id des Anmeldewegs.
     pub ziel: String,
+    /// Freier Text, nur noch bei Einträgen von vor LFH-1152; neuere tragen `angaben`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[sqlx(skip)]
+    pub angaben: Option<ZugangsAngaben>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peer_ip: Option<String>,
 }
@@ -162,15 +206,22 @@ pub async fn liste(
         qb.push_bind(aktion.as_str());
     }
     if let Some(konto) = &filter.konto {
-        qb.push(" AND (akteur_name = ");
-        qb.push_bind(konto.clone());
-        qb.push(" COLLATE NOCASE OR (ziel_benutzer_id IS NOT NULL AND ziel = ");
-        qb.push_bind(konto.clone());
-        qb.push(" COLLATE NOCASE))");
+        qb.push(" AND (");
+        SpurFilter::konto_enthalten(&mut qb, "akteur_name", konto);
+        qb.push(" OR (ziel_benutzer_id IS NOT NULL AND ");
+        SpurFilter::konto_enthalten(&mut qb, "ziel", konto);
+        qb.push("))");
     }
     filter.zeitraum_und_cursor(&mut qb);
     filter.ordnung_und_seite(&mut qb);
-    qb.build_query_as().fetch_all(pool).await
+    let mut zeilen: Vec<ZugangsaenderungAnzeige> = qb.build_query_as().fetch_all(pool).await?;
+    for zeile in &mut zeilen {
+        if let Some(angaben) = zeile.detail.as_deref().and_then(ZugangsAngaben::aus_detail) {
+            zeile.angaben = Some(angaben);
+            zeile.detail = None;
+        }
+    }
+    Ok(zeilen)
 }
 
 /// Löscht Einträge, deren Aufbewahrungsfrist abgelaufen ist. Liefert die Anzahl. Idempotent.
@@ -223,7 +274,7 @@ mod tests {
                     aktion,
                     akteur: &akteur,
                     ziel: Ziel::Anmeldeweg("oidc"),
-                    detail: None,
+                    angaben: None,
                     peer_ip: None,
                 },
             )
@@ -256,7 +307,7 @@ mod tests {
                     id: akteur.id,
                     benutzername: &lang,
                 },
-                detail: None,
+                angaben: None,
                 peer_ip: Some("203.0.113.5".parse().unwrap()),
             },
         )
@@ -283,6 +334,128 @@ mod tests {
                 format!("{}…", "x".repeat(64)),
                 Some("203.0.113.5".to_string()),
             )
+        );
+    }
+
+    /// LFH-1152: Angaben gehen als JSON in die Tabelle und kommen strukturiert zurück; ein Text
+    /// von vorher bleibt Text, auch einer, der wie JSON aussieht, aber keine Angaben trägt.
+    #[tokio::test]
+    async fn angaben_kommen_strukturiert_zurueck_alter_text_bleibt() {
+        let pool = db::test_pool().await;
+        let akteur = admin(&pool).await;
+        let angaben = ZugangsAngaben {
+            org_rolle_vorher: Some(OrgRolle::Keine),
+            org_rolle: Some(OrgRolle::Fuehrungskraft),
+            ..ZugangsAngaben::default()
+        };
+        schreibe(
+            &pool,
+            AdminEintrag {
+                aktion: AdminAktion::RolleGeaendert,
+                akteur: &akteur,
+                ziel: Ziel::Benutzer {
+                    id: akteur.id,
+                    benutzername: "admin",
+                },
+                angaben: Some(angaben.clone()),
+                peer_ip: None,
+            },
+        )
+        .await;
+        let gespeichert: String = sqlx::query_scalar("SELECT detail FROM admin_audit")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            gespeichert,
+            r#"{"org_rolle_vorher":"keine","org_rolle":"fuehrungskraft"}"#
+        );
+        for alt in [
+            "org_rolle: keine → fuehrungskraft",
+            "{}",
+            r#"{"org_rolle":"chef"}"#,
+            "{kaputt",
+        ] {
+            sqlx::query(
+                "INSERT INTO admin_audit (aktion, akteur_name, ziel, detail)                  VALUES ('rolle_geaendert', 'admin', 'admin', ?)",
+            )
+            .bind(alt)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let filter = SpurFilter {
+            limit: 10,
+            ..SpurFilter::default()
+        };
+        let zeilen = liste(&pool, &filter, None).await.unwrap();
+        let gelesen: Vec<(Option<&str>, Option<&ZugangsAngaben>)> = zeilen
+            .iter()
+            .map(|z| (z.detail.as_deref(), z.angaben.as_ref()))
+            .collect();
+        assert_eq!(
+            gelesen,
+            vec![
+                (Some("{kaputt"), None),
+                (Some(r#"{"org_rolle":"chef"}"#), None),
+                (Some("{}"), None),
+                (Some("org_rolle: keine → fuehrungskraft"), None),
+                (None, Some(&angaben)),
+            ]
+        );
+    }
+
+    /// Anlage und beendete Sitzung kommen ebenso strukturiert zurück (LFH-1152).
+    #[tokio::test]
+    async fn angaben_von_anlage_und_sitzung_kommen_zurueck() {
+        let pool = db::test_pool().await;
+        let akteur = admin(&pool).await;
+        let anlage = ZugangsAngaben {
+            system_rolle: Some(SystemRolle::Keiner),
+            org_rolle: Some(OrgRolle::Keine),
+            ..ZugangsAngaben::default()
+        };
+        let sitzung = ZugangsAngaben {
+            geraet: Some("Safari · iPadOS".to_string()),
+            angemeldet_at: Some("2026-10-10 12:13:34".to_string()),
+            ..ZugangsAngaben::default()
+        };
+        for (aktion, angaben) in [
+            (AdminAktion::BenutzerAngelegt, &anlage),
+            (AdminAktion::SitzungBeendet, &sitzung),
+        ] {
+            schreibe(
+                &pool,
+                AdminEintrag {
+                    aktion,
+                    akteur: &akteur,
+                    ziel: Ziel::Benutzer {
+                        id: akteur.id,
+                        benutzername: "admin",
+                    },
+                    angaben: Some(angaben.clone()),
+                    peer_ip: None,
+                },
+            )
+            .await;
+        }
+
+        let filter = SpurFilter {
+            limit: 10,
+            ..SpurFilter::default()
+        };
+        let zeilen = liste(&pool, &filter, None).await.unwrap();
+        let gelesen: Vec<(&str, Option<&str>, Option<&ZugangsAngaben>)> = zeilen
+            .iter()
+            .map(|z| (z.aktion.as_str(), z.detail.as_deref(), z.angaben.as_ref()))
+            .collect();
+        assert_eq!(
+            gelesen,
+            vec![
+                ("sitzung_beendet", None, Some(&sitzung)),
+                ("benutzer_angelegt", None, Some(&anlage)),
+            ]
         );
     }
 

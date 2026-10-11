@@ -28,7 +28,14 @@ import SitzungsListe from '../auth/SitzungsListe';
 import { beendeAlleSitzungenVon, beendeSitzungVon, ladeSitzungenVon } from '../api/sitzungen';
 import { globalKeys } from '../api/queryKeys';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
-import { EIGENES_KONTO, LETZTER_ADMIN } from '../stammdaten/rechteText';
+import {
+  EIGENES_KONTO,
+  LETZTER_ADMIN,
+  ORG_ROLLE_FELD,
+  ORG_ROLLE_TEXT,
+  SYSTEM_ROLLE_FELD,
+  SYSTEM_ROLLE_TEXT,
+} from '../stammdaten/rechteText';
 
 interface BearbeitenWerte {
   anzeigename: string;
@@ -37,8 +44,8 @@ interface BearbeitenWerte {
 }
 
 const SYSTEM_ROLLEN = [
-  { value: 'keiner', label: 'Benutzer' },
-  { value: 'admin', label: 'Admin' },
+  { value: 'keiner', label: SYSTEM_ROLLE_TEXT.keiner },
+  { value: 'admin', label: SYSTEM_ROLLE_TEXT.admin },
 ];
 /** Die Einträge des Aktionsmenüs einer Zeile. */
 type ZeilenAktion = 'bearbeiten' | 'anmeldungen' | 'zweitfaktor' | 'aktiv';
@@ -47,8 +54,8 @@ type ZeilenAktion = 'bearbeiten' | 'anmeldungen' | 'zweitfaktor' | 'aktiv';
 const AKTIONEN_BREITE = 80;
 
 const ORG_ROLLEN = [
-  { value: 'keine', label: 'Keine' },
-  { value: 'fuehrungskraft', label: 'Führungskraft (darf Einsätze anlegen)' },
+  { value: 'keine', label: ORG_ROLLE_TEXT.keine },
+  { value: 'fuehrungskraft', label: `${ORG_ROLLE_TEXT.fuehrungskraft} (darf Einsätze anlegen)` },
 ];
 
 export default function BenutzerPage() {
@@ -412,10 +419,10 @@ export default function BenutzerPage() {
               label: 'Weitere Angaben',
               children: (
                 <>
-                  <Form.Item label="System-Rolle" name="system_rolle">
+                  <Form.Item label={SYSTEM_ROLLE_FELD} name="system_rolle">
                     <Select options={SYSTEM_ROLLEN} />
                   </Form.Item>
-                  <Form.Item label="Org-Rolle" name="org_rolle">
+                  <Form.Item label={ORG_ROLLE_FELD} name="org_rolle">
                     <Select options={ORG_ROLLEN} />
                   </Form.Item>
                 </>
@@ -458,10 +465,10 @@ export default function BenutzerPage() {
         >
           <Input />
         </Form.Item>
-        <Form.Item label="System-Rolle" name="system_rolle">
+        <Form.Item label={SYSTEM_ROLLE_FELD} name="system_rolle">
           <Select options={SYSTEM_ROLLEN} />
         </Form.Item>
-        <Form.Item label="Org-Rolle" name="org_rolle">
+        <Form.Item label={ORG_ROLLE_FELD} name="org_rolle">
           <Select options={ORG_ROLLEN} />
         </Form.Item>
         {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}

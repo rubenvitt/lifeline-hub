@@ -461,6 +461,16 @@ fn serde_wire_gleich_as_str() {
         Oidc,
         Webauthn,
     });
+    enum_wire_as_str!(lifeline_hub::auth::provider::Anmeldeweg {
+        Passwort,
+        Dev,
+        Oidc,
+        Webauthn,
+        Totp,
+        Geraetecode,
+        Systembrowser,
+        Unbekannt,
+    });
 
     // Zugangsprotokoll (LFH-1097): Wire = DB-CHECK in 0091/0143 bzw. 0156.
     enum_wire_as_str!(lifeline_hub::auth::audit::Ereignis {
