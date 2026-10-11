@@ -89,7 +89,7 @@
 - [ ] 7.3 Sichtprüfung im Browser (Playwright, Tag und Nacht): Picker mit und ohne Grundzeichen, freie Zeichen auf der Karte, Inspector-Kachel, Altzeichen mit Platzhalter. Screenshots im Change-Ordner.
 - [ ] 7.4 `pruefliste.md` Einsatztauglichkeit für Picker, freie Zeichen auf der Karte und Inspector, nach dem Muster aus LFH-835. Liegt im Change-Ordner, alle Kriterien belegt.
 - [ ] 7.5 Anwenderdoku `docs/anwender/kapitel/lagekarte.md`, Abschnitt „Ein taktisches Zeichen setzen“: Text angepasst (Kein Grundzeichen, Palettenfarbe, keine Funktion), `quellen:` geprüft, Bild neu erzeugt mit `pnpm doku:bilder e2e/doku-bilder/lagekarte.bilder.ts`. Der Doku-Wächter ist grün.
-- [ ] 7.6 Folgetask auf dem Entwicklungsboard: Übergang beenden (alter Body → 400, Altspalten entfernen). Dazu ein Task für die Fachobjekt-Nachzüge (UHS ohne feste Hilfsorganisation, Fachaufgabe an der Führungskraft). Beide angelegt und in der Abschlussmeldung genannt.
+- [x] 7.6 Folgetask auf dem Entwicklungsboard: Übergang beenden (alter Body → 400, Altspalten entfernen). Dazu ein Task für die Fachobjekt-Nachzüge (UHS ohne feste Hilfsorganisation, Fachaufgabe an der Führungskraft). Beide angelegt und in der Abschlussmeldung genannt.
 
 ## 8. Abschluss
 
