@@ -9,7 +9,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  * (`pnpm doku:bilder --grep einsatzabschnitte`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   gliederung.png         frontend/src/pages/EinsatzabschnittePage.tsx,
  *                          frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx,
- *                          frontend/src/pages/einsatzabschnitte/GliederungZug.tsx (Griffe)
+ *                          frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx (Griffe)
  *   verschieben-unter.png  frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx
  *   abschnitt-anlegen.png  frontend/src/pages/EinsatzabschnittePage.tsx (Formular)
  *   organigramm.png        frontend/src/pages/einsatzabschnitte/Organigramm.tsx

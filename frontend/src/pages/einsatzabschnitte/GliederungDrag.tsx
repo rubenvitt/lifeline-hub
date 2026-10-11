@@ -9,7 +9,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import { useRollen } from '../../components/instrument';
 import { IconMenue } from '../../icons';
-import { OBERSTE_EBENE, abschnittZielGueltig, einheitZielGueltig } from './gliederungZugKern';
+import { OBERSTE_EBENE, canDropAbschnitt, canDropEinheit } from './gliederungDragKern';
 
 /**
  * Umhängen in der Gliederung per Zeiger (LFH-1212): ein Abschnitt auf einen anderen Abschnitt
@@ -23,11 +23,11 @@ import { OBERSTE_EBENE, abschnittZielGueltig, einheitZielGueltig } from './glied
  * an der Einheit (WCAG 2.5.7).
  */
 
-export type ZugDaten =
+export type DragDaten =
   | { art: 'abschnitt'; id: number; name: string }
   | { art: 'einheit'; id: number; name: string; abschnittId: number | null };
 
-export interface ZielDaten {
+export interface DropDaten {
   /** `null` = oberste Ebene. */
   zielId: number | null;
   /** Für die Ansage an Hilfstechnik. */
@@ -38,9 +38,9 @@ export interface ZielDaten {
  * Deutsche Ansagen statt dnd-kits englischer Vorgabe. Die Griffe sind keine Tastaturziele; die
  * Ansage begleitet nur einen Zeigerzug, etwa mit eingeschaltetem Vorleser.
  */
-const zugName = (daten: unknown) => (daten as ZugDaten | undefined)?.name ?? 'Eintrag';
-const zielName = (daten: unknown) => (daten as ZielDaten | undefined)?.name;
-export const ZUG_ANSAGEN: Announcements = {
+const zugName = (daten: unknown) => (daten as DragDaten | undefined)?.name ?? 'Eintrag';
+const zielName = (daten: unknown) => (daten as DropDaten | undefined)?.name;
+export const DRAG_ANSAGEN: Announcements = {
   onDragStart: ({ active }) => `${zugName(active.data.current)} gefasst.`,
   onDragOver: ({ active, over }) => {
     const ziel = zielName(over?.data.current);
@@ -56,33 +56,33 @@ export const ZUG_ANSAGEN: Announcements = {
   },
   onDragCancel: ({ active }) => `Ziehen von ${zugName(active.data.current)} abgebrochen.`,
 };
-export const ZUG_ANLEITUNG: ScreenReaderInstructions = {
+export const DRAG_ANLEITUNG: ScreenReaderInstructions = {
   draggable: 'Ohne Ziehen: „Verschieben unter …“ im Menü „Weitere Aktionen“.',
 };
 
-const zugSchluessel = (d: ZugDaten) => `zug-${d.art}-${d.id}`;
-const zielSchluessel = (id: number | null) => (id === null ? 'ziel-wurzel' : `ziel-${id}`);
+const dragKey = (d: DragDaten) => `zug-${d.art}-${d.id}`;
+const dropKey = (id: number | null) => (id === null ? 'ziel-wurzel' : `ziel-${id}`);
 
 /** Der laufende Zug, wenn einer läuft. */
-export function useLaufenderZug(): ZugDaten | null {
+export function useActiveDrag(): DragDaten | null {
   const { active } = useDndContext();
-  return (active?.data.current as ZugDaten | undefined) ?? null;
+  return (active?.data.current as DragDaten | undefined) ?? null;
 }
 
-/** Nimmt das Ziel den laufenden Zug an? Dieselbe Regel wie das Menü (`gliederungZugKern.ts`). */
-function nimmtAn(
-  zug: ZugDaten | null,
+/** Nimmt das Ziel den laufenden Zug an? Dieselbe Regel wie das Menü (`gliederungDragKern.ts`). */
+function canDrop(
+  zug: DragDaten | null,
   abschnitte: readonly Einsatzabschnitt[],
   zielId: number | null,
 ): boolean {
   if (!zug) return false;
   return zug.art === 'abschnitt'
-    ? abschnittZielGueltig(abschnitte, zug.id, zielId)
-    : einheitZielGueltig({ abschnitt_id: zug.abschnittId }, zielId);
+    ? canDropAbschnitt(abschnitte, zug.id, zielId)
+    : canDropEinheit({ abschnitt_id: zug.abschnittId }, zielId);
 }
 
 /** Rahmen eines Ziels während des Zugs: gestrichelt frei, gefüllt unter dem Zeiger, sonst keiner. */
-function useZielStil(frei: boolean, darueber: boolean, laeuft: boolean): CSSProperties {
+function useDropStil(frei: boolean, darueber: boolean, laeuft: boolean): CSSProperties {
   const { rollen } = useRollen();
   if (!laeuft) return {};
   if (!frei) return { cursor: 'not-allowed' };
@@ -94,10 +94,10 @@ function useZielStil(frei: boolean, darueber: boolean, laeuft: boolean): CSSProp
 }
 
 /** Der Griff eines Abschnitts oder einer Einheit. */
-export function ZugGriff({ daten }: { daten: ZugDaten }) {
+export function DragHandle({ daten }: { daten: DragDaten }) {
   const { token, rollen } = useRollen();
   const { setNodeRef, setActivatorNodeRef, listeners, isDragging } = useDraggable({
-    id: zugSchluessel(daten),
+    id: dragKey(daten),
     data: daten,
   });
   return (
@@ -109,7 +109,7 @@ export function ZugGriff({ daten }: { daten: ZugDaten }) {
       {...listeners}
       aria-hidden="true"
       data-lfh="zug-griff"
-      data-zug={zugSchluessel(daten)}
+      data-zug={dragKey(daten)}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -129,7 +129,7 @@ export function ZugGriff({ daten }: { daten: ZugDaten }) {
 }
 
 /** Ein Abschnitt der Gliederung als Ziel; sein Inhalt ist der Knoten selbst. */
-export function ZielKnoten({
+export function DropKnoten({
   abschnitt,
   abschnitte,
   children,
@@ -138,14 +138,14 @@ export function ZielKnoten({
   abschnitte: readonly Einsatzabschnitt[];
   children: ReactNode;
 }) {
-  const zug = useLaufenderZug();
-  const frei = nimmtAn(zug, abschnitte, abschnitt.id);
+  const zug = useActiveDrag();
+  const frei = canDrop(zug, abschnitte, abschnitt.id);
   const { setNodeRef, isOver } = useDroppable({
-    id: zielSchluessel(abschnitt.id),
-    data: { zielId: abschnitt.id, name: abschnitt.name } satisfies ZielDaten,
+    id: dropKey(abschnitt.id),
+    data: { zielId: abschnitt.id, name: abschnitt.name } satisfies DropDaten,
     disabled: !frei,
   });
-  const stil = useZielStil(frei, isOver, zug !== null);
+  const stil = useDropStil(frei, isOver, zug !== null);
   const gezogen = zug?.art === 'abschnitt' && zug.id === abschnitt.id;
   return (
     <span
@@ -171,16 +171,16 @@ export function ZielKnoten({
  * eingeschoben verschöbe sie den Baum unter dem Zeiger. Steht der Abschnitt schon oben, ist sie
  * gesperrt, aber da — ihr Fehlen verwirrte.
  */
-export function WurzelZone({ abschnitte }: { abschnitte: readonly Einsatzabschnitt[] }) {
+export function ObersteEbeneDropZone({ abschnitte }: { abschnitte: readonly Einsatzabschnitt[] }) {
   const { token, rollen } = useRollen();
-  const zug = useLaufenderZug();
-  const frei = nimmtAn(zug, abschnitte, null);
+  const zug = useActiveDrag();
+  const frei = canDrop(zug, abschnitte, null);
   const { setNodeRef, isOver } = useDroppable({
-    id: zielSchluessel(null),
-    data: { zielId: null, name: OBERSTE_EBENE } satisfies ZielDaten,
+    id: dropKey(null),
+    data: { zielId: null, name: OBERSTE_EBENE } satisfies DropDaten,
     disabled: !frei,
   });
-  const stil = useZielStil(frei, isOver, zug !== null);
+  const stil = useDropStil(frei, isOver, zug !== null);
   if (zug?.art !== 'abschnitt') return null;
   return (
     <div
@@ -203,7 +203,7 @@ export function WurzelZone({ abschnitte }: { abschnitte: readonly Einsatzabschni
 }
 
 /** Was am Zeiger hängt: der Name, in der Form eines Chips. */
-export function ZugMarke({ zug }: { zug: ZugDaten }) {
+export function DragMarke({ zug }: { zug: DragDaten }) {
   const { token, rollen } = useRollen();
   return (
     <span

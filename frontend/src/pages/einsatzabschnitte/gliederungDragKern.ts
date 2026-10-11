@@ -15,7 +15,7 @@ export const OBERSTE_EBENE = 'Oberste Ebene';
  * Darf der Abschnitt `gezogenId` unter `zielId` (`null` = oberste Ebene)? Gesperrt sind er selbst,
  * seine Nachfahren (Zyklus) und sein jetziger Ort (der Zug änderte nichts).
  */
-export function abschnittZielGueltig(
+export function canDropAbschnitt(
   abschnitte: readonly Einsatzabschnitt[],
   gezogenId: number,
   zielId: number | null,
@@ -31,7 +31,7 @@ export function abschnittZielGueltig(
  * Darf eine Einheit in den Abschnitt `zielId`? Nur in einen anderen Abschnitt: „nicht zugeordnet“
  * ist kein Ort im Baum, das setzt die Einheit selbst (Feld „Abschnitt“).
  */
-export function einheitZielGueltig(
+export function canDropEinheit(
   einheit: Pick<Einheit, 'abschnitt_id'>,
   zielId: number | null,
 ): boolean {
@@ -63,7 +63,7 @@ export function verschiebeZiele(
   const ziele: VerschiebeZiel[] = [
     { id: null, name: OBERSTE_EBENE, tiefe: 0, jetzt: jetzt === null },
   ];
-  const durchlaufe = (knoten: readonly GliederungKnoten[], tiefe: number) => {
+  const walk = (knoten: readonly GliederungKnoten[], tiefe: number) => {
     for (const k of knoten) {
       if (verboten.has(k.abschnitt.id)) continue;
       ziele.push({
@@ -72,10 +72,10 @@ export function verschiebeZiele(
         tiefe,
         jetzt: k.abschnitt.id === jetzt,
       });
-      durchlaufe(k.kinder, tiefe + 1);
+      walk(k.kinder, tiefe + 1);
     }
   };
-  durchlaufe(gliederungKnoten(abschnitte), 0);
+  walk(buildGliederungKnoten(abschnitte), 0);
   return ziele;
 }
 
@@ -88,7 +88,7 @@ export interface GliederungKnoten extends BaumKnoten<GliederungKnoten> {
  * Der Baum der Gliederung über `ueber_abschnitt_id`, in Lieferfolge. Ein Abschnitt, dessen
  * Über-Abschnitt nicht in der Liste steht, hängt an der Wurzel: verloren ginge er sonst still.
  */
-export function gliederungKnoten(abschnitte: readonly Einsatzabschnitt[]): GliederungKnoten[] {
+export function buildGliederungKnoten(abschnitte: readonly Einsatzabschnitt[]): GliederungKnoten[] {
   const ids = new Set(abschnitte.map((a) => a.id));
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
   for (const a of abschnitte) {
@@ -97,9 +97,13 @@ export function gliederungKnoten(abschnitte: readonly Einsatzabschnitt[]): Glied
     if (!kinder.has(ueber)) kinder.set(ueber, []);
     kinder.get(ueber)!.push(a);
   }
-  const baue = (ueber: number | null): GliederungKnoten[] =>
-    (kinder.get(ueber) ?? []).map((a) => ({ key: String(a.id), abschnitt: a, kinder: baue(a.id) }));
-  return baue(null);
+  const build = (ueber: number | null): GliederungKnoten[] =>
+    (kinder.get(ueber) ?? []).map((a) => ({
+      key: String(a.id),
+      abschnitt: a,
+      kinder: build(a.id),
+    }));
+  return build(null);
 }
 
 /** Wortlaut des Rückgängig-Toasts nach einem Umhängen. */
@@ -120,19 +124,19 @@ export function einheitVerschiebeText(name: string, ziel: string): string {
  * gehaltenen Kinder rücken an ihren Platz, statt mit ihnen zu verschwinden — ein aufgelöster
  * Abschnitt hebt seine Unterabschnitte eine Ebene hoch.
  */
-export function ohneEntfallenes<K extends BaumKnoten<K>>(
+export function removeEntfallenes<K extends BaumKnoten<K>>(
   knoten: readonly K[],
   entfallen: ReadonlySet<string>,
 ): K[] {
   return knoten.flatMap((k) => {
-    const kinder = ohneEntfallenes(k.kinder, entfallen);
+    const kinder = removeEntfallenes(k.kinder, entfallen);
     return entfallen.has(k.key) ? kinder : [{ ...k, kinder }];
   });
 }
 
 /** Schlüssel aller Knoten mit Kindern, für das Aufklappen in der Gliederung. */
-export function elternSchluessel(knoten: readonly GliederungKnoten[]): number[] {
+export function elternKeys(knoten: readonly GliederungKnoten[]): number[] {
   return knoten.flatMap((k) =>
-    k.kinder.length > 0 ? [k.abschnitt.id, ...elternSchluessel(k.kinder)] : [],
+    k.kinder.length > 0 ? [k.abschnitt.id, ...elternKeys(k.kinder)] : [],
   );
 }

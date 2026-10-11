@@ -49,7 +49,7 @@ interface Bedingung {
   zug: boolean;
 }
 
-const haelt = (b: Bedingung) => b.zeiger || b.fokus || b.zug;
+const isHolding = (b: Bedingung) => b.zeiger || b.fokus || b.zug;
 
 export function useGehaltenerBaum<K extends BaumKnoten<K>>(
   wurzeln: readonly K[],
@@ -66,12 +66,12 @@ export function useGehaltenerBaum<K extends BaumKnoten<K>>(
   const bedingungRef = useRef<Bedingung>({ zeiger: false, fokus: false, zug: false });
   const bereichRef = useRef<HTMLElement | null>(null);
 
-  const setze = useCallback((art: 'zeiger' | 'fokus' | 'zug', wert: boolean) => {
+  const set = useCallback((art: 'zeiger' | 'fokus' | 'zug', wert: boolean) => {
     bedingungRef.current = { ...bedingungRef.current, [art]: wert };
     // Ein leerer Baum schließt nicht: ohne Knoten rückt nichts, und der erste Zugang soll nicht
     // hinter dem Banner landen (wie im Gerüst).
     setGehalten((vorher) =>
-      haelt(bedingungRef.current)
+      isHolding(bedingungRef.current)
         ? (vorher ?? (frischRef.current.length > 0 ? frischRef.current : null))
         : null,
     );
@@ -79,7 +79,7 @@ export function useGehaltenerBaum<K extends BaumKnoten<K>>(
 
   const uebernehmen = useCallback((stand?: readonly K[]) => {
     const neu = stand ?? frischRef.current;
-    setGehalten(haelt(bedingungRef.current) && neu.length > 0 ? neu : null);
+    setGehalten(isHolding(bedingungRef.current) && neu.length > 0 ? neu : null);
   }, []);
 
   const bereich = useMemo(
@@ -88,28 +88,28 @@ export function useGehaltenerBaum<K extends BaumKnoten<K>>(
         bereichRef.current = el;
       },
       onPointerEnter: (e: PointerEvent) => {
-        if (e.pointerType !== 'touch') setze('zeiger', true);
+        if (e.pointerType !== 'touch') set('zeiger', true);
       },
       // Erscheint der Baum unter einem ruhenden Zeiger, meldet der Browser kein `pointerenter`;
       // die erste Bewegung holt es nach (LFH-668).
       onPointerMove: (e: PointerEvent) => {
-        if (e.pointerType !== 'touch' && !bedingungRef.current.zeiger) setze('zeiger', true);
+        if (e.pointerType !== 'touch' && !bedingungRef.current.zeiger) set('zeiger', true);
       },
       onPointerLeave: (e: PointerEvent) => {
-        if (e.pointerType !== 'touch') setze('zeiger', false);
+        if (e.pointerType !== 'touch') set('zeiger', false);
       },
-      onFocus: () => setze('fokus', true),
+      onFocus: () => set('fokus', true),
       // `blur` feuert auch beim Wechsel zwischen zwei Zielen des Bereichs; nur ein Ziel außerhalb
       // taut.
       onBlur: (e: FocusEvent) => {
         const ziel = e.relatedTarget;
         if (ziel instanceof Node && bereichRef.current?.contains(ziel)) return;
-        setze('fokus', false);
+        set('fokus', false);
       },
     }),
-    [setze],
+    [set],
   );
-  const halteZug = useCallback((laeuft: boolean) => setze('zug', laeuft), [setze]);
+  const halteZug = useCallback((laeuft: boolean) => set('zug', laeuft), [set]);
 
   const offen = druckt || gehalten === null;
   const stand = useMemo(

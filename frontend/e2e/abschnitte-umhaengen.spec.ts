@@ -9,7 +9,7 @@ import { FUEKW, anmelden, einsatzAnlegen, post } from './fuehrungsorganisation-k
  * die neue Struktur.
  *
  * Mutationsproben in `pages/EinsatzabschnittePage.tsx`: statt `zufluss.stand.gezeigt` den frischen
- * Baum zeigen → der Banner fehlt am zweiten Arbeitsplatz; `fokusZumAbschnitt` leeren → der Fokus
+ * Baum zeigen → der Banner fehlt am zweiten Arbeitsplatz; `focusAbschnitt` leeren → der Fokus
  * steht nach dem Dialog nicht am Auslöser.
  */
 

@@ -79,23 +79,23 @@ import { useGehaltenerBaum } from '../components/organigramm/useGehaltenerBaum';
 import { wartendText } from '../components/organigramm/baumSchleuse';
 import {
   einheitVerschiebeText,
-  elternSchluessel,
-  gliederungKnoten,
-  ohneEntfallenes,
+  elternKeys,
+  buildGliederungKnoten,
+  removeEntfallenes,
   verschiebeText,
   type GliederungKnoten,
-} from './einsatzabschnitte/gliederungZugKern';
+} from './einsatzabschnitte/gliederungDragKern';
 import {
-  WurzelZone,
-  ZUG_ANLEITUNG,
-  ZUG_ANSAGEN,
-  ZielKnoten,
-  ZugGriff,
-  ZugMarke,
-  useLaufenderZug,
-  type ZielDaten,
-  type ZugDaten,
-} from './einsatzabschnitte/GliederungZug';
+  ObersteEbeneDropZone,
+  DRAG_ANLEITUNG,
+  DRAG_ANSAGEN,
+  DropKnoten,
+  DragHandle,
+  DragMarke,
+  useActiveDrag,
+  type DropDaten,
+  type DragDaten,
+} from './einsatzabschnitte/GliederungDrag';
 import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
 
 /** Auswahl des Lagezustands in Stufenfolge — Wortlaut aus dem Farbvertrag, nicht doppelt. */
@@ -120,7 +120,7 @@ const nocase = (s: string) => s.trim().replace(/[A-Z]/g, (c) => c.toLowerCase())
  * Der gezeigte Stand der Gliederung als antd-Baum. Die Struktur kommt aus der Schleuse
  * (`gezeigt`), Stärke und Einheitenzahl aus den frischen Listen: der Inhalt fließt.
  */
-function baueBaum(
+function buildBaum(
   gezeigt: readonly GliederungKnoten[],
   abschnitte: Einsatzabschnitt[],
   einheiten: Einheit[],
@@ -137,14 +137,14 @@ function baueBaum(
     return {
       key: a.id,
       title: ziehbar ? (
-        <ZielKnoten abschnitt={a} abschnitte={abschnitte}>
-          <ZugGriff daten={{ art: 'abschnitt', id: a.id, name: a.name }} />
+        <DropKnoten abschnitt={a} abschnitte={abschnitte}>
+          <DragHandle daten={{ art: 'abschnitt', id: a.id, name: a.name }} />
           {inhalt}
-        </ZielKnoten>
+        </DropKnoten>
       ) : (
         inhalt
       ),
-      children: baueBaum(kinder, abschnitte, einheiten, ziehbar),
+      children: buildBaum(kinder, abschnitte, einheiten, ziehbar),
     };
   });
 }
@@ -155,7 +155,7 @@ function baueBaum(
  * Dialog oder — für das Rückgängig aus dem Toast — im Seitenhinweis.
  */
 interface Verschiebung {
-  art: ZugDaten['art'];
+  art: DragDaten['art'];
   id: number;
   name: string;
   von: number | null;
@@ -164,9 +164,9 @@ interface Verschiebung {
 }
 
 /** Was am Zeiger hängt, solange gezogen wird. */
-function LaufendeZugMarke() {
-  const zug = useLaufenderZug();
-  return zug ? <ZugMarke zug={zug} /> : null;
+function ActiveDragMarke() {
+  const zug = useActiveDrag();
+  return zug ? <DragMarke zug={zug} /> : null;
 }
 
 interface AbschnittWerte {
@@ -196,7 +196,7 @@ export default function EinsatzabschnittePage() {
   const [verschiebenFuer, setVerschiebenFuer] = useState<number | null>(null);
   const [aufloesenFrage, setAufloesenFrage] = useState(false);
   /** Gründe abgelehnter Umhänge, je Ort (LFH-1077): Baum, Dialog, Seitenhinweis. */
-  const [zugFehler, setZugFehler] = useState<unknown>(null);
+  const [dragFehler, setDragFehler] = useState<unknown>(null);
   const [dialogFehler, setDialogFehler] = useState<unknown>(null);
   const [rueckFehler, setRueckFehler] = useState<unknown>(null);
   /** Zugeklappte Abschnitte; alles andere steht offen, auch ein Abschnitt, der eben Kinder bekam. */
@@ -289,12 +289,12 @@ export default function EinsatzabschnittePage() {
    * Live-Zufluss der Gliederung über die Schleuse (LFH-1212, `frontend/AGENTS.md`, „Zufluss der
    * `Datensicht`“): Zeiger, Fokus oder ein Zug in der Gliederung halten Menge, Ort und Folge der
    * Abschnitte; was ein anderer Arbeitsplatz umhängt, wartet im Sammelbanner. Entfallenes fällt
-   * sofort weg (`ohneEntfallenes`).
+   * sofort weg (`removeEntfallenes`).
    */
-  const frischerBaum = useMemo(() => gliederungKnoten(abschnitte), [abschnitte]);
+  const frischerBaum = useMemo(() => buildGliederungKnoten(abschnitte), [abschnitte]);
   const zufluss = useGehaltenerBaum(frischerBaum);
   const gezeigterBaum = useMemo(
-    () => ohneEntfallenes(zufluss.stand.gezeigt, zufluss.stand.entfallen),
+    () => removeEntfallenes(zufluss.stand.gezeigt, zufluss.stand.entfallen),
     [zufluss.stand],
   );
   const wartet = wartendText({ ...zufluss.stand.wartend, entfallen: 0 });
@@ -371,7 +371,7 @@ export default function EinsatzabschnittePage() {
       else await patcheEinheit(einsatzId, v.id, { abschnitt_id: v.nach });
     },
     onMutate: () => {
-      setZugFehler(null);
+      setDragFehler(null);
       setDialogFehler(null);
       setRueckFehler(null);
     },
@@ -381,7 +381,7 @@ export default function EinsatzabschnittePage() {
           qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(einsatzId)) ?? []
         ).map((a) => (a.id === v.id ? { ...a, ueber_abschnitt_id: v.nach } : a));
         qc.setQueryData(einsatzKeys.abschnitte(einsatzId), neu);
-        zufluss.uebernehmen(gliederungKnoten(neu));
+        zufluss.uebernehmen(buildGliederungKnoten(neu));
         // Der neue Über-Abschnitt steht offen, sonst verschwände der Abschnitt im Zuklappen.
         if (v.nach !== null) {
           const nach = v.nach;
@@ -410,21 +410,21 @@ export default function EinsatzabschnittePage() {
       );
     },
     onError: (fehler, v) => {
-      if (v.quelle === 'zug') setZugFehler(fehler);
+      if (v.quelle === 'zug') setDragFehler(fehler);
       else if (v.quelle === 'menue') setDialogFehler(fehler);
       else setRueckFehler(fehler);
     },
   });
 
-  function zugBeginnt() {
-    setZugFehler(null);
+  function handleDragStart() {
+    setDragFehler(null);
     zufluss.halteZug(true);
   }
 
-  function zugEndet(e: DragEndEvent) {
+  function handleDragEnd(e: DragEndEvent) {
     zufluss.halteZug(false);
-    const zug = e.active.data.current as ZugDaten | undefined;
-    const ziel = e.over?.data.current as ZielDaten | undefined;
+    const zug = e.active.data.current as DragDaten | undefined;
+    const ziel = e.over?.data.current as DropDaten | undefined;
     // Gesperrte Ziele sind `disabled` und melden sich nie als `over`.
     if (!zug || !ziel) return;
     const von =
@@ -446,17 +446,17 @@ export default function EinsatzabschnittePage() {
    * beim Schließen; `nachDemSchliessen` holt ihn im Browser nach der Animation ein zweites Mal
    * (Muster `betreuung/MeldeVerlauf.tsx`).
    */
-  const fokusZumAbschnitt = useCallback(
+  const focusAbschnitt = useCallback(
     () => weitereRef.current?.querySelector('button')?.focus(),
     [],
   );
   const warOffen = useRef(false);
   useEffect(() => {
-    if (warOffen.current && verschiebenFuer === null) fokusZumAbschnitt();
+    if (warOffen.current && verschiebenFuer === null) focusAbschnitt();
     warOffen.current = verschiebenFuer !== null;
-  }, [verschiebenFuer, fokusZumAbschnitt]);
+  }, [verschiebenFuer, focusAbschnitt]);
 
-  function verschiebenOeffnen(aid: number) {
+  function openVerschieben(aid: number) {
     setDialogFehler(null);
     setVerschiebenFuer(aid);
   }
@@ -517,7 +517,12 @@ export default function EinsatzabschnittePage() {
   }
 
   const baumDaten = useMemo(() => {
-    const knoten = baueBaum(gezeigterBaum, abschnitte, einheitenQuery.data ?? [], darfSchreibenRoh);
+    const knoten = buildBaum(
+      gezeigterBaum,
+      abschnitte,
+      einheitenQuery.data ?? [],
+      darfSchreibenRoh,
+    );
     return entwurf
       ? [
           ...knoten,
@@ -526,7 +531,7 @@ export default function EinsatzabschnittePage() {
       : knoten;
   }, [gezeigterBaum, abschnitte, einheitenQuery.data, entwurf, darfSchreibenRoh]);
   const aufgeklappt = useMemo(
-    () => elternSchluessel(gezeigterBaum).filter((k) => !zugeklappt.has(k)),
+    () => elternKeys(gezeigterBaum).filter((k) => !zugeklappt.has(k)),
     [gezeigterBaum, zugeklappt],
   );
   const verschiebenAbschnitt =
@@ -592,7 +597,7 @@ export default function EinsatzabschnittePage() {
           <ListenEintrag>
             <Space>
               {darfSchreiben && (
-                <ZugGriff
+                <DragHandle
                   daten={{
                     art: 'einheit',
                     id: e.id,
@@ -712,9 +717,9 @@ export default function EinsatzabschnittePage() {
         <DndContext
           sensors={sensoren}
           collisionDetection={pointerWithin}
-          accessibility={{ announcements: ZUG_ANSAGEN, screenReaderInstructions: ZUG_ANLEITUNG }}
-          onDragStart={zugBeginnt}
-          onDragEnd={zugEndet}
+          accessibility={{ announcements: DRAG_ANSAGEN, screenReaderInstructions: DRAG_ANLEITUNG }}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
           onDragCancel={() => zufluss.halteZug(false)}
         >
           <div
@@ -802,10 +807,10 @@ export default function EinsatzabschnittePage() {
                           </span>
                         )}
                       </div>
-                      {zugFehler != null && (
+                      {dragFehler != null && (
                         <div style={{ marginBottom: token.marginSM }}>
                           <SpeicherFehler
-                            fehler={zugFehler}
+                            fehler={dragFehler}
                             titel="Nicht verschoben"
                             fallback="Verschieben fehlgeschlagen"
                           />
@@ -829,7 +834,7 @@ export default function EinsatzabschnittePage() {
                           setGewaehlt(keys.length ? Number(keys[0]) : null);
                         }}
                       />
-                      {darfSchreiben && <WurzelZone abschnitte={abschnitte} />}
+                      {darfSchreiben && <ObersteEbeneDropZone abschnitte={abschnitte} />}
                     </div>
                   </>
                 )}
@@ -1024,7 +1029,7 @@ export default function EinsatzabschnittePage() {
                             zugaenglicherName={`Weitere Aktionen zu Abschnitt ${aktuell.name}`}
                             onWahl={(key) => {
                               raeumeDetail();
-                              if (key === 'verschieben') verschiebenOeffnen(aktuell.id);
+                              if (key === 'verschieben') openVerschieben(aktuell.id);
                               else setAufloesenFrage(true);
                             }}
                           />
@@ -1039,7 +1044,7 @@ export default function EinsatzabschnittePage() {
             </Paneel>
           </div>
           <DragOverlay dropAnimation={null}>
-            <LaufendeZugMarke />
+            <ActiveDragMarke />
           </DragOverlay>
         </DndContext>
       )}
@@ -1060,7 +1065,7 @@ export default function EinsatzabschnittePage() {
           });
         }}
         onAbbrechen={() => setVerschiebenFuer(null)}
-        nachDemSchliessen={fokusZumAbschnitt}
+        nachDemSchliessen={focusAbschnitt}
       />
       {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). */}
       <Modal

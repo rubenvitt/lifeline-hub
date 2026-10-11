@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Einsatzabschnitt } from '../../api/types';
 import {
-  abschnittZielGueltig,
+  canDropAbschnitt,
   einheitVerschiebeText,
-  einheitZielGueltig,
-  elternSchluessel,
-  gliederungKnoten,
-  ohneEntfallenes,
+  canDropEinheit,
+  elternKeys,
+  buildGliederungKnoten,
+  removeEntfallenes,
   verschiebeText,
   verschiebeZiele,
-} from './gliederungZugKern';
+} from './gliederungDragKern';
 
 function abschnitt(id: number, name: string, ueber: number | null): Einsatzabschnitt {
   return { id, name, ueber_abschnitt_id: ueber } as unknown as Einsatzabschnitt;
@@ -25,35 +25,35 @@ const nordWest = abschnitt(4, 'Nord-West', 1);
 const sued = abschnitt(5, 'Süd', null);
 const alle = [nord, nordOst, nordOst1, nordWest, sued];
 
-describe('abschnittZielGueltig (LFH-1212)', () => {
+describe('canDropAbschnitt (LFH-1212)', () => {
   it('erlaubt einen fremden Zweig und die oberste Ebene', () => {
-    expect(abschnittZielGueltig(alle, nordOst.id, sued.id)).toBe(true);
-    expect(abschnittZielGueltig(alle, nordOst.id, null)).toBe(true);
-    expect(abschnittZielGueltig(alle, nordOst1.id, nordWest.id)).toBe(true);
+    expect(canDropAbschnitt(alle, nordOst.id, sued.id)).toBe(true);
+    expect(canDropAbschnitt(alle, nordOst.id, null)).toBe(true);
+    expect(canDropAbschnitt(alle, nordOst1.id, nordWest.id)).toBe(true);
   });
 
   it('sperrt sich selbst und jeden Nachfahren: ein Zyklus ist unmöglich', () => {
-    expect(abschnittZielGueltig(alle, nord.id, nord.id)).toBe(false);
-    expect(abschnittZielGueltig(alle, nord.id, nordOst.id)).toBe(false);
-    expect(abschnittZielGueltig(alle, nord.id, nordOst1.id)).toBe(false);
+    expect(canDropAbschnitt(alle, nord.id, nord.id)).toBe(false);
+    expect(canDropAbschnitt(alle, nord.id, nordOst.id)).toBe(false);
+    expect(canDropAbschnitt(alle, nord.id, nordOst1.id)).toBe(false);
   });
 
   it('sperrt den jetzigen Über-Abschnitt: der Zug änderte nichts', () => {
-    expect(abschnittZielGueltig(alle, nordOst.id, nord.id)).toBe(false);
-    expect(abschnittZielGueltig(alle, sued.id, null)).toBe(false);
+    expect(canDropAbschnitt(alle, nordOst.id, nord.id)).toBe(false);
+    expect(canDropAbschnitt(alle, sued.id, null)).toBe(false);
   });
 
   it('sperrt einen unbekannten Abschnitt', () => {
-    expect(abschnittZielGueltig(alle, 99, sued.id)).toBe(false);
+    expect(canDropAbschnitt(alle, 99, sued.id)).toBe(false);
   });
 });
 
-describe('einheitZielGueltig (LFH-1212)', () => {
+describe('canDropEinheit (LFH-1212)', () => {
   it('erlaubt jeden anderen Abschnitt, nicht den eigenen und nicht die oberste Ebene', () => {
-    expect(einheitZielGueltig({ abschnitt_id: nord.id }, sued.id)).toBe(true);
-    expect(einheitZielGueltig({ abschnitt_id: null }, sued.id)).toBe(true);
-    expect(einheitZielGueltig({ abschnitt_id: nord.id }, nord.id)).toBe(false);
-    expect(einheitZielGueltig({ abschnitt_id: nord.id }, null)).toBe(false);
+    expect(canDropEinheit({ abschnitt_id: nord.id }, sued.id)).toBe(true);
+    expect(canDropEinheit({ abschnitt_id: null }, sued.id)).toBe(true);
+    expect(canDropEinheit({ abschnitt_id: nord.id }, nord.id)).toBe(false);
+    expect(canDropEinheit({ abschnitt_id: nord.id }, null)).toBe(false);
   });
 });
 
@@ -82,9 +82,9 @@ describe('verschiebeZiele (LFH-1212)', () => {
   });
 });
 
-describe('gliederungKnoten (LFH-1212)', () => {
+describe('buildGliederungKnoten (LFH-1212)', () => {
   it('baut den Baum über `ueber_abschnitt_id` mit dem Abschnitt am Knoten', () => {
-    const baum = gliederungKnoten(alle);
+    const baum = buildGliederungKnoten(alle);
     expect(baum.map((k) => k.key)).toEqual(['1', '5']);
     expect(baum[0].kinder.map((k) => k.key)).toEqual(['2', '4']);
     expect(baum[0].kinder[0].kinder[0].abschnitt).toBe(nordOst1);
@@ -92,7 +92,7 @@ describe('gliederungKnoten (LFH-1212)', () => {
 
   it('hängt einen Abschnitt mit unbekanntem Über-Abschnitt an die Wurzel statt ihn zu verlieren', () => {
     const waise = abschnitt(7, 'Waise', 42);
-    expect(gliederungKnoten([nord, waise]).map((k) => k.key)).toEqual(['1', '7']);
+    expect(buildGliederungKnoten([nord, waise]).map((k) => k.key)).toEqual(['1', '7']);
   });
 });
 
@@ -104,22 +104,22 @@ describe('verschiebeText (LFH-1212)', () => {
   });
 });
 
-describe('ohneEntfallenes (LFH-1212)', () => {
+describe('removeEntfallenes (LFH-1212)', () => {
   it('nimmt Entfallenes heraus und hebt seine Kinder an seinen Platz', () => {
-    const baum = gliederungKnoten(alle);
-    const gezeigt = ohneEntfallenes(baum, new Set(['2']));
+    const baum = buildGliederungKnoten(alle);
+    const gezeigt = removeEntfallenes(baum, new Set(['2']));
     expect(gezeigt.map((k) => k.key)).toEqual(['1', '5']);
     expect(gezeigt[0].kinder.map((k) => k.key)).toEqual(['3', '4']);
   });
 
   it('lässt ohne Entfallenes alles stehen', () => {
-    const baum = gliederungKnoten(alle);
-    expect(ohneEntfallenes(baum, new Set())).toEqual(baum);
+    const baum = buildGliederungKnoten(alle);
+    expect(removeEntfallenes(baum, new Set())).toEqual(baum);
   });
 });
 
-describe('elternSchluessel (LFH-1212)', () => {
+describe('elternKeys (LFH-1212)', () => {
   it('nennt jeden Abschnitt mit Unterabschnitten', () => {
-    expect(elternSchluessel(gliederungKnoten(alle))).toEqual([1, 2]);
+    expect(elternKeys(buildGliederungKnoten(alle))).toEqual([1, 2]);
   });
 });
