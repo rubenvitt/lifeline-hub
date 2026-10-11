@@ -5800,13 +5800,12 @@
       },
       "FreiesZeichenAnzeige": {
         "type": "object",
-        "description": "Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).",
+        "description": "Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).\n\nGenau eine Form ist gesetzt (DB-CHECK, LFH-836): `zeichen_spec` (neu) ODER `grundzeichen` mit\nden Overlays (Altform aus der Zeit vor LFH-836 bzw. von einem veralteten Client). Der Client\nübersetzt die Altform beim Lesen (design.md D5).",
         "required": [
           "id",
           "einsatz_id",
           "lat",
           "lon",
-          "grundzeichen",
           "erstellt_von",
           "erstellt_at",
           "geaendert_at"
@@ -5859,7 +5858,11 @@
             "type": "string"
           },
           "grundzeichen": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Altform: fehlt bei einem Zeichen mit `zeichen_spec`."
           },
           "id": {
             "type": "integer",
@@ -5890,6 +5893,13 @@
               "string",
               "null"
             ]
+          },
+          "zeichen_spec": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet; fehlt bei einem Zeichen in Altform."
           }
         }
       },

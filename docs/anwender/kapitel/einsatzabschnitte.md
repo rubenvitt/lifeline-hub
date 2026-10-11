@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
 ---
 
 ## Überblick
@@ -45,10 +45,37 @@ Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie f
 
 1. In der Gliederung den Abschnitt wählen und „Bearbeiten“ wählen.
 2. Die Angaben ändern und „Speichern“ wählen.
-3. Zum Auflösen „Auflösen“ wählen und die Rückfrage „Abschnitt auflösen?“ mit „Abschnitt
-   auflösen“ bestätigen.
+3. Zum Auflösen neben „Bearbeiten“ das Menü „Weitere Aktionen“ öffnen, „Auflösen“ wählen und
+   die Rückfrage „Abschnitt „…“ auflösen?“ mit „Abschnitt auflösen“ bestätigen.
 
-Einheiten werden nicht hier zugeordnet, sondern an der Einheit selbst im Feld „Abschnitt“.
+### Einen Abschnitt umhängen
+
+1. In der Gliederung den Abschnitt am Griff vor seinem Namen fassen.
+2. Auf den künftigen Über-Abschnitt ziehen und loslassen. Gestrichelt umrandet sind die Ziele,
+   die den Abschnitt annehmen; seine eigenen Unterabschnitte und sein jetziger Über-Abschnitt
+   tragen keinen Rahmen. Unter dem Baum erscheint dabei „Oberste Ebene“: dort losgelassen, steht
+   der Abschnitt ohne Über-Abschnitt.
+3. Der Hinweis „„…“ unter „…“ verschoben“ (bzw. „„…“ auf die oberste Ebene verschoben“) bietet
+   einige Sekunden lang „Rückgängig“ an.
+
+Ohne Ziehen, etwa per Tastatur oder mit Handschuh:
+
+1. Den Abschnitt wählen, im Menü „Weitere Aktionen“ „Verschieben unter …“ wählen.
+2. Im Dialog das Ziel wählen; „Oberste Ebene“ steht zuerst, der jetzige Ort trägt den Zusatz
+   „(jetziger Ort)“ und ist nicht wählbar. Der Abschnitt selbst und seine Unterabschnitte stehen
+   nicht in der Liste.
+
+   ![Dialog „„Sanitätsdienst“ verschieben unter …“ mit den Zielen Oberste Ebene, Betreuung und Logistik](../bilder/einsatzabschnitte/verschieben-unter.png)
+
+### Eine Einheit einem anderen Abschnitt zuordnen
+
+1. Den Abschnitt wählen, unter dem die Einheit steht.
+2. Unter „Zugeordnete Einheiten“ die Einheit am Griff vor ihrem Namen fassen und auf einen
+   anderen Abschnitt der Gliederung ziehen.
+3. Der Hinweis „„…“ zu „…“ zugeordnet“ bietet einige Sekunden lang „Rückgängig“ an.
+
+Ohne Ziehen ordnet das Feld „Abschnitt“ an der Einheit selbst zu („Zu den Einheiten ↗“); dort
+lässt sich die Zuordnung auch aufheben.
 
 ### Das Organigramm ansehen, drucken oder übernehmen
 
@@ -74,9 +101,12 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
 - Anlegen: „Abschnitt «…» angelegt“, mit Lagezustand, wenn einer gesetzt ist.
 - Ein geänderter Lagezustand: „Lage Abschnitt «…»: alt → neu“.
+- Eine Einheit in einem anderen Abschnitt: „Einheit «…»: Abschnitt «…» zugeordnet“, auch beim
+  Ziehen in der Gliederung und beim „Rückgängig“.
 - Auflösen: „Abschnitt «…» aufgelöst“. Ein Gerät, das an den Abschnitt gekoppelt war, verliert
   dabei seinen Zugriff; auch das steht im Einsatztagebuch.
-- Andere Korrekturen und die Zuordnung von Sprechgruppen schreiben keinen Eintrag.
+- Andere Korrekturen, das Umhängen eines Abschnitts und die Zuordnung von Sprechgruppen schreiben
+  keinen Eintrag.
 
 ### Regeln der Gliederung
 
@@ -84,8 +114,22 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
   Groß- und Kleinschreibung; eine doppelte meldet „Schon vergeben (…)“.
 - Beim Auflösen rücken Unterabschnitte eine Ebene hoch, zugeordnete Einheiten stehen danach
   „nicht zugeordnet“.
+- Ein Abschnitt kann nie unter sich selbst oder einen seiner Unterabschnitte gehängt werden. Die
+  Gliederung bietet solche Ziele gar nicht erst an, und der Server lehnt sie ebenso ab.
+- Umgehängt wird nur die Stellung im Baum: Name, Leitung, Lage und Einheiten des Abschnitts
+  bleiben, wie sie sind. Die Stärke der Über-Abschnitte rechnet sich neu.
 - Die „Stärke“ eines Abschnitts ergibt sich aus seinen Einheiten; „Stärke inkl.
   Unterabschnitte“ nimmt die der Unterabschnitte hinzu.
+
+### Änderungen anderer Arbeitsplätze
+
+Was ein anderer Arbeitsplatz anlegt oder umhängt, erscheint in der Gliederung von selbst. Liegt
+der Mauszeiger über der Gliederung oder steht der Fokus darin, hält sie still: über dem Baum steht
+„Live pausiert“, und neue oder umgehängte Abschnitte warten in einem Hinweis wie „1 umgehängt“,
+bis „anzeigen“ sie übernimmt. Namen, Lage und Stärke der übrigen Abschnitte aktualisieren sich
+weiter sofort; ein fremd umgehängter Abschnitt zeigt bis „anzeigen“ seinen alten Stand an seinem
+alten Ort. Ein aufgelöster Abschnitt verschwindet gleich. Eigene Änderungen erscheinen immer
+sofort.
 
 ### Das Organigramm
 

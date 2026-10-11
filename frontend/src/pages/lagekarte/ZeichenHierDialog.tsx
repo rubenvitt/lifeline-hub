@@ -15,7 +15,8 @@ import { Button, Modal, Space, theme } from 'antd';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import type { Speicherung } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import FreiesZeichenPicker from './FreiesZeichenPicker';
+import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
+import { START_ZEICHEN_SPEC } from './zeichenWahl';
 
 interface Props {
   offen: boolean;
@@ -39,8 +40,8 @@ export default function ZeichenHierDialog({
 }: Props) {
   const { token } = theme.useToken();
   // Derselbe Startentwurf wie in der Leiste; „Zuletzt verwendet“ bringt der Picker selbst mit.
-  const [entwurf, setEntwurf] = useState<FreiesZeichenUpdate>({
-    grundzeichen: 'taktische-formation',
+  const [entwurf, setEntwurf] = useState<ZeichenEntwurf>({
+    zeichen_spec: START_ZEICHEN_SPEC,
   });
   const setzen = (spec: FreiesZeichenUpdate) => {
     if (laeuft) return;
@@ -79,7 +80,15 @@ export default function ZeichenHierDialog({
           <Button onClick={abbrechen} disabled={laeuft}>
             Abbrechen
           </Button>
-          <Button type="primary" loading={laeuft} onClick={() => setzen(entwurf)}>
+          {/* Ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl) gesperrt. */}
+          <Button
+            type="primary"
+            loading={laeuft}
+            disabled={!hatZeichen(entwurf)}
+            onClick={() => {
+              if (hatZeichen(entwurf)) setzen(entwurf);
+            }}
+          >
             Setzen
           </Button>
         </Space>

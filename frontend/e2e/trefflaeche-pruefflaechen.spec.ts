@@ -753,8 +753,15 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
           kurz: true,
         },
         {
+          // Seit LFH-1212 stehen „Verschieben unter …“ und „Auflösen“ hinter „Weitere Aktionen“.
           sorte: 'Abschnitt Detailaktionen',
-          ziele: knopf(/^(Bearbeiten|Auflösen)$/),
+          ziele: knopf(/^(Bearbeiten|Weitere Aktionen zu Abschnitt .+)$/),
+          mindestens: 2,
+        },
+        {
+          // Der Griff zum Umhängen ist ein Zeigerziel der Staffel (LFH-1212), kein Tastaturziel.
+          sorte: 'Gliederung Griffe',
+          ziele: (page) => inMain(page).locator('[data-lfh="drag-handle"]'),
           mindestens: 2,
         },
       ],

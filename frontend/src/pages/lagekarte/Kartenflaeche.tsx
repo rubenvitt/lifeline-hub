@@ -1,15 +1,14 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 // Namespace-Import: maplibre-gl ab 6 ist ESM ohne Default-Export. Kein named-Import der Klassen:
 // `Map` beschattete den globalen `Map`, den die Zeichen-Registry als
-// `useRef<Map<string, ZeichenQuelle>>` nutzt. `import * as ns, { type X }` ist kein gültiges ES,
+// `useRef<Map<string, Drawing>>` nutzt. `import * as ns, { type X }` ist kein gültiges ES,
 // daher zwei Zeilen.
 import * as maplibregl from 'maplibre-gl';
 import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl';
 // Worker-URL vor der ersten Map (Begründung in `maplibreWorker.ts`).
 import './maplibreWorker';
 import { addSymbolImage } from '@einsatzzeichen/maplibre';
-// Nur noch für freie Zeichen (`tz|`), bis LFH-836 sie auf @einsatzzeichen umstellt.
-import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
+import type { Drawing } from '@einsatzzeichen/schema';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import type { KarteMarker } from './marker';
@@ -36,12 +35,7 @@ import {
   SPIDER_CAP,
   type SpiderProjektor,
 } from './spiderfy';
-import {
-  baueZeichenRegistry,
-  kartenPixelRatio,
-  ZEICHEN_KARTEN_PX,
-  type ZeichenQuelle,
-} from './markerIcons';
+import { baueZeichenRegistry, kartenPixelRatio, ZEICHEN_KARTEN_PX } from './markerIcons';
 import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
 import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
@@ -426,7 +420,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const suchnadelRef = useRef({ daten: suchnadelFc(null), farbe: rollen.bedien });
   // Image-Key → Zeichenquelle; der Bild-Resolver (`kartenbildResolver.ts`) erzeugt daraus lazy die
   // Karten-Icons.
-  const zeichenRegistryRef = useRef<Map<string, ZeichenQuelle>>(new Map());
+  const zeichenRegistryRef = useRef<Map<string, Drawing>>(new Map());
   // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker): alle bekannten bzw. aktuell auf der
   // Karte. Nur für `marker-cluster` — Personen-Cluster sind WebGL-Layer, damit sie unter den
   // Kräften liegen.
@@ -664,9 +658,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
     // Alle Kartenbilder (Plaketten, Fachobjekte, freie Zeichen) über den Resolver, NICHT über
-    // `styleimagemissing` (LFH-841, Begründung in kartenbildResolver.ts). Fachobjekte synchron über
+    // `styleimagemissing` (LFH-841, Begründung in kartenbildResolver.ts). Zeichen synchron über
     // Canvas, in Bildschirmschärfe, alle gleich groß (der Statusring in markerLayer.ts ist auf
-    // ZEICHEN_KARTEN_PX abgestimmt).
+    // ZEICHEN_KARTEN_PX abgestimmt); freie Zeichen seit LFH-836 auf demselben Weg.
     map.setMissingStyleImageResolver(
       kartenbildResolver(map, {
         zeichen: () => zeichenRegistryRef.current,
@@ -675,19 +669,6 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
             size: ZEICHEN_KARTEN_PX,
             pixelRatio: kartenPixelRatio(window.devicePixelRatio),
           }),
-        ladeTz: (tz) => {
-          const { dataUrl, size } = erzeugeTaktischesZeichen(tz);
-          return new Promise((resolve, reject) => {
-            const bild = new Image(size[0], size[1]);
-            // Auf einheitliche Marker-Größe normieren (die TZ-SVGs haben je Grundzeichen
-            // abweichende Größe); erst so deckt der feste Status-Ring (markerLayer.ts, radius 20)
-            // das Symbol ab.
-            bild.onload = () =>
-              resolve({ bild, pixelRatio: Math.max(size[0], size[1]) / ZEICHEN_KARTEN_PX });
-            bild.onerror = reject;
-            bild.src = dataUrl;
-          });
-        },
       }),
     );
     // Wechselt die Pixeldichte (anderer Monitor, Browser-Zoom), rastern die schon angelegten

@@ -522,10 +522,11 @@ jobs:
     if: github.event_name == 'push'
     uses: ./.github/workflows/release.yml
     # `actions: write`: release.yml startet artefakte.yml per workflow_dispatch (LFH-1054).
+    # `id-token: write`: Claude meldet sich für die Release-Notizen per GitHub-OIDC an.
     permissions:
       contents: read
       actions: write
+      id-token: write
     secrets:
       RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
