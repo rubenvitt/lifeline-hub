@@ -1,3 +1,31 @@
+## [1.0.0-alpha.109](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.108...v1.0.0-alpha.109) (2026-10-11)
+
+### Wichtige Änderungen
+
+Diese Version bringt umfangreiche Verbesserungen der Dokumentation und führt ein Neuigkeiten-System ein, das Sie über Änderungen zwischen Versionen informiert.
+
+### Dokumentation
+
+Die Anwenderdokumentation wurde grundlegend überarbeitet:
+
+- **Dunkelmodus-Unterstützung**: Alle Screenshots liegen jetzt in heller und dunkler Ausführung vor und werden automatisch passend zum gewählten Modus angezeigt
+- **Volltextsuche**: Neue Suchfunktion (Tastenkürzel ⌘K/Strg+K oder „/") durchsucht Kapitel und Anleitungen
+- **Verbessertes Inhaltsverzeichnis**: Einklappbare Bereiche, Anzeige der Lesestelle und geschätzten Lesezeit
+- **Optimierte Navigation**: Kapitelübersicht im Raster, dauerhafte Sprungleiste, auf Mobilgeräten klappbare Kapitelliste
+
+Die Website zeigt jetzt echte 404-Fehlerseiten für unbekannte Adressen statt der Startseite, was verhindert, dass Browser nach Updates zwischengespeicherte Inhalte falsch darstellen.
+
+### Neuigkeiten und Versionsinformationen
+
+- **Versionshinweise direkt in der Anwendung**: Nach einem Update erscheint ein Hinweis auf der Einsatzliste mit den Änderungen der neuen Version
+- **Neuigkeiten-Seite**: Zeigt alle Änderungen seit der zuletzt verwendeten Version sowie ein durchsuchbares Archiv nach Kanälen (Neue Funktionen, Verbesserungen, Fehlerbehebungen)
+- **Offline-Verfügbarkeit**: Alle Versionshinweise sind ohne Internetverbindung lesbar
+- **Intelligente Lesestandverwaltung**: Der Lesestand wird nur aktualisiert, wenn die Versionshinweise tatsächlich angezeigt werden können
+
+### Technische Grundlagen
+
+Neue Konventionen für die Codebase festgelegt: Fachbegriffe der Domäne (Einsatztagebuch, Lagekarte, Betroffene etc.) bleiben deutsch, technisches Vokabular wird künftig englisch geschrieben. Die Umstellung erfolgt schrittweise beim Bearbeiten bestehenden Codes.
+
 ## [1.0.0-alpha.108](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.107...v1.0.0-alpha.108) (2026-10-11)
 
 ### Hilfe und Dokumentation
