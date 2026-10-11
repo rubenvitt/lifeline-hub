@@ -22,6 +22,8 @@ import {
  *   raum.png       frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx,
  *                  frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx,
  *                  frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx
+ *   bearbeiten.png frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx,
+ *                  frontend/src/components/Erfassung.tsx
  *
  * Demo-Lücke (D3): der Demo-BR „Parkplatz Stadion Nord“ ist aktiv, aber leer. Die Spec stellt
  * dort zwei Einheiten bereit und legt einen zweiten, geplanten BR an.
@@ -111,5 +113,21 @@ test.describe(KAPITEL, () => {
       page.getByRole('button', { name: 'Sanitätszug Musterstadt zuweisen' }),
     ).toBeVisible();
     await fotografiere(page, KAPITEL, 'raum');
+  });
+
+  test('Dialog „Bereitstellungsraum bearbeiten“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const br = await demoBr(page.request, demo.id);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}`);
+    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Bereitstellungsraum bearbeiten' });
+    await expect(dialog.getByLabel('Bezeichnung')).toHaveValue(DEMO_BR);
+    // Nur im Dialog, nicht gespeichert: das Bild „raum.png“ zeigt den Raum wie im Demo-Einsatz.
+    await dialog.getByLabel('Notiz (optional)').fill('Zufahrt über Tor 3, Platz für 15 Fahrzeuge');
+    await dialog.getByLabel('Notiz (optional)').blur();
+    await page.mouse.move(0, 0);
+    await fotografiere(dialog, KAPITEL, 'bearbeiten');
   });
 });
