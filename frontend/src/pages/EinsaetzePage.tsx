@@ -53,6 +53,17 @@ interface AnlegeWerte {
 /** Höhe des Kartenausschnitts im Anlegedialog: klein, er bestätigt nur die Wahl. */
 const AUSSCHNITT_ANLEGEN_PX = 120;
 
+/**
+ * Kartenausschnitt des gewählten Einsatzorts im Anlegedialog. Eigene Komponente IM Formular:
+ * `Form.useWatch` außerhalb (Dialog zu, `destroyOnHidden`) meldete eine Instanz ohne Formular.
+ */
+function GewaehlterOrt() {
+  const form = Form.useFormInstance<AnlegeWerte>();
+  const punkt = Form.useWatch('einsatzort', form)?.koordinate ?? null;
+  if (!punkt) return null;
+  return <Kartenausschnitt punkt={punkt} etikett="Einsatzort" hoehe={AUSSCHNITT_ANLEGEN_PX} />;
+}
+
 /** Einsatzort-Felder des Anlegerumpfs; ein leeres Feld schickt keines (Spec `ortsfeld`). */
 function einsatzortFelder(ort: OrtsfeldWert | undefined): {
   einsatzort?: string;
@@ -157,7 +168,6 @@ function EinsaetzeInhalt() {
   const qc = useQueryClient();
   const [dialogOffen, setDialogOffen] = useState(false);
   const [form] = Form.useForm<AnlegeWerte>();
-  const gewaehlterOrt = Form.useWatch('einsatzort', form)?.koordinate ?? null;
 
   const darfAnlegen = darfVerwaltung(benutzer);
 
@@ -476,13 +486,7 @@ function EinsaetzeInhalt() {
         <Form.Item label="Einsatzort" name="einsatzort">
           <Ortsfeld suchen={sucheOrtInOrg} suchSchluessel={globalKeys.orgOrtSuche} />
         </Form.Item>
-        {gewaehlterOrt && (
-          <Kartenausschnitt
-            punkt={gewaehlterOrt}
-            etikett="Einsatzort"
-            hoehe={AUSSCHNITT_ANLEGEN_PX}
-          />
-        )}
+        <GewaehlterOrt />
         <SpeicherFehler
           fehler={anlegen.error}
           titel="Einsatz nicht angelegt"

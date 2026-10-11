@@ -19,7 +19,7 @@
 
 ## 4. Frontend: API und Bausteine
 
-- [x] 4.1 `api/ortSuche.ts` (`sucheOrtImEinsatz`, `sucheOrtInOrg`), Query-Keys `einsatzKeys.einsatzortSuche` und `globalKeys.ortSuche` in `api/queryKeys.ts` als nicht live und nicht offline eingeordnet; `api/einsaetze.ts` `NeuerEinsatz` um den Einsatzort; Guard-Tests der Query-Keys grün
+- [x] 4.1 `api/ortSuche.ts` (`sucheOrtImEinsatz`, `sucheOrtInOrg`), Query-Keys `einsatzKeys.einsatzortSuche` und `globalKeys.orgOrtSuche` in `api/queryKeys.ts` als nicht live und nicht offline eingeordnet; `api/einsaetze.ts` `NeuerEinsatz` um den Einsatzort; Guard-Tests der Query-Keys grün
 - [x] 4.2 `anzeige/Ortsfeld.tsx` mit Vitest (MSW): Tippen fragt nicht, Enter sucht ohne Formular-Submit, „Ort suchen“ sucht, < 3 Zeichen fragt nicht, Treffer setzt Text = Kurzadresse und Koordinate, Textänderung verwirft Koordinate und Treffer, Zustände „ausgelastet“/„nicht erreichbar“ mit „Erneut suchen“, „Keine Adresse zu …“, offline gesperrt mit Wortlaut; jeder Test zuerst rot
 - [x] 4.3 `anzeige/Kartenausschnitt.tsx` nach dem Muster der Lagemonitor-Karte; Vitest mit gemocktem `maplibre-gl`: ohne Punkt „Nicht verortet“ und keine Karte, mit Punkt eine Karte und eine Nadel mit `aria-label`
 
@@ -38,9 +38,13 @@
 - [x] 7.2 e2e `e2e/einsatzort-ortssuche.spec.ts`: Einsatzdaten → Einsatzort suchen (Geocoder per `page.route` gemockt), Treffer wählen, speichern, Ausschnitt mit Nadel sichtbar, Kopfleiste zeigt die Kurzadresse; Anlegen mit Treffer; Handy 390 px ohne Überlauf
 - [x] 7.3 `docs/anwender/kapitel/einsatzdaten.md` (Paneel Einsatzort, Suche auf Enter/Knopf, Freitext, Koordinate von Hand, ohne Netz) und `einsatz-oberflaeche.md` (Feld beim Anlegen); Bilder nach `docs/anwender/AGENTS.md` nachgezogen; Doku-Wächter grün
 
-## 8. Nachweis
+## 8. Review (Phase 4)
 
-- [ ] 8.1 Gates: `cargo test` der berührten Tests, tsc, Lint, Prettier, Vitest komplett, `scripts/check-all.sh --nur schnell`, e2e `einsatzort-ortssuche.spec.ts`, `einsatzdaten-inline.spec.ts`, `einsatzdaten-schmal.spec.ts`, `lagekarte-ortssuche.spec.ts`
+- [x] 8.0 Befunde aus dem Review umgesetzt: `einsatz::EINSATZORT_MAX` (500) samt Spiegel, Bereich (400) vor Paar (422) auch im PATCH, Rechte-Test Admin eigene/fremde Org und abgeschlossener Einsatz; Ortsfeld gibt den Fokus nach der Wahl ins Feld, Escape schließt die Liste zuerst, „Ort suchen“ gesperrt ohne suchbaren Text; Sprung zur Lagekarte mit Steuerhöhe; `Form.useWatch` im Formular; 390 px auch als Führungspersonal und mit Koordinaten-Zeile; Feldbudget-Ausnahme in `frontend/AGENTS.md`
+
+## 9. Nachweis
+
+- [ ] 9.1 Gates: `cargo test` der berührten Tests, tsc, Lint, Prettier, Vitest komplett, `scripts/check-all.sh --nur schnell`, e2e `einsatzort-ortssuche.spec.ts`, `einsatzdaten-inline.spec.ts`, `einsatzdaten-schmal.spec.ts`, `lagekarte-ortssuche.spec.ts`
 
 ## Workflow follow-up
 

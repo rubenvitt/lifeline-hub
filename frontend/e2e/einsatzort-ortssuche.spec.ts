@@ -1,7 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { anmeldenAlsAdmin } from './rollen-kern';
+import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
  * LFH-1175, Spec `ortsfeld` und `einsatzdaten-bearbeitung`: den Einsatzort über die Ortssuche
@@ -124,28 +124,49 @@ test.describe('Handy 390 px', () => {
   const BREITE = 390;
   test.use({ viewport: { width: BREITE, height: 844 } });
 
-  test('Paneel Einsatzort mit offener Suche läuft nicht über', async ({ page }) => {
-    await geocoder(page);
-    await anmeldenAlsAdmin(page);
-    const id = await einsatzAnlegenApi(page);
-    await page.goto(einsatzdatenPfad(id));
-    await paneel(page).getByRole('button', { name: 'Adresse eintragen' }).click();
-    const feld = paneel(page).getByRole('textbox', { name: 'Adresse' });
-    await feld.fill('Bahnhofstraße 1');
-    await feld.press('Enter');
-    const treffer = paneel(page).getByRole('list', { name: 'Treffer' });
-    await expect(treffer).toBeVisible();
-
+  async function keinQuerlauf(page: Page, kaesten: Locator[], wo: string) {
     const breite = await page.evaluate(() => document.documentElement.scrollWidth);
-    expect(breite, 'documentElement.scrollWidth').toBeLessThanOrEqual(BREITE);
-    for (const k of [
-      paneel(page),
-      treffer,
-      paneel(page).getByRole('button', { name: 'Ort suchen' }),
-    ]) {
+    expect(breite, `${wo}: documentElement.scrollWidth`).toBeLessThanOrEqual(BREITE);
+    for (const k of kaesten) {
       const b = await k.boundingBox();
-      expect(b).not.toBeNull();
-      expect(b!.x + b!.width, 'rechte Kante').toBeLessThanOrEqual(BREITE);
+      expect(b, `${wo}: ohne Kasten`).not.toBeNull();
+      expect(b!.x + b!.width, `${wo}: rechte Kante`).toBeLessThanOrEqual(BREITE);
     }
-  });
+  }
+
+  // LFH-435: die Bearbeitung hängt am Schreibrecht, gemessen wird auch nicht-privilegiert.
+  for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
+    test(`${rolle}: Paneel Einsatzort mit offener Suche und Koordinate läuft nicht über`, async ({
+      page,
+    }) => {
+      await geocoder(page);
+      await anmeldenAlsAdmin(page);
+      const id = await einsatzAnlegenApi(page);
+      if (rolle === 'fuehrungspersonal') await wechsleZuRolle(page, rolle, String(id));
+      await page.goto(einsatzdatenPfad(id));
+      // Vorbedingung des Rollenzweigs: die Zeile ist bedienbar, kein „Nur Ansicht“.
+      await expect(paneel(page).getByRole('button', { name: 'Adresse eintragen' })).toBeVisible();
+
+      await paneel(page).getByRole('button', { name: 'Adresse eintragen' }).click();
+      const feld = paneel(page).getByRole('textbox', { name: 'Adresse' });
+      await feld.fill('Bahnhofstraße 1');
+      await feld.press('Enter');
+      const treffer = paneel(page).getByRole('list', { name: 'Treffer' });
+      await expect(treffer).toBeVisible();
+      await keinQuerlauf(
+        page,
+        [paneel(page), treffer, paneel(page).getByRole('button', { name: 'Ort suchen' })],
+        'Adresse mit Treffern',
+      );
+      await paneel(page).getByRole('button', { name: 'Bearbeitung von Adresse abbrechen' }).click();
+
+      await paneel(page).getByRole('button', { name: 'Koordinate eintragen' }).click();
+      await paneel(page).getByRole('textbox', { name: 'Koordinate' }).fill('53.07750, 8.81000');
+      await keinQuerlauf(
+        page,
+        [paneel(page), paneel(page).getByRole('button', { name: 'Koordinate speichern' })],
+        'Koordinate in Bearbeitung',
+      );
+    });
+  }
 });

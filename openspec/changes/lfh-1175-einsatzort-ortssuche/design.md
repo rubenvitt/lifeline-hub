@@ -86,7 +86,10 @@ setzt sie auf `null`. Props: `value`, `onChange`, `suchen: (begriff) => Promise<
 zehn Minuten gehalten. Enter im Feld ruft `preventDefault` und sucht; gespeichert wird in der
 Zeile über „Speichern“ (wie mehrzeilige Zeilen). Ohne Netz (`useOnline`) ist „Ort suchen“
 gesperrt. Treffer stehen als Liste von Knöpfen mit Kurzadresse und Geocoder-Beschriftung
-(gedämpft, eine Zeile, abgeschnitten).
+(gedämpft, umbrechend: eine abgeschnittene Zeile ging mit voller Breite in die Mindestbreite des
+Rasters ein und weitete die Seite am Handy). Escape schließt eine offene Liste zuerst allein (sie
+meldet sich über `onOpenChange` wie ein Popup), der Fokus geht nach der Wahl ins Feld zurück, und
+„Ort suchen“ ist gesperrt, solange der Text nicht suchbar ist.
 
 ### D6 Zeile „Adresse“ als `InlineAngabe<OrtsfeldWert>`
 Die Zeile vergleicht nur den Text plus Koordinate und baut den Patch:
@@ -127,7 +130,7 @@ der beiden Schlüssel oder Wert neben `null` → 422 (Zusammenhang, `src/AGENTS.
 Anlegen und PATCH.
 
 ### D11 Query-Keys
-`einsatzKeys.einsatzortSuche(einsatzId, begriff)` und `globalKeys.ortSuche(begriff)`, beide in
+`einsatzKeys.einsatzortSuche(einsatzId, begriff)` und `globalKeys.orgOrtSuche(begriff)` (Wire-String `org-ort-suche`; `ort-suche` ist der Einsatz-Prefix der Lagekarte), beide in
 `NICHT_LIVE_KEYS` bzw. der globalen Entsprechung mit derselben Begründung wie `ortSuche`, beide
 nicht im Lagebild offline.
 

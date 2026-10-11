@@ -1,5 +1,5 @@
 import { useQuery, type QueryKey } from '@tanstack/react-query';
-import { Button, Input, Space } from 'antd';
+import { Button, Input, Space, type InputRef } from 'antd';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { OrtSucheAntwort, OrtTreffer } from '../api/karteOrtSuche';
 import { useRollen } from '../components/instrument';
@@ -27,6 +27,11 @@ export interface OrtsfeldProps {
   suchen: (begriff: string) => Promise<OrtSucheAntwort>;
   /** Query-Key der Suche zu einem Begriff, aus `api/queryKeys.ts`. */
   suchSchluessel: (begriff: string) => QueryKey;
+  /**
+   * Meldet, ob die Trefferliste offen ist — wie das Popup einer Auswahl. `InlineAngabe` reicht es
+   * über `popup` herein: dann schließt Escape zuerst die Liste und verwirft erst danach die Zeile.
+   */
+  onOpenChange?: (offen: boolean) => void;
 }
 
 /** Eine Suche: der Begriff und ihre laufende Nummer (je Enter oder Knopf eine neue). */
@@ -58,16 +63,26 @@ export function Ortsfeld({
   onChange,
   suchen,
   suchSchluessel,
+  onOpenChange,
 }: OrtsfeldProps) {
   const { token, rollen } = useRollen();
   const online = useOnline();
   const [anfrage, setAnfrage] = useState<Anfrage | null>(null);
   const nrRef = useRef(0);
+  const feldRef = useRef<InputRef>(null);
+  const begriff = adressBegriff(value.text);
+  const listeOffen = online && anfrage !== null;
+
+  // Offen/zu nur beim Wechsel melden; der Anfangszustand „zu“ ist keine Meldung.
+  const gemeldetRef = useRef(false);
+  useEffect(() => {
+    if (gemeldetRef.current === listeOffen) return;
+    gemeldetRef.current = listeOffen;
+    onOpenChange?.(listeOffen);
+  }, [listeOffen, onOpenChange]);
 
   function sucheStarten() {
-    if (!online) return;
-    const begriff = adressBegriff(value.text);
-    if (begriff === null) return;
+    if (!online || begriff === null) return;
     nrRef.current += 1;
     setAnfrage({ begriff, nr: nrRef.current });
   }
@@ -79,17 +94,38 @@ export function Ortsfeld({
     sucheStarten();
   }
 
+  /**
+   * Escape am ganzen Feld (Eingabe, „Ort suchen“, Treffer): eine offene Liste schließt zuerst
+   * allein; erst das nächste Escape gehört dem Formular (Zeile verwerfen, Dialog schließen).
+   */
+  function escape(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Escape' || !listeOffen) return;
+    e.preventDefault();
+    setAnfrage(null);
+    fokusInsFeld();
+  }
+
+  /** Der Fokus fällt nicht auf `<body>`, wenn die Liste mit dem fokussierten Knopf aushängt. */
+  function fokusInsFeld() {
+    feldRef.current?.focus();
+  }
+
   function waehlen(t: OrtTreffer) {
     onChange?.({ text: t.kurz ?? t.name, koordinate: { lat: t.lat, lon: t.lon } });
     setAnfrage(null);
+    fokusInsFeld();
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}>
+    <div
+      onKeyDown={escape}
+      style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}
+    >
       {/* `minWidth: 0` am Feld: antds Eingabe bringt eine Mindestbreite mit und weitete am Handy
           das Raster der Zeile über 390 px (e2e `einsatzort-ortssuche.spec.ts`). */}
       <Space.Compact style={{ width: '100%', display: 'flex' }}>
         <Input
+          ref={feldRef}
           style={{ flex: '1 1 auto', minWidth: 0 }}
           id={id}
           aria-label={ariaLabel}
@@ -101,7 +137,7 @@ export function Ortsfeld({
           }}
           onKeyDown={tasten}
         />
-        <Button disabled={!online} onClick={sucheStarten}>
+        <Button disabled={!online || begriff === null} onClick={sucheStarten}>
           Ort suchen
         </Button>
       </Space.Compact>
@@ -116,6 +152,7 @@ export function Ortsfeld({
             suchen={suchen}
             suchSchluessel={suchSchluessel}
             onWaehlen={waehlen}
+            onNeuerVersuch={fokusInsFeld}
           />
         )
       )}
@@ -132,11 +169,14 @@ function OrtsfeldTreffer({
   suchen,
   suchSchluessel,
   onWaehlen,
+  onNeuerVersuch,
 }: {
   anfrage: Anfrage;
   suchen: (begriff: string) => Promise<OrtSucheAntwort>;
   suchSchluessel: (begriff: string) => QueryKey;
   onWaehlen: (t: OrtTreffer) => void;
+  /** Vor „Erneut suchen“: der Knopf hängt mit der Antwort aus, der Fokus geht ins Feld. */
+  onNeuerVersuch: () => void;
 }) {
   const { token, rollen } = useRollen();
   const abfrage = useQuery({
@@ -173,7 +213,13 @@ function OrtsfeldTreffer({
       >
         {aussage}
         {nochmal && (
-          <Button loading={abfrage.isFetching} onClick={() => void refetch()}>
+          <Button
+            loading={abfrage.isFetching}
+            onClick={() => {
+              onNeuerVersuch();
+              void refetch();
+            }}
+          >
             Erneut suchen
           </Button>
         )}

@@ -182,6 +182,58 @@ async fn fremde_org_ist_403_ohne_geocoder() {
     assert!(aufrufe.lock().unwrap().is_empty());
 }
 
+/// Spec `ortsfeld`: das Recht der Einsatzdaten, nicht die Mitgliedschaft. Der Admin der
+/// Einsatz-Org darf ohne Rolle suchen, der einer fremden Org nicht, und am abgeschlossenen
+/// Einsatz sucht niemand. Alle Fälle enden vor dem Geocoder (Suchtext zu kurz bzw. Rechte).
+#[tokio::test]
+async fn admin_der_einsatz_org_ja_fremder_admin_nein_abgeschlossen_409() {
+    let (app, pool) = setup_mit_pool().await;
+    let (base, aufrufe) = such_stub(stub_treffer()).await;
+    geocoder_setzen(&pool, 1, &base).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Die Einsatzleitung geht an jemand anderen; der Admin bleibt ohne Rolle im Einsatz.
+    let leitung_id = benutzer_anlegen(&app, &admin, "leitung", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, leitung_id, "einsatzleitung").await;
+    sqlx::query(
+        "DELETE FROM einsatz_mitgliedschaft WHERE einsatz_id = ? \
+         AND benutzer_id = (SELECT id FROM benutzer WHERE benutzername = 'admin')",
+    )
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 400 am Suchtext beweist den Durchgang durch das Recht, ohne den Geocoder zu fragen.
+    let (status, json) = anfrage(&app, "GET", &im_einsatz(einsatz, "ab"), &admin, None).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "Admin der Einsatz-Org: {json:?}"
+    );
+
+    let (_, fremd_id) =
+        fremde_org_anlegen(&pool, "Andere", "fremdadmin", "fremdpw123", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
+        .bind(fremd_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let fremd = login_cookie(&app, "fremdadmin", "fremdpw123").await;
+    let (status, _) = anfrage(&app, "GET", &im_einsatz(einsatz, "ab"), &fremd, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "Admin einer fremden Org");
+
+    sqlx::query("UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_at = datetime('now') WHERE id = ?")
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let leitung = login_cookie(&app, "leitung", "leitungpw1").await;
+    let (status, _) = anfrage(&app, "GET", &im_einsatz(einsatz, "ab"), &leitung, None).await;
+    assert_eq!(status, StatusCode::CONFLICT, "abgeschlossener Einsatz");
+    assert!(aufrufe.lock().unwrap().is_empty());
+}
+
 #[tokio::test]
 async fn org_suche_ohne_anlegerecht_ist_403_ohne_geocoder() {
     let (app, pool) = setup_mit_pool().await;

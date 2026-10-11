@@ -94,12 +94,62 @@ describe('Ortsfeld', () => {
     expect(await screen.findByRole('list', { name: 'Treffer' })).toBeInTheDocument();
   });
 
-  it('fragt unter drei Zeichen nicht', async () => {
+  it('fragt unter drei Zeichen nicht, „Ort suchen“ ist dann gesperrt', async () => {
     const suchen = vi.fn().mockResolvedValue(TREFFER);
     renderMitProviders(<Aufbau suchen={suchen} />);
+    expect(screen.getByRole('button', { name: 'Ort suchen' })).toBeDisabled();
     await userEvent.type(screen.getByRole('textbox', { name: 'Einsatzort' }), 'Ha{Enter}');
-    await userEvent.click(screen.getByRole('button', { name: 'Ort suchen' }));
+    expect(screen.getByRole('button', { name: 'Ort suchen' })).toBeDisabled();
     expect(suchen).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Einsatzort' }), 'u');
+    expect(screen.getByRole('button', { name: 'Ort suchen' })).toBeEnabled();
+  });
+
+  it('gibt den Fokus nach der Wahl eines Treffers ans Feld zurück', async () => {
+    const suchen = vi.fn().mockResolvedValue(TREFFER);
+    renderMitProviders(<Aufbau suchen={suchen} />);
+    const feld = screen.getByRole('textbox', { name: 'Einsatzort' });
+    await userEvent.type(feld, 'Bahnhofstraße 1{Enter}');
+    const liste = await screen.findByRole('list', { name: 'Treffer' });
+    within(liste).getAllByRole('button')[0].focus();
+    await userEvent.keyboard('{Enter}');
+    expect(screen.queryByRole('list', { name: 'Treffer' })).not.toBeInTheDocument();
+    expect(feld).toHaveFocus();
+  });
+
+  it('Escape schließt zuerst nur die Trefferliste und meldet sie als Popup', async () => {
+    const suchen = vi.fn().mockResolvedValue(TREFFER);
+    const offen: boolean[] = [];
+    function MitPopup() {
+      const [wert, setWert] = useState<OrtsfeldWert>({ text: '', koordinate: null });
+      return (
+        <div
+          onKeyDown={(e) => {
+            // Wie der Fenster-Handler des Erfassungsdialogs: ein behandeltes Escape bleibt liegen.
+            if (e.key === 'Escape' && !e.defaultPrevented) offen.push(false);
+          }}
+        >
+          <Ortsfeld
+            aria-label="Einsatzort"
+            value={wert}
+            onChange={setWert}
+            onOpenChange={(o) => offen.push(o)}
+            suchen={suchen}
+            suchSchluessel={(b) => einsatzKeys.einsatzortSuche(7, b)}
+          />
+        </div>
+      );
+    }
+    renderMitProviders(<MitPopup />);
+    const feld = screen.getByRole('textbox', { name: 'Einsatzort' });
+    await userEvent.type(feld, 'Bahnhofstraße 1{Enter}');
+    await screen.findByRole('list', { name: 'Treffer' });
+    expect(offen).toEqual([true]);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('list', { name: 'Treffer' })).not.toBeInTheDocument();
+    // Gemeldet „zu“, und das Escape ist behandelt: kein zweites `false` vom äußeren Handler.
+    expect(offen).toEqual([true, false]);
+    expect(feld).toHaveValue('Bahnhofstraße 1');
   });
 
   it('setzt mit dem Treffer Kurzadresse und Koordinate, ohne Kurzadresse den Namen', async () => {

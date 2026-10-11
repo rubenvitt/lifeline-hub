@@ -712,7 +712,9 @@ Spec `bedien-arbeitsplatz`).
   Platzhalter (`etb/Schnellerfassung.tsx`).
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
-  Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt".
+  Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
+  „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026): fünf Felder, das fünfte ist der
+  optionale Einsatzort; ein sechstes gehört in die Kopfdaten.
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
   bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
   `einheit:<id>`). Einzige Ausnahme: ein Klappteil, der bei einem Prüffehler darin selbst aufgeht

@@ -1578,6 +1578,22 @@ describe('EinsatzdatenPage · Paneel Einsatzort (LFH-1175)', () => {
     );
   });
 
+  it('Escape schließt zuerst die Trefferliste, erst das zweite verwirft die Zeile', async () => {
+    setup({ einsatz: { einsatzort: 'Deich Süd' } });
+    const bodies = patchMitschnitt({ einsatzort: 'Deich Süd' });
+    geocoder();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Ort suchen' }));
+    await screen.findByRole('list', { name: 'Treffer' });
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('list', { name: 'Treffer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Adresse' })).toHaveValue('Deich Süd');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('textbox', { name: 'Adresse' })).not.toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
   it('nur geänderter Text speichert nur die Adresse, die Koordinate bleibt', async () => {
     const stand = { einsatzort: 'Deich Süd', einsatzort_lat: 48.1, einsatzort_lon: 11.6 };
     setup({ einsatz: stand });

@@ -420,6 +420,7 @@ function EinsatzortPaneel({
   speichern: FeldSpeichern;
 }) {
   const { token } = useRollen();
+  const navigate = useNavigate();
   const einsatzId = einsatz.id;
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
@@ -461,9 +462,10 @@ function EinsatzortPaneel({
                       : { einsatzort: leerZuNull(w.text) },
                   )
                 }
-                eingabe={({ feld, value, onChange }) => (
+                eingabe={({ feld, popup, value, onChange }) => (
                   <Ortsfeld
                     {...feld}
+                    {...popup}
                     value={value}
                     onChange={onChange}
                     suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
@@ -528,10 +530,21 @@ function EinsatzortPaneel({
       >
         <Kartenausschnitt punkt={punkt} etikett="Einsatzort" />
         {punkt && lagekarteFrei && (
+          // Link in Knopfgestalt wie „Einsatzbericht drucken“: ein nacktes `<a>` erbt keine
+          // Steuerhöhe (`frontend/AGENTS.md`, Handgebautes Bedienziel); Strg/⌘+Klick öffnet einen Tab.
           <div data-lfh="inspector-sprung">
-            <Link to={lagekartePfad(einsatzId, { zentrum: punkt })}>
+            <Button
+              type="link"
+              href={lagekartePfad(einsatzId, { zentrum: punkt })}
+              style={{ paddingInline: 0 }}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                navigate(lagekartePfad(einsatzId, { zentrum: punkt }));
+              }}
+            >
               Auf Lagekarte zeigen <span aria-hidden="true">↗</span>
-            </Link>
+            </Button>
           </div>
         )}
       </div>

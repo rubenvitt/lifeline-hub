@@ -2513,3 +2513,42 @@ async fn anlegen_prueft_die_koordinate() {
     };
     assert_eq!(liste.as_array().unwrap().len(), 0, "nichts angelegt");
 }
+
+/// `src/AGENTS.md`, Eingabegrenzen und Statuscode-Konvention: der Einsatzort hat eine Grenze
+/// (`einsatz::EINSATZORT_MAX`), und ein Feld, das für sich scheitert, ist 400 vor jedem 422 des
+/// Zusammenhangs.
+#[tokio::test]
+async fn einsatzort_grenze_und_400_vor_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let zu_lang = "x".repeat(lifeline_hub::einsatz::EINSATZORT_MAX + 1);
+
+    let (status, json) = einsatz_anlegen_json(
+        &app,
+        &admin,
+        json!({"bezeichnung": "Zu lang", "einsatzort": zu_lang}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+
+    let id = einsatz_mit_vollen_kopfdaten(&app, &admin).await;
+    for body in [
+        json!({ "einsatzort": zu_lang }),
+        // Ein halbes Paar, dessen Wert schon für sich außerhalb liegt: 400, nicht 422.
+        json!({ "einsatzort_lat": 91.0 }),
+        // Ein halbes Paar neben einem für sich kaputten Feld: das Feld zuerst.
+        json!({ "einsatzort_lat": 51.0, "naechste_lagebesprechung_at": "kaputt" }),
+    ] {
+        let (status, json) = patch_kopf(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {json}");
+    }
+    // Genau an der Grenze geht es.
+    let (status, _) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({ "einsatzort": "x".repeat(lifeline_hub::einsatz::EINSATZORT_MAX) }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
