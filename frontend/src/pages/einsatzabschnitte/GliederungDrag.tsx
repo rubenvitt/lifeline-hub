@@ -1,10 +1,4 @@
-import {
-  useDndContext,
-  useDraggable,
-  useDroppable,
-  type Announcements,
-  type ScreenReaderInstructions,
-} from '@dnd-kit/core';
+import { useDndContext, useDraggable, useDroppable, type Announcements } from '@dnd-kit/core';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import { useRollen } from '../../components/instrument';
@@ -56,11 +50,8 @@ export const DRAG_ANSAGEN: Announcements = {
   },
   onDragCancel: ({ active }) => `Ziehen von ${zugName(active.data.current)} abgebrochen.`,
 };
-export const DRAG_ANLEITUNG: ScreenReaderInstructions = {
-  draggable: 'Ohne Ziehen: „Verschieben unter …“ im Menü „Weitere Aktionen“.',
-};
 
-const dragKey = (d: DragDaten) => `zug-${d.art}-${d.id}`;
+const dragKey = (d: DragDaten) => `drag-${d.art}-${d.id}`;
 const dropKey = (id: number | null) => (id === null ? 'ziel-wurzel' : `ziel-${id}`);
 
 /** Der laufende Zug, wenn einer läuft. */
@@ -71,14 +62,14 @@ export function useActiveDrag(): DragDaten | null {
 
 /** Nimmt das Ziel den laufenden Zug an? Dieselbe Regel wie das Menü (`gliederungDragKern.ts`). */
 function canDrop(
-  zug: DragDaten | null,
+  drag: DragDaten | null,
   abschnitte: readonly Einsatzabschnitt[],
   zielId: number | null,
 ): boolean {
-  if (!zug) return false;
-  return zug.art === 'abschnitt'
-    ? canDropAbschnitt(abschnitte, zug.id, zielId)
-    : canDropEinheit({ abschnitt_id: zug.abschnittId }, zielId);
+  if (!drag) return false;
+  return drag.art === 'abschnitt'
+    ? canDropAbschnitt(abschnitte, drag.id, zielId)
+    : canDropEinheit({ abschnitt_id: drag.abschnittId }, zielId);
 }
 
 /** Rahmen eines Ziels während des Zugs: gestrichelt frei, gefüllt unter dem Zeiger, sonst keiner. */
@@ -108,8 +99,8 @@ export function DragHandle({ daten }: { daten: DragDaten }) {
       }}
       {...listeners}
       aria-hidden="true"
-      data-lfh="zug-griff"
-      data-zug={dragKey(daten)}
+      data-lfh="drag-griff"
+      data-drag={dragKey(daten)}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -138,21 +129,21 @@ export function DropKnoten({
   abschnitte: readonly Einsatzabschnitt[];
   children: ReactNode;
 }) {
-  const zug = useActiveDrag();
-  const frei = canDrop(zug, abschnitte, abschnitt.id);
+  const drag = useActiveDrag();
+  const frei = canDrop(drag, abschnitte, abschnitt.id);
   const { setNodeRef, isOver } = useDroppable({
     id: dropKey(abschnitt.id),
     data: { zielId: abschnitt.id, name: abschnitt.name } satisfies DropDaten,
     disabled: !frei,
   });
-  const stil = useDropStil(frei, isOver, zug !== null);
-  const gezogen = zug?.art === 'abschnitt' && zug.id === abschnitt.id;
+  const stil = useDropStil(frei, isOver, drag !== null);
+  const gezogen = drag?.art === 'abschnitt' && drag.id === abschnitt.id;
   return (
     <span
       ref={setNodeRef}
       data-lfh="gliederung-ziel"
       data-abschnitt={abschnitt.id}
-      data-ziel={zug === null ? undefined : frei ? 'frei' : 'gesperrt'}
+      data-ziel={drag === null ? undefined : frei ? 'frei' : 'gesperrt'}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -173,15 +164,15 @@ export function DropKnoten({
  */
 export function ObersteEbeneDropZone({ abschnitte }: { abschnitte: readonly Einsatzabschnitt[] }) {
   const { token, rollen } = useRollen();
-  const zug = useActiveDrag();
-  const frei = canDrop(zug, abschnitte, null);
+  const drag = useActiveDrag();
+  const frei = canDrop(drag, abschnitte, null);
   const { setNodeRef, isOver } = useDroppable({
     id: dropKey(null),
     data: { zielId: null, name: OBERSTE_EBENE } satisfies DropDaten,
     disabled: !frei,
   });
-  const stil = useDropStil(frei, isOver, zug !== null);
-  if (zug?.art !== 'abschnitt') return null;
+  const stil = useDropStil(frei, isOver, drag !== null);
+  if (drag?.art !== 'abschnitt') return null;
   return (
     <div
       ref={setNodeRef}
@@ -203,11 +194,11 @@ export function ObersteEbeneDropZone({ abschnitte }: { abschnitte: readonly Eins
 }
 
 /** Was am Zeiger hängt: der Name, in der Form eines Chips. */
-export function DragMarke({ zug }: { zug: DragDaten }) {
+export function DragMarke({ drag }: { drag: DragDaten }) {
   const { token, rollen } = useRollen();
   return (
     <span
-      data-lfh="zug-marke"
+      data-lfh="drag-marke"
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -224,7 +215,7 @@ export function DragMarke({ zug }: { zug: DragDaten }) {
       <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.gedaempft }}>
         <IconMenue />
       </span>
-      {zug.name}
+      {drag.name}
     </span>
   );
 }

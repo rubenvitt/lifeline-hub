@@ -31,6 +31,10 @@ test.describe(KAPITEL, () => {
     const detail = page.getByRole('region', { name: 'Abschnitt: Sanitätsdienst' });
     await expect(detail.getByText('Zugeordnete Einheiten')).toBeVisible();
     await expect(detail.getByRole('listitem').first()).toBeVisible();
+    // Zeiger und Fokus aus der Gliederung: sonst stünde „Live pausiert“ im Bild (Zufluss-Schleuse).
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect(gliederung.getByText('Live', { exact: true })).toBeVisible();
     await fotografiere(page, KAPITEL, 'gliederung');
   });
 

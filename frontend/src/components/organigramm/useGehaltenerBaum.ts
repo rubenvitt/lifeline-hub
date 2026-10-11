@@ -6,6 +6,7 @@ import {
   useState,
   type FocusEvent,
   type PointerEvent,
+  type RefObject,
 } from 'react';
 import { useDruckModus } from '../druck/useDruckModus';
 import type { BaumKnoten } from './baum';
@@ -35,7 +36,14 @@ export interface GehaltenerBaum<K extends BaumKnoten<K>> {
     onBlur: (e: FocusEvent) => void;
   };
   /** Ein Zug hält, auch wenn der Zeiger dabei den Bereich verlässt. */
-  halteZug: (laeuft: boolean) => void;
+  holdDrag: (laeuft: boolean) => void;
+  /**
+   * An die Standzeile des Bereichs (mit `tabIndex={-1}`): sie fängt den Fokus, wenn der Knopf
+   * „anzeigen“ verschwindet, statt ihn auf `<body>` fallen zu lassen (WCAG 2.4.3).
+   */
+  standRef: RefObject<HTMLDivElement | null>;
+  /** Der Banner: Fokus auf die Standzeile, dann den frischen Stand übernehmen. */
+  anzeigen: () => void;
   /**
    * Zeigt `wurzeln` (Vorgabe: den frischen Stand) und hält, solange eine Bedingung gilt, ab dort
    * weiter. Für den Banner und für eigene Handlungen.
@@ -65,6 +73,7 @@ export function useGehaltenerBaum<K extends BaumKnoten<K>>(
   });
   const bedingungRef = useRef<Bedingung>({ zeiger: false, fokus: false, zug: false });
   const bereichRef = useRef<HTMLElement | null>(null);
+  const standRef = useRef<HTMLDivElement | null>(null);
 
   const set = useCallback((art: 'zeiger' | 'fokus' | 'zug', wert: boolean) => {
     bedingungRef.current = { ...bedingungRef.current, [art]: wert };
@@ -109,12 +118,33 @@ export function useGehaltenerBaum<K extends BaumKnoten<K>>(
     }),
     [set],
   );
-  const halteZug = useCallback((laeuft: boolean) => set('zug', laeuft), [set]);
+  const holdDrag = useCallback((laeuft: boolean) => set('zug', laeuft), [set]);
+  const anzeigen = useCallback(() => {
+    standRef.current?.focus({ preventScroll: true });
+    uebernehmen();
+  }, [uebernehmen]);
+
+  /**
+   * Sicherheitsnetz wie im Gerüst: entfernt ein Render das fokussierte Ziel (der Knopf „anzeigen“,
+   * ein entfallener Abschnitt), fällt der Fokus auf `body`, und Firefox und WebKit melden kein
+   * `focusout` — die Schleuse bliebe zu, obwohl niemand mehr im Bereich ist. Nach jedem Render: fiel
+   * der Fokus auf `body`, fängt ihn die Standzeile; liegt er sonst außerhalb, gilt er als gegangen.
+   */
+  useLayoutEffect(() => {
+    const bereich = bereichRef.current;
+    // Ohne gemessenen Bereich (noch nicht eingehängt) urteilt das Netz nicht.
+    if (!bedingungRef.current.fokus || !bereich || bereich.contains(document.activeElement)) return;
+    if (document.activeElement === null || document.activeElement === document.body) {
+      standRef.current?.focus({ preventScroll: true });
+      if (bereich.contains(document.activeElement)) return;
+    }
+    set('fokus', false);
+  });
 
   const offen = druckt || gehalten === null;
   const stand = useMemo(
     () => schleuse(offen ? null : gehalten, wurzeln),
     [offen, gehalten, wurzeln],
   );
-  return { stand, offen, bereich, halteZug, uebernehmen };
+  return { stand, offen, bereich, holdDrag, standRef, anzeigen, uebernehmen };
 }

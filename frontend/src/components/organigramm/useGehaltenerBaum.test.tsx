@@ -68,10 +68,10 @@ describe('useGehaltenerBaum (LFH-1212)', () => {
     const { result, rerender } = renderHook(({ w }) => useGehaltenerBaum(w), {
       initialProps: { w: vorher },
     });
-    act(() => result.current.halteZug(true));
+    act(() => result.current.holdDrag(true));
     rerender({ w: nachher });
     expect(form(result.current.stand.gezeigt)).toEqual(form(vorher));
-    act(() => result.current.halteZug(false));
+    act(() => result.current.holdDrag(false));
     expect(form(result.current.stand.gezeigt)).toEqual(form(nachher));
   });
 

@@ -1,8 +1,10 @@
 import { Button, Modal } from 'antd';
+import { useRef } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import { useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { verschiebeZiele } from './gliederungDragKern';
+import { useNewGesture } from './useNewGesture';
 
 interface Props {
   /** Der zu verschiebende Abschnitt; `null` = zu. */
@@ -38,22 +40,32 @@ export default function VerschiebenDialog({
   nachDemSchliessen,
 }: Props) {
   const { token } = useRollen();
+  const listeRef = useRef<HTMLUListElement>(null);
+  // Erst eine neue Geste handelt: das Enter, das den Dialog aus dem Menü öffnete, nicht.
+  const isNewGesture = useNewGesture(abschnitt !== null);
+  const abbrechen = () => {
+    if (isNewGesture()) onAbbrechen();
+  };
   const ziele = abschnitt ? verschiebeZiele(abschnitte, abschnitt.id) : [];
   return (
     <Modal
       open={abschnitt !== null}
       title={abschnitt ? `„${abschnitt.name}“ verschieben unter …` : undefined}
-      onCancel={laeuft ? undefined : onAbbrechen}
+      onCancel={laeuft ? undefined : abbrechen}
       closable={!laeuft}
       keyboard={!laeuft}
       mask={{ closable: !laeuft }}
       // Den Fokus setzt der Aufrufer (an den Auslöser des Abschnitts): antds Rückgabe zielte auf den
       // Menüeintrag, den es nicht mehr gibt, und landete auf <body>.
-      focusTriggerAfterClose={false}
+      focusable={{ focusTriggerAfterClose: false }}
       afterClose={nachDemSchliessen}
+      // Fokus ins erste wählbare Ziel, wenn der Dialog steht.
+      afterOpenChange={(offen) => {
+        if (offen) listeRef.current?.querySelector<HTMLButtonElement>('button:enabled')?.focus();
+      }}
       destroyOnHidden
       footer={
-        <Button onClick={onAbbrechen} disabled={laeuft}>
+        <Button onClick={abbrechen} disabled={laeuft}>
           Abbrechen
         </Button>
       }
@@ -68,19 +80,20 @@ export default function VerschiebenDialog({
         </div>
       )}
       <ul
+        ref={listeRef}
         aria-label="Ziele"
         data-lfh="verschieben-ziele"
         style={{ listStyle: 'none', margin: 0, padding: 0 }}
       >
-        {ziele.map((z, i) => (
+        {ziele.map((z) => (
           <li key={z.id ?? 'wurzel'}>
             <Button
               type="text"
               block
-              // Fokus im ersten wählbaren Ziel, nicht auf dem Kreuz.
-              autoFocus={i === ziele.findIndex((x) => !x.jetzt)}
               disabled={z.jetzt || laeuft}
-              onClick={() => onWahl(z.id)}
+              onClick={() => {
+                if (isNewGesture()) onWahl(z.id);
+              }}
               style={{
                 justifyContent: 'flex-start',
                 paddingInlineStart: token.paddingSM + z.tiefe * token.paddingLG,

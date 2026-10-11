@@ -87,7 +87,6 @@ import {
 } from './einsatzabschnitte/gliederungDragKern';
 import {
   ObersteEbeneDropZone,
-  DRAG_ANLEITUNG,
   DRAG_ANSAGEN,
   DropKnoten,
   DragHandle,
@@ -97,6 +96,7 @@ import {
   type DragDaten,
 } from './einsatzabschnitte/GliederungDrag';
 import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
+import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
 /** Auswahl des Lagezustands in Stufenfolge — Wortlaut aus dem Farbvertrag, nicht doppelt. */
 const LAGEZUSTAND_OPTIONEN = (['planmaessig', 'angespannt', 'kritisch'] as const).map((l) => ({
@@ -155,18 +155,20 @@ function buildBaum(
  * Dialog oder — für das Rückgängig aus dem Toast — im Seitenhinweis.
  */
 interface Verschiebung {
+  /** Der Einsatz beim Auslösen: ein Rückgängig nach einem Einsatzwechsel trifft den alten. */
+  einsatzId: number;
   art: DragDaten['art'];
   id: number;
   name: string;
   von: number | null;
   nach: number | null;
-  quelle: 'zug' | 'menue' | 'rueckgaengig';
+  quelle: 'drag' | 'menue' | 'rueckgaengig';
 }
 
 /** Was am Zeiger hängt, solange gezogen wird. */
 function ActiveDragMarke() {
-  const zug = useActiveDrag();
-  return zug ? <DragMarke zug={zug} /> : null;
+  const drag = useActiveDrag();
+  return drag ? <DragMarke drag={drag} /> : null;
 }
 
 interface AbschnittWerte {
@@ -192,9 +194,13 @@ export default function EinsatzabschnittePage() {
   const [bearbeiten, setBearbeiten] = useState(false);
   const [entwurf, setEntwurf] = useState(false);
   const [form] = Form.useForm<AbschnittWerte>();
-  /** Offener Dialog „Verschieben unter …“ (Abschnitts-ID) und offene Rückfrage „Auflösen“. */
+  /**
+   * Offener Dialog „Verschieben unter …“ (Abschnitts-ID) und offene Rückfrage „Auflösen“. Beide
+   * halten IHREN Abschnitt fest: wechselt das Detail darunter (die Vorwahl nach einem fremden
+   * Umhang), träfe die Bestätigung sonst einen anderen.
+   */
   const [verschiebenFuer, setVerschiebenFuer] = useState<number | null>(null);
-  const [aufloesenFrage, setAufloesenFrage] = useState(false);
+  const [aufloesenFuer, setAufloesenFuer] = useState<{ id: number; name: string } | null>(null);
   /** Gründe abgelehnter Umhänge, je Ort (LFH-1077): Baum, Dialog, Seitenhinweis. */
   const [dragFehler, setDragFehler] = useState<unknown>(null);
   const [dialogFehler, setDialogFehler] = useState<unknown>(null);
@@ -357,6 +363,21 @@ export default function EinsatzabschnittePage() {
     },
   });
 
+  const einsatzRef = useRef(einsatzId);
+  einsatzRef.current = einsatzId;
+  const setzeFehler = (quelle: Verschiebung['quelle'], fehler: unknown) =>
+    (quelle === 'drag' ? setDragFehler : quelle === 'menue' ? setDialogFehler : setRueckFehler)(
+      fehler,
+    );
+  // Ein Einsatzwechsel in derselben Instanz räumt die Gründe: ihr Ort ist ein anderer Einsatz.
+  useEffect(() => {
+    setDragFehler(null);
+    setDialogFehler(null);
+    setRueckFehler(null);
+    setVerschiebenFuer(null);
+    setAufloesenFuer(null);
+  }, [einsatzId]);
+
   /**
    * Umhängen per Zug oder Menü (LFH-1212): genau EIN Feld geht hinaus (`patcheAbschnitt` bzw.
    * `patcheEinheit`, Tri-State), ein mitgeschickter Name aus älterem Stand überschriebe sonst eine
@@ -367,20 +388,20 @@ export default function EinsatzabschnittePage() {
   const verschieben = useMutation({
     mutationFn: async (v: Verschiebung): Promise<void> => {
       if (v.art === 'abschnitt')
-        await patcheAbschnitt(einsatzId, v.id, { ueber_abschnitt_id: v.nach });
-      else await patcheEinheit(einsatzId, v.id, { abschnitt_id: v.nach });
+        await patcheAbschnitt(v.einsatzId, v.id, { ueber_abschnitt_id: v.nach });
+      else await patcheEinheit(v.einsatzId, v.id, { abschnitt_id: v.nach });
     },
-    onMutate: () => {
-      setDragFehler(null);
-      setDialogFehler(null);
-      setRueckFehler(null);
-    },
+    // Jede Quelle räumt nur ihren eigenen Grund: ein Rückgängig aus dem Toast nimmt dem offenen
+    // Dialog seinen nicht.
+    onMutate: (v) => setzeFehler(v.quelle, null),
     onSuccess: (_antwort, v) => {
+      // Nach einem Einsatzwechsel gehört die Antwort nicht mehr zu dieser Ansicht.
+      if (v.einsatzId !== einsatzRef.current) return;
       if (v.art === 'abschnitt') {
         const neu = (
-          qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(einsatzId)) ?? []
+          qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(v.einsatzId)) ?? []
         ).map((a) => (a.id === v.id ? { ...a, ueber_abschnitt_id: v.nach } : a));
-        qc.setQueryData(einsatzKeys.abschnitte(einsatzId), neu);
+        qc.setQueryData(einsatzKeys.abschnitte(v.einsatzId), neu);
         zufluss.uebernehmen(buildGliederungKnoten(neu));
         // Der neue Über-Abschnitt steht offen, sonst verschwände der Abschnitt im Zuklappen.
         if (v.nach !== null) {
@@ -393,12 +414,13 @@ export default function EinsatzabschnittePage() {
           });
         }
       } else {
-        qc.setQueryData<Einheit[]>(einsatzKeys.einheiten(einsatzId), (alt) =>
+        qc.setQueryData<Einheit[]>(einsatzKeys.einheiten(v.einsatzId), (alt) =>
           alt?.map((e) => (e.id === v.id ? { ...e, abschnitt_id: v.nach } : e)),
         );
       }
       invalidate();
-      setVerschiebenFuer(null);
+      // Nur der eigene Weg schließt den Dialog; ein Zug oder Rückgängig daneben lässt ihn offen.
+      if (v.quelle === 'menue') setVerschiebenFuer(null);
       if (v.quelle === 'rueckgaengig') return;
       const ziel = v.nach === null ? null : (abschnitte.find((a) => a.id === v.nach)?.name ?? '');
       zeigeRueckgaengig(
@@ -410,34 +432,33 @@ export default function EinsatzabschnittePage() {
       );
     },
     onError: (fehler, v) => {
-      if (v.quelle === 'zug') setDragFehler(fehler);
-      else if (v.quelle === 'menue') setDialogFehler(fehler);
-      else setRueckFehler(fehler);
+      if (v.einsatzId === einsatzRef.current) setzeFehler(v.quelle, fehler);
     },
   });
 
   function handleDragStart() {
     setDragFehler(null);
-    zufluss.halteZug(true);
+    zufluss.holdDrag(true);
   }
 
   function handleDragEnd(e: DragEndEvent) {
-    zufluss.halteZug(false);
-    const zug = e.active.data.current as DragDaten | undefined;
+    zufluss.holdDrag(false);
+    const drag = e.active.data.current as DragDaten | undefined;
     const ziel = e.over?.data.current as DropDaten | undefined;
     // Gesperrte Ziele sind `disabled` und melden sich nie als `over`.
-    if (!zug || !ziel) return;
+    if (!drag || !ziel) return;
     const von =
-      zug.art === 'abschnitt'
-        ? (abschnitte.find((a) => a.id === zug.id)?.ueber_abschnitt_id ?? null)
-        : zug.abschnittId;
+      drag.art === 'abschnitt'
+        ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
+        : drag.abschnittId;
     verschieben.mutate({
-      art: zug.art,
-      id: zug.id,
-      name: zug.name,
+      einsatzId,
+      art: drag.art,
+      id: drag.id,
+      name: drag.name,
       von,
       nach: ziel.zielId,
-      quelle: 'zug',
+      quelle: 'drag',
     });
   }
 
@@ -450,11 +471,14 @@ export default function EinsatzabschnittePage() {
     () => weitereRef.current?.querySelector('button')?.focus(),
     [],
   );
+  const dialogOffen = verschiebenFuer !== null || aufloesenFuer !== null;
   const warOffen = useRef(false);
   useEffect(() => {
-    if (warOffen.current && verschiebenFuer === null) focusAbschnitt();
-    warOffen.current = verschiebenFuer !== null;
-  }, [verschiebenFuer, focusAbschnitt]);
+    if (warOffen.current && !dialogOffen) focusAbschnitt();
+    warOffen.current = dialogOffen;
+  }, [dialogOffen, focusAbschnitt]);
+  // Erst eine neue Geste handelt im Dialog (`useNewGesture`): nicht das Enter aus dem Menü.
+  const isNewGestureAufloesen = useNewGesture(aufloesenFuer !== null);
 
   function openVerschieben(aid: number) {
     setDialogFehler(null);
@@ -717,10 +741,14 @@ export default function EinsatzabschnittePage() {
         <DndContext
           sensors={sensoren}
           collisionDetection={pointerWithin}
-          accessibility={{ announcements: DRAG_ANSAGEN, screenReaderInstructions: DRAG_ANLEITUNG }}
+          // Die Griffe sind keine Tastaturziele: keine Anleitung, nur deutsche Ansagen beim Ziehen.
+          accessibility={{
+            announcements: DRAG_ANSAGEN,
+            screenReaderInstructions: { draggable: '' },
+          }}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => zufluss.halteZug(false)}
+          onDragCancel={() => zufluss.holdDrag(false)}
         >
           <div
             data-testid="abschnitte-rahmen"
@@ -776,6 +804,8 @@ export default function EinsatzabschnittePage() {
                       {/* Feste Höhe wie im Gerüst des Organigramms: der Wechsel zwischen „Live“,
                         „Live pausiert“ und dem Banner verschiebt den Baum nicht. */}
                       <div
+                        ref={zufluss.standRef}
+                        tabIndex={-1}
                         data-lfh="gliederung-stand"
                         style={{
                           height: token.controlHeight + 2 * token.paddingXS + 2,
@@ -785,7 +815,7 @@ export default function EinsatzabschnittePage() {
                       >
                         {wartet !== null ? (
                           <Sammelbanner
-                            aktion={{ label: 'anzeigen', onKlick: () => zufluss.uebernehmen() }}
+                            aktion={{ label: 'anzeigen', onKlick: zufluss.anzeigen }}
                             style={{
                               flex: '1 1 auto',
                               minWidth: 0,
@@ -1030,7 +1060,7 @@ export default function EinsatzabschnittePage() {
                             onWahl={(key) => {
                               raeumeDetail();
                               if (key === 'verschieben') openVerschieben(aktuell.id);
-                              else setAufloesenFrage(true);
+                              else setAufloesenFuer({ id: aktuell.id, name: aktuell.name });
                             }}
                           />
                         </span>
@@ -1056,6 +1086,7 @@ export default function EinsatzabschnittePage() {
         onWahl={(nach) => {
           if (!verschiebenAbschnitt) return;
           verschieben.mutate({
+            einsatzId,
             art: 'abschnitt',
             id: verschiebenAbschnitt.id,
             name: verschiebenAbschnitt.name,
@@ -1067,22 +1098,33 @@ export default function EinsatzabschnittePage() {
         onAbbrechen={() => setVerschiebenFuer(null)}
         nachDemSchliessen={focusAbschnitt}
       />
-      {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). */}
+      {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). Sie
+          nennt ihren Abschnitt und schließt, wenn er entfällt. */}
       <Modal
-        open={aufloesenFrage && aktuell != null}
-        title="Abschnitt auflösen?"
-        onCancel={() => setAufloesenFrage(false)}
+        open={aufloesenFuer !== null && abschnitte.some((a) => a.id === aufloesenFuer.id)}
+        title={aufloesenFuer ? `Abschnitt „${aufloesenFuer.name}“ auflösen?` : undefined}
+        onCancel={() => {
+          if (isNewGestureAufloesen()) setAufloesenFuer(null);
+        }}
+        focusable={{ focusTriggerAfterClose: false }}
+        afterClose={focusAbschnitt}
         destroyOnHidden
         footer={
           <Space size="middle">
-            <Button onClick={() => setAufloesenFrage(false)}>Abbrechen</Button>
+            <Button
+              onClick={() => {
+                if (isNewGestureAufloesen()) setAufloesenFuer(null);
+              }}
+            >
+              Abbrechen
+            </Button>
             <Button
               danger
               onClick={() => {
-                setAufloesenFrage(false);
-                if (!aktuell) return;
+                if (!aufloesenFuer || !isNewGestureAufloesen()) return;
+                setAufloesenFuer(null);
                 raeumeDetail();
-                aufloesen.mutate(aktuell.id);
+                aufloesen.mutate(aufloesenFuer.id);
               }}
             >
               Abschnitt auflösen

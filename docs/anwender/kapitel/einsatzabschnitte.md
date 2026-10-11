@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
 ---
 
 ## Überblick
@@ -46,7 +46,7 @@ Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie f
 1. In der Gliederung den Abschnitt wählen und „Bearbeiten“ wählen.
 2. Die Angaben ändern und „Speichern“ wählen.
 3. Zum Auflösen neben „Bearbeiten“ das Menü „Weitere Aktionen“ öffnen, „Auflösen“ wählen und
-   die Rückfrage „Abschnitt auflösen?“ mit „Abschnitt auflösen“ bestätigen.
+   die Rückfrage „Abschnitt „…“ auflösen?“ mit „Abschnitt auflösen“ bestätigen.
 
 ### Einen Abschnitt umhängen
 
@@ -55,7 +55,8 @@ Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie f
    die den Abschnitt annehmen; seine eigenen Unterabschnitte und sein jetziger Über-Abschnitt
    tragen keinen Rahmen. Unter dem Baum erscheint dabei „Oberste Ebene“: dort losgelassen, steht
    der Abschnitt ohne Über-Abschnitt.
-3. Der Hinweis „„…“ unter „…“ verschoben“ bietet einige Sekunden lang „Rückgängig“ an.
+3. Der Hinweis „„…“ unter „…“ verschoben“ (bzw. „„…“ auf die oberste Ebene verschoben“) bietet
+   einige Sekunden lang „Rückgängig“ an.
 
 Ohne Ziehen, etwa per Tastatur oder mit Handschuh:
 
@@ -63,6 +64,8 @@ Ohne Ziehen, etwa per Tastatur oder mit Handschuh:
 2. Im Dialog das Ziel wählen; „Oberste Ebene“ steht zuerst, der jetzige Ort trägt den Zusatz
    „(jetziger Ort)“ und ist nicht wählbar. Der Abschnitt selbst und seine Unterabschnitte stehen
    nicht in der Liste.
+
+   ![Dialog „„Sanitätsdienst“ verschieben unter …“ mit den Zielen Oberste Ebene, Betreuung und Logistik](../bilder/einsatzabschnitte/verschieben-unter.png)
 
 ### Eine Einheit einem anderen Abschnitt zuordnen
 
@@ -123,8 +126,10 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 Was ein anderer Arbeitsplatz anlegt oder umhängt, erscheint in der Gliederung von selbst. Liegt
 der Mauszeiger über der Gliederung oder steht der Fokus darin, hält sie still: über dem Baum steht
 „Live pausiert“, und neue oder umgehängte Abschnitte warten in einem Hinweis wie „1 umgehängt“,
-bis „anzeigen“ sie übernimmt. Namen, Lage und Stärke aktualisieren sich weiter sofort. Ein
-aufgelöster Abschnitt verschwindet gleich. Eigene Änderungen erscheinen immer sofort.
+bis „anzeigen“ sie übernimmt. Namen, Lage und Stärke der übrigen Abschnitte aktualisieren sich
+weiter sofort; ein fremd umgehängter Abschnitt zeigt bis „anzeigen“ seinen alten Stand an seinem
+alten Ort. Ein aufgelöster Abschnitt verschwindet gleich. Eigene Änderungen erscheinen immer
+sofort.
 
 ### Das Organigramm
 

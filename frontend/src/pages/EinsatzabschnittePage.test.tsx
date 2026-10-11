@@ -515,7 +515,7 @@ describe('EinsatzabschnittePage', () => {
     await userEvent.click(await screen.findByText('Nord'));
     // Seit LFH-1212 drei Handlungen: „Auflösen“ steht im Menü, die Rückfrage als Dialog.
     await weitereAktion('Nord', 'Auflösen');
-    const rueckfrage = await screen.findByRole('dialog', { name: 'Abschnitt auflösen?' });
+    const rueckfrage = await screen.findByRole('dialog', { name: 'Abschnitt „Nord“ auflösen?' });
     expect(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' })).toHaveClass(
       'ant-btn-dangerous',
     );
@@ -991,7 +991,7 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
   async function loeseAuf(name: string) {
     await userEvent.click(await screen.findByText(name));
     await weitereAktion(name, 'Auflösen');
-    const rueckfrage = await screen.findByRole('dialog', { name: 'Abschnitt auflösen?' });
+    const rueckfrage = await screen.findByRole('dialog', { name: `Abschnitt „${name}“ auflösen?` });
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' }));
   }
 
@@ -1219,8 +1219,39 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       renderPage();
       await userEvent.click(await screen.findByText('Nord-Ost'));
       await screen.findByRole('region', { name: 'Abschnitt: Nord-Ost' });
-      expect(document.querySelector('[data-lfh="zug-griff"]')).toBeNull();
+      expect(document.querySelector('[data-lfh="drag-handle"]')).toBeNull();
       expect(screen.queryByRole('button', { name: /^Weitere Aktionen zu Abschnitt/ })).toBeNull();
+    });
+  });
+
+  describe('Rückfrage „Auflösen“', () => {
+    it('löst den Abschnitt auf, für den sie geöffnet wurde, auch wenn das Detail darunter wechselt', async () => {
+      mitPatches();
+      const geloescht: string[] = [];
+      server.use(
+        http.delete('/api/einsaetze/1/abschnitte/:aid', ({ params }) => {
+          geloescht.push(String(params.aid));
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      const { client } = renderPage();
+      // Ohne Klick steht die Vorwahl im Detail: der erste oberste Abschnitt, Nord.
+      await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+      await weitereAktion('Nord', 'Auflösen');
+      const rueckfrage = await screen.findByRole('dialog', { name: 'Abschnitt „Nord“ auflösen?' });
+
+      // Ein anderer Arbeitsplatz hängt Nord unter Süd: die Vorwahl wird Süd.
+      act(() => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          { ...nord, ueber_abschnitt_id: 6 },
+          nordOst,
+          sued,
+        ]);
+      });
+      await screen.findByRole('region', { name: 'Abschnitt: Süd' });
+
+      await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' }));
+      await waitFor(() => expect(geloescht).toEqual(['5']));
     });
   });
 
@@ -1252,7 +1283,7 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       return { clientX: r.left + 10, clientY: r.top + 10 };
     };
     const griff = (art: string, id: number) =>
-      document.querySelector(`[data-zug="zug-${art}-${id}"]`) as HTMLElement;
+      document.querySelector(`[data-drag="drag-${art}-${id}"]`) as HTMLElement;
 
     /** Greift, zieht über die Aktivierungsdistanz, fährt zum Ziel; `loslassen` beendet den Zug. */
     function zieheBis(start: HTMLElement, ziel: { clientX: number; clientY: number }) {
@@ -1360,6 +1391,28 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
 
       await userEvent.click(screen.getByRole('button', { name: /anzeigen/ }));
       await waitFor(() => expect(knoten('Nord-Ost').stelle).toBeGreaterThan(knoten('Süd').stelle));
+    });
+
+    it('„anzeigen“ lässt den Fokus im Bereich; wer ihn verlässt, taut die Schleuse', async () => {
+      mitPatches();
+      const { client } = renderPage();
+      await screen.findByText('Nord-Ost');
+      const bereich = document.querySelector('[data-lfh="gliederung-bereich"]') as HTMLElement;
+      fireEvent.pointerEnter(bereich, { pointerType: 'mouse' });
+      act(() => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          nord,
+          { ...nordOst, ueber_abschnitt_id: 6 },
+          sued,
+        ]);
+      });
+      await userEvent.click(await screen.findByRole('button', { name: /anzeigen/ }));
+
+      // Der Knopf ist weg; der Fokus fiel nicht auf <body>, die Standzeile hat ihn.
+      expect(document.activeElement).toBe(document.querySelector('[data-lfh="gliederung-stand"]'));
+      fireEvent.pointerLeave(bereich, { pointerType: 'mouse' });
+      act(() => screen.getByRole('button', { name: 'Bearbeiten' }).focus());
+      expect(await screen.findByText('Live')).toBeInTheDocument();
     });
 
     it('ohne Zeiger und Fokus fließt der Umhang sofort', async () => {

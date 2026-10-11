@@ -9,8 +9,9 @@ import { FUEKW, anmelden, einsatzAnlegen, post } from './fuehrungsorganisation-k
  * die neue Struktur.
  *
  * Mutationsproben in `pages/EinsatzabschnittePage.tsx`: statt `zufluss.stand.gezeigt` den frischen
- * Baum zeigen → der Banner fehlt am zweiten Arbeitsplatz; `focusAbschnitt` leeren → der Fokus
- * steht nach dem Dialog nicht am Auslöser.
+ * Baum zeigen → am zweiten Arbeitsplatz springt der Knoten unter dem Zeiger (Vergleich der
+ * `boundingBox`); `focusAbschnitt` leeren → der Fokus steht nach dem Dialog nicht am Auslöser;
+ * `useNewGesture` überall `true` liefern lassen → das Enter aus dem Menü schließt den Dialog.
  */
 
 test.use({ viewport: FUEKW });
@@ -51,7 +52,7 @@ async function ziehe(page: Page, quelle: Locator, ziel: Locator) {
 
 const ziel = (page: Page, id: number) =>
   page.locator(`[data-lfh="gliederung-ziel"][data-abschnitt="${id}"]`);
-const griff = (page: Page, id: number) => page.locator(`[data-zug="zug-abschnitt-${id}"]`);
+const griff = (page: Page, id: number) => page.locator(`[data-drag="drag-abschnitt-${id}"]`);
 
 /** Die Spalte eines obersten Abschnitts im Organigramm enthält den Unterabschnitt. */
 async function erwarteImOrganigramm(page: Page, einsatzId: string, oben: string, unter: string) {
@@ -59,7 +60,8 @@ async function erwarteImOrganigramm(page: Page, einsatzId: string, oben: string,
   await page.mouse.move(0, 0);
   const org = page.getByRole('region', { name: 'Organigramm' });
   await expect(org.getByRole('link', { name: oben, exact: true })).toBeVisible();
-  const aufklappen = org.getByRole('button', { name: 'Alle aufklappen' });
+  // Die Klappknöpfe stehen in der Werkzeugzeile über der Region.
+  const aufklappen = page.getByRole('button', { name: 'Alle aufklappen' });
   if (await aufklappen.isEnabled()) await aufklappen.click();
   const spalte = org
     .locator('[data-lfh="org-spalte"]')
@@ -81,8 +83,10 @@ test('Gliederung: ein Abschnitt per Zeiger auf einen anderen wird sein Unterabsc
   await expect.poll(() => ueberAbschnitt(page, einsatzId, ost)).toBe(sued);
 
   // Kein Klickverlust (Gegenprobe LFH-519): der ERSTE Klick nach dem Zug wählt den Abschnitt.
-  await page.getByRole('tree').getByText(NORD, { exact: true }).click();
+  // Süd, nicht Nord: Nord steht als Vorwahl schon im Detail, ein verlorener Klick bliebe grün.
   await expect(page.getByRole('region', { name: `Abschnitt: ${NORD}` })).toBeVisible();
+  await page.getByRole('tree').getByText(SUED, { exact: true }).click();
+  await expect(page.getByRole('region', { name: `Abschnitt: ${SUED}` })).toBeVisible();
 
   await erwarteImOrganigramm(page, einsatzId, SUED, OST);
 });
@@ -99,11 +103,22 @@ test('Gliederung: „Verschieben unter …“ hängt per Tastatur um und gibt de
   const ausloeser = page.getByRole('button', { name: `Weitere Aktionen zu Abschnitt ${OST}` });
   await ausloeser.focus();
   await page.keyboard.press('Enter');
-  await page.getByRole('menuitem', { name: 'Verschieben unter …' }).press('Enter');
+  // Das Menü nimmt den Fokus selbst (`MenueAusloeser`, `autoFocus`); die Pfeiltasten heben einen
+  // Eintrag hervor, Enter wählt ihn (Muster `etb-chronologie.spec.ts`, LFH-683).
+  const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  await expect(menue).toBeVisible();
+  const aktiv = menue.locator('.ant-dropdown-menu-item-active');
+  await page.keyboard.press('ArrowDown');
+  if (!(await aktiv.textContent())?.includes('Verschieben')) await page.keyboard.press('ArrowUp');
+  await expect(aktiv).toHaveText('Verschieben unter …');
+  await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog', { name: `„${OST}“ verschieben unter …` });
   await expect(dialog.getByRole('button', { name: `${NORD} (jetziger Ort)` })).toBeDisabled();
-  // Der Fokus steht im ersten wählbaren Ziel: „Oberste Ebene“.
+  // Das Enter aus dem Menü schließt den Dialog nicht und wählt kein Ziel (`useNewGesture`); der
+  // Fokus steht danach im ersten
+  // wählbaren Ziel „Oberste Ebene“.
   await expect(dialog.getByRole('button', { name: 'Oberste Ebene' })).toBeFocused();
+  expect(await ueberAbschnitt(page, einsatzId, ost)).toBe(nord);
   await page.keyboard.press('Enter');
 
   await expect(page.getByText(`„${OST}“ auf die oberste Ebene verschoben`)).toBeVisible();
