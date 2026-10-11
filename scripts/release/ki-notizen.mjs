@@ -8,7 +8,7 @@
  *     CHANGELOG und GitHub-Release wichen voneinander ab. Die Hülle merkt sich das Ergebnis je
  *     Version und liefert beim zweiten Aufruf denselben Text, ohne zweiten Modellaufruf.
  *  2. EIN FEHLER WIRD ZUM RELEASE-TEXT: scheitert der Aufruf, liefert das Plugin einen
- *     Fehltext als Notizen. Jeder unbrauchbare Text (und ein fehlender Schlüssel) fällt hier
+ *     Fehltext als Notizen. Jeder unbrauchbare Text (und fehlende Zugangsdaten) fällt hier
  *     auf die konventionellen Notizen zurück, mit Warnung. Ein Release scheitert nie an Prosa.
  *  3. KEINE VERSIONSÜBERSCHRIFT: die Hülle setzt die Kopfzeile der konventionellen Notizen
  *     davor (byte-gleich zum bisherigen Format) und rückt die Überschriften eine Ebene tiefer.
@@ -56,6 +56,22 @@ export function commitsFuerPrompt(commits, budget = ZEICHEN_BUDGET) {
   const koepfe = commits.map((c) => ({ ...c, message: c.message.split('\n', 1)[0] }));
   if (summe(koepfe) <= budget) return { form: 'kopfzeilen', commits: maskiert(koepfe) };
   return { form: null, commits: [] };
+}
+
+/**
+ * Hat der Lauf Zugangsdaten für Claude? Ein Schlüssel, ein Bearer-Token oder eine vollständige
+ * Workload Identity Federation (im Release-Job: das GitHub-OIDC-Token, `release.yml`). Leere
+ * Werte zählen nicht — ein gelöschtes Secret kommt in GitHub Actions als `""` an.
+ */
+export function hasCredentials(env) {
+  const isSet = (name) => Boolean(env?.[name]);
+  if (isSet('ANTHROPIC_API_KEY') || isSet('ANTHROPIC_AUTH_TOKEN')) return true;
+  return (
+    ['ANTHROPIC_FEDERATION_RULE_ID', 'ANTHROPIC_ORGANIZATION_ID', 'ANTHROPIC_SERVICE_ACCOUNT_ID'].every(
+      isSet,
+    ) &&
+    (isSet('ANTHROPIC_IDENTITY_TOKEN_FILE') || isSet('ANTHROPIC_IDENTITY_TOKEN'))
+  );
 }
 
 /** Ein Modelltext ist brauchbar, wenn er kein Fehlertext des Plugins ist und gegliedert ist. */
@@ -112,8 +128,10 @@ export function erzeugeNotizen({ ki, konventionell }) {
       return notizen;
     };
 
-    if (!context.env?.ANTHROPIC_API_KEY) {
-      logger.warn('ANTHROPIC_API_KEY fehlt — konventionelle Release-Notizen statt KI-Notizen.');
+    if (!hasCredentials(context.env)) {
+      logger.warn(
+        'Keine Zugangsdaten für Claude (Federation oder Schlüssel) — konventionelle Release-Notizen statt KI-Notizen.',
+      );
       return merke(konventionelleNotizen);
     }
 
