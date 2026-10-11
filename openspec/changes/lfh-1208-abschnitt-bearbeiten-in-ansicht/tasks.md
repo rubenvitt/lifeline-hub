@@ -85,11 +85,11 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
   durch: „‚Abschnitt anlegen‘ ist eine Erfassung (drei Felder), der Rest wird im Detail ergänzt;
   das Detail bearbeitet jede Angabe einzeln (`patcheAbschnitt`, ein Feld)“. Nachweis: Prettier
   über `frontend/` ist grün, und `grep -n "lokaler Entwurf" frontend/AGENTS.md` trifft nichts mehr.
-- [ ] 4.2 Kapitel `docs/anwender/kapitel/einsatzabschnitte.md` neu schreiben: Anlegen in drei
+- [x] 4.2 Kapitel `docs/anwender/kapitel/einsatzabschnitte.md` neu schreiben: Anlegen in drei
   Feldern, Angaben am Wert ändern, Lagezustand mit einem Klick, kein Fortschritt. Dabei die Regeln
   aus `docs/anwender/AGENTS.md` einhalten (Kapitelform, Wächter). Nachweis: der Wächter der
   Anwenderdoku in `check-all.sh` ist grün.
-- [ ] 4.3 `e2e/doku-bilder/einsatzabschnitte.bilder.ts` anpassen: `gliederung.png` zeigt das
+- [x] 4.3 `e2e/doku-bilder/einsatzabschnitte.bilder.ts` anpassen: `gliederung.png` zeigt das
   Detail mit Segmentleiste, `abschnitt-anlegen.png` das Modal mit drei Feldern, dazu der
   Dateikopf mit den neuen Quellen (`AbschnittDetail.tsx`, `AbschnittAnlegenModal.tsx`). Bilder
   neu erzeugen (`pnpm doku:bilder --grep einsatzabschnitte`). Nachweis: die Bilder liegen neu
@@ -97,14 +97,14 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 5. Einsatztauglichkeit und e2e
 
-- [ ] 5.1 Prüfflächen C12 in `e2e/trefflaeche-pruefflaechen.spec.ts`: „Abschnitt Detailaktionen“
+- [x] 5.1 Prüfflächen C12 in `e2e/trefflaeche-pruefflaechen.spec.ts`: „Abschnitt Detailaktionen“
   misst statt `Bearbeiten|Auflösen` die Zeilen-Auslöser des Details, die Segmente des
   Lagezustands und „Auflösen“. Der Beobachterzweig belegt, dass Segmentleiste und Stifte fehlen.
   Nachweis: die Spec läuft grün in `kompakt` und `handschuh`.
-- [ ] 5.2 Neue e2e `e2e/einsatzabschnitte-bearbeitung.spec.ts`: Lagezustand ändern (ETB-Eintrag
+- [x] 5.2 Neue e2e `e2e/einsatzabschnitte-bearbeitung.spec.ts`: Lagezustand ändern (ETB-Eintrag
   erscheint), Leiter setzen, Abschnitt anlegen per Enter. Jeweils in `kompakt` und `handschuh`,
   und der Request-Body des PATCH enthält genau ein Feld. Nachweis: die Spec läuft grün.
-- [ ] 5.3 `openspec/changes/lfh-1208-abschnitt-bearbeiten-in-ansicht/pruefliste.md` mit der
+- [x] 5.3 `openspec/changes/lfh-1208-abschnitt-bearbeiten-in-ansicht/pruefliste.md` mit der
   Prüfliste Einsatztauglichkeit (15 Kriterien, jedes mit Verdikt erfüllt / offen → Zielticket /
   nicht anwendbar) für Detail und Anlegen-Modal, inklusive Handy (390 px, Gliederung über dem
   Detail). Nachweis: die Datei ist vollständig, ohne „nicht geprüft“.
