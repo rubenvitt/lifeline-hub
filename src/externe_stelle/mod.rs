@@ -1,7 +1,7 @@
 //! Stammdaten-Katalog „Externe Stellen“ je Organisation (LFH-1194): Leitstellen, Behörden,
 //! Polizei und Hilfsorganisationen, mit denen ein Einsatz zu tun hat. Vorschlagsquelle für die
 //! meldende Stelle und den Adressaten einer Nachforderung; beide speichern nur Text (Speicherform
-//! A). Herleitung: `openspec/changes/lfh-1194-externe-stellen-katalog/design.md`.
+//! A). Herleitung: `openspec/changes/archive/2026-10-11-lfh-1194-externe-stellen-katalog/design.md`.
 
 pub mod repo;
 

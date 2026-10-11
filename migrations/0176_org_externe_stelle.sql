@@ -1,5 +1,5 @@
 -- LFH-1194: Stammdaten-Katalog „Externe Stellen“ je Organisation (Leitstellen, Behörden, Polizei,
--- Hilfsorganisationen). Herleitung: openspec/changes/lfh-1194-externe-stellen-katalog/design.md
+-- Hilfsorganisationen). Herleitung: openspec/changes/archive/2026-10-11-lfh-1194-externe-stellen-katalog/design.md
 -- (D2, D3).
 --
 -- Vorschlagsquelle für die meldende Stelle eines Einsatzes und den Adressaten einer

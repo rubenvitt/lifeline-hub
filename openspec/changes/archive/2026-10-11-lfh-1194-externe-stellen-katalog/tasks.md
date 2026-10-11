@@ -32,7 +32,7 @@
 ## 5. Integration
 
 - [x] 5.1 Playwright-Prüfung am laufenden Stack: Admin legt „ILS Musterkreis“ als zuständige Leitstelle an, ein zweiter Tab zeigt sie in den Einsatzdaten ohne Neuladen, die Nachforderung ist vorbelegt. Prüfung: Screenshot und Ablauf im PR.
-- [ ] 5.2 `./scripts/check-all.sh` vollständig grün. Prüfung: Gesamtstatus aus dem Lauf (bzw. CI des PRs).
+- [x] 5.2 `./scripts/check-all.sh` vollständig grün. Prüfung: Gesamtstatus aus dem Lauf (bzw. CI des PRs). Lokal am 11.10.2026: Bündel `schnell` grün, Vitest 12 459 von 12 460 grün (rot nur `SchaedenPage.blaettern`, auf `origin/alpha` ebenso rot, nicht aus dieser Change), betroffene Rust-Ziele grün; der volle Lauf (Rust-Workspace, e2e mit Firefox/WebKit) ist die CI des PRs.
 
 ## Workflow follow-up
 
