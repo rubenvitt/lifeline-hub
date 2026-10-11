@@ -36,7 +36,6 @@ import utc from 'dayjs/plugin/utc';
 import {
   ladeEinsatz,
   ladeFuehrungsstelle,
-  ladeMitglieder,
   ladeModulFreigaben,
   patcheEinsatz,
   patcheFuehrungsstelle,
@@ -278,6 +277,8 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
   const { token, rollen } = useRollen();
   return (
     <div
+      role="group"
+      aria-label={etikett}
       style={{
         background: rollen.flaeche,
         paddingBlock: token.paddingSM,
@@ -584,10 +585,6 @@ export default function EinsatzdatenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const mitgliederQuery = useQuery({
-    queryKey: einsatzKeys.mitglieder(einsatzId),
-    queryFn: () => ladeMitglieder(einsatzId),
-  });
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
@@ -638,11 +635,6 @@ export default function EinsatzdatenPage() {
   // Kopfdaten und Führungsstelle laufen über die Verwaltungsrouten: der Admin nur der Einsatz-Org
   // (LFH-1066, wie der Server).
   const darfBearbeiten = darfEinsatzVerwalten(einsatz, benutzer);
-
-  const leitung = (mitgliederQuery.data ?? [])
-    .filter((m) => m.einsatz_rolle === 'einsatzleitung')
-    .map((m) => m.anzeigename)
-    .join(', ');
 
   const darfVerwaltenMitglieder = darfEinsatzLeiten(einsatz);
   // Aktiver Einsatz und Einsatzleitung (oder Admin); nach dem Abschluss fällt der Abschnitt weg.
@@ -860,7 +852,12 @@ export default function EinsatzdatenPage() {
                 />
               }
             />
-            <KopfAngabe etikett="Einsatzleitung" wert={leitung || '—'} />
+            {/* Nie aus der App-Rolle `einsatzleitung` ableiten: sie ist ein Rechtebündel, kein
+                Einsatzleiter nach FwDV 100 (LFH-1199, Regel „Keine erfundenen Daten“). */}
+            <KopfAngabe
+              etikett="Einsatzleitung"
+              wert={<span style={{ color: rollen.gedaempft }}>nicht erfasst</span>}
+            />
           </div>
 
           <Paneel titel="Lagedaten">

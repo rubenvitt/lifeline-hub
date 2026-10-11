@@ -303,8 +303,6 @@ describe('EinsatzdatenPage', () => {
   it('zeigt Kopfdaten im Lesemodus, leere Felder als —', async () => {
     setup();
     expect(await screen.findByText('Realeinsatz')).toBeInTheDocument();
-    // 'Admin' erscheint als Einsatzleitung in der Kopfleiste und zusätzlich in der Zugriff-Tabelle.
-    expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     // Die Einsatznummer ist eine technische Angabe im eingeklappten Abschnitt; ohne `forceRender`
     // steht sie nicht im Baum. Das Aufklappen prüft der Gliederungs-Block weiter unten.
@@ -796,6 +794,15 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Meldende Stelle' })).toHaveValue('ILS');
     expect(document.querySelector('.ant-message-error')).toBeNull();
+  });
+
+  it('Kopfleiste leitet die Einsatzleitung nicht aus der App-Rolle ab (LFH-1199)', async () => {
+    // „Admin" trägt die Einsatzrolle `einsatzleitung`, ein Einsatzleiter ist nicht erfasst.
+    setup();
+    const zelle = await screen.findByRole('group', { name: 'Einsatzleitung' });
+    expect(within(zelle).getByText('nicht erfasst')).toBeInTheDocument();
+    expect(within(zelle).queryByText('Admin')).toBeNull();
+    expect(within(zelle).queryByRole('button')).toBeNull();
   });
 
   it('Koordinate, Einsatzleitung, Einsatznummer und „Angelegt am" tragen keine Aufforderung', async () => {
@@ -1299,7 +1306,8 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     const p = await paneel();
     expect(await p.findByText('Florian 10/1')).toBeInTheDocument();
     expect(p.queryByRole('button', { name: /eintragen|bearbeiten/ })).toBeNull();
-    expect(p.getAllByText('—')).toHaveLength(4);
+    // Die Fahrzeugzeile hat eine eigene Quelle; „—" steht dort erst, wenn sie geladen ist.
+    await waitFor(() => expect(p.getAllByText('—')).toHaveLength(4));
   });
 
   it('Speicherfehler steht an der Zeile, die Eingabe bleibt offen', async () => {

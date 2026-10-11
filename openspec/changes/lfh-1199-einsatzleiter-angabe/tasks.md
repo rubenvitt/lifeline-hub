@@ -4,11 +4,11 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, rot belegt, dann die Umsetzung.
 
 ## 1. Sofortschritt Kopfleiste (Route `klar`, eigener Commit)
 
-- [ ] 1.1 Test zuerst in `pages/EinsatzdatenPage.test.tsx`: Ein Mitglied „Administrator“ trägt
+- [x] 1.1 Test zuerst in `pages/EinsatzdatenPage.test.tsx`: Ein Mitglied „Administrator“ trägt
   die Rolle `einsatzleitung`, und die Führungsstelle hat keinen Einsatzleiter. Erwartet unter
   „Einsatzleitung“ gedämpft „nicht erfasst“, „Administrator“ fehlt dort, und es gibt keine
   Bearbeiten-Aufforderung. Nachweis: rot belegt.
-- [ ] 1.2 `EinsatzdatenPage.tsx`: Die Ableitung aus `einsatz_rolle` entfällt, `KopfAngabe` bekommt
+- [x] 1.2 `EinsatzdatenPage.tsx`: Die Ableitung aus `einsatz_rolle` entfällt, `KopfAngabe` bekommt
   die gedämpfte Form „nicht erfasst“, und ein Code-Kommentar verweist auf LFH-1199. Nachweis:
   1.1 grün, bestehende Seitentests grün.
 
