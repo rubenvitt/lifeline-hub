@@ -1,3 +1,15 @@
+## [1.0.0-alpha.107](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.106...v1.0.0-alpha.107) (2026-10-11)
+
+### Verwaltung
+
+Die Übersichtstabellen für Fahrzeuge, Dokumente und Aufbewahrung wurden für den Einsatz am Führungsarbeitsplatz optimiert und passen nun ohne horizontales Scrollen auf Bildschirme mit 1440 × 900 Pixeln (typische Auflösung von Fükw-Displays).
+
+**Fahrzeuge:** Bei schmaleren Fenstern werden Kennzeichen und Träger in den Spaltenschalter ausgeblendet und können bei Bedarf eingeblendet werden. Die Besatzungsanzeige zeigt Ist- und Soll-Besatzung kompakt in einer Zeile. Sehr lange Funkrufnamen (z.B. mit Ad-hoc-Zusätzen) werden bei Bedarf umgebrochen.
+
+**Aufbewahrungsübersicht:** Bei Fensterbreiten unter 1600 Pixeln werden die Spalten „Vorgemerkt am", „Schwärzung auf Antrag ab" und „Geschwärzt am" automatisch in den Spaltenschalter ausgeblendet. Die wichtigsten Informationen zum Aufbewahrungsstatus bleiben über die Zustandsmarken sichtbar. Bei Bedarf können die zusätzlichen Spalten über den Spaltenschalter eingeblendet werden.
+
+Alle drei Tabellen verwenden nun eine einheitliche Regelung: Eine Spalte (Funkrufname, Titel oder Bezeichnung) passt sich flexibel an die verfügbare Breite an, während alle anderen Spalten feste Breiten haben. Die Schaltflächen „Entfernen" und der Papierkorb sind ohne Querscrollen erreichbar.
+
 ## [1.0.0-alpha.106](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.105...v1.0.0-alpha.106) (2026-10-11)
 
 ### Kräfte und Mittel
