@@ -460,6 +460,8 @@ export function useLagekarteDaten({
     const katalog: [string, boolean][] = [
       ['Berechtigungen', freigabenFehler],
       ['Einsatzdaten', einsatzQuery.isError],
+      // Die eigene Führungsstelle (LFH-1181) steht als Anker auf der Karte; ihr Ausfall ist einer.
+      ['Führungsstelle', fuehrungsstelleQuery.isError],
       ['Unfallhilfsstellen', uhsFrei && uhsQuery.isError],
       ['Schäden', schaedenFrei && schaedenQuery.isError],
       ['Einheiten', einheitenFrei && einheitenQuery.isError],
@@ -481,6 +483,7 @@ export function useLagekarteDaten({
     snapQuery.isError,
     freigabenFehler,
     einsatzQuery.isError,
+    fuehrungsstelleQuery.isError,
     uhsFrei,
     uhsQuery.isError,
     schaedenFrei,

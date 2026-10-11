@@ -75,10 +75,9 @@ describe('ChecklistePaneel · Standort der Führungsstelle (LFH-1181)', () => {
     expect(
       await within(zeile).findByText('ELW 2 Musterstadt · Parkplatz Feuerwehrhaus Nord'),
     ).toBeInTheDocument();
-    expect(within(zeile).getByRole('link', { name: 'Einsatzdaten' })).toHaveAttribute(
-      'href',
-      expect.stringContaining('/einsaetze/1/einsatzdaten'),
-    );
+    expect(
+      within(zeile).getByRole('link', { name: 'Standort der Führungsstelle in Einsatzdaten' }),
+    ).toHaveAttribute('href', expect.stringContaining('/einsaetze/1/einsatzdaten'));
     expect(await box('Standort der Führungsstelle festgelegt')).not.toBeChecked();
   });
 
@@ -86,7 +85,9 @@ describe('ChecklistePaneel · Standort der Führungsstelle (LFH-1181)', () => {
     rendere();
     const zeile = await zeileStandort();
     expect(await within(zeile).findByText('Standort nicht erfasst')).toBeInTheDocument();
-    expect(within(zeile).getByRole('link', { name: 'Einsatzdaten' })).toBeInTheDocument();
+    expect(
+      within(zeile).getByRole('link', { name: 'Standort der Führungsstelle in Einsatzdaten' }),
+    ).toBeInTheDocument();
   });
 
   it('Abruf gescheitert: nennt den Grund, Haken bleibt bedienbar', async () => {

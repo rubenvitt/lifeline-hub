@@ -50,6 +50,7 @@ pub struct FuehrungsstelleAnzeige {
     /// Koordinate des Standorts, nur als Paar gesetzt. Wird mit der Adresse geschwärzt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub standort_lat: Option<f64>,
+    /// Länge zur Breite `standort_lat`, nur als Paar gesetzt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub standort_lon: Option<f64>,
     /// Funkrufname der Führungsstelle, z. B. „Florian Musterstadt 10/1“.

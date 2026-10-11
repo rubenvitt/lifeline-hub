@@ -10,6 +10,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzdatenPfad } from '../routing/deeplinks';
 import { Link } from 'react-router';
 import { ZUSTAND_GRUND } from './funkplan';
+import { stabZeilenzielStil } from './zeilenziel';
 import type { ChecklistenEintrag, ChecklistenPunkt, ChecklistenPunktBody } from '../api/types';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Liste, ListenEintrag } from '../components/Liste';
@@ -266,7 +267,13 @@ function FuehrungsstellenStandort({ einsatzId }: { einsatzId: number }) {
   return (
     <Flex gap={token.marginXS} wrap align="baseline">
       <span>{wert}</span>
-      <Link to={einsatzdatenPfad(einsatzId)}>Einsatzdaten</Link>
+      <Link
+        to={einsatzdatenPfad(einsatzId)}
+        aria-label="Standort der Führungsstelle in Einsatzdaten"
+        style={stabZeilenzielStil(token)}
+      >
+        Einsatzdaten
+      </Link>
     </Flex>
   );
 }

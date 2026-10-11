@@ -1,9 +1,16 @@
 import type { AbrufZustand } from '../../api/abrufZustand';
-import type { Einheit, Einsatzabschnitt, Staerke, Stabsfunktion } from '../../api/types';
+import type {
+  Einheit,
+  Einsatzabschnitt,
+  Fuehrungsstelle,
+  Staerke,
+  Stabsfunktion,
+} from '../../api/types';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { besetzungDarstellung } from '../../stab/besetzung';
 import { md, ZUSTAND_GRUND } from '../../stab/funkplan';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
+import { fuehrungsstelleErfasst } from '../../stab/fuehrungsstelle';
 import { baueTzProps, type TzProps } from '../lagekarte/taktischesZeichen';
 import { abschnittStaerken } from './abschnittStaerke';
 
@@ -208,6 +215,24 @@ function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
   return [kopf, ...k.kinder.flatMap((c) => knotenMarkdown(c, tiefe + 1))];
 }
 
+/** Die erfasste eigene Führungsstelle an der Wurzel „Einsatzleitung“ (LFH-1181). */
+export interface WurzelFuehrungsstelle {
+  bezeichnung: string | null;
+  rufname: string | null;
+}
+
+/**
+ * Was die Wurzel von der eigenen Führungsstelle zeigt — EINE Ableitung für Bildschirm, Druck und
+ * beide Übernahmen in den Lagebericht. Nicht erfasst oder nicht geladen: `null`, die Wurzel bleibt
+ * wie ohne Führungsstelle.
+ */
+export function wurzelFuehrungsstelle(
+  fs: Fuehrungsstelle | null | undefined,
+): WurzelFuehrungsstelle | null {
+  if (!fs || !fuehrungsstelleErfasst(fs)) return null;
+  return { bezeichnung: fs.bezeichnung?.trim() || null, rufname: fs.rufname?.trim() || null };
+}
+
 /**
  * Die Führungsorganisation als Freitext für „In Lagebericht übernehmen“: Kopf, Einsatzleitung
  * (mit Stab nur, wenn übergeben — also freigegeben und geladen), fehlende Quellen, dann die
@@ -222,7 +247,7 @@ export function rendereFuehrungsorganisationMarkdown(
     stab: readonly Stabsfunktion[] | 'fehler' | null;
     einheitenZustand: AbrufZustand;
     /** Die erfasste eigene Führungsstelle (LFH-1181); fehlt sie, steht keine Zeile dafür da. */
-    fuehrungsstelle?: { bezeichnung: string | null; rufname: string | null } | null;
+    fuehrungsstelle?: WurzelFuehrungsstelle | null;
   },
 ): string {
   const fs = opts.fuehrungsstelle;

@@ -5,7 +5,6 @@ import { Link, useNavigate } from 'react-router';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
-import { fuehrungsstelleErfasst } from '../../stab/fuehrungsstelle';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { ladeStab } from '../../api/stab';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -36,8 +35,10 @@ import {
   baueFuehrungsorganisation,
   rendereFuehrungsorganisationMarkdown,
   stabZeilen,
+  wurzelFuehrungsstelle,
   type Fuehrungsorganisation,
   type OrgKnoten,
+  type WurzelFuehrungsstelle,
 } from './fuehrungsorganisation';
 import './organigrammPrint.css';
 
@@ -63,12 +64,6 @@ export type StabsstelleZustand =
   | { zustand: 'aus' }
   | { zustand: 'fehler' }
   | { zustand: 'daten'; besetzung: readonly Stabsfunktion[] };
-
-/** Die erfasste eigene Führungsstelle an der Wurzel (LFH-1181); `null`, wenn nicht erfasst. */
-export interface WurzelFuehrungsstelle {
-  bezeichnung: string | null;
-  rufname: string | null;
-}
 
 interface BildProps {
   einsatzId: number;
@@ -328,14 +323,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
     queryKey: einsatzKeys.fuehrungsstelle(einsatz.id),
     queryFn: () => ladeFuehrungsstelle(einsatz.id),
   });
-  const fsDaten = fsQuery.data ?? null;
-  const fuehrungsstelle: WurzelFuehrungsstelle | null =
-    fsDaten && fuehrungsstelleErfasst(fsDaten)
-      ? {
-          bezeichnung: fsDaten.bezeichnung?.trim() || null,
-          rufname: fsDaten.rufname?.trim() || null,
-        }
-      : null;
+  const fuehrungsstelle = wurzelFuehrungsstelle(fsQuery.data);
 
   // Dieselbe Abfrage wie `useStabFreigabe` (gemeinsamer Cache): die Übernahme legt einen
   // Lagebericht an, also braucht es Schreibrecht UND das freigegebene Modul Lageberichte.

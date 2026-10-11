@@ -871,3 +871,38 @@ async fn koordinate_ausserhalb_ist_422() {
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{lat}/{lon}");
     }
 }
+
+#[tokio::test]
+async fn nur_die_adresse_wird_gespeichert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"standort_adresse": "Rathaus, Marktplatz 1"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let json = lesen(&app, &admin, einsatz).await.1;
+    assert_eq!(json["standort_adresse"], "Rathaus, Marktplatz 1");
+    assert!(json.get("standort_lat").is_none(), "{json:?}");
+}
+
+#[tokio::test]
+async fn feldfehler_400_geht_vor_dem_zusammenhang_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"art": "stationaer", "standort_lat": 95.0, "standort_lon": 0.0}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

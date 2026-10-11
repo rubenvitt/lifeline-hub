@@ -1232,7 +1232,9 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     const p = await paneel();
     await user.click(await p.findByRole('button', { name: 'Standort eintragen' }));
     await user.click(p.getByRole('button', { name: 'wie Einsatzort' }));
-    expect(p.getByRole('textbox', { name: 'Standort' })).toHaveValue('Industriestraße 4');
+    expect(p.getByRole('textbox', { name: 'Adresse des Standorts' })).toHaveValue(
+      'Industriestraße 4',
+    );
     await user.click(p.getByRole('button', { name: 'Standort speichern' }));
     await waitFor(() =>
       expect(bodies).toEqual([
@@ -1251,13 +1253,64 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     const p = await paneel();
     await user.click(await p.findByRole('button', { name: 'Standort eintragen' }));
     expect(p.queryByRole('button', { name: 'wie Einsatzort' })).toBeNull();
-    await user.type(p.getByRole('textbox', { name: 'Standort' }), 'Rathaus, Marktplatz 1');
+    await user.type(
+      p.getByRole('textbox', { name: 'Adresse des Standorts' }),
+      'Rathaus, Marktplatz 1',
+    );
     await user.click(p.getByRole('button', { name: 'Standort speichern' }));
     await waitFor(() =>
       expect(bodies).toEqual([
         { standort_adresse: 'Rathaus, Marktplatz 1', standort_lat: null, standort_lon: null },
       ]),
     );
+  });
+
+  it('Standort: eine unlesbare Koordinate steht als Fehler an der Zeile, nichts geht hinaus (LFH-1181)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Standort eintragen' }));
+    await user.type(p.getByRole('textbox', { name: 'Koordinate' }), 'abc');
+    await user.click(p.getByRole('button', { name: 'Standort speichern' }));
+    // Den Grund nennt die Koordinateneingabe am Feld, die Zeile meldet „Nicht gespeichert“.
+    expect(await p.findByText(/Ungültige Koordinate/)).toBeInTheDocument();
+    expect(await p.findByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
+  it('Standort „wie Einsatzort“ ohne Koordinate am Einsatzort leert auch die Koordinate (LFH-1181)', async () => {
+    setup({
+      einsatz: { einsatzort: 'Industriestraße 4', einsatzort_lat: null, einsatzort_lon: null },
+    });
+    const bodies = fuehrungsstelleMitschnitt({
+      art: 'mobil',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      standort_lat: 52.1,
+      standort_lon: 9.9,
+    });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Standort bearbeiten' }));
+    await user.click(p.getByRole('button', { name: 'wie Einsatzort' }));
+    await user.click(p.getByRole('button', { name: 'Standort speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { standort_adresse: 'Industriestraße 4', standort_lat: null, standort_lon: null },
+      ]),
+    );
+  });
+
+  it('Art: zwei schnelle Wechsel, es gilt der letzte (LFH-1181)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('radio', { name: 'ortsfest' }));
+    await user.click(p.getByRole('radio', { name: 'mobil' }));
+    await waitFor(() => expect(bodies).toEqual([{ art: 'ortsfest' }, { art: 'mobil' }]));
+    await waitFor(() => expect(p.getByRole('radio', { name: 'mobil' })).toBeChecked());
   });
 
   it('Ortsfest: Führungsfahrzeuge eingeklappt mit Anzahl, aufklappbar (LFH-1181)', async () => {
@@ -1400,6 +1453,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     expect(await p.findByText('Florian 10/1')).toBeInTheDocument();
     expect(p.queryByRole('button', { name: /eintragen|bearbeiten/ })).toBeNull();
     expect(p.queryByRole('radiogroup', { name: 'Art' })).toBeNull();
+    // Erfasst (Rufname): „mobil“ ist gewählt, nicht die Vorgabe.
     expect(p.getByText('mobil')).toBeInTheDocument();
     expect(p.getAllByText('—')).toHaveLength(6);
   });

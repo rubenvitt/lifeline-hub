@@ -6,6 +6,7 @@ import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeStab } from '../api/stab';
+import { ladeFuehrungsstelle } from '../api/einsaetze';
 import type { ModulFreigaben } from '../api/types';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -13,6 +14,7 @@ import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebil
 import {
   baueFuehrungsorganisation,
   rendereFuehrungsorganisationMarkdown,
+  wurzelFuehrungsstelle,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
 import { gesperrt, ladeListe, type Geladen, type UebernahmeQuelle } from './uebernahmeQuelle';
@@ -84,7 +86,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
     const lade = <T>(l: Liste, key: readonly unknown[], fn: () => Promise<T[]>) =>
       frei(l) ? ladeListe<T[]>(qc, key, fn, []) : Promise.resolve(gesperrt<T[]>([]));
     const stabFrei = istKeyFreigegeben('stab', freigaben);
-    const [abschnitte, einheiten, personal, fahrzeuge, material, stab] = await Promise.all([
+    const [abschnitte, einheiten, personal, fahrzeuge, material, stab, fs] = await Promise.all([
       lade('abschnitte', einsatzKeys.abschnitte(einsatzId), () => listeAbschnitte(einsatzId)),
       lade('einheiten', einsatzKeys.einheiten(einsatzId), () => listeEinheiten(einsatzId)),
       lade('personal', einsatzKeys.personal(einsatzId), () => listeEinsatzPersonal(einsatzId)),
@@ -93,6 +95,14 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
       stabFrei
         ? ladeListe(qc, einsatzKeys.stab(einsatzId), () => ladeStab(einsatzId), null)
         : Promise.resolve(null),
+      // Die eigene Führungsstelle liest jeder mit dem Einsatz (LFH-1181); gescheitert bleibt die
+      // Wurzel wie ohne sie, wie im Organigramm.
+      ladeListe(
+        qc,
+        einsatzKeys.fuehrungsstelle(einsatzId),
+        () => ladeFuehrungsstelle(einsatzId),
+        null,
+      ),
     ]);
     const listen: Record<Liste, Geladen<unknown[]>> = {
       abschnitte,
@@ -138,6 +148,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
                     ? stab.daten.besetzung
                     : 'fehler',
               einheitenZustand: einheiten.zustand,
+              fuehrungsstelle: wurzelFuehrungsstelle(fs.daten),
             },
           )
         : teilFehlt('Führungsorganisation', zustaende(ORGANISATION));

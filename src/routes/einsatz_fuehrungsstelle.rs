@@ -121,16 +121,6 @@ pub async fn aendern(
     {
         return Ok(Json(fuehrungsstelle::laden(&state.pool, einsatz_id).await?));
     }
-    // Koordinate als Paar am Stand nach der Änderung (Muster `einsatz_uhs.rs`, design.md D2).
-    if body.standort_lat.is_some() || body.standort_lon.is_some() {
-        let vorher = fuehrungsstelle::laden(&state.pool, einsatz_id).await?;
-        pruefe_koordinate(
-            body.standort_lat.unwrap_or(vorher.standort_lat),
-            body.standort_lon.unwrap_or(vorher.standort_lon),
-            "Breite",
-            "Länge",
-        )?;
-    }
     if let Some(ids) = &ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(
             &state.pool,
@@ -155,8 +145,16 @@ pub async fn aendern(
         sprechgruppe_ids: ids.as_deref(),
         fahrzeug_ids: fahrzeug_ids.as_deref(),
     };
+    let koordinate_gesendet = body.standort_lat.is_some() || body.standort_lon.is_some();
     let anzeige = crate::write_retry!(&state.pool, |conn| {
-        fuehrungsstelle::patchen_tx(conn, einsatz_id, &patch).await
+        let neu = fuehrungsstelle::patchen_tx(conn, einsatz_id, &patch).await?;
+        // Koordinate als Paar am Stand nach der Änderung, in derselben Transaktion (design.md
+        // D2): zwei Teiländerungen nacheinander hinterlassen nie eine halbe Koordinate, und ein
+        // Fehler rollt alles zurück.
+        if koordinate_gesendet {
+            pruefe_koordinate(neu.standort_lat, neu.standort_lon, "Breite", "Länge")?;
+        }
+        Ok(neu)
     })?;
     // Erst nach dem Commit (Reinheits-Kontrakt), wie jeder `einsatz`-Emitter.
     crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;

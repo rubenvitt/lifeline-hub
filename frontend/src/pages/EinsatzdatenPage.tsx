@@ -35,7 +35,7 @@ import {
 import { Link, useNavigate, useParams } from 'react-router';
 import { einsatzberichtPfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
@@ -412,14 +412,12 @@ interface StandortEntwurf {
 }
 
 function gleicherStandort(a: StandortEntwurf, b: StandortEntwurf): boolean {
+  // Eine unlesbare Koordinate ist nie „unverändert“: sie geht bis `onSpeichern` und steht dort als
+  // Fehler an der Zeile (`alsLatLon` würfe hier, vor dem Fehlerpfad der Zeile).
+  if (istUngueltigeKoordinate(a.koord) || istUngueltigeKoordinate(b.koord)) return false;
   const la = alsLatLon(a.koord);
   const lb = alsLatLon(b.koord);
-  return (
-    a.adresse.trim() === b.adresse.trim() &&
-    istUngueltigeKoordinate(a.koord) === istUngueltigeKoordinate(b.koord) &&
-    la?.lat === lb?.lat &&
-    la?.lon === lb?.lon
-  );
+  return a.adresse.trim() === b.adresse.trim() && la?.lat === lb?.lat && la?.lon === lb?.lon;
 }
 
 /**
@@ -618,17 +616,36 @@ function ArtAngabe({
   onSpeichern: (art: FuehrungsstellenArt) => Promise<unknown>;
 }) {
   const [fehler, setFehler] = useState<unknown>(null);
-  if (!darfSchreiben) return <>{erfasst ? art : mitVorgabe(art)}</>;
+  // Die zuletzt gewählte Art steht sofort, bis ihre Antwort da ist; eine frühere Antwort setzt sie
+  // nicht zurück (zwei schnelle Wechsel: es gilt der letzte).
+  const [gewaehlt, setGewaehlt] = useState<FuehrungsstellenArt | null>(null);
+  const letzte = useRef(0);
+  if (!darfSchreiben) {
+    // „Vorgabe“ heißt nur der Wert, der ohne Wahl gilt (`components/vorgabeText.ts`).
+    return <>{art === 'mobil' && !erfasst ? mitVorgabe(art) : art}</>;
+  }
+  const wert = gewaehlt ?? art;
   return (
     <>
       <Segmentleiste<FuehrungsstellenArt>
         optionen={ART_OPTIONEN}
-        wert={art}
+        wert={wert}
         beschriftung="Art"
         onWechsel={(neu) => {
-          if (neu === art) return;
+          if (neu === wert) return;
+          const nr = ++letzte.current;
           setFehler(null);
-          onSpeichern(neu).catch(setFehler);
+          setGewaehlt(neu);
+          onSpeichern(neu).then(
+            () => {
+              if (nr === letzte.current) setGewaehlt(null);
+            },
+            (e: unknown) => {
+              if (nr !== letzte.current) return;
+              setGewaehlt(null);
+              setFehler(e);
+            },
+          );
         }}
       />
       <SpeicherFehler fehler={fehler} />
@@ -663,6 +680,7 @@ function StandortAngabe({
       : null;
   const hatEinsatzort = !!einsatz.einsatzort?.trim() || ortKoord != null;
   const exclude = `fuehrungsstelle:${einsatz.id}`;
+  const koordId = useId();
   return (
     <InlineAngabe<StandortEntwurf>
       etikett="Standort"
@@ -698,11 +716,14 @@ function StandortAngabe({
         <Space orientation="vertical" style={{ width: '100%' }} size={token.marginXS}>
           <Input
             {...feld}
+            aria-label="Adresse des Standorts"
             value={value.adresse}
             maxLength={FUEHRUNGSSTELLE_ADRESSE_MAX}
             onChange={(e) => onChange({ ...value, adresse: e.target.value })}
           />
+          <label htmlFor={koordId}>Koordinate</label>
           <KoordinatenEingabe
+            id={koordId}
             value={value.koord}
             onChange={(k) => onChange({ ...value, koord: k })}
             einsatzId={einsatz.id}
@@ -710,9 +731,7 @@ function StandortAngabe({
           />
           {hatEinsatzort && (
             <Button
-              onClick={() =>
-                onChange({ adresse: einsatz.einsatzort ?? '', koord: ortKoord ?? value.koord })
-              }
+              onClick={() => onChange({ adresse: einsatz.einsatzort ?? '', koord: ortKoord })}
             >
               wie Einsatzort
             </Button>

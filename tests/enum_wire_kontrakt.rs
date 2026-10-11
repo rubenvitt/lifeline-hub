@@ -524,12 +524,6 @@ fn orphan_enums_wire() {
         NichtErreichbar => "nicht_erreichbar",
     });
 
-    // einsatz::fuehrungsstelle (LFH-1181)
-    enum_wire!(lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellenArt {
-        Mobil => "mobil",
-        Ortsfest => "ortsfest",
-    });
-
     // einsatz::einstellungen
     enum_wire!(lifeline_hub::einsatz::einstellungen::BasemapModus {
         Online => "online",
@@ -659,6 +653,16 @@ fn stab_checklisten_punkt_wire() {
         EtbEroeffnet => "etb_eroeffnet",
         LeitstelleGemeldet => "leitstelle_gemeldet",
     } in lifeline_hub::stab::checkliste::ChecklistenPunkt::ALLE);
+}
+
+/// Art der eigenen Führungsstelle (LFH-1181). Die CHECK-Liste in
+/// `migrations/0176_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+#[test]
+fn einsatz_fuehrungsstellen_art_wire() {
+    enum_wire!(lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellenArt {
+        Mobil => "mobil",
+        Ortsfest => "ortsfest",
+    } in lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellenArt::ALLE);
 }
 
 #[test]

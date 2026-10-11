@@ -95,10 +95,11 @@ Neue Spalten: `standort_adresse TEXT`, `standort_lat REAL`, `standort_lon REAL`,
 `standort_lat`, `standort_lon`, `bezeichnung`). Damit bleibt die Regel „eine fehlende Angabe bleibt
 unverändert“ wörtlich gültig.
 
-Ist `standort_lat` oder `standort_lon` gesendet, lädt der Handler vorher den gespeicherten Stand,
-bildet den Effektivzustand und ruft `pruefe_koordinate` (422: Paar, Bereich). So prüft schon
-`einsatz_uhs.rs`. Die Prüfung läuft in derselben Transaktion vor dem Schreiben, daher wird nichts
-teilweise gespeichert.
+Ist `standort_lat` oder `standort_lon` gesendet, prüft der Handler den Stand nach dem Schreiben
+mit `pruefe_koordinate` (422: Paar, Bereich), in derselben Transaktion wie das Schreiben. Ein
+Fehler rollt alles zurück, und zwei Teiländerungen nacheinander hinterlassen nie eine halbe
+Koordinate (Review: die Vorprüfung am vorher geladenen Stand, wie in `einsatz_uhs.rs`, ließe sie
+bei zwei gleichzeitigen Aufrufen zu).
 
 Grenzen: `FUEHRUNGSSTELLE_BEZEICHNUNG_MAX = 200`, `FUEHRUNGSSTELLE_ADRESSE_MAX = 500` (wie
 `SCHADEN_ORT_MAX`). Sie stehen in `src/einsatz/fuehrungsstelle.rs`, sind gespiegelt in
@@ -139,11 +140,12 @@ Kommunikationsmittel · Erreichbarkeit · Führungsfahrzeuge. Ort und Name gehö
 Funkangaben, denn wer die Führungsstelle sucht, braucht zuerst den Ort.
 
 - **Art:** `Segmentleiste` (nicht antds `Segmented`, siehe `frontend/AGENTS.md`), Werte „mobil“ und
-  „ortsfest“. Sie schickt `{ art }`. Die Vorgabe wird mit dem Baustein aus
-  `components/vorgabeText.ts` gekennzeichnet.
+  „ortsfest“. Sie schickt `{ art }` sofort; die zuletzt gewählte Art steht, bis ihre Antwort da
+  ist, und eine frühere Antwort setzt sie nicht zurück. Ohne Schreibrecht steht der Wert, bei
+  nicht erfasster Führungsstelle `mobil` als „mobil (Vorgabe)“ (`components/vorgabeText.ts`).
 - **Führungsfahrzeuge:** Das Etikett heißt „Führungsfahrzeuge“. Bei `ortsfest` stehen die
   Fahrzeuge hinter einem Aufklapper (Boden über den Kontext, kein lokales `styles.header`).
-  Eingeklappt nennt er die Anzahl („1 Führungsfahrzeug“) bzw. „—“. Das ist zulässig, weil die Angabe
+  Eingeklappt nennt er die Anzahl („1 Führungsfahrzeug“) bzw. „kein Führungsfahrzeug“. Das ist zulässig, weil die Angabe
   keine Pflicht ist („Ein Pflichtfeld gehört nie hinter den Collapse“).
 
 ### D6 · Abnehmer lesen die Bezeichnung, nie abgeleitet
@@ -184,8 +186,9 @@ und die Spec-Szenarien der Skizze und des Organigramms würden brechen.
   e2e-Tests und Klickebene hängen daran. Der Filter wird `typ ∈ {einsatzort, fuehrungsstelle}`.
 - Ebene: neuer Key `fuehrungsstelle` in `EBENEN` („Führungsstelle“), mit Farbe, Sichtbarkeit und
   Zähler wie beim Einsatzort.
-  - Inspector: Art, Adresse, Koordinate, Link „In Einsatzdaten bearbeiten“. Kein Ziehen, kein
-    Platzieren.
+  - Inspector: Art, Adresse, Rufname; der Sprung „Im Fachmodul öffnen“ führt wie beim Einsatzort
+    in die Einsatzdaten. Kein Ziehen, kein Platzieren, kein „Verortung löschen“.
+  - Scheitert der Abruf, nennt der Ausfallhinweis der Karte „Führungsstelle“.
   - Objektsuche, Startansicht und Deeplink (`markerToUrl`) kennen den Typ, und `clusterDonut`
     schließt ihn aus.
 - Klickziel: dieselbe Rolle wie der Einsatzort in `ordneKlickebene` (Guard `klickziel.test.ts`),
