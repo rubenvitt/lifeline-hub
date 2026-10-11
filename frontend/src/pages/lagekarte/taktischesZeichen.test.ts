@@ -12,7 +12,7 @@ import {
   organisationAusText,
   fachaufgabeAusFahrzeugtyp,
   fachaufgabeAusFunktion,
-  grundzeichenAkzeptiert,
+  GRUNDZEICHEN_IDS,
   type TzProps,
 } from './taktischesZeichen';
 
@@ -263,14 +263,12 @@ describe('LFH-172: Personal-Zeichen aus Funktion differenzieren', () => {
   });
 });
 
-describe('grundzeichenAkzeptiert', () => {
-  it('bekanntes Grundzeichen rendert das gelistete Overlay → true', () => {
-    // 'stelle' akzeptiert laut DV-102-Katalog eine Fachaufgabe (uhsTz nutzt genau das).
-    expect(grundzeichenAkzeptiert('stelle', 'fachaufgabe')).toBe(true);
-  });
-  it('unbekanntes Grundzeichen → false (?? false-Zweig: kein Phantom-Overlay)', () => {
-    // Das Backend validiert grundzeichen NICHT gegen den Katalog → dieser Pfad ist erreichbar.
-    expect(grundzeichenAkzeptiert('gibt-es-nicht', 'organisation')).toBe(false);
+// LFH-836 (design.md D9): die Kennungstypen stehen lokal, nur mit den Werten, die der Hub für
+// Fachobjekte vergibt. Jedes Grundzeichen davon muss die Fachobjekt-Übersetzung zeichnen.
+describe('GRUNDZEICHEN_IDS', () => {
+  it('jedes Grundzeichen des Hubs zeichnet', () => {
+    expect(GRUNDZEICHEN_IDS.length).toBe(11);
+    for (const grundzeichen of GRUNDZEICHEN_IDS) expect(render({ grundzeichen })).toContain('<svg');
   });
 });
 
