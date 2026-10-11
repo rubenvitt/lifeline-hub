@@ -67,6 +67,12 @@ export interface InlineAngabeProps<T> {
   darfSchreiben: boolean;
   /** Leer wird abgelehnt: kein Senden, alter Wert, Hinweis an der Zeile. */
   pflicht?: boolean;
+  /**
+   * Für Eingaben, die einen ungültigen Entwurf selbst anzeigen (Koordinate, LFH-1170): `false`
+   * sperrt das Senden, die Eingabe bleibt mit dem Entwurf offen. Ohne Angabe ist jeder Entwurf
+   * sendbar.
+   */
+  gueltig?: (wert: T) => boolean;
   /** Enter bleibt Zeilenumbruch; gesendet wird mit Strg/⌘+Enter. */
   mehrzeilig?: boolean;
   eingabe: (p: InlineEingabe<T>) => ReactNode;
@@ -117,6 +123,7 @@ export function InlineAngabe<T>({
   gleich = Object.is,
   darfSchreiben,
   pflicht = false,
+  gueltig,
   mehrzeilig = false,
   eingabe,
   ausloeser,
@@ -166,6 +173,8 @@ export function InlineAngabe<T>({
       schliessen();
       return;
     }
+    // Den Grund zeigt die Eingabe selbst; ein zweiter Text hier stünde doppelt.
+    if (gueltig && !gueltig(entwurf)) return;
     sendetRef.current = true;
     setSendet(true);
     setFehler(null);

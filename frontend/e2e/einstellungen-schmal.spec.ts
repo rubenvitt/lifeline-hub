@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { wechsleZuRolle } from './rollen-kern';
+import {
+  anmeldenAlsAdmin,
+  benutzerAnlegen,
+  mitgliedEintragen,
+  wechsleZuRolle,
+} from './rollen-kern';
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
 import { einsatzAnlegen } from './einsatz-kern';
 
@@ -400,4 +405,71 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit Rechtehinw
   await keinQuerlauf(page, modulPfad(einsatzId), MODUL, modulZeileGesperrt);
   await modulZeilenOhneUeberlauf(page);
   await rollenAuswaehlerLesbar(page);
+});
+
+/**
+ * LFH-1170: die Zugriffsverwaltung liegt in den Einstellungen; ihre Messung kommt aus
+ * `einsatzdaten-schmal.spec.ts` (LFH-964) mit. Die Tabelle läuft im eigenen Scrollcontainer, den
+ * `scrollWidth` des Dokuments nicht sieht (`frontend/AGENTS.md`, Fließende Spalte): deshalb die
+ * rechte Kante von Rolle und „Entfernen“ gegen 390, und „Entfernen“ wird ANGEKLICKT (LFH-355).
+ */
+test.describe('LFH-1170 Zugriff am Handy', () => {
+  test.use({ viewport: HANDSCHIRM });
+
+  const zugriff = (page: Page) => page.getByRole('region', { name: 'Zugriff' });
+
+  /** Über die API: der Anlege-Dialog ist hier nicht Gegenstand, und 390 px ändern seinen Weg. */
+  async function einsatzPerApi(page: Page, name: string): Promise<string> {
+    const r = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+    expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();
+    return String(((await r.json()) as { id: number }).id);
+  }
+
+  async function rechteKanten(page: Page, kaesten: ReturnType<Page['locator']>[], wo: string) {
+    const breite = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(breite, `${wo}: documentElement.scrollWidth`).toBeLessThanOrEqual(HANDSCHIRM.width);
+    for (const k of kaesten) {
+      const b = await k.boundingBox();
+      expect(b, `${wo}: ohne Kasten`).not.toBeNull();
+      expect(b!.x + b!.width, `${wo}: rechte Kante`).toBeLessThanOrEqual(HANDSCHIRM.width);
+    }
+  }
+
+  test('Einsatzleitung: Rolle und „Entfernen“ ohne Wischen erreichbar, die Rückfrage öffnet sich', async ({
+    page,
+  }) => {
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzPerApi(page, `Zugriff schmal ${Date.now()}`);
+    const kollege = await benutzerAnlegen(page, 'fuehrungspersonal', 'Kollegin Mitglied');
+    await mitgliedEintragen(page, einsatzId, kollege.id, 'beobachter');
+    await page.goto(`/einsaetze/${einsatzId}/einstellungen/zugriff`);
+
+    const zeile = zugriff(page).getByRole('row').filter({ hasText: 'Kollegin Mitglied' });
+    const rolle = zeile.getByRole('combobox');
+    const entfernen = zeile.getByRole('button', { name: 'Entfernen' });
+    await expect(entfernen).toBeVisible();
+    await rechteKanten(page, [zugriff(page), rolle, entfernen], 'Zugriff');
+    await entfernen.click();
+    await expect(page.getByText('Mitglied entfernen?')).toBeVisible();
+    await page.keyboard.press('Escape');
+  });
+
+  test('Führungspersonal: Rolle gesperrt, keine Aktion, der Grund steht — kein Querlauf', async ({
+    page,
+  }) => {
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzPerApi(page, `Zugriff schmal FP ${Date.now()}`);
+    await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
+    await page.goto(`/einsaetze/${einsatzId}/einstellungen/zugriff`);
+
+    // Vorbedingung des Rollenzweigs: Rolle gesperrt, kein „Entfernen“, der Grund steht.
+    await expect(zugriff(page).getByRole('combobox').first()).toBeDisabled();
+    await expect(zugriff(page).getByRole('button', { name: 'Entfernen' })).toHaveCount(0);
+    await expect(page.getByText('nur Einsatzleitung', { exact: true })).toBeVisible();
+    await rechteKanten(
+      page,
+      [zugriff(page), ...(await zugriff(page).getByRole('combobox').all())],
+      'Führungspersonal',
+    );
+  });
 });

@@ -85,6 +85,9 @@ const kaestchen = (text: string) => (page: Page) =>
   inMain(page).locator('label.ant-checkbox-wrapper').filter({ hasText: text });
 const knopf = (name: string | RegExp) => (page: Page) =>
   inMain(page).getByRole('button', { name, exact: typeof name === 'string' });
+/** Ein Nebenweg des Seitenkopfs mit Ziel ist ab `md` ein Link in Knopfgestalt (LFH-963). */
+const nebenweg = (name: RegExp) => (page: Page) =>
+  page.locator('[data-lfh="seitenkopf-aktionen"]').getByRole('link', { name });
 /** Ein Segment der `Segmentleiste` ist ein `<button role="radio">` (bzw. `tab`). */
 const segment =
   (name: RegExp, rolle: 'radio' | 'tab' = 'radio') =>
@@ -557,18 +560,32 @@ function einstellungenFlaechen(einsatzId: string): Flaeche[] {
       ],
     },
     {
-      pfad: `${R}/einsatzdaten`,
-      anker: knopf('Bearbeiten'),
+      // LFH-1170: Mitglieder, Rollen und Führungsstelle je Person, von den Einsatzdaten umgezogen.
+      pfad: `${R}/einstellungen/zugriff`,
+      anker: knopf('Hinzufügen'),
       ziele: [
         {
-          sorte: 'Einsatzdaten Bearbeiten',
-          ziele: knopf(/( eintragen| bearbeiten|^Bearbeiten)$/),
+          sorte: 'Zugriff Auswahl',
+          ziele: (page) => inMain(page).locator('.ant-select'),
+          mindestens: 3,
+        },
+        { sorte: 'Zugriff Hinzufügen', ziele: knopf('Hinzufügen'), mindestens: 1 },
+      ],
+    },
+    {
+      // LFH-1170: ein Bearbeitungsweg (Zeilen), die Nebenwege im Kopf statt „Bearbeiten“.
+      pfad: `${R}/einsatzdaten`,
+      anker: knopf('Bezeichnung bearbeiten'),
+      ziele: [
+        {
+          sorte: 'Einsatzdaten Zeilen',
+          ziele: knopf(/( eintragen| bearbeiten)$/),
           mindestens: 5,
         },
         {
-          sorte: 'Einsatzdaten Technische Angaben',
-          ziele: (page) => inMain(page).locator('.ant-collapse-header'),
-          mindestens: 1,
+          sorte: 'Einsatzdaten Nebenwege',
+          ziele: nebenweg(/^(Einsatzbericht drucken|Zugriff verwalten)/),
+          mindestens: 2,
         },
       ],
     },
@@ -629,13 +646,14 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
     },
     {
       pfad: `${R}/einsatzdaten`,
-      anker: (page) => inMain(page).locator('.ant-collapse-header').first(),
+      anker: nebenweg(/^Einsatzbericht drucken/),
       hinweis: /nur Einsatzleitung, Führungspersonal oder Org-Admin$/,
-      fehlt: knopf('Bearbeiten'),
+      fehlt: knopf('Bezeichnung bearbeiten'),
       ziele: [
         {
-          sorte: 'Einsatzdaten Technische Angaben',
-          ziele: (page) => inMain(page).locator('.ant-collapse-header'),
+          // „Zugriff verwalten“ fehlt dem Beobachter (LFH-1170); der Einsatzbericht bleibt.
+          sorte: 'Einsatzdaten Nebenwege',
+          ziele: nebenweg(/^(Einsatzbericht drucken|Zugriff verwalten)/),
           mindestens: 1,
         },
       ],

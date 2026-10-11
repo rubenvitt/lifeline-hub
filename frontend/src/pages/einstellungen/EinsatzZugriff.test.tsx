@@ -9,14 +9,14 @@ import EinsatzZugriff from './EinsatzZugriff';
 
 /** Sektion „Zugriff“ (LFH-1170, Spec `einsatz-zugriff`): das Paneel der Einsatzdaten, umgezogen. */
 
-const einsatz = (meine_rolle: string, status = 'aktiv') => ({
+const einsatz = (meine_rolle: string | null, status = 'aktiv') => ({
   id: 1,
   bezeichnung: 'Hochwasser Weser',
   status,
   meine_rolle,
 });
 
-function stelleBereit(rolle: string, status = 'aktiv') {
+function stelleBereit(rolle: string | null, status = 'aktiv') {
   server.use(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(rolle, status))),
     http.get('/api/einsaetze/1/einstellungen', () =>
@@ -87,6 +87,26 @@ describe('EinsatzZugriff', () => {
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).toBeNull();
     expect(screen.getByRole('combobox', { name: 'Rolle von Eva Einsatz' })).toBeDisabled();
+  });
+
+  // LFH-461, umgezogen von den Einsatzdaten: `mitglied_setzen` fordert die Einsatzrolle, ohne
+  // Ausnahme für System-Admins.
+  it.each([null, 'beobachter', 'fuehrungspersonal'] as const)(
+    'Rolle %s: keine Führungsstelle je Person bearbeitbar',
+    async (rolle) => {
+      stelleBereit(rolle);
+      rendern();
+      expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
+      expect(screen.queryAllByRole('button', { name: /Führungsstelle für/ })).toHaveLength(0);
+    },
+  );
+
+  it('aktive Einsatzleitung bearbeitet die Führungsstelle je Person', async () => {
+    stelleBereit('einsatzleitung');
+    rendern();
+    expect(
+      await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
+    ).toBeInTheDocument();
   });
 
   it('abgeschlossener Einsatz: kein zweiter Hinweis, den Grund trägt die Einstellungsseite', async () => {

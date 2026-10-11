@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzdatenPfad } from '../src/routing/deeplinks';
+import { einsatzEinstellungenPfad } from '../src/routing/deeplinks';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../src/stammdaten/rechteText';
 import { stehendeAuswahl, waehleStehend, zeigtWahl } from './auswahl-kern';
 import { oeffneMenue, waehleImMenue } from './menue-kern';
@@ -63,7 +63,7 @@ for (const breite of [390, 1440]) {
     test('Einsatzleitung: die letzte Leitung ist gesperrt, mit Grund', async ({ page }) => {
       await anmeldenAlsAdmin(page);
       const id = await einsatzAnlegen(page);
-      await page.goto(einsatzdatenPfad(id));
+      await page.goto(einsatzEinstellungenPfad(id, 'zugriff'));
 
       // Vorbedingung des Rollenzweigs: verwalten dürfen (Hinzufügen steht), genau eine Leitung.
       await expect(zugriff(page).getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
@@ -101,7 +101,7 @@ for (const breite of [390, 1440]) {
       await anmeldenAlsAdmin(page);
       const id = await einsatzAnlegen(page);
       await wechsleZuRolle(page, 'fuehrungspersonal', String(id));
-      await page.goto(einsatzdatenPfad(id));
+      await page.goto(einsatzEinstellungenPfad(id, 'zugriff'));
 
       // Inhaltsanker und Vorbedingung des Rollenzweigs: Rollenfelder gesperrt, kein Hinzufügen.
       const felder = zugriff(page).getByRole('combobox');
@@ -125,7 +125,7 @@ test('LFH-966 Zweite Einsatzleitung ohne Systemrolle: eigene Herabstufung fragt 
   const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'Zweite Leitung');
   await mitgliedEintragen(page, String(id), konto.id, 'einsatzleitung');
   await wechsleZu(page, konto);
-  await page.goto(einsatzdatenPfad(id));
+  await page.goto(einsatzEinstellungenPfad(id, 'zugriff'));
 
   // Vorbedingung: zwei Leitungen, also keine Sperre; diese Sitzung verwaltet.
   await expect(zugriff(page).getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
@@ -158,7 +158,7 @@ test('LFH-1141 Einsatzleitung ohne Systemrolle nimmt eine Person der Organisatio
   const name = `Neu ${Date.now() % 100000}`;
   await benutzerAnlegen(page, 'beobachter', name);
   await wechsleZu(page, leitung);
-  await page.goto(einsatzdatenPfad(id));
+  await page.goto(einsatzEinstellungenPfad(id, 'zugriff'));
 
   // Vorbedingung: diese Sitzung verwaltet den Zugriff, ist aber kein System-Admin.
   await expect(zugriff(page).getByRole('button', { name: 'Hinzufügen' })).toBeVisible();

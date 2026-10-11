@@ -445,8 +445,9 @@ anwendbar), „nicht geprüft" ist keins.
   eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
   Hinweis per `data-fehler`; Zeitpunkte über `ZeitpunktEingabe` und Gleichheit am Instant. Die
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
-  Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung und Koordinate nur
-  im Vollformular.
+  Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
+  (`patcheEinsatz`), die Koordinate als Paar; ein Vollformular gibt es nicht. Eine Eingabe, die
+  einen ungültigen Entwurf selbst anzeigt (Koordinate), sperrt das Senden über `gueltig`.
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel

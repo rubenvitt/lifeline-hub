@@ -24,11 +24,14 @@ const dateien = import.meta.glob('/src/**/*.tsx', {
 
 /**
  * Direkte Einbindungen außerhalb eines Formulars; jede prüft den Wert per `istLatLon`
- * (Verhalten belegt in `Sidebar.test.tsx`).
+ * (Verhalten belegt in `Sidebar.test.tsx` und `EinsatzdatenPage.test.tsx`).
  */
 const DIREKT = new Set([
   '/src/anzeige/KoordinatenFeld.tsx', // die Formularhülle selbst
   '/src/pages/lagekarte/Sidebar.tsx', // „Übernehmen“ und „Mittelpunkt setzen“, kein Form
+  // Koordinatenzeile (LFH-1170): `InlineAngabe` mit eigenem `<form>`, kein `Form.Item`; das
+  // Senden sperrt `istLatLon`, belegt in `EinsatzdatenPage.test.tsx` („unlesbare Koordinate“).
+  '/src/pages/EinsatzdatenPage.tsx',
 ]);
 
 const IMPORT = /import\s+KoordinatenEingabe\s+from\s+['"][^'"]*\/KoordinatenEingabe['"]/;
