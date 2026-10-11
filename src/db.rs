@@ -5062,7 +5062,7 @@ mod tests {
         }
     }
 
-    // --- Migration 0175: freies_zeichen-Rebuild für die Zeichenbeschreibung (LFH-836, D2) ---
+    // --- Migration 0176: freies_zeichen-Rebuild für die Zeichenbeschreibung (LFH-836, D2) ---
     //
     // Geprüft an einem Zeichen, das VOR dem Rebuild existiert (auf der leeren Vorlage bliebe ein
     // Kopierfehler unsichtbar): es übersteht den Umbau mit allen Spalten, die Fremdschlüssel und
@@ -5092,7 +5092,7 @@ mod tests {
             )
             .await
             .unwrap();
-        bis(174).run(&pool).await.expect("Migrationen bis 0174");
+        bis(175).run(&pool).await.expect("Migrationen bis 0175");
 
         let indizes = || async {
             sqlx::query_scalar::<_, String>(
@@ -5195,10 +5195,10 @@ mod tests {
         };
         let vor_dem_umbau = zeile(z).await;
 
-        bis(175)
+        bis(176)
             .run(&pool)
             .await
-            .expect("0175 läuft auf einer DB mit Bestand");
+            .expect("0176 läuft auf einer DB mit Bestand");
 
         assert_eq!(
             zeile(z).await,
