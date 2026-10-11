@@ -2,7 +2,7 @@
 
 ## 1. Backend: Datenmodell, PATCH, Schwärzung
 
-- [x] 1.1 Migration `0177_einsatz_fuehrungsstelle_ort.sql` (D1, D2): `art` NOT NULL DEFAULT `mobil` mit CHECK, `bezeichnung`, `standort_adresse`, `standort_lat`, `standort_lon`; `scripts/check-migrationen.sh` gegen `origin/alpha` grün, `db::tests::migrationsnummern_sind_eindeutig` grün
+- [x] 1.1 Migration `0178_einsatz_fuehrungsstelle_ort.sql` (D1, D2): `art` NOT NULL DEFAULT `mobil` mit CHECK, `bezeichnung`, `standort_adresse`, `standort_lat`, `standort_lon`; `scripts/check-migrationen.sh` gegen `origin/alpha` grün, `db::tests::migrationsnummern_sind_eindeutig` grün
 - [x] 1.2 `wire_enum! FuehrungsstellenArt` in `src/einsatz/fuehrungsstelle.rs`, Registrierung in `src/api_doc.rs`, Pin in `tests/enum_wire_kontrakt.rs`; `cargo test --test enum_wire_kontrakt` grün
 - [x] 1.3 Lesen: `FuehrungsstelleAnzeige` trägt `art` (immer) und `bezeichnung`, `standort_adresse`, `standort_lat`, `standort_lon` (optional); ohne Zeile `mobil`. Test in `tests/einsatz_fuehrungsstelle.rs` „Neuer Einsatz“ zuerst rot, dann grün
 - [x] 1.4 PATCH Art: Tri-State, `null`/`""`/unbekannt → 400 ohne Teilspeichern; „Nur die Art geändert“ lässt die Stelle nicht erfasst. Tests aus den Spec-Szenarien „Unbekannte Art“, „Art leeren“ zuerst rot, dann grün

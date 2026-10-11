@@ -656,7 +656,7 @@ fn stab_checklisten_punkt_wire() {
 }
 
 /// Art der eigenen Führungsstelle (LFH-1181). Die CHECK-Liste in
-/// `migrations/0177_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+/// `migrations/0178_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
 #[test]
 fn einsatz_fuehrungsstellen_art_wire() {
     enum_wire!(lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellenArt {

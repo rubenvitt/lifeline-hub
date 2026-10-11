@@ -6048,7 +6048,7 @@
       },
       "FuehrungsstellenArt": {
         "type": "string",
-        "description": "Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`\n(Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in\n`migrations/0177_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.",
+        "description": "Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`\n(Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in\n`migrations/0178_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.",
         "enum": [
           "mobil",
           "ortsfest"

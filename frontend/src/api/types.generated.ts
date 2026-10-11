@@ -2298,7 +2298,7 @@ export interface components {
         /**
          * @description Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`
          *     (Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in
-         *     `migrations/0177_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+         *     `migrations/0178_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
          * @enum {string}
          */
         FuehrungsstellenArt: "mobil" | "ortsfest";
