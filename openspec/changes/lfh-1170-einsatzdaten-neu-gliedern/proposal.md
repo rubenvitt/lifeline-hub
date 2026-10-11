@@ -27,6 +27,9 @@ Die schmale Lesebreite lässt die Seite anders aussehen als die übrigen Führun
 - **Zugriff wandert in die Einsatz-Einstellungen:** neue Sektion `…/einstellungen/zugriff`
   („Zugriff“, hinter „Geräte“) trägt das bisherige Paneel mit unveränderten Rechten. Auf den
   Einsatzdaten bleibt für die Einsatzleitung ein Nebenweg „Zugriff verwalten ↗“ im Seitenkopf.
+- **Schnellaktion „Person aufnehmen“** in der Sprungpalette, nur für die Einsatzleitung eines
+  laufenden Einsatzes: öffnet `…/einstellungen/zugriff?neu=1` mit offener Personenauswahl —
+  Mitglieder aufnehmen ist einer der ersten Schritte eines neuen Einsatzes.
 - „Einsatzbericht drucken“ geht aus `aktionen` in `weitere` (Nebenweg-Regel, LFH-963).
 - Regel `frontend/AGENTS.md` („Inline-Bearbeitung und Status“) und die Anwenderdoku
   (`einsatzdaten.md`, `einsatz-einstellungen.md`, `rechte-im-einsatz.md` samt Bildern) werden
@@ -43,7 +46,8 @@ Die schmale Lesebreite lässt die Seite anders aussehen als die übrigen Führun
 - `einsatzdaten-bearbeitung`: ein Bearbeitungsweg (Zeile), Bezeichnung und Koordinate als
   Zeile, kein Vollformular, Kennungen im Seitenkopf, Gliederung der Seite.
 - `einsatz-zugriff`: der Ort der Verwaltung ist die Einstellungs-Sektion „Zugriff“; die
-  Einsatzdaten tragen nur den Sprung dorthin.
+  Einsatzdaten tragen nur den Sprung dorthin; die Schnellaktion „Person aufnehmen“ führt direkt
+  in die Personenauswahl.
 - `einsatzkopf-live`: das Szenario „Offenes Bearbeitungsformular“ wird zur offenen Zeile.
 - `einsatztauglichkeit-layout`: in der Liste der Bedienziele entfallen auf den Einsatzdaten
   „Bearbeiten“ und der Akkordeon-Kopf „Technische Angaben“; die Einstellungs-Sektion „Zugriff“
@@ -56,7 +60,9 @@ Die schmale Lesebreite lässt die Seite anders aussehen als die übrigen Führun
 - Frontend: `pages/EinsatzdatenPage.tsx` (Umbau), `pages/MitgliederAbschnitt.tsx` (wandert
   unverändert in eine Sektion), neu `pages/einstellungen/EinsatzZugriff.tsx`,
   `routing/deeplinks.ts` (`EinstellungenSektion`, `EINSTELLUNGEN_SEKTIONEN`), `App.tsx`
-  (`EINSTELLUNGEN_ROUTEN`), `anzeige/koordinatenFeld.guard.test.ts` (neue bewertete Stelle).
+  (`EINSTELLUNGEN_ROUTEN`), `pages/EinsatzEinstellungenPage.tsx` (Leser von `neu`),
+  `command-palette/befehle.ts`, `typen.ts`, `useBefehle.ts` (Schnellaktion mit Rechte-Merkmal)
+  samt Regel in `command-palette/AGENTS.md`, `anzeige/koordinatenFeld.guard.test.ts` (neue bewertete Stelle).
 - Tests: `EinsatzdatenPage.test.tsx`, `MitgliederAbschnitt.test.tsx`, Routing-/Deeplink-Tests;
   e2e `einsatzdaten-inline`, `einsatzdaten-schmal`, `einstellungen-schmal`, `einsatzabschluss`,
   `trefflaeche-pruefflaechen`, `einsatzkopf-live` und weitere, die „Bearbeiten“, „Lagedaten“ oder

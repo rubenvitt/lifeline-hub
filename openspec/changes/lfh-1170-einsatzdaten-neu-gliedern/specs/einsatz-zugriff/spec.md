@@ -35,3 +35,21 @@ Nebenweg „Zugriff verwalten“ anbieten, der die Sektion „Zugriff“ der Ein
 #### Scenario: Beobachter
 - **WHEN** ein Beobachter die Einsatzdaten öffnet
 - **THEN** gibt es keinen Nebenweg „Zugriff verwalten“
+
+### Requirement: Schnellaktion „Person aufnehmen“
+Die Sprungpalette SHALL der Einsatzleitung eines laufenden Einsatzes die Schnellaktion „Person
+aufnehmen“ anbieten. Sie öffnet die Sektion „Zugriff“ der Einsatz-Einstellungen mit
+aufgeklappter, fokussierter Personenauswahl. Wer den Zugriff nicht verwalten darf, MUST die
+Schnellaktion nicht sehen. Der Auftrag MUST nach dem Öffnen aus der Adresse verschwinden.
+
+#### Scenario: Einsatzleitung nimmt per Palette auf
+- **WHEN** die Einsatzleitung eines laufenden Einsatzes in der Sprungpalette „Person aufnehmen“ wählt
+- **THEN** steht sie in `…/einstellungen/zugriff`, die Auswahl „Benutzer …“ hat den Fokus und ist aufgeklappt
+
+#### Scenario: Ohne Leitungsrecht keine Zeile
+- **WHEN** Führungspersonal oder ein Beobachter die Sprungpalette in einem laufenden Einsatz öffnet, oder die Einsatzleitung in einem abgeschlossenen
+- **THEN** gibt es keine Zeile „Person aufnehmen“
+
+#### Scenario: Neuladen öffnet nicht erneut
+- **WHEN** die Sektion nach der Schnellaktion geöffnet ist und die Seite neu geladen wird
+- **THEN** enthält die Adresse keinen Auftrag mehr, und die Auswahl ist zugeklappt

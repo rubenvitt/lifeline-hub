@@ -10,6 +10,9 @@ Code). Gates aus dem Frontend-Ordner über `mise exec -- pnpm …`.
 - [ ] 1.3 `MitgliederAbschnitt` den oberen Außenabstand über eine Prop oder den Aufrufer setzen lassen, sonst unverändert; `MitgliederAbschnitt.test.tsx` grün
 - [ ] 1.4 e2e `einstellungen-schmal.spec.ts` um die Sektion „Zugriff“ bei 390 px ergänzen (kein Querlauf, „Entfernen“ ohne Wischen erreichbar, Rückfrage öffnet sich) — die Messung, die bisher `einsatzdaten-schmal.spec.ts` für das Paneel trug, wandert mit; `trefflaeche-pruefflaechen.spec.ts` um die Ziele der Sektion ergänzen
 
+- [ ] 1.5 Schnellaktion „Person aufnehmen“ (D7): Feld `recht?: 'leitung'` an `SCHNELLAKTIONEN`, `darfEinsatzLeiten` im Befehlskontext (`typen.ts`, `useBefehle.ts`), neue Zeile am Ende mit `kennung: 'person-aufnehmen'`; `befehle.test.ts` — Einsatzleitung am laufenden Einsatz sieht die Zeile mit Ziel `/einsaetze/<id>/einstellungen/zugriff?neu=1`, Führungspersonal, Beobachter und abgeschlossener Einsatz nicht, Bestandszeilen in unveränderter Reihenfolge; `schnellaktionen.guard.test.ts` grün
+- [ ] 1.6 Leser `neu` in `EinsatzEinstellungenPage.tsx`, Einmal-Signal per `Outlet`-Context an `EinsatzZugriff`, `MitgliederAbschnitt` mit `auswahlOeffnen`; Vitest — mit `?neu=1` hat die Auswahl „Benutzer …“ den Fokus und ist offen, danach steht kein `neu` mehr in der Adresse, ohne Parameter bleibt sie zu
+
 ## 2. Einsatzdaten: ein Bearbeitungsweg (D2, D3)
 
 - [ ] 2.1 Bezeichnung als Pflicht-Zeile (`TextAngabe` mit `pflicht`): Vitest — Speichern sendet genau `{ bezeichnung }`, nur Leerzeichen sendet nichts und zeigt den Pflichthinweis an der Zeile, unverändert sendet nichts, Ortspfad zeigt den neuen Namen
@@ -27,7 +30,7 @@ Code). Gates aus dem Frontend-Ordner über `mise exec -- pnpm …`.
 
 ## 4. Regeln, Specs und Anwenderdoku (D6)
 
-- [ ] 4.1 `frontend/AGENTS.md`, „Inline-Bearbeitung und Status“: Satz zu den Einsatzdaten nach D6 ersetzen; `prettier --check` über `frontend/` grün; Verweise auf „Vollformular“/„Technische Angaben“ in Code-Kommentaren per Grep bereinigt
+- [ ] 4.1 `frontend/AGENTS.md`, „Inline-Bearbeitung und Status“: Satz zu den Einsatzdaten nach D6 ersetzen; `frontend/src/command-palette/AGENTS.md`, „Schnellaktionen“: Merkmal `recht: 'leitung'` und Leser im Layout der Einstellungen ergänzen; `prettier --check` über `frontend/` grün; Verweise auf „Vollformular“/„Technische Angaben“ in Code-Kommentaren per Grep bereinigt
 - [ ] 4.2 Anwenderdoku: `docs/anwender/kapitel/einsatzdaten.md`, `einsatz-einstellungen.md`, `rechte-im-einsatz.md` fortschreiben; Bildskripte `frontend/e2e/doku-bilder/einsatzdaten.bilder.ts`, `rechte-im-einsatz.bilder.ts` (Pfad `…/einstellungen/zugriff`), `einsatz-einstellungen.bilder.ts` anpassen und die Bilder neu erzeugen (`pnpm doku:bilder --grep "einsatzdaten|rechte-im-einsatz|einsatz-einstellungen"`); Doku-Wächter aus `docs/anwender/AGENTS.md` grün
 
 ## 5. Abschluss-Prüfung

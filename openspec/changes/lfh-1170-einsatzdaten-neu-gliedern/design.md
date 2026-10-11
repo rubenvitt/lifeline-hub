@@ -133,6 +133,32 @@ Alternativen: **K2** Lücke bis LFH-1175 (Koordinate nur lesend) — eine Regres
 - Purpose der Haupt-Spec `einsatzdaten-bearbeitung` („… viele Angaben auf einmal über das
   Vollformular“) wird beim Archivieren direkt in `openspec/specs/` nachgezogen.
 
+### D7 Schnellaktion „Person aufnehmen“
+
+Mitglieder aufnehmen ist einer der ersten Schritte eines neuen Einsatzes; mit dem Umzug in die
+Einstellungen liegt der Weg einen Klick weiter weg. Die Sprungpalette hat dafür das feste
+Muster `SCHNELLAKTIONEN` (`command-palette/AGENTS.md`, „Schnellaktionen“):
+
+- Neue Zeile ans Ende: Träger `einsatz-einstellungen`, Parameter `neu`,
+  `kennung: 'person-aufnehmen'`, Ziel `einsatzEinstellungenPfad(id, 'zugriff')` + `?neu=1`,
+  Label „Person aufnehmen“ (Objekt + Verb), Schlagworte mitglied, zugriff, aufnehmen,
+  hinzufügen, rolle.
+- **Rechte-Merkmal je Schnellaktion:** Block 4 in `befehle.ts` prüft heute nur
+  `darfSchreibenImEinsatz`, das schließt Führungspersonal ein. Neues optionales Feld
+  `recht?: 'leitung'`; der Befehlskontext bekommt `darfEinsatzLeiten` (aus
+  `einsatz/schreibrecht.ts`), und eine Zeile mit `recht: 'leitung'` erscheint nur damit.
+- **Leser in `EinsatzEinstellungenPage.tsx`:** `schnellaktionen.guard.test.ts` ordnet einen
+  Leser über den Dateinamen einem Modul zu; nur dieser Name passt zu `einsatz-einstellungen`.
+  Das Layout liest `neu` als Literal und reicht ein Einmal-Signal per `Outlet`-Context an
+  `EinsatzZugriff`. Der Context trägt nur dieses Flag, keine Daten, deshalb gilt die
+  Formular-Falle aus dem Kommentar von `useEinstellungenDaten` hier nicht.
+- `MitgliederAbschnitt` bekommt `auswahlOeffnen`: die Personenauswahl erhält Fokus und klappt
+  auf; danach räumt die Sektion `neu` per `replace`, ein Neuladen öffnet nicht noch einmal.
+
+Alternativen: eine Kachel „Personen aufnehmen“ auf dem Führungsüberblick — ein weiterer Ort für
+dieselbe Handlung, ohne Muster dafür. Die Sektionsdatei nach dem Modul benennen statt das Layout
+lesen zu lassen — mehrere Sektionen hießen dann gleich, und der Guard ordnete trotzdem falsch zu.
+
 ## Risks / Trade-offs
 
 - [Mehrere Angaben auf einmal ändern geht nicht mehr] → Im Einsatz wird eine Angabe nach der
