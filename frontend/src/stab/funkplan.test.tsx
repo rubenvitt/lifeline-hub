@@ -615,7 +615,7 @@ describe('baueFunkplan · eigene Führungsstelle', () => {
     }
   });
 
-  it('steht erfasst als erste Zeile, ohne Kinder und ohne Leitung', () => {
+  it('steht erfasst als erste Zeile, ohne Kinder und ohne Einsatzleiter „—“', () => {
     const zeilen = baueFunkplan(mitFs);
     expect(zeilen.map((z) => z.key)).toEqual(['fs', 'ab-1']);
     expect(zeilen[0]).toEqual({
@@ -632,6 +632,50 @@ describe('baueFunkplan · eigene Führungsstelle', () => {
       erreichbarkeit: '0171 GEHEIM',
     });
     expect(aufklappbareSchluessel(zeilen)).toEqual([]);
+  });
+
+  it('zeigt den erfassten Einsatzleiter in Leiter/Führer (LFH-1199)', () => {
+    const q = quellen({
+      abschnitte: daten([abschnitt(1)]),
+      fuehrungsstelle: fs({
+        rufname: 'Florian Stadt 10/1',
+        einsatzleiter: {
+          art: 'personal',
+          name: 'Anna Schulz',
+          personal_id: 3,
+          personal_noch_disponiert: false,
+          seit: '2026-10-11 12:30:00',
+        },
+      }),
+    });
+    const zeilen = baueFunkplan(q);
+    expect(zeilen[0].leitung).toEqual({
+      art: 'name',
+      namen: ['Anna Schulz · nicht mehr disponiert'],
+    });
+    const text = rendereFunkplanMarkdown(zeilen, 'X', funkplanLuecken(q), q);
+    expect(text).toContain(
+      '**Führungsstelle** · Rufname Florian Stadt 10/1 · Einsatzleiter Anna Schulz · nicht mehr disponiert',
+    );
+  });
+
+  it('ein Einsatzleiter allein erfasst die Zeile', () => {
+    const zeilen = baueFunkplan(
+      quellen({
+        fuehrungsstelle: fs({
+          einsatzleiter: {
+            art: 'extern',
+            name: 'KBM Weber',
+            personal_noch_disponiert: false,
+            seit: '2026-10-11 12:30:00',
+          },
+        }),
+      }),
+    );
+    expect(zeilen[0]).toMatchObject({
+      key: 'fs',
+      leitung: { art: 'name', namen: ['KBM Weber (extern)'] },
+    });
   });
 
   it('trägt die zugeordneten Fahrzeuge als Kinder; sie fehlen unter Einheit und Sammelknoten (LFH-1106)', () => {

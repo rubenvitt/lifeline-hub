@@ -110,8 +110,9 @@ und Ereignis.
 
 Ist `einsatzleiter` im Patch, läuft im `write_retry!` des PATCH in dieser Reihenfolge:
 
-1. Aktiv-Check in der Transaktion (409). `stab::repo::fordere_aktiv_in_tx` wird dazu nach
-   `einsatz::repo` gehoben und von beiden genutzt.
+1. Aktiv-Check in der Transaktion (409). Genutzt wird `stab::repo::fordere_aktiv_in_tx`, dessen
+   Sichtbarkeit dafür auf `pub(crate)` erweitert ist (Umsetzung: kein Umzug, der ~30 Aufrufer im
+   Stab anfasste).
 2. Vorher-Stand lesen: `(art, personal_id, name)`.
 3. Bei `personal` den `snap_name` holen (422, wenn fremd).
 4. Schreiben.
@@ -154,7 +155,10 @@ function einsatzleiterDarstellung(
 ): EinsatzleiterDarstellung;
 
 function einsatzleiterName(e: Einsatzleiter): string;  // „Anna Schulz“ | „KBM Weber (extern)“
-function einsatzleiterMarkdown(d: EinsatzleiterDarstellung, tz): string; // für Lagebericht/Funkplan
+function einsatzleiterKurz(d): string;                  // Name und Vermerk (Kopfleiste, Funkplan)
+function einsatzleiterText(d, konv): string;            // dazu „seit“ als kurze DTG
+function einsatzleiterMarkdown(d, dtg): string;         // Lagebericht: dtg ist der Formatierer
+                                                        // des Dokuments (volle DTG)
 ```
 
 Die Datei liegt neben `stab/fuehrungsstelle.ts`, denn der Stab-Bereich besitzt die Führungsstelle
@@ -168,7 +172,7 @@ Abnehmer:
 | Lagebericht Organigramm | `fuehrungsorganisation.ts:rendereFuehrungsorganisationMarkdown` (Option `einsatzleiter`) | `- Einsatzleiter: Name (seit DTG)` bzw. `- Leitung nicht erfasst` |
 | Lagebericht „Aus Meldebild …“ | `lageberichte/eigeneLageUebernahme.ts` | wie oben, Quelle über `ladeListe(qc, einsatzKeys.fuehrungsstelle(id), …)` |
 | Funkplan `fs` | `stab/funkplan.ts:fuehrungsstelleZeile` | `leitung: { art: 'name', namen: [Name] }` oder `leer`; Markdown-Etikett „Einsatzleiter“ statt „Führer“ |
-| Einsatzbericht | `druck/einsatzbericht/` (Quelle `fuehrungsstelle`, `modul: null`) | Abschnitt „Einsatzleitung“: Name und „seit“, sonst „nicht erfasst“; die Rollenmitglieder entfallen |
+| Einsatzbericht | `druck/einsatzbericht/` (Quelle `fuehrungsstelle` ersetzt `mitglieder`, `modul: null`) | Abschnitt „Einsatzleitung“: „Einsatzleiter“ und „Seit“ in der Zeitform des Berichts (`TT.MM.JJJJ HH:mm`), sonst „nicht erfasst“; die Rollenmitglieder entfallen |
 
 Die Kopfleiste zeigt kein „seit“: sie bleibt eine Zeile. Das „seit“ steht im Paneel, im
 Organigramm, im Lagebericht und im Bericht.
@@ -186,7 +190,9 @@ die Führungsangabe. Der Editor hat zwei Felder:
 2. `ZeitpunktEingabe` „seit“, leer heißt jetzt (Platzhalter „jetzt“, `keineZukunftstage`).
 
 Gespeichert wird nur `einsatzleiter`. Der Gleichheitsschutz greift bei unveränderter Wahl und
-unverändertem „seit“. Eine Aktion „Einsatzleiter leeren“ sendet `null`. Die Leseansicht zeigt den
+unverändertem „seit“. Eine neue Wahl setzt „seit“ auf jetzt zurück, außer es wurde eigens eine
+Zeit gesetzt. „Einsatzleiter leeren“ im Editor, dann „Speichern“, sendet `null`. Die Zeile liegt
+in `pages/EinsatzleiterAngabe.tsx`. Die Leseansicht zeigt den
 Namen und „seit DTG“ in Mono, bei einer entlassenen Person „· nicht mehr disponiert“.
 
 Verworfen: ein Erfassungsmodal „Einsatzleiter wechseln“. Es wäre ein zweites Bedienmuster im

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import { ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
 import { freigabenFixture } from '../../test/fixtures';
 import { ladeStab } from '../../api/stab';
 import { legeLageberichtAn } from '../../api/lageberichte';
@@ -15,13 +15,18 @@ import type {
   Stabsfunktion,
 } from '../../api/types';
 import type { Quelle } from '../../stab/luecken';
+import type { EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
+import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
 import { ZEICHEN_UNTERLAGE } from '../../zeichen/EinsatzZeichen';
 
-vi.mock('../../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
+vi.mock('../../api/einsaetze', () => ({
+  ladeModulFreigaben: vi.fn(),
+  ladeFuehrungsstelle: vi.fn(() => Promise.resolve({ sprechgruppen: [], fahrzeug_ids: [] })),
+}));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 77 })),
@@ -84,18 +89,25 @@ function besetzung(p: Partial<Stabsfunktion>): Stabsfunktion {
   } as Stabsfunktion;
 }
 
-function bild(zugeklappt: ReadonlySet<string> = new Set(), onUmschalten = vi.fn()) {
+function bild(
+  zugeklappt: ReadonlySet<string> = new Set(),
+  onUmschalten = vi.fn(),
+  einsatzleiter: EinsatzleiterDarstellung = { art: 'nicht-erfasst' },
+) {
   const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
   return {
     onUmschalten,
     ...renderMitProviders(
-      <OrganigrammBild
-        einsatzId={1}
-        org={org}
-        stab={{ zustand: 'aus' }}
-        zugeklappt={zugeklappt}
-        onUmschalten={onUmschalten}
-      />,
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <OrganigrammBild
+          einsatzId={1}
+          org={org}
+          einsatzleiter={einsatzleiter}
+          stab={{ zustand: 'aus' }}
+          zugeklappt={zugeklappt}
+          onUmschalten={onUmschalten}
+        />
+      </AnzeigeKonventionenProvider>,
     ),
   };
 }
@@ -106,6 +118,25 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
     expect(within(wurzel).getByText('Leitung nicht erfasst')).toBeInTheDocument();
     expect(wurzel.textContent).not.toMatch(/\d+\/\d+\/\d+\/\/\d+/);
+  });
+
+  it('zeigt den erfassten Einsatzleiter mit „seit“ (LFH-1199)', () => {
+    bild(new Set(), vi.fn(), {
+      art: 'erfasst',
+      name: 'Anna Schulz',
+      seit: '2026-10-11 12:30:00',
+      nichtMehrDisponiert: false,
+    });
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('Anna Schulz')).toBeInTheDocument();
+    expect(within(wurzel).getByText('seit 111430')).toBeInTheDocument();
+    expect(within(wurzel).queryByText('Leitung nicht erfasst')).toBeNull();
+  });
+
+  it('nennt den Grund, wenn die Führungsstelle fehlt', () => {
+    bild(new Set(), vi.fn(), { art: 'zustand', grund: 'nicht geladen' });
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('Leitung: nicht geladen')).toBeInTheDocument();
   });
 });
 
@@ -141,6 +172,7 @@ describe('OrganigrammBild — Knoten', () => {
       <OrganigrammBild
         einsatzId={1}
         org={org}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={{ zustand: 'aus' }}
         zugeklappt={new Set()}
         onUmschalten={vi.fn()}
@@ -174,6 +206,7 @@ describe('OrganigrammBild — Knoten', () => {
       <OrganigrammBild
         einsatzId={1}
         org={org}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={{ zustand: 'aus' }}
         zugeklappt={new Set()}
         onUmschalten={vi.fn()}
@@ -199,6 +232,7 @@ describe('OrganigrammBild — Klappen', () => {
       <OrganigrammBild
         einsatzId={1}
         org={org}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={{ zustand: 'aus' }}
         zugeklappt={new Set(['ab-1'])}
         onUmschalten={onUmschalten}
@@ -382,6 +416,36 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     expect(eingabe.abschnitte).toHaveLength(1);
     expect(eingabe.abschnitte![0].schluessel).toBe('text');
     expect(eingabe.abschnitte![0].text).toContain('**EA Nord** · Rufname EA-N');
+    expect(eingabe.abschnitte![0].text).toContain('- Leitung nicht erfasst');
+  });
+
+  it('übernimmt den erfassten Einsatzleiter (LFH-1199)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValueOnce({
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      einsatzleiter: {
+        art: 'extern',
+        name: 'KBM Weber',
+        personal_noch_disponiert: false,
+        seit: '2026-10-11 12:30:00',
+      },
+    });
+    container();
+    await screen.findByText('KBM Weber (extern)');
+    const knopf = screen.getByRole('button', { name: /In Lagebericht übernehmen/ });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
+    const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text;
+    expect(text).toMatch(/- Einsatzleiter: KBM Weber \(extern\) \(seit 11\d{4}OKT2026\)/);
+  });
+
+  it('sperrt die Übernahme, solange die Führungsstelle lädt', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockReturnValueOnce(new Promise(() => {}));
+    container();
+    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/ });
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
+    expect(knopf).toBeDisabled();
   });
 
   it('nimmt den Stand aus dem Datenstand, nicht aus dem Klick', async () => {

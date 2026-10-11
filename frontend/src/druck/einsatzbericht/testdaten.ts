@@ -9,7 +9,7 @@ import type {
   EtbZaehler,
   LageberichtAnzeige,
   Lagebesprechung,
-  MitgliedAnzeige,
+  Fuehrungsstelle,
   Person,
   PersonPerioden,
   Schaden,
@@ -129,22 +129,17 @@ export function rohBericht(
         abgeschlossen_at: null,
       }),
     ),
-    mitglieder: daten([
-      {
-        benutzer_id: 1,
-        anzeigename: 'Max Leiter',
-        benutzername: 'max',
-        einsatz_rolle: 'einsatzleitung',
-        zugewiesen_at: '2026-03-29T00:30:00',
+    fuehrungsstelle: daten({
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      einsatzleiter: {
+        art: 'personal',
+        name: 'Max Leiter',
+        personal_id: 7,
+        personal_noch_disponiert: true,
+        seit: '2026-03-29 00:40:00',
       },
-      {
-        benutzer_id: 2,
-        anzeigename: 'Bea Beobachter',
-        benutzername: 'bea',
-        einsatz_rolle: 'beobachter',
-        zugewiesen_at: '2026-03-29T00:30:00',
-      },
-    ] as MitgliedAnzeige[]),
+    } as Fuehrungsstelle),
     stab: daten({
       besetzung: [
         { sachgebiet: 's2', besetzung_art: 'personal', name: 'Sven Lage' },

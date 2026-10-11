@@ -73,6 +73,8 @@ import {
   teileSprechgruppen,
 } from '../components/kommunikationsmittel';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
+import EinsatzleiterAngabe from './EinsatzleiterAngabe';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
@@ -390,8 +392,9 @@ function useFahrzeugeQuelle(einsatzId: number): {
 
 /**
  * Eigene Führungsstelle des Einsatzes (LFH-849, Spec `einsatz-fuehrungsstelle`): die Gegenstelle
- * des Funkplans. Fünf Zeilen, jede schickt nur ihr Feld an `…/fuehrungsstelle`, mit dem
- * Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
+ * des Funkplans. Sechs Zeilen, zuerst der Einsatzleiter (LFH-1199); jede schickt nur ihr Feld an
+ * `…/fuehrungsstelle`, mit dem Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und
+ * bearbeitet selbst nichts.
  */
 function FuehrungsstellePaneel({
   einsatzId,
@@ -453,6 +456,17 @@ function FuehrungsstellePaneel({
         {fs && (
           <Angaben
             zeilen={[
+              {
+                etikett: 'Einsatzleiter',
+                wert: (
+                  <EinsatzleiterAngabe
+                    einsatzId={einsatzId}
+                    fs={fs}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(einsatzleiter) => speichern('Einsatzleiter', { einsatzleiter })}
+                  />
+                ),
+              },
               { etikett: 'Rufname', wert: text('Rufname', fs.rufname, true, 'rufname') },
               {
                 etikett: 'Sprechgruppen',
@@ -585,6 +599,12 @@ export default function EinsatzdatenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
+  // Der Einsatzleiter der Kopfleiste kommt aus der Führungsstelle (LFH-1199), derselbe Key wie das
+  // Paneel; live über `einsatz`.
+  const fuehrungsstelleQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+  });
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
@@ -635,6 +655,11 @@ export default function EinsatzdatenPage() {
   // Kopfdaten und Führungsstelle laufen über die Verwaltungsrouten: der Admin nur der Einsatz-Org
   // (LFH-1066, wie der Server).
   const darfBearbeiten = darfEinsatzVerwalten(einsatz, benutzer);
+
+  const einsatzleiter = einsatzleiterDarstellung({
+    zustand: abrufZustand(fuehrungsstelleQuery),
+    daten: fuehrungsstelleQuery.data ?? null,
+  });
 
   const darfVerwaltenMitglieder = darfEinsatzLeiten(einsatz);
   // Aktiver Einsatz und Einsatzleitung (oder Admin); nach dem Abschluss fällt der Abschnitt weg.
@@ -852,11 +877,20 @@ export default function EinsatzdatenPage() {
                 />
               }
             />
-            {/* Nie aus der App-Rolle `einsatzleitung` ableiten: sie ist ein Rechtebündel, kein
-                Einsatzleiter nach FwDV 100 (LFH-1199, Regel „Keine erfundenen Daten“). */}
+            {/* Der Einsatzleiter der Führungsstelle, nie die App-Rolle `einsatzleitung`: sie ist
+                ein Rechtebündel, kein Einsatzleiter nach FwDV 100 (LFH-1199, Regel „Keine
+                erfundenen Daten“). Gepflegt wird er im Paneel „Eigene Führungsstelle“. */}
             <KopfAngabe
               etikett="Einsatzleitung"
-              wert={<span style={{ color: rollen.gedaempft }}>nicht erfasst</span>}
+              wert={
+                einsatzleiter.art === 'erfasst' ? (
+                  einsatzleiterKurz(einsatzleiter)
+                ) : (
+                  <span style={{ color: rollen.gedaempft }}>
+                    {einsatzleiterKurz(einsatzleiter)}
+                  </span>
+                )
+              }
             />
           </div>
 

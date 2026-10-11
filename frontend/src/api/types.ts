@@ -247,6 +247,17 @@ export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
 /** Eigene Führungsstelle des Einsatzes (LFH-849). */
 export type Fuehrungsstelle = S['FuehrungsstelleAnzeige'];
+/** Der Einsatzleiter an der eigenen Führungsstelle (LFH-1199). */
+export type Einsatzleiter = S['EinsatzleiterAnzeige'];
+export type EinsatzleiterArt = S['EinsatzleiterArt'];
+
+/**
+ * Ein neuer Einsatzleiter im PATCH der Führungsstelle: eine disponierte Person oder ein externer
+ * als Freitext; ohne `seit` gilt die Zeit des Speicherns.
+ */
+export type EinsatzleiterEingabe =
+  | { art: 'personal'; personal_id: number; seit?: string }
+  | { art: 'extern'; name: string; seit?: string };
 
 /**
  * Teiländerung der Führungsstelle (kein Backend-Schema, `routes/einsatz_fuehrungsstelle.rs`):
@@ -259,6 +270,8 @@ export interface FuehrungsstellePatch {
   sprechgruppe_ids?: number[];
   /** Dispositionszeilen, die die Führungsstelle tragen (LFH-1106); ersetzt vollständig. */
   fahrzeug_ids?: number[];
+  /** Der Einsatzleiter (LFH-1199); `null` leert ihn, ein Wechsel schreibt ins ETB. */
+  einsatzleiter?: EinsatzleiterEingabe | null;
 }
 
 // ============================== E‑2 Personen ==============================

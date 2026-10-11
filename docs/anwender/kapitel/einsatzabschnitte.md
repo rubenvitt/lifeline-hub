@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
 ---
 
 ## Überblick
@@ -89,10 +89,12 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
 ### Das Organigramm
 
-Das Organigramm wird nicht gepflegt, es entsteht aus Abschnitten, Einheiten und der Besetzung des
-Stabs. Den Kasten der Einsatzleitung beschriftet es mit „Leitung nicht erfasst“, weil die App die
-Person der Einsatzleitung nicht als Angabe führt. An der Wurzel steht keine Stärke; die
-Gesamtstärke zeigt das Meldebild.
+Das Organigramm wird nicht gepflegt, es entsteht aus Abschnitten, Einheiten, der eigenen
+Führungsstelle und der Besetzung des Stabs. Im Kasten der Einsatzleitung steht der Einsatzleiter
+mit „seit“, wie er in „Einsatzdaten“ festgelegt ist (siehe
+[Einsatzdaten und Führungsstelle](einsatzdaten.md)). Ist keiner festgelegt, steht dort „Leitung
+nicht erfasst“; die Rolle Einsatzleitung im „Zugriff“ macht niemanden zum Einsatzleiter. An der
+Wurzel steht keine Stärke; die Gesamtstärke zeigt das Meldebild.
 
 ### Führungsfunktionen
 

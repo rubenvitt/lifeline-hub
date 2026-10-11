@@ -2,6 +2,7 @@ import type { AbrufZustand } from '../../api/abrufZustand';
 import type { Einheit, Einsatzabschnitt, Staerke, Stabsfunktion } from '../../api/types';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { besetzungDarstellung } from '../../stab/besetzung';
+import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
 import { md, ZUSTAND_GRUND } from '../../stab/funkplan';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
 import { baueTzProps, type TzProps } from '../lagekarte/taktischesZeichen';
@@ -210,7 +211,8 @@ function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
 
 /**
  * Die Führungsorganisation als Freitext für „In Lagebericht übernehmen“: Kopf, Einsatzleitung
- * (mit Stab nur, wenn übergeben — also freigegeben und geladen), fehlende Quellen, dann die
+ * (der Einsatzleiter, LFH-1199; Stab nur, wenn übergeben — also freigegeben und geladen), fehlende
+ * Quellen, dann die
  * Gliederung als verschachtelte Liste. Namen laufen durch `md()`: im Bericht stehen sie als Text,
  * nie als Auszeichnung. Erreichbarkeit führt das Organigramm nicht, also auch nicht hier.
  */
@@ -221,6 +223,10 @@ export function rendereFuehrungsorganisationMarkdown(
     /** `null`: nicht freigegeben (kein Wort darüber) · `'fehler'`: Abruf gescheitert. */
     stab: readonly Stabsfunktion[] | 'fehler' | null;
     einheitenZustand: AbrufZustand;
+    /** Aus der Führungsstelle (LFH-1199). */
+    einsatzleiter: EinsatzleiterDarstellung;
+    /** UTC → volle taktische DTG in der Anzeigezone, für das „seit“ des Einsatzleiters. */
+    dtg: (utc: string) => string;
   },
 ): string {
   const stab =
@@ -258,9 +264,11 @@ export function rendereFuehrungsorganisationMarkdown(
     '',
     '## Einsatzleitung',
     '',
-    // Wer die Einsatzleitung führt, ist kein Datum (die Führungsstelle, LFH-849, trägt nur
-    // Funkangaben).
-    '- Leitung nicht erfasst',
+    // Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke; ein fehlender
+    // Abruf steht mit Grund darin, nicht als „nicht erfasst“.
+    opts.einsatzleiter.art === 'nicht-erfasst'
+      ? '- Leitung nicht erfasst'
+      : `- Einsatzleiter: ${einsatzleiterMarkdown(opts.einsatzleiter, opts.dtg)}`,
     ...stab,
     '',
     ...quellen,

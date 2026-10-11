@@ -16,9 +16,9 @@ Einträge je Typ und alle Entscheidungen zeigen.
 
 #### Scenario: Einsatzleiter im Block Führung
 
-- **WHEN** der Einsatzleiter „Anna Schulz“ seit 11.10. 14:30 erfasst ist und zwei Konten die
+- **WHEN** der Einsatzleiter „Anna Schulz“ seit 11.10.2026 14:30 erfasst ist und zwei Konten die
   App-Rolle Einsatzleitung tragen
-- **THEN** nennt der Block Führung unter „Einsatzleitung“ „Anna Schulz“ mit „seit 11.10. 14:30“
+- **THEN** nennt der Block Führung unter „Einsatzleitung“ „Anna Schulz“ mit „seit 11.10.2026 14:30“
 - **AND** die beiden Konten stehen dort nicht
 
 #### Scenario: Kein Einsatzleiter erfasst

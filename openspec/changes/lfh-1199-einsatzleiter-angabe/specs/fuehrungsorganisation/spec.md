@@ -21,8 +21,8 @@ Stab erscheinen.
 
 #### Scenario: Einsatzleiter erfasst
 
-- **WHEN** an der Führungsstelle „Anna Schulz“ seit 11.10. 14:30 als Einsatzleiter erfasst ist
-- **THEN** zeigt die Wurzel „Einsatzleitung“ „Anna Schulz“ und „seit 11.10. 14:30“
+- **WHEN** an der Führungsstelle „Anna Schulz“ seit 111430 als Einsatzleiter erfasst ist
+- **THEN** zeigt die Wurzel „Einsatzleitung“ „Anna Schulz“ und „seit 111430“
 
 #### Scenario: Kein Einsatzleiter, aber App-Rolle
 
