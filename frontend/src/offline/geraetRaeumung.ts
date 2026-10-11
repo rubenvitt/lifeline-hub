@@ -169,10 +169,11 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Geräte-Einstellung der Lagekarte (Leisten), ohne Personenbezug.',
   },
   {
-    ort: 'localStorage lfh:lagekarte:zeichen-zuletzt',
+    ort: 'localStorage lfh:lagekarte:zeichen-zuletzt-v2; lfh:lagekarte:zeichen-zuletzt (Altschlüssel)',
     datei: 'pages/lagekarte/zuletztVerwendet.ts',
     entscheidung: 'bleibt',
-    grund: 'Zuletzt gewählte taktische Zeichen (Katalog-Schlüssel), ohne Einsatzinhalt.',
+    grund:
+      'Zuletzt gewählte taktische Zeichen (Zeichenbeschreibungen), ohne Einsatzinhalt. Den Altschlüssel übernimmt und löscht das erste Lesen (LFH-836, D10).',
   },
 ];
 

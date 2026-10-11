@@ -16,7 +16,6 @@ import type {
 import {
   baueTzProps,
   einsatzortTz,
-  grundzeichenAkzeptiert,
   schadenTz,
   uhsTz,
   betreuungsstelleTz,
@@ -24,6 +23,11 @@ import {
 } from './taktischesZeichen';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import { registrierNummer } from '../../anzeige/registrierNummer';
+import {
+  freiesZeichen as freiesZeichenBild,
+  fuellfarbe,
+  type FreiesZeichenEingabe,
+} from '../../zeichen/freiesZeichen';
 
 export type MarkerTyp =
   | 'einsatzort'
@@ -57,8 +61,14 @@ export interface KarteMarker {
   lon: number;
   label: string;
   farbe: string;
-  /** Wenn gesetzt → DV-102-SVG (taktisches Zeichen) statt einfachem Kreis. */
+  /** Fachobjekt: wenn gesetzt → taktisches Zeichen (`fachobjektZeichen`) statt einfachem Kreis. */
   tz?: TzProps;
+  /**
+   * Freies Zeichen (nur `typ: 'freies_zeichen'`): das gespeicherte Zeichen, wie es aus DB-Zeile,
+   * Snapshot oder Offline-Stand kommt. Gezeichnet über den Leseadapter `zeichen/freiesZeichen.ts`
+   * (LFH-836, design.md D8); ein freies Zeichen trägt kein `tz`.
+   */
+  freiesZeichen?: FreiesZeichenEingabe;
   /**
    * Flächen-/Linien-Geometrie des Markers (z. B. Abschnittsfläche) → Kennzahlen im Inspector.
    * FE-lokal, nicht Teil des Response-DTO.
@@ -248,39 +258,11 @@ export function baueLageMeldungMarker(
 }
 
 /**
- * Neutrale DV-102-Tinte, wenn das freie Zeichen keine eigene Farbe trägt: Farbe auf der Karte und
- * Vorgabe des Farbfelds im Picker (LFH-797, eine Quelle). Ein Datenwert für das Zeichen auf
- * weißem Grundzeichen, keine UI-Farbe — die Symbolkachel im Inspector nimmt ohne eigene Farbe
- * eine Textrolle (Spec `lagekarte-taktische-zeichen`).
+ * Neutrale DV-102-Tinte, wenn das freie Zeichen keine Füllung aus der Palette trägt: Farbe des
+ * Markers (LFH-797). Ein Datenwert für das Zeichen auf weißem Grundzeichen, keine UI-Farbe — die
+ * Symbolkachel im Inspector nimmt ohne Füllung eine Textrolle (Spec `lagekarte-taktische-zeichen`).
  */
 export const FREIES_ZEICHEN_TINTE = '#333333';
-
-/**
- * Baut die DV-102-Spec eines freien Zeichens und strippt jedes Overlay (auch die Farbe), das das
- * Grundzeichen laut `accepts`-Katalog nicht rendert ({@link grundzeichenAkzeptiert}) — sonst
- * divergierte der Icon-Dedup-Key und ein Phantom-Overlay entstünde.
- */
-export function baueFreiesZeichenTz(
-  z: Pick<
-    FreiesZeichen,
-    'grundzeichen' | 'organisation' | 'fachaufgabe' | 'symbol' | 'einheit' | 'funktion' | 'farbe'
-  >,
-): TzProps {
-  const gz = z.grundzeichen;
-  const nimm = (
-    overlay: Parameters<typeof grundzeichenAkzeptiert>[1],
-    wert: string | null | undefined,
-  ) => (wert != null && grundzeichenAkzeptiert(gz, overlay) ? wert : undefined);
-  return {
-    grundzeichen: gz,
-    organisation: nimm('organisation', z.organisation),
-    fachaufgabe: nimm('fachaufgabe', z.fachaufgabe),
-    symbol: nimm('symbol', z.symbol),
-    einheit: nimm('einheit', z.einheit),
-    funktion: nimm('funktion', z.funktion),
-    farbe: nimm('farbe', z.farbe),
-  } as TzProps;
-}
 
 /**
  * Ersatztext eines freien Zeichens ohne eigenen Namen. Inspector und Leiste zeigen ihn, die
@@ -293,17 +275,30 @@ export function baueFreieZeichenMarker(
   zeichen: FreiesZeichen[],
   token: Pick<GlobalToken, 'controlHeight'>,
 ): KarteMarker[] {
-  return zeichen.map((z) => ({
-    schluessel: `freies_zeichen-${z.id}`,
-    typ: 'freies_zeichen' as const,
-    id: z.id,
-    lat: z.lat,
-    lon: z.lon,
-    label: z.label ?? FREIES_ZEICHEN_ERSATZLABEL,
-    farbe: z.farbe ?? FREIES_ZEICHEN_TINTE,
-    tz: baueFreiesZeichenTz(z),
-    trefferDurchmesser: token.controlHeight,
-  }));
+  return zeichen.map((z) => {
+    // Nur die Felder des Zeichens, gepflückt: der Adapter cacht nach ihnen.
+    const eingabe: FreiesZeichenEingabe = {
+      zeichen_spec: z.zeichen_spec,
+      grundzeichen: z.grundzeichen,
+      organisation: z.organisation,
+      fachaufgabe: z.fachaufgabe,
+      symbol: z.symbol,
+      einheit: z.einheit,
+      funktion: z.funktion,
+      farbe: z.farbe,
+    };
+    return {
+      schluessel: `freies_zeichen-${z.id}`,
+      typ: 'freies_zeichen' as const,
+      id: z.id,
+      lat: z.lat,
+      lon: z.lon,
+      label: z.label ?? FREIES_ZEICHEN_ERSATZLABEL,
+      farbe: fuellfarbe(freiesZeichenBild(eingabe).spec) ?? FREIES_ZEICHEN_TINTE,
+      freiesZeichen: eingabe,
+      trefferDurchmesser: token.controlHeight,
+    };
+  });
 }
 
 export interface TaktischeQuelle {

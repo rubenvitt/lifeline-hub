@@ -81,6 +81,7 @@
   --lfh-berichtigung-zeile: #fbeaea;
   --lfh-luecke-zeile: #faf3da;
   --lfh-problem-zeile: #f8eded;
+  --lfh-zeichen-platte: transparent;
 
   /* ── ETB-Typfarben · Tagmodus (Kante + Typwort, tokens.ts: etbTypFarbenHell) ── */
   --lfh-etb-meldung-kante: #1677ff;
@@ -245,6 +246,7 @@
   --lfh-berichtigung-zeile: #160d0f;
   --lfh-luecke-zeile: #161305;
   --lfh-problem-zeile: #130f0f;
+  --lfh-zeichen-platte: #c9ced4;
 
   /* ── ETB-Typfarben · Nachtmodus (tokens.ts: etbTypFarbenDunkel) ────────── */
   --lfh-etb-meldung-kante: #1677ff;

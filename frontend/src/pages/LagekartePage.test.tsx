@@ -33,6 +33,16 @@ const KONTEXT_PUNKT = vi.hoisted(() => ({ lng: 8.6, lat: 50.1, quelle: 'maus' as
 /** Jede `flaechen`-Prop, die die Karte bekommt, in Render-Folge (LFH-945: Identität). */
 const flaechenProps = vi.hoisted(() => [] as unknown[]);
 
+/** Picker-Kosten (LFH-836): das Aufwärmen des Vokabulars, beobachtet statt gerechnet. */
+const aufwaermen = vi.hoisted(() => ({ abbrechen: vi.fn(), start: vi.fn() }));
+vi.mock('./lagekarte/zeichenWahl', async (original) => ({
+  ...(await original<typeof import('./lagekarte/zeichenWahl')>()),
+  waermeVokabularAuf: () => {
+    aufwaermen.start();
+    return aufwaermen.abbrechen;
+  },
+}));
+
 vi.mock('./lagekarte/Kartenflaeche', async () => {
   const { forwardRef, useImperativeHandle } = await import('react');
   return {
@@ -625,6 +635,18 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
 });
 
 describe('LagekartePage', () => {
+  it('wärmt das Vokabular des Zeichen-Pickers auf, sobald die Karte steht, und bricht beim Verlassen ab (LFH-836)', async () => {
+    aufwaermen.start.mockClear();
+    aufwaermen.abbrechen.mockClear();
+    basisHandler();
+    const { unmount } = renderSeite();
+    await screen.findByTestId('kartenflaeche-stub');
+    await waitFor(() => expect(aufwaermen.start).toHaveBeenCalledTimes(1));
+    expect(aufwaermen.abbrechen).not.toHaveBeenCalled();
+    unmount();
+    expect(aufwaermen.abbrechen).toHaveBeenCalledTimes(1);
+  });
+
   it('zeigt die Nicht-verortet-Liste mit Anzahl im Paneelkopf', async () => {
     basisHandler();
     renderSeite();
@@ -797,8 +819,9 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-freies_zeichen-42'));
-    // FreiesZeichenInspector: Picker mit vorbelegtem Grundzeichen; KEIN „Im Fach-Modul öffnen".
-    expect(await screen.findByText('Stelle, Einrichtung')).toBeInTheDocument();
+    // FreiesZeichenInspector: Picker mit vorbelegtem Grundzeichen (das Altzeichen „stelle“ über den
+    // Leseadapter als Stelle); KEIN „Im Fach-Modul öffnen".
+    expect(await screen.findByRole('radio', { name: 'Stelle', checked: true })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Im Fachmodul öffnen/ })).not.toBeInTheDocument();
   });
 

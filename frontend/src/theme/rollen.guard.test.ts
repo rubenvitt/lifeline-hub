@@ -127,6 +127,7 @@ const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
   berichtigungZeile: '--lfh-berichtigung-zeile',
   lueckeZeile: '--lfh-luecke-zeile',
   problemZeile: '--lfh-problem-zeile',
+  zeichenPlatte: '--lfh-zeichen-platte',
 };
 
 /** ETB-Typ → die zwei Properties (Kante, Typwort). Exhaustiv über {@link EtbTypTon}:
