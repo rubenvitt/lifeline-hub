@@ -16,6 +16,7 @@ import type { FreiesZeichenUpdate } from '../../api/types';
 import type { Speicherung } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
+import { START_ZEICHEN_SPEC } from './zeichenWahl';
 
 interface Props {
   offen: boolean;
@@ -40,7 +41,7 @@ export default function ZeichenHierDialog({
   const { token } = theme.useToken();
   // Derselbe Startentwurf wie in der Leiste; „Zuletzt verwendet“ bringt der Picker selbst mit.
   const [entwurf, setEntwurf] = useState<FreiesZeichenUpdate>({
-    grundzeichen: 'taktische-formation',
+    zeichen_spec: START_ZEICHEN_SPEC,
   });
   const setzen = (spec: FreiesZeichenUpdate) => {
     if (laeuft) return;

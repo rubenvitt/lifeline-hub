@@ -34,7 +34,7 @@ describe('ZeichenHierDialog (LFH-776)', () => {
     await userEvent.click(within(raster('Grundzeichen')).getByRole('radio', { name: 'Person' }));
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Setzen' }));
     expect(onSetzen).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ grundzeichen: 'person' }),
+      expect.objectContaining({ zeichen_spec: '{"v":1,"spec":{"kind":"person"}}' }),
     );
     expect(onAbbrechen).not.toHaveBeenCalled();
   });
@@ -45,7 +45,7 @@ describe('ZeichenHierDialog (LFH-776)', () => {
     kachel.focus();
     fireEvent.keyDown(kachel, { key: 'Enter' });
     expect(onSetzen).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ grundzeichen: 'person' }),
+      expect.objectContaining({ zeichen_spec: '{"v":1,"spec":{"kind":"person"}}' }),
     );
   });
 

@@ -6,9 +6,13 @@ import { renderMitProviders } from '../../test/utils';
 import type { FreiesZeichen } from '../../api/types';
 import { ConfigProvider, theme } from 'antd';
 import FreiesZeichenInspector, { type FreiesZeichenInspectorProps } from './FreiesZeichenInspector';
+import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import { PALETTE, type AnySpec } from '@einsatzzeichen/schema';
 import { FREIES_ZEICHEN_TINTE } from './marker';
 import { antdToken, farbenDunkel } from '../../theme/tokens';
+import type { FreiesZeichenUpdate } from '../../api/types';
 
+/** Ein Altzeichen (Altspalten, kein `zeichen_spec`): der Bestand vor LFH-836. */
 const basis: FreiesZeichen = {
   id: 42,
   einsatz_id: 1,
@@ -26,6 +30,35 @@ const basis: FreiesZeichen = {
   erstellt_at: '',
   geaendert_at: '',
 };
+
+const OHNE_ALTFELDER = {
+  grundzeichen: null,
+  organisation: null,
+  fachaufgabe: null,
+  symbol: null,
+  einheit: null,
+  funktion: null,
+  farbe: null,
+};
+
+/** Ein Zeichen mit `zeichen_spec`, wie es ein neuer Client speichert. */
+const specZeile = (spec: AnySpec, rest: Partial<FreiesZeichen> = {}): FreiesZeichen => ({
+  ...basis,
+  ...OHNE_ALTFELDER,
+  zeichen_spec: serializeAnySpec(spec),
+  ...rest,
+});
+
+/** Der Stand nach dem eigenen PATCH: der Server schreibt die Spec und leert die Altspalten. */
+const nachPatch = (gesendet: FreiesZeichenUpdate, geaendert_at: string): FreiesZeichen => ({
+  ...basis,
+  ...OHNE_ALTFELDER,
+  ...gesendet,
+  geaendert_at,
+});
+
+/** Die Zeichenbeschreibung eines gesendeten PATCH. */
+const gesendeteSpec = (aufruf: FreiesZeichenUpdate): AnySpec => parseAnySpec(aufruf.zeichen_spec);
 
 function renderInspector(
   opts: {
@@ -102,21 +135,16 @@ describe('FreiesZeichenInspector', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('meldet onAendern mit der vollständigen Spec bei einer Edit-Auswahl', async () => {
+  it('meldet onAendern mit Zeichen und Bezeichnung bei einer Edit-Auswahl', async () => {
     const { onAendern } = renderInspector();
     const org = screen.getAllByLabelText('Organisation')[0];
-    fireEvent.mouseDown(org.querySelector('.ant-select-selector') ?? org);
-    const opt = await screen.findAllByText('THW');
+    fireEvent.mouseDown(org.closest('.ant-select')?.querySelector('.ant-select-selector') ?? org);
+    const opt = await screen.findAllByText('Technisches Hilfswerk');
     await userEvent.click(opt[opt.length - 1]);
-    await waitFor(() =>
-      expect(onAendern).toHaveBeenCalledWith(
-        expect.objectContaining({
-          grundzeichen: 'taktische-formation',
-          organisation: 'thw',
-          label: 'Zug 1',
-        }),
-      ),
-    );
+    await waitFor(() => expect(onAendern).toHaveBeenCalled());
+    const gesendet = vi.mocked(onAendern).mock.calls[0][0];
+    expect(gesendet.label).toBe('Zug 1');
+    expect(gesendeteSpec(gesendet)).toMatchObject({ kind: 'formation', organization: 'thw' });
   });
 
   it('read-only (darfSchreiben=false): keine Edit-Controls, zeigt die Werte', () => {
@@ -124,9 +152,10 @@ describe('FreiesZeichenInspector', () => {
     // Keine interaktiven Selects/Buttons.
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
-    // Werte als Text (Grundzeichen + gesetzte Overlays).
+    // Werte als Text, aus der wirksamen Zeichenbeschreibung.
     expect(screen.getByText('Taktische Formation')).toBeInTheDocument();
     expect(screen.getByText('Feuerwehr')).toBeInTheDocument();
+    expect(screen.getByText('Zug')).toBeInTheDocument();
   });
 });
 
@@ -150,14 +179,16 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
   it('fasst schnelle Auswahlwechsel zu EINEM Schreibvorgang mit dem letzten Stand zusammen', () => {
     vi.useFakeTimers();
     const { onAendern } = renderInspector();
-    for (const name of ['Person', 'Befehlsstelle', 'Gebäude']) {
+    for (const name of ['Person', 'Gefahr', 'Gebäude']) {
       fireEvent.click(kachel(name));
       act(() => vi.advanceTimersByTime(200));
     }
     expect(onAendern).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(700));
     expect(onAendern).toHaveBeenCalledTimes(1);
-    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'gebaeude' }));
+    expect(gesendeteSpec(vi.mocked(onAendern).mock.calls[0][0])).toMatchObject({
+      kind: 'building',
+    });
   });
 
   it('holt eine Änderung nach, die beim Schließen noch in der Frist stand', () => {
@@ -166,7 +197,7 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     fireEvent.click(kachel('Person'));
     unmount();
     expect(onAendern).toHaveBeenCalledTimes(1);
-    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'person' }));
+    expect(gesendeteSpec(vi.mocked(onAendern).mock.calls[0][0])).toMatchObject({ kind: 'person' });
   });
 
   it('schreibt beim Schließen ohne Änderung nichts', () => {
@@ -194,7 +225,7 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     act(() => vi.advanceTimersByTime(700));
     expect(onAendern).toHaveBeenCalledTimes(1);
     const gesendet = vi.mocked(onAendern).mock.calls[0][0];
-    serverstand({ ...basis, ...gesendet, geaendert_at: 'später' } as FreiesZeichen);
+    serverstand(nachPatch(gesendet, 'später'));
     act(() => vi.advanceTimersByTime(2000));
     expect(onAendern).toHaveBeenCalledTimes(1);
   });
@@ -205,11 +236,11 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     fireEvent.click(kachel('Person'));
     act(() => vi.advanceTimersByTime(700));
     const gesendet = vi.mocked(onAendern).mock.calls[0][0];
-    serverstand({ ...basis, ...gesendet, geaendert_at: 't1' } as FreiesZeichen);
-    serverstand({ ...basis, grundzeichen: 'befehlsstelle', geaendert_at: 't2' });
+    serverstand(nachPatch(gesendet, 't1'));
+    serverstand(specZeile({ kind: 'hazard' }, { geaendert_at: 't2' }));
     act(() => vi.advanceTimersByTime(2000));
     expect(onAendern).toHaveBeenCalledTimes(1);
-    expect(kachel('Befehlsstelle')).toHaveAttribute('aria-checked', 'true');
+    expect(kachel('Gefahr')).toHaveAttribute('aria-checked', 'true');
   });
 
   // Ein Merker, der ohne Sendung stehen bleibt, schaltete die Übernahme fremder Änderungen
@@ -278,11 +309,11 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     const { onAendern, serverstand } = renderInspector();
     fireEvent.click(kachel('Person'));
     act(() => vi.advanceTimersByTime(200));
-    serverstand({ ...basis, grundzeichen: 'befehlsstelle', geaendert_at: 'x' });
+    serverstand({ ...basis, grundzeichen: 'gefahr', geaendert_at: 'x' });
     expect(kachel('Person')).toHaveAttribute('aria-checked', 'true');
     act(() => vi.advanceTimersByTime(700));
     expect(onAendern).toHaveBeenCalledTimes(1);
-    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'person' }));
+    expect(gesendeteSpec(vi.mocked(onAendern).mock.calls[0][0])).toMatchObject({ kind: 'person' });
   });
 
   // Nach „Löschen" holt der Abbau keine offene Änderung nach — ein PATCH auf das gelöschte Zeichen
@@ -326,15 +357,71 @@ describe('FreiesZeichenInspector — Symbolkachel (LFH-797)', () => {
     return document.querySelector<HTMLElement>('[data-lfh="auswahl-kachel"]')!;
   };
 
-  it('zeigt ein farbloses Zeichen in der Textrolle, nicht in der Kartentinte', () => {
-    const zelle = kachelImNachtmodus({ ...basis, farbe: null });
+  it('zeigt ein farbloses Zeichen im Nachtmodus mit Rahmen in der Textrolle, nicht in der Kartentinte', () => {
+    const zelle = kachelImNachtmodus(specZeile({ kind: 'formation' }));
+    expect(zelle.querySelector('svg')).not.toBeNull();
     expect(zelle.style.borderColor).toBe(css(farbenDunkel.text2));
-    expect(zelle.style.color).toBe(css(farbenDunkel.text2));
     expect(zelle.style.borderColor).not.toBe(css(FREIES_ZEICHEN_TINTE));
   });
 
-  it('zeigt ein Zeichen mit eigener Farbe in dieser Farbe', () => {
-    const zelle = kachelImNachtmodus({ ...basis, farbe: '#cc0000' });
-    expect(zelle.style.borderColor).toBe(css('#cc0000'));
+  it('zeigt eine Gefahr mit roter Füllung mit Rahmen im Rot der Palette', () => {
+    const zelle = kachelImNachtmodus(specZeile({ kind: 'hazard', technicalFill: 'rot' }));
+    expect(zelle.querySelector('svg')).not.toBeNull();
+    expect(zelle.style.borderColor).toBe(css(PALETTE.rot));
+  });
+
+  it('bildet die Hexfarbe einer alten Gefahr auf das Rot der Palette ab', () => {
+    const zelle = kachelImNachtmodus({ ...basis, grundzeichen: 'gefahr', farbe: '#cc0000' });
+    expect(zelle.style.borderColor).toBe(css(PALETTE.rot));
+  });
+});
+
+describe('FreiesZeichenInspector — Altzeichen (LFH-836)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('speichert ein Altzeichen beim Ändern als Zeichenbeschreibung', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    const gesendet = vi.mocked(onAendern).mock.calls[0][0];
+    // Nur `zeichen_spec` und Bezeichnung: keine Altfelder mehr im Body.
+    expect(Object.keys(gesendet).sort()).toEqual(['label', 'zeichen_spec']);
+    expect(gesendeteSpec(gesendet)).toMatchObject({ kind: 'person', organization: 'feuerwehr' });
+  });
+
+  it('nennt bei einem vereinfacht dargestellten Altzeichen die Alt-Kennung', () => {
+    renderInspector({
+      zeichen: {
+        ...basis,
+        grundzeichen: 'person',
+        organisation: null,
+        fachaufgabe: null,
+        einheit: null,
+        funktion: 'fuehrungskraft',
+        farbe: null,
+      },
+      darfSchreiben: false,
+    });
+    const hinweis = document.querySelector('[data-lfh="zeichen-vereinfacht"]');
+    expect(hinweis).toHaveTextContent('vereinfacht dargestellt');
+    expect(hinweis).toHaveTextContent('person · fuehrungskraft');
+  });
+
+  it('zeigt den Platzhalter für ein Altzeichen ohne Nachfolger, mit Hinweis', () => {
+    renderInspector({
+      zeichen: { ...basis, ...OHNE_ALTFELDER, grundzeichen: 'ohne', symbol: 'fernschreiben' },
+      darfSchreiben: false,
+    });
+    expect(document.querySelector('[data-lfh="zeichen-vereinfacht"]')).toHaveTextContent(
+      'vereinfacht dargestellt · ohne · fernschreiben',
+    );
+    expect(screen.getByText('Punkt')).toBeInTheDocument();
+  });
+
+  it('zeigt keinen Hinweis bei einem vollständig dargestellten Zeichen', () => {
+    renderInspector({ zeichen: specZeile({ kind: 'person' }), darfSchreiben: false });
+    expect(document.querySelector('[data-lfh="zeichen-vereinfacht"]')).toBeNull();
   });
 });

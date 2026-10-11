@@ -1,16 +1,6 @@
 // Barrel über die aus Rust generierten Schemas (`types.generated.ts`, LFH-120). Nicht von Hand
 // pflegen: Response-Typen ändern sich über die Rust-Structs + `scripts/check-typ-codegen.sh`.
 // FE-lokale Typen (Eingabe-Bodies, Record-Maps) sind unten als „kein Backend-Schema“ markiert.
-// ID-Typen der freien Zeichen (`NeuesFreiesZeichen`/`FreiesZeichenUpdate`) aus dem Altpaket, bis
-// LFH-836 sie auf @einsatzzeichen umstellt.
-import type {
-  EinheitId,
-  FachaufgabeId,
-  FunktionId,
-  GrundzeichenId,
-  OrganisationId,
-  SymbolId,
-} from 'taktische-zeichen-react';
 import type { components } from './types.generated';
 
 type S = components['schemas'];
@@ -346,24 +336,20 @@ export type LageZone = S['LageZoneAnzeige'];
 export type FreiesZeichen = S['FreiesZeichenAnzeige'];
 
 /** POST-Body für ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt). Kein
- *  Backend-Schema, FE-lokal; Overlays nutzen die DV-102-ID-Unions aus
- *  `taktische-zeichen-core`. */
+ *  Backend-Schema, FE-lokal. Neue Clients senden nur `zeichen_spec`, die kanonische
+ *  Zeichenbeschreibung von @einsatzzeichen (`serializeAnySpec`; LFH-836, design.md D1/D4); den
+ *  alten Body mit Grundzeichen und Overlays nimmt der Server nur noch für veraltete Clients an. */
 export interface NeuesFreiesZeichen {
   lat: number;
   lon: number;
-  grundzeichen: GrundzeichenId;
-  organisation?: OrganisationId | null;
-  fachaufgabe?: FachaufgabeId | null;
-  symbol?: SymbolId | null;
-  einheit?: EinheitId | null;
-  funktion?: FunktionId | null;
-  farbe?: string | null;
+  zeichen_spec: string;
   label?: string | null;
   /** Ansichts-Zugehörigkeit (LFH-320): aktive Ansicht beim Anlegen; `null` = auf allen. */
   ansicht_id?: number | null;
 }
 
-/** PATCH-Body (Whole-Spec-Overwrite ohne lat/lon, nicht verschiebbar). */
+/** PATCH-Body (ohne lat/lon, nicht verschiebbar). `zeichen_spec` schreibt das Zeichen und leert
+ *  die Altspalten; eine Altzeile wird so beim nächsten Ändern zur Spec. */
 export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 
 // ============================== LFH-319 Kartenansichten ==============================

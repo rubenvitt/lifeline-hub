@@ -44,6 +44,7 @@ import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
+import { START_ZEICHEN_SPEC } from './zeichenWahl';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
@@ -610,7 +611,7 @@ export default function Sidebar(props: SidebarProps) {
   // Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
-    grundzeichen: 'taktische-formation',
+    zeichen_spec: START_ZEICHEN_SPEC,
   });
   /**
    * Knopf „Platzieren" und Enter im Picker: der Entwurf übernimmt die Spec, damit der wieder

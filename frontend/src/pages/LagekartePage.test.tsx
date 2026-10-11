@@ -797,8 +797,9 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-freies_zeichen-42'));
-    // FreiesZeichenInspector: Picker mit vorbelegtem Grundzeichen; KEIN „Im Fach-Modul öffnen".
-    expect(await screen.findByText('Stelle, Einrichtung')).toBeInTheDocument();
+    // FreiesZeichenInspector: Picker mit vorbelegtem Grundzeichen (das Altzeichen „stelle“ über den
+    // Leseadapter als Stelle); KEIN „Im Fach-Modul öffnen".
+    expect(await screen.findByRole('radio', { name: 'Stelle', checked: true })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Im Fachmodul öffnen/ })).not.toBeInTheDocument();
   });
 
