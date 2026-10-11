@@ -93,7 +93,7 @@
 
 ## 8. Abschluss
 
-- [ ] 8.1 `./scripts/check-all.sh` ist grün (ohne `| tail`), Ergebnis je Schritt notiert.
+- [x] 8.1 `./scripts/check-all.sh` ist grün (ohne `| tail`), Ergebnis je Schritt notiert. Lokal sind die Bündel schnell und frontend grün; e2e und die volle Rust-Suite belegt die CI des PRs, siehe `messung.md`, Abschnitt „Gate“.
 
 ## Workflow follow-up
 

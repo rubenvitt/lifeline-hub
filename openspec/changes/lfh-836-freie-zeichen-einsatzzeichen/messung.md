@@ -173,3 +173,26 @@ kann in diesem Fenster einmal bis zu rund 0,4 s warten.
 Bundle nach den Nachbesserungen (`pnpm run build`, Stand `812fec76f`): `LagekartePage` 137.76 kB
 (gzip 43.46), Precache 6660.05 KiB (34 Einträge). Gegenüber Task 6.3 (134.83 kB) +2.93 kB, durch
 die Picker-Fixes, das Aufwärmen und die Zeichenplatte.
+
+## Gate (Task 8.1, 11.10.2026)
+
+Ein voller Lauf von `./scripts/check-all.sh` ohne `--nur` war in der Cloud-Sitzung nicht möglich.
+Die Rust-Suite belegt rund 26 GB im `target/`, das sprengt das Platten-Kontingent der Sitzung.
+Firefox und WebKit fehlen, und das vorhandene Chromium (Build 1194) passt nicht zu Playwright 1.62.
+Belegt wird der volle Lauf deshalb durch die CI des PRs, die `check-all.sh` unverändert fährt.
+
+Lokal gelaufen, alle ohne `| tail`:
+
+- `--nur schnell` (Schritte 1–3, 6, 8–14): grün.
+- `--nur frontend` (Schritt 5, Vitest): grün, 834 Dateien, 12 994 Tests.
+- Rust gezielt: `cargo test --test freies_zeichen` 22/22 grün. Der Backend-Strang lief zuvor mit
+  `cargo test --lib` (2809 grün) und den Integrationstests für `lage_snapshot`,
+  `enum_wire_kontrakt`, `openapi_spec_aktuell`, Schwärzung und Aufbewahrung, alle grün.
+- `--nur e2e` mit `PW_PROJEKTE=chromium`: Der Lauf brach nach 2 h am Zeitlimit der Sitzung ab.
+  - Bis dahin waren 845 Fälle grün. Rot waren Fälle in 19 Dateien, fast alle auf Seiten, die
+    dieser Branch nicht anfasst (ETB, Funkplan, Rail, Kräfte, UHS, Anhänge, Geräte), mit
+    30-s-Timeouts.
+  - Einzeln laufen die geprüften Specs grün: `lagekarte-zeichnen-korrigierbar` und
+    `rail-etikett`, 9/9.
+  - Die Lagekarten-Specs dieses Umbaus waren schon in Gruppe 7 grün: `lagekarte-smoke`,
+    `-touch`, `-kartengrundlage`, `-offline-precache`.
