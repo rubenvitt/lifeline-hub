@@ -43,7 +43,7 @@ dem Katalog, Lücke „Leitstelle“ in `stab/luecken.ts`) und die Umstellung au
 
 ## Impact
 
-- **Backend:** Migration `0176_org_externe_stelle.sql` (neue Tabelle, partieller UNIQUE-Index),
+- **Backend:** Migration `0177_org_externe_stelle.sql` (neue Tabelle, partieller UNIQUE-Index),
   neues Modul `src/externe_stelle/` und Route `src/routes/externe_stelle.rs`, Routen in
   `src/app.rs`, `STAMMDATEN_PFADE` in `src/routes/live.rs`, Grenze in `src/routes/einsatz.rs`.
   Tests: `tests/externe_stelle.rs`, `tests/stammdaten_live_guard.rs`, `tests/org_live.rs`,
