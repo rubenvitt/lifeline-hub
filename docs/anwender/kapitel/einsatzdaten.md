@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts]
 ---
 
 ## Überblick
@@ -28,6 +28,10 @@ gehört. Den Zugriff verwaltet nur die Einsatzleitung.
 
 So lassen sich Einsatzstichwort, Alarmzeit, Einsatzort, Einsatzart, Nächste Lagebesprechung,
 Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial) ändern.
+
+Bei „Meldende Stelle“ schlägt die App beim Tippen die externen Stellen aus den
+[Stammdaten](stammdaten.md) vor, nach Art gruppiert. Ein Vorschlag lässt sich wählen oder ein
+anderer Text eintragen.
 
 ### Alle Angaben auf einmal bearbeiten
 
@@ -134,6 +138,12 @@ aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder d
   wird er erst, wenn ihn jemand wählt.
 - Die **Führungsstelle eines Mitglieds** ist der erste Vorschlag, wenn das Einsatztagebuch die
   Person nach ihrem Rufnamen fragt, noch vor ihrem eigenen Sachgebiet im Stab.
+
+### Meldende Stelle und Katalog
+
+Gespeichert wird nur der Text der meldenden Stelle, kein Verweis auf den Katalog. Wird eine
+externe Stelle später umbenannt oder deaktiviert, behält der Einsatz den Text von damals. Die
+meldende Stelle darf höchstens 200 Zeichen lang sein.
 
 ### Ohne Netz
 

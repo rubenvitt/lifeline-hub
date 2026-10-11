@@ -147,6 +147,8 @@ use utoipa::OpenApi;
         crate::etb::EtbTyp,
         crate::etb::MeldeWeg,
         crate::etb_baustein::EtbBaustein,
+        crate::externe_stelle::ExterneStelle,
+        crate::externe_stelle::ExterneStelleArt,
         crate::fahrzeug::EinsatzFahrzeugAnzeige,
         crate::fahrzeug::FahrzeugAnzeige,
         crate::fahrzeug::FahrzeugStatus,

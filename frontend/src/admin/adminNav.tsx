@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import StichworteTab from '../stammdaten/StichworteTab';
+import ExterneStellenTab from '../stammdaten/ExterneStellenTab';
 import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import MaterialTab from '../stammdaten/MaterialTab';
 import StatusKatalogTab from '../stammdaten/StatusKatalogTab';
@@ -46,6 +47,7 @@ export const adminGruppen: AdminGruppe[] = [
        * `titel` in der Sektion); `adminNav.test.tsx` fängt Drift für die Stammdaten-Sektionen.
        */
       { key: 'stichworte', label: 'Einsatz-Stichworte', element: <StichworteTab /> },
+      { key: 'externe-stellen', label: 'Externe Stellen', element: <ExterneStellenTab /> },
       { key: 'fahrzeuge', label: 'Fahrzeuge', element: <FahrzeugeTab /> },
       { key: 'material', label: 'Material', element: <MaterialTab /> },
       { key: 'status', label: 'Fahrzeug-Status', element: <StatusKatalogTab /> },

@@ -5,6 +5,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import StichworteTab from './StichworteTab';
+import ExterneStellenTab from './ExterneStellenTab';
 import FahrzeugeTab from './FahrzeugeTab';
 import MaterialTab from './MaterialTab';
 import StatusKatalogTab from './StatusKatalogTab';
@@ -22,9 +23,9 @@ import { adminFixture, benutzerFixture } from '../test/fixtures';
  * Stammdaten-Sektion öffnet, erfährt den Grund, statt eine Tabelle ohne Handlungsmöglichkeit
  * zu sehen.
  *
- * Der Test steht bewusst QUER zu den elf Dateien: die Aussage ist „KEINE Sektion fehlt", und
- * die lässt sich nur an der vollständigen Menge treffen. Ein zwölfter Tab ohne Hinweis fiele
- * hier auf, in elf Einzeltests nicht.
+ * Der Test steht bewusst QUER zu den zwölf Dateien: die Aussage ist „KEINE Sektion fehlt", und
+ * die lässt sich nur an der vollständigen Menge treffen. Ein dreizehnter Tab ohne Hinweis fiele
+ * hier auf, in zwölf Einzeltests nicht.
  */
 const nichtAdmin = benutzerFixture({
   id: 2,
@@ -34,7 +35,7 @@ const nichtAdmin = benutzerFixture({
 const admin = adminFixture({ org_rolle: 'fuehrungskraft' });
 
 /**
- * Alle Abrufe der elf Tabs mit leeren Katalogen. `onUnhandledRequest: 'error'`
+ * Alle Abrufe der zwölf Tabs mit leeren Katalogen. `onUnhandledRequest: 'error'`
  * (test/setup.ts) macht eine fehlende Route zum Fehler statt zum stillen Leerlauf.
  * Leere Kataloge genügen: der Hinweis hängt am Recht, nicht an den Daten.
  */
@@ -55,6 +56,7 @@ function handler(benutzer: typeof admin) {
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     http.get('/api/einheit-typen', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Muster', tz_organisation: 'feuerwehr' }),
@@ -80,12 +82,13 @@ const SEKTIONEN = [
   { name: 'Einheitstypen', Komp: EinheitTypenTab, aktion: 'Typ anlegen' },
   { name: 'Organisation', Komp: OrganisationTab, aktion: 'Speichern' },
   { name: 'Sprechgruppen', Komp: SprechgruppenTab, aktion: 'Sprechgruppe anlegen' },
+  { name: 'Externe Stellen', Komp: ExterneStellenTab, aktion: 'Externe Stelle anlegen' },
 ];
 
 describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
-  it('deckt alle elf Sektionen ab', () => {
+  it('deckt alle zwölf Sektionen ab', () => {
     // Ohne diese Zahl wäre die Schleife darunter auch bei halber Menge grün.
-    expect(SEKTIONEN).toHaveLength(11);
+    expect(SEKTIONEN).toHaveLength(12);
   });
 
   it.each(SEKTIONEN)('$name nennt ohne Admin-Recht den Grund', async ({ Komp }) => {
@@ -106,7 +109,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
       renderMitProviders(<Komp />, { datenRouter: true });
       // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
       await screen.findByText(STAMMDATEN_RECHTE_TEXT);
-      // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der elf
+      // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der zwölf
       // Primäraktionen aber im INHALT — auf den Hinweis zu warten sichert für die nichts zu.
       // `waitFor` maskiert nichts: ein Knopf, der nie gesperrt wird, läuft in die Zeitüberschreitung.
       await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeDisabled());
@@ -127,7 +130,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
       expect(await screen.findByRole('heading', { level: 1, name })).toBeInTheDocument();
       expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
       // Die Gegenaussage zur Sperre. Ohne sie bliebe eine fest verdrahtete `disabled`-Angabe
-      // unentdeckt: elf `toBeDisabled` wären dann grün, und die Seite unbedienbar.
+      // unentdeckt: zwölf `toBeDisabled` wären dann grün, und die Seite unbedienbar.
       await waitFor(() => expect(screen.getByRole('button', { name: aktion })).toBeEnabled());
     },
   );

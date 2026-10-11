@@ -30,6 +30,7 @@ pub mod einsatzabschnitt;
 pub mod erinnerung;
 pub mod etb;
 pub mod etb_baustein;
+pub mod externe_stelle;
 pub mod fahrzeug;
 pub mod fahrzeug_status;
 pub mod freies_zeichen;
