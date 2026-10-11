@@ -4,7 +4,7 @@ import { sichtung } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
 import type { MarkerTyp } from './marker';
 
-type ClusterTyp = Exclude<MarkerTyp, 'einsatzort'>;
+type ClusterTyp = Exclude<MarkerTyp, 'einsatzort' | 'fuehrungsstelle'>;
 
 /**
  * Segment-Farben je Marker-Typ für den Cluster-Donut — eine eigene, kräftige Palette unabhängig von

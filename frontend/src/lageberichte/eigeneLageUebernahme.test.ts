@@ -7,6 +7,7 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { ladeStab } from '../api/stab';
+import { ladeFuehrungsstelle } from '../api/einsaetze';
 import type {
   Einheit,
   EinsatzFahrzeug,
@@ -29,6 +30,7 @@ vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn() }));
 
 const ABSCHNITTE = [
   {
@@ -107,6 +109,9 @@ beforeEach(() => {
   vi.mocked(listeEinsatzFahrzeuge).mockReset().mockResolvedValue(FAHRZEUGE);
   vi.mocked(listeEinsatzMaterial).mockReset().mockResolvedValue([]);
   vi.mocked(ladeStab).mockReset().mockResolvedValue(STAB);
+  vi.mocked(ladeFuehrungsstelle)
+    .mockReset()
+    .mockResolvedValue({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] });
 });
 
 const MELDEBILD = () =>
@@ -119,6 +124,8 @@ const ORG = (
     stand: STAND,
     stab: STAB.besetzung,
     einheitenZustand: 'daten',
+    einsatzleiter: { art: 'nicht-erfasst' },
+    dtg,
     ...opts,
   });
 
@@ -157,11 +164,57 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     );
   });
 
+  it('nennt den Einsatzleiter der Führungsstelle (LFH-1199)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      einsatzleiter: {
+        art: 'personal',
+        name: 'Anna Schulz',
+        personal_id: 3,
+        personal_noch_disponiert: true,
+        seit: '2026-10-11 12:30:00',
+      },
+    });
+    const text = await erzeuge();
+    expect(text).toContain('## Einsatzleitung\n\n- Einsatzleiter: Anna Schulz (seit STAND)\n');
+    expect(text).not.toContain('Leitung nicht erfasst');
+  });
+
+  it('nennt eine Führungsstelle, die nicht lädt, mit Grund statt „nicht erfasst“', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new Error('500'));
+    const text = await erzeuge();
+    expect(text).toContain('- Einsatzleiter: nicht geladen\n');
+    expect(text).not.toContain('Leitung nicht erfasst');
+  });
+
   it('sagt ohne Stab-Freigabe kein Wort über den Stab und ruft ihn nicht ab', async () => {
     const text = await erzeuge(freigabenFixture({ stab: { sichtbar: false } }));
     expect(ladeStab).not.toHaveBeenCalled();
     expect(text).toBe(`${MELDEBILD()}\n${ORG({ stab: null })}`);
     expect(text).not.toContain('Stab:');
+  });
+
+  it('nennt die erfasste Führungsstelle wie die Einzelübernahme; gescheitert bleibt sie weg (LFH-1181)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
+      bezeichnung: 'ELW 2 Musterstadt',
+      rufname: 'Florian 10/1',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+    });
+    const text = await erzeuge();
+    expect(text).toBe(
+      `${MELDEBILD()}\n${ORG({ fuehrungsstelle: { bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian 10/1' } })}`,
+    );
+    expect(text).toContain('- Führungsstelle ELW 2 Musterstadt · Rufname Florian 10/1\n');
+
+    // Gescheitert: keine Zeile der Führungsstelle, die Leitung nennt den Grund (LFH-1199).
+    vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new Error('500'));
+    expect(await erzeuge()).toBe(
+      `${MELDEBILD()}\n${ORG({ einsatzleiter: { art: 'zustand', grund: 'nicht geladen' } })}`,
+    );
   });
 
   it('überlässt fehlende Einheiten dem Renderer der Führungsorganisation', async () => {

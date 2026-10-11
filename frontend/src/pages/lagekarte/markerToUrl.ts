@@ -45,7 +45,9 @@ export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
         einsatzId,
         marker.lageMeldung ? { meldung: marker.lageMeldung.meldungId } : {},
       );
+    // Einsatzort und Führungsstelle (LFH-1181) pflegt die Seite Einsatzdaten.
     case 'einsatzort':
+    case 'fuehrungsstelle':
     default:
       return einsatzdatenPfad(einsatzId);
   }

@@ -90,6 +90,7 @@ import { useKartenFehler } from './lagekarte/useKartenFehler';
 import { KartenFehlerHinweis } from './lagekarte/KartenFehlerHinweis';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { modulName } from '../einsatz/modulRegistry';
+import { waermeVokabularAuf } from './lagekarte/zeichenWahl';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
@@ -841,6 +842,16 @@ export default function LagekartePage() {
     naechste.delete('zeichnen');
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, ladt, darfSchreiben, onZoneZeichnenStart]);
+
+  /**
+   * Picker-Kosten (LFH-836, design.md Risiko „Picker-Kosten“): steht die Karte und darf geschrieben
+   * werden, rechnet der Hub die Optionen des Zeichen-Pickers im Leerlauf vor, je Schritt ein Raster
+   * einer Art. Der Picker liest danach aus demselben Merker. Abbruch beim Verlassen.
+   */
+  useEffect(() => {
+    if (ladt || !darfSchreiben) return;
+    return waermeVokabularAuf();
+  }, [ladt, darfSchreiben]);
 
   /**
    * Koordinatensprung: `?zentrum=<lat>,<lon>` aus der Sprungpalette — anfliegen, dann räumen, sonst

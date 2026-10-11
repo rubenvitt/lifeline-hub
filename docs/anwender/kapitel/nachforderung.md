@@ -2,7 +2,7 @@
 titel: Nachforderung
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs]
+quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts]
 ---
 
 ## Überblick
@@ -30,7 +30,8 @@ Für Einsatzleitung und Führungspersonal:
 
 3. Unter „Bezeichnung / Bedarf“ den Bedarf genauer beschreiben.
 4. Den „Adressat“ wählen: „Leitstelle“ (vorbelegt), „Nachbar-Einsatzabschnitt“, „Übergeordnete
-   Führung“ oder „Andere BOS“. Bei Bedarf unter „Adressat-Bezeichnung“ die Stelle genauer nennen.
+   Führung“ oder „Andere BOS“. Bei Bedarf unter „Adressat-Bezeichnung“ die Stelle genauer nennen;
+   beim Tippen schlägt die App die externen Stellen aus den Stammdaten vor.
 5. „Priorität“ setzen und unter „Begründung / Lagebezug“ den Grund eintragen.
 6. „Nachforderung absetzen“ wählen.
 
@@ -72,6 +73,13 @@ Eine abgelehnte Nachforderung ist abgeschlossen und lässt sich nicht wieder öf
 Jede abgesetzte Nachforderung schreibt einen ETB-Eintrag vom Typ „Meldung“ mit dem Inhalt
 „Nachforderung: … × Art — Bezeichnung“, die Begründung als Veranlassung. Dieser Eintrag entsteht
 immer, unabhängig von „Automatische ETB-Einträge“ (siehe [Einsatztagebuch](einsatztagebuch.md)).
+
+### Zuständige Leitstelle als Vorgabe
+
+Ist in den [Stammdaten](stammdaten.md) eine externe Stelle als „Zuständige Leitstelle“
+markiert, steht sie bei „Adressat“ „Leitstelle“ schon in der „Adressat-Bezeichnung“, auch nach
+dem Absetzen. Ein selbst eingetragener Wert wird dabei nie überschrieben. Gespeichert wird nur
+der Text.
 
 ### Aus der Verpflegung nachfordern
 

@@ -12,7 +12,7 @@ import type {
   LageberichtAnzeige,
   LageberichtKopf,
   Lagebesprechung,
-  MitgliedAnzeige,
+  Fuehrungsstelle,
   Person,
   PersonPerioden,
   Schaden,
@@ -35,6 +35,7 @@ import {
   transportBilanz,
   verbleibZaehlung,
 } from '../../personen/personenBilanz';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../../stab/einsatzleiter';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
 import {
   etbTyp,
@@ -189,29 +190,28 @@ function zeiten(e: EinsatzAnzeige, standMs: number, konv: AnzeigeKonventionen): 
 }
 
 function fuehrung(
-  mitglieder: MitgliedAnzeige[],
+  fuehrungsstelle: Fuehrungsstelle | null,
   stab: Stab | null,
   besprechungen: Lagebesprechung[] | null,
   konv: AnzeigeKonventionen,
 ): Abschnitt[] {
-  const leitung = mitglieder.filter((m) => m.einsatz_rolle === 'einsatzleitung');
+  // Der Einsatzleiter der Führungsstelle (LFH-1199), dargestellt wie in Kopfleiste und
+  // Organigramm; nie die Konten mit der App-Rolle `einsatzleitung`.
+  const leiter = einsatzleiterDarstellung({ zustand: 'daten', daten: fuehrungsstelle });
   const besetzung = besetzungAusStab(stab ?? undefined);
   return [
-    abschnittAus(
-      'Einsatzleitung',
-      leitung,
-      (l) => l.length === 0,
-      (l) => [
-        zeilen(
-          l.map((m) => ({
-            etikett: 'Einsatzleitung',
-            wert: m.fuehrungsstelle_anzeige
-              ? `${m.anzeigename} (${m.fuehrungsstelle_anzeige})`
-              : m.anzeigename,
-          })),
-        ),
-      ],
-    ),
+    {
+      titel: 'Einsatzleitung',
+      inhalt:
+        leiter.art === 'erfasst'
+          ? [
+              zeilen([
+                { etikett: 'Einsatzleiter', wert: einsatzleiterKurz(leiter) },
+                { etikett: 'Seit', wert: zeit(leiter.seit, konv) },
+              ]),
+            ]
+          : [vermerk(einsatzleiterKurz(leiter))],
+    },
     abschnittAus(
       'Stab',
       stab,
@@ -700,7 +700,7 @@ export function verdichteEinsatzbericht(
     stammdaten: () => stammdaten(einsatz),
     zeiten: () => zeiten(einsatz, standMs, konv),
     fuehrung: () =>
-      fuehrung(daten(q.mitglieder) ?? [], daten(q.stab), daten(q.lagebesprechungen), konv),
+      fuehrung(daten(q.fuehrungsstelle), daten(q.stab), daten(q.lagebesprechungen), konv),
     kraefte: () =>
       kraefte(
         daten(q.einheiten),

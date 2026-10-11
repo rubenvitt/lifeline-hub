@@ -9,7 +9,7 @@ die Leitstelle wird im ETB belegt.
 ## Requirements
 
 ### Requirement: Sieben feste Punkte mit Quelle
-Die Checkliste SHALL genau sieben Punkte in fester Reihenfolge führen: Aufstellort des ELW
+Die Checkliste SHALL genau sieben Punkte in fester Reihenfolge führen: Standort der Führungsstelle
 festgelegt, Einweisung durch die Einsatzleitung erhalten, Lageskizze begonnen,
 Funkarbeitsplätze eingerichtet, Sprechgruppen zugeteilt, ETB eröffnet, Einsatzbereitschaft an die
 Leitstelle gemeldet. Jeder Punkt MUST seine Quelle sichtbar tragen. Die Punkte MUST NOT je
@@ -131,3 +131,21 @@ Zeitpunkte und Verweise bleiben als Skelett erhalten.
 #### Scenario: Einsatz geschwärzt
 - **WHEN** ein Einsatz mit Bemerkungen in der Checkliste geschwärzt wird
 - **THEN** sind alle Bemerkungen leer, und die Haken samt Zeitpunkten bleiben
+
+### Requirement: Standort der Führungsstelle am ersten Punkt
+Der Punkt „Standort der Führungsstelle festgelegt“ SHALL Bezeichnung und Standort der eigenen
+Führungsstelle als Wert zeigen, soweit erfasst, und auf ihr Paneel in den Einsatzdaten verweisen.
+Ohne Standort MUST dort „Standort nicht erfasst“ stehen. Der Wert MUST NOT den Haken setzen oder
+entfernen; der gespeicherte Schlüssel des Punkts bleibt unverändert.
+
+#### Scenario: Standort erfasst, Punkt offen
+- **WHEN** die Führungsstelle „ELW 2 Musterstadt“ mit Adresse „Parkplatz Feuerwehrhaus Nord“ erfasst ist und der Punkt nicht abgehakt ist
+- **THEN** zeigt der Punkt „ELW 2 Musterstadt · Parkplatz Feuerwehrhaus Nord“ mit Verweis auf die Einsatzdaten und bleibt offen
+
+#### Scenario: Kein Standort
+- **WHEN** die Führungsstelle keinen Standort trägt
+- **THEN** zeigt der Punkt „Standort nicht erfasst“ mit Verweis auf die Einsatzdaten
+
+#### Scenario: Abruf gesperrt oder gescheitert
+- **WHEN** der Abruf der Führungsstelle scheitert
+- **THEN** nennt der Punkt den Grund statt „nicht erfasst“, und Haken und Bemerkung bleiben bedienbar

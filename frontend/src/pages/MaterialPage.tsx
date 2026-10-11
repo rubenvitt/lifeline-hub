@@ -43,7 +43,7 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
-import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
+import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 import { modulName } from '../einsatz/modulRegistry';
@@ -275,7 +275,7 @@ export default function MaterialPage() {
   // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach als getrennte Position
   // disponiert werden (Mengen-Splitting auf Einheiten).
   // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
-  const poolOptionen = demoGruppierteOptionen(
+  const poolOptionen = demoGroupedOptions(
     poolQuery.data ?? [],
     (m) => `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
   );

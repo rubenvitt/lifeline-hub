@@ -22,7 +22,7 @@ export { BLOECKE, type BlockSchluessel } from './auswahl';
 
 export type QuellenSchluessel =
   | 'einsatz'
-  | 'mitglieder'
+  | 'fuehrungsstelle'
   | 'stab'
   | 'lagebesprechungen'
   | 'einheiten'
@@ -60,8 +60,9 @@ export const QUELLEN: readonly Quelle[] = [
   // GET /api/einsaetze/{id} — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs:113).
   // Kopf, Stand und Abschluss des Einsatzes braucht jeder Block.
   { schluessel: 'einsatz', bloecke: BLOECKE.map((b) => b.schluessel), modul: null },
-  // GET …/mitglieder — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs:622).
-  { schluessel: 'mitglieder', bloecke: nur('fuehrung'), modul: null },
+  // GET …/fuehrungsstelle — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
+  // Sie trägt den Einsatzleiter (LFH-1199); die Mitglieder mit App-Rolle sind keine Leitung.
+  { schluessel: 'fuehrungsstelle', bloecke: nur('fuehrung'), modul: null },
   // GET …/stab — `EinsatzLesezugriff<Stab>` (src/routes/stab.rs:122).
   { schluessel: 'stab', bloecke: nur('fuehrung'), modul: 'stab' },
   // GET …/stab/lagebesprechungen — `EinsatzLesezugriff<Stab>` (src/routes/stab.rs:192).

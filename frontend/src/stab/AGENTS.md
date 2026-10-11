@@ -13,6 +13,15 @@ gepflegt im Paneel auf Einsatzdaten, live über `einsatz`): erfasst (`fuehrungss
 eine Regel) steht sie als Zeile `fs` vor den Wurzeln und an der Skizzenwurzel und ist Gegenstelle
 der obersten Abschnitte in `verbindungsurteil`; sonst nennt `gegenstelleHinweis` sie als Lücke.
 
+**Einsatzleiter** (LFH-1199, `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md`):
+eine Angabe der eigenen Führungsstelle (Person aus dem disponierten Personal oder Freitext, dazu
+„seit“), gepflegt in deren Paneel auf Einsatzdaten; ein Wechsel schreibt der Server als Übergabe
+ins ETB. Dargestellt wird er nur über `stab/einsatzleiter.ts` (`einsatzleiterDarstellung`):
+Kopfleiste der Einsatzdaten, Wurzel des Organigramms, Spalte Leiter/Führer der Zeile `fs`, die
+Lagebericht-Übernahmen und der Einsatzbericht. **Nie aus der App-Rolle `einsatzleitung` oder der
+Stab-Besetzung ableiten**; fehlt er, steht „nicht erfasst“, fehlt die Quelle, ihr Grund. In der
+Fernmeldeskizze steht kein Name (Regel unten).
+
 **Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`;
 Vorgänger LFH-625): taktische Skizze nach BBK-Anhang J.5 als zweite Darstellung des Funkplans
 (`?ansicht=skizze`), kein Modul, keine Route. **Ein Modell:** `stab/fernmeldeskizze.ts:

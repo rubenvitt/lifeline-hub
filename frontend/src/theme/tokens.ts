@@ -102,6 +102,11 @@ export interface Farbrollen {
   berichtigungZeile: string;
   lueckeZeile: string;
   problemZeile: string;
+  /** Platte unter einem taktischen Zeichen in Picker- und Inspector-Kacheln (LFH-836): die
+   *  Bibliothek zeichnet mit schwarzer Tinte, nachts trüge das dunkle Paneel sie nicht. Am Tag
+   *  durchsichtig (die Kachel sieht aus wie zuvor), nachts hell: Tinte ≥ 7 : 1, gegen `paneel`
+   *  und `flaeche3` ≥ 3 : 1 (`tokens.test.ts`). Die Karte bleibt ohne Platte (LFH-833). */
+  zeichenPlatte: string;
 }
 
 /**
@@ -203,6 +208,7 @@ export const farbenHell: Farbrollen = {
   berichtigungZeile: '#fbeaea',
   lueckeZeile: '#faf3da',
   problemZeile: '#f8eded',
+  zeichenPlatte: 'transparent',
 };
 
 /**
@@ -283,6 +289,7 @@ export const farbenDunkel: Farbrollen = {
   berichtigungZeile: '#160d0f',
   lueckeZeile: '#161305',
   problemZeile: '#130f0f',
+  zeichenPlatte: '#c9ced4',
 };
 
 /**

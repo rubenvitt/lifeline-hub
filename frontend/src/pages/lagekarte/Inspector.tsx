@@ -3,8 +3,6 @@ import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry'
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { useId, useMemo } from 'react';
 import { renderSvg } from '@einsatzzeichen/core';
-// Nur noch für freie Zeichen, bis LFH-836 sie auf @einsatzzeichen umstellt.
-import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
@@ -79,6 +77,9 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
   switch (m.typ) {
     case 'einsatzort':
       return `einsatzort:${einsatzId}`;
+    // Die Ort-Vorschau kennt die Führungsstelle nicht als Peilungsquelle.
+    case 'fuehrungsstelle':
+      return undefined;
     case 'uhs':
       return `uhs:${m.id}`;
     case 'schaden':
@@ -107,23 +108,17 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
 }
 
 /**
- * Das taktische Zeichen als Bild-URL für die Symbol-Kachel — aus derselben Quelle wie die
- * Karten-Icons (`markerIconKey`): Fachobjekte über @einsatzzeichen (LFH-835), freie Zeichen bis
- * LFH-836 über das Altpaket. `null`, wenn es sich nicht bauen lässt; dann trägt die Kachel das Kürzel.
+ * Das taktische Zeichen eines Fachobjekts als Bild-URL für die Symbol-Kachel — aus derselben Quelle
+ * wie die Karten-Icons (`markerIconKey`, LFH-835). Freie Zeichen zeigt dieser Inspector nicht, sie
+ * haben den `FreiesZeichenInspector` (LFH-836). `null`, wenn es sich nicht bauen lässt; dann trägt
+ * die Kachel das Kürzel.
  */
-function markerBildUrl(typ: MarkerTyp, tz: TzProps | undefined): string | null {
+function markerBildUrl(tz: TzProps | undefined): string | null {
   if (!tz) return null;
-  if (typ !== 'freies_zeichen') {
-    const zeichen = fachobjektZeichen(tz);
-    if (!zeichen) return null;
-    const svg = renderSvg(zeichen.drawing, KACHEL_SVG_OPTIONEN);
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  }
-  try {
-    return erzeugeTaktischesZeichen(tz).dataUrl;
-  } catch {
-    return null;
-  }
+  const zeichen = fachobjektZeichen(tz);
+  if (!zeichen) return null;
+  const svg = renderSvg(zeichen.drawing, KACHEL_SVG_OPTIONEN);
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 /** Ein Feld des Datenrasters: Augenbraue über dem Wert; mit Statusrolle als getönter Chip. */
@@ -180,7 +175,7 @@ export default function Inspector({
   const fachmodulText = marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen';
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
-  const bild = useMemo(() => markerBildUrl(marker.typ, marker.tz), [marker.typ, marker.tz]);
+  const bild = useMemo(() => markerBildUrl(marker.tz), [marker.tz]);
   const raster = auswahlRaster(marker, roh, formatZeitKurz);
   const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
 
@@ -326,9 +321,11 @@ export default function Inspector({
             </Link>
           )}
         </div>
-        {/* Lagemeldungen sind auf der Karte read-only: verortet wird nur beim Übergeben. */}
+        {/* Lagemeldungen sind auf der Karte read-only: verortet wird nur beim Übergeben. Die
+            Führungsstelle ebenso: sie wird in den Einsatzdaten gepflegt (LFH-1181). */}
         {darfSchreiben &&
           marker.typ !== 'einsatzort' &&
+          marker.typ !== 'fuehrungsstelle' &&
           marker.typ !== 'lagemeldung' &&
           (marker.typ === 'abschnitt' ? (
             // Ein Abschnitt steht nur mit Fläche auf der Karte, sein Löschen schickt

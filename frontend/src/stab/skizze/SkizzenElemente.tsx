@@ -38,6 +38,7 @@ import {
   ausstattungsZeilen,
   komponentenBildHoehe,
   schienenLinieY,
+  zusatzHoehe,
   type Platz,
 } from '../fernmeldeskizzeLayout';
 import { STELLENART_LABEL } from '../kommunikationsplan';
@@ -388,7 +389,10 @@ export function StelleBild({
   const nameY = tzY + TZ_HOEHE + ZEICHEN_ABSTAND;
   const schrift = kasten ? KASTEN_SCHRIFT : NAME_SCHRIFT;
   const zeile = kasten ? KASTEN_ZEILE : NAME_ZEILE;
-  const rufY = nameY + zeilenHoehe(name, schrift, zeile, innen);
+  // Die Bezeichnung der Führungsstelle (LFH-1181) steht unter der Überschrift „Einsatzleitung“.
+  const zusatzY = nameY + zeilenHoehe(name, schrift, zeile, innen);
+  const zusatz = stelle.art === 'fuehrungsstelle' ? stelle.zusatz : null;
+  const rufY = zusatzY + zusatzHoehe(stelle, innen);
   // Ein langer Rufname bricht um wie die Bezeichnung (Messung 1.1); der Platz wächst in
   // `stellenMasse` um dieselben Zeilen mit.
   const rufZeilen = ruf ? umbrich(ruf, NAME_SCHRIFT, innen) : [];
@@ -436,6 +440,17 @@ export function StelleBild({
           breite={innen}
           fett={kasten}
         />
+        {zusatz ? (
+          <Zeilen
+            x={cx}
+            y={zusatzY}
+            text={zusatz}
+            schrift={NAME_SCHRIFT}
+            zeile={NAME_ZEILE}
+            breite={innen}
+            fett={false}
+          />
+        ) : null}
         {ruf ? (
           <text
             x={cx}

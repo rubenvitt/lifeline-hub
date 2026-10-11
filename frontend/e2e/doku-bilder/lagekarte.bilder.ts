@@ -4,7 +4,16 @@ import {
   kartenConfigBeantworten,
   vektorStilBeantworten,
 } from '../kartenFixture';
-import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
+import {
+  anmelden,
+  demoEinsatz,
+  expect,
+  fotografiere,
+  fuehrungsstelleOrtFuellen,
+  fuelle,
+  test,
+  uhrAnhalten,
+} from './kern';
 
 /**
  * Bilder des Kapitels „Lagekarte, Zeichnen und Messen“ (`docs/anwender/kapitel/lagekarte.md`).
@@ -15,7 +24,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                          frontend/src/pages/lagekarte/Sidebar.tsx,
  *                          frontend/src/pages/lagekarte/KartenUeberlagerung.tsx
  *   taktisches-zeichen.png frontend/src/pages/lagekarte/Sidebar.tsx (Paneel „Zeichnen“),
- *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx
+ *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx,
+ *                          frontend/src/pages/lagekarte/zeichenWahl.ts
  *   zone-zeichnen.png      frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx
  *   messen.png             frontend/src/pages/lagekarte/MessSteuerung.tsx
  *
@@ -71,6 +81,8 @@ async function oeffneKarte(page: Page): Promise<Locator> {
   await anmelden(page);
   const demo = await demoEinsatz(page);
   await lageVerorten(page, demo.id);
+  // Die eigene Führungsstelle steht als Befehlsstelle neben der Einsatzstelle (LFH-1181).
+  await fuehrungsstelleOrtFuellen(page, demo.id);
   await uhrAnhalten(page);
   await page.goto(`/einsaetze/${demo.id}/lagekarte`);
   const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
@@ -157,7 +169,7 @@ test.describe(KAPITEL, () => {
     const zeichnen = page.locator('section[data-paneel="zeichnen"]');
     await zeichnen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
     const grundzeichen = zeichnen.getByRole('radiogroup', { name: 'Grundzeichen' });
-    await grundzeichen.getByRole('radio', { name: 'Fahrzeug', exact: true }).click();
+    await grundzeichen.getByRole('radio', { name: 'Landfahrzeug', exact: true }).click();
     await expect(zeichnen.getByRole('button', { name: 'Platzieren' })).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(zeichnen, KAPITEL, 'taktisches-zeichen');

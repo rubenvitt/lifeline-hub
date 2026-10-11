@@ -152,6 +152,11 @@ export type NetzStelle =
       art: 'fuehrungsstelle';
       id: null;
       erfasst: boolean;
+      /**
+       * Bezeichnung der Führungsstelle („TEL Rathaus“, LFH-1181) als eigene Zeile unter der
+       * Überschrift „Einsatzleitung“; nur bei Erfassung, sonst `null`. Nie abgeleitet.
+       */
+      zusatz: string | null;
       /** Warum keine Gegenstelle dasteht, sonst `null`. */
       hinweis: string | null;
       tz: TzProps;
@@ -327,14 +332,16 @@ const vergleiche = (a: string, b: string) =>
 const vergleicheMittel = (a: SkizzenAusstattung, b: SkizzenAusstattung) =>
   vergleiche(a.text, b.text) || vergleiche(a.titel, b.titel);
 
-/**
- * Ein disponiertes Fahrzeug ist Führungsmittel eines Abschnitts, wenn sein Zeichen die Fachaufgabe
- * Führung trägt: dieselbe Regel wie die Lagekarte (`baueTzProps`), ein manuelles
- * `tz_fachaufgabe` gewinnt. Ein der eigenen Führungsstelle zugeordnetes Fahrzeug ist es ohne diese
- * Bedingung (`nurFuehrung = false`, LFH-1106): die Zuordnung ist selbst die Aussage.
- */
-function fuehrungsmittel(f: EinsatzFahrzeug, nurFuehrung = true): SkizzenAusstattung | null {
-  const tz = baueTzProps({
+/** Was das Zeichen eines Fahrzeugs bestimmt; Stammdaten-Fahrzeuge tragen keine Overrides. */
+export type FahrzeugZeichenSource = Pick<
+  EinsatzFahrzeug,
+  'fahrzeugtyp' | 'opta' | 'traegerorganisation'
+> &
+  Partial<Pick<EinsatzFahrzeug, 'tz_fachaufgabe' | 'tz_organisation'>>;
+
+/** Das Zeichen eines Fahrzeugs wie auf der Lagekarte (`baueTzProps`), Overrides gewinnen. */
+function fahrzeugTz(f: FahrzeugZeichenSource): TzProps {
+  return baueTzProps({
     objekttyp: 'fahrzeug',
     fachaufgabe: f.tz_fachaufgabe,
     organisation: f.tz_organisation,
@@ -342,6 +349,24 @@ function fuehrungsmittel(f: EinsatzFahrzeug, nurFuehrung = true): SkizzenAusstat
     opta: f.opta,
     traegerorganisation: f.traegerorganisation,
   });
+}
+
+/**
+ * Ein Führungsfahrzeug trägt im Zeichen die Fachaufgabe Führung — die eine Regel für Lagekarte,
+ * Skizze und die Rufname-Vorschläge der Führungsstelle (LFH-1187).
+ */
+export function isFuehrungsfahrzeug(f: FahrzeugZeichenSource): boolean {
+  return fahrzeugTz(f).fachaufgabe === 'fuehrung';
+}
+
+/**
+ * Ein disponiertes Fahrzeug ist Führungsmittel eines Abschnitts, wenn sein Zeichen die Fachaufgabe
+ * Führung trägt: dieselbe Regel wie die Lagekarte (`baueTzProps`), ein manuelles
+ * `tz_fachaufgabe` gewinnt. Ein der eigenen Führungsstelle zugeordnetes Fahrzeug ist es ohne diese
+ * Bedingung (`nurFuehrung = false`, LFH-1106): die Zuordnung ist selbst die Aussage.
+ */
+function fuehrungsmittel(f: EinsatzFahrzeug, nurFuehrung = true): SkizzenAusstattung | null {
+  const tz = fahrzeugTz(f);
   if (nurFuehrung && tz.fachaufgabe !== 'fuehrung') return null;
   const typ = f.fahrzeugtyp?.trim() || null;
   return {
@@ -464,6 +489,7 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
     id: null,
     bezeichnung: EINSATZLEITUNG,
     rufname: fsErfasst ? (fsDaten?.rufname ?? null) : null,
+    zusatz: fsErfasst ? fsDaten?.bezeichnung?.trim() || null : null,
     ziel: einsatzdatenPfad(q.einsatzId),
     recht: 'verwaltung',
     schreibbar: schreibbar('verwaltung'),

@@ -1,18 +1,89 @@
 // Hub-Vokabular der taktischen Zeichen: Ableitung aus App-Feldern (`baueTzProps`) und Fest-Specs.
 // Gezeichnet werden die Fachobjekte über @einsatzzeichen (`zeichen/fachobjektZeichen.ts`, LFH-835).
-// Die Importe aus dem Altpaket bleiben für die Kennungstypen und das accepts-Gating der freien
-// Zeichen stehen, bis LFH-836 auch diese umstellt.
-import { grundzeichen as grundzeichenKatalog } from 'taktische-zeichen-react';
-import type {
-  ComponentType,
-  EinheitId,
-  FachaufgabeId,
-  FunktionId,
-  GrundzeichenId,
-  OrganisationId,
-  TaktischesZeichen as TZSpec,
-} from 'taktische-zeichen-react';
+// Die Kennungen stammen aus dem früheren Paket taktische-zeichen (bis LFH-836); ihre Typen stehen
+// seitdem hier, nur mit den Werten, die der Hub für Fachobjekte vergibt (design.md D9). Freie
+// Zeichen tippt der Leseadapter `zeichen/freiesZeichen.ts` als `string`, denn sie sind Eingabe.
 import type { Ausmass, UhsTyp } from '../../api/types';
+
+/** Grundzeichen der Fachobjekte; jedes hat einen Körper in `fachobjektZeichen` (`KOERPER`). */
+export const GRUNDZEICHEN_IDS = [
+  'taktische-formation',
+  'kraftfahrzeug-landgebunden',
+  'person',
+  'befehlsstelle',
+  'wasserfahrzeug',
+  'zweirad',
+  'anhaenger',
+  'hubschrauber',
+  'anlass',
+  'gefahr',
+  'stelle',
+] as const;
+export type GrundzeichenId = (typeof GRUNDZEICHEN_IDS)[number];
+
+/**
+ * Organisationen, die der Hub vergibt: Override im Inspector, Ableitung aus Träger und OPTA.
+ * Gespeicherte Werte kommen als `string` aus der DB; die Übersetzung nimmt jeden.
+ */
+export type OrganisationId =
+  'feuerwehr' | 'thw' | 'hilfsorganisation' | 'polizei' | 'bundeswehr' | 'zivil';
+
+/**
+ * Fachaufgaben der Fachobjekte (`tz_fachaufgabe`, Ableitung, UHS, Betreuung): die Werte, die
+ * `fachobjektZeichen` abbildet (`FAEHIGKEIT`, `VERSORGUNG`) und „Führung“.
+ */
+export type FachaufgabeId =
+  | 'brandbekaempfung'
+  | 'wasserversorgung'
+  | 'technische-hilfeleistung'
+  | 'bergung'
+  | 'sprengen'
+  | 'entschaerfen'
+  | 'abc'
+  | 'messen'
+  | 'dekontamination'
+  | 'dekontamination-personen'
+  | 'dekontamination-geraete'
+  | 'rettungswesen'
+  | 'aerztliche-versorgung'
+  | 'krankenhaus'
+  | 'einsatzeinheit'
+  | 'betreuung'
+  | 'unterbringung'
+  | 'seelsorge'
+  | 'versorgung-trinkwasser'
+  | 'versorgung-brauchwasser'
+  | 'instandhaltung'
+  | 'iuk'
+  | 'erkundung'
+  | 'veterinaerwesen'
+  | 'schlachten'
+  | 'wasserrettung'
+  | 'wasserfahrzeuge'
+  | 'rettungshunde'
+  | 'abwehr-wassergefahren'
+  | 'heben'
+  | 'raeumen'
+  | 'hoehenrettung'
+  | 'beleuchtung'
+  | 'pumpen'
+  | 'umweltschaeden-gewaesser'
+  | 'warnen'
+  | 'transport'
+  | 'logistik'
+  | 'verpflegung'
+  | 'verbrauchsgueter'
+  | 'versorgung-elektrizitaet'
+  | 'fuehrung';
+
+/** Einheitsgrößen aus dem Typ-Label einer Einheit. */
+export type EinheitId = 'trupp' | 'staffel' | 'gruppe' | 'zug' | 'zugtrupp';
+
+/** DV-102-Funktions-Indikator; der Hub setzt nur die Führungskraft. */
+export type FunktionId = 'fuehrungskraft';
+
+/** Symbole der UHS-Typen. */
+export type SymbolId = 'sammelplatz-betroffene' | 'sammeln';
 
 type Objekttyp = 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
 
@@ -52,10 +123,17 @@ interface TzEingabe {
   istFuehrungskraft?: boolean; // setzt den DV-102-Funktions-Indikator 'fuehrungskraft'
 }
 
-export type TzProps = Pick<
-  TZSpec,
-  'grundzeichen' | 'organisation' | 'fachaufgabe' | 'einheit' | 'symbol' | 'farbe' | 'funktion'
->;
+/** Das Zeichen eines Fachobjekts im Hub-Vokabular; gezeichnet über `fachobjektZeichen`. */
+export interface TzProps {
+  grundzeichen?: GrundzeichenId;
+  organisation?: OrganisationId;
+  fachaufgabe?: FachaufgabeId;
+  einheit?: EinheitId;
+  symbol?: SymbolId;
+  /** Freie Farbe (nur Schäden, `AUSMASS_FARBE`); `fachobjektZeichen` bildet sie aufs Palettentoken ab. */
+  farbe?: string;
+  funktion?: FunktionId;
+}
 
 // Fahrzeugtyp (Freitext) → spezifischeres DV-102-Grundzeichen. Konservativ: nur eindeutige Fälle,
 // sonst das generische 'kraftfahrzeug-landgebunden'. `kraftrad` ist in der Library deprecated →
@@ -115,21 +193,6 @@ export function fachaufgabeAusFunktion(
   return undefined;
 }
 
-// accepts-Gating NUR noch für freie Zeichen (Picker, `baueFreiesZeichenTz`), die bis LFH-836 auf dem
-// Altpaket bleiben: manche Grundzeichen rendern bestimmte Overlays nicht, die Library ignoriert sie
-// still. Wir setzen sie gar nicht erst, damit der Icon-Dedup-Key (`tzIconKey`) nicht divergiert und
-// kein Phantom-Overlay entsteht. Die Fachobjekte gaten nicht mehr: dort entscheidet die Komposition
-// in `zeichen/fachobjektZeichen.ts` (LFH-835).
-const AKZEPTIERTE_OVERLAYS: ReadonlyMap<string, ReadonlySet<ComponentType>> = new Map(
-  grundzeichenKatalog.map((g) => [g.id, new Set(g.accepts ?? [])]),
-);
-
-/** Rendert das Grundzeichen das gegebene Overlay laut DV-102-Katalog? Unbekanntes Grundzeichen
- *  → false (sicher: kein Phantom-Overlay). */
-export function grundzeichenAkzeptiert(grundzeichen: string, overlay: ComponentType): boolean {
-  return AKZEPTIERTE_OVERLAYS.get(grundzeichen)?.has(overlay) ?? false;
-}
-
 /**
  * Leitet die DV-102-Spec aus App-Feldern ab. Priorität je Overlay: manueller Override (tz_*) ??
  * abgeleitet aus Fahrzeugtyp/Träger/OPTA ?? Typ-/Org-Default. Ergebnis ist Hub-Vokabular: welche
@@ -153,8 +216,7 @@ export function baueTzProps(e: TzEingabe): TzProps {
     (e.objekttyp === 'abschnitt' || e.objekttyp === 'fuehrung' ? 'fuehrung' : undefined)) as
     FachaufgabeId | undefined;
 
-  // DV-102-Funktions-Indikator nur für als Führungskraft markierte Personen. Die Library-Enum kennt
-  // nur fuehrungskraft|sonderfunktion.
+  // DV-102-Funktions-Indikator nur für als Führungskraft markierte Personen.
   const funktion: FunktionId | undefined =
     e.objekttyp === 'fuehrung' && e.istFuehrungskraft ? 'fuehrungskraft' : undefined;
 
@@ -179,6 +241,14 @@ const AUSMASS_FALLBACK = '#8c8c8c';
 /** Einsatzort (id:0): DV-102-Grundzeichen „anlass" (Einsatz-/Schadensanlass). */
 export function einsatzortTz(): TzProps {
   return { grundzeichen: 'anlass' };
+}
+
+/**
+ * Eigene Führungsstelle (LFH-1181): DV-102-Grundzeichen „Befehlsstelle“ (BABZ D.1.1), die Stelle,
+ * an der die Einsatzleitung arbeitet — mobil wie ortsfest dasselbe Zeichen.
+ */
+export function fuehrungsstelleTz(): TzProps {
+  return { grundzeichen: 'befehlsstelle' };
 }
 
 /**

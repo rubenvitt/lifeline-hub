@@ -2457,22 +2457,38 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        // LFH-836: ein Zeichen mit Zeichenbeschreibung — die Beschreibung trägt nur Katalogwerte
+        // (Freitext lehnt der Server ab) und bleibt als Skelett, das Label fällt.
+        let spec = r#"{"v":1,"freestanding":{"kind":"state","state":"developed-fire"}}"#;
+        sqlx::query(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, label, erstellt_von) \
+             VALUES (?, ?, ?, ?, 'Fam. Meier', ?)",
+        )
+        .bind(einsatz.id)
+        .bind(50.2)
+        .bind(8.7)
+        .bind(spec)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
             .await
             .unwrap());
 
-        let (label, lat): (Option<String>, f64) =
-            sqlx::query_as("SELECT label, lat FROM freies_zeichen WHERE einsatz_id = ?")
-                .bind(einsatz.id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let zeilen: Vec<(Option<String>, f64, Option<String>)> = sqlx::query_as(
+            "SELECT label, lat, zeichen_spec FROM freies_zeichen WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(einsatz.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
         assert_eq!(
-            label, None,
-            "Freitext-Label (PII) muss nach Schwärzung NULL sein"
+            zeilen,
+            vec![(None, 50.1, None), (None, 50.2, Some(spec.to_string()))],
+            "Freitext-Label (PII) NULL, Position und Zeichenbeschreibung bleiben (Skelett)"
         );
-        assert_eq!(lat, 50.1, "operative Position bleibt erhalten (Skelett)");
     }
 
     #[tokio::test]

@@ -21,6 +21,7 @@ import type { LayerSichtbar } from './Sidebar';
 const FACHEBENE_KEYS = fachebeneKeys();
 const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'einsatzort',
+  'fuehrungsstelle',
   'uhs',
   'schaden',
   'einheit',
@@ -40,6 +41,8 @@ const LAYER_KEYS: (keyof LayerSichtbar)[] = [
  */
 const LAYER_DEFAULT: LayerSichtbar = {
   einsatzort: true,
+  // Ein Anker wie der Einsatzort (LFH-1181); ältere Ansichten ohne Schlüssel öffnen ihn an.
+  fuehrungsstelle: true,
   uhs: true,
   schaden: true,
   einheit: true,

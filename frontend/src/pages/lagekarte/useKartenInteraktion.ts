@@ -17,7 +17,7 @@ import {
   verschiebeFreiesZeichen,
 } from '../../api/freieZeichen';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { ZoneTyp, FreiesZeichenUpdate } from '../../api/types';
+import type { ZoneTyp, FreiesZeichenPatch, FreiesZeichenUpdate } from '../../api/types';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
 import {
@@ -766,9 +766,9 @@ export function useKartenInteraktion({
       .catch(melde);
   };
 
-  // Freies-Zeichen-Inspector-CRUD, Whole-Spec-Update (lat/lon unverändert). Jede quittiert erst
+  // Freies-Zeichen-Inspector-CRUD, Teil-Patch (nur Bezeichnung) oder Zeichen samt Bezeichnung. Jede quittiert erst
   // nach erfolgreicher Antwort; die drei teilen den Schlüssel des Zeichens.
-  const zeichenAendern = (id: number, spec: FreiesZeichenUpdate) => {
+  const zeichenAendern = (id: number, spec: FreiesZeichenPatch) => {
     const melde = beginneHandlung(`objekt:freies_zeichen-${id}`, 'Zeichen nicht gespeichert');
     return aktualisiereFreiesZeichen(einsatzId, id, spec)
       .then(() => {

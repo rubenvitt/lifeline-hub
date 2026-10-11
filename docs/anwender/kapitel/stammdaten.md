@@ -2,14 +2,14 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/organisation.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/organisation.rs, src/externe_stelle/repo.rs]
 ---
 
 ## Überblick
 
 Stammdaten sind das, was eine Organisation über jeden Einsatz hinweg vorhält: Fahrzeuge,
 Material und Personal, dazu die Kataloge, aus denen Einsätze schöpfen (Einsatz-Stichworte,
-Qualifikationen, Status, ETB-Schnellbausteine, Einheitstypen, Sprechgruppen,
+externe Stellen, Qualifikationen, Status, ETB-Schnellbausteine, Einheitstypen, Sprechgruppen,
 Führungsfunktionen), sowie Name, Logo und Zeichen der Organisation. Im Einsatz werden daraus
 Kräfte disponiert und Einträge vorbelegt.
 
@@ -57,6 +57,23 @@ gleich:
 4. Zum Entfernen „Deaktivieren“ wählen und die Rückfrage „Qualifikation deaktivieren?“ mit
    „Qualifikation deaktivieren“ bestätigen.
 
+### Externe Stellen pflegen
+
+Externe Stellen sind Leitstellen, Behörden, Polizei und Hilfsorganisationen, mit denen Einsätze
+zu tun haben. Sie erscheinen als Vorschlag bei der meldenden Stelle eines Einsatzes und beim
+Adressaten einer Nachforderung.
+
+1. Unter „Stammdaten“ „Externe Stellen“ öffnen.
+2. „Externe Stelle anlegen“ wählen.
+3. „Bezeichnung“ eintragen und die „Art“ wählen: Leitstelle, Polizei, Behörde,
+   Hilfsorganisation oder Sonstige.
+4. Bei der eigenen Leitstelle „Zuständige Leitstelle“ anhaken.
+5. Nach Bedarf „Rufnummer und Funkrufname“ aufklappen und beides eintragen.
+6. „Speichern“ wählen.
+
+Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
+deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
+
 ### Name, Logo und Zeichen der Organisation festlegen
 
 1. Unter „Stammdaten“ „Organisation“ öffnen.
@@ -96,6 +113,18 @@ Verwaltung nicht.
   zeigt den Stand von damals; nach „Wieder in Dienst nehmen“ wieder die aktuellen Stammdaten.
 - **Deaktivieren** nimmt einen Katalogeintrag aus der Auswahl. Bestehende Zuordnungen bleiben
   gültig.
+
+### Externe Stellen
+
+- Eine Stelle lässt sich nicht löschen, nur deaktivieren. Eine deaktivierte Stelle erscheint
+  nicht mehr als Vorschlag. Einsätze, die sie als meldende Stelle tragen, behalten den Text.
+- Einsätze und Nachforderungen speichern nur den Text der Stelle. Eine spätere Umbenennung im
+  Katalog ändert ältere Einsätze nicht.
+- Je Organisation ist höchstens eine Stelle die „Zuständige Leitstelle“, und nur eine aktive
+  Stelle der Art Leitstelle. Wer eine andere Leitstelle als zuständig markiert, nimmt der
+  bisherigen die Markierung ab; Deaktivieren nimmt sie ebenfalls. Die zuständige Leitstelle steht
+  in den Vorschlägen vorn und ist die Vorgabe für den Adressaten einer
+  [Nachforderung](nachforderung.md).
 
 ### Demo-Stammdaten
 

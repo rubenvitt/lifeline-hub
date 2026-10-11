@@ -134,6 +134,8 @@ export function stellenLabel(s: NetzStelle): string {
     komponente: 'Komponente',
   };
   const teile = [`${art[s.art]} ${anzeigeName(s)}`];
+  // Die Bezeichnung der Führungsstelle (LFH-1181) steht sichtbar im Kasten, also auch im Namen.
+  if (s.art === 'fuehrungsstelle' && s.zusatz) teile.push(s.zusatz);
   const ruf = rufnamenZeile(s);
   if (ruf && s.art !== 'extern') teile.push(s.rufname ? `Rufname ${ruf}` : ruf);
   if (s.art === 'extern') teile.push(ruf ?? '');

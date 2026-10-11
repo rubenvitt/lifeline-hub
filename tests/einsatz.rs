@@ -1084,6 +1084,49 @@ async fn patch_leitstellen_nr_bleibt_frei() {
     assert_eq!(c["einsatznummer_intern"], nummer.as_str());
 }
 
+/// LFH-1194 (Spec `eingabegrenzen`, „Meldende Stelle ist begrenzt“): höchstens 200 Zeichen beim
+/// Ändern; ein längerer Altwert bleibt stehen, solange niemand ihn ändert.
+#[tokio::test]
+async fn patch_meldende_stelle_ist_begrenzt_altwert_bleibt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, a) = einsatz_anlegen(&app, &admin, "A").await;
+    let id = a["id"].as_i64().unwrap();
+
+    let (status, b) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({"meldende_stelle": "x".repeat(201)}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{b}");
+    let meldung = b.to_string();
+    assert!(
+        meldung.contains("Meldende Stelle") && meldung.contains("200"),
+        "{meldung}"
+    );
+    let (_, jetzt) = einsatz_detail(&app, &admin, id).await;
+    assert!(jetzt["meldende_stelle"].is_null());
+
+    let genau = "ä".repeat(200);
+    let (status, c) = patch_kopf(&app, &admin, id, json!({"meldende_stelle": genau})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(c["meldende_stelle"], genau.as_str());
+
+    let alt = "y".repeat(300);
+    sqlx::query("UPDATE einsatz SET meldende_stelle = ? WHERE id = ?")
+        .bind(&alt)
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (status, d) = patch_kopf(&app, &admin, id, json!({"leitstellen_nr": "LS-1"})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(d["leitstellen_nr"], "LS-1");
+    assert_eq!(d["meldende_stelle"], alt.as_str());
+}
+
 #[tokio::test]
 async fn angelegt_at_bleibt_bei_patch_unveraendert() {
     let app = setup().await;

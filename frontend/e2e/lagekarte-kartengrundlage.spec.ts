@@ -13,8 +13,9 @@ import {
 //     über den Render-Poller). Die übrigen Stilwechsel-Tests fahren den Blindstil, der inline ist
 //     und im selben Takt lädt; hier lädt der neue Style per URL, also erst nach dem Wechsel —
 //     der Fall, für den die Neuanlage am Poller hängt und nicht an `styledata`.
-//     Freie taktische Zeichen (`tz|`) bekommen ihr Bild über `styleimagemissing`: GEZÄHLT wird,
-//     was in `marker-symbol` GEZEICHNET ist, nicht was registriert ist (Lehre aus LFH-835).
+//     Freie taktische Zeichen laufen seit LFH-836 über denselben synchronen `ez|`-Weg wie die
+//     Fachobjekte: GEZÄHLT wird, was in `marker-symbol` GEZEICHNET ist, nicht nur was registriert
+//     ist (Lehre aus LFH-835), und das `ez|`-Bild des Zeichens muss nach dem Wechsel wieder da sein.
 //
 // (2) ABSTUFUNG ONLINE → OFFLINE: das Style-JSON der einzigen Online-Karte antwortet 404, die
 //     Karte weicht auf die Offline-Region aus (`stilFehlerWaechter.ts`, `useKartenAnsicht`). Die
@@ -31,6 +32,13 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 /** Einsatzort; alles Übrige liegt wenige hundert Meter darum, im Startausschnitt. */
 const ORT = { lat: 49.3519, lon: 9.1457 };
+
+/**
+ * Das freie Zeichen des Wechsels: eine Gefahr, nicht das Ereignis des Einsatzorts — sonst teilten
+ * sich beide dasselbe `ez|`-Bild, und der Nachweis sähe nur den Einsatzort.
+ */
+const ZEICHEN_SPEC = '{"v":1,"spec":{"kind":"hazard"}}';
+const ZEICHEN_BILD = `ez|${ZEICHEN_SPEC}`;
 
 /** Online-Views des Wechsels: eigene Style-Pfade, eigene Source-Ids, gemeinsame Kacheln. */
 const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
@@ -123,7 +131,7 @@ function rechteck(dLon: number, dLat: number, versatzLon = 0) {
  */
 function kartenStand(page: Page, grundQuellen: string[], grundLayer: string) {
   return page.evaluate(
-    ({ grundQuellen, grundLayer, lageQuellen }) => {
+    ({ grundQuellen, grundLayer, lageQuellen, zeichenBildId }) => {
       const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
       if (!map?.isStyleLoaded()) return null;
       const quellen = map.getStyle()?.sources ?? {};
@@ -144,10 +152,10 @@ function kartenStand(page: Page, grundQuellen: string[], grundLayer: string) {
             .queryRenderedFeatures({ layers: ['marker-symbol'] })
             .filter((f) => f.properties.typ === 'freies_zeichen').length
         : 0;
-      const tzBilder = map.listImages().filter((id) => id.startsWith('tz|')).length;
-      return { grundlage, lage, zeichen, tzBilder };
+      const zeichenBild = map.listImages().includes(zeichenBildId);
+      return { grundlage, lage, zeichen, zeichenBild };
     },
-    { grundQuellen, grundLayer, lageQuellen: [...LAGE_QUELLEN] },
+    { grundQuellen, grundLayer, lageQuellen: [...LAGE_QUELLEN], zeichenBildId: ZEICHEN_BILD },
   );
 }
 
@@ -209,7 +217,7 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
   await senden(page, 'post', `${basis}/freie-zeichen`, {
     lat: ORT.lat + 0.001,
     lon: ORT.lon,
-    grundzeichen: 'anlass',
+    zeichen_spec: ZEICHEN_SPEC,
     label: 'Zeichen Wechsel',
   });
 
@@ -242,7 +250,7 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
       grundlage: { [VIEW_A.quelle]: 'dekodiert', [VIEW_B.quelle]: 'fehlt' },
       lage: ALLE_LAGEQUELLEN_BEFUELLT,
       zeichen: 1,
-      tzBilder: 1,
+      zeichenBild: true,
     });
 
   // Der Wechsel über die Grundlage-Leiste — der echte `[style]`-Effekt, kein `setStyle` von außen.
@@ -257,13 +265,13 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
       timeout: 20_000,
       message:
         'nach dem Wechsel fehlt etwas — Verdacht: die Neuanlage nach `setStyle` lief nicht ' +
-        '(Lagequelle leer), oder `styleimagemissing` erzeugt das `tz|`-Bild nicht (zeichen 0)',
+        '(Lagequelle leer), oder das `ez|`-Bild des freien Zeichens fehlt (zeichen 0)',
     })
     .toEqual({
       grundlage: { [VIEW_A.quelle]: 'fehlt', [VIEW_B.quelle]: 'dekodiert' },
       lage: ALLE_LAGEQUELLEN_BEFUELLT,
       zeichen: 1,
-      tzBilder: 1,
+      zeichenBild: true,
     });
 
   expect(seitenFehler.map((f) => f.message)).toEqual([]);

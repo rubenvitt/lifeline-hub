@@ -1073,6 +1073,13 @@ pub async fn aktualisieren(
         support::hoechstens(ort, "Einsatzort", crate::einsatz::EINSATZORT_MAX)?;
     }
     let meldende_stelle = support::trimme_tri(req.meldende_stelle);
+    if let Some(Some(stelle)) = &meldende_stelle {
+        support::hoechstens(
+            stelle,
+            "Meldende Stelle",
+            crate::einsatz::MELDENDE_STELLE_MAX,
+        )?;
+    }
     let sachverhalt = support::trimme_tri(req.sachverhalt);
     // Nach allen Feldprüfungen: ein halbes Paar ist 422 (Zusammenhang), ein Feld für sich 400.
     pruefe_koordinate(req.einsatzort_lat, req.einsatzort_lon)?;

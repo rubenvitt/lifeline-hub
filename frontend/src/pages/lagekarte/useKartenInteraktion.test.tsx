@@ -12,6 +12,9 @@ import { leseZuletztVerwendet } from './zuletztVerwendet';
 import { useKartenFehler } from './useKartenFehler';
 import { ApiError } from '../../api/client';
 
+/** Ein freies Zeichen, wie der Picker es meldet: die Stelle als Zeichenbeschreibung (LFH-836). */
+const STELLE = '{"v":1,"spec":{"kind":"circle-12"}}';
+
 // API-Client der freien Zeichen mocken; hier nur die Aufrufe prüfen.
 const freieZeichenApi = vi.hoisted(() => ({
   legeFreiesZeichenAn: vi.fn(() => Promise.resolve({ id: 42 })),
@@ -150,7 +153,7 @@ const MODI: { name: string; familie: string; betreten: (r: HookResult) => void }
   {
     name: 'zeichen-platzieren',
     familie: 'zeichen',
-    betreten: (r) => act(() => r.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' })),
+    betreten: (r) => act(() => r.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE })),
   },
   // Messen zeichnet auf der Karte und ist damit exklusiv.
   {
@@ -464,14 +467,14 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
   it('onZeichenPlatzierenStart setzt zeichenPlatzieren und resettet andere Modi', () => {
     const { result } = rendere();
     act(() => result.current.onPlatzierenStart({ typ: 'uhs', id: 2 }));
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
-    expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle' });
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
+    expect(result.current.zeichenPlatzieren).toEqual({ zeichen_spec: STELLE });
     expect(result.current.platzierungZiel).toBeNull();
   });
 
   it('ein anderer Start-Modus resettet zeichenPlatzieren (Mutual-Exclusion, LFH-145)', () => {
     const { result } = rendere();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
     expect(result.current.zeichenPlatzieren).toBeNull();
   });
@@ -489,8 +492,8 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
   describe.each(RAEUMT_ZEICHEN_PLATZIEREN)('$name räumt zeichenPlatzieren', ({ start }) => {
     it('setzt einen offenen zeichenPlatzieren-Modus auf null', () => {
       const { result } = rendere();
-      act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
-      expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle' });
+      act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
+      expect(result.current.zeichenPlatzieren).toEqual({ zeichen_spec: STELLE });
       start(result);
       expect(result.current.zeichenPlatzieren).toBeNull();
     });
@@ -503,7 +506,7 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
     act(() => result.current.onZoneGezeichnet(POLYGON));
     expect(result.current.zoneBestaetigung).not.toBeNull();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     expect(result.current.zoneBestaetigung).toBeNull();
   });
 
@@ -511,13 +514,13 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const erfolg = vi.fn();
     const { result } = rendere(vi.fn(), erfolg);
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'X' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE, label: 'X' }));
     act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
     await waitFor(() =>
       expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledWith(1, {
         lat: 50.1,
         lon: 8.6,
-        grundzeichen: 'stelle',
+        zeichen_spec: STELLE,
         label: 'X',
         // Ohne aktive Ansicht wird auf „alle Ansichten" (null) gestempelt.
         ansicht_id: null,
@@ -526,7 +529,7 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     // Der Platzier-Modus überlebt den POST (Serie ist Vorgabe); der Zähler zeigt, dass onSuccess
     // gelaufen ist.
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
-    expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle', label: 'X' });
+    expect(result.current.zeichenPlatzieren).toEqual({ zeichen_spec: STELLE, label: 'X' });
     expect(erfolg).toHaveBeenCalledWith('Taktisches Zeichen angelegt');
   });
 
@@ -536,11 +539,11 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     localStorage.clear();
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result } = rendere();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'X' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE, label: 'X' }));
     expect(leseZuletztVerwendet()).toEqual([]);
     act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
-    expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']);
+    expect(leseZuletztVerwendet()).toEqual([STELLE]);
   });
 
   it('merkt das gesendete Zeichen auch, wenn der Modus vor der Antwort beendet wurde', async () => {
@@ -556,15 +559,13 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
         }),
     );
     const { result } = rendere();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
     await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1));
     act(() => result.current.onZeichenPlatzierenFertig());
     expect(result.current.zeichenPlatzieren).toBeNull();
     await act(async () => aufloesen({ id: 7 }));
-    await waitFor(() =>
-      expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']),
-    );
+    await waitFor(() => expect(leseZuletztVerwendet()).toEqual([STELLE]));
     freieZeichenApi.legeFreiesZeichenAn.mockReset();
     freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.resolve({ id: 42 }));
   });
@@ -575,7 +576,7 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.reject(new Error('500')));
     const fehler = vi.fn();
     const { result } = rendere(fehler);
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
     await waitFor(() => expect(fehler).toHaveBeenCalled());
     expect(leseZuletztVerwendet()).toEqual([]);
@@ -612,7 +613,7 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
         }),
     );
     const { result } = rendere();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
     await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1));
     // zweiter Klick, während die erste Mutation noch pending ist → Guard greift
@@ -627,7 +628,7 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
   it('zeichenAendern(id, spec) ruft aktualisiereFreiesZeichen(einsatzId, id, spec)', async () => {
     freieZeichenApi.aktualisiereFreiesZeichen.mockClear();
     const { result } = rendere();
-    const spec: FreiesZeichenUpdate = { grundzeichen: 'stelle', label: 'Neu' };
+    const spec: FreiesZeichenUpdate = { zeichen_spec: STELLE, label: 'Neu' };
     act(() => {
       result.current.zeichenAendern(42, spec);
     });
@@ -676,12 +677,12 @@ describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => 
   it('nach erfolgreichem Speichern bleibt der Platzier-Modus aktiv — erst „Fertig" beendet ihn', async () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result } = rendere();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
 
     await platziere(result, 8.6, 50.1, 1);
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
     // Kern der Sache: der Modus steht noch, samt unveränderter Spec.
-    expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle' });
+    expect(result.current.zeichenPlatzieren).toEqual({ zeichen_spec: STELLE });
 
     // … und ein zweiter Karten-Klick legt deshalb ohne Umweg ein zweites Zeichen an.
     await platziere(result, 8.7, 50.2, 2);
@@ -697,7 +698,7 @@ describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => 
   it('mit ausgeschalteter Serie endet der Modus nach dem Speichern wie zuvor', async () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result } = rendere();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     act(() => result.current.setZeichenSerie(false));
 
     await platziere(result, 8.6, 50.1, 1);
@@ -708,12 +709,12 @@ describe('useKartenInteraktion — Serienmodus freies Zeichen (LFH-332)', () => 
   it('ein neuer Platzier-Start setzt den Serien-Zähler zurück', async () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result } = rendere();
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     await platziere(result, 8.6, 50.1, 1);
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
 
     act(() =>
-      result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'zweite Serie' }),
+      result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE, label: 'zweite Serie' }),
     );
     expect(result.current.zeichenSerieAnzahl).toBe(0);
   });
@@ -845,7 +846,7 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
     await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
 
     // Mittendrin etwas anderes anfangen: ein taktisches Zeichen verlässt den Zonen-Modus ganz.
-    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     expect(result.current.zeichenPlatzieren).not.toBeNull();
 
     await act(async () => {
@@ -1041,7 +1042,7 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     [
       'zeichenAendern',
       freieZeichenApi.aktualisiereFreiesZeichen,
-      (r) => r.current.zeichenAendern(42, { grundzeichen: 'stelle' }),
+      (r) => r.current.zeichenAendern(42, { zeichen_spec: STELLE }),
       'Taktisches Zeichen gespeichert',
     ],
     [
@@ -1238,7 +1239,7 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
     const { result } = rendere(vi.fn(), erfolg);
     act(() =>
       result.current.legeZeichenAnPunkt(
-        { grundzeichen: 'stelle', label: 'Y' },
+        { zeichen_spec: STELLE, label: 'Y' },
         { lng: 8.6, lat: 50.1 },
         nachErfolg,
       ),
@@ -1247,12 +1248,12 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
     expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledExactlyOnceWith(1, {
       lat: 50.1,
       lon: 8.6,
-      grundzeichen: 'stelle',
+      zeichen_spec: STELLE,
       label: 'Y',
       ansicht_id: null,
     });
     expect(erfolg).toHaveBeenCalledWith('Taktisches Zeichen angelegt');
-    expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']);
+    expect(leseZuletztVerwendet()).toEqual([STELLE]);
     expect(result.current.zeichenPlatzieren).toBeNull();
     expect(result.current.exklusiverModusAktiv).toBe(false);
   });
@@ -1268,10 +1269,10 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
     );
     const { result } = rendere();
     const punkt = { lng: 8.6, lat: 50.1 };
-    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, punkt));
-    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, punkt));
+    act(() => result.current.legeZeichenAnPunkt({ zeichen_spec: STELLE }, punkt));
+    act(() => result.current.legeZeichenAnPunkt({ zeichen_spec: STELLE }, punkt));
     await waitFor(() => expect(result.current.zeichenAnPunktLaeuft).toBe(true));
-    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, punkt));
+    act(() => result.current.legeZeichenAnPunkt({ zeichen_spec: STELLE }, punkt));
     await new Promise((r) => setTimeout(r, 15));
     expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1);
     aufloesen({ id: 1 });
@@ -1294,7 +1295,7 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
         }),
       { wrapper: wrapper() },
     );
-    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 1, lat: 2 }));
+    act(() => result.current.legeZeichenAnPunkt({ zeichen_spec: STELLE }, { lng: 1, lat: 2 }));
     await new Promise((r) => setTimeout(r, 15));
     expect(freieZeichenApi.legeFreiesZeichenAn).not.toHaveBeenCalled();
   });
@@ -1369,9 +1370,7 @@ describe('useKartenInteraktion · „Zeichen hier setzen“ nach Einsatzwechsel 
         }),
       { wrapper: wrapper(), initialProps: { id: 1 } },
     );
-    act(() =>
-      result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 8.6, lat: 50.1 }),
-    );
+    act(() => result.current.legeZeichenAnPunkt({ zeichen_spec: STELLE }, { lng: 8.6, lat: 50.1 }));
     await waitFor(() => expect(result.current.zeichenAnPunktSpeicherung.isPending).toBe(true));
     rerender({ id: 2 });
     expect(result.current.zeichenAnPunktSpeicherung.isPending).toBe(false);
@@ -1425,7 +1424,7 @@ describe('useKartenInteraktion · Beenden räumt den Grund des Modus (LFH-1077)'
   ] as const)('Zeichen setzen abgelehnt, %s: der Grund geht', async (_name, beenden) => {
     freieZeichenApi.legeFreiesZeichenAn.mockRejectedValueOnce(new ApiError(422, 'Ansicht weg'));
     const { result } = mitFehlern();
-    act(() => result.current.karte.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.karte.onZeichenPlatzierenStart({ zeichen_spec: STELLE }));
     act(() => result.current.karte.onKarteKlick({ lng: 8.6, lat: 50.1 }));
     await waitFor(() => expect(schluessel(result)).toEqual(['zeichen-setzen']));
     act(() => result.current.karte[beenden]());
@@ -1507,9 +1506,7 @@ describe('useKartenInteraktion · „Zeichen hier setzen“ hält Einsatz und An
       () => new Promise<{ id: number }>((r) => (aufloesen = r)),
     );
     const { result, rerender, invalidiert } = aufbau();
-    act(() =>
-      result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 8.6, lat: 50.1 }),
-    );
+    act(() => result.current.legeZeichenAnPunkt({ zeichen_spec: STELLE }, { lng: 8.6, lat: 50.1 }));
     await waitFor(() => expect(result.current.zeichenAnPunktLaeuft).toBe(true));
     rerender({ id: 2, ansicht: 5 });
     expect(result.current.zeichenAnPunktLaeuft).toBe(false);
@@ -1524,7 +1521,7 @@ describe('useKartenInteraktion · „Zeichen hier setzen“ hält Einsatz und An
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result, rerender } = aufbau();
     act(() => {
-      result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 8.6, lat: 50.1 });
+      result.current.legeZeichenAnPunkt({ zeichen_spec: STELLE }, { lng: 8.6, lat: 50.1 });
       // Der Wechsel fällt vor die Ausführung der Mutation (sie wartet erst auf `onMutate`).
       rerender({ id: 1, ansicht: 6 });
     });

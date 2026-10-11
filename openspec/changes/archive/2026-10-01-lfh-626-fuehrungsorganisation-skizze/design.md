@@ -238,6 +238,9 @@ Meldebild, die bei Einzelpersonal stillschweigend abweicht.
 
 ### D5 · Einsatzleitung und Stabsstelle
 
+> Aufgehoben für die Wurzel durch LFH-1199: sie zeigt den Einsatzleiter, der an der eigenen
+> Führungsstelle erfasst ist (`openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/`).
+
 - **Wurzel:** „Einsatzleitung“, darunter „Leitung nicht erfasst“ in gedämpfter Schrift, mit
   Code-Kommentar auf LFH-849. Ein Zeichen trägt sie nicht (Non-Goal).
 - **Stabsstelle:**

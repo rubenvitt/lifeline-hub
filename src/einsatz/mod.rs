@@ -23,6 +23,11 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+/// Höchstlänge der meldenden Stelle nach dem Trimmen (LFH-1194, `src/AGENTS.md`,
+/// „Eingabegrenzen“). Gleich [`crate::externe_stelle::BEZEICHNUNG_MAX`]: jede Stelle aus dem
+/// Katalog passt hinein. Geprüft nur beim Ändern; ein längerer Altwert bleibt stehen.
+pub const MELDENDE_STELLE_MAX: usize = 200;
+
 /// Einsatz-Rolle: voller Zugriff + Einsatz-Administration (anlegen/abschließen/Personen).
 pub const EINSATZ_ROLLE_LEITUNG: &str = EinsatzRolle::Einsatzleitung.as_str();
 /// Einsatz-Rolle: voller Lese-/Schreibzugriff im Einsatz, keine Administration.

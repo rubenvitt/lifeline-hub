@@ -128,15 +128,32 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     expect(wert(a, 'Dauer')).toBe('00:40 h');
   });
 
-  it('Führung: Einsatzleitung aus den Mitgliedern, Stab S1–S6, Lagebesprechungen', () => {
+  it('Führung: Einsatzleiter der Führungsstelle, Stab S1–S6, Lagebesprechungen', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
-    expect(wert(abschnitt(b, 'fuehrung', 'Einsatzleitung'), 'Einsatzleitung')).toBe('Max Leiter');
+    const leitung = abschnitt(b, 'fuehrung', 'Einsatzleitung');
+    expect(wert(leitung, 'Einsatzleiter')).toBe('Max Leiter');
+    expect(wert(leitung, 'Seit')).toBe('29.03.2026 01:40');
     const stab = abschnitt(b, 'fuehrung', 'Stab');
     expect(wert(stab, 'S1')).toBe('bei der Einsatzleitung');
     expect(wert(stab, 'S2')).toBe('Sven Lage');
     expect(wert(stab, 'S6')).toBe('nicht vergeben');
     const lb = tabelle(abschnitt(b, 'fuehrung', 'Lagebesprechungen'));
     expect(lb.zeilen).toEqual([['1', '29.03.2026 03:15', 'Riegelstellung halten']]);
+  });
+
+  it('Führung: ohne Einsatzleiter „nicht erfasst“, nie die App-Rolle (LFH-1199)', () => {
+    const b = verdichteEinsatzbericht(
+      rohBericht({
+        fuehrungsstelle: {
+          zustand: 'daten',
+          daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] },
+        },
+      }),
+      konv,
+    );
+    expect(abschnitt(b, 'fuehrung', 'Einsatzleitung').inhalt).toEqual([
+      { art: 'vermerk', text: 'nicht erfasst' },
+    ]);
   });
 
   it('Stab im Einsatz ausgeblendet: Vermerk statt Besetzung', () => {

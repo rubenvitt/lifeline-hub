@@ -28,7 +28,7 @@ use crate::zeitachse::{
 
 /// Ein Nachtrag darf so weit vor der Serveruhr liegen, ohne als „Zukunft" zu gelten: die Uhr
 /// des Geräts im Fahrzeug geht selten sekundengenau.
-const UHRENTOLERANZ_MINUTEN: i64 = 2;
+pub(crate) const UHRENTOLERANZ_MINUTEN: i64 = 2;
 
 #[derive(Debug, Deserialize)]
 pub struct NachtragBody {

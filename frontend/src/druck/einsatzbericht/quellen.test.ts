@@ -102,13 +102,13 @@ describe('berichtFreigabe', () => {
     expect(f.gesperrteModule).toEqual(['Betroffene']);
   });
 
-  it('Einsatz und Mitglieder hängen an keinem Modul und werden immer abgerufen', () => {
+  it('Einsatz und Führungsstelle hängen an keinem Modul und werden immer abgerufen', () => {
     const alleAus = Object.fromEntries(
       modulRegistry.map((m) => [m.key, { sichtbar: false, zugriff: false }]),
     ) as ModulFreigaben;
     const f = berichtFreigabe(alleAus);
     expect(f.je.einsatz).toBe('abrufen');
-    expect(f.je.mitglieder).toBe('abrufen');
+    expect(f.je.fuehrungsstelle).toBe('abrufen');
   });
 });
 
@@ -149,6 +149,6 @@ describe('berichtFreigabe mit Auswahl (LFH-902, design.md D3)', () => {
   it('der Einsatz wird bei jeder Auswahl abgerufen', () => {
     const f = berichtFreigabe(freigabenFixture(), ['etb']);
     expect(f.je.einsatz).toBe('abrufen');
-    expect(f.je.mitglieder).toBe('nicht-gewaehlt');
+    expect(f.je.fuehrungsstelle).toBe('nicht-gewaehlt');
   });
 });
