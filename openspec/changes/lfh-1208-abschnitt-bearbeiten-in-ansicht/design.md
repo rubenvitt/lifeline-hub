@@ -59,8 +59,9 @@ Funktionsansicht und verliert nur den Fortschritt.
 *Alternative:* `AbschnittDaten` bekommt eine optionale Bearbeitungs-Prop und schaltet je Zelle
 zwischen Lesen und `InlineAngabe` um. Das hielte die Reihenfolge an einer Stelle. Dafür bekämen
 Palette und Gerät Abhängigkeiten auf Personal, Sprechgruppen und Mutationen, die sie nie nutzen,
-und jede Zelle bekäme eine zweite Weiche. Verworfen. Die Reihenfolge der Zeilen pinnt stattdessen
-ein Test, der beide Bauteile vergleicht (Etiketten in derselben Folge, ohne Fortschritt).
+und jede Zelle bekäme eine zweite Weiche. Verworfen. Stattdessen pinnt ein Test die Etiketten-Folge des Details und
+belegt für beide Bauteile, dass kein Fortschritt erscheint. Das Lesebauteil fasst Funk und
+Erreichbarkeit weiter in einer Zelle zusammen.
 
 ### D2 · Teil-Patch je Zeile über `patcheAbschnitt`, eine Mutation mit Feldkennung
 
@@ -74,6 +75,12 @@ keinen Aufrufer mehr und entfällt. Die neue Seite kann den vollen Stand also ni
 Leer heißt `null`. Freitexte werden getrimmt, leer ergibt `null`. `leiter_id`,
 `ueber_abschnitt_id` und `kommunikationsmittel` setzen beim Leeren `null`, `sprechgruppe_ids`
 wird `[]`.
+
+Alle Zeilen nehmen `InlineAngabe`, auch die optionalen Freitexte (Abschnittsauftrag,
+Erreichbarkeit, Bemerkung). Das weicht vom Ticket ab, das dafür `BemerkungZelle` vorschlug.
+`BemerkungZelle` ist für Listenzellen gebaut und speichert beim Verlassen. Im Detail gilt wie auf
+den Einsatzdaten ein Vertrag für alle Zeilen: Speichern/Abbrechen, Fehler an der Zeile, und eine
+leere Angabe zeigt „… eintragen“.
 
 *Alternative:* ein Formular, das nur die geänderten Felder sendet (Muster LFH-979). Verworfen,
 weil das Langformular gerade wegfallen soll.

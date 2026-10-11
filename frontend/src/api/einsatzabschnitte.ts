@@ -36,19 +36,11 @@ export function legeAbschnittAn(
   return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte`, 'POST', daten);
 }
 
-export function aktualisiereAbschnitt(
-  einsatzId: number,
-  aid: number,
-  daten: AbschnittEingabe,
-): Promise<Einsatzabschnitt> {
-  return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}`, 'PATCH', daten);
-}
-
 /**
  * Teiländerung eines Abschnitts (LFH-306, Tri-State): nur die übergebenen Schlüssel gehen hinaus,
- * `null` leert. Für Einzelfelder ohne Formular, etwa Rufname und Kommunikationsmittel aus der
- * Fernmeldeskizze (LFH-893) — ein mitgeschickter Name aus einem älteren Stand überschriebe eine
- * gleichzeitige Umbenennung.
+ * `null` leert. Der einzige Schreibweg für einen bestehenden Abschnitt: die Zeilen des Details
+ * (LFH-1208) und die Fernmeldeskizze (LFH-893) schicken je ein Feld — ein mitgeschickter Stand
+ * vom Öffnen überschriebe, was ein anderer Arbeitsplatz inzwischen geändert hat.
  */
 export type AbschnittPatch = Partial<AbschnittEingabe>;
 

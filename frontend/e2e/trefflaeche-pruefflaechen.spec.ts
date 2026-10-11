@@ -752,11 +752,19 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
           mindestens: 1,
           kurz: true,
         },
+        // Das Detail bearbeitet an der Zeile (LFH-1208): Wert- und Eintragen-Knöpfe, die Stufen des
+        // Lagezustands und das abgesetzte „Auflösen“.
         {
-          sorte: 'Abschnitt Detailaktionen',
-          ziele: knopf(/^(Bearbeiten|Auflösen)$/),
-          mindestens: 2,
+          sorte: 'Abschnitt Zeilen',
+          ziele: knopf(/ (bearbeiten|eintragen)$/),
+          mindestens: 8,
         },
+        {
+          sorte: 'Abschnitt Lagezustand',
+          ziele: segment(/^(nicht beurteilt|planmäßig|angespannt|kritisch)$/),
+          mindestens: 4,
+        },
+        { sorte: 'Abschnitt Auflösen', ziele: knopf('Auflösen'), mindestens: 1 },
       ],
     },
     {
@@ -790,7 +798,11 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
     {
       pfad: `${R}/einsatzabschnitte`,
       anker: (page) => inMain(page).locator('.ant-tree-node-content-wrapper').first(),
-      fehlt: knopf('Abschnitt anlegen'),
+      // Ohne Schreibrecht fehlen Anlegen, Zeilenstifte und die Stufenwahl (LFH-1208).
+      fehlt: (page) =>
+        inMain(page)
+          .getByRole('button', { name: /^Abschnitt anlegen$| (bearbeiten|eintragen)$|^Auflösen$/ })
+          .or(inMain(page).getByRole('radiogroup', { name: 'Lagezustand' })),
       ziele: [
         {
           sorte: 'Baumknoten',

@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/]
 ---
 
 ## Überblick
@@ -20,9 +20,10 @@ Führungspersonal.
 
 1. „Einsatzabschnitte“ öffnen. Die „Gliederung“ zeigt den Baum der Abschnitte mit Lage, Stärke,
    Zahl der direkt zugeordneten Einheiten und dem Hinweis „ohne Leiter“.
-2. Einen Abschnitt wählen. Rechts stehen seine Angaben und die „Zugeordneten Einheiten“.
+2. Einen Abschnitt wählen. Rechts stehen seine Angaben, der „Lagezustand“ und die „Zugeordneten
+   Einheiten“.
 
-   ![Gliederung mit dem gewählten Abschnitt Sanitätsdienst und seinen Angaben](../bilder/einsatzabschnitte/gliederung.png)
+   ![Gliederung mit dem gewählten Abschnitt Sanitätsdienst, seinen Angaben und der Stufenleiste des Lagezustands](../bilder/einsatzabschnitte/gliederung.png)
 
 3. „Zu den Einheiten ↗“ führt zur Seite der Einheiten.
 
@@ -31,24 +32,35 @@ Führungspersonal.
 1. Im Seitenkopf „Abschnitt anlegen“ wählen.
 2. „Name“ eintragen, bei Bedarf „Kurzbezeichnung“ und den „Über-Abschnitt“ für einen
    Unterabschnitt.
-3. Unter „Lage“ „Lagezustand“, „Abschnittsauftrag“ und „Fortschritt“ eintragen, unter „Funk /
-   Kommunikation“ die Sprechgruppen, das Kommunikationsmittel und die „Erreichbarkeit / Nummer“.
 
-   ![Formular „Neuer Abschnitt“ mit Name, Kurzbezeichnung, Lagezustand und Abschnittsauftrag](../bilder/einsatzabschnitte/abschnitt-anlegen.png)
+   ![Dialog „Abschnitt anlegen“ mit Name, Kurzbezeichnung und Über-Abschnitt](../bilder/einsatzabschnitte/abschnitt-anlegen.png)
 
-4. „Speichern“ wählen.
+3. „Anlegen“ wählen. Der neue Abschnitt steht danach gewählt in der Gliederung; Lagezustand,
+   Leitung, Auftrag und Funkangaben werden dort ergänzt.
+
+### Die Lage eines Abschnitts setzen
+
+1. In der Gliederung den Abschnitt wählen.
+2. Unter „Lagezustand“ die Stufe wählen: „nicht beurteilt“, „planmäßig“, „angespannt“ oder
+   „kritisch“. Die Wahl gilt sofort.
+
+### Eine Angabe ändern
+
+1. In der Gliederung den Abschnitt wählen.
+2. Auf den Wert der Angabe tippen, etwa auf den Abschnittsleiter; eine leere Angabe heißt
+   „… eintragen“.
+3. Den neuen Wert eingeben und „Speichern“ wählen. „Abbrechen“ lässt den alten Wert stehen.
 
 Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie für diesen Einsatz an
 („Neue Bezeichnung“, „Neue Betriebsart“, dann „Anlegen“). Sie trägt danach den Zusatz „(lokal)“.
 
-### Einen Abschnitt ändern oder auflösen
-
-1. In der Gliederung den Abschnitt wählen und „Bearbeiten“ wählen.
-2. Die Angaben ändern und „Speichern“ wählen.
-3. Zum Auflösen „Auflösen“ wählen und die Rückfrage „Abschnitt auflösen?“ mit „Abschnitt
-   auflösen“ bestätigen.
-
 Einheiten werden nicht hier zugeordnet, sondern an der Einheit selbst im Feld „Abschnitt“.
+
+### Einen Abschnitt auflösen
+
+1. In der Gliederung den Abschnitt wählen.
+2. Unter den Angaben „Auflösen“ wählen und die Rückfrage „Abschnitt auflösen?“ mit „Abschnitt
+   auflösen“ bestätigen.
 
 ### Das Organigramm ansehen, drucken oder übernehmen
 
@@ -80,6 +92,10 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
 ### Regeln der Gliederung
 
+- Jede Angabe wird für sich gespeichert. Was ein anderer Arbeitsplatz inzwischen an einer anderen
+  Angabe geändert hat, bleibt dabei stehen.
+- Ein Fortschritt in Prozent wird nicht geführt: die Lage trägt der Lagezustand, den Arbeitsstand
+  zeigen die offenen Aufträge eines Abschnitts im Führungsüberblick.
 - Die „Kurzbezeichnung“ ist höchstens 20 Zeichen lang und je Einsatz eindeutig, ohne Rücksicht auf
   Groß- und Kleinschreibung; eine doppelte meldet „Schon vergeben (…)“.
 - Beim Auflösen rücken Unterabschnitte eine Ebene hoch, zugeordnete Einheiten stehen danach

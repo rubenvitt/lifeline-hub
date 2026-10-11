@@ -1,18 +1,4 @@
-import {
-  App,
-  Breadcrumb,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Popconfirm,
-  Space,
-  Tag,
-  Tree,
-  TreeSelect,
-  type TreeDataNode,
-} from 'antd';
-import { Select } from '../components/Select';
+import { App, Breadcrumb, Button, Popconfirm, Space, Tag, Tree, type TreeDataNode } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,15 +8,13 @@ import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import {
-  aktualisiereAbschnitt,
-  legeAbschnittAn,
   listeAbschnitte,
   loeseAbschnittAuf,
-  type AbschnittEingabe,
+  patcheAbschnitt,
+  type AbschnittPatch,
 } from '../api/einsatzabschnitte';
-import type { AbschnittLagezustand, Einheit, Einsatzabschnitt } from '../api/types';
+import type { Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
 import {
   SeitenFehler,
@@ -38,16 +22,15 @@ import {
   SeitenSkeleton,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
-import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, monoStil, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
+import { abschnittStaerken } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
-import AbschnittDaten from './einsatzabschnitte/AbschnittDaten';
-import { abschnittLagezustand } from '../theme/statusFarben';
+import AbschnittDetail, { type AbschnittPatchHandler } from './einsatzabschnitte/AbschnittDetail';
+import AbschnittAnlegenModal from './einsatzabschnitte/AbschnittAnlegenModal';
 import { abrufZustand } from '../api/abrufZustand';
 import {
   einheitenPfad,
@@ -62,12 +45,6 @@ import type { Quelle } from '../stab/luecken';
 import Organigramm from './einsatzabschnitte/Organigramm';
 import { modulName } from '../einsatz/modulRegistry';
 
-/** Auswahl des Lagezustands in Stufenfolge — Wortlaut aus dem Farbvertrag, nicht doppelt. */
-const LAGEZUSTAND_OPTIONEN = (['planmaessig', 'angespannt', 'kritisch'] as const).map((l) => ({
-  value: l,
-  label: abschnittLagezustand[l].label,
-}));
-
 /**
  * Zwei Ansichten derselben Daten (LFH-626): die Gliederung bearbeitet, das Organigramm liest,
  * druckt und übernimmt. Kein Nutzerschalter Tabelle ↔ Karte — das hier sind zwei Fragen.
@@ -76,9 +53,6 @@ const ANSICHT_OPTIONEN = [
   { wert: 'gliederung', label: 'Gliederung' },
   { wert: 'organigramm', label: 'Organigramm' },
 ] as const satisfies readonly { wert: AbschnitteAnsicht; label: string }[];
-
-/** Vergleichsform der Kurzbezeichnung wie SQLite `NOCASE`: getrimmt, nur A–Z gefaltet. */
-const nocase = (s: string) => s.trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
 
 function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -102,29 +76,15 @@ function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDat
   return baue(null);
 }
 
-interface AbschnittWerte {
-  name: string;
-  ueber_abschnitt_id?: number | null;
-  leiter_id?: number | null;
-  bemerkung?: string;
-  sprechgruppe_ids?: number[];
-  kommunikationsmittel?: string;
-  erreichbarkeit?: string;
-  kurzbezeichnung?: string;
-  lagezustand?: AbschnittLagezustand | null;
-  abschnittsauftrag?: string;
-  fortschritt?: number | null;
-}
-
 export default function EinsatzabschnittePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
-  const [bearbeiten, setBearbeiten] = useState(false);
-  const [entwurf, setEntwurf] = useState(false);
-  const [form] = Form.useForm<AbschnittWerte>();
+  // „Abschnitt anlegen“ ist eine Erfassung (LFH-1208, design.md D6): kein lokaler Entwurf mehr in
+  // der Gliederung, den Datensatz gibt es erst nach dem Absenden.
+  const [anlegenOffen, setAnlegenOffen] = useState(false);
   const { abBreite } = useViewport();
   const breit = abBreite('md');
   const { token, rollen } = useRollen();
@@ -154,21 +114,18 @@ export default function EinsatzabschnittePage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
-  // Cross-Modul-Deeplink: ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden. Spiegelt
-  // `Tree onSelect`: ein danach feuernder Deeplink darf einen offenen Entwurf nicht überleben
-  // lassen, sonst nähme `speichern` wegen `!entwurf === false` fälschlich den POST-Zweig.
+  // Cross-Modul-Deeplink: ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
   useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
     if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) {
-      setEntwurf(false);
       setGewaehlt(zid);
       // Aus dem Organigramm: das Detail steht in der Gliederung (LFH-626, D7).
       setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
     }
   });
 
-  // Schnellaktion: ?neu=1 öffnet den Entwurf eines neuen Abschnitts (Sprungpalette, LFH-506) —
-  // dieselben Schritte wie `entwurfOeffnen`, hier ausgeschrieben, weil die Funktion je Render neu
-  // entsteht. Warten bis der Einsatz geladen ist; Param immer löschen, Entwurf nur bei
+  // Schnellaktion: ?neu=1 öffnet die Erfassung eines neuen Abschnitts (Sprungpalette, LFH-506) —
+  // dieselben Schritte wie `anlegenOeffnen`, hier ausgeschrieben, weil die Funktion je Render neu
+  // entsteht. Warten bis der Einsatz geladen ist; Param immer löschen, Erfassung nur bei
   // Schreibrecht.
   const [searchParams, setSearchParams] = useSearchParams();
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
@@ -176,23 +133,20 @@ export default function EinsatzabschnittePage() {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) {
-      setGewaehlt(null);
-      setBearbeiten(false);
-      form.resetFields();
-      setEntwurf(true);
-      // Der Entwurf steht in der Gliederung; aus dem Organigramm sähe ihn sonst niemand.
+      setAnlegenOffen(true);
+      // Der neue Abschnitt steht danach gewählt in der Gliederung, nicht im Organigramm.
       setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
     }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('neu');
     setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, form, einsatzId]);
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
 
   // Sichtvorgabe ?ansicht= (LFH-626), apply-then-clean wie auf der Fahrzeugseite. Geräumt wird
   // auch ein unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
   useEffect(() => {
     if (!searchParams.has('ansicht')) return;
-    // `?neu=1` gewinnt: ein Entwurf braucht die Gliederung (Review LFH-626).
+    // `?neu=1` gewinnt: der neue Abschnitt steht danach in der Gliederung (Review LFH-626).
     const vorgabe =
       searchParams.get('neu') === '1' ? undefined : parseAbschnitteAnsicht(searchParams);
     if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
@@ -218,120 +172,74 @@ export default function EinsatzabschnittePage() {
   );
   /**
    * Ohne Wahl steht der erste Abschnitt der Gliederung im Detail (LFH-1078): statt einer
-   * Aufforderung „Wähle einen Abschnitt im Baum“ zeigt die Seite gleich einen. Ein offener Entwurf
-   * hat keinen. `gewaehlt` bleibt die Wahl der Person; die Vorwahl ist nur ihr Rückfall.
+   * Aufforderung „Wähle einen Abschnitt im Baum“ zeigt die Seite gleich einen. `gewaehlt` bleibt
+   * die Wahl der Person; die Vorwahl ist nur ihr Rückfall.
    */
-  const aktuell = entwurf
-    ? null
-    : gewaehlt != null
+  const aktuell =
+    gewaehlt != null
       ? (abschnitte.find((a) => a.id === gewaehlt) ?? null)
       : (abschnitte.find((a) => a.ueber_abschnitt_id == null) ?? null);
 
-  const speichern = useMutation({
-    mutationFn: (werte: AbschnittWerte) => {
-      const daten: AbschnittEingabe = {
-        name: werte.name.trim(),
-        ueber_abschnitt_id: werte.ueber_abschnitt_id ?? null,
-        leiter_id: werte.leiter_id ?? null,
-        bemerkung: werte.bemerkung?.trim() || null,
-        sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
-        kommunikationsmittel: werte.kommunikationsmittel || null,
-        erreichbarkeit: werte.erreichbarkeit?.trim() || null,
-        kurzbezeichnung: werte.kurzbezeichnung?.trim() || null,
-        lagezustand: werte.lagezustand ?? null,
-        abschnittsauftrag: werte.abschnittsauftrag?.trim() || null,
-        fortschritt: werte.fortschritt ?? null,
-      };
-      return aktuell && !entwurf
-        ? aktualisiereAbschnitt(einsatzId, aktuell.id, daten)
-        : legeAbschnittAn(einsatzId, daten);
-    },
-    onSuccess: (a) => {
+  // Zeilenweg (LFH-1208, design.md D2): EIN Feld je PATCH, nie der Stand vom Öffnen — so
+  // überschreibt keine Zeile, was ein anderer Arbeitsplatz inzwischen geändert hat. Der Fehler
+  // geht an die Zeile (`mutateAsync` lehnt ab), deshalb kein `onError`-Toast.
+  const patch = useMutation({
+    mutationFn: ({ aid, patch: p }: { aid: number; etikett: string; patch: AbschnittPatch }) =>
+      patcheAbschnitt(einsatzId, aid, p),
+    onSuccess: (aktualisiert, { etikett }) => {
+      // Erst in den Cache, dann erfüllen: die Zeile zeigt den neuen Wert in derselben Runde, in der
+      // sie die Eingabe schließt (Muster Einsatzdaten).
+      qc.setQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(einsatzId), (alt) =>
+        alt?.map((a) => (a.id === aktualisiert.id ? aktualisiert : a)),
+      );
       invalidate();
-      setEntwurf(false);
-      setGewaehlt(a.id);
-      setBearbeiten(false);
-      message.success('Gespeichert');
+      message.success(`${etikett} gespeichert`);
     },
   });
+  const patchHandler =
+    (aid: number): AbschnittPatchHandler =>
+    (etikett, p) =>
+      patch.mutateAsync({ aid, etikett, patch: p });
   const aufloesen = useMutation({
     mutationFn: (aid: number) => loeseAbschnittAuf(einsatzId, aid),
     onSuccess: () => {
       invalidate();
       setGewaehlt(null);
-      setBearbeiten(false);
     },
   });
 
   /*
-   * Speichern und Auflösen melden ihre Ablehnung im Detailpaneel, kein Toast (LFH-1077,
-   * `frontend/AGENTS.md`, „Rückwege und Fehler“). Der Grund gehört zum gezeigten Abschnitt: jede
-   * neue Handlung, Abbrechen, Bearbeiten und der Wechsel des Abschnitts räumen ihn. Eine laufende
-   * Mutation bleibt unberührt, `reset()` hängte ihr Ergebnis ab. Ref, damit der Effekt beim
-   * Wechsel die AKTUELLEN Mutationen räumt, ohne je Render neu zu laufen.
+   * Auflösen meldet seine Ablehnung im Detailpaneel, kein Toast (LFH-1077, `frontend/AGENTS.md`,
+   * „Rückwege und Fehler“); die Zeilen melden ihre selbst. Der Grund gehört zum gezeigten
+   * Abschnitt: ein neuer Versuch und der Wechsel des Abschnitts räumen ihn. Eine laufende Mutation
+   * bleibt unberührt, `reset()` hängte ihr Ergebnis ab. Ref, damit der Effekt beim Wechsel die
+   * AKTUELLE Mutation räumt, ohne je Render neu zu laufen.
    */
-  const detailFehler = speichern.error ?? aufloesen.error;
-  const detailRef = useRef([speichern, aufloesen]);
-  detailRef.current = [speichern, aufloesen];
+  const aufloesenRef = useRef(aufloesen);
+  aufloesenRef.current = aufloesen;
   const raeumeDetail = useCallback(() => {
-    for (const m of detailRef.current) if (!m.isPending && m.error != null) m.reset();
+    const m = aufloesenRef.current;
+    if (!m.isPending && m.error != null) m.reset();
   }, []);
 
-  // Beim Wechsel des angezeigten Abschnitts zurück in die Lese-Ansicht — auch wenn die Vorwahl
-  // wechselt, weil ein anderer Arbeitsplatz den Abschnitt aufgelöst hat; sonst füllte das Formular
-  // still den nächsten und Speichern träfe ihn.
+  // Beim Wechsel des angezeigten Abschnitts räumen — auch wenn die Vorwahl wechselt, weil ein
+  // anderer Arbeitsplatz den Abschnitt aufgelöst hat. Offene Zeilen räumt `key` am Detail.
   const aktuellId = aktuell?.id;
   useEffect(() => {
-    setBearbeiten(false);
     raeumeDetail();
   }, [aktuellId, raeumeDetail]);
 
-  // Formular mit den Werten des aktuellen Abschnitts vorbelegen, sobald der Edit-Modus öffnet.
-  useEffect(() => {
-    if (aktuell && bearbeiten && !entwurf) {
-      form.setFieldsValue({
-        name: aktuell.name,
-        ueber_abschnitt_id: aktuell.ueber_abschnitt_id ?? undefined,
-        leiter_id: aktuell.leiter_id ?? undefined,
-        bemerkung: aktuell.bemerkung ?? undefined,
-        sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
-        kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
-        erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
-        kurzbezeichnung: aktuell.kurzbezeichnung ?? undefined,
-        lagezustand: aktuell.lagezustand ?? undefined,
-        abschnittsauftrag: aktuell.abschnittsauftrag ?? undefined,
-        fortschritt: aktuell.fortschritt ?? undefined,
-      });
-    }
-  }, [aktuell, bearbeiten, entwurf, form]);
-
-  /**
-   * Lokaler Entwurf statt Server-Datensatz: der POST — und damit der ETB-Eintrag — entsteht erst
-   * beim Speichern. Abbrechen hinterlässt nichts.
-   */
-  function entwurfOeffnen() {
+  function anlegenOeffnen() {
     raeumeDetail();
-    setGewaehlt(null);
-    setBearbeiten(false);
-    form.resetFields();
-    setEntwurf(true);
+    setAnlegenOffen(true);
     setzeAnsicht('gliederung');
   }
 
-  const baumDaten = useMemo(() => {
-    const knoten = baueBaum(abschnitte, einheitenQuery.data ?? []);
-    return entwurf
-      ? [
-          ...knoten,
-          { key: 'entwurf', title: <i>Neuer Abschnitt (ungespeichert)</i>, selectable: false },
-        ]
-      : knoten;
-  }, [abschnitte, einheitenQuery.data, entwurf]);
-  const verboten = aktuell ? nachfahrenInkl(abschnitte, aktuell.id) : new Set<number>();
-  const parentOptionen = abschnitte
-    .filter((a) => !verboten.has(a.id))
-    .map((a) => ({ value: a.id, title: a.name }));
-  const personalOptionen = (personalQuery.data ?? []).map((p) => ({ value: p.id, label: p.name }));
+  const baumDaten = useMemo(
+    () => baueBaum(abschnitte, einheitenQuery.data ?? []),
+    [abschnitte, einheitenQuery.data],
+  );
+  const personal = personalQuery.data ?? [];
   const zugeordneteEinheiten = (einheitenQuery.data ?? []).filter(
     (e) => e.abschnitt_id === aktuell?.id,
   );
@@ -435,7 +343,7 @@ export default function EinsatzabschnittePage() {
             onWechsel={setzeAnsicht}
           />
           {darfSchreiben && (
-            <Button type="primary" onClick={entwurfOeffnen}>
+            <Button type="primary" onClick={anlegenOeffnen}>
               Abschnitt anlegen
             </Button>
           )}
@@ -465,7 +373,7 @@ export default function EinsatzabschnittePage() {
           <SeitenLeer
             titel="Noch keine Abschnitte"
             aktion={
-              darfSchreiben ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen } : undefined
+              darfSchreiben ? { label: 'Abschnitt anlegen', onClick: anlegenOeffnen } : undefined
             }
           />
         ) : (
@@ -519,14 +427,14 @@ export default function EinsatzabschnittePage() {
                   ursache={abschnitteQuery.error}
                   onWiederholen={() => void abschnitteQuery.refetch()}
                 />
-              ) : abschnitte.length === 0 && !entwurf ? (
+              ) : abschnitte.length === 0 ? (
                 <SeitenLeer
                   titel="Noch keine Abschnitte"
                   /* Derselbe Wortlaut wie der Kopfknopf. Ohne Schreibrecht keine Aktion — ein
                    Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
                   aktion={
                     darfSchreiben
-                      ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen }
+                      ? { label: 'Abschnitt anlegen', onClick: anlegenOeffnen }
                       : undefined
                   }
                 />
@@ -537,12 +445,9 @@ export default function EinsatzabschnittePage() {
                   )}
                   <Tree
                     treeData={baumDaten}
-                    selectedKeys={entwurf ? ['entwurf'] : aktuell ? [aktuell.id] : []}
+                    selectedKeys={aktuell ? [aktuell.id] : []}
                     defaultExpandAll
-                    onSelect={(keys) => {
-                      setEntwurf(false);
-                      setGewaehlt(keys.length ? Number(keys[0]) : null);
-                    }}
+                    onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)}
                   />
                 </>
               )}
@@ -552,134 +457,29 @@ export default function EinsatzabschnittePage() {
           <Paneel
             style={{ flex: 1, width: breit ? undefined : '100%' }}
             koerperPolster
-            titel={
-              entwurf
-                ? 'Neuer Abschnitt'
-                : aktuell
-                  ? `Abschnitt: ${aktuell.name}`
-                  : 'Kein Abschnitt gewählt'
-            }
+            titel={aktuell ? `Abschnitt: ${aktuell.name}` : 'Kein Abschnitt gewählt'}
           >
             {/* Ohne Abschnitt (leere Gliederung, Ladefehler) trägt der Titel den Zustand; den
                 Weg hinaus zeigt der Leerzustand der Gliederung. */}
-            {!aktuell && !entwurf ? null : entwurf || bearbeiten ? (
-              <Form<AbschnittWerte>
-                form={form}
-                layout="vertical"
-                onFinish={(w) => {
-                  raeumeDetail();
-                  speichern.mutate(w);
-                }}
-              >
-                <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-                  <Input autoFocus />
-                </Form.Item>
-                {/* Eindeutig je Einsatz ohne Groß-/Kleinschreibung wie der Index
-                    `einsatzabschnitt_kurzbezeichnung_eindeutig` (NOCASE): als Prüfung am Feld,
-                    nicht als Satz (LFH-1078). Der Server bleibt die Wahrheit. */}
-                <Form.Item
-                  label="Kurzbezeichnung"
-                  name="kurzbezeichnung"
-                  rules={[
-                    {
-                      validator: (_, wert?: string) => {
-                        const kurz = wert ? nocase(wert) : undefined;
-                        const belegt = kurz
-                          ? abschnitte.find(
-                              (a) =>
-                                a.id !== aktuell?.id &&
-                                a.kurzbezeichnung != null &&
-                                nocase(a.kurzbezeichnung) === kurz,
-                            )
-                          : undefined;
-                        return belegt
-                          ? Promise.reject(new Error(`Schon vergeben (${belegt.name})`))
-                          : Promise.resolve();
-                      },
-                    },
-                  ]}
-                >
-                  <Input maxLength={20} allowClear placeholder="z. B. EA-N" />
-                </Form.Item>
-                <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
-                  <TreeSelect
-                    allowClear
-                    placeholder="Übergeordneter Abschnitt"
-                    treeData={parentOptionen}
-                  />
-                </Form.Item>
-                <Form.Item label="Abschnittsleiter" name="leiter_id">
-                  <Select allowClear placeholder="Disponierte Person" options={personalOptionen} />
-                </Form.Item>
+            {aktuell && (
+              <>
+                {/* `key`: ein Wechsel des Abschnitts schließt jede offene Zeile, sonst speicherte
+                    ihr Entwurf in den nächsten. */}
+                <AbschnittDetail
+                  key={aktuell.id}
+                  abschnitt={aktuell}
+                  abschnitte={abschnitte}
+                  personal={personal}
+                  einsatzId={einsatzId}
+                  staerken={staerken}
+                  darfSchreiben={darfSchreiben}
+                  onPatch={patchHandler(aktuell.id)}
+                />
 
-                <Augenbraue
-                  als="h3"
-                  style={{
-                    display: 'block',
-                    marginTop: token.marginXS,
-                    marginBottom: token.marginSM,
-                  }}
-                >
-                  Lage
-                </Augenbraue>
-                <Form.Item label="Lagezustand" name="lagezustand">
-                  <Select allowClear placeholder="nicht beurteilt" options={LAGEZUSTAND_OPTIONEN} />
-                </Form.Item>
-                <Form.Item label="Abschnittsauftrag" name="abschnittsauftrag">
-                  <Input.TextArea rows={2} placeholder="Fester Auftrag des Abschnitts" />
-                </Form.Item>
-                <Form.Item label="Fortschritt" name="fortschritt">
-                  <InputNumber
-                    min={0}
-                    max={100}
-                    precision={0}
-                    suffix="%"
-                    placeholder="nicht eingeschätzt"
-                  />
-                </Form.Item>
-
-                <Augenbraue
-                  als="h3"
-                  style={{
-                    display: 'block',
-                    marginTop: token.marginXS,
-                    marginBottom: token.marginSM,
-                  }}
-                >
-                  Funk / Kommunikation
-                </Augenbraue>
-                <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
-                  <SprechgruppenPicker einsatzId={einsatzId} />
-                </Form.Item>
-                <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
-                  <Select
-                    allowClear
-                    placeholder="Digitalfunk / Mobil / Festnetz"
-                    options={KOMMUNIKATIONSMITTEL_OPTIONEN}
-                  />
-                </Form.Item>
-                <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
-                  <Input placeholder="z. B. 0151 23456" allowClear />
-                </Form.Item>
-
-                <Form.Item label="Bemerkung" name="bemerkung">
-                  <Input.TextArea rows={2} />
-                </Form.Item>
-                <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
-                <Space size="middle">
-                  <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-                    Speichern
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      raeumeDetail();
-                      setEntwurf(false);
-                      setBearbeiten(false);
-                    }}
-                  >
-                    Abbrechen
-                  </Button>
-                  {!entwurf && aktuell && (
+                {darfSchreiben && (
+                  // Rot, abgesetzt, mit Rückfrage (LFH-363): Auflösen ist unumkehrbar.
+                  <div style={{ marginTop: token.marginLG }}>
+                    <DetailFehler fehler={aufloesen.error} />
                     <Popconfirm
                       title="Abschnitt auflösen?"
                       description={
@@ -694,69 +494,38 @@ export default function EinsatzabschnittePage() {
                     >
                       <Button danger>Auflösen</Button>
                     </Popconfirm>
-                  )}
-                </Space>
-              </Form>
-            ) : aktuell ? (
-              <>
-                <AbschnittDaten abschnitt={aktuell} staerken={staerken} />
-
-                {darfSchreiben && (
-                  <div style={{ marginTop: 12 }}>
-                    <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
-                    <Space size="middle">
-                      <Button
-                        type="primary"
-                        onClick={() => {
-                          raeumeDetail();
-                          setBearbeiten(true);
-                        }}
-                      >
-                        Bearbeiten
-                      </Button>
-                      <Popconfirm
-                        title="Abschnitt auflösen?"
-                        description={
-                          'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'
-                        }
-                        okText="Abschnitt auflösen"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() => {
-                          raeumeDetail();
-                          aufloesen.mutate(aktuell.id);
-                        }}
-                      >
-                        <Button danger>Auflösen</Button>
-                      </Popconfirm>
-                    </Space>
                   </div>
                 )}
 
                 {einheitenListe}
               </>
-            ) : null}
+            )}
           </Paneel>
         </div>
+      )}
+      {darfSchreiben && (
+        <AbschnittAnlegenModal
+          offen={anlegenOffen}
+          einsatzId={einsatzId}
+          abschnitte={abschnitte}
+          onAngelegt={(id) => {
+            setGewaehlt(id);
+            setzeAnsicht('gliederung');
+          }}
+          onSchliessen={() => setAnlegenOffen(false)}
+        />
       )}
     </EinsatzSeite>
   );
 }
 
-/**
- * Grund einer abgelehnten Handlung im Detailpaneel, über ihren Knöpfen. `speicherFehler` wählt den
- * Wortlaut: ohne ihn stammt der Fehler vom Auflösen.
- */
-function DetailFehler({ speicherFehler, fehler }: { speicherFehler: unknown; fehler: unknown }) {
+/** Grund eines abgelehnten Auflösens im Detailpaneel, über dem Knopf (LFH-1077). */
+function DetailFehler({ fehler }: { fehler: unknown }) {
   const { token } = useRollen();
   if (fehler == null) return null;
-  const vomAufloesen = speicherFehler == null;
   return (
     <div style={{ marginBottom: token.marginSM }}>
-      <SpeicherFehler
-        fehler={fehler}
-        titel={vomAufloesen ? 'Nicht aufgelöst' : undefined}
-        fallback={vomAufloesen ? 'Auflösen fehlgeschlagen' : undefined}
-      />
+      <SpeicherFehler fehler={fehler} titel="Nicht aufgelöst" fallback="Auflösen fehlgeschlagen" />
     </div>
   );
 }

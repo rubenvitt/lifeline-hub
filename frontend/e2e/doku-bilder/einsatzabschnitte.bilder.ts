@@ -1,4 +1,3 @@
-import { waehleIn } from '../auswahl-kern';
 import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from './kern';
 
 /**
@@ -8,12 +7,12 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep einsatzabschnitte`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   gliederung.png         frontend/src/pages/EinsatzabschnittePage.tsx,
- *                          frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx
- *   abschnitt-anlegen.png  frontend/src/pages/EinsatzabschnittePage.tsx (Formular)
+ *                          frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx
+ *   abschnitt-anlegen.png  frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx
  *   organigramm.png        frontend/src/pages/einsatzabschnitte/Organigramm.tsx
  *
  * Daten: Abschnitte, Unterabschnitt und Einheiten stammen aus den Demo-Daten; der neue Abschnitt
- * wird nur ausgefüllt, nicht gespeichert.
+ * wird nur ausgefüllt, nicht angelegt.
  */
 
 const KAPITEL = 'einsatzabschnitte';
@@ -27,27 +26,24 @@ test.describe(KAPITEL, () => {
     const gliederung = page.getByRole('region', { name: 'Gliederung' });
     await gliederung.getByText('Sanitätsdienst').first().click();
     const detail = page.getByRole('region', { name: 'Abschnitt: Sanitätsdienst' });
+    await expect(detail.getByRole('radiogroup', { name: 'Lagezustand' })).toBeVisible();
     await expect(detail.getByText('Zugeordnete Einheiten')).toBeVisible();
     await expect(detail.getByRole('listitem').first()).toBeVisible();
     await fotografiere(page, KAPITEL, 'gliederung');
   });
 
-  test('Formular „Neuer Abschnitt“', async ({ page }) => {
+  test('Dialog „Abschnitt anlegen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einsatzabschnitte`);
     await expect(page.getByRole('region', { name: 'Gliederung' })).toBeVisible();
     await page.getByRole('button', { name: 'Abschnitt anlegen' }).first().click();
-    const formular = page.getByRole('region', { name: 'Neuer Abschnitt' });
-    await formular.getByLabel('Name').fill('Deichverteidigung');
-    await formular.getByLabel('Kurzbezeichnung').fill('EA 4');
-    await waehleIn(formular.getByRole('combobox', { name: 'Lagezustand' }), 'angespannt');
-    await formular
-      .getByLabel('Abschnittsauftrag')
-      .fill('Deich am Mühlbach sichern, Sandsackverbau am Nordufer');
-    await formular.getByLabel('Abschnittsauftrag').blur();
-    await fotografiere(formular, KAPITEL, 'abschnitt-anlegen');
+    const dialog = page.getByRole('dialog', { name: 'Abschnitt anlegen' });
+    await dialog.getByRole('textbox', { name: 'Name' }).fill('Deichverteidigung');
+    await dialog.getByRole('textbox', { name: 'Kurzbezeichnung' }).fill('EA 4');
+    await dialog.getByRole('textbox', { name: 'Kurzbezeichnung' }).blur();
+    await fotografiere(dialog, KAPITEL, 'abschnitt-anlegen');
   });
 
   test('Organigramm der Führungsorganisation', async ({ page }) => {

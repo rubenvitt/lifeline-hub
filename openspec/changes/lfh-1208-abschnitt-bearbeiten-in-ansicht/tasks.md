@@ -15,7 +15,7 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
   `ueberblickDaten.test.ts` und `UeberblickPage.test.tsx` belegen die Abwesenheit
   (`[data-lfh="abschnitt-fortschritt"]` fehlt auch bei `fortschritt: 72`). Kürzel, Lagezustand
   und Auftrag bleiben geprüft.
-- [ ] 1.3 `api/einsatzabschnitte.ts`: `fortschritt` an `AbschnittEingabe` mit dem Vermerk „nur
+- [x] 1.3 `api/einsatzabschnitte.ts`: `fortschritt` an `AbschnittEingabe` mit dem Vermerk „nur
   Altdaten, die Oberfläche schreibt ihn nicht (LFH-1208)“. Den Kommentar „S2 Abschnittsfortschritt“
   in `components/instrument/Aufgliederung.tsx` ziehen wir nach. Nachweis:
   `grep -rn "fortschritt" frontend/src/pages frontend/src/geraet` trifft nur noch Tests mit
@@ -23,11 +23,11 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 2. Bearbeitbares Detail (D1–D5, D8)
 
-- [ ] 2.1 `nocase` und die Belegt-Suche aus `EinsatzabschnittePage.tsx` in ein reines Modul
+- [x] 2.1 `nocase` und die Belegt-Suche aus `EinsatzabschnittePage.tsx` in ein reines Modul
   `pages/einsatzabschnitte/kurzbezeichnung.ts` ziehen, etwa `findKurzbezeichnungKonflikt(abschnitte,
   wert, eigeneId)`. Nachweis: `kurzbezeichnung.test.ts` mit Groß-/Kleinschreibung, Trimmen,
   eigenem Abschnitt (kein Konflikt) und leerem Wert.
-- [ ] 2.2 `pages/einsatzabschnitte/AbschnittDetail.tsx`: `Datenraster` mit `InlineAngabe` für Name
+- [x] 2.2 `pages/einsatzabschnitte/AbschnittDetail.tsx`: `Datenraster` mit `InlineAngabe` für Name
   (Pflicht), Kurzbezeichnung (Prüfung aus 2.1 in `onSpeichern`), Über-Abschnitt (`TreeSelect`
   ohne eigene Nachfahren), Abschnittsleiter (`Select` disponierte Personen), Abschnittsauftrag
   (`TextArea`, `mehrzeilig`), Sprechgruppen (`SprechgruppenPicker`), Kommunikationsmittel,
@@ -36,20 +36,20 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
   je Zeile, Gegenprobe „zwei Zeilen nacheinander aus altem Stand“ (Spec-Szenario), unverändert
   heißt keine Anfrage, leerer Name heißt keine Anfrage samt Hinweis, vergebene Kurzbezeichnung
   heißt keine Anfrage samt „Schon vergeben (…)“, Ablehnung bleibt offen mit Grund an der Zeile.
-- [ ] 2.3 Lagezustand als `Segmentleiste` in `AbschnittDetail` (vier Stufen, Punkt aus
+- [x] 2.3 Lagezustand als `Segmentleiste` in `AbschnittDetail` (vier Stufen, Punkt aus
   `abschnittLagezustand`, `nicht_beurteilt` ↔ `null`). Ein Wechsel speichert sofort, mit lokalem
   Wert bis zur Antwort, Rücksprung und `ZeilenFehler` bei Ablehnung und einem Riegel während eines
   laufenden Wechsels. Nachweis: Vitest prüft Klick (genau `{ lagezustand: 'kritisch' }`), Klick
   auf die gewählte Stufe (keine Anfrage), „nicht beurteilt“ (`{ lagezustand: null }`), Pfeiltaste
   (speichert), Ablehnung (vorige Stufe gewählt, Grund an der Zeile) und Doppelklick während
   laufender Anfrage (nur eine Anfrage).
-- [ ] 2.4 Ohne Schreibrecht: kein Stift, keine Aufforderung, Lagezustand als `StatusTag` bzw.
+- [x] 2.4 Ohne Schreibrecht: kein Stift, keine Aufforderung, Lagezustand als `StatusTag` bzw.
   „nicht beurteilt“, leere Angaben „—“. Nachweis: Vitest mit `darfSchreiben={false}` zählt
   null Knöpfe im Raster und keine `radiogroup`.
-- [ ] 2.5 Gleichlauf mit `AbschnittDaten` (D1). Nachweis: ein Test rendert beide für denselben
-  Abschnitt und vergleicht die Etiketten-Folge der `Datenfeld`-Augenbrauen. Name steht nur im
-  Detail vorn, Fortschritt in keinem.
-- [ ] 2.6 `EinsatzabschnittePage.tsx` nutzt `AbschnittDetail` mit einer Mutation `patch`
+- [x] 2.5 Gleichlauf mit `AbschnittDaten` (D1). Nachweis: ein Test pinnt die Etiketten-Folge des
+  Details (das Lesebauteil fasst Funk und Erreichbarkeit in einer Zelle zusammen, eine
+  Gleichheit beider Folgen gäbe es also nicht), und beide Bauteile zeigen keinen Fortschritt.
+- [x] 2.6 `EinsatzabschnittePage.tsx` nutzt `AbschnittDetail` mit einer Mutation `patch`
   (`mutateAsync`, Invalidierung Abschnitte/Einheiten/ETB, Erfolgs-Toast mit Angabe, kein
   `onError`-Toast). Knopf „Bearbeiten“, Schreibzweig-`Form`, `bearbeiten`-Zustand und
   `aktualisiereAbschnitt` (Seite und `api/einsatzabschnitte.ts`) entfallen. „Auflösen“ bleibt rot
@@ -60,14 +60,14 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 3. Anlegen als Erfassung (D6)
 
-- [ ] 3.1 `pages/einsatzabschnitte/AbschnittAnlegenModal.tsx` mit `ErfassungsModal`: Name
+- [x] 3.1 `pages/einsatzabschnitte/AbschnittAnlegenModal.tsx` mit `ErfassungsModal`: Name
   (Pflicht), Kurzbezeichnung (Regel aus 2.1) und Über-Abschnitt (`TreeSelect`). `onErfassen` ruft
   `legeAbschnittAn` per `mutateAsync` mit genau diesen Feldern. Nachweis: Vitest prüft das
   Feldbudget (sichtbare Felder = 3 mit `forceRender`, Gegenprobe: ein viertes Feld würde die
   Zählung auf 4 heben, als Prüfung der Zählfunktion), Fokus im Namen, Enter im Namen sendet,
   Struktur (Knopf im `<form>`, keine `.ant-modal-footer`), Ablehnung bleibt offen mit Grund und
   Abbrechen sendet nichts.
-- [ ] 3.2 Seite: Kopfknopf, Leeraktion der Gliederung, Leeraktion des Organigramms und `?neu=1`
+- [x] 3.2 Seite: Kopfknopf, Leeraktion der Gliederung, Leeraktion des Organigramms und `?neu=1`
   öffnen das Modal (nur mit Schreibrecht, Parameter wird immer geräumt, Ansicht → `gliederung`).
   Nach Erfolg ist der neue Abschnitt gewählt. `entwurf`-Zustand, Baumknoten „Neuer Abschnitt
   (ungespeichert)“ und die Entwurf-Spiegelung in `useQueryParamSelektion` entfallen. Nachweis:
@@ -77,7 +77,7 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 4. Regeln und Doku
 
-- [ ] 4.1 `frontend/AGENTS.md` fortschreiben. Unter „Farbachsen · Lagezustand“ entfällt
+- [x] 4.1 `frontend/AGENTS.md` fortschreiben. Unter „Farbachsen · Lagezustand“ entfällt
   „Fortschritt manuell (leer ≠ 0 %)“. Dafür kommen: Lagezustand im Abschnittsdetail per
   Segmentleiste, ein Klick speichert, und „Fortschritt“ ist ohne Oberfläche (LFH-1208, Spalte nur
   Altdaten). Unter „Formularseiten“ wird „Abschnitt anlegen ist ein lokaler Entwurf“ ersetzt
