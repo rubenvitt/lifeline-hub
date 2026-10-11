@@ -127,8 +127,13 @@ jobs:
       # SCHEITERT DIESER SCHRITT, scheitert nicht der Release: ohne die Variablen schreibt
       # ki-notizen.mjs die konventionellen Notizen, mit Warnung. Die IDs sind nicht geheim und
       # liegen als Repo-Variablen (`vars.*`), nicht als Secrets.
+      #
+      # Netz mit Frist (LFH-1101): je Versuch 20 s, zwei Wiederholungen; dazu eine harte
+      # Schrittgrenze und `continue-on-error` — auch ein Hänger kostet nur die KI-Notizen.
       - name: Claude-Anmeldung (GitHub-OIDC)
         if: steps.fenster.outputs.freigabe == 'true'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
           ORGANIZATION_ID: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
@@ -145,7 +150,8 @@ jobs:
             exit 0
           fi
           jwt="$RUNNER_TEMP/claude-oidc.jwt"
-          if ! curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          if ! curl -fsS --connect-timeout 10 --max-time 20 --retry 2 --retry-all-errors \
+              -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.anthropic.com" \
               | jq -er .value > "$jwt"; then
             echo "::warning::Claude-Anmeldung übersprungen — GitHub hat kein OIDC-Token ausgestellt. Es gelten die konventionellen Release-Notizen."
