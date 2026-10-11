@@ -1,5 +1,5 @@
 import { IconMenue } from '../icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -112,7 +112,33 @@ const KOPF_STIL = {
  */
 const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
 
+/**
+ * Die Zelle des Einsatznamens: Restbreite wie {@link REST_STIL}, aber nie unter der Trefffläche
+ * des Wechslers (`controlHeight`, LFH-1126). `contain: inline-size` nimmt den Namen aus der
+ * Eigenbreite: die Namensgruppe zählt für ihren Boden (`minWidth: 'min-content'`) nur die
+ * Trefffläche, nicht den ganzen Namen, und ein langer Name kürzt weiter mit Ellipsis.
+ */
+function nameZelleStil(token: { controlHeight: number }): CSSProperties {
+  return { ...REST_STIL, minWidth: token.controlHeight, contain: 'inline-size' };
+}
+
 const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
+
+const EINSATZNUMMER_STIL = {
+  fontFamily: schrift.zahl,
+  fontSize: 12,
+  color: rahmenFarben.text,
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
+} as const;
+
+/**
+ * Platzhalter der Einsatznummer, solange der Einsatz lädt: dieselbe Form, die das System beim
+ * Anlegen vergibt (`E-<Jahr>-<lfd. Nr.>`, Mono, also gleich breit), unsichtbar. Die Nummer
+ * trägt den Boden der Namensgruppe mit (LFH-1126); ohne Platzhalter brach der Kopf in
+ * `handschuh` erst nach dem Laden um, und die Seite sprang 72 px.
+ */
+const EINSATZNUMMER_PLATZHALTER = 'E-0000-0000';
 
 /**
  * Statuspunkt vor der Einsatznummer: `normal` bei aktivem Einsatz, sonst neutral. Das Wort
@@ -347,7 +373,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             display: 'flex',
             alignItems: 'stretch',
             flex: breit ? KOPF_NAME_FLEX : KOPF_NAME_FLEX_SCHMAL,
-            minWidth: 0,
+            // Boden = fester Teil plus Trefffläche des Namens (LFH-1126). Ab diesem Maß zählt der
+            // Umbruch (`flexWrap`), statt dass die Gruppe schrumpft und der Wechsler über die
+            // Suche läuft: in `handschuh` ist der feste Teil breiter als die Basis vorsieht.
+            minWidth: 'min-content',
           }}
         >
           {breit ? (
@@ -390,20 +419,16 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               einsatzQuery.isLoading && <span aria-hidden="true" style={STATUSPUNKT_PLATZ} />
             )}
             {mittel && einsatzKennung(einsatz) && (
-              <span
-                data-lfh="kopf-einsatznummer"
-                style={{
-                  fontFamily: schrift.zahl,
-                  fontSize: 12,
-                  color: rahmenFarben.text,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
+              <span data-lfh="kopf-einsatznummer" style={EINSATZNUMMER_STIL}>
                 {einsatzKennung(einsatz)}
               </span>
             )}
-            <div data-lfh="kopf-einsatzname" style={REST_STIL}>
+            {mittel && !einsatz && einsatzQuery.isLoading && (
+              <span aria-hidden="true" style={{ ...EINSATZNUMMER_STIL, visibility: 'hidden' }}>
+                {EINSATZNUMMER_PLATZHALTER}
+              </span>
+            )}
+            <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
               {einsatzQuery.isLoading ? (
                 <span
                   style={{ display: 'flex', alignItems: 'center', minHeight: token.controlHeight }}

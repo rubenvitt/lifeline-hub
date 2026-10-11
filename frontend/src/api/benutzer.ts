@@ -21,6 +21,14 @@ export function deaktiviereBenutzer(id: number): Promise<BenutzerAnzeige> {
   return apiSend<BenutzerAnzeige>(`/api/benutzer/${id}/deaktivieren`, 'POST');
 }
 
+/**
+ * Admin-Reset des zweiten Faktors (LFH-43, bedienbar seit LFH-1122): löscht Secret und
+ * Wiederherstellungscodes und beendet alle Anmeldungen der Person.
+ */
+export function setzeZweitfaktorZurueck(id: number): Promise<BenutzerAnzeige> {
+  return apiSend<BenutzerAnzeige>(`/api/benutzer/${id}/totp/reset`, 'POST');
+}
+
 /** Partielle Änderung eines bestehenden Benutzers (LFH-286). Nur gesetzte Felder ändern sich. */
 export interface PatchBenutzer {
   anzeigename?: string;
