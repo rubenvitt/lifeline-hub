@@ -1,53 +1,157 @@
 ---
 /**
- * Übersicht der Anwenderdokumentation (LFH-1096) nach Lesergruppen. Die Kapitel kommen aus
- * `docs/anwender/kapitel/` (Content-Collection `kapitel`), dieselben wie in der App.
+ * Übersicht der Anwenderdokumentation (LFH-1096, Gestaltung LFH-1150). Die Kapitel kommen aus
+ * `docs/anwender/kapitel/` (Content-Collection `kapitel`), dieselben wie in der App. Gruppiert nach
+ * Bereichen (Hunderterblöcke der `reihenfolge`), mit Suche und Filter nach Lesergruppe. Suche und
+ * Filter laufen im Browser über `data-*`-Attribute; ohne Skript zeigt die Seite alle Kapitel.
  */
 import { getCollection } from 'astro:content';
 import Grundriss from '../../layouts/Grundriss.astro';
 import { GRUPPEN } from '../../daten/gruppen';
+import { BEREICHE, bereichVon, kurztext } from '../../daten/bereiche';
 import '../../styles/doku.css';
 
 const kapitel = (await getCollection('kapitel')).sort(
   (a, b) => a.data.reihenfolge - b.data.reihenfolge,
 );
+
+const bereiche = BEREICHE.map((name, index) => ({
+  name,
+  nummer: String(index).padStart(2, '0'),
+  kapitel: kapitel
+    .filter((k) => bereichVon(k.data.reihenfolge) === name)
+    .map((k) => ({
+      id: k.id,
+      titel: k.data.titel,
+      gruppen: k.data.gruppen,
+      kurz: kurztext(k.body ?? ''),
+    })),
+})).filter((b) => b.kapitel.length > 0);
+
+const filter = GRUPPEN.filter((g) => g.key !== 'alle');
+const gruppenNamen = Object.fromEntries(GRUPPEN.map((g) => [g.key, g.name]));
 ---
 
 <Grundriss
   titel="Anwenderdokumentation · Lifeline Hub"
-  beschreibung="Wie Lifeline Hub im Einsatz arbeitet: Anmelden, Arbeiten ohne Netz, Gerät verloren."
+  beschreibung="Wie Lifeline Hub im Einsatz arbeitet: Anmelden, Arbeiten ohne Netz, Gerät verloren. Kapitel mit Schritten, Bildern und Hintergrund."
 >
-  <section class="abschnitt">
-    <header class="abschnitt-kopf">
-      <h1 class="ueberschrift">Anwenderdokumentation</h1>
-      <p class="lauftext">
-        Abläufe in Schritten mit Bild und das Wissen, das die Oberfläche nicht zeigt: Folgen,
-        Sonderlagen und Rechte. Dieselben Kapitel stehen in der App unter „Hilfe“, dort im Stand
-        der eigenen Installation; hier steht der Stand der Entwicklung.
+  <section class="abschnitt doku-start">
+    <header class="doku-kopf">
+      <p class="doku-label">Anwenderdokumentation</p>
+      <h1 class="doku-kopf__titel">Wie Lifeline Hub im Einsatz arbeitet</h1>
+      <p class="lauftext doku-kopf__text">
+        Jedes Kapitel beschreibt Abläufe in Schritten, mit Bildschirmfoto, und das Wissen, das die
+        Oberfläche nicht zeigt: Folgen, Sonderlagen und Rechte. Dieselben Kapitel stehen in der App
+        unter „Hilfe“, dort im Stand der eigenen Installation; hier steht der Stand der Entwicklung.
       </p>
     </header>
-    <div class="doku-gruppen fugenraster">
-      {
-        GRUPPEN.map((g) => {
-          const liste = kapitel.filter((k) => k.data.gruppen.includes(g.key));
-          return (
-            <section class="doku-gruppe">
-              <h2 class="doku-gruppe__titel">{g.name}</h2>
-              {liste.length === 0 ? (
-                <p class="lauftext">Noch keine Kapitel.</p>
-              ) : (
-                <ul class="doku-liste">
-                  {liste.map((k) => (
-                    <li>
-                      <a href={`/doku/${k.id}/`}>{k.data.titel}</a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })
-      }
+
+    <div class="doku-werkzeuge" role="search">
+      <label class="doku-suche">
+        <span class="doku-label">Suchen</span>
+        <input
+          type="search"
+          name="suche"
+          placeholder="Titel oder Überblick, z. B. Gerät"
+          autocomplete="off"
+          data-suche
+        />
+      </label>
+      <div class="doku-filter" role="group" aria-label="Für welche Lesergruppe">
+        <button type="button" data-gruppe="" aria-pressed="true">Alle Kapitel</button>
+        {
+          filter.map((g) => (
+            <button type="button" data-gruppe={g.key} aria-pressed="false">
+              Für {g.name}
+            </button>
+          ))
+        }
+      </div>
+      <p class="doku-stand mono" aria-live="polite" data-stand>
+        {kapitel.length} von {kapitel.length} Kapiteln
+      </p>
     </div>
   </section>
+
+  <div class="abschnitt doku-bereiche" data-bereiche>
+    {
+      bereiche.map((b) => (
+        <section class="doku-bereich" data-bereich aria-labelledby={`bereich-${b.nummer}`}>
+          <h2 class="doku-bereich__titel" id={`bereich-${b.nummer}`}>
+            <span class="mono doku-bereich__nummer">{b.nummer}</span>
+            {b.name}
+          </h2>
+          <ul class="doku-karten">
+            {b.kapitel.map((k) => (
+              <li>
+                <a
+                  class="doku-karte"
+                  href={`/doku/${k.id}/`}
+                  data-karte
+                  data-gruppen={k.gruppen.join(' ')}
+                  data-suchtext={`${k.titel} ${k.kurz}`.toLowerCase()}
+                >
+                  <span class="doku-karte__titel">{k.titel}</span>
+                  {k.kurz && <span class="doku-karte__kurz">{k.kurz}</span>}
+                  <span class="doku-karte__fuss mono">
+                    {k.gruppen.map((g) => gruppenNamen[g]).join(' · ')}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+    <p class="doku-leer lauftext" data-leer hidden>
+      Kein Kapitel passt zu dieser Suche. <button type="button" data-zuruecksetzen>Filter lösen</button>
+    </p>
+  </div>
 </Grundriss>
+
+<script>
+  const suche = document.querySelector<HTMLInputElement>('[data-suche]');
+  const knoepfe = document.querySelectorAll<HTMLButtonElement>('[data-gruppe]');
+  const karten = document.querySelectorAll<HTMLElement>('[data-karte]');
+  const bereiche = document.querySelectorAll<HTMLElement>('[data-bereich]');
+  const leer = document.querySelector<HTMLElement>('[data-leer]');
+  const stand = document.querySelector<HTMLElement>('[data-stand]');
+  const gesamt = karten.length;
+  const zuruecksetzen = document.querySelector<HTMLButtonElement>('[data-zuruecksetzen]');
+
+  let gruppe = '';
+
+  function aktualisiere() {
+    const begriff = (suche?.value ?? '').trim().toLowerCase();
+    let sichtbar = 0;
+    karten.forEach((karte) => {
+      const passtGruppe = !gruppe || (karte.dataset.gruppen ?? '').split(' ').includes(gruppe);
+      const passtText = !begriff || (karte.dataset.suchtext ?? '').includes(begriff);
+      const zeigen = passtGruppe && passtText;
+      karte.parentElement!.hidden = !zeigen;
+      if (zeigen) sichtbar += 1;
+    });
+    bereiche.forEach((b) => {
+      b.hidden = [...b.querySelectorAll<HTMLElement>('[data-karte]')].every(
+        (k) => k.parentElement!.hidden,
+      );
+    });
+    knoepfe.forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.gruppe === gruppe)));
+    if (leer) leer.hidden = sichtbar > 0;
+    if (stand) stand.textContent = `${sichtbar} von ${gesamt} Kapiteln`;
+  }
+
+  suche?.addEventListener('input', aktualisiere);
+  knoepfe.forEach((knopf) =>
+    knopf.addEventListener('click', () => {
+      gruppe = knopf.dataset.gruppe ?? '';
+      aktualisiere();
+    }),
+  );
+  zuruecksetzen?.addEventListener('click', () => {
+    if (suche) suche.value = '';
+    gruppe = '';
+    aktualisiere();
+  });
+</script>
