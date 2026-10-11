@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs]
 ---
 
 ## Überblick
@@ -12,8 +12,8 @@ warten. Das Modul zeigt je Raum, wer dort bereitsteht und mit welcher Stärke, u
 keinem Raum zugewiesen sind.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
-Räume an, nehmen sie in Betrieb, weisen Kräfte zu und lösen Räume wieder auf. Die Bedienung am
-gekoppelten Tablet eines Bereitstellungsraums beschreibt
+Räume an, ändern ihre Raumdaten, nehmen sie in Betrieb, weisen Kräfte zu und lösen Räume wieder
+auf. Die Bedienung am gekoppelten Tablet eines Bereitstellungsraums beschreibt
 [Bereitstellungsraum am Gerät](geraet-bereitstellungsraum.md).
 
 ## Abläufe
@@ -40,6 +40,19 @@ Für Einsatzleitung und Führungspersonal:
 
 3. „Anlegen“ wählen. Die App öffnet den neuen Raum; er steht auf „geplant“.
 4. Ist der Raum eingerichtet, „In Betrieb nehmen“ wählen. Er steht dann auf „aktiv“.
+
+### Bezeichnung, Standort und Notiz ändern
+
+Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv ist:
+
+1. Den Raum öffnen und bei „Raumdaten“ „Bearbeiten“ wählen.
+2. Im Dialog „Bereitstellungsraum bearbeiten“ „Bezeichnung“, „Standort (optional)“ oder
+   „Notiz (optional)“ ändern. Ein geleertes Feld löscht die Angabe; die Bezeichnung bleibt Pflicht.
+
+   ![Dialog „Bereitstellungsraum bearbeiten“ mit Bezeichnung „Parkplatz Stadion Nord“, Standort und Notiz](../bilder/bereitstellungsraeume/bearbeiten.png)
+
+3. „Speichern“ wählen. Die neue Bezeichnung steht im Seitenkopf, im Umschalter und in der
+   Übersicht, Standort und Notiz stehen unter „Raumdaten“; die Übersicht zeigt auch den Standort.
 
 ### Kräfte zuweisen und entfernen
 
@@ -71,7 +84,8 @@ Für Einsatzleitung und Führungspersonal:
 ### Status eines Raums
 
 Ein Raum durchläuft „geplant“, „aktiv“ und „aufgelöst“. Kräfte lassen sich nur einem aktiven Raum
-zuweisen; ein geplanter oder aufgelöster Raum ist nur zu lesen.
+zuweisen. Bezeichnung, Standort und Notiz lassen sich ändern, solange der Raum geplant oder aktiv
+ist; ein aufgelöster Raum ist nur zu lesen.
 
 ### Wer zugewiesen werden kann
 
@@ -83,12 +97,14 @@ rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält fest, wenn ein Raum in Betrieb genommen oder aufgelöst wird und wenn eine
-Kraft in einen Raum eintritt oder ihn verlässt, jeweils mit Namen. Das Anlegen und das Stornieren
-eines Raums stehen nicht darin.
+Kraft in einen Raum eintritt oder ihn verlässt, jeweils mit Namen. Das Anlegen, das Ändern der
+Raumdaten und das Stornieren eines Raums stehen nicht darin. Wird ein Raum umbenannt, behalten
+frühere Einträge den alten Namen.
 
 ### Rechte und ohne Netz
 
-Lesen darf, wer das Modul Bereitstellungsräume sieht. Anlegen, in Betrieb nehmen, zuweisen,
-entfernen, auflösen und stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz
-läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Die Bereitstellungsräume gehören nicht zu
-dem, was die App für die Arbeit ohne Netz vorhält (Kapitel [Ohne Netz](ohne-netz.md)).
+Lesen darf, wer das Modul Bereitstellungsräume sieht. Anlegen, ändern, in Betrieb nehmen,
+zuweisen, entfernen, auflösen und stornieren dürfen Einsatzleitung und Führungspersonal, solange
+der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Die Bereitstellungsräume
+gehören nicht zu dem, was die App für die Arbeit ohne Netz vorhält (Kapitel
+[Ohne Netz](ohne-netz.md)).

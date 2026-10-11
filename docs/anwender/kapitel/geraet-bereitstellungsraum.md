@@ -59,8 +59,8 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an; die Knöpfe zum Z
 ### Was das Tablet nicht tut
 
 Das Tablet führt nur seinen eigenen Raum. Es legt keinen Raum an, wechselt nicht in einen anderen,
-ändert keine Stammdaten, löst den Raum nicht auf und storniert ihn nicht; das bleibt der
-Einsatzleitung. Auch an den Einheiten und Fahrzeugen selbst ändert es nichts.
+ändert weder Stammdaten noch Bezeichnung, Standort und Notiz des Raums, löst den Raum nicht auf und
+storniert ihn nicht; das bleibt der Einsatzleitung. Auch an den Einheiten und Fahrzeugen selbst ändert es nichts.
 
 ### Absender der Meldungen
 
