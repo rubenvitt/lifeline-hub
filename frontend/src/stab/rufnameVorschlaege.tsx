@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { EinsatzFahrzeug, Fahrzeug } from '../api/types';
 import { monoStil, useRollen } from '../components/instrument';
-import { DEMO_GRUPPE, DemoLabel, splitDemo } from '../stammdaten/demoAuswahl';
+import { DEMO_GROUP, DemoLabel, splitDemo } from '../stammdaten/demoAuswahl';
 import { isFuehrungsfahrzeug } from './fernmeldeskizze';
 
 /**
@@ -86,7 +86,7 @@ export function rufnameVorschlaege({
       stamm.filter((f) => !imEinsatz.has(f.id) && isFuehrungsfahrzeug(f)),
     );
     addGroup(RUFNAME_GROUP.organisation, echte);
-    addGroup(DEMO_GRUPPE, demo);
+    addGroup(DEMO_GROUP, demo);
   }
   return groups;
 }

@@ -12,7 +12,7 @@ import DemoMarke from '../components/DemoMarke';
  * `optionFilterProp` auf ein Textfeld — nach dem Label kann antd dann nicht mehr filtern.
  */
 
-export const DEMO_GRUPPE = 'Demo-Daten';
+export const DEMO_GROUP = 'Demo-Daten';
 
 /**
  * Das Auswahlfeld ist schmal (`minWidth: 260`), die Liste so breit wie das Feld. Gekürzt wird
@@ -32,7 +32,7 @@ export interface AuswahlOption {
   label: ReactNode;
 }
 
-export interface AuswahlGruppe {
+export interface AuswahlGroup {
   label: string;
   title: string;
   options: AuswahlOption[];
@@ -40,7 +40,7 @@ export interface AuswahlGruppe {
 
 /**
  * Demo-Label: Text gekürzt, Marke ganz. Für Auswahllisten, die eigene Optionen bauen (etwa die
- * Rufname-Vorschläge, LFH-1187), aus derselben Quelle wie `demoGruppierteOptionen`.
+ * Rufname-Vorschläge, LFH-1187), aus derselben Quelle wie `demoGroupedOptions`.
  */
 export function DemoLabel({ children }: { children: ReactNode }) {
   return (
@@ -63,18 +63,18 @@ export function splitDemo<T extends { ist_demo: boolean }>(
   return { echte, demo };
 }
 
-export function demoGruppierteOptionen<T extends { id: number; ist_demo: boolean }>(
+export function demoGroupedOptions<T extends { id: number; ist_demo: boolean }>(
   eintraege: readonly T[],
   label: (eintrag: T) => string,
-): (AuswahlOption | AuswahlGruppe)[] {
+): (AuswahlOption | AuswahlGroup)[] {
   const { echte, demo } = splitDemo(eintraege);
   const echteOptionen = echte.map((e) => ({ value: e.id, label: label(e) }));
   return demo.length
     ? [
         ...echteOptionen,
         {
-          label: DEMO_GRUPPE,
-          title: DEMO_GRUPPE,
+          label: DEMO_GROUP,
+          title: DEMO_GROUP,
           options: demo.map((e) => ({ value: e.id, label: <DemoLabel>{label(e)}</DemoLabel> })),
         },
       ]

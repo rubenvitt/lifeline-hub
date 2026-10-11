@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EinsatzFahrzeug, Fahrzeug } from '../api/types';
-import { DEMO_GRUPPE } from '../stammdaten/demoAuswahl';
+import { DEMO_GROUP } from '../stammdaten/demoAuswahl';
 import {
   RUFNAME_GROUP,
   rufnameFilter,
@@ -76,7 +76,7 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
       `${RUFNAME_GROUP.fuehrungsstelle}: Florian Musterstadt 19/1`,
       `${RUFNAME_GROUP.disponiert}: Florian Musterstadt 11/1, Heros Musterstadt 10/1`,
       `${RUFNAME_GROUP.organisation}: Kater Musterstadt 1, Rotkreuz Musterstadt 10/1`,
-      `${DEMO_GRUPPE}: Demo ELW`,
+      `${DEMO_GROUP}: Demo ELW`,
     ]);
   });
 
@@ -104,7 +104,7 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
 
   it('ohne Freigabe der Fahrzeuge keine Gruppe 1–2, die Organisation bleibt ganz', () => {
     const gruppen = rufnameVorschlaege({ fahrzeugIds: [1], disponiert: null, stamm: orgFahrzeuge });
-    expect(gruppen.map((g) => g.title)).toEqual([RUFNAME_GROUP.organisation, DEMO_GRUPPE]);
+    expect(gruppen.map((g) => g.title)).toEqual([RUFNAME_GROUP.organisation, DEMO_GROUP]);
     // Ohne Disposition ist auch das disponierte ELW 1 nur ein Fahrzeug der Organisation.
     expect(gruppen[0].vorschlaege.map((v) => v.funkrufname)).toContain('Florian Musterstadt 11/1');
   });
