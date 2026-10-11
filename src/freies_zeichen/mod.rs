@@ -1,3 +1,4 @@
+pub mod pruefung;
 pub mod repo;
 
 use serde::Serialize;
