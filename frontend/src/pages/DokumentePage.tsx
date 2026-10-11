@@ -81,6 +81,11 @@ function bezugText(d: Dokument): string | null {
  * Das eine Spaltenregister (Bauform `SchaedenPage`). Funktion von `einsatzId` (Download-Pfad) und
  * Schreibrecht (Aktionsspalte), durch `spaltenFuer<Dokument>()` geführt, nie annotiert — sonst
  * weitete sich `K` auf `string` und der Kartenplan nähme Tippfehler an.
+ *
+ * Der Titel fließt (`mindestBreite`, LFH-523), alle übrigen Spalten tragen eine Zahlbreite: so
+ * bricht ein langer Titel samt „Original (mit Standort)“ um, und die Aktionen stehen auf dem
+ * Fükw-Schirm (1440 px) ohne Querscrollen im Bild (LFH-1149). Wer eine Breite ändert, misst neu
+ * (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen am Führungsarbeitsplatz“).
  */
 const dokumentSpalten = (
   einsatzId: number,
@@ -95,6 +100,7 @@ const dokumentSpalten = (
       title: 'Titel',
       key: 'titel',
       immerSichtbar: true,
+      mindestBreite: 220,
       sortWert: (d) => d.titel,
       suchText: (d) => `${d.titel} ${d.dateiname}`,
       render: (_, d) => {
@@ -126,6 +132,7 @@ const dokumentSpalten = (
     {
       title: 'Kategorie',
       key: 'kategorie',
+      width: 120,
       sortWert: (d) => DOKUMENT_KATEGORIE_REIHENFOLGE.indexOf(d.kategorie),
       filter: {
         werte: DOKUMENT_KATEGORIE_REIHENFOLGE.map((k) => ({
@@ -139,6 +146,7 @@ const dokumentSpalten = (
     {
       title: 'Bezug',
       key: 'bezug',
+      width: 130,
       abBreite: 'lg',
       sortWert: (d) => bezugText(d),
       suchText: (d) => bezugText(d),
@@ -154,6 +162,7 @@ const dokumentSpalten = (
     {
       title: 'Datei',
       key: 'datei',
+      width: 290,
       abBreite: 'xl',
       sortWert: (d) => d.groesse,
       render: (_, d) => `${d.dateiname} · ${formatGroesse(d.groesse)}`,
@@ -161,6 +170,7 @@ const dokumentSpalten = (
     {
       title: 'Abgelegt',
       key: 'abgelegt',
+      width: 225,
       sortWert: (d) => d.abgelegt_at,
       suchText: (d) => d.abgelegt_von_name,
       render: (_, d) => (
@@ -174,6 +184,7 @@ const dokumentSpalten = (
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
+            width: 100,
             immerSichtbar: true,
             render: (_: unknown, d: Dokument) => (
               <Space size="middle">

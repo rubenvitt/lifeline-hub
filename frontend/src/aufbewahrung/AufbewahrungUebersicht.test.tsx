@@ -10,6 +10,7 @@ import { renderMitProviders } from '../test/utils';
 import AufbewahrungUebersicht from './AufbewahrungUebersicht';
 import { globalKeys } from '../api/queryKeys';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
+import { setzeViewportBreite } from '../test/viewport';
 
 /** Übersicht. */
 
@@ -101,6 +102,9 @@ async function tabelle(): Promise<HTMLElement> {
 
 describe('AufbewahrungUebersicht', () => {
   it('zeigt Einsatznummer, Zustand mit Wort und das Karenz-Ende in der Anzeigezeit', async () => {
+    // Ab 1600 px steht jede Angabe als Spalte (Spec „Aufbewahrungsübersicht“); darunter weicht
+    // „Vorgemerkt am“ in den Spaltenschalter (Test unten, LFH-1149).
+    setzeViewportBreite(1600);
     zeige();
     const t = await tabelle();
     await within(t).findByText('E-2026-0007');
@@ -122,6 +126,7 @@ describe('AufbewahrungUebersicht', () => {
   });
 
   it('LFH-751: offener Einsatz-Antrag mit Zustand und Fälligkeit', async () => {
+    setzeViewportBreite(1600);
     zeige();
     const t = await tabelle();
     await within(t).findByText('E-2026-0009');
@@ -132,6 +137,28 @@ describe('AufbewahrungUebersicht', () => {
     expect(
       within(t).getByText(formatZeit('2026-10-03 08:00:00', DEFAULT_KONVENTIONEN)),
     ).toBeInTheDocument();
+  });
+
+  it('unter 1600 px weichen Vormerkung, Antrags-Fälligkeit und Schwärzung in den Spaltenschalter (LFH-1149)', async () => {
+    // Fensterbreite unter `xxl` (Vorgabe 1024): die drei Zustandsdaten stehen nicht in der
+    // Tabelle, der Zähler nennt sie, und der Schalter holt sie zurück (Spec
+    // „Aufbewahrungsübersicht“, Szenario „Führungsarbeitsplatz“).
+    zeige();
+    const t = await tabelle();
+    await within(t).findByText('E-2026-0007');
+    for (const kopf of [/Vorgemerkt am/, /Schwärzung auf Antrag ab/, /Geschwärzt am/]) {
+      expect(within(t).queryByRole('columnheader', { name: kopf })).toBeNull();
+    }
+    for (const kopf of [/Frist/, /Karenz-Ende/, /Löschung am/]) {
+      expect(within(t).getAllByRole('columnheader', { name: kopf }).length).toBeGreaterThan(0);
+    }
+
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Vorgemerkt am' }));
+    expect(
+      within(await tabelle()).getByRole('columnheader', { name: /Vorgemerkt am/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
   });
 
   it('filtert je Zustand über die Segmentleiste', async () => {

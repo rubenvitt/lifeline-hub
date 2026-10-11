@@ -87,6 +87,12 @@ genau einer dieser Werte sein:
 Aktive Einsätze MUST fehlen. Die Übersicht MUST ohne Schreibvorgang auskommen und keine
 personenbezogenen Spalten enthalten. Ein offener Personen-Antrag ändert den Zustand nicht.
 
+Jede Angabe MUST in der Übersicht erreichbar sein. Unter einer Fensterbreite von 1600 px MAY nur
+der Zeitpunkt der Vormerkung, die Fälligkeit eines offenen Einsatz-Antrags und der Zeitpunkt der
+Schwärzung aus der Tabelle weichen; eine gewichene Angabe MUST sich über den Spaltenschalter
+einblenden lassen, und sein Zähler MUST sie mitzählen. Ab 1600 px SHALL jede Angabe ohne
+Handauswahl als Spalte im Bild stehen.
+
 #### Scenario: Zustände
 - **WHEN** die Organisation je einen abgeschlossenen Einsatz ohne Frist, mit künftiger Frist, mit abgelaufener Frist, vorgemerkt seit 3 Tagen, vorgemerkt seit 31 Tagen und geschwärzt hat
 - **THEN** zeigt die Übersicht sie mit den Zuständen `ohne_frist`, `frist_laeuft`, `faellig`, `vorgemerkt`, `schwaerzung_ausstehend` und `geschwaerzt`
@@ -121,6 +127,15 @@ personenbezogenen Spalten enthalten. Ein offener Personen-Antrag ändert den Zus
 #### Scenario: Löschprotokoll einer fremden Organisation
 - **WHEN** nur eine fremde Organisation eine Zeile im Löschprotokoll hat
 - **THEN** fehlt sie in der Übersicht
+
+#### Scenario: Führungsarbeitsplatz
+- **WHEN** der Admin die Übersicht in einem 1440 px breiten Fenster öffnet
+- **THEN** stehen Einsatznummer, Zustand, Bezeichnung, Abschlusszeitpunkt, Frist, Karenz-Ende und „Löschung am“ als Spalten im Bild, ohne dass die Tabelle waagerecht überläuft
+- **AND** nennt der Spaltenschalter drei ausgeblendete Spalten, und Vormerkung, Antrags-Fälligkeit und Schwärzung lassen sich darüber einblenden
+
+#### Scenario: Breites Fenster
+- **WHEN** der Admin die Übersicht in einem mindestens 1600 px breiten Fenster öffnet und im Spaltenschalter nichts abgewählt hat
+- **THEN** steht jede Angabe als eigene Spalte im Bild
 
 ### Requirement: Pseudonyme Archivakte
 

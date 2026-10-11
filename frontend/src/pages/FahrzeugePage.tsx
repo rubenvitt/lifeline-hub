@@ -501,6 +501,10 @@ export default function FahrzeugePage() {
    * Feld erscheint erst mit dem ersten gepflegten Wert, nach dem Laden, mit kleiner Verschiebung in
    * der umbrechenden Werkzeugzeile. Gewollt: ein dauerhaft leeres Filterfeld sieht wie ein Werkzeug
    * aus und ist keins.
+   *
+   * Wie jedes Filterfeld steht es nur bei sichtbarer Spalte: unter `xxl` weicht `traeger` in den
+   * Spaltenschalter (LFH-1149), und das Feld kommt erst mit der eingeblendeten Spalte zurück (wie
+   * auf der Personalseite).
    */
   const traegerWerte = [
     ...new Set(efs.map((e) => e.traegerorganisation).filter((t): t is string => !!t)),
@@ -522,19 +526,34 @@ export default function FahrzeugePage() {
    *
    * ── `abBreite` nur für lesende Spalten ──
    *
-   * `abBreite` versteckt eine Spalte, ohne dass der Nutzer sie zurückholen kann. Schreibtragende
-   * Spalten (`status`, `bemerkung`, `aktionen`) bekommen deshalb nie eins; soll eine weichen, dann
-   * über `spaltenAusVoreinstellung` — dann steht sie im Spaltenschalter und im Zähler.
+   * `abBreite` nimmt eine Spalte unter der Breite aus dem Bild; zurück holt sie nur der
+   * Spaltenschalter. Schreibtragende Spalten (`status`, `bemerkung`, `aktionen`) bekommen deshalb
+   * nie eins; soll eine weichen, dann über `spaltenAusVoreinstellung` — dann steht sie im
+   * Spaltenschalter und im Zähler.
+   *
+   * ── Gemessen gegen 1440 (LFH-1149) ──
+   *
+   * `funkrufname` fließt (`mindestBreite`, LFH-523), alle übrigen tragen eine Zahlbreite; so passt
+   * die Tabelle auf den Fükw-Schirm, auch wenn die Besatzung „Ist … · Soll …“ zeigt; die
+   * Besatzung hält dabei eine Zeile (320 px für „unterbesetzt“ samt Ist und Soll). Den Rest
+   * nimmt der Funkrufname: neben „ad-hoc“ und Auslöser trägt er bei 1440 rund 30 Zeichen in einer
+   * Zeile, ein längerer bricht um (Entscheidung Ruben, 10.10.2026). Unter `xxl`
+   * weichen `kennzeichen` und `traeger`, beide über den Spaltenschalter und im Zähler (wie die
+   * Personalseite). Wer eine Breite ändert, misst neu (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen
+   * am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
     {
       title: 'Funkrufname',
       key: 'funkrufname',
       immerSichtbar: true,
+      mindestBreite: 180,
       sortWert: (ef) => ef.funkrufname,
       suchText: (ef) => ef.funkrufname,
+      // `wrap`: die Marken dürfen unter den Funkrufnamen rutschen, statt die Fließspalte über ihr
+      // Maß zu drücken (wie `PersonalPage`, LFH-975).
       render: (_, ef) => (
-        <Space>
+        <Space wrap>
           {/* Funkrufname in Mono. */}
           <span style={monoStil(13)}>{ef.funkrufname}</span>
           {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
@@ -546,6 +565,7 @@ export default function FahrzeugePage() {
       title: 'Typ',
       dataIndex: 'fahrzeugtyp',
       key: 'typ',
+      width: 100,
       sortWert: (ef) => ef.fahrzeugtyp,
       suchText: (ef) => ef.fahrzeugtyp,
       render: (t) => t ?? '—',
@@ -554,7 +574,8 @@ export default function FahrzeugePage() {
       title: 'Kennzeichen',
       dataIndex: 'kennzeichen',
       key: 'kennzeichen',
-      abBreite: 'lg',
+      width: 120,
+      abBreite: 'xxl',
       suchText: (ef) => ef.kennzeichen,
       render: (t) => t ?? '—',
     },
@@ -562,12 +583,15 @@ export default function FahrzeugePage() {
       title: 'Träger',
       dataIndex: 'traegerorganisation',
       key: 'traeger',
+      width: 160,
+      abBreite: 'xxl',
       filter: traegerFilter,
       render: (t) => t ?? '—',
     },
     {
       title: 'Status',
       key: 'status',
+      width: 160,
       // Gefiltert wird über die Kategorie, nicht über `status_id`: die ID kommt aus dem
       // Mandantenkatalog und stimmte nicht mit den Gruppen derselben Achse überein.
       filter: {
@@ -589,6 +613,7 @@ export default function FahrzeugePage() {
     {
       title: 'Besatzung',
       key: 'besatzung',
+      width: 320,
       render: (_, ef) => (
         <BesatzungsStaerkeBadge
           crew={personal.filter((p) => p.fahrzeug_id === ef.id)}
@@ -599,6 +624,7 @@ export default function FahrzeugePage() {
     {
       title: 'Bemerkung',
       key: 'bemerkung',
+      width: 200,
       render: (_, ef) => (
         <BemerkungZelle
           wert={ef.bemerkung}
@@ -614,6 +640,7 @@ export default function FahrzeugePage() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
+            width: 110,
             immerSichtbar: true,
             render: (_: unknown, ef: EinsatzFahrzeug) => (
               <Popconfirm
