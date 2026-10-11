@@ -1159,24 +1159,6 @@ function AbschnittEintrag({
             )}
           </span>
         ) : null}
-        {zeile.fortschritt != null && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            {/* Der Balken ist Beiwerk, die Zahl daneben die Aussage — deshalb aria-hidden. */}
-            <span
-              aria-hidden
-              style={{ flex: 1, height: 4, background: rollen.linie, display: 'flex' }}
-            >
-              <span
-                data-lfh="abschnitt-fortschritt"
-                style={{
-                  width: `${zeile.fortschritt}%`,
-                  background: lage ? rollenFarbe(lage.rolle, token) : rollen.gedaempft,
-                }}
-              />
-            </span>
-            <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.fortschritt} %</span>
-          </span>
-        )}
         {unterzeile && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unterzeile}</span>}
         {/* Nur wenn die Rückmeldungen feststehen, sonst gar nichts. Der verborgene Vorsatz gibt
             der Zeit im Linknamen ihre Bedeutung. */}

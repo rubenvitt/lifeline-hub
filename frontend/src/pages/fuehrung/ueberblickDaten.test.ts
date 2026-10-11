@@ -642,7 +642,7 @@ describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
       auftraege,
     });
 
-  it('übernimmt Kürzel, Lagezustand, festen Auftrag und Fortschritt des Abschnitts', () => {
+  it('übernimmt Kürzel, Lagezustand und festen Auftrag des Abschnitts, keinen Fortschritt (LFH-1208)', () => {
     const [nord] = roh([
       abschnitt(1, 'Nord', {
         kurzbezeichnung: 'EA-N',
@@ -654,7 +654,8 @@ describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
     expect(nord.kurzbezeichnung).toBe('EA-N');
     expect(nord.lagezustand).toBe('angespannt');
     expect(nord.abschnittsauftrag).toBe('Deichsicherung km 3,8 – 5,4');
-    expect(nord.fortschritt).toBe(72);
+    // Fortschritt hat keine Oberfläche mehr; die Zeile trägt das Feld nicht (LFH-1208).
+    expect(nord).not.toHaveProperty('fortschritt');
   });
 
   it('nicht gepflegt bleibt null — kein erfundenes „planmäßig" und keine 0 %', () => {
@@ -662,7 +663,6 @@ describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
     expect(nord.kurzbezeichnung).toBeNull();
     expect(nord.lagezustand).toBeNull();
     expect(nord.abschnittsauftrag).toBeNull();
-    expect(nord.fortschritt).toBeNull();
     expect(nord.unterLage).toBeNull();
   });
 

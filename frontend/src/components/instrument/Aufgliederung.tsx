@@ -8,7 +8,7 @@ import { monoStil, useRollen } from './rollenwerte';
  * `flex` nach ihrem Wert, 2-px-Fugen, darunter eine Mono-Legende. „Zahl führt,
  * Aufgliederung folgt" — der Balken ersetzt nie die Zahl.
  *
- * **Balken** (S2 Abschnittsfortschritt, S4 Tagesbilanz): Anteil einer Menge. Spur
+ * **Balken** (S4 Tagesbilanz): Anteil einer Menge. Spur
  * `flaeche3`, Füllung in der übergebenen Farbe.
  *
  * FARBEN KOMMEN VOM AUFRUFER, bereits aufgelöst (`rollenFarbe`, `sichtungsfarben`,

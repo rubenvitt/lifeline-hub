@@ -72,7 +72,9 @@ describe('AbschnittVorschau (LFH-664)', () => {
     expect(screen.getByText('EA N')).toBeInTheDocument();
     expect(screen.getByText('kritisch')).toBeInTheDocument();
     expect(screen.getByText('Deich an der Mühle halten')).toBeInTheDocument();
-    expect(screen.getByText('40 %')).toBeInTheDocument();
+    // Fortschritt hat keine Oberfläche mehr (LFH-1208); der Altwert 40 bleibt unsichtbar.
+    expect(screen.queryByText('Fortschritt')).not.toBeInTheDocument();
+    expect(screen.queryByText('40 %')).not.toBeInTheDocument();
     expect(screen.getByText('keine Funk-Angaben')).toBeInTheDocument();
     expect(screen.getByText('Zufahrt nur über Norden')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -87,14 +89,14 @@ describe('AbschnittVorschau (LFH-664)', () => {
     expect(feldwert('Stärke inkl. Unterabschnitte (F/UF/M//Σ)')).toHaveTextContent('1/3/4//8');
   });
 
-  it('nennt eine fehlende Beurteilung und Einschätzung als Wort', async () => {
+  it('nennt eine fehlende Beurteilung als Wort', async () => {
     liefere([abschnitt({ lagezustand: null, fortschritt: null })], () =>
       HttpResponse.json(einheiten),
     );
     renderMitProviders(<AbschnittVorschau einsatzId={5} id={5} />);
 
     expect(await screen.findByText('nicht beurteilt')).toBeInTheDocument();
-    expect(screen.getByText('nicht eingeschätzt')).toBeInTheDocument();
+    expect(screen.queryByText('nicht eingeschätzt')).not.toBeInTheDocument();
   });
 
   it('zeigt den Abschnitt, während die Einheiten noch laden', async () => {

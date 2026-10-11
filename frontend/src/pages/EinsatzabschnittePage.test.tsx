@@ -399,7 +399,7 @@ describe('EinsatzabschnittePage', () => {
     });
   });
 
-  it('zeigt Kürzel, Lagezustand, festen Auftrag und Fortschritt in der Lese-Ansicht (LFH-608)', async () => {
+  it('zeigt Kürzel, Lagezustand und festen Auftrag, aber keinen Fortschritt (LFH-608, LFH-1208)', async () => {
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [
         {
@@ -418,7 +418,9 @@ describe('EinsatzabschnittePage', () => {
     // Einmal im Baumknoten (LFH-962), einmal in den Abschnittsdaten.
     expect(screen.getAllByText('angespannt')).toHaveLength(2);
     expect(screen.getByText('Deichsicherung km 3,8 – 5,4')).toBeInTheDocument();
-    expect(screen.getByText('72 %')).toBeInTheDocument();
+    // Der Altwert 72 hat keine Oberfläche mehr (LFH-1208).
+    expect(screen.queryByText('72 %')).toBeNull();
+    expect(screen.queryByText('Fortschritt')).toBeNull();
   });
 
   it('nennt eine fehlende Beurteilung ausdrücklich, statt eine Stufe zu zeigen (LFH-608)', async () => {
@@ -426,7 +428,6 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
     expect(await screen.findByText('nicht beurteilt')).toBeInTheDocument();
-    expect(screen.getByText('nicht eingeschätzt')).toBeInTheDocument();
     expect(screen.queryByText(/planmäßig|angespannt|kritisch/)).toBeNull();
   });
 

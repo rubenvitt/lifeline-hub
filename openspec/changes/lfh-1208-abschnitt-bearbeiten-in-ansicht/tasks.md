@@ -5,12 +5,12 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 1. Fortschritt verlässt die Oberfläche (D7)
 
-- [ ] 1.1 `pages/einsatzabschnitte/AbschnittDaten.tsx` ohne Zeile „Fortschritt“. Der Kommentar
+- [x] 1.1 `pages/einsatzabschnitte/AbschnittDaten.tsx` ohne Zeile „Fortschritt“. Der Kommentar
   zur Reihenfolge vor dem Abschnittsauftrag entfällt. Nachweis: Abwesenheitstest in
   `AbschnittVorschau.test.tsx` (Abschnitt mit `fortschritt: 72` zeigt weder „Fortschritt“ noch
   „72 %“). Der bisherige Lesetest LFH-608 in `EinsatzabschnittePage.test.tsx` wird
   entsprechend umgeschrieben.
-- [ ] 1.2 `pages/fuehrung/ueberblickDaten.ts` ohne Feld `fortschritt` in der Abschnittszeile,
+- [x] 1.2 `pages/fuehrung/ueberblickDaten.ts` ohne Feld `fortschritt` in der Abschnittszeile,
   `pages/fuehrung/UeberblickPage.tsx` ohne Balken und Prozentzahl. Nachweis:
   `ueberblickDaten.test.ts` und `UeberblickPage.test.tsx` belegen die Abwesenheit
   (`[data-lfh="abschnitt-fortschritt"]` fehlt auch bei `fortschritt: 72`). Kürzel, Lagezustand

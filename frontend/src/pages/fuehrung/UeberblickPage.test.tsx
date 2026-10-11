@@ -432,7 +432,7 @@ describe('UeberblickPage', () => {
     expect(zeile).not.toHaveTextContent(/Rückmeldung/);
   });
 
-  it('Abschnittszeile mit Lage (LFH-608): Kante, Stufenwort, Kürzel, fester Auftrag, Fortschritt', async () => {
+  it('Abschnittszeile mit Lage (LFH-608): Kante, Stufenwort, Kürzel, fester Auftrag, kein Fortschritt (LFH-1208)', async () => {
     stelleBereit({
       ...volleDaten,
       abschnitte: [
@@ -457,10 +457,10 @@ describe('UeberblickPage', () => {
     // Der feste Auftrag steht vorn; der offene Einzelauftrag bleibt als kleine Zeile.
     expect(zeile).toHaveTextContent('Deichsicherung km 3,8 – 5,4');
     expect(zeile).toHaveTextContent('1 offen · Trupps verlegen');
-    // Fortschritt: Balken UND Zahl, daneben die Zählung — zwei Aussagen, beide benannt.
-    const balken = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-fortschritt"]')!;
-    expect(balken.style.width).toBe('72%');
-    expect(zeile).toHaveTextContent('72 %');
+    // Den Arbeitsstand trägt die Auftragszählung; der Altwert 72 bleibt ohne Balken und Zahl
+    // (LFH-1208).
+    expect(zeile.querySelector('[data-lfh="abschnitt-fortschritt"]')).toBeNull();
+    expect(zeile).not.toHaveTextContent('%');
     expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');
   });
 

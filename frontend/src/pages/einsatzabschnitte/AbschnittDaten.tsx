@@ -40,15 +40,8 @@ export default function AbschnittDaten({
           <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
         )}
       </Datenfeld>
-      {/* Fortschritt vor dem Abschnittsauftrag: das breite Auftragsfeld risse sonst ein Loch in
-          die zweispaltige Zeile. */}
-      <Datenfeld label="Fortschritt" mono={a.fortschritt != null}>
-        {a.fortschritt != null ? (
-          `${a.fortschritt} %`
-        ) : (
-          <span style={{ color: rollen.gedaempft }}>nicht eingeschätzt</span>
-        )}
-      </Datenfeld>
+      {/* Kein Fortschritt (LFH-1208): eine geschätzte Prozentzahl ist im Einsatz nicht belastbar;
+          die Lage trägt der Lagezustand, den Arbeitsstand die offenen Aufträge. */}
       {a.abschnittsauftrag && (
         <Datenfeld label="Abschnittsauftrag" breit>
           {a.abschnittsauftrag}
