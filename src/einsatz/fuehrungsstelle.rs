@@ -185,12 +185,12 @@ struct Zeile {
 }
 
 /// Lädt die Führungsstelle; ohne Zeile alle Angaben leer.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<FuehrungsstelleAnzeige, AppError> {
+pub async fn load(pool: &SqlitePool, einsatz_id: i64) -> Result<FuehrungsstelleAnzeige, AppError> {
     let mut conn = pool.acquire().await?;
-    laden_tx(&mut conn, einsatz_id).await
+    load_tx(&mut conn, einsatz_id).await
 }
 
-async fn laden_tx(
+async fn load_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
 ) -> Result<FuehrungsstelleAnzeige, AppError> {
@@ -411,7 +411,7 @@ async fn save_einsatzleiter_tx(
 ///
 /// Liefert dazu die id eines Übergabe-Eintrags im ETB; den Live-Kurzruf macht der Aufrufer nach
 /// dem Commit.
-pub async fn patchen_tx(
+pub async fn patch_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     schreiber: Schreiber,
@@ -469,5 +469,5 @@ pub async fn patchen_tx(
         Some(eingabe) => save_einsatzleiter_tx(conn, einsatz_id, schreiber, eingabe).await?,
         None => None,
     };
-    Ok((laden_tx(conn, einsatz_id).await?, etb_id))
+    Ok((load_tx(conn, einsatz_id).await?, etb_id))
 }

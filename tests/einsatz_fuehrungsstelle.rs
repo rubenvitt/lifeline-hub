@@ -319,7 +319,7 @@ async fn ein_fehler_im_schreiben_hinterlaesst_nichts() {
         sprechgruppe_ids: Some(&[987_654]),
         ..Default::default()
     };
-    let ergebnis = lifeline_hub::einsatz::fuehrungsstelle::patchen_tx(
+    let ergebnis = lifeline_hub::einsatz::fuehrungsstelle::patch_tx(
         &mut tx,
         einsatz,
         admin_schreiber(),
@@ -629,7 +629,7 @@ async fn schwaerzung_nullt_nur_die_erreichbarkeit() {
     .unwrap();
     tx.commit().await.unwrap();
 
-    let nachher = lifeline_hub::einsatz::fuehrungsstelle::laden(&pool, einsatz)
+    let nachher = lifeline_hub::einsatz::fuehrungsstelle::load(&pool, einsatz)
         .await
         .unwrap();
     assert_eq!(nachher.erreichbarkeit, None);
@@ -1021,8 +1021,7 @@ async fn scheitert_der_etb_eintrag_scheitert_die_aenderung() {
         etb_startwert: 1,
     };
     let ergebnis =
-        lifeline_hub::einsatz::fuehrungsstelle::patchen_tx(&mut tx, einsatz, schreiber, &patch)
-            .await;
+        lifeline_hub::einsatz::fuehrungsstelle::patch_tx(&mut tx, einsatz, schreiber, &patch).await;
     assert!(
         ergebnis.is_err(),
         "unbekannter Erfasser verletzt den Fremdschlüssel"
@@ -1061,7 +1060,7 @@ async fn repo_lehnt_den_abgeschlossenen_einsatz_in_der_transaktion_ab() {
         )),
         ..Default::default()
     };
-    let ergebnis = lifeline_hub::einsatz::fuehrungsstelle::patchen_tx(
+    let ergebnis = lifeline_hub::einsatz::fuehrungsstelle::patch_tx(
         &mut tx,
         einsatz,
         admin_schreiber(),
@@ -1122,7 +1121,7 @@ async fn schwaerzung_nullt_den_namen_des_einsatzleiters() {
     .unwrap();
     tx.commit().await.unwrap();
 
-    let nachher = lifeline_hub::einsatz::fuehrungsstelle::laden(&pool, einsatz)
+    let nachher = lifeline_hub::einsatz::fuehrungsstelle::load(&pool, einsatz)
         .await
         .unwrap();
     assert_eq!(nachher.erreichbarkeit, None);
