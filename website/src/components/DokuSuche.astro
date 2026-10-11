@@ -1,0 +1,286 @@
+---
+/**
+ * Suche der Anwenderdokumentation: ein modaler Dialog über jeder Seite der Website. Öffnet über
+ * jeden Knopf mit `data-such-oeffnen`, über ⌘K / Strg+K und über „/“ (außerhalb von Eingaben).
+ * Der Index (`/doku/suche.json`) lädt erst beim ersten Öffnen. Treffer: Kapitel und einzelne
+ * Abschnitte (`###`, also vor allem die Abläufe) mit Sprungmarke. Umlaute zählen wie ihre
+ * Grundbuchstaben („gerat“ findet „Gerät“). Bedienung: ↑ ↓ wählen, ↵ öffnen, Esc schließen.
+ */
+---
+
+<dialog class="such-dialog" data-such-dialog aria-label="Dokumentation durchsuchen">
+  <div class="such-kopf">
+    <svg class="such-lupe" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.75"></circle>
+      <path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.75" stroke-linecap="square"></path>
+    </svg>
+    <input
+      class="such-eingabe"
+      type="search"
+      placeholder="Kapitel und Abläufe durchsuchen"
+      autocomplete="off"
+      spellcheck="false"
+      role="combobox"
+      aria-expanded="true"
+      aria-controls="such-treffer"
+      aria-autocomplete="list"
+      aria-label="Suchbegriff"
+      data-such-eingabe
+    />
+    <button class="such-schliessen mono" type="button" data-such-schliessen>Esc</button>
+  </div>
+  <p class="such-stand mono" aria-live="polite" data-such-stand>
+    Suchbegriff eingeben, etwa „Passkey“, „Ablösung“ oder „Sichtung“.
+  </p>
+  <ul class="such-treffer" id="such-treffer" role="listbox" aria-label="Treffer" data-such-treffer>
+  </ul>
+  <footer class="such-fuss mono" aria-hidden="true">
+    <span><kbd>↑</kbd><kbd>↓</kbd> wählen</span>
+    <span><kbd>↵</kbd> öffnen</span>
+    <span><kbd>Esc</kbd> schließen</span>
+  </footer>
+</dialog>
+
+<script>
+  interface Abschnitt {
+    id: string;
+    t: string;
+    e: 2 | 3;
+    x: string;
+  }
+  interface Kapitel {
+    k: string;
+    t: string;
+    b: string;
+    kurz: string;
+    a: Abschnitt[];
+  }
+  interface Eintrag {
+    art: 'Kapitel' | 'Ablauf' | 'Abschnitt';
+    adresse: string;
+    titel: string;
+    pfad: string;
+    text: string;
+    suchTitel: string;
+    suchPfad: string;
+    suchText: string;
+  }
+
+  const dialog = document.querySelector<HTMLDialogElement>('[data-such-dialog]');
+  const eingabe = document.querySelector<HTMLInputElement>('[data-such-eingabe]');
+  const liste = document.querySelector<HTMLUListElement>('[data-such-treffer]');
+  const stand = document.querySelector<HTMLElement>('[data-such-stand]');
+  const HINWEIS = stand?.textContent?.trim() ?? '';
+
+  /** Klein, ohne Umlaute und ß: „Gerät“ und „gerat“ treffen einander. */
+  const falte = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/ä/g, 'a')
+      .replace(/ö/g, 'o')
+      .replace(/ü/g, 'u')
+      .replace(/ß/g, 'ss');
+
+  let eintraege: Eintrag[] | undefined;
+  let laden: Promise<void> | undefined;
+  let treffer: Eintrag[] = [];
+  let aktiv = 0;
+
+  function ladeIndex(): Promise<void> {
+    laden ??= fetch('/doku/suche.json')
+      .then((r) => r.json() as Promise<Kapitel[]>)
+      .then((kapitel) => {
+        eintraege = kapitel.flatMap((k) => {
+          const ueberblick = k.a.find((a) => a.e === 2)?.x ?? k.kurz;
+          const kopf: Eintrag = {
+            art: 'Kapitel',
+            adresse: `/doku/${k.k}/`,
+            titel: k.t,
+            pfad: k.b,
+            text: k.kurz || ueberblick,
+            suchTitel: falte(k.t),
+            suchPfad: falte(k.b),
+            suchText: falte(k.a.filter((a) => a.e === 2).map((a) => a.x).join(' ')),
+          };
+          let h2 = '';
+          const teile: Eintrag[] = [];
+          for (const a of k.a) {
+            if (a.e === 2) {
+              h2 = a.t;
+              continue;
+            }
+            const pfad = `${k.t} › ${h2}`;
+            teile.push({
+              art: h2 === 'Abläufe' ? 'Ablauf' : 'Abschnitt',
+              adresse: `/doku/${k.k}/#${a.id}`,
+              titel: a.t,
+              pfad,
+              text: a.x,
+              suchTitel: falte(a.t),
+              suchPfad: falte(pfad),
+              suchText: falte(a.x),
+            });
+          }
+          return [kopf, ...teile];
+        });
+      })
+      .catch(() => {
+        laden = undefined;
+        if (stand) stand.textContent = 'Der Suchindex lädt nicht. Ohne Netz bleibt die Übersicht.';
+      });
+    return laden;
+  }
+
+  function wertung(e: Eintrag, woerter: string[]): number {
+    let punkte = 0;
+    for (const w of woerter) {
+      if (e.suchTitel.includes(w)) punkte += e.suchTitel.startsWith(w) ? 14 : 10;
+      else if (e.suchPfad.includes(w)) punkte += 4;
+      else if (e.suchText.includes(w)) punkte += 1;
+      else return 0;
+    }
+    if (e.art === 'Kapitel') punkte += 2;
+    return punkte;
+  }
+
+  const maske = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  /** Ausschnitt um den ersten Fund, Fundstellen markiert. */
+  function auszug(text: string, woerter: string[]): string {
+    const gefaltet = falte(text);
+    const stellen = woerter.map((w) => gefaltet.indexOf(w)).filter((i) => i >= 0);
+    const erste = stellen.length ? Math.min(...stellen) : 0;
+    let von = Math.max(0, erste - 50);
+    if (von > 0) {
+      const leer = text.indexOf(' ', von);
+      von = leer >= 0 && leer < erste ? leer + 1 : von;
+    }
+    const bis = Math.min(text.length, von + 170);
+    const stueck = text.slice(von, bis);
+    const stueckGefaltet = gefaltet.slice(von, bis);
+    const marken: [number, number][] = [];
+    for (const w of woerter) {
+      let i = stueckGefaltet.indexOf(w);
+      while (i >= 0 && w) {
+        marken.push([i, i + w.length]);
+        i = stueckGefaltet.indexOf(w, i + w.length);
+      }
+    }
+    marken.sort((a, b) => a[0] - b[0]);
+    let html = '';
+    let pos = 0;
+    for (const [a, b] of marken) {
+      if (a < pos) continue;
+      html += maske(stueck.slice(pos, a)) + '<mark>' + maske(stueck.slice(a, b)) + '</mark>';
+      pos = b;
+    }
+    html += maske(stueck.slice(pos));
+    return (von > 0 ? '… ' : '') + html + (bis < text.length ? ' …' : '');
+  }
+
+  function zeige() {
+    if (!liste || !eingabe) return;
+    const woerter = falte(eingabe.value).split(/\s+/).filter(Boolean);
+    if (!woerter.length || !eintraege) {
+      treffer = [];
+      liste.innerHTML = '';
+      if (stand) stand.textContent = eintraege || !woerter.length ? HINWEIS : 'Lädt …';
+      eingabe.removeAttribute('aria-activedescendant');
+      return;
+    }
+    treffer = eintraege
+      .map((e) => ({ e, p: wertung(e, woerter) }))
+      .filter((t) => t.p > 0)
+      .sort((a, b) => b.p - a.p)
+      .slice(0, 20)
+      .map((t) => t.e);
+    aktiv = 0;
+    liste.innerHTML = treffer
+      .map(
+        (t, i) => `<li role="option" id="such-treffer-${i}" aria-selected="${i === 0}">
+          <a class="such-eintrag" href="${maske(t.adresse)}" tabindex="-1">
+            <span class="such-eintrag__kopf"><span class="such-eintrag__art">${t.art}</span><span class="such-eintrag__pfad">${maske(t.pfad)}</span></span>
+            <span class="such-eintrag__titel">${maske(t.titel)}</span>
+            <span class="such-eintrag__auszug">${auszug(t.text, woerter)}</span>
+          </a></li>`,
+      )
+      .join('');
+    if (stand) {
+      stand.textContent = treffer.length
+        ? `${treffer.length}${treffer.length === 20 ? '+' : ''} Treffer`
+        : 'Kein Treffer. Andere Wörter oder kürzer suchen.';
+    }
+    markiere();
+  }
+
+  function markiere() {
+    if (!liste || !eingabe) return;
+    liste.querySelectorAll('[role="option"]').forEach((li, i) => {
+      li.setAttribute('aria-selected', String(i === aktiv));
+    });
+    const ziel = liste.querySelector<HTMLElement>(`#such-treffer-${aktiv}`);
+    if (ziel) {
+      eingabe.setAttribute('aria-activedescendant', ziel.id);
+      ziel.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function oeffne() {
+    if (!dialog || !eingabe) return;
+    if (!dialog.open) dialog.showModal();
+    eingabe.select();
+    void ladeIndex().then(zeige);
+  }
+
+  function gehe(adresse: string) {
+    dialog?.close();
+    window.location.assign(adresse);
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-such-oeffnen]').forEach((knopf) =>
+    knopf.addEventListener('click', oeffne),
+  );
+  document.querySelector('[data-such-schliessen]')?.addEventListener('click', () => dialog?.close());
+  dialog?.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+  liste?.addEventListener('click', (e) => {
+    const a = (e.target as HTMLElement).closest('a');
+    if (!a) return;
+    e.preventDefault();
+    gehe(a.getAttribute('href') ?? '/doku/');
+  });
+  eingabe?.addEventListener('input', zeige);
+  eingabe?.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' && treffer.length) {
+      e.preventDefault();
+      aktiv = (aktiv + 1) % treffer.length;
+      markiere();
+    } else if (e.key === 'ArrowUp' && treffer.length) {
+      e.preventDefault();
+      aktiv = (aktiv - 1 + treffer.length) % treffer.length;
+      markiere();
+    } else if (e.key === 'Enter' && treffer[aktiv]) {
+      e.preventDefault();
+      gehe(treffer[aktiv].adresse);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    const ziel = e.target as HTMLElement;
+    const tippt = ziel.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ziel.tagName);
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      oeffne();
+    } else if (e.key === '/' && !tippt && !dialog?.open) {
+      e.preventDefault();
+      oeffne();
+    }
+  });
+
+  // Kürzel am Knopf: ⌘K auf dem Mac, sonst Strg K.
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  document.querySelectorAll<HTMLElement>('[data-such-kuerzel]').forEach((k) => {
+    k.textContent = mac ? '⌘K' : 'Strg K';
+  });
+</script>

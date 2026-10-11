@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BILDER, bildAdresse, bilderTabelle } from './bilder';
+import { BILDER, bildAdresse, bilderTabelle, dunklerVerweis } from './bilder';
 
 describe('bilderTabelle', () => {
   it('ordnet den Pfad unter docs/anwender/bilder/ der gebauten Adresse zu', () => {
@@ -35,13 +35,21 @@ describe('bildAdresse', () => {
   });
 });
 
+describe('dunklerVerweis', () => {
+  it('nennt die dunkle Fassung neben dem hellen Bild', () => {
+    expect(dunklerVerweis('../bilder/etb/eintrag-erfassen.png')).toBe(
+      '../bilder/etb/eintrag-erfassen.dunkel.png',
+    );
+  });
+});
+
 describe('BILDER', () => {
   it('bindet jede Datei unter docs/anwender/bilder/ ein', () => {
     // Das Muster-Kapitel „Anmelden und Abmelden“ zeigt Bilder (LFH-1128); ein leerer Glob wäre
     // ein still gebrochenes Muster.
     expect(BILDER.size).toBeGreaterThan(0);
     for (const [pfad, adresse] of BILDER) {
-      expect(pfad).toMatch(/^[a-z0-9-]+\/[a-z0-9-]+\.png$/);
+      expect(pfad).toMatch(/^[a-z0-9-]+\/[a-z0-9-]+(\.dunkel)?\.png$/);
       expect(adresse).toBeTruthy();
     }
   });

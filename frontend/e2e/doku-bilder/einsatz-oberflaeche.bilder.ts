@@ -120,8 +120,9 @@ test.describe(KAPITEL, () => {
     ).toBeVisible();
     await page.getByRole('button', { name: 'Benutzermenü' }).click();
     const menue = page.getByRole('menu');
-    // Der Lauf stellt hell und kompakt ein (`playwright.doku.config.ts`); die Wahl trägt ✓.
-    await expect(menue.getByRole('menuitem', { name: 'Hell ✓' })).toBeVisible();
+    // Der Lauf stellt „System“ und kompakt ein (`playwright.doku.config.ts`), damit jedes Bild
+    // hell und dunkel entsteht; die Wahl trägt ✓.
+    await expect(menue.getByRole('menuitem', { name: 'System ✓' })).toBeVisible();
     await expect(menue.getByRole('menuitem', { name: 'Kompakt ✓' })).toBeVisible();
     await expect(menue.getByRole('menuitem', { name: '100 % ✓' })).toBeVisible();
     await fotografiere(menue, KAPITEL, 'darstellung');

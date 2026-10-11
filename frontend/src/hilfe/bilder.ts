@@ -29,6 +29,15 @@ const GLOB = import.meta.glob<string>('../../../docs/anwender/bilder/**/*.png', 
 export const BILDER: ReadonlyMap<string, string> = bilderTabelle(GLOB);
 
 /**
+ * Verweis auf die dunkle Fassung eines Bildes (`…/<name>.png` → `…/<name>.dunkel.png`). Der
+ * Bildlauf nimmt jedes Motiv hell und dunkel auf (`e2e/doku-bilder/kern.ts`); das Kapitel nennt
+ * nur das helle.
+ */
+export function dunklerVerweis(src: string): string {
+  return src.replace(/\.png$/, '.dunkel.png');
+}
+
+/**
  * Gebaute Adresse zu einem Verweis aus einem Kapitel (`../bilder/<kapitel>/<name>.png`);
  * `undefined` für alles andere. Der Wächter (`anwenderdoku.guard.test.ts`) lässt keine andere
  * Form zu.
