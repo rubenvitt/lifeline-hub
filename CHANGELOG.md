@@ -1,3 +1,15 @@
+## [1.0.0-alpha.106](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.105...v1.0.0-alpha.106) (2026-10-11)
+
+### Kräfte und Mittel
+
+- **Bereitstellungsräume bearbeiten**: Bezeichnung, Standort und Notiz eines geplanten oder aktiven Bereitstellungsraums können jetzt nachträglich bearbeitet werden. Die Bearbeiten-Funktion steht direkt an den Raumdaten zur Verfügung.
+- **Stabilität bei Live-Aktualisierung**: Eingaben in offenen Bearbeitungs-Dialogen bleiben bei eingehenden Live-Updates erhalten und werden nicht überschrieben. Änderungen anderer Nutzer werden erst nach dem Speichern oder Schließen sichtbar.
+- **Automatische Aktualisierung**: Beim Wechsel des Bereitstellungsraums wird der Bearbeitungs-Dialog automatisch geschlossen und Gerätekopplungen werden neu geladen.
+
+### Dokumentation
+
+- Anwenderdokumentation zum Thema Bereitstellungsräume wurde an die neuen Bearbeitungsmöglichkeiten angepasst und Bildmaterial aktualisiert.
+
 ## [1.0.0-alpha.105](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.104...v1.0.0-alpha.105) (2026-10-11)
 
 ### Verwaltung
