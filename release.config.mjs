@@ -137,7 +137,8 @@ export default {
      * DIE NOTIZEN SCHREIBT CLAUDE, die konventionellen bleiben Rückfallebene und Quelle der
      * Kopfzeile (Version, Vergleichslink, Datum). Warum hinter einer eigenen Hülle, steht im
      * Kopf von `scripts/release/ki-notizen.mjs`. `preset` geht an den konventionellen
-     * Generator, `promptTemplate` an Claude. Ohne das Secret `ANTHROPIC_API_KEY` läuft der
+     * Generator, `promptTemplate` an Claude. Ohne Claude-Anmeldung (Federation per GitHub-OIDC,
+     * Schritt „Claude-Anmeldung" in `.github/workflows/release.yml`) läuft der
      * Release mit den konventionellen Notizen weiter — Warnung, kein roter Lauf.
      */
     [

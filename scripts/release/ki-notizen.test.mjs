@@ -13,6 +13,7 @@ import {
   KI_FEHLTEXTE,
   commitsFuerPrompt,
   erzeugeNotizen,
+  hasCredentials,
   istBrauchbar,
   kopfzeileAus,
   mitKopfzeile,
@@ -83,12 +84,46 @@ test('der Rückfall wird ebenfalls gemerkt — kein zweiter Versuch nach dem Pus
   assert.equal(aufrufe.ki.length, 1);
 });
 
-test('ohne ANTHROPIC_API_KEY: konventionelle Notizen, Claude wird gar nicht gefragt', async () => {
+test('ohne Zugangsdaten: konventionelle Notizen, Claude wird gar nicht gefragt', async () => {
   const { generateNotes, aufrufe } = hülle();
   const k = kontext({ env: {} });
   assert.equal(await generateNotes(CONFIG, k), KONVENTIONELL);
   assert.equal(aufrufe.ki.length, 0);
   assert.ok(k.logger.zeilen.some(([art]) => art === 'warn'));
+});
+
+const FEDERATION = {
+  ANTHROPIC_FEDERATION_RULE_ID: 'fdrl_test',
+  ANTHROPIC_ORGANIZATION_ID: '00000000-0000-0000-0000-000000000000',
+  ANTHROPIC_SERVICE_ACCOUNT_ID: 'svac_test',
+  ANTHROPIC_IDENTITY_TOKEN_FILE: '/tmp/gha-jwt',
+};
+
+test('mit Workload Identity Federation statt Schlüssel wird Claude gefragt', async () => {
+  const { generateNotes, aufrufe } = hülle();
+  await generateNotes(CONFIG, kontext({ env: FEDERATION }));
+  assert.equal(aufrufe.ki.length, 1);
+});
+
+test('hasCredentials: Schlüssel, Bearer-Token oder vollständige Federation — nichts Halbes', () => {
+  assert.equal(hasCredentials({ ANTHROPIC_API_KEY: 'sk-test' }), true);
+  assert.equal(hasCredentials({ ANTHROPIC_AUTH_TOKEN: 'sk-ant-oat01-test' }), true);
+  assert.equal(hasCredentials(FEDERATION), true);
+  assert.equal(
+    hasCredentials({
+      ...FEDERATION,
+      ANTHROPIC_IDENTITY_TOKEN_FILE: undefined,
+      ANTHROPIC_IDENTITY_TOKEN: 'eyJ…',
+    }),
+    true,
+  );
+  // Ohne Identitätstoken tauscht die CLI nichts — das wäre ein stiller Fehltext statt Warnung.
+  assert.equal(hasCredentials({ ...FEDERATION, ANTHROPIC_IDENTITY_TOKEN_FILE: undefined }), false);
+  assert.equal(hasCredentials({ ...FEDERATION, ANTHROPIC_SERVICE_ACCOUNT_ID: '' }), false);
+  // Ein gelöschtes Secret kommt in GitHub Actions als leerer Wert an, nicht als fehlender.
+  assert.equal(hasCredentials({ ANTHROPIC_API_KEY: '' }), false);
+  assert.equal(hasCredentials({}), false);
+  assert.equal(hasCredentials(undefined), false);
 });
 
 for (const fehltext of KI_FEHLTEXTE) {

@@ -2,36 +2,62 @@ import { IconMinus } from '../../icons';
 import {
   memo,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
 import { Collapse, Input, Space, Tooltip, Typography } from 'antd';
+import { serializeAnySpec } from '@einsatzzeichen/core';
+import type { AnySpec, Drawing, SymbolKind, SymbolSpec } from '@einsatzzeichen/schema';
 import { Select } from '../../components/Select';
-import TaktischesZeichen, {
-  einheiten,
-  fachaufgaben,
-  funktionen,
-  grundzeichen as grundzeichenKatalog,
-  organisationen,
-  symbole,
-} from 'taktische-zeichen-react';
-import type { GrundzeichenId, SymbolId } from 'taktische-zeichen-react';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import type { Farbrollen } from '../../theme/tokens';
 import { useRollen } from '../../components/instrument';
-import { grundzeichenAkzeptiert } from './taktischesZeichen';
-import { baueFreiesZeichenTz, FREIES_ZEICHEN_TINTE } from './marker';
+import { ZeichenBild } from '../../zeichen/EinsatzZeichen';
+import { freiesZeichen } from '../../zeichen/freiesZeichen';
 import { abonniereZuletztVerwendet, leseZuletztVerwendet } from './zuletztVerwendet';
+import {
+  detailOptionen,
+  detailVon,
+  grundzeichenOptionen,
+  grundzeichenVon,
+  KEINE_DETAILS,
+  leseEntwurf,
+  mitDetail,
+  mitGrundzeichen,
+  mitSymbol,
+  symbolOptionen,
+  symbolVon,
+  zeichenName,
+  type DetailAchse,
+} from './zeichenWahl';
+
+/**
+ * Der Entwurf im Picker: wie {@link FreiesZeichenUpdate}, aber `zeichen_spec` darf `null` sein —
+ * „Kein Grundzeichen“ ohne gewähltes Symbol ist noch kein Zeichen. Platzieren, Setzen und das
+ * Speichern im Inspector warten dann, bis ein Symbol gewählt ist ({@link hatZeichen}).
+ */
+export type ZeichenEntwurf = Omit<FreiesZeichenUpdate, 'zeichen_spec'> & {
+  zeichen_spec: string | null;
+};
+
+/** Trägt der Entwurf ein Zeichen? Nur dann darf er platziert oder gespeichert werden. */
+export function hatZeichen(entwurf: ZeichenEntwurf): entwurf is FreiesZeichenUpdate {
+  return entwurf.zeichen_spec != null;
+}
 
 export interface FreiesZeichenPickerProps {
-  wert: FreiesZeichenUpdate;
-  onChange: (spec: FreiesZeichenUpdate) => void;
+  /** Der Entwurf: das Zeichen als `zeichen_spec` (`serializeAnySpec`), dazu die Bezeichnung. */
+  wert: ZeichenEntwurf;
+  onChange: (entwurf: ZeichenEntwurf) => void;
   /**
    * Enter im Picker: auf einer Kachel, in einem Suchfeld und in der Bezeichnung. Ohne diesen
-   * Callback (Inspector) sendet Enter nichts — das Platzieren gehört der Leiste.
+   * Callback (Inspector) sendet Enter nichts — das Platzieren gehört der Leiste. Ein Entwurf ohne
+   * Zeichen wird nie gesendet.
    *
    * Der Callback bringt die Spec mit: die Bezeichnung wird erst beim Verlassen übernommen, und eine
    * per Enter gewählte Kachel steht in derselben Runde noch nicht im State des Aufrufers.
@@ -45,39 +71,11 @@ export interface FreiesZeichenPickerProps {
   autoFokus?: boolean;
 }
 
-/**
- * Die 5 accepts-gegateten Overlay-Felder. `key` ist zugleich der ComponentType fürs {@link
- * grundzeichenAkzeptiert}-Gating und der Feldname in FreiesZeichenUpdate.
- */
-type OverlayKey = 'organisation' | 'fachaufgabe' | 'symbol' | 'einheit' | 'funktion';
-
-interface KatalogEintrag {
-  id: string;
-  label: string;
-}
-
-/**
- * Die vier Overlays als Text-`Select` hinter „Details". `symbol` hat ein eigenes Bild-Raster (84
- * Einträge).
- */
-const DETAIL_OVERLAYS: {
-  key: Exclude<OverlayKey, 'symbol'>;
-  label: string;
-  katalog: readonly KatalogEintrag[];
-}[] = [
-  { key: 'organisation', label: 'Organisation', katalog: organisationen },
-  { key: 'fachaufgabe', label: 'Fachaufgabe', katalog: fachaufgaben },
-  { key: 'einheit', label: 'Einheit', katalog: einheiten },
-  { key: 'funktion', label: 'Funktion', katalog: funktionen },
-];
-
-/** Reihenfolge, in der ein Zeichen benannt wird — vom Träger zum Beiwerk. */
-const NAMENS_TEILE: { katalog: readonly KatalogEintrag[]; feld: keyof FreiesZeichenUpdate }[] = [
-  { katalog: organisationen, feld: 'organisation' },
-  { katalog: fachaufgaben, feld: 'fachaufgabe' },
-  { katalog: symbole, feld: 'symbol' },
-  { katalog: einheiten, feld: 'einheit' },
-  { katalog: funktionen, feld: 'funktion' },
+/** Die Auswahlen unter „Details“ in ihrer Reihenfolge — vom Träger zum Beiwerk. */
+const DETAIL_ACHSEN: { achse: Exclude<DetailAchse, 'farbe'>; label: string }[] = [
+  { achse: 'organisation', label: 'Organisation' },
+  { achse: 'fachaufgabe', label: 'Fachaufgabe' },
+  { achse: 'einheit', label: 'Einheit' },
 ];
 
 /** Kantenlänge der Zeichnung in einer Kachel. Ab 40 px bleibt die DV-102-Binnenzeichnung
@@ -85,11 +83,49 @@ const NAMENS_TEILE: { katalog: readonly KatalogEintrag[]; feld: keyof FreiesZeic
 const KACHEL_BILD = 40;
 const VORSCHAU_BILD = 56;
 
+/** Die Vorschau ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl). */
+export const OHNE_ZEICHEN_HINWEIS = 'Symbol wählen';
+
+/**
+ * Ein Zeichen auf der Zeichenplatte (Rolle `zeichenPlatte`, LFH-836): die Bibliothek zeichnet mit
+ * schwarzer Tinte, nachts trüge das dunkle Paneel sie nicht. Die Platte deckt genau die Zeichenfläche
+ * (keine Lageänderung); am Tag ist sie durchsichtig. Picker-Kacheln, Vorschau, „Zuletzt verwendet“
+ * und die Symbolkachel des Inspectors nehmen sie, die Karte nicht (LFH-833).
+ */
+export function ZeichenAufPlatte({ drawing, size }: { drawing: Drawing; size: number }) {
+  const { rollen } = useRollen();
+  return (
+    <span
+      aria-hidden
+      data-lfh="zeichen-platte"
+      style={{ display: 'flex', width: size, height: size, background: rollen.zeichenPlatte }}
+    >
+      <ZeichenBild drawing={drawing} size={size} />
+    </span>
+  );
+}
+
+/**
+ * Höhe eines Rasters, das mit der letzten GANZEN Reihe endet — rein und exportiert. `kacheln` sind
+ * Ober- und Unterkante jeder Kachel relativ zum Raster. Die Reihen sind verschieden hoch (ein Name
+ * bricht um); eine feste Rechnung schnitt die nächste Reihe mitten im Namen an. `undefined`, wenn
+ * alle Reihen passen.
+ */
+export function ganzeReihenHoehe(
+  kacheln: readonly { oben: number; unten: number }[],
+  reihen: number,
+): number | undefined {
+  const oben = [...new Set(kacheln.map((k) => k.oben))].sort((a, b) => a - b);
+  if (oben.length <= reihen) return undefined;
+  const grenze = oben[reihen];
+  return Math.max(...kacheln.filter((k) => k.oben < grenze).map((k) => k.unten));
+}
+
 /** Kachel-Höhen, bis das Raster scrollt. Die Suche ist der eigentliche Weg zum Ziel. */
 const RASTER_REIHEN = 4;
 
-/** Mindestspaltenbreite: der längste Kachelname („Stelle, Einrichtung") bricht in zwei Zeilen
- *  um, statt die Leiste (300 px) auf zwei Spalten zu drücken. */
+/** Mindestspaltenbreite: lange Kachelnamen brechen in zwei Zeilen um, statt die Leiste (300 px)
+ *  auf zwei Spalten zu drücken. */
 const SPALTE_MIN = 78;
 
 /**
@@ -138,48 +174,24 @@ export function kachelFarben(
   };
 }
 
-/**
- * Benennt ein Zeichen aus seinen Katalog-Bestandteilen — der zugängliche Name der „zuletzt
- * verwendet"-Kacheln. Rein.
- */
-export function zeichenName(spec: FreiesZeichenUpdate): string {
-  const roh = spec as unknown as Record<string, unknown>;
-  const teile = [
-    grundzeichenKatalog.find((g) => g.id === spec.grundzeichen)?.label ?? String(spec.grundzeichen),
-  ];
-  for (const { katalog, feld } of NAMENS_TEILE) {
-    const wert = roh[feld];
-    if (typeof wert !== 'string') continue;
-    const label = katalog.find((k) => k.id === wert)?.label;
-    if (label) teile.push(label);
-  }
-  return teile.join(' · ');
+interface RasterEintrag {
+  /** `null` ist die Leer-Kachel („Kein Grundzeichen“, „Kein Symbol“). */
+  id: string | null;
+  label: string;
+  /** Weitere Suchbegriffe neben Name und Kennung. */
+  suche?: string;
+  drawing?: Drawing | null;
 }
 
-/**
- * Entfernt beim Grundzeichen-Wechsel alle Overlays, die das neue Grundzeichen nicht rendert — als
- * `null` (nicht `undefined`) für den Whole-Spec-PATCH, damit kein Phantom-Overlay den tz-Icon-Key
- * verändert.
- */
-function strippeNichtAkzeptierte(spec: FreiesZeichenUpdate): FreiesZeichenUpdate {
-  const gz = spec.grundzeichen;
-  return {
-    ...spec,
-    organisation: grundzeichenAkzeptiert(gz, 'organisation') ? spec.organisation : null,
-    fachaufgabe: grundzeichenAkzeptiert(gz, 'fachaufgabe') ? spec.fachaufgabe : null,
-    symbol: grundzeichenAkzeptiert(gz, 'symbol') ? spec.symbol : null,
-    einheit: grundzeichenAkzeptiert(gz, 'einheit') ? spec.einheit : null,
-    funktion: grundzeichenAkzeptiert(gz, 'funktion') ? spec.funktion : null,
-  };
-}
-
-function passt(eintrag: { id: string | null; label: string }, suche: string): boolean {
+function passt(eintrag: RasterEintrag, suche: string): boolean {
   const s = suche.trim().toLowerCase();
   if (!s) return true;
-  return eintrag.label.toLowerCase().includes(s) || (eintrag.id ?? '').toLowerCase().includes(s);
+  return [eintrag.label, eintrag.id ?? '', eintrag.suche ?? ''].some((t) =>
+    t.toLowerCase().includes(s),
+  );
 }
 
-/** `data-id` einer Kachel; `''` steht für „keins" (die Leer-Kachel des Symbol-Rasters). */
+/** `data-id` einer Kachel; `''` steht für „keins" (die Leer-Kachel eines Rasters). */
 function idAus(el: HTMLElement | null): string | null | undefined {
   if (!el) return undefined;
   const roh = el.dataset.id;
@@ -188,9 +200,9 @@ function idAus(el: HTMLElement | null): string | null | undefined {
 }
 
 interface KachelProps {
-  art: 'grundzeichen' | 'symbol';
   id: string | null;
   label: string;
+  drawing: Drawing | null | undefined;
   gewaehlt: boolean;
   tabbar: boolean;
   stil: CSSProperties;
@@ -198,7 +210,8 @@ interface KachelProps {
 
 /**
  * Eine Katalog-Kachel: Zeichnung und Name — ein Piktogramm allein ist keine Beschriftung, und die
- * Namen durchsucht die Suche. Die Grafik hängt in einer `aria-hidden`-Hülle.
+ * Namen durchsucht die Suche. Die Grafik hängt in einer `aria-hidden`-Hülle und trägt ihren eigenen
+ * `idPrefix` (`ZeichenBild`), sonst kollidierten die SVG-ids der Kacheln.
  *
  * `memo` plus Klick-/Tasten-Delegation an der Gruppe: eine Pfeilfunktion je Kachel wechselte bei
  * jedem Anschlag die Identität. Das Stilobjekt kommt identitätsstabil vom Raster.
@@ -216,14 +229,9 @@ const Kachel = memo(function Kachel(p: KachelProps) {
       <span aria-hidden style={{ display: 'flex', height: KACHEL_BILD, alignItems: 'center' }}>
         {p.id == null ? (
           <IconMinus style={{ fontSize: KACHEL_BILD / 2 }} />
-        ) : (
-          <TaktischesZeichen
-            {...(p.art === 'grundzeichen'
-              ? { grundzeichen: p.id as GrundzeichenId }
-              : { grundzeichen: 'ohne' as GrundzeichenId, symbol: p.id as SymbolId })}
-            style={{ width: KACHEL_BILD, height: KACHEL_BILD }}
-          />
-        )}
+        ) : p.drawing ? (
+          <ZeichenAufPlatte drawing={p.drawing} size={KACHEL_BILD} />
+        ) : null}
       </span>
       <span style={{ lineHeight: 1.15, textAlign: 'center', wordBreak: 'break-word' }}>
         {p.label}
@@ -233,12 +241,11 @@ const Kachel = memo(function Kachel(p: KachelProps) {
 });
 
 interface RasterProps {
-  art: 'grundzeichen' | 'symbol';
   /** Zugleich der zugängliche Name der Radiogruppe. */
   gruppenName: string;
   suchName: string;
   autoFocus?: boolean;
-  eintraege: { id: string | null; label: string }[];
+  eintraege: readonly RasterEintrag[];
   gewaehlt: string | null;
   onWaehle: (id: string | null) => void;
   /** Enter auf einer Kachel oder im Suchfeld: wählen UND absenden (D4). */
@@ -252,7 +259,6 @@ const PFEILE: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft:
  * sonst liefe jeder Anschlag als Entwurfsänderung durch die Kartenseite.
  */
 function Raster({
-  art,
   gruppenName,
   suchName,
   autoFocus,
@@ -284,6 +290,31 @@ function Raster({
   // Rollender Tabstopp: die Gruppe ist ein Tabstopp. Ist die Auswahl weggefiltert, übernimmt die
   // erste sichtbare Kachel.
   const tabbarId = sichtbare.some((e) => e.id === gewaehlt) ? gewaehlt : (sichtbare[0]?.id ?? null);
+
+  // Sichtbare Höhe auf ganze Reihen gemessen (die Reihen sind verschieden hoch); bis zur ersten
+  // Messung und ohne Layout (jsdom) gilt die Schätzung.
+  const rasterRef = useRef<HTMLDivElement>(null);
+  const [hoehe, setHoehe] = useState<number | undefined>(
+    (KACHEL_BILD + token.controlHeight) * RASTER_REIHEN,
+  );
+  useLayoutEffect(() => {
+    const raster = rasterRef.current;
+    if (!raster) return;
+    const messen = () => {
+      const kacheln = Array.from(raster.children as HTMLCollectionOf<HTMLElement>).map((k) => ({
+        oben: k.offsetTop,
+        unten: k.offsetTop + k.offsetHeight,
+      }));
+      if (kacheln.every((k) => k.unten === 0)) return;
+      const neu = ganzeReihenHoehe(kacheln, RASTER_REIHEN);
+      setHoehe((alt) => (alt === neu ? alt : neu));
+    };
+    messen();
+    if (typeof ResizeObserver === 'undefined') return;
+    const beobachter = new ResizeObserver(messen);
+    beobachter.observe(raster);
+    return () => beobachter.disconnect();
+  }, [sichtbare.length]);
 
   const kachelVon = (ziel: EventTarget) =>
     (ziel as HTMLElement).closest<HTMLElement>('[role="radio"]');
@@ -345,6 +376,7 @@ function Raster({
         style={{ marginBottom: token.marginXXS }}
       />
       <div
+        ref={rasterRef}
         role="radiogroup"
         aria-label={gruppenName}
         onClick={aufKlick}
@@ -357,16 +389,18 @@ function Raster({
             token.controlHeight + 2 * token.paddingXS
           }px), 1fr))`,
           gap: token.marginXXS,
-          maxHeight: (KACHEL_BILD + token.controlHeight) * RASTER_REIHEN,
+          maxHeight: hoehe,
           overflowY: 'auto',
+          // Bezugsrahmen der Kachelkanten (`offsetTop`) für die Höhenmessung.
+          position: 'relative',
         }}
       >
         {sichtbare.map((e) => (
           <Kachel
             key={e.id ?? ''}
-            art={art}
             id={e.id}
             label={e.label}
+            drawing={e.drawing}
             gewaehlt={e.id === gewaehlt}
             tabbar={e.id === tabbarId}
             stil={
@@ -382,9 +416,34 @@ function Raster({
   );
 }
 
+/** Die Palettenfarbe als Feld neben ihrem Namen; die Farbe ist zweiter Kanal, der Name der erste. */
+function Farbfeld({ farbe, rand }: { farbe: string; rand: string }) {
+  return (
+    <span
+      aria-hidden
+      data-lfh="farbfeld"
+      data-farbe={farbe}
+      style={{
+        display: 'inline-block',
+        width: '1em',
+        height: '1em',
+        marginInlineEnd: '0.5em',
+        verticalAlign: '-0.15em',
+        background: farbe,
+        border: `1px solid ${rand}`,
+      }}
+    />
+  );
+}
+
 /**
- * Controlled Editor für die DV-102-Spec eines freien taktischen Zeichens: Bild-Raster mit Suche,
- * „zuletzt verwendet" und Enter-Weg. Kein `<Form>`: das Absenden gehört der Leiste.
+ * Controlled Editor eines freien taktischen Zeichens aus dem Vokabular von @einsatzzeichen (LFH-836,
+ * design.md D7): Bild-Raster mit Suche, „zuletzt verwendet" und Enter-Weg. Kein `<Form>`: das
+ * Absenden gehört der Leiste.
+ *
+ * „Kein Grundzeichen“ ohne gewähltes Symbol ist noch kein Zeichen: der Picker meldet einen Entwurf
+ * ohne Zeichen (`zeichen_spec: null`). Die Vorschau zeigt dann „Symbol wählen“, Enter sendet nichts,
+ * und der Aufrufer sperrt Platzieren bzw. Speichern ({@link hatZeichen}), bis ein Symbol gewählt ist.
  */
 export default function FreiesZeichenPicker({
   wert,
@@ -399,10 +458,39 @@ export default function FreiesZeichenPicker({
   // montierter Picker den Stand vom Einhängen.
   useEffect(() => abonniereZuletztVerwendet(() => setZuletzt(leseZuletztVerwendet())), []);
 
-  const mitGrundzeichen = (gz: string): FreiesZeichenUpdate =>
-    strippeNichtAkzeptierte({ ...wert, grundzeichen: gz as GrundzeichenId });
-  const mitOverlay = (key: OverlayKey, v: string | null): FreiesZeichenUpdate =>
-    ({ ...wert, [key]: v }) as FreiesZeichenUpdate;
+  /** Das gewählte Zeichen; `null` nach „Kein Grundzeichen“, solange kein Symbol gewählt ist. */
+  const entwurf = useMemo(
+    () => (wert.zeichen_spec == null ? null : leseEntwurf(wert.zeichen_spec)),
+    [wert.zeichen_spec],
+  );
+  const grundzeichen: SymbolKind | null = entwurf ? grundzeichenVon(entwurf) : null;
+  const koerper = grundzeichen ? (entwurf as SymbolSpec) : null;
+
+  // Das Vokabular zeichnet jeden Kandidaten probeweise (D7): Optionen je Entwurfsstand gemerkt.
+  const gzEintraege = useMemo<RasterEintrag[]>(
+    () => [{ id: null, label: 'Kein Grundzeichen' }, ...grundzeichenOptionen()],
+    [],
+  );
+  const symbolEintraege = useMemo<RasterEintrag[]>(
+    () =>
+      koerper
+        ? [{ id: null, label: 'Kein Symbol' }, ...symbolOptionen(koerper)]
+        : symbolOptionen(null),
+    [koerper],
+  );
+  // Ohne Grundzeichen (auch „Kein Grundzeichen“ vor der Symbolwahl) nur die Bezeichnung.
+  const details = useMemo(() => (koerper ? detailOptionen(koerper) : KEINE_DETAILS), [koerper]);
+  const vorschau = useMemo(
+    () =>
+      wert.zeichen_spec == null ? null : freiesZeichen({ zeichen_spec: wert.zeichen_spec }).drawing,
+    [wert.zeichen_spec],
+  );
+
+  const mitSpec = (spec: AnySpec): FreiesZeichenUpdate => ({
+    ...wert,
+    zeichen_spec: serializeAnySpec(spec),
+  });
+  const melde = onChange;
 
   /**
    * Übernimmt eine Spec und sendet sie — dieselbe frische Spec an beide, weil der Aufrufer seinen
@@ -410,29 +498,41 @@ export default function FreiesZeichenPicker({
    */
   const uebernimmUndSende = (spec: FreiesZeichenUpdate) => {
     if (!onAbsenden) return;
-    onChange(spec);
+    melde(spec);
     onAbsenden(spec);
+  };
+
+  /** Der Entwurf nach einer Grundzeichen-Kachel; `null` heißt „Kein Grundzeichen“ (noch kein Zeichen). */
+  const nachGrundzeichen = (id: string | null): FreiesZeichenUpdate | null => {
+    if (id == null) return null;
+    // Nach „Kein Grundzeichen“ beginnt ein neues Grundzeichen von vorn.
+    return mitSpec(
+      entwurf ? mitGrundzeichen(entwurf, id as SymbolKind) : { kind: id as SymbolKind },
+    );
+  };
+  /** „Kein Grundzeichen“ an einem Körper: noch kein Zeichen. Ein freistehendes bleibt, wie es ist. */
+  const waehleGrundzeichen = (id: string | null) => {
+    const neu = nachGrundzeichen(id);
+    if (neu) melde(neu);
+    else if (koerper) melde({ ...wert, zeichen_spec: null });
+  };
+
+  const nachSymbol = (id: string | null): FreiesZeichenUpdate | null => {
+    // Ohne Körper ist das Symbol das ganze Zeichen (freistehend).
+    const spec = mitSymbol(
+      koerper ?? (entwurf && grundzeichenVon(entwurf) === null ? entwurf : null),
+      id,
+    );
+    return spec ? mitSpec(spec) : null;
   };
 
   /**
    * Ein Griff in die Leiste tauscht das Zeichen, nicht die Platzierung: Name und Ansichts-Bindung
-   * bleiben. Felder einzeln gesetzt, damit kein Overlay des alten Entwurfs überlebt.
+   * bleiben.
    */
-  const uebernimm = (z: FreiesZeichenUpdate) =>
-    onChange(
-      strippeNichtAkzeptierte({
-        ...wert,
-        grundzeichen: z.grundzeichen,
-        organisation: z.organisation ?? null,
-        fachaufgabe: z.fachaufgabe ?? null,
-        symbol: z.symbol ?? null,
-        einheit: z.einheit ?? null,
-        funktion: z.funktion ?? null,
-        farbe: z.farbe ?? null,
-      }),
-    );
+  const uebernimm = (zeichenSpec: string) => melde({ ...wert, zeichen_spec: zeichenSpec });
 
-  const mitLabel = (roh: string): FreiesZeichenUpdate => ({ ...wert, label: roh.trim() || null });
+  const mitLabel = (roh: string): ZeichenEntwurf => ({ ...wert, label: roh.trim() || null });
 
   /**
    * Die Bezeichnung ist kontrolliert, mit eigenem Tipp-Merker: das Feld folgt `wert.label`, solange
@@ -445,25 +545,31 @@ export default function FreiesZeichenPicker({
   const [bezeichnung, setBezeichnung] = useState(wert.label ?? '');
   const [bezeichnungGetippt, setBezeichnungGetippt] = useState(false);
   if (!bezeichnungGetippt && bezeichnung !== (wert.label ?? '')) setBezeichnung(wert.label ?? '');
-  const bezeichnungUebernehmen = (): FreiesZeichenUpdate | null => {
+  const bezeichnungUebernehmen = (): ZeichenEntwurf | null => {
     setBezeichnungGetippt(false);
     const spec = mitLabel(bezeichnung);
     return spec.label !== (wert.label ?? null) ? spec : null;
   };
 
-  const vorschau = baueFreiesZeichenTz(wert);
-  const zeigtSymbol = grundzeichenAkzeptiert(wert.grundzeichen, 'symbol');
   const leistenKnopf = { ...kachelStil(token), ...kachelFarben(rollen, false) };
+  const farbOptionen = details.farbe;
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} data-lfh="zeichen-picker">
-      <div style={{ display: 'flex', justifyContent: 'center' }} aria-label="Vorschau">
-        <span aria-hidden style={{ display: 'flex' }}>
-          <TaktischesZeichen
-            {...vorschau}
-            style={{ width: VORSCHAU_BILD, height: VORSCHAU_BILD }}
-          />
-        </span>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: VORSCHAU_BILD,
+        }}
+        aria-label="Vorschau"
+      >
+        {vorschau ? (
+          <ZeichenAufPlatte drawing={vorschau} size={VORSCHAU_BILD} />
+        ) : (
+          <Typography.Text type="secondary">{OHNE_ZEICHEN_HINWEIS}</Typography.Text>
+        )}
       </div>
 
       {zuletzt.length > 0 && (
@@ -473,34 +579,21 @@ export default function FreiesZeichenPicker({
           style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXXS }}
         >
           {zuletzt.map((z) => {
-            const name = zeichenName(z);
-            /* Nicht der Name als React-Key: zwei Einträge dürfen sich nur in der Farbe
-               unterscheiden. */
-            const key = [
-              z.grundzeichen,
-              z.organisation,
-              z.fachaufgabe,
-              z.symbol,
-              z.einheit,
-              z.funktion,
-              z.farbe,
-            ].join('|');
+            const name = zeichenName(leseEntwurf(z));
             return (
               /* Name als `aria-label` samt Tooltip: sechs ausgeschriebene DV-102-Namen sprengten
-                 die Leiste. */
-              <Tooltip key={key} title={name}>
+                 die Leiste. Die kanonische Spec ist der Schlüssel (die Leiste ist entdoppelt). */
+              <Tooltip key={z} title={name}>
                 <button
                   type="button"
                   aria-label={name}
                   onClick={() => uebernimm(z)}
                   style={leistenKnopf}
                 >
-                  <span aria-hidden style={{ display: 'flex' }}>
-                    <TaktischesZeichen
-                      {...baueFreiesZeichenTz(z)}
-                      style={{ width: KACHEL_BILD, height: KACHEL_BILD }}
-                    />
-                  </span>
+                  <ZeichenAufPlatte
+                    drawing={freiesZeichen({ zeichen_spec: z }).drawing}
+                    size={KACHEL_BILD}
+                  />
                 </button>
               </Tooltip>
             );
@@ -509,37 +602,42 @@ export default function FreiesZeichenPicker({
       )}
 
       <Raster
-        art="grundzeichen"
         gruppenName="Grundzeichen"
         suchName="Grundzeichen suchen"
         autoFocus={autoFokus}
-        eintraege={grundzeichenKatalog.map((g) => ({ id: g.id as string, label: g.label }))}
-        gewaehlt={wert.grundzeichen}
-        onWaehle={(gz) => {
-          if (gz != null) onChange(mitGrundzeichen(gz));
-        }}
+        eintraege={gzEintraege}
+        gewaehlt={grundzeichen}
+        onWaehle={waehleGrundzeichen}
         onWaehleUndSende={
           onAbsenden
-            ? (gz) => {
-                if (gz != null) uebernimmUndSende(mitGrundzeichen(gz));
+            ? (id) => {
+                const neu = nachGrundzeichen(id);
+                if (neu) uebernimmUndSende(neu);
+                // „Kein Grundzeichen“: ein schon freistehendes Zeichen gilt, sonst nur wählen.
+                else if (hatZeichen(wert) && !koerper) uebernimmUndSende(wert);
+                else waehleGrundzeichen(id);
               }
             : undefined
         }
       />
 
-      {zeigtSymbol && (
+      {symbolEintraege.some((e) => e.id != null) && (
         <Raster
-          art="symbol"
           gruppenName="Symbol"
           suchName="Symbol suchen"
-          eintraege={[
-            { id: null, label: 'Kein Symbol' },
-            ...symbole.map((s) => ({ id: s.id as string, label: s.label })),
-          ]}
-          gewaehlt={wert.symbol ?? null}
-          onWaehle={(id) => onChange(mitOverlay('symbol', id))}
+          eintraege={symbolEintraege}
+          gewaehlt={entwurf ? symbolVon(entwurf) : null}
+          onWaehle={(id) => {
+            const neu = nachSymbol(id);
+            if (neu) melde(neu);
+          }}
           onWaehleUndSende={
-            onAbsenden ? (id) => uebernimmUndSende(mitOverlay('symbol', id)) : undefined
+            onAbsenden
+              ? (id) => {
+                  const neu = nachSymbol(id);
+                  if (neu) uebernimmUndSende(neu);
+                }
+              : undefined
           }
         />
       )}
@@ -556,34 +654,54 @@ export default function FreiesZeichenPicker({
             children: (
               <div data-lfh="zeichen-details">
                 <Space orientation="vertical" style={{ width: '100%' }}>
-                  {DETAIL_OVERLAYS.map(({ key, label, katalog }) =>
-                    grundzeichenAkzeptiert(wert.grundzeichen, key) ? (
+                  {DETAIL_ACHSEN.map(({ achse, label }) =>
+                    details[achse].length > 0 ? (
                       <Select
-                        key={key}
+                        key={achse}
                         aria-label={label}
                         allowClear
                         placeholder={label}
                         style={{ width: '100%' }}
-                        value={(wert[key] as string | null | undefined) ?? undefined}
-                        options={katalog.map((k) => ({ value: k.id, label: k.label }))}
-                        onChange={(v?: string) => onChange(mitOverlay(key, v ?? null))}
+                        value={(koerper && detailVon(koerper, achse)) ?? undefined}
+                        options={details[achse]}
+                        onChange={(v?: string) =>
+                          melde(mitSpec(mitDetail(koerper!, achse, v ?? null)))
+                        }
                       />
                     ) : null,
                   )}
 
-                  {/* `key` am unkontrollierten Farbfeld: ein Griff in „zuletzt verwendet" bringt
-                      eine fremde Farbe mit. */}
-                  <Input
-                    key={`farbe-${wert.farbe ?? ''}`}
-                    aria-label="Farbe"
-                    type="color"
-                    defaultValue={wert.farbe ?? FREIES_ZEICHEN_TINTE}
-                    onBlur={(e) => {
-                      if (e.target.value !== (wert.farbe ?? FREIES_ZEICHEN_TINTE)) {
-                        onChange({ ...wert, farbe: e.target.value });
+                  {/* Farbe nur aus der Palette und nur, wo das Zeichen eine Füllung trägt (D6). */}
+                  {farbOptionen.length > 0 && (
+                    <Select
+                      aria-label="Farbe"
+                      allowClear
+                      placeholder="Farbe"
+                      style={{ width: '100%' }}
+                      value={(koerper && detailVon(koerper, 'farbe')) ?? undefined}
+                      options={farbOptionen}
+                      optionRender={(o) => (
+                        <span>
+                          <Farbfeld farbe={o.data.farbe} rand={rollen.steuerRahmen} />
+                          {o.data.label}
+                        </span>
+                      )}
+                      labelRender={(o) => {
+                        const option = farbOptionen.find((f) => f.value === o.value);
+                        return option ? (
+                          <span>
+                            <Farbfeld farbe={option.farbe} rand={rollen.steuerRahmen} />
+                            {option.label}
+                          </span>
+                        ) : (
+                          o.label
+                        );
+                      }}
+                      onChange={(v?: string) =>
+                        melde(mitSpec(mitDetail(koerper!, 'farbe', v ?? null)))
                       }
-                    }}
-                  />
+                    />
+                  )}
 
                   <Input
                     aria-label="Bezeichnung"
@@ -600,9 +718,10 @@ export default function FreiesZeichenPicker({
                     }}
                     onPressEnter={() => {
                       const geaendert = bezeichnungUebernehmen();
-                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) übernimmt es
-                      // nur den getippten Namen.
-                      if (onAbsenden) uebernimmUndSende(geaendert ?? wert);
+                      const stand = geaendert ?? wert;
+                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) oder ohne
+                      // Zeichen übernimmt es nur den getippten Namen.
+                      if (onAbsenden && hatZeichen(stand)) uebernimmUndSende(stand);
                       else if (geaendert) onChange(geaendert);
                     }}
                   />

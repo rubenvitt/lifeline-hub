@@ -596,6 +596,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit", G_ENUM),
             retain("funktion", G_ENUM),
             retain("farbe", G_ENUM),
+            // LFH-836: Zeichenbeschreibung aus Katalogwerten von @einsatzzeichen, vom Server gegen
+            // die Werteliste geprüft (`freies_zeichen::pruefung`); Freitext (`designation`,
+            // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`.
+            retain("zeichen_spec", G_ENUM),
             // Freitext-Label (kann PII tragen, „ELW Fam. Müller“) → NULL (nullable).
             scrub("label", Strategie::NullSetzen, Z_EINSATZ),
             retain("erstellt_von", G_FK),

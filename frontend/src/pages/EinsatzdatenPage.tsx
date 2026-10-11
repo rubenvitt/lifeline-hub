@@ -46,7 +46,7 @@ import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
-import { InlineAngabe } from '../components/InlineAngabe';
+import { InlineAngabe, type InlineEingabe } from '../components/InlineAngabe';
 import { useViewport } from '../components/useViewport';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -62,8 +62,15 @@ import type {
   FuehrungsstellePatch,
 } from '../api/types';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
+import { listeFahrzeuge } from '../api/fahrzeuge';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
+import {
+  rufnameFilter,
+  rufnameOptions,
+  rufnamePlaceholder,
+  rufnameVorschlaege,
+} from '../stab/rufnameVorschlaege';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import {
@@ -425,20 +432,15 @@ function FuehrungsstellePaneel({
   const fahrzeugQuelle = useFahrzeugeQuelle(einsatzId);
 
   const fs = query.data;
-  const text = (
-    etikett: string,
-    wert: string | null | undefined,
-    mono: boolean,
-    schluessel: 'rufname' | 'erreichbarkeit',
-  ) => (
+  const erreichbarkeit = (wert: string | null | undefined) => (
     <InlineAngabe<string>
-      etikett={etikett}
+      etikett="Erreichbarkeit"
       wert={wert ?? ''}
-      anzeige={mono ? <span style={monoStil(13)}>{wert}</span> : wert}
+      anzeige={wert}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(w) => speichern(etikett, { [schluessel]: leerZuNull(w) })}
+      onSpeichern={(w) => speichern('Erreichbarkeit', { erreichbarkeit: leerZuNull(w) })}
       eingabe={({ feld, value, onChange }) => (
         <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
@@ -467,7 +469,18 @@ function FuehrungsstellePaneel({
                   />
                 ),
               },
-              { etikett: 'Rufname', wert: text('Rufname', fs.rufname, true, 'rufname') },
+              {
+                etikett: 'Rufname',
+                wert: (
+                  <RufnameAngabe
+                    rufname={fs.rufname}
+                    fahrzeugIds={fs.fahrzeug_ids}
+                    quelle={fahrzeugQuelle}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(w) => speichern('Rufname', { rufname: leerZuNull(w) })}
+                  />
+                ),
+              },
               {
                 etikett: 'Sprechgruppen',
                 wert: (
@@ -517,7 +530,7 @@ function FuehrungsstellePaneel({
               },
               {
                 etikett: 'Erreichbarkeit',
-                wert: text('Erreichbarkeit', fs.erreichbarkeit, false, 'erreichbarkeit'),
+                wert: erreichbarkeit(fs.erreichbarkeit),
               },
               {
                 etikett: 'Fahrzeuge',
@@ -535,6 +548,94 @@ function FuehrungsstellePaneel({
         )}
       </PaneelZustand>
     </Paneel>
+  );
+}
+
+/**
+ * Zeile „Rufname“ der Führungsstelle mit Vorschlägen aus den Stammdaten (LFH-1187,
+ * `stab/rufnameVorschlaege.tsx`): Funkrufnamen der Führungsfahrzeuge, Freitext bleibt erlaubt.
+ */
+function RufnameAngabe({
+  rufname,
+  fahrzeugIds,
+  quelle,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  rufname: string | null | undefined;
+  fahrzeugIds: readonly number[];
+  quelle: ReturnType<typeof useFahrzeugeQuelle>;
+  darfSchreiben: boolean;
+  onSpeichern: (wert: string) => Promise<unknown>;
+}) {
+  return (
+    <InlineAngabe<string>
+      etikett="Rufname"
+      wert={rufname ?? ''}
+      anzeige={<span style={monoStil(13)}>{rufname}</span>}
+      leer={leererText}
+      gleich={(a, b) => a.trim() === b.trim()}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={onSpeichern}
+      eingabe={(eingabe) => (
+        <RufnameInput
+          eingabe={eingabe}
+          fahrzeugIds={fahrzeugIds}
+          disponiert={quelle.zustand === 'daten' ? quelle.fahrzeuge : null}
+        />
+      )}
+    />
+  );
+}
+
+/**
+ * Das Eingabefeld des Rufnamens. Die Fahrzeuge der Organisation lädt es erst beim Bearbeiten,
+ * aus demselben Cache wie der Pool der Fahrzeugseite; ein Fehler dort lässt nur ihre Gruppe weg.
+ *
+ * **Enter übernimmt nur eine angesteuerte Option.** rc-select macht beim Tippen still die erste
+ * Option aktiv, deren Wert mit dem Getippten beginnt, und Enter übernähme sie: „Kater 1“ würde zu
+ * „Kater 11“. Ohne Pfeiltaste seit der letzten Eingabe hält die Capture-Phase Enter deshalb von
+ * rc-select fern, und das `<form>` von `InlineAngabe` sendet den getippten Text. Bei
+ * geschlossenem Popup lässt rc-select Enter ohnehin durch.
+ */
+function RufnameInput({
+  eingabe: { feld, popup, value, onChange },
+  fahrzeugIds,
+  disponiert,
+}: {
+  eingabe: InlineEingabe<string>;
+  fahrzeugIds: readonly number[];
+  disponiert: readonly EinsatzFahrzeug[] | null;
+}) {
+  const stammQuery = useQuery({
+    queryKey: globalKeys.fahrzeugeListe('im-dienst'),
+    queryFn: () => listeFahrzeuge(true),
+  });
+  const navigated = useRef(false);
+  const options = rufnameOptions(
+    rufnameVorschlaege({ fahrzeugIds, disponiert, stamm: stammQuery.data ?? null }),
+  );
+  return (
+    <div
+      onKeyDownCapture={(e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') navigated.current = true;
+        else if (e.key === 'Enter' && !navigated.current) e.stopPropagation();
+      }}
+    >
+      <AutoComplete
+        {...feld}
+        {...popup}
+        options={options}
+        filterOption={rufnameFilter}
+        placeholder={rufnamePlaceholder(fahrzeugIds, disponiert)}
+        value={value}
+        onChange={(v?: string) => {
+          navigated.current = false;
+          onChange(v ?? '');
+        }}
+        style={{ width: '100%' }}
+      />
+    </div>
   );
 }
 

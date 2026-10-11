@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
+import { serializeAnySpec } from '@einsatzzeichen/core';
+import { PALETTE } from '@einsatzzeichen/schema';
 import {
   baueMarker,
   baueBetreuungMarker,
   baueTaktischeMarker,
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
-  baueFreiesZeichenTz,
+  FREIES_ZEICHEN_TINTE,
   baueAbschnittMarker,
   type TaktischeQuelle,
 } from './marker';
@@ -368,60 +370,18 @@ function freiesZeichen(partial: Partial<FreiesZeichen>): FreiesZeichen {
   };
 }
 
-describe('baueFreiesZeichenTz (accepts-Gating aus taktische-zeichen-core-Katalog)', () => {
-  it('strippt ein Overlay, das das Grundzeichen laut accepts NICHT rendert', () => {
-    // 'anlass' akzeptiert laut Katalog nur 'symbol' → fachaufgabe/organisation entfallen.
-    const tz = baueFreiesZeichenTz(
-      freiesZeichen({
-        grundzeichen: 'anlass',
-        fachaufgabe: 'brandbekaempfung',
-        organisation: 'feuerwehr',
-        symbol: 'sammeln',
-      }),
-    );
-    expect(tz.grundzeichen).toBe('anlass');
-    expect(tz.fachaufgabe).toBeUndefined();
-    expect(tz.organisation).toBeUndefined();
-    expect(tz.symbol).toBe('sammeln');
-  });
-
-  it('behält akzeptierte Overlays (taktische-formation akzeptiert Fachaufgabe + Organisation)', () => {
-    const tz = baueFreiesZeichenTz(
-      freiesZeichen({
-        grundzeichen: 'taktische-formation',
-        fachaufgabe: 'rettungswesen',
-        organisation: 'hilfsorganisation',
-        einheit: 'zug',
-      }),
-    );
-    expect(tz.fachaufgabe).toBe('rettungswesen');
-    expect(tz.organisation).toBe('hilfsorganisation');
-    expect(tz.einheit).toBe('zug');
-  });
-
-  it('gated auch die Farbe: nur farb-akzeptierende Grundzeichen tragen tz.farbe', () => {
-    // 'gefahr' akzeptiert 'farbe', 'taktische-formation' nicht.
-    expect(
-      baueFreiesZeichenTz(freiesZeichen({ grundzeichen: 'gefahr', farbe: '#ff0000' })).farbe,
-    ).toBe('#ff0000');
-    expect(
-      baueFreiesZeichenTz(freiesZeichen({ grundzeichen: 'taktische-formation', farbe: '#ff0000' }))
-        .farbe,
-    ).toBeUndefined();
-  });
-});
-
 describe('baueFreieZeichenMarker', () => {
-  it('baut Karten-Marker mit stabilem Schlüssel, Typ und taktischem Zeichen', () => {
+  it('baut Karten-Marker mit stabilem Schlüssel, Typ und dem gespeicherten Zeichen', () => {
+    const zeichen_spec = serializeAnySpec({ kind: 'hazard', technicalFill: 'gelb' });
     const marker = baueFreieZeichenMarker(
       [
         freiesZeichen({
           id: 7,
           lat: 50.1,
           lon: 8.1,
-          grundzeichen: 'stelle',
+          grundzeichen: null,
+          zeichen_spec,
           label: 'Sammelplatz',
-          farbe: '#123456',
         }),
       ],
       token,
@@ -432,8 +392,25 @@ describe('baueFreieZeichenMarker', () => {
     expect(marker[0].id).toBe(7);
     expect(marker[0].lat).toBe(50.1);
     expect(marker[0].label).toBe('Sammelplatz');
-    expect(marker[0].farbe).toBe('#123456');
-    expect(marker[0].tz?.grundzeichen).toBe('stelle');
+    // Die Füllung aus der Palette ist die Markerfarbe (D6).
+    expect(marker[0].farbe).toBe(PALETTE.gelb);
+    expect(marker[0].freiesZeichen?.zeichen_spec).toBe(zeichen_spec);
+    // Kein Hub-Vokabular am freien Zeichen: das Bild kommt allein aus dem Leseadapter (D8).
+    expect(marker[0].tz).toBeUndefined();
+  });
+
+  it('trägt die Altfelder eines Altzeichens unverändert zum Leseadapter', () => {
+    const [m] = baueFreieZeichenMarker(
+      [freiesZeichen({ grundzeichen: 'gefahr', symbol: 'abc', farbe: '#cc0000' })],
+      token,
+    );
+    expect(m.freiesZeichen).toMatchObject({
+      grundzeichen: 'gefahr',
+      symbol: 'abc',
+      farbe: '#cc0000',
+    });
+    // Alt-Hex an der Gefahr → Palettenrot.
+    expect(m.farbe).toBe(PALETTE.rot);
   });
 
   it('nutzt sinnvolle Defaults für label und farbe, wenn nicht gesetzt', () => {
@@ -442,7 +419,8 @@ describe('baueFreieZeichenMarker', () => {
       token,
     );
     expect(marker[0].label).toBe('(freies Zeichen)');
-    expect(marker[0].farbe).toBeTruthy();
+    // Ohne Füllung die Kartentinte wie ein Fachobjekt-Zeichen (Spec `lagekarte-taktische-zeichen`).
+    expect(marker[0].farbe).toBe(FREIES_ZEICHEN_TINTE);
   });
 });
 

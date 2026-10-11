@@ -16,12 +16,14 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep einsatzabschnitte`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   gliederung.png         frontend/src/pages/EinsatzabschnittePage.tsx,
- *                          frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx
+ *                          frontend/src/pages/einsatzabschnitte/AbschnittDaten.tsx,
+ *                          frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx (Griffe)
+ *   verschieben-unter.png  frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx
  *   abschnitt-anlegen.png  frontend/src/pages/EinsatzabschnittePage.tsx (Formular)
  *   organigramm.png        frontend/src/pages/einsatzabschnitte/Organigramm.tsx
  *
  * Daten: Abschnitte, Unterabschnitt und Einheiten stammen aus den Demo-Daten; der neue Abschnitt
- * wird nur ausgefüllt, nicht gespeichert.
+ * wird nur ausgefüllt, nicht gespeichert, der Dialog „Verschieben unter …“ nur geöffnet.
  */
 
 const KAPITEL = 'einsatzabschnitte';
@@ -37,7 +39,27 @@ test.describe(KAPITEL, () => {
     const detail = page.getByRole('region', { name: 'Abschnitt: Sanitätsdienst' });
     await expect(detail.getByText('Zugeordnete Einheiten')).toBeVisible();
     await expect(detail.getByRole('listitem').first()).toBeVisible();
+    // Zeiger und Fokus aus der Gliederung: sonst stünde „Live pausiert“ im Bild (Zufluss-Schleuse).
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect(gliederung.getByText('Live', { exact: true })).toBeVisible();
     await fotografiere(page, KAPITEL, 'gliederung');
+  });
+
+  test('Dialog „Verschieben unter …“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einsatzabschnitte`);
+    const gliederung = page.getByRole('region', { name: 'Gliederung' });
+    await gliederung.getByText('Sanitätsdienst').first().click();
+    await page
+      .getByRole('button', { name: 'Weitere Aktionen zu Abschnitt Sanitätsdienst' })
+      .click();
+    await page.getByRole('menuitem', { name: 'Verschieben unter …' }).click();
+    const dialog = page.getByRole('dialog', { name: '„Sanitätsdienst“ verschieben unter …' });
+    await expect(dialog.getByRole('button', { name: 'Oberste Ebene' })).toBeVisible();
+    await fotografiere(dialog, KAPITEL, 'verschieben-unter');
   });
 
   test('Formular „Neuer Abschnitt“', async ({ page }) => {
