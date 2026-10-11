@@ -1,8 +1,9 @@
 //! LFH-170 Freie taktische Zeichen — Backend-Integrationstests.
 //!
 //! Deckt ab: CRUD (POST→GET→PATCH→DELETE), Teil-Patch-Semantik (LFH-306: absentes Feld
-//! unverändert, `null` leert, lat/lon unverändert), 400 bei fehlendem/leerem grundzeichen
-//! (POST), 404 für fremden
+//! unverändert, `null` leert, lat/lon unverändert), Zeichenbeschreibung `zeichen_spec` und
+//! Übergang mit altem Body (LFH-836: genau eine Form, sonst 400; ungültige Beschreibung 400;
+//! Altfelder ohne Grundzeichen an einem Spec-Zeichen 422), 404 für fremden
 //! Einsatz bzw. fremde zeichen-id, Gate-Matrix (GET braucht Lesezugriff+Modul; POST/PATCH/
 //! DELETE Schreibrecht+aktiv+Modul; Org-Isolation), SSE-Event `freies_zeichen` (Wire-Tag +
 //! Payload load-bearing für das Frontend).
@@ -54,6 +55,7 @@ async fn anlegen_und_liste() {
     assert_eq!(z["organisation"], "feuerwehr");
     assert_eq!(z["lat"], 50.1);
     assert_eq!(z["lon"], 8.6);
+    assert!(z.get("zeichen_spec").is_none_or(Value::is_null), "{z:?}");
 
     let (_, liste) = anfrage(
         &app,
@@ -66,58 +68,401 @@ async fn anlegen_und_liste() {
     assert_eq!(liste.as_array().unwrap().len(), 1);
 }
 
-/// Fehlendes Pflichtfeld ist ein FORMALER Fehler → 400 (LFH-267/F22).
+/// Ein Zeichen ohne jede Form ist ein FORMALER Fehler → 400 (LFH-267/F22, Spec
+/// `lagekarte-freie-zeichen`). Statuscode-Referenz: das Gegenstück im Zusammenhang ist
+/// `altfelder_ohne_grundzeichen_an_spec_zeichen_ist_422`.
 ///
-/// `AnlegenBody.grundzeichen` ist ein `String` ohne `#[serde(default)]`, der Body scheitert
-/// also schon am Extractor — der Handler läuft nie an. Vor LFH-267 lieferte axums
-/// `JsonDataError` dafür 422; seit dem `JsonBody`-Wrapper ist es 400. Zusammen mit dem Test
-/// darunter deckt das beide Wege zum selben Code ab: Extractor und Handler-Validierung.
+/// Umbenannt aus `fehlendes_grundzeichen_ist_400` (LFH-836): seit der Zeichenbeschreibung ist
+/// `grundzeichen` nur noch eine der zwei Formen und strukturell optional, der Body scheitert
+/// deshalb nicht mehr am Extractor, sondern an der Handler-Prüfung „genau eine Form“ — weiterhin
+/// mit 400, weil der Body für sich kein Zeichen beschreibt. Overlays allein sind keine Form.
 #[tokio::test]
-async fn fehlendes_grundzeichen_ist_400() {
+async fn ohne_zeichenform_ist_400() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    let body = json!({"lat": 50.1, "lon": 8.6}).to_string();
-    assert_eq!(
-        anfrage(
+    for body in [
+        json!({"lat": 50.1, "lon": 8.6}),
+        json!({"lat": 50.1, "lon": 8.6, "organisation": "feuerwehr", "label": "A"}),
+        json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": null, "grundzeichen": null}),
+    ] {
+        let (status, v) = anfrage(
             &app,
             "POST",
             &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
             &admin,
-            Some(&body)
+            Some(&body.to_string()),
         )
-        .await
-        .0,
-        StatusCode::BAD_REQUEST
-    );
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {v:?}");
+        assert!(
+            v["error"].as_str().unwrap().contains("zeichen_spec"),
+            "Meldung nennt das Feld: {v:?}"
+        );
+    }
+    assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
 }
 
-/// Auch ein vorhandenes, aber leeres Pflichtfeld ist ein FORMALER Fehler → 400 (F22-B).
+/// Auch eine vorhandene, aber leere Form ist ein FORMALER Fehler → 400 (F22-B), für beide
+/// Formen. Umbenannt aus `leeres_grundzeichen_ist_400` (LFH-836).
 ///
 /// Der Body ist strukturell gültig, der Extractor lässt ihn durch; erst die
-/// Handler-Validierung lehnt den Whitespace-only-Wert ab — beide Wege enden bei 400.
-/// 422 bliebe der Fall, in dem erst der ZUSAMMENHANG die Aktion verbietet (Feld-Kombination,
-/// Objekt-Zustand), nicht das Feld für sich.
+/// Handler-Validierung lehnt den Whitespace-only-Wert ab. 422 bliebe der Fall, in dem erst der
+/// ZUSAMMENHANG die Aktion verbietet (Objekt-Zustand), nicht das Feld für sich.
 #[tokio::test]
-async fn leeres_grundzeichen_ist_400() {
+async fn leere_zeichenform_ist_400() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    let body = json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "   "}).to_string();
-    assert_eq!(
-        anfrage(
+    for (body, feld) in [
+        (
+            json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "   "}),
+            "grundzeichen",
+        ),
+        (
+            json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": "  "}),
+            "zeichen_spec",
+        ),
+    ] {
+        let (status, v) = anfrage(
             &app,
             "POST",
             &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
             &admin,
-            Some(&body)
+            Some(&body.to_string()),
         )
-        .await
-        .0,
-        StatusCode::BAD_REQUEST
-    );
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {v:?}");
+        assert_eq!(v["error"], format!("{feld} darf nicht leer sein"));
+    }
+    assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
+}
+
+// ===== LFH-836: Zeichenbeschreibung und Übergang =====
+
+/// Ausgaben von `serializeAnySpec` aus `@einsatzzeichen/core` 5.2.0 (per Node erzeugt).
+const STELLE_SANITAET: &str =
+    r#"{"v":1,"spec":{"bodyMarks":["medical-service"],"kind":"post","organization":"feuerwehr"}}"#;
+const DREHLEITER: &str =
+    r#"{"v":1,"freestanding":{"kind":"pictogram","pictogram":"capability.rescue-aerial-ladder"}}"#;
+
+async fn anzahl_zeichen(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
+    let (status, liste) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{liste:?}");
+    liste.as_array().unwrap().len()
+}
+
+/// Legt ein Zeichen mit Zeichenbeschreibung an und liefert die Antwort.
+async fn spec_zeichen_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, spec: &str) -> Value {
+    let (status, z) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        cookie,
+        Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": spec, "label": "BHP"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{z:?}");
+    z
+}
+
+/// Die Altform eines Zeichens ist leer: weder Grundzeichen noch Overlays (Schlüssel fehlt oder
+/// ist `null`).
+fn altform_leer(z: &Value) {
+    for feld in [
+        "grundzeichen",
+        "organisation",
+        "fachaufgabe",
+        "symbol",
+        "einheit",
+        "funktion",
+        "farbe",
+    ] {
+        assert!(z.get(feld).is_none_or(Value::is_null), "{feld} leer: {z:?}");
+    }
+}
+
+/// Spec „Zeichen mit Grundzeichen anlegen“ und „Freistehendes Piktogramm anlegen“: die
+/// Beschreibung kommt beim Lesen unverändert zurück, die Altspalten bleiben leer.
+#[tokio::test]
+async fn spec_anlegen_und_lesen() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    for spec in [STELLE_SANITAET, DREHLEITER] {
+        let z = spec_zeichen_anlegen(&app, &admin, einsatz, spec).await;
+        assert_eq!(z["zeichen_spec"], spec, "{z:?}");
+        assert_eq!(z["label"], "BHP");
+        altform_leer(&z);
+    }
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        None,
+    )
+    .await;
+    let liste = liste.as_array().unwrap();
+    assert_eq!(liste.len(), 2);
+    assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET);
+    assert_eq!(liste[1]["zeichen_spec"], DREHLEITER);
+}
+
+/// Spec „Veralteter Client legt an“: der alte Body bleibt gültig und trägt keine
+/// Zeichenbeschreibung.
+#[tokio::test]
+async fn altformat_anlegen_bleibt_moeglich() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (status, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        Some(&json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "person"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["grundzeichen"], "person");
+    assert!(z.get("zeichen_spec").is_none_or(Value::is_null), "{z:?}");
+}
+
+/// Spec „Beide Formate zugleich“: Zeichenbeschreibung und Altform in einem Body → 400, beim
+/// Anlegen wie beim Ändern; es entsteht nichts und es ändert sich nichts.
+#[tokio::test]
+async fn beide_formen_ist_400() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    for body in [
+        json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": STELLE_SANITAET, "grundzeichen": "person"}),
+        json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": STELLE_SANITAET, "organisation": "thw"}),
+    ] {
+        let (status, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {v:?}");
+    }
+    assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
+
+    let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
+    let zid = z["id"].as_i64().unwrap();
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"zeichen_spec": DREHLEITER, "grundzeichen": "person"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET, "unverändert");
+}
+
+/// Spec „Unbekannter Wert“ und „Beschriftung in der Beschreibung“: 400 mit Pfad, kein Zeichen;
+/// beim PATCH bleibt die gespeicherte Beschreibung.
+#[tokio::test]
+async fn ungueltige_spec_ist_400() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    for (spec, erwartet) in [
+        (
+            r#"{"v":1,"spec":{"kind":"post","organization":"gibt-es-nicht"}}"#,
+            "$.spec.organization",
+        ),
+        (
+            r#"{"v":1,"spec":{"designation":"ELW 1","kind":"vehicle-land"}}"#,
+            "„label“",
+        ),
+        (r#"{"v":2,"spec":{"kind":"post"}}"#, "$.v"),
+        ("kein json", "kein gültiges JSON"),
+    ] {
+        let (status, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+            &admin,
+            Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": spec}).to_string()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{spec}: {v:?}");
+        let meldung = v["error"].as_str().unwrap();
+        assert!(meldung.starts_with("zeichen_spec: "), "{meldung}");
+        assert!(meldung.contains(erwartet), "{meldung}");
+    }
+    assert_eq!(anzahl_zeichen(&app, &admin, einsatz).await, 0);
+
+    let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
+    let zid = z["id"].as_i64().unwrap();
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"zeichen_spec": r#"{"v":1,"spec":{"kind":"raumschiff"}}"#}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{v:?}");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET, "unverändert");
+}
+
+/// Spec „Altzeichen wird geändert“: ein PATCH mit Zeichenbeschreibung an einer Altzeile schreibt
+/// die Beschreibung und leert die Altspalten; Bezeichnung und Ansicht bleiben.
+#[tokio::test]
+async fn patch_altzeile_mit_spec_schreibt_spec_und_leert_altspalten() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
+
+    let (status, n) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"zeichen_spec": STELLE_SANITAET}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{n:?}");
+    assert_eq!(n["zeichen_spec"], STELLE_SANITAET);
+    altform_leer(&n);
+    assert_eq!(n["label"], "A", "Bezeichnung bleibt");
+    assert_eq!(n["lat"], 50.1);
+}
+
+/// Umgekehrt: ein alter Body mit Grundzeichen an einem Spec-Zeichen schreibt die Altform und
+/// leert die Zeichenbeschreibung (Übergang, design.md D4).
+#[tokio::test]
+async fn patch_spec_zeichen_mit_altem_body_schreibt_altform() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
+    let zid = z["id"].as_i64().unwrap();
+
+    let (status, n) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"grundzeichen": "fahrzeug", "organisation": "thw"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{n:?}");
+    assert_eq!(n["grundzeichen"], "fahrzeug");
+    assert_eq!(n["organisation"], "thw");
+    assert!(n.get("zeichen_spec").is_none_or(Value::is_null), "{n:?}");
+    assert_eq!(n["label"], "BHP");
+}
+
+/// Ein PATCH ohne Zeichenfelder (nur Bezeichnung oder Ansicht) lässt die gespeicherte Form
+/// unberührt — auch der Ganz-Body eines veralteten Clients, der an einem Spec-Zeichen
+/// `grundzeichen: null` und lauter `null`-Overlays mitschickt.
+#[tokio::test]
+async fn patch_nur_bezeichnung_laesst_form_unberuehrt() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let z = spec_zeichen_anlegen(&app, &admin, einsatz, DREHLEITER).await;
+    let zid = z["id"].as_i64().unwrap();
+    let aid = standard_ansicht_id(&app, &admin, einsatz).await;
+
+    for (body, label) in [
+        (json!({"label": "DLK 23"}), "DLK 23"),
+        (json!({"ansicht_id": aid}), "DLK 23"),
+        (
+            json!({
+                "grundzeichen": null, "organisation": null, "fachaufgabe": null,
+                "symbol": null, "einheit": null, "funktion": null, "farbe": null,
+                "label": "DLK 1"
+            }),
+            "DLK 1",
+        ),
+    ] {
+        let (status, n) = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}: {n:?}");
+        assert_eq!(n["zeichen_spec"], DREHLEITER, "Form unberührt: {body}");
+        assert_eq!(n["label"], label);
+        altform_leer(&n);
+    }
+}
+
+/// Statuscode-Referenz (Zusammenhang, `src/AGENTS.md`): ein Overlay-Wert ohne Grundzeichen an
+/// einem Zeichen, das als Zeichenbeschreibung gespeichert ist, ist für sich ein gültiges Feld —
+/// erst der Zustand des Zeichens verbietet ihn → 422, und nichts ändert sich. Gegenstück zu
+/// `ohne_zeichenform_ist_400`.
+#[tokio::test]
+async fn altfelder_ohne_grundzeichen_an_spec_zeichen_ist_422() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let z = spec_zeichen_anlegen(&app, &admin, einsatz, STELLE_SANITAET).await;
+    let zid = z["id"].as_i64().unwrap();
+
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"organisation": "thw", "label": "X"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{v:?}");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["zeichen_spec"], STELLE_SANITAET, "unverändert");
+    assert_eq!(liste[0]["label"], "BHP", "auch die Bezeichnung nicht");
+    altform_leer(&liste[0]);
 }
 
 /// Migriert von `crud_whole_spec_haelt_lat_lon` (LFH-306): derselbe Teil-Body, invertierte
@@ -283,10 +628,9 @@ async fn patch_organisation_null_loescht_nur_diese() {
     assert_eq!(n["label"], "A");
 }
 
-/// `grundzeichen` ist NOT NULL: ein Patch OHNE das Feld lässt es stehen (statt am Extractor
-/// zu scheitern), ein Patch mit LEEREM Wert bleibt 400 (Statuscode-Konvention, LFH-267/F22).
-/// Die POST-seitigen Referenztests `fehlendes_/leeres_grundzeichen_ist_400` bleiben davon
-/// unberührt — dort ist das Feld strukturell Pflicht.
+/// Ein Patch OHNE `grundzeichen` lässt es stehen (statt am Extractor zu scheitern), ein Patch
+/// mit LEEREM Wert bleibt 400 (Statuscode-Konvention, LFH-267/F22). Die POST-seitigen
+/// Referenztests heißen seit LFH-836 `ohne_zeichenform_ist_400`/`leere_zeichenform_ist_400`.
 #[tokio::test]
 async fn patch_ohne_grundzeichen_behaelt_grundzeichen() {
     let (app, _live) = setup_mit_live().await;

@@ -4949,4 +4949,243 @@ mod tests {
             );
         }
     }
+
+    // --- Migration 0175: freies_zeichen-Rebuild für die Zeichenbeschreibung (LFH-836, D2) ---
+    //
+    // Geprüft an einem Zeichen, das VOR dem Rebuild existiert (auf der leeren Vorlage bliebe ein
+    // Kopierfehler unsichtbar): es übersteht den Umbau mit allen Spalten, die Fremdschlüssel und
+    // der Index sind dieselben, CASCADE und SET NULL wirken weiter, und der CHECK verlangt genau
+    // eine Form — Zeichenbeschreibung oder Grundzeichen.
+    #[tokio::test]
+    async fn migration_0175_freies_zeichen_rebuild_erhaelt_bestand_und_verlangt_genau_eine_form() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        let bis = |version: i64| Migrator {
+            migrations: Cow::Owned(
+                alle.iter()
+                    .filter(|m| m.version <= version)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        };
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        bis(174).run(&pool).await.expect("Migrationen bis 0174");
+
+        let indizes = || async {
+            sqlx::query_scalar::<_, String>(
+                "SELECT name FROM sqlite_master WHERE type = 'index' \
+                 AND tbl_name = 'freies_zeichen' AND sql IS NOT NULL ORDER BY name",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let fremdschluessel = || async {
+            sqlx::query_as::<_, (String, String, String, String)>(
+                "SELECT \"table\", \"from\", \"to\", on_delete \
+                 FROM pragma_foreign_key_list('freies_zeichen') ORDER BY \"from\"",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let indizes_vorher = indizes().await;
+        let fks_vorher = fremdschluessel().await;
+        assert_eq!(
+            fks_vorher.len(),
+            3,
+            "einsatz, benutzer, karten_ansicht: {fks_vorher:?}"
+        );
+
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let a: i64 = sqlx::query_scalar(
+            "INSERT INTO karten_ansicht (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let z: i64 = sqlx::query_scalar(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, organisation, \
+                fachaufgabe, symbol, einheit, funktion, farbe, label, erstellt_von, ansicht_id) \
+             VALUES (?, 50.1, 8.6, 'einheit', 'feuerwehr', 'brandbekaempfung', 'kran', 'zug', \
+                'zugtrupp', '#ff0000', 'A', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let zeile = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                let r = sqlx::query(
+                    "SELECT einsatz_id, lat, lon, grundzeichen, organisation, fachaufgabe, \
+                        symbol, einheit, funktion, farbe, label, erstellt_von, erstellt_at, \
+                        geaendert_at, ansicht_id FROM freies_zeichen WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .expect("das Zeichen behält seine id");
+                (
+                    (
+                        r.get::<i64, _>(0),
+                        r.get::<f64, _>(1),
+                        r.get::<f64, _>(2),
+                        r.get::<Option<String>, _>(3),
+                    ),
+                    (
+                        r.get::<Option<String>, _>(4),
+                        r.get::<Option<String>, _>(5),
+                        r.get::<Option<String>, _>(6),
+                        r.get::<Option<String>, _>(7),
+                        r.get::<Option<String>, _>(8),
+                        r.get::<Option<String>, _>(9),
+                        r.get::<Option<String>, _>(10),
+                    ),
+                    (
+                        r.get::<Option<i64>, _>(11),
+                        r.get::<String, _>(12),
+                        r.get::<String, _>(13),
+                        r.get::<Option<i64>, _>(14),
+                    ),
+                )
+            }
+        };
+        let vor_dem_umbau = zeile(z).await;
+
+        bis(175)
+            .run(&pool)
+            .await
+            .expect("0175 läuft auf einer DB mit Bestand");
+
+        assert_eq!(
+            zeile(z).await,
+            vor_dem_umbau,
+            "Zeile übersteht den Rebuild unverändert"
+        );
+        let spec: Option<String> =
+            sqlx::query_scalar("SELECT zeichen_spec FROM freies_zeichen WHERE id = ?")
+                .bind(z)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            spec, None,
+            "kein Backfill: der Bestand behält seine Altform"
+        );
+        assert_eq!(indizes().await, indizes_vorher, "derselbe Index");
+        assert_eq!(
+            fremdschluessel().await,
+            fks_vorher,
+            "dieselben Fremdschlüssel"
+        );
+        let fk: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check()")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(fk, 0, "kein hängender Fremdschlüssel nach dem Rebuild");
+
+        // Genau eine Form: Zeichenbeschreibung ohne Grundzeichen geht …
+        let spec_json = r#"{"v":1,"freestanding":{"kind":"pictogram","pictogram":"x"}}"#;
+        let neu: i64 = sqlx::query_scalar(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, erstellt_von) \
+             VALUES (?, 50.2, 8.7, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(spec_json)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .expect("Zeichenbeschreibung allein ist eine Form");
+        // … beide zugleich nicht …
+        let beide = sqlx::query(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, zeichen_spec, \
+                erstellt_von) VALUES (?, 50.2, 8.7, 'einheit', ?, ?)",
+        )
+        .bind(e)
+        .bind(spec_json)
+        .bind(b)
+        .execute(&pool)
+        .await;
+        assert!(beide.is_err(), "beide Formen zugleich verletzen den CHECK");
+        // … und keine auch nicht.
+        let keine = sqlx::query(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, erstellt_von) \
+             VALUES (?, 50.2, 8.7, ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await;
+        assert!(keine.is_err(), "keine Form verletzt den CHECK");
+        let umschreiben = sqlx::query("UPDATE freies_zeichen SET zeichen_spec = ? WHERE id = ?")
+            .bind(spec_json)
+            .bind(z)
+            .execute(&pool)
+            .await;
+        assert!(
+            umschreiben.is_err(),
+            "auch ein UPDATE darf nicht zwei Formen hinterlassen"
+        );
+
+        // SET NULL beim Löschen der Ansicht, CASCADE beim Löschen des Einsatzes.
+        sqlx::query("DELETE FROM karten_ansicht WHERE id = ?")
+            .bind(a)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let ansicht: Option<i64> =
+            sqlx::query_scalar("SELECT ansicht_id FROM freies_zeichen WHERE id = ?")
+                .bind(z)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            ansicht, None,
+            "ON DELETE SET NULL auf karten_ansicht wirkt weiter"
+        );
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM freies_zeichen WHERE id IN (?, ?)")
+                .bind(z)
+                .bind(neu)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(rest, 0, "ON DELETE CASCADE auf einsatz wirkt weiter");
+    }
 }
