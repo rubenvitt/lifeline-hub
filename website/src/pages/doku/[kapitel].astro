@@ -44,13 +44,23 @@ const entschluesselt = (text: string) =>
 const attribut = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
-/** Ersetzt den Bild-Platzhalter der Content-Collection durch das fertige `<img>`. */
+function bildDatei(src: string): ImageMetadata | undefined {
+  return BILDER[`../../../../docs/anwender/bilder/${src.replace(/^\.\.\/bilder\//, '')}`]?.default;
+}
+
+/**
+ * Ersetzt den Bild-Platzhalter der Content-Collection durch zwei `<img>`: die helle Fassung und
+ * die dunkle (`<name>.dunkel.png`, `docs/anwender/AGENTS.md`, „Bilder“). Welche sichtbar ist,
+ * entscheidet `data-theme` in `doku.css`; die verborgene lädt dank `loading="lazy"` nicht.
+ */
 function bild(platzhalter: string): string {
   const { alt, src } = JSON.parse(entschluesselt(platzhalter)) as { alt: string; src: string };
-  const datei = BILDER[`../../../../docs/anwender/bilder/${src.replace(/^\.\.\/bilder\//, '')}`];
-  if (!datei) throw new Error(`Bild ${src} fehlt unter docs/anwender/bilder/`);
-  const { src: adresse, width, height } = datei.default;
-  return `<img src="${adresse}" width="${width}" height="${height}" alt="${attribut(alt)}" loading="lazy" decoding="async">`;
+  const hell = bildDatei(src);
+  if (!hell) throw new Error(`Bild ${src} fehlt unter docs/anwender/bilder/`);
+  const dunkel = bildDatei(src.replace(/\.png$/, '.dunkel.png'));
+  const tag = (d: ImageMetadata, art: string) =>
+    `<img class="doku-bild doku-bild--${art}" src="${d.src}" width="${d.width}" height="${d.height}" alt="${attribut(alt)}" loading="lazy" decoding="async">`;
+  return dunkel ? tag(hell, 'hell') + tag(dunkel, 'dunkel') : tag(hell, 'einzeln');
 }
 
 const { eintrag, kapitel } = Astro.props;
@@ -66,26 +76,41 @@ const bereiche = BEREICHE.map((name) => ({
 const stelle = kapitel.findIndex((k) => k.id === eintrag.id);
 const zurueck = stelle > 0 ? kapitel[stelle - 1] : undefined;
 const weiter = kapitel[stelle + 1];
-/** Abschnitte des Kapitels (`## …`) mit den IDs, die der Renderer setzt. */
-const abschnitte = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => ({
-  id: m[1],
-  titel: m[2].replace(/<[^>]+>/g, ''),
-}));
+/** Gliederung des Kapitels: `##` mit den `###` darunter, IDs wie der Renderer sie setzt. */
+const gliederung: { id: string; titel: string; unter: { id: string; titel: string }[] }[] = [];
+for (const m of html.matchAll(/<h([23]) id="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g)) {
+  const eintragTitel = m[3].replace(/<[^>]+>/g, '');
+  if (m[1] === '2') gliederung.push({ id: m[2], titel: eintragTitel, unter: [] });
+  else gliederung.at(-1)?.unter.push({ id: m[2], titel: eintragTitel });
+}
+const ablaeufe = gliederung.find((g) => g.titel === 'Abläufe')?.unter.length ?? 0;
+const woerter = html.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
+const minuten = Math.max(1, Math.round(woerter / 180));
+const quelle = `https://github.com/rubenvitt/lifeline-hub/blob/alpha/docs/anwender/kapitel/${eintrag.id}.md`;
 ---
 
 <Grundriss
   titel={`${eintrag.data.titel} · Anwenderdokumentation · Lifeline Hub`}
   beschreibung={`Anwenderdokumentation Lifeline Hub: ${eintrag.data.titel}.`}
 >
-  <div class="abschnitt doku-seite">
+  <div class="doku-seite">
     <nav class="doku-navi" aria-label="Kapitel">
+      <button class="doku-suchfeld" type="button" data-such-oeffnen>
+        <span>Suchen</span>
+        <kbd class="mono" data-such-kuerzel>⌘K</kbd>
+      </button>
       <details class="doku-navi__klappe" open>
-        <summary class="doku-navi__summary mono">Alle Kapitel</summary>
-        <a class="doku-navi__uebersicht" href="/doku/">Zur Übersicht</a>
+        <summary class="doku-navi__summary">
+          <span>Alle Kapitel</span>
+          <span class="doku-navi__ort mono">{bereich}</span>
+        </summary>
         {
           bereiche.map((b) => (
-            <div class="doku-navi__bereich">
-              <p class="doku-label">{b.name}</p>
+            <details class="doku-navi__bereich" open={b.name === bereich}>
+              <summary>
+                <span>{b.name}</span>
+                <span class="doku-navi__zahl mono">{b.kapitel.length}</span>
+              </summary>
               <ul class="doku-liste">
                 {b.kapitel.map((k) => (
                   <li>
@@ -98,7 +123,7 @@ const abschnitte = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)]
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ))
         }
       </details>
@@ -106,32 +131,45 @@ const abschnitte = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)]
 
     <article class="doku-kapitel">
       <p class="doku-pfad mono">
-        <a href="/doku/">Anwenderdokumentation</a>
+        <a href="/doku/">Doku</a>
         <span aria-hidden="true">/</span>
-        {bereich}
+        <span>{bereich}</span>
       </p>
       <header class="doku-kapitel__kopf">
         <h1 class="doku-kapitel__titel">{eintrag.data.titel}</h1>
-        <p class="doku-fuer">
-          <span class="doku-label">Für</span>
-          {gruppen.map((g) => <span class="doku-marke mono">{g}</span>)}
-        </p>
+        <div class="doku-kapitel__meta">
+          <p class="doku-fuer">
+            <span class="doku-label">Für</span>
+            {gruppen.map((g) => <span class="doku-marke mono">{g}</span>)}
+          </p>
+          <p class="doku-umfang mono">
+            {ablaeufe > 0 && <span>{ablaeufe} {ablaeufe === 1 ? 'Ablauf' : 'Abläufe'}</span>}
+            <span>ca. {minuten} Min. Lesezeit</span>
+          </p>
+        </div>
       </header>
 
-      {
-        abschnitte.length > 1 && (
-          <nav class="doku-inhalt" aria-label="Auf dieser Seite">
-            <p class="doku-label">Auf dieser Seite</p>
-            <ol>
-              {abschnitte.map((a) => (
-                <li>
-                  <a href={`#${a.id}`}>{a.titel}</a>
-                </li>
-              ))}
-            </ol>
-          </nav>
-        )
-      }
+      <details class="doku-inhalt doku-inhalt--im-text">
+        <summary class="doku-label">Auf dieser Seite</summary>
+        <ol class="doku-toc">
+          {
+            gliederung.map((g) => (
+              <li>
+                <a href={`#${g.id}`}>{g.titel}</a>
+                {g.unter.length > 0 && (
+                  <ul>
+                    {g.unter.map((u) => (
+                      <li>
+                        <a href={`#${u.id}`}>{u.titel}</a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))
+          }
+        </ol>
+      </details>
 
       <div class="doku-text">
         <Fragment set:html={html} />
@@ -140,7 +178,10 @@ const abschnitte = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)]
       <nav class="doku-blaettern" aria-label="Kapitel blättern">
         {
           zurueck ? (
-            <a class="doku-blaettern__link doku-blaettern__link--zurueck" href={`/doku/${zurueck.id}/`}>
+            <a
+              class="doku-blaettern__link doku-blaettern__link--zurueck"
+              href={`/doku/${zurueck.id}/`}
+            >
               <span class="doku-label">← Zurück</span>
               <span>{zurueck.data.titel}</span>
             </a>
@@ -150,14 +191,46 @@ const abschnitte = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)]
         }
         {
           weiter && (
-            <a class="doku-blaettern__link doku-blaettern__link--weiter" href={`/doku/${weiter.id}/`}>
+            <a
+              class="doku-blaettern__link doku-blaettern__link--weiter"
+              href={`/doku/${weiter.id}/`}
+            >
               <span class="doku-label">Weiter →</span>
               <span>{weiter.data.titel}</span>
             </a>
           )
         }
       </nav>
+      <p class="doku-quelle mono">
+        <a href={quelle} target="_blank" rel="noopener noreferrer">Kapitel auf GitHub ansehen ↗</a>
+      </p>
     </article>
+
+    <aside class="doku-rand" aria-label="Auf dieser Seite">
+      <p class="doku-label">Auf dieser Seite</p>
+      <ol class="doku-toc" data-toc>
+        {
+          gliederung.map((g) => (
+            <li>
+              <a href={`#${g.id}`} data-toc-link={g.id}>
+                {g.titel}
+              </a>
+              {g.unter.length > 0 && (
+                <ul>
+                  {g.unter.map((u) => (
+                    <li>
+                      <a href={`#${u.id}`} data-toc-link={u.id}>
+                        {u.titel}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))
+        }
+      </ol>
+    </aside>
   </div>
 </Grundriss>
 
@@ -165,4 +238,46 @@ const abschnitte = [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)]
   // Unter 960 px startet die Kapitelliste zu, damit der Text oben steht; darüber bleibt sie offen.
   const klappe = document.querySelector<HTMLDetailsElement>('.doku-navi__klappe');
   if (klappe && !matchMedia('(min-width: 960px)').matches) klappe.open = false;
+
+  // Das aktive Kapitel in der Liste ins Bild holen, ohne die Seite zu rollen.
+  const aktiv = document.querySelector<HTMLElement>('.doku-liste a[aria-current="page"]');
+  const navi = document.querySelector<HTMLElement>('.doku-navi');
+  if (aktiv && navi && matchMedia('(min-width: 960px)').matches) {
+    navi.scrollTop = aktiv.offsetTop - navi.clientHeight / 3;
+  }
+
+  // Inhaltsverzeichnis am Rand: markiert den Abschnitt, in dem die Lesenden gerade sind.
+  const links = new Map(
+    [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')].map((a) => [
+      a.dataset.tocLink,
+      a,
+    ]),
+  );
+  const ueberschriften = [
+    ...document.querySelectorAll<HTMLElement>('.doku-text h2[id], .doku-text h3[id]'),
+  ];
+  let geplant = false;
+  function markiere() {
+    geplant = false;
+    let aktuell: HTMLElement | undefined;
+    for (const h of ueberschriften) {
+      if (h.getBoundingClientRect().top < 120) aktuell = h;
+      else break;
+    }
+    links.forEach((a, id) => {
+      if (id === aktuell?.id) a.setAttribute('aria-current', 'location');
+      else a.removeAttribute('aria-current');
+    });
+  }
+  addEventListener(
+    'scroll',
+    () => {
+      if (!geplant) {
+        geplant = true;
+        requestAnimationFrame(markiere);
+      }
+    },
+    { passive: true },
+  );
+  markiere();
 </script>
