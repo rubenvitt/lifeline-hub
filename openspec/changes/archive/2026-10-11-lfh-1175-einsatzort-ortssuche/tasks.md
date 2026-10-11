@@ -44,7 +44,7 @@
 
 ## 9. Nachweis
 
-- [ ] 9.1 Gates: `cargo test` der berührten Tests, tsc, Lint, Prettier, Vitest komplett, `scripts/check-all.sh --nur schnell`, e2e `einsatzort-ortssuche.spec.ts`, `einsatzdaten-inline.spec.ts`, `einsatzdaten-schmal.spec.ts`, `lagekarte-ortssuche.spec.ts`
+- [x] 9.1 Gates (`check-all.sh` in Bündeln, Container mit 4 Kernen und begrenzter Platte, Rust ohne Debug-Info): Schnellbündel 1–3, 6, 8–14 grün; Rust-Workspace grün (Desktop-Hülle baut hier mangels GTK nicht, `src-tauri/` unberührt); Dev-Seed (15) grün; Vitest in drei Teilen 12 461 Tests grün außer `SchaedenPage.blaettern` „entprellt“ (Timeout, auf `alpha` ebenso rot); e2e Chromium: alle einsatzdaten-nahen Specs grün (`einsatzort-ortssuche`, `einsatzdaten-*`, `lagekarte-ortssuche`, `funkplan`, `gate1`, `gate3`, `kopfzeile-schmal`), die übrigen Fehlschläge des vollen Laufs mit einem Worker grün oder auf `alpha` identisch rot (14 Tests in `datensicht-schmal`, `etb-anhang`, `etb-chronologie`, `fokus-verdeckung`); die CI des PRs fährt alles voll
 
 ## Workflow follow-up
 
