@@ -84,7 +84,7 @@ export default function EinsatzabschnittePage() {
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   // „Abschnitt anlegen“ ist eine Erfassung (LFH-1208, design.md D6): kein lokaler Entwurf mehr in
   // der Gliederung, den Datensatz gibt es erst nach dem Absenden.
-  const [anlegenOffen, setAnlegenOffen] = useState(false);
+  const [isAnlegenOpen, setIsAnlegenOpen] = useState(false);
   const { abBreite } = useViewport();
   const breit = abBreite('md');
   const { token, rollen } = useRollen();
@@ -124,7 +124,7 @@ export default function EinsatzabschnittePage() {
   });
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung eines neuen Abschnitts (Sprungpalette, LFH-506) —
-  // dieselben Schritte wie `anlegenOeffnen`, hier ausgeschrieben, weil die Funktion je Render neu
+  // dieselben Schritte wie `openAnlegen`, hier ausgeschrieben, weil die Funktion je Render neu
   // entsteht. Warten bis der Einsatz geladen ist; Param immer löschen, Erfassung nur bei
   // Schreibrecht.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -133,7 +133,7 @@ export default function EinsatzabschnittePage() {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) {
-      setAnlegenOffen(true);
+      setIsAnlegenOpen(true);
       // Der neue Abschnitt steht danach gewählt in der Gliederung, nicht im Organigramm.
       setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
     }
@@ -202,7 +202,13 @@ export default function EinsatzabschnittePage() {
       patch.mutateAsync({ aid, etikett, patch: p });
   const aufloesen = useMutation({
     mutationFn: (aid: number) => loeseAbschnittAuf(einsatzId, aid),
-    onSuccess: () => {
+    onSuccess: (_, aid) => {
+      // Sofort aus der Liste: bis zum Neuabruf stünde der aufgelöste Abschnitt sonst als Vorwahl
+      // mit bearbeitbaren Zeilen im Detail, und ein Speichern liefe ins Leere. Unterabschnitte
+      // rücken serverseitig hoch; das bringt der Neuabruf.
+      qc.setQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(einsatzId), (alt) =>
+        alt?.filter((a) => a.id !== aid),
+      );
       invalidate();
       setGewaehlt(null);
     },
@@ -229,9 +235,9 @@ export default function EinsatzabschnittePage() {
     raeumeDetail();
   }, [aktuellId, raeumeDetail]);
 
-  function anlegenOeffnen() {
+  function openAnlegen() {
     raeumeDetail();
-    setAnlegenOffen(true);
+    setIsAnlegenOpen(true);
     setzeAnsicht('gliederung');
   }
 
@@ -343,7 +349,7 @@ export default function EinsatzabschnittePage() {
             onWechsel={setzeAnsicht}
           />
           {darfSchreiben && (
-            <Button type="primary" onClick={anlegenOeffnen}>
+            <Button type="primary" onClick={openAnlegen}>
               Abschnitt anlegen
             </Button>
           )}
@@ -373,7 +379,7 @@ export default function EinsatzabschnittePage() {
           <SeitenLeer
             titel="Noch keine Abschnitte"
             aktion={
-              darfSchreiben ? { label: 'Abschnitt anlegen', onClick: anlegenOeffnen } : undefined
+              darfSchreiben ? { label: 'Abschnitt anlegen', onClick: openAnlegen } : undefined
             }
           />
         ) : (
@@ -433,9 +439,7 @@ export default function EinsatzabschnittePage() {
                   /* Derselbe Wortlaut wie der Kopfknopf. Ohne Schreibrecht keine Aktion — ein
                    Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
                   aktion={
-                    darfSchreiben
-                      ? { label: 'Abschnitt anlegen', onClick: anlegenOeffnen }
-                      : undefined
+                    darfSchreiben ? { label: 'Abschnitt anlegen', onClick: openAnlegen } : undefined
                   }
                 />
               ) : (
@@ -505,14 +509,14 @@ export default function EinsatzabschnittePage() {
       )}
       {darfSchreiben && (
         <AbschnittAnlegenModal
-          offen={anlegenOffen}
+          open={isAnlegenOpen}
           einsatzId={einsatzId}
           abschnitte={abschnitte}
           onAngelegt={(id) => {
             setGewaehlt(id);
             setzeAnsicht('gliederung');
           }}
-          onSchliessen={() => setAnlegenOffen(false)}
+          onClose={() => setIsAnlegenOpen(false)}
         />
       )}
     </EinsatzSeite>

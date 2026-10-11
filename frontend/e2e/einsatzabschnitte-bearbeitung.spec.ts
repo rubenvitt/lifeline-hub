@@ -15,15 +15,15 @@ import { FUEKW, anlegen, anmelden, einsatzAnlegen, stelleDichte } from './treffl
 const DICHTEN = ['kompakt', 'handschuh'] as const;
 
 /** Körper aller PATCH/POST an die Abschnitte dieses Einsatzes, in Reihenfolge. */
-function schreibMitschnitt(page: Page, einsatzId: string) {
-  const koerper: { methode: string; body: unknown }[] = [];
-  const muster = new RegExp(`/api/einsaetze/${einsatzId}/abschnitte(/\\d+)?$`);
+function recordWrites(page: Page, einsatzId: string) {
+  const bodies: { methode: string; body: unknown }[] = [];
+  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/abschnitte(/\\d+)?$`);
   page.on('request', (r: Request) => {
-    if ((r.method() === 'PATCH' || r.method() === 'POST') && muster.test(r.url())) {
-      koerper.push({ methode: r.method(), body: r.postDataJSON() });
+    if ((r.method() === 'PATCH' || r.method() === 'POST') && pattern.test(r.url())) {
+      bodies.push({ methode: r.method(), body: r.postDataJSON() });
     }
   });
-  return koerper;
+  return bodies;
 }
 
 for (const dichte of DICHTEN) {
@@ -45,22 +45,22 @@ for (const dichte of DICHTEN) {
       );
       await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte`);
       await stelleDichte(page, dichte);
-      const koerper = schreibMitschnitt(page, einsatzId);
+      const bodies = recordWrites(page, einsatzId);
 
       const detail = page.getByRole('region', { name: 'Abschnitt: Abschnitt Nord' });
-      const leiste = detail.getByRole('radiogroup', { name: 'Lagezustand' });
-      await expect(leiste.getByRole('radio', { name: 'angespannt' })).toHaveAttribute(
+      const bar = detail.getByRole('radiogroup', { name: 'Lagezustand' });
+      await expect(bar.getByRole('radio', { name: 'angespannt' })).toHaveAttribute(
         'aria-checked',
         'true',
       );
-      await leiste.getByRole('radio', { name: 'kritisch' }).click();
+      await bar.getByRole('radio', { name: 'kritisch' }).click();
 
-      await expect(leiste.getByRole('radio', { name: 'kritisch' })).toHaveAttribute(
+      await expect(bar.getByRole('radio', { name: 'kritisch' })).toHaveAttribute(
         'aria-checked',
         'true',
       );
       await expect
-        .poll(() => koerper)
+        .poll(() => bodies)
         .toEqual([{ methode: 'PATCH', body: { lagezustand: 'kritisch' } }]);
       // Nur der Wechsel schreibt System-ETB (LFH-608).
       await expect
@@ -76,7 +76,7 @@ for (const dichte of DICHTEN) {
       await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Carla Christ' } }, 'Personal');
       await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte`);
       await stelleDichte(page, dichte);
-      const koerper = schreibMitschnitt(page, einsatzId);
+      const bodies = recordWrites(page, einsatzId);
 
       const detail = page.getByRole('region', { name: 'Abschnitt: Abschnitt Nord' });
       await detail.getByRole('button', { name: 'Abschnittsleiter eintragen' }).click();
@@ -86,8 +86,8 @@ for (const dichte of DICHTEN) {
       await expect(
         detail.getByRole('button', { name: 'Abschnittsleiter bearbeiten' }),
       ).toHaveAccessibleDescription('Carla Christ');
-      expect(koerper).toHaveLength(1);
-      expect(Object.keys(koerper[0].body as object)).toEqual(['leiter_id']);
+      expect(bodies).toHaveLength(1);
+      expect(Object.keys(bodies[0].body as object)).toEqual(['leiter_id']);
     });
 
     test('Abschnitt anlegen: drei Felder, Enter sendet, danach gewählt', async ({ page }) => {
@@ -96,7 +96,7 @@ for (const dichte of DICHTEN) {
       await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte`);
       await stelleDichte(page, dichte);
       await expect(page.getByRole('region', { name: 'Abschnitt: Abschnitt Nord' })).toBeVisible();
-      const koerper = schreibMitschnitt(page, einsatzId);
+      const bodies = recordWrites(page, einsatzId);
 
       await page.getByRole('button', { name: 'Abschnitt anlegen' }).first().click();
       const dialog = page.getByRole('dialog', { name: 'Abschnitt anlegen' });
@@ -110,7 +110,7 @@ for (const dichte of DICHTEN) {
         page.getByRole('region', { name: 'Abschnitt: Deichverteidigung' }),
       ).toBeVisible();
       await expect(dialog).toBeHidden();
-      expect(koerper).toEqual([
+      expect(bodies).toEqual([
         {
           methode: 'POST',
           body: { name: 'Deichverteidigung', kurzbezeichnung: null, ueber_abschnitt_id: null },

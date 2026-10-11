@@ -6,9 +6,9 @@ import { leerZuNull } from '../../api/patchTriState';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Einsatzabschnitt } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { findKurzbezeichnungKonflikt, kurzbezeichnungVergeben } from './kurzbezeichnung';
+import { findKurzbezeichnungConflict, kurzbezeichnungVergeben } from './kurzbezeichnung';
 
-interface AnlegenWerte {
+interface AnlegenValues {
   name: string;
   kurzbezeichnung?: string;
   ueber_abschnitt_id?: number | null;
@@ -20,27 +20,27 @@ interface AnlegenWerte {
  * Leiter, Funk — ergänzt man danach im Detail, wo der neue Abschnitt gewählt steht.
  */
 export default function AbschnittAnlegenModal({
-  offen,
+  open,
   einsatzId,
   abschnitte,
   onAngelegt,
-  onSchliessen,
+  onClose,
 }: {
-  offen: boolean;
+  open: boolean;
   einsatzId: number;
   abschnitte: Einsatzabschnitt[];
   /** Nach dem Erfolg, mit der Kennung des neuen Abschnitts; der Aufrufer wählt ihn. */
   onAngelegt: (id: number) => void;
-  onSchliessen: () => void;
+  onClose: () => void;
 }) {
-  const [form] = Form.useForm<AnlegenWerte>();
+  const [form] = Form.useForm<AnlegenValues>();
   const qc = useQueryClient();
   // Die Kennung des neuen Abschnitts für `onFertig`: `anlegen.data` stünde dort erst nach dem
   // nächsten Rendern.
-  const neuId = useRef<number | null>(null);
+  const newIdRef = useRef<number | null>(null);
 
   const anlegen = useMutation({
-    mutationFn: (w: AnlegenWerte) =>
+    mutationFn: (w: AnlegenValues) =>
       legeAbschnittAn(einsatzId, {
         name: w.name.trim(),
         kurzbezeichnung: leerZuNull(w.kurzbezeichnung),
@@ -57,8 +57,8 @@ export default function AbschnittAnlegenModal({
   });
 
   return (
-    <ErfassungsModal<AnlegenWerte>
-      offen={offen}
+    <ErfassungsModal<AnlegenValues>
+      offen={open}
       titel="Abschnitt anlegen"
       form={form}
       erfassenText="Anlegen"
@@ -67,14 +67,14 @@ export default function AbschnittAnlegenModal({
       speicherung={anlegen}
       // `mutateAsync`: bei Ablehnung muss die Zusage brechen (LFH-332).
       onErfassen={async (w) => {
-        neuId.current = (await anlegen.mutateAsync(w)).id;
+        newIdRef.current = (await anlegen.mutateAsync(w)).id;
       }}
       onFertig={() => {
-        if (neuId.current != null) onAngelegt(neuId.current);
-        neuId.current = null;
-        onSchliessen();
+        if (newIdRef.current != null) onAngelegt(newIdRef.current);
+        newIdRef.current = null;
+        onClose();
       }}
-      onAbbrechen={onSchliessen}
+      onAbbrechen={onClose}
     >
       <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
         <Input />
@@ -85,10 +85,12 @@ export default function AbschnittAnlegenModal({
         name="kurzbezeichnung"
         rules={[
           {
-            validator: (_, wert?: string) => {
-              const belegt = wert ? findKurzbezeichnungKonflikt(abschnitte, wert, undefined) : null;
-              return belegt
-                ? Promise.reject(new Error(kurzbezeichnungVergeben(belegt)))
+            validator: (_, value?: string) => {
+              const conflict = value
+                ? findKurzbezeichnungConflict(abschnitte, value, undefined)
+                : null;
+              return conflict
+                ? Promise.reject(new Error(kurzbezeichnungVergeben(conflict)))
                 : Promise.resolve();
             },
           },

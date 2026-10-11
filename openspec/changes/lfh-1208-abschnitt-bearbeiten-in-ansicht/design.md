@@ -105,8 +105,11 @@ Die Seite bildet ihn auf `lagezustand: null` ab, denn die Leiste kennt kein `nul
 
 Ein Wechsel ruft `patch` sofort. Bis zur Antwort zeigt die Leiste die gewählte Stufe
 (lokaler Wert), bei Ablehnung springt sie auf den Serverstand zurück, und der Grund steht als
-`ZeilenFehler` unter der Leiste. Solange ein Wechsel läuft, löst ein weiterer Klick nichts aus
-(Riegel in der Handler-Funktion). Sonst könnte eine ältere Antwort eine jüngere Wahl überholen.
+`ZeilenFehler` unter der Leiste. Es ist immer nur eine Anfrage unterwegs, sonst könnte eine ältere
+Antwort eine jüngere Wahl überholen. Eine Wahl währenddessen wird gemerkt und angezeigt (Häkchen
+und Fokus stimmen überein); nach der Antwort geht die jeweils letzte hinaus, wenn sie vom
+Gesendeten abweicht. Ein erster Entwurf verwarf sie still; das Review fand, dass der Fokus dann
+auf einer nicht gewählten Stufe stand.
 Pfeiltasten wählen in der Segmentleiste schon heute (APG), jede Wahl speichert also. Das ist
 gewollt: ein Schritt ist ein Wechsel, und der Server schreibt je Wechsel einen ETB-Eintrag.
 
@@ -123,7 +126,8 @@ können, stehen unter Risiken.
 `InlineAngabe` hat keine Feldprüfung. Die Zeile Kurzbezeichnung prüft deshalb in `onSpeichern` mit
 derselben NOCASE-Vergleichsform wie heute (`nocase`, aus der Seite in ein kleines reines Modul
 `pages/einsatzabschnitte/kurzbezeichnung.ts` gezogen). Ist die Bezeichnung vergeben, lehnt die
-Zusage mit `Error('Schon vergeben (<Name>)')` ab, ohne Anfrage. `InlineAngabe` zeigt das wie
+Zusage mit `ApiError(409, 'Schon vergeben (<Name>)')` ab, ohne Anfrage: dieselbe Ablehnung, die der
+Index des Servers gäbe, und nur deren Meldung zeigt die Zeile wörtlich. `InlineAngabe` zeigt das wie
 jede Ablehnung an der Zeile. Das Anlegen-Modal nutzt dieselbe Funktion als Feldregel.
 
 *Alternative:* eine `pruefe`-Prop an `InlineAngabe`. Ein neuer Baustein-Vertrag für einen einzigen
@@ -164,8 +168,8 @@ greift also nicht mehr. Damit erledigt sich der Befund „kein Verlassen-Schutz 
 
 ## Risks / Trade-offs
 
-- [Pfeiltasten in der Lagezustand-Leiste schreiben je Schritt einen ETB-Eintrag] → Der Riegel
-  während eines laufenden Wechsels verhindert Überholen. Die Leiste hat vier Stufen, und wer mit
+- [Pfeiltasten in der Lagezustand-Leiste schreiben je Schritt einen ETB-Eintrag] → Schritte
+  während einer laufenden Anfrage fallen zu einer zusammen (nur die letzte geht hinaus). Die Leiste hat vier Stufen, und wer mit
   Pfeilen wandert, landet in höchstens drei Schritten am Ziel. Häufen sich im Feld solche
   Zwischeneinträge, kommt ein Nachzug, der Pfeile nur wandern lässt.
 - [Ein Fehlklick auf „kritisch“ wirkt sofort und steht im ETB] → So ist es gewollt: ein Klick,

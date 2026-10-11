@@ -7,12 +7,12 @@ import { renderMitProviders } from '../../test/utils';
 import type { Einsatzabschnitt } from '../../api/types';
 import AbschnittAnlegenModal from './AbschnittAnlegenModal';
 
-const bestand = [
+const abschnitte = [
   { id: 5, einsatz_id: 1, name: 'Abschnitt Nord', kurzbezeichnung: 'EA 1' },
   { id: 6, einsatz_id: 1, name: 'Süd', kurzbezeichnung: null },
 ] as Einsatzabschnitt[];
 
-function mitschnitt(antwort: () => Response = () => HttpResponse.json({ id: 9, name: 'x' })) {
+function recordPosts(antwort: () => Response = () => HttpResponse.json({ id: 9, name: 'x' })) {
   const bodies: unknown[] = [];
   server.use(
     http.post('/api/einsaetze/1/abschnitte', async ({ request }) => {
@@ -23,24 +23,24 @@ function mitschnitt(antwort: () => Response = () => HttpResponse.json({ id: 9, n
   return bodies;
 }
 
-function zeige() {
+function renderModal() {
   const onAngelegt = vi.fn();
-  const onSchliessen = vi.fn();
+  const onClose = vi.fn();
   renderMitProviders(
     <AbschnittAnlegenModal
-      offen
+      open
       einsatzId={1}
-      abschnitte={bestand}
+      abschnitte={abschnitte}
       onAngelegt={onAngelegt}
-      onSchliessen={onSchliessen}
+      onClose={onClose}
     />,
   );
-  return { onAngelegt, onSchliessen };
+  return { onAngelegt, onClose };
 }
 
 describe('AbschnittAnlegenModal (LFH-1208)', () => {
   it('Feldbudget: genau drei sichtbare Felder — Name, Kurzbezeichnung, Über-Abschnitt', async () => {
-    zeige();
+    renderModal();
     const dialog = await screen.findByRole('dialog', { name: 'Abschnitt anlegen' });
     const felder = dialog.querySelectorAll('.ant-form-item');
     // Die Gegenprobe zur Obergrenze: drei benannte Felder, nicht bloß „höchstens drei“.
@@ -54,9 +54,9 @@ describe('AbschnittAnlegenModal (LFH-1208)', () => {
   });
 
   it('Fokus im Namen, Enter sendet genau die drei Felder', async () => {
-    const bodies = mitschnitt();
+    const bodies = recordPosts();
     const user = userEvent.setup();
-    const { onAngelegt } = zeige();
+    const { onAngelegt } = renderModal();
     const name = await screen.findByRole('textbox', { name: 'Name' });
     await waitFor(() => expect(name).toHaveFocus());
     await user.type(name, '  Deichverteidigung {Enter}');
@@ -67,7 +67,7 @@ describe('AbschnittAnlegenModal (LFH-1208)', () => {
   });
 
   it('Struktur der Erfassungs-Norm: Absende-Knopf im Formular, keine antd-Fußzeile', async () => {
-    zeige();
+    renderModal();
     const dialog = await screen.findByRole('dialog');
     const knopf = within(dialog).getByRole('button', { name: /Anlegen/ });
     expect(knopf.closest('form')).not.toBeNull();
@@ -75,9 +75,9 @@ describe('AbschnittAnlegenModal (LFH-1208)', () => {
   });
 
   it('Kurzbezeichnung und Über-Abschnitt gehen mit', async () => {
-    const bodies = mitschnitt();
+    const bodies = recordPosts();
     const user = userEvent.setup();
-    zeige();
+    renderModal();
     await user.type(await screen.findByRole('textbox', { name: 'Name' }), 'Deichspitze');
     await user.type(screen.getByRole('textbox', { name: 'Kurzbezeichnung' }), 'EA 1.1');
     await user.click(screen.getByRole('combobox', { name: 'Über-Abschnitt' }));
@@ -91,19 +91,19 @@ describe('AbschnittAnlegenModal (LFH-1208)', () => {
   });
 
   it('vergebene Kurzbezeichnung: Grund am Feld, nichts gesendet', async () => {
-    const bodies = mitschnitt();
+    const bodies = recordPosts();
     const user = userEvent.setup();
-    zeige();
+    renderModal();
     await user.type(await screen.findByRole('textbox', { name: 'Name' }), 'Neu');
     await user.type(screen.getByRole('textbox', { name: 'Kurzbezeichnung' }), 'ea 1{Enter}');
     expect(await screen.findByText('Schon vergeben (Abschnitt Nord)')).toBeInTheDocument();
     expect(bodies).toEqual([]);
   });
 
-  it('Ablehnung: der Dialog bleibt mit den Werten offen, der Grund steht in ihm', async () => {
-    mitschnitt(() => HttpResponse.json({ error: 'Kurzbezeichnung vergeben' }, { status: 409 }));
+  it('Ablehnung: der Dialog bleibt mit den Werten open, der Grund steht in ihm', async () => {
+    recordPosts(() => HttpResponse.json({ error: 'Kurzbezeichnung vergeben' }, { status: 409 }));
     const user = userEvent.setup();
-    const { onAngelegt } = zeige();
+    const { onAngelegt } = renderModal();
     await user.type(await screen.findByRole('textbox', { name: 'Name' }), 'Neu{Enter}');
     const dialog = screen.getByRole('dialog');
     expect(await within(dialog).findByText('Kurzbezeichnung vergeben')).toBeInTheDocument();
@@ -112,12 +112,12 @@ describe('AbschnittAnlegenModal (LFH-1208)', () => {
   });
 
   it('Abbrechen sendet nichts', async () => {
-    const bodies = mitschnitt();
+    const bodies = recordPosts();
     const user = userEvent.setup();
-    const { onSchliessen } = zeige();
+    const { onClose } = renderModal();
     await user.type(await screen.findByRole('textbox', { name: 'Name' }), 'Verworfen');
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    expect(onSchliessen).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
     expect(bodies).toEqual([]);
   });
 });

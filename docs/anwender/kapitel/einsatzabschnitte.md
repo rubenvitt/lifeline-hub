@@ -29,6 +29,8 @@ Führungspersonal.
 
 ### Einen Abschnitt anlegen
 
+Für Einsatzleitung und Führungspersonal:
+
 1. Im Seitenkopf „Abschnitt anlegen“ wählen.
 2. „Name“ eintragen, bei Bedarf „Kurzbezeichnung“ und den „Über-Abschnitt“ für einen
    Unterabschnitt.
@@ -40,11 +42,15 @@ Führungspersonal.
 
 ### Die Lage eines Abschnitts setzen
 
+Für Einsatzleitung und Führungspersonal:
+
 1. In der Gliederung den Abschnitt wählen.
 2. Unter „Lagezustand“ die Stufe wählen: „nicht beurteilt“, „planmäßig“, „angespannt“ oder
    „kritisch“. Die Wahl gilt sofort.
 
 ### Eine Angabe ändern
+
+Für Einsatzleitung und Führungspersonal:
 
 1. In der Gliederung den Abschnitt wählen.
 2. Auf den Wert der Angabe tippen, etwa auf den Abschnittsleiter; eine leere Angabe heißt
@@ -57,6 +63,8 @@ Fehlt eine Sprechgruppe in der Liste, legt „neue Sprechgruppe anlegen“ sie f
 Einheiten werden nicht hier zugeordnet, sondern an der Einheit selbst im Feld „Abschnitt“.
 
 ### Einen Abschnitt auflösen
+
+Für Einsatzleitung und Führungspersonal:
 
 1. In der Gliederung den Abschnitt wählen.
 2. Unter den Angaben „Auflösen“ wählen und die Rückfrage „Abschnitt auflösen?“ mit „Abschnitt
@@ -94,8 +102,11 @@ ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
 - Jede Angabe wird für sich gespeichert. Was ein anderer Arbeitsplatz inzwischen an einer anderen
   Angabe geändert hat, bleibt dabei stehen.
-- Ein Fortschritt in Prozent wird nicht geführt: die Lage trägt der Lagezustand, den Arbeitsstand
-  zeigen die offenen Aufträge eines Abschnitts im Führungsüberblick.
+- Die Lage eines Abschnitts trägt der Lagezustand, seinen Arbeitsstand zeigen die offenen
+  Aufträge des Abschnitts im Führungsüberblick.
+- Jede Wahl in „Lagezustand“ gilt sofort, auch mit den Pfeiltasten, und jeder Wechsel steht im
+  Einsatztagebuch. Wer mit den Pfeiltasten über eine Stufe hinweg wandert, erzeugt deshalb auch
+  für die Zwischenstufe einen Eintrag; ein Klick auf die Zielstufe erzeugt nur einen.
 - Die „Kurzbezeichnung“ ist höchstens 20 Zeichen lang und je Einsatz eindeutig, ohne Rücksicht auf
   Groß- und Kleinschreibung; eine doppelte meldet „Schon vergeben (…)“.
 - Beim Auflösen rücken Unterabschnitte eine Ebene hoch, zugeordnete Einheiten stehen danach

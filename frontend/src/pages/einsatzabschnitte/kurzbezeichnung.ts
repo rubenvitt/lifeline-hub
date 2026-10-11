@@ -4,23 +4,23 @@ import type { Einsatzabschnitt } from '../../api/types';
 export const nocase = (s: string) => s.trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
 
 /**
- * Der Abschnitt, der die Kurzbezeichnung `wert` schon trägt — `undefined`, wenn sie frei, leer oder
- * die eigene (`eigeneId`) ist. Spiegelt den Index `einsatzabschnitt_kurzbezeichnung_eindeutig`
+ * Der Abschnitt, der die Kurzbezeichnung `value` schon trägt — `undefined`, wenn sie frei, leer oder
+ * die eigene (`ownId`) ist. Spiegelt den Index `einsatzabschnitt_kurzbezeichnung_eindeutig`
  * (NOCASE), damit Detailzeile und Anlegen-Dialog am Feld ablehnen statt erst am Server (LFH-1078,
  * LFH-1208). Der Server bleibt die Wahrheit.
  */
-export function findKurzbezeichnungKonflikt(
+export function findKurzbezeichnungConflict(
   abschnitte: readonly Einsatzabschnitt[],
-  wert: string,
-  eigeneId: number | undefined,
+  value: string,
+  ownId: number | undefined,
 ): Einsatzabschnitt | undefined {
-  const kurz = nocase(wert);
-  if (kurz === '') return undefined;
+  const normalized = nocase(value);
+  if (normalized === '') return undefined;
   return abschnitte.find(
-    (a) => a.id !== eigeneId && a.kurzbezeichnung != null && nocase(a.kurzbezeichnung) === kurz,
+    (a) => a.id !== ownId && a.kurzbezeichnung != null && nocase(a.kurzbezeichnung) === normalized,
   );
 }
 
 /** Wortlaut der Ablehnung — eine Quelle für Zeile und Dialog. */
-export const kurzbezeichnungVergeben = (belegt: Einsatzabschnitt) =>
-  `Schon vergeben (${belegt.name})`;
+export const kurzbezeichnungVergeben = (conflict: Einsatzabschnitt) =>
+  `Schon vergeben (${conflict.name})`;

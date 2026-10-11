@@ -26,7 +26,7 @@ import SprechgruppenPicker from '../../components/SprechgruppenPicker';
 import StatusTag from '../../components/StatusTag';
 import { abschnittLagezustand, rollenFarbe } from '../../theme/statusFarben';
 import { nachfahrenInkl, type AbschnittStaerken } from './abschnittStaerke';
-import { findKurzbezeichnungKonflikt, kurzbezeichnungVergeben } from './kurzbezeichnung';
+import { findKurzbezeichnungConflict, kurzbezeichnungVergeben } from './kurzbezeichnung';
 
 /**
  * Speichert EINE Angabe des Abschnitts (LFH-1208): `etikett` nennt sie in der Erfolgsmeldung, der
@@ -48,13 +48,13 @@ interface AbschnittDetailProps {
 }
 
 /** Leer ist ein Text, der nach dem Trimmen nichts übrig lässt — wie `leerZuNull` beim Senden. */
-const leererText = (w: string) => w.trim() === '';
-const gleicherText = (a: string, b: string) => a.trim() === b.trim();
+const isEmptyText = (w: string) => w.trim() === '';
+const isSameText = (a: string, b: string) => a.trim() === b.trim();
 
-function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
+function isSameIds(a: readonly number[], b: readonly number[]): boolean {
   if (a.length !== b.length) return false;
-  const menge = new Set(a);
-  return b.every((id) => menge.has(id));
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
 }
 
 /**
@@ -79,17 +79,18 @@ export default function AbschnittDetail({
   darfSchreiben,
   onPatch,
 }: AbschnittDetailProps) {
-  const text = (
+  const textRow = (
     etikett: string,
     feld: 'abschnittsauftrag' | 'erreichbarkeit' | 'bemerkung',
     mehrzeilig: boolean,
+    placeholder?: string,
   ) => (
     <InlineAngabe<string>
       etikett={etikett}
       wert={a[feld] ?? ''}
       anzeige={<span style={{ whiteSpace: 'pre-wrap' }}>{a[feld]}</span>}
-      leer={leererText}
-      gleich={gleicherText}
+      leer={isEmptyText}
+      gleich={isSameText}
       darfSchreiben={darfSchreiben}
       mehrzeilig={mehrzeilig}
       onSpeichern={(w) => onPatch(etikett, { [feld]: leerZuNull(w) })}
@@ -102,18 +103,23 @@ export default function AbschnittDetail({
             onChange={(e) => onChange(e.target.value)}
           />
         ) : (
-          <Input {...f} value={value} onChange={(e) => onChange(e.target.value)} />
+          <Input
+            {...f}
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
         )
       }
     />
   );
 
   // Ein Abschnitt kann nicht unter sich selbst oder einen eigenen Unterabschnitt rücken.
-  const verboten = nachfahrenInkl(abschnitte, a.id);
-  const ueberOptionen = abschnitte
-    .filter((x) => !verboten.has(x.id))
+  const excludedIds = nachfahrenInkl(abschnitte, a.id);
+  const ueberAbschnittOptions = abschnitte
+    .filter((x) => !excludedIds.has(x.id))
     .map((x) => ({ value: x.id, title: x.name }));
-  const ueberName = abschnitte.find((x) => x.id === a.ueber_abschnitt_id)?.name ?? null;
+  const ueberAbschnittName = abschnitte.find((x) => x.id === a.ueber_abschnitt_id)?.name ?? null;
 
   const { tmo, dmo } = teileSprechgruppen(a.sprechgruppen);
   const sprechgruppenText = [
@@ -130,8 +136,8 @@ export default function AbschnittDetail({
           etikett="Name"
           wert={a.name}
           anzeige={a.name}
-          leer={leererText}
-          gleich={gleicherText}
+          leer={isEmptyText}
+          gleich={isSameText}
           darfSchreiben={darfSchreiben}
           pflicht
           onSpeichern={(w) => onPatch('Name', { name: w.trim() })}
@@ -145,13 +151,14 @@ export default function AbschnittDetail({
           etikett="Kurzbezeichnung"
           wert={a.kurzbezeichnung ?? ''}
           anzeige={<span style={monoStil(13)}>{a.kurzbezeichnung}</span>}
-          leer={leererText}
-          gleich={gleicherText}
+          leer={isEmptyText}
+          gleich={isSameText}
           darfSchreiben={darfSchreiben}
           onSpeichern={(w) => {
-            const belegt = findKurzbezeichnungKonflikt(abschnitte, w, a.id);
+            const conflict = findKurzbezeichnungConflict(abschnitte, w, a.id);
             // Dieselbe Ablehnung, die der Index des Servers mit 409 gäbe — nur ohne Anfrage.
-            if (belegt) return Promise.reject(new ApiError(409, kurzbezeichnungVergeben(belegt)));
+            if (conflict)
+              return Promise.reject(new ApiError(409, kurzbezeichnungVergeben(conflict)));
             return onPatch('Kurzbezeichnung', { kurzbezeichnung: leerZuNull(w) });
           }}
           eingabe={({ feld, value, onChange }) => (
@@ -169,7 +176,7 @@ export default function AbschnittDetail({
         <InlineAngabe<number | null>
           etikett="Über-Abschnitt"
           wert={a.ueber_abschnitt_id ?? null}
-          anzeige={ueberName}
+          anzeige={ueberAbschnittName}
           leer={(w) => w == null}
           darfSchreiben={darfSchreiben}
           onSpeichern={(w) => onPatch('Über-Abschnitt', { ueber_abschnitt_id: w })}
@@ -178,7 +185,8 @@ export default function AbschnittDetail({
               {...feld}
               {...popup}
               allowClear
-              treeData={ueberOptionen}
+              placeholder="oberster Abschnitt"
+              treeData={ueberAbschnittOptions}
               value={value ?? undefined}
               onChange={(w) => onChange(w ?? null)}
             />
@@ -198,6 +206,7 @@ export default function AbschnittDetail({
               {...feld}
               {...popup}
               allowClear
+              placeholder="Disponierte Person"
               options={personal.map((p) => ({ value: p.id, label: p.name }))}
               value={value ?? undefined}
               onChange={(w) => onChange(w ?? null)}
@@ -206,14 +215,14 @@ export default function AbschnittDetail({
         />
       </Datenfeld>
       <Datenfeld label="Lagezustand" breit>
-        <LagezustandWahl
-          wert={a.lagezustand ?? null}
+        <LagezustandSelect
+          value={a.lagezustand ?? null}
           darfSchreiben={darfSchreiben}
           onPatch={onPatch}
         />
       </Datenfeld>
       <Datenfeld label="Abschnittsauftrag" breit>
-        {text('Abschnittsauftrag', 'abschnittsauftrag', true)}
+        {textRow('Abschnittsauftrag', 'abschnittsauftrag', true)}
       </Datenfeld>
       <Datenfeld label="Sprechgruppen">
         <InlineAngabe<number[]>
@@ -221,7 +230,7 @@ export default function AbschnittDetail({
           wert={(a.sprechgruppen ?? []).map((s) => s.id)}
           anzeige={<span style={monoStil(13)}>{sprechgruppenText}</span>}
           leer={(ids) => ids.length === 0}
-          gleich={gleicheIds}
+          gleich={isSameIds}
           darfSchreiben={darfSchreiben}
           onSpeichern={(ids) => onPatch('Sprechgruppen', { sprechgruppe_ids: ids })}
           eingabe={({ feld, popup, value, onChange }) => (
@@ -247,6 +256,7 @@ export default function AbschnittDetail({
               {...feld}
               {...popup}
               allowClear
+              placeholder="Digitalfunk / Mobil / Festnetz"
               options={KOMMUNIKATIONSMITTEL_OPTIONEN}
               value={value ?? undefined}
               onChange={(w) => onChange(w ?? null)}
@@ -255,9 +265,9 @@ export default function AbschnittDetail({
         />
       </Datenfeld>
       <Datenfeld label="Erreichbarkeit / Nummer">
-        {text('Erreichbarkeit / Nummer', 'erreichbarkeit', false)}
+        {textRow('Erreichbarkeit / Nummer', 'erreichbarkeit', false, 'z. B. 0151 23456')}
       </Datenfeld>
-      <Datenfeld label="Bemerkung">{text('Bemerkung', 'bemerkung', true)}</Datenfeld>
+      <Datenfeld label="Bemerkung">{textRow('Bemerkung', 'bemerkung', true)}</Datenfeld>
       <Datenfeld label="Stärke (F/UF/M//Σ)" mono>
         <StaerkeAnzeige wert={staerken.eigene} />
       </Datenfeld>
@@ -270,73 +280,100 @@ export default function AbschnittDetail({
 
 /** Wert der Segmentleiste für „nicht beurteilt“ — die Leiste kennt kein `null`. */
 const NICHT_BEURTEILT = 'nicht_beurteilt';
-type LageWahl = AbschnittLagezustand | typeof NICHT_BEURTEILT;
-const STUFEN = ['planmaessig', 'angespannt', 'kritisch'] as const;
+type LagezustandValue = AbschnittLagezustand | typeof NICHT_BEURTEILT;
+const LAGE_STUFEN = ['planmaessig', 'angespannt', 'kritisch'] as const;
 
 /**
  * Lagezustand mit einem Klick (design.md D4): jede Wahl der Segmentleiste speichert sofort, auch
  * mit den Pfeiltasten — der Wechsel IST die Handlung, und der Server schreibt je Wechsel einen
  * ETB-Eintrag. Bis zur Antwort steht die gewählte Stufe; eine Ablehnung springt auf den Serverstand
- * zurück und nennt den Grund an der Zeile. Ein Riegel hält weitere Wahlen an, solange eine läuft:
- * sonst könnte eine ältere Antwort eine jüngere Wahl überholen.
+ * zurück und nennt den Grund an der Zeile.
+ *
+ * Immer nur EINE Anfrage unterwegs, sonst könnte eine ältere Antwort eine jüngere Wahl überholen.
+ * Eine Wahl währenddessen geht nicht verloren: die Leiste zeigt sie (Fokus und Häkchen stimmen
+ * überein), und nach der Antwort geht die jeweils letzte hinaus, wenn sie vom Gesendeten abweicht.
  */
-function LagezustandWahl({
-  wert,
+function LagezustandSelect({
+  value,
   darfSchreiben,
   onPatch,
 }: {
-  wert: AbschnittLagezustand | null;
+  value: AbschnittLagezustand | null;
   darfSchreiben: boolean;
   onPatch: AbschnittPatchHandler;
 }) {
   const { token, rollen } = useRollen();
-  const [laufend, setLaufend] = useState<LageWahl | null>(null);
-  const [fehler, setFehler] = useState<unknown>(null);
-  const sendetRef = useRef(false);
+  const [pending, setPending] = useState<LagezustandValue | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const isSendingRef = useRef(false);
+  const nextRef = useRef<LagezustandValue | null>(null);
 
   if (!darfSchreiben) {
     // Fehlende Beurteilung als Wort, nicht als leere Zelle (LFH-608).
-    return wert ? (
-      <StatusTag darstellung={abschnittLagezustand[wert]} darstellungsart="rand" />
+    return value ? (
+      <StatusTag darstellung={abschnittLagezustand[value]} darstellungsart="rand" />
     ) : (
       <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
     );
   }
 
-  const optionen: SegmentOption<LageWahl>[] = [
+  const options: SegmentOption<LagezustandValue>[] = [
     { wert: NICHT_BEURTEILT, label: 'nicht beurteilt' },
-    ...STUFEN.map((l) => ({
+    ...LAGE_STUFEN.map((l) => ({
       wert: l,
       label: abschnittLagezustand[l].label,
       punkt: rollenFarbe(abschnittLagezustand[l].rolle, token),
     })),
   ];
-  const gespeichert: LageWahl = wert ?? NICHT_BEURTEILT;
+  const saved: LagezustandValue = value ?? NICHT_BEURTEILT;
 
-  async function waehle(neu: LageWahl) {
-    if (sendetRef.current || neu === gespeichert) return;
-    sendetRef.current = true;
-    setLaufend(neu);
-    setFehler(null);
+  async function select(choice: LagezustandValue) {
+    if (isSendingRef.current) {
+      nextRef.current = choice;
+      setPending(choice);
+      return;
+    }
+    if (choice === saved) return;
+    isSendingRef.current = true;
+    setPending(choice);
+    setError(null);
+    let current = choice;
     try {
-      await onPatch('Lagezustand', { lagezustand: neu === NICHT_BEURTEILT ? null : neu });
+      for (;;) {
+        await onPatch('Lagezustand', {
+          lagezustand: current === NICHT_BEURTEILT ? null : current,
+        });
+        const next = nextRef.current;
+        nextRef.current = null;
+        if (next == null || next === current) break;
+        current = next;
+      }
     } catch (e) {
-      setFehler(e);
+      nextRef.current = null;
+      setError(e);
     } finally {
-      sendetRef.current = false;
-      setLaufend(null);
+      isSendingRef.current = false;
+      setPending(null);
     }
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-      <Segmentleiste<LageWahl>
+    // `flex-start`: gestreckt zöge die Leiste (`inline-flex`) ihren Fugengrund über die ganze Zeile.
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: token.marginXS,
+      }}
+    >
+      <Segmentleiste<LagezustandValue>
         beschriftung="Lagezustand"
-        optionen={optionen}
-        wert={laufend ?? gespeichert}
-        onWechsel={(w) => void waehle(w)}
+        optionen={options}
+        wert={pending ?? saved}
+        onWechsel={(w) => void select(w)}
       />
-      <ZeilenFehler fehler={fehler} />
+      <ZeilenFehler fehler={error} />
     </div>
   );
 }

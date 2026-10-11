@@ -54,7 +54,7 @@ const funkAbschnitt = {
 };
 
 /** Ein Abschnitt in der Gliederung — der Name steht auch im Detail (Zeile „Name“, LFH-1208). */
-async function imBaum(name: string) {
+async function findInTree(name: string) {
   return within(await screen.findByRole('tree')).findByText(name);
 }
 
@@ -62,7 +62,7 @@ async function imBaum(name: string) {
  * Ist die Erfassung zu? jsdom kennt kein `transitionend`: antd beginnt das Ausblenden
  * (`ant-zoom-leave`), beendet es aber nie (Muster `stammdaten/verwaltungstabellen.test.tsx`).
  */
-function erfassungZu(): boolean {
+function isModalClosed(): boolean {
   return [...document.querySelectorAll('.ant-modal')].every((m) =>
     m.classList.contains('ant-zoom-leave'),
   );
@@ -73,7 +73,7 @@ function erfassungZu(): boolean {
  * dasselbe Objekt, das der GET der Liste liefert, und wird geändert — sonst holte der Neuabruf
  * nach dem Speichern den alten Stand zurück.
  */
-function patchMitschnitt(basis: Record<string, unknown>, aid = 5) {
+function recordPatches(basis: Record<string, unknown>, aid = 5) {
   const bodies: Record<string, unknown>[] = [];
   server.use(
     http.patch(`/api/einsaetze/1/abschnitte/${aid}`, async ({ request }) => {
@@ -133,7 +133,7 @@ describe('EinsatzabschnittePage', () => {
       </Routes>,
       { route: '/einsaetze/1/einsatzabschnitte' },
     );
-    expect(await imBaum('Nord')).toBeInTheDocument();
+    expect(await findInTree('Nord')).toBeInTheDocument();
     // Im Baumknoten; das vorgewählte Detail nennt den Leiter ein zweites Mal.
     expect(within(screen.getByRole('tree')).getByText(/Leiter Nord/)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
@@ -246,7 +246,7 @@ describe('EinsatzabschnittePage', () => {
       ),
     );
     renderPage();
-    await userEvent.click(await imBaum('Nord'));
+    await userEvent.click(await findInTree('Nord'));
 
     // Datenraster statt `Descriptions`: die Zeile ist das Datenfeld.
     const eigene = screen
@@ -303,7 +303,7 @@ describe('EinsatzabschnittePage', () => {
     it('ohne ?neu=1 bleibt die Erfassung zu', async () => {
       server.use(...handlers());
       rendereMit('/einsaetze/1/einsatzabschnitte');
-      await imBaum('Nord');
+      await findInTree('Nord');
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));
       });
@@ -316,7 +316,7 @@ describe('EinsatzabschnittePage', () => {
       // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt
       // entschieden.
       await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
-      await imBaum('Nord');
+      await findInTree('Nord');
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));
       });
@@ -343,7 +343,7 @@ describe('EinsatzabschnittePage', () => {
       </Routes>,
       { route: '/einsaetze/1/einsatzabschnitte' },
     );
-    await imBaum('Nord');
+    await findInTree('Nord');
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Abschnitt anlegen' })).not.toBeInTheDocument(),
     );
@@ -355,7 +355,7 @@ describe('EinsatzabschnittePage', () => {
   it('abgeschlossener Einsatz: „Nur Ansicht · Einsatz abgeschlossen“ statt Satz', async () => {
     server.use(...handlers('einsatzleitung', 'abgeschlossen'));
     renderPage();
-    await imBaum('Nord');
+    await findInTree('Nord');
     const hinweis = document.querySelector('[data-lfh="rechte-hinweis"]');
     expect(hinweis?.textContent).toBe('Nur Ansicht Einsatz abgeschlossen');
     expect(screen.queryByText(/nur Ansicht\./)).not.toBeInTheDocument();
@@ -364,7 +364,7 @@ describe('EinsatzabschnittePage', () => {
   it('mit Schreibrecht kein Rechtehinweis', async () => {
     server.use(...handlers());
     renderPage();
-    await imBaum('Nord');
+    await findInTree('Nord');
     expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
   });
 
@@ -398,7 +398,7 @@ describe('EinsatzabschnittePage', () => {
   it('Kommunikationsmittel: genau dieses Feld geht hinaus', async () => {
     const nord = { ...funkAbschnitt };
     server.use(...handlers('einsatzleitung', 'aktiv', [nord]));
-    const bodies = patchMitschnitt(nord);
+    const bodies = recordPatches(nord);
     renderPage();
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
     await userEvent.click(
@@ -426,7 +426,7 @@ describe('EinsatzabschnittePage', () => {
       ),
       ...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, leiter_id: 3 }]),
     );
-    const bodies = patchMitschnitt({ ...funkAbschnitt });
+    const bodies = recordPatches({ ...funkAbschnitt });
     renderPage();
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
     await userEvent.click(
@@ -442,10 +442,35 @@ describe('EinsatzabschnittePage', () => {
     await waitFor(() => expect(bodies).toEqual([{ leiter_id: 4 }]));
   });
 
+  it('Gegenprobe: eine Zeile aus altem Stand überschreibt die Änderung eines anderen Arbeitsplatzes nicht', async () => {
+    const nord = { ...funkAbschnitt, lagezustand: 'planmaessig' };
+    server.use(...handlers('einsatzleitung', 'aktiv', [nord]));
+    const bodies = recordPatches(nord);
+    renderPage();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    // Der gezeigte Stand ist ab jetzt alt: ein anderer Arbeitsplatz setzt „kritisch“.
+    nord.lagezustand = 'kritisch';
+    await userEvent.click(within(detail).getByRole('button', { name: 'Bemerkung eintragen' }));
+    await userEvent.type(
+      within(detail).getByRole('textbox', { name: 'Bemerkung' }),
+      'Zufahrt Nord',
+    );
+    await userEvent.click(within(detail).getByRole('button', { name: 'Bemerkung speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ bemerkung: 'Zufahrt Nord' }]));
+    // Nach dem Speichern zeigt das Detail den Stand des Servers, „kritisch“ bleibt.
+    const leiste = within(detail).getByRole('radiogroup', { name: 'Lagezustand' });
+    await waitFor(() =>
+      expect(within(leiste).getByRole('radio', { name: 'kritisch' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      ),
+    );
+  });
+
   it('Lagezustand mit einem Klick: genau `lagezustand` geht hinaus (LFH-1208)', async () => {
     const nord = { ...funkAbschnitt, lagezustand: 'angespannt' };
     server.use(...handlers('einsatzleitung', 'aktiv', [nord]));
-    const bodies = patchMitschnitt(nord);
+    const bodies = recordPatches(nord);
     const { client } = renderPage();
     const invalidieren = vi.spyOn(client, 'invalidateQueries');
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
@@ -505,7 +530,7 @@ describe('EinsatzabschnittePage', () => {
   it('die Rückfrage vor dem Auflösen nennt die Handlung im roten Knopf (LFH-1090)', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
-    await userEvent.click(await imBaum('Nord'));
+    await userEvent.click(await findInTree('Nord'));
     await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
     const rueckfrage = await offeneRueckfrage();
     expect(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' })).toHaveClass(
@@ -561,7 +586,7 @@ describe('EinsatzabschnittePage', () => {
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Abschnitten im Cache scheitert', async () => {
     server.use(...handlers());
     const { client } = renderPage();
-    await imBaum('Nord');
+    await findInTree('Nord');
 
     server.use(
       http.get('/api/einsaetze/1/abschnitte', () => new HttpResponse(null, { status: 500 })),
@@ -616,7 +641,7 @@ describe('EinsatzabschnittePage', () => {
     await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Verworfen');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
 
-    await waitFor(() => expect(erfassungZu()).toBe(true));
+    await waitFor(() => expect(isModalClosed()).toBe(true));
     expect(posts).toBe(0);
     expect(within(screen.getByRole('tree')).queryByText('Verworfen')).toBeNull();
     expect(
@@ -659,7 +684,7 @@ describe('EinsatzabschnittePage', () => {
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Ost' });
     // Dort wird er ergänzt.
     expect(within(detail).getByRole('radiogroup', { name: 'Lagezustand' })).toBeInTheDocument();
-    await waitFor(() => expect(erfassungZu()).toBe(true));
+    await waitFor(() => expect(isModalClosed()).toBe(true));
   });
 
   /**
@@ -702,7 +727,7 @@ describe('EinsatzabschnittePage', () => {
       }),
     );
     renderPage();
-    await userEvent.click(await imBaum('Süd'));
+    await userEvent.click(await findInTree('Süd'));
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Süd' });
     await userEvent.click(
       within(detail).getByRole('button', { name: 'Kurzbezeichnung bearbeiten' }),
@@ -722,9 +747,9 @@ describe('EinsatzabschnittePage', () => {
         { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1, kurzbezeichnung: 'EA-S' },
       ]),
     );
-    const bodies = patchMitschnitt({ ...funkAbschnitt, id: 6, name: 'Süd' }, 6);
+    const bodies = recordPatches({ ...funkAbschnitt, id: 6, name: 'Süd' }, 6);
     renderPage();
-    await userEvent.click(await imBaum('Süd'));
+    await userEvent.click(await findInTree('Süd'));
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Süd' });
     await userEvent.click(
       within(detail).getByRole('button', { name: 'Kurzbezeichnung bearbeiten' }),
@@ -746,7 +771,7 @@ describe('EinsatzabschnittePage', () => {
       ...handlers('einsatzleitung', 'aktiv', []),
     );
     const { client } = renderPage();
-    await userEvent.click(await imBaum('Süd'));
+    await userEvent.click(await findInTree('Süd'));
     const detail = await screen.findByRole('region', { name: 'Abschnitt: Süd' });
     await userEvent.click(
       within(detail).getByRole('button', { name: 'Kurzbezeichnung eintragen' }),
@@ -932,7 +957,7 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(within(d).getByRole('button', { name: 'Bemerkung speichern' }));
   }
   async function loeseAuf(name: string) {
-    await userEvent.click(await imBaum(name));
+    await userEvent.click(await findInTree(name));
     await userEvent.click(await within(detail(name)).findByRole('button', { name: 'Auflösen' }));
     const rueckfrage = await offeneRueckfrage();
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' }));
@@ -998,6 +1023,33 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     await within(detail('Nord')).findByRole('button', { name: 'Bemerkung speichern' });
     expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
+  });
+
+  it('Auflösen bestätigt: der Abschnitt verschwindet sofort, das Detail zeigt den ersten verbliebenen', async () => {
+    let freigeben!: () => void;
+    const neuabrufGesperrt = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    const liste = [funkAbschnitt, sued];
+    let geloescht = false;
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', async () => {
+        // Der Neuabruf nach dem Auflösen hängt: belegt wird der Cache, nicht der Server.
+        if (geloescht) await neuabrufGesperrt;
+        return HttpResponse.json(liste);
+      }),
+      ...handlers('einsatzleitung', 'aktiv', []),
+      http.delete('/api/einsaetze/1/abschnitte/5', () => {
+        geloescht = true;
+        liste.splice(0, 1);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderPage();
+    await loeseAuf('Nord');
+    expect(await screen.findByRole('region', { name: 'Abschnitt: Süd' })).toBeInTheDocument();
+    expect(within(screen.getByRole('tree')).queryByText('Nord')).toBeNull();
+    freigeben();
   });
 
   it('Auflösen: der Grund steht im Detailpaneel, der Wechsel des Abschnitts räumt ihn', async () => {

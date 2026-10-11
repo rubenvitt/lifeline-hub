@@ -47,14 +47,18 @@ const personal = [
   { id: 4, name: 'Dora Dreher' },
 ];
 
-function zeige(
+function renderDetail(
   abschnitt: Einsatzabschnitt,
   {
     darfSchreiben = true,
     onPatch = vi.fn<AbschnittPatchHandler>().mockResolvedValue(undefined),
-  }: { darfSchreiben?: boolean; onPatch?: ReturnType<typeof vi.fn<AbschnittPatchHandler>> } = {},
+    abschnitte = [abschnitt, ...(abschnitt.id === sued.id ? [] : [sued])],
+  }: {
+    darfSchreiben?: boolean;
+    onPatch?: ReturnType<typeof vi.fn<AbschnittPatchHandler>>;
+    abschnitte?: Einsatzabschnitt[];
+  } = {},
 ) {
-  const abschnitte = [abschnitt, ...(abschnitt.id === sued.id ? [] : [sued])];
   const ansicht = renderMitProviders(
     <AbschnittDetail
       abschnitt={abschnitt}
@@ -69,13 +73,13 @@ function zeige(
   return { onPatch, ansicht };
 }
 
-const etiketten = (wurzel: HTMLElement) =>
+const labelsOf = (wurzel: HTMLElement) =>
   Array.from(wurzel.querySelectorAll('[data-lfh="datenfeld"] dt')).map((e) => e.textContent);
 
 describe('AbschnittDetail (LFH-1208)', () => {
   it('jede Angabe steht an ihrem Wert, kein Knopf „Bearbeiten“ und kein Fortschritt', () => {
-    const { ansicht } = zeige(nord());
-    expect(etiketten(ansicht.container)).toEqual([
+    const { ansicht } = renderDetail(nord());
+    expect(labelsOf(ansicht.container)).toEqual([
       'Name',
       'Kurzbezeichnung',
       'Über-Abschnitt',
@@ -110,12 +114,12 @@ describe('AbschnittDetail (LFH-1208)', () => {
     const { container } = renderMitProviders(
       <AbschnittDaten abschnitt={nord()} staerken={{ eigene: null, inklUnter: null }} />,
     );
-    expect(etiketten(container)).not.toContain('Fortschritt');
+    expect(labelsOf(container)).not.toContain('Fortschritt');
   });
 
   it('Abschnittsleiter: genau `leiter_id` geht hinaus', async () => {
     const user = userEvent.setup();
-    const { onPatch } = zeige(nord());
+    const { onPatch } = renderDetail(nord());
     await user.click(screen.getByRole('button', { name: 'Abschnittsleiter eintragen' }));
     await user.click(screen.getByRole('combobox', { name: 'Abschnittsleiter' }));
     await user.click(await screen.findByText('Dora Dreher'));
@@ -124,11 +128,10 @@ describe('AbschnittDetail (LFH-1208)', () => {
     expect(onPatch).toHaveBeenCalledTimes(1);
   });
 
-  it('Gegenprobe: zwei Zeilen nacheinander aus altem Stand schicken je nur ihr Feld', async () => {
-    // Der gezeigte Stand ist alt: anderswo steht der Lagezustand längst auf „kritisch“. Wer hier
-    // erst die Bemerkung, dann den Auftrag speichert, darf ihn nicht auf „planmäßig“ zurücksetzen.
+  // Die Gegenprobe gegen einen geänderten Serverstand steht in `EinsatzabschnittePage.test.tsx`.
+  it('zwei Zeilen nacheinander schicken je nur ihr Feld', async () => {
     const user = userEvent.setup();
-    const { onPatch } = zeige(nord({ lagezustand: 'planmaessig' }));
+    const { onPatch } = renderDetail(nord({ lagezustand: 'planmaessig' }));
     await user.click(screen.getByRole('button', { name: 'Bemerkung eintragen' }));
     await user.type(screen.getByRole('textbox', { name: 'Bemerkung' }), 'Zufahrt Nord');
     await user.click(screen.getByRole('button', { name: 'Bemerkung speichern' }));
@@ -144,7 +147,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
   it('unverändert gespeichert: keine Anfrage', async () => {
     const user = userEvent.setup();
-    const { onPatch } = zeige(nord());
+    const { onPatch } = renderDetail(nord());
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.click(screen.getByRole('button', { name: 'Name speichern' }));
     expect(await screen.findByRole('button', { name: 'Name bearbeiten' })).toBeInTheDocument();
@@ -153,7 +156,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
   it('eine geleerte optionale Angabe geht als `null`', async () => {
     const user = userEvent.setup();
-    const { onPatch } = zeige(nord({ erreichbarkeit: '0151 23456' }));
+    const { onPatch } = renderDetail(nord({ erreichbarkeit: '0151 23456' }));
     await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer bearbeiten' }));
     await user.clear(screen.getByRole('textbox', { name: 'Erreichbarkeit / Nummer' }));
     await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer speichern' }));
@@ -164,7 +167,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
   it('Name ist Pflicht: leer gespeichert heißt keine Anfrage und ein Hinweis an der Zeile', async () => {
     const user = userEvent.setup();
-    const { onPatch } = zeige(nord());
+    const { onPatch } = renderDetail(nord());
     await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
     await user.clear(screen.getByRole('textbox', { name: 'Name' }));
     await user.click(screen.getByRole('button', { name: 'Name speichern' }));
@@ -177,7 +180,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
   it('Kurzbezeichnung: vergeben (ohne Groß-/Kleinschreibung) heißt keine Anfrage, Grund am Feld', async () => {
     const user = userEvent.setup();
-    const { onPatch } = zeige(nord());
+    const { onPatch } = renderDetail(nord());
     await user.click(screen.getByRole('button', { name: 'Kurzbezeichnung bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Kurzbezeichnung' });
     await user.clear(feld);
@@ -197,7 +200,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
     const onPatch = vi
       .fn<AbschnittPatchHandler>()
       .mockRejectedValue(new ApiError(400, 'Sprechgruppe gehört nicht zum Einsatz'));
-    zeige(nord(), { onPatch });
+    renderDetail(nord(), { onPatch });
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen eintragen' }));
     await user.click(screen.getByRole('combobox', { name: 'Sprechgruppen' }));
     await user.click(await screen.findByText('DMO 31'));
@@ -208,23 +211,25 @@ describe('AbschnittDetail (LFH-1208)', () => {
   });
 
   describe('Lagezustand mit einem Klick', () => {
-    const leiste = () => screen.getByRole('radiogroup', { name: 'Lagezustand' });
-    const stufe = (name: string) => within(leiste()).getByRole('radio', { name });
+    const bar = () => screen.getByRole('radiogroup', { name: 'Lagezustand' });
+    const level = (name: string) => within(bar()).getByRole('radio', { name });
 
     it('vier Stufen, die gespeicherte gewählt', () => {
-      zeige(nord({ lagezustand: 'angespannt' }));
+      renderDetail(nord({ lagezustand: 'angespannt' }));
       expect(
-        within(leiste())
+        within(bar())
           .getAllByRole('radio')
           .map((r) => r.textContent),
       ).toEqual(['nicht beurteilt', 'planmäßig', 'angespannt', 'kritisch']);
-      expect(stufe('angespannt')).toHaveAttribute('aria-checked', 'true');
+      expect(level('angespannt')).toHaveAttribute('aria-checked', 'true');
+      // Nicht gestreckt: sonst füllte der Fugengrund der Leiste die ganze Zeile grau.
+      expect(bar().parentElement).toHaveStyle({ alignItems: 'flex-start' });
     });
 
     it('ein Klick speichert genau `lagezustand`', async () => {
       const user = userEvent.setup();
-      const { onPatch } = zeige(nord({ lagezustand: 'angespannt' }));
-      await user.click(stufe('kritisch'));
+      const { onPatch } = renderDetail(nord({ lagezustand: 'angespannt' }));
+      await user.click(level('kritisch'));
       await waitFor(() =>
         expect(onPatch).toHaveBeenCalledWith('Lagezustand', { lagezustand: 'kritisch' }),
       );
@@ -233,8 +238,8 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
     it('„nicht beurteilt“ leert das Feld', async () => {
       const user = userEvent.setup();
-      const { onPatch } = zeige(nord({ lagezustand: 'kritisch' }));
-      await user.click(stufe('nicht beurteilt'));
+      const { onPatch } = renderDetail(nord({ lagezustand: 'kritisch' }));
+      await user.click(level('nicht beurteilt'));
       await waitFor(() =>
         expect(onPatch).toHaveBeenCalledWith('Lagezustand', { lagezustand: null }),
       );
@@ -242,15 +247,15 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
     it('die gewählte Stufe noch einmal: keine Anfrage', async () => {
       const user = userEvent.setup();
-      const { onPatch } = zeige(nord({ lagezustand: 'angespannt' }));
-      await user.click(stufe('angespannt'));
+      const { onPatch } = renderDetail(nord({ lagezustand: 'angespannt' }));
+      await user.click(level('angespannt'));
       expect(onPatch).not.toHaveBeenCalled();
     });
 
     it('Pfeiltaste wählt und speichert die nächste Stufe', async () => {
       const user = userEvent.setup();
-      const { onPatch } = zeige(nord({ lagezustand: 'angespannt' }));
-      stufe('angespannt').focus();
+      const { onPatch } = renderDetail(nord({ lagezustand: 'angespannt' }));
+      level('angespannt').focus();
       await user.keyboard('{ArrowRight}');
       await waitFor(() =>
         expect(onPatch).toHaveBeenCalledWith('Lagezustand', { lagezustand: 'kritisch' }),
@@ -262,17 +267,45 @@ describe('AbschnittDetail (LFH-1208)', () => {
       const onPatch = vi
         .fn<AbschnittPatchHandler>()
         .mockRejectedValue(new ApiError(403, 'Einsatz abgeschlossen'));
-      zeige(nord({ lagezustand: 'angespannt' }), { onPatch });
-      await user.click(stufe('kritisch'));
+      renderDetail(nord({ lagezustand: 'angespannt' }), { onPatch });
+      await user.click(level('kritisch'));
       expect(await screen.findByText('Einsatz abgeschlossen')).toHaveAttribute(
         'data-fehler',
         'true',
       );
-      expect(stufe('angespannt')).toHaveAttribute('aria-checked', 'true');
-      expect(stufe('kritisch')).toHaveAttribute('aria-checked', 'false');
+      expect(level('angespannt')).toHaveAttribute('aria-checked', 'true');
+      expect(level('kritisch')).toHaveAttribute('aria-checked', 'false');
     });
 
-    it('bis zur Antwort steht die neue Stufe; ein zweiter Klick wartet nicht in der Schlange', async () => {
+    it('zwei schnelle Pfeilschritte: eine Anfrage zur Zeit, die letzte Wahl geht danach hinaus', async () => {
+      // Vorher ging der zweite Schritt im Riegel verloren, während der Fokus schon auf ihm stand
+      // (Review LFH-1208).
+      const user = userEvent.setup();
+      const zusagen: (() => void)[] = [];
+      const onPatch = vi.fn<AbschnittPatchHandler>().mockImplementation(
+        () =>
+          new Promise<void>((r) => {
+            zusagen.push(r);
+          }),
+      );
+      renderDetail(nord({ lagezustand: 'kritisch' }), { onPatch });
+      level('kritisch').focus();
+      await user.keyboard('{ArrowLeft}');
+      await user.keyboard('{ArrowLeft}');
+      // Eine Anfrage unterwegs; Häkchen und Fokus stehen auf der letzten Wahl.
+      expect(onPatch.mock.calls).toEqual([['Lagezustand', { lagezustand: 'angespannt' }]]);
+      expect(level('planmäßig')).toHaveAttribute('aria-checked', 'true');
+      expect(level('planmäßig')).toHaveFocus();
+
+      zusagen[0]();
+      await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(2));
+      expect(onPatch.mock.calls[1]).toEqual(['Lagezustand', { lagezustand: 'planmaessig' }]);
+      zusagen[1]();
+      await waitFor(() => expect(level('planmäßig')).toHaveAttribute('aria-checked', 'true'));
+      expect(onPatch).toHaveBeenCalledTimes(2);
+    });
+
+    it('zurück zur gesendeten Stufe, solange sie unterwegs ist: keine zweite Anfrage', async () => {
       const user = userEvent.setup();
       let erfuelle: () => void = () => {};
       const onPatch = vi.fn<AbschnittPatchHandler>().mockImplementation(
@@ -281,18 +314,56 @@ describe('AbschnittDetail (LFH-1208)', () => {
             erfuelle = r;
           }),
       );
-      zeige(nord({ lagezustand: 'planmaessig' }), { onPatch });
-      await user.click(stufe('angespannt'));
-      expect(stufe('angespannt')).toHaveAttribute('aria-checked', 'true');
-      await user.click(stufe('kritisch'));
-      expect(onPatch).toHaveBeenCalledTimes(1);
+      renderDetail(nord({ lagezustand: 'planmaessig' }), { onPatch });
+      await user.click(level('kritisch'));
+      await user.click(level('angespannt'));
+      await user.click(level('kritisch'));
       erfuelle();
-      await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(level('kritisch')).toHaveAttribute('aria-checked', 'true'));
+      expect(onPatch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Über-Abschnitt', () => {
+    // Nord (5) mit Unterabschnitt UA Nord 1 (7), daneben Süd (6).
+    const ua = nord({ id: 7, name: 'UA Nord 1', ueber_abschnitt_id: 5, kurzbezeichnung: null });
+    const baum = [nord(), sued, ua];
+
+    it('ohne sich selbst und eigene Unterabschnitte; Süd geht als `ueber_abschnitt_id`', async () => {
+      const user = userEvent.setup();
+      const { onPatch } = renderDetail(nord(), { abschnitte: baum });
+      await user.click(screen.getByRole('button', { name: 'Über-Abschnitt eintragen' }));
+      await user.click(screen.getByRole('combobox', { name: 'Über-Abschnitt' }));
+      const liste = document.querySelector<HTMLElement>('.ant-select-dropdown')!;
+      await waitFor(() => expect(within(liste).getByTitle('Süd')).toBeInTheDocument());
+      expect(within(liste).queryByTitle('Nord')).toBeNull();
+      expect(within(liste).queryByTitle('UA Nord 1')).toBeNull();
+      await user.click(within(liste).getByTitle('Süd'));
+      await user.click(screen.getByRole('button', { name: 'Über-Abschnitt speichern' }));
+      await waitFor(() =>
+        expect(onPatch).toHaveBeenCalledWith('Über-Abschnitt', { ueber_abschnitt_id: 6 }),
+      );
+    });
+
+    it('Leeren macht ihn zum obersten Abschnitt: `null`', async () => {
+      const user = userEvent.setup();
+      const { onPatch } = renderDetail(ua, { abschnitte: baum });
+      const knopf = screen.getByRole('button', { name: 'Über-Abschnitt bearbeiten' });
+      expect(knopf).toHaveAccessibleDescription('Nord');
+      await user.click(knopf);
+      const feld = screen.getByRole('combobox', { name: 'Über-Abschnitt' });
+      await user.click(
+        feld.closest('.ant-select')!.querySelector<HTMLElement>('.ant-select-clear')!,
+      );
+      await user.click(screen.getByRole('button', { name: 'Über-Abschnitt speichern' }));
+      await waitFor(() =>
+        expect(onPatch).toHaveBeenCalledWith('Über-Abschnitt', { ueber_abschnitt_id: null }),
+      );
     });
   });
 
   it('ohne Schreibrecht: kein Stift, keine Stufenwahl, leer als „—“', () => {
-    zeige(nord({ lagezustand: null }), { darfSchreiben: false });
+    renderDetail(nord({ lagezustand: null }), { darfSchreiben: false });
     expect(screen.queryAllByRole('button')).toHaveLength(0);
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.getByText('nicht beurteilt')).toBeInTheDocument();
@@ -300,7 +371,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
   });
 
   it('ohne Schreibrecht steht ein beurteilter Lagezustand als Wort', () => {
-    zeige(nord({ lagezustand: 'kritisch' }), { darfSchreiben: false });
+    renderDetail(nord({ lagezustand: 'kritisch' }), { darfSchreiben: false });
     expect(screen.getByText('kritisch')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).toBeNull();
   });

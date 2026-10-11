@@ -63,8 +63,9 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
 - [x] 3.1 `pages/einsatzabschnitte/AbschnittAnlegenModal.tsx` mit `ErfassungsModal`: Name
   (Pflicht), Kurzbezeichnung (Regel aus 2.1) und Über-Abschnitt (`TreeSelect`). `onErfassen` ruft
   `legeAbschnittAn` per `mutateAsync` mit genau diesen Feldern. Nachweis: Vitest prüft das
-  Feldbudget (sichtbare Felder = 3 mit `forceRender`, Gegenprobe: ein viertes Feld würde die
-  Zählung auf 4 heben, als Prüfung der Zählfunktion), Fokus im Namen, Enter im Namen sendet,
+  Feldbudget (genau drei `.ant-form-item`, als Gegenprobe zur bloßen Obergrenze mit ihren
+  Etiketten Name, Kurzbezeichnung, Über-Abschnitt gepinnt; kein Klappteil, also kein
+  `forceRender`), Fokus im Namen, Enter im Namen sendet,
   Struktur (Knopf im `<form>`, keine `.ant-modal-footer`), Ablehnung bleibt offen mit Grund und
   Abbrechen sendet nichts.
 - [x] 3.2 Seite: Kopfknopf, Leeraktion der Gliederung, Leeraktion des Organigramms und `?neu=1`
