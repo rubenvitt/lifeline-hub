@@ -12,7 +12,7 @@ import DemoMarke from '../components/DemoMarke';
  * `optionFilterProp` auf ein Textfeld — nach dem Label kann antd dann nicht mehr filtern.
  */
 
-export const DEMO_GRUPPE = 'Demo-Daten';
+export const DEMO_GROUP = 'Demo-Daten';
 
 /**
  * Das Auswahlfeld ist schmal (`minWidth: 260`), die Liste so breit wie das Feld. Gekürzt wird
@@ -32,36 +32,51 @@ export interface AuswahlOption {
   label: ReactNode;
 }
 
-export interface AuswahlGruppe {
+export interface AuswahlGroup {
   label: string;
   title: string;
   options: AuswahlOption[];
 }
 
-export function demoGruppierteOptionen<T extends { id: number; ist_demo: boolean }>(
+/**
+ * Demo-Label: Text gekürzt, Marke ganz. Für Auswahllisten, die eigene Optionen bauen (etwa die
+ * Rufname-Vorschläge, LFH-1187), aus derselben Quelle wie `demoGroupedOptions`.
+ */
+export function DemoLabel({ children }: { children: ReactNode }) {
+  return (
+    <span style={demoLabelStil}>
+      <span style={demoTextStil}>{children}</span>
+      <span style={{ flex: 'none' }}>
+        <DemoMarke />
+      </span>
+    </span>
+  );
+}
+
+/** Teilt in echte und Demo-Einträge; beide behalten die Eingangsreihenfolge. */
+export function splitDemo<T extends { ist_demo: boolean }>(
+  eintraege: readonly T[],
+): { echte: T[]; demo: T[] } {
+  const echte: T[] = [];
+  const demo: T[] = [];
+  for (const e of eintraege) (e.ist_demo ? demo : echte).push(e);
+  return { echte, demo };
+}
+
+export function demoGroupedOptions<T extends { id: number; ist_demo: boolean }>(
   eintraege: readonly T[],
   label: (eintrag: T) => string,
-): (AuswahlOption | AuswahlGruppe)[] {
-  const echte: AuswahlOption[] = [];
-  const demo: AuswahlOption[] = [];
-  for (const e of eintraege) {
-    if (e.ist_demo) {
-      demo.push({
-        value: e.id,
-        label: (
-          <span style={demoLabelStil}>
-            <span style={demoTextStil}>{label(e)}</span>
-            <span style={{ flex: 'none' }}>
-              <DemoMarke />
-            </span>
-          </span>
-        ),
-      });
-    } else {
-      echte.push({ value: e.id, label: label(e) });
-    }
-  }
+): (AuswahlOption | AuswahlGroup)[] {
+  const { echte, demo } = splitDemo(eintraege);
+  const echteOptionen = echte.map((e) => ({ value: e.id, label: label(e) }));
   return demo.length
-    ? [...echte, { label: DEMO_GRUPPE, title: DEMO_GRUPPE, options: demo }]
-    : echte;
+    ? [
+        ...echteOptionen,
+        {
+          label: DEMO_GROUP,
+          title: DEMO_GROUP,
+          options: demo.map((e) => ({ value: e.id, label: <DemoLabel>{label(e)}</DemoLabel> })),
+        },
+      ]
+    : echteOptionen;
 }
