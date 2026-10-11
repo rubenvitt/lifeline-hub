@@ -624,3 +624,121 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
       .toBe(4);
   });
 });
+
+// LFH-836: Freie Zeichen laufen über denselben synchronen `ez|`-Weg wie die Fachobjekte (Spec
+// `lagekarte-taktische-zeichen`, „Kartenzeichen in Bildschirmschärfe“). Vorher kam ihr Bild
+// asynchron über `tz|`/`styleimagemissing` und fehlte bis zum nächsten Neu-Layout. Gezählt wird,
+// was in `marker-symbol` GEZEICHNET ist, nicht nur, was registriert ist (Lehre aus LFH-835).
+test.describe('Lagekarte: freie Zeichen', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  const ORT = { lat: 49.3519, lon: 9.1457 };
+
+  /** Gezeichnete freie Zeichen und die Rasterbreite ihres `ez|`-Bildes; im Stilwechsel `null`. */
+  const freieZeichen = (page: Page, bildId: string) =>
+    page.evaluate((id) => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+      // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
+      if (!map?.isStyleLoaded()) return null;
+      return {
+        breite: map.listImages().includes(id) ? map.getImage(id)?.data.width : null,
+        gezeichnet: map
+          .queryRenderedFeatures({ layers: ['marker-symbol'] })
+          .filter((f) => f.properties.typ === 'freies_zeichen').length,
+      };
+    }, bildId);
+
+  const stilwechsel = (page: Page) =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+      map.setStyle(map.getStyle(), { diff: false });
+    });
+
+  test('ein platziertes freies Zeichen steht sofort als `ez|`-Bild mit 68 px, auch nach einem Stilwechsel', async ({
+    page,
+  }) => {
+    const fehler: Error[] = [];
+    page.on('pageerror', (f) => fehler.push(f));
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    await einsatzortSetzen(page, eid, ORT);
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    const flaeche = page.getByTestId('kartenflaeche');
+    await expect(flaeche.locator('canvas.maplibregl-canvas')).toHaveCount(1);
+
+    // Über die Oberfläche: Grundzeichen „Gefahr“, Farbe Rot aus der Palette, platzieren.
+    await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
+    const paneel = page.locator('[data-paneel="zeichnen"]');
+    await paneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
+    await paneel
+      .getByRole('radiogroup', { name: 'Grundzeichen' })
+      .getByRole('radio', { name: 'Gefahr', exact: true })
+      .click();
+    await paneel.getByRole('button', { name: 'Details' }).click();
+    await paneel.getByLabel('Farbe').click();
+    await page.locator('.ant-select-dropdown:visible').getByTitle('Rot', { exact: true }).click();
+    await paneel.getByRole('button', { name: 'Platzieren', exact: true }).click();
+    // Neben den Einsatzort, damit kein Cluster entsteht (clusterRadius 45 px).
+    const box = (await flaeche.locator('canvas.maplibregl-canvas').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2 + 120, box.y + box.height / 2 - 80);
+    await expect(page.getByText('Taktisches Zeichen angelegt')).toBeVisible();
+
+    const spec = '{"v":1,"spec":{"kind":"hazard","technicalFill":"rot"}}';
+    const gespeichert = (await (
+      await page.request.get(`/api/einsaetze/${eid}/freie-zeichen`)
+    ).json()) as { zeichen_spec?: string; grundzeichen?: string }[];
+    // Gespeichert als Zeichenbeschreibung; die Altform fehlt (DTO, design.md D4).
+    expect(gespeichert.map((z) => [z.zeichen_spec, z.grundzeichen ?? null])).toEqual([
+      [spec, null],
+    ]);
+
+    // „Sofort“: ohne weitere Bedienung, kein Neu-Layout von außen.
+    await expect
+      .poll(() => freieZeichen(page, `ez|${spec}`), {
+        timeout: 5_000,
+        message: 'freies Zeichen nicht sofort als `ez|`-Bild gezeichnet',
+      })
+      .toEqual({ breite: 68, gezeichnet: 1 });
+
+    await stilwechsel(page);
+    await expect
+      .poll(() => freieZeichen(page, `ez|${spec}`), {
+        timeout: 15_000,
+        message: 'freies Zeichen nach dem Stilwechsel nicht zurück',
+      })
+      .toEqual({ breite: 68, gezeichnet: 1 });
+    expect(fehler.map((f) => f.message)).toEqual([]);
+  });
+
+  test('ein Altzeichen im alten Format erscheint über den Leseadapter', async ({ page }) => {
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    await einsatzortSetzen(page, eid, ORT);
+    // Der alte Body eines veralteten Clients (Übergang, design.md D4): Grundzeichen plus Hexfarbe.
+    const r = await page.request.post(`/api/einsaetze/${eid}/freie-zeichen`, {
+      data: {
+        lat: ORT.lat + 0.0028,
+        lon: ORT.lon + 0.004,
+        grundzeichen: 'gefahr',
+        farbe: '#cc0000',
+        label: 'Altzeichen',
+      },
+    });
+    expect(r.ok(), await r.text()).toBeTruthy();
+    const angelegt = (await r.json()) as { zeichen_spec?: string; grundzeichen?: string };
+    expect([angelegt.zeichen_spec ?? null, angelegt.grundzeichen]).toEqual([null, 'gefahr']);
+
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+    // Die Hexfarbe fällt auf das nächste Palettentoken (D6): dieselbe Gefahr in Rot.
+    const bild = 'ez|{"v":1,"spec":{"kind":"hazard","technicalFill":"rot"}}';
+    await expect
+      .poll(() => freieZeichen(page, bild), {
+        timeout: 15_000,
+        message: 'Altzeichen nicht gezeichnet',
+      })
+      .toEqual({ breite: 68, gezeichnet: 1 });
+  });
+});
