@@ -64,6 +64,9 @@ describe('NeuigkeitenPage', () => {
   it('markiert die laufende Version beim Öffnen als gelesen', async () => {
     let aufgerufen = false;
     server.use(
+      http.get('/api/versionsstand', () =>
+        HttpResponse.json({ laufend: LAUFEND, gelesen_bis: ZULETZT }),
+      ),
       http.post('/api/versionsstand/gelesen', () => {
         aufgerufen = true;
         return HttpResponse.json({ laufend: LAUFEND, gelesen_bis: LAUFEND });
@@ -72,5 +75,26 @@ describe('NeuigkeitenPage', () => {
     renderMitProviders(<NeuigkeitenPage />);
 
     await waitFor(() => expect(aufgerufen).toBe(true));
+  });
+
+  // Das alte Bundle nach einem Server-Update kennt die Notizen der laufenden Version noch nicht:
+  // es darf sie nicht als gelesen markieren, sonst sieht sie nach dem Aktualisieren niemand.
+  it('markiert nichts und verweist auf die Aktualisierung, wenn die Notizen der laufenden Version fehlen', async () => {
+    let aufgerufen = false;
+    server.use(
+      http.get('/api/versionsstand', () =>
+        HttpResponse.json({ laufend: '99.0.0', gelesen_bis: LAUFEND, zuletzt_gestartet: LAUFEND }),
+      ),
+      http.post('/api/versionsstand/gelesen', () => {
+        aufgerufen = true;
+        return HttpResponse.json({ laufend: '99.0.0', gelesen_bis: '99.0.0' });
+      }),
+    );
+    renderMitProviders(<NeuigkeitenPage />);
+
+    expect(await screen.findByText(/Die Notizen zu Version 99\.0\.0/)).toBeInTheDocument();
+    // Gelegenheit für einen (falschen) Aufruf geben, bevor das Ausbleiben geprüft wird.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(aufgerufen).toBe(false);
   });
 });

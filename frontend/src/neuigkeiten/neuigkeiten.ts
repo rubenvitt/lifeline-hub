@@ -14,8 +14,18 @@ function position(liste: readonly ChangelogEintrag[], version: string | null | u
 }
 
 /**
- * Einträge des laufenden Kanals, die über dem Lesestand liegen. Ist der Lesestand unbekannt, gibt
- * es nichts zu drängen: die Liste bleibt leer.
+ * Führt die Liste diese Version? Nach einem Server-Update läuft oft noch das alte Bundle, bis
+ * jemand die App aktualisiert (`pwa/appAktualisierung.ts`); seine Liste kennt die laufende Version
+ * dann noch nicht.
+ */
+export function kenntVersion(liste: readonly ChangelogEintrag[], version: string): boolean {
+  return position(liste, version) >= 0;
+}
+
+/**
+ * Einträge des laufenden Kanals von der laufenden Version bis vor den Lesestand. Ist eine der
+ * beiden unbekannt oder liegt der Lesestand nicht darunter, gibt es nichts zu drängen: die Liste
+ * bleibt leer.
  */
 export function ungelesene(
   liste: readonly ChangelogEintrag[],
@@ -23,9 +33,10 @@ export function ungelesene(
   gelesenBis: string | null | undefined,
 ): ChangelogEintrag[] {
   const kanal = kanalVon(laufend);
+  const start = position(liste, laufend);
   const ende = position(liste, gelesenBis);
-  if (ende < 0) return [];
-  return liste.slice(0, ende).filter((e) => e.kanal === kanal);
+  if (start < 0 || ende <= start) return [];
+  return liste.slice(start, ende).filter((e) => e.kanal === kanal);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangelogEintrag } from '../../scripts/changelog-zerlegen.mjs';
-import { ungelesene, seitLetzterVersion, nachKanal, vorschau } from './neuigkeiten';
+import { ungelesene, seitLetzterVersion, nachKanal, vorschau, kenntVersion } from './neuigkeiten';
 
 // Neueste zuerst, wie die CHANGELOG.md.
 const LISTE: ChangelogEintrag[] = [
@@ -45,6 +45,31 @@ describe('ungelesene', () => {
 
   it('zählt beim Wechsel in den stabilen Kanal nur stabile Einträge', () => {
     expect(versionen(ungelesene(LISTE, '1.0.0', '1.0.0-alpha.105'))).toEqual(['1.0.0']);
+  });
+
+  it('zählt ab der laufenden Version, nicht ab dem neuesten Eintrag der Liste', () => {
+    expect(versionen(ungelesene(LISTE, '1.0.0-alpha.105', '1.0.0-alpha.100'))).toEqual([
+      '1.0.0-alpha.105',
+      '1.0.0-alpha.104',
+      '1.0.0-alpha.101',
+    ]);
+  });
+
+  // Nach einem Server-Update läuft oft noch das alte Bundle, bis jemand die App aktualisiert
+  // (`pwa/appAktualisierung.ts`): seine Liste kennt die laufende Version noch nicht.
+  it('ist leer, wenn die Liste die laufende Version nicht kennt', () => {
+    expect(ungelesene(LISTE, '1.0.0-alpha.107', '1.0.0-alpha.100')).toEqual([]);
+  });
+
+  it('ist leer nach einer Rückkehr auf eine ältere Version', () => {
+    expect(ungelesene(LISTE, '1.0.0-alpha.100', '1.0.0-alpha.105')).toEqual([]);
+  });
+});
+
+describe('kenntVersion', () => {
+  it('erkennt, ob die Liste eine Version führt', () => {
+    expect(kenntVersion(LISTE, '1.0.0-alpha.106')).toBe(true);
+    expect(kenntVersion(LISTE, '1.0.0-alpha.107')).toBe(false);
   });
 });
 

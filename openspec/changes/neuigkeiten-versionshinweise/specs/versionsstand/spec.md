@@ -51,8 +51,9 @@ Lesestand bleibt dabei unverändert, damit ein ungelesener Hinweis bestehen blei
 
 Der Versionsstand SHALL die Version führen, bis zu der die Neuigkeiten als gelesen gelten
 (`gelesen_bis`). Der Server MUST `gelesen_bis` auf die laufende Version setzen, sobald eine
-angemeldete Person die Neuigkeiten-Seite öffnet oder die Hinweiskarte schließt. Der Lesestand gilt
-für alle Personen derselben Instanz.
+angemeldete Person die Neuigkeiten-Seite öffnet oder die Hinweiskarte schließt, sofern die App die
+Notizen der laufenden Version kennt (Spec `neuigkeiten`). Der Lesestand gilt für alle Personen
+derselben Instanz.
 
 #### Scenario: Seite geöffnet
 

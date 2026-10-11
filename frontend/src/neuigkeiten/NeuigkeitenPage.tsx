@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button, Tag, Typography } from 'antd';
+import { Alert, Button, Tag, Typography } from 'antd';
 import { EINTRAEGE } from 'virtual:neuigkeiten';
 import type { ChangelogEintrag, Kanal } from '../../scripts/changelog-zerlegen.mjs';
 import Markdown from '../components/Markdown';
 import { Paneel, Segmentleiste } from '../components/instrument';
 import { useVersionsstand, useMarkiereGelesen } from './useVersionsstand';
 import {
+  kenntVersion,
   nachKanal,
   seitLetzterVersion,
   vorschau,
@@ -37,9 +38,13 @@ export default function NeuigkeitenPage() {
   const { mutate: markiereGelesen } = useMarkiereGelesen();
   const [filter, setFilter] = useState<KanalFilter>('alle');
 
+  // Gelesen ist nur, was diese Seite zeigen kann: ein altes Bundle kennt die Notizen der laufenden
+  // Version nicht und lässt den Lesestand stehen, bis die App aktualisiert ist.
+  const laufend = stand?.laufend;
+  const notizenFehlen = !!laufend && !kenntVersion(EINTRAEGE, laufend);
   useEffect(() => {
-    markiereGelesen();
-  }, [markiereGelesen]);
+    if (laufend && !notizenFehlen) markiereGelesen();
+  }, [laufend, notizenFehlen, markiereGelesen]);
 
   const seitLetzter = stand
     ? seitLetzterVersion(EINTRAEGE, stand.laufend, stand.zuletzt_gestartet)
@@ -51,6 +56,14 @@ export default function NeuigkeitenPage() {
       <Typography.Title level={1} style={{ margin: 0 }}>
         Neuigkeiten
       </Typography.Title>
+
+      {notizenFehlen && (
+        <Alert
+          type="info"
+          showIcon
+          title={`Die Notizen zu Version ${laufend} kommen mit der Aktualisierung der App.`}
+        />
+      )}
 
       {seitLetzter.length > 0 && (
         <Paneel titel="Seit deiner letzten Version" koerperPolster>

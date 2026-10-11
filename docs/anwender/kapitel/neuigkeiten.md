@@ -39,12 +39,17 @@ gelesen ist.
 
 **Lesestand gilt für den Server.** Öffnet eine Person die Seite oder schließt sie die Karte, gilt
 die laufende Version für alle Personen auf diesem Server als gelesen. Die Karte und der Punkt
-verschwinden dann für alle. Bei mehreren Personen mit Administrationsrechten kann das eine
-Information übergehen, die eine andere Person noch braucht.
+verschwinden dann für alle. Arbeiten mehrere Personen auf dem Server, kann das eine Information
+übergehen, die eine andere Person noch braucht.
 
 **Kanäle.** Eine Alpha-Version trägt im Namen `-alpha`, eine Beta-Version `-beta`. Alles andere ist
 ein stabiles Release. Ein Wechsel in den stabilen Kanal zeigt das stabile Release, das die
 Änderungen aller Vorabversionen seit dem letzten stabilen Stand zusammenfasst.
+
+**App noch nicht aktualisiert.** Nach einem Update des Servers läuft im Browser oft noch die
+vorige Fassung der App, bis jemand sie über die Meldung zur Aktualisierung neu lädt. Diese Fassung
+kennt die neuen Notizen noch nicht. Die Seite sagt das dann oben, und der Lesestand bleibt
+unverändert, bis die neue Fassung geladen ist. Der Punkt im Benutzermenü bleibt so lange stehen.
 
 **Beta.** Solange es keine Beta-Versionen gibt, bleibt der Kanal leer, und die Seite sagt das.
 

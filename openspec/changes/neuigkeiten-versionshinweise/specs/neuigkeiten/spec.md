@@ -119,3 +119,22 @@ Hinweiskarte geschlossen wurde.
 - **GIVEN** `gelesen_bis` entspricht der laufenden Version
 - **WHEN** eine Person das Benutzermenü öffnet
 - **THEN** zeigt der Eintrag „Neuigkeiten“ keinen Punkt
+
+#### Scenario: Rückkehr auf eine ältere Version
+
+- **GIVEN** die laufende Version ist `1.0.0-alpha.100` und `gelesen_bis` ist `1.0.0-alpha.106`
+- **WHEN** eine Person das Benutzermenü öffnet
+- **THEN** zeigt der Eintrag „Neuigkeiten“ keinen Punkt
+
+### Requirement: Gelesen ist nur, was die App zeigen kann
+
+Kennt die ausgelieferte App die Notizen der laufenden Version nicht, weil sie nach einem
+Server-Update noch nicht aktualisiert wurde, MUST das Öffnen der Neuigkeiten-Seite den Lesestand
+unverändert lassen. Die Seite SHALL dann darauf hinweisen, dass die Notizen mit der Aktualisierung
+der App kommen. Die Hinweiskarte MUST in diesem Fall ausbleiben.
+
+#### Scenario: Altes Bundle nach einem Server-Update
+
+- **GIVEN** die laufende Version ist `1.0.0-alpha.107` und die App führt Notizen nur bis `1.0.0-alpha.106`
+- **WHEN** eine angemeldete Person die Neuigkeiten-Seite öffnet
+- **THEN** bleibt `gelesen_bis` unverändert und die Seite nennt die fehlende Aktualisierung

@@ -132,8 +132,6 @@ const depsOhneSourcemap = (aktiv: boolean): Plugin => ({
   },
 });
 
-// Dev-Port und Proxy-Ziel kommen aus .env.local und der Umgebung (process.env hat
-// Vorrang), weil Workspaces Ports dynamisch vergeben.
 // Neuigkeiten (Spec `neuigkeiten`): die CHANGELOG.md des Repos liegt zur Build-Zeit als Modul
 // `virtual:neuigkeiten` vor, damit die Seite ohne Netz läuft. Eine nicht lesbare Überschrift
 // bricht den Build (Zerlegung in `scripts/changelog-zerlegen.mjs`).
@@ -158,6 +156,8 @@ const neuigkeitenQuelle = (): Plugin => {
   };
 };
 
+// Dev-Port und Proxy-Ziel kommen aus .env.local und der Umgebung (process.env hat
+// Vorrang), weil Workspaces Ports dynamisch vergeben.
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
   const backendUrl = env.LIFELINE_BACKEND_URL || 'http://127.0.0.1:8080';
