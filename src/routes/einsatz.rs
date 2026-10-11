@@ -54,6 +54,37 @@ pub struct NeuerEinsatz {
     pub einsatzart: Option<String>,
     /// Alarmzeit. Absent → DB-Default `datetime('now')`.
     pub begonnen_at: Option<String>,
+    /// Einsatzort (LFH-1175). Leer oder absent → ohne Ort.
+    pub einsatzort: Option<String>,
+    /// Koordinate des Einsatzorts, nur als Paar ([`pruefe_koordinate`]).
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lon: Option<Option<f64>>,
+}
+
+/// Prüft die Koordinate des Einsatzorts im Tri-State von Anlegen und PATCH (LFH-1175, Spec
+/// `ortsfeld`, „Koordinate des Einsatzorts wird geprüft“). Breite und Länge kommen nur als Paar:
+/// beide fehlen, beide `null` oder beide mit Wert. Ein halbes Paar ist **422**, ein Wert außerhalb
+/// des Bereichs **400** (`src/AGENTS.md`, Statuscode-Konvention). Liefert das gesetzte Paar.
+fn pruefe_koordinate(
+    lat: Option<Option<f64>>,
+    lon: Option<Option<f64>>,
+) -> Result<Option<(f64, f64)>, AppError> {
+    match (lat, lon) {
+        (None, None) | (Some(None), Some(None)) => Ok(None),
+        (Some(Some(lat)), Some(Some(lon))) => {
+            if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
+                return Err(AppError::Validation(
+                    "Koordinate außerhalb des gültigen Bereichs".into(),
+                ));
+            }
+            Ok(Some((lat, lon)))
+        }
+        _ => Err(AppError::UnprocessableEntity(
+            "Breite und Länge des Einsatzorts nur gemeinsam setzen oder leeren".into(),
+        )),
+    }
 }
 
 /// POST /api/einsaetze — neuen Einsatz anlegen; Ersteller wird Einsatzleitung.
@@ -91,6 +122,12 @@ pub async fn anlegen(
         Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
         None => None,
     };
+    let koordinate = pruefe_koordinate(req.einsatzort_lat, req.einsatzort_lon)?;
+    let adresse = req
+        .einsatzort
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
 
     let einsatz = repo::anlegen(
         &state.pool,
@@ -99,6 +136,10 @@ pub async fn anlegen(
             stichwort,
             einsatzart,
             begonnen_at: begonnen_at.as_deref(),
+            ort: repo::NeuerEinsatzort {
+                adresse,
+                koordinate,
+            },
         },
         benutzer.id,
     )
@@ -1023,6 +1064,7 @@ pub async fn aktualisieren(
         Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
         None => None,
     };
+    pruefe_koordinate(req.einsatzort_lat, req.einsatzort_lon)?;
 
     let stichwort = support::trimme_tri(req.stichwort);
     let naechste_lagebesprechung_at = support::trimme_tri(req.naechste_lagebesprechung_at)

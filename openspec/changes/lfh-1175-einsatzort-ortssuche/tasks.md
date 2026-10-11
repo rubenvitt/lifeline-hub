@@ -14,8 +14,8 @@
 
 ## 3. Server: Einsatzort beim Anlegen, Prüfung der Koordinate
 
-- [ ] 3.1 Prüfhelfer für die Koordinate in `src/routes/einsatz.rs` (Bereich 400, Paar 422); Integrationstests am PATCH: lat 91 → 400, nur lon → 422, Wert neben `null` → 422, Paar `null` leert; zuerst rot
-- [ ] 3.2 `NeuerEinsatz` und `repo::NeuerEinsatzDaten` um `einsatzort`, `einsatzort_lat`, `einsatzort_lon` erweitern, dieselbe Prüfung; Integrationstests: Anlegen mit Treffer speichert alle drei, mit Freitext nur die Adresse, ohne Feld nichts, lat 91 → 400
+- [x] 3.1 Prüfhelfer für die Koordinate in `src/routes/einsatz.rs` (Bereich 400, Paar 422); Integrationstests am PATCH: lat 91 → 400, nur lon → 422, Wert neben `null` → 422, Paar `null` leert; zuerst rot
+- [x] 3.2 `NeuerEinsatz` und `repo::NeuerEinsatzDaten` um `einsatzort`, `einsatzort_lat`, `einsatzort_lon` erweitern, dieselbe Prüfung; Integrationstests: Anlegen mit Treffer speichert alle drei, mit Freitext nur die Adresse, ohne Feld nichts, lat 91 → 400
 
 ## 4. Frontend: API und Bausteine
 

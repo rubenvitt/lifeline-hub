@@ -2343,3 +2343,173 @@ async fn aufbewahrungsfrist_nach_karenz_ist_409_und_aendert_nichts() {
     }
     assert_eq!(frist_stand(&pool, id).await, vorher);
 }
+
+// ---------- LFH-1175: Koordinate des Einsatzorts prüfen, Einsatzort beim Anlegen ----------
+
+/// Wie [`einsatz_anlegen`], aber mit beliebigem Body.
+async fn einsatz_anlegen_json(
+    app: &axum::Router,
+    cookie: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/einsaetze")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+/// Spec `ortsfeld`, „Koordinate des Einsatzorts wird geprüft“: Bereich ist 400 (das Feld für
+/// sich), ein halbes Paar 422 (Zusammenhang). Nichts davon ändert den Einsatz.
+#[tokio::test]
+async fn patch_prueft_bereich_und_paar_der_koordinate() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = einsatz_mit_vollen_kopfdaten(&app, &admin).await;
+
+    for (body, erwartet) in [
+        (
+            json!({"einsatzort_lat": 91.0, "einsatzort_lon": 10.0}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"einsatzort_lat": 51.0, "einsatzort_lon": -180.5}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"einsatzort_lon": 10.0}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"einsatzort_lat": 51.0}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"einsatzort_lat": 51.0, "einsatzort_lon": null}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"einsatzort_lat": null, "einsatzort_lon": 10.0}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let (status, json) = patch_kopf(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, erwartet, "{body}: {json}");
+        assert!(json["error"].is_string(), "{json}");
+    }
+    let (_, a) = patch_kopf(&app, &admin, id, json!({})).await;
+    assert_eq!(a["einsatzort_lat"], 52.5, "unverändert");
+    assert_eq!(a["einsatzort_lon"], 13.4);
+
+    // Das Paar aus `null` leert, Grenzwerte gelten.
+    let (status, a) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({"einsatzort_lat": null, "einsatzort_lon": null}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(a["einsatzort_lat"].is_null() && a["einsatzort_lon"].is_null());
+    let (status, _) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({"einsatzort_lat": -90.0, "einsatzort_lon": 180.0}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+/// Spec `ortsfeld`, „Einsatzort beim Anlegen“: Treffer, Freitext, leer.
+#[tokio::test]
+async fn anlegen_nimmt_den_einsatzort_an() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, a) = einsatz_anlegen_json(
+        &app,
+        &admin,
+        json!({
+            "bezeichnung": "Mit Treffer",
+            "einsatzort": "  Bahnhofstraße 1, 12345 Musterstadt ",
+            "einsatzort_lat": 51.1,
+            "einsatzort_lon": 10.4
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{a}");
+    assert_eq!(a["einsatzort"], "Bahnhofstraße 1, 12345 Musterstadt");
+    assert_eq!(a["einsatzort_lat"], 51.1);
+    assert_eq!(a["einsatzort_lon"], 10.4);
+
+    let (status, a) = einsatz_anlegen_json(
+        &app,
+        &admin,
+        json!({"bezeichnung": "Freitext", "einsatzort": "Waldweg hinter Sportplatz"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{a}");
+    assert_eq!(a["einsatzort"], "Waldweg hinter Sportplatz");
+    assert!(a["einsatzort_lat"].is_null());
+
+    let (status, a) = einsatz_anlegen_json(
+        &app,
+        &admin,
+        json!({"bezeichnung": "Leer", "einsatzort": "  "}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{a}");
+    assert!(a["einsatzort"].is_null());
+    assert!(a["einsatzort_lat"].is_null());
+}
+
+#[tokio::test]
+async fn anlegen_prueft_die_koordinate() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    for (body, erwartet) in [
+        (
+            json!({"bezeichnung": "X", "einsatzort_lat": 91.0, "einsatzort_lon": 10.0}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"bezeichnung": "X", "einsatzort_lat": 51.0}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let (status, json) = einsatz_anlegen_json(&app, &admin, body.clone()).await;
+        assert_eq!(status, erwartet, "{body}: {json}");
+    }
+    let (_, liste) = {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/einsaetze")
+                    .header(header::COOKIE, admin.clone())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let s = resp.status();
+        let b = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        (s, serde_json::from_slice::<Value>(&b).unwrap())
+    };
+    assert_eq!(liste.as_array().unwrap().len(), 0, "nichts angelegt");
+}
