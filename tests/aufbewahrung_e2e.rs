@@ -159,6 +159,20 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "freigegebenes Besatzungsmitglied, wenn ad-hoc extern",
     },
     Ausnahme {
+        datei: "src/einsatz/fuehrungsstelle.rs",
+        funktion: "einsatzleiter_schreiben_tx",
+        spalte: "einsatz_fuehrungsstelle.einsatzleiter_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Übergabe der Einsatzleitung (neu und vorher) über uebergabe_text (LFH-1199)",
+    },
+    Ausnahme {
+        datei: "src/einsatz/fuehrungsstelle.rs",
+        funktion: "einsatzleiter_schreiben_tx",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "neuer Einsatzleiter über snap_name_von, wenn ad-hoc extern (derselbe Wert wie einsatz_fuehrungsstelle.einsatzleiter_name)",
+    },
+    Ausnahme {
         datei: "src/stab/repo.rs",
         funktion: "setzen",
         spalte: "einsatz_stabsfunktion.snap_name",

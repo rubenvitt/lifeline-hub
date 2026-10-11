@@ -4,9 +4,15 @@
 //! Lesen mit dem Einsatz (kein Modul), Schreiben mit den Rechten der Kopfdaten. Eine Änderung
 //! meldet das Ereignis `einsatz` über `routes::einsatz::kopf_geaendert` (Spec `einsatzkopf-live`).
 //! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3).
+//! Der Einsatzleiter (LFH-1199) schreibt bei einem Wechsel zusätzlich einen Übergabe-Eintrag ins
+//! ETB und meldet ihn nach dem Commit: `openspec/changes/lfh-1199-einsatzleiter-angabe/design.md`
+//! (D2, D3).
 
 use crate::app::AppState;
-use crate::einsatz::fuehrungsstelle::{self, FuehrungsstelleAnzeige, FuehrungsstellePatch};
+use crate::einsatz::fuehrungsstelle::{
+    self, EinsatzleiterArt, EinsatzleiterEingabe, FuehrungsstelleAnzeige, FuehrungsstellePatch,
+    Schreiber, EINSATZLEITER_NAME_MAX,
+};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -33,6 +39,97 @@ pub struct FuehrungsstellePatchBody {
     /// `sprechgruppe_ids`.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub fahrzeug_ids: Option<Option<Vec<i64>>>,
+    /// Der Einsatzleiter (LFH-1199); `null` leert ihn.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einsatzleiter: Option<Option<EinsatzleiterBody>>,
+}
+
+/// Ein neuer Einsatzleiter: `personal` mit `personal_id` oder `extern` mit `name`; `seit` fehlt =
+/// jetzt.
+#[derive(Debug, Deserialize)]
+pub struct EinsatzleiterBody {
+    pub art: String,
+    #[serde(default)]
+    pub personal_id: Option<i64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub seit: Option<String>,
+}
+
+/// Uhrabweichung, die ein „seit“ in der Zukunft noch hinnimmt — wie die Zeitachse.
+const UHRENTOLERANZ_MINUTEN: i64 = 2;
+
+/// Der geprüfte Einsatzleiter: Art und Name einzeln 400, Zusammenhänge 422 (`src/AGENTS.md`,
+/// Statuscode-Konvention). Die Zugehörigkeit der Person prüft die Transaktion.
+struct EinsatzleiterGeprueft {
+    art: EinsatzleiterArt,
+    personal_id: Option<i64>,
+    name: Option<String>,
+    seit: String,
+}
+
+fn pruefe_einsatzleiter(body: EinsatzleiterBody) -> Result<EinsatzleiterGeprueft, AppError> {
+    let art = EinsatzleiterArt::try_from(body.art).map_err(AppError::Validation)?;
+    let name_gesendet = body.name.is_some();
+    let name = body
+        .name
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty());
+    if let Some(n) = &name {
+        if n.chars().count() > EINSATZLEITER_NAME_MAX {
+            return Err(AppError::Validation(format!(
+                "Name des Einsatzleiters höchstens {EINSATZLEITER_NAME_MAX} Zeichen"
+            )));
+        }
+    }
+    let jetzt = crate::zeit::jetzt();
+    let seit = match body
+        .seit
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(roh) => crate::etb::normalisiere_zeit(roh)?,
+        None => jetzt.clone(),
+    };
+    match art {
+        EinsatzleiterArt::Personal => {
+            if body.personal_id.is_none() {
+                return Err(AppError::Validation("personal_id fehlt".into()));
+            }
+            if name_gesendet {
+                return Err(AppError::UnprocessableEntity(
+                    "Eine Person trägt ihren Namen aus dem Personal, keinen Freitext".into(),
+                ));
+            }
+        }
+        EinsatzleiterArt::Extern => {
+            if body.personal_id.is_some() {
+                return Err(AppError::UnprocessableEntity(
+                    "Ein externer Einsatzleiter hat keine Person aus dem Personal".into(),
+                ));
+            }
+            if name.is_none() {
+                return Err(AppError::Validation(
+                    "Name des externen Einsatzleiters fehlt".into(),
+                ));
+            }
+        }
+    }
+    let grenze =
+        crate::zeit::plus_minuten(&jetzt, UHRENTOLERANZ_MINUTEN).unwrap_or_else(|| jetzt.clone());
+    if seit > grenze {
+        return Err(AppError::UnprocessableEntity(
+            "„seit“ liegt in der Zukunft".into(),
+        ));
+    }
+    Ok(EinsatzleiterGeprueft {
+        art,
+        personal_id: body.personal_id,
+        name,
+        seit,
+    })
 }
 
 /// GET /api/einsaetze/{id}/fuehrungsstelle — ohne erfasste Angaben alles leer (200).
@@ -68,12 +165,17 @@ pub async fn aendern(
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
+    let einsatzleiter: Option<Option<EinsatzleiterGeprueft>> = body
+        .einsatzleiter
+        .map(|e| e.map(pruefe_einsatzleiter).transpose())
+        .transpose()?;
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
     if rufname.is_none()
         && mittel.is_none()
         && erreichbarkeit.is_none()
         && ids.is_none()
         && fahrzeug_ids.is_none()
+        && einsatzleiter.is_none()
     {
         return Ok(Json(fuehrungsstelle::laden(&state.pool, einsatz_id).await?));
     }
@@ -95,12 +197,36 @@ pub async fn aendern(
         erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
         sprechgruppe_ids: ids.as_deref(),
         fahrzeug_ids: fahrzeug_ids.as_deref(),
+        einsatzleiter: einsatzleiter.as_ref().map(|e| {
+            e.as_ref()
+                .map(|e| match (e.art, e.personal_id, e.name.as_deref()) {
+                    (EinsatzleiterArt::Personal, Some(personal_id), _) => {
+                        EinsatzleiterEingabe::Personal {
+                            personal_id,
+                            seit: &e.seit,
+                        }
+                    }
+                    (_, _, name) => EinsatzleiterEingabe::Extern {
+                        name: name.unwrap_or_default(),
+                        seit: &e.seit,
+                    },
+                })
+        }),
     };
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
-        fuehrungsstelle::patchen_tx(conn, einsatz_id, &patch).await
+    let schreiber = Schreiber {
+        benutzer_id: ctx.benutzer.id,
+        etb_startwert: crate::einsatz::einstellungen::etb_startwert(&state.pool, einsatz_id)
+            .await?,
+    };
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        fuehrungsstelle::patchen_tx(conn, einsatz_id, schreiber, &patch).await
     })?;
-    // Erst nach dem Commit (Reinheits-Kontrakt), wie jeder `einsatz`-Emitter.
+    // Erst nach dem Commit (Reinheits-Kontrakt), wie jeder `einsatz`-Emitter; der Übergabe-Eintrag
+    // braucht seinen eigenen Kurzruf, sonst bliebe das ETB anderer Schirme still veraltet.
     crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     Ok(Json(anzeige))
 }
 

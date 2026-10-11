@@ -46,3 +46,5 @@ export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
 /** Netz und Sicherheit einer Sprechgruppe (Bedingungszeichen, LFH-1030). */
 export const SPRECHGRUPPE_BEDINGUNG_MAX = 40;
+/** Freitext eines externen Einsatzleiters an der eigenen Führungsstelle (LFH-1199). */
+export const EINSATZLEITER_NAME_MAX = 200;
