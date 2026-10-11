@@ -3,6 +3,7 @@ import {
   apiAlsAdmin,
   anmelden,
   demoEinsatz,
+  einsatzleiterFuellen,
   expect,
   fotografiere,
   fuelle,
@@ -90,6 +91,7 @@ test.describe(KAPITEL, () => {
         fahrzeug_ids: elw ? [elw.id] : [],
       });
     }
+    await einsatzleiterFuellen(api, demo);
     await api.dispose();
   });
 
@@ -114,6 +116,7 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
     const paneel = page.getByRole('region', { name: 'Eigene Führungsstelle' });
     await expect(paneel.getByText('Florian Musterstadt 11-1')).toBeVisible();
+    await expect(paneel.getByText('Max Mustermann')).toBeVisible();
     await expect(paneel.getByText('Musterstadt 11-1', { exact: false }).last()).toBeVisible();
     await fotografiere(paneel, KAPITEL, 'fuehrungsstelle');
   });

@@ -16,7 +16,9 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { taktischeDtg } from '../anzeige/format';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { EINSATZLEITER_NAME_MAX } from '../api/eingabegrenzen';
 import { InlineAngabe } from '../components/InlineAngabe';
+import { istZuLang, Zeichenzaehler } from '../components/zeichenGrenze';
 import { monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -38,18 +40,18 @@ interface Wahl {
 
 const BISHER = 'bisher';
 
-function wahlAus(e: Einsatzleiter | null | undefined): string | null {
+function toWahl(e: Einsatzleiter | null | undefined): string | null {
   if (!e) return null;
   if (e.art === 'extern') return `x:${e.name ?? ''}`;
   return e.personal_id != null ? `p:${e.personal_id}` : BISHER;
 }
 
-function gleicheZeit(a: Dayjs | null, b: Dayjs | null): boolean {
+function isSameZeit(a: Dayjs | null, b: Dayjs | null): boolean {
   return a === null || b === null ? a === b : a.valueOf() === b.valueOf();
 }
 
 /** Die Wahl als PATCH-Feld; ohne „seit“ nimmt der Server die Zeit des Speicherns. */
-function eingabeAus(w: Wahl): EinsatzleiterEingabe | null {
+function toEingabe(w: Wahl): EinsatzleiterEingabe | null {
   if (w.wahl === null) return null;
   const seit = w.seit ? { seit: alsBackendZeit(w.seit) } : {};
   if (w.wahl.startsWith('p:')) {
@@ -110,7 +112,7 @@ export default function EinsatzleiterAngabe({
   const [suche, setSuche] = useState('');
   const e = fs.einsatzleiter;
   const d = einsatzleiterDarstellung({ zustand: 'daten', daten: fs });
-  const gespeichert: Wahl = { wahl: wahlAus(e), seit: alsZeitpunkt(e?.seit) ?? null };
+  const gespeichert: Wahl = { wahl: toWahl(e), seit: alsZeitpunkt(e?.seit) ?? null };
 
   const optionen = (wert: Wahl) => {
     const text = suche.trim();
@@ -124,10 +126,18 @@ export default function EinsatzleiterAngabe({
       wert.wahl?.startsWith('x:') && wert.wahl !== gespeichert.wahl
         ? [{ value: wert.wahl, label: `${wert.wahl.slice(2)} (extern)` }]
         : [];
-    const freitext = text
-      ? [{ value: `x:${text}`, label: `„${text}“ als externen Einsatzleiter übernehmen` }]
-      : [];
-    return [...bisher, ...eigene, ...personen, ...freitext];
+    // Freitext nur, wenn er keiner Person gleicht und die Grenze des Servers hält: über ihr sperrt
+    // die Zeile das Angebot, und der Zähler nennt die Überlänge (`components/zeichenGrenze.tsx`).
+    const istPerson = quelle.personal.some(
+      (p) => p.name.localeCompare(text, 'de', { sensitivity: 'base' }) === 0,
+    );
+    const freitext =
+      text && !istPerson && !istZuLang(text, EINSATZLEITER_NAME_MAX)
+        ? [{ value: `x:${text}`, label: `„${text}“ als externen Einsatzleiter übernehmen` }]
+        : [];
+    // Eine Wahl steht nur einmal da, auch wenn der Suchtext sie noch einmal vorschlägt.
+    const alle = [...bisher, ...eigene, ...personen, ...freitext];
+    return alle.filter((o, i) => alle.findIndex((x) => x.value === o.value) === i);
   };
 
   return (
@@ -144,12 +154,12 @@ export default function EinsatzleiterAngabe({
         ) : null
       }
       leer={(w) => w.wahl === null}
-      gleich={(a, b) => a.wahl === b.wahl && gleicheZeit(a.seit, b.seit)}
+      gleich={(a, b) => a.wahl === b.wahl && isSameZeit(a.seit, b.seit)}
       darfSchreiben={darfSchreiben}
       onSpeichern={(w) => {
         setSuche('');
         return Promise.resolve()
-          .then(() => eingabeAus(w))
+          .then(() => toEingabe(w))
           .then(onSpeichern);
       }}
       eingabe={({ feld, popup, value, onChange }) => (
@@ -164,18 +174,22 @@ export default function EinsatzleiterAngabe({
             options={optionen(value)}
             value={value.wahl ?? undefined}
             onSearch={setSuche}
-            onChange={(w) =>
+            // rc-select leert seine Suche nach einer Wahl, meldet das aber nicht: sonst bliebe der
+            // Freitext als zweite Option stehen (Muster `fuehrung/EinWertAuswahl.tsx`).
+            onSelect={() => setSuche('')}
+            onBlur={() => setSuche('')}
+            onChange={(w) => {
+              // Eine eigens gesetzte Zeit bleibt. Sonst beginnt eine neue Wahl „jetzt“, und die
+              // gespeicherte Wahl bekommt ihr gespeichertes „seit“ zurück.
+              const eigeneZeit = value.seit !== null && !isSameZeit(value.seit, gespeichert.seit);
               onChange({
                 wahl: w ?? null,
-                // Eine neue Wahl beginnt „jetzt“, außer es wurde eigens eine Zeit gesetzt.
-                seit:
-                  w === gespeichert.wahl || !gleicheZeit(value.seit, gespeichert.seit)
-                    ? value.seit
-                    : null,
-              })
-            }
+                seit: eigeneZeit ? value.seit : w === gespeichert.wahl ? gespeichert.seit : null,
+              });
+            }}
             style={{ width: '100%' }}
           />
+          <Zeichenzaehler wert={suche.trim()} max={EINSATZLEITER_NAME_MAX} />
           {(quelle.zustand === 'gesperrt' || quelle.zustand === 'fehler') && (
             <div style={{ color: rollen.gedaempft }}>
               {`Personal ${ZUSTAND_GRUND[quelle.zustand]} — nur Freitext`}

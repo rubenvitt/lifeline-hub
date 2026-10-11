@@ -160,17 +160,17 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     },
     Ausnahme {
         datei: "src/einsatz/fuehrungsstelle.rs",
-        funktion: "einsatzleiter_schreiben_tx",
+        funktion: "save_einsatzleiter_tx",
         spalte: "einsatz_fuehrungsstelle.einsatzleiter_name",
         gruppe: Gruppe::Einsatzkraft,
         begruendung: "Übergabe der Einsatzleitung (neu und vorher) über uebergabe_text (LFH-1199)",
     },
     Ausnahme {
         datei: "src/einsatz/fuehrungsstelle.rs",
-        funktion: "einsatzleiter_schreiben_tx",
+        funktion: "save_einsatzleiter_tx",
         spalte: "einsatz_personal.snap_name",
         gruppe: Gruppe::Einsatzkraft,
-        begruendung: "neuer Einsatzleiter über snap_name_von, wenn ad-hoc extern (derselbe Wert wie einsatz_fuehrungsstelle.einsatzleiter_name)",
+        begruendung: "neuer Einsatzleiter über load_snap_name, wenn ad-hoc extern (derselbe Wert wie einsatz_fuehrungsstelle.einsatzleiter_name)",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",

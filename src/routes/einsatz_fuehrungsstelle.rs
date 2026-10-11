@@ -57,19 +57,16 @@ pub struct EinsatzleiterBody {
     pub seit: Option<String>,
 }
 
-/// Uhrabweichung, die ein „seit“ in der Zukunft noch hinnimmt — wie die Zeitachse.
-const UHRENTOLERANZ_MINUTEN: i64 = 2;
-
 /// Der geprüfte Einsatzleiter: Art und Name einzeln 400, Zusammenhänge 422 (`src/AGENTS.md`,
 /// Statuscode-Konvention). Die Zugehörigkeit der Person prüft die Transaktion.
-struct EinsatzleiterGeprueft {
+struct CheckedEinsatzleiter {
     art: EinsatzleiterArt,
     personal_id: Option<i64>,
     name: Option<String>,
     seit: String,
 }
 
-fn pruefe_einsatzleiter(body: EinsatzleiterBody) -> Result<EinsatzleiterGeprueft, AppError> {
+fn check_einsatzleiter(body: EinsatzleiterBody) -> Result<CheckedEinsatzleiter, AppError> {
     let art = EinsatzleiterArt::try_from(body.art).map_err(AppError::Validation)?;
     let name_gesendet = body.name.is_some();
     let name = body
@@ -77,11 +74,7 @@ fn pruefe_einsatzleiter(body: EinsatzleiterBody) -> Result<EinsatzleiterGeprueft
         .map(|n| n.trim().to_string())
         .filter(|n| !n.is_empty());
     if let Some(n) = &name {
-        if n.chars().count() > EINSATZLEITER_NAME_MAX {
-            return Err(AppError::Validation(format!(
-                "Name des Einsatzleiters höchstens {EINSATZLEITER_NAME_MAX} Zeichen"
-            )));
-        }
+        crate::routes::support::hoechstens(n, "Name des Einsatzleiters", EINSATZLEITER_NAME_MAX)?;
     }
     let jetzt = crate::zeit::jetzt();
     let seit = match body
@@ -90,7 +83,8 @@ fn pruefe_einsatzleiter(body: EinsatzleiterBody) -> Result<EinsatzleiterGeprueft
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        Some(roh) => crate::etb::normalisiere_zeit(roh)?,
+        // Ein Tippfehler im Jahr landete sonst als Ereigniszeit im ETB (LFH-924).
+        Some(roh) => crate::zeit::im_jahresbereich(crate::etb::normalisiere_zeit(roh)?, "seit")?,
         None => jetzt.clone(),
     };
     match art {
@@ -117,14 +111,15 @@ fn pruefe_einsatzleiter(body: EinsatzleiterBody) -> Result<EinsatzleiterGeprueft
             }
         }
     }
-    let grenze =
-        crate::zeit::plus_minuten(&jetzt, UHRENTOLERANZ_MINUTEN).unwrap_or_else(|| jetzt.clone());
+    // Uhrabweichung wie die Zeitachse.
+    let grenze = crate::zeit::plus_minuten(&jetzt, crate::routes::zeitachse::UHRENTOLERANZ_MINUTEN)
+        .unwrap_or_else(|| jetzt.clone());
     if seit > grenze {
         return Err(AppError::UnprocessableEntity(
             "„seit“ liegt in der Zukunft".into(),
         ));
     }
-    Ok(EinsatzleiterGeprueft {
+    Ok(CheckedEinsatzleiter {
         art,
         personal_id: body.personal_id,
         name,
@@ -165,9 +160,9 @@ pub async fn aendern(
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
-    let einsatzleiter: Option<Option<EinsatzleiterGeprueft>> = body
+    let einsatzleiter: Option<Option<CheckedEinsatzleiter>> = body
         .einsatzleiter
-        .map(|e| e.map(pruefe_einsatzleiter).transpose())
+        .map(|e| e.map(check_einsatzleiter).transpose())
         .transpose()?;
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
     if rufname.is_none()

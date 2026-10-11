@@ -1311,6 +1311,40 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     expect(await p.findByRole('button', { name: 'Einsatzleiter eintragen' })).toBeVisible();
   });
 
+  it('Einsatzleiter: die bisherige Person erneut gewählt behält ihr „seit“', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt({
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      einsatzleiter: anna,
+    });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Einsatzleiter bearbeiten' }));
+    await user.click(p.getByRole('combobox', { name: 'Einsatzleiter' }));
+    await user.click(await screen.findByText('Bernd Berg'));
+    await user.click(p.getByRole('combobox', { name: 'Einsatzleiter' }));
+    await user.click(await screen.findByText('Anna Schulz · Zugführerin'));
+    await user.click(p.getByRole('button', { name: 'Einsatzleiter speichern' }));
+    expect(await p.findByRole('button', { name: 'Einsatzleiter bearbeiten' })).toBeVisible();
+    expect(bodies).toEqual([]);
+  });
+
+  it('Einsatzleiter: Freitext nur unter der Grenze und nie für eine Person der Liste', async () => {
+    setup();
+    fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Einsatzleiter eintragen' }));
+    const feld = p.getByRole('combobox', { name: 'Einsatzleiter' });
+    await user.type(feld, 'anna schulz');
+    expect(screen.queryByText(/als externen Einsatzleiter übernehmen/)).toBeNull();
+    await user.clear(feld);
+    fireEvent.change(feld, { target: { value: 'x'.repeat(201) } });
+    expect(await p.findByText(/zu lang/)).toBeInTheDocument();
+    expect(screen.queryByText(/als externen Einsatzleiter übernehmen/)).toBeNull();
+  });
+
   it('Einsatzleiter: ohne Freigabe Personal nur Freitext, mit Grund', async () => {
     setup();
     server.use(

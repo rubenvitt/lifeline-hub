@@ -1,5 +1,13 @@
 import { waehleIn } from '../auswahl-kern';
-import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from './kern';
+import {
+  anmelden,
+  demoEinsatz,
+  einsatzleiterFuellen,
+  expect,
+  fotografiere,
+  test,
+  uhrAnhalten,
+} from './kern';
 
 /**
  * Bilder des Kapitels „Einsatzabschnitte und Führungsorganisation“
@@ -53,10 +61,13 @@ test.describe(KAPITEL, () => {
   test('Organigramm der Führungsorganisation', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
+    await einsatzleiterFuellen(page.request, demo);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einsatzabschnitte?ansicht=organigramm`);
     const organigramm = page.locator('.organigramm-print-root');
-    await expect(organigramm.getByRole('group', { name: 'Einsatzleitung' })).toBeVisible();
+    await expect(organigramm.getByRole('group', { name: 'Einsatzleitung' })).toContainText(
+      'Max Mustermann',
+    );
     await expect(organigramm.getByText('UHS Turnhalle').first()).toBeVisible();
     await fotografiere(organigramm, KAPITEL, 'organigramm');
   });

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { anmelden, einsatzAnlegen, oeffneOrganigramm, organigramm } from './fuehrungsorganisation-kern';
+import { anmelden, einsatzAnlegen, organigramm, post } from './fuehrungsorganisation-kern';
 
 /**
  * Einsatzleiter an der eigenen Führungsstelle (LFH-1199, Spec `einsatz-fuehrungsstelle`): über
@@ -36,7 +36,12 @@ test('Einsatzleiter setzen und übergeben: ein Name überall, eine Übergabe im 
   const kopf = page.getByRole('group', { name: 'Einsatzleitung' });
   await expect(kopf).toHaveText(/BI Krause \(extern\)/);
 
-  await oeffneOrganigramm(page, einsatzId);
+  await post(page, einsatzId, 'abschnitte', { name: 'EA Nord' });
+  await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
+  // Der Zeiger darf nicht über dem Organigramm ruhen: die Schleuse hielte den Kopf mit dem Stand
+  // beim Betreten (LFH-867), wie in `fuehrungsorganisation-kern.ts:oeffneOrganigramm`.
+  await page.mouse.move(0, 0);
+  await expect(organigramm(page).getByRole('link', { name: 'EA Nord' })).toBeVisible();
   await expect(organigramm(page).getByRole('group', { name: 'Einsatzleitung' })).toContainText(
     'BI Krause (extern)',
   );

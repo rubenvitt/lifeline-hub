@@ -1035,6 +1035,45 @@ async fn scheitert_der_etb_eintrag_scheitert_die_aenderung() {
     );
 }
 
+/// Der Extractor prüft den Lebenszyklus VOR der Transaktion; ein Abschluss kann dazwischenliegen.
+/// Das Repo schreibt in einen abgeschlossenen Einsatz weder Einsatzleiter noch Übergabe (D3).
+#[tokio::test]
+async fn repo_lehnt_den_abgeschlossenen_einsatz_in_der_transaktion_ab() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+
+    let mut tx = pool.begin().await.unwrap();
+    let patch = lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellePatch {
+        einsatzleiter: Some(Some(
+            lifeline_hub::einsatz::fuehrungsstelle::EinsatzleiterEingabe::Extern {
+                name: "KBM Weber",
+                seit: "2026-10-11 12:00:00",
+            },
+        )),
+        ..Default::default()
+    };
+    let ergebnis = lifeline_hub::einsatz::fuehrungsstelle::patchen_tx(
+        &mut tx,
+        einsatz,
+        admin_schreiber(),
+        &patch,
+    )
+    .await;
+    assert!(
+        matches!(ergebnis, Err(lifeline_hub::error::AppError::Conflict(_))),
+        "{ergebnis:?}"
+    );
+}
+
 #[tokio::test]
 async fn abgelehnte_aenderung_meldet_kein_etb() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;

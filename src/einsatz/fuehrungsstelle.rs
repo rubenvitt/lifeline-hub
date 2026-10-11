@@ -318,7 +318,7 @@ fn uebergabe_text(vorher: &Stand, nachher: &Stand) -> Option<String> {
 
 /// Prüft, dass `personal_id` eine Disposition **dieses** Einsatzes ist (sonst 422), und liefert
 /// ihren `snap_name` zum Einfrieren — Muster `stab::repo::snap_name_von`.
-async fn snap_name_von(
+async fn load_snap_name(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     personal_id: i64,
@@ -339,7 +339,7 @@ async fn snap_name_von(
 
 /// Schreibt den Einsatzleiter und, bei einem fachlichen Wechsel, den Übergabe-Eintrag ins ETB —
 /// in der offenen Transaktion des Aufrufers. Liefert die id des Eintrags.
-async fn einsatzleiter_schreiben_tx(
+async fn save_einsatzleiter_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     schreiber: Schreiber,
@@ -352,7 +352,7 @@ async fn einsatzleiter_schreiben_tx(
     let (nachher, seit): (Stand, Option<&str>) = match eingabe {
         None => (None, None),
         Some(EinsatzleiterEingabe::Personal { personal_id, seit }) => {
-            let name = snap_name_von(conn, einsatz_id, personal_id).await?;
+            let name = load_snap_name(conn, einsatz_id, personal_id).await?;
             (
                 Some((EinsatzleiterArt::Personal, Some(personal_id), Some(name))),
                 Some(seit),
@@ -466,7 +466,7 @@ pub async fn patchen_tx(
         .await?;
     }
     let etb_id = match patch.einsatzleiter {
-        Some(eingabe) => einsatzleiter_schreiben_tx(conn, einsatz_id, schreiber, eingabe).await?,
+        Some(eingabe) => save_einsatzleiter_tx(conn, einsatz_id, schreiber, eingabe).await?,
         None => None,
     };
     Ok((laden_tx(conn, einsatz_id).await?, etb_id))
