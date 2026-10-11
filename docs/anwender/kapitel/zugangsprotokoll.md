@@ -2,7 +2,7 @@
 titel: Zugangsprotokoll
 gruppen: [administration]
 reihenfolge: 680
-quellen: [frontend/src/zugangsprotokoll/ZugangsprotokollPage.tsx, frontend/src/zugangsprotokoll/zugangsprotokollText.ts, frontend/src/api/zugangsprotokoll.ts, frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, src/routes/zugangsprotokoll.rs, src/auth/spur.rs, src/auth/audit.rs, src/auth/admin_audit.rs, src/auth/benutzername.rs, src/routes/auth.rs, src/routes/benutzer.rs, src/routes/sitzung.rs, src/routes/geraet.rs, src/extract.rs, src/einsatz/purge_scheduler.rs]
+quellen: [frontend/src/zugangsprotokoll/ZugangsprotokollPage.tsx, frontend/src/zugangsprotokoll/zugangsprotokollText.ts, frontend/src/api/zugangsprotokoll.ts, frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, src/routes/zugangsprotokoll.rs, src/auth/spur.rs, src/auth/audit.rs, src/auth/admin_audit.rs, src/auth/benutzername.rs, src/routes/auth.rs, src/routes/benutzer.rs, src/routes/sitzung.rs, src/routes/geraet.rs, src/auth/session.rs, frontend/src/stammdaten/rechteText.ts, src/extract.rs, src/einsatz/purge_scheduler.rs]
 ---
 
 ## Überblick
@@ -41,7 +41,8 @@ Für System-Admins:
 
 3. Bei Bedarf mit „von“ und „bis“ den Zeitraum eingrenzen.
 
-Mit dem Konto im Feld zeigt auch die Spur „Zugangsänderungen“ nur noch Einträge dieses Kontos.
+Mit dem Text im Feld „Konto“ zeigt auch die Spur „Zugangsänderungen“ nur noch Einträge der
+Konten, deren Name ihn enthält.
 
 ### Fehlgeschlagene Anmeldeversuche finden
 
@@ -63,12 +64,14 @@ Eine Zeile entsteht, nachdem ein System-Admin eine dieser Aktionen ausgeführt h
 abgewiesene Aktion hinterlässt nichts.
 
 - **„Konto angelegt“**: unter „Benutzer“ mit „Benutzer anlegen“. „Detail“ nennt die beiden
-  Rollen.
+  Rollen, etwa „System-Rolle: Benutzer, Org-Rolle: Keine“.
 - **„Rolle geändert“**: System- oder Org-Rolle im Dialog „Benutzer bearbeiten“ geändert.
-  „Detail“ nennt alte und neue Rolle. Eine reine Änderung des Anzeigenamens schreibt nichts.
+  „Detail“ nennt alte und neue Rolle, etwa „Org-Rolle: Keine → Führungskraft“. Eine reine
+  Änderung des Anzeigenamens schreibt nichts.
 - **„Konto deaktiviert“** und **„Konto reaktiviert“**: unter „Benutzer“.
 - **„Sitzung beendet“**: eine Anmeldung der Person unter „Benutzer“, „Anmeldungen“ beendet, eine
-  Zeile je Anmeldung. „Detail“ nennt das Gerät und den Zeitpunkt der Anmeldung.
+  Zeile je Anmeldung. „Detail“ nennt das Gerät und den Zeitpunkt der Anmeldung, in derselben
+  Form wie die Spalte „Zeitpunkt“.
 - **„Einmalpasswort vergeben“**: im Dialog „Benutzer bearbeiten“. Ohne „Detail“, das Passwort
   steht nie in der Spur. Die Anmeldungen, die dabei enden, stehen nicht einzeln da.
 - **„Anmeldeweg aktiviert“** und **„Anmeldeweg deaktiviert“**: jedes Schalten unter
@@ -77,9 +80,9 @@ abgewiesene Aktion hinterlässt nichts.
 - **„Zweitfaktor zurückgesetzt“**: steht in der Auswahl; die Oberfläche der Verwaltung bietet
   das Zurücksetzen derzeit nicht an.
 
-Die Rollen in „Detail“ stehen in der internen Schreibweise, etwa
-„org_rolle: keine → fuehrungskraft“, und der Zeitpunkt der Anmeldung bei „Sitzung beendet“ in der
-Form „2026-10-10 12:13:34“ in UTC, nicht in Zeitzone und Zeitformat der Organisation.
+Die Rollen heißen in „Detail“ so wie im Dialog „Benutzer bearbeiten“. Einträge, die vor dem
+Update mit diesem Klartext entstanden sind, behalten ihre alte Form, etwa
+„org_rolle: keine → fuehrungskraft“ oder eine Zeit in UTC; sie verschwinden mit ihrer Frist.
 
 Wie die Aktionen selbst gehen, beschreiben [Benutzer](benutzer.md) und
 [Verwaltung](verwaltung.md).
@@ -109,10 +112,11 @@ in dieser Spur, und eine Anmeldung, die nur abläuft, endet still.
 
 - **„Konto“**: der angemeldete Name, beim Fehlversuch der versuchte. Gekoppelte Geräte stehen mit
   ihrem Gerätekonto „geraet-…“. Namen über 64 Zeichen stehen gekürzt mit „…“.
-- **„Anmeldeweg“**: „Passwort“, „SSO“ oder „Passkey“. Andere Wege stehen in der internen
-  Schreibweise: „totp“ für den zweiten Faktor, „geraetecode“ für gekoppelte Geräte,
-  „systembrowser“ für die Mac-App. Bei „Abmeldung“ und „Sitzung beendet“ steht immer
-  „Passwort“, weil sich der Server den Weg der Anmeldung nicht merkt.
+- **„Anmeldeweg“**: „Passwort“, „SSO“, „Passkey“, „Zweiter Faktor“ (Passwort und Code),
+  „Gerätecode“ (gekoppelte Geräte) oder „Mac-App“ (Anmeldung der Mac-App über den Browser). Bei
+  „Abmeldung“ und „Sitzung beendet“ steht der Weg, auf dem die beendete Anmeldung entstand. Ist
+  er nicht bekannt, steht „—“: so bei Anmeldungen, die schon vor dem Update mit diesem Klartext
+  bestanden. Ältere Abmeldungen zeigen noch „Passwort“, auch wenn die Anmeldung anders entstand.
 - **„Quelle“**: die IP-Adresse, von der die Anfrage kam. Steht der Server hinter einem
   Reverse-Proxy, ist das nur dann die Adresse des Geräts, wenn der Betrieb den Proxy als
   vertrauenswürdig eingetragen hat; sonst steht dort die Adresse des Proxys.
@@ -121,9 +125,10 @@ in dieser Spur, und eine Anmeldung, die nur abläuft, endet still.
 ### Suchen und Filtern
 
 - „von“ und „bis“ schließen die genannten Zeitpunkte ein.
-- „Konto“ trifft nur den ganzen Benutzernamen; Groß- und Kleinschreibung zählen nicht. Ein Teil
-  des Namens findet nichts. In „Zugangsänderungen“ trifft das Konto sowohl den handelnden Admin
-  als auch das Zielkonto.
+- „Konto“ trifft jeden Benutzernamen, der den eingetragenen Text enthält; „rub“ findet „ruben“
+  und „rubina“. Groß- und Kleinschreibung zählen nicht. Die Liste folgt schon beim Tippen. In
+  „Zugangsänderungen“ trifft das Konto sowohl den handelnden Admin als auch das Zielkonto, nie
+  einen Anmeldeweg gleichen Namens.
 - Die Filter stehen in der Adresse der Seite; ein Lesezeichen oder ein geteilter Link öffnet
   dieselbe Auswahl.
 - Die Liste lädt beim Öffnen und bei jedem Filterwechsel je 100 Einträge, weitere mit „Ältere

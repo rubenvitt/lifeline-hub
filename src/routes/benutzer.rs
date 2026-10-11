@@ -1,5 +1,5 @@
 use crate::app::AppState;
-use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel};
+use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
 use crate::auth::session::{self, AdminUser};
 use crate::auth::{
     BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY, ROLLE_ADMIN,
@@ -192,7 +192,11 @@ pub async fn anlegen(
             aktion: AdminAktion::BenutzerAngelegt,
             akteur: &admin,
             ziel: Ziel::Benutzer { id, benutzername },
-            detail: Some(format!("system_rolle: {rolle}, org_rolle: {org_rolle}")),
+            angaben: Some(ZugangsAngaben {
+                system_rolle: SystemRolle::parse(rolle),
+                org_rolle: OrgRolle::parse(org_rolle),
+                ..ZugangsAngaben::default()
+            }),
             peer_ip,
         },
     )
@@ -308,7 +312,7 @@ pub async fn deaktivieren(
                 id,
                 benutzername: &ziel.benutzername,
             },
-            detail: None,
+            angaben: None,
             peer_ip,
         },
     )
@@ -388,27 +392,24 @@ pub async fn bearbeiten(
     tx.commit().await?;
     state.live.melde_sitzung_ende(beendet);
 
-    let mut rollen = Vec::new();
+    // Je geänderter Rolle alt → neu (LFH-1152: strukturiert, die Verwaltung beschriftet).
+    let mut rollen = ZugangsAngaben::default();
     if system_rolle != ziel.system_rolle.as_str() {
-        rollen.push(format!(
-            "system_rolle: {} → {system_rolle}",
-            ziel.system_rolle.as_str()
-        ));
+        rollen.system_rolle_vorher = Some(ziel.system_rolle);
+        rollen.system_rolle = SystemRolle::parse(&system_rolle);
     }
     if org_rolle != ziel.org_rolle.as_str() {
-        rollen.push(format!(
-            "org_rolle: {} → {org_rolle}",
-            ziel.org_rolle.as_str()
-        ));
+        rollen.org_rolle_vorher = Some(ziel.org_rolle);
+        rollen.org_rolle = OrgRolle::parse(&org_rolle);
     }
     let aktiv_aktion = match (ziel.aktiv, aktiv) {
         (true, false) => Some(AdminAktion::BenutzerDeaktiviert),
         (false, true) => Some(AdminAktion::BenutzerReaktiviert),
         _ => None,
     };
-    let rollen_aktion =
-        (!rollen.is_empty()).then(|| (AdminAktion::RolleGeaendert, Some(rollen.join(", "))));
-    for (aktion, detail) in rollen_aktion
+    let rollen_aktion = (rollen != ZugangsAngaben::default())
+        .then_some((AdminAktion::RolleGeaendert, Some(rollen)));
+    for (aktion, angaben) in rollen_aktion
         .into_iter()
         .chain(aktiv_aktion.map(|a| (a, None)))
     {
@@ -421,7 +422,7 @@ pub async fn bearbeiten(
                     id,
                     benutzername: &ziel.benutzername,
                 },
-                detail,
+                angaben,
                 peer_ip,
             },
         )
@@ -474,7 +475,7 @@ pub async fn totp_reset(
                 id,
                 benutzername: &benutzername,
             },
-            detail: None,
+            angaben: None,
             peer_ip,
         },
     )
@@ -549,7 +550,7 @@ pub async fn einmalpasswort(
                 id,
                 benutzername: &ziel.benutzername,
             },
-            detail: None,
+            angaben: None,
             peer_ip,
         },
     )

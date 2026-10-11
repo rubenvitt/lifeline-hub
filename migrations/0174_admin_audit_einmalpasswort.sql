@@ -9,7 +9,7 @@
 -- Zeile (365-Tage-Purge) deren id erneut.
 -- Schema = 0170 1:1, einzige Änderung ist der aktion-CHECK; die Spaltenkommentare bleiben
 -- wortgleich (die DDL trägt sie mit, der Test vergleicht sie).
--- Abgesichert von db::tests::migration_0173_* (include_str!).
+-- Abgesichert von db::tests::migration_0174_* (include_str!).
 
 CREATE TABLE admin_audit_neu (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,

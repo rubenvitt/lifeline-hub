@@ -16,8 +16,9 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 
 ### Lageberichte finden
 
-1. Im Bereich „Lage“ „Lageberichte“ öffnen. Die Berichte stehen in den Gruppen „Entwürfe“ und
-   „Freigegeben“, je mit Status, Vorlage und Fassung.
+1. Im Bereich „Lage“ „Lageberichte“ öffnen. Die Berichte stehen in zwei Gruppen, Entwürfe und
+   „Freigegeben“, je mit Status, Vorlage und Fassung. Der Gruppenkopf nennt die Anzahl, bei einem
+   Bericht „1 Entwurf“.
 
    ![Liste der Lageberichte mit einem Entwurf und einem freigegebenen Bericht](../bilder/lageberichte/lageberichte.png)
 
@@ -35,7 +36,7 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 
    ![Dialog „Neuer Lagebericht“ mit Titel, Vorlage und Zeitstand](../bilder/lageberichte/neuer-lagebericht.png)
 
-5. „Anlegen“ wählen. Der neue Entwurf steht in der Liste unter „Entwürfe“.
+5. „Anlegen“ wählen. Der neue Entwurf steht in der Liste bei den Entwürfen.
 
 ### Einen Entwurf schreiben
 

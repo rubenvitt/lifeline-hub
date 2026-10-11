@@ -302,6 +302,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/mitglieder",
             get(routes::einsatz::mitglieder),
         )
+        // Statisches Segment vor `{benutzer_id}` (LFH-1141); Kennungen sind Zahlen.
+        .route(
+            "/api/einsaetze/{id}/mitglieder/auswahl",
+            get(routes::einsatz::mitglied_auswahl),
+        )
         .route(
             "/api/einsaetze/{id}/mitglieder/{benutzer_id}",
             put(routes::einsatz::mitglied_setzen),

@@ -38,11 +38,16 @@ const BEZUG_LINK: Record<
   abloesung_vorwarnung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
 };
 
-/** Deeplink zum Quell-Objekt, sofern bezug_typ/-id gesetzt und Route bekannt. */
+/**
+ * Deeplink zum Quell-Objekt, sofern bezug_typ/-id gesetzt und Route bekannt. Der Text nennt die
+ * laufende Nummer vom Server, nie die DB-`id` (LFH-1146, `frontend/AGENTS.md`, menschenlesbare
+ * Kennung); ohne laufende Nummer steht nur das Wort.
+ */
 function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefined }) {
   if (!e.bezug_typ || e.bezug_id == null) return null;
   const bezug = BEZUG_LINK[e.bezug_typ];
-  const text = `↗ ${bezug?.wort ?? e.bezug_typ} #${e.bezug_id}`;
+  const nummer = e.bezug_lfd_nr != null ? ` #${e.bezug_lfd_nr}` : '';
+  const text = `↗ ${bezug?.wort ?? e.bezug_typ}${nummer}`;
   const eid = parseRouteId(einsatzId);
   if (!bezug || eid == null) {
     // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → Verweistext ohne Link.

@@ -100,8 +100,6 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
-    // Ohne `?gefahrengebiet=`: nach dem Sprung hält die Seite das Zielgebiet fest, ein Klick auf ein
-    // anderes Gebiet springt zurück (gemeldet mit LFH-1131).
     await page.goto(`/einsaetze/${demo.id}/gefahren`);
     await expect(page.getByRole('heading', { name: 'Überflutung Unterstadt' })).toBeVisible();
     await page.locator('.listen-eintrag').filter({ hasText: 'Hangrutsch Kirchberg' }).click();

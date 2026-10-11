@@ -1,5 +1,6 @@
 use crate::app::AppState;
 use crate::auth::geraet_bezeichnung::GeraetAngabe;
+use crate::auth::provider::Anmeldeweg;
 use crate::auth::session::{self, CurrentUser, SichererTransport, SESSION_COOKIE};
 use crate::auth::Benutzer;
 use crate::error::AppError;
@@ -347,7 +348,13 @@ pub async fn login(
         return passwort_wechsel_beginnen(jar, &benutzer, false, secure);
     }
 
-    let token = session::anlegen(&state.pool, benutzer.id, geraet.as_deref()).await?;
+    let token = session::anlegen(
+        &state.pool,
+        benutzer.id,
+        geraet.as_deref(),
+        Anmeldeweg::Passwort,
+    )
+    .await?;
     let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,
@@ -438,7 +445,8 @@ pub async fn logout(
             session::pruefe_erwarteten_benutzer(&Method::POST, &headers, inhaber.id)?;
         }
         // Wer sich abmeldet, wird vor dem Löschen bestimmt — danach ist die Zuordnung weg.
-        let benutzer_id = session::benutzer_id_zu_token(&state.pool, cookie.value()).await;
+        let (benutzer_id, anmeldeweg) =
+            session::herkunft_zu_token(&state.pool, cookie.value()).await;
 
         let beendet = session::loeschen(&state.pool, cookie.value()).await?;
         state.live.melde_sitzung_ende(beendet);
@@ -451,7 +459,7 @@ pub async fn logout(
                 benutzername: None,
                 benutzer_id,
                 peer_ip: peer_ip.map(|ip| ip.to_string()),
-                provider: crate::auth::provider::ID_PASSWORT,
+                provider: anmeldeweg.as_str(),
             },
         )
         .await;
@@ -758,7 +766,13 @@ pub async fn passwort_festlegen(
         return Err(AppError::Unauthorized);
     }
 
-    let token = session::anlegen(&state.pool, benutzer.id, geraet.as_deref()).await?;
+    // Derselbe Weg wie im `login_ok` dieser Anmeldung (LFH-1152): mit zweitem Faktor `totp`.
+    let anmeldeweg = if offen.nach_zweitfaktor {
+        Anmeldeweg::Totp
+    } else {
+        Anmeldeweg::Passwort
+    };
+    let token = session::anlegen(&state.pool, benutzer.id, geraet.as_deref(), anmeldeweg).await?;
     let jar = jar.add(session_cookie(token, secure)).remove(
         Cookie::build((PASSWORT_WECHSEL_COOKIE, ""))
             .path("/api/auth")
@@ -856,7 +870,7 @@ pub async fn provider_schalten(
             },
             akteur: &admin,
             ziel: Ziel::Anmeldeweg(&id),
-            detail: None,
+            angaben: None,
             peer_ip,
         },
     )
@@ -1194,7 +1208,7 @@ async fn oidc_anmelden(
         return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(pool, benutzer.id, geraet).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet, Anmeldeweg::Oidc).await?;
     Ok((benutzer, token, eintrag.ziel_pfad))
 }
 
@@ -1527,7 +1541,7 @@ async fn webauthn_auth_pruefen(
         return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(pool, benutzer.id, geraet).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet, Anmeldeweg::Webauthn).await?;
     Ok((benutzer, token))
 }
 
@@ -1722,7 +1736,7 @@ async fn webauthn_discoverable_pruefen(
         return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(pool, benutzer.id, geraet).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet, Anmeldeweg::Webauthn).await?;
     Ok((benutzer, token))
 }
 
@@ -2082,7 +2096,7 @@ async fn totp_pruefen(
         return Ok((benutzer, NachZweitfaktor::PasswortWechsel));
     }
 
-    let token = session::anlegen(pool, benutzer.id, geraet).await?;
+    let token = session::anlegen(pool, benutzer.id, geraet, Anmeldeweg::Totp).await?;
     Ok((benutzer, NachZweitfaktor::Sitzung(token)))
 }
 
@@ -2212,7 +2226,13 @@ pub async fn app_code_einloesen(
         let beendet = session::loeschen(&state.pool, alt.value()).await?;
         state.live.melde_sitzung_ende(beendet);
     }
-    let token = session::anlegen(&state.pool, benutzer.id, geraet.as_deref()).await?;
+    let token = session::anlegen(
+        &state.pool,
+        benutzer.id,
+        geraet.as_deref(),
+        Anmeldeweg::Systembrowser,
+    )
+    .await?;
     let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,

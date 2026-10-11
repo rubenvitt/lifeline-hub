@@ -125,6 +125,72 @@ describe('useEtbEntwuerfe', () => {
     expect(result.current.entwuerfe[0].inhalt).toBe('');
   });
 
+  it('LFH-1139: scheitert das Entfernen, schließt der Reiter trotzdem und hält den Grund', async () => {
+    await entwurfSpeichern(entwurf({ id: 'A', inhalt: 'A' }));
+    await entwurfSpeichern(entwurf({ id: 'B', inhalt: 'B' }));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(2));
+    const grund = new Error('Speicher gesperrt');
+    vi.spyOn(entwurfStore, 'entwurfEntfernen').mockRejectedValueOnce(grund);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Verwirft ohne Ablehnung: der Aufrufer ruft mit `void`, ein Wurf bliebe unbehandelt.
+    await act(async () => {
+      await expect(result.current.entwurfSchliessen('B')).resolves.toBeUndefined();
+    });
+    expect(result.current.entwuerfe.map((e) => e.id)).toEqual(['A']);
+    expect(result.current.schliessFehler).toBe(grund);
+    // Der Plattenfehler bleibt für die Fehlersuche im Protokoll.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ETB-Entwürfe'), grund);
+
+    // Das nächste Schließen räumt den Grund.
+    await act(async () => {
+      await result.current.entwurfSchliessen('A');
+    });
+    expect(result.current.schliessFehler).toBeNull();
+  });
+
+  it('LFH-1139: bricht die Plattentransaktion ab, holt das nächste Laden das Entfernen nach', async () => {
+    // Ohne Attrappe des Speichers: der Reiter darf nur schließen, weil `entwurfEntfernen` den
+    // Auftrag vor dem ersten `await` im Vorlauf vermerkt (LFH-521).
+    await entwurfSpeichern(entwurf({ id: 'A', inhalt: 'A' }));
+    await entwurfSpeichern(entwurf({ id: 'B', inhalt: 'B' }));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(2));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const loeschen = IDBObjectStore.prototype.delete;
+    const spion = vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function (
+      this: IDBObjectStore,
+      ...args
+    ) {
+      const anfrage = loeschen.apply(this, args);
+      this.transaction.abort();
+      return anfrage;
+    });
+
+    await act(async () => {
+      await result.current.entwurfSchliessen('B');
+    });
+    expect(result.current.schliessFehler).not.toBeNull();
+    expect(result.current.entwuerfe.map((e) => e.id)).toEqual(['A']);
+    spion.mockRestore();
+
+    expect((await entwuerfeLaden(ICH, 7)).map((e) => e.id)).toEqual(['A']);
+  });
+
+  it('LFH-1139: der Grund lässt sich verwerfen', async () => {
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    vi.spyOn(entwurfStore, 'entwurfEntfernen').mockRejectedValueOnce(new Error('voll'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await act(async () => {
+      await result.current.entwurfSchliessen(result.current.entwuerfe[0].id);
+    });
+    expect(result.current.schliessFehler).not.toBeNull();
+    act(() => result.current.schliessFehlerVerwerfen());
+    expect(result.current.schliessFehler).toBeNull();
+  });
+
   it('persistiert unter StrictMode nur einmal — keine idb-Writes im setEntwuerfe-Updater (LFH-216)', async () => {
     const speichernSpy = vi.spyOn(entwurfStore, 'entwurfSpeichern');
     const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7), { wrapper: StrictMode });

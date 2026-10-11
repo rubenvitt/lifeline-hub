@@ -115,6 +115,52 @@
     [data-lfh='druckwurzel'] [data-lfh='titelblock-tabelle'] {
       break-inside: avoid;
     }
+
+    /* Vor einer langen Tabelle der Deckel (LFH-1124, `druck/einsatzbericht/Bloecke.tsx`): Titel
+       und eine Kopie der Tabelle, von der nur Kopf und erste Zeile Höhe haben. Er bricht nicht und
+       deckt mit Papiergrund die echte Tabelle, die um ihre Kopfhöhe hochgezogen ist: ihr erster
+       Kopf liegt unter dem Deckel, ihre erste Zeile ist eine Maßzeile, Zeile 2 schließt an. Auf
+       jeder Folgeseite wiederholt sie ihren Kopf. Chromium und WebKit sehen weder Deckel noch
+       Kopie (im Markup `display: contents` bzw. `none`), dort steht die Tabelle wie ohne Deckel
+       und Chromium hält den Titel über `break-after: avoid` bei ihr. */
+    [data-lfh='druckwurzel'] [data-lfh='titelblock-deckel'] {
+      display: block !important;
+      position: relative;
+      z-index: 1;
+      break-inside: avoid;
+      /* Gegen den durchsichtigen Grund der Wurzel; `exact` auch ohne „Hintergründe drucken“. */
+      background: white !important;
+      print-color-adjust: exact;
+    }
+
+    [data-lfh='druckwurzel'] [data-lfh='deckel-tabelle'] {
+      display: table !important;
+    }
+
+    [data-lfh='druckwurzel'] [data-lfh='unter-deckel'] {
+      margin-top: calc(-1 * var(--druck-kopfhoehe));
+    }
+
+    /* Die Kopfhöhe ist aus einer Zeile dieser Höhe gerechnet (`--druck-kopfhoehe`). */
+    [data-lfh='druckwurzel'] :is([data-lfh='deckel-tabelle'], [data-lfh='unter-deckel']) th {
+      white-space: nowrap;
+      line-height: var(--druck-kopfzeile);
+    }
+
+    /* Maßzeile: keine Höhe, aber ihre Textbreite zählt für die Spalten beider Tabellen. */
+    [data-lfh='druckwurzel'] :is(tr[data-lfh='masszeile'], tr[data-lfh='deckel-erste-zeile']) > td {
+      padding-block: 0 !important;
+      border: 0 !important;
+    }
+
+    [data-lfh='druckwurzel']
+      :is(tr[data-lfh='masszeile'], tr[data-lfh='deckel-erste-zeile'])
+      > td
+      > span {
+      display: block;
+      height: 0;
+      overflow: hidden;
+    }
   }
 
   /* Eine überlange Tabellenzeile bricht frei, samt ihren Textblöcken (LFH-1009). Zusammenhalten

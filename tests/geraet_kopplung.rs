@@ -297,8 +297,8 @@ async fn stelle_id_bindet_wie_uhs_id() {
 }
 
 /// Wird der Abschnitt eines Abschnittsgeräts aufgelöst, endet die Kopplung wie bei einem
-/// Widerruf: die nächste Anfrage ist 401, das ETB nennt das Gerät. Die Ansicht ist noch nicht
-/// koppelbar; die Kopplung entsteht deshalb direkt im Repository.
+/// Widerruf: die nächste Anfrage ist 401, das ETB nennt das Gerät. Die Kopplung entsteht direkt
+/// im Repository; der Weg über Kopplungscode und Einlösen ist hier nicht Gegenstand.
 #[tokio::test]
 async fn aufgeloester_abschnitt_beendet_seine_kopplung() {
     use lifeline_hub::geraet::repo::{self, NeueKopplung};
@@ -1346,6 +1346,62 @@ async fn modulfreigabe_sperrt_zusaetzlich() {
     assert_eq!(tablet["gesperrte_module"], json!(["personen"]));
 }
 
+/// LFH-1150 (design.md D4): Ein Gerät zählt nicht als Führung im Einsatz, obwohl das Tablet als
+/// Führungspersonal schreibt. Liste, Freigabe und Kopplungsmaske sagen dasselbe.
+#[tokio::test]
+async fn einsatzfuehrung_sperrt_das_geraet() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let (_, geraet) = tablet(&app, &admin, einsatz, uhs).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &admin,
+        Some(&json!({"sichtbar": true, "benoetigte_rolle": "einsatzfuehrung"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (_, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-freigaben"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(v["personen"]["zugriff"], false, "{v}");
+
+    let (_, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &admin,
+        None,
+    )
+    .await;
+    let tablet = v["sperren"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["ansicht"] == "uhs-tablet")
+        .unwrap();
+    assert_eq!(tablet["gesperrte_module"], json!(["personen"]));
+}
+
 // ---------- Gerätekonto ----------
 
 #[tokio::test]
@@ -1437,6 +1493,14 @@ async fn kopplung_ist_auditiert() {
         koppeln(&app, &code, Some(peer)).await.status,
         StatusCode::OK
     );
+    // Die Gerätesitzung merkt sich ihren Weg wie die der Personen (LFH-1152).
+    let weg: Option<String> =
+        sqlx::query_scalar("SELECT anmeldeweg FROM session WHERE benutzer_id = ?")
+            .bind(konto)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(weg.as_deref(), Some("geraetecode"));
     widerrufen(&app, &admin, einsatz, id).await;
 
     let audit: Vec<(String, String, Option<i64>, Option<String>)> = sqlx::query_as(

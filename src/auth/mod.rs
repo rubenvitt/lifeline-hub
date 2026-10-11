@@ -17,7 +17,7 @@ pub mod totp;
 pub mod webauthn;
 
 use crate::wire_enum::wire_enum;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Wert der System-Rolle für Administratoren (serverweite Verwaltung).
@@ -44,7 +44,7 @@ pub const PASSWORT_HASH_SSO_ONLY: &str = "!sso-kein-lokales-passwort";
 
 wire_enum! {
     /// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
     pub enum SystemRolle {
         Admin => "admin",
         Keiner => "keiner",
@@ -54,7 +54,7 @@ wire_enum! {
 
 wire_enum! {
     /// Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
     pub enum OrgRolle {
         Fuehrungskraft => "fuehrungskraft",
         Keine => "keine",

@@ -515,6 +515,49 @@ async fn ohne_stab_recht_keine_aufloesung() {
     );
 }
 
+/// LFH-1150: Die Stab-Auflösung in Aufträgen rechnet mit der Einsatzrolle. Steht `stab` auf
+/// „Führung im Einsatz“, sieht Führungspersonal ohne Org-Rolle die Besetzung, ein Beobachter nicht.
+#[tokio::test]
+async fn besetzung_unter_einsatzfuehrung_folgt_der_einsatzrolle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    stab_extern(&app, &admin, einsatz, "s3", "Müller").await;
+    auftrag_an(
+        &app,
+        &admin,
+        einsatz,
+        serde_json::json!({"empfaenger_typ": "funktion", "funktion": "s3"}),
+    )
+    .await;
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let berta = benutzer_anlegen(&app, &admin, "berta", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, berta, "beobachter").await;
+    let berta = login_cookie(&app, "berta", "bertapw1").await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/stab"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let a = erster_auftrag(&app, &frieda, einsatz).await;
+    assert_eq!(a["empfaenger"][0]["aktuelle_besetzung"]["name"], "Müller");
+    let a = erster_auftrag(&app, &berta, einsatz).await;
+    assert!(
+        !a["empfaenger"][0]
+            .as_object()
+            .unwrap()
+            .contains_key("aktuelle_besetzung"),
+        "Beobachter ohne Stab-Recht: {a:?}"
+    );
+}
+
 #[tokio::test]
 async fn erinnerung_an_katalogwert_und_freitext() {
     let app = setup().await;

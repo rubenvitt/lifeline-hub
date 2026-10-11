@@ -24,7 +24,7 @@ import {
   normalisiereEinsatz,
   zuUpdate,
 } from './orgEinstellungenForm';
-import type { OrgEinstellungenUpdate } from '../../api/types';
+import type { BenoetigteRolle, OrgEinstellungenUpdate } from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
 import { mitVorgabe } from '../../components/vorgabeText';
@@ -96,7 +96,7 @@ export default function EinsatzDefaults() {
   });
 
   const modulMutation = useMutation({
-    mutationFn: (vars: { modulKey: string; rolle: 'admin' | 'fuehrungskraft' | null }) =>
+    mutationFn: (vars: { modulKey: string; rolle: BenoetigteRolle | null }) =>
       setzeOrgModulEinstellung(vars.modulKey, vars.rolle),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
@@ -222,7 +222,7 @@ export default function EinsatzDefaults() {
             />
           </Form.Item>
           <Form.Item
-            label="Vorgabe-Quittierungsfrist Aufträge (Minuten)"
+            label="Vorgabe-Quittierfrist Aufträge (Minuten)"
             name="auftrag_quittierung_frist_min"
           >
             <InputNumber
@@ -278,7 +278,7 @@ export default function EinsatzDefaults() {
             aufRolle={(modulKey, val) =>
               modulMutation.mutate({
                 modulKey,
-                rolle: (val || null) as 'admin' | 'fuehrungskraft' | null,
+                rolle: (val || null) as BenoetigteRolle | null,
               })
             }
             darfVerwalten={istAdmin}

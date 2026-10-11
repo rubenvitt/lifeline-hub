@@ -19,6 +19,9 @@ vi.mock('./entwurfStore', async (echt) => {
   return { ...modul, entwurfEntfernen: vi.fn(modul.entwurfEntfernen) };
 });
 
+/** Überschrift des Hinweises, wenn das Entfernen aus dem Gerätespeicher scheitert (LFH-1139). */
+const ENTFERNEN_GESCHEITERT = 'Entwurf nicht aus dem Gerätespeicher entfernt';
+
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
 /** Angemeldete Person (LFH-767): Die Reiter zeigen nur ihre Entwürfe. */
 const ich = benutzerFixture();
@@ -128,6 +131,10 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
     expect(document.querySelector('[data-lfh="etb-ablehnung"]')).toBeNull();
     expect(screen.queryByText('Senden fehlgeschlagen')).toBeNull();
+    // Der Grund steht an der Leiste, nicht an der Erfassung (LFH-1139), und der gesendete
+    // Entwurf ist zu: nur ein Reiter, und der ist leer.
+    expect(await screen.findByText(ENTFERNEN_GESCHEITERT)).toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
     warn.mockRestore();
   });
 
@@ -653,6 +660,29 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
     fireEvent.keyDown(reiter, { key: 'Delete', code: 'Delete' });
     expect(await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' })).toBeInTheDocument();
     expect(screen.getAllByRole('tab', { name: /Nicht weg/ })).toHaveLength(1);
+  });
+
+  it('LFH-1139: scheitert das Entfernen, schließt der Reiter und der Grund steht an der Leiste', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
+    vi.mocked(entwurfEntfernen).mockRejectedValueOnce(new Error('Speicher gesperrt'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await verwerfenKlicken(1);
+
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1));
+    const hinweis = (await screen.findByText(ENTFERNEN_GESCHEITERT)).closest('[role="alert"]');
+    expect(hinweis).not.toBeNull();
+    // Kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“).
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    // Der Ort des Grundes kommt nie wieder: er lässt sich schließen.
+    await userEvent.click(
+      within(hinweis as HTMLElement).getByRole('button', { name: 'Hinweis schließen' }),
+    );
+    await waitFor(() => expect(screen.queryByText(ENTFERNEN_GESCHEITERT)).toBeNull());
+    warn.mockRestore();
   });
 
   it('die Knöpfe tragen deutsche Namen, kein „Add tab“ und kein „remove“', async () => {

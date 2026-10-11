@@ -241,11 +241,15 @@ async fn kontofilter_trifft_akteur_und_ziel() {
     aenderung(&pool, "anmeldeweg_deaktiviert", "admin", None, "bernd").await;
     aenderung(&pool, "rolle_geaendert", "admin", Some(doris), "doris").await;
 
-    let zeilen = lesen(&app, &admin, &format!("{AENDERUNGEN}?konto=bernd")).await;
-    assert_eq!(
-        feld(&zeilen, "aktion"),
-        ["benutzer_angelegt", "benutzer_deaktiviert"]
-    );
+    // Auch ein Teil des Namens trifft beide, der Anmeldeweg gleichen Namens bleibt draußen.
+    for konto in ["bernd", "ERN"] {
+        let zeilen = lesen(&app, &admin, &format!("{AENDERUNGEN}?konto={konto}")).await;
+        assert_eq!(
+            feld(&zeilen, "aktion"),
+            ["benutzer_angelegt", "benutzer_deaktiviert"],
+            "{konto}"
+        );
+    }
 
     let nur_rolle = lesen(
         &app,
@@ -256,7 +260,7 @@ async fn kontofilter_trifft_akteur_und_ziel() {
     assert_eq!(feld(&nur_rolle, "ziel"), ["doris"]);
 }
 
-/// Der Filterwert wird gekürzt wie beim Schreiben, sonst träfe ein langer Name nie.
+/// Der Filterwert wird auf die gespeicherte Länge gekürzt (ohne „…“), sonst träfe ein langer Name nie.
 #[tokio::test]
 async fn langer_kontoname_trifft_seinen_gekuerzten_eintrag() {
     let (app, pool) = setup_mit_pool().await;
@@ -277,6 +281,85 @@ async fn langer_kontoname_trifft_seinen_gekuerzten_eintrag() {
 
     let zeilen = lesen(&app, &admin, &format!("{ANMELDUNGEN}?konto={lang}")).await;
     assert_eq!(zeilen.len(), 1);
+}
+
+/// LFH-1152: das Kontofeld meldet getippten Text; ein Teil des Namens trifft, ohne Rücksicht auf
+/// Groß- und Kleinschreibung, und `%`/`_` zählen wörtlich.
+#[tokio::test]
+async fn kontofilter_trifft_teile_des_namens() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    leeren(&pool).await;
+    anmeldung(&pool, "2026-10-01 08:00:00", "login_ok", "ruben").await;
+    anmeldung(&pool, "2026-10-02 08:00:00", "login_ok", "rubina").await;
+    anmeldung(&pool, "2026-10-03 08:00:00", "login_ok", "admin").await;
+    anmeldung(&pool, "2026-10-04 08:00:00", "login_fehlgeschlagen", "a_b").await;
+
+    let treffer = |konto: &'static str| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            let zeilen = lesen(&app, &admin, &format!("{ANMELDUNGEN}?konto={konto}")).await;
+            feld(&zeilen, "benutzername")
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        }
+    };
+    assert_eq!(treffer("rub").await, ["rubina", "ruben"]);
+    assert_eq!(treffer("BEN").await, ["ruben"]);
+    assert_eq!(treffer("a_b").await, ["a_b"]);
+    assert_eq!(
+        treffer("%25").await,
+        Vec::<String>::new(),
+        "% ist kein Platzhalter"
+    );
+    assert_eq!(
+        treffer("r_b").await,
+        Vec::<String>::new(),
+        "_ ist kein Platzhalter"
+    );
+    assert!(treffer("xyz").await.is_empty());
+}
+
+/// LFH-1152: neue Einträge tragen strukturierte `angaben` statt eines Rohtexts im `detail`;
+/// ältere behalten ihren Text.
+#[tokio::test]
+async fn zugangsaenderung_liefert_angaben_alter_text_bleibt_detail() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let marlene = benutzer_anlegen(&app, &admin, "marlene", "keine").await;
+    sqlx::query(
+        "INSERT INTO admin_audit (aktion, akteur_name, ziel_benutzer_id, ziel, detail)          VALUES ('rolle_geaendert', 'admin', ?, 'marlene', 'org_rolle: keine → fuehrungskraft')",
+    )
+    .bind(marlene)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{marlene}"),
+        &admin,
+        Some(r#"{"org_rolle":"fuehrungskraft"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let zeilen = lesen(
+        &app,
+        &admin,
+        &format!("{AENDERUNGEN}?aktion=rolle_geaendert"),
+    )
+    .await;
+    assert_eq!(zeilen.len(), 2);
+    assert_eq!(
+        zeilen[0]["angaben"],
+        serde_json::json!({"org_rolle_vorher": "keine", "org_rolle": "fuehrungskraft"})
+    );
+    assert!(zeilen[0].get("detail").is_none(), "{}", zeilen[0]);
+    assert_eq!(zeilen[1]["detail"], "org_rolle: keine → fuehrungskraft");
+    assert!(zeilen[1].get("angaben").is_none(), "{}", zeilen[1]);
 }
 
 #[tokio::test]

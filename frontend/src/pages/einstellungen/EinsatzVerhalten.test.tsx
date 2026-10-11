@@ -85,6 +85,9 @@ describe('EinsatzVerhalten', () => {
 
     expect(await screen.findByText('Verhalten & Automatik')).toBeInTheDocument();
     expect((screen.getByLabelText('Präfix ETB') as HTMLInputElement).value).toBe('EB-');
+    // Je Nummernkreis sein eigenes Beispiel, wie in den Vorgaben der Verwaltung (LFH-1151).
+    expect(screen.getByLabelText('Präfix Meldungen')).toHaveAttribute('placeholder', 'z. B. M-');
+    expect(screen.getByLabelText('Präfix Aufträge')).toHaveAttribute('placeholder', 'z. B. A-');
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>

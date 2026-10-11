@@ -175,6 +175,10 @@ Entwürfe liegen nur auf dem Gerät, auf dem sie entstanden sind, und gehören d
 Person. Beim Abmelden werden sie gelöscht. Ein leerer Entwurf verschwindet nach 24 Stunden ohne
 Änderung.
 
+Lehnt der Gerätespeicher das Entfernen eines verworfenen oder gesendeten Entwurfs ab, schließt
+der Reiter trotzdem, und über den Reitern steht „Entwurf nicht aus dem Gerätespeicher entfernt“.
+Taucht der Entwurf nach dem Neuladen wieder auf, lässt er sich erneut verwerfen.
+
 ### Ohne Netz
 
 Ohne Verbindung nimmt das ETB Einträge weiter an und merkt sie als „offline vorgemerkt“ vor. Sie

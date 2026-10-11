@@ -4175,17 +4175,17 @@ mod tests {
         assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
     }
 
-    // --- LFH-1121: Einmalpasswort (0172 Änderungszwang, 0173 Admin-Spur-CHECK) ---
+    // --- LFH-1121: Einmalpasswort (0173 Änderungszwang, 0174 Admin-Spur-CHECK) ---
 
-    const MIGRATION_0172: &str =
+    const MIGRATION_0173: &str =
         include_str!("../migrations/0173_benutzer_passwort_wechsel_pflicht.sql");
-    const MIGRATION_0173: &str = include_str!("../migrations/0174_admin_audit_einmalpasswort.sql");
+    const MIGRATION_0174: &str = include_str!("../migrations/0174_admin_audit_einmalpasswort.sql");
 
     #[tokio::test]
-    async fn migration_0172_bestandskonten_stehen_nicht_unter_aenderungszwang() {
+    async fn migration_0173_bestandskonten_stehen_nicht_unter_aenderungszwang() {
         let pool = minimal_pool_mit_benutzer().await;
 
-        sqlx::raw_sql(MIGRATION_0172).execute(&pool).await.unwrap();
+        sqlx::raw_sql(MIGRATION_0173).execute(&pool).await.unwrap();
 
         let pflichten: Vec<i64> =
             sqlx::query_scalar("SELECT passwort_wechsel_pflicht FROM benutzer ORDER BY id")
@@ -4211,7 +4211,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn migration_0173_admin_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+    async fn migration_0174_admin_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
         let pool = minimal_pool_mit_benutzer().await;
         sqlx::raw_sql(include_str!("../migrations/0156_admin_audit.sql"))
             .execute(&pool)
@@ -4248,8 +4248,8 @@ mod tests {
                     detail, peer_ip FROM admin_audit ORDER BY id";
         let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
 
-        assert!(MIGRATION_0173.starts_with("-- no-transaction"));
-        sqlx::raw_sql(MIGRATION_0173).execute(&pool).await.unwrap();
+        assert!(MIGRATION_0174.starts_with("-- no-transaction"));
+        sqlx::raw_sql(MIGRATION_0174).execute(&pool).await.unwrap();
 
         let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
         assert_eq!(zeilen_nachher, zeilen_vorher);

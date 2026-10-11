@@ -2,7 +2,7 @@
 titel: Rechte im Einsatz
 gruppen: [fuehrung, administration]
 reihenfolge: 40
-quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, src/routes/benutzer.rs]
+quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, src/routes/einsatz.rs]
 ---
 
 ## Überblick
@@ -42,13 +42,12 @@ Recht, den Zugriff des Einsatzes zu verwalten.
 - **Beobachter** lesen nur.
 - Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte.
 
-Die Rolle gilt auch, wenn die Person zu einer anderen Organisation gehört als der Einsatz. Die
-letzte Einsatzleitung eines Einsatzes lässt sich nicht entfernen („Gesperrt: letzte
+Die letzte Einsatzleitung eines Einsatzes lässt sich nicht entfernen („Gesperrt: letzte
 Einsatzleitung“).
 
-Die Auswahl „Benutzer …“ füllt sich nur für System-Admins („Benutzerliste nur für Admins“). Eine
-Einsatzleitung ohne diese Rolle ändert die Rollen der eingetragenen Mitglieder, nimmt aber
-niemanden neu auf.
+Aufnehmen kann die Einsatzleitung jede aktive Person der Organisation des Einsatzes, auch ohne
+Rolle in der Administration. Die Auswahl „Benutzer …“ zeigt nur diese Personen, mit ihrem
+Anzeigenamen; Personen anderer Organisationen stehen nicht darin.
 
 ### Ohne Rolle im Einsatz
 

@@ -51,9 +51,10 @@ describe('geraeteKern (LFH-892)', () => {
     expect(stellenOptionen({}, 'uhs')).toEqual([]);
   });
 
-  it('lässt eine abgelaufene Kopplung bearbeitbar, eine widerrufene nicht', () => {
-    expect(istBeendet({ status: 'abgelaufen' })).toBe(false);
+  it('lässt eine laufende Kopplung bearbeitbar, eine abgelaufene oder widerrufene nicht (LFH-1143)', () => {
+    expect(istBeendet({ status: 'wartend' })).toBe(false);
     expect(istBeendet({ status: 'aktiv' })).toBe(false);
+    expect(istBeendet({ status: 'abgelaufen' })).toBe(true);
     expect(istBeendet({ status: 'widerrufen' })).toBe(true);
   });
 
@@ -66,10 +67,10 @@ describe('geraeteKern (LFH-892)', () => {
     expect(sperrSatz(sperren, undefined, name)).toBeNull();
     expect(sperrSatz(sperren, 'uhs-laptop', name)).toBeNull();
     expect(sperrSatz(sperren, 'uhs-tablet', name)).toBe(
-      'PERSONEN für einfache Mitglieder gesperrt – fehlt auf dem UHS-Tablet',
+      'PERSONEN für gekoppelte Geräte gesperrt – fehlt auf dem UHS-Tablet',
     );
     expect(sperrSatz(sperren, 'lagemonitor', name)).toBe(
-      'ETB, LAGEKARTE für einfache Mitglieder gesperrt – fehlen auf dem Lagemonitor',
+      'ETB, LAGEKARTE für gekoppelte Geräte gesperrt – fehlen auf dem Lagemonitor',
     );
   });
 

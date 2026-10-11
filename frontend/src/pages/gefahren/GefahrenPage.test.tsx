@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +8,31 @@ import { server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
 import GefahrenPage, { gebietszeileStil } from './GefahrenPage';
+
+/**
+ * Hält `useSearchParams` auf einem festen Stand, solange gesetzt: so steht die Seite in dem
+ * Fenster, in dem der Data Router das Räumen der Adresse noch nicht übernommen hat (LFH-1153).
+ */
+const adresse = vi.hoisted(() => ({
+  fest: null as URLSearchParams | null,
+  // Stabil wie der echte Setter: der ändert sich nur mit der Adresse.
+  setzen: () => {},
+}));
+vi.mock('react-router', async (original) => {
+  const echt = await original<typeof import('react-router')>();
+  return {
+    ...echt,
+    useSearchParams: (...args: Parameters<typeof echt.useSearchParams>) => {
+      const ergebnis = echt.useSearchParams(...args);
+      return adresse.fest
+        ? ([adresse.fest, adresse.setzen] as unknown as typeof ergebnis)
+        : ergebnis;
+    },
+  };
+});
+afterEach(() => {
+  adresse.fest = null;
+});
 import { dichten } from '../../theme/tokens';
 import { einsatzKeys } from '../../api/queryKeys';
 import { formatiereDatenstand } from '../../components/Datenstand';
@@ -333,6 +358,40 @@ describe('GefahrenPage', () => {
     // Finale Auswahl: der Titel zeigt nur das gewählte Gebiet.
     const titel = await screen.findByRole('heading', { level: 3 });
     expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
+  });
+
+  it('ein Klick bleibt stehen, solange die Adresse ?gefahrengebiet= noch trägt (LFH-1153)', async () => {
+    const sued = {
+      id: 8,
+      einsatz_id: 1,
+      label: 'Süd',
+      zonen_ids: [11],
+      hoechste_warnstufe: 'mittel',
+    };
+    server.use(
+      ...handlers([gebiet, sued]),
+      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
+    );
+    // Der Data Router übernimmt das Räumen verzögert; ein Klick in diesem Fenster sprang zurück
+    // auf das Ziel aus der Adresse.
+    adresse.fest = new URLSearchParams('gefahrengebiet=8');
+    renderMitProviders(
+      <StrictMode>
+        <Routes>
+          <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+        </Routes>
+      </StrictMode>,
+      { route: '/einsaetze/1/gefahren?gefahrengebiet=8' },
+    );
+    expect(await screen.findByRole('heading', { level: 3 })).toHaveTextContent('Süd');
+
+    await userEvent.click(screen.getByRole('button', { name: /Nord/ }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Nord'),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Nord');
   });
 
   it('setzt eine Warnstufe (PUT auf das gewählte Gebiet)', async () => {

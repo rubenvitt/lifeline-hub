@@ -1,5 +1,5 @@
-import { createHmac } from 'node:crypto';
 import { request, type Page } from '@playwright/test';
+import { totpCode } from '../totp-kern';
 import { KONTEXTE, anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
 import { kontoAnlegen } from '../konto-anlegen';
 
@@ -38,24 +38,6 @@ async function alsNeuePerson(page: Page, anzeigename: string, benutzername: stri
   expect((await page.request.post('/api/auth/logout')).ok()).toBe(true);
   await anmelden(page, person);
   return person;
-}
-
-/** TOTP nach RFC 6238 wie `src/auth/totp/mod.rs`: SHA-1, sechs Stellen, 30 s. */
-function totpCode(base32: string, zeitMs = Date.now()): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const zeichen of base32.replace(/=+$/, '').toUpperCase()) {
-    bits += alphabet.indexOf(zeichen).toString(2).padStart(5, '0');
-  }
-  const schluessel = Buffer.from(
-    (bits.match(/.{8}/g) ?? []).map((byte) => Number.parseInt(byte, 2)),
-  );
-  const zaehler = Buffer.alloc(8);
-  zaehler.writeBigUInt64BE(BigInt(Math.floor(zeitMs / 1000 / 30)));
-  const hmac = createHmac('sha1', schluessel).update(zaehler).digest();
-  const versatz = hmac[hmac.length - 1] & 0x0f;
-  const wert = hmac.readUInt32BE(versatz) & 0x7fffffff;
-  return String(wert % 1_000_000).padStart(6, '0');
 }
 
 test.describe(KAPITEL, () => {

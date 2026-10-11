@@ -199,17 +199,24 @@ export interface components {
             /** Format: int64 */
             id: number;
             peer_ip?: string | null;
-            /** @description Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`. */
-            provider: string;
+            /** @description Anmeldeweg ([`crate::auth::provider::Anmeldeweg`]). */
+            provider: components["schemas"]["Anmeldeweg"];
             /** @description UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`. */
             zeitpunkt: string;
         };
+        /**
+         * @description Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung
+         *     (`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des
+         *     Zugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120).
+         * @enum {string}
+         */
+        Anmeldeweg: "passwort" | "dev" | "oidc" | "webauthn" | "totp" | "geraetecode" | "systembrowser" | "unbekannt";
         /** @description Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle. */
         AnsichtAuswahl: {
             ansicht: components["schemas"]["Funktionsansicht"];
             stellenart?: components["schemas"]["Bindungsart"] | null;
         };
-        /** @description Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind. */
+        /** @description Module einer Ansicht, die in diesem Einsatz einem gekoppelten Gerät gesperrt sind. */
         AnsichtSperre: {
             ansicht: components["schemas"]["Funktionsansicht"];
             /** @description Modul-Keys, die das Gerät nicht nutzen könnte. Leer: die Ansicht ist voll nutzbar. */
@@ -1813,6 +1820,13 @@ export interface components {
             beschreibung?: string | null;
             /** Format: int64 */
             bezug_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis
+             *     (LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei
+             *     Bezügen ohne laufende Nummer (Ablösung).
+             */
+            bezug_lfd_nr?: number | null;
             bezug_typ?: string | null;
             /** Format: int64 */
             einsatz_id: number;
@@ -2260,8 +2274,9 @@ export interface components {
          */
         Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
         /**
-         * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
-         *     `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
+         * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
+         *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
+         *     eine Zelle ohne Eintrag als „nicht bewertet".
          */
         GefahrBewertungAnzeige: {
             /** Format: int64 */
@@ -3163,6 +3178,16 @@ export interface components {
             /** @description Anzeige der Führungsstelle: „S2 Lage“, „Fachberater: THW“ oder der Freitext. */
             fuehrungsstelle_anzeige?: string | null;
             zugewiesen_at: string;
+        };
+        /**
+         * @description Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec
+         *     `einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),
+         *     keine Rollen, kein Aktiv- oder MFA-Status.
+         */
+        MitgliedAuswahl: {
+            anzeigename: string;
+            /** Format: int64 */
+            benutzer_id: number;
         };
         /**
          * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
@@ -5105,6 +5130,26 @@ export interface components {
          * @enum {string}
          */
         Zeitformat: "24h" | "12h";
+        /**
+         * @description Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
+         *     `admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren
+         *     Konventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.
+         *     Flach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:
+         *
+         *     - `benutzer_angelegt`: `system_rolle`, `org_rolle`.
+         *     - `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.
+         *     - `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.
+         */
+        ZugangsAngaben: {
+            /** @description Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`. */
+            angemeldet_at?: string | null;
+            /** @description Grobe Gerätebezeichnung der beendeten Sitzung. */
+            geraet?: string | null;
+            org_rolle?: components["schemas"]["OrgRolle"] | null;
+            org_rolle_vorher?: components["schemas"]["OrgRolle"] | null;
+            system_rolle?: components["schemas"]["SystemRolle"] | null;
+            system_rolle_vorher?: components["schemas"]["SystemRolle"] | null;
+        };
         /** @description Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097). */
         ZugangsaenderungAnzeige: {
             /** Format: int64 */
@@ -5112,6 +5157,8 @@ export interface components {
             /** @description Benutzername der handelnden Person zum Zeitpunkt der Aktion, gekürzt. */
             akteur_name?: string | null;
             aktion: components["schemas"]["AdminAktion"];
+            angaben?: components["schemas"]["ZugangsAngaben"] | null;
+            /** @description Freier Text, nur noch bei Einträgen von vor LFH-1152; neuere tragen `angaben`. */
             detail?: string | null;
             /** Format: int64 */
             id: number;

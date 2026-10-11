@@ -355,7 +355,8 @@ export default function MeldungFormular({
                   </Col>
                 </Row>
                 <Form.Item label="Bestätigung erforderlich (Sofortmeldung)">
-                  <Space>
+                  {/* Flex statt `Space`: nur so trägt die Grundbreite des Fristfelds. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Form.Item name="bestaetigung_pflicht" valuePropName="checked" noStyle>
                       <Switch aria-label="Bestätigung erforderlich" />
                     </Form.Item>
@@ -376,10 +377,13 @@ export default function MeldungFormular({
                           suffix="Min"
                           placeholder="Frist (Vorgabe)"
                           aria-label="Bestätigungsfrist in Minuten"
+                          // Antds Vorgabebreite (90 px) schnitt den Platzhalter neben „Min“ zu
+                          // „Frist (…“ ab (LFH-1151). Bis 200 px, am schmalen Schirm schmaler.
+                          style={{ flex: '0 1 200px', minWidth: 0 }}
                         />
                       </Form.Item>
                     )}
-                  </Space>
+                  </div>
                 </Form.Item>
               </>
             ),

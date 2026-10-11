@@ -328,6 +328,41 @@ async fn modul_put_ungueltige_rolle_ist_400() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+    // Nichts gespeichert (Spec `modul-freigabe`, LFH-1150): die Map bleibt ohne `etb`.
+    let (_, map) = anfrage(
+        &app,
+        "GET",
+        "/api/org-modul-einstellungen",
+        &admin_cookie,
+        None,
+    )
+    .await;
+    assert!(map.get("etb").is_none(), "map={map}");
+}
+
+/// PUT mit der Stufe „Führung im Einsatz“ (LFH-1150) → 200; die Vorgabe trägt den Wert.
+#[tokio::test]
+async fn modul_put_einsatzfuehrung_ist_gueltig() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = put_modul_einstellung(
+        &app,
+        &admin_cookie,
+        "schaeden",
+        serde_json::json!({"benoetigte_rolle": "einsatzfuehrung"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    let (_, get_body) = anfrage(
+        &app,
+        "GET",
+        "/api/org-modul-einstellungen",
+        &admin_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(get_body["schaeden"], "einsatzfuehrung", "body={get_body}");
 }
 
 /// GET /api/org-einstellungen als Benutzer mit org_rolle=keine → 403.

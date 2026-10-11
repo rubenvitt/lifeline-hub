@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waehleImMenue } from './menue-kern';
 import { anmeldenAls, anmeldenAlsAdmin, benutzerAnlegen } from './rollen-kern';
 
 /*
@@ -21,8 +22,13 @@ test('Einmalpasswort vergeben, anmelden, eigenes Passwort festlegen', async ({ p
   // Der Admin vergibt das Einmalpasswort.
   await page.goto('/admin/benutzer');
   await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
-  const zeile = page.getByRole('row').filter({ hasText: `@${person.benutzername}` });
-  await zeile.getByRole('button', { name: 'Bearbeiten' }).click();
+  await waehleImMenue(
+    page,
+    page.getByRole('button', {
+      name: `Aktionen zu Benutzer E2E Vergessen (@${person.benutzername})`,
+    }),
+    'Bearbeiten',
+  );
   const dialog = page.getByRole('dialog', { name: 'Benutzer bearbeiten' });
   await dialog.getByRole('button', { name: 'Einmalpasswort vergeben' }).click();
   await page

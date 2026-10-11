@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../src/stammdaten/rechteText';
-import { stehendeAuswahl } from './auswahl-kern';
+import { stehendeAuswahl, waehleStehend, zeigtWahl } from './auswahl-kern';
+import { oeffneMenue, waehleImMenue } from './menue-kern';
 import {
   ADMIN,
   anmeldenAlsAdmin,
@@ -146,6 +147,34 @@ test('LFH-966 Zweite Einsatzleitung ohne Systemrolle: eigene Herabstufung fragt 
   await keinToast(page);
 });
 
+test('LFH-1141 Einsatzleitung ohne Systemrolle nimmt eine Person der Organisation auf', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const id = await einsatzAnlegen(page);
+  const leitung = await benutzerAnlegen(page, 'fuehrungspersonal', 'Leitung ohne Admin');
+  await mitgliedEintragen(page, String(id), leitung.id, 'einsatzleitung');
+  // Kurzer, eindeutiger Name: die Temp-DB lebt über den ganzen Lauf (LFH-819).
+  const name = `Neu ${Date.now() % 100000}`;
+  await benutzerAnlegen(page, 'beobachter', name);
+  await wechsleZu(page, leitung);
+  await page.goto(einsatzdatenPfad(id));
+
+  // Vorbedingung: diese Sitzung verwaltet den Zugriff, ist aber kein System-Admin.
+  await expect(zugriff(page).getByRole('button', { name: 'Hinzufügen' })).toBeVisible();
+  // Suchen statt Scrollen: die Liste ist virtuell, in einer vollen Temp-DB steht die Person
+  // unterhalb des gerenderten Ausschnitts.
+  const auswahl = zugriff(page).getByRole('combobox', { name: 'Person zum Aufnehmen' });
+  await auswahl.click();
+  await auswahl.fill(name);
+  await waehleStehend(page, name);
+  await zeigtWahl(auswahl, name);
+  await zugriff(page).getByRole('button', { name: 'Hinzufügen' }).click();
+  await expect(zugriff(page).getByRole('combobox', { name: `Rolle von ${name}` })).toBeVisible();
+  await expect(page.getByText('Benutzerliste nur für Admins')).toHaveCount(0);
+  await keinToast(page);
+});
+
 test('LFH-966 Benutzerverwaltung: eigenes Konto gesperrt, ein anderes ohne Rückfrage deaktiviert', async ({
   page,
 }) => {
@@ -159,17 +188,27 @@ test('LFH-966 Benutzerverwaltung: eigenes Konto gesperrt, ein anderes ohne Rück
     .locator('tr.ant-table-row')
     .filter({ hasText: `@${ADMIN}` })
     .first();
-  await expect(eigene.getByRole('button', { name: 'Deaktivieren' })).toBeDisabled();
+  // Die Aktionen stehen auf jeder Breite im Menü (LFH-1122), der Grund im gesperrten Eintrag.
   // Welcher der beiden Gründe gilt, hängt davon ab, ob der Lauf schon weitere Admins angelegt hat.
-  await expect(eigene.getByText(/^Gesperrt: (eigenes Konto|letzter aktiver Admin)$/)).toBeVisible();
+  const eigenesMenue = await oeffneMenue(
+    page,
+    eigene.getByRole('button', { name: /^Aktionen zu/ }),
+  );
+  await expect(
+    eigenesMenue.getByRole('menuitem', {
+      name: /^Deaktivieren gesperrt: (eigenes Konto|letzter aktiver Admin)$/,
+    }),
+  ).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
 
   await suche.fill(anderes.benutzername);
   const zeile = page.locator('tr.ant-table-row').filter({ hasText: `@${anderes.benutzername}` });
-  await zeile.getByRole('button', { name: 'Deaktivieren' }).click();
-  // Keine Rückfrage (LFH-363): der Klick wirkt, der Rückweg steht in derselben Zelle.
-  await expect(zeile.getByRole('button', { name: 'Reaktivieren' })).toBeVisible();
-  await expect(page.locator('.ant-popover:not(.ant-popover-hidden)')).toHaveCount(0);
-  await zeile.getByRole('button', { name: 'Reaktivieren' }).click();
-  await expect(zeile.getByRole('button', { name: 'Deaktivieren' })).toBeEnabled();
+  const ausloeser = zeile.getByRole('button', { name: /^Aktionen zu/ });
+  await waehleImMenue(page, ausloeser, 'Deaktivieren');
+  // Keine Rückfrage (LFH-363): die Wahl wirkt, der Rückweg steht im selben Menü.
+  await expect(zeile.getByText('deaktiviert', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await waehleImMenue(page, ausloeser, 'Reaktivieren');
+  await expect(zeile.getByText('aktiv', { exact: true })).toBeVisible();
   await keinToast(page);
 });

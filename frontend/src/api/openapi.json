@@ -503,14 +503,28 @@
             ]
           },
           "provider": {
-            "type": "string",
-            "description": "Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`."
+            "$ref": "#/components/schemas/Anmeldeweg",
+            "description": "Anmeldeweg ([`crate::auth::provider::Anmeldeweg`])."
           },
           "zeitpunkt": {
             "type": "string",
             "description": "UTC im SQLite-Format `YYYY-MM-DD HH:MM:SS`."
           }
         }
+      },
+      "Anmeldeweg": {
+        "type": "string",
+        "description": "Anmeldeweg eines Eintrags der Anmeldespur (`auth_audit.provider`) und einer Sitzung\n(`session.anmeldeweg`, LFH-1152). Geschlossen, damit ein neuer Weg den Typecheck des\nZugangsprotokolls bricht, statt dort roh zu erscheinen (Schema-Anker, LFH-120).",
+        "enum": [
+          "passwort",
+          "dev",
+          "oidc",
+          "webauthn",
+          "totp",
+          "geraetecode",
+          "systembrowser",
+          "unbekannt"
+        ]
       },
       "AnsichtAuswahl": {
         "type": "object",
@@ -537,7 +551,7 @@
       },
       "AnsichtSperre": {
         "type": "object",
-        "description": "Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.",
+        "description": "Module einer Ansicht, die in diesem Einsatz einem gekoppelten Gerät gesperrt sind.",
         "required": [
           "ansicht",
           "gesperrte_module"
@@ -4863,6 +4877,14 @@
             ],
             "format": "int64"
           },
+          "bezug_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des Bezugs im Einsatz (Meldung, Auftrag, ETB-Eintrag) für den Verweis\n(LFH-1146); `bezug_id` bleibt die Selektion des Deeplinks. Fehlt ohne Bezug und bei\nBezügen ohne laufende Nummer (Ablösung)."
+          },
           "bezug_typ": {
             "type": [
               "string",
@@ -6004,7 +6026,7 @@
       },
       "GefahrBewertungAnzeige": {
         "type": "object",
-        "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit\n`warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.",
+        "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,\nauch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt\neine Zelle ohne Eintrag als „nicht bewertet\".",
         "required": [
           "id",
           "gefahrengebiet_id",
@@ -8363,6 +8385,23 @@
           },
           "zugewiesen_at": {
             "type": "string"
+          }
+        }
+      },
+      "MitgliedAuswahl": {
+        "type": "object",
+        "description": "Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec\n`einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),\nkeine Rollen, kein Aktiv- oder MFA-Status.",
+        "required": [
+          "benutzer_id",
+          "anzeigename"
+        ],
+        "properties": {
+          "anzeigename": {
+            "type": "string"
+          },
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -13337,6 +13376,66 @@
           "12h"
         ]
       },
+      "ZugangsAngaben": {
+        "type": "object",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.",
+        "properties": {
+          "angemeldet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anmeldezeit der beendeten Sitzung, UTC im SQLite-Format wie `zeitpunkt`."
+          },
+          "geraet": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Grobe Gerätebezeichnung der beendeten Sitzung."
+          },
+          "org_rolle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrgRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "org_rolle_vorher": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrgRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "system_rolle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SystemRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "system_rolle_vorher": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SystemRolle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "ZugangsaenderungAnzeige": {
         "type": "object",
         "description": "Eine Zeile der Admin-Spur, wie die Verwaltung sie liest (LFH-1097).",
@@ -13364,11 +13463,22 @@
           "aktion": {
             "$ref": "#/components/schemas/AdminAktion"
           },
+          "angaben": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZugangsAngaben"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "detail": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Freier Text, nur noch bei Einträgen von vor LFH-1152; neuere tragen `angaben`."
           },
           "id": {
             "type": "integer",

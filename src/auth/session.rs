@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::auth::provider::Anmeldeweg;
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use argon2::password_hash::rand_core::{OsRng, RngCore};
@@ -95,7 +96,9 @@ pub const ZULETZT_GESEHEN_TAKT_MINUTEN: i64 = 5;
 pub const SITZUNG_TAGE: i64 = 7;
 
 /// Legt eine neue Session für den Benutzer an (TTL [`SITZUNG_TAGE`]) und liefert den Token.
-/// `geraet` ist die grobe Bezeichnung aus dem User-Agent ([`crate::auth::geraet_bezeichnung`]).
+/// `geraet` ist die grobe Bezeichnung aus dem User-Agent ([`crate::auth::geraet_bezeichnung`]),
+/// `anmeldeweg` der Weg des `login_ok`-Eintrags dieser Anmeldung (LFH-1152): ihn schreiben
+/// Abmeldung und Beenden der Sitzung in die Spur.
 ///
 /// Ein Gerätekonto (LFH-892) bekommt hier nie eine Sitzung: jeder Anmeldeweg einer Person läuft
 /// durch diese Funktion, ein Gerät meldet sich nur über den Kopplungscode an
@@ -104,20 +107,23 @@ pub async fn anlegen(
     pool: &SqlitePool,
     benutzer_id: i64,
     geraet: Option<&str>,
+    anmeldeweg: Anmeldeweg,
 ) -> Result<String, AppError> {
     if crate::geraet::repo::ist_geraetekonto(pool, benutzer_id).await? {
         return Err(AppError::Unauthorized);
     }
     let token = neuer_token();
     sqlx::query(
-        "INSERT INTO session (token_hash, benutzer_id, expires_at, kennung, zuletzt_gesehen_at, geraet) \
-         VALUES (?, ?, datetime('now', ?), ?, datetime('now'), ?)",
+        "INSERT INTO session (token_hash, benutzer_id, expires_at, kennung, zuletzt_gesehen_at, geraet, \
+                              anmeldeweg) \
+         VALUES (?, ?, datetime('now', ?), ?, datetime('now'), ?, ?)",
     )
     .bind(hash_token(&token))
     .bind(benutzer_id)
     .bind(format!("+{SITZUNG_TAGE} days"))
     .bind(neue_kennung())
     .bind(geraet)
+    .bind(anmeldeweg.as_str())
     .execute(pool)
     .await?;
     Ok(token)
@@ -217,6 +223,9 @@ pub struct BeendeteSitzung {
     pub kennung: String,
     pub angemeldet_at: String,
     pub geraet: Option<String>,
+    /// Gespeicherter Anmeldeweg (`None` bei einer Sitzung von vor LFH-1152), lesen über
+    /// [`Anmeldeweg::aus_gespeichert`].
+    pub anmeldeweg: Option<String>,
 }
 
 /// Beendet Personensitzungen eines Benutzers (LFH-1092, design.md D5): löscht nur die Zeilen,
@@ -228,7 +237,7 @@ pub async fn beenden(
 ) -> Result<Vec<BeendeteSitzung>, AppError> {
     let basis = "DELETE FROM session \
                  WHERE benutzer_id = ? AND kopplung_id IS NULL AND kennung IS NOT NULL";
-    let rueckgabe = "RETURNING kennung, erstellt_at AS angemeldet_at, geraet";
+    let rueckgabe = "RETURNING kennung, erstellt_at AS angemeldet_at, geraet, anmeldeweg";
     let beendet = match auswahl {
         Auswahl::Eine(kennung) => {
             let sql = format!("{basis} AND kennung = ? {rueckgabe}");
@@ -261,16 +270,25 @@ pub async fn purge_abgelaufene(pool: &SqlitePool) -> Result<u64, sqlx::Error> {
     Ok(ergebnis.rows_affected())
 }
 
-/// Benutzer-ID hinter einem Session-Token, ohne Gültigkeitsprüfung. Für die Audit-Spur beim
-/// Logout, die den Benutzer VOR dem Löschen der Session bestimmen muss. Eine abgelaufene Sitzung
-/// steht nur bis zum nächsten Purge-Lauf (Phase C2); danach bleibt der Logout ohne Benutzer.
-pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64> {
-    sqlx::query_scalar("SELECT benutzer_id FROM session WHERE token_hash = ?")
-        .bind(hash_token(token))
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
+/// Benutzer und Anmeldeweg hinter einem Session-Token, ohne Gültigkeitsprüfung. Für die
+/// Audit-Spur beim Logout, die beides VOR dem Löschen der Session bestimmen muss. Eine
+/// abgelaufene Sitzung steht nur bis zum nächsten Purge-Lauf (Phase C2); danach bleibt der Logout
+/// ohne Benutzer und mit [`Anmeldeweg::Unbekannt`], wie eine Sitzung von vor LFH-1152.
+pub async fn herkunft_zu_token(pool: &SqlitePool, token: &str) -> (Option<i64>, Anmeldeweg) {
+    let zeile: Option<(i64, Option<String>)> =
+        sqlx::query_as("SELECT benutzer_id, anmeldeweg FROM session WHERE token_hash = ?")
+            .bind(hash_token(token))
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten();
+    match zeile {
+        Some((benutzer_id, weg)) => (
+            Some(benutzer_id),
+            Anmeldeweg::aus_gespeichert(weg.as_deref()),
+        ),
+        None => (None, Anmeldeweg::Unbekannt),
+    }
 }
 
 /// Legt die Sitzung eines gekoppelten Geräts an (LFH-892) und liefert den Token. Läuft in der
@@ -284,14 +302,16 @@ pub async fn anlegen_geraet(
 ) -> Result<String, AppError> {
     let token = neuer_token();
     sqlx::query(
-        "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id, kennung, zuletzt_gesehen_at) \
-         VALUES (?, ?, ?, ?, ?, datetime('now'))",
+        "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id, kennung, zuletzt_gesehen_at, \
+                              anmeldeweg) \
+         VALUES (?, ?, ?, ?, ?, datetime('now'), ?)",
     )
     .bind(hash_token(&token))
     .bind(benutzer_id)
     .bind(expires_at)
     .bind(kopplung_id)
     .bind(neue_kennung())
+    .bind(Anmeldeweg::Geraetecode.as_str())
     .execute(conn)
     .await?;
     Ok(token)
@@ -628,7 +648,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
 
-        let token = anlegen(&pool, id, None).await.unwrap();
+        let token = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
 
         let gespeichert: String = sqlx::query_scalar("SELECT token_hash FROM session")
             .fetch_one(&pool)
@@ -658,7 +680,9 @@ mod tests {
         // pinnen die 7 Tage bewusst als Literal: eine andere Dauer ist eine Entscheidung.
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        anlegen(&pool, id, None).await.unwrap();
+        anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
 
         let tage: f64 =
             sqlx::query_scalar("SELECT julianday(expires_at) - julianday('now') FROM session")
@@ -676,7 +700,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
 
-        let token = anlegen(&pool, id, None).await.unwrap();
+        let token = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         // Der Klartext-Token (aus dem Cookie) löst weiterhin auf.
         assert!(benutzer_aus_token(&pool, &token).await.is_ok());
 
@@ -697,7 +723,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
 
-        let token = anlegen(&pool, id, None).await.unwrap();
+        let token = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         let benutzer = benutzer_aus_token(&pool, &token).await.unwrap();
         assert_eq!(benutzer.id, id);
         assert_eq!(benutzer.benutzername, "max");
@@ -734,7 +762,9 @@ mod tests {
     async fn session_eines_inaktiven_benutzers_ist_unauthorized() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 0).await; // inaktiv
-        let token = anlegen(&pool, id, None).await.unwrap();
+        let token = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         let err = benutzer_aus_token(&pool, &token).await.unwrap_err();
         assert!(matches!(err, AppError::Unauthorized));
     }
@@ -743,7 +773,9 @@ mod tests {
     async fn loeschen_invalidiert_session() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        let token = anlegen(&pool, id, None).await.unwrap();
+        let token = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         loeschen(&pool, &token).await.unwrap();
         let err = benutzer_aus_token(&pool, &token).await.unwrap_err();
         assert!(matches!(err, AppError::Unauthorized));
@@ -763,8 +795,12 @@ mod tests {
     async fn anlegen_speichert_kennung_geraet_und_zuletzt_gesehen() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        let a = anlegen(&pool, id, Some("Firefox · Windows")).await.unwrap();
-        let b = anlegen(&pool, id, None).await.unwrap();
+        let a = anlegen(&pool, id, Some("Firefox · Windows"), Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        let b = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
 
         let (kennung, geraet, frisch): (String, Option<String>, bool) = sqlx::query_as(
             "SELECT kennung, geraet, zuletzt_gesehen_at >= datetime('now', '-1 minute') \
@@ -789,7 +825,9 @@ mod tests {
     async fn zuletzt_gesehen_wird_nur_nach_dem_takt_geschrieben() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        let token = anlegen(&pool, id, None).await.unwrap();
+        let token = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         let setze = |vor: &'static str| {
             let pool = pool.clone();
             let token = token.clone();
@@ -836,9 +874,15 @@ mod tests {
     async fn liste_markiert_die_aktuelle_und_laesst_abgelaufene_weg() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        let a = anlegen(&pool, id, Some("Firefox · Windows")).await.unwrap();
-        let b = anlegen(&pool, id, Some("Safari · iPadOS")).await.unwrap();
-        let c = anlegen(&pool, id, None).await.unwrap();
+        let a = anlegen(&pool, id, Some("Firefox · Windows"), Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        let b = anlegen(&pool, id, Some("Safari · iPadOS"), Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        let c = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         sqlx::query("UPDATE session SET zuletzt_gesehen_at = datetime('now', '-1 hour') WHERE token_hash = ?")
             .bind(hash_token(&b))
             .execute(&pool)
@@ -868,13 +912,57 @@ mod tests {
         );
     }
 
+    /// LFH-1152: die Sitzung trägt ihren Anmeldeweg; Logout-Nachschlag und Beenden liefern ihn,
+    /// eine Sitzung ohne gespeicherten Weg liefert `Unbekannt`.
+    #[tokio::test]
+    async fn sitzung_merkt_sich_ihren_anmeldeweg() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        let passkey = anlegen(&pool, id, None, Anmeldeweg::Webauthn)
+            .await
+            .unwrap();
+        let alt = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE session SET anmeldeweg = NULL WHERE token_hash = ?")
+            .bind(hash_token(&alt))
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            herkunft_zu_token(&pool, &passkey).await,
+            (Some(id), Anmeldeweg::Webauthn)
+        );
+        assert_eq!(
+            herkunft_zu_token(&pool, &alt).await,
+            (Some(id), Anmeldeweg::Unbekannt)
+        );
+        assert_eq!(
+            herkunft_zu_token(&pool, "kein-token").await,
+            (None, Anmeldeweg::Unbekannt)
+        );
+
+        let kp = kennung_zu(&pool, &passkey).await;
+        let beendet = beenden(&pool, id, Auswahl::Eine(&kp)).await.unwrap();
+        assert_eq!(beendet[0].anmeldeweg.as_deref(), Some("webauthn"));
+        let beendet = beenden(&pool, id, Auswahl::AlleAusser(None)).await.unwrap();
+        assert_eq!(beendet[0].anmeldeweg, None);
+    }
+
     #[tokio::test]
     async fn beenden_loescht_nur_die_auswahl_und_laesst_das_konto() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        let a = anlegen(&pool, id, Some("Firefox · Windows")).await.unwrap();
-        let b = anlegen(&pool, id, Some("Safari · iPadOS")).await.unwrap();
-        let c = anlegen(&pool, id, None).await.unwrap();
+        let a = anlegen(&pool, id, Some("Firefox · Windows"), Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        let b = anlegen(&pool, id, Some("Safari · iPadOS"), Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        let c = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         let (ka, kb) = (kennung_zu(&pool, &a).await, kennung_zu(&pool, &b).await);
         let konto = || async {
             sqlx::query_as::<_, (i64, String)>(
@@ -923,9 +1011,15 @@ mod tests {
     async fn loeschwege_liefern_die_kennungen() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        let a = anlegen(&pool, id, None).await.unwrap();
-        let b = anlegen(&pool, id, None).await.unwrap();
-        let c = anlegen(&pool, id, None).await.unwrap();
+        let a = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        let b = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
+        let c = anlegen(&pool, id, None, Anmeldeweg::Passwort)
+            .await
+            .unwrap();
         let (ka, kb, kc) = (
             kennung_zu(&pool, &a).await,
             kennung_zu(&pool, &b).await,

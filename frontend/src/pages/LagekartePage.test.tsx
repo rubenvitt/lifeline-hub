@@ -1,8 +1,9 @@
 import { http, HttpResponse } from 'msw';
+import type { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -3093,6 +3094,32 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     expect(kopf).toHaveAttribute('aria-expanded', 'false');
   });
 
+  // LFH-1140: Mutationsprobe für das Räumen am Schlüssel `standard` beim Verlassen der Ansicht.
+  it('Als Standard abgelehnt, dann Ansicht gewechselt: der Grund geht mit, auch nicht über die Karte', async () => {
+    basisHandler([
+      ZWEI_ANSICHTEN,
+      http.patch('/api/einsaetze/1/karten-ansichten/2', () => ablehnen('Keine Berechtigung')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite('/einsaetze/1/lagekarte?ansicht=2');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Als Standard/ }));
+    await waitFor(() => expect(paneelFehler()).toHaveTextContent('Keine Berechtigung'));
+    expect(paneelFehler()).toHaveTextContent('Nicht als Standardansicht gesetzt · Nord');
+
+    await user.click(screen.getByRole('combobox', { name: 'Kartenansicht wählen' }));
+    await user.click(
+      await screen.findByText(
+        (_, el) =>
+          el?.className === 'ant-select-item-option-content' && el?.textContent === 'Standard',
+      ),
+    );
+    await waitFor(() => expect(paneelFehler()).toBeNull());
+    // Ohne das Räumen wanderte der Grund der verlassenen Ansicht in den Kartenhinweis.
+    expect(hinweis()).toBeNull();
+    expect(toasts()).toBe(0);
+  });
+
   it('Ablehnung erst nach dem Ansichtswechsel: Grund über der Karte, nicht im neuen Paneel', async () => {
     let freigeben: () => void = () => {};
     basisHandler([
@@ -3142,5 +3169,188 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     await user.click(screen.getByRole('button', { name: 'Leiste einblenden' }));
     expect(paneelFehler()).toBeNull();
     expect(toasts()).toBe(0);
+  });
+});
+
+/**
+ * Eine Antwort, die erst nach dem Einsatzwechsel eintrifft, gehört dem alten Einsatz (LFH-1138,
+ * `frontend/AGENTS.md`, „Rückwege und Fehler“): sie aktiviert keine Ansicht und räumt keine. Das
+ * Layout keyt sein `Outlet` nicht, die Seite bleibt über den Wechsel dieselbe.
+ */
+describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
+  const ANSICHT = {
+    einsatz_id: 1,
+    reihenfolge: 0,
+    erstellt_at: '',
+    geaendert_at: '',
+  };
+  const ZWEI_ANSICHTEN = http.get('/api/einsaetze/1/karten-ansichten', () =>
+    HttpResponse.json([
+      { ...ANSICHT, id: 1, name: 'Standard', ist_standard: true },
+      { ...ANSICHT, id: 2, name: 'Nord', reihenfolge: 1, ist_standard: false },
+    ]),
+  );
+  /** Einsatz B: eigene Ansicht 9, alles übrige wie in A (über die Handler von A beantwortet). */
+  const EINSATZ_B = [
+    http.get('/api/einsaetze/2', () => HttpResponse.json({ ...EINSATZ, id: 2 })),
+    http.get('/api/einsaetze/2/karten-ansichten', () =>
+      HttpResponse.json([
+        { ...ANSICHT, einsatz_id: 2, id: 9, name: 'B-Standard', ist_standard: true },
+      ]),
+    ),
+    http.get('/api/einsaetze/2/*', ({ request }) =>
+      fetch(request.url.replace('/api/einsaetze/2/', '/api/einsaetze/1/')),
+    ),
+  ];
+
+  function Ort() {
+    const navigate = useNavigate();
+    const loc = useLocation();
+    return (
+      <>
+        <button type="button" onClick={() => void navigate('/einsaetze/2/lagekarte?ansicht=9')}>
+          Zu Einsatz B
+        </button>
+        <div data-testid="ort">{loc.pathname + loc.search}</div>
+      </>
+    );
+  }
+  function renderMitWechsel(route: string) {
+    return renderMitProviders(
+      <>
+        <Ort />
+        <Routes>
+          <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+        </Routes>
+      </>,
+      { route },
+    );
+  }
+  const ort = () => screen.getByTestId('ort').textContent;
+  async function offenerDialog(titel: string) {
+    return waitFor(() => {
+      const el = [...document.querySelectorAll<HTMLElement>('.ant-modal')].find((m) =>
+        m.textContent?.includes(titel),
+      );
+      expect(el).toBeDefined();
+      return el!;
+    });
+  }
+  /** Gibt die Antwort frei und wartet, bis die Mutation durch ist. */
+  async function antworte(client: QueryClient, gibFrei: () => void) {
+    await act(async () => gibFrei());
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+  }
+  async function wechsleNachB() {
+    fireEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+    await waitFor(() => expect(ort()).toBe('/einsaetze/2/lagekarte?ansicht=9'));
+    await screen.findByText('B-Standard');
+  }
+
+  it('eine spät angelegte Ansicht aus A wird in B nicht aktiviert', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    basisHandler([
+      ...EINSATZ_B,
+      http.post('/api/einsaetze/1/karten-ansichten', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return HttpResponse.json(
+          { ...ANSICHT, id: 5, name: 'Nord', ist_standard: false },
+          { status: 201 },
+        );
+      }),
+    ]);
+    const user = userEvent.setup();
+    const { client } = renderMitWechsel('/einsaetze/1/lagekarte');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Neue Ansicht/ }));
+    const dialog = await offenerDialog('Neue Ansicht');
+    await user.type(within(dialog).getByLabelText('Ansichts-Name', { selector: 'input' }), 'Nord');
+    await user.click(within(dialog).getByRole('button', { name: /Speichern/, hidden: true }));
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await wechsleNachB();
+    // Ohne Riegel führte die Antwort jetzt zurück nach `/einsaetze/1/lagekarte?ansicht=5`.
+    await antworte(client, gibFrei);
+
+    expect(ort()).toBe('/einsaetze/2/lagekarte?ansicht=9');
+    expect(screen.queryByText(/Ansicht „Nord" angelegt/)).toBeNull();
+  });
+
+  it('eine spät gelöschte aktive Ansicht aus A räumt die Ansicht von B nicht', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    basisHandler([
+      ...EINSATZ_B,
+      ZWEI_ANSICHTEN,
+      http.delete('/api/einsaetze/1/karten-ansichten/2', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const { client } = renderMitWechsel('/einsaetze/1/lagekarte?ansicht=2');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Löschen/ }));
+    const dialog = await offenerDialog('löschen');
+    await user.click(within(dialog).getByRole('button', { name: 'Löschen', hidden: true }));
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await wechsleNachB();
+    await antworte(client, gibFrei);
+
+    expect(ort()).toBe('/einsaetze/2/lagekarte?ansicht=9');
+    expect(screen.queryByText('Ansicht gelöscht')).toBeNull();
+  });
+  it('„Als Standard“ aus A quittiert in B nicht', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    basisHandler([
+      ...EINSATZ_B,
+      ZWEI_ANSICHTEN,
+      http.patch('/api/einsaetze/1/karten-ansichten/2', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return HttpResponse.json({ ...ANSICHT, id: 2, name: 'Nord', ist_standard: true });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const { client } = renderMitWechsel('/einsaetze/1/lagekarte?ansicht=2');
+    await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
+    await user.click(await screen.findByRole('menuitem', { name: /Als Standard/ }));
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await wechsleNachB();
+    await antworte(client, gibFrei);
+
+    expect(screen.queryByText('Als Standardansicht gesetzt')).toBeNull();
+    expect(ort()).toBe('/einsaetze/2/lagekarte?ansicht=9');
+  });
+
+  it('„In dieser Ansicht speichern“ aus A quittiert in B nicht', async () => {
+    let gibFrei: () => void = () => {};
+    let angefragt = false;
+    basisHandler([
+      ...EINSATZ_B,
+      http.patch('/api/einsaetze/1/karten-ansichten/1', async () => {
+        angefragt = true;
+        await new Promise<void>((r) => (gibFrei = r));
+        return HttpResponse.json({ ...ANSICHT, id: 1, name: 'Standard', ist_standard: true });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const { client } = renderMitWechsel('/einsaetze/1/lagekarte');
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(angefragt).toBe(true));
+
+    await wechsleNachB();
+    await antworte(client, gibFrei);
+
+    expect(screen.queryByText('In der Ansicht gespeichert')).toBeNull();
+    expect(ort()).toBe('/einsaetze/2/lagekarte?ansicht=9');
   });
 });

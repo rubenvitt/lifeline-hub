@@ -54,8 +54,10 @@ pub const MODUL_KEYS: [&str; 31] = [
 /// und die Setz-Route lehnt einen Ausblend-Versuch ab.
 pub const NICHT_AUSBLENDBAR: [&str; 2] = ["einsatzdaten", "einsatz-einstellungen"];
 
-/// Gültige Werte für `benoetigte_rolle` (System-/Org-Rolle, vgl. LFH-129).
-pub const BENOETIGTE_ROLLEN: [&str; 2] = ["admin", "fuehrungskraft"];
+/// Gültige Werte für `benoetigte_rolle`: `admin` und `fuehrungskraft` prüfen System- bzw.
+/// Org-Rolle (LFH-129), `einsatzfuehrung` zusätzlich die Rolle im Einsatz (LFH-1150, Spec
+/// `modul-freigabe`). Auswertung: [`crate::einsatz::berechtigung::modul_freigabe`].
+pub const BENOETIGTE_ROLLEN: [&str; 3] = ["admin", "fuehrungskraft", "einsatzfuehrung"];
 
 /// Ob `key` ein in der Registry bekannter Modul-Key ist.
 pub fn ist_gueltiger_modul_key(key: &str) -> bool {
@@ -289,6 +291,7 @@ mod tests {
     fn benoetigte_rolle_validierung() {
         assert!(ist_gueltige_benoetigte_rolle("admin"));
         assert!(ist_gueltige_benoetigte_rolle("fuehrungskraft"));
+        assert!(ist_gueltige_benoetigte_rolle("einsatzfuehrung"));
         assert!(!ist_gueltige_benoetigte_rolle("einsatzleitung"));
         assert!(!ist_gueltige_benoetigte_rolle(""));
     }

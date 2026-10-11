@@ -245,6 +245,120 @@ async fn erinnerung_bezug_gueltige_etb_ist_201() {
     assert_eq!(json["bezug_id"], etb_id);
 }
 
+/// LFH-1146: Der Verweis einer Erinnerung nennt die laufende Nummer des Bezugs, nie seine
+/// Datenbank-ID. Meldungen und Aufträge im ersten Einsatz schieben die IDs im zweiten von den
+/// laufenden Nummern weg; ohne Nummer (Ablösung) fehlt das Feld.
+#[tokio::test]
+async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e1 = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+    let meldung_body = serde_json::json!({
+        "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+        "inhalt": "Deich instabil", "ereigniszeit": "2026-06-12 09:00:00"
+    })
+    .to_string();
+    let mut meldung = serde_json::Value::Null;
+    for e in [e1, e1, e2] {
+        let (status, m) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/meldungen"),
+            &admin,
+            Some(&meldung_body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        meldung = m;
+    }
+    let auftrag_body = serde_json::json!({
+        "auftrag_text": "Deich sichern",
+        "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "EA1" }]
+    })
+    .to_string();
+    for _ in 0..2 {
+        let (status, _) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e1}/auftraege"),
+            &admin,
+            Some(&auftrag_body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+    }
+    let (status, auftrag) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e2}/auftraege"),
+        &admin,
+        Some(&auftrag_body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, etb) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e2}/etb"),
+        &admin,
+        Some(r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich instabil"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    for (typ, objekt) in [("meldung", &meldung), ("auftrag", &auftrag), ("etb", &etb)] {
+        let id = objekt["id"].as_i64().unwrap();
+        let lfd_nr = objekt["lfd_nr"].as_i64().unwrap();
+        assert_ne!(id, lfd_nr, "{typ}: Testaufbau braucht ID ≠ laufende Nummer");
+        let body = format!(
+            r#"{{"titel":"Nachfassen","faellig_at":"2026-06-11 10:00","bezug_typ":"{typ}","bezug_id":{id}}}"#
+        );
+        let (status, json) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e2}/erinnerungen"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(json["bezug_id"], id);
+        assert_eq!(
+            json["bezug_lfd_nr"], lfd_nr,
+            "{typ}: laufende Nummer des Bezugs"
+        );
+    }
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e2}/erinnerungen"),
+        &admin,
+        None,
+    )
+    .await;
+    let liste = liste.as_array().unwrap();
+    assert_eq!(liste.len(), 3);
+    assert!(
+        liste.iter().all(|e| e["bezug_lfd_nr"].is_i64()),
+        "Liste trägt die laufende Nummer: {liste:?}"
+    );
+
+    let (_, ohne) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e2}/erinnerungen"),
+        &admin,
+        Some(r#"{"titel":"Ohne Bezug","faellig_at":"2026-06-11 10:00"}"#),
+    )
+    .await;
+    assert!(
+        ohne.get("bezug_lfd_nr").is_none(),
+        "ohne Bezug keine Nummer"
+    );
+}
+
 #[tokio::test]
 async fn erledigen_anderer_einsatz_ist_404() {
     let app = setup().await;

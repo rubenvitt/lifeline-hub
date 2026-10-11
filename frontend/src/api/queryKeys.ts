@@ -90,6 +90,9 @@ export const EINSATZ_KEYS = {
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einstellungen: 'einsatz-einstellungen',
   mitglieder: 'einsatz-mitglieder',
+  // Personen, die die Einsatzleitung aufnehmen kann (LFH-1141): eigener Prefix, damit die
+  // Klassifizierung je Prefix eindeutig bleibt; Schreiben im Zugriff invalidiert beide.
+  mitgliedAuswahl: 'einsatz-mitglieder-auswahl',
   sprechgruppen: 'einsatz-sprechgruppen',
   modulOverrides: 'einsatz-modul-overrides',
   // Gerätekopplungen der Einsatzleitung (LFH-892).
@@ -382,6 +385,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *
  * - `einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event. Der
  *   Einsatzkopf `einsatz` ist seit LFH-555 live.
+ * - `mitgliedAuswahl` (LFH-1141): wie `mitglieder`; die eigene Aufnahme oder Entfernung
+ *   invalidiert sie, eine neu angelegte Person erscheint beim nächsten Abruf.
  * - `person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
@@ -421,6 +426,7 @@ export const EINSATZ_STREAM_ZIELE: Partial<
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einstellungen,
   EINSATZ_KEYS.mitglieder,
+  EINSATZ_KEYS.mitgliedAuswahl,
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.modulOverrides,
   EINSATZ_KEYS.geraete,
@@ -496,6 +502,8 @@ export const einsatzKeys = {
   aufbewahrungKategorien: (einsatzId: number) =>
     [EINSATZ_KEYS.einstellungen, einsatzId, 'aufbewahrung-kategorien'] as const,
   mitglieder: (einsatzId: number) => [EINSATZ_KEYS.mitglieder, einsatzId] as const,
+  /** Aufnehmbare Personen der Einsatz-Org (LFH-1141), nur für die Einsatzleitung, nicht live. */
+  mitgliedAuswahl: (einsatzId: number) => [EINSATZ_KEYS.mitgliedAuswahl, einsatzId] as const,
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulOverrides: (einsatzId: number | null) => [EINSATZ_KEYS.modulOverrides, einsatzId] as const,
@@ -1058,7 +1066,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit samt Listenzugriffen der
  * Personenliste (LFH-916, nur für die Einsatzleitung), die Auswahl „Bestätigt von“ am Gerät
- * (LFH-1046, Geräte speichern nichts), Chat, Dokumente, die
+ * (LFH-1046, Geräte speichern nichts), die Personenauswahl im Zugriff (LFH-1141: Namen der Org,
+ * und ohne Netz nimmt niemand jemanden auf), Chat, Dokumente, die
  * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
  * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
  * (Object-URLs, nur im Speicher, LFH-759),

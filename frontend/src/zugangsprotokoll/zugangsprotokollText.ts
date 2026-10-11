@@ -1,4 +1,10 @@
-import type { AdminAktion, AnmeldeEreignis } from '../api/types';
+import type { AdminAktion, AnmeldeEreignis, Anmeldeweg, ZugangsAngaben } from '../api/types';
+import {
+  ORG_ROLLE_FELD,
+  ORG_ROLLE_TEXT,
+  SYSTEM_ROLLE_FELD,
+  SYSTEM_ROLLE_TEXT,
+} from '../stammdaten/rechteText';
 
 /**
  * Wortlaut des Zugangsprotokolls (LFH-1097). Exhaustive `Record`s: ein neuer Wert im Backend
@@ -27,16 +33,48 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   einmalpasswort_vergeben: 'Einmalpasswort vergeben',
 };
 
-/** Anmeldewege nach ihrer id (`auth::provider::ID_*`); Unbekanntes steht als id. */
-const ANMELDEWEG_TEXT: Readonly<Record<string, string>> = {
+/**
+ * Anmeldewege nach ihrer id (`auth::provider::Anmeldeweg`, LFH-1152). Exhaustiv wie Ereignis und
+ * Aktion: ein neuer Weg im Backend bricht hier den Typecheck. `unbekannt` trägt eine Abmeldung
+ * aus einer Sitzung, die sich ihren Weg nicht gemerkt hat.
+ */
+export const ANMELDEWEG_TEXT: Record<Anmeldeweg, string> = {
   passwort: 'Passwort',
   oidc: 'SSO',
   webauthn: 'Passkey',
   dev: 'Entwicklung',
+  totp: 'Zweiter Faktor',
+  geraetecode: 'Gerätecode',
+  systembrowser: 'Mac-App',
+  unbekannt: '—',
 };
 
+/** Klartext eines Anmeldewegs; auch das Ziel der Admin-Spur ist eine solche id. Fremdes: „—“. */
 export function anmeldewegText(id: string): string {
-  return ANMELDEWEG_TEXT[id] ?? id;
+  return Object.prototype.hasOwnProperty.call(ANMELDEWEG_TEXT, id)
+    ? ANMELDEWEG_TEXT[id as Anmeldeweg]
+    : ANMELDEWEG_TEXT.unbekannt;
+}
+
+/**
+ * Rollen der Angaben einer Zugangsänderung (LFH-1152), beschriftet wie der Benutzer-Dialog:
+ * „System-Rolle: Benutzer, Org-Rolle: Keine“ bei der Anlage, „Org-Rolle: Keine → Führungskraft“
+ * beim Wechsel. `undefined`, wenn die Angaben keine Rolle tragen.
+ */
+export function rollenText(a: ZugangsAngaben): string | undefined {
+  const teile: string[] = [];
+  const rolle = <R extends string>(
+    feld: string,
+    text: Record<R, string>,
+    vorher: R | null | undefined,
+    nachher: R | null | undefined,
+  ) => {
+    if (nachher == null) return;
+    teile.push(`${feld}: ${vorher == null ? '' : `${text[vorher]} → `}${text[nachher]}`);
+  };
+  rolle(SYSTEM_ROLLE_FELD, SYSTEM_ROLLE_TEXT, a.system_rolle_vorher, a.system_rolle);
+  rolle(ORG_ROLLE_FELD, ORG_ROLLE_TEXT, a.org_rolle_vorher, a.org_rolle);
+  return teile.length > 0 ? teile.join(', ') : undefined;
 }
 
 export function istEreignis(wert: string | null): wert is AnmeldeEreignis {

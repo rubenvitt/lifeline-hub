@@ -71,6 +71,7 @@ pub async fn liste(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         &mut liste,
     )
     .await?;
@@ -205,6 +206,7 @@ pub async fn anlegen(
         einsatz_id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
         &mut r,
     )
     .await?;
@@ -249,7 +251,15 @@ pub async fn erledigen(
     )
     .await?;
     let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
-    anreichern_alle(&state.pool, einsatz_id, org_id, &ctx.benutzer, &mut r).await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+        &mut r,
+    )
+    .await?;
     let [r] = r;
     sse(&state, einsatz_id);
     Ok(Json(r))
@@ -277,7 +287,15 @@ pub async fn quittieren(
     )
     .await?;
     let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
-    anreichern_alle(&state.pool, einsatz_id, org_id, &ctx.benutzer, &mut r).await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+        &mut r,
+    )
+    .await?;
     let [r] = r;
     sse(&state, einsatz_id);
     Ok(Json(r))
@@ -325,7 +343,15 @@ pub async fn oeffnen(
     // nie gab (dieselbe Regel wie bei der Sichtung in LFH-340/C5). Deshalb wird der
     // Rückgabewert von `wieder_oeffnen` oben verworfen.
     let mut r = [repo::laden(&state.pool, erinnerung_id, &now).await?];
-    anreichern_alle(&state.pool, einsatz_id, org_id, &ctx.benutzer, &mut r).await?;
+    anreichern_alle(
+        &state.pool,
+        einsatz_id,
+        org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+        &mut r,
+    )
+    .await?;
     let [r] = r;
     sse(&state, einsatz_id);
     Ok(Json(r))
