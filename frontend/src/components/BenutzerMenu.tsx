@@ -3,11 +3,14 @@ import {
   IconChevronRunter,
   IconDokument,
   IconDokumente,
+  IconGlocke,
   IconPerson,
   type Icon,
 } from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
+import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
+import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
 import { HILFE_PFAD } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -76,6 +79,8 @@ function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Ico
 export default function BenutzerMenu({ funktion }: { funktion?: string | null } = {}) {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
+  const { data: versionsstand } = useVersionsstand();
+  const neuigkeitenUngelesen = istUngelesen(versionsstand);
   const { token } = theme.useToken();
   // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die Hook-Reihenfolge, sobald
   // der Benutzer eintrifft.
@@ -220,6 +225,33 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         };
       }),
     },
+    // Die Neuigkeiten mit einem Punkt, solange die laufende Version noch nicht gelesen ist (Spec
+    // `neuigkeiten`). Der Punkt trägt den Zustand, nicht die Farbe allein: der Eintrag bleibt benannt.
+    {
+      key: 'neuigkeiten',
+      icon: <IconGlocke />,
+      label: (
+        <span data-lfh="neuigkeiten-eintrag">
+          Neuigkeiten
+          {neuigkeitenUngelesen && (
+            <span
+              data-lfh="neuigkeiten-punkt"
+              role="img"
+              aria-label="ungelesen"
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                marginLeft: 8,
+                borderRadius: '50%',
+                backgroundColor: token.colorPrimary,
+                verticalAlign: 'middle',
+              }}
+            />
+          )}
+        </span>
+      ),
+    },
     // Hinweis auf die LGPL-Bibliotheken (HEIC-Decoder, LFH-1000, `heic/LIESMICH.md`), ganz
     // unten, weil er selten gebraucht wird. Über `onClick`, nicht als `<a>` im Label: sonst
     // öffnete nur ein Klick genau auf den Text, Enter und die Polsterung nicht. Die Hilfe
@@ -233,6 +265,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') void abmelden();
     else if (key === 'hilfe') navigate(HILFE_PFAD);
+    else if (key === 'neuigkeiten') navigate(NEUIGKEITEN_PFAD);
     else if (key === 'lizenzen') window.open(LIZENZ_HINWEIS, '_blank', 'noopener');
     else if (key.startsWith(DARSTELLUNG_PRAEFIX))
       setModus(key.slice(DARSTELLUNG_PRAEFIX.length) as ThemeModus);

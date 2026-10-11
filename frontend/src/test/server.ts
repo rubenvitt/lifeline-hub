@@ -24,6 +24,16 @@ export const server = setupServer(
    */
   http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
   /**
+   * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,
+   * also keine Hinweiskarte und kein Punkt). Tests der Neuigkeiten überschreiben per `server.use()`.
+   */
+  http.get('/api/versionsstand', () =>
+    HttpResponse.json({ laufend: '1.0.0-alpha.106', gelesen_bis: '1.0.0-alpha.106' }),
+  ),
+  http.post('/api/versionsstand/gelesen', () =>
+    HttpResponse.json({ laufend: '1.0.0-alpha.106', gelesen_bis: '1.0.0-alpha.106' }),
+  ),
+  /**
    * Eigene Sitzungen (LFH-1092) — nur die aktuelle als Default (echter Zustand einer frischen
    * Anmeldung). Das Profil fragt sie beim Mount ab; Tests der Liste überschreiben per
    * `server.use()`.

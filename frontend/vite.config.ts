@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA, type ManifestOptions } from 'vite-plugin-pwa';
+import { zerlegeChangelog } from './scripts/changelog-zerlegen.mjs';
 
 const frontendVersion = (
   JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
@@ -131,6 +132,30 @@ const depsOhneSourcemap = (aktiv: boolean): Plugin => ({
   },
 });
 
+// Neuigkeiten (Spec `neuigkeiten`): die CHANGELOG.md des Repos liegt zur Build-Zeit als Modul
+// `virtual:neuigkeiten` vor, damit die Seite ohne Netz läuft. Eine nicht lesbare Überschrift
+// bricht den Build (Zerlegung in `scripts/changelog-zerlegen.mjs`).
+const NEUIGKEITEN_ID = 'virtual:neuigkeiten';
+const NEUIGKEITEN_AUFGELOEST = `\0${NEUIGKEITEN_ID}`;
+const neuigkeitenQuelle = (): Plugin => {
+  let quelle = '';
+  return {
+    name: 'lifeline-neuigkeiten-quelle',
+    configResolved(config) {
+      quelle = resolve(config.root, '../CHANGELOG.md');
+    },
+    resolveId(id) {
+      return id === NEUIGKEITEN_ID ? NEUIGKEITEN_AUFGELOEST : null;
+    },
+    load(id) {
+      if (id !== NEUIGKEITEN_AUFGELOEST) return null;
+      this.addWatchFile(quelle);
+      const eintraege = zerlegeChangelog(readFileSync(quelle, 'utf8'));
+      return `export const EINTRAEGE = ${JSON.stringify(eintraege)};`;
+    },
+  };
+};
+
 // Dev-Port und Proxy-Ziel kommen aus .env.local und der Umgebung (process.env hat
 // Vorrang), weil Workspaces Ports dynamisch vergeben.
 export default defineConfig(({ mode }) => {
@@ -144,6 +169,7 @@ export default defineConfig(({ mode }) => {
       gitkeepBewahren(),
       libheifBibliothek(),
       depsOhneSourcemap(env.LIFELINE_DEPS_OHNE_SOURCEMAP === '1'),
+      neuigkeitenQuelle(),
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],

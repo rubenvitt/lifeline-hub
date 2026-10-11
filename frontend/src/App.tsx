@@ -126,6 +126,7 @@ const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage')
 const GeraetAbschnittKarte = lazy(() => import('./geraet/GeraetAbschnittKarte'));
 // Hilfe (LFH-1096): eigener Chunk mit den Kapiteltexten; der Service Worker hält ihn vor.
 const HilfePage = lazy(() => import('./hilfe/HilfePage'));
+const NeuigkeitenPage = lazy(() => import('./neuigkeiten/NeuigkeitenPage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -306,6 +307,7 @@ export const appRouten = createRoutesFromElements(
         {/* Ebene 1 — globale Shell */}
         <Route element={<AppLayout />}>
           <Route path="/einsaetze" element={<EinsaetzePage />} />
+          <Route path="/neuigkeiten" element={<NeuigkeitenPage />} />
           {/* Alt-Link bleibt als Redirect in die Admin-Sidebar. */}
           <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
           <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />

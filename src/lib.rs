@@ -70,6 +70,7 @@ pub mod tx;
 pub mod uhs;
 pub mod verbindung;
 pub mod verpflegung;
+pub mod versionsstand;
 pub mod vorlagendokument;
 pub mod wetter;
 mod wire_enum;
