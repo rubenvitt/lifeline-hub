@@ -23,6 +23,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Einstieg | [Rechte im Einsatz](kapitel/rechte-im-einsatz.md) | Führung, Administration |
 | Einstieg | [Einsatz auswählen und Oberfläche](kapitel/einsatz-oberflaeche.md) | Alle |
 | Einstieg | [Profil und Sicherheit](kapitel/profil-sicherheit.md) | Alle |
+| Einstieg | [Neuigkeiten](kapitel/neuigkeiten.md) | Alle |
 | Einstieg | [Chat](kapitel/chat.md) | Alle |
 | Führungsmittel | [Einsatztagebuch](kapitel/einsatztagebuch.md) | Alle, Führung |
 | Führungsmittel | [Meldungen](kapitel/meldungen.md) | Alle, Führung |

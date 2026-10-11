@@ -27,7 +27,7 @@ import { backendBinaer, freiePorts, umgebungRaeumen, viteServer } from './e2e/la
  * Backend-Binary wie im e2e-Lauf.
  *
  * Gleiche Aufnahmen: ein Worker, Chromium, Zeitzone Europe/Berlin, Gebietsschema de-DE, keine
- * Animationen, Gerätefaktor 1, helles Theme und Dichte `kompakt` im Speicher des Geräts, fester
+ * Animationen, Gerätefaktor 1, Darstellung „System“ und Dichte `kompakt` im Speicher des Geräts, fester
  * Viewport (Fükw 1440×900; weitere Kontexte in `e2e/doku-bilder/kontexte.ts`). Die Browser-Uhr
  * hält jede Bilder-Spec selbst an (`uhrAnhalten`).
  */
@@ -78,16 +78,17 @@ export default defineConfig({
     timezoneId: 'Europe/Berlin',
     reducedMotion: 'reduce',
     colorScheme: 'light',
-    // Helles Theme und Dichte `kompakt` (Design LFH-1127, F1/F2): als gespeicherte Wahl des
-    // Geräts, wie bei jemandem, der sie eingestellt hat. Gilt auch für Kontexte, die eine Spec
-    // selbst öffnet (`browser.newContext()` erbt die Optionen des Projekts).
+    // Darstellung „System“ und Dichte `kompakt` (Design LFH-1127, F1/F2): als gespeicherte Wahl
+    // des Geräts. „System“, damit `fotografiere` jedes Motiv hell (colorScheme `light`) und gleich
+    // danach dunkel aufnimmt, ohne neu zu laden (`e2e/doku-bilder/kern.ts`). Gilt auch für
+    // Kontexte, die eine Spec selbst öffnet (`browser.newContext()` erbt die Optionen des Projekts).
     storageState: {
       cookies: [],
       origins: [
         {
           origin: baseURL,
           localStorage: [
-            { name: 'lifeline-hub.theme', value: 'light' },
+            { name: 'lifeline-hub.theme', value: 'system' },
             { name: 'lifeline-hub.dichte', value: 'kompakt' },
           ],
         },

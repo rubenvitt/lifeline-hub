@@ -24,6 +24,7 @@ import { leseKapitel, type Kapitel } from './kapitel';
  *     „Abläufe“ mindestens ein `###`, jeder mit nummerierten Schritten und höchstens einem Bild;
  *   • Bilder nur als `![Alt](../bilder/<eigenes-kapitel>/<name>.png)`, Alt-Text nicht leer, die
  *     Datei existiert und ist höchstens {@link BILD_GRENZE} Bytes groß;
+ *   • zu jedem Bild liegt die dunkle Fassung `<name>.dunkel.png` daneben, ebenso begrenzt;
  *   • unter `docs/anwender/bilder/` liegt nichts, was kein Kapitel zeigt (keine Waisen, nur PNG).
  *
  * ── Was er NICHT prüft (Teil des Vertrags) ─────────────────────────────────────
@@ -118,8 +119,21 @@ export function bildBefunde(
     else if (bytes > BILD_GRENZE) {
       aus.push(`Bild ${ziel}: ${Math.ceil(bytes / 1024)} KB, Grenze ${BILD_GRENZE / 1024} KB`);
     }
+    const dunkel = dunklePfad(pfad);
+    const dunkelBytes = groesse(dunkel);
+    if (dunkelBytes === undefined) aus.push(`Bild ${ziel}: dunkle Fassung ${dunkel} fehlt`);
+    else if (dunkelBytes > BILD_GRENZE) {
+      aus.push(
+        `Bild ${dunkel}: ${Math.ceil(dunkelBytes / 1024)} KB, Grenze ${BILD_GRENZE / 1024} KB`,
+      );
+    }
   }
   return aus;
+}
+
+/** Die dunkle Fassung eines Bildes: `<kapitel>/<name>.png` → `<kapitel>/<name>.dunkel.png`. */
+function dunklePfad(pfad: string): string {
+  return pfad.replace(/\.png$/, '.dunkel.png');
 }
 
 interface Abschnitt {
@@ -183,7 +197,8 @@ export function waisen(dateien: readonly string[], kapitel: readonly Kapitel[]):
     kapitel.flatMap((k) =>
       bildVerweise(k.text)
         .map((b) => bildPfad(b.ziel))
-        .filter((p): p is string => p !== undefined),
+        .filter((p): p is string => p !== undefined)
+        .flatMap((p) => [p, dunklePfad(p)]),
     ),
   );
   return dateien
@@ -275,7 +290,8 @@ describe('Anwenderdokumentation', () => {
     };
     const slugs = new Set(['a', 'b']);
     const gibtEs = (p: string) => p === 'da';
-    const groesse = (p: string) => (p === 'a/maske.png' ? 1000 : undefined);
+    const groesse = (p: string) =>
+      p === 'a/maske.png' || p === 'a/maske.dunkel.png' ? 1000 : undefined;
     const mit = (text: string) => befunde({ ...basis, text }, slugs, gibtEs);
     const bild = (text: string) => bildBefunde({ ...basis, text }, groesse);
     const gliederung = (text: string) => gliederungBefunde({ ...basis, text });
@@ -284,7 +300,7 @@ describe('Anwenderdokumentation', () => {
       expect(befunde(basis, slugs, gibtEs)).toEqual([]);
       expect(bildBefunde(basis, groesse)).toEqual([]);
       expect(gliederungBefunde(basis)).toEqual([]);
-      expect(waisen(['a/maske.png'], [basis])).toEqual([]);
+      expect(waisen(['a/maske.png', 'a/maske.dunkel.png'], [basis])).toEqual([]);
       expect(
         gliederung(`${basis.text}\n## Grundlagen und Quellen\n\nFwDV 100.\n`),
         '„Grundlagen und Quellen“ darf stehen',
@@ -308,6 +324,7 @@ describe('Anwenderdokumentation', () => {
       ]);
       expect(bild('![Maske](../bilder/a/fehlt.png)')).toEqual([
         'Bild ../bilder/a/fehlt.png: Datei fehlt',
+        'Bild ../bilder/a/fehlt.png: dunkle Fassung a/fehlt.dunkel.png fehlt',
       ]);
       expect(bild('![Maske](../bilder/b/maske.png)')).toEqual([
         'Bild ../bilder/b/maske.png: liegt nicht im eigenen Ordner bilder/a/',
@@ -323,11 +340,16 @@ describe('Anwenderdokumentation', () => {
           `Bild ${ziel}: nur ../bilder/a/<name>.png`,
         ]);
       }
-      const gross = (p: string) => (p === 'a/maske.png' ? 300 * 1024 + 1 : undefined);
+      const gross = (p: string) => (p.startsWith('a/maske.') ? 300 * 1024 + 1 : undefined);
       expect(bildBefunde({ ...basis, text: '![Maske](../bilder/a/maske.png)' }, gross)).toEqual([
         'Bild ../bilder/a/maske.png: 301 KB, Grenze 300 KB',
+        'Bild a/maske.dunkel.png: 301 KB, Grenze 300 KB',
       ]);
-      const genau = (p: string) => (p === 'a/maske.png' ? 300 * 1024 : undefined);
+      const nurHell = (p: string) => (p === 'a/maske.png' ? 1000 : undefined);
+      expect(bildBefunde({ ...basis, text: '![Maske](../bilder/a/maske.png)' }, nurHell)).toEqual([
+        'Bild ../bilder/a/maske.png: dunkle Fassung a/maske.dunkel.png fehlt',
+      ]);
+      const genau = (p: string) => (p.startsWith('a/maske.') ? 300 * 1024 : undefined);
       expect(bildBefunde({ ...basis, text: '![Maske](../bilder/a/maske.png)' }, genau)).toEqual([]);
       expect(bild('```\n![](egal.png)\n```')).toEqual([]);
     });
@@ -337,6 +359,9 @@ describe('Anwenderdokumentation', () => {
         'bilder/a/alt.png: von keinem Kapitel gezeigt',
       ]);
       expect(waisen(['a/notiz.txt'], [basis])).toEqual(['bilder/a/notiz.txt: kein PNG']);
+      expect(waisen(['a/maske.dunkel.png', 'a/alt.dunkel.png'], [basis])).toEqual([
+        'bilder/a/alt.dunkel.png: von keinem Kapitel gezeigt',
+      ]);
       expect(waisen(['b/maske.png'], [basis])).toEqual([
         'bilder/b/maske.png: von keinem Kapitel gezeigt',
       ]);

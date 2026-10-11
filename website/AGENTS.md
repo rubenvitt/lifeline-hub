@@ -11,12 +11,18 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   `pnpm build`, Ausgabe `dist`; Cloudflare installiert selbst aus dem Lockfile. Node und pnpm
   setzen dort die Umgebungsvariablen `NODE_VERSION` und `PNPM_VERSION`: wer `engines` oder
   `packageManager` in `website/package.json` hebt, zieht beide im Pages-Projekt nach.
+- **Unbekannte Adressen und Cache:** `src/pages/404.astro` muss bleiben. Ohne `404.html`
+  beantwortet Pages jede unbekannte Adresse mit der Startseite und Status 200, auch eine
+  CSS-Adresse; ein Browser, der während eines Rollouts zu früh anfragt, hielte dieses HTML bis zu
+  vier Stunden als Stylesheet fest, und die Seite stünde ungestaltet da (11.10.2026, iOS-Safari).
+  `public/_headers` setzt die gehashten Dateien unter `/_astro/` auf `immutable`.
 - **CI:** `website/` löst keine schwere Suite aus; ein PR, der nur hier ändert, fährt nur die
   Schnellprüfungen (Bereichs-Erkennung, `scripts/AGENTS.md`).
 - **Kopien statt zweiter Quelle:** `src/styles/rollen.css` (aus `frontend/src/theme/rollen.css`),
   `src/daten/module.ts` (aus `frontend/src/einsatz/modulRegistry.ts`, Name und Beschreibung
   wörtlich), `src/components/Bildmarke.astro` (aus `frontend/src/marke/bildmarkeGeometrie.ts`),
-  `src/daten/gruppen.ts` (aus `frontend/src/hilfe/gruppen.ts`) und `public/schriften/` samt
+  `src/daten/gruppen.ts` (aus `frontend/src/hilfe/gruppen.ts`), `src/daten/bereiche.ts` (aus
+  `frontend/src/hilfe/bereiche.ts`, Bereiche und Kurztext) und `public/schriften/` samt
   Lizenztexten (aus `frontend/src/assets/fonts/`). Wer dort eine Rolle, ein Modul, eine
   Lesergruppe, die Marke oder einen Schnitt ändert, zieht es hier nach.
 - **Doku** (`src/pages/doku/`, LFH-1096): die Anwenderdokumentation aus
@@ -27,8 +33,15 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   weiteres Paket. Bilder (`../bilder/<kapitel>/<name>.png`, LFH-1128) gibt die Bildpipeline der
   Collection unverändert unter `/_astro/` aus; ihren Platzhalter im HTML ersetzt die
   Kapitelseite durch `<img>` mit Adresse und Maßen aus einem Glob über `docs/anwender/bilder/`
-  (keine Kopie nach `public/`). Ein fehlendes Bild bricht den Build. Ein Kapitel-PR ändert nur `docs/anwender/`, also stehen in den
-  Build-Überwachungspfaden des Pages-Projekts `website/*` **und** `docs/anwender/*`.
+  (keine Kopie nach `public/`), je Bild die helle und die dunkle Fassung (`<name>.dunkel.png`);
+  sichtbar ist die zum Modus passende, im Druck die helle. Ein fehlendes Bild bricht den Build.
+  Ein Kapitel-PR ändert nur `docs/anwender/`, also stehen in den Build-Überwachungspfaden des
+  Pages-Projekts `website/*` **und** `docs/anwender/*`.
+- **Suche** (`src/components/DokuSuche.astro`, im `Grundriss` jeder Seite): Dialog über ⌘K /
+  Strg+K, „/“ und den Suchknopf der Kopfleiste. Der Index `/doku/suche.json`
+  (`src/pages/doku/suche.json.ts`) entsteht beim Bauen aus denselben Kapiteln, mit den
+  Sprungmarken der gerenderten Überschriften, und lädt erst beim ersten Öffnen. Kein Suchdienst,
+  keine Bibliothek.
 - **Gestaltung wie die App** (`frontend/AGENTS.md`, Gestaltungssprache): Nachtbetrieb ist
   Vorgabe, Radius 0, Fugenraster, Rot bedient nichts, Zahlen in Mono. Schriften nur lokal,
   kein CDN.

@@ -96,6 +96,12 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
 
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
+    // Versionsstand der Instanz: Versionswechsel erkennen, bevor Anfragen kommen (Spec `versionsstand`).
+    lifeline_hub::versionsstand::repo::beim_start(
+        &pool,
+        lifeline_hub::routes::versionsstand::LAUFENDE_VERSION,
+    )
+    .await?;
     physisch_bereinigen(&pool).await;
 
     // `bootstrap_admin` läuft ZUERST: es legt auf leerer DB Organisation, Admin und

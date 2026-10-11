@@ -1,0 +1,4 @@
+# Cloudflare Pages (website/AGENTS.md, „Bereitstellung“). Dateien unter /_astro/ tragen einen
+# Inhalts-Hash im Namen: jede Änderung ergibt eine neue Adresse, die alte ändert sich nie.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable

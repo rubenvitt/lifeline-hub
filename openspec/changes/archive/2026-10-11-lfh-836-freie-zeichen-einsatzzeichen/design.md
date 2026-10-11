@@ -70,8 +70,8 @@ richtig (LFH-835, D1). Diese Abweichung von D1 ist bewusst. Die kanonische Form 
 
 ### D2 Migration: Spalte anhängen, Altspalten per Tabellen-Rebuild nullable
 
-Die Migration hat die nächste freie Nummer auf `alpha`: 0175, weil `alpha` inzwischen 0172–0174
-trug (`scripts/check-migrationen.sh`). Sie baut `freies_zeichen` neu auf:
+Die Migration hat die nächste freie Nummer auf `alpha`: zuerst 0175, nach dem Merge von `alpha`
+(0175 dort vergeben) umgelegt auf 0176 (`scripts/check-migrationen.sh --umnummerieren`). Sie baut `freies_zeichen` neu auf:
 - `grundzeichen` wird nullable, `zeichen_spec TEXT` kommt neu dazu.
 - Ein `CHECK` verlangt genau eine Form: `(zeichen_spec IS NULL) <> (grundzeichen IS NULL)`.
 - Fremdschlüssel (`einsatz` CASCADE, `karten_ansicht` SET NULL, `benutzer`), Index und alle

@@ -4825,6 +4825,15 @@ export interface components {
             /** @description Nach Beginn geordnet. */
             zeitfenster: components["schemas"]["ZeitfensterAnzeige"][];
         };
+        /** @description Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`. */
+        VersionsstandAnzeige: {
+            /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */
+            gelesen_bis?: string | null;
+            /** @description Die laufende Version des Servers. */
+            laufend: string;
+            /** @description Die Version davor, nur wenn ein Versionswechsel stattfand. */
+            zuletzt_gestartet?: string | null;
+        };
         /**
          * @description Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den
          *     lokalen Import gebauter Region-Packs (LFH-199, ohne Download/Hosting).

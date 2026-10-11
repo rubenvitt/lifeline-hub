@@ -283,6 +283,7 @@ use utoipa::OpenApi;
         crate::verpflegung::Sonderkost,
         crate::verpflegung::VerpflegungAnzeige,
         crate::verpflegung::ZeitfensterAnzeige,
+        crate::versionsstand::VersionsstandAnzeige,
         crate::wetter::WetterAktuell,
         crate::wetter::WetterAktuellTeil,
         crate::wetter::WetterAnzeige,

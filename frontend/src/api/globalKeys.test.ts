@@ -39,6 +39,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.benutzerEinstellungenVon(7)).toEqual(['benutzer-einstellungen', 7]);
     // Ohne Sitzung ist das Fach adressierbar, aber leer; die Abfrage ist dann abgeschaltet.
     expect(globalKeys.benutzerEinstellungenVon(null)).toEqual(['benutzer-einstellungen', null]);
+    expect(globalKeys.versionsstand()).toEqual(['versionsstand']);
     // ZWEI Benutzer, ZWEI Fächer: ein prozessweiter QueryClient überlebt den Schichtwechsel ohne
     // Neuladen.
     expect(globalKeys.benutzerEinstellungenVon(1)).not.toEqual(
@@ -117,10 +118,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 29 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 30 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(29);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(29);
+    expect(werte).toHaveLength(30);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(30);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

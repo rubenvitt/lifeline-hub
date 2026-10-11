@@ -64,6 +64,11 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
 - **Ablage:** `bilder/<kapitel>/<name>.png`, `<name>` aus `[a-z0-9-]`. Ein Kapitel zeigt nur
   Bilder aus seinem eigenen Ordner, relativ und mit Alt-Text, der sagt, was zu sehen ist:
   `![Dialog „Gerät koppeln“ mit Ansicht und Gerätebezeichnung](../bilder/anmelden-abmelden/geraet-koppeln.png)`.
+- **Hell und dunkel:** neben jedem Bild liegt `<name>.dunkel.png`, dieselbe Aufnahme im
+  Nachtbetrieb. Das Kapitel nennt nur das helle; App (`hilfe/HilfeBild.tsx`, nach dem wirksamen
+  Modus) und Website (`data-theme`, im Druck hell) wählen selbst. Beide entstehen im selben Zug:
+  `fotografiere` nimmt hell auf, schaltet die Systemfarbe um (`emulateMedia`) und nimmt dunkel
+  auf; das Gerät steht dafür im Lauf auf „System“. Kein Filter, keine Umkehrung.
 - **Nur per Skript, nie von Hand:** je Kapitel eine Bilder-Spec
   `frontend/e2e/doku-bilder/<kapitel>.bilder.ts` (`test.describe('<kapitel>', …)`), Helfer in
   `e2e/doku-bilder/kern.ts`. Ihr Kopfkommentar nennt je Bild die gezeigten Komponenten-Pfade.
@@ -73,7 +78,8 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
   gegenseitig in die Bilder kämen.
 - **Gleiche Aufnahmen:** eigener Lauf (`playwright.doku.config.ts`, getrennt vom e2e-Lauf), eigene
   Temp-DB und Ports je Lauf, Backend mit `--demo-daten`, Demo-Import vorab
-  (`e2e/doku-bilder/vorbereitung.ts`), Chromium, ein Worker, helles Theme, Dichte `kompakt`,
+  (`e2e/doku-bilder/vorbereitung.ts`), Chromium, ein Worker, Darstellung „System“ (hell, dann
+  dunkel je Aufnahme), Dichte `kompakt`,
   Zeitzone Europe/Berlin, `reducedMotion`, Gerätefaktor 1, fester Viewport je Kontext
   (`e2e/doku-bilder/kontexte.ts`: Fükw 1440×900 als Vorgabe, Tablet 1280×800, Handy 390×844,
   Lagemonitor 1920×1080; Handy und Handschuh nur, wo das Kapitel den Kontext behandelt). Die Uhr
@@ -101,8 +107,8 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
 
 `frontend/src/hilfe/anwenderdoku.guard.test.ts`: Kopf, Reihenfolge, Quellen existieren, Links
 treffen, nur GFM; die vier Abschnitte in Reihenfolge, je Ablauf nummerierte Schritte und
-höchstens ein Bild; Bilder nur `../bilder/<eigenes-kapitel>/<name>.png`, Alt-Text da, Datei da
-und höchstens 300 KB; nichts unter `bilder/`, das kein Kapitel zeigt. Allein fahren:
+höchstens ein Bild; Bilder nur `../bilder/<eigenes-kapitel>/<name>.png`, Alt-Text da, Datei und
+dunkle Fassung da, beide höchstens 300 KB; nichts unter `bilder/`, das kein Kapitel zeigt. Allein fahren:
 `TZ=Europe/Berlin mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` in
 `frontend/`. Er prüft nicht, ob ein Kapitel oder Bild noch stimmt; das trägt die
 Mitänderungsregel im Review.
@@ -141,6 +147,13 @@ stehen im Hintergrund jedes Kapitels.
 
 ## Hilfe in der App
 
+- Aufbau wie die Doku der Website: links die Kapitel nach Bereichen (`hilfe/bereiche.ts`, je
+  Hunderterblock der `reihenfolge` ein Bereich, einklappbar), Volltextsuche (Umlaute wie
+  Grundbuchstaben, „/“ springt hinein) und Lesergruppe; ab `xl` rechts das Inhaltsverzeichnis des
+  Kapitels mit dem Abschnitt, in dem man liest, darunter als Klappe über dem Text; unter `lg` die
+  Kapitelliste als Klappe. Ohne Kapitel: Übersichtskarten mit dem Kurztext des Überblicks, darunter
+  die Mappe (alle Kapitel der gefilterten Lesergruppe am Stück). Ein Kapitel endet mit
+  Zurück/Weiter. Gedruckt wird nur die Druckwurzel (Mappe bzw. Kapitel).
 - Route `/hilfe` und `/hilfe/<kapitel>` **ohne** `RequireAuth` (das Kapitel „Anmelden“ braucht man
   davor), Gruppe als `?gruppe=` (`hilfePfad`, `parseHilfeGruppe` in `routing/deeplinks.ts`).
   Ohne Kapitel zeigt die Seite die Mappe der Gruppe.

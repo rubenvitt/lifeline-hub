@@ -22,7 +22,7 @@ import { ADMIN, ADMIN_PW, type Konto } from '../rollen-kern';
  *   2. Lücken der Demo-Daten füllen: `demoEinsatz(page)` und `fuelle(page, …)` (D3);
  *   3. `uhrAnhalten(page)` vor dem ersten `goto`;
  *   4. auf einen Inhaltsanker warten, nie auf `networkidle` (e2e/AGENTS.md, SSE);
- *   5. `fotografiere(locator, '<kapitel>', '<name>')`.
+ *   5. `fotografiere(locator, '<kapitel>', '<name>')` — hell und dunkel in einem Zug.
  */
 
 export { expect };
@@ -60,16 +60,52 @@ const BILD_GRENZE = 300 * 1024;
  */
 const AUFNAHME_STIL = '.tsqd-parent-container { display: none !important; }';
 
-/** Pfad eines Bildes: `docs/anwender/bilder/<kapitel>/<name>.png` in diesem Checkout. */
-export function bildDatei(kapitel: string, name: string): string {
-  return join(ANWENDER, 'bilder', kapitel, `${name}.png`);
+export type Modus = 'hell' | 'dunkel';
+
+/**
+ * Pfad eines Bildes in diesem Checkout: `docs/anwender/bilder/<kapitel>/<name>.png` (hell) bzw.
+ * `<name>.dunkel.png` (dunkel). Das Kapitel verweist nur auf das helle; das dunkle gehört dazu.
+ */
+export function bildDatei(kapitel: string, name: string, modus: Modus = 'hell'): string {
+  return join(ANWENDER, 'bilder', kapitel, `${name}${modus === 'dunkel' ? '.dunkel' : ''}.png`);
+}
+
+/** Wartet, bis die App den Modus angenommen und einmal gezeichnet hat. */
+async function warteAufModus(seite: Page, modus: Modus) {
+  const theme = modus === 'dunkel' ? 'dark' : 'light';
+  await seite.waitForFunction((t) => document.documentElement.dataset.theme === t, theme);
+  await seite.evaluate(
+    () =>
+      new Promise<void>((fertig) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => fertig())),
+      ),
+  );
+}
+
+async function aufnehmen(ziel: Locator | Page, pfad: string) {
+  await ziel.screenshot({
+    path: pfad,
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'css',
+    style: AUFNAHME_STIL,
+  });
+  const groesse = statSync(pfad).size;
+  expect(
+    groesse,
+    `${pfad} wiegt ${Math.ceil(groesse / 1024)} KB, Grenze 300 KB`,
+  ).toBeLessThanOrEqual(BILD_GRENZE);
 }
 
 /**
- * Fotografiert `ziel` (ein Element, sonst die sichtbare Seite) als
- * `docs/anwender/bilder/<kapitel>/<name>.png` und gibt den Pfad zurück. Rot, wenn es das Kapitel
- * nicht gibt, der Name nicht der Form `[a-z0-9-]+` folgt oder das Bild über 300 KB wiegt (dann
- * den Ausschnitt verkleinern: Maske, Liste oder Dialog statt ganzer Seite).
+ * Fotografiert `ziel` (ein Element, sonst die sichtbare Seite) zweimal: hell als
+ * `docs/anwender/bilder/<kapitel>/<name>.png`, dann dunkel als `<name>.dunkel.png`, und gibt den
+ * Pfad des hellen zurück. Beide im selben Zustand: das Gerät steht auf „System“
+ * (`playwright.doku.config.ts`), der Lauf schaltet nur die Systemfarbe um (`emulateMedia`), und
+ * die App folgt live. Danach steht sie wieder hell.
+ *
+ * Rot, wenn es das Kapitel nicht gibt, der Name nicht der Form `[a-z0-9-]+` folgt oder ein Bild
+ * über 300 KB wiegt (dann den Ausschnitt verkleinern: Maske, Liste oder Dialog statt ganzer Seite).
  */
 export async function fotografiere(
   ziel: Locator | Page,
@@ -87,18 +123,16 @@ export async function fotografiere(
   await seite.evaluate(() => document.fonts.ready.then(() => undefined));
   const pfad = bildDatei(kapitel, name);
   mkdirSync(dirname(pfad), { recursive: true });
-  await ziel.screenshot({
-    path: pfad,
-    animations: 'disabled',
-    caret: 'hide',
-    scale: 'css',
-    style: AUFNAHME_STIL,
-  });
-  const groesse = statSync(pfad).size;
-  expect(
-    groesse,
-    `${kapitel}/${name}.png wiegt ${Math.ceil(groesse / 1024)} KB, Grenze 300 KB`,
-  ).toBeLessThanOrEqual(BILD_GRENZE);
+  await warteAufModus(seite, 'hell');
+  await aufnehmen(ziel, pfad);
+  await seite.emulateMedia({ colorScheme: 'dark' });
+  try {
+    await warteAufModus(seite, 'dunkel');
+    await aufnehmen(ziel, bildDatei(kapitel, name, 'dunkel'));
+  } finally {
+    await seite.emulateMedia({ colorScheme: 'light' });
+  }
+  await warteAufModus(seite, 'hell');
   return pfad;
 }
 

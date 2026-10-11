@@ -44,6 +44,30 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 - Code-Kommentare verweisen auf Regeln mit Datei und Abschnitt („`src/AGENTS.md`,
   Statuscode-Konvention“). Wer eine Regel verschiebt, greppt die Verweise.
 
+## Bezeichner-Sprache (LFH-1312)
+
+- **Fachbegriffe deutsch, Technik englisch.** Ein Wort, das eine Einsatzkraft so benutzt oder die
+  Oberfläche so zeigt, bleibt deutsch (`einsatz`, `lagemeldung`, `kraefte`, `sichtung`,
+  `geraetekonto`). Alles, was nur Programmierer sagen, ist englisch: Abläufe (`load`, `fetch`,
+  `save`, `create`, `update`, `delete`, `check`, `parse`, `build`, `render`), Wahrheitswerte
+  (`is`, `has`, `can`), Strukturwörter (`Props`, `State`, `Hook`, `Handler`, `Repo`, `Error`,
+  `List`, `Count`). Also `load_einsatz`, `isGeraetekonto`, `EinsatzKopfProps`, nicht
+  `lade_einsatz`, `istGeraetekonto`. Im Zweifel deutsch, wenn die Oberfläche dasselbe Wort zeigt.
+  Umlaute werden umschrieben (`kraefte`); Dateinamen folgen den Bezeichnern, die sie tragen.
+- **Prosa bleibt deutsch:** Kommentare, Commit-Nachrichten, UI-Texte, Testbeschreibungen (auch
+  Rust-Testnamen als Satz), Doku.
+- **Grenzwerte bleiben:** Wire-Felder und -Werte, Tabellen und Spalten, Migrationen, generierte
+  Typen, gespeicherte Schlüssel, Routen und Ereignisnamen nicht wegen dieser Regel umbenennen,
+  auch nicht per `#[serde(rename)]`; dafür braucht es eine eigene Change mit Übergangsweg.
+- **Bestand beim Anfassen umstellen, nie in einem Zug:** Neue Bezeichner folgen der Regel sofort.
+  Ein bestehender wird umgestellt, wenn der Task Code ändert, der ihn deklariert, und seine
+  Verwendungen im Diff liegen oder sich mechanisch mitziehen lassen; eine Namensfamilie in
+  derselben Datei (`lade_a`, `lade_b`) zusammen. Die Umbenennung kommt als eigener
+  `refactor`-Commit in denselben Branch.
+- Die Vorgabe „Bezeichner auf Deutsch“ in älteren Plänen unter `docs/superpowers/plans/` ist
+  überholt. Herleitung:
+  `openspec/changes/archive/2026-10-11-lfh-1312-bezeichner-sprache/design.md`.
+
 ## ClickUp
 
 Dieses Projekt hat ein eigenes ClickUp-Projekt im Space **Lifeline Hub** (`901511065513`,

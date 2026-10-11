@@ -7,6 +7,7 @@
 import '../styles/rollen.css';
 import '../styles/seite.css';
 import Bildmarke from '../components/Bildmarke.astro';
+import DokuSuche from '../components/DokuSuche.astro';
 
 interface Props {
   titel: string;
@@ -14,6 +15,7 @@ interface Props {
 }
 const { titel, beschreibung } = Astro.props;
 const repo = 'https://github.com/rubenvitt/lifeline-hub';
+const inDoku = Astro.url.pathname.startsWith('/doku');
 ---
 
 <!doctype html>
@@ -54,9 +56,17 @@ const repo = 'https://github.com/rubenvitt/lifeline-hub';
         <a href="/#etb">ETB</a>
         <a href="/#einsatz">Einsatztauglich</a>
         <a href="/#stand">Stand</a>
-        <a href="/doku/">Doku</a>
+        <a href="/doku/" aria-current={inDoku ? 'page' : undefined}>Doku</a>
       </nav>
       <div class="rechts">
+        <button class="suchknopf" type="button" data-such-oeffnen aria-label="Dokumentation durchsuchen">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"></circle>
+            <path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2"></path>
+          </svg>
+          <span class="suchknopf__text">Doku durchsuchen</span>
+          <kbd class="suchknopf__kuerzel" data-such-kuerzel>⌘K</kbd>
+        </button>
         <div class="modus" role="group" aria-label="Darstellung">
           <button type="button" data-modus="dark" aria-pressed="true">Nacht</button>
           <button type="button" data-modus="light" aria-pressed="false">Tag</button>
@@ -68,6 +78,7 @@ const repo = 'https://github.com/rubenvitt/lifeline-hub';
     <main id="inhalt">
       <slot />
     </main>
+    <DokuSuche />
 
     <footer class="fuss">
       <div class="fuss-innen">
@@ -179,9 +190,38 @@ const repo = 'https://github.com/rubenvitt/lifeline-hub';
   .navigation a:last-child {
     border-right: 1px solid var(--lfh-rahmen-linie);
   }
-  .navigation a:hover {
+  .navigation a:hover,
+  .navigation a[aria-current='page'] {
     color: var(--lfh-rahmen-text);
     background: var(--lfh-rahmen-aktiv);
+  }
+  .navigation a[aria-current='page'] {
+    box-shadow: inset 0 -2px 0 var(--lfh-bedien);
+  }
+  .suchknopf {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 8px 0 10px;
+    border: 1px solid var(--lfh-rahmen-linie);
+    background: var(--lfh-rahmen-grund);
+    color: var(--lfh-rahmen-gedaempft);
+    font: 500 12px var(--lfh-schrift-text);
+    cursor: pointer;
+  }
+  .suchknopf:hover {
+    color: var(--lfh-rahmen-text);
+    background: var(--lfh-rahmen-aktiv);
+  }
+  .suchknopf__text,
+  .suchknopf__kuerzel {
+    display: none;
+  }
+  .suchknopf__kuerzel {
+    padding: 1px 5px;
+    border: 1px solid var(--lfh-rahmen-linie);
+    font: 500 11px var(--lfh-schrift-zahl);
   }
   .rechts {
     display: flex;
@@ -251,6 +291,18 @@ const repo = 'https://github.com/rubenvitt/lifeline-hub';
   @media (min-width: 960px) {
     .navigation {
       display: flex;
+    }
+  }
+  @media (min-width: 1100px) {
+    .suchknopf {
+      min-width: 220px;
+    }
+    .suchknopf__text {
+      display: inline;
+      margin-right: auto;
+    }
+    .suchknopf__kuerzel {
+      display: inline;
     }
   }
 </style>

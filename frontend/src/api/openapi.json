@@ -12648,6 +12648,33 @@
           }
         }
       },
+      "VersionsstandAnzeige": {
+        "type": "object",
+        "description": "Die Antwort von `GET /api/versionsstand` und `POST /api/versionsstand/gelesen`.",
+        "required": [
+          "laufend"
+        ],
+        "properties": {
+          "gelesen_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die Version, bis zu der die Neuigkeiten als gelesen gelten."
+          },
+          "laufend": {
+            "type": "string",
+            "description": "Die laufende Version des Servers."
+          },
+          "zuletzt_gestartet": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die Version davor, nur wenn ein Versionswechsel stattfand."
+          }
+        }
+      },
       "VorhandeneKarte": {
         "type": "object",
         "description": "Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den\nlokalen Import gebauter Region-Packs (LFH-199, ohne Download/Hosting).",

@@ -243,6 +243,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/benutzer/{id}/sitzungen/{kennung}",
             delete(routes::sitzung::admin_beenden),
         )
+        .route("/api/versionsstand", get(routes::versionsstand::lesen))
+        .route(
+            "/api/versionsstand/gelesen",
+            post(routes::versionsstand::gelesen),
+        )
         .route(
             "/api/benutzer-einstellungen",
             get(routes::benutzer_einstellungen::lesen),

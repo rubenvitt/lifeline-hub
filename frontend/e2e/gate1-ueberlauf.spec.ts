@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
 import { einsatzAnlegen } from './einsatz-kern';
+import { FOTO_JPEG } from './bildFixture';
 
 // Beide Kopfzeilen teilen Auslöser, aber nicht ihren Layout-Rahmen. Die gespeicherte Wahl
 // muss auch bei Touch gelten; Pixel prüft nur der Browser.
@@ -1201,7 +1202,13 @@ test.describe('Gate 1', () => {
 const KRAFT = 'Kirchgassner-Wohlfahrt, Maximiliane';
 /** Ein gewöhnlicher Name für die Zeilenhöhe: der lange oben darf umbrechen, dieser nicht. */
 const KRAFT_KURZ = 'Meyer, Jan';
-const KRAFT_FAHRZEUG = 'Florian Musterstadt-Nordwest 46/11-1';
+/**
+ * Ein gewöhnlicher Funkrufname für die Zeilenhöhe der Fahrzeugseite. Seit LFH-1149 hält die
+ * Besatzung bei 1440 px eine Zeile, den Rest nimmt der Funkrufname; ein Name wie
+ * „Florian Musterstadt-Nordwest 46/11-1“ samt „ad-hoc“ und Auslöser bricht dort um
+ * (Entscheidung Ruben, 10.10.2026, `pages/FahrzeugePage.tsx`).
+ */
+const KRAFT_FAHRZEUG = 'Florian Musterstadt 46/11-1';
 
 async function seedeKraefte(page: Page): Promise<string> {
   const neu = await page.request.post('/api/einsaetze', {
@@ -1452,4 +1459,210 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       expect(m2.links - m1.links, 'Einzug der zweiten Ebene').toBeLessThanOrEqual(12);
     });
   }
+});
+
+/*
+ * TABELLEN AM FÜHRUNGSARBEITSPLATZ (LFH-1149): Fahrzeuge mit Besatzung, Dokumente und die
+ * Aufbewahrung laufen bei 1440 × 900 nicht über, und die Aktionen stehen ohne Querscrollen im
+ * Bild. Gemessen wie oben an der Bildlauffläche der Tabelle. Träger der Spaltenbreiten ist die
+ * Regel „Fließende Spalte“ (`frontend/AGENTS.md`).
+ *
+ * NICHT-PRIVILEGIERT (LFH-435): ohne Schreibrecht fehlt die Aktionsspalte — Vorbedingung vor der
+ * Messung —, die Messung greift trotzdem. Die Aufbewahrung sieht nur der System-Admin.
+ */
+const FUEKW_TABELLE = { width: 1440, height: 900 } as const;
+/** Stammfahrzeug: der Funkrufname ist je Lauf eindeutig, mit kurzem Zusatz. */
+const FAHRZEUG_SOLL = 'Florian Musterstadt 46/12';
+const DOKUMENT_FOTO = 'Mühlbach an der Brücke';
+const DOKUMENT_PLAN = 'Lageplan Ortsteil Nord';
+
+async function neuerEinsatz(page: Page, bezeichnung: string): Promise<number> {
+  const neu = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+  return ((await neu.json()) as { id: number }).id;
+}
+
+async function seedeJson(
+  page: Page,
+  methode: 'post' | 'put',
+  pfad: string,
+  data?: unknown,
+): Promise<{ id: number }> {
+  const antwort = await page.request[methode](pfad, data === undefined ? undefined : { data });
+  expect(antwort.ok(), `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  const text = await antwort.text();
+  return (text ? JSON.parse(text) : {}) as { id: number };
+}
+
+/** Ein Stammfahrzeug mit Soll-Stärke und drei Kräften: die Besatzungszelle zeigt Ist UND Soll. */
+async function seedeFahrzeugMitBesatzung(page: Page): Promise<string> {
+  const einsatzId = await neuerEinsatz(page, `E2E Fükw-Fahrzeuge ${Date.now()}`);
+  const stamm = await seedeJson(page, 'post', '/api/fahrzeuge', {
+    funkrufname: `${FAHRZEUG_SOLL}-${Math.random().toString(36).slice(2, 6)}`,
+    fahrzeugtyp: 'HLF 20',
+    traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest',
+    kennzeichen: 'MU-NW 4711',
+    staerke_fuehrer: 0,
+    staerke_unterfuehrer: 1,
+    staerke_mannschaft: 8,
+  });
+  const ef = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/fahrzeuge`, {
+    fahrzeug_id: stamm.id,
+  });
+  for (const name of ['Kirchgassner-Wohlfahrt, Maximiliane', 'Meyer, Jan', 'Probe, Anna']) {
+    const kraft = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/personal`, {
+      adhoc: { name },
+    });
+    await seedeJson(
+      page,
+      'put',
+      `/api/einsaetze/${einsatzId}/fahrzeuge/${ef.id}/besatzung/${kraft.id}`,
+    );
+  }
+  return String(einsatzId);
+}
+
+/**
+ * Der Bestand der Doku-Bilder (`e2e/doku-bilder/dokumente.bilder.ts`): ein Foto mit Vorschau und
+ * „Original (mit Standort)“, ein Befehl mit langem Dateinamen, ein Plan mit Abschnittsbezug.
+ */
+async function seedeDokumente(page: Page): Promise<string> {
+  const einsatzId = await neuerEinsatz(page, `E2E Fükw-Dokumente ${Date.now()}`);
+  const abschnitt = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/abschnitte`, {
+    name: 'Sanitätsdienst',
+  });
+  for (const [titel, kategorie, dateiname, mimeType, buffer, bezug] of [
+    [DOKUMENT_FOTO, 'foto', `${DOKUMENT_FOTO}.jpg`, 'image/jpeg', FOTO_JPEG, false],
+    [
+      DOKUMENT_PLAN,
+      'lagekarte_plan',
+      `${DOKUMENT_PLAN}.pdf`,
+      'application/pdf',
+      Buffer.from('%PDF-1.4 e2e'),
+      true,
+    ],
+    [
+      'Einsatzbefehl Deichverteidigung',
+      'befehl',
+      'Einsatzbefehl Deichverteidigung.pdf',
+      'application/pdf',
+      Buffer.from('%PDF-1.4 e2e'),
+      false,
+    ],
+  ] as const) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/dokumente`, {
+      multipart: {
+        datei: { name: dateiname, mimeType, buffer },
+        titel,
+        kategorie,
+        ...(bezug ? { bezug_typ: 'abschnitt', bezug_id: String(abschnitt.id) } : {}),
+      },
+    });
+    expect(
+      antwort.ok(),
+      `Seeding ${titel}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+  }
+  return String(einsatzId);
+}
+
+test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
+  test.describe.configure({ mode: 'parallel' });
+
+  for (const rolle of ['admin', 'beobachter'] as const) {
+    test(`Fükw (1440 px) · ${rolle}: Fahrzeuge mit Besatzung ohne Tabellenüberlauf`, async ({
+      page,
+    }) => {
+      await anmelden(page);
+      const einsatzId = await seedeFahrzeugMitBesatzung(page);
+      if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+      await page.setViewportSize(FUEKW_TABELLE);
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge?ansicht=liste`);
+      const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+      const zeile = region.locator('tr.ant-table-row').filter({ hasText: FAHRZEUG_SOLL });
+      // Inhaltsanker: Ist UND Soll stehen in der Besatzungszelle.
+      await expect(zeile.getByText(/Ist .* · Soll /)).toBeVisible();
+      const entfernen = region.getByRole('button', { name: 'Entfernen', exact: true });
+      // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
+      await expect(entfernen).toHaveCount(rolle === 'admin' ? 1 : 0);
+
+      const ueber = await tabellenUeberlauf(region);
+      test.info().annotations.push({
+        type: 'messwert',
+        description: `Fahrzeuge @1440 (${rolle}): ${ueber}px Tabellenüberlauf`,
+      });
+      expect(ueber, 'Fahrzeugtabelle läuft nicht über').toBeLessThanOrEqual(1);
+      const besatzung = zeile.locator('[data-lfh="besatzung-urteil"]');
+      await expect(besatzung, 'Besatzung ohne Querscrollen').toBeInViewport({ ratio: 1 });
+      // Urteil, Ist und Soll in EINER Zeile: die Zeile bleibt so hoch wie in den Kräfte-Listen.
+      expect(
+        (await zeile.boundingBox())!.height,
+        'Zeilenhöhe mit Ist und Soll',
+      ).toBeLessThanOrEqual(48);
+      if (rolle === 'admin') {
+        await expect(entfernen, '„Entfernen“ ohne Querscrollen').toBeInViewport({ ratio: 1 });
+        // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): die Rückfrage steht.
+        await entfernen.click();
+        await expect(page.getByText('Aus Einsatz entfernen?')).toBeVisible();
+      }
+    });
+
+    test(`Fükw (1440 px) · ${rolle}: Dokumente ohne Tabellenüberlauf`, async ({ page }) => {
+      await anmelden(page);
+      const einsatzId = await seedeDokumente(page);
+      if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+      await page.setViewportSize(FUEKW_TABELLE);
+      await page.goto(`/einsaetze/${einsatzId}/dokumente`);
+      const region = page.getByRole('region', { name: 'Dokumente', exact: true });
+      await expect(region.getByText(DOKUMENT_PLAN, { exact: true })).toBeVisible();
+      const entfernen = region.getByRole('button', { name: `Dokument ${DOKUMENT_FOTO} entfernen` });
+      await expect(entfernen).toHaveCount(rolle === 'admin' ? 1 : 0);
+      if (rolle === 'admin') {
+        await expect(region.getByText('Original (mit Standort)')).toBeVisible();
+      }
+
+      const ueber = await tabellenUeberlauf(region);
+      test.info().annotations.push({
+        type: 'messwert',
+        description: `Dokumente @1440 (${rolle}): ${ueber}px Tabellenüberlauf`,
+      });
+      expect(ueber, 'Dokumententabelle läuft nicht über').toBeLessThanOrEqual(1);
+      if (rolle === 'admin') {
+        await expect(entfernen, 'Papierkorb ohne Querscrollen').toBeInViewport({ ratio: 1 });
+        await entfernen.click();
+        await expect(page.getByText('Dokument entfernen?')).toBeVisible();
+      }
+    });
+  }
+
+  test('Fükw (1440 px) · admin: Aufbewahrung ohne Tabellenüberlauf', async ({ page }) => {
+    await anmelden(page);
+    // Einer mit laufender Frist (Datum in „Frist“), einer ohne.
+    for (const [bezeichnung, mitFrist] of [
+      [`E2E Brandsicherheitswache Stadtfest ${Date.now()}`, true],
+      [`E2E Sanitätsdienst Stadtlauf ${Date.now()}`, false],
+    ] as const) {
+      const id = await neuerEinsatz(page, bezeichnung);
+      await seedeJson(page, 'post', `/api/einsaetze/${id}/abschliessen`);
+      if (mitFrist) {
+        await seedeJson(page, 'put', `/api/einsaetze/${id}/aufbewahrungsfrist`, {
+          retention_bis: new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString(),
+          bestaetigt: true,
+        });
+      }
+    }
+    await page.setViewportSize(FUEKW_TABELLE);
+    await page.goto('/admin/aufbewahrung');
+    const region = page.getByRole('region', { name: 'Aufbewahrung', exact: true });
+    await expect(region.getByText(/E2E Sanitätsdienst Stadtlauf/).first()).toBeVisible();
+    // Vorbedingung: unter `xxl` weichen die drei Zustandsdaten in den Spaltenschalter.
+    await expect(region.getByRole('button', { name: 'Spalten · 3 ausgeblendet' })).toBeVisible();
+
+    const ueber = await tabellenUeberlauf(region);
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `Aufbewahrung @1440: ${ueber}px Tabellenüberlauf`,
+    });
+    expect(ueber, 'Aufbewahrungstabelle läuft nicht über').toBeLessThanOrEqual(1);
+  });
 });

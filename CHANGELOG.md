@@ -1,3 +1,59 @@
+## [1.0.0-alpha.109](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.108...v1.0.0-alpha.109) (2026-10-11)
+
+### Wichtige Änderungen
+
+Diese Version bringt umfangreiche Verbesserungen der Dokumentation und führt ein Neuigkeiten-System ein, das Sie über Änderungen zwischen Versionen informiert.
+
+### Dokumentation
+
+Die Anwenderdokumentation wurde grundlegend überarbeitet:
+
+- **Dunkelmodus-Unterstützung**: Alle Screenshots liegen jetzt in heller und dunkler Ausführung vor und werden automatisch passend zum gewählten Modus angezeigt
+- **Volltextsuche**: Neue Suchfunktion (Tastenkürzel ⌘K/Strg+K oder „/") durchsucht Kapitel und Anleitungen
+- **Verbessertes Inhaltsverzeichnis**: Einklappbare Bereiche, Anzeige der Lesestelle und geschätzten Lesezeit
+- **Optimierte Navigation**: Kapitelübersicht im Raster, dauerhafte Sprungleiste, auf Mobilgeräten klappbare Kapitelliste
+
+Die Website zeigt jetzt echte 404-Fehlerseiten für unbekannte Adressen statt der Startseite, was verhindert, dass Browser nach Updates zwischengespeicherte Inhalte falsch darstellen.
+
+### Neuigkeiten und Versionsinformationen
+
+- **Versionshinweise direkt in der Anwendung**: Nach einem Update erscheint ein Hinweis auf der Einsatzliste mit den Änderungen der neuen Version
+- **Neuigkeiten-Seite**: Zeigt alle Änderungen seit der zuletzt verwendeten Version sowie ein durchsuchbares Archiv nach Kanälen (Neue Funktionen, Verbesserungen, Fehlerbehebungen)
+- **Offline-Verfügbarkeit**: Alle Versionshinweise sind ohne Internetverbindung lesbar
+- **Intelligente Lesestandverwaltung**: Der Lesestand wird nur aktualisiert, wenn die Versionshinweise tatsächlich angezeigt werden können
+
+### Technische Grundlagen
+
+Neue Konventionen für die Codebase festgelegt: Fachbegriffe der Domäne (Einsatztagebuch, Lagekarte, Betroffene etc.) bleiben deutsch, technisches Vokabular wird künftig englisch geschrieben. Die Umstellung erfolgt schrittweise beim Bearbeiten bestehenden Codes.
+
+## [1.0.0-alpha.108](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.107...v1.0.0-alpha.108) (2026-10-11)
+
+### Hilfe und Dokumentation
+
+Die Anwenderdokumentation wurde vollständig neu gestaltet und ist jetzt sowohl auf der Website (/doku/) als auch in der App deutlich übersichtlicher:
+
+- **Website**: Übersichtsseite zeigt alle Kapitel nach Bereichen gegliedert mit Kurztext. Neue Suchfunktion und Filter nach Lesergruppe (Führungskraft, Sachbearbeiter, Administrator). Kapitelseiten mit nummerierten Schritten, Abschnittsübersicht „Auf dieser Seite" und Vor/Zurück-Navigation zwischen Kapiteln.
+
+- **App**: Hilfe-Bereich mit Navigation nach Bereichen, Suchfunktion und Übersichtskarten zu jedem Bereich. Am Ende jedes Kapitels finden Sie Vor/Zurück-Buttons zur nächsten Seite. Die Druckmappe bleibt unverändert.
+
+- **Nachtmodus**: Fotos und Screenshots werden im Dunkelmodus jetzt automatisch invertiert, sodass helle Bildschirminhalte nicht blenden.
+
+- **Tastatursteuerung**: Mit Strg+K (Windows/Linux) bzw. Cmd+K (Mac) springen Sie direkt ins Suchfeld.
+
+- **Werkzeugleiste**: Die Filter-Buttons der Übersichtsseite werden auf schmalen Bildschirmen (unter 1100 px Breite) gestapelt dargestellt und zeigen keine grauen Restbalken mehr.
+
+## [1.0.0-alpha.107](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.106...v1.0.0-alpha.107) (2026-10-11)
+
+### Verwaltung
+
+Die Übersichtstabellen für Fahrzeuge, Dokumente und Aufbewahrung wurden für den Einsatz am Führungsarbeitsplatz optimiert und passen nun ohne horizontales Scrollen auf Bildschirme mit 1440 × 900 Pixeln (typische Auflösung von Fükw-Displays).
+
+**Fahrzeuge:** Bei schmaleren Fenstern werden Kennzeichen und Träger in den Spaltenschalter ausgeblendet und können bei Bedarf eingeblendet werden. Die Besatzungsanzeige zeigt Ist- und Soll-Besatzung kompakt in einer Zeile. Sehr lange Funkrufnamen (z.B. mit Ad-hoc-Zusätzen) werden bei Bedarf umgebrochen.
+
+**Aufbewahrungsübersicht:** Bei Fensterbreiten unter 1600 Pixeln werden die Spalten „Vorgemerkt am", „Schwärzung auf Antrag ab" und „Geschwärzt am" automatisch in den Spaltenschalter ausgeblendet. Die wichtigsten Informationen zum Aufbewahrungsstatus bleiben über die Zustandsmarken sichtbar. Bei Bedarf können die zusätzlichen Spalten über den Spaltenschalter eingeblendet werden.
+
+Alle drei Tabellen verwenden nun eine einheitliche Regelung: Eine Spalte (Funkrufname, Titel oder Bezeichnung) passt sich flexibel an die verfügbare Breite an, während alle anderen Spalten feste Breiten haben. Die Schaltflächen „Entfernen" und der Papierkorb sind ohne Querscrollen erreichbar.
+
 ## [1.0.0-alpha.106](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.105...v1.0.0-alpha.106) (2026-10-11)
 
 ### Kräfte und Mittel

@@ -1,6 +1,8 @@
-/* Hilfe (LFH-1096): eine Lesespalte neben der Kapitelliste, im Instrumententafel-Stil wie die
-   Anmeldung (Flächen und Linien aus den Rollen, Radius 0). Unter 992 px steht die Liste über dem
-   Text. Druckmechanik nur in `druck/druck.css`; hier steht nur der Seitenumbruch je Kapitel. */
+/* Hilfe (LFH-1096): Aufbau wie die Doku der Website (`website/src/styles/doku.css`) im
+   Instrumententafel-Stil: Flächen und Linien aus den Rollen, Radius 0, Nummern in Mono. Links die
+   Kapitel nach Bereichen, in der Mitte der Text, ab 1200 px rechts das Inhaltsverzeichnis; unter
+   992 px liegt die Kapitelliste eingeklappt über dem Text. Druckmechanik nur in `druck/druck.css`;
+   hier steht nur, was die Hilfe im Druck anders braucht. */
 
 .hilfe-seite {
   min-height: 100vh;
@@ -9,13 +11,21 @@
   color: var(--lfh-text);
 }
 
+/* ── Kopf ───────────────────────────────────────────────────────────────── */
+
 .hilfe-kopf {
+  /* rahmen-oben: frei — die Hilfe hat keinen App-Rahmen; sie klebt am Fenster bzw. unter
+     ihrem eigenen Kopf (56 px). */
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  min-height: 56px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--lfh-linie);
   background: var(--lfh-paneel);
 }
@@ -29,7 +39,7 @@
 
 .hilfe-kopf__name {
   font-family: var(--lfh-schrift-zahl);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -48,22 +58,54 @@
   gap: 8px;
 }
 
+/* ── Raster ─────────────────────────────────────────────────────────────── */
+
 .hilfe-rumpf {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px;
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
 @media (min-width: 992px) {
   .hilfe-rumpf {
-    grid-template-columns: 260px minmax(0, 1fr);
-    gap: 24px;
-    padding: 24px;
+    grid-template-columns: 272px minmax(0, 1fr);
   }
 }
 
+@media (min-width: 1200px) {
+  .hilfe-rumpf:has(.hilfe-rand) {
+    grid-template-columns: 272px minmax(0, 1fr) 232px;
+  }
+}
+
+/* ── Navigation ─────────────────────────────────────────────────────────── */
+
 .hilfe-navi {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 16px 0;
+}
+
+@media (min-width: 992px) {
+  .hilfe-navi {
+    /* rahmen-oben: frei — die Hilfe hat keinen App-Rahmen; sie klebt am Fenster bzw. unter
+     ihrem eigenen Kopf (56 px). */
+    position: sticky;
+    top: 56px;
+    align-self: start;
+    max-height: calc(100vh - 56px);
+    max-height: calc(100dvh - 56px);
+    padding: 20px 16px 32px 20px;
+    overflow-y: auto;
+    border-right: 1px solid var(--lfh-linie);
+    scrollbar-width: thin;
+  }
+}
+
+.hilfe-navi__werkzeuge {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -73,26 +115,476 @@
   width: 100%;
 }
 
-.hilfe-navi .ant-menu {
-  border-inline-end: 0;
-  background: transparent;
+.hilfe-navi .ant-input-affix-wrapper,
+.hilfe-navi .ant-input {
+  border-radius: 0;
 }
 
-.hilfe-inhalt {
-  min-width: 0;
-  max-width: 72ch;
+.hilfe-navi__klappe {
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
 }
 
-.hilfe-kapitel + .hilfe-kapitel {
-  margin-top: 40px;
-  padding-top: 24px;
+.hilfe-navi__klappe > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.hilfe-navi__klappe > summary::after {
+  content: '+';
+  font-family: var(--lfh-schrift-zahl);
+  color: var(--lfh-text-2);
+}
+
+.hilfe-navi__klappe[open] > summary::after {
+  content: '–';
+}
+
+.hilfe-navi__klappe > .hilfe-navi__kapitel {
+  padding: 0 14px 12px;
+}
+
+.hilfe-navi__ort {
+  margin-left: auto;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--lfh-text-2);
+}
+
+.hilfe-navi__klappe > summary::-webkit-details-marker,
+.hilfe-navi__bereich > summary::-webkit-details-marker,
+.hilfe-inhaltsklappe > summary::-webkit-details-marker {
+  display: none;
+}
+
+.hilfe-navi__start {
+  display: block;
+  margin: 4px 0 8px;
+  padding: 6px 10px;
+  border-left: 1px solid var(--lfh-linie);
+  color: var(--lfh-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hilfe-navi__start[aria-current='page'],
+.hilfe-navi__liste a[aria-current='page'] {
+  padding-left: 9px;
+  border-left: 2px solid var(--lfh-bedien);
+  background: var(--lfh-flaeche-3);
+  color: var(--lfh-text);
+}
+
+.hilfe-navi__bereich {
   border-top: 1px solid var(--lfh-linie);
 }
 
-.hilfe-kapitel__titel {
-  margin: 0 0 12px;
-  font-size: 22px;
+.hilfe-navi__bereich > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lfh-text-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.hilfe-navi__bereich > summary::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.hilfe-navi__bereich[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.hilfe-navi__bereich > summary:hover {
+  color: var(--lfh-text);
+}
+
+.hilfe-navi__zahl {
+  margin-left: auto;
+  letter-spacing: 0;
+}
+
+.hilfe-navi__liste {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.hilfe-navi__liste a {
+  display: block;
+  padding: 6px 10px;
+  border-left: 1px solid var(--lfh-linie);
+  line-height: 1.35;
+  color: var(--lfh-text-2);
+  text-decoration: none;
+}
+
+.hilfe-navi__liste a:hover,
+.hilfe-navi__start:hover {
+  border-left-color: var(--lfh-text-2);
+  color: var(--lfh-text);
+}
+
+.hilfe-navi__leer {
+  margin: 8px 0;
+  color: var(--lfh-text-2);
+}
+
+/* ── Inhalt ─────────────────────────────────────────────────────────────── */
+
+.hilfe-inhalt {
+  min-width: 0;
+  padding: 20px 16px 64px;
+}
+
+@media (min-width: 992px) {
+  .hilfe-inhalt {
+    padding: 32px 40px 96px;
+  }
+}
+
+/* Der Lesetext bleibt schmal, die Übersicht nimmt die volle Breite. */
+.hilfe-druckwurzel,
+.hilfe-inhaltsklappe,
+.hilfe-blaettern {
+  max-width: 760px;
+}
+
+/* Übersicht nach Bereichen: Karten im Fugenraster, Nummer in Mono. */
+.hilfe-uebersicht {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin-bottom: 40px;
+}
+
+.hilfe-bereich__titel,
+.hilfe-mappe__titel {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 14px;
+  font-size: 20px;
   font-weight: 600;
+}
+
+.hilfe-bereich__nummer,
+.hilfe-mappe__zahl {
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--lfh-bedien-text);
+}
+
+.hilfe-mappe__titel {
+  margin: 8px 0 0;
+  padding-top: 32px;
+  border-top: 1px solid var(--lfh-linie);
+}
+
+/* Die Linie zeichnet die Zelle, nicht der Rastergrund (wie LFH-961 im Kennzahlenband): eine
+   unvollständige letzte Zeile bleibt leer statt grau. Benachbarte Linien liegen übereinander. */
+.hilfe-karten {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0 1px 1px 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .hilfe-karten {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .hilfe-karten {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.hilfe-karten > li {
+  display: flex;
+  margin: 0 -1px -1px 0;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+.hilfe-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 120px;
+  padding: 16px 18px;
+  box-shadow: inset 2px 0 0 transparent;
+  color: var(--lfh-text);
+  text-decoration: none;
+}
+
+.hilfe-karte:hover,
+.hilfe-karte:focus-visible {
+  background: var(--lfh-flaeche-3);
+  box-shadow: inset 2px 0 0 var(--lfh-bedien);
+  color: var(--lfh-text);
+}
+
+.hilfe-karte__titel {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.hilfe-karte__kurz {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lfh-text-2);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.hilfe-leer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 0;
+  color: var(--lfh-text-2);
+}
+
+/* Inhaltsverzeichnis: unter 1200 px als Klappe über dem Text, darüber am rechten Rand. */
+.hilfe-inhaltsklappe {
+  margin-bottom: 20px;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-paneel);
+}
+
+.hilfe-inhaltsklappe > summary {
+  display: flex;
+  justify-content: space-between;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 14px;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lfh-text-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.hilfe-inhaltsklappe > summary::after {
+  content: '+';
+}
+
+.hilfe-inhaltsklappe[open] > summary::after {
+  content: '–';
+}
+
+.hilfe-inhaltsklappe > .hilfe-toc {
+  padding: 0 14px 12px;
+}
+
+.hilfe-rand {
+  /* rahmen-oben: frei — die Hilfe hat keinen App-Rahmen; sie klebt am Fenster bzw. unter
+     ihrem eigenen Kopf (56 px). */
+  position: sticky;
+  top: 56px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 56px);
+  padding: 32px 20px 32px 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.hilfe-rand__titel {
+  margin: 0;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lfh-text-2);
+}
+
+.hilfe-toc {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hilfe-toc button {
+  display: block;
+  width: 100%;
+  padding: 4px 0 4px 12px;
+  border: 0;
+  border-left: 1px solid var(--lfh-linie);
+  background: none;
+  color: var(--lfh-text-2);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hilfe-toc__punkt--2 button {
+  margin-top: 8px;
+  color: var(--lfh-text);
+  font-weight: 600;
+}
+
+.hilfe-toc__punkt--2:first-child button {
+  margin-top: 0;
+}
+
+.hilfe-toc__punkt--3 button {
+  padding-left: 22px;
+}
+
+.hilfe-toc button:hover {
+  border-left-color: var(--lfh-text-2);
+  color: var(--lfh-text);
+}
+
+.hilfe-toc button[aria-current='location'] {
+  padding-left: 11px;
+  border-left: 2px solid var(--lfh-bedien);
+  color: var(--lfh-bedien-text);
+}
+
+.hilfe-toc__punkt--3 button[aria-current='location'] {
+  padding-left: 21px;
+}
+
+/* ── Kapiteltext ────────────────────────────────────────────────────────── */
+
+.hilfe-kapitel + .hilfe-kapitel {
+  margin-top: 56px;
+  padding-top: 32px;
+  border-top: 1px solid var(--lfh-linie);
+}
+
+.hilfe-kapitel__bereich {
+  margin: 0 0 8px;
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lfh-text-2);
+}
+
+.hilfe-kapitel__titel {
+  margin: 0 0 20px;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.hilfe-kapitel .markdown {
+  font-size: 15px;
+  line-height: 1.7;
+  counter-reset: abschnitt;
+}
+
+/* Abschnitte (`##`, gerendert als `.md-h2`) nummeriert mit Linie darüber, wie auf der Website. */
+.hilfe-kapitel .markdown .md-h2 {
+  counter-increment: abschnitt;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 40px 0 14px;
+  padding-top: 20px;
+  border-top: 1px solid var(--lfh-linie);
+  font-size: 21px;
+  font-weight: 600;
+  scroll-margin-top: 72px;
+}
+
+.hilfe-kapitel .markdown .md-h2::before {
+  content: counter(abschnitt, decimal-leading-zero);
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--lfh-bedien-text);
+}
+
+.hilfe-kapitel .markdown .md-h3 {
+  margin: 28px 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+  scroll-margin-top: 72px;
+}
+
+/* Abläufe: nummerierte Schritte mit Zähler in Mono und Faden, wie auf der Website. */
+.hilfe-kapitel ol {
+  counter-reset: schritt;
+  list-style: none;
+  padding: 0;
+}
+
+.hilfe-kapitel ol > li {
+  counter-increment: schritt;
+  position: relative;
+  min-height: 28px;
+  padding-left: 44px;
+}
+
+.hilfe-kapitel ol > li + li {
+  margin-top: 14px;
+}
+
+.hilfe-kapitel ol > li::before {
+  content: counter(schritt);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lfh-steuer-rahmen);
+  background: var(--lfh-grund);
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hilfe-kapitel ol > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 28px;
+  bottom: -14px;
+  left: 14px;
+  width: 1px;
+  background: var(--lfh-linie);
 }
 
 .hilfe-druckkopf {
@@ -101,18 +593,70 @@
 }
 
 /* Bildschirmfotos der Kapitel (LFH-1128): Breite aus `.markdown img` (nie breiter als die
-   Lesespalte), dazu ein Rahmen, weil das helle Foto sonst auf hellem Grund zerfließt; Radius 0
-   wie die übrige App. Ohne Netz und ohne Cache zeigt der Browser den Alt-Text an seiner Stelle.
+   Lesespalte), dazu ein Rahmen; Radius 0 wie die übrige App. Im Nachtbetrieb zeigt `HilfeBild`
+   die dunkle Aufnahme. Ohne Netz und ohne Cache zeigt der Browser den Alt-Text an seiner Stelle.
    Im Druck gelten Breite und Umbruch aus `druck/druck.css` (Bilder in der Druckwurzel). */
 .hilfe-bild {
   display: block;
-  margin: 8px 0;
+  margin: 12px 0 16px;
   border: 1px solid var(--lfh-linie);
   border-radius: 0;
+  background: var(--lfh-paneel);
 }
 
 .hilfe-bild--fehlt {
   padding: 8px;
+  color: var(--lfh-text-2);
+}
+
+/* ── Blättern ───────────────────────────────────────────────────────────── */
+
+.hilfe-blaettern {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin-top: 48px;
+  border: 1px solid var(--lfh-linie);
+  background: var(--lfh-linie);
+}
+
+@media (min-width: 640px) {
+  .hilfe-blaettern {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.hilfe-blaettern > span {
+  background: var(--lfh-grund);
+}
+
+.hilfe-blaettern__link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 76px;
+  padding: 14px 16px;
+  background: var(--lfh-paneel);
+  color: var(--lfh-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hilfe-blaettern__link:hover {
+  background: var(--lfh-flaeche-3);
+  color: var(--lfh-text);
+}
+
+.hilfe-blaettern__link--weiter {
+  text-align: right;
+}
+
+.hilfe-blaettern__richtung {
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--lfh-text-2);
 }
 
@@ -121,5 +665,9 @@
     margin-top: 0;
     padding-top: 0;
     border-top: 0;
+  }
+
+  .hilfe-druckwurzel {
+    max-width: none;
   }
 }

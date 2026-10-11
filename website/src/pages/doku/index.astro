@@ -1,53 +1,205 @@
 ---
 /**
- * Übersicht der Anwenderdokumentation (LFH-1096) nach Lesergruppen. Die Kapitel kommen aus
- * `docs/anwender/kapitel/` (Content-Collection `kapitel`), dieselben wie in der App.
+ * Übersicht der Anwenderdokumentation (LFH-1096). Die Kapitel kommen aus
+ * `docs/anwender/kapitel/` (Content-Collection `kapitel`), dieselben wie in der App. Gruppiert nach
+ * Bereichen (Hunderterblöcke der `reihenfolge`). Oben die Suche (`components/DokuSuche.astro`)
+ * und die Eckzahlen, darunter eine stehende Leiste mit Sprüngen zu den Bereichen und dem Filter
+ * nach Lesergruppe. Der Filter läuft im Browser über `data-*`; ohne Skript zeigt die Seite alles.
  */
 import { getCollection } from 'astro:content';
 import Grundriss from '../../layouts/Grundriss.astro';
 import { GRUPPEN } from '../../daten/gruppen';
+import { BEREICHE, bereichVon, kurztext } from '../../daten/bereiche';
 import '../../styles/doku.css';
 
 const kapitel = (await getCollection('kapitel')).sort(
   (a, b) => a.data.reihenfolge - b.data.reihenfolge,
 );
+
+const bereiche = BEREICHE.map((name, index) => ({
+  name,
+  nummer: String(index).padStart(2, '0'),
+  kapitel: kapitel
+    .filter((k) => bereichVon(k.data.reihenfolge) === name)
+    .map((k) => ({
+      id: k.id,
+      titel: k.data.titel,
+      gruppen: k.data.gruppen,
+      kurz: kurztext(k.body ?? ''),
+    })),
+})).filter((b) => b.kapitel.length > 0);
+
+/** Abläufe = `###` unter `## Abläufe`; Bilder = Verweise `![…](…)`. */
+function zaehle(text: string) {
+  const ablaeufe = /(?:^|\n)## Abläufe\n([\s\S]*?)(?=\n## |$)/.exec(text)?.[1] ?? '';
+  return {
+    ablaeufe: (ablaeufe.match(/^### /gm) ?? []).length,
+    bilder: (text.match(/!\[[^\]]*\]\(/g) ?? []).length,
+  };
+}
+const summe = kapitel
+  .map((k) => zaehle(k.body ?? ''))
+  .reduce((a, b) => ({ ablaeufe: a.ablaeufe + b.ablaeufe, bilder: a.bilder + b.bilder }), {
+    ablaeufe: 0,
+    bilder: 0,
+  });
+const eckzahlen = [
+  { zahl: kapitel.length, wort: 'Kapitel' },
+  { zahl: summe.ablaeufe, wort: 'Abläufe in Schritten' },
+  { zahl: summe.bilder, wort: 'Bildschirmfotos, hell und dunkel' },
+  { zahl: bereiche.length, wort: 'Bereiche' },
+];
+
+const filter = GRUPPEN.filter((g) => g.key !== 'alle');
+const gruppenNamen = Object.fromEntries(GRUPPEN.map((g) => [g.key, g.name]));
 ---
 
 <Grundriss
   titel="Anwenderdokumentation · Lifeline Hub"
-  beschreibung="Wie Lifeline Hub im Einsatz arbeitet: Anmelden, Arbeiten ohne Netz, Gerät verloren."
+  beschreibung="Wie Lifeline Hub im Einsatz arbeitet: Anmelden, Arbeiten ohne Netz, Gerät verloren. Kapitel mit Schritten, Bildern und Hintergrund."
 >
-  <section class="abschnitt">
-    <header class="abschnitt-kopf">
-      <h1 class="ueberschrift">Anwenderdokumentation</h1>
-      <p class="lauftext">
-        Abläufe in Schritten mit Bild und das Wissen, das die Oberfläche nicht zeigt: Folgen,
-        Sonderlagen und Rechte. Dieselben Kapitel stehen in der App unter „Hilfe“, dort im Stand
-        der eigenen Installation; hier steht der Stand der Entwicklung.
-      </p>
-    </header>
-    <div class="doku-gruppen fugenraster">
-      {
-        GRUPPEN.map((g) => {
-          const liste = kapitel.filter((k) => k.data.gruppen.includes(g.key));
-          return (
-            <section class="doku-gruppe">
-              <h2 class="doku-gruppe__titel">{g.name}</h2>
-              {liste.length === 0 ? (
-                <p class="lauftext">Noch keine Kapitel.</p>
-              ) : (
-                <ul class="doku-liste">
-                  {liste.map((k) => (
-                    <li>
-                      <a href={`/doku/${k.id}/`}>{k.data.titel}</a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })
-      }
+  <section class="doku-held" aria-labelledby="doku-titel">
+    <div class="doku-held__innen">
+      <div class="doku-held__text">
+        <p class="doku-label doku-label--marke">Anwenderdokumentation</p>
+        <h1 class="doku-held__titel" id="doku-titel">Wie Lifeline Hub im Einsatz arbeitet</h1>
+        <p class="doku-held__einleitung">
+          Abläufe in Schritten, mit Bildschirmfoto, und das Wissen, das die Oberfläche nicht zeigt:
+          Folgen, Sonderlagen und Rechte. Dieselben Kapitel stehen in der App unter „Hilfe“, dort im
+          Stand der eigenen Installation; hier steht der Stand der Entwicklung.
+        </p>
+        <button class="doku-suchfeld doku-suchfeld--gross" type="button" data-such-oeffnen>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.75"
+            ></circle>
+            <path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.75"></path>
+          </svg>
+          <span>Kapitel und Abläufe durchsuchen</span>
+          <kbd class="mono" data-such-kuerzel>⌘K</kbd>
+        </button>
+        <div class="doku-filter-zeile">
+          <span class="doku-label">Für</span>
+          <div class="doku-filter" role="group" aria-label="Für welche Lesergruppe">
+            <button type="button" data-gruppe="" aria-pressed="true">Alle</button>
+            {
+              filter.map((g) => (
+                <button type="button" data-gruppe={g.key} aria-pressed="false">
+                  {g.name}
+                </button>
+              ))
+            }
+          </div>
+          <span class="doku-stand mono" aria-live="polite" data-stand></span>
+        </div>
+      </div>
+      <dl class="doku-eckzahlen fugenraster">
+        {
+          eckzahlen.map((e) => (
+            <div class="doku-eckzahl">
+              <dt class="doku-eckzahl__wort">{e.wort}</dt>
+              <dd class="doku-eckzahl__zahl mono">{e.zahl}</dd>
+            </div>
+          ))
+        }
+      </dl>
     </div>
   </section>
+
+  <div class="doku-leiste">
+    <div class="doku-leiste__innen">
+      <nav class="doku-sprung" aria-label="Bereiche">
+        {
+          bereiche.map((b) => (
+            <a href={`#bereich-${b.nummer}`} data-sprung={b.nummer}>
+              {b.name}
+              <span class="mono">{b.kapitel.length}</span>
+            </a>
+          ))
+        }
+      </nav>
+    </div>
+  </div>
+
+  <div class="doku-bereiche">
+    {
+      bereiche.map((b) => (
+        <section
+          class="doku-bereich"
+          id={`bereich-${b.nummer}`}
+          data-bereich={b.nummer}
+          aria-labelledby={`bereich-${b.nummer}-titel`}
+        >
+          <h2 class="doku-bereich__titel" id={`bereich-${b.nummer}-titel`}>
+            <span class="mono doku-bereich__nummer">{b.nummer}</span>
+            {b.name}
+          </h2>
+          <ul class="doku-karten">
+            {b.kapitel.map((k) => (
+              <li data-gruppen={k.gruppen.join(' ')}>
+                <a class="doku-karte" href={`/doku/${k.id}/`}>
+                  <span class="doku-karte__titel">{k.titel}</span>
+                  {k.kurz && <span class="doku-karte__kurz">{k.kurz}</span>}
+                  <span class="doku-karte__fuss mono">
+                    {k.gruppen.map((g) => gruppenNamen[g]).join(' · ')}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
 </Grundriss>
+
+<script>
+  const knoepfe = document.querySelectorAll<HTMLButtonElement>('[data-gruppe]');
+  const eintraege = document.querySelectorAll<HTMLElement>('[data-gruppen]');
+  const bereiche = document.querySelectorAll<HTMLElement>('[data-bereich]');
+  const spruenge = document.querySelectorAll<HTMLAnchorElement>('[data-sprung]');
+  const stand = document.querySelector<HTMLElement>('[data-stand]');
+
+  function filtere(gruppe: string) {
+    let sichtbar = 0;
+    eintraege.forEach((li) => {
+      const zeigen = !gruppe || (li.dataset.gruppen ?? '').split(' ').includes(gruppe);
+      li.hidden = !zeigen;
+      if (zeigen) sichtbar += 1;
+    });
+    bereiche.forEach((b) => {
+      const leer = [...b.querySelectorAll<HTMLElement>('[data-gruppen]')].every((li) => li.hidden);
+      b.hidden = leer;
+      const sprung = document.querySelector<HTMLElement>(`[data-sprung="${b.dataset.bereich}"]`);
+      if (sprung) sprung.hidden = leer;
+    });
+    knoepfe.forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.gruppe === gruppe)));
+    if (stand) stand.textContent = gruppe ? `${sichtbar} von ${eintraege.length} Kapiteln` : '';
+  }
+
+  knoepfe.forEach((knopf) => knopf.addEventListener('click', () => filtere(knopf.dataset.gruppe ?? '')));
+
+  // Der Sprung des Bereichs, in dem die Lesenden gerade sind, ist hervorgehoben.
+  let geplant = false;
+  function markiere() {
+    geplant = false;
+    let aktuell = '';
+    bereiche.forEach((b) => {
+      if (!b.hidden && b.getBoundingClientRect().top < 180) aktuell = b.dataset.bereich ?? '';
+    });
+    spruenge.forEach((a) => {
+      if (a.dataset.sprung === aktuell) a.setAttribute('aria-current', 'location');
+      else a.removeAttribute('aria-current');
+    });
+  }
+  addEventListener(
+    'scroll',
+    () => {
+      if (!geplant) {
+        geplant = true;
+        requestAnimationFrame(markiere);
+      }
+    },
+    { passive: true },
+  );
+  markiere();
+</script>

@@ -814,6 +814,8 @@ export const GLOBAL_KEYS = {
   authProvider: 'auth-provider',
   // Präferenzen des ANGEMELDETEN Benutzers.
   benutzerEinstellungen: 'benutzer-einstellungen',
+  // Versionsstand der Instanz und Lesestand der Neuigkeiten (Spec `versionsstand`).
+  versionsstand: 'versionsstand',
   // Laufende Sitzungen (LFH-1092): die eigenen und die einer Person für den Admin.
   sitzungen: 'sitzungen',
   // Stand der Demo-Daten der eigenen Organisation, nur für den System-Admin; 404 heißt „nicht
@@ -964,6 +966,7 @@ export const globalKeys = {
    */
   benutzerEinstellungenVon: (benutzerId: number | null) =>
     [GLOBAL_KEYS.benutzerEinstellungen, benutzerId] as const,
+  versionsstand: () => [GLOBAL_KEYS.versionsstand] as const,
 
   // Karte: barer Prefix (invalidiereKarte trifft alle sieben Bereiche) + adressierter Bereich.
   datentraeger: () => [GLOBAL_KEYS.datentraeger] as const,
@@ -1044,6 +1047,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
   GLOBAL_KEYS.benutzerEinstellungen,
+  GLOBAL_KEYS.versionsstand,
   GLOBAL_KEYS.sitzungen,
   GLOBAL_KEYS.adminKarte,
   GLOBAL_KEYS.karteConfig,

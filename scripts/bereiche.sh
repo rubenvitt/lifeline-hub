@@ -31,6 +31,10 @@ bereiche_von() {
     # (zeichenWerte.guard.test.ts, LFH-836).
     src/karte/quellen.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json)
       echo "rust frontend e2e" ;;
+    # Das Frontend bindet die CHANGELOG.md als Neuigkeiten ein (vite.config.ts, neuigkeiten/);
+    # e2e liest sie für den Versionshinweis (e2e/neuigkeiten.spec.ts). Steht vor `*.md` unten.
+    CHANGELOG.md)
+      echo "frontend e2e" ;;
     # Das Frontend bündelt die Anwenderdokumentation als Hilfe (vite.config.ts, hilfe/kapitel.ts);
     # Vitest und e2e lesen die Kapitel. Steht vor der Doku-Regel, die Markdown sonst ausnimmt.
     docs/anwender/*)

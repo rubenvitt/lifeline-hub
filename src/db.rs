@@ -5069,7 +5069,7 @@ mod tests {
     // der Index sind dieselben, CASCADE und SET NULL wirken weiter, und der CHECK verlangt genau
     // eine Form — Zeichenbeschreibung oder Grundzeichen.
     #[tokio::test]
-    async fn migration_0175_freies_zeichen_rebuild_erhaelt_bestand_und_verlangt_genau_eine_form() {
+    async fn migration_0176_freies_zeichen_rebuild_erhaelt_bestand_und_verlangt_genau_eine_form() {
         use sqlx::migrate::Migrator;
         use std::borrow::Cow;
 
