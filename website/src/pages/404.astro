@@ -1,0 +1,23 @@
+---
+/**
+ * Seite für unbekannte Adressen. Cloudflare Pages liefert sie mit Status 404 aus, sobald es eine
+ * `404.html` gibt. Ohne sie beantwortet Pages jede unbekannte Adresse mit der Startseite und
+ * Status 200, auch eine Stylesheet-Adresse: ein Browser, der während eines Rollouts eine neue
+ * CSS-Datei zu früh anfragt, bekäme HTML, verwürfe es wegen `nosniff` und hielte die Antwort bis
+ * zu vier Stunden im Cache. Die Seite stünde so lange ohne Gestaltung da (website/AGENTS.md).
+ */
+import Grundriss from '../layouts/Grundriss.astro';
+---
+
+<Grundriss titel="Seite nicht gefunden · Lifeline Hub" beschreibung="Diese Adresse gibt es nicht.">
+  <section class="abschnitt">
+    <header class="abschnitt-kopf">
+      <p class="mono" style="margin:0;color:var(--lfh-gedaempft)">404</p>
+      <h1 class="ueberschrift">Seite nicht gefunden</h1>
+      <p class="lauftext">Diese Adresse gibt es nicht oder nicht mehr.</p>
+      <p class="lauftext">
+        <a href="/">Zur Startseite</a> · <a href="/doku/">Zur Anwenderdokumentation</a>
+      </p>
+    </header>
+  </section>
+</Grundriss>
