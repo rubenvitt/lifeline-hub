@@ -1,7 +1,12 @@
 import { drawAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
-import type { AnySpec, SymbolSpec, TechnicalFillToken } from '@einsatzzeichen/schema';
+import { PALETTE, type AnySpec, type SymbolSpec, type TechnicalFillToken } from '@einsatzzeichen/schema';
 import { describe, expect, it } from 'vitest';
-import { freiesZeichen, naechstesFarbtoken, type FreiesZeichenEingabe } from './freiesZeichen';
+import {
+  freiesZeichen,
+  fuellfarbe,
+  naechstesFarbtoken,
+  type FreiesZeichenEingabe,
+} from './freiesZeichen';
 
 // Abbildung der Alt-Kennungen freier Zeichen (Katalog taktische-zeichen-core 0.10) auf
 // @einsatzzeichen 5.2 (LFH-836, openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/design.md D5,
@@ -845,5 +850,16 @@ describe('freiesZeichen — gespeicherte Spec (zeichen_spec)', () => {
   it('nimmt null und leeren String wie fehlend', () => {
     pruefe({ zeichen_spec: null, grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');
     pruefe({ zeichen_spec: '', grundzeichen: 'gefahr' }, { kind: 'hazard' }, 'exakt');
+  });
+});
+
+describe('fuellfarbe — Palettenfarbe einer wirksamen Spec (D6)', () => {
+  it('liefert die Palettenfarbe der technischen Füllung', () => {
+    expect(fuellfarbe({ kind: 'hazard', technicalFill: 'rot' })).toBe(PALETTE.rot);
+  });
+
+  it('ist null ohne Füllung und für freistehende Zeichen', () => {
+    expect(fuellfarbe({ kind: 'hazard' })).toBeNull();
+    expect(fuellfarbe({ kind: 'pictogram', pictogram: 'capability.lighting' })).toBeNull();
   });
 });

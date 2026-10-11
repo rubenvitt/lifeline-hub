@@ -312,6 +312,15 @@ export function naechstesFarbtoken(hex: string): TechnicalFillToken | null {
   return bestes;
 }
 
+/**
+ * Die Palettenfarbe der technischen Füllung einer wirksamen Spec (D6), sonst `null` — ohne
+ * Füllung trägt das Zeichen keine eigene Farbe. Für Markerfarbe und Kachelrahmen im Inspector.
+ */
+export function fuellfarbe(spec: AnySpec): string | null {
+  if (isFreestandingSpec(spec)) return null;
+  return spec.technicalFill ? PALETTE[spec.technicalFill] : null;
+}
+
 function ohneDoppel<T>(liste: readonly T[]): T[] {
   return [...new Set(liste)];
 }

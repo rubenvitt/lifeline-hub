@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { theme } from 'antd';
 import { http, HttpResponse } from 'msw';
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, dehydrate, hydrate } from '@tanstack/react-query';
+import { PALETTE } from '@einsatzzeichen/schema';
 import type { ReactNode } from 'react';
 import { server } from '../../test/server';
 import { neuerQueryClient } from '../../test/utils';
 import { gefahrengebietStil } from './zonenStil';
 import { freigabenFixture } from '../../test/fixtures';
 import type { ModulFreigabe } from '../../api/types';
+import { freiesZeichen } from '../../zeichen/freiesZeichen';
+import { baueZeichenRegistry, markerIconKey } from './markerIcons';
 
 // darfSchreiben wird im Snapshot-Modus hart auf false gefahren → benutzer egal.
 vi.mock('../../auth/AuthContext', () => ({
@@ -953,5 +956,74 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     handler({}, () => new HttpResponse(null, { status: 500 }));
     const { result } = render();
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Schäden']));
+  });
+});
+
+/**
+ * LFH-836, Aufgabe 3.4 (design.md D5): Lage-Snapshots und Offline-Stände behalten freie Zeichen im
+ * Altformat. Beide zeichnen über den Leseadapter nach der neuen Darstellung (`ez|`), nicht über
+ * das Altpaket.
+ */
+describe('useLagekarteDaten freie Zeichen im Altformat (LFH-836)', () => {
+  const ALTZEICHEN = {
+    id: 3,
+    einsatz_id: 5,
+    lat: 50.1,
+    lon: 8.6,
+    grundzeichen: 'gefahr',
+    organisation: null,
+    fachaufgabe: null,
+    symbol: 'abc',
+    einheit: null,
+    funktion: null,
+    farbe: '#cc0000',
+    label: 'Leck',
+    ansicht_id: null,
+    erstellt_von: 1,
+    erstellt_at: '2026-07-24 08:00:00',
+    geaendert_at: '2026-07-24 08:00:00',
+  };
+  const erwartet = freiesZeichen(ALTZEICHEN);
+
+  it('ein eingefrorener Snapshot mit Altfeldern zeichnet nach neuer Darstellung', async () => {
+    const dok = dokument('keine');
+    ladeLageSnapshot.mockResolvedValue({
+      ...dok,
+      daten: { ...dok.daten, freie_zeichen: [ALTZEICHEN] },
+    });
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() =>
+      expect(result.current.alleVerortet.some((m) => m.typ === 'freies_zeichen')).toBe(true),
+    );
+    const marker = result.current.alleVerortet.find((m) => m.schluessel === 'freies_zeichen-3')!;
+    expect(erwartet.schluessel.startsWith('ez|')).toBe(true);
+    expect(markerIconKey(marker)).toBe(erwartet.schluessel);
+    // Rote Gefahr aus dem Altbestand: Palettenrot (D6), nicht die alte Hexfarbe.
+    expect(marker.farbe).toBe(PALETTE.rot);
+    expect(baueZeichenRegistry([marker]).get(erwartet.schluessel)).toBe(erwartet.drawing);
+  });
+
+  it('ein Offline-Stand mit Altfeldern zeichnet ebenso', async () => {
+    server.use(http.get('/api/einsaetze/5/freie-zeichen', () => HttpResponse.error()));
+    // Der wiederhergestellte Stand (LFH-723): ein eigener Client, sonst räumt `gcTime: 0` ihn ab.
+    const quelle = new QueryClient();
+    quelle.setQueryData(['einsatz-freie-zeichen', 5], [ALTZEICHEN]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    hydrate(client, dehydrate(quelle));
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() =>
+      expect(result.current.alleVerortet.some((m) => m.typ === 'freies_zeichen')).toBe(true),
+    );
+    const marker = result.current.alleVerortet.find((m) => m.schluessel === 'freies_zeichen-3')!;
+    expect(markerIconKey(marker)).toBe(erwartet.schluessel);
+    expect(baueZeichenRegistry([marker]).get(erwartet.schluessel)).toBe(erwartet.drawing);
   });
 });
