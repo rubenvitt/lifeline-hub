@@ -47,11 +47,8 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
       .click();
     const termin = page.getByRole('textbox', { name: 'Nächste Lagebesprechung', exact: true });
     await termin.fill('2099-09-09 15:17:43');
-    // Enter übernimmt den Pickerwert; „Speichern“ sendet die Zeile.
+    // Enter übernimmt den Pickerwert und sendet die Zeile (wie die Alarmzeit, LFH-472).
     await termin.press('Enter');
-    await page
-      .getByRole('button', { name: 'Nächste Lagebesprechung speichern', exact: true })
-      .click();
     await expect(
       page.getByRole('button', { name: 'Nächste Lagebesprechung bearbeiten', exact: true }),
     ).toBeVisible();
