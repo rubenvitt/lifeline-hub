@@ -221,10 +221,10 @@ export default function EinsatzabschnittePage() {
    * bleibt unberührt, `reset()` hängte ihr Ergebnis ab. Ref, damit der Effekt beim Wechsel die
    * AKTUELLE Mutation räumt, ohne je Render neu zu laufen.
    */
-  const aufloesenRef = useRef(aufloesen);
-  aufloesenRef.current = aufloesen;
-  const raeumeDetail = useCallback(() => {
-    const m = aufloesenRef.current;
+  const aufloesenMutationRef = useRef(aufloesen);
+  aufloesenMutationRef.current = aufloesen;
+  const clearDetailError = useCallback(() => {
+    const m = aufloesenMutationRef.current;
     if (!m.isPending && m.error != null) m.reset();
   }, []);
 
@@ -232,11 +232,11 @@ export default function EinsatzabschnittePage() {
   // anderer Arbeitsplatz den Abschnitt aufgelöst hat. Offene Zeilen räumt `key` am Detail.
   const aktuellId = aktuell?.id;
   useEffect(() => {
-    raeumeDetail();
-  }, [aktuellId, raeumeDetail]);
+    clearDetailError();
+  }, [aktuellId, clearDetailError]);
 
   function openAnlegen() {
-    raeumeDetail();
+    clearDetailError();
     setIsAnlegenOpen(true);
     setzeAnsicht('gliederung');
   }
@@ -483,7 +483,7 @@ export default function EinsatzabschnittePage() {
                 {darfSchreiben && (
                   // Rot, abgesetzt, mit Rückfrage (LFH-363): Auflösen ist unumkehrbar.
                   <div style={{ marginTop: token.marginLG }}>
-                    <DetailFehler fehler={aufloesen.error} />
+                    <DetailError error={aufloesen.error} />
                     <Popconfirm
                       title="Abschnitt auflösen?"
                       description={
@@ -492,7 +492,7 @@ export default function EinsatzabschnittePage() {
                       okText="Abschnitt auflösen"
                       okButtonProps={{ danger: true }}
                       onConfirm={() => {
-                        raeumeDetail();
+                        clearDetailError();
                         aufloesen.mutate(aktuell.id);
                       }}
                     >
@@ -524,12 +524,12 @@ export default function EinsatzabschnittePage() {
 }
 
 /** Grund eines abgelehnten Auflösens im Detailpaneel, über dem Knopf (LFH-1077). */
-function DetailFehler({ fehler }: { fehler: unknown }) {
+function DetailError({ error }: { error: unknown }) {
   const { token } = useRollen();
-  if (fehler == null) return null;
+  if (error == null) return null;
   return (
     <div style={{ marginBottom: token.marginSM }}>
-      <SpeicherFehler fehler={fehler} titel="Nicht aufgelöst" fallback="Auflösen fehlgeschlagen" />
+      <SpeicherFehler fehler={error} titel="Nicht aufgelöst" fallback="Auflösen fehlgeschlagen" />
     </div>
   );
 }
