@@ -8,7 +8,9 @@ import { baueZeichenRegistry, kartenPixelRatio, markerIconKey } from './markerIc
 // Fachobjekte und freie Zeichen hinweg.
 describe('markerIconKey', () => {
   it('nimmt für ein freies Zeichen den Schlüssel des Leseadapters', () => {
-    const z = { zeichen_spec: serializeAnySpec({ kind: 'pictogram', pictogram: 'capability.lighting' }) };
+    const z = {
+      zeichen_spec: serializeAnySpec({ kind: 'pictogram', pictogram: 'capability.lighting' }),
+    };
     expect(markerIconKey({ typ: 'freies_zeichen', freiesZeichen: z })).toBe(
       freiesZeichen(z).schluessel,
     );

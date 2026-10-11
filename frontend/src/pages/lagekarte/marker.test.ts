@@ -374,7 +374,16 @@ describe('baueFreieZeichenMarker', () => {
   it('baut Karten-Marker mit stabilem Schlüssel, Typ und dem gespeicherten Zeichen', () => {
     const zeichen_spec = serializeAnySpec({ kind: 'hazard', technicalFill: 'gelb' });
     const marker = baueFreieZeichenMarker(
-      [freiesZeichen({ id: 7, lat: 50.1, lon: 8.1, grundzeichen: null, zeichen_spec, label: 'Sammelplatz' })],
+      [
+        freiesZeichen({
+          id: 7,
+          lat: 50.1,
+          lon: 8.1,
+          grundzeichen: null,
+          zeichen_spec,
+          label: 'Sammelplatz',
+        }),
+      ],
       token,
     );
     expect(marker).toHaveLength(1);
@@ -395,7 +404,11 @@ describe('baueFreieZeichenMarker', () => {
       [freiesZeichen({ grundzeichen: 'gefahr', symbol: 'abc', farbe: '#cc0000' })],
       token,
     );
-    expect(m.freiesZeichen).toMatchObject({ grundzeichen: 'gefahr', symbol: 'abc', farbe: '#cc0000' });
+    expect(m.freiesZeichen).toMatchObject({
+      grundzeichen: 'gefahr',
+      symbol: 'abc',
+      farbe: '#cc0000',
+    });
     // Alt-Hex an der Gefahr → Palettenrot.
     expect(m.farbe).toBe(PALETTE.rot);
   });

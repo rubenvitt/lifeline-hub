@@ -35,11 +35,7 @@ import {
   SPIDER_CAP,
   type SpiderProjektor,
 } from './spiderfy';
-import {
-  baueZeichenRegistry,
-  kartenPixelRatio,
-  ZEICHEN_KARTEN_PX,
-} from './markerIcons';
+import { baueZeichenRegistry, kartenPixelRatio, ZEICHEN_KARTEN_PX } from './markerIcons';
 import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
 import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';

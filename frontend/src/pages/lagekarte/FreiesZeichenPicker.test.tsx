@@ -232,6 +232,15 @@ describe('FreiesZeichenPicker — Piktogramm ohne Grundzeichen', () => {
     });
   });
 
+  it('blendet nach „Kein Grundzeichen“ die Achsen des alten Grundzeichens unter „Details“ aus', async () => {
+    render(FORMATION);
+    expect(sichtbar('Organisation')).toBe(true);
+    await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
+    expect(sichtbar('Organisation')).toBe(false);
+    expect(sichtbar('Einheit')).toBe(false);
+    expect(sichtbar('Bezeichnung')).toBe(true);
+  });
+
   it('zeigt ein freistehendes Zeichen mit „Kein Grundzeichen“ gewählt und ohne Details außer der Bezeichnung', () => {
     render(wertAus({ kind: 'state', state: 'damaged' }));
     expect(

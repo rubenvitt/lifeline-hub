@@ -1,5 +1,10 @@
 import { drawAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
-import { PALETTE, type AnySpec, type SymbolSpec, type TechnicalFillToken } from '@einsatzzeichen/schema';
+import {
+  PALETTE,
+  type AnySpec,
+  type SymbolSpec,
+  type TechnicalFillToken,
+} from '@einsatzzeichen/schema';
 import { describe, expect, it } from 'vitest';
 import {
   freiesZeichen,

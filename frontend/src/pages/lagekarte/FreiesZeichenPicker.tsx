@@ -23,6 +23,7 @@ import {
   detailVon,
   grundzeichenOptionen,
   grundzeichenVon,
+  KEINE_DETAILS,
   leseEntwurf,
   mitDetail,
   mitGrundzeichen,
@@ -394,7 +395,8 @@ export default function FreiesZeichenPicker({
         : symbolOptionen(null),
     [koerper],
   );
-  const details = useMemo(() => detailOptionen(koerper ?? entwurf), [koerper, entwurf]);
+  // Ohne Grundzeichen (auch „Kein Grundzeichen“ vor der Symbolwahl) nur die Bezeichnung.
+  const details = useMemo(() => (koerper ? detailOptionen(koerper) : KEINE_DETAILS), [koerper]);
   const vorschau = useMemo(
     () => freiesZeichen({ zeichen_spec: wert.zeichen_spec }).drawing,
     [wert.zeichen_spec],

@@ -420,7 +420,13 @@ export interface DetailOptionen {
   farbe: (DetailOption & { farbe: string })[];
 }
 
-const KEINE_DETAILS: DetailOptionen = { organisation: [], fachaufgabe: [], einheit: [], farbe: [] };
+/** Ohne Grundzeichen gibt es unter „Details“ nur die Bezeichnung. */
+export const KEINE_DETAILS: DetailOptionen = {
+  organisation: [],
+  fachaufgabe: [],
+  einheit: [],
+  farbe: [],
+};
 const DETAILS = new Map<string, DetailOptionen>();
 
 /**
