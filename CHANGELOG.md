@@ -1,3 +1,15 @@
+## [1.0.0-alpha.105](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.104...v1.0.0-alpha.105) (2026-10-11)
+
+### Verwaltung
+
+**Einmalpasswörter für Benutzerkonten**
+
+Die Administration kann jetzt im Bearbeiten-Dialog eines Benutzerkontos ein vom System erzeugtes Einmalpasswort vergeben. Beim Vergeben werden alle aktiven Sitzungen der betroffenen Person beendet. Bei der nächsten Anmeldung mit diesem Einmalpasswort – auch nach erfolgreicher Zwei-Faktor-Authentifizierung – muss die Person sofort ein neues Passwort festlegen, bevor sie auf das System zugreifen kann.
+
+Die Vergabe von Einmalpasswörtern wird in der Administrationsspur protokolliert. Auch neu angelegte Benutzerkonten starten automatisch mit Passwort-Änderungszwang.
+
+Diese Funktion ermöglicht es, Konten nach Sicherheitsvorfällen oder bei Geräteverlust schnell abzusichern und gleichzeitig den betroffenen Personen einen kontrollierten Wiedereinstieg zu ermöglichen.
+
 ## [1.0.0-alpha.104](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.103...v1.0.0-alpha.104) (2026-10-11)
 
 ### Wichtige Änderungen
