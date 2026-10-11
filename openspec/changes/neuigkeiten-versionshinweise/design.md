@@ -48,10 +48,14 @@ Migrationslauf und vor der ersten Anfrage. Weicht `laufend` von `CARGO_PKG_VERSI
 `zuletzt_gestartet` auf den alten Wert gesetzt und `laufend` auf den neuen. `gelesen_bis` bleibt
 unberührt.
 
-**Zwei Endpunkte.** `GET /api/versionsstand` liefert laufend, zuletzt gestartet, gelesen_bis und
-die Anzahl ungelesener Einträge. `POST /api/versionsstand/gelesen` setzt `gelesen_bis` auf die
+**Zwei Endpunkte.** `GET /api/versionsstand` liefert laufend, zuletzt gestartet und gelesen_bis.
+Die Anzahl ungelesener Einträge rechnet die Oberfläche aus den Einträgen des Builds, der Server
+kennt die CHANGELOG nicht. `POST /api/versionsstand/gelesen` setzt `gelesen_bis` auf die
 laufende Version. Beide verlangen Anmeldung. Die Antwort wird in den Typ-Codegen aufgenommen;
 danach `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten.
+
+**Hinweiskarte in eigenem Chunk.** Die Karte trägt die Einträge der CHANGELOG und wird erst geladen,
+wenn eine Version ungelesen ist. Die Einsatzliste lädt die Notizen so nicht mit.
 
 **Hinweiskarte und Punkt teilen sich einen Zustand.** Das Schließen der Karte ruft denselben
 Endpunkt wie das Öffnen der Seite. Damit gilt eine Version nach einem der beiden als gelesen.

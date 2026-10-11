@@ -35,6 +35,7 @@ import { monoStil, useRollen } from '../components/instrument';
 import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
+import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
 interface AnlegeWerte {
@@ -335,6 +336,8 @@ function EinsaetzeInhalt() {
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
+      <NeuigkeitenHinweis />
+
       {/* Leer und anlegeberechtigt schließen sich nicht aus. Keine Primäraktion am Leerknoten:
           der Weg heraus ist die Anlegen-Kachel direkt darunter; ein zweiter gleich
           beschrifteter Knopf machte jede Abfrage darauf mehrdeutig. */}

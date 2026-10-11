@@ -10,13 +10,13 @@
 
 ## 2. Neuigkeiten aus CHANGELOG.md
 
-- [ ] 2.1 Vite-Plugin, das `CHANGELOG.md` liest und an den Versionsüberschriften zerlegt. Ausgabe je Eintrag: Version, Datum, Kanal, Text. Prüfung: Vitest gegen die echte Datei im Repo, mindestens ein Eintrag je Kanal, sonst Fehler.
+- [ ] 2.1 Vite-Plugin, das `CHANGELOG.md` liest und an den Versionsüberschriften zerlegt. Ausgabe je Eintrag: Version, Datum, Kanal, Text. Prüfung: Vitest gegen die echte Datei im Repo; enthält sie Alpha-Einträge. Beta fehlt, bis es Beta-Releases gibt, und wird nicht vorausgesetzt.
 - [ ] 2.2 Test zuerst: Kanal aus dem Suffix (`-alpha.N`, `-beta.N`, sonst stabil), Eintrag ohne Datum bleibt sichtbar, Überschriften in Codeblöcken werden nicht zerlegt. Prüfung: Test rot, dann grün nach 2.1.
 - [ ] 2.3 Build bricht, wenn ein Eintrag keine erkennbare Version trägt. Prüfung: Testlauf mit präparierter Datei schlägt fehl.
 
 ## 3. Oberfläche
 
-- [ ] 3.1 Startseite festlegen, auf der die Hinweiskarte erscheint. Prüfung: in der Spec-Notiz oder im Code benannt, mit Verweis auf die Route.
+- [ ] 3.1 Startseite festlegen, auf der die Hinweiskarte erscheint. Festgelegt: die Einsatzliste unter `/einsaetze`, dorthin landen Angemeldete nach dem Login. Prüfung: `NeuigkeitenHinweis` steht in `pages/EinsaetzePage.tsx`.
 - [ ] 3.2 Test zuerst: Hinweiskarte erscheint nur bei `gelesen_bis` vor der laufenden Version, zeigt die Anzahl, ist schließbar und ruft den Lesestand-Endpunkt. Prüfung: Test rot, dann grün nach 3.3.
 - [ ] 3.3 Hinweiskarte umsetzen, nicht modal, mit Link zur Neuigkeiten-Seite. Prüfung: Tests aus 3.2 grün, Playwright-Prüfung zeigt die Karte ohne Blockade des Startbildschirms.
 - [ ] 3.4 Test zuerst: Neuigkeiten-Seite zeigt den Abschnitt „Seit deiner letzten Version“ nur bei Versionswechsel, Kanalfilter, Hinweis bei leerem Beta-Kanal, Vorschau für Einträge über 20 000 Zeichen. Prüfung: Test rot, dann grün nach 3.5.

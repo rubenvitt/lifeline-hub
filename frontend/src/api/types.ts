@@ -59,6 +59,7 @@ export type StichwortVorschlag = S['StichwortVorschlag'];
  *  heißt „nie geschrieben“; der Wert ist ein opaker Text, dessen Form nur der Besitzer des
  *  Schlüssels kennt. */
 export type BenutzerEinstellungen = S['BenutzerEinstellungenAnzeige'];
+export type VersionsstandAnzeige = S['VersionsstandAnzeige'];
 
 // ============================== Karten-/Anzeige-Defaults ==============================
 export type BasemapModus = S['BasemapModus'];
