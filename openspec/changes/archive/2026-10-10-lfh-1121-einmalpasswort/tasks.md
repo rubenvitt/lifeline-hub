@@ -6,11 +6,11 @@ höchsten auf `origin/alpha`.
 
 ## 1. Datenmodell und Admin-Spur (LFH-1121)
 
-- [x] 1.1 Migration `0172_benutzer_passwort_wechsel_pflicht.sql`: neue Spalte mit Default 0 und CHECK
+- [x] 1.1 Migration `0173_benutzer_passwort_wechsel_pflicht.sql`: neue Spalte mit Default 0 und CHECK
       (0, 1), wie in design.md unter „Migration Plan“ beschrieben. Prüfung: Ein Test in `src/db.rs`
       zeigt, dass bestehende Zeilen 0 tragen und der CHECK den Wert 2 abweist.
       `scripts/check-migrationen.sh` endet grün.
-- [x] 1.2 Migration `0173_admin_audit_einmalpasswort.sql`: Neuaufbau von `admin_audit` mit
+- [x] 1.2 Migration `0174_admin_audit_einmalpasswort.sql`: Neuaufbau von `admin_audit` mit
       `'einmalpasswort_vergeben'` im CHECK, nach dem Muster von `0170`. Dazu kommen der Rebuild-Test
       neben dem von 0170 in `src/db.rs`, die neue Variante `AdminAktion::EinmalpasswortVergeben` und
       der Eintrag in `tests/enum_wire_kontrakt.rs`. Prüfung: Zuerst ist

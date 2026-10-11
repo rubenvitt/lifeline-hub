@@ -4178,8 +4178,8 @@ mod tests {
     // --- LFH-1121: Einmalpasswort (0172 Änderungszwang, 0173 Admin-Spur-CHECK) ---
 
     const MIGRATION_0172: &str =
-        include_str!("../migrations/0172_benutzer_passwort_wechsel_pflicht.sql");
-    const MIGRATION_0173: &str = include_str!("../migrations/0173_admin_audit_einmalpasswort.sql");
+        include_str!("../migrations/0173_benutzer_passwort_wechsel_pflicht.sql");
+    const MIGRATION_0173: &str = include_str!("../migrations/0174_admin_audit_einmalpasswort.sql");
 
     #[tokio::test]
     async fn migration_0172_bestandskonten_stehen_nicht_unter_aenderungszwang() {
