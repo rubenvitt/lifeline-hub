@@ -4,6 +4,7 @@ import {
   apiAlsAdmin,
   anmelden,
   demoEinsatz,
+  einsatzleiterFuellen,
   expect,
   fotografiere,
   fuehrungsstelleOrtFuellen,
@@ -69,8 +70,10 @@ async function idNachName(api: APIRequestContext, pfad: string, name: string): P
 test.describe(KAPITEL, () => {
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
-    const { id } = await demoEinsatz(api);
+    const demo = await demoEinsatz(api);
+    const { id } = demo;
     const e = `/api/einsaetze/${id}`;
+    await einsatzleiterFuellen(api, demo);
     const el = await sprechgruppe(api, id, 'TMO 311_F_EL', 'TMO');
     const san = await sprechgruppe(api, id, 'TMO 311_F_SAN', 'TMO');
     const dmo = await sprechgruppe(api, id, 'DMO 505', 'DMO');

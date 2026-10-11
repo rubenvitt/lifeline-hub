@@ -41,7 +41,6 @@ import utc from 'dayjs/plugin/utc';
 import {
   ladeEinsatz,
   ladeFuehrungsstelle,
-  ladeMitglieder,
   ladeModulFreigaben,
   patcheEinsatz,
   patcheFuehrungsstelle,
@@ -94,6 +93,8 @@ import {
   teileSprechgruppen,
 } from '../components/kommunikationsmittel';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
+import EinsatzleiterAngabe from './EinsatzleiterAngabe';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
@@ -298,6 +299,8 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
   const { token, rollen } = useRollen();
   return (
     <div
+      role="group"
+      aria-label={etikett}
       style={{
         background: rollen.flaeche,
         paddingBlock: token.paddingSM,
@@ -429,11 +432,11 @@ function gleicherStandort(a: StandortEntwurf, b: StandortEntwurf): boolean {
 
 /**
  * Eigene Führungsstelle des Einsatzes (LFH-849, Spec `einsatz-fuehrungsstelle`): die Gegenstelle
- * des Funkplans, seit LFH-1181 ein Ort mit Ausstattung. Art, Bezeichnung und Standort stehen vor
- * den Funkangaben, denn wer die Führungsstelle sucht, braucht zuerst den Ort (design.md D5). Jede
- * Zeile schickt nur ihr Feld an `…/fuehrungsstelle`, der Standort Adresse und Koordinate
- * zusammen, mit dem Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und bearbeitet
- * selbst nichts.
+ * des Funkplans, seit LFH-1181 ein Ort mit Ausstattung. Zuerst der Einsatzleiter (LFH-1199),
+ * dann Art, Bezeichnung und Standort vor den Funkangaben, denn wer die Führungsstelle sucht, braucht
+ * den Ort vor dem Funk (LFH-1181, design.md D5). Jede Zeile schickt nur ihr Feld an
+ * `…/fuehrungsstelle`, der Standort Adresse und Koordinate zusammen, mit dem Schreibrecht der
+ * Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
  */
 function FuehrungsstellePaneel({
   einsatz,
@@ -501,6 +504,17 @@ function FuehrungsstellePaneel({
         {fs && (
           <Angaben
             zeilen={[
+              {
+                etikett: 'Einsatzleiter',
+                wert: (
+                  <EinsatzleiterAngabe
+                    einsatzId={einsatzId}
+                    fs={fs}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(einsatzleiter) => speichern('Einsatzleiter', { einsatzleiter })}
+                  />
+                ),
+              },
               {
                 etikett: 'Art',
                 wert: (
@@ -927,9 +941,11 @@ export default function EinsatzdatenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const mitgliederQuery = useQuery({
-    queryKey: einsatzKeys.mitglieder(einsatzId),
-    queryFn: () => ladeMitglieder(einsatzId),
+  // Der Einsatzleiter der Kopfleiste kommt aus der Führungsstelle (LFH-1199), derselbe Key wie das
+  // Paneel; live über `einsatz`.
+  const fuehrungsstelleQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
   });
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
@@ -982,10 +998,10 @@ export default function EinsatzdatenPage() {
   // (LFH-1066, wie der Server).
   const darfBearbeiten = darfEinsatzVerwalten(einsatz, benutzer);
 
-  const leitung = (mitgliederQuery.data ?? [])
-    .filter((m) => m.einsatz_rolle === 'einsatzleitung')
-    .map((m) => m.anzeigename)
-    .join(', ');
+  const einsatzleiter = einsatzleiterDarstellung({
+    zustand: abrufZustand(fuehrungsstelleQuery),
+    daten: fuehrungsstelleQuery.data ?? null,
+  });
 
   const darfVerwaltenMitglieder = darfEinsatzLeiten(einsatz);
   // Aktiver Einsatz und Einsatzleitung (oder Admin); nach dem Abschluss fällt der Abschnitt weg.
@@ -1203,7 +1219,21 @@ export default function EinsatzdatenPage() {
                 />
               }
             />
-            <KopfAngabe etikett="Einsatzleitung" wert={leitung || '—'} />
+            {/* Der Einsatzleiter der Führungsstelle, nie die App-Rolle `einsatzleitung`: sie ist
+                ein Rechtebündel, kein Einsatzleiter nach FwDV 100 (LFH-1199, Regel „Keine
+                erfundenen Daten“). Gepflegt wird er im Paneel „Eigene Führungsstelle“. */}
+            <KopfAngabe
+              etikett="Einsatzleitung"
+              wert={
+                einsatzleiter.art === 'erfasst' ? (
+                  einsatzleiterKurz(einsatzleiter)
+                ) : (
+                  <span style={{ color: rollen.gedaempft }}>
+                    {einsatzleiterKurz(einsatzleiter)}
+                  </span>
+                )
+              }
+            />
           </div>
 
           <Paneel titel="Lagedaten">

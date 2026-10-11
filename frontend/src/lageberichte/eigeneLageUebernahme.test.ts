@@ -124,6 +124,8 @@ const ORG = (
     stand: STAND,
     stab: STAB.besetzung,
     einheitenZustand: 'daten',
+    einsatzleiter: { art: 'nicht-erfasst' },
+    dtg,
     ...opts,
   });
 
@@ -162,6 +164,31 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     );
   });
 
+  it('nennt den Einsatzleiter der Führungsstelle (LFH-1199)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
+      sprechgruppen: [],
+      fahrzeug_ids: [],
+      einsatzleiter: {
+        art: 'personal',
+        name: 'Anna Schulz',
+        personal_id: 3,
+        personal_noch_disponiert: true,
+        seit: '2026-10-11 12:30:00',
+      },
+    });
+    const text = await erzeuge();
+    expect(text).toContain('## Einsatzleitung\n\n- Einsatzleiter: Anna Schulz (seit STAND)\n');
+    expect(text).not.toContain('Leitung nicht erfasst');
+  });
+
+  it('nennt eine Führungsstelle, die nicht lädt, mit Grund statt „nicht erfasst“', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new Error('500'));
+    const text = await erzeuge();
+    expect(text).toContain('- Einsatzleiter: nicht geladen\n');
+    expect(text).not.toContain('Leitung nicht erfasst');
+  });
+
   it('sagt ohne Stab-Freigabe kein Wort über den Stab und ruft ihn nicht ab', async () => {
     const text = await erzeuge(freigabenFixture({ stab: { sichtbar: false } }));
     expect(ladeStab).not.toHaveBeenCalled();
@@ -183,8 +210,11 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     );
     expect(text).toContain('- Führungsstelle ELW 2 Musterstadt · Rufname Florian 10/1\n');
 
+    // Gescheitert: keine Zeile der Führungsstelle, die Leitung nennt den Grund (LFH-1199).
     vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new Error('500'));
-    expect(await erzeuge()).toBe(`${MELDEBILD()}\n${ORG()}`);
+    expect(await erzeuge()).toBe(
+      `${MELDEBILD()}\n${ORG({ einsatzleiter: { art: 'zustand', grund: 'nicht geladen' } })}`,
+    );
   });
 
   it('überlässt fehlende Einheiten dem Renderer der Führungsorganisation', async () => {

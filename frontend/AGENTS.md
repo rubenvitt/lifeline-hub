@@ -151,7 +151,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
   `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
-  „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
+  „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `stab/einsatzleiter.ts`
+  (LFH-1199); Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
   das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
   `SPALTE_MIN_PX` gemessen, tiefer senkrecht) — keine
   Graph-Bibliothek, kein zweites Gerüst. **Live-Zufluss nur über die Schleuse des Gerüsts**

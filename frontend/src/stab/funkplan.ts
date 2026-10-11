@@ -11,6 +11,11 @@ import {
   mitBetriebsart,
   teileSprechgruppen,
 } from '../components/kommunikationsmittel';
+import {
+  einsatzleiterDarstellung,
+  einsatzleiterKurz,
+  type EinsatzleiterDarstellung,
+} from './einsatzleiter';
 import type { Fernmeldenetz, NetzStelle } from './fernmeldeskizze';
 import {
   FUEHRUNGSSTELLE_STELLE,
@@ -113,6 +118,10 @@ function gruppiere<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T
   return m;
 }
 
+function einsatzleiterLeitung(d: EinsatzleiterDarstellung): Leitung {
+  return d.art === 'erfasst' ? { art: 'name', namen: [einsatzleiterKurz(d)] } : { art: 'leer' };
+}
+
 /** Die Zeile der eigenen Führungsstelle — nur, wenn sie geladen und erfasst ist (D4). */
 function fuehrungsstelleZeile(q: FuehrungsstelleQuelle): FunkplanZeile | null {
   const fs = q.zustand === 'daten' ? q.daten : null;
@@ -125,8 +134,9 @@ function fuehrungsstelleZeile(q: FuehrungsstelleQuelle): FunkplanZeile | null {
     // Die Bezeichnung (LFH-1181) steht wie der Typ einer Fahrzeugzeile im Zusatz; nie abgeleitet.
     stelleZusatz: fs.bezeichnung?.trim() || null,
     rufname: fs.rufname ?? null,
-    // Wer die Führungsstelle besetzt, steht in der Besetzung des Stabs, nicht hier.
-    leitung: { art: 'leer' },
+    // Der Einsatzleiter der Führungsstelle (LFH-1199), dargestellt wie in Kopfleiste und
+    // Organigramm; nie aus App-Rolle oder Stab-Besetzung.
+    leitung: einsatzleiterLeitung(einsatzleiterDarstellung(q)),
     ...funk(fs.sprechgruppen),
     kommunikationsmittel: kommunikationsmittelLabel(fs.kommunikationsmittel),
     erreichbarkeit: fs.erreichbarkeit ?? null,
@@ -414,7 +424,8 @@ export function md(text: string): string {
 }
 
 function leitungMarkdown(z: FunkplanZeile): string | null {
-  const wort = z.art === 'abschnitt' ? 'Leitung' : 'Führer';
+  const wort =
+    z.art === 'abschnitt' ? 'Leitung' : z.art === 'fuehrungsstelle' ? 'Einsatzleiter' : 'Führer';
   if (z.leitung.art === 'name') return `${wort} ${z.leitung.namen.map(md).join(', ')}`;
   if (z.leitung.art === 'zustand') return `${wort} ${ZUSTAND_GRUND[z.leitung.zustand]}`;
   return null;

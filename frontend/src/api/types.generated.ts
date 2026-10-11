@@ -1718,6 +1718,32 @@ export interface components {
          * @enum {string}
          */
         Einsatzart: "realeinsatz" | "uebung" | "sanitaetsdienst" | "bereitstellung";
+        /** @description Der Einsatzleiter, wie der Client ihn liest. */
+        EinsatzleiterAnzeige: {
+            art: components["schemas"]["EinsatzleiterArt"];
+            /**
+             * @description Bei `personal` der beim Setzen eingefrorene Name, bei `extern` der Freitext. Fehlt nur nach
+             *     der Schwärzung des Einsatzes.
+             */
+            name?: string | null;
+            /**
+             * Format: int64
+             * @description Die Dispositionszeile (`einsatz_personal.id`); fehlt bei `extern` und nach dem Entlassen.
+             */
+            personal_id?: number | null;
+            /**
+             * @description `false`, wenn die Person aus dem Einsatz entlassen ist (Name bleibt, `ON DELETE SET NULL`);
+             *     bei `extern` immer `false`.
+             */
+            personal_noch_disponiert: boolean;
+            /** @description Seit wann er die Einsatzleitung hat (UTC `YYYY-MM-DD HH:MM:SS`). */
+            seit: string;
+        };
+        /**
+         * @description Woher der Einsatzleiter kommt (LFH-1199). Wire == `as_str()`.
+         * @enum {string}
+         */
+        EinsatzleiterArt: "personal" | "extern";
         /** @description Eine Einsatzperiode einer Kraft. Offen, solange `ende_at` fehlt. */
         Einsatzperiode: {
             /** @description `alarmierung` oder `eintreffen`. */
@@ -2265,6 +2291,7 @@ export interface components {
             art: components["schemas"]["FuehrungsstellenArt"];
             /** @description Name der Stelle, z. B. „ELW 2 Musterstadt“ oder „TEL Rathaus“. */
             bezeichnung?: string | null;
+            einsatzleiter?: components["schemas"]["EinsatzleiterAnzeige"] | null;
             /** @description Personenbezogen: wird geschwärzt und steht nie im Lagebericht. */
             erreichbarkeit?: string | null;
             /**

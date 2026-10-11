@@ -36,6 +36,11 @@ Stand im Code (03.10.2026):
   Funktionen wie die übrigen Stellen.
 
 **Non-Goals:**
+
+> Aufgehoben durch LFH-1199 (`openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/`):
+> der Einsatzleiter ist eine Angabe der Führungsstelle, steht in ihrer Zeile, im Organigramm und im
+> Einsatzbericht, und sein Wechsel schreibt einen ETB-Eintrag.
+
 - Kein Leiter/Führer in der Zeile der Führungsstelle. Die Einsatzleitung ist eine App-Rolle und
   nicht dasselbe wie der Einsatzleiter nach FwDV; die Zelle bleibt „—“.
 - Keine Übernahme in Organigramm, Einsatzbericht, Einsatzliste oder Akte der Aufbewahrung.

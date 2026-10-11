@@ -3,13 +3,17 @@
 //!
 //! Lesen mit dem Einsatz (kein Modul), Schreiben mit den Rechten der Kopfdaten. Eine Änderung
 //! meldet das Ereignis `einsatz` über `routes::einsatz::kopf_geaendert` (Spec `einsatzkopf-live`).
-//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3),
-//! Art, Bezeichnung und Standort: `openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md` (D1, D2).
+//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3).
+//! Der Einsatzleiter (LFH-1199) schreibt bei einem Wechsel zusätzlich einen Übergabe-Eintrag ins
+//! ETB und meldet ihn nach dem Commit: `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md`
+//! (D2, D3). Art, Bezeichnung und Standort:
+//! `openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md` (D1, D2).
 
 use crate::app::AppState;
 use crate::einsatz::fuehrungsstelle::{
-    self, FuehrungsstelleAnzeige, FuehrungsstellePatch, FuehrungsstellenArt,
-    FUEHRUNGSSTELLE_ADRESSE_MAX, FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+    self, EinsatzleiterArt, EinsatzleiterEingabe, FuehrungsstelleAnzeige, FuehrungsstellePatch,
+    FuehrungsstellenArt, Schreiber, EINSATZLEITER_NAME_MAX, FUEHRUNGSSTELLE_ADRESSE_MAX,
+    FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
 };
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::error::AppError;
@@ -52,6 +56,92 @@ pub struct FuehrungsstellePatchBody {
     /// `sprechgruppe_ids`.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub fahrzeug_ids: Option<Option<Vec<i64>>>,
+    /// Der Einsatzleiter (LFH-1199); `null` leert ihn.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einsatzleiter: Option<Option<EinsatzleiterBody>>,
+}
+
+/// Ein neuer Einsatzleiter: `personal` mit `personal_id` oder `extern` mit `name`; `seit` fehlt =
+/// jetzt.
+#[derive(Debug, Deserialize)]
+pub struct EinsatzleiterBody {
+    pub art: String,
+    #[serde(default)]
+    pub personal_id: Option<i64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub seit: Option<String>,
+}
+
+/// Der geprüfte Einsatzleiter: Art und Name einzeln 400, Zusammenhänge 422 (`src/AGENTS.md`,
+/// Statuscode-Konvention). Die Zugehörigkeit der Person prüft die Transaktion.
+struct CheckedEinsatzleiter {
+    art: EinsatzleiterArt,
+    personal_id: Option<i64>,
+    name: Option<String>,
+    seit: String,
+}
+
+fn check_einsatzleiter(body: EinsatzleiterBody) -> Result<CheckedEinsatzleiter, AppError> {
+    let art = EinsatzleiterArt::try_from(body.art).map_err(AppError::Validation)?;
+    let name_gesendet = body.name.is_some();
+    let name = body
+        .name
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty());
+    if let Some(n) = &name {
+        crate::routes::support::hoechstens(n, "Name des Einsatzleiters", EINSATZLEITER_NAME_MAX)?;
+    }
+    let jetzt = crate::zeit::jetzt();
+    let seit = match body
+        .seit
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        // Ein Tippfehler im Jahr landete sonst als Ereigniszeit im ETB (LFH-924).
+        Some(roh) => crate::zeit::im_jahresbereich(crate::etb::normalisiere_zeit(roh)?, "seit")?,
+        None => jetzt.clone(),
+    };
+    match art {
+        EinsatzleiterArt::Personal => {
+            if body.personal_id.is_none() {
+                return Err(AppError::Validation("personal_id fehlt".into()));
+            }
+            if name_gesendet {
+                return Err(AppError::UnprocessableEntity(
+                    "Eine Person trägt ihren Namen aus dem Personal, keinen Freitext".into(),
+                ));
+            }
+        }
+        EinsatzleiterArt::Extern => {
+            if body.personal_id.is_some() {
+                return Err(AppError::UnprocessableEntity(
+                    "Ein externer Einsatzleiter hat keine Person aus dem Personal".into(),
+                ));
+            }
+            if name.is_none() {
+                return Err(AppError::Validation(
+                    "Name des externen Einsatzleiters fehlt".into(),
+                ));
+            }
+        }
+    }
+    // Uhrabweichung wie die Zeitachse.
+    let grenze = crate::zeit::plus_minuten(&jetzt, crate::routes::zeitachse::UHRENTOLERANZ_MINUTEN)
+        .unwrap_or_else(|| jetzt.clone());
+    if seit > grenze {
+        return Err(AppError::UnprocessableEntity(
+            "„seit“ liegt in der Zukunft".into(),
+        ));
+    }
+    Ok(CheckedEinsatzleiter {
+        art,
+        personal_id: body.personal_id,
+        name,
+        seit,
+    })
 }
 
 /// GET /api/einsaetze/{id}/fuehrungsstelle — ohne erfasste Angaben alles leer (200).
@@ -60,7 +150,7 @@ pub async fn lesen(
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<FuehrungsstelleAnzeige>, AppError> {
     Ok(Json(
-        fuehrungsstelle::laden(&state.pool, ctx.einsatz.id).await?,
+        fuehrungsstelle::load(&state.pool, ctx.einsatz.id).await?,
     ))
 }
 
@@ -107,6 +197,10 @@ pub async fn aendern(
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
+    let einsatzleiter: Option<Option<CheckedEinsatzleiter>> = body
+        .einsatzleiter
+        .map(|e| e.map(check_einsatzleiter).transpose())
+        .transpose()?;
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
     if art.is_none()
         && bezeichnung.is_none()
@@ -118,8 +212,9 @@ pub async fn aendern(
         && erreichbarkeit.is_none()
         && ids.is_none()
         && fahrzeug_ids.is_none()
+        && einsatzleiter.is_none()
     {
-        return Ok(Json(fuehrungsstelle::laden(&state.pool, einsatz_id).await?));
+        return Ok(Json(fuehrungsstelle::load(&state.pool, einsatz_id).await?));
     }
     if let Some(ids) = &ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(
@@ -144,20 +239,44 @@ pub async fn aendern(
         erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
         sprechgruppe_ids: ids.as_deref(),
         fahrzeug_ids: fahrzeug_ids.as_deref(),
+        einsatzleiter: einsatzleiter.as_ref().map(|e| {
+            e.as_ref()
+                .map(|e| match (e.art, e.personal_id, e.name.as_deref()) {
+                    (EinsatzleiterArt::Personal, Some(personal_id), _) => {
+                        EinsatzleiterEingabe::Personal {
+                            personal_id,
+                            seit: &e.seit,
+                        }
+                    }
+                    (_, _, name) => EinsatzleiterEingabe::Extern {
+                        name: name.unwrap_or_default(),
+                        seit: &e.seit,
+                    },
+                })
+        }),
+    };
+    let schreiber = Schreiber {
+        benutzer_id: ctx.benutzer.id,
+        etb_startwert: crate::einsatz::einstellungen::etb_startwert(&state.pool, einsatz_id)
+            .await?,
     };
     let koordinate_gesendet = body.standort_lat.is_some() || body.standort_lon.is_some();
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
-        let neu = fuehrungsstelle::patchen_tx(conn, einsatz_id, &patch).await?;
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let (neu, etb_id) = fuehrungsstelle::patch_tx(conn, einsatz_id, schreiber, &patch).await?;
         // Koordinate als Paar am Stand nach der Änderung, in derselben Transaktion (design.md
         // D2): zwei Teiländerungen nacheinander hinterlassen nie eine halbe Koordinate, und ein
-        // Fehler rollt alles zurück.
+        // Fehler rollt alles zurück, auch einen Übergabe-Eintrag im ETB.
         if koordinate_gesendet {
             pruefe_koordinate(neu.standort_lat, neu.standort_lon, "Breite", "Länge")?;
         }
-        Ok(neu)
+        Ok((neu, etb_id))
     })?;
-    // Erst nach dem Commit (Reinheits-Kontrakt), wie jeder `einsatz`-Emitter.
+    // Erst nach dem Commit (Reinheits-Kontrakt), wie jeder `einsatz`-Emitter; der Übergabe-Eintrag
+    // braucht seinen eigenen Kurzruf, sonst bliebe das ETB anderer Schirme still veraltet.
     crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     Ok(Json(anzeige))
 }
 

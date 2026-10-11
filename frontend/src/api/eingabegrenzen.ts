@@ -50,3 +50,5 @@ export const SPRECHGRUPPE_BEDINGUNG_MAX = 40;
 export const FUEHRUNGSSTELLE_BEZEICHNUNG_MAX = 200;
 /** Adresse des Standorts der eigenen Führungsstelle (LFH-1181). */
 export const FUEHRUNGSSTELLE_ADRESSE_MAX = 500;
+/** Freitext eines externen Einsatzleiters an der eigenen Führungsstelle (LFH-1199). */
+export const EINSATZLEITER_NAME_MAX = 200;

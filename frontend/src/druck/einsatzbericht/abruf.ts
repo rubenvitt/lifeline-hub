@@ -1,6 +1,6 @@
 import { ApiError } from '../../api/client';
 import { ladeBetreuung } from '../../api/betreuung';
-import { ladeEinsatz, ladeMitglieder } from '../../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle } from '../../api/einsaetze';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listePersonen } from '../../api/einsatzPerson';
@@ -37,7 +37,7 @@ async function ladeLageberichtQuelle(einsatzId: number): Promise<LageberichtQuel
 /** Die Abruffunktionen je Quelle. Die Entscheidungen kommen vollständig, nicht gedeckelt. */
 const ABRUF = {
   einsatz: ladeEinsatz,
-  mitglieder: ladeMitglieder,
+  fuehrungsstelle: ladeFuehrungsstelle,
   stab: ladeStab,
   lagebesprechungen: ladeLagebesprechungen,
   einheiten: listeEinheiten,

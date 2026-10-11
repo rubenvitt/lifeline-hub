@@ -45,6 +45,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "FUEHRUNGSSTELLE_ADRESSE_MAX",
             fuehrungsstelle::FUEHRUNGSSTELLE_ADRESSE_MAX,
         ),
+        (
+            "EINSATZLEITER_NAME_MAX",
+            fuehrungsstelle::EINSATZLEITER_NAME_MAX,
+        ),
     ])
 }
 

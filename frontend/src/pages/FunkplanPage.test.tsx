@@ -1109,6 +1109,22 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     expect(within(luecken()).queryByText(/Eigene Gegenstelle/)).toBeNull();
   });
 
+  it('zeigt den Einsatzleiter in der Spalte Leiter/Führer der Führungsstelle (LFH-1199)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      ...FS,
+      einsatzleiter: {
+        art: 'extern',
+        name: 'KBM Weber',
+        personal_noch_disponiert: false,
+        seit: '2026-10-11 12:30:00',
+      },
+    });
+    const { container } = setup();
+    await screen.findByText('Florian Stadt 10/1');
+    const fs = container.querySelector('tr[data-row-key="fs"]') as HTMLElement;
+    expect(within(fs).getByText('KBM Weber (extern)')).toBeInTheDocument();
+  });
+
   it('nennt bei 403 den Grund statt „nicht erfasst“', async () => {
     vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new ApiError(403, 'verboten'));
     setup();

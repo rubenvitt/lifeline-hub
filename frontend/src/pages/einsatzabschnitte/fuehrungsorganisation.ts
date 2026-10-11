@@ -8,6 +8,7 @@ import type {
 } from '../../api/types';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { besetzungDarstellung } from '../../stab/besetzung';
+import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
 import { md, ZUSTAND_GRUND } from '../../stab/funkplan';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
 import { fuehrungsstelleErfasst } from '../../stab/fuehrungsstelle';
@@ -235,7 +236,8 @@ export function wurzelFuehrungsstelle(
 
 /**
  * Die Führungsorganisation als Freitext für „In Lagebericht übernehmen“: Kopf, Einsatzleitung
- * (mit Stab nur, wenn übergeben — also freigegeben und geladen), fehlende Quellen, dann die
+ * (der Einsatzleiter, LFH-1199; Stab nur, wenn übergeben — also freigegeben und geladen), fehlende
+ * Quellen, dann die
  * Gliederung als verschachtelte Liste. Namen laufen durch `md()`: im Bericht stehen sie als Text,
  * nie als Auszeichnung. Erreichbarkeit führt das Organigramm nicht, also auch nicht hier.
  */
@@ -248,6 +250,10 @@ export function rendereFuehrungsorganisationMarkdown(
     einheitenZustand: AbrufZustand;
     /** Die erfasste eigene Führungsstelle (LFH-1181); fehlt sie, steht keine Zeile dafür da. */
     fuehrungsstelle?: WurzelFuehrungsstelle | null;
+    /** Aus der Führungsstelle (LFH-1199). */
+    einsatzleiter: EinsatzleiterDarstellung;
+    /** UTC → volle taktische DTG in der Anzeigezone, für das „seit“ des Einsatzleiters. */
+    dtg: (utc: string) => string;
   },
 ): string {
   const fs = opts.fuehrungsstelle;
@@ -296,8 +302,11 @@ export function rendereFuehrungsorganisationMarkdown(
     '## Einsatzleitung',
     '',
     ...fuehrungsstelle,
-    // Wer die Einsatzleitung führt, ist kein Datum: die Führungsstelle nennt keine Person.
-    '- Leitung nicht erfasst',
+    // Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke; ein fehlender
+    // Abruf steht mit Grund darin, nicht als „nicht erfasst“.
+    opts.einsatzleiter.art === 'nicht-erfasst'
+      ? '- Leitung nicht erfasst'
+      : `- Einsatzleiter: ${einsatzleiterMarkdown(opts.einsatzleiter, opts.dtg)}`,
     ...stab,
     '',
     ...quellen,
