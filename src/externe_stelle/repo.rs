@@ -3,18 +3,18 @@ use crate::error::AppError;
 use crate::write_retry;
 use sqlx::{SqliteConnection, SqlitePool};
 
-const SPALTEN: &str = "id, bezeichnung, art, rufnummer, funkrufname, aktiv, zustaendig";
+const COLUMNS: &str = "id, bezeichnung, art, rufnummer, funkrufname, aktiv, zustaendig";
 
 /// Sortierung nach design.md D2: Gruppen in der Reihenfolge von [`ExterneStelleArt::ALLE`], darin
 /// die zuständige Leitstelle vorn, dann alphabetisch.
-const SORTIERUNG: &str = "ORDER BY CASE art \
+const ORDER_BY: &str = "ORDER BY CASE art \
         WHEN 'leitstelle' THEN 0 WHEN 'polizei' THEN 1 WHEN 'behoerde' THEN 2 \
         WHEN 'hilfsorganisation' THEN 3 ELSE 4 END, \
      zustaendig DESC, bezeichnung COLLATE NOCASE, id";
 
 /// Felder einer neuen Stelle, schon getrimmt und geprüft.
 #[derive(Debug)]
-pub struct StelleDaten<'a> {
+pub struct NeueStelle<'a> {
     pub bezeichnung: &'a str,
     pub art: ExterneStelleArt,
     pub rufnummer: Option<&'a str>,
@@ -34,7 +34,7 @@ pub struct StellePatch<'a> {
     pub zustaendig: Option<bool>,
 }
 
-fn bezeichnung_conflict<T>(e: AppError) -> Result<T, AppError> {
+fn map_bezeichnung_conflict<T>(e: AppError) -> Result<T, AppError> {
     if let AppError::Database(sqlx::Error::Database(db)) = &e {
         if db.is_unique_violation() && db.message().contains("bezeichnung") {
             return Err(AppError::Conflict(
@@ -49,14 +49,14 @@ const NUR_LEITSTELLE: &str = "Zuständig kann nur eine Stelle der Art Leitstelle
 const NUR_AKTIV: &str = "Zuständig kann nur eine aktive Stelle sein";
 
 /// Alle Stellen der Organisation, mit `nur_aktive` ohne die inaktiven; sortiert nach D2.
-pub async fn liste(
+pub async fn list(
     pool: &SqlitePool,
     org_id: i64,
     nur_aktive: bool,
 ) -> Result<Vec<ExterneStelle>, AppError> {
     let filter = if nur_aktive { "AND aktiv = 1" } else { "" };
     sqlx::query_as::<_, ExterneStelle>(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM org_externe_stelle WHERE org_id = ? {filter} {SORTIERUNG}"
+        "SELECT {COLUMNS} FROM org_externe_stelle WHERE org_id = ? {filter} {ORDER_BY}"
     )))
     .bind(org_id)
     .fetch_all(pool)
@@ -65,18 +65,18 @@ pub async fn liste(
 }
 
 /// Eine Stelle der Organisation, auch inaktiv; `NotFound` bei fremder oder unbekannter id.
-pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<ExterneStelle, AppError> {
+pub async fn load(pool: &SqlitePool, org_id: i64, id: i64) -> Result<ExterneStelle, AppError> {
     let mut conn = pool.acquire().await?;
-    laden_conn(&mut conn, org_id, id).await
+    load_conn(&mut conn, org_id, id).await
 }
 
-async fn laden_conn(
+async fn load_conn(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
 ) -> Result<ExterneStelle, AppError> {
     sqlx::query_as::<_, ExterneStelle>(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM org_externe_stelle WHERE id = ? AND org_id = ?"
+        "SELECT {COLUMNS} FROM org_externe_stelle WHERE id = ? AND org_id = ?"
     )))
     .bind(id)
     .bind(org_id)
@@ -86,7 +86,7 @@ async fn laden_conn(
 }
 
 /// Nimmt allen übrigen Stellen der Organisation die Markierung „zuständig“.
-async fn markierung_abnehmen(
+async fn clear_zustaendig(
     conn: &mut SqliteConnection,
     org_id: i64,
     ausser: Option<i64>,
@@ -104,17 +104,17 @@ async fn markierung_abnehmen(
 
 /// Legt eine Stelle an (aktiv). Mit `zustaendig` nur bei Art Leitstelle (sonst 422); die bisherige
 /// Markierung entfällt in derselben Transaktion. Doppelte Bezeichnung → `Conflict`.
-pub async fn anlegen(
+pub async fn create(
     pool: &SqlitePool,
     org_id: i64,
-    daten: StelleDaten<'_>,
+    daten: NeueStelle<'_>,
 ) -> Result<ExterneStelle, AppError> {
     if daten.zustaendig && daten.art != ExterneStelleArt::Leitstelle {
         return Err(AppError::UnprocessableEntity(NUR_LEITSTELLE.into()));
     }
     let ergebnis = write_retry!(pool, |conn| {
         if daten.zustaendig {
-            markierung_abnehmen(conn, org_id, None).await?;
+            clear_zustaendig(conn, org_id, None).await?;
         }
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO org_externe_stelle \
@@ -129,9 +129,9 @@ pub async fn anlegen(
         .bind(daten.zustaendig)
         .fetch_one(&mut *conn)
         .await?;
-        laden_conn(conn, org_id, id).await
+        load_conn(conn, org_id, id).await
     });
-    ergebnis.or_else(bezeichnung_conflict)
+    ergebnis.or_else(map_bezeichnung_conflict)
 }
 
 /// Teil-Patch einer Stelle der Organisation (`NotFound` bei fremder oder unbekannter id).
@@ -140,14 +140,14 @@ pub async fn anlegen(
 /// zuständige Stelle muss aktiv und Leitstelle sein, sonst 422. `aktiv: false` nimmt die
 /// Markierung mit; zusammen mit `zustaendig: true` ist es 422. Wird eine Stelle zuständig,
 /// verliert die bisherige die Markierung in derselben Transaktion.
-pub async fn patche(
+pub async fn update(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
     patch: StellePatch<'_>,
 ) -> Result<ExterneStelle, AppError> {
     let ergebnis = write_retry!(pool, |conn| {
-        let bisher = laden_conn(conn, org_id, id).await?;
+        let bisher = load_conn(conn, org_id, id).await?;
         let aktiv = patch.aktiv.unwrap_or(bisher.aktiv);
         let art = patch.art.unwrap_or(bisher.art);
         if patch.zustaendig == Some(true) && !aktiv {
@@ -158,7 +158,7 @@ pub async fn patche(
             return Err(AppError::UnprocessableEntity(NUR_LEITSTELLE.into()));
         }
         if zustaendig && !bisher.zustaendig {
-            markierung_abnehmen(conn, org_id, Some(id)).await?;
+            clear_zustaendig(conn, org_id, Some(id)).await?;
         }
         // Flag/Wert-Paare wie in `etb_baustein::repo::patche`: ein nicht gesendetes Feld bleibt,
         // `Some(None)` leert. Nummerierte Parameter gegen still vertauschte Nachbarn.
@@ -186,7 +186,7 @@ pub async fn patche(
         .bind(org_id)
         .execute(&mut *conn)
         .await?;
-        laden_conn(conn, org_id, id).await
+        load_conn(conn, org_id, id).await
     });
-    ergebnis.or_else(bezeichnung_conflict)
+    ergebnis.or_else(map_bezeichnung_conflict)
 }

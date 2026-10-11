@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { listeExterneStellen } from '../api/externeStellen';
+import { fetchExterneStellen } from '../api/externeStellen';
 import { globalKeys } from '../api/queryKeys';
 import type { ExterneStelle, ExterneStelleArt } from '../api/types';
 
@@ -32,7 +32,7 @@ export const EXTERNE_STELLE_ART_LABEL: Record<ExterneStelleArt, string> = {
 export function useExterneStellen() {
   return useQuery({
     queryKey: globalKeys.externeStellenListe('aktiv'),
-    queryFn: () => listeExterneStellen('aktiv'),
+    queryFn: () => fetchExterneStellen('aktiv'),
   });
 }
 
@@ -48,20 +48,17 @@ export interface StellenGruppe {
 
 /**
  * Gruppierte `AutoComplete`-Optionen: je Art eine Gruppe in der Reihenfolge von
- * {@link EXTERNE_STELLE_ARTEN}, darin die zuständige Leitstelle vorn, dann alphabetisch. Leere
+ * {@link EXTERNE_STELLE_ARTEN}, darin die Folge des Servers (zuständige Leitstelle vorn). Leere
  * Gruppen fallen weg, inaktive Stellen auch. Die zuständige Leitstelle trägt das Wort
  * „zuständig“, keine Farbe allein.
  */
-export function externeStellenOptionen(stellen: readonly ExterneStelle[]): StellenGruppe[] {
+export function externeStellenOptions(stellen: readonly ExterneStelle[]): StellenGruppe[] {
   return EXTERNE_STELLE_ARTEN.map((art) => ({
     label: EXTERNE_STELLE_ART_LABEL[art],
     options: stellen
+      // Innerhalb der Gruppe die Folge des Servers (zuständige vorn, dann Name), dieselbe wie in
+      // der Verwaltungstabelle.
       .filter((s) => s.aktiv && s.art === art)
-      .sort(
-        (a, b) =>
-          Number(b.zustaendig) - Number(a.zustaendig) ||
-          a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
-      )
       .map((s) => ({
         value: s.bezeichnung,
         label: s.zustaendig ? `${s.bezeichnung} · zuständig` : s.bezeichnung,

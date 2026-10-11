@@ -24,7 +24,7 @@ import { adminFixture, benutzerFixture } from '../test/fixtures';
  * zu sehen.
  *
  * Der Test steht bewusst QUER zu den zwölf Dateien: die Aussage ist „KEINE Sektion fehlt", und
- * die lässt sich nur an der vollständigen Menge treffen. Ein zwölfter Tab ohne Hinweis fiele
+ * die lässt sich nur an der vollständigen Menge treffen. Ein dreizehnter Tab ohne Hinweis fiele
  * hier auf, in zwölf Einzeltests nicht.
  */
 const nichtAdmin = benutzerFixture({
@@ -65,7 +65,7 @@ function handler(benutzer: typeof admin) {
 }
 
 /**
- * `aktion` ist der zugängliche Name der PRIMÄRAKTION der Sektion — bei sieben Sektionen der
+ * `aktion` ist der zugängliche Name der PRIMÄRAKTION der Sektion — bei sechs Sektionen der
  * Knopf im `aktionen`-Slot, bei fünf der Anlegen-Knopf ihrer `SchnellAnlegen`-Zeile, bei
  * `Organisation` der Speichern-Knopf ihres Formulars. Dass „Status anlegen" zweimal
  * vorkommt, ist unschädlich: je Durchlauf steht genau eine Sektion im Baum.

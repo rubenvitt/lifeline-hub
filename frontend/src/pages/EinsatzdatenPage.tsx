@@ -44,7 +44,7 @@ import {
   type KopfdatenPatch,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
-import { externeStellenOptionen, useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
+import { externeStellenOptions, useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { MELDENDE_STELLE_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -654,7 +654,7 @@ export default function EinsatzdatenPage() {
   const darfAbschliessen = darfEinsatzLeiten(einsatz);
 
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
-  const stellenOptionen = externeStellenOptionen(stellenQuery.data ?? []);
+  const stellenOptionen = externeStellenOptions(stellenQuery.data ?? []);
 
   function bearbeitenStarten() {
     const werte: FormWerte = {

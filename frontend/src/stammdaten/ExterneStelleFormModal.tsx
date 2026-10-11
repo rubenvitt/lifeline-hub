@@ -3,7 +3,12 @@ import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
-import { aendereExterneStelle, legeExterneStelleAn } from '../api/externeStellen';
+import {
+  createExterneStelle,
+  updateExterneStelle,
+  type ExterneStellePatch,
+  type NeueExterneStelle,
+} from '../api/externeStellen';
 import type { ExterneStelle, ExterneStelleArt } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
@@ -29,6 +34,25 @@ const ART_OPTIONEN = EXTERNE_STELLE_ARTEN.map((art) => ({
  */
 function kurzfeld(wert: string | undefined): string | null | undefined {
   return wert === undefined ? undefined : leerZuNull(wert);
+}
+
+/**
+ * Nur, was vom geöffneten Stand abweicht (Muster `geaenderteKopfdaten`, LFH-839): ein Modal,
+ * das offen stand, während ein anderer Schirm die zuständige Leitstelle wechselte, holt sich
+ * die Markierung sonst mit einer bloßen Rufnummernänderung zurück.
+ */
+function geaenderteFelder(bisher: ExterneStelle, neu: NeueExterneStelle): ExterneStellePatch {
+  const patch: ExterneStellePatch = {};
+  if (neu.bezeichnung !== bisher.bezeichnung) patch.bezeichnung = neu.bezeichnung;
+  if (neu.art !== bisher.art) patch.art = neu.art;
+  if (neu.zustaendig !== bisher.zustaendig) patch.zustaendig = neu.zustaendig;
+  if (neu.rufnummer !== undefined && neu.rufnummer !== (bisher.rufnummer ?? null)) {
+    patch.rufnummer = neu.rufnummer;
+  }
+  if (neu.funkrufname !== undefined && neu.funkrufname !== (bisher.funkrufname ?? null)) {
+    patch.funkrufname = neu.funkrufname;
+  }
+  return patch;
 }
 
 /** Anlegen und Bearbeiten einer externen Stelle (LFH-1194, design.md D10). */
@@ -69,7 +93,12 @@ export default function ExterneStelleFormModal({
         rufnummer: kurzfeld(werte.rufnummer),
         funkrufname: kurzfeld(werte.funkrufname),
       };
-      return stelle ? aendereExterneStelle(stelle.id, daten) : legeExterneStelleAn(daten);
+      if (!stelle) return createExterneStelle(daten);
+      const patch = geaenderteFelder(stelle, daten);
+      // Nichts geändert: keine Anfrage, das Modal schließt wie nach dem Speichern.
+      return Object.keys(patch).length > 0
+        ? updateExterneStelle(stelle.id, patch)
+        : Promise.resolve(stelle);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.externeStellen() }),
   });

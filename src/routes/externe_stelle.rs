@@ -6,7 +6,7 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
-use crate::externe_stelle::repo::{self, StelleDaten, StellePatch};
+use crate::externe_stelle::repo::{self, NeueStelle, StellePatch};
 use crate::externe_stelle::{ExterneStelle, ExterneStelleArt, BEZEICHNUNG_MAX, KURZ_MAX};
 use crate::extract::{JsonBody, PfadParam};
 use crate::routes::support::{
@@ -21,20 +21,20 @@ use serde::Deserialize;
 const UNGUELTIGE_ART: &str = "Ungültige Art einer externen Stelle";
 
 #[derive(Debug, Deserialize)]
-pub struct ListeQuery {
+pub struct ListQuery {
     pub nur_aktive: Option<bool>,
 }
 
 /// GET /api/externe-stellen — Stellen der eigenen Organisation; ohne `nur_aktive=false` nur die
 /// aktiven.
-pub async fn liste(
+pub async fn list(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Query(q): Query<ListeQuery>,
+    Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<ExterneStelle>>, AppError> {
     let nur_aktive = q.nur_aktive.unwrap_or(true);
     Ok(Json(
-        repo::liste(&state.pool, benutzer.org_id, nur_aktive).await?,
+        repo::list(&state.pool, benutzer.org_id, nur_aktive).await?,
     ))
 }
 
@@ -49,7 +49,7 @@ pub struct StelleBody {
 }
 
 /// POST /api/externe-stellen — Admin. Neue Stelle (aktiv).
-pub async fn anlegen(
+pub async fn create(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     JsonBody(body): JsonBody<StelleBody>,
@@ -58,10 +58,10 @@ pub async fn anlegen(
     let art = parse_enum(ExterneStelleArt::parse, body.art.trim(), UNGUELTIGE_ART)?;
     let rufnummer = optional_max(body.rufnummer, "Rufnummer", KURZ_MAX)?;
     let funkrufname = optional_max(body.funkrufname, "Funkrufname", KURZ_MAX)?;
-    let stelle = repo::anlegen(
+    let stelle = repo::create(
         &state.pool,
         benutzer.org_id,
-        StelleDaten {
+        NeueStelle {
             bezeichnung: &bezeichnung,
             art,
             rufnummer: rufnummer.as_deref(),
@@ -88,7 +88,10 @@ pub struct PatchStelle {
 }
 
 /// Prüft ein gesendetes, nicht geleertes Tri-State-Feld gegen seine Grenze.
-fn kurz_tri(wert: Option<Option<String>>, feld: &str) -> Result<Option<Option<String>>, AppError> {
+fn check_kurz_tri(
+    wert: Option<Option<String>>,
+    feld: &str,
+) -> Result<Option<Option<String>>, AppError> {
     let wert = trimme_tri(wert);
     if let Some(Some(w)) = &wert {
         hoechstens(w, feld, KURZ_MAX)?;
@@ -98,7 +101,7 @@ fn kurz_tri(wert: Option<Option<String>>, feld: &str) -> Result<Option<Option<St
 
 /// PATCH /api/externe-stellen/{id} — Admin, Teil-Patch. Fremde oder unbekannte id → 404;
 /// unzulässige Markierung „zuständig“ → 422 (design.md D3).
-pub async fn aktualisieren(
+pub async fn update(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     PfadParam(id): PfadParam<i64>,
@@ -109,9 +112,9 @@ pub async fn aktualisieren(
         .art
         .map(|a| parse_enum(ExterneStelleArt::parse, a.trim(), UNGUELTIGE_ART))
         .transpose()?;
-    let rufnummer = kurz_tri(body.rufnummer, "Rufnummer")?;
-    let funkrufname = kurz_tri(body.funkrufname, "Funkrufname")?;
-    let stelle = repo::patche(
+    let rufnummer = check_kurz_tri(body.rufnummer, "Rufnummer")?;
+    let funkrufname = check_kurz_tri(body.funkrufname, "Funkrufname")?;
+    let stelle = repo::update(
         &state.pool,
         benutzer.org_id,
         id,

@@ -85,11 +85,11 @@ describe('ExterneStelleFormModal', () => {
     );
   });
 
-  it('Bearbeiten ohne Kontaktfelder lässt Rufnummer und Funkrufname im PATCH weg', async () => {
-    let body: unknown = null;
+  it('Bearbeiten sendet nur Geändertes; unverändert geht keine Anfrage hinaus', async () => {
+    const bodies: unknown[] = [];
     server.use(
       http.patch('/api/externe-stellen/4', async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json(ils);
       }),
     );
@@ -98,12 +98,16 @@ describe('ExterneStelleFormModal', () => {
     expect(await screen.findByLabelText('Bezeichnung')).toHaveValue('ILS Musterkreis');
     expect(screen.getByLabelText('Zuständige Leitstelle')).toBeChecked();
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() =>
-      expect(body).toEqual({ bezeichnung: 'ILS Musterkreis', art: 'leitstelle', zustaendig: true }),
-    );
+    // Geschlossen heißt: die Hülle hat zurückgesetzt.
+    await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveValue(''));
+    expect(bodies).toEqual([]);
   });
 
-  it('Bearbeiten mit Rufnummer öffnet den Bereich und leert ein geleertes Feld mit null', async () => {
+  /**
+   * Review LFH-1194: Stand das Modal offen, während ein anderer Schirm die Markierung auf eine
+   * andere Leitstelle legte, darf eine bloße Rufnummernänderung sie nicht zurückholen.
+   */
+  it('eine Rufnummernänderung trägt die Markierung „zuständig“ nicht mit', async () => {
     let body: unknown = null;
     server.use(
       http.patch('/api/externe-stellen/4', async ({ request }) => {
@@ -117,17 +121,28 @@ describe('ExterneStelleFormModal', () => {
     );
     const ruf = await screen.findByLabelText('Rufnummer');
     expect(ruf).toHaveValue('112');
+    await nutzer.clear(ruf);
+    await nutzer.type(ruf, '0800 1');
     await nutzer.clear(screen.getByLabelText('Funkrufname'));
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() =>
-      expect(body).toEqual({
-        bezeichnung: 'ILS Musterkreis',
-        art: 'leitstelle',
-        zustaendig: true,
-        rufnummer: '112',
-        funkrufname: null,
+    await waitFor(() => expect(body).toEqual({ rufnummer: '0800 1', funkrufname: null }));
+  });
+
+  it('Artwechsel weg von Leitstelle nimmt die Markierung mit', async () => {
+    let body: unknown = null;
+    server.use(
+      http.patch('/api/externe-stellen/4', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(ils);
       }),
     );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness bestand={ils} />);
+    await screen.findByLabelText('Zuständige Leitstelle');
+    await artWaehlen(nutzer, 'Behörde');
+    expect(screen.queryByLabelText('Zuständige Leitstelle')).toBeNull();
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(body).toEqual({ art: 'behoerde', zustaendig: false }));
   });
 
   it('nennt eine Ablehnung (409) im Dialog', async () => {

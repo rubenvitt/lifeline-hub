@@ -12,7 +12,7 @@
 --
 -- Zuständige Leitstelle: höchstens eine je Organisation (partieller UNIQUE-Index), nur an einer
 -- aktiven Stelle der Art `leitstelle` (CHECK). Den Wechsel der Markierung macht Rust in einer
--- Transaktion (`externe_stelle::repo::patche`); Index und CHECK sind das Netz.
+-- Transaktion (`externe_stelle::repo::update`); Index und CHECK sind das Netz.
 --
 -- Die Art-Liste im CHECK ist `externe_stelle::ExterneStelleArt::ALLE`
 -- (Test `externe_stelle::tests::check_liste_entspricht_der_art`).

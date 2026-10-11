@@ -12,7 +12,7 @@ import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
 import type { NachforderungVorbelegung } from '../routing/deeplinks';
 import {
-  externeStellenOptionen,
+  externeStellenOptions,
   useExterneStellen,
   zustaendigeLeitstelle,
 } from '../stammdaten/externeStellenVorschlaege';
@@ -80,7 +80,7 @@ export default function NachforderungFormular({
   // Katalog „Externe Stellen“ (LFH-1194, design.md D8): Vorschläge für die Adressat-Bezeichnung,
   // die zuständige Leitstelle als Vorgabe bei der Kategorie „Leitstelle“.
   const stellen = useExterneStellen().data;
-  const stellenOptionen = externeStellenOptionen(stellen ?? []);
+  const stellenOptionen = externeStellenOptions(stellen ?? []);
   const vorgabeLeitstelle = zustaendigeLeitstelle(stellen ?? []) ?? '';
   const kategorie = Form.useWatch('adressatKategorie', form);
 

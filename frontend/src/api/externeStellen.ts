@@ -24,19 +24,16 @@ export interface ExterneStellePatch {
  * Stellen der eigenen Organisation. `'aktiv'` für die Vorschläge, `'alle'` für die Verwaltung.
  * Der Parameter steht ausgeschrieben: `mitParametern` ließe ein `false` weg.
  */
-export function listeExterneStellen(umfang: 'aktiv' | 'alle'): Promise<ExterneStelle[]> {
+export function fetchExterneStellen(umfang: 'aktiv' | 'alle'): Promise<ExterneStelle[]> {
   return apiGet<ExterneStelle[]>(
     umfang === 'alle' ? '/api/externe-stellen?nur_aktive=false' : '/api/externe-stellen',
   );
 }
 
-export function legeExterneStelleAn(daten: NeueExterneStelle): Promise<ExterneStelle> {
+export function createExterneStelle(daten: NeueExterneStelle): Promise<ExterneStelle> {
   return apiSend<ExterneStelle>('/api/externe-stellen', 'POST', daten);
 }
 
-export function aendereExterneStelle(
-  id: number,
-  patch: ExterneStellePatch,
-): Promise<ExterneStelle> {
+export function updateExterneStelle(id: number, patch: ExterneStellePatch): Promise<ExterneStelle> {
   return apiSend<ExterneStelle>(`/api/externe-stellen/${id}`, 'PATCH', patch);
 }

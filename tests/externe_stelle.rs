@@ -10,11 +10,16 @@ use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup,
 
 const PFAD: &str = "/api/externe-stellen";
 
-async fn anlegen(app: &axum::Router, cookie: &str, rumpf: &str) -> (StatusCode, Value) {
+async fn create_stelle(app: &axum::Router, cookie: &str, rumpf: &str) -> (StatusCode, Value) {
     anfrage(app, "POST", PFAD, cookie, Some(rumpf)).await
 }
 
-async fn patch(app: &axum::Router, cookie: &str, id: i64, rumpf: &str) -> (StatusCode, Value) {
+async fn update_stelle(
+    app: &axum::Router,
+    cookie: &str,
+    id: i64,
+    rumpf: &str,
+) -> (StatusCode, Value) {
     anfrage(app, "PATCH", &format!("{PFAD}/{id}"), cookie, Some(rumpf)).await
 }
 
@@ -30,7 +35,7 @@ fn bezeichnungen(json: &Value) -> Vec<String> {
 async fn admin_legt_leitstelle_an_aktiv_und_nicht_zustaendig() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anlegen(
+    let (status, json) = create_stelle(
         &app,
         &admin,
         r#"{"bezeichnung":"  ILS Musterkreis ","art":"leitstelle","rufnummer":"112"}"#,
@@ -59,10 +64,10 @@ async fn eingaben_werden_geprueft() {
             "1".repeat(101)
         ),
     ] {
-        let (status, json) = anlegen(&app, &admin, &rumpf).await;
+        let (status, json) = create_stelle(&app, &admin, &rumpf).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{rumpf}: {json}");
     }
-    let (_, json) = anlegen(
+    let (_, json) = create_stelle(
         &app,
         &admin,
         &format!(r#"{{"bezeichnung":"{lang}","art":"polizei"}}"#),
@@ -75,7 +80,7 @@ async fn eingaben_werden_geprueft() {
     );
 
     let genau = "ä".repeat(200);
-    let (status, _) = anlegen(
+    let (status, _) = create_stelle(
         &app,
         &admin,
         &format!(r#"{{"bezeichnung":"{genau}","art":"polizei"}}"#),
@@ -83,9 +88,10 @@ async fn eingaben_werden_geprueft() {
     .await;
     assert_eq!(status, StatusCode::CREATED);
 
-    let (status, _) = anlegen(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
+    let (status, _) =
+        create_stelle(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
     assert_eq!(status, StatusCode::CREATED);
-    let (status, _) = anlegen(
+    let (status, _) = create_stelle(
         &app,
         &admin,
         r#"{"bezeichnung":"Polizei","art":"sonstige"}"#,
@@ -101,20 +107,20 @@ async fn ohne_admin_recht_403_aber_lesen_geht_nur_aktive() {
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
-    let (status, _) = anlegen(&app, &erika, r#"{"bezeichnung":"X","art":"polizei"}"#).await;
+    let (status, _) = create_stelle(&app, &erika, r#"{"bezeichnung":"X","art":"polizei"}"#).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
-    let (_, amt) = anlegen(
+    let (_, amt) = create_stelle(
         &app,
         &admin,
         r#"{"bezeichnung":"Ordnungsamt","art":"behoerde"}"#,
     )
     .await;
-    anlegen(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
+    create_stelle(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
     let amt = amt["id"].as_i64().unwrap();
-    let (status, _) = patch(&app, &erika, amt, r#"{"aktiv":false}"#).await;
+    let (status, _) = update_stelle(&app, &erika, amt, r#"{"aktiv":false}"#).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    let (status, _) = patch(&app, &admin, amt, r#"{"aktiv":false}"#).await;
+    let (status, _) = update_stelle(&app, &admin, amt, r#"{"aktiv":false}"#).await;
     assert_eq!(status, StatusCode::OK);
 
     let (status, json) = anfrage(&app, "GET", PFAD, &erika, None).await;
@@ -133,7 +139,7 @@ async fn ohne_admin_recht_403_aber_lesen_geht_nur_aktive() {
     assert_eq!(json[1]["aktiv"], false);
 
     // Reaktivieren.
-    let (status, json) = patch(&app, &admin, amt, r#"{"aktiv":true}"#).await;
+    let (status, json) = update_stelle(&app, &admin, amt, r#"{"aktiv":true}"#).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["aktiv"], true);
     let (_, json) = anfrage(&app, "GET", PFAD, &erika, None).await;
@@ -144,7 +150,8 @@ async fn ohne_admin_recht_403_aber_lesen_geht_nur_aktive() {
 async fn kein_loeschen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, json) = anlegen(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
+    let (_, json) =
+        create_stelle(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
     let id = json["id"].as_i64().unwrap();
     let (status, _) = anfrage(&app, "DELETE", &format!("{PFAD}/{id}"), &admin, None).await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
@@ -154,22 +161,23 @@ async fn kein_loeschen() {
 async fn zustaendige_leitstelle_wechselt_und_422_bei_anderer_art() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, nord) = anlegen(
+    let (_, nord) = create_stelle(
         &app,
         &admin,
         r#"{"bezeichnung":"ILS Nord","art":"leitstelle","zustaendig":true}"#,
     )
     .await;
-    let (_, sued) = anlegen(
+    let (_, sued) = create_stelle(
         &app,
         &admin,
         r#"{"bezeichnung":"ILS Süd","art":"leitstelle"}"#,
     )
     .await;
-    let (_, polizei) = anlegen(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
+    let (_, polizei) =
+        create_stelle(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
     assert_eq!(nord["zustaendig"], true);
 
-    let (status, json) = patch(
+    let (status, json) = update_stelle(
         &app,
         &admin,
         sued["id"].as_i64().unwrap(),
@@ -189,7 +197,7 @@ async fn zustaendige_leitstelle_wechselt_und_422_bei_anderer_art() {
     assert_eq!(zustaendige, ["ILS Süd"]);
     assert_eq!(liste[0]["bezeichnung"], "ILS Süd", "zuständige vorn");
 
-    let (status, _) = patch(
+    let (status, _) = update_stelle(
         &app,
         &admin,
         polizei["id"].as_i64().unwrap(),
@@ -197,7 +205,7 @@ async fn zustaendige_leitstelle_wechselt_und_422_bei_anderer_art() {
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    let (status, _) = patch(
+    let (status, _) = update_stelle(
         &app,
         &admin,
         sued["id"].as_i64().unwrap(),
@@ -205,7 +213,7 @@ async fn zustaendige_leitstelle_wechselt_und_422_bei_anderer_art() {
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    let (status, _) = anlegen(
+    let (status, _) = create_stelle(
         &app,
         &admin,
         r#"{"bezeichnung":"Amt","art":"behoerde","zustaendig":true}"#,
@@ -218,7 +226,8 @@ async fn zustaendige_leitstelle_wechselt_und_422_bei_anderer_art() {
 async fn org_grenze_liste_und_patch() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, json) = anlegen(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
+    let (_, json) =
+        create_stelle(&app, &admin, r#"{"bezeichnung":"Polizei","art":"polizei"}"#).await;
     let id_a = json["id"].as_i64().unwrap();
 
     let (org_b, _) = fremde_org_anlegen(&pool, "Org B", "bert", "bertpw123", "keine").await;
@@ -228,10 +237,10 @@ async fn org_grenze_liste_und_patch() {
     assert!(json.as_array().unwrap().is_empty(), "{json}");
 
     // Die Stelle von Org B (gleicher Name erlaubt) bleibt für den Admin von Org A unerreichbar.
-    let id_b = lifeline_hub::externe_stelle::repo::anlegen(
+    let id_b = lifeline_hub::externe_stelle::repo::create(
         &pool,
         org_b,
-        lifeline_hub::externe_stelle::repo::StelleDaten {
+        lifeline_hub::externe_stelle::repo::NeueStelle {
             bezeichnung: "Polizei",
             art: lifeline_hub::externe_stelle::ExterneStelleArt::Polizei,
             rufnummer: None,
@@ -243,10 +252,51 @@ async fn org_grenze_liste_und_patch() {
     .unwrap()
     .id;
     assert_ne!(id_a, id_b);
-    let (status, _) = patch(&app, &admin, id_b, r#"{"bezeichnung":"fremd"}"#).await;
+    let (status, _) = update_stelle(&app, &admin, id_b, r#"{"bezeichnung":"fremd"}"#).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-    let b = lifeline_hub::externe_stelle::repo::laden(&pool, org_b, id_b)
+    let b = lifeline_hub::externe_stelle::repo::load(&pool, org_b, id_b)
         .await
         .unwrap();
     assert_eq!(b.bezeichnung, "Polizei");
+}
+
+#[tokio::test]
+async fn patch_prueft_eingaben_und_leert_mit_null_oder_leer() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = create_stelle(
+        &app,
+        &admin,
+        r#"{"bezeichnung":"ILS","art":"leitstelle","rufnummer":"112","funkrufname":"Leitstelle"}"#,
+    )
+    .await;
+    let id = json["id"].as_i64().unwrap();
+
+    for rumpf in [
+        r#"{"bezeichnung":"  "}"#.to_string(),
+        format!(r#"{{"bezeichnung":"{}"}}"#, "x".repeat(201)),
+        r#"{"art":"feuerwehr"}"#.to_string(),
+        format!(r#"{{"rufnummer":"{}"}}"#, "1".repeat(101)),
+        format!(r#"{{"funkrufname":"{}"}}"#, "f".repeat(101)),
+    ] {
+        let (status, json) = update_stelle(&app, &admin, id, &rumpf).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{rumpf}: {json}");
+    }
+    let (status, json) = create_stelle(
+        &app,
+        &admin,
+        &format!(
+            r#"{{"bezeichnung":"P","art":"polizei","funkrufname":"{}"}}"#,
+            "f".repeat(101)
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+
+    let (status, json) =
+        update_stelle(&app, &admin, id, r#"{"rufnummer":"  ","funkrufname":null}"#).await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    assert!(json.get("rufnummer").is_none(), "leer leert: {json}");
+    assert!(json.get("funkrufname").is_none(), "null leert: {json}");
+    assert_eq!(json["bezeichnung"], "ILS");
 }

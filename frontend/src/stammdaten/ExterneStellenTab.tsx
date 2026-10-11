@@ -12,7 +12,7 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { aendereExterneStelle, listeExterneStellen } from '../api/externeStellen';
+import { updateExterneStelle, fetchExterneStellen } from '../api/externeStellen';
 import type { ExterneStelle, ExterneStelleArt } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -35,13 +35,13 @@ export default function ExterneStellenTab() {
 
   const stellenQuery = useQuery({
     queryKey: globalKeys.externeStellenListe('alle'),
-    queryFn: () => listeExterneStellen('alle'),
+    queryFn: () => fetchExterneStellen('alle'),
   });
 
   // KEIN `onError`-Toast (LFH-473): der Fehler steht im `SeitenHinweise`-Slot.
   const aktivMutation = useMutation({
     mutationFn: ({ id, aktiv }: { id: number; aktiv: boolean }) =>
-      aendereExterneStelle(id, { aktiv }),
+      updateExterneStelle(id, { aktiv }),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.externeStellen() }),
     onSettled: () => setZuDeaktivieren(null),
   });

@@ -137,6 +137,33 @@ describe('NachforderungFormular — Adressat aus dem Katalog „Externe Stellen�
     expect(adressat()).toHaveValue('Leitstelle Nachbarkreis');
   });
 
+  it('belegt nicht vor, wenn die Kategorie beim Eintreffen der Liste nicht „Leitstelle“ ist', async () => {
+    let liefern: () => void = () => {};
+    const geliefert = new Promise<void>((r) => (liefern = r));
+    server.use(
+      http.get('/api/externe-stellen', async () => {
+        await geliefert;
+        return HttpResponse.json(KATALOG);
+      }),
+    );
+    renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
+    await kategorieWaehlen('Andere BOS');
+    liefern();
+    await userEvent.click(adressat());
+    expect(await screen.findByTitle('ILS Musterkreis · zuständig')).toBeInTheDocument();
+    expect(adressat()).toHaveValue('');
+  });
+
+  it('eine gelöschte Vorbelegung kommt beim Kategoriewechsel nicht zurück', async () => {
+    katalog(KATALOG);
+    renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} />);
+    await waitFor(() => expect(adressat()).toHaveValue('ILS Musterkreis'));
+    await userEvent.clear(adressat());
+    await kategorieWaehlen('Andere BOS');
+    await kategorieWaehlen('Leitstelle');
+    expect(adressat()).toHaveValue('');
+  });
+
   it('ohne zuständige Leitstelle bleibt das Feld leer, die Vorschläge stehen trotzdem bereit', async () => {
     katalog(KATALOG.map((s) => ({ ...s, zustaendig: false })));
     renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} />);

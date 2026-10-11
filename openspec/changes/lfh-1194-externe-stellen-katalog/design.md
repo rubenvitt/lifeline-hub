@@ -128,7 +128,7 @@ Katalogbezeichnung passt hinein.
 ### D6 Ein Vorschlags-Hook für beide Abnehmer
 Neues Modul `stammdaten/externeStellenVorschlaege.ts(x)`:
 - `useExterneStellen()` liest `GLOBAL_KEYS.externeStellen` mit `nur_aktive=true`.
-- `externeStellenOptionen(stellen)` liefert gruppierte `AutoComplete`-Optionen
+- `externeStellenOptions(stellen)` liefert gruppierte `AutoComplete`-Optionen
   (`{ label: 'Leitstelle', options: [{ value: bezeichnung, label }] }`). Die zuständige
   Leitstelle trägt die Marke „zuständig“ als Wort.
 - Gefiltert wird per Teilwortsuche, ohne Rücksicht auf Groß- und Kleinschreibung (Logik wie
