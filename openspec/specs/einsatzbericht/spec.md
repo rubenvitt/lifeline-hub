@@ -55,9 +55,24 @@ und MUST NOT wegfallen.
 Stammdaten SHALL Bezeichnung, Einsatznummer, Leitstellennummer, Einsatzart, Stichwort,
 Einsatzort, meldende Stelle und Sachverhalt nennen, Zeiten SHALL Beginn, Ende und Dauer nennen.
 Führung SHALL die Einsatzleitung, die Stabsbesetzung S1–S6 und die abgehaltenen
-Lagebesprechungen mit Zeitpunkt und Entschluss nennen. Lage SHALL ein Verzeichnis aller
+Lagebesprechungen mit Zeitpunkt und Entschluss nennen. Als Einsatzleitung SHALL der an der eigenen
+Führungsstelle erfasste Einsatzleiter mit seinem „seit“ stehen, in derselben Darstellung wie die
+Kopfleiste der Einsatzdaten, sonst „nicht erfasst“. Die Konten mit der App-Rolle Einsatzleitung
+MUST NOT als Einsatzleitung erscheinen. Lage SHALL ein Verzeichnis aller
 freigegebenen Lageberichte und den letzten im Volltext zeigen. Der ETB-Auszug SHALL die Zahl der
 Einträge je Typ und alle Entscheidungen zeigen.
+
+#### Scenario: Einsatzleiter im Block Führung
+
+- **WHEN** der Einsatzleiter „Anna Schulz“ seit 11.10.2026 14:30 erfasst ist und zwei Konten die
+  App-Rolle Einsatzleitung tragen
+- **THEN** nennt der Block Führung unter „Einsatzleitung“ „Anna Schulz“ mit „seit 11.10.2026 14:30“
+- **AND** die beiden Konten stehen dort nicht
+
+#### Scenario: Kein Einsatzleiter erfasst
+
+- **WHEN** an der Führungsstelle kein Einsatzleiter erfasst ist
+- **THEN** steht unter „Einsatzleitung“ „nicht erfasst“
 
 #### Scenario: Lage mit drei Berichten
 

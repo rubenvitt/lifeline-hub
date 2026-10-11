@@ -2,12 +2,15 @@ use super::FreiesZeichenAnzeige;
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
-/// Felder zum Anlegen eines freien Zeichens (durch den Handler validiert/normalisiert).
+/// Felder zum Anlegen eines freien Zeichens (durch den Handler validiert/normalisiert). Genau
+/// eines von `zeichen_spec` und `grundzeichen` ist gesetzt (der Handler prüft, der DB-CHECK hält
+/// es fest); bei `zeichen_spec` sind die Overlays `None`.
 #[derive(Debug)]
 pub struct ZeichenNeu<'a> {
     pub lat: f64,
     pub lon: f64,
-    pub grundzeichen: &'a str,
+    pub zeichen_spec: Option<&'a str>,
+    pub grundzeichen: Option<&'a str>,
     pub organisation: Option<&'a str>,
     pub fachaufgabe: Option<&'a str>,
     pub symbol: Option<&'a str>,
@@ -21,10 +24,16 @@ pub struct ZeichenNeu<'a> {
 }
 
 /// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei nullable Overlay-Spalten setzt
-/// `Some(None)` NULL. `grundzeichen` ist NOT NULL und nur einfach optional. lat/lon sind nicht
-/// verschiebbar und fehlen hier.
+/// `Some(None)` NULL. lat/lon sind nicht verschiebbar und fehlen hier.
+///
+/// Die Form (LFH-836, design.md D4): `zeichen_spec` setzt die Zeichenbeschreibung und leert die
+/// Altform (`grundzeichen` und alle Overlays); `grundzeichen` setzt die Altform und leert die
+/// Zeichenbeschreibung. Beides zugleich lehnt der Handler ab. Overlay-Werte ohne `grundzeichen`
+/// an einem Zeichen mit Zeichenbeschreibung lehnt [`patche`] mit 422 ab; `null`-Overlays und
+/// ein Patch ohne Zeichenfelder lassen die Form unberührt.
 #[derive(Debug, Default)]
 pub struct ZeichenPatch<'a> {
+    pub zeichen_spec: Option<&'a str>,
     pub grundzeichen: Option<&'a str>,
     pub organisation: Option<Option<&'a str>>,
     pub fachaufgabe: Option<Option<&'a str>>,
@@ -39,8 +48,9 @@ pub struct ZeichenPatch<'a> {
 }
 
 const SELECT_ALLE: &str = "\
-    SELECT id, einsatz_id, lat, lon, grundzeichen, organisation, fachaufgabe, symbol, \
-           einheit, funktion, farbe, label, ansicht_id, erstellt_von, erstellt_at, geaendert_at \
+    SELECT id, einsatz_id, lat, lon, zeichen_spec, grundzeichen, organisation, fachaufgabe, \
+           symbol, einheit, funktion, farbe, label, ansicht_id, erstellt_von, erstellt_at, \
+           geaendert_at \
     FROM freies_zeichen";
 
 #[derive(sqlx::FromRow)]
@@ -49,7 +59,8 @@ struct Row {
     einsatz_id: i64,
     lat: f64,
     lon: f64,
-    grundzeichen: String,
+    zeichen_spec: Option<String>,
+    grundzeichen: Option<String>,
     organisation: Option<String>,
     fachaufgabe: Option<String>,
     symbol: Option<String>,
@@ -69,6 +80,7 @@ fn zu_anzeige(r: Row) -> FreiesZeichenAnzeige {
         einsatz_id: r.einsatz_id,
         lat: r.lat,
         lon: r.lon,
+        zeichen_spec: r.zeichen_spec,
         grundzeichen: r.grundzeichen,
         organisation: r.organisation,
         fachaufgabe: r.fachaufgabe,
@@ -130,13 +142,14 @@ pub async fn anlegen(
 ) -> Result<FreiesZeichenAnzeige, AppError> {
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO freies_zeichen \
-            (einsatz_id, lat, lon, grundzeichen, organisation, fachaufgabe, symbol, \
+            (einsatz_id, lat, lon, zeichen_spec, grundzeichen, organisation, fachaufgabe, symbol, \
              einheit, funktion, farbe, label, ansicht_id, erstellt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.lat)
     .bind(daten.lon)
+    .bind(daten.zeichen_spec)
     .bind(daten.grundzeichen)
     .bind(daten.organisation)
     .bind(daten.fachaufgabe)
@@ -152,34 +165,60 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Teil-Patch der TZ-Overlays, `label` und `grundzeichen`; `geaendert_at` wird immer
+/// Teil-Patch der Zeichenform, der Overlays, `label` und der Ansicht; `geaendert_at` wird immer
 /// nachgezogen, lat/lon bleiben. `NotFound`, falls fremd/unbekannt.
 ///
-/// Flag/Wert-Paare statt Vollersatz: ein `{"label":"X"}`-Patch lässt die Overlays stehen, und
+/// Flag/Wert-Paare statt Vollersatz: ein `{"label":"X"}`-Patch lässt die Form stehen, und
 /// `null` bleibt als Leerwunsch verfügbar. Nummerierte Parameter, damit eine verschobene
 /// Bind-Kette `organisation`↔`fachaufgabe` nicht still vertauscht
-/// (`patche_setzt_jede_spalte_an_ihren_platz`).
+/// (`patche_setzt_jede_spalte_an_ihren_platz`). `?1` (Zeichenbeschreibung) und `?2`
+/// (Grundzeichen) wählen die Form: `?1` leert die ganze Altform, `?2` die Zeichenbeschreibung.
+/// Alle SET-Ausdrücke lesen die Werte vor dem UPDATE.
+///
+/// `?21` sperrt Overlay-Werte ohne Grundzeichen an einem Zeichen mit Zeichenbeschreibung im
+/// selben Statement (kein Lese-Schreib-Fenster): der Zusammenhang mit dem gespeicherten Zustand
+/// verbietet sie → 422 (`src/AGENTS.md`, Statuscode-Konvention). Sonst stünden Overlays neben
+/// einer Beschreibung, die sie nie zeichnet.
 pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     patch: ZeichenPatch<'_>,
 ) -> Result<FreiesZeichenAnzeige, AppError> {
+    let overlay_werte = [
+        patch.organisation,
+        patch.fachaufgabe,
+        patch.symbol,
+        patch.einheit,
+        patch.funktion,
+        patch.farbe,
+    ]
+    .iter()
+    .any(|o| matches!(o, Some(Some(_))));
+    let altfelder_ohne_grundzeichen =
+        overlay_werte && patch.grundzeichen.is_none() && patch.zeichen_spec.is_none();
     let betroffen = sqlx::query(
         "UPDATE freies_zeichen SET \
-            grundzeichen = CASE WHEN ?1 IS NULL THEN grundzeichen ELSE ?2 END, \
-            organisation = CASE WHEN ?3 IS NULL THEN organisation ELSE ?4 END, \
-            fachaufgabe = CASE WHEN ?5 IS NULL THEN fachaufgabe ELSE ?6 END, \
-            symbol = CASE WHEN ?7 IS NULL THEN symbol ELSE ?8 END, \
-            einheit = CASE WHEN ?9 IS NULL THEN einheit ELSE ?10 END, \
-            funktion = CASE WHEN ?11 IS NULL THEN funktion ELSE ?12 END, \
-            farbe = CASE WHEN ?13 IS NULL THEN farbe ELSE ?14 END, \
+            zeichen_spec = CASE WHEN ?1 IS NOT NULL THEN ?1 \
+                                WHEN ?2 IS NOT NULL THEN NULL ELSE zeichen_spec END, \
+            grundzeichen = CASE WHEN ?1 IS NOT NULL THEN NULL \
+                                WHEN ?2 IS NOT NULL THEN ?2 ELSE grundzeichen END, \
+            organisation = CASE WHEN ?1 IS NOT NULL THEN NULL \
+                                WHEN ?3 IS NULL THEN organisation ELSE ?4 END, \
+            fachaufgabe = CASE WHEN ?1 IS NOT NULL THEN NULL \
+                               WHEN ?5 IS NULL THEN fachaufgabe ELSE ?6 END, \
+            symbol = CASE WHEN ?1 IS NOT NULL THEN NULL WHEN ?7 IS NULL THEN symbol ELSE ?8 END, \
+            einheit = CASE WHEN ?1 IS NOT NULL THEN NULL WHEN ?9 IS NULL THEN einheit ELSE ?10 END, \
+            funktion = CASE WHEN ?1 IS NOT NULL THEN NULL \
+                            WHEN ?11 IS NULL THEN funktion ELSE ?12 END, \
+            farbe = CASE WHEN ?1 IS NOT NULL THEN NULL WHEN ?13 IS NULL THEN farbe ELSE ?14 END, \
             label = CASE WHEN ?15 IS NULL THEN label ELSE ?16 END, \
             ansicht_id = CASE WHEN ?17 IS NULL THEN ansicht_id ELSE ?18 END, \
             geaendert_at = datetime('now') \
-         WHERE id = ?19 AND einsatz_id = ?20",
+         WHERE id = ?19 AND einsatz_id = ?20 \
+           AND NOT (?21 IS NOT NULL AND zeichen_spec IS NOT NULL)",
     )
-    .bind(patch.grundzeichen.map(|_| 1_i64))
+    .bind(patch.zeichen_spec)
     .bind(patch.grundzeichen)
     .bind(patch.organisation.map(|_| 1_i64))
     .bind(patch.organisation.and_then(|v| v))
@@ -199,11 +238,19 @@ pub async fn patche(
     .bind(patch.ansicht_id.and_then(|v| v))
     .bind(id)
     .bind(einsatz_id)
+    .bind(altfelder_ohne_grundzeichen.then_some(1_i64))
     .execute(pool)
     .await?
     .rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        // Unbekannt/fremd bleibt 404; sonst hat die Sperre `?21` gegriffen.
+        laden(pool, einsatz_id, id).await?;
+        return Err(AppError::UnprocessableEntity(
+            "Das Zeichen ist als Zeichenbeschreibung gespeichert: Organisation, Fachaufgabe, \
+             Symbol, Einheit, Funktion und Farbe nur zusammen mit grundzeichen oder als \
+             zeichen_spec senden"
+                .into(),
+        ));
     }
     laden(pool, einsatz_id, id).await
 }
@@ -249,7 +296,8 @@ mod tests {
         ZeichenNeu {
             lat: 50.1,
             lon: 8.6,
-            grundzeichen: "einheit",
+            zeichen_spec: None,
+            grundzeichen: Some("einheit"),
             organisation: Some("feuerwehr"),
             fachaufgabe: Some("brandbekaempfung"),
             symbol: None,
@@ -268,7 +316,7 @@ mod tests {
         let (einsatz, von) = setup(&pool).await;
         let z = anlegen(&pool, einsatz, neu(von)).await.unwrap();
         assert_eq!(z.einsatz_id, einsatz);
-        assert_eq!(z.grundzeichen, "einheit");
+        assert_eq!(z.grundzeichen.as_deref(), Some("einheit"));
         assert_eq!(z.organisation.as_deref(), Some("feuerwehr"));
         assert_eq!(z.lat, 50.1);
         assert_eq!(z.lon, 8.6);
@@ -311,6 +359,7 @@ mod tests {
             einsatz,
             z.id,
             ZeichenPatch {
+                zeichen_spec: None,
                 grundzeichen: Some("fahrzeug"),
                 organisation: Some(Some("thw")),
                 fachaufgabe: Some(None),
@@ -325,7 +374,7 @@ mod tests {
         .await
         .unwrap();
         // Neue Overlay-Werte übernommen …
-        assert_eq!(n.grundzeichen, "fahrzeug");
+        assert_eq!(n.grundzeichen.as_deref(), Some("fahrzeug"));
         assert_eq!(n.organisation.as_deref(), Some("thw"));
         assert_eq!(n.symbol.as_deref(), Some("kran"));
         assert_eq!(n.funktion.as_deref(), Some("zugtrupp"));
@@ -353,6 +402,7 @@ mod tests {
             einsatz,
             z.id,
             ZeichenPatch {
+                zeichen_spec: None,
                 grundzeichen: Some("stelle"),
                 organisation: Some(Some("thw")),
                 fachaufgabe: Some(Some("bergung")),
@@ -366,7 +416,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(n.grundzeichen, "stelle");
+        assert_eq!(n.grundzeichen.as_deref(), Some("stelle"));
         assert_eq!(n.organisation.as_deref(), Some("thw"));
         assert_eq!(n.fachaufgabe.as_deref(), Some("bergung"));
         assert_eq!(n.symbol.as_deref(), Some("kran"));
@@ -396,7 +446,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(n.label.as_deref(), Some("B"));
-        assert_eq!(n.grundzeichen, "einheit", "unberührt");
+        assert_eq!(n.grundzeichen.as_deref(), Some("einheit"), "unberührt");
         assert_eq!(n.organisation.as_deref(), Some("feuerwehr"), "unberührt");
         assert_eq!(
             n.fachaufgabe.as_deref(),
@@ -458,6 +508,142 @@ mod tests {
             )
             .await
             .unwrap_err(),
+            AppError::NotFound
+        ));
+    }
+
+    const SPEC: &str = r#"{"v":1,"freestanding":{"kind":"state","state":"developed-fire"}}"#;
+
+    /// LFH-836: eine Zeichenbeschreibung leert die ganze Altform, ein Grundzeichen danach die
+    /// Beschreibung; Bezeichnung und Ansicht bleiben, der DB-CHECK hält in beiden Richtungen.
+    #[tokio::test]
+    async fn patche_wechselt_die_form_in_beide_richtungen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let z = anlegen(&pool, einsatz, neu(von)).await.unwrap();
+
+        let n = patche(
+            &pool,
+            einsatz,
+            z.id,
+            ZeichenPatch {
+                zeichen_spec: Some(SPEC),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.zeichen_spec.as_deref(), Some(SPEC));
+        assert_eq!(
+            (
+                &n.grundzeichen,
+                &n.organisation,
+                &n.fachaufgabe,
+                &n.symbol,
+                &n.einheit,
+                &n.funktion,
+                &n.farbe
+            ),
+            (&None, &None, &None, &None, &None, &None, &None),
+            "Altform geleert"
+        );
+        assert_eq!(n.label.as_deref(), Some("A"), "Bezeichnung bleibt");
+
+        let n = patche(
+            &pool,
+            einsatz,
+            z.id,
+            ZeichenPatch {
+                grundzeichen: Some("person"),
+                einheit: Some(Some("trupp")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.zeichen_spec, None, "Beschreibung geleert");
+        assert_eq!(n.grundzeichen.as_deref(), Some("person"));
+        assert_eq!(n.einheit.as_deref(), Some("trupp"));
+        assert_eq!(n.organisation, None, "war durch die Beschreibung geleert");
+    }
+
+    /// Ein Zeichen mit Zeichenbeschreibung anlegen; `label`/Ansicht-Patch lässt die Form stehen.
+    #[tokio::test]
+    async fn anlegen_mit_spec_und_label_patch_laesst_form_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let z = anlegen(
+            &pool,
+            einsatz,
+            ZeichenNeu {
+                zeichen_spec: Some(SPEC),
+                grundzeichen: None,
+                organisation: None,
+                fachaufgabe: None,
+                symbol: None,
+                einheit: None,
+                funktion: None,
+                farbe: None,
+                ..neu(von)
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(z.zeichen_spec.as_deref(), Some(SPEC));
+        assert_eq!(z.grundzeichen, None);
+        let n = patche(
+            &pool,
+            einsatz,
+            z.id,
+            ZeichenPatch {
+                label: Some(Some("B")),
+                organisation: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.zeichen_spec.as_deref(), Some(SPEC), "Form unberührt");
+        assert_eq!(n.label.as_deref(), Some("B"));
+    }
+
+    /// Overlay-Werte ohne Grundzeichen an einem Spec-Zeichen: 422, nichts ändert sich; an einer
+    /// Altzeile bleibt derselbe Patch erlaubt.
+    #[tokio::test]
+    async fn patche_altfelder_ohne_grundzeichen_an_spec_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let alt = anlegen(&pool, einsatz, neu(von)).await.unwrap();
+        let spec = patche(
+            &pool,
+            einsatz,
+            anlegen(&pool, einsatz, neu(von)).await.unwrap().id,
+            ZeichenPatch {
+                zeichen_spec: Some(SPEC),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let p = || ZeichenPatch {
+            farbe: Some(Some("#00ff00")),
+            label: Some(Some("X")),
+            ..Default::default()
+        };
+        assert!(matches!(
+            patche(&pool, einsatz, spec.id, p()).await.unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
+        assert_eq!(
+            laden(&pool, einsatz, spec.id).await.unwrap(),
+            spec,
+            "unverändert"
+        );
+        let n = patche(&pool, einsatz, alt.id, p()).await.unwrap();
+        assert_eq!(n.farbe.as_deref(), Some("#00ff00"));
+        // Fremd bleibt 404, auch mit gesetzter Sperre.
+        assert!(matches!(
+            patche(&pool, 999, spec.id, p()).await.unwrap_err(),
             AppError::NotFound
         ));
     }

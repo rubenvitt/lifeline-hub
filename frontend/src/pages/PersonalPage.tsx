@@ -48,7 +48,7 @@ import {
 import { statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import DemoMarke from '../components/DemoMarke';
-import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
+import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
@@ -229,7 +229,7 @@ export default function PersonalPage() {
     eps.map((e) => e.personal_id).filter((x): x is number => x != null),
   );
   // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
-  const poolOptionen = demoGruppierteOptionen(
+  const poolOptionen = demoGroupedOptions(
     (poolQuery.data ?? []).filter((p) => !disponierteIds.has(p.id)),
     (p) => `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,
   );

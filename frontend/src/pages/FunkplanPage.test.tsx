@@ -188,7 +188,11 @@ beforeEach(() => {
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue(FAHRZEUGE);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue(PERSONAL);
   vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(SPRECHGRUPPEN);
-  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({ sprechgruppen: [], fahrzeug_ids: [] });
+  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+    art: 'mobil',
+    sprechgruppen: [],
+    fahrzeug_ids: [],
+  });
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
   vi.mocked(ladeStab).mockResolvedValue({ besetzung: [], anzahl_lagebesprechungen: 0 });
@@ -1077,6 +1081,7 @@ describe('FunkplanPage — Lücke „Verbindungen ohne gemeinsame Sprechgruppe�
 
 describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
   const FS = {
+    art: 'mobil' as const,
     rufname: 'Florian Stadt 10/1',
     sprechgruppen: [sg(1, 'TMO', 'TMO 311')],
     kommunikationsmittel: 'digitalfunk',
@@ -1104,6 +1109,22 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     expect(within(luecken()).queryByText(/Eigene Gegenstelle/)).toBeNull();
   });
 
+  it('zeigt den Einsatzleiter in der Spalte Leiter/Führer der Führungsstelle (LFH-1199)', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      ...FS,
+      einsatzleiter: {
+        art: 'extern',
+        name: 'KBM Weber',
+        personal_noch_disponiert: false,
+        seit: '2026-10-11 12:30:00',
+      },
+    });
+    const { container } = setup();
+    await screen.findByText('Florian Stadt 10/1');
+    const fs = container.querySelector('tr[data-row-key="fs"]') as HTMLElement;
+    expect(within(fs).getByText('KBM Weber (extern)')).toBeInTheDocument();
+  });
+
   it('nennt bei 403 den Grund statt „nicht erfasst“', async () => {
     vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new ApiError(403, 'verboten'));
     setup();
@@ -1122,6 +1143,7 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
 
   it('zählt die Verbindung Führungsstelle → oberster Abschnitt und verweist auf den Abschnitt', async () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      art: 'mobil',
       sprechgruppen: [sg(7, 'TMO', 'TMO 700')],
       fahrzeug_ids: [],
     });

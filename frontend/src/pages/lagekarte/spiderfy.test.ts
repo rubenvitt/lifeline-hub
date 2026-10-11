@@ -67,11 +67,11 @@ const props = (schluessel: string, extra: Partial<MarkerProps> = {}): MarkerProp
 
 describe('baueSpiderFc', () => {
   it('liefert je Leaf ein Feature mit unveränderten Properties + ein Beinchen vom Anker', () => {
-    const leaves = [props('uhs-1'), props('fahrzeug-2', { icon: 'tz|x', statusFarbe: '#0f0' })];
+    const leaves = [props('uhs-1'), props('fahrzeug-2', { icon: 'ez|x', statusFarbe: '#0f0' })];
     const { leaves: leafFc, legs } = baueSpiderFc(leaves, [100, 100], idProjektor);
 
     expect(leafFc.features.map((f) => f.properties.schluessel)).toEqual(['uhs-1', 'fahrzeug-2']);
-    expect(leafFc.features[1].properties.icon).toBe('tz|x');
+    expect(leafFc.features[1].properties.icon).toBe('ez|x');
     expect(leafFc.features[1].properties.statusFarbe).toBe('#0f0');
     // Position = Anker + Offset (Identitäts-Projektor)
     expect(leafFc.features).toHaveLength(2);

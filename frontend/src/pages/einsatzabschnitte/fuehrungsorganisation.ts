@@ -1,9 +1,17 @@
 import type { AbrufZustand } from '../../api/abrufZustand';
-import type { Einheit, Einsatzabschnitt, Staerke, Stabsfunktion } from '../../api/types';
+import type {
+  Einheit,
+  Einsatzabschnitt,
+  Fuehrungsstelle,
+  Staerke,
+  Stabsfunktion,
+} from '../../api/types';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { besetzungDarstellung } from '../../stab/besetzung';
+import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../stab/einsatzleiter';
 import { md, ZUSTAND_GRUND } from '../../stab/funkplan';
 import { SACHGEBIETE } from '../../stab/sachgebiete';
+import { fuehrungsstelleErfasst } from '../../stab/fuehrungsstelle';
 import { baueTzProps, type TzProps } from '../lagekarte/taktischesZeichen';
 import { abschnittStaerken } from './abschnittStaerke';
 
@@ -129,7 +137,7 @@ export function baueFuehrungsorganisation(
       name: a.name,
       rufname: a.kurzbezeichnung ?? null,
       leitung: a.leiter_name ?? null,
-      // Derselbe Aufruf wie der Gliederungsbaum (`baueBaum`): inklusive aller Unterabschnitte.
+      // Derselbe Aufruf wie der Gliederungsbaum (`buildBaum`): inklusive aller Unterabschnitte.
       staerke: einheitenFehlen
         ? null
         : abschnittStaerken([...abschnitte], [...alleEinheiten], a.id).inklUnter,
@@ -208,9 +216,28 @@ function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
   return [kopf, ...k.kinder.flatMap((c) => knotenMarkdown(c, tiefe + 1))];
 }
 
+/** Die erfasste eigene Führungsstelle an der Wurzel „Einsatzleitung“ (LFH-1181). */
+export interface WurzelFuehrungsstelle {
+  bezeichnung: string | null;
+  rufname: string | null;
+}
+
+/**
+ * Was die Wurzel von der eigenen Führungsstelle zeigt — EINE Ableitung für Bildschirm, Druck und
+ * beide Übernahmen in den Lagebericht. Nicht erfasst oder nicht geladen: `null`, die Wurzel bleibt
+ * wie ohne Führungsstelle.
+ */
+export function wurzelFuehrungsstelle(
+  fs: Fuehrungsstelle | null | undefined,
+): WurzelFuehrungsstelle | null {
+  if (!fs || !fuehrungsstelleErfasst(fs)) return null;
+  return { bezeichnung: fs.bezeichnung?.trim() || null, rufname: fs.rufname?.trim() || null };
+}
+
 /**
  * Die Führungsorganisation als Freitext für „In Lagebericht übernehmen“: Kopf, Einsatzleitung
- * (mit Stab nur, wenn übergeben — also freigegeben und geladen), fehlende Quellen, dann die
+ * (der Einsatzleiter, LFH-1199; Stab nur, wenn übergeben — also freigegeben und geladen), fehlende
+ * Quellen, dann die
  * Gliederung als verschachtelte Liste. Namen laufen durch `md()`: im Bericht stehen sie als Text,
  * nie als Auszeichnung. Erreichbarkeit führt das Organigramm nicht, also auch nicht hier.
  */
@@ -221,8 +248,24 @@ export function rendereFuehrungsorganisationMarkdown(
     /** `null`: nicht freigegeben (kein Wort darüber) · `'fehler'`: Abruf gescheitert. */
     stab: readonly Stabsfunktion[] | 'fehler' | null;
     einheitenZustand: AbrufZustand;
+    /** Die erfasste eigene Führungsstelle (LFH-1181); fehlt sie, steht keine Zeile dafür da. */
+    fuehrungsstelle?: WurzelFuehrungsstelle | null;
+    /** Aus der Führungsstelle (LFH-1199). */
+    einsatzleiter: EinsatzleiterDarstellung;
+    /** UTC → volle taktische DTG in der Anzeigezone, für das „seit“ des Einsatzleiters. */
+    dtg: (utc: string) => string;
   },
 ): string {
+  const fs = opts.fuehrungsstelle;
+  const fuehrungsstelle =
+    fs && (fs.bezeichnung || fs.rufname)
+      ? [
+          `- ${[
+            fs.bezeichnung ? `Führungsstelle ${md(fs.bezeichnung)}` : 'Führungsstelle',
+            ...(fs.rufname ? [`Rufname ${md(fs.rufname)}`] : []),
+          ].join(' · ')}`,
+        ]
+      : [];
   const stab =
     opts.stab == null
       ? []
@@ -258,9 +301,12 @@ export function rendereFuehrungsorganisationMarkdown(
     '',
     '## Einsatzleitung',
     '',
-    // Wer die Einsatzleitung führt, ist kein Datum (die Führungsstelle, LFH-849, trägt nur
-    // Funkangaben).
-    '- Leitung nicht erfasst',
+    ...fuehrungsstelle,
+    // Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke; ein fehlender
+    // Abruf steht mit Grund darin, nicht als „nicht erfasst“.
+    opts.einsatzleiter.art === 'nicht-erfasst'
+      ? '- Leitung nicht erfasst'
+      : `- Einsatzleiter: ${einsatzleiterMarkdown(opts.einsatzleiter, opts.dtg)}`,
     ...stab,
     '',
     ...quellen,

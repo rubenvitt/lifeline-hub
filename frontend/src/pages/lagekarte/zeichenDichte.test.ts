@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Drawing } from '@einsatzzeichen/schema';
-import type { ZeichenQuelle } from './markerIcons';
 import { beobachtePixeldichte, rastereZeichenNeu, type ZeichenKarte } from './zeichenDichte';
 
 /** Ein Fenster, dessen Pixeldichte der Test von Hand wechselt — wie ein Monitor- oder Zoomwechsel. */
@@ -88,14 +87,13 @@ function testKarte(ids: string[], geladen = true) {
 }
 
 describe('rastereZeichenNeu', () => {
-  const registry = new Map<string, ZeichenQuelle>([
-    ['ez|a', { art: 'ez', drawing: ZEICHNUNG }],
-    ['ez|b', { art: 'ez', drawing: ZEICHNUNG }],
-    ['tz|c', { art: 'tz', tz: { grundzeichen: 'anlass' } }],
+  const registry = new Map<string, Drawing>([
+    ['ez|a', ZEICHNUNG],
+    ['ez|b', ZEICHNUNG],
   ]);
 
   it('ersetzt jedes registrierte ez|-Bild in der neuen Dichte und lässt die übrigen stehen', () => {
-    const t = testKarte(['ez|a', 'ez|b', 'tz|c', 'plakette|x']);
+    const t = testKarte(['ez|a', 'ez|b', 'plakette|x']);
     const zeichne = vi.fn((_karte: ZeichenKarte, id: string) => {
       t.bilder.add(id);
       t.protokoll.push(`neu ${id}`);
@@ -109,7 +107,7 @@ describe('rastereZeichenNeu', () => {
     });
     // Erst entfernen, dann anlegen: `addSymbolImage` wirft auf eine belegte ID.
     expect(t.protokoll).toEqual(['weg ez|a', 'neu ez|a', 'weg ez|b', 'neu ez|b']);
-    expect([...t.bilder].sort()).toEqual(['ez|a', 'ez|b', 'plakette|x', 'tz|c']);
+    expect([...t.bilder].sort()).toEqual(['ez|a', 'ez|b', 'plakette|x']);
   });
 
   it('lässt ein ez|-Bild ohne Quelle in der Registry stehen', () => {

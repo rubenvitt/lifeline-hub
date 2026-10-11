@@ -14,9 +14,11 @@ fehlendes oder **leeres** Pflichtfeld) · **422** `UnprocessableEntity` — der 
 (Feld-Kombination, **Status-Übergang**, Zustand) · **409** `Conflict` — Nebenläufigkeit (CAS) oder
 Lebenszyklus (storniert) · **413** `PayloadTooLarge` — Body über dem Limit der Route, vor dem
 Handler (`JsonBody`, LFH-1074).
-- Referenzpaare: `tests/freies_zeichen.rs`, `tests/einsatz_schaden.rs`;
-  `abschliessen_ohne_grund_ist_400` gegen `abschluss_ohne_grund_ist_422_und_mit_grund_ok` nicht
-  „harmonisieren".
+- Referenzpaare, nicht „harmonisieren": `tests/freies_zeichen.rs` (`ohne_zeichenform_ist_400`,
+  `leere_zeichenform_ist_400` gegen `altfelder_ohne_grundzeichen_an_spec_zeichen_ist_422`; zwei
+  Zeichenformen in einem Body sind per Spec `lagekarte-freie-zeichen` 400, LFH-836),
+  `tests/einsatz_schaden.rs` (`abschliessen_ohne_grund_ist_400` gegen
+  `abschluss_ohne_grund_ist_422_und_mit_grund_ok`).
 - **409 hat zwei Quellen:** CAS (`basis_geaendert_at` in `schaden/repo.rs`, `tier/repo.rs`;
   Überschreiben-Dialog) und Lebenszyklus (kein Dialog). Das Frontend trennt nur heuristisch
   (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in

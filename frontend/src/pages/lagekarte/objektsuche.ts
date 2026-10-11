@@ -42,6 +42,7 @@ export function suchbareMarker(a: {
  */
 export const TYP_REIHENFOLGE: readonly MarkerTyp[] = [
   'einsatzort',
+  'fuehrungsstelle',
   'schaden',
   'uhs',
   'betreuungsstelle',

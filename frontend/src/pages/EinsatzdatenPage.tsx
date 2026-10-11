@@ -1,4 +1,14 @@
-import { App, AutoComplete, Breadcrumb, Button, Input, InputNumber, Popconfirm } from 'antd';
+import {
+  App,
+  AutoComplete,
+  Breadcrumb,
+  Button,
+  Collapse,
+  Input,
+  InputNumber,
+  Popconfirm,
+  Space,
+} from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -15,17 +25,21 @@ import {
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
-import { istLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
+import {
+  alsLatLon,
+  istLatLon,
+  istUngueltigeKoordinate,
+  type KoordinatenWert,
+} from '../anzeige/koordinatenWert';
 import { Link, useNavigate, useParams } from 'react-router';
 import { einsatzberichtPfad, einsatzEinstellungenPfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
   ladeEinsatz,
   ladeFuehrungsstelle,
-  ladeMitglieder,
   ladeModulFreigaben,
   patcheEinsatz,
   patcheFuehrungsstelle,
@@ -33,10 +47,13 @@ import {
   type KopfdatenPatch,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
+import { externeStellenOptions, useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
+import { teilwortSuche } from '../components/teilwortSuche';
+import { MELDENDE_STELLE_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
-import { InlineAngabe } from '../components/InlineAngabe';
+import { InlineAngabe, type InlineEingabe } from '../components/InlineAngabe';
 import { useViewport } from '../components/useViewport';
 import { useAuth } from '../auth/AuthContext';
 import { darfEinsatzLeiten, darfEinsatzVerwalten } from '../einsatz/schreibrecht';
@@ -45,11 +62,26 @@ import type {
   Einsatzart,
   EinsatzFahrzeug,
   Fuehrungsstelle,
+  FuehrungsstellenArt,
   FuehrungsstellePatch,
 } from '../api/types';
+import Segmentleiste from '../components/instrument/Segmentleiste';
+import { mitVorgabe } from '../components/vorgabeText';
+import { fuehrungsstelleErfasst } from '../stab/fuehrungsstelle';
+import {
+  FUEHRUNGSSTELLE_ADRESSE_MAX,
+  FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+} from '../api/eingabegrenzen';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
+import { listeFahrzeuge } from '../api/fahrzeuge';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
+import {
+  rufnameFilter,
+  rufnameOptions,
+  rufnamePlaceholder,
+  rufnameVorschlaege,
+} from '../stab/rufnameVorschlaege';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import {
@@ -58,6 +90,8 @@ import {
   mitBetriebsart,
   teileSprechgruppen,
 } from '../components/kommunikationsmittel';
+import EinsatzleiterAngabe from './EinsatzleiterAngabe';
+import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
@@ -85,7 +119,7 @@ function leererText(w: string): boolean {
  */
 type FeldSpeichern = (etikett: string, patch: KopfdatenPatch) => Promise<EinsatzAnzeige>;
 
-/** Eine freie Textangabe als Zeile (Stichwort ausgenommen: es hat Vorschläge). */
+/** Eine freie Textangabe als Zeile (Stichwort und meldende Stelle ausgenommen: sie haben Vorschläge). */
 function TextAngabe({
   etikett,
   wert,
@@ -270,6 +304,8 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
   const { token, rollen } = useRollen();
   return (
     <div
+      role="group"
+      aria-label={etikett}
       style={{
         background: rollen.flaeche,
         paddingBlock: token.paddingSM,
@@ -339,14 +375,14 @@ function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
   return b.every((id) => menge.has(id));
 }
 
-/** Ein Fahrzeug, wie die Zeile „Fahrzeuge“ es nennt: „Florian 10/1 (ELW 2)“. */
+/** Ein Fahrzeug, wie die Zeile „Führungsfahrzeuge“ es nennt: „Florian 10/1 (ELW 2)“. */
 function fahrzeugText(f: EinsatzFahrzeug): string {
   const typ = f.fahrzeugtyp?.trim();
   return typ ? `${f.funkrufname} (${typ})` : f.funkrufname;
 }
 
 /**
- * Die disponierten Fahrzeuge für die Zeile „Fahrzeuge“ (LFH-1106). Die Führungsstelle liefert nur
+ * Die disponierten Fahrzeuge für die Zeile „Führungsfahrzeuge“ (LFH-1106). Die Führungsstelle liefert nur
  * IDs; Namen kommen aus dem Modul Fahrzeuge, abgerufen nur mit dessen Freigabe.
  */
 function useFahrzeugeQuelle(einsatzId: number): {
@@ -379,18 +415,42 @@ function useFahrzeugeQuelle(einsatzId: number): {
   };
 }
 
+const ART_OPTIONEN: { wert: FuehrungsstellenArt; label: string }[] = [
+  { wert: 'mobil', label: 'mobil' },
+  { wert: 'ortsfest', label: 'ortsfest' },
+];
+
+/** Entwurf der Zeile „Standort“: Adresse und Koordinate gehen zusammen hinaus (LFH-1181, D4). */
+interface StandortEntwurf {
+  adresse: string;
+  koord: KoordinatenWert;
+}
+
+function gleicherStandort(a: StandortEntwurf, b: StandortEntwurf): boolean {
+  // Eine unlesbare Koordinate ist nie „unverändert“: sie geht bis `onSpeichern` und steht dort als
+  // Fehler an der Zeile (`alsLatLon` würfe hier, vor dem Fehlerpfad der Zeile).
+  if (istUngueltigeKoordinate(a.koord) || istUngueltigeKoordinate(b.koord)) return false;
+  const la = alsLatLon(a.koord);
+  const lb = alsLatLon(b.koord);
+  return a.adresse.trim() === b.adresse.trim() && la?.lat === lb?.lat && la?.lon === lb?.lon;
+}
+
 /**
  * Eigene Führungsstelle des Einsatzes (LFH-849, Spec `einsatz-fuehrungsstelle`): die Gegenstelle
- * des Funkplans. Fünf Zeilen, jede schickt nur ihr Feld an `…/fuehrungsstelle`, mit dem
- * Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
+ * des Funkplans, seit LFH-1181 ein Ort mit Ausstattung. Zuerst der Einsatzleiter (LFH-1199),
+ * dann Art, Bezeichnung und Standort vor den Funkangaben, denn wer die Führungsstelle sucht, braucht
+ * den Ort vor dem Funk (LFH-1181, design.md D5). Jede Zeile schickt nur ihr Feld an
+ * `…/fuehrungsstelle`, der Standort Adresse und Koordinate zusammen, mit dem Schreibrecht der
+ * Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
  */
 function FuehrungsstellePaneel({
-  einsatzId,
+  einsatz,
   darfSchreiben,
 }: {
-  einsatzId: number;
+  einsatz: EinsatzAnzeige;
   darfSchreiben: boolean;
 }) {
+  const einsatzId = einsatz.id;
   const qc = useQueryClient();
   const { message } = App.useApp();
   const query = useQuery({
@@ -415,19 +475,24 @@ function FuehrungsstellePaneel({
   const text = (
     etikett: string,
     wert: string | null | undefined,
-    mono: boolean,
-    schluessel: 'rufname' | 'erreichbarkeit',
+    schluessel: 'bezeichnung' | 'erreichbarkeit',
+    maxLength?: number,
   ) => (
     <InlineAngabe<string>
       etikett={etikett}
       wert={wert ?? ''}
-      anzeige={mono ? <span style={monoStil(13)}>{wert}</span> : wert}
+      anzeige={wert}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
       onSpeichern={(w) => speichern(etikett, { [schluessel]: leerZuNull(w) })}
       eingabe={({ feld, value, onChange }) => (
-        <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+        <Input
+          {...feld}
+          value={value}
+          maxLength={maxLength}
+          onChange={(e) => onChange(e.target.value)}
+        />
       )}
     />
   );
@@ -444,7 +509,60 @@ function FuehrungsstellePaneel({
         {fs && (
           <Angaben
             zeilen={[
-              { etikett: 'Rufname', wert: text('Rufname', fs.rufname, true, 'rufname') },
+              {
+                etikett: 'Einsatzleiter',
+                wert: (
+                  <EinsatzleiterAngabe
+                    einsatzId={einsatzId}
+                    fs={fs}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(einsatzleiter) => speichern('Einsatzleiter', { einsatzleiter })}
+                  />
+                ),
+              },
+              {
+                etikett: 'Art',
+                wert: (
+                  <ArtAngabe
+                    art={fs.art}
+                    erfasst={fuehrungsstelleErfasst(fs)}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(art) => speichern('Art', { art })}
+                  />
+                ),
+              },
+              {
+                etikett: 'Bezeichnung',
+                wert: text(
+                  'Bezeichnung',
+                  fs.bezeichnung,
+                  'bezeichnung',
+                  FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+                ),
+              },
+              {
+                etikett: 'Standort',
+                wert: (
+                  <StandortAngabe
+                    fs={fs}
+                    einsatz={einsatz}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(patch) => speichern('Standort', patch)}
+                  />
+                ),
+              },
+              {
+                etikett: 'Rufname',
+                wert: (
+                  <RufnameAngabe
+                    rufname={fs.rufname}
+                    fahrzeugIds={fs.fahrzeug_ids}
+                    quelle={fahrzeugQuelle}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(w) => speichern('Rufname', { rufname: leerZuNull(w) })}
+                  />
+                ),
+              },
               {
                 etikett: 'Sprechgruppen',
                 wert: (
@@ -494,16 +612,17 @@ function FuehrungsstellePaneel({
               },
               {
                 etikett: 'Erreichbarkeit',
-                wert: text('Erreichbarkeit', fs.erreichbarkeit, false, 'erreichbarkeit'),
+                wert: text('Erreichbarkeit', fs.erreichbarkeit, 'erreichbarkeit'),
               },
               {
-                etikett: 'Fahrzeuge',
+                etikett: 'Führungsfahrzeuge',
                 wert: (
-                  <FahrzeugeAngabe
+                  <FuehrungsfahrzeugeZeile
+                    art={fs.art}
                     ids={fs.fahrzeug_ids}
                     quelle={fahrzeugQuelle}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(ids) => speichern('Fahrzeuge', { fahrzeug_ids: ids })}
+                    onSpeichern={(ids) => speichern('Führungsfahrzeuge', { fahrzeug_ids: ids })}
                   />
                 ),
               },
@@ -516,8 +635,259 @@ function FuehrungsstellePaneel({
 }
 
 /**
- * Zeile „Fahrzeuge“ der Führungsstelle (LFH-1106): welche disponierten Fahrzeuge sie tragen.
- * Ohne Freigabe für Fahrzeuge gesperrt, mit dem Grund statt eines leeren Werts.
+ * Zeile „Art“ (LFH-1181, D1/D5): mit Schreibrecht eine Segmentleiste, deren Wahl sofort nur die Art
+ * schickt; ohne Schreibrecht der Wert. Die Art ist nie leer; solange sonst nichts erfasst ist,
+ * gilt `mobil` als Vorgabe und heißt so.
+ */
+function ArtAngabe({
+  art,
+  erfasst,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  art: FuehrungsstellenArt;
+  erfasst: boolean;
+  darfSchreiben: boolean;
+  onSpeichern: (art: FuehrungsstellenArt) => Promise<unknown>;
+}) {
+  const [fehler, setFehler] = useState<unknown>(null);
+  // Die zuletzt gewählte Art steht sofort, bis ihre Antwort da ist; eine frühere Antwort setzt sie
+  // nicht zurück (zwei schnelle Wechsel: es gilt der letzte).
+  const [gewaehlt, setGewaehlt] = useState<FuehrungsstellenArt | null>(null);
+  const letzte = useRef(0);
+  if (!darfSchreiben) {
+    // „Vorgabe“ heißt nur der Wert, der ohne Wahl gilt (`components/vorgabeText.ts`).
+    return <>{art === 'mobil' && !erfasst ? mitVorgabe(art) : art}</>;
+  }
+  const wert = gewaehlt ?? art;
+  return (
+    <>
+      <Segmentleiste<FuehrungsstellenArt>
+        optionen={ART_OPTIONEN}
+        wert={wert}
+        beschriftung="Art"
+        onWechsel={(neu) => {
+          if (neu === wert) return;
+          const nr = ++letzte.current;
+          setFehler(null);
+          setGewaehlt(neu);
+          onSpeichern(neu).then(
+            () => {
+              if (nr === letzte.current) setGewaehlt(null);
+            },
+            (e: unknown) => {
+              if (nr !== letzte.current) return;
+              setGewaehlt(null);
+              setFehler(e);
+            },
+          );
+        }}
+      />
+      <SpeicherFehler fehler={fehler} />
+    </>
+  );
+}
+
+/**
+ * Zeile „Standort“ (LFH-1181, D3/D4): Adresse als Text und Koordinate über die Koordinateneingabe
+ * mit Ortsvorschau. „wie Einsatzort“ übernimmt beides einmalig in den Entwurf; gespeichert wird erst
+ * mit der Zeile. Eine Adresssuche bringt erst der Ortsfeld-Baustein (LFH-1248).
+ */
+function StandortAngabe({
+  fs,
+  einsatz,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  fs: Fuehrungsstelle;
+  einsatz: EinsatzAnzeige;
+  darfSchreiben: boolean;
+  onSpeichern: (patch: FuehrungsstellePatch) => Promise<unknown>;
+}) {
+  const { token } = useRollen();
+  const koord =
+    fs.standort_lat != null && fs.standort_lon != null
+      ? { lat: fs.standort_lat, lon: fs.standort_lon }
+      : null;
+  const ortKoord =
+    einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
+      ? { lat: einsatz.einsatzort_lat, lon: einsatz.einsatzort_lon }
+      : null;
+  const hatEinsatzort = !!einsatz.einsatzort?.trim() || ortKoord != null;
+  const exclude = `fuehrungsstelle:${einsatz.id}`;
+  const koordId = useId();
+  return (
+    <InlineAngabe<StandortEntwurf>
+      etikett="Standort"
+      wert={{ adresse: fs.standort_adresse ?? '', koord }}
+      anzeige={
+        <span>
+          {fs.standort_adresse && <span style={{ display: 'block' }}>{fs.standort_adresse}</span>}
+          {koord && (
+            <KoordinatenAnzeige
+              lat={koord.lat}
+              lon={koord.lon}
+              einsatzId={einsatz.id}
+              exclude={exclude}
+            />
+          )}
+        </span>
+      }
+      leer={(w) => w.adresse.trim() === '' && w.koord == null}
+      gleich={gleicherStandort}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={(w) => {
+        if (istUngueltigeKoordinate(w.koord)) {
+          return Promise.reject(new Error('Koordinate nicht lesbar'));
+        }
+        const ll = alsLatLon(w.koord);
+        return onSpeichern({
+          standort_adresse: leerZuNull(w.adresse),
+          standort_lat: ll?.lat ?? null,
+          standort_lon: ll?.lon ?? null,
+        });
+      }}
+      eingabe={({ feld, value, onChange }) => (
+        <Space orientation="vertical" style={{ width: '100%' }} size={token.marginXS}>
+          <Input
+            {...feld}
+            aria-label="Adresse des Standorts"
+            value={value.adresse}
+            maxLength={FUEHRUNGSSTELLE_ADRESSE_MAX}
+            onChange={(e) => onChange({ ...value, adresse: e.target.value })}
+          />
+          <label htmlFor={koordId}>Koordinate</label>
+          <KoordinatenEingabe
+            id={koordId}
+            value={value.koord}
+            onChange={(k) => onChange({ ...value, koord: k })}
+            einsatzId={einsatz.id}
+            exclude={exclude}
+          />
+          {hatEinsatzort && (
+            <Button
+              onClick={() => onChange({ adresse: einsatz.einsatzort ?? '', koord: ortKoord })}
+            >
+              wie Einsatzort
+            </Button>
+          )}
+        </Space>
+      )}
+    />
+  );
+}
+
+/**
+ * Zeile „Führungsfahrzeuge“ (LFH-1181, D5): bei `mobil` offen, bei `ortsfest` eingeklappt mit der
+ * Anzahl im Kopf. Keine Art verlangt ein Fahrzeug; die Zuordnung bleibt beim Einklappen erhalten.
+ */
+function FuehrungsfahrzeugeZeile({
+  art,
+  ...props
+}: { art: FuehrungsstellenArt } & Parameters<typeof FahrzeugeAngabe>[0]) {
+  if (art !== 'ortsfest') return <FahrzeugeAngabe {...props} />;
+  const n = props.ids.length;
+  const kopf =
+    n === 0 ? 'kein Führungsfahrzeug' : n === 1 ? '1 Führungsfahrzeug' : `${n} Führungsfahrzeuge`;
+  return (
+    <Collapse
+      ghost
+      items={[{ key: 'fahrzeuge', label: kopf, children: <FahrzeugeAngabe {...props} /> }]}
+    />
+  );
+}
+
+/**
+ * Zeile „Rufname“ der Führungsstelle mit Vorschlägen aus den Stammdaten (LFH-1187,
+ * `stab/rufnameVorschlaege.tsx`): Funkrufnamen der Führungsfahrzeuge, Freitext bleibt erlaubt.
+ */
+function RufnameAngabe({
+  rufname,
+  fahrzeugIds,
+  quelle,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  rufname: string | null | undefined;
+  fahrzeugIds: readonly number[];
+  quelle: ReturnType<typeof useFahrzeugeQuelle>;
+  darfSchreiben: boolean;
+  onSpeichern: (wert: string) => Promise<unknown>;
+}) {
+  return (
+    <InlineAngabe<string>
+      etikett="Rufname"
+      wert={rufname ?? ''}
+      anzeige={<span style={monoStil(13)}>{rufname}</span>}
+      leer={leererText}
+      gleich={(a, b) => a.trim() === b.trim()}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={onSpeichern}
+      eingabe={(eingabe) => (
+        <RufnameInput
+          eingabe={eingabe}
+          fahrzeugIds={fahrzeugIds}
+          disponiert={quelle.zustand === 'daten' ? quelle.fahrzeuge : null}
+        />
+      )}
+    />
+  );
+}
+
+/**
+ * Das Eingabefeld des Rufnamens. Die Fahrzeuge der Organisation lädt es erst beim Bearbeiten,
+ * aus demselben Cache wie der Pool der Fahrzeugseite; ein Fehler dort lässt nur ihre Gruppe weg.
+ *
+ * **Enter übernimmt nur eine angesteuerte Option.** rc-select macht beim Tippen still die erste
+ * Option aktiv, deren Wert mit dem Getippten beginnt, und Enter übernähme sie: „Kater 1“ würde zu
+ * „Kater 11“. Ohne Pfeiltaste seit der letzten Eingabe hält die Capture-Phase Enter deshalb von
+ * rc-select fern, und das `<form>` von `InlineAngabe` sendet den getippten Text. Bei
+ * geschlossenem Popup lässt rc-select Enter ohnehin durch.
+ */
+function RufnameInput({
+  eingabe: { feld, popup, value, onChange },
+  fahrzeugIds,
+  disponiert,
+}: {
+  eingabe: InlineEingabe<string>;
+  fahrzeugIds: readonly number[];
+  disponiert: readonly EinsatzFahrzeug[] | null;
+}) {
+  const stammQuery = useQuery({
+    queryKey: globalKeys.fahrzeugeListe('im-dienst'),
+    queryFn: () => listeFahrzeuge(true),
+  });
+  const navigated = useRef(false);
+  const options = rufnameOptions(
+    rufnameVorschlaege({ fahrzeugIds, disponiert, stamm: stammQuery.data ?? null }),
+  );
+  return (
+    <div
+      onKeyDownCapture={(e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') navigated.current = true;
+        else if (e.key === 'Enter' && !navigated.current) e.stopPropagation();
+      }}
+    >
+      <AutoComplete
+        {...feld}
+        {...popup}
+        options={options}
+        filterOption={rufnameFilter}
+        placeholder={rufnamePlaceholder(fahrzeugIds, disponiert)}
+        value={value}
+        onChange={(v?: string) => {
+          navigated.current = false;
+          onChange(v ?? '');
+        }}
+        style={{ width: '100%' }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Zeile „Führungsfahrzeuge“ der Führungsstelle (LFH-1106): welche disponierten Fahrzeuge sie
+ * tragen. Ohne Freigabe für Fahrzeuge gesperrt, mit dem Grund statt eines leeren Werts.
  */
 function FahrzeugeAngabe({
   ids,
@@ -535,7 +905,7 @@ function FahrzeugeAngabe({
   const gewaehlt = quelle.fahrzeuge.filter((f) => ids.includes(f.id));
   return (
     <InlineAngabe<number[]>
-      etikett="Fahrzeuge"
+      etikett="Führungsfahrzeuge"
       wert={gewaehlt.map((f) => f.id)}
       anzeige={gewaehlt.map(fahrzeugText).join(', ')}
       leer={(w) => w.length === 0}
@@ -586,14 +956,18 @@ export default function EinsatzdatenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const mitgliederQuery = useQuery({
-    queryKey: einsatzKeys.mitglieder(einsatzId),
-    queryFn: () => ladeMitglieder(einsatzId),
+  // Der Einsatzleiter der Kopfleiste kommt aus der Führungsstelle (LFH-1199), derselbe Key wie das
+  // Paneel; live über `einsatz`.
+  const fuehrungsstelleQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
   });
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
   });
+  // Katalog „Externe Stellen“ (LFH-1194): Vorschläge für die meldende Stelle, Freitext bleibt.
+  const stellenQuery = useExterneStellen();
 
   // Der einzige Bearbeitungsweg (LFH-472, LFH-1170): EIN Feld je PATCH, die Koordinate als Paar.
   // Der Fehler geht an die Zeile (`mutateAsync` lehnt ab, `InlineAngabe` zeigt ihn), deshalb kein
@@ -630,15 +1004,16 @@ export default function EinsatzdatenPage() {
   // (LFH-1066, wie der Server).
   const darfBearbeiten = darfEinsatzVerwalten(einsatz, benutzer);
 
-  const leitung = (mitgliederQuery.data ?? [])
-    .filter((m) => m.einsatz_rolle === 'einsatzleitung')
-    .map((m) => m.anzeigename)
-    .join(', ');
+  const einsatzleiter = einsatzleiterDarstellung({
+    zustand: abrufZustand(fuehrungsstelleQuery),
+    daten: fuehrungsstelleQuery.data ?? null,
+  });
 
   // Aktiver Einsatz und Einsatzleitung, ohne Admin-Zweig (wie der Server): Abschluss und Zugriff.
   const darfLeiten = darfEinsatzLeiten(einsatz);
 
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
+  const stellenOptionen = externeStellenOptions(stellenQuery.data ?? []);
   const kennungen = einsatzKennungen(einsatz);
 
   // Nebenwege im Kopf (LFH-963, LFH-1170): nichts davon muss am Handy ohne Menü sichtbar sein.
@@ -758,7 +1133,19 @@ export default function EinsatzdatenPage() {
             />
           }
         />
-        <KopfAngabe etikett="Einsatzleitung" wert={leitung || '—'} />
+        {/* Der Einsatzleiter der Führungsstelle, nie die App-Rolle `einsatzleitung`: sie ist
+            ein Rechtebündel, kein Einsatzleiter nach FwDV 100 (LFH-1199, Regel „Keine
+            erfundenen Daten“). Gepflegt wird er im Paneel „Eigene Führungsstelle“. */}
+        <KopfAngabe
+          etikett="Einsatzleitung"
+          wert={
+            einsatzleiter.art === 'erfasst' ? (
+              einsatzleiterKurz(einsatzleiter)
+            ) : (
+              <span style={{ color: rollen.gedaempft }}>{einsatzleiterKurz(einsatzleiter)}</span>
+            )
+          }
+        />
       </div>
 
       <div
@@ -879,13 +1266,32 @@ export default function EinsatzdatenPage() {
             zeilen={[
               {
                 etikett: 'Meldende Stelle',
+                // Vorschläge aus dem Katalog „Externe Stellen“ (LFH-1194); gespeichert wird nur
+                // der Text (Speicherform A), Freitext bleibt.
                 wert: (
-                  <TextAngabe
+                  <InlineAngabe<string>
                     etikett="Meldende Stelle"
-                    wert={einsatz.meldende_stelle}
+                    wert={einsatz.meldende_stelle ?? ''}
+                    anzeige={einsatz.meldende_stelle}
+                    leer={leererText}
+                    gleich={(a, b) => a.trim() === b.trim()}
                     darfSchreiben={darfBearbeiten}
-                    speichern={feldSpeichern}
-                    zuPatch={(w) => ({ meldende_stelle: w })}
+                    onSpeichern={(w) =>
+                      feldSpeichern('Meldende Stelle', { meldende_stelle: leerZuNull(w) })
+                    }
+                    eingabe={({ feld, popup, value, onChange }) => (
+                      <AutoComplete
+                        {...feld}
+                        {...popup}
+                        options={stellenOptionen}
+                        showSearch={teilwortSuche}
+                        allowClear
+                        maxLength={MELDENDE_STELLE_MAX}
+                        placeholder="z. B. ILS Musterkreis"
+                        value={value}
+                        onChange={(v?: string) => onChange(v ?? '')}
+                      />
+                    )}
                   />
                 ),
               },
@@ -933,7 +1339,7 @@ export default function EinsatzdatenPage() {
           />
         </Paneel>
 
-        <FuehrungsstellePaneel einsatzId={einsatzId} darfSchreiben={darfBearbeiten} />
+        <FuehrungsstellePaneel einsatz={einsatz} darfSchreiben={darfBearbeiten} />
       </div>
 
       {/* Zuletzt und nicht im Kopf (LFH-960): Unumkehrbares für den ganzen Einsatz steht nicht im

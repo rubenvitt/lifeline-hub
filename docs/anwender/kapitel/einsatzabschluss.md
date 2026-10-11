@@ -2,7 +2,7 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs]
 ---
 
 ## Überblick
@@ -76,6 +76,13 @@ Aufbewahrungsfrist abgelaufen“.
   am Block „– kein Zugriff: …“ mit dem Modul, und die Druckansicht zeigt „Einsatzbericht nicht
   verfügbar“, bis der Block abgewählt ist.
 - Ein im Einsatz ausgeblendetes Modul erscheint im Bericht als „In diesem Einsatz nicht genutzt“.
+
+### Wer im Bericht als Einsatzleitung steht
+
+Der Block „Führung“ nennt unter „Einsatzleitung“ den Einsatzleiter mit „Seit“, wie er in
+„Einsatzdaten“ festgelegt ist (siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)), sonst
+„nicht erfasst“. Mitglieder mit der Rolle Einsatzleitung stehen dort nicht; die Rolle ist ein
+Recht, keine Führungsfunktion.
 
 ### Stand, Anlagen und Adresse
 

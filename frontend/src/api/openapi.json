@@ -4561,6 +4561,51 @@
           "bereitstellung"
         ]
       },
+      "EinsatzleiterAnzeige": {
+        "type": "object",
+        "description": "Der Einsatzleiter, wie der Client ihn liest.",
+        "required": [
+          "art",
+          "personal_noch_disponiert",
+          "seit"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/EinsatzleiterArt"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bei `personal` der beim Setzen eingefrorene Name, bei `extern` der Freitext. Fehlt nur nach\nder Schwärzung des Einsatzes."
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Dispositionszeile (`einsatz_personal.id`); fehlt bei `extern` und nach dem Entlassen."
+          },
+          "personal_noch_disponiert": {
+            "type": "boolean",
+            "description": "`false`, wenn die Person aus dem Einsatz entlassen ist (Name bleibt, `ON DELETE SET NULL`);\nbei `extern` immer `false`."
+          },
+          "seit": {
+            "type": "string",
+            "description": "Seit wann er die Einsatzleitung hat (UTC `YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
+      },
+      "EinsatzleiterArt": {
+        "type": "string",
+        "description": "Woher der Einsatzleiter kommt (LFH-1199). Wire == `as_str()`.",
+        "enum": [
+          "personal",
+          "extern"
+        ]
+      },
       "Einsatzperiode": {
         "type": "object",
         "description": "Eine Einsatzperiode einer Kraft. Offen, solange `ende_at` fehlt.",
@@ -5456,6 +5501,59 @@
           }
         }
       },
+      "ExterneStelle": {
+        "type": "object",
+        "description": "Eine externe Stelle des Katalogs.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "art",
+          "aktiv",
+          "zustaendig"
+        ],
+        "properties": {
+          "aktiv": {
+            "type": "boolean"
+          },
+          "art": {
+            "$ref": "#/components/schemas/ExterneStelleArt"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rufnummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustaendig": {
+            "type": "boolean",
+            "description": "Die zuständige Leitstelle der Organisation; höchstens eine, nur aktiv und Art\n`leitstelle`."
+          }
+        }
+      },
+      "ExterneStelleArt": {
+        "type": "string",
+        "description": "Art einer externen Stelle (Schema-Anker für die OpenAPI-Union, LFH-120). Bewusst nicht\ndie `Stellenart` des Kommunikationsplans: die beschreibt die Rolle im Plan und kennt weder\nPolizei noch Hilfsorganisation (design.md D2).\n\nDie Reihenfolge der Varianten ist die Anzeigereihenfolge der Gruppen.",
+        "enum": [
+          "leitstelle",
+          "polizei",
+          "behoerde",
+          "hilfsorganisation",
+          "sonstige"
+        ]
+      },
       "FachebeneAntwort": {
         "type": "object",
         "description": "Einheitlicher Umschlag für jede Fachebene.",
@@ -5747,13 +5845,12 @@
       },
       "FreiesZeichenAnzeige": {
         "type": "object",
-        "description": "Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).",
+        "description": "Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).\n\nGenau eine Form ist gesetzt (DB-CHECK, LFH-836): `zeichen_spec` (neu) ODER `grundzeichen` mit\nden Overlays (Altform aus der Zeit vor LFH-836 bzw. von einem veralteten Client). Der Client\nübersetzt die Altform beim Lesen (design.md D5).",
         "required": [
           "id",
           "einsatz_id",
           "lat",
           "lon",
-          "grundzeichen",
           "erstellt_von",
           "erstellt_at",
           "geaendert_at"
@@ -5806,7 +5903,11 @@
             "type": "string"
           },
           "grundzeichen": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Altform: fehlt bei einem Zeichen mit `zeichen_spec`."
           },
           "id": {
             "type": "integer",
@@ -5837,6 +5938,13 @@
               "string",
               "null"
             ]
+          },
+          "zeichen_spec": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet; fehlt bei einem Zeichen in Altform."
           }
         }
       },
@@ -5957,12 +6065,35 @@
       },
       "FuehrungsstelleAnzeige": {
         "type": "object",
-        "description": "Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON.",
+        "description": "Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON; die Art steht\nimmer.",
         "required": [
+          "art",
           "sprechgruppen",
           "fahrzeug_ids"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/FuehrungsstellenArt",
+            "description": "Ohne gespeicherte Zeile die Vorgabe `mobil`. Zählt nicht dafür, ob die Führungsstelle\nerfasst ist (Spec `einsatz-fuehrungsstelle`)."
+          },
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der Stelle, z. B. „ELW 2 Musterstadt“ oder „TEL Rathaus“."
+          },
+          "einsatzleiter": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzleiterAnzeige",
+                "description": "Der Einsatzleiter nach FwDV 100 (LFH-1199); fehlt, solange keiner erfasst ist. Den Namen\nliefert der Server jedem, der den Einsatz lesen darf: er ist eingefroren, kein Abruf des\nPersonals."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "erreichbarkeit": {
             "type": [
               "string",
@@ -5998,8 +6129,39 @@
               "$ref": "#/components/schemas/SprechgruppeAnzeige"
             },
             "description": "Zugeordnete Sprechgruppen (Katalog oder einsatzlokal), sortiert wie an Abschnitt und\nEinheit."
+          },
+          "standort_adresse": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Adresse des Standorts. Wird geschwärzt (kann eine Privatadresse sein)."
+          },
+          "standort_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Koordinate des Standorts, nur als Paar gesetzt. Wird mit der Adresse geschwärzt."
+          },
+          "standort_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Länge zur Breite `standort_lat`, nur als Paar gesetzt."
           }
         }
+      },
+      "FuehrungsstellenArt": {
+        "type": "string",
+        "description": "Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`\n(Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in\n`migrations/0179_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.",
+        "enum": [
+          "mobil",
+          "ortsfest"
+        ]
       },
       "FunktionsArt": {
         "type": "string",

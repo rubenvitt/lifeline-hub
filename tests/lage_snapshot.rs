@@ -583,3 +583,86 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
         1
     );
 }
+
+// ---------- LFH-836: Zeichenbeschreibung freier Zeichen im Stand ----------
+
+/// Ein neuer Stand friert `zeichen_spec` ein (und eine Altzeile in ihrer Altform); ein Stand von
+/// vor LFH-836 — freie Zeichen nur mit Altfeldern, ohne `zeichen_spec` — bleibt über die Route
+/// lesbar und kommt unverändert zurück. Den Altbestand übersetzt erst der Client (design.md D5).
+#[tokio::test]
+async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
+    const DREHLEITER: &str = r#"{"v":1,"freestanding":{"kind":"pictogram","pictogram":"capability.rescue-aerial-ladder"}}"#;
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    for body in [
+        json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": DREHLEITER, "label": "DLK"}),
+        json!({"lat": 50.2, "lon": 8.7, "grundzeichen": "person"}),
+    ] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/freie-zeichen"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    }
+    let (s, neu) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &admin,
+        Some(r#"{"bezeichnung":"Neu"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{neu:?}");
+    let zeichen = neu["daten"]["freie_zeichen"].as_array().unwrap();
+    assert_eq!(zeichen.len(), 2, "{neu}");
+    assert_eq!(zeichen[0]["zeichen_spec"], DREHLEITER);
+    assert!(zeichen[0].get("grundzeichen").is_none(), "{neu}");
+    assert_eq!(zeichen[1]["grundzeichen"], "person");
+    assert!(zeichen[1].get("zeichen_spec").is_none(), "{neu}");
+
+    // Wortlaut eines Stands vor LFH-836 (FreiesZeichenAnzeige ohne zeichen_spec).
+    let alt_zeichen = json!([{
+        "id": 7, "einsatz_id": e, "lat": 50.1, "lon": 8.6, "grundzeichen": "einheit",
+        "organisation": "feuerwehr", "fachaufgabe": "brandbekaempfung", "symbol": null,
+        "einheit": "zug", "funktion": null, "farbe": "#ff0000", "label": "A",
+        "erstellt_von": benutzer_id, "erstellt_at": "2026-09-01 08:00:00",
+        "geaendert_at": "2026-09-01 08:00:00"
+    }]);
+    let mut alt = neu["daten"].clone();
+    alt["freie_zeichen"] = alt_zeichen.clone();
+    let sid = repo::insert_roh(
+        &pool,
+        e,
+        benutzer_id,
+        Some("Alt"),
+        None,
+        "2026-09-01 08:00:00",
+        &alt,
+    )
+    .await
+    .unwrap();
+    let (s, dok) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert_eq!(
+        dok["daten"]["freie_zeichen"], alt_zeichen,
+        "unverändert lesbar"
+    );
+}

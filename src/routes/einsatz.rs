@@ -1031,6 +1031,13 @@ pub async fn aktualisieren(
     let leitstellen_nr = support::trimme_tri(req.leitstellen_nr);
     let einsatzort = support::trimme_tri(req.einsatzort);
     let meldende_stelle = support::trimme_tri(req.meldende_stelle);
+    if let Some(Some(stelle)) = &meldende_stelle {
+        support::hoechstens(
+            stelle,
+            "Meldende Stelle",
+            crate::einsatz::MELDENDE_STELLE_MAX,
+        )?;
+    }
     let sachverhalt = support::trimme_tri(req.sachverhalt);
 
     let aktualisiert = repo::patche_kopf(

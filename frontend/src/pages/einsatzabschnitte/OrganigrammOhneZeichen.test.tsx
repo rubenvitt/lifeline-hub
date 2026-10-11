@@ -27,6 +27,7 @@ describe('OrganigrammBild — ohne darstellbares Zeichen', () => {
       <OrganigrammBild
         einsatzId={1}
         org={org}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={{ zustand: 'aus' }}
         zugeklappt={new Set()}
         onUmschalten={vi.fn()}

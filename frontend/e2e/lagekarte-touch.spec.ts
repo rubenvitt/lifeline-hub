@@ -1767,12 +1767,13 @@ for (const { viewport, dichte } of [
           async () =>
             (await (
               await page.request.get(`/api/einsaetze/${saat.einsatzId}/freie-zeichen`)
-            ).json()) as { grundzeichen: string; lat: number; lon: number }[],
+            ).json()) as { zeichen_spec: string | null; lat: number; lon: number }[],
           { message: 'Zeichen ist an der Druckstelle gespeichert' },
         )
         .toEqual([
+          // Gespeichert als Zeichenbeschreibung (LFH-836), nicht mehr als Grundzeichen-Kennung.
           expect.objectContaining({
-            grundzeichen: 'person',
+            zeichen_spec: '{"v":1,"spec":{"kind":"person"}}',
             lat: expect.closeTo(druckLl.lat, 4),
             lon: expect.closeTo(druckLl.lng, 4),
           }),

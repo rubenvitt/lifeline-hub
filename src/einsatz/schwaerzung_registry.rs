@@ -596,6 +596,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit", G_ENUM),
             retain("funktion", G_ENUM),
             retain("farbe", G_ENUM),
+            // LFH-836: Zeichenbeschreibung aus Katalogwerten von @einsatzzeichen, vom Server gegen
+            // die Werteliste geprüft (`freies_zeichen::pruefung`); Freitext (`designation`,
+            // `labels`) lehnt er ab — die Bezeichnung steht im gescrubbten `label`.
+            retain("zeichen_spec", G_ENUM),
             // Freitext-Label (kann PII tragen, „ELW Fam. Müller“) → NULL (nullable).
             scrub("label", Strategie::NullSetzen, Z_EINSATZ),
             retain("erstellt_von", G_FK),
@@ -1705,7 +1709,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // Eigene Führungsstelle (LFH-849): Rufname und Kommunikationsmittel sind Führungsstruktur wie
-    // an Abschnitt und Einheit, die Erreichbarkeit eine mögliche Rufnummer (Scrub).
+    // an Abschnitt und Einheit, die Erreichbarkeit eine mögliche Rufnummer (Scrub). Art und
+    // Bezeichnung (LFH-1181) sind Struktur wie an UHS und Bereitstellungsraum; der Standort kann
+    // eine Privatadresse sein („wie Einsatzort“), GPS mit-nullen wie beim Einsatzort.
     TabellenRegel {
         tabelle: "einsatz_fuehrungsstelle",
         scoping: Scoping::EinsatzId,
@@ -1719,6 +1725,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
+            retain("art", G_ENUM),
+            retain("bezeichnung", G_OP_LABEL),
+            scrub("standort_adresse", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("standort_lat", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("standort_lon", Strategie::NullSetzen, Z_EINSATZ),
+            // Einsatzleiter (LFH-1199): Art, Person (FK) und „seit“ bleiben als anonymer
+            // Führungsnachweis wie bei der Stab-Besetzung; der Name ist PII.
+            retain("einsatzleiter_art", G_ENUM),
+            retain("einsatzleiter_personal_id", G_FK),
+            scrub("einsatzleiter_name", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name der Person bzw. des externen Einsatzleiters
+            retain("einsatzleiter_seit", G_ZEIT),
         ],
     },
     TabellenRegel {

@@ -26,9 +26,10 @@ bereiche_von() {
     # (tests/anhang_vorschau.rs), die Modul-Registry (tests/modul_override.rs).
     frontend/src/api/* | frontend/src/heic/__fixtures__/* | frontend/src/einsatz/modulRegistry.ts)
       echo "rust frontend e2e" ;;
-    # Vitest liest: die Fachebenen-Quellen (fachebenen.test.ts) und das gemeinsame Fixture der
-    # Zählregeln (verdichtungFixture.test.ts).
-    src/karte/quellen.rs | tests/fixtures/verdichtung/*)
+    # Vitest liest: die Fachebenen-Quellen (fachebenen.test.ts), das gemeinsame Fixture der
+    # Zählregeln (verdichtungFixture.test.ts) und die Werteliste der Zeichenbeschreibung
+    # (zeichenWerte.guard.test.ts, LFH-836).
+    src/karte/quellen.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json)
       echo "rust frontend e2e" ;;
     # Das Frontend bindet die CHANGELOG.md als Neuigkeiten ein (vite.config.ts, neuigkeiten/);
     # e2e liest sie für den Versionshinweis (e2e/neuigkeiten.spec.ts). Steht vor `*.md` unten.

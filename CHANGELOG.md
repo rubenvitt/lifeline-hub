@@ -1,3 +1,97 @@
+## [1.0.0-alpha.110](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.109...v1.0.0-alpha.110) (2026-10-11)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Beim ersten Start nach dem Update werden mehrere Migrationen eingespielt:
+  - Die Tabelle der freien Lagekarten-Zeichen wird umgebaut und erhält eine neue Zeichenbeschreibung. Vorhandene Zeichen bleiben erhalten.
+  - Die eigene Führungsstelle erhält Felder für Art, Bezeichnung, Standort und Einsatzleiter.
+  - Für den neuen Katalog „Externe Stellen“ kommt eine eigene Tabelle hinzu.
+- **Schnittstelle für freie Lagekarten-Zeichen:** Neue Zeichen werden als Zeichenbeschreibung gespeichert. Clients mit dem alten Format (Grundzeichen mit Zusätzen) werden während des Übergangs weiter angenommen. Eine Anfrage, die beide Formen oder keine davon enthält, wird abgelehnt. In der Antwort sind Zeichenbeschreibung und Grundzeichen jetzt optional.
+- **Meldende Stelle begrenzt:** Beim Ändern eines Einsatzes wird eine meldende Stelle mit mehr als 200 Zeichen abgelehnt. Längere Einträge, die schon gespeichert sind, bleiben stehen.
+- **Neue Schnittstelle für externe Stellen:** Alle angemeldeten Nutzer der Organisation können externe Stellen lesen. Nur Administratoren können sie anlegen und ändern. Löschen ist nicht vorgesehen.
+- **Zuletzt verwendete Zeichen:** Die Liste der zuletzt verwendeten Zeichen wird im Browser in ein neues Format übernommen. Zeichen, die sich nicht übersetzen lassen, fallen aus der Liste.
+
+### Lagekarte
+
+- **Neue Zeichenwahl für freie Zeichen:** Grundzeichen, Symbole, Organisation, Fachaufgabe und Einheit stammen jetzt aus dem aktuellen Vokabular der taktischen Zeichen. Neu ist außerdem:
+  - Mit „Kein Grundzeichen“ lassen sich Symbole auch einzeln setzen. Gesetzt oder gespeichert werden kann erst, wenn ein Symbol gewählt ist.
+  - Hat ein Symbol eine zweite Darstellung, erscheint sie als eigene Kachel, zum Beispiel „(Funk)“ und „(Draht)“.
+  - Farben kommen nur noch aus der Palette und gelten nur bei Zeichen mit Füllung.
+  - Die Angabe „Funktion“ gibt es nicht mehr.
+- **Bestehende Zeichen bleiben lesbar:** Ältere freie Zeichen werden in die neue Darstellung übersetzt. Geht das nicht vollständig, zeigt der Inspector den Hinweis „vereinfacht dargestellt“. Wird so ein Zeichen geändert, speichert die Lagekarte es im neuen Format. Wer ein Zeichen nur umbenennt, ändert nur den Namen.
+- **Nachtmodus:** Kacheln, Vorschau und „Zuletzt verwendet“ zeigen die Zeichen auf einer hellen Zeichenplatte, damit sie gut lesbar bleiben.
+- **Schnellere Zeichenwahl:** Nach dem Laden der Lagekarte bereitet die Lagekarte die Zeichenwahl im Hintergrund vor. Danach öffnet sie spürbar schneller. Das Raster endet mit der letzten vollständigen Kachelreihe.
+- **Eigene Führungsstelle auf der Karte:** Ist eine Koordinate erfasst, erscheint die Führungsstelle als Befehlsstelle mit ihrer Bezeichnung. Sie hat eine eigene Ebene „Führungsstelle“ und lässt sich auf der Karte nicht verschieben. Der Inspector verweist auf die Einsatzdaten. Kann die Führungsstelle nicht abgerufen werden, nennt der Ausfallhinweis das.
+
+### Führung
+
+- **Einsatzleiter an der Führungsstelle:** In „Eigene Führungsstelle“ kann der Einsatzleiter eingetragen werden: entweder eine Person aus dem disponierten Personal oder ein externer Einsatzleiter als Freitext, jeweils mit „seit“. Bleibt „seit“ leer, gilt der aktuelle Zeitpunkt.
+- **Übergabe im Einsatztagebuch:** Jeder Wechsel des Einsatzleiters erzeugt im Einsatztagebuch automatisch einen Eintrag mit dem Übergabezeitpunkt.
+- **Eine Angabe für alle Ansichten:** Kopfleiste, Organigramm, Funkplan, Lagebericht und Einsatzbericht zeigen den Einsatzleiter aus der Führungsstelle. Die Kopfleiste leitet die Einsatzleitung nicht mehr aus der App-Rolle ab. Das Organigramm meldet daher keine abweichende Einsatzleitung mehr.
+- **Art, Bezeichnung und Standort der Führungsstelle:**
+  - Art: mobil oder ortsfest.
+  - Bezeichnung: frei wählbar.
+  - Standort: Adresse und Koordinate. Mit „wie Einsatzort“ werden beide in einem Schritt übernommen.
+  - „Fahrzeuge“ heißt jetzt „Führungsfahrzeuge“ und ist bei einer ortsfesten Stelle eingeklappt.
+- **Rufname aus den Stammdaten:** Für den Rufnamen der Führungsstelle schlägt die App die Funkrufnamen der Führungsfahrzeuge gruppiert vor. Freitext bleibt möglich. Hat die Führungsstelle genau ein Fahrzeug, steht dessen Rufname als Vorschlag im Feld, wird aber nicht automatisch eingetragen.
+- **Datenschutz bei der Schwärzung:** Die Schwärzung entfernt den Namen des Einsatzleiters sowie Adresse und Koordinate der Führungsstelle.
+
+### Stab
+
+- **Fernmeldeskizze:** Der Kasten „Einsatzleitung“ zeigt die Bezeichnung der Führungsstelle.
+- **Organigramm und Lagebericht:** Die Wurzel nennt Bezeichnung, Rufname und Einsatzleiter. Das gilt auch, wenn das Organigramm in den Lagebericht übernommen wird.
+- **Funkplan:** Die Zeile „Führungsstelle“ zeigt die Bezeichnung und den Einsatzleiter.
+- **Checkliste Arbeitsaufnahme:** Der Punkt heißt jetzt „Standort der Führungsstelle festgelegt“. Er zeigt Bezeichnung und Standort und verweist auf die Einsatzdaten. Abgehakt wird er weiterhin von Hand.
+
+### Einsatzabschnitte
+
+- **Abschnitte umhängen:** In der Gliederung lassen sich Abschnitte am Griff ziehen. Auf einen anderen Abschnitt gezogen, wird ein Abschnitt dessen Unterabschnitt. Auf „Oberste Ebene“ gezogen, steht er ohne übergeordneten Abschnitt. Eigene Unterabschnitte sind als Ziel gesperrt.
+- **Ohne Ziehen:** Im Menü „Weitere Aktionen“ verschiebt „Verschieben unter …“ einen Abschnitt. Dort steht jetzt auch „Auflösen“, mit Rückfrage, die den Abschnitt nennt.
+- **Rückgängig:** Nach jedem Umhängen lässt sich die Änderung im Hinweis zurücknehmen.
+- **Einheiten zuordnen:** Einheiten aus „Zugeordnete Einheiten“ lassen sich auf einen Abschnitt ziehen.
+- **Stabile Gliederung:** Während man in der Gliederung arbeitet, ändern Änderungen anderer Nutzer die Struktur nicht. Sie warten gesammelt in einem Hinweis.
+
+### Verwaltung
+
+- **Katalog „Externe Stellen“:** Unter Verwaltung → Stammdaten lassen sich externe Stellen verwalten:
+  - Filter nach Art und Zustand.
+  - Rufnummer und Funkrufname.
+  - Markierung der zuständigen Leitstelle. Je Organisation kann nur eine aktive Leitstelle zuständig sein.
+  - Stellen lassen sich deaktivieren und wieder aktivieren.
+
+### Kommunikation
+
+- **Meldende Stelle:** In den Einsatzdaten schlägt die App für die meldende Stelle die aktiven externen Stellen vor, nach Art gruppiert. Freitext bleibt möglich.
+- **Nachforderung:** Die Adressat-Bezeichnung schlägt externe Stellen vor. Bei der Kategorie „Leitstelle“ ist die zuständige Leitstelle vorbelegt, ohne eine eigene Eingabe zu überschreiben.
+
+## [1.0.0-alpha.109](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.108...v1.0.0-alpha.109) (2026-10-11)
+
+### Wichtige Änderungen
+
+Diese Version bringt umfangreiche Verbesserungen der Dokumentation und führt ein Neuigkeiten-System ein, das Sie über Änderungen zwischen Versionen informiert.
+
+### Dokumentation
+
+Die Anwenderdokumentation wurde grundlegend überarbeitet:
+
+- **Dunkelmodus-Unterstützung**: Alle Screenshots liegen jetzt in heller und dunkler Ausführung vor und werden automatisch passend zum gewählten Modus angezeigt
+- **Volltextsuche**: Neue Suchfunktion (Tastenkürzel ⌘K/Strg+K oder „/") durchsucht Kapitel und Anleitungen
+- **Verbessertes Inhaltsverzeichnis**: Einklappbare Bereiche, Anzeige der Lesestelle und geschätzten Lesezeit
+- **Optimierte Navigation**: Kapitelübersicht im Raster, dauerhafte Sprungleiste, auf Mobilgeräten klappbare Kapitelliste
+
+Die Website zeigt jetzt echte 404-Fehlerseiten für unbekannte Adressen statt der Startseite, was verhindert, dass Browser nach Updates zwischengespeicherte Inhalte falsch darstellen.
+
+### Neuigkeiten und Versionsinformationen
+
+- **Versionshinweise direkt in der Anwendung**: Nach einem Update erscheint ein Hinweis auf der Einsatzliste mit den Änderungen der neuen Version
+- **Neuigkeiten-Seite**: Zeigt alle Änderungen seit der zuletzt verwendeten Version sowie ein durchsuchbares Archiv nach Kanälen (Neue Funktionen, Verbesserungen, Fehlerbehebungen)
+- **Offline-Verfügbarkeit**: Alle Versionshinweise sind ohne Internetverbindung lesbar
+- **Intelligente Lesestandverwaltung**: Der Lesestand wird nur aktualisiert, wenn die Versionshinweise tatsächlich angezeigt werden können
+
+### Technische Grundlagen
+
+Neue Konventionen für die Codebase festgelegt: Fachbegriffe der Domäne (Einsatztagebuch, Lagekarte, Betroffene etc.) bleiben deutsch, technisches Vokabular wird künftig englisch geschrieben. Die Umstellung erfolgt schrittweise beim Bearbeiten bestehenden Codes.
+
 ## [1.0.0-alpha.108](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.107...v1.0.0-alpha.108) (2026-10-11)
 
 ### Hilfe und Dokumentation
