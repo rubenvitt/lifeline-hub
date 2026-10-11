@@ -1,3 +1,19 @@
+## [1.0.0-alpha.108](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.107...v1.0.0-alpha.108) (2026-10-11)
+
+### Hilfe und Dokumentation
+
+Die Anwenderdokumentation wurde vollständig neu gestaltet und ist jetzt sowohl auf der Website (/doku/) als auch in der App deutlich übersichtlicher:
+
+- **Website**: Übersichtsseite zeigt alle Kapitel nach Bereichen gegliedert mit Kurztext. Neue Suchfunktion und Filter nach Lesergruppe (Führungskraft, Sachbearbeiter, Administrator). Kapitelseiten mit nummerierten Schritten, Abschnittsübersicht „Auf dieser Seite" und Vor/Zurück-Navigation zwischen Kapiteln.
+
+- **App**: Hilfe-Bereich mit Navigation nach Bereichen, Suchfunktion und Übersichtskarten zu jedem Bereich. Am Ende jedes Kapitels finden Sie Vor/Zurück-Buttons zur nächsten Seite. Die Druckmappe bleibt unverändert.
+
+- **Nachtmodus**: Fotos und Screenshots werden im Dunkelmodus jetzt automatisch invertiert, sodass helle Bildschirminhalte nicht blenden.
+
+- **Tastatursteuerung**: Mit Strg+K (Windows/Linux) bzw. Cmd+K (Mac) springen Sie direkt ins Suchfeld.
+
+- **Werkzeugleiste**: Die Filter-Buttons der Übersichtsseite werden auf schmalen Bildschirmen (unter 1100 px Breite) gestapelt dargestellt und zeigen keine grauen Restbalken mehr.
+
 ## [1.0.0-alpha.107](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.106...v1.0.0-alpha.107) (2026-10-11)
 
 ### Verwaltung
