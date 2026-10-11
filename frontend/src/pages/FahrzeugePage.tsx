@@ -501,6 +501,10 @@ export default function FahrzeugePage() {
    * Feld erscheint erst mit dem ersten gepflegten Wert, nach dem Laden, mit kleiner Verschiebung in
    * der umbrechenden Werkzeugzeile. Gewollt: ein dauerhaft leeres Filterfeld sieht wie ein Werkzeug
    * aus und ist keins.
+   *
+   * Wie jedes Filterfeld steht es nur bei sichtbarer Spalte: unter `xxl` weicht `traeger` in den
+   * Spaltenschalter (LFH-1149), und das Feld kommt erst mit der eingeblendeten Spalte zurück (wie
+   * auf der Personalseite).
    */
   const traegerWerte = [
     ...new Set(efs.map((e) => e.traegerorganisation).filter((t): t is string => !!t)),

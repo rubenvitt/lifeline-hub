@@ -59,7 +59,7 @@ Für System-Admins:
 
    ![Übersicht „Aufbewahrung“ mit zwei abgeschlossenen Einsätzen, einer ohne Frist, einer mit laufender Frist](../bilder/aufbewahrung/uebersicht.png)
 
-3. Unter 1600 px Bildbreite stehen „Vorgemerkt am“, „Schwärzung auf Antrag ab“ und „Geschwärzt am“
+3. Unter 1600 px Fensterbreite stehen „Vorgemerkt am“, „Schwärzung auf Antrag ab“ und „Geschwärzt am“
    nicht in der Tabelle; bei Bedarf unter „Spalten“ einblenden.
 4. Eine Zeile wählen, um die Archivakte des Einsatzes zu öffnen.
 

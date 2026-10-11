@@ -9,7 +9,7 @@ quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/kraefte/FmsTableau.
 
 Das Modul **Fahrzeuge** führt alle Fahrzeuge, die im Einsatz disponiert sind, aus dem Fahrzeugstamm
 der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, Typ, FMS-Status und
-Besatzung; Kennzeichen und Träger stehen erst ab 1600 px Bildbreite in der Liste, darunter lassen
+Besatzung; Kennzeichen und Träger stehen erst ab 1600 px Fensterbreite in der Liste, darunter lassen
 sie sich wie die Bemerkung unter „Spalten“ einblenden.
 
 Zwei Ansichten zeigen dieselben Fahrzeuge: die **Liste** zum Pflegen und Vergleichen und das
