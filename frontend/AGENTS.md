@@ -447,7 +447,7 @@ anwendbar), „nicht geprüft" ist keins.
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
   Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
   (`patcheEinsatz`), die Koordinate als Paar; ein Vollformular gibt es nicht. Eine Eingabe, die
-  einen ungültigen Entwurf selbst anzeigt (Koordinate), sperrt das Senden über `gueltig`.
+  einen ungültigen Entwurf selbst anzeigt (Koordinate), sperrt das Senden über `isValid`.
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel

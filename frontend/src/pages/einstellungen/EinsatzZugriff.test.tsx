@@ -16,7 +16,7 @@ const einsatz = (meine_rolle: string | null, status = 'aktiv') => ({
   meine_rolle,
 });
 
-function stelleBereit(rolle: string | null, status = 'aktiv') {
+function setupServer(rolle: string | null, status = 'aktiv') {
   server.use(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(rolle, status))),
     http.get('/api/einsaetze/1/einstellungen', () =>
@@ -46,7 +46,7 @@ function Adresse() {
 }
 
 /** Layout samt Sektion: den Auftrag `neu` liest das Layout (LFH-1170, D7). */
-function rendernMitLayout(route: string) {
+function renderMitLayout(route: string) {
   return renderMitProviders(
     <>
       <Routes>
@@ -60,7 +60,7 @@ function rendernMitLayout(route: string) {
   );
 }
 
-function rendern() {
+function renderZugriff() {
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/einstellungen/zugriff" element={<EinsatzZugriff />} />
@@ -71,8 +71,8 @@ function rendern() {
 
 describe('EinsatzZugriff', () => {
   it('Einsatzleitung: Mitglieder und die Zeile zum Aufnehmen, kein Rechtehinweis', async () => {
-    stelleBereit('einsatzleitung');
-    rendern();
+    setupServer('einsatzleitung');
+    renderZugriff();
     const zugriff = await screen.findByRole('region', { name: 'Zugriff' });
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
     expect(zugriff).toContainElement(screen.getByRole('button', { name: 'Hinzufügen' }));
@@ -80,8 +80,8 @@ describe('EinsatzZugriff', () => {
   });
 
   it('Führungspersonal: Liste ohne Bedienziele, der Grund steht dabei', async () => {
-    stelleBereit('fuehrungspersonal');
-    rendern();
+    setupServer('fuehrungspersonal');
+    renderZugriff();
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
     expect(screen.getByText('nur Einsatzleitung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).toBeNull();
@@ -94,33 +94,33 @@ describe('EinsatzZugriff', () => {
   it.each([null, 'beobachter', 'fuehrungspersonal'] as const)(
     'Rolle %s: keine Führungsstelle je Person bearbeitbar',
     async (rolle) => {
-      stelleBereit(rolle);
-      rendern();
+      setupServer(rolle);
+      renderZugriff();
       expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
       expect(screen.queryAllByRole('button', { name: /Führungsstelle für/ })).toHaveLength(0);
     },
   );
 
   it('aktive Einsatzleitung bearbeitet die Führungsstelle je Person', async () => {
-    stelleBereit('einsatzleitung');
-    rendern();
+    setupServer('einsatzleitung');
+    renderZugriff();
     expect(
       await screen.findByRole('button', { name: 'Führungsstelle für Eva Einsatz bearbeiten' }),
     ).toBeInTheDocument();
   });
 
   it('abgeschlossener Einsatz: kein zweiter Hinweis, den Grund trägt die Einstellungsseite', async () => {
-    stelleBereit('einsatzleitung', 'abgeschlossen');
-    rendern();
+    setupServer('einsatzleitung', 'abgeschlossen');
+    renderZugriff();
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
     expect(screen.queryByText('nur Einsatzleitung')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).toBeNull();
   });
 
-  describe('Schnellaktion „Person aufnehmen“ (LFH-1170)', () => {
+  describe('Schnellaktion „Mitglied aufnehmen“ (LFH-1170)', () => {
     it('öffnet mit `?neu=1` die Personenauswahl mit Fokus und räumt den Auftrag', async () => {
-      stelleBereit('einsatzleitung');
-      rendernMitLayout('/einsaetze/1/einstellungen/zugriff?neu=1');
+      setupServer('einsatzleitung');
+      renderMitLayout('/einsaetze/1/einstellungen/zugriff?neu=1');
       const auswahl = await screen.findByRole('combobox', { name: 'Person zum Aufnehmen' });
       await waitFor(() => expect(auswahl).toHaveFocus());
       expect(auswahl).toHaveAttribute('aria-expanded', 'true');
@@ -133,16 +133,16 @@ describe('EinsatzZugriff', () => {
     });
 
     it('ohne Auftrag bleibt die Auswahl zu und ohne Fokus', async () => {
-      stelleBereit('einsatzleitung');
-      rendernMitLayout('/einsaetze/1/einstellungen/zugriff');
+      setupServer('einsatzleitung');
+      renderMitLayout('/einsaetze/1/einstellungen/zugriff');
       const auswahl = await screen.findByRole('combobox', { name: 'Person zum Aufnehmen' });
       expect(auswahl).not.toHaveFocus();
       expect(auswahl).toHaveAttribute('aria-expanded', 'false');
     });
 
     it('ohne Leitungsrecht bleibt der Auftrag folgenlos', async () => {
-      stelleBereit('fuehrungspersonal');
-      rendernMitLayout('/einsaetze/1/einstellungen/zugriff?neu=1');
+      setupServer('fuehrungspersonal');
+      renderMitLayout('/einsaetze/1/einstellungen/zugriff?neu=1');
       expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
       expect(screen.queryByRole('combobox', { name: 'Person zum Aufnehmen' })).toBeNull();
     });

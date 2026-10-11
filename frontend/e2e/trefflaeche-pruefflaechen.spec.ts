@@ -570,6 +570,13 @@ function einstellungenFlaechen(einsatzId: string): Flaeche[] {
           mindestens: 3,
         },
         { sorte: 'Zugriff Hinzufügen', ziele: knopf('Hinzufügen'), mindestens: 1 },
+        {
+          // Zeilenaktionen: „Entfernen“ (an der letzten Leitung gesperrt, aber sichtbar) und der
+          // Link-Knopf der Führungsstelle mit eigenem Stil (`height: auto` + `minHeight`).
+          sorte: 'Zugriff Zeilenaktionen',
+          ziele: knopf(/^(Entfernen|Führungsstelle für .+ bearbeiten)$/),
+          mindestens: 2,
+        },
       ],
     },
     {

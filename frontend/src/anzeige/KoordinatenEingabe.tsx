@@ -1,6 +1,6 @@
 import { Input, Space, Typography } from 'antd';
 import { Select } from '../components/Select';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import type { Koordinatenformat } from '../api/types';
 import { formatiere, parse } from './koordinaten';
 import {
@@ -55,6 +55,7 @@ export default function KoordinatenEingabe({
   const { konventionen } = useAnzeigeKonventionen();
   const system: Koordinatenformat = override ?? konventionen.koordinatenformat ?? 'wgs84';
 
+  const fehlerId = useId();
   const [text, setText] = useState('');
   const [fehler, setFehler] = useState(false);
   const [fokus, setFokus] = useState(false);
@@ -112,6 +113,9 @@ export default function KoordinatenEingabe({
           id={id}
           aria-label={ariaLabel}
           autoFocus={autoFocus}
+          aria-invalid={fehler || undefined}
+          // Den Grund liest ein Screenreader mit dem Feld vor; im Formular trägt ihn das Form.Item.
+          aria-describedby={fehler && !fehlerImFormular ? fehlerId : undefined}
           value={text}
           onChange={(e) => bearbeiten(e.target.value)}
           onFocus={() => setFokus(true)}
@@ -129,7 +133,9 @@ export default function KoordinatenEingabe({
       </Space.Compact>
       {fehler ? (
         fehlerImFormular ? null : (
-          <Typography.Text type="danger">{ungueltigText(system)}</Typography.Text>
+          <Typography.Text type="danger" id={fehlerId} data-fehler="">
+            {ungueltigText(system)}
+          </Typography.Text>
         )
       ) : koord ? (
         <Typography.Text type="secondary">

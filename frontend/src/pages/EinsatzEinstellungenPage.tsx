@@ -78,20 +78,20 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
 export const RECHTE_TEXT = NUR_LEITUNG_FUEHRUNG_ORG_ADMIN;
 
 /**
- * Einmal-Auftrag an die Sektionen (LFH-1170): `personAufnehmen` kommt aus `?neu=1`, dem Ziel der
- * Schnellaktion „Person aufnehmen“. Gelesen wird im Layout, weil der Schnellaktionen-Guard den
+ * Einmal-Auftrag an die Sektionen (LFH-1170): `mitgliedAufnehmen` kommt aus `?neu=1`, dem Ziel der
+ * Schnellaktion „Mitglied aufnehmen“. Gelesen wird im Layout, weil der Schnellaktionen-Guard den
  * Leser über den Dateinamen dem Modul `einsatz-einstellungen` zuordnet.
  *
  * Der Context trägt nur dieses Signal und keine Daten; die Falle aus {@link useEinstellungenDaten}
  * (ein Formular, das ohne Daten montiert) betrifft ihn nicht.
  */
 export interface EinstellungenAuftrag {
-  personAufnehmen: boolean;
+  mitgliedAufnehmen: boolean;
   /** Räumt den Auftrag aus der Adresse (`replace`): ein Neuladen öffnet nicht noch einmal. */
-  auftragErledigt: () => void;
+  clearAuftrag: () => void;
 }
 
-const KEIN_AUFTRAG: EinstellungenAuftrag = { personAufnehmen: false, auftragErledigt: () => {} };
+const KEIN_AUFTRAG: EinstellungenAuftrag = { mitgliedAufnehmen: false, clearAuftrag: () => {} };
 
 /** Der Auftrag des Layouts; außerhalb des Layouts (Einzeltests einer Sektion) keiner. */
 export function useEinstellungenAuftrag(): EinstellungenAuftrag {
@@ -128,8 +128,9 @@ export default function EinsatzEinstellungenPage() {
   const aktiv = sektionAus(pathname);
   const panelId = useId();
   const [suche, setSuche] = useSearchParams();
-  // Stabil, weil die Sektion es in den Abhängigkeiten ihres Effekts führt.
-  const auftragErledigt = useCallback(
+  // `setSuche` wechselt mit jeder Suche (react-router), also auch dieses Callback. Keine Schleife:
+  // der Effekt der Sektion ruft es nur, solange `mitgliedAufnehmen` gilt, und das räumt es selbst.
+  const clearAuftrag = useCallback(
     () =>
       setSuche(
         (vorher) => {
@@ -142,8 +143,8 @@ export default function EinsatzEinstellungenPage() {
     [setSuche],
   );
   const auftrag: EinstellungenAuftrag = {
-    personAufnehmen: suche.get('neu') === '1',
-    auftragErledigt,
+    mitgliedAufnehmen: suche.get('neu') === '1',
+    clearAuftrag,
   };
 
   if (daten.laedt) return <SeitenSkeleton />;

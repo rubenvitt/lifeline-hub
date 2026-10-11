@@ -175,6 +175,26 @@ test('Schnellaktion „Person erfassen" navigiert und öffnet „Betroffene erfa
   await expect(page.getByRole('dialog', { name: 'Betroffene erfassen' })).toBeVisible();
 });
 
+test('Schnellaktion „Mitglied aufnehmen“ öffnet den Zugriff mit offener Personenauswahl (LFH-1170)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const id = await einsatzAnlegen(page, `E2E Mitglied ${Date.now()}`);
+  await zumModul(page, id, 'etb');
+
+  await page.keyboard.press('Control+k');
+  await expect(paletteInput(page)).toBeVisible();
+  await paletteInput(page).fill('Mitglied aufnehmen');
+  await page.getByRole('option', { name: /^Mitglied aufnehmen/ }).click();
+
+  // Der Auftrag ist verbraucht: die Adresse trägt kein `neu` mehr, die Auswahl ist offen und fokussiert.
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/einstellungen/zugriff$`));
+  await expect(page.getByRole('tab', { name: 'Zugriff' })).toHaveAttribute('aria-selected', 'true');
+  const auswahl = page.getByRole('combobox', { name: 'Person zum Aufnehmen' });
+  await expect(auswahl).toBeFocused();
+  await expect(auswahl).toHaveAttribute('aria-expanded', 'true');
+});
+
 test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)', async ({
   page,
 }) => {

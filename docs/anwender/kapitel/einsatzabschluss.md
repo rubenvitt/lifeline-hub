@@ -17,7 +17,8 @@ Einsatz noch läuft.
 
 ### Einsatzbericht drucken
 
-1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht drucken“ wählen. Die Seite
+1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht drucken“ wählen (am Handy unter
+   „Weitere“). Die Seite
    „Einsatzbericht – Druckansicht“ öffnet sich.
 2. Unter „Blöcke“ abwählen, was nicht in den Bericht soll, und bei Bedarf eine der Anlagen
    dazunehmen.

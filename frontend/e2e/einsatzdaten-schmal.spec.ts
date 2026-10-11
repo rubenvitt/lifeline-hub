@@ -41,7 +41,7 @@ async function keinQuerlauf(page: Page, kaesten: Locator[], wo: string) {
   }
 }
 
-const paneel = (page: Page, name: string) => page.getByRole('region', { name });
+const paneel = (page: Page, name: string) => page.getByRole('region', { name, exact: true });
 const PANEELE = ['Einsatz', 'Einsatzort', 'Erstmeldung', 'Eigene Führungsstelle'];
 
 /** Unter `md` steht das Etikett ÜBER dem Wert, nicht daneben. */

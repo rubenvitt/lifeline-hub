@@ -40,10 +40,10 @@ interface Props {
   darfVerwalten: boolean;
   darfFuehrungsstelleVerwalten: boolean;
   /**
-   * Personenauswahl beim Einhängen aufgeklappt und fokussiert (Schnellaktion „Person aufnehmen“,
+   * Personenauswahl beim Einhängen aufgeklappt und fokussiert (Schnellaktion „Mitglied aufnehmen“,
    * LFH-1170). Wirkt nur beim Einhängen der Auswahl; ein späterer Wechsel schließt sie nicht.
    */
-  auswahlOeffnen?: boolean;
+  openAuswahl?: boolean;
 }
 
 /**
@@ -137,7 +137,7 @@ export default function MitgliederAbschnitt({
   einsatzId,
   darfVerwalten,
   darfFuehrungsstelleVerwalten,
-  auswahlOeffnen = false,
+  openAuswahl = false,
 }: Props) {
   const qc = useQueryClient();
   const { benutzer: ich } = useAuth();
@@ -405,8 +405,8 @@ export default function MitgliederAbschnitt({
           <Select
             placeholder="Benutzer …"
             aria-label="Person zum Aufnehmen"
-            autoFocus={auswahlOeffnen}
-            defaultOpen={auswahlOeffnen}
+            autoFocus={openAuswahl}
+            defaultOpen={openAuswahl}
             style={{ width: 200 }}
             value={neuerBenutzer}
             options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}

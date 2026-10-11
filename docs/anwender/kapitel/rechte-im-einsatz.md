@@ -18,7 +18,7 @@ der Organisation und System-Admins mit; schreiben dürfen sie dort nur eingeschr
 
 Für die Einsatzleitung:
 
-1. In der Sprungpalette „Person aufnehmen“ wählen. Die Einstellungen öffnen sich im Reiter
+1. In der Sprungpalette „Mitglied aufnehmen“ wählen. Die Einstellungen öffnen sich im Reiter
    „Zugriff“, die Auswahl „Benutzer …“ ist aufgeklappt. Alternativ im Einsatz „Einstellungen“
    und dort den Reiter „Zugriff“ öffnen, oder in den „Einsatzdaten“ „Zugriff verwalten“ wählen.
 2. Unter „Benutzer …“ die Person wählen und daneben ihre Rolle; vorgewählt ist
@@ -60,7 +60,7 @@ Für die Einsatzleitung:
 - **Beobachter** lesen nur.
 - Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte. Alle anderen sehen den
   Reiter „Zugriff“ als „Nur Ansicht“ mit dem Grund „nur Einsatzleitung“; die Schnellaktion
-  „Person aufnehmen“ und der Sprung „Zugriff verwalten“ fehlen ihnen.
+  „Mitglied aufnehmen“ und der Sprung „Zugriff verwalten“ fehlen ihnen.
 
 Die letzte Einsatzleitung eines Einsatzes lässt sich nicht entfernen („Gesperrt: letzte
 Einsatzleitung“).

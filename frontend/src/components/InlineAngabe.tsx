@@ -72,7 +72,7 @@ export interface InlineAngabeProps<T> {
    * sperrt das Senden, die Eingabe bleibt mit dem Entwurf offen. Ohne Angabe ist jeder Entwurf
    * sendbar.
    */
-  gueltig?: (wert: T) => boolean;
+  isValid?: (wert: T) => boolean;
   /** Enter bleibt Zeilenumbruch; gesendet wird mit Strg/⌘+Enter. */
   mehrzeilig?: boolean;
   eingabe: (p: InlineEingabe<T>) => ReactNode;
@@ -123,7 +123,7 @@ export function InlineAngabe<T>({
   gleich = Object.is,
   darfSchreiben,
   pflicht = false,
-  gueltig,
+  isValid,
   mehrzeilig = false,
   eingabe,
   ausloeser,
@@ -173,8 +173,13 @@ export function InlineAngabe<T>({
       schliessen();
       return;
     }
-    // Den Grund zeigt die Eingabe selbst; ein zweiter Text hier stünde doppelt.
-    if (gueltig && !gueltig(entwurf)) return;
+    // Den Grund zeigt die Eingabe selbst (`aria-invalid`, `aria-describedby`); ein zweiter Text
+    // hier stünde doppelt. Der Fokus geht ins Feld zurück, damit ein Screenreader ihn vorliest,
+    // auch wenn „Speichern“ per Klick kam.
+    if (isValid && !isValid(entwurf)) {
+      document.getElementById(feldId)?.focus();
+      return;
+    }
     sendetRef.current = true;
     setSendet(true);
     setFehler(null);

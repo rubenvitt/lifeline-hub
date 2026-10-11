@@ -178,7 +178,7 @@ function ZeitpunktAngabe({
 }
 
 /** Gleiche Koordinate: dasselbe Paar; eine unlesbare Eingabe ist nie gleich (sie soll prüfen). */
-function gleicheKoordinate(a: KoordinatenWert, b: KoordinatenWert): boolean {
+function isSameKoordinate(a: KoordinatenWert, b: KoordinatenWert): boolean {
   if (a === null || b === null) return a === b;
   return istLatLon(a) && istLatLon(b) && a.lat === b.lat && a.lon === b.lon;
 }
@@ -189,7 +189,7 @@ function gleicheKoordinate(a: KoordinatenWert, b: KoordinatenWert): boolean {
  * zweimal `null`.
  *
  * Keine `KoordinatenFeld`-Hülle: die Zeile ist kein `Form.Item`. Die Eingabe meldet unlesbaren Text
- * als `ungueltig` und nennt den Grund selbst unter dem Feld; `gueltig` sperrt damit das Senden
+ * als `ungueltig` und nennt den Grund selbst unter dem Feld; `isValid` sperrt damit das Senden
  * (Koordinaten-Guard, bewertete Stelle), die Zeile bleibt offen.
  */
 function KoordinatenAngabe({
@@ -221,9 +221,9 @@ function KoordinatenAngabe({
         ) : null
       }
       leer={(w) => w === null}
-      gleich={gleicheKoordinate}
+      gleich={isSameKoordinate}
       darfSchreiben={darfSchreiben}
-      gueltig={(w) => w === null || istLatLon(w)}
+      isValid={(w) => w === null || istLatLon(w)}
       onSpeichern={(w) =>
         speichern('Koordinate', {
           einsatzort_lat: istLatLon(w) ? w.lat : null,
@@ -248,8 +248,7 @@ function KoordinatenAngabe({
  * weiterer Schlüssel in `flaeche`: das ist als geschlossene Menge gepinnt, und eine Kopfleiste ist
  * kein Nebenraster.
  *
- * `auto-fit` legt bei ~900 px Lesebreite vier Spalten nebeneinander (Fükw), auf dem Handschirm
- * eine.
+ * `auto-fit` legt am Fükw vier Spalten nebeneinander, auf dem Handschirm eine.
  */
 const KOPF_MIN_BREITE = 220;
 
@@ -669,7 +668,7 @@ export default function EinsatzdatenPage() {
 
   // Ab `xl` zwei Spalten (Fükw), darunter eine; der Fluss läuft zeilenweise, DOM- und
   // Lesereihenfolge bleiben Einsatz → Einsatzort → Erstmeldung → Eigene Führungsstelle.
-  const zweispaltig = abBreite('xl');
+  const hasTwoColumns = abBreite('xl');
 
   return (
     <EinsatzSeite
@@ -766,7 +765,7 @@ export default function EinsatzdatenPage() {
         data-lfh="einsatzdaten-paneele"
         style={{
           display: 'grid',
-          gridTemplateColumns: zweispaltig ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
+          gridTemplateColumns: hasTwoColumns ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
           gap: token.margin,
           alignItems: 'start',
         }}

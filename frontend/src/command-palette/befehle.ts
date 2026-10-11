@@ -193,10 +193,12 @@ export const SCHNELLAKTIONEN: {
     // an die Sektion.
     modulKey: 'einsatz-einstellungen',
     parameter: 'neu',
-    kennung: 'person-aufnehmen',
+    kennung: 'mitglied-aufnehmen',
     pfad: (id) => einsatzEinstellungenPfad(id, 'zugriff', { neu: true }),
-    label: 'Person aufnehmen',
-    schlagworte: ['mitglied', 'zugriff', 'hinzufügen', 'rolle', 'benutzer', 'einsatzkraft'],
+    label: 'Mitglied aufnehmen',
+    // Nicht „Person aufnehmen“, auch nicht als Schlagwort: so heißt im Lage-Überblick die
+    // Erfassung von Betroffenen (dort führt die Palette „Person erfassen“).
+    schlagworte: ['zugriff', 'hinzufügen', 'rolle', 'benutzer', 'einsatzkraft'],
     recht: 'leitung',
   },
 ];

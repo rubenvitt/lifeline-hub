@@ -236,17 +236,17 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(baueBefehle(kontext()).some((x) => x.id === 'aktion:etb')).toBe(true);
   });
   /**
-   * „Person aufnehmen“ (LFH-1170, Spec `einsatz-zugriff`): Mitglieder aufnehmen darf nur die
+   * „Mitglied aufnehmen“ (LFH-1170, Spec `einsatz-zugriff`): Mitglieder aufnehmen darf nur die
    * Einsatzleitung eines laufenden Einsatzes. `darfSchreibenImEinsatz` schließt Führungspersonal
    * ein und reicht deshalb nicht.
    */
-  describe('Person aufnehmen (LFH-1170)', () => {
-    const ID = 'aktion:person-aufnehmen';
+  describe('Mitglied aufnehmen (LFH-1170)', () => {
+    const ID = 'aktion:mitglied-aufnehmen';
     it('springt für die Einsatzleitung in die Personenauswahl der Sektion „Zugriff“', () => {
       const k = kontext({ darfEinsatzLeiten: true });
       const b = baueBefehle(k);
       const zeile = b.find((x) => x.id === ID)!;
-      expect(zeile.label).toBe('Person aufnehmen');
+      expect(zeile.label).toBe('Mitglied aufnehmen');
       expect(zeile.gruppe).toBe('schnellaktionen');
       expect(zeile.kontext).toBe(b.find((x) => x.id === 'modul:einsatz-einstellungen')!.label);
       zeile.ausfuehren();
@@ -273,9 +273,13 @@ describe('baueBefehle — Schnellaktionen', () => {
       const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false, darfEinsatzLeiten: true }));
       expect(b.some((x) => x.id === ID)).toBe(false);
     });
+    it('„person“ führt auch für die Einsatzleitung zuerst zur Erfassung, nicht in den Zugriff', () => {
+      const b = baueBefehle(kontext({ darfEinsatzLeiten: true }));
+      expect(ordneTreffer(filtereBefehle(b, 'person'), 'person')[0]?.id).toBe('aktion:personen');
+    });
     it('findet sich über „mitglied“ und „zugriff“', () => {
       const b = baueBefehle(kontext({ darfEinsatzLeiten: true }));
-      for (const q of ['mitglied', 'zugriff']) {
+      for (const q of ['mitglied aufnehmen', 'zugriff']) {
         expect(ordneTreffer(filtereBefehle(b, q), q)[0]?.id).toBe(ID);
       }
     });

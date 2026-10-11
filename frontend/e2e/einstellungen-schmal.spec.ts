@@ -416,10 +416,10 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit Rechtehinw
 test.describe('LFH-1170 Zugriff am Handy', () => {
   test.use({ viewport: HANDSCHIRM });
 
-  const zugriff = (page: Page) => page.getByRole('region', { name: 'Zugriff' });
+  const zugriff = (page: Page) => page.getByRole('region', { name: 'Zugriff', exact: true });
 
   /** Über die API: der Anlege-Dialog ist hier nicht Gegenstand, und 390 px ändern seinen Weg. */
-  async function einsatzPerApi(page: Page, name: string): Promise<string> {
+  async function createEinsatzPerApi(page: Page, name: string): Promise<string> {
     const r = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
     expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();
     return String(((await r.json()) as { id: number }).id);
@@ -439,7 +439,7 @@ test.describe('LFH-1170 Zugriff am Handy', () => {
     page,
   }) => {
     await anmeldenAlsAdmin(page);
-    const einsatzId = await einsatzPerApi(page, `Zugriff schmal ${Date.now()}`);
+    const einsatzId = await createEinsatzPerApi(page, `Zugriff schmal ${Date.now()}`);
     const kollege = await benutzerAnlegen(page, 'fuehrungspersonal', 'Kollegin Mitglied');
     await mitgliedEintragen(page, einsatzId, kollege.id, 'beobachter');
     await page.goto(`/einsaetze/${einsatzId}/einstellungen/zugriff`);
@@ -458,7 +458,7 @@ test.describe('LFH-1170 Zugriff am Handy', () => {
     page,
   }) => {
     await anmeldenAlsAdmin(page);
-    const einsatzId = await einsatzPerApi(page, `Zugriff schmal FP ${Date.now()}`);
+    const einsatzId = await createEinsatzPerApi(page, `Zugriff schmal FP ${Date.now()}`);
     await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
     await page.goto(`/einsaetze/${einsatzId}/einstellungen/zugriff`);
 

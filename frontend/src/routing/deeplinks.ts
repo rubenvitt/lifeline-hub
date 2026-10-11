@@ -937,7 +937,7 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
 
 /**
  * Sektions-Route der Einsatz-Einstellungen. Ohne Sektion der bare Modulpfad, der auf die erste
- * Sektion umleitet. `neu` ist der Auftrag der Schnellaktion „Person aufnehmen“ (LFH-1170): die
+ * Sektion umleitet. `neu` ist der Auftrag der Schnellaktion „Mitglied aufnehmen“ (LFH-1170): die
  * Sektion „Zugriff“ öffnet damit die Personenauswahl.
  */
 export function einsatzEinstellungenPfad(

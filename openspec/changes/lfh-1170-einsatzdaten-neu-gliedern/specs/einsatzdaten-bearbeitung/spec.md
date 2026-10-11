@@ -22,7 +22,8 @@ Einen einklappbaren Bereich „Technische Angaben“ MUST es nicht geben.
 Die Seite Einsatzdaten SHALL ihre Angaben in dieser Reihenfolge zeigen: Kopfleiste
 (Einsatzstichwort, Alarmzeit, Einsatzort, Einsatzleitung), Paneel „Einsatz“, Paneel
 „Einsatzort“, Paneel „Erstmeldung“, Paneel „Eigene Führungsstelle“, zuletzt der
-Einsatzabschluss. Jede Angabe MUST genau einmal auf der Seite stehen. Die Seite MUST die volle
+Einsatzabschluss. Kopfleiste und Paneele MUST keine Angabe wiederholen; die Kennungen im
+Seitenkopf sind eine Lesekopie aus dem Paneel „Einsatz“. Die Seite MUST die volle
 Inhaltsbreite nutzen.
 
 #### Scenario: Angaben je Paneel

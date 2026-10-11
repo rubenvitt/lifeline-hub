@@ -27,7 +27,7 @@ Die schmale Lesebreite lässt die Seite anders aussehen als die übrigen Führun
 - **Zugriff wandert in die Einsatz-Einstellungen:** neue Sektion `…/einstellungen/zugriff`
   („Zugriff“, hinter „Geräte“) trägt das bisherige Paneel mit unveränderten Rechten. Auf den
   Einsatzdaten bleibt für die Einsatzleitung ein Nebenweg „Zugriff verwalten ↗“ im Seitenkopf.
-- **Schnellaktion „Person aufnehmen“** in der Sprungpalette, nur für die Einsatzleitung eines
+- **Schnellaktion „Mitglied aufnehmen“** in der Sprungpalette, nur für die Einsatzleitung eines
   laufenden Einsatzes: öffnet `…/einstellungen/zugriff?neu=1` mit offener Personenauswahl —
   Mitglieder aufnehmen ist einer der ersten Schritte eines neuen Einsatzes.
 - „Einsatzbericht drucken“ geht aus `aktionen` in `weitere` (Nebenweg-Regel, LFH-963).
@@ -46,7 +46,7 @@ Die schmale Lesebreite lässt die Seite anders aussehen als die übrigen Führun
 - `einsatzdaten-bearbeitung`: ein Bearbeitungsweg (Zeile), Bezeichnung und Koordinate als
   Zeile, kein Vollformular, Kennungen im Seitenkopf, Gliederung der Seite.
 - `einsatz-zugriff`: der Ort der Verwaltung ist die Einstellungs-Sektion „Zugriff“; die
-  Einsatzdaten tragen nur den Sprung dorthin; die Schnellaktion „Person aufnehmen“ führt direkt
+  Einsatzdaten tragen nur den Sprung dorthin; die Schnellaktion „Mitglied aufnehmen“ führt direkt
   in die Personenauswahl.
 - `einsatzkopf-live`: das Szenario „Offenes Bearbeitungsformular“ wird zur offenen Zeile.
 - `einsatztauglichkeit-layout`: in der Liste der Bedienziele entfallen auf den Einsatzdaten

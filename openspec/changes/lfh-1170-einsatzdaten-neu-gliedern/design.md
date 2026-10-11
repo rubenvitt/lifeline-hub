@@ -80,9 +80,10 @@ Alternative: Formular behalten, nur versteckter — zwei Wege bleiben, das ist d
 Ohne Formular wäre die Koordinate bis LFH-1175 gar nicht mehr änderbar. Deshalb bekommt sie
 jetzt eine Zeile: `InlineAngabe<KoordinatenWert>` mit `KoordinatenEingabe` als Eingabe,
 Anzeige weiter über `KoordinatenAnzeige`. `gleich` vergleicht `lat`/`lon` (ungültig ist nie
-gleich), `leer` ist `null`. `onSpeichern` prüft mit `istLatLon`: ein ungültiger Wert lehnt mit
-einem Fehler ab („Koordinate nicht lesbar“), den `InlineAngabe` an der Zeile zeigt, die Eingabe
-bleibt offen; ein gültiger sendet `{ einsatzort_lat, einsatzort_lon }`, ein leerer beide `null`.
+gleich), `leer` ist `null`. Das neue Merkmal `isValid` von `InlineAngabe` prüft mit
+`istLatLon`: ein ungültiger Wert wird nicht gesendet, die Zeile bleibt offen, der Fokus geht ins
+Feld zurück, und die Eingabe nennt den Grund selbst (`aria-invalid`, `aria-describedby`, Wortlaut
+„Ungültige Koordinate im Format …“); ein gültiger sendet `{ einsatzort_lat, einsatzort_lon }`, ein leerer beide `null`.
 `EinsatzdatenPage.tsx` kommt mit diesem Begründungskommentar in `DIREKT` des
 Koordinaten-Guards.
 
@@ -133,15 +134,16 @@ Alternativen: **K2** Lücke bis LFH-1175 (Koordinate nur lesend) — eine Regres
 - Purpose der Haupt-Spec `einsatzdaten-bearbeitung` („… viele Angaben auf einmal über das
   Vollformular“) wird beim Archivieren direkt in `openspec/specs/` nachgezogen.
 
-### D7 Schnellaktion „Person aufnehmen“
+### D7 Schnellaktion „Mitglied aufnehmen“
 
 Mitglieder aufnehmen ist einer der ersten Schritte eines neuen Einsatzes; mit dem Umzug in die
 Einstellungen liegt der Weg einen Klick weiter weg. Die Sprungpalette hat dafür das feste
 Muster `SCHNELLAKTIONEN` (`command-palette/AGENTS.md`, „Schnellaktionen“):
 
 - Neue Zeile ans Ende: Träger `einsatz-einstellungen`, Parameter `neu`,
-  `kennung: 'person-aufnehmen'`, Ziel `einsatzEinstellungenPfad(id, 'zugriff')` + `?neu=1`,
-  Label „Person aufnehmen“ (Objekt + Verb), Schlagworte mitglied, zugriff, aufnehmen,
+  `kennung: 'mitglied-aufnehmen'`, Ziel `einsatzEinstellungenPfad(id, 'zugriff')` + `?neu=1`,
+  Label „Mitglied aufnehmen“ (Objekt + Verb; nicht „Person aufnehmen“, so heißt im
+  Lage-Überblick die Erfassung von Betroffenen, Review 11.10.2026), Schlagworte zugriff,
   hinzufügen, rolle.
 - **Rechte-Merkmal je Schnellaktion:** Block 4 in `befehle.ts` prüft heute nur
   `darfSchreibenImEinsatz`, das schließt Führungspersonal ein. Neues optionales Feld
@@ -152,7 +154,7 @@ Muster `SCHNELLAKTIONEN` (`command-palette/AGENTS.md`, „Schnellaktionen“):
   Das Layout liest `neu` als Literal und reicht ein Einmal-Signal per `Outlet`-Context an
   `EinsatzZugriff`. Der Context trägt nur dieses Flag, keine Daten, deshalb gilt die
   Formular-Falle aus dem Kommentar von `useEinstellungenDaten` hier nicht.
-- `MitgliederAbschnitt` bekommt `auswahlOeffnen`: die Personenauswahl erhält Fokus und klappt
+- `MitgliederAbschnitt` bekommt `openAuswahl`: die Personenauswahl erhält Fokus und klappt
   auf; danach räumt die Sektion `neu` per `replace`, ein Neuladen öffnet nicht noch einmal.
 
 Alternativen: eine Kachel „Personen aufnehmen“ auf dem Führungsüberblick — ein weiterer Ort für
