@@ -94,8 +94,9 @@ Die Zeile vergleicht nur den Text plus Koordinate und baut den Patch:
 Die Zeile „Koordinate“ ist eine `InlineAngabe<KoordinatenWert>` mit `KoordinatenEingabe`, Patch
 als Paar (geleert → Paar aus `null`). Beide stehen im neuen Paneel „Einsatzort“ unter
 „Lagedaten“; die Kopfleiste zeigt den Text ohne Aufforderung (ein Wert, eine Bearbeitungsstelle).
-Neben der Adresse steht `OrtZeile` der gespeicherten Koordinate (Reverse-Ortsname), damit ein
-Auseinanderfallen sichtbar bleibt.
+Die Zeile „Koordinate“ direkt darunter zeigt über `KoordinatenAnzeige` den Reverse-Ortsname der
+gespeicherten Koordinate, damit ein Auseinanderfallen sichtbar bleibt; eine zweite `OrtZeile`
+neben der Adresse fragte den Geocoder je Seitenaufruf doppelt.
 
 ### D7 Kartenausschnitt als eigener Baustein
 `anzeige/Kartenausschnitt.tsx`: `{ punkt: LatLon | null; etikett: string; hoehe?: number }`,

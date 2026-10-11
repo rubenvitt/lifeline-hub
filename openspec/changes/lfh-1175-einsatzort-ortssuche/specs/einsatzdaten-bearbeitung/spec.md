@@ -61,9 +61,9 @@ optionale Angabe MUST als `null` gesendet werden; eine geleerte Koordinate als P
 Die Seite Einsatzdaten SHALL ein Paneel „Einsatzort“ zeigen mit den Zeilen „Adresse“ und
 „Koordinate“ und darunter einem Kartenausschnitt des Einsatzorts. Ist der Einsatzort verortet und
 darf die Person die Lagekarte sehen, SHALL das Paneel den Sprung „Auf Lagekarte zeigen ↗“ tragen,
-der die Lagekarte um den Einsatzort öffnet. Neben der Adresse SHALL der Ortsname der Koordinate
-stehen, wie die Koordinatenanzeige ihn liefert, damit auffällt, wenn Adresse und Koordinate
-auseinanderfallen.
+der die Lagekarte um den Einsatzort öffnet. In der Zeile „Koordinate“ direkt unter der Adresse
+SHALL der Ortsname der Koordinate stehen, wie die Koordinatenanzeige ihn liefert, damit auffällt,
+wenn Adresse und Koordinate auseinanderfallen.
 
 #### Scenario: Verorteter Einsatz
 - **WHEN** eine Person die Einsatzdaten eines Einsatzes mit Adresse und Koordinate öffnet

@@ -30,7 +30,7 @@
 
 ## 6. Frontend: Einsatz anlegen
 
-- [ ] 6.1 Fünftes Feld „Einsatzort“ im `ErfassungsModal` von `EinsaetzePage` (Ortsfeld mit `sucheOrtInOrg`, Ausschnitt 120 px nach der Wahl), Kommentar zur Feldobergrenze fortgeschrieben; Vitest: Anlegen mit Treffer sendet drei Felder, mit Freitext nur `einsatzort`, leer keines
+- [x] 6.1 Fünftes Feld „Einsatzort“ im `ErfassungsModal` von `EinsaetzePage` (Ortsfeld mit `sucheOrtInOrg`, Ausschnitt 120 px nach der Wahl), Kommentar zur Feldobergrenze fortgeschrieben; Vitest: Anlegen mit Treffer sendet drei Felder, mit Freitext nur `einsatzort`, leer keines
 
 ## 7. Regeln, e2e, Doku
 
