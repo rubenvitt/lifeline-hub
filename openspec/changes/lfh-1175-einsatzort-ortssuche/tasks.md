@@ -25,8 +25,8 @@
 
 ## 5. Frontend: Einsatzdaten
 
-- [ ] 5.1 Paneel „Einsatzort“ (`EinsatzortPaneel`) mit Zeile „Adresse“ (`InlineAngabe<OrtsfeldWert>`, `sucheOrtImEinsatz`) und Zeile „Koordinate“ (`InlineAngabe` mit `KoordinatenEingabe`); Kopfleiste zeigt den Einsatzort ohne Aufforderung, „Koordinate“ verlässt „Lagedaten“; Vitest: Treffer → genau ein PATCH mit drei Feldern, nur Text → `{ einsatzort }`, Koordinate MGRS → Paar, Koordinate leeren → Paar `null`, Beobachter ohne Aufforderung und ohne Suche, Kopfleiste ohne „Einsatzort bearbeiten“; bestehende Zeilentests angepasst und grün
-- [ ] 5.2 Kartenausschnitt und `OrtZeile` im Paneel, Sprung „Auf Lagekarte zeigen ↗“ nur bei Koordinate und Lagekarten-Recht; Vitest für beide Fälle
+- [x] 5.1 Paneel „Einsatzort“ (`EinsatzortPaneel`) mit Zeile „Adresse“ (`InlineAngabe<OrtsfeldWert>`, `sucheOrtImEinsatz`) und Zeile „Koordinate“ (`InlineAngabe` mit `KoordinatenEingabe`); Kopfleiste zeigt den Einsatzort ohne Aufforderung, „Koordinate“ verlässt „Lagedaten“; Vitest: Treffer → genau ein PATCH mit drei Feldern, nur Text → `{ einsatzort }`, Koordinate MGRS → Paar, Koordinate leeren → Paar `null`, Beobachter ohne Aufforderung und ohne Suche, Kopfleiste ohne „Einsatzort bearbeiten“; bestehende Zeilentests angepasst und grün
+- [x] 5.2 Kartenausschnitt und `OrtZeile` im Paneel, Sprung „Auf Lagekarte zeigen ↗“ nur bei Koordinate und Lagekarten-Recht; Vitest für beide Fälle
 
 ## 6. Frontend: Einsatz anlegen
 

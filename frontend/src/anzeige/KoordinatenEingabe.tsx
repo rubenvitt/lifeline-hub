@@ -22,6 +22,9 @@ const OPTIONEN = (Object.keys(FORMAT_LABEL) as Koordinatenformat[]).map((value) 
 interface Props {
   /** Von Form.Item gesetzte ID verbindet dessen Label mit dem Texteingabefeld. */
   id?: string;
+  /** Name des Texteingabefelds ohne umgebendes Label, etwa in einer Zeile (`InlineAngabe`). */
+  'aria-label'?: string;
+  autoFocus?: boolean;
   /** Leer `null`, gültig `LatLon`, ungültig mit Wortlaut und Format (LFH-517, `koordinatenWert.ts`). */
   value?: KoordinatenWert;
   onChange?: (wert: KoordinatenWert) => void;
@@ -39,6 +42,8 @@ interface Props {
 
 export default function KoordinatenEingabe({
   id,
+  'aria-label': ariaLabel,
+  autoFocus,
   value,
   onChange,
   status,
@@ -105,6 +110,8 @@ export default function KoordinatenEingabe({
       <Space.Compact style={{ width: '100%' }}>
         <Input
           id={id}
+          aria-label={ariaLabel}
+          autoFocus={autoFocus}
           value={text}
           onChange={(e) => bearbeiten(e.target.value)}
           onFocus={() => setFokus(true)}
