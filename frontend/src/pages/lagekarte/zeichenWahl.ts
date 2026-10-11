@@ -1,6 +1,6 @@
 /**
  * Zeichenwahl der freien Lagekarten-Zeichen aus dem Vokabular von @einsatzzeichen (LFH-836,
- * openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/design.md D7, Spec
+ * openspec/changes/archive/2026-10-11-lfh-836-freie-zeichen-einsatzzeichen/design.md D7, Spec
  * `lagekarte-zeichenwahl`). Rein und ohne React: was der Picker anbietet, wie eine Wahl den
  * Entwurf ändert und wie ein Zeichen heißt.
  *

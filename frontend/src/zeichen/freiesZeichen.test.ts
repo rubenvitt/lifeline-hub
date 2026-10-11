@@ -14,7 +14,7 @@ import {
 } from './freiesZeichen';
 
 // Abbildung der Alt-Kennungen freier Zeichen (Katalog taktische-zeichen-core 0.10) auf
-// @einsatzzeichen 5.2 (LFH-836, openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/design.md D5,
+// @einsatzzeichen 5.2 (LFH-836, openspec/changes/archive/2026-10-11-lfh-836-freie-zeichen-einsatzzeichen/design.md D5,
 // D6). Jede Zeile zeichnet echt: ein Bibliotheks-Update, das eine Abbildung verschiebt, wird hier
 // rot statt im Betrieb still zum Rückfall.
 //

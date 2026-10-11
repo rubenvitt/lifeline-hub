@@ -14,7 +14,7 @@ import {
 // Kosten des Vokabulars (LFH-836, Aufgabe 5.2, design.md D7): `vocabulary()` zeichnet jeden
 // Kandidaten probeweise. Gemessen werden das Öffnen des Pickers und ein Grundzeichenwechsel, kalt
 // und gemerkt. Die Zahlen stehen in
-// openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/messung.md; die Prüfung hier hält nur fest,
+// openspec/changes/archive/2026-10-11-lfh-836-freie-zeichen-einsatzzeichen/messung.md; die Prüfung hier hält nur fest,
 // dass ein zweiter Besuch desselben Entwurfs aus dem Merker kommt (keine Zeitgrenze: Zeiten auf
 // geteilten CI-Rechnern schwanken).
 

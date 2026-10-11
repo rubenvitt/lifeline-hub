@@ -5,7 +5,7 @@
 -- altem Body (Übergang, design.md D4); `grundzeichen` wird dafür nullable. Ein CHECK verlangt
 -- genau eine Form: Zeichenbeschreibung ODER Grundzeichen. Kein Backfill (design.md D5: der
 -- Übersetzer steht in TypeScript). Herleitung:
--- openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/design.md, D2.
+-- openspec/changes/archive/2026-10-11-lfh-836-freie-zeichen-einsatzzeichen/design.md, D2.
 --
 -- SQLite kann weder NOT NULL lösen noch einen CHECK nachrüsten → Rebuild, FK-sicher nach dem
 -- Muster von 0082/0119. Leaf-Rebuild: KEIN Fremdschlüssel zeigt auf freies_zeichen, keine

@@ -1,6 +1,6 @@
 /**
  * Leseadapter der freien Lagekarten-Zeichen (LFH-836,
- * openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/design.md D5, D6). EINZIGE Stelle, die ein
+ * openspec/changes/archive/2026-10-11-lfh-836-freie-zeichen-einsatzzeichen/design.md D5, D6). EINZIGE Stelle, die ein
  * gespeichertes freies Zeichen in eine Zeichenbeschreibung von @einsatzzeichen übersetzt — für
  * DB-Zeilen, Lage-Snapshots, Offline-Stände und „zuletzt verwendet“ gleichermaßen.
  *
