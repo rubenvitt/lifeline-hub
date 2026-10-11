@@ -68,7 +68,7 @@ Hilfsorganisation, sonstige. Innerhalb einer Gruppe erst die zuständige Leitste
 alphabetisch.
 
 ### D3 Tabelle `org_externe_stelle` und die zuständige Leitstelle
-Migration `0177_org_externe_stelle.sql`:
+Migration `0178_org_externe_stelle.sql`:
 
 ```
 id, org_id → organisation, bezeichnung TEXT NOT NULL, art TEXT NOT NULL CHECK(...),
