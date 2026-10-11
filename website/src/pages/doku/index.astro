@@ -53,7 +53,7 @@ const gruppenNamen = Object.fromEntries(GRUPPEN.map((g) => [g.key, g.name]));
         <input
           type="search"
           name="suche"
-          placeholder="Titel oder Überblick, z. B. Gerät"
+          placeholder="Titel oder Überblick, z. B. Gerät (⌘K)"
           autocomplete="off"
           data-suche
         />
@@ -143,6 +143,14 @@ const gruppenNamen = Object.fromEntries(GRUPPEN.map((g) => [g.key, g.name]));
   }
 
   suche?.addEventListener('input', aktualisiere);
+  // Cmd+K (Mac) bzw. Strg+K springt ins Suchfeld, wie die Sprungpalette der App.
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && suche) {
+      e.preventDefault();
+      suche.focus();
+      suche.select();
+    }
+  });
   knoepfe.forEach((knopf) =>
     knopf.addEventListener('click', () => {
       gruppe = knopf.dataset.gruppe ?? '';
