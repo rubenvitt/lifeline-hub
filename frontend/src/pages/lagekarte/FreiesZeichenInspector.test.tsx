@@ -394,6 +394,16 @@ describe('FreiesZeichenInspector — Symbolkachel (LFH-797)', () => {
     expect(zelle.style.borderColor).not.toBe(css(FREIES_ZEICHEN_TINTE));
   });
 
+  it('legt das Zeichen nachts auf die helle Zeichenplatte, damit schwarze Tinte lesbar bleibt (LFH-836)', () => {
+    const zelle = kachelImNachtmodus(specZeile({ kind: 'formation' }));
+    const platte = zelle.querySelector<HTMLElement>('[data-lfh="zeichen-platte"]');
+    expect(platte).not.toBeNull();
+    expect(platte!.querySelector('svg')).not.toBeNull();
+    const probe = document.createElement('div');
+    probe.style.background = farbenDunkel.zeichenPlatte;
+    expect(platte!.style.background).toBe(probe.style.background);
+  });
+
   it('zeigt eine Gefahr mit roter Füllung mit Rahmen im Rot der Palette', () => {
     const zelle = kachelImNachtmodus(specZeile({ kind: 'hazard', technicalFill: 'rot' }));
     expect(zelle.querySelector('svg')).not.toBeNull();

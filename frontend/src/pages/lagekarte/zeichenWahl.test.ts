@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GRUNDZEICHEN_NAMEN,
   START_ZEICHEN_SPEC,
+  darstellungsName,
   detailOptionen,
   grundzeichenOptionen,
   grundzeichenVon,
@@ -100,7 +101,7 @@ describe('symbolOptionen ohne Grundzeichen', () => {
       'Chemische Stoffe (zweite Darstellung)',
     );
     expect(name('pic:capability.chemical-materials')).toBe('Chemische Stoffe');
-    expect(name('state:hazardous-substances:alternative')).toMatch(/\(zweite Darstellung\)$/);
+    // 5.8.6.2: die Register-Datei trägt nur den Buchstaben „K“, kein Wort — Rückfall.
     expect(name('tier:contaminated-animal:alternative')).toMatch(/\(zweite Darstellung\)$/);
     expect(mitSymbol(null, 'tier:contaminated-animal:alternative')).toEqual({
       kind: 'animal-state',
@@ -110,6 +111,15 @@ describe('symbolOptionen ohne Grundzeichen', () => {
     // 5.8.8.6: die erste Darstellung gehört an die Person, die zweite zeichnet nur freistehend.
     expect(ids).not.toContain('state:person-contaminated');
     expect(ids).toContain('state:person-contaminated:alternative');
+  });
+
+  it('nennt die zweite Darstellung nach dem Register, wo es sie benennt (5.8.1.7 „Chlor“)', () => {
+    const name = (id: string) => optionen.find((o) => o.id === id)?.label;
+    expect(name('state:hazardous-substances:alternative')).toBe('Gefährliche Stoffe (Chlor)');
+    expect(name('state:hazardous-substances')).toBe('Gefährliche Stoffe');
+    expect(
+      zeichenName({ kind: 'state', state: 'hazardous-substances', variant: 'alternative' }),
+    ).toBe('Gefährliche Stoffe (Chlor)');
   });
 
   it('bietet keine zweite Darstellung an, die die Bibliothek freistehend nicht zeichnet', () => {
@@ -126,6 +136,45 @@ describe('symbolOptionen ohne Grundzeichen', () => {
       kind: 'pictogram',
       pictogram: 'capability.rescue-aerial-ladder',
     });
+  });
+});
+
+describe('darstellungsName', () => {
+  const erste = 'Gefährliche Stoffe';
+  const eintrag = (titel: string, datei: string) => ({
+    id: 'state.hazardous-substances',
+    titel: erste,
+    zweite: { titel, datei },
+  });
+
+  it('nimmt einen eigenen Titel der zweiten Darstellung, wo er sich von der ersten unterscheidet', () => {
+    expect(darstellungsName(eintrag('Chlorgas', '5.8.1.7_x.svg'), true)).toBe('Chlorgas');
+    expect(darstellungsName(eintrag('Chlorgas', '5.8.1.7_x.svg'), false)).toBe(erste);
+  });
+
+  it('nimmt sonst das Wort hinter dem Titel in der Register-Datei', () => {
+    expect(darstellungsName(eintrag(erste, '5.8.1.7_Gefährliche Stoffe_Chlor.svg'), true)).toBe(
+      'Gefährliche Stoffe (Chlor)',
+    );
+  });
+
+  it('fällt auf „(zweite Darstellung)“ zurück: kein Wort, nur ein Buchstabe, eine Zahl oder „Alternative“', () => {
+    for (const datei of ['a_b_Alternative.svg', 'a_b_2.svg', 'a_b_K.svg', 'a_b.svg']) {
+      expect(darstellungsName(eintrag(erste, datei), true), datei).toBe(
+        'Gefährliche Stoffe (zweite Darstellung)',
+      );
+    }
+  });
+
+  it('nennt Anhang J nach Funk und Draht, und ohne zweite Darstellung nur den Titel', () => {
+    const j = {
+      id: 'comms.voice',
+      titel: 'Sprache',
+      zweite: { titel: 'Sprache', datei: 'J.1.1_Sprache_leitergebunden.svg' },
+    };
+    expect(darstellungsName(j, false)).toBe('Sprache (Funk)');
+    expect(darstellungsName(j, true)).toBe('Sprache (Draht)');
+    expect(darstellungsName({ id: 'comms.radio', titel: 'Funk' }, false)).toBe('Funk');
   });
 });
 

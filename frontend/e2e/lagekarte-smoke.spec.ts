@@ -742,3 +742,35 @@ test.describe('Lagekarte: freie Zeichen', () => {
       .toEqual({ breite: 68, gezeichnet: 1 });
   });
 });
+
+// LFH-836: Das Raster des Zeichen-Pickers endet mit einer ganzen Kachelreihe. Die Reihen sind
+// verschieden hoch (Namen brechen um); eine feste Höhe schnitt die nächste Reihe mitten im Namen an.
+test('Lagekarte: das Grundzeichen-Raster schneidet keine Kachelreihe an', async ({ page }) => {
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
+  const paneel = page.locator('[data-paneel="zeichnen"]');
+  await paneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
+  for (const name of ['Grundzeichen', 'Symbol']) {
+    const raster = paneel.getByRole('radiogroup', { name });
+    await expect(raster.getByRole('radio').first()).toBeVisible();
+    const befund = await raster.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const kacheln = Array.from(el.querySelectorAll('[role="radio"]')).map((k) => {
+        const b = k.getBoundingClientRect();
+        return { oben: b.top - r.top, unten: b.bottom - r.top, name: k.textContent };
+      });
+      const sicht = el.clientHeight;
+      return {
+        rollt: el.scrollHeight > sicht + 1,
+        angeschnitten: kacheln
+          .filter((k) => k.oben < sicht - 0.5 && k.unten > sicht + 0.5)
+          .map((k) => k.name),
+      };
+    });
+    // Vorbedingung: das Raster rollt, sonst gäbe es nichts anzuschneiden.
+    expect(befund.rollt, `${name}: Raster rollt nicht`).toBe(true);
+    expect(befund.angeschnitten, `${name}: angeschnittene Kacheln`).toEqual([]);
+  }
+});

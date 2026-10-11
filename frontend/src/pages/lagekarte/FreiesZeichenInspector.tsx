@@ -3,10 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
 import type { FreiesZeichen, FreiesZeichenUpdate, KartenAnsicht } from '../../api/types';
 import KartenDetailCard from './KartenDetailCard';
-import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
+import FreiesZeichenPicker, {
+  hatZeichen,
+  ZeichenAufPlatte,
+  type ZeichenEntwurf,
+} from './FreiesZeichenPicker';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
-import { ZeichenBild } from '../../zeichen/EinsatzZeichen';
 import { freiesZeichen, fuellfarbe, type FreiesZeichenEingabe } from '../../zeichen/freiesZeichen';
 import { ZEICHEN_KARTEN_PX } from './markerIcons';
 import { zeichenTeile } from './zeichenWahl';
@@ -159,7 +162,7 @@ export default function FreiesZeichenInspector({
         // dunklen Paneel (LFH-797, Spec `lagekarte-taktische-zeichen`).
         fuellfarbe(bild.spec) ?? rollen.text2
       }
-      kachel={<ZeichenBild drawing={bild.drawing} size={ZEICHEN_KARTEN_PX} />}
+      kachel={<ZeichenAufPlatte drawing={bild.drawing} size={ZEICHEN_KARTEN_PX} />}
       unterzeile={
         bild.vereinfacht ? (
           <span data-lfh="zeichen-vereinfacht">

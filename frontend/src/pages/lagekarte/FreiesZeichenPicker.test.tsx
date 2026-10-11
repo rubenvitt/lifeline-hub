@@ -7,7 +7,10 @@ import { PALETTE, type AnySpec } from '@einsatzzeichen/schema';
 import { renderMitProviders } from '../../test/utils';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import { farbenDunkel } from '../../theme/tokens';
+import { ConfigProvider, theme } from 'antd';
+import { antdToken, farbenHell } from '../../theme/tokens';
 import FreiesZeichenPicker, {
+  ganzeReihenHoehe,
   kachelFarben,
   kachelStil,
   type FreiesZeichenPickerProps,
@@ -617,6 +620,70 @@ describe('FreiesZeichenPicker — zwei Picker im selben Baum', () => {
     expect(screen.getAllByRole('radio', { name: 'Stelle' })).toHaveLength(2);
     const vorbelegt = await screen.findAllByRole('radio', { name: 'Stelle', checked: true });
     expect(vorbelegt).toHaveLength(1);
+  });
+});
+
+describe('FreiesZeichenPicker — Zeichenplatte (LFH-836)', () => {
+  const css = (farbe: string) => {
+    const probe = document.createElement('div');
+    probe.style.background = farbe;
+    return probe.style.background;
+  };
+  const bilderIm = (modus: 'nacht' | 'tag') => {
+    renderMitProviders(
+      <ConfigProvider
+        theme={
+          modus === 'nacht'
+            ? { algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }
+            : { token: antdToken(farbenHell) }
+        }
+      >
+        <FreiesZeichenPicker wert={FORMATION} onChange={vi.fn()} autoFokus={false} />
+      </ConfigProvider>,
+    );
+    // Zeichen, keine Icons (Leerkachel, Klapppfeil tragen die Hülle `anticon`).
+    return Array.from(document.querySelectorAll('[data-lfh="zeichen-picker"] svg')).filter(
+      (svg) => !svg.closest('.anticon'),
+    );
+  };
+
+  it('legt nachts jedes Zeichen (Vorschau und Kacheln) auf die helle Zeichenplatte', () => {
+    const bilder = bilderIm('nacht');
+    expect(bilder.length).toBeGreaterThan(20);
+    for (const svg of bilder) {
+      const platte = svg.closest<HTMLElement>('[data-lfh="zeichen-platte"]');
+      expect(platte, 'Zeichen ohne Platte').not.toBeNull();
+      expect(platte!.style.background).toBe(css(farbenDunkel.zeichenPlatte));
+    }
+  });
+
+  it('lässt die Platte am Tag durchsichtig', () => {
+    const [vorschau] = bilderIm('tag');
+    const platte = vorschau.closest<HTMLElement>('[data-lfh="zeichen-platte"]');
+    expect(platte!.style.background).toBe(css('transparent'));
+  });
+});
+
+describe('ganzeReihenHoehe (Raster ohne angeschnittene Reihe, LFH-836)', () => {
+  // Drei Spalten, Reihen verschieden hoch (ein Name bricht in zwei Zeilen).
+  const kacheln = [
+    { oben: 0, unten: 80 },
+    { oben: 0, unten: 92 },
+    { oben: 0, unten: 80 },
+    { oben: 96, unten: 176 },
+    { oben: 96, unten: 176 },
+    { oben: 96, unten: 176 },
+    { oben: 180, unten: 290 },
+  ];
+
+  it('endet mit der letzten ganzen Reihe, nicht mitten in der nächsten', () => {
+    expect(ganzeReihenHoehe(kacheln, 1)).toBe(92);
+    expect(ganzeReihenHoehe(kacheln, 2)).toBe(176);
+  });
+
+  it('begrenzt nicht, wenn alle Reihen in die Höhe passen', () => {
+    expect(ganzeReihenHoehe(kacheln, 3)).toBeUndefined();
+    expect(ganzeReihenHoehe([], 4)).toBeUndefined();
   });
 });
 

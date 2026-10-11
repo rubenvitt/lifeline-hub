@@ -2,7 +2,9 @@ import { IconMinus } from '../../icons';
 import {
   memo,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -83,6 +85,41 @@ const VORSCHAU_BILD = 56;
 
 /** Die Vorschau ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl). */
 export const OHNE_ZEICHEN_HINWEIS = 'Symbol wählen';
+
+/**
+ * Ein Zeichen auf der Zeichenplatte (Rolle `zeichenPlatte`, LFH-836): die Bibliothek zeichnet mit
+ * schwarzer Tinte, nachts trüge das dunkle Paneel sie nicht. Die Platte deckt genau die Zeichenfläche
+ * (keine Lageänderung); am Tag ist sie durchsichtig. Picker-Kacheln, Vorschau, „Zuletzt verwendet“
+ * und die Symbolkachel des Inspectors nehmen sie, die Karte nicht (LFH-833).
+ */
+export function ZeichenAufPlatte({ drawing, size }: { drawing: Drawing; size: number }) {
+  const { rollen } = useRollen();
+  return (
+    <span
+      aria-hidden
+      data-lfh="zeichen-platte"
+      style={{ display: 'flex', width: size, height: size, background: rollen.zeichenPlatte }}
+    >
+      <ZeichenBild drawing={drawing} size={size} />
+    </span>
+  );
+}
+
+/**
+ * Höhe eines Rasters, das mit der letzten GANZEN Reihe endet — rein und exportiert. `kacheln` sind
+ * Ober- und Unterkante jeder Kachel relativ zum Raster. Die Reihen sind verschieden hoch (ein Name
+ * bricht um); eine feste Rechnung schnitt die nächste Reihe mitten im Namen an. `undefined`, wenn
+ * alle Reihen passen.
+ */
+export function ganzeReihenHoehe(
+  kacheln: readonly { oben: number; unten: number }[],
+  reihen: number,
+): number | undefined {
+  const oben = [...new Set(kacheln.map((k) => k.oben))].sort((a, b) => a - b);
+  if (oben.length <= reihen) return undefined;
+  const grenze = oben[reihen];
+  return Math.max(...kacheln.filter((k) => k.oben < grenze).map((k) => k.unten));
+}
 
 /** Kachel-Höhen, bis das Raster scrollt. Die Suche ist der eigentliche Weg zum Ziel. */
 const RASTER_REIHEN = 4;
@@ -193,7 +230,7 @@ const Kachel = memo(function Kachel(p: KachelProps) {
         {p.id == null ? (
           <IconMinus style={{ fontSize: KACHEL_BILD / 2 }} />
         ) : p.drawing ? (
-          <ZeichenBild drawing={p.drawing} size={KACHEL_BILD} />
+          <ZeichenAufPlatte drawing={p.drawing} size={KACHEL_BILD} />
         ) : null}
       </span>
       <span style={{ lineHeight: 1.15, textAlign: 'center', wordBreak: 'break-word' }}>
@@ -253,6 +290,31 @@ function Raster({
   // Rollender Tabstopp: die Gruppe ist ein Tabstopp. Ist die Auswahl weggefiltert, übernimmt die
   // erste sichtbare Kachel.
   const tabbarId = sichtbare.some((e) => e.id === gewaehlt) ? gewaehlt : (sichtbare[0]?.id ?? null);
+
+  // Sichtbare Höhe auf ganze Reihen gemessen (die Reihen sind verschieden hoch); bis zur ersten
+  // Messung und ohne Layout (jsdom) gilt die Schätzung.
+  const rasterRef = useRef<HTMLDivElement>(null);
+  const [hoehe, setHoehe] = useState<number | undefined>(
+    (KACHEL_BILD + token.controlHeight) * RASTER_REIHEN,
+  );
+  useLayoutEffect(() => {
+    const raster = rasterRef.current;
+    if (!raster) return;
+    const messen = () => {
+      const kacheln = Array.from(raster.children as HTMLCollectionOf<HTMLElement>).map((k) => ({
+        oben: k.offsetTop,
+        unten: k.offsetTop + k.offsetHeight,
+      }));
+      if (kacheln.every((k) => k.unten === 0)) return;
+      const neu = ganzeReihenHoehe(kacheln, RASTER_REIHEN);
+      setHoehe((alt) => (alt === neu ? alt : neu));
+    };
+    messen();
+    if (typeof ResizeObserver === 'undefined') return;
+    const beobachter = new ResizeObserver(messen);
+    beobachter.observe(raster);
+    return () => beobachter.disconnect();
+  }, [sichtbare.length]);
 
   const kachelVon = (ziel: EventTarget) =>
     (ziel as HTMLElement).closest<HTMLElement>('[role="radio"]');
@@ -314,6 +376,7 @@ function Raster({
         style={{ marginBottom: token.marginXXS }}
       />
       <div
+        ref={rasterRef}
         role="radiogroup"
         aria-label={gruppenName}
         onClick={aufKlick}
@@ -326,8 +389,10 @@ function Raster({
             token.controlHeight + 2 * token.paddingXS
           }px), 1fr))`,
           gap: token.marginXXS,
-          maxHeight: (KACHEL_BILD + token.controlHeight) * RASTER_REIHEN,
+          maxHeight: hoehe,
           overflowY: 'auto',
+          // Bezugsrahmen der Kachelkanten (`offsetTop`) für die Höhenmessung.
+          position: 'relative',
         }}
       >
         {sichtbare.map((e) => (
@@ -501,9 +566,7 @@ export default function FreiesZeichenPicker({
         aria-label="Vorschau"
       >
         {vorschau ? (
-          <span aria-hidden style={{ display: 'flex' }}>
-            <ZeichenBild drawing={vorschau} size={VORSCHAU_BILD} />
-          </span>
+          <ZeichenAufPlatte drawing={vorschau} size={VORSCHAU_BILD} />
         ) : (
           <Typography.Text type="secondary">{OHNE_ZEICHEN_HINWEIS}</Typography.Text>
         )}
@@ -527,12 +590,10 @@ export default function FreiesZeichenPicker({
                   onClick={() => uebernimm(z)}
                   style={leistenKnopf}
                 >
-                  <span aria-hidden style={{ display: 'flex' }}>
-                    <ZeichenBild
-                      drawing={freiesZeichen({ zeichen_spec: z }).drawing}
-                      size={KACHEL_BILD}
-                    />
-                  </span>
+                  <ZeichenAufPlatte
+                    drawing={freiesZeichen({ zeichen_spec: z }).drawing}
+                    size={KACHEL_BILD}
+                  />
                 </button>
               </Tooltip>
             );

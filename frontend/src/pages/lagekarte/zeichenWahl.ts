@@ -14,7 +14,7 @@
  *   (`states`), eins zur Zeit. **Ohne Grundzeichen:** freistehender Zustand, Piktogramm oder
  *   Tierzustand. Namen aus den Piktogrammtiteln. Führt das Register eine zweite Darstellung
  *   (`variant: 'alternative'`) und zeichnet die Bibliothek sie freistehend, steht sie als eigene
- *   Kachel direkt hinter der ersten — mit unterscheidendem Namen ({@link variantenZusatz}).
+ *   Kachel direkt hinter der ersten — mit unterscheidendem Namen ({@link darstellungsName}).
  * - **Details:** Organisation, Fachaufgabe als randbündige Körpermarke (`bodyMarks`, wie die
  *   Fachobjekte), Einheit (`strength`/`unitGrouping`), Farbe nur aus der Palette und nur, wo das
  *   Zeichen eine technische Füllung trägt (D6). Die Achse „Funktion“ des Altpakets gibt es nicht.
@@ -112,36 +112,64 @@ export const FARB_NAMEN: Record<TechnicalFillToken, string> = {
 export const START_ZEICHEN_SPEC = serializeAnySpec({ kind: 'formation' });
 
 const TITEL = new Map<string, string>();
-/** Register-Datei der zweiten Darstellung je Piktogramm, nur wo das Register eine führt. */
-const ZWEITE_DARSTELLUNG = new Map<string, string>();
+/** Titel und Register-Datei der zweiten Darstellung je Piktogramm, nur wo das Register eine führt. */
+const ZWEITE_DARSTELLUNG = new Map<string, { titel: string; datei: string }>();
 for (const p of ALL_PICTOGRAMS) {
   if (p.variant === 'primary') TITEL.set(p.id, p.title);
-  else if (p.variant === 'alternative') ZWEITE_DARSTELLUNG.set(p.id, p.referenceAsset);
+  else if (p.variant === 'alternative') {
+    ZWEITE_DARSTELLUNG.set(p.id, { titel: p.title, datei: p.referenceAsset });
+  }
 }
 
 const ZWEITE = 'alternative' as const;
 /** Das Feld der Darstellung: die erste trägt keins. */
 const variante = (zweite: boolean) => (zweite ? { variant: ZWEITE } : {});
 
+/** Ein Piktogramm des Registers mit seiner zweiten Darstellung, soweit es eine führt. */
+export interface Darstellungen {
+  id: string;
+  titel: string;
+  zweite?: { titel: string; datei: string };
+}
+
 /**
- * Was den Namen einer Darstellung unterscheidet, wo das Register zwei führt; beide Fassungen
- * tragen dort denselben Titel. Anhang J (`comms.*`): die erste Darstellung ist drahtlos
- * (Zickzack), die zweite leitergebunden (`pictograms/comms/01-connections.ts` der Bibliothek,
- * Register-Datei `…_leitergebunden.svg`) — „(Funk)“ und „(Draht)“. Sonst heißt nur die zweite
- * „(zweite Darstellung)“. Ohne zweite Darstellung im Register: nichts.
+ * Der Name einer Darstellung, wo das Register zwei führt; sonst der Titel.
+ *
+ * - Anhang J (`comms.*`): die erste Darstellung ist drahtlos (Zickzack), die zweite
+ *   leitergebunden (`pictograms/comms/01-connections.ts` der Bibliothek, Register-Datei
+ *   `…_leitergebunden.svg`) — „(Funk)“ und „(Draht)“.
+ * - Trägt die zweite einen eigenen Titel, gilt er.
+ * - Sonst das Wort hinter dem Titel in der Register-Datei (`5.8.1.7_Gefährliche Stoffe_Chlor.svg`
+ *   → „(Chlor)“): die Bibliothek gibt beiden Fassungen denselben Titel, das Register benennt die
+ *   zweite nur im Dateinamen. Ein einzelner Buchstabe, eine Zahl oder „Alternative“ ist kein Name.
+ * - Rückfall „(zweite Darstellung)“. Die erste Darstellung behält ihren Titel.
  */
-export function variantenZusatz(pictogram: string, zweite: boolean): string {
-  const datei = ZWEITE_DARSTELLUNG.get(pictogram);
-  if (datei === undefined) return '';
-  if (pictogram.startsWith('comms.') && /leitergebunden/i.test(datei)) {
-    return zweite ? ' (Draht)' : ' (Funk)';
+export function darstellungsName(p: Darstellungen, zweite: boolean): string {
+  if (!p.zweite) return p.titel;
+  if (p.id.startsWith('comms.') && /leitergebunden/i.test(p.zweite.datei)) {
+    return `${p.titel} ${zweite ? '(Draht)' : '(Funk)'}`;
   }
-  return zweite ? ' (zweite Darstellung)' : '';
+  if (!zweite) return p.titel;
+  if (p.zweite.titel !== p.titel) return p.zweite.titel;
+  const wort = p.zweite.datei
+    .replace(/\.svg$/i, '')
+    .split('_')
+    .slice(2)
+    .join(' ')
+    .trim();
+  if (/^\p{L}{3,}$/u.test(wort) && !/^alternative$/i.test(wort)) return `${p.titel} (${wort})`;
+  return `${p.titel} (zweite Darstellung)`;
 }
 
 const titel = (pictogram: string): string => TITEL.get(pictogram) ?? pictogram;
 const faehigkeitName = (id: string) => titel(`capability.${id}`);
 const zustandName = (id: string) => titel(`state.${id}`);
+/** Name eines Piktogramms in der ersten oder zweiten Darstellung ({@link darstellungsName}). */
+const nameDerDarstellung = (pictogram: string, zweite: boolean) =>
+  darstellungsName(
+    { id: pictogram, titel: titel(pictogram), zweite: ZWEITE_DARSTELLUNG.get(pictogram) },
+    zweite,
+  );
 
 /** Die Fähigkeiten, die es auch als randbündige Körpermarke gibt: der Vorrat der Fachaufgabe. */
 const FACHAUFGABEN: readonly CapabilityId[] = SPEC_FIELD_VALUES.capabilities.values.filter((c) =>
@@ -409,7 +437,7 @@ function freistehendeKacheln<V extends string>(
     const pictogram = registerId(art, wert);
     return {
       id: symbolVon(spec)!,
-      label: titel(pictogram) + variantenZusatz(pictogram, zweite),
+      label: nameDerDarstellung(pictogram, zweite),
       suche: '',
       drawing: kachelBild(spec),
     };
@@ -541,6 +569,70 @@ export function detailOptionen(spec: AnySpec): DetailOptionen {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Aufwärmen
+// ---------------------------------------------------------------------------------------------
+
+/** Plant einen Schritt und gibt zurück, wie er sich wieder abbestellen lässt. */
+export type Planer = (schritt: () => void) => () => void;
+
+/** Im Leerlauf des Browsers (`requestIdleCallback`), sonst nach kurzer Pause (`setTimeout`). */
+export const leerlaufPlaner: Planer = (schritt) => {
+  if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+    const id = window.requestIdleCallback(() => schritt(), { timeout: 2000 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = setTimeout(schritt, 50);
+  return () => clearTimeout(id);
+};
+
+/**
+ * Die Schritte des Aufwärmens, je Schritt EIN Raster einer Art: die Grundzeichen, der Satz ohne
+ * Grundzeichen, dann je Art das Symbolraster und die Auswahlen unter „Details“.
+ */
+function aufwaermSchritte(): (() => void)[] {
+  return [
+    () => void grundzeichenOptionen(),
+    () => void symbolOptionen(null),
+    ...Object.keys(GRUNDZEICHEN_NAMEN).flatMap((kind) => {
+      const spec: SymbolSpec = { kind: kind as SymbolKind };
+      return [() => void symbolOptionen(spec), () => void detailOptionen(spec)];
+    }),
+  ];
+}
+
+/**
+ * Rechnet die Optionen des Pickers im Leerlauf vor (design.md, Risiko „Picker-Kosten“;
+ * Messung in `messung.md`): `vocabulary()` zeichnet jeden Kandidaten probeweise, und der erste
+ * Besuch einer Grundzeichenart kostete im Browser rund eine halbe Sekunde. Gefüllt werden dieselben
+ * Merker, die der Picker liest; die Bibliothek merkt sich zudem ihre Fassungen je Art.
+ *
+ * In Häppchen: je Schritt ein Raster einer Art, der nächste erst im nächsten Leerlauf — die Karte
+ * bleibt bedienbar. Die Rückgabe bricht ab (Unmount). Ein Wurf in einem Schritt hält das Aufwärmen
+ * nicht an; der Picker rechnet das Raster dann selbst.
+ */
+export function waermeVokabularAuf(planen: Planer = leerlaufPlaner): () => void {
+  const schritte = aufwaermSchritte();
+  let aus = false;
+  let abbestellen = () => {};
+  const weiter = () => {
+    if (aus) return;
+    const schritt = schritte.shift();
+    if (!schritt) return;
+    try {
+      schritt();
+    } catch {
+      // Bewusst still: das Raster rechnet sonst der Picker beim Öffnen.
+    }
+    if (schritte.length > 0) abbestellen = planen(weiter);
+  };
+  abbestellen = planen(weiter);
+  return () => {
+    aus = true;
+    abbestellen();
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Namen
 // ---------------------------------------------------------------------------------------------
 
@@ -552,7 +644,7 @@ export function symbolName(spec: AnySpec): string | null {
   if (art === 'cap') return faehigkeitName(wert);
   if (art === 'st') return zustandName(wert);
   const pictogram = registerId(art as FreiArt, wert);
-  return titel(pictogram) + variantenZusatz(pictogram, zweite);
+  return nameDerDarstellung(pictogram, zweite);
 }
 
 /** Die Bestandteile eines Zeichens mit ihren Namen, vom Träger zum Beiwerk. */
