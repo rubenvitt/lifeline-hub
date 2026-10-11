@@ -5,6 +5,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Modal,
   Popconfirm,
   Space,
   Tag,
@@ -12,6 +13,14 @@ import {
   TreeSelect,
   type TreeDataNode,
 } from 'antd';
+import {
+  DndContext,
+  DragOverlay,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import { Select } from '../components/Select';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -20,12 +29,13 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
-import { listeEinheiten } from '../api/einheiten';
+import { listeEinheiten, patcheEinheit } from '../api/einheiten';
 import {
   aktualisiereAbschnitt,
   legeAbschnittAn,
   listeAbschnitte,
   loeseAbschnittAuf,
+  patcheAbschnitt,
   type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
 import type { AbschnittLagezustand, Einheit, Einsatzabschnitt } from '../api/types';
@@ -54,13 +64,39 @@ import {
   parseAbschnitteAnsicht,
   type AbschnitteAnsicht,
 } from '../routing/deeplinks';
-import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
+import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SprungKnopf } from '../components/Sprung';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import type { Quelle } from '../stab/luecken';
 import Organigramm from './einsatzabschnitte/Organigramm';
 import { modulName } from '../einsatz/modulRegistry';
+import { ZugPointerSensor } from '../components/zugPointerSensor';
+import { MenueAusloeser } from '../components/MenueAusloeser';
+import { Sammelbanner } from '../components/instrument';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { useGehaltenerBaum } from '../components/organigramm/useGehaltenerBaum';
+import { wartendText } from '../components/organigramm/baumSchleuse';
+import {
+  einheitVerschiebeText,
+  elternKeys,
+  buildGliederungKnoten,
+  removeEntfallenes,
+  verschiebeText,
+  type GliederungKnoten,
+} from './einsatzabschnitte/gliederungDragKern';
+import {
+  ObersteEbeneDropZone,
+  DRAG_ANSAGEN,
+  DropKnoten,
+  DragHandle,
+  DragMarke,
+  useActiveDrag,
+  type DropDaten,
+  type DragDaten,
+} from './einsatzabschnitte/GliederungDrag';
+import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
+import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 
 /** Auswahl des Lagezustands in Stufenfolge — Wortlaut aus dem Farbvertrag, nicht doppelt. */
 const LAGEZUSTAND_OPTIONEN = (['planmaessig', 'angespannt', 'kritisch'] as const).map((l) => ({
@@ -80,26 +116,59 @@ const ANSICHT_OPTIONEN = [
 /** Vergleichsform der Kurzbezeichnung wie SQLite `NOCASE`: getrimmt, nur A–Z gefaltet. */
 const nocase = (s: string) => s.trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
 
-function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
-  const kinder = new Map<number | null, Einsatzabschnitt[]>();
-  for (const a of abschnitte) {
-    const key = a.ueber_abschnitt_id ?? null;
-    if (!kinder.has(key)) kinder.set(key, []);
-    kinder.get(key)!.push(a);
-  }
-  const baue = (parent: number | null): TreeDataNode[] =>
-    (kinder.get(parent) ?? []).map((a) => ({
+/**
+ * Der gezeigte Stand der Gliederung als antd-Baum. Die Struktur kommt aus der Schleuse
+ * (`gezeigt`), Stärke und Einheitenzahl aus den frischen Listen: der Inhalt fließt.
+ */
+function buildBaum(
+  gezeigt: readonly GliederungKnoten[],
+  abschnitte: Einsatzabschnitt[],
+  einheiten: Einheit[],
+  ziehbar: boolean,
+): TreeDataNode[] {
+  return gezeigt.map(({ abschnitt: a, kinder }) => {
+    const inhalt = (
+      <AbschnittKnoten
+        abschnitt={a}
+        staerke={abschnittStaerken(abschnitte, einheiten, a.id).inklUnter}
+        anzahlEinheiten={einheiten.filter((e) => e.abschnitt_id === a.id).length}
+      />
+    );
+    return {
       key: a.id,
-      title: (
-        <AbschnittKnoten
-          abschnitt={a}
-          staerke={abschnittStaerken(abschnitte, einheiten, a.id).inklUnter}
-          anzahlEinheiten={einheiten.filter((e) => e.abschnitt_id === a.id).length}
-        />
+      title: ziehbar ? (
+        <DropKnoten abschnitt={a} abschnitte={abschnitte}>
+          <DragHandle daten={{ art: 'abschnitt', id: a.id, name: a.name }} />
+          {inhalt}
+        </DropKnoten>
+      ) : (
+        inhalt
       ),
-      children: baue(a.id),
-    }));
-  return baue(null);
+      children: buildBaum(kinder, abschnitte, einheiten, ziehbar),
+    };
+  });
+}
+
+/**
+ * Ein Umhang (LFH-1212): ein Abschnitt unter einen anderen (`nach` = `null`: oberste Ebene) oder
+ * eine Einheit in einen Abschnitt. `quelle` sagt, wo der Grund einer Ablehnung steht: am Baum, im
+ * Dialog oder — für das Rückgängig aus dem Toast — im Seitenhinweis.
+ */
+interface Verschiebung {
+  /** Der Einsatz beim Auslösen: ein Rückgängig nach einem Einsatzwechsel trifft den alten. */
+  einsatzId: number;
+  art: DragDaten['art'];
+  id: number;
+  name: string;
+  von: number | null;
+  nach: number | null;
+  quelle: 'drag' | 'menue' | 'rueckgaengig';
+}
+
+/** Was am Zeiger hängt, solange gezogen wird. */
+function ActiveDragMarke() {
+  const drag = useActiveDrag();
+  return drag ? <DragMarke drag={drag} /> : null;
 }
 
 interface AbschnittWerte {
@@ -125,6 +194,20 @@ export default function EinsatzabschnittePage() {
   const [bearbeiten, setBearbeiten] = useState(false);
   const [entwurf, setEntwurf] = useState(false);
   const [form] = Form.useForm<AbschnittWerte>();
+  /**
+   * Offener Dialog „Verschieben unter …“ (Abschnitts-ID) und offene Rückfrage „Auflösen“. Beide
+   * halten IHREN Abschnitt fest: wechselt das Detail darunter (die Vorwahl nach einem fremden
+   * Umhang), träfe die Bestätigung sonst einen anderen.
+   */
+  const [verschiebenFuer, setVerschiebenFuer] = useState<number | null>(null);
+  const [aufloesenFuer, setAufloesenFuer] = useState<{ id: number; name: string } | null>(null);
+  /** Gründe abgelehnter Umhänge, je Ort (LFH-1077): Baum, Dialog, Seitenhinweis. */
+  const [dragFehler, setDragFehler] = useState<unknown>(null);
+  const [dialogFehler, setDialogFehler] = useState<unknown>(null);
+  const [rueckFehler, setRueckFehler] = useState<unknown>(null);
+  /** Zugeklappte Abschnitte; alles andere steht offen, auch ein Abschnitt, der eben Kinder bekam. */
+  const [zugeklappt, setZugeklappt] = useState<ReadonlySet<number>>(() => new Set());
+  const weitereRef = useRef<HTMLSpanElement>(null);
   const { abBreite } = useViewport();
   const breit = abBreite('md');
   const { token, rollen } = useRollen();
@@ -208,6 +291,23 @@ export default function EinsatzabschnittePage() {
   }
 
   const abschnitte = useMemo(() => abschnitteQuery.data ?? [], [abschnitteQuery.data]);
+  /**
+   * Live-Zufluss der Gliederung über die Schleuse (LFH-1212, `frontend/AGENTS.md`, „Zufluss der
+   * `Datensicht`“): Zeiger, Fokus oder ein Zug in der Gliederung halten Menge, Ort und Folge der
+   * Abschnitte; was ein anderer Arbeitsplatz umhängt, wartet im Sammelbanner. Entfallenes fällt
+   * sofort weg (`removeEntfallenes`).
+   */
+  const frischerBaum = useMemo(() => buildGliederungKnoten(abschnitte), [abschnitte]);
+  const zufluss = useGehaltenerBaum(frischerBaum);
+  const gezeigterBaum = useMemo(
+    () => removeEntfallenes(zufluss.stand.gezeigt, zufluss.stand.entfallen),
+    [zufluss.stand],
+  );
+  const wartet = wartendText({ ...zufluss.stand.wartend, entfallen: 0 });
+  const sensoren = useSensors(
+    // 5 px Weg, sonst begänne jeder Klick auf den Griff einen Zug (Muster UHS-Grundriss).
+    useSensor(ZugPointerSensor, { activationConstraint: { distance: 5 } }),
+  );
   const istGesperrt = useSprungSperre(einsatzId);
   // Für das Organigramm: eine fehlende Liste ist kein leerer Bestand (Stärke „—“ mit Grund).
   const einheitenZustand =
@@ -262,6 +362,128 @@ export default function EinsatzabschnittePage() {
       setBearbeiten(false);
     },
   });
+
+  const einsatzRef = useRef(einsatzId);
+  einsatzRef.current = einsatzId;
+  const setzeFehler = (quelle: Verschiebung['quelle'], fehler: unknown) =>
+    (quelle === 'drag' ? setDragFehler : quelle === 'menue' ? setDialogFehler : setRueckFehler)(
+      fehler,
+    );
+  // Ein Einsatzwechsel in derselben Instanz räumt die Gründe: ihr Ort ist ein anderer Einsatz.
+  useEffect(() => {
+    setDragFehler(null);
+    setDialogFehler(null);
+    setRueckFehler(null);
+    setVerschiebenFuer(null);
+    setAufloesenFuer(null);
+  }, [einsatzId]);
+
+  /**
+   * Umhängen per Zug oder Menü (LFH-1212): genau EIN Feld geht hinaus (`patcheAbschnitt` bzw.
+   * `patcheEinheit`, Tri-State), ein mitgeschickter Name aus älterem Stand überschriebe sonst eine
+   * gleichzeitige Umbenennung. Der Rückweg ist serverseitig derselbe PATCH, deshalb Rückgängig im
+   * Toast statt Rückfrage (LFH-343). Der Zwischenspeicher zieht sofort nach, und die Schleuse
+   * übernimmt das Ergebnis: die eigene Handlung wartet nicht hinter dem Banner.
+   */
+  const verschieben = useMutation({
+    mutationFn: async (v: Verschiebung): Promise<void> => {
+      if (v.art === 'abschnitt')
+        await patcheAbschnitt(v.einsatzId, v.id, { ueber_abschnitt_id: v.nach });
+      else await patcheEinheit(v.einsatzId, v.id, { abschnitt_id: v.nach });
+    },
+    // Jede Quelle räumt nur ihren eigenen Grund: ein Rückgängig aus dem Toast nimmt dem offenen
+    // Dialog seinen nicht.
+    onMutate: (v) => setzeFehler(v.quelle, null),
+    onSuccess: (_antwort, v) => {
+      // Nach einem Einsatzwechsel gehört die Antwort nicht mehr zu dieser Ansicht.
+      if (v.einsatzId !== einsatzRef.current) return;
+      if (v.art === 'abschnitt') {
+        const neu = (
+          qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(v.einsatzId)) ?? []
+        ).map((a) => (a.id === v.id ? { ...a, ueber_abschnitt_id: v.nach } : a));
+        qc.setQueryData(einsatzKeys.abschnitte(v.einsatzId), neu);
+        zufluss.uebernehmen(buildGliederungKnoten(neu));
+        // Der neue Über-Abschnitt steht offen, sonst verschwände der Abschnitt im Zuklappen.
+        if (v.nach !== null) {
+          const nach = v.nach;
+          setZugeklappt((alt) => {
+            if (!alt.has(nach)) return alt;
+            const rest = new Set(alt);
+            rest.delete(nach);
+            return rest;
+          });
+        }
+      } else {
+        qc.setQueryData<Einheit[]>(einsatzKeys.einheiten(v.einsatzId), (alt) =>
+          alt?.map((e) => (e.id === v.id ? { ...e, abschnitt_id: v.nach } : e)),
+        );
+      }
+      invalidate();
+      // Nur der eigene Weg schließt den Dialog; ein Zug oder Rückgängig daneben lässt ihn offen.
+      if (v.quelle === 'menue') setVerschiebenFuer(null);
+      if (v.quelle === 'rueckgaengig') return;
+      const ziel = v.nach === null ? null : (abschnitte.find((a) => a.id === v.nach)?.name ?? '');
+      zeigeRueckgaengig(
+        message,
+        v.art === 'abschnitt'
+          ? verschiebeText(v.name, ziel)
+          : einheitVerschiebeText(v.name, ziel ?? ''),
+        () => verschieben.mutate({ ...v, von: v.nach, nach: v.von, quelle: 'rueckgaengig' }),
+      );
+    },
+    onError: (fehler, v) => {
+      if (v.einsatzId === einsatzRef.current) setzeFehler(v.quelle, fehler);
+    },
+  });
+
+  function handleDragStart() {
+    setDragFehler(null);
+    zufluss.holdDrag(true);
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    zufluss.holdDrag(false);
+    const drag = e.active.data.current as DragDaten | undefined;
+    const ziel = e.over?.data.current as DropDaten | undefined;
+    // Gesperrte Ziele sind `disabled` und melden sich nie als `over`.
+    if (!drag || !ziel) return;
+    const von =
+      drag.art === 'abschnitt'
+        ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
+        : drag.abschnittId;
+    verschieben.mutate({
+      einsatzId,
+      art: drag.art,
+      id: drag.id,
+      name: drag.name,
+      von,
+      nach: ziel.zielId,
+      quelle: 'drag',
+    });
+  }
+
+  /**
+   * Der Fokus kehrt nach dem Dialog zum Abschnitt zurück, an „Weitere Aktionen“ (LFH-1212). Sofort
+   * beim Schließen; `nachDemSchliessen` holt ihn im Browser nach der Animation ein zweites Mal
+   * (Muster `betreuung/MeldeVerlauf.tsx`).
+   */
+  const focusAbschnitt = useCallback(
+    () => weitereRef.current?.querySelector('button')?.focus(),
+    [],
+  );
+  const dialogOffen = verschiebenFuer !== null || aufloesenFuer !== null;
+  const warOffen = useRef(false);
+  useEffect(() => {
+    if (warOffen.current && !dialogOffen) focusAbschnitt();
+    warOffen.current = dialogOffen;
+  }, [dialogOffen, focusAbschnitt]);
+  // Erst eine neue Geste handelt im Dialog (`useNewGesture`): nicht das Enter aus dem Menü.
+  const isNewGestureAufloesen = useNewGesture(aufloesenFuer !== null);
+
+  function openVerschieben(aid: number) {
+    setDialogFehler(null);
+    setVerschiebenFuer(aid);
+  }
 
   /*
    * Speichern und Auflösen melden ihre Ablehnung im Detailpaneel, kein Toast (LFH-1077,
@@ -319,14 +541,25 @@ export default function EinsatzabschnittePage() {
   }
 
   const baumDaten = useMemo(() => {
-    const knoten = baueBaum(abschnitte, einheitenQuery.data ?? []);
+    const knoten = buildBaum(
+      gezeigterBaum,
+      abschnitte,
+      einheitenQuery.data ?? [],
+      darfSchreibenRoh,
+    );
     return entwurf
       ? [
           ...knoten,
           { key: 'entwurf', title: <i>Neuer Abschnitt (ungespeichert)</i>, selectable: false },
         ]
       : knoten;
-  }, [abschnitte, einheitenQuery.data, entwurf]);
+  }, [gezeigterBaum, abschnitte, einheitenQuery.data, entwurf, darfSchreibenRoh]);
+  const aufgeklappt = useMemo(
+    () => elternKeys(gezeigterBaum).filter((k) => !zugeklappt.has(k)),
+    [gezeigterBaum, zugeklappt],
+  );
+  const verschiebenAbschnitt =
+    verschiebenFuer != null ? (abschnitte.find((a) => a.id === verschiebenFuer) ?? null) : null;
   const verboten = aktuell ? nachfahrenInkl(abschnitte, aktuell.id) : new Set<number>();
   const parentOptionen = abschnitte
     .filter((a) => !verboten.has(a.id))
@@ -387,6 +620,16 @@ export default function EinsatzabschnittePage() {
         renderItem={(e) => (
           <ListenEintrag>
             <Space>
+              {darfSchreiben && (
+                <DragHandle
+                  daten={{
+                    art: 'einheit',
+                    id: e.id,
+                    name: e.name,
+                    abschnittId: e.abschnitt_id ?? null,
+                  }}
+                />
+              )}
               <span>{e.name}</span>
               {e.typ_label && <Tag>{e.typ_label}</Tag>}
               <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
@@ -442,9 +685,16 @@ export default function EinsatzabschnittePage() {
         </Space>
       }
       hinweis={
-        // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei.
-        darfSchreiben ? undefined : (
-          <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
+        // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei. Das Rückgängig aus
+        // dem Toast meldet seine Ablehnung hier: sein Ort ist kein Teil der Seite (LFH-1077).
+        darfSchreiben && rueckFehler == null ? undefined : (
+          <SeitenHinweise
+            rechteFehlt={!darfSchreiben}
+            rechteText={einsatzRechteGrund(einsatz.status)}
+            fehler={rueckFehler}
+            fehlerTitel="Nicht zurückgenommen"
+            fehlerFallback="Rückgängig fehlgeschlagen"
+          />
         )
       }
     >
@@ -486,234 +736,284 @@ export default function EinsatzabschnittePage() {
         )
       ) : (
         /* Unter `md` stapeln statt einer 360-px-Spalte neben dem Detail. Kein Collapse:
-          gestapelt trägt die Gliederung dieselbe Bedienung wie breit. */
-        <div
-          data-testid="abschnitte-rahmen"
-          style={{
-            display: 'flex',
-            flexDirection: breit ? 'row' : 'column',
-            gap: token.margin,
-            alignItems: breit ? 'flex-start' : 'stretch',
+          gestapelt trägt die Gliederung dieselbe Bedienung wie breit. Der Zugkontext umfasst
+          beide Spalten: eine Einheit wird aus dem Detail in den Baum gezogen. */
+        <DndContext
+          sensors={sensoren}
+          collisionDetection={pointerWithin}
+          // Die Griffe sind keine Tastaturziele: keine Anleitung, nur deutsche Ansagen beim Ziehen.
+          accessibility={{
+            announcements: DRAG_ANSAGEN,
+            screenReaderInstructions: { draggable: '' },
           }}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => zufluss.holdDrag(false)}
         >
           <div
-            data-testid="abschnitte-gliederung"
-            style={breit ? { flex: '0 0 360px', minWidth: 0 } : { width: '100%' }}
+            data-testid="abschnitte-rahmen"
+            style={{
+              display: 'flex',
+              flexDirection: breit ? 'row' : 'column',
+              gap: token.margin,
+              alignItems: breit ? 'flex-start' : 'stretch',
+            }}
           >
-            <Paneel
-              titel="Gliederung"
-              meta={abschnitteQuery.isSuccess ? String(abschnitte.length) : undefined}
-              koerperPolster
+            <div
+              data-testid="abschnitte-gliederung"
+              style={breit ? { flex: '0 0 360px', minWidth: 0 } : { width: '100%' }}
             >
-              {/* Drei Zustände in dieser Reihenfolge: eine Weiche auf die Länge der Liste wäre
+              <Paneel
+                titel="Gliederung"
+                meta={abschnitteQuery.isSuccess ? String(abschnitte.length) : undefined}
+                koerperPolster
+              >
+                {/* Drei Zustände in dieser Reihenfolge: eine Weiche auf die Länge der Liste wäre
                 auch beim Laden und im Fehlerfall wahr. Solange geladen wird, wird über die
                 Menge nichts behauptet.
 
                 Der Fehlerzweig trägt zusätzlich die Mengenbedingung (`listeGescheitert`): er
                 verdrängt den Baum nur, wenn es keinen gibt. */}
-              {abschnitteQuery.isLoading ? (
-                <SeitenSkeleton />
-              ) : listeGescheitert ? (
-                <SeitenFehler
-                  text="Abschnitte konnten nicht geladen werden"
-                  ursache={abschnitteQuery.error}
-                  onWiederholen={() => void abschnitteQuery.refetch()}
-                />
-              ) : abschnitte.length === 0 && !entwurf ? (
-                <SeitenLeer
-                  titel="Noch keine Abschnitte"
-                  /* Derselbe Wortlaut wie der Kopfknopf. Ohne Schreibrecht keine Aktion — ein
+                {abschnitteQuery.isLoading ? (
+                  <SeitenSkeleton />
+                ) : listeGescheitert ? (
+                  <SeitenFehler
+                    text="Abschnitte konnten nicht geladen werden"
+                    ursache={abschnitteQuery.error}
+                    onWiederholen={() => void abschnitteQuery.refetch()}
+                  />
+                ) : abschnitte.length === 0 && !entwurf ? (
+                  <SeitenLeer
+                    titel="Noch keine Abschnitte"
+                    /* Derselbe Wortlaut wie der Kopfknopf. Ohne Schreibrecht keine Aktion — ein
                    Knopf, der nur eine Fehlermeldung auslöst, ist kein Weg aus dem Leerzustand. */
-                  aktion={
-                    darfSchreiben
-                      ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen }
-                      : undefined
-                  }
-                />
-              ) : (
-                <>
-                  {standVeraltet && (
-                    <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
-                  )}
-                  <Tree
-                    treeData={baumDaten}
-                    selectedKeys={entwurf ? ['entwurf'] : aktuell ? [aktuell.id] : []}
-                    defaultExpandAll
-                    onSelect={(keys) => {
-                      setEntwurf(false);
-                      setGewaehlt(keys.length ? Number(keys[0]) : null);
-                    }}
+                    aktion={
+                      darfSchreiben
+                        ? { label: 'Abschnitt anlegen', onClick: entwurfOeffnen }
+                        : undefined
+                    }
                   />
-                </>
-              )}
-            </Paneel>
-          </div>
-
-          <Paneel
-            style={{ flex: 1, width: breit ? undefined : '100%' }}
-            koerperPolster
-            titel={
-              entwurf
-                ? 'Neuer Abschnitt'
-                : aktuell
-                  ? `Abschnitt: ${aktuell.name}`
-                  : 'Kein Abschnitt gewählt'
-            }
-          >
-            {/* Ohne Abschnitt (leere Gliederung, Ladefehler) trägt der Titel den Zustand; den
-                Weg hinaus zeigt der Leerzustand der Gliederung. */}
-            {!aktuell && !entwurf ? null : entwurf || bearbeiten ? (
-              <Form<AbschnittWerte>
-                form={form}
-                layout="vertical"
-                onFinish={(w) => {
-                  raeumeDetail();
-                  speichern.mutate(w);
-                }}
-              >
-                <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
-                  <Input autoFocus />
-                </Form.Item>
-                {/* Eindeutig je Einsatz ohne Groß-/Kleinschreibung wie der Index
-                    `einsatzabschnitt_kurzbezeichnung_eindeutig` (NOCASE): als Prüfung am Feld,
-                    nicht als Satz (LFH-1078). Der Server bleibt die Wahrheit. */}
-                <Form.Item
-                  label="Kurzbezeichnung"
-                  name="kurzbezeichnung"
-                  rules={[
-                    {
-                      validator: (_, wert?: string) => {
-                        const kurz = wert ? nocase(wert) : undefined;
-                        const belegt = kurz
-                          ? abschnitte.find(
-                              (a) =>
-                                a.id !== aktuell?.id &&
-                                a.kurzbezeichnung != null &&
-                                nocase(a.kurzbezeichnung) === kurz,
-                            )
-                          : undefined;
-                        return belegt
-                          ? Promise.reject(new Error(`Schon vergeben (${belegt.name})`))
-                          : Promise.resolve();
-                      },
-                    },
-                  ]}
-                >
-                  <Input maxLength={20} allowClear placeholder="z. B. EA-N" />
-                </Form.Item>
-                <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
-                  <TreeSelect
-                    allowClear
-                    placeholder="Übergeordneter Abschnitt"
-                    treeData={parentOptionen}
-                  />
-                </Form.Item>
-                <Form.Item label="Abschnittsleiter" name="leiter_id">
-                  <Select allowClear placeholder="Disponierte Person" options={personalOptionen} />
-                </Form.Item>
-
-                <Augenbraue
-                  als="h3"
-                  style={{
-                    display: 'block',
-                    marginTop: token.marginXS,
-                    marginBottom: token.marginSM,
-                  }}
-                >
-                  Lage
-                </Augenbraue>
-                <Form.Item label="Lagezustand" name="lagezustand">
-                  <Select allowClear placeholder="nicht beurteilt" options={LAGEZUSTAND_OPTIONEN} />
-                </Form.Item>
-                <Form.Item label="Abschnittsauftrag" name="abschnittsauftrag">
-                  <Input.TextArea rows={2} placeholder="Fester Auftrag des Abschnitts" />
-                </Form.Item>
-                <Form.Item label="Fortschritt" name="fortschritt">
-                  <InputNumber
-                    min={0}
-                    max={100}
-                    precision={0}
-                    suffix="%"
-                    placeholder="nicht eingeschätzt"
-                  />
-                </Form.Item>
-
-                <Augenbraue
-                  als="h3"
-                  style={{
-                    display: 'block',
-                    marginTop: token.marginXS,
-                    marginBottom: token.marginSM,
-                  }}
-                >
-                  Funk / Kommunikation
-                </Augenbraue>
-                <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
-                  <SprechgruppenPicker einsatzId={einsatzId} />
-                </Form.Item>
-                <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
-                  <Select
-                    allowClear
-                    placeholder="Digitalfunk / Mobil / Festnetz"
-                    options={KOMMUNIKATIONSMITTEL_OPTIONEN}
-                  />
-                </Form.Item>
-                <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
-                  <Input placeholder="z. B. 0151 23456" allowClear />
-                </Form.Item>
-
-                <Form.Item label="Bemerkung" name="bemerkung">
-                  <Input.TextArea rows={2} />
-                </Form.Item>
-                <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
-                <Space size="middle">
-                  <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-                    Speichern
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      raeumeDetail();
-                      setEntwurf(false);
-                      setBearbeiten(false);
-                    }}
-                  >
-                    Abbrechen
-                  </Button>
-                  {!entwurf && aktuell && (
-                    <Popconfirm
-                      title="Abschnitt auflösen?"
-                      description={
-                        'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'
-                      }
-                      okText="Abschnitt auflösen"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => {
-                        raeumeDetail();
-                        aufloesen.mutate(aktuell.id);
-                      }}
-                    >
-                      <Button danger>Auflösen</Button>
-                    </Popconfirm>
-                  )}
-                </Space>
-              </Form>
-            ) : aktuell ? (
-              <>
-                <AbschnittDaten abschnitt={aktuell} staerken={staerken} />
-
-                {darfSchreiben && (
-                  <div style={{ marginTop: 12 }}>
-                    <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
-                    <Space size="middle">
-                      <Button
-                        type="primary"
-                        onClick={() => {
-                          raeumeDetail();
-                          setBearbeiten(true);
+                ) : (
+                  <>
+                    {standVeraltet && (
+                      <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
+                    )}
+                    {/* Der Bereich der Schleuse: Standzeile, Baum und Wurzelzone. Der Weg zum
+                      Banner taut nicht auf. */}
+                    <div data-lfh="gliederung-bereich" {...zufluss.bereich}>
+                      {/* Feste Höhe wie im Gerüst des Organigramms: der Wechsel zwischen „Live“,
+                        „Live pausiert“ und dem Banner verschiebt den Baum nicht. */}
+                      <div
+                        ref={zufluss.standRef}
+                        tabIndex={-1}
+                        data-lfh="gliederung-stand"
+                        style={{
+                          height: token.controlHeight + 2 * token.paddingXS + 2,
+                          marginBottom: token.marginXS,
+                          display: 'flex',
                         }}
                       >
-                        Bearbeiten
-                      </Button>
+                        {wartet !== null ? (
+                          <Sammelbanner
+                            aktion={{ label: 'anzeigen', onKlick: zufluss.anzeigen }}
+                            style={{
+                              flex: '1 1 auto',
+                              minWidth: 0,
+                              flexWrap: 'nowrap',
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            {wartet}
+                          </Sammelbanner>
+                        ) : (
+                          <span
+                            style={{
+                              alignSelf: 'center',
+                              fontSize: token.fontSizeSM,
+                              color: rollen.gedaempft,
+                            }}
+                          >
+                            {zufluss.offen ? 'Live' : 'Live pausiert'}
+                          </span>
+                        )}
+                      </div>
+                      {dragFehler != null && (
+                        <div style={{ marginBottom: token.marginSM }}>
+                          <SpeicherFehler
+                            fehler={dragFehler}
+                            titel="Nicht verschoben"
+                            fallback="Verschieben fehlgeschlagen"
+                          />
+                        </div>
+                      )}
+                      <Tree
+                        treeData={baumDaten}
+                        selectedKeys={entwurf ? ['entwurf'] : aktuell ? [aktuell.id] : []}
+                        expandedKeys={aufgeklappt}
+                        onExpand={(_keys, { node, expanded }) => {
+                          const key = Number(node.key);
+                          setZugeklappt((alt) => {
+                            const neu = new Set(alt);
+                            if (expanded) neu.delete(key);
+                            else neu.add(key);
+                            return neu;
+                          });
+                        }}
+                        onSelect={(keys) => {
+                          setEntwurf(false);
+                          setGewaehlt(keys.length ? Number(keys[0]) : null);
+                        }}
+                      />
+                      {darfSchreiben && <ObersteEbeneDropZone abschnitte={abschnitte} />}
+                    </div>
+                  </>
+                )}
+              </Paneel>
+            </div>
+
+            <Paneel
+              style={{ flex: 1, width: breit ? undefined : '100%' }}
+              koerperPolster
+              titel={
+                entwurf
+                  ? 'Neuer Abschnitt'
+                  : aktuell
+                    ? `Abschnitt: ${aktuell.name}`
+                    : 'Kein Abschnitt gewählt'
+              }
+            >
+              {/* Ohne Abschnitt (leere Gliederung, Ladefehler) trägt der Titel den Zustand; den
+                Weg hinaus zeigt der Leerzustand der Gliederung. */}
+              {!aktuell && !entwurf ? null : entwurf || bearbeiten ? (
+                <Form<AbschnittWerte>
+                  form={form}
+                  layout="vertical"
+                  onFinish={(w) => {
+                    raeumeDetail();
+                    speichern.mutate(w);
+                  }}
+                >
+                  <Form.Item
+                    label="Name"
+                    name="name"
+                    rules={[{ required: true, whitespace: true }]}
+                  >
+                    <Input autoFocus />
+                  </Form.Item>
+                  {/* Eindeutig je Einsatz ohne Groß-/Kleinschreibung wie der Index
+                    `einsatzabschnitt_kurzbezeichnung_eindeutig` (NOCASE): als Prüfung am Feld,
+                    nicht als Satz (LFH-1078). Der Server bleibt die Wahrheit. */}
+                  <Form.Item
+                    label="Kurzbezeichnung"
+                    name="kurzbezeichnung"
+                    rules={[
+                      {
+                        validator: (_, wert?: string) => {
+                          const kurz = wert ? nocase(wert) : undefined;
+                          const belegt = kurz
+                            ? abschnitte.find(
+                                (a) =>
+                                  a.id !== aktuell?.id &&
+                                  a.kurzbezeichnung != null &&
+                                  nocase(a.kurzbezeichnung) === kurz,
+                              )
+                            : undefined;
+                          return belegt
+                            ? Promise.reject(new Error(`Schon vergeben (${belegt.name})`))
+                            : Promise.resolve();
+                        },
+                      },
+                    ]}
+                  >
+                    <Input maxLength={20} allowClear placeholder="z. B. EA-N" />
+                  </Form.Item>
+                  <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
+                    <TreeSelect
+                      allowClear
+                      placeholder="Übergeordneter Abschnitt"
+                      treeData={parentOptionen}
+                    />
+                  </Form.Item>
+                  <Form.Item label="Abschnittsleiter" name="leiter_id">
+                    <Select
+                      allowClear
+                      placeholder="Disponierte Person"
+                      options={personalOptionen}
+                    />
+                  </Form.Item>
+
+                  <Augenbraue
+                    als="h3"
+                    style={{
+                      display: 'block',
+                      marginTop: token.marginXS,
+                      marginBottom: token.marginSM,
+                    }}
+                  >
+                    Lage
+                  </Augenbraue>
+                  <Form.Item label="Lagezustand" name="lagezustand">
+                    <Select
+                      allowClear
+                      placeholder="nicht beurteilt"
+                      options={LAGEZUSTAND_OPTIONEN}
+                    />
+                  </Form.Item>
+                  <Form.Item label="Abschnittsauftrag" name="abschnittsauftrag">
+                    <Input.TextArea rows={2} placeholder="Fester Auftrag des Abschnitts" />
+                  </Form.Item>
+                  <Form.Item label="Fortschritt" name="fortschritt">
+                    <InputNumber
+                      min={0}
+                      max={100}
+                      precision={0}
+                      suffix="%"
+                      placeholder="nicht eingeschätzt"
+                    />
+                  </Form.Item>
+
+                  <Augenbraue
+                    als="h3"
+                    style={{
+                      display: 'block',
+                      marginTop: token.marginXS,
+                      marginBottom: token.marginSM,
+                    }}
+                  >
+                    Funk / Kommunikation
+                  </Augenbraue>
+                  <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
+                    <SprechgruppenPicker einsatzId={einsatzId} />
+                  </Form.Item>
+                  <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
+                    <Select
+                      allowClear
+                      placeholder="Digitalfunk / Mobil / Festnetz"
+                      options={KOMMUNIKATIONSMITTEL_OPTIONEN}
+                    />
+                  </Form.Item>
+                  <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
+                    <Input placeholder="z. B. 0151 23456" allowClear />
+                  </Form.Item>
+
+                  <Form.Item label="Bemerkung" name="bemerkung">
+                    <Input.TextArea rows={2} />
+                  </Form.Item>
+                  <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
+                  <Space size="middle">
+                    <Button type="primary" htmlType="submit" loading={speichern.isPending}>
+                      Speichern
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        raeumeDetail();
+                        setEntwurf(false);
+                        setBearbeiten(false);
+                      }}
+                    >
+                      Abbrechen
+                    </Button>
+                    {!entwurf && aktuell && (
                       <Popconfirm
                         title="Abschnitt auflösen?"
                         description={
@@ -728,16 +1028,112 @@ export default function EinsatzabschnittePage() {
                       >
                         <Button danger>Auflösen</Button>
                       </Popconfirm>
-                    </Space>
-                  </div>
-                )}
+                    )}
+                  </Space>
+                </Form>
+              ) : aktuell ? (
+                <>
+                  <AbschnittDaten abschnitt={aktuell} staerken={staerken} />
 
-                {einheitenListe}
-              </>
-            ) : null}
-          </Paneel>
-        </div>
+                  {darfSchreiben && (
+                    <div style={{ marginTop: 12 }}>
+                      <DetailFehler speicherFehler={speichern.error} fehler={detailFehler} />
+                      <Space size="middle">
+                        <Button
+                          type="primary"
+                          onClick={() => {
+                            raeumeDetail();
+                            setBearbeiten(true);
+                          }}
+                        >
+                          Bearbeiten
+                        </Button>
+                        {/* Drei Handlungen: die übrigen hinter EINEM Auslöser (LFH-365/LFH-683).
+                          „Verschieben unter …“ ist der Weg ohne Ziehen (LFH-1212). */}
+                        <span ref={weitereRef} style={{ display: 'inline-flex' }}>
+                          <MenueAusloeser
+                            eintraege={[
+                              { key: 'verschieben', label: 'Verschieben unter …' },
+                              { key: 'aufloesen', label: 'Auflösen', gefahr: true },
+                            ]}
+                            zugaenglicherName={`Weitere Aktionen zu Abschnitt ${aktuell.name}`}
+                            onWahl={(key) => {
+                              raeumeDetail();
+                              if (key === 'verschieben') openVerschieben(aktuell.id);
+                              else setAufloesenFuer({ id: aktuell.id, name: aktuell.name });
+                            }}
+                          />
+                        </span>
+                      </Space>
+                    </div>
+                  )}
+
+                  {einheitenListe}
+                </>
+              ) : null}
+            </Paneel>
+          </div>
+          <DragOverlay dropAnimation={null}>
+            <ActiveDragMarke />
+          </DragOverlay>
+        </DndContext>
       )}
+      <VerschiebenDialog
+        abschnitt={verschiebenAbschnitt}
+        abschnitte={abschnitte}
+        laeuft={verschieben.isPending && verschieben.variables?.quelle === 'menue'}
+        fehler={dialogFehler}
+        onWahl={(nach) => {
+          if (!verschiebenAbschnitt) return;
+          verschieben.mutate({
+            einsatzId,
+            art: 'abschnitt',
+            id: verschiebenAbschnitt.id,
+            name: verschiebenAbschnitt.name,
+            von: verschiebenAbschnitt.ueber_abschnitt_id ?? null,
+            nach,
+            quelle: 'menue',
+          });
+        }}
+        onAbbrechen={() => setVerschiebenFuer(null)}
+        nachDemSchliessen={focusAbschnitt}
+      />
+      {/* Die Rückfrage vor dem Unumkehrbaren steht als `<Modal>`, nicht im Menü (LFH-683). Sie
+          nennt ihren Abschnitt und schließt, wenn er entfällt. */}
+      <Modal
+        open={aufloesenFuer !== null && abschnitte.some((a) => a.id === aufloesenFuer.id)}
+        title={aufloesenFuer ? `Abschnitt „${aufloesenFuer.name}“ auflösen?` : undefined}
+        onCancel={() => {
+          if (isNewGestureAufloesen()) setAufloesenFuer(null);
+        }}
+        focusable={{ focusTriggerAfterClose: false }}
+        afterClose={focusAbschnitt}
+        destroyOnHidden
+        footer={
+          <Space size="middle">
+            <Button
+              onClick={() => {
+                if (isNewGestureAufloesen()) setAufloesenFuer(null);
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              danger
+              onClick={() => {
+                if (!aufloesenFuer || !isNewGestureAufloesen()) return;
+                setAufloesenFuer(null);
+                raeumeDetail();
+                aufloesen.mutate(aufloesenFuer.id);
+              }}
+            >
+              Abschnitt auflösen
+            </Button>
+          </Space>
+        }
+      >
+        Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.
+      </Modal>
     </EinsatzSeite>
   );
 }
