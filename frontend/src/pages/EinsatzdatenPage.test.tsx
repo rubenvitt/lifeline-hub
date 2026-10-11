@@ -12,6 +12,7 @@ import type {
   BenutzerAnzeige,
   EinsatzAnzeige,
   EinsatzFahrzeug,
+  Fahrzeug,
   Fuehrungsstelle,
   FuehrungsstellePatch,
   Sprechgruppe,
@@ -104,6 +105,37 @@ const fahrzeugListe = [
   },
 ] satisfies EinsatzFahrzeug[];
 
+/** Fahrzeuge der Organisation im Dienst; 41 ist disponiert (`fahrzeug_id` fehlt dort: ad hoc). */
+const stammFahrzeuge = [
+  {
+    id: 501,
+    funkrufname: 'Kater Musterstadt 1',
+    fahrzeugtyp: 'KdoW',
+    angelegt_at: '2026-01-01T00:00:00',
+    dienststatus: 'im_dienst',
+    ist_demo: false,
+    sondersignal: true,
+  },
+  {
+    id: 502,
+    funkrufname: 'Demo ELW 1',
+    fahrzeugtyp: 'ELW 1',
+    angelegt_at: '2026-01-01T00:00:00',
+    dienststatus: 'im_dienst',
+    ist_demo: true,
+    sondersignal: true,
+  },
+  {
+    id: 503,
+    funkrufname: 'Florian Musterstadt 44/1',
+    fahrzeugtyp: 'HLF 20',
+    angelegt_at: '2026-01-01T00:00:00',
+    dienststatus: 'im_dienst',
+    ist_demo: false,
+    sondersignal: true,
+  },
+] satisfies Fahrzeug[];
+
 interface SetupOpts {
   einsatz?: Partial<EinsatzAnzeige>;
   benutzer?: BenutzerAnzeige;
@@ -128,6 +160,7 @@ function setup(opts: SetupOpts = {}) {
     ),
     http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeugListe)),
+    http.get('/api/fahrzeuge', () => HttpResponse.json(stammFahrzeuge)),
   );
   const routen = (
     <Routes>
@@ -1193,11 +1226,122 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     const user = userEvent.setup();
     const p = await paneel();
     await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
-    await user.type(p.getByRole('textbox', { name: 'Rufname' }), 'Florian Musterstadt 10/1{Enter}');
+    await user.type(
+      p.getByRole('combobox', { name: 'Rufname' }),
+      'Florian Musterstadt 10/1{Enter}',
+    );
     await waitFor(() => expect(bodies).toEqual([{ rufname: 'Florian Musterstadt 10/1' }]));
     expect(
       await p.findByRole('button', { name: 'Rufname bearbeiten' }),
     ).toHaveAccessibleDescription('Florian Musterstadt 10/1');
+  });
+
+  /** Gruppen der offenen Vorschlagsliste mit ihren Funkrufnamen, in Anzeigefolge. */
+  function vorschlagsliste(): string[] {
+    const liste = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+    if (!liste) return [];
+    return [...liste.querySelectorAll('.ant-select-item')].map((el) =>
+      el.classList.contains('ant-select-item-group')
+        ? `# ${el.textContent}`
+        : (el.getAttribute('title') ?? el.textContent ?? ''),
+    );
+  }
+
+  it('Rufname: Vorschläge aus den Führungsfahrzeugen, gruppiert, Demo-Daten zuletzt (LFH-1187)', async () => {
+    setup();
+    fuehrungsstelleMitschnitt({ sprechgruppen: [], fahrzeug_ids: [42] });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Rufname' }));
+    await waitFor(() =>
+      expect(vorschlagsliste()).toEqual([
+        '# Fahrzeuge der Führungsstelle',
+        'Florian Musterstadt 19/1MTW',
+        '# Disponierte Führungsfahrzeuge',
+        'Florian Musterstadt 10/1ELW 2',
+        '# Führungsfahrzeuge der Organisation',
+        'Kater Musterstadt 1KdoW',
+        '# Demo-Daten',
+        'Demo ELW 1ELW 1Demo',
+      ]),
+    );
+  });
+
+  it('Rufname: Tippen filtert, die Wahl übernimmt den Funkrufnamen exakt (LFH-1187)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.type(p.getByRole('combobox', { name: 'Rufname' }), 'kater');
+    await waitFor(() =>
+      expect(vorschlagsliste()).toEqual([
+        '# Führungsfahrzeuge der Organisation',
+        'Kater Musterstadt 1KdoW',
+      ]),
+    );
+    await user.click(screen.getByText('Kater Musterstadt 1'));
+    expect(p.getByRole('combobox', { name: 'Rufname' })).toHaveValue('Kater Musterstadt 1');
+    await user.click(p.getByRole('button', { name: 'Rufname speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ rufname: 'Kater Musterstadt 1' }]));
+  });
+
+  it('Rufname: genau ein zugeordnetes Fahrzeug steht im Platzhalter, nicht im Wert (LFH-1187)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt({ sprechgruppen: [], fahrzeug_ids: [41] });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    const feld = p.getByRole('combobox', { name: 'Rufname' });
+    expect(feld).toHaveValue('');
+    await waitFor(() =>
+      expect(feld.closest('.ant-select')).toHaveTextContent('Florian Musterstadt 10/1'),
+    );
+    expect(bodies).toEqual([]);
+  });
+
+  it('Rufname: ohne Freigabe der Fahrzeuge nur die Organisation, kein Fehler (LFH-1187)', async () => {
+    setup();
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
+      ),
+    );
+    fuehrungsstelleMitschnitt({ sprechgruppen: [], fahrzeug_ids: [41] });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Rufname' }));
+    await waitFor(() =>
+      expect(vorschlagsliste()).toEqual([
+        '# Führungsfahrzeuge der Organisation',
+        'Kater Musterstadt 1KdoW',
+        '# Demo-Daten',
+        'Demo ELW 1ELW 1Demo',
+      ]),
+    );
+    expect(
+      p.getByRole('combobox', { name: 'Rufname' }).closest('.ant-select'),
+    ).not.toHaveTextContent('Florian Musterstadt 10/1');
+  });
+
+  it('Rufname: ohne Stammdaten bleiben die disponierten Vorschläge (LFH-1187)', async () => {
+    setup();
+    server.use(
+      http.get('/api/fahrzeuge', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    );
+    fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Rufname' }));
+    await waitFor(() =>
+      expect(vorschlagsliste()).toEqual([
+        '# Disponierte Führungsfahrzeuge',
+        'Florian Musterstadt 10/1ELW 2',
+      ]),
+    );
   });
 
   it('Sprechgruppen: Auswahl geht als `sprechgruppe_ids`, Anzeige nach Betriebsart', async () => {
@@ -1312,10 +1456,10 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     const user = userEvent.setup();
     const p = await paneel();
     await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
-    await user.type(p.getByRole('textbox', { name: 'Rufname' }), 'X{Enter}');
+    await user.type(p.getByRole('combobox', { name: 'Rufname' }), 'X{Enter}');
     const fehler = await p.findByText('Einsatz ist abgeschlossen');
     expect(fehler.closest('.ant-message')).toBeNull();
-    expect(p.getByRole('textbox', { name: 'Rufname' })).toHaveValue('X');
+    expect(p.getByRole('combobox', { name: 'Rufname' })).toHaveValue('X');
   });
 });
 

@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs]
 ---
 
 ## Überblick
@@ -43,7 +43,9 @@ Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial) ändern
    ![Paneel „Eigene Führungsstelle“ mit Rufname, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit und Fahrzeug](../bilder/einsatzdaten/fuehrungsstelle.png)
 
 2. „Rufname“, „Sprechgruppen“, „Kommunikationsmittel“, „Erreichbarkeit“ und „Fahrzeuge“ Zeile
-   für Zeile eintragen und speichern wie jede andere Angabe.
+   für Zeile eintragen und speichern wie jede andere Angabe. Beim „Rufname“ schlägt die Liste
+   die Funkrufnamen der Führungsfahrzeuge vor; Tippen grenzt sie ein, ein Eintrag übernimmt den
+   Funkrufnamen unverändert, freier Text bleibt möglich.
 
 ### Ein Mitglied hinzufügen
 
@@ -99,6 +101,13 @@ aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder d
   [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); dort wird sie nicht
   bearbeitet. „Fahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.
+- Die Vorschläge für den **Rufname** stehen in Gruppen, in dieser Folge: die Fahrzeuge, die der
+  Führungsstelle zugeordnet sind, die übrigen disponierten Führungsfahrzeuge, dann die
+  Führungsfahrzeuge der Organisation, die im Dienst und nicht disponiert sind, Demo-Daten zuletzt.
+  Als Führungsfahrzeug gilt, was auf der Lagekarte das Zeichen Führung trägt (etwa ELW, KdoW).
+  Ohne Freigabe des Moduls Fahrzeuge fehlen die ersten beiden Gruppen. Trägt die Führungsstelle
+  genau ein Fahrzeug, steht dessen Funkrufname grau im leeren Feld; gespeichert wird er erst,
+  wenn ihn jemand wählt.
 - Die **Führungsstelle eines Mitglieds** ist der erste Vorschlag, wenn das Einsatztagebuch die
   Person nach ihrem Rufnamen fragt, noch vor ihrem eigenen Sachgebiet im Stab.
 

@@ -63,8 +63,15 @@ import type {
   FuehrungsstellePatch,
 } from '../api/types';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
+import { listeFahrzeuge } from '../api/fahrzeuge';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
+import {
+  rufnameFilter,
+  rufnameOptionen,
+  rufnamePlatzhalter,
+  rufnameVorschlaege,
+} from '../stab/rufnameVorschlaege';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import {
@@ -421,20 +428,15 @@ function FuehrungsstellePaneel({
   const fahrzeugQuelle = useFahrzeugeQuelle(einsatzId);
 
   const fs = query.data;
-  const text = (
-    etikett: string,
-    wert: string | null | undefined,
-    mono: boolean,
-    schluessel: 'rufname' | 'erreichbarkeit',
-  ) => (
+  const erreichbarkeit = (wert: string | null | undefined) => (
     <InlineAngabe<string>
-      etikett={etikett}
+      etikett="Erreichbarkeit"
       wert={wert ?? ''}
-      anzeige={mono ? <span style={monoStil(13)}>{wert}</span> : wert}
+      anzeige={wert}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(w) => speichern(etikett, { [schluessel]: leerZuNull(w) })}
+      onSpeichern={(w) => speichern('Erreichbarkeit', { erreichbarkeit: leerZuNull(w) })}
       eingabe={({ feld, value, onChange }) => (
         <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
@@ -452,7 +454,18 @@ function FuehrungsstellePaneel({
         {fs && (
           <Angaben
             zeilen={[
-              { etikett: 'Rufname', wert: text('Rufname', fs.rufname, true, 'rufname') },
+              {
+                etikett: 'Rufname',
+                wert: (
+                  <RufnameAngabe
+                    rufname={fs.rufname}
+                    fahrzeugIds={fs.fahrzeug_ids}
+                    quelle={fahrzeugQuelle}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(w) => speichern('Rufname', { rufname: leerZuNull(w) })}
+                  />
+                ),
+              },
               {
                 etikett: 'Sprechgruppen',
                 wert: (
@@ -502,7 +515,7 @@ function FuehrungsstellePaneel({
               },
               {
                 etikett: 'Erreichbarkeit',
-                wert: text('Erreichbarkeit', fs.erreichbarkeit, false, 'erreichbarkeit'),
+                wert: erreichbarkeit(fs.erreichbarkeit),
               },
               {
                 etikett: 'Fahrzeuge',
@@ -520,6 +533,58 @@ function FuehrungsstellePaneel({
         )}
       </PaneelZustand>
     </Paneel>
+  );
+}
+
+/**
+ * Zeile „Rufname“ der Führungsstelle mit Vorschlägen aus den Stammdaten (LFH-1187,
+ * `stab/rufnameVorschlaege.tsx`): Funkrufnamen der Führungsfahrzeuge, Freitext bleibt erlaubt.
+ * Die Organisationsfahrzeuge kommen aus demselben Cache wie der Pool auf der Fahrzeugseite und
+ * werden nur mit Schreibrecht abgerufen; ein Fehler dort lässt nur ihre Gruppe weg.
+ */
+function RufnameAngabe({
+  rufname,
+  fahrzeugIds,
+  quelle,
+  darfSchreiben,
+  onSpeichern,
+}: {
+  rufname: string | null | undefined;
+  fahrzeugIds: readonly number[];
+  quelle: ReturnType<typeof useFahrzeugeQuelle>;
+  darfSchreiben: boolean;
+  onSpeichern: (wert: string) => Promise<unknown>;
+}) {
+  const stammQuery = useQuery({
+    queryKey: globalKeys.fahrzeugeListe('im-dienst'),
+    queryFn: () => listeFahrzeuge(true),
+    enabled: darfSchreiben,
+  });
+  const disponiert = quelle.zustand === 'daten' ? quelle.fahrzeuge : null;
+  const optionen = rufnameOptionen(
+    rufnameVorschlaege({ fahrzeugIds, disponiert, stamm: stammQuery.data ?? null }),
+  );
+  return (
+    <InlineAngabe<string>
+      etikett="Rufname"
+      wert={rufname ?? ''}
+      anzeige={<span style={monoStil(13)}>{rufname}</span>}
+      leer={leererText}
+      gleich={(a, b) => a.trim() === b.trim()}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={onSpeichern}
+      eingabe={({ feld, popup, value, onChange }) => (
+        <AutoComplete
+          {...feld}
+          {...popup}
+          options={optionen}
+          filterOption={rufnameFilter}
+          placeholder={rufnamePlatzhalter(fahrzeugIds, disponiert)}
+          value={value}
+          onChange={(v?: string) => onChange(v ?? '')}
+        />
+      )}
+    />
   );
 }
 
