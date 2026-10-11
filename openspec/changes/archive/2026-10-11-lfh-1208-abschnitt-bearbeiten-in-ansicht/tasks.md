@@ -104,16 +104,22 @@ Pfade ohne Präfix sind relativ zu `frontend/src/`.
 - [x] 5.2 Neue e2e `e2e/einsatzabschnitte-bearbeitung.spec.ts`: Lagezustand ändern (ETB-Eintrag
   erscheint), Leiter setzen, Abschnitt anlegen per Enter. Jeweils in `kompakt` und `handschuh`,
   und der Request-Body des PATCH enthält genau ein Feld. Nachweis: die Spec läuft grün.
-- [x] 5.3 `openspec/changes/lfh-1208-abschnitt-bearbeiten-in-ansicht/pruefliste.md` mit der
+- [x] 5.3 `pruefliste.md` (neben dieser Datei) mit der
   Prüfliste Einsatztauglichkeit (15 Kriterien, jedes mit Verdikt erfüllt / offen → Zielticket /
   nicht anwendbar) für Detail und Anlegen-Modal, inklusive Handy (390 px, Gliederung über dem
   Detail). Nachweis: die Datei ist vollständig, ohne „nicht geprüft“.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh` ist grün (lokal, ohne `| tail`). Kästchen, die erst die CI
-  des PRs belegt, werden mit Verweis auf diesen Lauf abgehakt.
-- [ ] 6.2 `superpowers:requesting-code-review` ist gelaufen, bestätigte Findings sind behoben.
+- [x] 6.1 `./scripts/check-all.sh` ist grün (lokal, ohne `| tail`). Kästchen, die erst die CI
+  des PRs belegt, werden mit Verweis auf diesen Lauf abgehakt. Stand: lokal Bündel `schnell` grün
+  (11 Schritte); Vitest über `pages`, `components`, `geraet`, `command-palette`, `stab`
+  (418 Dateien) grün; e2e gezielt 16/16 grün (neue Spec, C12, Farbvertrag, Führungsorganisation).
+  Voller Lauf (Rust, Vitest gesamt, e2e gesamt): CI des PRs, weil der Container (4 Kerne, Chromium
+  einer anderen Playwright-Version) ihn nicht trägt.
+- [x] 6.2 Code-Review ist gelaufen (unabhängiger Review-Agent; `superpowers:requesting-code-review`
+  steht in der Cloud-Sitzung nicht bereit), bestätigte Findings sind behoben (Commits `fix` und
+  `refactor` im Branch).
 
 ## Workflow follow-up
 

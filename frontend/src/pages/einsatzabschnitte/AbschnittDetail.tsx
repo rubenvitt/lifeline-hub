@@ -59,7 +59,9 @@ function isSameIds(a: readonly number[], b: readonly number[]): boolean {
 
 /**
  * Das Detail eines Einsatzabschnitts zum Lesen UND Bearbeiten (LFH-1208, Spec
- * `einsatzabschnitt-bearbeitung`): jede Angabe an ihrem Wert, ein Speichern schickt genau ein Feld.
+ * `einsatzabschnitt-bearbeitung`, Entscheidungen D1–D8 in
+ * `openspec/changes/archive/2026-10-11-lfh-1208-abschnitt-bearbeiten-in-ansicht/design.md`):
+ * jede Angabe an ihrem Wert, ein Speichern schickt genau ein Feld.
  * Kein Langformular — es überschrieb mit dem Stand vom Öffnen still, was ein anderer Arbeitsplatz
  * inzwischen geändert hatte.
  *

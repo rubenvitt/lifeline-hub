@@ -637,7 +637,8 @@ und `pages/personen/`.
   kumuliert `pages/einsatzabschnitte/abschnittStaerke.ts`).
   „Abschnitt anlegen" ist eine Erfassung mit drei Feldern (`ErfassungsModal`), den Datensatz gibt
   es erst nach dem Absenden; das Detail bearbeitet jede Angabe einzeln (`patcheAbschnitt`, ein
-  Feld je PATCH, Spec `einsatzabschnitt-bearbeitung`, LFH-1208).
+  Feld je PATCH, Spec `einsatzabschnitt-bearbeitung`, LFH-1208,
+  `openspec/changes/archive/2026-10-11-lfh-1208-abschnitt-bearbeiten-in-ansicht/design.md`).
 
 **Entwürfe** (Verlustschutz, Navigationsschutz, „Entwurf speichern“, Lagebericht-Akkordeon):
 `frontend/src/entwurf/AGENTS.md` — gilt auch für `lageberichte/`, `pages/BefehlDetailPage.tsx` und
