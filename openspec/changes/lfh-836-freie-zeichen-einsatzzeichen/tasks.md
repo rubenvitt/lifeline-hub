@@ -28,12 +28,12 @@
 
 ## 3. Leseadapter für freie Zeichen (TDD)
 
-- [ ] 3.1 `zeichen/freiesZeichen.test.ts` rot anlegen:
+- [x] 3.1 `zeichen/freiesZeichen.test.ts` rot anlegen:
   - **Abbildungstest alt → neu** über alle Bestandskennungen aus dem Abgleich: 36 Grundzeichen, 84 Symbole (frei und im Grundzeichen), Organisationen, Fachaufgaben, Einheiten, Funktionen.
   - Je Zeile die erwartete wirksame Spec. `drawAnySpec` wirft nie; nicht Abbildbares ergibt Kaskade oder Platzhalter mit `vereinfacht: true`.
   - Die Näherungen nach D5 sind gepinnt.
-- [ ] 3.2 `zeichen/freiesZeichen.ts` umsetzen: `zeichen_spec`-Pfad, Altspalten-Pfad mit den Tabellen aus `fachobjektZeichen.ts` plus der Symboltabelle, Kaskade, Platzhalter `point`, Cache, `schluessel = 'ez|' + serializeAnySpec`. Die Tests aus 3.1 sind grün. Mutationsprobe: eine Kaskadenstufe entfernt → mindestens ein Test rot.
-- [ ] 3.3 Farbabbildung nach D6 (Alt-Hex → nächstes `TECHNICAL_FILL_TOKENS`-Token, Gleichstand nach Reihenfolge, entfällt ohne erlaubte Füllung). Tests:
+- [x] 3.2 `zeichen/freiesZeichen.ts` umsetzen: `zeichen_spec`-Pfad, Altspalten-Pfad mit den Tabellen aus `fachobjektZeichen.ts` plus der Symboltabelle, Kaskade, Platzhalter `point`, Cache, `schluessel = 'ez|' + serializeAnySpec`. Die Tests aus 3.1 sind grün. Mutationsprobe: eine Kaskadenstufe entfernt → mindestens ein Test rot.
+- [x] 3.3 Farbabbildung nach D6 (Alt-Hex → nächstes `TECHNICAL_FILL_TOKENS`-Token, Gleichstand nach Reihenfolge, entfällt ohne erlaubte Füllung). Tests:
   - `#cc0000` an Gefahr → `rot`
   - Farbe an Person → entfällt
   - gleiche Eingabe → gleiches Token
