@@ -28,14 +28,21 @@ macro_rules! ist_faellig_sql {
     };
 }
 
-/// SELECT-Projektion inkl. abgeleitetem `ist_faellig`. `jetzt` wird als erster positionaler
-/// `?` gebunden (steht vor der WHERE-Klausel), danach die WHERE-Parameter.
+/// SELECT-Projektion inkl. abgeleitetem `ist_faellig` und der laufenden Nummer des Bezugs
+/// (LFH-1146; Bezugstypen mit Nummer wie in der Allowlist von `routes::erinnerung`). `jetzt`
+/// wird als erster positionaler `?` gebunden (steht vor der WHERE-Klausel), danach die
+/// WHERE-Parameter.
 const ANZEIGE_SELECT: &str = concat!(
     "SELECT e.id, e.einsatz_id, e.titel, e.beschreibung, e.faellig_at, e.intervall_minuten, \
             e.empfaenger_funktion, e.empfaenger_funktion_code, e.bezug_typ, e.bezug_id, e.quelle, e.status, e.erledigt_at, \
             e.erstellt_von_id, e.erstellt_at, ",
     ist_faellig_sql!(),
     " AS ist_faellig, \
+            CASE e.bezug_typ \
+              WHEN 'meldung' THEN (SELECT lfd_nr FROM meldung WHERE id = e.bezug_id) \
+              WHEN 'auftrag' THEN (SELECT lfd_nr FROM auftrag WHERE id = e.bezug_id) \
+              WHEN 'etb' THEN (SELECT lfd_nr FROM etb_eintrag WHERE id = e.bezug_id) \
+            END AS bezug_lfd_nr, \
             ks.quittiert_at AS quittiert_at, ks.quittiert_von_id AS quittiert_von_id, \
             COALESCE(ks.vollzug_status, 'offen') AS vollzug_status, \
             ks.vollzogen_at AS vollzogen_at, ks.vollzogen_von_id AS vollzogen_von_id \

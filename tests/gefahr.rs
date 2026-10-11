@@ -78,7 +78,7 @@ async fn matrix_leer_dann_put_dann_upsert() {
 }
 
 #[tokio::test]
-async fn keine_leert_die_zelle() {
+async fn keine_bleibt_als_meldung_in_der_liste() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -100,8 +100,12 @@ async fn keine_leert_die_zelle() {
         Some(&bewertung("brand", "menschen", "keine")),
     )
     .await;
+    // „keine" ist eine Meldung, keine Lücke (LFH-1153): die Matrix zeigt sie als „–", nicht als
+    // „nicht bewertet".
     let (_, liste) = anfrage(&app, "GET", &u, &admin, None).await;
-    assert_eq!(liste.as_array().unwrap().len(), 0);
+    let zellen = liste.as_array().unwrap();
+    assert_eq!(zellen.len(), 1);
+    assert_eq!(zellen[0]["warnstufe"], "keine");
 }
 
 /// Trennlinie der Statuscode-Konvention an einer Stelle: die ersten drei Bodies scheitern

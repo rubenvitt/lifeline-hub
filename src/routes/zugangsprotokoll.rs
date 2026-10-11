@@ -5,7 +5,7 @@
 //! | GET | `/api/zugangsprotokoll/anmeldungen` | Anmeldespur (`auth_audit`) |
 //! | GET | `/api/zugangsprotokoll/zugangsaenderungen` | Admin-Spur (`admin_audit`) |
 //!
-//! Filter: `von`, `bis` (ISO-8601, einschließlich), `konto` (Benutzername), `ereignis` bzw.
+//! Filter: `von`, `bis` (ISO-8601, einschließlich), `konto` (Teil des Benutzernamens), `ereignis` bzw.
 //! `aktion`; Cursor `vor_id`, Seitengröße `limit`. Nur System-Admin (`AdminUser`): die Spuren
 //! sind Personen- und Beschäftigtendaten ohne Einsatzbezug. **Das Lesen schreibt keine Spur**
 //! (wie die Einsicht ins Personen-Zugriffsprotokoll); Herleitung in
@@ -48,11 +48,16 @@ fn spur_filter(params: &SpurParams) -> Result<SpurFilter, AppError> {
     let bis = leer_als_none(params.bis.as_deref())
         .map(normalisiere_zeit)
         .transpose()?;
-    // Gekürzt wie beim Schreiben, sonst träfe ein langer Name nie seinen Eintrag.
+    // Auf die Länge gekürzt, mit der Namen gespeichert sind, aber ohne deren „…“: der Filter
+    // sucht einen Teil (LFH-1152), und so trifft auch ein langer Name seinen gekürzten Eintrag.
     let konto = leer_als_none(params.konto.as_deref())
         .map(benutzername::normalisiere)
         .transpose()?
-        .map(|name| benutzername::fuer_protokoll(&name).into_owned());
+        .map(|name| {
+            name.chars()
+                .take(benutzername::PROTOKOLL_LAENGE)
+                .collect::<String>()
+        });
     if let (Some(von), Some(bis)) = (&von, &bis) {
         if bis < von {
             return Err(AppError::UnprocessableEntity("bis liegt vor von".into()));

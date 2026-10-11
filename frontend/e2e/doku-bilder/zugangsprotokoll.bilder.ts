@@ -1,6 +1,7 @@
 import { request, type APIRequestContext, type Page } from '@playwright/test';
 import { waehleIn } from '../auswahl-kern';
 import { anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
+import { kontoAnlegen } from '../konto-anlegen';
 
 /**
  * Bilder des Kapitels „Zugangsprotokoll“ (`docs/anwender/kapitel/zugangsprotokoll.md`).
@@ -15,7 +16,8 @@ import { anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './ker
  *                           frontend/src/zugangsprotokoll/zugangsprotokollText.ts
  *
  * Füllung (D3): die Demo-Daten legen keine Benutzer an und ändern keinen Zugang. Die Spec legt
- * „Kim Beispiel“ an und spielt über die API durch, was beide Spuren füllt: Anmeldungen von zwei
+ * „Kim Beispiel“ an (samt Erstwechsel des Startpassworts, LFH-1121) und spielt über die API durch,
+ * was beide Spuren füllt: Anmeldungen von zwei
  * Geräten, zwei Fehlversuche (falsches Passwort, vertippter Name), eine vom Admin beendete
  * Sitzung, Rollenwechsel, Passwortwechsel, Abmeldung, Deaktivieren und Reaktivieren, dazu ein
  * Schalten des Anmeldewegs „Passwort“ (bleibt an). Nur zwei Fehlversuche: ab zehn sperrt der
@@ -50,10 +52,7 @@ async function zugangsgeschichte(page: Page): Promise<void> {
   );
   if (vorhanden) return;
 
-  const { id } = await fuelle<{ id: number }>(page, 'post', '/api/benutzer', {
-    ...PERSON,
-    passwort: PASSWORT,
-  });
+  const { id } = await kontoAnlegen(page.request, { ...PERSON, passwort: PASSWORT });
 
   const ipad = await geraet(IPAD);
   const windows = await geraet(WINDOWS);
@@ -121,7 +120,8 @@ test.describe(KAPITEL, () => {
     const konto = page.getByRole('combobox', { name: 'Konto' });
     await konto.fill(PERSON.benutzername);
     const tabelle = page.locator('.ant-table-wrapper');
-    await expect(tabelle.getByText('Passwort geändert')).toBeVisible();
+    // Zweimal: der Erstwechsel nach der Anlage (LFH-1121) und der Wechsel am iPad.
+    await expect(tabelle.getByText('Passwort geändert')).toHaveCount(2);
     await expect(tabelle.getByText('admin', { exact: true })).toHaveCount(0);
     await konto.blur();
     await page.mouse.move(0, 0);

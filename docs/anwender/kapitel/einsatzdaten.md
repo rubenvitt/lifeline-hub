@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/routes/benutzer.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs]
 ---
 
 ## Überblick
@@ -82,9 +82,11 @@ Für die Einsatzleitung:
 
 ### Die Auswahl „Benutzer …“
 
-Die Liste der Personen füllt sich nur für die Administration des Systems. Für alle anderen bleibt
-sie leer und zeigt „Benutzerliste nur für Admins“. Eine Einsatzleitung ohne dieses Recht kann
-deshalb zurzeit keine Mitglieder hinzufügen und bittet die Administration darum.
+Die Auswahl bietet jede aktive Person der Organisation des Einsatzes an, die noch nicht Mitglied
+ist, mit ihrem Anzeigenamen. Die Einsatzleitung braucht dafür keine Rolle in der Administration.
+Personen anderer Organisationen, deaktivierte Konten und gekoppelte Geräte stehen nicht darin.
+Ist niemand mehr übrig, zeigt die Auswahl „Keine weitere Person der Organisation“. Wer
+aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder darin.
 
 ### Was eine Änderung bewirkt
 
@@ -93,7 +95,7 @@ deshalb zurzeit keine Mitglieder hinzufügen und bittet die Administration darum
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie
   schreiben keinen Eintrag ins Einsatztagebuch.
 - Die „Einsatznummer“ unter „Technische Angaben“ vergibt das System; sie lässt sich nicht ändern.
-- Die **eigene Führungsstelle** speist Funkplan und Fernmeldeskizze (siehe
+- Die **eigene Führungsstelle** speist Funkplan, Fernmeldeskizze und Kommunikationsplan (siehe
   [Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)); dort wird sie nicht
   bearbeitet. „Fahrzeuge“ bietet nur disponierte Fahrzeuge an und nur, wenn das Modul Fahrzeuge
   freigegeben ist.

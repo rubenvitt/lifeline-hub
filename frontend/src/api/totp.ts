@@ -1,4 +1,5 @@
 import type { BenutzerAnzeige, TotpEnrollFinish, TotpEnrollStart } from './types';
+import type { PasswortWechselErforderlich } from './auth';
 import { apiSend } from './client';
 
 /** POST /api/auth/totp/enroll/start: beginnt ein TOTP-Enrollment für den angemeldeten Nutzer
@@ -20,7 +21,10 @@ export function enrollFinish(code: string): Promise<TotpEnrollFinish> {
 /** POST /api/auth/totp/finish: zweiter Schritt des Passwort→TOTP-Logins (öffentlich, vor der
  *  Session). Body ist ein TOTP- ODER Recovery-Code, dasselbe Feld. Die Identität kommt allein aus
  *  dem `mfa_pending`-Cookie von `POST /api/auth/login`. Bei Erfolg steht die Session per Cookie;
- *  der Aufrufer lädt den Benutzer über `AuthContext.aktualisiere()` nach. */
-export function totpFinish(code: string): Promise<BenutzerAnzeige> {
-  return apiSend<BenutzerAnzeige>('/api/auth/totp/finish', 'POST', { code });
+ *  der Aufrufer lädt den Benutzer über `AuthContext.aktualisiere()` nach. Steht das Konto unter
+ *  Änderungszwang (LFH-1121), kommt statt der Session {@link PasswortWechselErforderlich}. */
+export function totpFinish(code: string): Promise<BenutzerAnzeige | PasswortWechselErforderlich> {
+  return apiSend<BenutzerAnzeige | PasswortWechselErforderlich>('/api/auth/totp/finish', 'POST', {
+    code,
+  });
 }

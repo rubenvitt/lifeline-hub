@@ -252,6 +252,36 @@ async fn ungueltige_benoetigte_rolle_ist_400() {
     );
 }
 
+/// Die Stufe „Führung im Einsatz“ (LFH-1150) ist ein gültiger Wert; ein unbekannter Wert
+/// lässt den gespeicherten Override unverändert.
+#[tokio::test]
+async fn einsatzfuehrung_ist_gueltig_und_ungueltiges_aendert_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "schaeden", true, Some("einsatzfuehrung")).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "schaeden", true, Some("einsatzleitung")).await,
+        StatusCode::BAD_REQUEST
+    );
+    let (status, v) = common::anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/modul-overrides"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        v["schaeden"]["benoetigte_rolle"], "einsatzfuehrung",
+        "{v:?}"
+    );
+}
+
 #[tokio::test]
 async fn nicht_leitung_kann_keinen_override_setzen() {
     let app = setup().await;
@@ -911,6 +941,49 @@ async fn org_modul_default_wirkt_auch_im_live_feed() {
     assert!(
         !gelesen.contains("event: etb"),
         "Org-Default muss den Live-Feed genauso sperren wie den GET: {gelesen:?}"
+    );
+}
+
+/// LFH-1150: Unter „Führung im Einsatz“ bekommt Führungspersonal ohne Org-Rolle die Ereignisse
+/// des Moduls, ein Beobachter nicht — der Live-Filter rechnet mit der Einsatzrolle.
+#[tokio::test]
+async fn einsatzfuehrung_filtert_den_live_feed_nach_einsatzrolle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let bid = benutzer_anlegen(&app, &admin, "berta", "keine").await;
+    rolle_setzen(&app, &admin, eid, bid, "beobachter").await;
+    let berta = login_cookie(&app, "berta", "bertapw1").await;
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "etb", true, Some("einsatzfuehrung")).await,
+        StatusCode::OK
+    );
+
+    let feed_frieda = live_oeffnen(&app, &frieda, eid, None).await;
+    let feed_berta = live_oeffnen(&app, &berta, eid, None).await;
+    assert_eq!(feed_frieda.status(), StatusCode::OK);
+    assert_eq!(feed_berta.status(), StatusCode::OK);
+
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Fuer die Fuehrung"}"#,
+    )
+    .await;
+
+    let gelesen = sse_anfang_lesen(feed_frieda.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: etb"),
+        "Führungspersonal muss das ETB-Ereignis bekommen: {gelesen:?}"
+    );
+    let gelesen = sse_anfang_lesen(feed_berta.into_body(), 400).await;
+    assert!(
+        !gelesen.contains("event: etb"),
+        "Beobachter darf das ETB-Ereignis nicht bekommen: {gelesen:?}"
     );
 }
 

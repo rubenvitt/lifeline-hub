@@ -492,3 +492,43 @@ async fn entwurfs_patch_nur_an_abschnitten_kennzeichnet_das_ereignis() {
         n.data
     );
 }
+
+/// LFH-1150: Die Dokumentrouten (`routes/vorlagendokument.rs`) reichen die Einsatzrolle in die
+/// Modulfreigabe. Unter „Führung im Einsatz“ liest und schreibt die Einsatzleitung ohne Org-Rolle
+/// Lageberichte; ein Beobachter liest sie nicht.
+#[tokio::test]
+async fn einsatzfuehrung_laesst_einsatzleitung_ohne_org_rolle_lesen_und_schreiben() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let lid = benutzer_anlegen(&app, &admin, "leonie", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, lid, "einsatzleitung").await;
+    let leonie = login_cookie(&app, "leonie", "leoniepw1").await;
+    let bid = benutzer_anlegen(&app, &admin, "berta", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, bid, "beobachter").await;
+    let berta = login_cookie(&app, "berta", "bertapw1").await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/lageberichte"),
+        &leonie,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let pfad = format!("/api/einsaetze/{einsatz}/lageberichte");
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &leonie,
+        Some(r#"{"vorlage":"lagebericht","titel":"Lage 10:00"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    let (status, _) = anfrage(&app, "GET", &pfad, &leonie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = anfrage(&app, "GET", &pfad, &berta, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

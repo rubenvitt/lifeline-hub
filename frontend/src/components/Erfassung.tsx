@@ -1,4 +1,4 @@
-import { Button, Checkbox, Form, Modal, Space, Typography, theme } from 'antd';
+import { Button, Checkbox, ConfigProvider, Form, Modal, Space, Typography, theme } from 'antd';
 import type { FormInstance, FormProps } from 'antd';
 import {
   useCallback,
@@ -108,6 +108,16 @@ export function serienKuerzel(userAgent: string) {
 
 // Einmal je Sitzung bestimmt — die Plattform wechselt nicht.
 const SERIEN_KUERZEL = serienKuerzel(typeof navigator === 'undefined' ? '' : navigator.userAgent);
+
+/**
+ * Die Aktionsknöpfe laufen ohne antds Bewegung (LFH-1142). Das Lade-Symbol eines Knopfs blendet
+ * antd mit einem Übergang aus und entfernt es erst bei dessen `transitionend`; nach einigen
+ * Serien-Speicherungen blieb das Ereignis aus. Das leere Symbol (Breite 0, Deckkraft 0) blieb dann
+ * im Knopf stehen, mit `aria-label="loading"`: der Knopf hieß „loading Erfassen“, 30 s bis über
+ * 3 min lang, obwohl er längst wieder bediente. Ohne Bewegung kommt und geht das Symbol mit dem
+ * Ladezustand. Nachweis: `e2e/personen-aufnahme.spec.ts`, Fall LFH-1142.
+ */
+const AKTION_OHNE_BEWEGUNG = { token: { motion: false } } as const;
 
 /**
  * Klasse des Kürzels im Serienknopf: sichtbar nur bei feinem Zeiger mit Hover (`Erfassung.css`,
@@ -430,46 +440,49 @@ export function ErfassungsFormular<T extends object>({
               </Typography.Text>
             </div>
           )}
-          {/* AKTION — unter `md` gestapelt, siehe Dateikopf. */}
-          <Space
-            size="middle"
-            orientation={istSchmal ? 'vertical' : 'horizontal'}
-            wrap={!istSchmal}
-            style={
-              istSchmal ? { display: 'flex' } : { display: 'flex', justifyContent: 'flex-end' }
-            }
-          >
-            {onAbbrechen && (
-              <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
-                Abbrechen
-              </Button>
-            )}
-            {serie && (
-              // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
-              // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
-              // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
-              <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
-                Speichern und nächste
-                <span
-                  aria-hidden
-                  className={SERIEN_KUERZEL_KLASSE}
-                  style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
-                >
-                  {SERIEN_KUERZEL}
-                </span>
-              </Button>
-            )}
-            <Button
-              type="primary"
-              htmlType="submit"
-              block={istSchmal}
-              loading={laeuft}
-              danger={unumkehrbar}
-              disabled={gesperrt}
+          {/* AKTION — unter `md` gestapelt, siehe Dateikopf. Ohne antds Bewegung: siehe
+              `AKTION_OHNE_BEWEGUNG`. */}
+          <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
+            <Space
+              size="middle"
+              orientation={istSchmal ? 'vertical' : 'horizontal'}
+              wrap={!istSchmal}
+              style={
+                istSchmal ? { display: 'flex' } : { display: 'flex', justifyContent: 'flex-end' }
+              }
             >
-              {erfassenText}
-            </Button>
-          </Space>
+              {onAbbrechen && (
+                <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
+                  Abbrechen
+                </Button>
+              )}
+              {serie && (
+                // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
+                // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt; zu sehen ist es nur
+                // mit feinem Zeiger (`Erfassung.css`), auf dem Touchgerät gibt es keine Tastatur dafür.
+                <Button block={istSchmal} loading={laeuft} onClick={serienSpeichern}>
+                  Speichern und nächste
+                  <span
+                    aria-hidden
+                    className={SERIEN_KUERZEL_KLASSE}
+                    style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }}
+                  >
+                    {SERIEN_KUERZEL}
+                  </span>
+                </Button>
+              )}
+              <Button
+                type="primary"
+                htmlType="submit"
+                block={istSchmal}
+                loading={laeuft}
+                danger={unumkehrbar}
+                disabled={gesperrt}
+              >
+                {erfassenText}
+              </Button>
+            </Space>
+          </ConfigProvider>
         </div>
       </Form>
     </div>

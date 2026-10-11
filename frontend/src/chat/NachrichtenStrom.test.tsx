@@ -99,6 +99,24 @@ describe('NachrichtenStrom', () => {
     expect(screen.getByTestId('nachrichten-strom').style.maxWidth).toBe('');
   });
 
+  /** Umschalt+Enter setzt im Eingabefeld einen Umbruch; der Verlauf zeigt ihn (LFH-1145). */
+  it('erhält die Zeilenumbrüche einer Nachricht', () => {
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[nachricht({ inhalt: 'Erste Zeile\nZweite Zeile' })]}
+        eigeneBenutzerId={1}
+        darfSchreiben
+        onBearbeiten={vi.fn()}
+        onLoeschen={vi.fn()}
+        onHeraufstufen={vi.fn()}
+        onHeraufstufenAuftrag={vi.fn()}
+      />,
+    );
+    const text = screen.getByText('Erste Zeile Zweite Zeile');
+    expect(text.textContent).toBe('Erste Zeile\nZweite Zeile');
+    expect(text.style.whiteSpace).toBe('pre-wrap');
+  });
+
   it('zeigt Tombstone für gelöschte Nachrichten ohne Aktionen', () => {
     renderMitProviders(
       <NachrichtenStrom

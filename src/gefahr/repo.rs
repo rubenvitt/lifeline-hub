@@ -50,14 +50,15 @@ fn zu_anzeige(r: Row) -> GefahrBewertungAnzeige {
     }
 }
 
-/// Alle gesetzten Zellen eines Gefahrengebiets (ohne `warnstufe='keine'`).
+/// Alle bewerteten Zellen eines Gefahrengebiets, auch `warnstufe='keine'`: „keine" ist eine
+/// Meldung, keine Lücke (LFH-969). Ohne sie zeigte die Matrix eine bewusst vergebene Stufe
+/// „Keine" als „nicht bewertet" (LFH-1153).
 pub async fn liste(
     pool: &SqlitePool,
     gefahrengebiet_id: i64,
 ) -> Result<Vec<GefahrBewertungAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ALLE} WHERE gefahrengebiet_id = ? AND warnstufe != 'keine' \
-         ORDER BY gefahrentyp, schutzobjekt"
+        "{SELECT_ALLE} WHERE gefahrengebiet_id = ? ORDER BY gefahrentyp, schutzobjekt"
     )))
     .bind(gefahrengebiet_id)
     .fetch_all(pool)
@@ -89,7 +90,7 @@ pub async fn aktuelle_warnstufe(
 
 /// UPSERT einer Bewertung INNERHALB einer offenen Transaktion (F06/LFH-244, Tier-A:
 /// atomar mit dem System-ETB-Eintrag). KEIN Delete-Zweig: `warnstufe='keine'` lässt die
-/// Zeile bestehen, `liste()` filtert sie aus. Liefert die frische Anzeige (In-Tx-Reload)
+/// Zeile bestehen, `liste()` liefert sie mit. Liefert die frische Anzeige (In-Tx-Reload)
 /// für ETB-Text UND Response in EINER Tx.
 pub async fn upsert_bewertung_tx(
     conn: &mut SqliteConnection,
@@ -336,7 +337,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn warnstufe_keine_ist_kein_phantom() {
+    async fn warnstufe_keine_bleibt_als_meldung_sichtbar() {
         let pool = crate::db::test_pool().await;
         let (gid, bid) = setup(&pool).await;
         upsert_bewertung_tx(
@@ -353,7 +354,11 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(liste(&pool, gid).await.unwrap().is_empty());
+        // „keine" ist eine Meldung, keine Lücke (LFH-969/LFH-1153): die Zelle bleibt in der Liste,
+        // sonst zeigte die Matrix eine bewusst vergebene Stufe als „nicht bewertet".
+        let zellen = liste(&pool, gid).await.unwrap();
+        assert_eq!(zellen.len(), 1);
+        assert_eq!(zellen[0].warnstufe, Warnstufe::Keine);
     }
 
     #[tokio::test]

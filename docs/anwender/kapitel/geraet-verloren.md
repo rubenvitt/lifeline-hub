@@ -10,7 +10,8 @@ quellen: [src/auth/session.rs, src/routes/benutzer.rs, src/routes/geraet.rs, fro
 Wer ein Gerät verliert, auf dem Lifeline Hub angemeldet war, meldet das **sofort** der
 Einsatzleitung oder der Administration der Organisation, auch wenn das Gerät gesperrt war. Die
 Person selbst, die Administration und die Einsatzleitung können die Anmeldung auf dem verlorenen
-Gerät beenden, jede auf ihrem Weg.
+Gerät beenden, jede auf ihrem Weg. War auf dem Gerät die Authenticator-App für den zweiten Faktor,
+setzt die Administration ihn zurück.
 
 ## Abläufe
 
@@ -30,8 +31,7 @@ Anmeldungen des Kontos (siehe [Profil und Sicherheit](profil-sicherheit.md)).
 Für die Administration:
 
 1. In der Verwaltung „Benutzer“ öffnen und die Person über „Name oder Benutzername“ suchen.
-2. In ihrer Zeile „Anmeldungen“ wählen. Auf schmalen Bildschirmen steht der Punkt im
-   Aktionsmenü der Zeile.
+2. Im Aktionsmenü ihrer Zeile „Anmeldungen“ wählen.
 3. Im Dialog „Anmeldungen · …“ beim verlorenen Gerät „Beenden“ wählen. „Alle beenden“ beendet
    jede Anmeldung der Person.
 
@@ -42,9 +42,24 @@ Für die Administration:
 Für die Administration:
 
 1. In der Verwaltung „Benutzer“ öffnen.
-2. In der Zeile der Person „Deaktivieren“ wählen; eine Rückfrage gibt es nicht. Auf schmalen
-   Bildschirmen steht der Punkt im Aktionsmenü der Zeile.
-3. Sobald die Person wieder ein sicheres Gerät hat, an derselben Stelle „Reaktivieren“ wählen.
+2. Im Aktionsmenü der Zeile der Person „Deaktivieren“ wählen; eine Rückfrage gibt es nicht.
+3. Sobald die Person wieder ein sicheres Gerät hat, im selben Menü „Reaktivieren“ wählen.
+
+### Zweiten Faktor zurücksetzen
+
+Für die Administration, wenn mit dem Gerät die Authenticator-App verloren ist und die Person keinen
+Wiederherstellungscode mehr hat:
+
+1. In der Verwaltung „Benutzer“ öffnen und die Person über „Name oder Benutzername“ suchen.
+2. Im Aktionsmenü ihrer Zeile „Zweiten Faktor zurücksetzen …“ wählen. Der Eintrag steht nur bei
+   Personen, die einen zweiten Faktor eingerichtet haben.
+3. Die Rückfrage „Zweiten Faktor von … zurücksetzen?“ mit „Zweiten Faktor zurücksetzen“
+   bestätigen.
+
+   ![Rückfrage „Zweiten Faktor von Erik Beispiel zurücksetzen?“ mit den Folgen und dem roten Knopf „Zweiten Faktor zurücksetzen“](../bilder/geraet-verloren/zweiten-faktor-zuruecksetzen.png)
+
+4. Der Person Bescheid geben: Sie meldet sich mit dem Passwort an und richtet im Profil einen neuen
+   zweiten Faktor ein (siehe [Profil und Sicherheit](profil-sicherheit.md)).
 
 ### Gekoppeltes Gerät widerrufen
 
@@ -71,6 +86,11 @@ schreiben. Das ist das größere Risiko; die vorgehaltenen Daten auf dem Gerät 
   wurde, bleibt angemeldet.
 - **Person deaktivieren** beendet sofort jede Anmeldung der Person auf allen Geräten.
   „Reaktivieren“ lässt Passwort und zweiten Faktor unverändert.
+- **Zweiten Faktor zurücksetzen** beendet sofort jede Anmeldung der Person und löscht den
+  Schlüssel der Authenticator-App samt allen Wiederherstellungscodes. Bis zur neuen Einrichtung
+  genügt das Passwort. Rückgängig machen lässt sich das nicht; die alte App erzeugt danach nur
+  noch ungültige Codes. Der Server hält das Zurücksetzen in der Admin-Spur fest
+  („Zugangsprotokoll“ der Verwaltung).
 - **Gekoppeltes Gerät widerrufen**: Das Gerät verliert sofort jeden Zugriff, seine Einträge
   bleiben. Das Einsatztagebuch hält den Widerruf fest.
 

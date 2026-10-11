@@ -378,7 +378,10 @@ pub async fn status_wechsel(
     let text = match body.status.as_str() {
         "abgeschlossen" => format!(
             "Tier {r}: abgeschlossen ({})",
-            grund.as_deref().unwrap_or("")
+            grund
+                .as_deref()
+                .and_then(AbschlussGrund::parse)
+                .map_or("", |g| g.etb_label())
         ),
         "aktiv" if vorher.status == TierStatus::Vermisst => {
             format!("Tier {r}: vermisst → aktiv (aufgefunden)")

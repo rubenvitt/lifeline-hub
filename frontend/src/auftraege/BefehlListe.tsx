@@ -168,7 +168,7 @@ export default function BefehlListe({
         standardSortierung={{ spalte: 'fassung', richtung: 'ab' }}
         gruppen={{
           schluessel: (b) => b.status,
-          etikett: (w) => (w === 'entwurf' ? 'Entwürfe' : 'Freigegeben'),
+          etikett: (w, n) => (w === 'entwurf' ? (n === 1 ? 'Entwurf' : 'Entwürfe') : 'Freigegeben'),
           reihenfolge: ['entwurf', 'freigegeben'],
           // Die Gruppenköpfe stehen unter dem `Bereichskopf` (`ueberschrift="h3"` oben).
           unterEbene: 3,

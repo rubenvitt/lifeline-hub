@@ -109,7 +109,7 @@ describe('ModulEinstellungsListe', () => {
     );
 
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).not.toBeChecked();
-    expect(screen.getByTitle('Führungskraft')).toBeInTheDocument();
+    expect(screen.getByTitle('Führungskraft der Organisation')).toBeInTheDocument();
   });
 });
 
@@ -149,17 +149,17 @@ describe('ModulEinstellungsListe · Zeilenzustand (LFH-345)', () => {
 describe('modulRasterSpalten (LFH-474)', () => {
   it('gibt der Rollen-Spalte eine feste Spur statt `auto`, die mit der Schrift wächst', () => {
     expect(modulRasterSpalten({ mitSichtbar: true, fontSize: 13.5 })).toBe(
-      'minmax(0, 1fr) auto 162px',
+      'minmax(0, 1fr) auto 243px',
     );
     expect(modulRasterSpalten({ mitSichtbar: true, fontSize: 15 })).toBe(
-      'minmax(0, 1fr) auto 180px',
+      'minmax(0, 1fr) auto 270px',
     );
   });
 
   // Ohne Schalter hat die Zeile zwei Kinder: bei drei Spuren fiele der Auswähler in die
   // `auto`-Spur des Schalters, und die feste Spur stünde leer daneben.
   it('legt ohne Sichtbar-Spalte genau zwei Spuren an', () => {
-    expect(modulRasterSpalten({ mitSichtbar: false, fontSize: 13.5 })).toBe('minmax(0, 1fr) 162px');
+    expect(modulRasterSpalten({ mitSichtbar: false, fontSize: 13.5 })).toBe('minmax(0, 1fr) 243px');
   });
 
   it('rendert Kopf und Zeilen mit derselben Spurvorschrift', () => {

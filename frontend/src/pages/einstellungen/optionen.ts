@@ -1,4 +1,9 @@
-import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/types';
+import type {
+  BenoetigteRolle,
+  EinheitenSystem,
+  Koordinatenformat,
+  Zeitformat,
+} from '../../api/types';
 
 /**
  * Auswahllisten der Einstellungsseiten. Der Platzhalter der Selects bleibt an der Aufrufstelle und
@@ -7,12 +12,23 @@ import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/t
  * Labels für den Palettenkontext.
  */
 
-/** Benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
-export const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
+/**
+ * Benötigte Rolle eines Moduls, von offen nach eng; '' = frei (für alle sichtbaren). „Führung im
+ * Einsatz“ zählt die Rolle im Einsatz mit, „Führungskraft der Organisation“ nur die Org-Rolle
+ * (Spec `modul-freigabe`, LFH-1150).
+ */
+export const ROLLEN_OPTIONEN: { value: BenoetigteRolle | ''; label: string }[] = [
   { value: '', label: 'Frei (alle)' },
-  { value: 'fuehrungskraft', label: 'Führungskraft' },
+  { value: 'einsatzfuehrung', label: 'Führung im Einsatz' },
+  { value: 'fuehrungskraft', label: 'Führungskraft der Organisation' },
   { value: 'admin', label: 'Admin' },
 ];
+
+/** Der Name einer gesetzten Stufe aus `ROLLEN_OPTIONEN`; `undefined` für frei oder unbekannt. */
+export function rollenName(rolle: string | null | undefined): string | undefined {
+  if (!rolle) return undefined;
+  return ROLLEN_OPTIONEN.find((o) => o.value === rolle)?.label;
+}
 
 /** Kuratierte IANA-Zeitzonen; Freitext bleibt über die `AutoComplete` möglich. */
 export const ZEITZONEN_OPTIONEN = [

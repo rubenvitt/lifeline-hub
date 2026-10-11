@@ -177,6 +177,7 @@ async fn nicht_mitglied_wird_abgewiesen() {
         "anzeigename": "gast", "benutzername": "gast", "passwort": "gastpw12", "org_rolle": "keine"
     })).await;
     assert_eq!(s, StatusCode::CREATED);
+    common::zwang_aufheben("gast").await;
     let gast = login_cookie(&app, "gast", "gastpw12").await;
     let (s, _v) = get(
         &app,

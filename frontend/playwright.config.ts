@@ -51,7 +51,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
  */
 const DRUCK_SPECS =
-  /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck|dokument-anlage-druck|hilfe-druck)\.spec\.ts$/;
+  /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck|dokument-anlage-druck|hilfe-druck|einsatzbericht-deckel-druck)\.spec\.ts$/;
 
 /*
  * ANTEILE NACH LAUFZEIT (LFH-1117): `PW_SHARD=k/n` wählt die Spec-Dateien des Anteils k, verteilt

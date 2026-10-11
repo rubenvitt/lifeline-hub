@@ -133,10 +133,11 @@ export const STATUS_WORT: Record<KopplungStatus, string> = {
   widerrufen: 'widerrufen',
 };
 
-/** Ob die Einsatzleitung an der Kopplung noch etwas tun kann. Eine abgelaufene lässt sich
- *  verlängern und neu ausstellen, eine widerrufene nicht. */
+/** Ob die Einsatzleitung an der Kopplung nichts mehr tun kann. Eine abgelaufene ist so zu Ende
+ *  wie eine widerrufene: der Server lehnt Verlängern und neuen Code für beide ab
+ *  (`fordere_offen` in `src/geraet/repo.rs`, LFH-1143); für das Gerät gibt es eine neue Kopplung. */
 export function istBeendet(k: Pick<KopplungAnzeige, 'status'>): boolean {
-  return k.status === 'widerrufen';
+  return k.status === 'widerrufen' || k.status === 'abgelaufen';
 }
 
 /** Gesperrte Module der Ansicht, als kurze Zeile für die Kopplungsmaske; `null` ohne Sperre. */
@@ -150,7 +151,7 @@ export function sperrSatz(
   if (module.length === 0) return null;
   const namen = module.map(modulName).join(', ');
   const fehlt = module.length === 1 ? 'fehlt' : 'fehlen';
-  return `${namen} für einfache Mitglieder gesperrt – ${fehlt} auf dem ${ANSICHT_LABEL[ansicht]}`;
+  return `${namen} für gekoppelte Geräte gesperrt – ${fehlt} auf dem ${ANSICHT_LABEL[ansicht]}`;
 }
 
 /** Code in Vierergruppen („ABCD-1234"), wie er sich vorlesen lässt. */

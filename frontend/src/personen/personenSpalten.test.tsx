@@ -147,6 +147,14 @@ describe('personenSpalten — Registerform (Neuentwurf S7)', () => {
     expect(spalte('seit')[0].zahl).toBe(true);
   });
 
+  it('bricht die Nr. nie um, auch nicht in der Handschuh-Dichte (LFH-1151)', () => {
+    // „R-“ / „001“ auf zwei Zeilen las sich am Gerät wie zwei Angaben. Ohne Umbruch wächst die
+    // Spalte im `auto`-Layout der Fließtabelle über ihre 84 px hinaus.
+    const reg = spalte('reg')[0];
+    render(<>{reg.render!(undefined, basis, 0)}</>);
+    expect(screen.getByText('R-001')).toHaveStyle({ whiteSpace: 'nowrap' });
+  });
+
   it('lässt den Namen zur Suche beitragen, ohne „unbekannt" als Namen zu führen', () => {
     const person = spalte('person')[0];
     expect(person.suchText!(basis)).toBe('Mustermann, Max');

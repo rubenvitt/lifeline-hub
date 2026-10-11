@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/effektiv.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -54,9 +54,9 @@ Für die Einsatzleitung:
 1. Den Reiter „Module“ öffnen.
 2. Unter „Modul filtern“ einen Teil des Modulnamens eintippen.
 3. In der Zeile des Moduls „Sichtbar“ ausschalten, um es auszublenden, oder unter „Benötigte
-   Rolle“ „Führungskraft“ oder „Admin“ wählen.
+   Rolle“ „Führung im Einsatz“, „Führungskraft der Organisation“ oder „Admin“ wählen.
 
-   ![Liste „Modul-Sichtbarkeit & Berechtigungen“, gefiltert auf „Lage“: Lageberichte ausgeblendet, Lagemeldungen nur für Führungskräfte](../bilder/einsatz-einstellungen/module.png)
+   ![Liste „Modul-Sichtbarkeit & Berechtigungen“, gefiltert auf „Lage“: Lageberichte ausgeblendet, Lagemeldungen nur für die Führung im Einsatz](../bilder/einsatz-einstellungen/module.png)
 
 Jede Änderung gilt sofort, ohne „Speichern“. Die App meldet „Modul-Einstellung gespeichert“.
 
@@ -90,9 +90,14 @@ was ins Einsatztagebuch gehört, trägt dann jemand selbst ein.
 
 - **Ausgeblendet** fehlt ein Modul in der Navigation aller Personen und ist für sie gesperrt.
   Nur System-Admins erreichen es noch über seine Adresse; in ihrer Navigation fehlt es ebenso.
-- **„Führungskraft“** lässt nur Führungskräfte der Organisation und System-Admins in das Modul.
-  Gemeint ist die Rolle in der Organisation, nicht die im Einsatz: Einsatzleitung und
-  Führungspersonal ohne diese Organisationsrolle bleiben draußen.
+- **„Führung im Einsatz“** lässt die Einsatzleitung, das Führungspersonal, Führungskräfte der
+  Organisation und System-Admins in das Modul. Beobachter bleiben draußen, ebenso gekoppelte
+  Geräte: ein Gerät arbeitet an einer Stelle und zählt nicht als Führung. Wer als Einsatzleitung
+  ein Modul der Führung vorbehalten will, wählt diese Stufe; damit sperrt sie sich nicht selbst
+  aus.
+- **„Führungskraft der Organisation“** lässt nur Führungskräfte der Organisation und
+  System-Admins in das Modul. Gemeint ist die Rolle in der Organisation, nicht die im Einsatz:
+  Einsatzleitung und Führungspersonal ohne diese Organisationsrolle bleiben draußen.
 - **„Admin“** lässt nur System-Admins in das Modul.
 - **„Frei (alle)“** schränkt nichts ein; es gelten die Rollen im Einsatz.
 

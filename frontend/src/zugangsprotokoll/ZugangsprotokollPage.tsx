@@ -10,7 +10,13 @@ import {
 import { AutoComplete, Button, Space, theme } from 'antd';
 import { listeBenutzer } from '../api/benutzer';
 import { globalKeys, type ZugangsprotokollSpur } from '../api/queryKeys';
-import type { AdminAktion, AnmeldeEintrag, AnmeldeEreignis, Zugangsaenderung } from '../api/types';
+import type {
+  AdminAktion,
+  AnmeldeEintrag,
+  AnmeldeEreignis,
+  ZugangsAngaben,
+  Zugangsaenderung,
+} from '../api/types';
 import {
   ladeAnmeldungen,
   ladeZugangsaenderungen,
@@ -36,6 +42,7 @@ import {
   anmeldewegText,
   istAktion,
   istEreignis,
+  rollenText,
 } from './zugangsprotokollText';
 
 /**
@@ -142,6 +149,22 @@ const ANMELDE_KARTE: Kartenplan<AnmeldeEintrag, (typeof anmeldeSpalten)[number][
   sekundaer: ['ereignis', 'konto', 'quelle'],
 };
 
+/**
+ * Detail einer Zugangsänderung aus ihren Angaben (LFH-1152): Rollen wie im Benutzer-Dialog, die
+ * Anmeldezeit einer beendeten Sitzung wie die Spalte „Zeitpunkt“. Einträge von vorher tragen
+ * statt Angaben ihren Text.
+ */
+function AngabenAnzeige({ angaben }: { angaben: ZugangsAngaben }) {
+  const rollen = rollenText(angaben);
+  if (angaben.angemeldet_at == null) return <>{rollen ?? leer}</>;
+  return (
+    <>
+      {angaben.geraet ?? 'unbekanntes Gerät'}, angemeldet{' '}
+      <ZeitAnzeige wert={angaben.angemeldet_at} />
+    </>
+  );
+}
+
 const aenderungsSpalten = spaltenFuer<Zugangsaenderung>()([
   {
     key: 'zeitpunkt',
@@ -175,7 +198,7 @@ const aenderungsSpalten = spaltenFuer<Zugangsaenderung>()([
     key: 'detail',
     title: 'Detail',
     mindestBreite: 200,
-    render: (_, e) => e.detail ?? leer,
+    render: (_, e) => (e.angaben ? <AngabenAnzeige angaben={e.angaben} /> : (e.detail ?? leer)),
   },
   {
     key: 'quelle',

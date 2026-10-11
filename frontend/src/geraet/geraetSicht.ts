@@ -24,7 +24,7 @@ export type GeraetFaehigkeit =
   | 'person-zuordnungen'
   /** Fotos und Dateien einer Person. */
   | 'person-anhaenge'
-  /** Bereitstellungsraum wechseln, anlegen, auflösen, stornieren (LFH-1042). */
+  /** Bereitstellungsraum wechseln, anlegen, bearbeiten, auflösen, stornieren (LFH-1042, LFH-1147). */
   | 'br-verwalten'
   /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044). */
   | 'verpflegung-planen'

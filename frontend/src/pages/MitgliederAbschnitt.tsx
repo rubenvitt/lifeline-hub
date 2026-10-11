@@ -3,9 +3,9 @@ import { Select } from '../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
-import { ApiError } from '../api/client';
 import {
   entferneMitglied,
+  ladeMitgliedAuswahl,
   ladeMitglieder,
   setzeMitglied,
   type FuehrungsstelleUpdate,
@@ -13,8 +13,7 @@ import {
 import { EinWertAuswahl, letzterWert } from '../fuehrung/EinWertAuswahl';
 import { dekodiere, kodiere } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
-import { listeBenutzer } from '../api/benutzer';
-import { einsatzKeys, globalKeys } from '../api/queryKeys';
+import { einsatzKeys } from '../api/queryKeys';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { useViewport } from '../components/useViewport';
 import Datenstand from '../components/Datenstand';
@@ -179,23 +178,42 @@ export default function MitgliederAbschnitt({
     queryKey: einsatzKeys.mitglieder(einsatzId),
     queryFn: () => ladeMitglieder(einsatzId),
   });
-  const benutzerQuery = useQuery({
-    queryKey: globalKeys.benutzer(),
-    queryFn: listeBenutzer,
+  /*
+   * Die Auswahl kommt vom Einsatz, nicht aus der Benutzerverwaltung (LFH-1141, Spec
+   * `einsatz-zugriff`): dieselbe Tür wie das Aufnehmen, also auch für eine Einsatzleitung ohne
+   * Systemrolle, und nur Personen der Organisation des Einsatzes.
+   */
+  const auswahlQuery = useQuery({
+    queryKey: einsatzKeys.mitgliedAuswahl(einsatzId),
+    queryFn: () => ladeMitgliedAuswahl(einsatzId),
     enabled: darfVerwalten,
   });
+  /*
+   * Wer aufgenommen ist, fällt aus der Auswahl; wer entfernt ist, kommt zurück. Ein bloßer
+   * Rollenwechsel ändert die Menge nicht, und nach der eigenen Herabstufung oder Entfernung
+   * fehlt das Recht: dort liefe der Abruf in ein 403.
+   */
+  const auswahlNeuLaden = () =>
+    void qc.invalidateQueries({ queryKey: einsatzKeys.mitgliedAuswahl(einsatzId) });
 
   const setzen = useMutation({
     mutationFn: (v: { benutzerId: number; rolle: EinsatzRolle }) =>
       setzeMitglied(einsatzId, v.benutzerId, v.rolle),
-    onSuccess: (liste) => {
+    onSuccess: (liste, v) => {
+      const warMitglied = qc
+        .getQueryData<MitgliedAnzeige[]>(einsatzKeys.mitglieder(einsatzId))
+        ?.some((m) => m.benutzer_id === v.benutzerId);
       qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste);
       setNeuerBenutzer(undefined);
+      if (!warMitglied) auswahlNeuLaden();
     },
   });
   const entfernen = useMutation({
     mutationFn: (benutzerId: number) => entferneMitglied(einsatzId, benutzerId),
-    onSuccess: (liste) => qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste),
+    onSuccess: (liste, benutzerId) => {
+      qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste);
+      if (benutzerId !== ich?.id) auswahlNeuLaden();
+    },
   });
   /*
    * Kein `onError`-Toast (LFH-966, `frontend/AGENTS.md`, „Speicherfehler an die Seite“): der
@@ -231,8 +249,9 @@ export default function MitgliederAbschnitt({
     if (eigeneHerabstufung) setHerabstufung({ benutzerId: m.benutzer_id, rolle });
     else rolleSetzen({ benutzerId: m.benutzer_id, rolle });
   };
+  // Der Server lässt Mitglieder schon weg; der Filter deckt den Moment bis zum Neuladen.
   const mitgliedIds = new Set(mitglieder.map((m) => m.benutzer_id));
-  const verfuegbar = (benutzerQuery.data ?? []).filter((b) => b.aktiv && !mitgliedIds.has(b.id));
+  const verfuegbar = (auswahlQuery.data ?? []).filter((p) => !mitgliedIds.has(p.benutzer_id));
 
   const fuehrungsstelle = (m: MitgliedAnzeige) =>
     darfFuehrungsstelleVerwalten ? (
@@ -379,15 +398,18 @@ export default function MitgliederAbschnitt({
         <Space style={{ padding: token.padding }} wrap>
           <Select
             placeholder="Benutzer …"
+            aria-label="Person zum Aufnehmen"
             style={{ width: 200 }}
             value={neuerBenutzer}
-            options={verfuegbar.map((b) => ({ value: b.id, label: b.anzeigename }))}
+            options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}
             onChange={(v) => setNeuerBenutzer(v)}
+            // „Keine weitere Person“ nur, wenn wirklich niemand übrig ist; eine Suche ohne Treffer
+            // behält den Leerhinweis von antd.
             notFoundContent={
-              benutzerQuery.error instanceof ApiError && benutzerQuery.error.status === 403
-                ? 'Benutzerliste nur für Admins'
-                : benutzerQuery.isError
-                  ? 'Benutzerliste nicht verfügbar'
+              auswahlQuery.isError
+                ? 'Personenauswahl nicht verfügbar'
+                : auswahlQuery.isSuccess && verfuegbar.length === 0
+                  ? 'Keine weitere Person der Organisation'
                   : undefined
             }
           />

@@ -226,7 +226,14 @@ export default function PersonenPage() {
     setQuittungNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: quittung }));
   };
   /** `null` = kein Abgleich-Dialog offen. Trägt die vermisste Person, zu der gesucht wird. */
-  const [abgleichFuer, setAbgleichFuer] = useState<Person | null>(null);
+  // Am Einsatz festgemacht wie die Listenzugriffe: ein Wechsel schließt den Dialog samt Grund, statt
+  // ihn mit der Person des alten Einsatzes im neuen stehen zu lassen (LFH-1138).
+  const [abgleichDialog, setAbgleichDialog] = useState<{
+    einsatzId: number;
+    person: Person;
+    fehler: unknown;
+  } | null>(null);
+  const abgleichFuer = abgleichDialog?.einsatzId === einsatzId ? abgleichDialog.person : null;
   /*
    * Ablehnungen stehen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
    * Die Anlage teilt sich Maske und Zeile, der Abgleich-Vorschlag Spalte und Dialog; jeder Weg
@@ -237,12 +244,12 @@ export default function PersonenPage() {
     null,
   );
   const abgleichZeilen = useZeilenFehler<number>();
-  const [abgleichDialogFehler, setAbgleichDialogFehler] = useState<unknown>(null);
+  const abgleichDialogFehler = abgleichFuer ? abgleichDialog?.fehler : null;
+  const setzeAbgleichDialogFehler = (zielEinsatzId: number, fehler: unknown) =>
+    setAbgleichDialog((alt) =>
+      alt?.einsatzId === zielEinsatzId && alt.fehler !== fehler ? { ...alt, fehler } : alt,
+    );
 
-  function invalidate() {
-    qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-  }
   const anlegenMutation = useMutation({
     // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
     // (LFH-705, design.md D6).
@@ -530,22 +537,33 @@ export default function PersonenPage() {
   const csvExport = useCsvExport(einsatzId, 'personen', ladePersonenExport);
 
   const abgleichVorschlagMutation = useMutation({
-    mutationFn: (v: { vermisstId: number; gefundenId: number; quelle: 'zeile' | 'dialog' }) =>
-      schlageAbgleichVor(einsatzId, v.vermisstId, v.gefundenId),
+    mutationFn: (v: {
+      einsatzId: number;
+      vermisstId: number;
+      gefundenId: number;
+      quelle: 'zeile' | 'dialog';
+    }) => schlageAbgleichVor(v.einsatzId, v.vermisstId, v.gefundenId),
     onMutate: (v) => {
       if (v.quelle === 'zeile') abgleichZeilen.beginne(v.vermisstId);
-      else setAbgleichDialogFehler(null);
+      else setzeAbgleichDialogFehler(v.einsatzId, null);
     },
     // Der Dialog schließt erst hier (design.md D3), und nur auf seinen eigenen Vorschlag: ein
     // Zeilenvorschlag, der während des offenen Dialogs ankommt, schlösse ihn sonst mit.
     onSuccess: (_abgleich, v) => {
-      invalidate();
-      if (v.quelle === 'dialog') setAbgleichFuer(null);
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(v.einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(v.einsatzId) });
+      if (v.quelle === 'dialog')
+        setAbgleichDialog((alt) => (alt?.einsatzId === v.einsatzId ? null : alt));
+      // Eine Antwort nach dem Einsatzwechsel quittiert im neuen nicht (LFH-1138).
+      if (v.einsatzId !== quittungKontextRef.current.einsatzId) return;
       message.success('Verdachts-Abgleich angelegt');
     },
     onError: (e, v) => {
+      // Der Wechsel hat die Gründe geräumt; ein später Grund des alten Einsatzes stünde sonst im
+      // Seitenhinweis des neuen (LFH-1138, `frontend/AGENTS.md`, „Rückwege und Fehler“).
+      if (v.einsatzId !== quittungKontextRef.current.einsatzId) return;
       if (v.quelle === 'zeile') abgleichZeilen.melde(v.vermisstId, e, 'Vorschlagen fehlgeschlagen');
-      else setAbgleichDialogFehler(e);
+      else setzeAbgleichDialogFehler(v.einsatzId, e);
     },
   });
   const abgleichVorschlagen = abgleichVorschlagMutation.mutate;
@@ -556,10 +574,10 @@ export default function PersonenPage() {
     leereAbgleichZeilen();
   }, [einsatzId, leereAbgleichZeilen]);
   /** Öffnen und Abbrechen räumen den Grund einer früheren Ablehnung im Dialog. */
-  const oeffneAbgleich = useCallback((p: Person | null) => {
-    setAbgleichDialogFehler(null);
-    setAbgleichFuer(p);
-  }, []);
+  const oeffneAbgleich = useCallback(
+    (p: Person | null) => setAbgleichDialog(p ? { einsatzId, person: p, fehler: null } : null),
+    [einsatzId],
+  );
 
   /**
    * Spalten und Kartenplan GEMERKT (LFH-949, D4): `Datensicht` rendert eine Zelle nur bei
@@ -592,11 +610,11 @@ export default function PersonenPage() {
         ...register,
         ...(darfAbgleichenListe
           ? abgleichSpalten(gefundeneListe, (vermisstId, gefundenId) =>
-              abgleichVorschlagen({ vermisstId, gefundenId, quelle: 'zeile' }),
+              abgleichVorschlagen({ einsatzId, vermisstId, gefundenId, quelle: 'zeile' }),
             )
           : []),
       ]),
-    [register, darfAbgleichenListe, gefundeneListe, abgleichVorschlagen],
+    [register, darfAbgleichenListe, gefundeneListe, abgleichVorschlagen, einsatzId],
   );
   const rasterKarte = useMemo(() => personenKarte(einsatzId), [einsatzId]);
   const listenKarte = useMemo(
@@ -970,13 +988,15 @@ export default function PersonenPage() {
         gefundene={gefundene}
         isPending={
           abgleichVorschlagMutation.isPending &&
-          abgleichVorschlagMutation.variables?.quelle === 'dialog'
+          abgleichVorschlagMutation.variables?.quelle === 'dialog' &&
+          abgleichVorschlagMutation.variables.einsatzId === einsatzId
         }
         fehler={abgleichDialogFehler}
         onCancel={() => oeffneAbgleich(null)}
         onFinish={(gefundenId) =>
           abgleichFuer &&
           abgleichVorschlagMutation.mutate({
+            einsatzId,
             vermisstId: abgleichFuer.id,
             gefundenId,
             quelle: 'dialog',

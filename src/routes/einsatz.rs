@@ -7,7 +7,7 @@ use crate::einsatz::kontext::{
 };
 use crate::einsatz::{
     einstellungen, modul, modul_override, repo, EinsatzAnzeige, EinsatzRolle, Einsatzart,
-    MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
+    MitgliedAnzeige, MitgliedAuswahl, EINSATZ_ROLLE_LEITUNG,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -735,6 +735,7 @@ pub async fn modul_freigaben_laden(
         ctx.einsatz.id,
         ctx.einsatz.org_id,
         &ctx.benutzer,
+        ctx.modul_rolle(),
     )
     .await?;
     crate::geraet::verenge_freigaben(ctx.geraet.as_ref(), &mut freigaben);
@@ -744,7 +745,7 @@ pub async fn modul_freigaben_laden(
 #[derive(Debug, Deserialize)]
 pub struct ModulOverrideUpdate {
     pub sichtbar: bool,
-    /// 'admin' | 'fuehrungskraft' | null (= frei).
+    /// 'admin' | 'fuehrungskraft' | 'einsatzfuehrung' | null (= frei); Spec `modul-freigabe`.
     pub benoetigte_rolle: Option<String>,
 }
 
@@ -817,6 +818,19 @@ pub async fn mitglieder(
 ) -> Result<Json<Vec<MitgliedAnzeige>>, AppError> {
     let id = ctx.einsatz.id;
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
+}
+
+/// GET /api/einsaetze/{id}/mitglieder/auswahl — die Personen, die die Einsatzleitung aufnehmen
+/// kann (LFH-1141, Spec `einsatz-zugriff`). Dieselbe Tür wie [`mitglied_setzen`]: wer die Liste
+/// sieht, kann aus ihr aufnehmen, auch ohne Systemrolle; die Benutzerverwaltung bleibt admin-only.
+/// Gekoppelte Geräte erreichen die Route nicht (Positivliste in `src/geraet/mod.rs`).
+pub async fn mitglied_auswahl(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+) -> Result<Json<Vec<MitgliedAuswahl>>, AppError> {
+    Ok(Json(
+        repo::mitglied_auswahl(&state.pool, ctx.einsatz.id).await?,
+    ))
 }
 
 /// PUT /api/einsaetze/{id}/mitglieder/{benutzer_id} — Mitglied hinzufügen oder

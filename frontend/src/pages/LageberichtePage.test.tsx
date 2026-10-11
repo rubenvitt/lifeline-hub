@@ -786,10 +786,12 @@ describe('LageberichtePage', () => {
 
     // Gruppenköpfe mit Zähler, Entwürfe zuerst; die Zählerform (Zahl vor Wort) gehört dem
     // Primitiv (`gruppenZahl`).
-    expect(sicht).toHaveTextContent(/1\s*Entwürfe/);
+    // Einzahl bei einem (LFH-1153): „1 Entwürfe“ war falsch.
+    expect(sicht).toHaveTextContent(/1\s*Entwurf(?!e)/);
+    expect(sicht).not.toHaveTextContent(/Entwürfe/);
     expect(sicht).toHaveTextContent(/1\s*Freigegeben/);
     const text = sicht.textContent ?? '';
-    expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
+    expect(text.indexOf('Entwurf')).toBeLessThan(text.indexOf('Freigegeben'));
 
     // Gruppenachse führend; der freigegebene Kopf 14 steht in seiner Gruppe.
     expect(

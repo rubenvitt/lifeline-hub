@@ -44,29 +44,49 @@ function renderKarte(ui: React.ReactElement, einsatzId = 7) {
 }
 
 describe('ErinnerungKarte — Bezug-Deeplink (F36/LFH-257)', () => {
+  // Der Text nennt die laufende Nummer, der Link selektiert über die DB-id (LFH-1146).
   it('verlinkt einen Auftrags-Bezug mit ?auftrag=<id>-Selektion', () => {
     renderKarte(
-      <ErinnerungKarte erinnerung={erinnerung({ bezug_typ: 'auftrag', bezug_id: 42 })} />,
+      <ErinnerungKarte
+        erinnerung={erinnerung({ bezug_typ: 'auftrag', bezug_id: 42, bezug_lfd_nr: 3 })}
+      />,
     );
-    const link = screen.getByRole('link', { name: /Auftrag #42/ });
+    const link = screen.getByRole('link', { name: '↗ Auftrag #3' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/auftraege?auftrag=42');
   });
 
   it('verlinkt einen Meldungs-Bezug mit ?meldung=<id>-Selektion', () => {
-    renderKarte(<ErinnerungKarte erinnerung={erinnerung({ bezug_typ: 'meldung', bezug_id: 5 })} />);
-    const link = screen.getByRole('link', { name: /Meldung #5/ });
+    renderKarte(
+      <ErinnerungKarte
+        erinnerung={erinnerung({ bezug_typ: 'meldung', bezug_id: 5, bezug_lfd_nr: 2 })}
+      />,
+    );
+    const link = screen.getByRole('link', { name: '↗ Meldung #2' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/meldungen?meldung=5');
   });
 
   it('verlinkt einen ETB-Bezug mit ?eintrag=<id>-Selektion', () => {
-    renderKarte(<ErinnerungKarte erinnerung={erinnerung({ bezug_typ: 'etb', bezug_id: 9 })} />);
-    const link = screen.getByRole('link', { name: /ETB-Eintrag #9/ });
+    renderKarte(
+      <ErinnerungKarte
+        erinnerung={erinnerung({ bezug_typ: 'etb', bezug_id: 9, bezug_lfd_nr: 4 })}
+      />,
+    );
+    const link = screen.getByRole('link', { name: '↗ ETB-Eintrag #4' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/etb?eintrag=9');
+  });
+
+  it('nennt ohne laufende Nummer keine Datenbank-ID (LFH-1146)', () => {
+    renderKarte(
+      <ErinnerungKarte erinnerung={erinnerung({ bezug_typ: 'abloesung', bezug_id: 11 })} />,
+    );
+    const link = screen.getByRole('link', { name: '↗ Ablösung' });
+    expect(link).toHaveAttribute('href', '/einsaetze/7/abloesung');
+    expect(screen.queryByText(/#11/)).toBeNull();
   });
 
   it('rendert unbekannte Bezugstypen als Tag ohne Link', () => {
     renderKarte(<ErinnerungKarte erinnerung={erinnerung({ bezug_typ: 'person', bezug_id: 3 })} />);
-    expect(screen.getByText(/person #3/i)).toBeInTheDocument();
+    expect(screen.getByText('↗ person')).toBeInTheDocument();
     expect(screen.queryByRole('link')).toBeNull();
   });
 

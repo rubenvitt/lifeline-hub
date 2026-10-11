@@ -42,13 +42,15 @@ export function modulZeilenStil(token: {
  * LFH-369). Fest statt `minmax(…, auto)`: jede Zeile ist ein eigenes Raster, und nur eine feste
  * Spur hält die Rollen-Spalte über alle Zeilen und den Kopf bündig; der Hinweis darunter bricht um.
  *
- * Die Breite folgt der Grundschrift der Dichte (zwölf Schriftgrade: 162 px bei 13,5, 180 px bei
- * 15), damit die längste Option in jeder Stufe samt Pfeil lesbar steht. Ohne Sichtbar-Spalte hat
+ * Die Breite folgt der Grundschrift der Dichte (18 Schriftgrade: 243 px bei 13,5, 270 px bei 15),
+ * damit die längste Option in jeder Stufe samt Pfeil lesbar steht: „Führungskraft der
+ * Organisation“ misst in Archivo 186 bzw. 207 px, der Auswähler braucht rund 42 px für Innenabstand,
+ * Pfeil und Rand (LFH-1150; vorher zwölf Grade für „Führungskraft“). Ohne Sichtbar-Spalte hat
  * die Zeile zwei Kinder und bekommt genau zwei Spuren — sonst fiele der Auswähler in die
  * `auto`-Spur des Schalters.
  */
 export function modulRasterSpalten(vorgabe: { mitSichtbar: boolean; fontSize: number }): string {
-  const rollenSpur = `${Math.round(vorgabe.fontSize * 12)}px`;
+  const rollenSpur = `${Math.round(vorgabe.fontSize * 18)}px`;
   return vorgabe.mitSichtbar ? `minmax(0, 1fr) auto ${rollenSpur}` : `minmax(0, 1fr) ${rollenSpur}`;
 }
 

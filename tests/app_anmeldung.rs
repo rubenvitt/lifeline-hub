@@ -176,6 +176,28 @@ async fn passender_verifier_ergibt_eigene_sitzung_und_browsersitzung_bleibt() {
     );
 }
 
+/// Die Sitzung der Mac-App merkt sich ihren Weg: ihre Abmeldung nennt `systembrowser`, nicht
+/// `passwort` (LFH-1152).
+#[tokio::test]
+async fn abmeldung_der_mac_app_nennt_den_systembrowser() {
+    let (_reihe, app, pool) = aufbau().await;
+    let browser = login_cookie(&app, "admin", "startpw12").await;
+    let code = code_ausstellen(&app, &browser, CHALLENGE).await;
+    let app_cookie = einloesen(&app, &code, VERIFIER)
+        .await
+        .set_cookie
+        .expect("Sitzungs-Cookie");
+
+    let (status, _) = anfrage(&app, "POST", "/api/auth/logout", &app_cookie, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let spur = audit(&pool).await;
+    let (ereignis, _, weg) = spur.last().unwrap();
+    assert_eq!(
+        (ereignis.as_str(), weg.as_str()),
+        ("logout", "systembrowser")
+    );
+}
+
 #[tokio::test]
 async fn code_gilt_nur_einmal() {
     let (_reihe, app, _pool) = aufbau().await;

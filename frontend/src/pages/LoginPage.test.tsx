@@ -956,6 +956,148 @@ describe('LoginPage', () => {
     });
   });
 
+  /** LFH-1121: nach einem Einmalpasswort legt die Person erst ein eigenes Passwort fest. */
+  describe('Neues Passwort festlegen (LFH-1121)', () => {
+    const maxim = {
+      id: 7,
+      anzeigename: 'Maxim',
+      benutzername: 'maxim',
+      system_rolle: 'keiner',
+      org_rolle: 'keine',
+      aktiv: true,
+      erstellt_at: '2026-10-10 10:00:00',
+      totp_aktiviert: false,
+      passwort_gesetzt: true,
+    };
+
+    function zeige() {
+      let sitzung: typeof maxim | null = null;
+      const meAufrufe: string[] = [];
+      const festgelegt: unknown[] = [];
+      server.use(
+        http.get('/api/auth/me', () => {
+          meAufrufe.push(sitzung ? 'angemeldet' : 'anonym');
+          return sitzung
+            ? HttpResponse.json(sitzung)
+            : HttpResponse.json({ error: 'x' }, { status: 401 });
+        }),
+        http.get('/api/dev/users', () => HttpResponse.json([])),
+        http.get('/api/auth/providers', () => HttpResponse.json([])),
+        http.post('/api/auth/login', () =>
+          HttpResponse.json({ passwort_wechsel_erforderlich: true }),
+        ),
+        http.post('/api/auth/passwort/festlegen', async ({ request }) => {
+          festgelegt.push(await request.json());
+          sitzung = maxim;
+          return HttpResponse.json(maxim);
+        }),
+      );
+      renderMitProviders(
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/einsaetze" element={<div>Einsatzliste</div>} />
+        </Routes>,
+        { route: '/login' } as never,
+      );
+      return { festgelegt, meAufrufe };
+    }
+
+    async function mitEinmalpasswortAnmelden() {
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'maxim');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'kx7m-p4qr-9tzw');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+    }
+
+    it('zeigt nach dem Einmalpasswort die Stufe und meldet erst nach dem Festlegen an', async () => {
+      const { festgelegt } = zeige();
+      await mitEinmalpasswortAnmelden();
+
+      expect(await screen.findByText('Neues Passwort festlegen')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument();
+      expect(screen.queryByText('Einsatzliste')).not.toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText('Neues Passwort'), 'eigenes-passwort');
+      await userEvent.type(screen.getByLabelText('Neues Passwort wiederholen'), 'eigenes-passwort');
+      await userEvent.click(screen.getByRole('button', { name: 'Passwort festlegen' }));
+
+      expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
+      expect(festgelegt).toEqual([{ neues_passwort: 'eigenes-passwort' }]);
+    });
+
+    it('sendet nichts, solange die Wiederholung abweicht', async () => {
+      const { festgelegt } = zeige();
+      await mitEinmalpasswortAnmelden();
+
+      await userEvent.type(await screen.findByLabelText('Neues Passwort'), 'eigenes-passwort');
+      await userEvent.type(screen.getByLabelText('Neues Passwort wiederholen'), 'anderes-passwort');
+      await userEvent.click(screen.getByRole('button', { name: 'Passwort festlegen' }));
+
+      expect(
+        await screen.findByText('Die Wiederholung weicht vom neuen Passwort ab'),
+      ).toBeInTheDocument();
+      expect(festgelegt).toEqual([]);
+    });
+
+    it('zeigt die Ablehnung des Servers und bleibt in der Stufe', async () => {
+      zeige();
+      server.use(
+        http.post('/api/auth/passwort/festlegen', () =>
+          HttpResponse.json(
+            { error: 'Das neue Passwort muss sich vom bisherigen unterscheiden.' },
+            { status: 422 },
+          ),
+        ),
+      );
+      await mitEinmalpasswortAnmelden();
+
+      await userEvent.type(await screen.findByLabelText('Neues Passwort'), 'kx7m-p4qr-9tzw');
+      await userEvent.type(screen.getByLabelText('Neues Passwort wiederholen'), 'kx7m-p4qr-9tzw');
+      await userEvent.click(screen.getByRole('button', { name: 'Passwort festlegen' }));
+
+      expect(
+        await screen.findByText('Das neue Passwort muss sich vom bisherigen unterscheiden.'),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Neues Passwort')).toBeInTheDocument();
+    });
+
+    it('führt nach abgelaufenem Zwischenschritt zurück zur Anmeldung', async () => {
+      zeige();
+      server.use(
+        http.post('/api/auth/passwort/festlegen', () =>
+          HttpResponse.json({ error: 'Nicht angemeldet' }, { status: 401 }),
+        ),
+      );
+      await mitEinmalpasswortAnmelden();
+
+      await userEvent.type(await screen.findByLabelText('Neues Passwort'), 'eigenes-passwort');
+      await userEvent.type(screen.getByLabelText('Neues Passwort wiederholen'), 'eigenes-passwort');
+      await userEvent.click(screen.getByRole('button', { name: 'Passwort festlegen' }));
+
+      expect(
+        await screen.findByText('Die Anmeldung ist abgelaufen. Bitte erneut anmelden.'),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Passwort')).toBeInTheDocument();
+    });
+
+    it('kommt nach dem zweiten Faktor in die Stufe', async () => {
+      zeige();
+      server.use(
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+        http.post('/api/auth/totp/finish', () =>
+          HttpResponse.json({ passwort_wechsel_erforderlich: true }),
+        ),
+      );
+      await mitEinmalpasswortAnmelden();
+      await userEvent.type(
+        await screen.findByLabelText('Code aus deiner Authenticator-App'),
+        '123456',
+      );
+
+      expect(await screen.findByText('Neues Passwort festlegen')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Code aus deiner Authenticator-App')).not.toBeInTheDocument();
+    });
+  });
+
   /** LFH-387: meldet sich in einem anderen Tab jemand an, zieht die Anmeldeseite nach. */
   describe('Anmeldung aus einem anderen Tab', () => {
     const anna = {

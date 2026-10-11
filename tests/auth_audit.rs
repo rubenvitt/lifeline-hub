@@ -128,6 +128,45 @@ async fn erfolgreicher_login_und_logout_werden_protokolliert() {
         benutzer_id.is_some(),
         "der Logout muss dem Benutzer zuzuordnen sein, sonst ist die Spur wertlos"
     );
+    // Der Weg der Anmeldung, nicht ein fester Wert (LFH-1152).
+    let wege: Vec<String> = sqlx::query_scalar("SELECT provider FROM auth_audit ORDER BY id")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(wege, vec!["passwort", "passwort"]);
+}
+
+/// Eine Sitzung von vor LFH-1152 kennt ihren Anmeldeweg nicht: die Abmeldung schreibt
+/// `unbekannt`, nie einen geratenen Weg.
+#[tokio::test]
+async fn abmeldung_einer_sitzung_ohne_anmeldeweg_schreibt_unbekannt() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = common::login_cookie(&app, "admin", "startpw12").await;
+    sqlx::query("UPDATE session SET anmeldeweg = NULL")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/logout")
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+    let logout: String =
+        sqlx::query_scalar("SELECT provider FROM auth_audit WHERE ereignis = 'logout'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(logout, "unbekannt");
 }
 
 // --- Passwortwechsel (LFH-827) ---

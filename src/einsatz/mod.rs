@@ -81,6 +81,15 @@ impl EinsatzRolle {
         matches!(self, EinsatzRolle::Einsatzleitung)
     }
 
+    /// Ob diese Rolle zur Führung im Einsatz gehört (Modulstufe `einsatzfuehrung`, LFH-1150):
+    /// Einsatzleitung und Führungspersonal, nicht Beobachter.
+    pub fn gehoert_zur_fuehrung(&self) -> bool {
+        matches!(
+            self,
+            EinsatzRolle::Einsatzleitung | EinsatzRolle::Fuehrungspersonal
+        )
+    }
+
     /// Ob diese Rolle ETB-Einträge erfassen/berichtigen darf
     /// (Einsatzleitung und Führungspersonal; Beobachter ist nur lesend).
     pub fn darf_schreiben(&self) -> bool {
@@ -253,6 +262,15 @@ pub struct EinsatzAnzeige {
     /// Nennt bewusst weder Person noch Zeitpunkt noch Modul.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub teilschwaerzungen: Option<i64>,
+}
+
+/// Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec
+/// `einsatz-zugriff`). Bewusst nur Kennung und Anzeigename: kein Benutzername (Anmeldekennung),
+/// keine Rollen, kein Aktiv- oder MFA-Status.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct MitgliedAuswahl {
+    pub benutzer_id: i64,
+    pub anzeigename: String,
 }
 
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).

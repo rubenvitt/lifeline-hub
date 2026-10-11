@@ -258,8 +258,11 @@ export function personenSpalten(
       // Sortiert wird über die ZAHL — über den Anzeigetext läge „R-10" vor „R-9".
       sortWert: (p) => p.registrier_nr,
       suchText: (p) => registrierAnzeige(p.registrier_nr),
-      // KEIN Anker hier: den Titel-Link setzt der Kartenplan über `titel.ziel`.
-      render: (_, p) => registrierAnzeige(p.registrier_nr),
+      // KEIN Anker hier: den Titel-Link setzt der Kartenplan über `titel.ziel`. Ohne Umbruch: in
+      // der Handschuh-Dichte brach „R-001“ sonst in „R-“ / „001“ (LFH-1151).
+      render: (_, p) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{registrierAnzeige(p.registrier_nr)}</span>
+      ),
     },
     {
       title: 'Person',

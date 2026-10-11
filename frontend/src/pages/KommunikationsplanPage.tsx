@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
@@ -69,9 +69,10 @@ import './kommunikationsplanPrint.css';
  * - **Ort:** Unterroute des Stabs (`kommunikationsplanPfad`) neben dem Funkplan, Einstieg in der
  *   S6-Zeile. Sperre und Sichtbarkeit erbt die Seite vom Stab, fail-closed über
  *   `useStabFreigabe` (D1).
- * - **Daten:** gepflegte Stellen (Funktionen und externe Stellen) vom Server; Abschnitte und
- *   Einheiten abgeleitet aus ihren eigenen Angaben, gepflegt wird dort (D4). Die Besetzung ist
- *   nur Nebentext, Kontaktangaben des Personals kommen nie vor.
+ * - **Daten:** gepflegte Stellen (Funktionen und externe Stellen) vom Server; Abschnitte,
+ *   Einheiten und die eigene Führungsstelle (LFH-1148) abgeleitet aus ihren eigenen Angaben,
+ *   gepflegt wird dort (D4, D7). Die Besetzung ist nur Nebentext, Kontaktangaben des Personals
+ *   kommen nie vor.
  * - **Form:** `form="tabelle"` in jeder Breite (Vergleichsfläche „welche Nummer hat …?“), die vier
  *   Gruppen als Baumknoten. Die Erreichbarkeit ist hier der Inhalt und immer sichtbar (D5).
  * - **Kein Lagebericht** (D6): ein Bericht wird verteilt und fortgeschrieben, Rufnummern gehören
@@ -335,6 +336,13 @@ export default function KommunikationsplanPage() {
     enabled: einheitenFrei,
   });
 
+  // Die eigene Führungsstelle (LFH-849, LFH-1148): Teil der Kopfdaten, kein Modul; live über
+  // `einsatz`. Nicht auf der Platte: ohne Netz gilt sie als nicht geladen wie die Besetzung.
+  const fuehrungsstelleQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+  });
+
   // Die Verbindungen der Fernmeldeskizze (LFH-893), eigene Quelle mit Weiche. Nicht auf der
   // Platte: ohne Netz pausiert die Abfrage, dann gilt sie als nicht geladen wie die Besetzung.
   const skizzeQuery = useQuery({
@@ -357,6 +365,13 @@ export default function KommunikationsplanPage() {
   // nicht geladen (D9: der Stab außer dem Plan liegt nicht auf der Platte).
   const stabZustand: AbrufZustand =
     stabQuery.data != null ? 'daten' : ohneVerbindung ? 'fehler' : abrufZustand(stabQuery);
+  const fuehrungsstelleZustand: AbrufZustand =
+    fuehrungsstelleQuery.data != null
+      ? 'daten'
+      : ohneVerbindung
+        ? 'fehler'
+        : abrufZustand(fuehrungsstelleQuery);
+  const fuehrungsstelleDaten = fuehrungsstelleQuery.data ?? null;
   const plan = useMemo(
     () =>
       baueKommunikationsplan({
@@ -365,8 +380,18 @@ export default function KommunikationsplanPage() {
         abschnitte,
         einheiten,
         stab: { zustand: stabZustand, daten: stabQuery.data },
+        fuehrungsstelle: { zustand: fuehrungsstelleZustand, daten: fuehrungsstelleDaten },
       }),
-    [einsatzId, stellen, abschnitte, einheiten, stabZustand, stabQuery.data],
+    [
+      einsatzId,
+      stellen,
+      abschnitte,
+      einheiten,
+      stabZustand,
+      stabQuery.data,
+      fuehrungsstelleZustand,
+      fuehrungsstelleDaten,
+    ],
   );
   const luecke = useMemo(
     () => leitstelleOhneVerbindung(stellen, skizzenVerbindungen),
@@ -491,6 +516,7 @@ export default function KommunikationsplanPage() {
   const datenstand = gemeinsamerDatenstand(
     stellenQuery.dataUpdatedAt,
     skizzeQuery.dataUpdatedAt,
+    fuehrungsstelleQuery.dataUpdatedAt,
     abschnitteFrei ? abschnitteQuery.dataUpdatedAt : undefined,
     einheitenFrei ? einheitenQuery.dataUpdatedAt : undefined,
   );
@@ -606,10 +632,8 @@ export default function KommunikationsplanPage() {
             art: 'plan',
             titel: {
               spalte: 'stelle',
-              ziel: (p) =>
-                p.zeile && (p.zeile.art === 'abschnitt' || p.zeile.art === 'einheit')
-                  ? p.zeile.ziel
-                  : null,
+              // Abgeleitete Zeilen führen zu ihrem Datensatz, die Führungsstelle zu Einsatzdaten.
+              ziel: (p) => (p.zeile && p.zeile.art !== 'gepflegt' ? p.zeile.ziel : null),
             },
             sekundaer: ['besetzung', 'verbindungen'],
           }}

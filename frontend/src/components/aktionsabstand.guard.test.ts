@@ -51,7 +51,6 @@ const MIT_NACHBARSCHAFT = [
   // Die Aktionsspalte von Qualifikationen, Einheitstypen, Personal- und Fahrzeug-Status
   // steht nur noch hier, in der gemeinsamen Hülle.
   'stammdaten/KatalogVerwaltung.tsx',
-  'pages/BenutzerPage.tsx',
   // Reihe Speichern + Auflösen(danger) in der sticky Aktionsleiste der Detailroute.
   'pages/EinheitDetailPage.tsx',
   'pages/EinsatzabschnittePage.tsx',

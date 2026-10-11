@@ -1,4 +1,9 @@
-import type { OrgEinstellungen, OrgEinstellungenUpdate, OrgModulEinstellungen } from './types';
+import type {
+  BenoetigteRolle,
+  OrgEinstellungen,
+  OrgEinstellungenUpdate,
+  OrgModulEinstellungen,
+} from './types';
 import { apiGet, apiSend } from './client';
 
 /** Org-weite Einstellungen laden (GET /api/org-einstellungen).
@@ -27,7 +32,7 @@ export function ladeOrgModulEinstellungen(): Promise<OrgModulEinstellungen> {
  *  `rolle = null` = kein Rollen-Zwang (frei). */
 export function setzeOrgModulEinstellung(
   modulKey: string,
-  rolle: 'admin' | 'fuehrungskraft' | null,
+  rolle: BenoetigteRolle | null,
 ): Promise<void> {
   return apiSend<void>(`/api/org-modul-einstellungen/${modulKey}`, 'PUT', {
     benoetigte_rolle: rolle,

@@ -98,7 +98,11 @@ Kern `stab/kommunikationsplan.ts`, Lücke „Leitstelle“ nur über `stab/lueck
 Festnetz/Mobil, `mailto:` nur mit `@`. **Kein Lagebericht**, Druck ja (im Druck flach, ohne
 Aktionsspalte). **Offline lesbar** als einziger Stab-Unter-Key in `LAGEBILD_OFFLINE`; ohne Netz
 Bedienung gesperrt, nicht versteckt, Besetzung „nicht geladen“. Schreibantworten tragen den ganzen
-Plan (`setQueryData`). Die eigene Führungsstelle fehlt, bis LFH-849 sie liefert.
+Plan (`setQueryData`). **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist abgeleitet wie
+Abschnitte und Einheiten: erfasst (`fuehrungsstelleErfasst`, die eine Regel) erste Zeile `fs` in
+„Einsatzleitung und Stab“ (Rufname, Verbindung aus Kommunikationsmittel und Erreichbarkeit, führt zu
+Einsatzdaten), sonst keine Zeile; fehlt ihre Quelle (auch ohne Netz, sie liegt nicht auf der Platte),
+steht die Zeile mit Grund.
 
 **Checkliste Arbeitsaufnahme** (LFH-551,
 `openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): unterstes

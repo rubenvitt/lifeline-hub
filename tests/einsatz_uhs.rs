@@ -711,6 +711,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
+    common::zwang_aufheben("beob").await;
     let beob_cookie = login_cookie(&app, "beob", "startpw12").await;
     let (s, _) = anfrage_json(
         &app,

@@ -7,6 +7,7 @@ import {
   type Route,
 } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { kontoAnlegen } from './konto-anlegen';
 
 /*
  * LFH-387 — Sitzung über mehrere Tabs.
@@ -45,13 +46,11 @@ async function zweitenBenutzerAnlegen(
   const lauf = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const name = `e2e-tabs-${lauf}`;
   const anzeige = `Tab Zwei ${lauf}`;
-  const antwort = await ctx.request.post('/api/benutzer', {
-    data: { anzeigename: anzeige, benutzername: name, passwort: passwortVon(name) },
+  await kontoAnlegen(ctx.request, {
+    anzeigename: anzeige,
+    benutzername: name,
+    passwort: passwortVon(name),
   });
-  expect(
-    antwort.ok(),
-    `Benutzer anlegen: ${antwort.status()} ${await antwort.text()}`,
-  ).toBeTruthy();
   return { name, anzeige, passwort: passwortVon(name) };
 }
 

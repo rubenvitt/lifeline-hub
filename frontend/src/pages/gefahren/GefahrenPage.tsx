@@ -15,7 +15,8 @@ import {
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useViewport } from '../../components/useViewport';
-import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
+import { lagekartePfad } from '../../routing/deeplinks';
+import { useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
 import { warnstufeKarte } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import StatusTag from '../../components/StatusTag';
@@ -65,7 +66,7 @@ export default function GefahrenPage() {
   const { token } = theme.useToken();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const titelId = useId();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
 
@@ -80,27 +81,25 @@ export default function GefahrenPage() {
 
   // Stabile Referenz → der Auswahl-Effekt läuft nicht bei jedem Render neu.
   const gebiete = useMemo(() => gebieteQuery.data ?? [], [gebieteQuery.data]);
-  // Auswahl in einem Effekt, damit StrictMode-fest: das Deeplink-Ziel `?gefahrengebiet=<id>` hat
-  // Vorrang vor dem Default aufs erste Gebiet und wird danach geräumt (apply-then-clean). Sonst
-  // erstes Gebiet defaulten bzw. korrigieren, wenn das gewählte verschwindet.
+  // Das Deeplink-Ziel `?gefahrengebiet=<id>` wird EINMAL angewandt und geräumt (apply-then-clean).
+  // Eigener Effekt, getaktet nur über die Adresse: hinge er an `gewaehlt`, wendete ein Klick das
+  // Ziel erneut an, solange der Data Router das Räumen noch nicht übernommen hat — die Auswahl
+  // sprang zurück (LFH-1153).
+  useQueryParamSelektion('gefahrengebiet', gebieteQuery.isSuccess, (ziel) => {
+    if (gebiete.some((g) => g.id === ziel)) setGewaehlt(ziel);
+  });
+  // Default aufs erste Gebiet bzw. korrigieren, wenn das gewählte verschwindet. Solange die Adresse
+  // ein Ziel trägt, entscheidet der Deeplink (StrictMode-fest, LFH-150).
+  const zielInAdresse = searchParams.has('gefahrengebiet');
   useEffect(() => {
     if (!gebieteQuery.isSuccess) return;
     if (gebiete.length === 0) {
       setGewaehlt(null);
       return;
     }
-    const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
-    if (ziel != null && gebiete.some((g) => g.id === ziel)) {
-      setGewaehlt(ziel);
-      // searchParams nicht in-place mutieren — sonst sähe der zweite StrictMode-Durchlauf das Ziel
-      // nicht mehr.
-      const naechste = new URLSearchParams(searchParams);
-      naechste.delete('gefahrengebiet');
-      setSearchParams(naechste, { replace: true });
-      return;
-    }
+    if (zielInAdresse) return;
     if (gewaehlt == null || !gebiete.some((g) => g.id === gewaehlt)) setGewaehlt(gebiete[0].id);
-  }, [gebieteQuery.isSuccess, gebiete, gewaehlt, searchParams, setSearchParams]);
+  }, [gebieteQuery.isSuccess, gebiete, gewaehlt, zielInAdresse]);
 
   const matrixQuery = useQuery({
     // Dieselben Optionen wie die Gefahrengebiet-Vorschau der Sprungpalette.

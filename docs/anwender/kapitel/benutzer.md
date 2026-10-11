@@ -2,15 +2,16 @@
 titel: Benutzer
 gruppen: [administration]
 reihenfolge: 650
-quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs]
+quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/EinmalpasswortVergeben.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs]
 ---
 
 ## Überblick
 
 Unter „Benutzer“ in der Verwaltung legen System-Admins die Konten der Personen an, die mit
 Lifeline Hub arbeiten, vergeben ihre Rollen in System und Organisation, sehen ihre laufenden
-Anmeldungen und deaktivieren Konten, die nicht mehr gebraucht werden. Was eine Person in einem
-einzelnen Einsatz darf, regelt dagegen die Einsatzleitung, siehe
+Anmeldungen, vergeben ein Einmalpasswort, wenn jemand sein Passwort vergessen hat, setzen einen
+verlorenen zweiten Faktor zurück und deaktivieren Konten, die nicht mehr gebraucht werden. Was
+eine Person in einem einzelnen Einsatz darf, regelt dagegen die Einsatzleitung, siehe
 [Rechte im Einsatz](rechte-im-einsatz.md).
 
 ## Abläufe
@@ -26,19 +27,34 @@ Für System-Admins:
 
    ![Dialog „Neuen Benutzer anlegen“ mit Anzeigename, Benutzername, Passwort und den aufgeklappten Rollen](../bilder/benutzer/benutzer-anlegen.png)
 
-5. „Anlegen“ wählen und der Person Benutzername und Passwort auf sicherem Weg mitteilen.
+5. „Anlegen“ wählen und der Person Benutzername und Passwort auf sicherem Weg mitteilen. Bei der
+   ersten Anmeldung legt sie ein eigenes Passwort fest.
 
 ### Rollen eines Benutzers ändern
 
-1. Unter „Benutzer“ in der Zeile der Person „Bearbeiten“ wählen.
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Bearbeiten“ wählen.
 2. Im Dialog „Benutzer bearbeiten“ „Anzeigename“, „System-Rolle“ oder „Org-Rolle“ ändern.
 3. „Speichern“ wählen.
 
-Benutzername und Passwort lassen sich hier nicht ändern.
+Der Benutzername lässt sich nicht ändern.
+
+### Ein Einmalpasswort vergeben
+
+Hat eine Person ihr Passwort vergessen:
+
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Bearbeiten“ wählen.
+2. Im Dialog „Benutzer bearbeiten“ unter „Passwort“ „Einmalpasswort vergeben“ wählen und die
+   Rückfrage mit „Einmalpasswort vergeben“ bestätigen.
+3. Das angezeigte Einmalpasswort der Person auf sicherem Weg mitteilen, etwa am Telefon; der
+   Knopf daneben kopiert es.
+
+   ![Dialog „Benutzer bearbeiten“ mit dem angezeigten Einmalpasswort für Kim Beispiel und dem Kopierknopf](../bilder/benutzer/einmalpasswort.png)
+
+4. Den Dialog schließen. Das Einmalpasswort ist danach nicht mehr abrufbar.
 
 ### Anmeldungen einer Person beenden
 
-1. Unter „Benutzer“ in der Zeile der Person „Anmeldungen“ wählen.
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Anmeldungen“ wählen.
 2. Bei einem Gerät „Beenden“ wählen, oder „Alle beenden“, um die Person überall abzumelden.
 
    ![Dialog „Anmeldungen · Kim Beispiel“ mit zwei Geräten, je einem Knopf „Beenden“ und dem Knopf „Alle beenden“](../bilder/benutzer/anmeldungen.png)
@@ -47,13 +63,19 @@ Benutzername und Passwort lassen sich hier nicht ändern.
 
 ### Einen Benutzer deaktivieren
 
-1. Unter „Benutzer“ in der Zeile der Person „Deaktivieren“ wählen.
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Deaktivieren“ wählen.
 
-   ![Liste der Benutzer: beim Administrator ist „Deaktivieren“ gesperrt mit „Gesperrt: letzter aktiver Admin“, bei Kim Beispiel bedienbar](../bilder/benutzer/benutzerliste.png)
+   ![Liste der Benutzer mit dem offenen Aktionsmenü bei Kim Beispiel: „Bearbeiten“, „Anmeldungen“ und, rot hinter einem Trenner, „Deaktivieren“](../bilder/benutzer/benutzerliste.png)
 
-2. Soll die Person wieder arbeiten, an derselben Stelle „Reaktivieren“ wählen.
+2. Soll die Person wieder arbeiten, im selben Menü „Reaktivieren“ wählen.
 
-Auf schmalen Bildschirmen liegen die Aktionen einer Zeile in einem Aktionsmenü.
+### Den zweiten Faktor zurücksetzen
+
+1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Zweiten Faktor zurücksetzen …“ wählen.
+   Der Eintrag steht nur, wenn die Person einen zweiten Faktor eingerichtet hat.
+2. Die Rückfrage mit „Zweiten Faktor zurücksetzen“ bestätigen.
+
+Wann das nötig ist und was danach zu tun ist, beschreibt [Gerät verloren](geraet-verloren.md).
 
 ## Hintergrund
 
@@ -63,12 +85,14 @@ Auf schmalen Bildschirmen liegen die Aktionen einer Zeile in einem Aktionsmenü.
   Aufbewahrung, liest jeden Einsatz und ändert an Einsätzen der eigenen Organisation die
   Verwaltungsangaben.
 - **Org-Rolle „Führungskraft (darf Einsätze anlegen)“**: legt Einsätze an, liest jeden Einsatz
-  der eigenen Organisation und sieht die Verwaltung zum Nachschlagen. In Modulen, die eine
-  „Führungskraft“ verlangen, ist sie zugelassen.
+  der eigenen Organisation und sieht die Verwaltung zum Nachschlagen. In Modulen, die
+  „Führungskraft der Organisation“ oder „Führung im Einsatz“ verlangen, ist sie zugelassen.
 - **System-Rolle „Benutzer“ und Org-Rolle „Keine“** (die Vorgabe): arbeitet nur in Einsätzen,
   in die die Einsatzleitung die Person aufgenommen hat.
 
-Ein neues Konto gehört zur Organisation des System-Admins, der es anlegt.
+Ein neues Konto gehört zur Organisation des System-Admins, der es anlegt. Die Liste zeigt nur
+die Konten der eigenen Organisation; Konten anderer Organisationen kann ein System-Admin weder
+sehen noch ändern.
 
 ### Anmeldungen beenden
 
@@ -92,9 +116,9 @@ das bei einem verlorenen Gerät hilft, beschreibt [Gerät verloren](geraet-verlo
 
 Nicht deaktivieren lassen sich:
 
-- der letzte aktive System-Admin („Gesperrt: letzter aktiver Admin“), damit die Verwaltung nie
-  ohne Admin bleibt,
-- das eigene Konto („Gesperrt: eigenes Konto“).
+- der letzte aktive System-Admin der Organisation („Deaktivieren gesperrt: letzter aktiver
+  Admin“), damit ihre Verwaltung nie ohne Admin bleibt,
+- das eigene Konto („Deaktivieren gesperrt: eigenes Konto“).
 
 Für ein deaktiviertes Konto gibt es keine „Anmeldungen“. Konten gekoppelter Geräte erscheinen
 nicht in der Liste.
@@ -102,13 +126,31 @@ nicht in der Liste.
 ### Passwort und zweiter Faktor
 
 Die Anmeldeseite sagt „Passwort vergessen? Die Administration deiner Organisation setzt es
-zurück.“ In der Oberfläche der Verwaltung gibt es dafür derzeit keinen Weg: das Passwort setzt
-nur die Person selbst in ihrem Profil. Auch einen eingerichteten zweiten Faktor kann die
-Verwaltung in der Oberfläche nicht zurücksetzen.
+zurück.“ Das geschieht mit „Einmalpasswort vergeben“:
+
+- Der Server erzeugt das Einmalpasswort, drei Vierergruppen aus Kleinbuchstaben und Ziffern ohne
+  leicht verwechselbare Zeichen (etwa `kx7m-p4qr-9tzw`). Die Verwaltung zeigt es genau einmal.
+- Das bisherige Passwort gilt sofort nicht mehr, und jede Anmeldung der Person endet, auf allen
+  Geräten.
+- Mit dem Einmalpasswort meldet sich die Person an und legt sofort ein eigenes Passwort fest,
+  siehe [Anmelden und Abmelden](anmelden-abmelden.md). Ein zweiter Faktor bleibt eingerichtet und
+  wird dabei wie sonst abgefragt.
+- Ein zweites Einmalpasswort ersetzt das erste.
+- Gesperrt ist die Aktion für das eigene Konto („Gesperrt: eigenes Konto, Passwort im Profil
+  ändern“) und für Konten, die sich nur über die Organisation anmelden („Gesperrt: meldet sich
+  über SSO an“).
+
+Dasselbe gilt für ein neu angelegtes Konto: Das Passwort aus der Anlage gilt nur für die erste
+Anmeldung.
+
+Einen eingerichteten zweiten Faktor setzt die Verwaltung zurück (oben). Dabei enden alle
+Anmeldungen der Person, auch die eigene, wenn ein System-Admin das eigene Konto zurücksetzt, und
+alle Wiederherstellungscodes verfallen. Bis zur neuen Einrichtung im Profil genügt das Passwort.
 
 ### Nachvollziehbarkeit
 
-Anlegen, Rollenwechsel, Deaktivieren, Reaktivieren und jedes Beenden einer Anmeldung hält der
-Server in der Admin-Spur fest; System-Admins lesen sie im „Zugangsprotokoll“ der Verwaltung.
+Anlegen, Rollenwechsel, Deaktivieren, Reaktivieren, das Zurücksetzen des zweiten Faktors, jedes
+Einmalpasswort und jedes Beenden einer Anmeldung hält der Server in der Admin-Spur fest, das
+Einmalpasswort selbst nie; System-Admins lesen sie im „Zugangsprotokoll“ der Verwaltung.
 
 Die Seite „Benutzer“ erreichen nur System-Admins.

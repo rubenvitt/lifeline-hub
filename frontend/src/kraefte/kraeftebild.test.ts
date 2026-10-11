@@ -1,4 +1,7 @@
+import { createElement } from 'react';
 import { it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import Markdown from '../components/Markdown';
 import {
   baueKraeftebild,
   filtereKraefte,
@@ -293,6 +296,36 @@ it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
   expect(md).toContain('- Fzg. F1');
   expect(md).toContain('- Mtl. M1');
   expect(md).not.toMatch(/\p{Extended_Pictographic}/u);
+});
+
+it('Kennzahlen des Lagebilds stehen in der Anzeige je in eigenem Block (LFH-1153)', () => {
+  // Markdown ohne harte Umbrüche: Zeilen ohne Leerzeile dazwischen liefen zu EINEM Absatz zusammen
+  // — im Lagebericht stand „Gesamtstärke … Fahrzeuge … Material …“ in einer Zeile.
+  const bild = baueKraeftebild(
+    [ab(1)],
+    [eh(10, 1)],
+    [p(1, 10, 'fuehrer')],
+    [fz(1, 10)],
+    [mat(1, 10, 'einsatzbereit')],
+  );
+  render(
+    createElement(Markdown, {
+      unterEbene: 2,
+      children: rendereMeldebildMarkdown(bild, 'Stand 12:00'),
+    }),
+  );
+  for (const [kennzahl, nachbar] of [
+    ['Gesamtstärke', 'Fahrzeuge:'],
+    ['Fahrzeuge:', 'Material'],
+  ] as const) {
+    const block = screen.getByText(kennzahl, { exact: false }).closest('p, li');
+    expect(block).not.toBeNull();
+    expect(block).not.toHaveTextContent(nachbar);
+  }
+  // Die Aufschlüsselung des Materials bleibt bei seiner Kennzahl.
+  expect(screen.getByText(/Material \(Positionen\)/).closest('p, li')).toHaveTextContent(
+    'einsatzbereit: 1',
+  );
 });
 
 it('Suche matcht über Name und Funkrufname', () => {

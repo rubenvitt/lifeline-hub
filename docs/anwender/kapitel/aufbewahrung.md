@@ -118,6 +118,10 @@ früher abläuft als die des Einsatzes. Danach wird die Kategorie vorgemerkt und
 Karenz geschwärzt; der Einsatz selbst bleibt lesbar. Name, Geburtsdatum, Antreffort und Verbleib
 einer Person bleiben, bis alle Zwecke der Person abgelaufen sind.
 
+Während der Karenz bleiben die Daten der Kategorie lesbar, auch in Druck und Export. Wer eine
+Höchstfrist einhalten muss, wählt die Dauer deshalb so, dass Dauer und 30 Tage Karenz zusammen
+darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
+
 ### Löschersuchen
 
 - Ein Löschersuchen wartet nicht auf Frist und Karenz. Es wird 24 Stunden nach dem Erfassen

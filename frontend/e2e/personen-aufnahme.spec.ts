@@ -107,6 +107,45 @@ test('die Aufnahme-Route zeigt dieselbe Maske und erfasst in Serie', async ({ pa
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/aufnahme`));
 });
 
+test('LFH-1142: nach „Speichern und nächste" sind beide Knöpfe sofort wieder bedienbar', async ({
+  page,
+}) => {
+  // Die Quittung allein belegt nicht, dass die nächste Person erfasst werden kann: sie steht schon,
+  // während die Knöpfe noch laden könnten. Belegt wird es, indem beide Knöpfe danach wirken —
+  // antd verschluckt den Klick auf einen ladenden Knopf, die nächste Quittung bliebe dann aus.
+  //
+  // Der Name gehört dazu: antds Lade-Symbol trägt `aria-label="loading"`, und blieb sein
+  // Ausblenden hängen, hieß der Knopf minutenlang „loading Erfassen“, obwohl er wieder bediente.
+  // Das trat erst nach einigen Speicherungen auf, deshalb läuft die Serie mehrmals. Die Grenze
+  // von 5 s liegt weit über dem Ausblenden (0,15 s) und weit unter dem Hängen (30 s bis 3 min).
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Aufnahme bedienbar ${Date.now()}`);
+  await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
+  const serie = page.locator('main form button', { hasText: 'Speichern und nächste' });
+  const erfassen = page.locator('main form button[type="submit"]');
+
+  for (let n = 1; n <= 12; n += 1) {
+    await skFlaeche(page, 'SK I').click();
+    await serie.click();
+    await expect(page.getByText(new RegExp(`Erfasst: ${n}$`))).toBeVisible();
+    for (const [knopf, name] of [
+      [serie, 'Speichern und nächste'],
+      [erfassen, 'Erfassen'],
+    ] as const) {
+      await expect(knopf, `${name} lädt nach Person ${n} nicht mehr`).not.toHaveClass(
+        /ant-btn-loading/,
+      );
+      await expect(knopf, `${name} heißt nach Person ${n} wieder so`).toHaveAccessibleName(name, {
+        timeout: 5_000,
+      });
+    }
+  }
+
+  await skFlaeche(page, 'SK III').click();
+  await erfassen.click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
+});
+
 test('S7: die Erfassungszeile erfasst per Kürzel in Serie, ohne Dialog', async ({ page }) => {
   // Die Kurzeingabe: EINE Eingabe, Enter erfasst, das Feld ist danach leer und fokussiert, die
   // Quittung steht an der Zeile und kommt aus der ANTWORT.

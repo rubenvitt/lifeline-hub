@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { kontoAnlegen } from './konto-anlegen';
 
 // Betreuung auf der Lagekarte — Durchstich im echten Renderer: landet eine verortete Stelle
 // in der Marker-Quelle, kommt der Platziermodus aus dem Modul an, bekommt eine zweite Karte
@@ -300,7 +301,7 @@ test('ohne Modul Betreuung: Sperrzeile, Fläche nur mit Typwort', async ({ page 
     sichtbar: true,
     benoetigte_rolle: 'fuehrungskraft',
   });
-  const { id: nutzerId } = await senden(page, 'post', '/api/benutzer', {
+  const { id: nutzerId } = await kontoAnlegen(page.request, {
     anzeigename: `E2E Betreuung ${LAUF}`,
     benutzername: NUTZER,
     passwort: NUTZER_PW,

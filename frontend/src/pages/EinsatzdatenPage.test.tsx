@@ -118,7 +118,7 @@ function setup(opts: SetupOpts = {}) {
     meHandler(benutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
-    http.get('/api/benutzer', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
     http.get('/api/einsaetze/:id/ort-vorschau', () =>
       HttpResponse.json({ peilung: null, ortsname: null }),
@@ -1427,7 +1427,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
         HttpResponse.json({ ...leitungEinsatz, id: Number(params.id) }),
       ),
       http.get('/api/einsaetze/:id/mitglieder', () => HttpResponse.json(mitglieder)),
-      http.get('/api/benutzer', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
       http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
       http.get('/api/einsaetze/:id/ort-vorschau', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),

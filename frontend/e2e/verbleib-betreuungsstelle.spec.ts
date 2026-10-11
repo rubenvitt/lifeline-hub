@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
+import { kontoAnlegen } from './konto-anlegen';
 
 // Verbleib „Notunterkunft" an eine Betreuungsstelle knüpfen — Durchstich gegen das echte
 // Backend. Die Einzelheiten prüfen Vitest und `tests/verbleib_betreuungsstelle.rs`; hier geht
@@ -109,7 +110,7 @@ test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async (
   const { id: p } = await senden(page, 'post', `${basis}/personen`, {});
   await senden(page, 'post', `${basis}/personen/${p}/sichtung`, { kategorie: 'sk3' });
   const name = `fk${LAUF}`;
-  const { id: bid } = await senden(page, 'post', '/api/benutzer', {
+  const { id: bid } = await kontoAnlegen(page.request, {
     anzeigename: name,
     benutzername: name,
     passwort: `${name}pw1`,

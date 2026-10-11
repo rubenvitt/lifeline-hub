@@ -7,7 +7,7 @@
 //! offenen Live-Ströme sofort. Herleitung: `/mnt/project-files/lfh-1092/design.md`.
 
 use crate::app::AppState;
-use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel};
+use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
 use crate::auth::session::{
     self, AdminUser, AktuelleSitzung, Auswahl, BeendeteSitzung, CurrentUser, SitzungAnzeige,
 };
@@ -81,25 +81,6 @@ pub async fn eigene_andere_beenden(
     ))
 }
 
-/// Das Zielkonto einer Admin-Route: eine Person der eigenen Organisation. Ein Konto einer
-/// fremden Organisation und ein Gerätekonto sind 404 wie ein unbekanntes.
-async fn ziel_laden(state: &AppState, admin: &Benutzer, id: i64) -> Result<Benutzer, AppError> {
-    let ziel = sqlx::query_as::<_, Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
-                aktiv, erstellt_at \
-         FROM benutzer WHERE id = ? AND org_id = ?",
-    )
-    .bind(id)
-    .bind(admin.org_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    if crate::geraet::repo::ist_geraetekonto(&state.pool, id).await? {
-        return Err(AppError::NotFound);
-    }
-    Ok(ziel)
-}
-
 /// Die eigene Kennung, wenn der Admin sein eigenes Konto meint; sonst keine.
 fn eigene_kennung(admin: &Benutzer, ziel: &Benutzer, aktuell: Option<String>) -> Option<String> {
     aktuell.filter(|_| admin.id == ziel.id)
@@ -112,7 +93,7 @@ pub async fn admin_liste(
     AktuelleSitzung(aktuell): AktuelleSitzung,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<Vec<SitzungAnzeige>>, AppError> {
-    let ziel = ziel_laden(&state, &admin, id).await?;
+    let ziel = crate::routes::benutzer::ziel_laden(&state.pool, &admin, id).await?;
     let aktuell = eigene_kennung(&admin, &ziel, aktuell.map(|k| k.0));
     Ok(Json(
         session::liste(&state.pool, ziel.id, aktuell.as_deref()).await?,
@@ -128,7 +109,7 @@ pub async fn admin_beenden(
     AktuelleSitzung(aktuell): AktuelleSitzung,
     PfadParam((id, kennung)): PfadParam<(i64, String)>,
 ) -> Result<Json<SitzungenBeendet>, AppError> {
-    let ziel = ziel_laden(&state, &admin, id).await?;
+    let ziel = crate::routes::benutzer::ziel_laden(&state.pool, &admin, id).await?;
     if eigene_kennung(&admin, &ziel, aktuell.map(|k| k.0)).as_deref() == Some(kennung.as_str()) {
         return Err(AppError::UnprocessableEntity(AKTUELLE_SITZUNG.into()));
     }
@@ -150,7 +131,7 @@ pub async fn admin_alle_beenden(
     AktuelleSitzung(aktuell): AktuelleSitzung,
     PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<SitzungenBeendet>, AppError> {
-    let ziel = ziel_laden(&state, &admin, id).await?;
+    let ziel = crate::routes::benutzer::ziel_laden(&state.pool, &admin, id).await?;
     let ausser = eigene_kennung(&admin, &ziel, aktuell.map(|k| k.0));
     let beendet =
         session::beenden(&state.pool, ziel.id, Auswahl::AlleAusser(ausser.as_deref())).await?;
@@ -184,11 +165,11 @@ async fn nach_dem_beenden(
                             id: person.id,
                             benutzername: &person.benutzername,
                         },
-                        detail: Some(format!(
-                            "{}, angemeldet {}",
-                            sitzung.geraet.as_deref().unwrap_or("unbekanntes Gerät"),
-                            sitzung.angemeldet_at
-                        )),
+                        angaben: Some(ZugangsAngaben {
+                            geraet: sitzung.geraet.clone(),
+                            angemeldet_at: Some(sitzung.angemeldet_at.clone()),
+                            ..ZugangsAngaben::default()
+                        }),
                         peer_ip,
                     },
                 )
@@ -202,9 +183,11 @@ async fn nach_dem_beenden(
                         benutzername: Some(&person.benutzername),
                         benutzer_id: Some(person.id),
                         peer_ip: peer_ip.map(|ip| ip.to_string()),
-                        // Wie beim Logout: die Spalte ist NOT NULL, die Sitzung kennt ihren
-                        // Anmeldeweg nicht.
-                        provider: crate::auth::provider::ID_PASSWORT,
+                        // Der Weg, auf dem die beendete Sitzung entstand (LFH-1152).
+                        provider: crate::auth::provider::Anmeldeweg::aus_gespeichert(
+                            sitzung.anmeldeweg.as_deref(),
+                        )
+                        .as_str(),
                     },
                 )
                 .await;

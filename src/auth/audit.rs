@@ -116,12 +116,13 @@ pub struct AnmeldeEintragAnzeige {
     pub benutzer_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peer_ip: Option<String>,
-    /// Anmeldeweg (`auth::provider::ID_*`): `passwort`, `oidc`, `webauthn`, `dev`.
+    /// Anmeldeweg ([`crate::auth::provider::Anmeldeweg`]).
+    #[schema(value_type = crate::auth::provider::Anmeldeweg)]
     pub provider: String,
 }
 
-/// Liest die Anmeldespur, neueste zuerst. `konto` trifft den protokollierten Namen, auch einen
-/// versuchten, zu dem es kein Konto gibt.
+/// Liest die Anmeldespur, neueste zuerst. `konto` trifft jeden protokollierten Namen, der ihn
+/// enthält, auch einen versuchten, zu dem es kein Konto gibt.
 ///
 /// Manche Ereignisse schreiben nur `benutzer_id` (Abmeldung, Code-Tausch, Gerätekopplung): ihr
 /// Name kommt aus dem Konto, gekürzt wie [`benutzername::fuer_protokoll`], damit Anzeige und
@@ -144,9 +145,8 @@ pub async fn liste(
         qb.push_bind(ereignis.as_str());
     }
     if let Some(konto) = &filter.konto {
-        qb.push(" AND benutzername = ");
-        qb.push_bind(konto.clone());
-        qb.push(" COLLATE NOCASE");
+        qb.push(" AND ");
+        SpurFilter::konto_enthalten(&mut qb, "benutzername", konto);
     }
     filter.zeitraum_und_cursor(&mut qb);
     filter.ordnung_und_seite(&mut qb);

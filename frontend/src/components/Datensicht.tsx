@@ -309,7 +309,8 @@ export type DatensichtSortierung<K extends string> = Sortierung<K>;
  */
 interface Gruppierung<T> {
   schluessel: (zeile: T) => string;
-  etikett: (wert: string) => string;
+  /** Wort hinter der Zahl; `anzahl` für die Einzahl („1 Entwurf“, LFH-1153). */
+  etikett: (wert: string, anzahl: number) => string;
   /** Feste Gruppenfolge; unbekannte Werte hängen in Antreffreihenfolge hinten an. */
   reihenfolge?: readonly string[];
 }
@@ -650,7 +651,10 @@ export function gruppiere<T>(
   // Nur BELEGTE Gruppen: ein leerer Kopf „· 0“ wäre Rauschen.
   return [...eimer.keys()]
     .sort((a, b) => rang.get(a)! - rang.get(b)!)
-    .map((wert) => ({ wert, etikett: gruppen.etikett(wert), zeilen: eimer.get(wert)! }));
+    .map((wert) => {
+      const zeilen = eimer.get(wert)!;
+      return { wert, etikett: gruppen.etikett(wert, zeilen.length), zeilen };
+    });
 }
 
 /**

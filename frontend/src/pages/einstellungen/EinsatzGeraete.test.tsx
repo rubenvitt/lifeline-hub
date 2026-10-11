@@ -163,6 +163,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
           widerrufen_at: '2026-10-04 13:00:00',
           widerrufen_von_name: 'Erika Leitung',
         }),
+        kopplung(3, 'abgelaufen'),
       ],
     });
     rendern();
@@ -172,12 +173,17 @@ describe('EinsatzGeraete (LFH-892)', () => {
     );
     expect(zustaende[0]).toMatch(/^UHS-Tablet · gekoppelt · bis /);
     expect(zustaende[1]).toMatch(/^UHS-Tablet · widerrufen · von Erika Leitung um /);
-    // Eine widerrufene Kopplung ist zu Ende: kein Aktionsmenü.
+    expect(zustaende[2]).toMatch(/^UHS-Tablet · abgelaufen · bis /);
+    // Eine widerrufene oder abgelaufene Kopplung ist zu Ende: kein Aktionsmenü. Der Server lehnt
+    // Verlängern und neuen Code für beide ab (LFH-1143).
     expect(
       screen.getByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 1' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 2' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 3' }),
     ).not.toBeInTheDocument();
   });
 
@@ -282,7 +288,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
       expect(h).not.toBeNull();
       return h!;
     });
-    expect(hinweis.textContent).toMatch(/für einfache Mitglieder gesperrt/);
+    expect(hinweis.textContent).toMatch(/für gekoppelte Geräte gesperrt/);
   });
 
   it('widerruft erst nach Rückfrage', async () => {

@@ -215,7 +215,9 @@ function KnotenInhalt({
             marginBlockStart: token.paddingXXS,
           }}
         >
-          <EinsatzZeichen tz={knoten.tz} size={ZEICHEN_PX} />
+          {/* Helle Unterlage am Schirm (LFH-1120): Zeichen ohne Organisation trügen im
+              Nachtbetrieb nur einen schwarzen Umriss auf dunklem Grund. */}
+          <EinsatzZeichen tz={knoten.tz} size={ZEICHEN_PX} unterlage />
         </span>
       )}
       <div style={{ minWidth: 0, flex: 1 }}>

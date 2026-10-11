@@ -151,7 +151,7 @@ const LESEZWEIG: Record<(typeof MODULE)[number]['route'], { weg: string[]; bleib
     bleibt: 'Ansicht',
   },
   tiere: { weg: ['Tier erfassen', 'Vermisst melden'], bleibt: 'Tiere nach Status filtern' },
-  schaeden: { weg: ['Schnellerfassung'] },
+  schaeden: { weg: ['Schaden erfassen'] },
 };
 
 /**

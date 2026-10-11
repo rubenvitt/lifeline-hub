@@ -42,6 +42,26 @@ export function legeBrAn(einsatzId: number, daten: BrEingabe): Promise<Bereitste
   );
 }
 
+/** Teil-Patch der Raumdaten: fehlender Key = unverändert, `null` = leeren (`patchTriState.ts`). */
+export interface BrPatch {
+  bezeichnung?: string;
+  abschnitt_id?: number | null;
+  standort?: string | null;
+  notiz?: string | null;
+}
+
+export function aktualisiereBr(
+  einsatzId: number,
+  brId: number,
+  daten: BrPatch,
+): Promise<Bereitstellungsraum> {
+  return apiSend<Bereitstellungsraum>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`,
+    'PATCH',
+    daten,
+  );
+}
+
 export function setzeBrStatus(
   einsatzId: number,
   brId: number,

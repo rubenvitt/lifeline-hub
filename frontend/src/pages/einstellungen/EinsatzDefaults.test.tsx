@@ -333,6 +333,26 @@ describe('EinsatzDefaults', () => {
     await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'admin'));
   });
 
+  it('setzt die Org-Vorgabe „Führung im Einsatz“ als einsatzfuehrung (LFH-1150)', async () => {
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
+    // Dieselben vier Stufen wie im Einsatz, in derselben Reihenfolge (`ROLLEN_OPTIONEN`).
+    await screen.findByText('Führung im Einsatz');
+    const optionen = [...document.querySelectorAll('.ant-select-item-option-content')];
+    expect(optionen.map((o) => o.textContent)).toEqual([
+      'Frei (alle)',
+      'Führung im Einsatz',
+      'Führungskraft der Organisation',
+      'Admin',
+    ]);
+    fireEvent.click(await screen.findByText('Führung im Einsatz'));
+
+    await waitFor(() =>
+      expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'einsatzfuehrung'),
+    );
+  });
+
   it('stapelt die Quittung beim Serienschalten nicht (LFH-478)', async () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
@@ -357,12 +377,10 @@ describe('EinsatzDefaults', () => {
     expect(
       screen.getByLabelText('Vorgabe-Bestätigungsfrist Meldungen (Minuten)'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText('Vorgabe-Quittierungsfrist Aufträge (Minuten)'),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Vorgabe-Quittierfrist Aufträge (Minuten)')).toBeInTheDocument();
     // Leere Meldungsfrist heißt 5 Minuten (System), leere Auftragsfrist heißt keine Frist.
     expect(screen.getByPlaceholderText('5 (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Vorgabe-Quittierungsfrist Aufträge (Minuten)')).toHaveAttribute(
+    expect(screen.getByLabelText('Vorgabe-Quittierfrist Aufträge (Minuten)')).toHaveAttribute(
       'placeholder',
       'keine Frist (Vorgabe)',
     );

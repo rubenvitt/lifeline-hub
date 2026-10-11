@@ -4175,6 +4175,118 @@ mod tests {
         assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
     }
 
+    // --- LFH-1121: Einmalpasswort (0173 Änderungszwang, 0174 Admin-Spur-CHECK) ---
+
+    const MIGRATION_0173: &str =
+        include_str!("../migrations/0173_benutzer_passwort_wechsel_pflicht.sql");
+    const MIGRATION_0174: &str = include_str!("../migrations/0174_admin_audit_einmalpasswort.sql");
+
+    #[tokio::test]
+    async fn migration_0173_bestandskonten_stehen_nicht_unter_aenderungszwang() {
+        let pool = minimal_pool_mit_benutzer().await;
+
+        sqlx::raw_sql(MIGRATION_0173).execute(&pool).await.unwrap();
+
+        let pflichten: Vec<i64> =
+            sqlx::query_scalar("SELECT passwort_wechsel_pflicht FROM benutzer ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            pflichten,
+            vec![0, 0],
+            "Bestandskonten melden sich unverändert an"
+        );
+        sqlx::query("UPDATE benutzer SET passwort_wechsel_pflicht = 1 WHERE id = 1")
+            .execute(&pool)
+            .await
+            .expect("1 ist erlaubt");
+        assert!(
+            sqlx::query("UPDATE benutzer SET passwort_wechsel_pflicht = 2 WHERE id = 2")
+                .execute(&pool)
+                .await
+                .is_err(),
+            "der CHECK lässt nur 0 und 1 zu"
+        );
+    }
+
+    #[tokio::test]
+    async fn migration_0174_admin_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = minimal_pool_mit_benutzer().await;
+        sqlx::raw_sql(include_str!("../migrations/0156_admin_audit.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(MIGRATION_0170).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO admin_audit (zeitpunkt, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip) \
+             VALUES ('2026-10-09 10:00:00', 'benutzer_angelegt', 1, 'admin', 2, 'max', 'keiner', '10.0.0.1'), \
+                    ('2026-10-09 10:01:00', 'sitzung_beendet', 1, 'admin', 2, 'max', 'Firefox', NULL), \
+                    ('2026-10-09 10:02:00', 'benutzer_deaktiviert', 1, 'admin', 2, 'max', NULL, NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM admin_audit WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let schema_vorher = schema_von(&pool, "admin_audit").await;
+        let ddl_vorher = ddl_ohne_namen(&pool, "admin_audit").await;
+        type Zeile = (
+            i64,
+            String,
+            String,
+            Option<i64>,
+            Option<String>,
+            Option<i64>,
+            String,
+            Option<String>,
+            Option<String>,
+        );
+        let alle = "SELECT id, zeitpunkt, aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, \
+                    detail, peer_ip FROM admin_audit ORDER BY id";
+        let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+
+        assert!(MIGRATION_0174.starts_with("-- no-transaction"));
+        sqlx::raw_sql(MIGRATION_0174).execute(&pool).await.unwrap();
+
+        let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(zeilen_nachher, zeilen_vorher);
+        assert_eq!(schema_von(&pool, "admin_audit").await, schema_vorher);
+        assert_eq!(
+            ddl_ohne_namen(&pool, "admin_audit").await.replacen(
+                ", 'einmalpasswort_vergeben'",
+                "",
+                1
+            ),
+            ddl_vorher,
+            "die DDL unterscheidet sich ausschließlich im aktion-CHECK"
+        );
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO admin_audit (aktion, akteur_id, ziel_benutzer_id, ziel) \
+             VALUES ('einmalpasswort_vergeben', 1, 2, 'max') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("der neue CHECK nimmt einmalpasswort_vergeben");
+        assert_eq!(neue_id, 4, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        assert!(
+            sqlx::query("INSERT INTO admin_audit (aktion, ziel) VALUES ('foo', 'x')")
+                .execute(&pool)
+                .await
+                .is_err()
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'admin_audit_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'admin_audit_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+    }
+
     /// 0115 übernimmt nur Bestandsnummern im exakten Muster `JJJJ-NNN` in die Zahlenspalten. Gegen
     /// die echte Migration auf einem Minimal-Schema: `2026-01` neben `2026-001` ergäbe sonst
     /// dasselbe Zahlenpaar und spränge den Unique-Index mitten in der Migration.

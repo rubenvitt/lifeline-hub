@@ -75,7 +75,7 @@ async fn benutzer_anlegen_steht_in_der_spur() {
             "benutzer_angelegt",
             Some(id),
             "marlene",
-            Some("system_rolle: keiner, org_rolle: fuehrungskraft"),
+            Some(r#"{"system_rolle":"keiner","org_rolle":"fuehrungskraft"}"#),
         )]
     );
 }
@@ -174,7 +174,7 @@ async fn bearbeiten_mit_rollenwechsel_steht_in_der_spur() {
             "rolle_geaendert",
             Some(id),
             "marlene",
-            Some("system_rolle: keiner → admin"),
+            Some(r#"{"system_rolle_vorher":"keiner","system_rolle":"admin"}"#),
         )]
     );
 }
@@ -209,7 +209,7 @@ async fn bearbeiten_mit_aktiv_wechsel_steht_in_der_spur() {
                 "rolle_geaendert",
                 Some(id),
                 "marlene",
-                Some("org_rolle: keine → fuehrungskraft"),
+                Some(r#"{"org_rolle_vorher":"keine","org_rolle":"fuehrungskraft"}"#),
             ),
             zeile("benutzer_deaktiviert", Some(id), "marlene", None),
             zeile("benutzer_reaktiviert", Some(id), "marlene", None),

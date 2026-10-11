@@ -13,15 +13,16 @@ pub const STANDARD_LIMIT: i64 = 100;
 pub const MAX_LIMIT: i64 = 500;
 
 /// Gemeinsamer Filter beider Spuren. Die Werte sind schon geprüft: Zeiten im SQLite-Format
-/// (`etb::normalisiere_zeit`), `konto` normalisiert und so gekürzt wie beim Schreiben
-/// (`benutzername::fuer_protokoll`), `limit` geklemmt.
+/// (`etb::normalisiere_zeit`), `konto` normalisiert und auf die Länge gekürzt, mit der Namen
+/// gespeichert sind (`benutzername::PROTOKOLL_LAENGE`, ohne „…“), `limit` geklemmt.
 #[derive(Debug, Clone, Default)]
 pub struct SpurFilter {
     /// Untere Grenze von `zeitpunkt`, einschließlich.
     pub von: Option<String>,
     /// Obere Grenze von `zeitpunkt`, einschließlich.
     pub bis: Option<String>,
-    /// Benutzername, verglichen mit `COLLATE NOCASE` wie beim Login.
+    /// Teil eines Benutzernamens, ohne Rücksicht auf Groß- und Kleinschreibung (LFH-1152,
+    /// [`SpurFilter::konto_enthalten`]).
     pub konto: Option<String>,
     /// Cursor: nur Einträge mit kleinerer `id`.
     pub vor_id: Option<i64>,
@@ -43,6 +44,20 @@ impl SpurFilter {
             qb.push(" AND id < ");
             qb.push_bind(vor_id);
         }
+    }
+
+    /// Hängt „`spalte` enthält `konto`“ an (LFH-1152): ein getippter Namensteil trifft schon,
+    /// nicht erst der ganze Name. `lower()` faltet wie `COLLATE NOCASE` nur ASCII; `instr`
+    /// statt `LIKE`, damit `%` und `_` im Namen wörtlich zählen. `spalte` ist ein fester
+    /// Spaltenname des Aufrufers, nie eine Eingabe.
+    pub(crate) fn konto_enthalten(
+        qb: &mut QueryBuilder<Sqlite>,
+        spalte: &'static str,
+        konto: &str,
+    ) {
+        qb.push(format!("instr(lower({spalte}), lower("));
+        qb.push_bind(konto.to_string());
+        qb.push(")) > 0");
     }
 
     /// Neueste zuerst, eine Seite.

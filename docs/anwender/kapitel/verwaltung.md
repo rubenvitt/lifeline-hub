@@ -50,8 +50,8 @@ Kapitel [Aufbewahrung](aufbewahrung.md).
 1. Unter „Einstellungen“ „Einsatz-Vorgaben“ wählen.
 2. Im Paneel „Rollen-Vorgabe je Modul“ unter „Modul filtern“ einen Teil des Modulnamens
    eintippen.
-3. Unter „Benötigte Rolle (Vorgabe)“ „Führungskraft“ oder „Admin“ wählen, zum Aufheben
-   „Frei (alle)“.
+3. Unter „Benötigte Rolle (Vorgabe)“ „Führung im Einsatz“, „Führungskraft der Organisation“
+   oder „Admin“ wählen, zum Aufheben „Frei (alle)“.
 
    ![Paneel „Rollen-Vorgabe je Modul“, gefiltert auf „Lage“, alle Module frei](../bilder/verwaltung/rollen-vorgabe.png)
 
@@ -77,9 +77,13 @@ Das „Präfix Einsatznummer“ gilt nur für neue Einsätze; vergebene Einsatzn
 
 ### Rollen-Vorgabe
 
-Die Rolle wirkt wie die „Benötigte Rolle“ im Einsatz: „Führungskraft“ lässt nur Führungskräfte
-der Organisation und System-Admins in das Modul, „Admin“ nur System-Admins. Die Einsatzleitung
-eines Einsatzes kann die Vorgabe für ihren Einsatz mit einem eigenen Wert ersetzen.
+Die Rolle wirkt wie die „Benötigte Rolle“ im Einsatz: „Führung im Einsatz“ lässt Einsatzleitung
+und Führungspersonal jedes Einsatzes sowie Führungskräfte der Organisation hinein, „Führungskraft
+der Organisation“ nur Führungskräfte der Organisation, „Admin“ nur System-Admins; System-Admins
+kommen immer hinein. Was die Stufen im Einzelnen bedeuten, beschreibt das Kapitel
+[Einstellungen des Einsatzes und Module](einsatz-einstellungen.md) unter „Was ‚Sichtbar‘ und
+‚Benötigte Rolle‘ bewirken“. Die Einsatzleitung eines Einsatzes kann die Vorgabe für ihren Einsatz
+mit einem eigenen Wert ersetzen.
 
 ### Ort-Vorschau
 

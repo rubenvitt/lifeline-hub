@@ -30,7 +30,7 @@ und einen Ort. Er ist „offen“, bis er an eine zuständige Stelle „übergeb
 
 ### Einen Schaden erfassen
 
-1. „Schnellerfassung“ wählen. Es öffnet sich der Dialog „Schaden erfassen“.
+1. „Schaden erfassen“ wählen. Es öffnet sich der gleichnamige Dialog.
 2. „Typ“, „Ausmaß“ („gering“, „mittel“, „groß“, „katastrophal“) und „Ort“ angeben; die drei
    Felder sind Pflicht. Dazu eine „Beschreibung“.
 

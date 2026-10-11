@@ -1,3 +1,114 @@
+## [1.0.0-alpha.106](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.105...v1.0.0-alpha.106) (2026-10-11)
+
+### Kräfte und Mittel
+
+- **Bereitstellungsräume bearbeiten**: Bezeichnung, Standort und Notiz eines geplanten oder aktiven Bereitstellungsraums können jetzt nachträglich bearbeitet werden. Die Bearbeiten-Funktion steht direkt an den Raumdaten zur Verfügung.
+- **Stabilität bei Live-Aktualisierung**: Eingaben in offenen Bearbeitungs-Dialogen bleiben bei eingehenden Live-Updates erhalten und werden nicht überschrieben. Änderungen anderer Nutzer werden erst nach dem Speichern oder Schließen sichtbar.
+- **Automatische Aktualisierung**: Beim Wechsel des Bereitstellungsraums wird der Bearbeitungs-Dialog automatisch geschlossen und Gerätekopplungen werden neu geladen.
+
+### Dokumentation
+
+- Anwenderdokumentation zum Thema Bereitstellungsräume wurde an die neuen Bearbeitungsmöglichkeiten angepasst und Bildmaterial aktualisiert.
+
+## [1.0.0-alpha.105](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.104...v1.0.0-alpha.105) (2026-10-11)
+
+### Verwaltung
+
+**Einmalpasswörter für Benutzerkonten**
+
+Die Administration kann jetzt im Bearbeiten-Dialog eines Benutzerkontos ein vom System erzeugtes Einmalpasswort vergeben. Beim Vergeben werden alle aktiven Sitzungen der betroffenen Person beendet. Bei der nächsten Anmeldung mit diesem Einmalpasswort – auch nach erfolgreicher Zwei-Faktor-Authentifizierung – muss die Person sofort ein neues Passwort festlegen, bevor sie auf das System zugreifen kann.
+
+Die Vergabe von Einmalpasswörtern wird in der Administrationsspur protokolliert. Auch neu angelegte Benutzerkonten starten automatisch mit Passwort-Änderungszwang.
+
+Diese Funktion ermöglicht es, Konten nach Sicherheitsvorfällen oder bei Geräteverlust schnell abzusichern und gleichzeitig den betroffenen Personen einen kontrollierten Wiedereinstieg zu ermöglichen.
+
+## [1.0.0-alpha.104](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.103...v1.0.0-alpha.104) (2026-10-11)
+
+### Wichtige Änderungen
+
+Die Anwendung verfügt nun über eine vollständige Anwenderdokumentation mit über 40 Kapiteln und Bildmaterial zu allen wesentlichen Funktionen. Die Dokumentation ist direkt in der Anwendung unter dem Hilfe-Menü verfügbar und funktioniert auch ohne Internetverbindung.
+
+### Dokumentation
+
+- Vollständige Anwenderdokumentation mit Bildern zu allen Modulen: Einsatztagebuch, Meldungen, Aufträge, Erinnerungen, Nachforderung, Lagekarte, Gefahren, Wetter und Pegel, Lageberichte, Kräfte und Mittel, Einsatzabschnitte, Stab, Funkplan, Presse und Informationstelefon, Dokumente, Betroffene, Unfallhilfsstellen, Betreuung, Tiere, Schäden, Einstellungen, Verwaltung sowie alle Gerätevarianten
+- Jedes Kapitel enthält einen Überblick, Schritt-für-Schritt-Abläufe mit Bildern, Hintergrundwissen und Quellenangaben
+- Die Bilder werden beim ersten Aufruf geladen und stehen danach auch offline zur Verfügung
+- Kapitel zu Arbeiten ohne Netz, Gerät verloren, Rechte im Einsatz, Profil und Sicherheit überarbeitet
+- Betriebsdokumentation für Endgeräte an aktuelle Funktionen angepasst (Sitzungen beenden statt Benutzer deaktivieren)
+
+### Zugriffsverwaltung
+
+- Einsatzleitungen können ohne Systemadministrator-Rechte Personen der eigenen Organisation in den Einsatz aufnehmen – die Auswahl zeigt nur noch die Personen der eigenen Organisation
+- Systemadministratoren sehen in der Benutzerverwaltung nur noch die Konten der eigenen Organisation und können keine Benutzer anderer Organisationen mehr verwalten
+- Neuer zweiter Faktor kann in der Benutzerverwaltung zurückgesetzt werden, wenn ein Gerät verloren ging – mit deutlichem Hinweis, dass die eigene Anmeldung dabei beendet wird
+- Die Aktionen in der Benutzerverwaltung sind auf allen Bildschirmgrößen im Menü gebündelt statt als Knopfreihe dargestellt
+
+### Module und Berechtigungen
+
+- Neue Berechtigungsstufe „Führung im Einsatz" für Module: lässt Einsatzleitung, Führungspersonal und Führungskräfte der Organisation hinein, nicht aber Beobachter oder gekoppelte Geräte
+- Die bisherige Stufe „Führungskraft" heißt jetzt „Führungskraft der Organisation" und prüft weiterhin nur die Organisationsrolle
+- Gekoppelte Geräte werden nicht als „Führung im Einsatz" gezählt, auch wenn sie von Führungspersonal bedient werden
+
+### Zugangsprotokoll
+
+- Das Zugangsprotokoll zeigt Anmeldewege als Klartext (z. B. „Zweiter Faktor", „Gerätecode", „Mac-App") statt interner Kennungen
+- Zugangsänderungen enthalten strukturierte Angaben: alte und neue Rollen in Klartext, betroffenes Gerät, Zeitpunkt der Anmeldung im DTG-Format der Organisation
+- Der Kontofilter findet Personen auch bei Eingabe von Namensteilen
+- Die Sitzung merkt sich den Anmeldeweg und zeigt ihn auch beim Beenden an
+
+### Führung und Stab
+
+- Der Kommunikationsplan zeigt die eigene Führungsstelle (aus Einsatzdaten) als erste Zeile, wenn sie erfasst ist – mit Rufname und Verbindung aus Kommunikationsmittel und Erreichbarkeit
+- Taktische Zeichen in Meldebild und Organigramm sind im Nachtbetrieb durch eine helle Unterlage besser sichtbar
+
+### Einsatztagebuch
+
+- Schäden und Tiere werden im Einsatztagebuch mit Klartext-Bezeichnungen angezeigt statt mit internen Schlüsseln (z. B. „Umweltschaden (groß)" statt „umweltschaden (gross)")
+- Fehler beim Schließen eines Entwurfs werden abgefangen und als Hinweis über den Reitern angezeigt – der Reiter schließt trotzdem, das nächste Laden holt das Entfernen nach
+- Erfassungsknöpfe behalten nach dem Speichern zuverlässig ihre Beschriftung „Erfassen" und „Speichern und nächste"
+
+### Meldungen und Aufträge
+
+- Erinnerungen verweisen auf Meldungen, Aufträge und Tagebucheinträge mit der laufenden Nummer statt der Datenbank-ID
+- Späte Antworten nach einem Einsatzwechsel erscheinen nicht mehr fälschlich im neuen Einsatz – betrifft Betroffenen-Abgleich, Personenaufnahme und Lagekarten-Ansichten
+- Chat-Nachrichten behalten Zeilenumbrüche im Verlauf (Umschalt+Enter im Eingabefeld)
+
+### Lage
+
+- Warnstufe „Keine" wird in der Gefahren-Matrix als „–" dargestellt und nicht mehr herausgefiltert
+- Gefahrengebiete können per Deeplink direkt ausgewählt werden, ohne dass ein zweiter Klick die Auswahl wieder aufhebt
+- Entwurfs-Gruppierungen zeigen „1 Entwurf" statt „1 Entwürfe"
+- Kennzahlen des Lagebilds (Kräftemeldebild) werden in der Übernahme-Vorschau als Liste dargestellt
+
+### Oberfläche
+
+- Der Einsatzname in der Kopfzeile überdeckt auf schmalen Bildschirmen (Führungs-Tablet, 1024 px) nicht mehr die Suche – die Kopfzeile bricht bei Bedarf auf zwei Zeilen um
+- Ein unsichtbarer Platzhalter hält die Breite der Einsatznummer beim Laden, damit die Kopfzeile nicht nachträglich springt
+- Präfix-Platzhalter in den Nummernkreis-Einstellungen sind jetzt spezifisch („z. B. M-", „z. B. A-")
+- Das Fristfeld der Sofortmeldung ist breiter, sodass der Platzhalter nicht mehr abgeschnitten wird
+- R-Nummern im Register brechen auf Handschuh-Dichte nicht mehr um
+- Der Kopfknopf heißt jetzt „Schaden erfassen" statt „Schnellerfassung"
+- Das Zugangsprotokoll zeigt den Ortspfad „Verwaltung" für seine eigene Seite
+
+### Geräte
+
+- Abgelaufene Kopplungen bieten kein Aktionsmenü mehr an – ein vergessenes Gerät soll nicht wieder aufwachen
+- Abgelehnte Queue-Einträge werden nach 30 Tagen automatisch vom Gerät gelöscht
+
+### Druck
+
+- Titel vor langen Tabellen bleiben im Firefox-Druck bei Kopf und erster Zeile der Tabelle – kein Seitenumbruch mehr direkt nach dem Titel
+- Bilder in der Hilfe werden nicht über Seitengrenzen zerteilt und bleiben in der Seitenbreite
+
+### Datenschutz
+
+- Betroffene liegen ohne Freitexte auf der Gerätespeicherung
+- Daten einer Kategorie bleiben während der 30-tägigen Karenz nach Einsatzende lesbar – Organisationen mit gesetzlicher Höchstfrist müssen Aufbewahrungsdauer plus Karenz unter der Höchstfrist halten
+
+### Verwaltung
+
+- Die Vorgabe-Quittierfrist für Aufträge heißt in der Verwaltung nun wie im Einsatz „Vorgabe-Quittierfrist Aufträge (Minuten)"
+
 ## [1.0.0-alpha.103](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.102...v1.0.0-alpha.103) (2026-10-10)
 
 ### Lagekarte

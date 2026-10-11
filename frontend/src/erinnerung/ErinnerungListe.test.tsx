@@ -171,14 +171,15 @@ describe('ErinnerungListe', () => {
   it('zeigt einen Deeplink zum Bezugsobjekt (Auftrag) mit Objekt-Selektion', () => {
     renderListe(
       <ErinnerungListe
-        erinnerungen={[erinnerung({ bezug_typ: 'auftrag', bezug_id: 42 })]}
+        erinnerungen={[erinnerung({ bezug_typ: 'auftrag', bezug_id: 42, bezug_lfd_nr: 3 })]}
         darfSchreiben
         onErledigen={() => {}}
         onQuittieren={() => {}}
       />,
     );
-    const link = screen.getByRole('link', { name: /Auftrag #42/ });
-    // Der Deeplink selektiert das referenzierte Objekt, statt nur auf die Liste zu zeigen.
+    // Der Text nennt die laufende Nummer (LFH-1146); der Deeplink selektiert das referenzierte
+    // Objekt über seine id, statt nur auf die Liste zu zeigen.
+    const link = screen.getByRole('link', { name: '↗ Auftrag #3' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=42');
   });
 

@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { waehleImMenue } from './menue-kern';
 import { anmeldenAls, anmeldenAlsAdmin, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /*
@@ -113,7 +114,7 @@ test('ein Admin beendet die Anmeldung in der Benutzerverwaltung', async ({ page,
   // Ab 50 Konten blättert die Tabelle; die Zeile steht erst nach der Suche sicher auf Seite 1.
   await page.getByPlaceholder('Name oder Benutzername').fill(person.benutzername);
   const zeile = page.getByRole('row').filter({ hasText: `@${person.benutzername}` });
-  await zeile.getByRole('button', { name: 'Anmeldungen' }).click();
+  await waehleImMenue(page, zeile.getByRole('button', { name: /^Aktionen zu/ }), 'Anmeldungen');
   const dialog = page.getByRole('dialog', { name: 'Anmeldungen · E2E Verlust' });
   await dialog.getByRole('button', { name: 'Anmeldung Safari · iPadOS beenden' }).click();
   await expect(dialog.getByText('Keine Anmeldungen')).toBeVisible();

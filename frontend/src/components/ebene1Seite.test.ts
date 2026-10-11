@@ -26,6 +26,12 @@ describe('ebene1Seite', () => {
     expect(ebene1Seite('/admin/benutzer').titel).toEqual(['Benutzer', 'Verwaltung']);
     expect(ebene1Seite('/admin/demo-daten').titel).toEqual(['Demo-Daten', 'Verwaltung']);
     expect(ebene1Seite('/admin/aufbewahrung/4').titel).toEqual(['Aufbewahrung', 'Verwaltung']);
+    // Ohne Eintrag fiel das Zugangsprotokoll auf „nur Verwaltung“, und der Ortspfad blendete
+    // diesen letzten Teil als Seitennamen aus (LFH-1151).
+    expect(ebene1Seite('/admin/zugangsprotokoll')).toEqual({
+      titel: ['Zugangsprotokoll', 'Verwaltung'],
+      ort: ['Verwaltung', 'Zugangsprotokoll'],
+    });
   });
 
   it('Verwaltung ohne bekannte Sektion nennt nur den Bereich', () => {

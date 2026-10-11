@@ -11,8 +11,13 @@ import type {
 } from '../api/types';
 import { anzahl } from '../anzeige/anzahl';
 import { kommunikationsmittelLabel } from '../components/kommunikationsmittel';
-import { einheitDetailPfad, einsatzabschnittePfad } from '../routing/deeplinks';
+import { einheitDetailPfad, einsatzabschnittePfad, einsatzdatenPfad } from '../routing/deeplinks';
 import { besetzungDarstellung, zeileFuer } from './besetzung';
+import {
+  FUEHRUNGSSTELLE_STELLE,
+  fuehrungsstelleErfasst,
+  type FuehrungsstelleQuelle,
+} from './fuehrungsstelle';
 import { ZUSTAND_GRUND } from './funkplan';
 import type { Quelle } from './luecken';
 import { bedingungszeichenText } from './skizzenZeichen';
@@ -26,6 +31,9 @@ import { bedingungszeichenText } from './skizzenZeichen';
  *   (Server, `api/kommunikationsplan.ts`).
  * - **Abgeleitet** sind Abschnitte und Einheiten mit Kommunikationsmittel oder Erreichbarkeit;
  *   ihre Angaben werden dort gepflegt, die Zeile führt hin. Keine zweite Datenhaltung.
+ * - **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist ebenso abgeleitet: erste Zeile der
+ *   Gruppe „Einsatzleitung und Stab“, sobald sie erfasst ist (`fuehrungsstelleErfasst`, dieselbe
+ *   Regel wie im Funkplan), gepflegt auf Einsatzdaten.
  * - **Die Verbindung gehört der Stelle.** Die Besetzung aus dem Stab ist nur Nebentext;
  *   Kontaktangaben des Einsatzpersonals kommen hier nie vor.
  * - Eine fehlende Quelle ist kein leerer Bestand: die Gruppe trägt ihren Zustand.
@@ -91,8 +99,8 @@ interface ZeileBasis {
   nebentext: string | null;
   /**
    * Kanäle einer externen Stelle als Nebentext (LFH-893), z. B. „TMO SL AS (geplant)“; gepflegt
-   * in der Fernmeldeskizze. Funktionen, Abschnitte und Einheiten: leer (ihre Sprechgruppen stehen
-   * im Funkplan).
+   * in der Fernmeldeskizze. Führungsstelle, Funktionen, Abschnitte und Einheiten: leer (ihre
+   * Sprechgruppen stehen im Funkplan).
    */
   kanaele: string[];
   verbindungen: VerbindungsAnzeige[];
@@ -100,6 +108,7 @@ interface ZeileBasis {
 
 export type KommunikationsZeile =
   | (ZeileBasis & { art: 'gepflegt'; stelle: KommunikationsStelle })
+  | (ZeileBasis & { art: 'fuehrungsstelle'; ziel: string })
   | (ZeileBasis & { art: 'abschnitt'; ziel: string })
   | (ZeileBasis & { art: 'einheit'; ziel: string });
 
@@ -118,6 +127,8 @@ export interface KommunikationsplanQuellen {
   einheiten: Quelle<Einheit>;
   /** Besetzung des Stabs; nur für den Nebentext der Sachgebiete. */
   stab: { zustand: AbrufZustand; daten: Stab | undefined };
+  /** Die eigene Führungsstelle (LFH-849), eine einzelne Angabe mit eigener Weiche. */
+  fuehrungsstelle: FuehrungsstelleQuelle;
 }
 
 /**
@@ -209,6 +220,31 @@ function gepflegteZeile(
   };
 }
 
+/**
+ * Die Zeile der eigenen Führungsstelle (LFH-1148): erfasst mit Rufname als Nebentext und der
+ * Verbindung aus Kommunikationsmittel und Erreichbarkeit; nicht erfasst keine Zeile. Fehlt die
+ * Quelle, steht die Zeile mit Grund da, denn ihr Fehlen hieße sonst „nicht erfasst“. Lädt sie
+ * noch, steht nichts.
+ */
+function fuehrungsstelleZeile(q: KommunikationsplanQuellen): KommunikationsZeile | null {
+  const { zustand, daten } = q.fuehrungsstelle;
+  if (zustand === 'laden') return null;
+  if (zustand === 'daten' && !fuehrungsstelleErfasst(daten)) return null;
+  const schluessel = 'fs';
+  return {
+    art: 'fuehrungsstelle',
+    schluessel,
+    kennung: FUEHRUNGSSTELLE_STELLE,
+    nebentext: zustand === 'daten' ? daten?.rufname?.trim() || null : ZUSTAND_GRUND[zustand],
+    kanaele: [],
+    ziel: einsatzdatenPfad(q.einsatzId),
+    verbindungen:
+      zustand === 'daten'
+        ? abgeleiteteVerbindung(schluessel, daten?.kommunikationsmittel, daten?.erreichbarkeit)
+        : [],
+  };
+}
+
 function hatAngaben(x: { kommunikationsmittel?: string | null; erreichbarkeit?: string | null }) {
   return Boolean(x.kommunikationsmittel?.trim() || x.erreichbarkeit?.trim());
 }
@@ -227,12 +263,12 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
     zeilen: zustand === 'daten' ? zeilen : [],
   });
 
+  const fs = fuehrungsstelleZeile(q);
   return [
-    gruppe(
-      'stab',
-      q.stellen.zustand,
-      stellen.filter((s) => s.stellenart === 'funktion').map((s) => gepflegteZeile(s, q.stab)),
-    ),
+    gruppe('stab', q.stellen.zustand, [
+      ...(fs ? [fs] : []),
+      ...stellen.filter((s) => s.stellenart === 'funktion').map((s) => gepflegteZeile(s, q.stab)),
+    ]),
     gruppe(
       'abschnitte',
       q.abschnitte.zustand,

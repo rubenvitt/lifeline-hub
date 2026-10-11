@@ -40,7 +40,7 @@ const FAELLE: Fall[] = [
     schalter: 'Benutzer',
     status: 'Status',
     zeile: 'Eva Muster',
-    menue: 'Aktionen zu Benutzer Eva Muster',
+    menue: 'Aktionen zu Benutzer Eva Muster (@eva)',
     render: () => {
       server.use(
         meHandler(admin),
@@ -246,7 +246,9 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     );
     FAELLE[0].render();
     await screen.findByText('Eva Muster');
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Benutzer Eva Muster' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Aktionen zu Benutzer Eva Muster (@eva)' }),
+    );
     await waitFor(() => expect(offenesMenue()).not.toBeNull());
     await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: 'Deaktivieren' }));
     await waitFor(() => expect(gesendet).toEqual(['2']));

@@ -45,7 +45,7 @@ test.describe(KAPITEL, () => {
     await fuelle(page, 'put', pfad('lageberichte'), { sichtbar: false, benoetigte_rolle: null });
     await fuelle(page, 'put', pfad('lagemeldungen'), {
       sichtbar: true,
-      benoetigte_rolle: 'fuehrungskraft',
+      benoetigte_rolle: 'einsatzfuehrung',
     });
     try {
       await uhrAnhalten(page);

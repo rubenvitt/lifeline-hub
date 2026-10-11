@@ -189,6 +189,8 @@ test.describe(KAPITEL, () => {
     await expect(page.getByText('0561 7000 112')).toBeVisible();
     await expect(page.getByText('presse@musterstadt.example')).toBeVisible();
     await expect(page.getByText('Sanitätsdienst · EA 1')).toBeVisible();
+    // Die eigene Führungsstelle (LFH-1148) lädt getrennt; ohne Anker fehlte die Zeile mal.
+    await expect(page.getByText('0561 123 4567')).toBeVisible();
     await fotografiere(page, KAPITEL, 'kommunikationsplan');
   });
 

@@ -764,9 +764,14 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste
   expect(verdeckt.besuchteZiele).toEqual(['Leistenprobe']);
   expect(verdeckt.verdeckt).toHaveLength(1);
   expect(verdeckt.verdeckt[0]).toContain('e2e-einheit-leiste');
-  // Gegenprobe am selben Ziel: die Geometrie außerhalb der Leiste muss frei sein.
+  // Gegenprobe am selben Ziel: die Geometrie außerhalb der Leiste muss frei sein. Gemessen ab
+  // der Rahmenkante (`--lfh-rahmen-oben`), nicht ab einer festen Zeile: in `handschuh` bricht
+  // der Kopf bei 1366 px mit gestörter Alarmzentrale auf zwei Zeilen um (LFH-1126).
   await page.locator('#e2e-leistenprobe').evaluate((el) => {
-    el.style.top = '100px';
+    const rahmenOben = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
+    );
+    el.style.top = `${rahmenOben + 28}px`;
   });
   await page.locator('#e2e-probenstart').focus();
   expect((await pruefeFokusVerdeckung(page, 1)).verdeckt).toEqual([]);

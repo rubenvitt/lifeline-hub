@@ -11,7 +11,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
-  `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
+  `einsatzbericht-deckel-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
@@ -48,9 +49,18 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (zwei Subgrids desselben Rasters, die Etikettspalte bleibt gleich breit), eine Tabelle bis
   `KURZE_TABELLE` Zeilen ganz, aber nur in Firefox (`titelblock-tabelle` unter
   `@supports (-moz-appearance: none)`): Chromium hält Titel, Kopf und erste Zeile selbst
-  zusammen, eine Hülle rückte dort die ganze Tabelle weiter. Eine längere bleibt draußen: in einer
-  Hülle, die nicht bricht, rückt sie samt Titel auf die nächste Seite und lässt davor fast eine
-  Seite leer.
+  zusammen, eine Hülle rückte dort die ganze Tabelle weiter. Vor einer längeren steht der
+  **Deckel** (LFH-1124, Herleitung
+  `openspec/changes/archive/2026-10-10-lfh-1124-firefox-titel-lange-tabelle/design.md`): Titel
+  und eine Kopie der Tabelle (`aria-hidden`), von der nur Kopf und erste Zeile Höhe haben, die
+  übrigen Zeilen sind Maßzeilen der Höhe 0 und halten die Spalten beider Tabellen gleich. Im
+  Firefox-Druck bricht er nicht, deckt weiß (`print-color-adjust: exact`) und liegt über der
+  echten Tabelle, die um `--druck-kopfhoehe` hochgezogen ist und deren erste Zeile dort eine
+  Maßzeile ist. Im Markup ist der Deckel `display: contents` und die Kopie `display: none` ohne
+  eigene Hülle: jede Box zwischen Titel und Tabelle trennte in Chromium den Titel ab. Im
+  Firefox-Druck brechen Spaltenköpfe am Deckel nicht um, sie müssen kurz bleiben. Nachweis
+  `e2e/einsatzbericht-deckel-druck.spec.ts`, Umbruch mit der Verschiebeprobe im `werkzeug/` der
+  Change.
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
   brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur

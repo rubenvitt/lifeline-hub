@@ -465,15 +465,22 @@ describe('EinsatzLayout', () => {
 
   it('der Einsatzname sitzt im Restbreiten-Rahmen', async () => {
     // Der Rahmen ist eine Hälfte der Kürzung, die andere (Ellipsis, `title`) sitzt im Switcher.
-    // Ohne `min-width: 0` kürzt ein Flex-Kind nicht, sondern schiebt seine Nachbarn hinaus.
     setup();
     // `parentElement` ist belastbar: antds Dropdown klont sein Kind, statt es einzupacken.
     const switcher = await screen.findByRole('button', { name: /Hochwasser Nord/ });
     const rahmen = switcher.parentElement!;
-    expect(rahmen.style.minWidth).toBe('0px');
+    // Boden = Trefffläche des Wechslers, nicht 0 und nicht die Namenslänge (LFH-1126):
+    // `contain: inline-size` nimmt den Namen aus der Eigenbreite, sonst kürzte ein langer Name
+    // nicht, sondern schöbe die Nachbarn hinaus.
+    expect(Number.parseFloat(rahmen.style.minWidth)).toBeGreaterThan(0);
+    expect(rahmen.style.contain).toBe('inline-size');
     expect(rahmen.style.flexGrow).toBe('1');
     // `flex-basis: 0`: mit `auto` wüchse der Rahmen mit einem langen Namen über die Kopfzeile.
     expect(rahmen.style.flexBasis).toBe('0px');
+    // Die Namensgruppe (Zelle → Gruppe) schrumpft nie unter festen Teil plus Trefffläche: ab
+    // diesem Maß bricht der Kopf um, statt den Wechsler über die Suche zu schieben.
+    const gruppe = rahmen.parentElement!.parentElement!;
+    expect(gruppe.style.minWidth).toBe('min-content');
   });
 
   /**

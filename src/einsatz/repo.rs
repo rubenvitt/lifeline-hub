@@ -1,7 +1,7 @@
 use super::berechtigung::darf_lesen;
 use super::{
     Einsatz, EinsatzAnzeige, EinsatzRolle, EinsatzStatus, Einsatzart, MitgliedAnzeige,
-    EINSATZ_ROLLE_LEITUNG, STATUS_ABGESCHLOSSEN,
+    MitgliedAuswahl, EINSATZ_ROLLE_LEITUNG, STATUS_ABGESCHLOSSEN,
 };
 use crate::auth::{Benutzer, FremdeinsatzLesezugriff};
 use crate::error::AppError;
@@ -1246,6 +1246,31 @@ pub async fn patche_kopf(
     ergebnis?;
 
     laden(pool, einsatz_id).await
+}
+
+/// Die Personen, die sich in den Einsatz aufnehmen lassen (LFH-1141): aktive Personenkonten der
+/// Organisation des Einsatzes ohne Mitgliedschaft, sortiert nach Anzeigename. Dieselbe Menge, die
+/// `routes::einsatz::mitglied_setzen` und [`setze_mitgliedschaft`] annehmen (design.md D2); ein
+/// Test nimmt jeden Eintrag auf (`tests/einsatz_mitglieder_auswahl.rs`).
+pub async fn mitglied_auswahl(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<MitgliedAuswahl>, AppError> {
+    let sql = format!(
+        "SELECT b.id AS benutzer_id, b.anzeigename \
+         FROM benutzer b JOIN einsatz e ON e.id = ? \
+         WHERE b.org_id = e.org_id AND b.aktiv = 1 AND {} \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_mitgliedschaft m \
+                           WHERE m.einsatz_id = e.id AND m.benutzer_id = b.id) \
+         ORDER BY b.anzeigename COLLATE NOCASE, b.id",
+        crate::geraet::repo::OHNE_GERAETEKONTEN
+    );
+    Ok(
+        sqlx::query_as::<_, MitgliedAuswahl>(sqlx::AssertSqlSafe(sql))
+            .bind(einsatz_id)
+            .fetch_all(pool)
+            .await?,
+    )
 }
 
 /// Alle Mitglieder eines Einsatzes (mit Benutzer-Klartext), sortiert nach Zuweisung.

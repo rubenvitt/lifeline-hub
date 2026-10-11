@@ -72,6 +72,7 @@ async fn fordere_lesen<T: DokumentRoute>(
         einsatz.org_id,
         T::MODUL_KEY,
         benutzer,
+        rolle,
     )
     .await
 }
@@ -91,6 +92,7 @@ async fn fordere_schreiben<T: DokumentRoute>(
         einsatz.org_id,
         T::MODUL_KEY,
         benutzer,
+        rolle,
     )
     .await?;
     fordere_aktiv(&einsatz)

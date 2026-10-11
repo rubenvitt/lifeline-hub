@@ -66,6 +66,9 @@ const AUSNAHMEN: Record<string, string> = {
   'auth.ts#MfaErforderlich':
     'Zweig einer `#[serde(untagged)]`-Union (`LoginAntwort`), bewusst NICHT im Typ-Codegen ' +
     'registriert — die Nicht-TOTP-Form bleibt byte-identisch `BenutzerAnzeige` (LFH-43).',
+  'auth.ts#PasswortWechselErforderlich':
+    'Weiterer Zweig derselben untagged Union (`LoginAntwort`, auch Antwort von `totp/finish`), ' +
+    'aus demselben Grund nicht im Codegen: Änderungszwang nach Einmalpasswort (LFH-1121).',
   'webauthn.ts#WebauthnCreationChallenge':
     'Hülle um `PublicKeyCredentialCreationOptionsJSON` aus @simplewebauthn/browser; das Backend ' +
     'serialisiert einen Fremdcrate-Typ (webauthn_rs) ohne ToSchema (LFH-275).',

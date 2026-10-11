@@ -60,6 +60,11 @@ describe('MeldungFormular', () => {
       'placeholder',
       'Frist (Vorgabe)',
     );
+    // Antds Vorgabebreite (90 px) schnitt den Platzhalter neben „Min“ zu „Frist (…“ ab. Das Feld
+    // nimmt bis 200 px und schrumpft am schmalen Schirm (LFH-1151).
+    expect(
+      screen.getByLabelText('Bestätigungsfrist in Minuten').closest('.ant-input-number'),
+    ).toHaveStyle({ flex: '0 1 200px' });
     await userEvent.type(screen.getByLabelText('Bestätigungsfrist in Minuten'), '30');
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));

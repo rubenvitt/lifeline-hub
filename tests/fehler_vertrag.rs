@@ -211,12 +211,13 @@ async fn zu_grosser_login_body_liefert_413_im_fehler_envelope() {
     assert_eq!(json["error"], BODY_ZU_GROSS, "abgewiesen wegen der Größe");
 }
 
-/// Die übrigen öffentlichen Routen mit Body tragen nur einen kurzen Code und haben ebenfalls
-/// 4 KiB (LFH-1061).
-const OEFFENTLICHE_CODE_ROUTEN: [&str; 3] = [
+/// Die übrigen öffentlichen Routen mit Body tragen nur einen kurzen Code (oder ein neues Passwort
+/// nach einem Einmalpasswort, LFH-1121) und haben ebenfalls 4 KiB (LFH-1061).
+const OEFFENTLICHE_CODE_ROUTEN: [&str; 4] = [
     "/api/auth/totp/finish",
     "/api/auth/app-code/einloesen",
     "/api/geraete/koppeln",
+    "/api/auth/passwort/festlegen",
 ];
 
 fn json_post(pfad: &str, body: &str) -> Request<Body> {

@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { kontoAnlegen } from './konto-anlegen';
 
 /**
  * Rollen für die Layout-Gates (LFH-435). Ein Gate, das nur als `admin` misst, läuft durch die
@@ -60,17 +61,14 @@ export async function benutzerAnlegen(
   zaehler += 1;
   const benutzername = `e2e-${rolle}-${Date.now()}-${zaehler}-${Math.floor(Math.random() * 1e6)}`;
   const passwort = `e2e-${rolle}-passwort-123`;
-  const antwort = await page.request.post('/api/benutzer', {
-    data: {
-      anzeigename,
-      benutzername,
-      passwort,
-      ...(rolle === 'fuehrungskraft' ? { org_rolle: 'fuehrungskraft' } : {}),
-    },
+  // Ein still gescheitertes Seeding führte zurück in den Admin-Zustand — grün durch Nichtstun;
+  // `kontoAnlegen` prüft Anlage und Erstwechsel (LFH-1121).
+  const { id } = await kontoAnlegen(page.request, {
+    anzeigename,
+    benutzername,
+    passwort,
+    ...(rolle === 'fuehrungskraft' ? { org_rolle: 'fuehrungskraft' as const } : {}),
   });
-  // Ein still gescheitertes Seeding führte zurück in den Admin-Zustand — grün durch Nichtstun.
-  expect(antwort.ok(), `Benutzer ${rolle}: ${antwort.status()} ${await antwort.text()}`).toBe(true);
-  const { id } = (await antwort.json()) as { id: number };
   return { id, benutzername, passwort };
 }
 

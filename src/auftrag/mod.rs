@@ -284,11 +284,17 @@ pub async fn anreichern_alle(
     einsatz_id: i64,
     org_id: i64,
     benutzer: &crate::auth::Benutzer,
+    einsatz_rolle: Option<crate::einsatz::EinsatzRolle>,
     auftraege: &mut [AuftragDetail],
 ) -> Result<(), crate::error::AppError> {
-    let aufloeser =
-        crate::fuehrung::aufloesung::Aufloeser::laden_fuer(pool, einsatz_id, org_id, benutzer)
-            .await?;
+    let aufloeser = crate::fuehrung::aufloesung::Aufloeser::laden_fuer(
+        pool,
+        einsatz_id,
+        org_id,
+        benutzer,
+        einsatz_rolle,
+    )
+    .await?;
     for d in auftraege.iter_mut() {
         for e in d.empfaenger.iter_mut() {
             e.aktuelle_besetzung = aufloeser.aufloesen(
