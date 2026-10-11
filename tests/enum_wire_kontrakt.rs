@@ -518,7 +518,7 @@ fn orphan_enums_wire() {
     });
 
     // Adresssuche der Lagekarte (LFH-638)
-    enum_wire!(lifeline_hub::routes::karte_ort_suche::OrtSucheZustand {
+    enum_wire!(lifeline_hub::routes::ort_suche::OrtSucheZustand {
         Ok => "ok",
         Ausgelastet => "ausgelastet",
         NichtErreichbar => "nicht_erreichbar",

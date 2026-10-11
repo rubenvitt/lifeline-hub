@@ -9368,6 +9368,13 @@
           "name"
         ],
         "properties": {
+          "kurz": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kurzadresse „Straße Nr, PLZ Ort“, wenn der Geocoder die Teile liefert (LFH-1175)."
+          },
           "lat": {
             "type": "number",
             "format": "double"

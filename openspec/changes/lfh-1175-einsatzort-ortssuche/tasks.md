@@ -2,15 +2,15 @@
 
 ## 1. Server: Such-Kern und Kurzadresse
 
-- [ ] 1.1 `src/geocoding/suche.rs`: Anfrage mit `addressdetails=1`, `OrtTreffer.kurz` aus den Adressteilen („Straße Nr, PLZ Ort“, fehlende Teile ohne Trennzeichen); Unit-Tests für volle Adresse, nur Ort, ohne Teile und den Parameter am Stub, zuerst rot
-- [ ] 1.2 Gemeinsamen Kern aus `src/routes/karte_ort_suche.rs` nach `src/routes/ort_suche.rs` ziehen (`pruefe_suchtext`, DTOs, `antwort_aus`, `kurz` mit `skip_serializing_if`); bestehende Unit-Tests wandern mit und bleiben grün, `tests/karte_ort_suche.rs` grün
-- [ ] 1.3 `scripts/check-typ-codegen.sh`: `openapi.json` und `frontend/src/api/types.generated.ts` neu, beide mitcommitten
+- [x] 1.1 `src/geocoding/suche.rs`: Anfrage mit `addressdetails=1`, `OrtTreffer.kurz` aus den Adressteilen („Straße Nr, PLZ Ort“, fehlende Teile ohne Trennzeichen); Unit-Tests für volle Adresse, nur Ort, ohne Teile und den Parameter am Stub, zuerst rot
+- [x] 1.2 Gemeinsamen Kern aus `src/routes/karte_ort_suche.rs` nach `src/routes/ort_suche.rs` ziehen (`pruefe_suchtext`, DTOs, `antwort_aus`, `kurz` mit `skip_serializing_if`); bestehende Unit-Tests wandern mit und bleiben grün, `tests/karte_ort_suche.rs` grün
+- [x] 1.3 `scripts/check-typ-codegen.sh`: `openapi.json` und `frontend/src/api/types.generated.ts` neu, beide mitcommitten
 
 ## 2. Server: neue Einstiege
 
 - [ ] 2.1 `GET /api/einsaetze/{id}/ort-suche` mit `EinsatzVerwaltungszugriff`, Umgebung = Einsatzort, `PFAD_KEY` ohne Modul; Integrationstests in `tests/ort_suche.rs`: Führungspersonal ohne Lagekarte 200 mit Treffern und `viewbox`, Beobachter 403, fremde Org 404, Suchtext zu kurz 400, Geocoder geschlossen → `nicht_erreichbar` mit 200 (Stub nicht gefragt, wo verlangt); `tests/einsatz_kontext_guard.rs` grün
 - [ ] 2.2 `GET /api/ort-suche` mit `darf_einsatz_anlegen()`, Geocoder der Org des Benutzers, ohne `viewbox`; Integrationstests: Führungskraft 200, Helfer 403 ohne Geocoder-Anfrage, zwei Orgs mit verschiedenen Geocodern → Anfrage am Stub der eigenen Org, 400 bei zu kurzem Text
-- [ ] 2.3 Routen in `src/api_doc.rs` dokumentiert; Codegen erneut prüfen
+- [ ] 2.3 Schema-Pfade der DTOs in `src/api_doc.rs` und `tests/enum_wire_kontrakt.rs` auf `routes::ort_suche` (das OpenAPI-Dokument führt keine Pfade); Codegen erneut prüfen
 
 ## 3. Server: Einsatzort beim Anlegen, Prüfung der Koordinate
 
