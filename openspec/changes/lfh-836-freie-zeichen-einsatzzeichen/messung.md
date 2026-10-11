@@ -110,3 +110,31 @@ wächst um 4,96 kB, weil die Picker-Logik (`zeichenWahl.ts`, „zuletzt verwende
 Inspector-Kachel) dort liegt, während der Katalog des Altpakets im geteilten Zeichen-Chunk lag.
 Den Picker in einen eigenen Lazy-Chunk auszulagern, würde die Gesamtmenge nicht senken. Es
 brächte nur eine Ladeverzögerung beim ersten Öffnen. Wir verzichten deshalb darauf.
+
+## Kosten des Pickers im echten Browser (Task 7.3, 11.10.2026)
+
+Gemessen im Prod-Bundle (`pnpm run build`, Stand nach `4f6eaad12`), ausgeliefert vom e2e-Backend
+wie im Einsatz, mit Playwright-Chromium (headless, Build 1194 / Chromium 141, Cloud-Container mit
+4 Kernen, Xeon 2,8 GHz), Viewport 1440 × 1000, Dichte `kompakt`. Sieben Runden, jede in einem
+frischen Browserkontext (kalter Modulzustand, Service Worker gesperrt). Gemessen wurde in der
+Seite von `click()` auf das Bedienelement bis zum ersten gemalten Bild danach
+(`requestAnimationFrame` + `setTimeout 0`), also die Wartezeit, die eine Person sieht. Die Messspec
+lag nur temporär im Baum (nicht committet).
+
+| Messpunkt | Median ms | min | max | jsdom (5.2) |
+| --- | ---: | ---: | ---: | ---: |
+| Öffnen („Taktisches Zeichen platzieren“ → Raster steht) | 829 | 806 | 1026 | 570 (nur Optionen) |
+| erster Wechsel Formation → Landfahrzeug | 620 | 590 | 839 | 529 |
+| Wechsel zurück auf die Formation (schon besucht) | 21 | 20 | 31 | — |
+| wiederholter Wechsel auf das Landfahrzeug | 21 | 20 | 25 | 0,1 |
+| „Kein Grundzeichen“ (freistehende Optionen, 226 + Varianten) | 105 | 86 | 120 | ≈ 11 (nur Vokabular) |
+| erster Wechsel auf eine weitere Art (Gefahr) | 430 | 418 | 504 | — |
+
+**Befund:** Der erste Wechsel auf eine noch nicht besuchte Grundzeichenart liegt im Browser mit
+rund 0,4–0,6 s deutlich über 300 ms, ebenso das Öffnen mit rund 0,8 s. Ein wiederholter Wechsel
+ist mit rund 20 ms flüssig. Teuer ist das probeweise Zeichnen der Kandidaten in `vocabulary()`
+beim ersten Besuch einer Art (siehe Gegenprobe in 5.2). Nicht umgebaut; die Entscheidung über ein
+Vorausberechnen je Art (Risiko „Picker-Kosten“ in design.md) liegt beim Main-Loop.
+
+Nebenbefund Bundle: Mit den beiden Picker-Fixes (zweite Darstellungen, Entwurf ohne Zeichen) liegt
+`LagekartePage` bei 135.74 kB (gzip 42.72), Precache 6657.96 KiB (34 Einträge).
