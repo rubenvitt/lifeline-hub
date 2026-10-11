@@ -111,6 +111,11 @@
   border-radius: 0;
 }
 
+/* Nachtmodus: die Fotos sind hell aufgenommen; ein Filter dreht sie um (wie auf der Website). */
+:root[data-theme='dark'] .hilfe-bild {
+  filter: invert(0.92) hue-rotate(180deg);
+}
+
 .hilfe-bild--fehlt {
   padding: 8px;
   color: var(--lfh-text-2);
