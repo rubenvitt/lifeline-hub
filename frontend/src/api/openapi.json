@@ -280,7 +280,7 @@
       },
       "AdminAktion": {
         "type": "string",
-        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` —\nbeide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql` und\n`0174_admin_audit_einmalpasswort.sql` — beide Seiten müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
         "enum": [
           "benutzer_angelegt",
           "benutzer_deaktiviert",
@@ -289,7 +289,8 @@
           "zweitfaktor_zurueckgesetzt",
           "anmeldeweg_aktiviert",
           "anmeldeweg_deaktiviert",
-          "sitzung_beendet"
+          "sitzung_beendet",
+          "einmalpasswort_vergeben"
         ]
       },
       "AdressatKategorie": {
@@ -3767,6 +3768,18 @@
           "metrisch",
           "imperial"
         ]
+      },
+      "Einmalpasswort": {
+        "type": "object",
+        "description": "Antwort von `POST /api/benutzer/{id}/einmalpasswort` (LFH-1121): das erzeugte Einmalpasswort,\ngenau dieses eine Mal.",
+        "required": [
+          "einmalpasswort"
+        ],
+        "properties": {
+          "einmalpasswort": {
+            "type": "string"
+          }
+        }
       },
       "EinsatzAnzeige": {
         "type": "object",

@@ -9,13 +9,32 @@ export interface MfaErforderlich {
   mfa_erforderlich: string;
 }
 
+/** Schmale Antwort auf `POST /api/auth/login` bzw. `POST /api/auth/totp/finish`, wenn das Konto
+ *  unter Änderungszwang steht (LFH-1121, Einmalpasswort): KEIN Benutzer, KEINE Session; der Server
+ *  setzt ein HttpOnly `passwort_wechsel`-Cookie, weiter geht es über {@link passwortFestlegen}.
+ *  Wie {@link MfaErforderlich} untagged und nicht im Typ-Codegen. */
+export interface PasswortWechselErforderlich {
+  passwort_wechsel_erforderlich: true;
+}
+
 export function login(
   benutzername: string,
   passwort: string,
-): Promise<BenutzerAnzeige | MfaErforderlich> {
-  return apiSend<BenutzerAnzeige | MfaErforderlich>('/api/auth/login', 'POST', {
-    benutzername,
-    passwort,
+): Promise<BenutzerAnzeige | MfaErforderlich | PasswortWechselErforderlich> {
+  return apiSend<BenutzerAnzeige | MfaErforderlich | PasswortWechselErforderlich>(
+    '/api/auth/login',
+    'POST',
+    { benutzername, passwort },
+  );
+}
+
+/** Legt nach einem Login mit Einmalpasswort das eigene Passwort fest (LFH-1121) und öffnet damit
+ *  erst die Sitzung. Die Identität kommt allein aus dem `passwort_wechsel`-Cookie. `422`, wenn das
+ *  neue dem bisherigen gleicht, `400` bei falscher Länge, `401` ohne gültigen Zwischenschritt —
+ *  alle als {@link ApiError}. Request-DTO handgepflegt (Server: `PasswortFestlegen`). */
+export function passwortFestlegen(neuesPasswort: string): Promise<BenutzerAnzeige> {
+  return apiSend<BenutzerAnzeige>('/api/auth/passwort/festlegen', 'POST', {
+    neues_passwort: neuesPasswort,
   });
 }
 

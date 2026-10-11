@@ -189,6 +189,7 @@ async fn backup_als_nicht_admin_ist_403() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
 
+    common::zwang_aufheben("bea").await;
     let bea_cookie = login_cookie(&app, "bea", "passwort1").await;
     let resp = app
         .oneshot(

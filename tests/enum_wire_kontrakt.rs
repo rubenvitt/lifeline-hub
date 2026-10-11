@@ -472,7 +472,7 @@ fn serde_wire_gleich_as_str() {
         Unbekannt,
     });
 
-    // Zugangsprotokoll (LFH-1097): Wire = DB-CHECK in 0091/0143 bzw. 0156.
+    // Zugangsprotokoll (LFH-1097): Wire = DB-CHECK in 0091/0143 bzw. 0156/0170/0173.
     enum_wire_as_str!(lifeline_hub::auth::audit::Ereignis {
         LoginOk,
         LoginFehlgeschlagen,
@@ -490,6 +490,7 @@ fn serde_wire_gleich_as_str() {
         AnmeldewegAktiviert,
         AnmeldewegDeaktiviert,
         SitzungBeendet,
+        EinmalpasswortVergeben,
     });
 }
 

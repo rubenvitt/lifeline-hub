@@ -11,6 +11,7 @@ import {
   test,
   uhrAnhalten,
 } from './kern';
+import { kontoAnlegen } from '../konto-anlegen';
 
 /**
  * Bilder des Kapitels „Chat“ (`docs/anwender/kapitel/chat.md`, LFH-1129).
@@ -37,7 +38,7 @@ test.describe(KAPITEL, () => {
 
     // Zweite Person im Einsatz: Führungspersonal, schreibt über die API.
     const eva = { benutzername: 'e.beispiel', passwort: 'doku-passwort-123' };
-    const { id: evaId } = await fuelle<{ id: number }>(page, 'post', '/api/benutzer', {
+    const { id: evaId } = await kontoAnlegen(page.request, {
       anzeigename: 'Eva Beispiel',
       ...eva,
     });

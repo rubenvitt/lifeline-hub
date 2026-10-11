@@ -19,12 +19,14 @@ import {
   deaktiviereBenutzer,
   legeBenutzerAn,
   listeBenutzer,
+  vergibEinmalpasswort,
   setzeZweitfaktorZurueck,
   type NeuerBenutzer,
   type PatchBenutzer,
 } from '../api/benutzer';
 import { useAuth } from '../auth/AuthContext';
 import SitzungsListe from '../auth/SitzungsListe';
+import EinmalpasswortVergeben from '../auth/EinmalpasswortVergeben';
 import { beendeAlleSitzungenVon, beendeSitzungVon, ladeSitzungenVon } from '../api/sitzungen';
 import { globalKeys } from '../api/queryKeys';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -97,6 +99,14 @@ export default function BenutzerPage() {
   const bearbeiten = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) =>
       bearbeiteBenutzer(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
+  });
+
+  // „Einmalpasswort vergeben“ im Bearbeiten-Dialog (LFH-1121). Hier statt in der Komponente:
+  // solange sie läuft, darf der Dialog nicht schließen, und beim Schließen räumt `reset()` das
+  // angezeigte Passwort. Nur die Liste neu laden: die Antwort gehört in keinen Cache.
+  const einmalpasswort = useMutation({
+    mutationFn: (id: number) => vergibEinmalpasswort(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
   });
 
@@ -291,6 +301,7 @@ export default function BenutzerPage() {
             onWahl={(aktion) => {
               if (aktion === 'bearbeiten') {
                 bearbeiten.reset();
+                einmalpasswort.reset();
                 setZuBearbeiten(b);
               } else if (aktion === 'anmeldungen') setAnmeldungenVon(b);
               else if (aktion === 'zweitfaktor') {
@@ -446,15 +457,27 @@ export default function BenutzerPage() {
         form={editForm}
         erfassenText="Speichern"
         laeuft={bearbeiten.isPending}
+        // Sperrt jeden Ausweg, solange gespeichert oder ein Einmalpasswort vergeben wird (LFH-1121):
+        // schlösse der Dialog vorher, ginge das schon gesetzte Passwort verloren. Die Fehler
+        // stehen an ihren eigenen Stellen, deshalb hier keiner.
+        speicherung={{
+          isPending: bearbeiten.isPending || einmalpasswort.isPending,
+          error: null,
+          reset: () => {},
+        }}
         // Werfen statt stillem `return`: ein aufgelöstes Versprechen läse die Hülle als Erfolg und
         // schlösse den Dialog, ohne dass etwas gesendet wurde.
         onErfassen={async (w) => {
           if (!zuBearbeiten) throw new Error('Kein Benutzer zum Bearbeiten');
           await bearbeiten.mutateAsync({ id: zuBearbeiten.id, patch: w });
         }}
-        onFertig={() => setZuBearbeiten(null)}
+        onFertig={() => {
+          einmalpasswort.reset();
+          setZuBearbeiten(null);
+        }}
         onAbbrechen={() => {
           bearbeiten.reset();
+          einmalpasswort.reset();
           setZuBearbeiten(null);
         }}
       >
@@ -473,6 +496,16 @@ export default function BenutzerPage() {
         </Form.Item>
         {/* Auch eine abgelehnte Herabstufung des letzten Admins steht hier (LFH-966). */}
         <SpeicherFehler fehler={bearbeiten.error} />
+        {/* Passwort vergessen (LFH-1121): eine eigene Aktion neben dem Formular, kein Feld. */}
+        {zuBearbeiten && (
+          <Form.Item label="Passwort">
+            <EinmalpasswortVergeben
+              benutzer={zuBearbeiten}
+              eigenesKonto={zuBearbeiten.id === angemeldeterBenutzer?.id}
+              vergeben={einmalpasswort}
+            />
+          </Form.Item>
+        )}
       </ErfassungsModal>
 
       <Modal

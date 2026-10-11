@@ -35,6 +35,7 @@ use utoipa::OpenApi;
         crate::auth::admin_audit::ZugangsAngaben,
         crate::auth::admin_audit::AdminAktion,
         crate::routes::auth::MeAntwort,
+        crate::routes::benutzer::Einmalpasswort,
         crate::auth::session::SitzungAnzeige,
         crate::routes::sitzung::SitzungenBeendet,
         crate::auth::OrgRolle,

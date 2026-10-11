@@ -58,6 +58,47 @@ fn mfa_pending_cookie(key: String, secure: bool) -> Cookie<'static> {
         .build()
 }
 
+/// Cookie für den Zwischenschritt nach einem Login mit Einmalpasswort (LFH-1121). Trägt nur den
+/// Schlüssel in `auth::passwort_wechsel`, nie die `benutzer_id`; auf `/api/auth` beschränkt.
+const PASSWORT_WECHSEL_COOKIE: &str = "passwort_wechsel";
+
+/// Baut das Wechsel-Cookie (HttpOnly, Lax, `secure` nach Transport, Pfad `/api/auth`).
+fn passwort_wechsel_cookie(key: String, secure: bool) -> Cookie<'static> {
+    Cookie::build((PASSWORT_WECHSEL_COOKIE, key))
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .path("/api/auth")
+        .build()
+}
+
+/// Legt den Zwischenschritt „Neues Passwort festlegen“ für ein Konto unter Änderungszwang an
+/// (LFH-1121, Design D1): keine Sitzung, nur das Wechsel-Cookie. Gerufen vom Passwort-Login und
+/// nach bestandenem zweitem Faktor.
+fn passwort_wechsel_beginnen(
+    jar: CookieJar,
+    benutzer: &Benutzer,
+    nach_zweitfaktor: bool,
+    secure: bool,
+) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
+    let key = session::neuer_token();
+    crate::auth::passwort_wechsel::speichere(
+        key.clone(),
+        crate::auth::passwort_wechsel::Offen {
+            benutzer_id: benutzer.id,
+            passwort_hash: benutzer.passwort_hash.clone(),
+            nach_zweitfaktor,
+        },
+    )
+    .map_err(anmeldungen_voll)?;
+    Ok((
+        jar.add(passwort_wechsel_cookie(key, secure)),
+        Json(LoginAntwort::PasswortWechselErforderlich {
+            passwort_wechsel_erforderlich: true,
+        }),
+    ))
+}
+
 /// Abweisung eines Anmeldeabschlusses (TOTP, OIDC, Passkey; LFH-792). `benutzer` ist gesetzt,
 /// sobald der Server die Identität selbst festgestellt hat (TOTP nach dem Passwortschritt, ein
 /// deaktiviertes Konto nach geprüfter Signatur), nie aus einer bloßen Behauptung des Aufrufers.
@@ -165,15 +206,17 @@ async fn audit_anmeldung(
     .await;
 }
 
-/// Antwort auf `POST /api/auth/login`. `#[serde(untagged)]` serialisiert `Angemeldet`
-/// byte-identisch als nackte `BenutzerAnzeige`; nur ein TOTP-Nutzer bekommt stattdessen
-/// `{"mfa_erforderlich":"totp"}` ohne Benutzer-Objekt und ohne Session-Cookie. Nicht im Codegen
-/// registriert — die Frontend-Union ist handgepflegt.
+/// Antwort auf `POST /api/auth/login` und `POST /api/auth/totp/finish`. `#[serde(untagged)]`
+/// serialisiert `Angemeldet` byte-identisch als nackte `BenutzerAnzeige`; nur ein TOTP-Nutzer
+/// bekommt beim Login stattdessen `{"mfa_erforderlich":"totp"}`, ein Konto unter Änderungszwang
+/// (LFH-1121) `{"passwort_wechsel_erforderlich":true}`, beide ohne Benutzer-Objekt und ohne
+/// Session-Cookie. Nicht im Codegen registriert — die Frontend-Union ist handgepflegt.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum LoginAntwort {
     Angemeldet(crate::auth::BenutzerAnzeige),
     MfaErforderlich { mfa_erforderlich: String },
+    PasswortWechselErforderlich { passwort_wechsel_erforderlich: bool },
 }
 
 /// Wo eine gesperrte Quelle abgewiesen wird; bestimmt die Logzeile.
@@ -224,6 +267,10 @@ fn quelle_pruefen(peer_ip: Option<std::net::IpAddr>, weg: GesperrterWeg) -> Resu
 /// einen hochentropischen Pending-Key in `auth::totp::state` und ein HttpOnly-Cookie
 /// `mfa_pending`. Der einzige Weg zur Session ist danach `/api/auth/totp/finish` mit gültigem
 /// Zweitfaktor. Der Dev-Seed-Login nutzt denselben Handler und kann das nicht umgehen.
+///
+/// **Änderungszwang (LFH-1121):** steht das Konto unter `passwort_wechsel_pflicht`, gibt es nach
+/// dem Passwort (und ggf. dem zweiten Faktor) ebenfalls keine Session, sondern den Zwischenschritt
+/// [`passwort_festlegen`].
 pub async fn login(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -257,11 +304,12 @@ pub async fn login(
     )
     .await?;
 
-    let totp_aktiviert: bool =
-        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
-            .bind(benutzer.id)
-            .fetch_one(&state.pool)
-            .await?;
+    let (totp_aktiviert, wechsel_pflicht): (bool, bool) = sqlx::query_as(
+        "SELECT totp_aktiviert, passwort_wechsel_pflicht FROM benutzer WHERE id = ?",
+    )
+    .bind(benutzer.id)
+    .fetch_one(&state.pool)
+    .await?;
 
     if totp_aktiviert {
         // Keine Session, kein Session-Cookie (s. Doc oben). Kein Audit: angemeldet ist hier noch
@@ -272,7 +320,14 @@ pub async fn login(
         // Anlauf `login` → `totp/finish` den Zähler zurück, und der Code ließe sich ungebremst
         // raten. Geräumt wird in `totp_finish`.
         let key = session::neuer_token();
-        crate::auth::totp::state::speichere(key.clone(), benutzer.id).map_err(anmeldungen_voll)?;
+        crate::auth::totp::state::speichere(
+            key.clone(),
+            crate::auth::totp::state::Offen {
+                benutzer_id: benutzer.id,
+                passwort_hash: benutzer.passwort_hash.clone(),
+            },
+        )
+        .map_err(anmeldungen_voll)?;
         let jar = jar.add(mfa_pending_cookie(key, secure));
         return Ok((
             jar,
@@ -282,9 +337,15 @@ pub async fn login(
         ));
     }
 
-    // Angemeldet; das räumt nur die Fehlversuche gegen dieses Konto (LFH-793).
+    // Angemeldet; das räumt nur die Fehlversuche gegen dieses Konto (LFH-793). Auch vor dem
+    // Zwischenschritt eines Einmalpassworts: danach gibt es kein ratbares Geheimnis mehr.
     if let Some(ip) = peer_ip {
         crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
+    }
+
+    if wechsel_pflicht {
+        // Keine Session und kein `login_ok` (LFH-1121): beides entsteht erst beim Festlegen.
+        return passwort_wechsel_beginnen(jar, &benutzer, false, secure);
     }
 
     let token = session::anlegen(
@@ -453,7 +514,7 @@ pub struct PasswortWechsel {
 
 /// 403, wenn der Passwort-Provider abgeschaltet ist: ohne Passwort-Anmeldung gibt es weder
 /// Passwortwechsel noch TOTP-Einrichtung, dieselbe Durchsetzung wie beim Login.
-async fn passwort_provider_aktiv(pool: &SqlitePool) -> Result<(), AppError> {
+pub(crate) async fn passwort_provider_aktiv(pool: &SqlitePool) -> Result<(), AppError> {
     let liste = crate::auth::provider::registry::liste(pool).await?;
     if liste
         .iter()
@@ -585,7 +646,9 @@ pub async fn passwort_aendern(
         .ok_or(AppError::Unauthorized)?;
 
     let mut tx = state.pool.begin().await?;
-    sqlx::query("UPDATE benutzer SET passwort_hash = ? WHERE id = ?")
+    // Hebt einen offenen Änderungszwang mit auf (LFH-1121, Design D7): wer sich per Passkey
+    // angemeldet und das Passwort hier gewechselt hat, kennt nun ein eigenes.
+    sqlx::query("UPDATE benutzer SET passwort_hash = ?, passwort_wechsel_pflicht = 0 WHERE id = ?")
         .bind(&hash)
         .bind(benutzer.id)
         .execute(&mut *tx)
@@ -613,6 +676,140 @@ pub async fn passwort_aendern(
     )
     .await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Body von `POST /api/auth/passwort/festlegen` (LFH-1121).
+#[derive(Debug, Deserialize)]
+pub struct PasswortFestlegen {
+    pub neues_passwort: String,
+}
+
+/// Prüft den entnommenen Zwischenschritt gegen das Konto und das neue Passwort; liefert Konto und
+/// neuen Hash. 401, wenn das Konto fehlt, deaktiviert ist, nicht mehr unter Zwang steht oder sein
+/// Passwort sich seit dem Login geändert hat; 422, wenn das neue dem bisherigen gleicht.
+async fn festlegen_pruefen(
+    pool: &SqlitePool,
+    offen: &crate::auth::passwort_wechsel::Offen,
+    neues_passwort: &str,
+) -> Result<(Benutzer, String), AppError> {
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE id = ? AND passwort_wechsel_pflicht = 1",
+    )
+    .bind(offen.benutzer_id)
+    .fetch_optional(pool)
+    .await?
+    .filter(|b| b.aktiv && b.passwort_hash == offen.passwort_hash)
+    .ok_or(AppError::Unauthorized)?;
+    if crate::auth::provider::password::gleicht_gedrosselt(neues_passwort, &offen.passwort_hash)
+        .await?
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Das neue Passwort muss sich vom bisherigen unterscheiden.".to_string(),
+        ));
+    }
+    let hash = crate::auth::provider::password::hash_gedrosselt(neues_passwort).await?;
+    Ok((benutzer, hash))
+}
+
+/// POST /api/auth/passwort/festlegen — der Schritt nach einem Login mit Einmalpasswort (LFH-1121,
+/// Spec `konto-einmalpasswort`, Design D3). Mit gültigem Wechsel-Cookie setzt er das neue
+/// Passwort, hebt den Änderungszwang auf und legt erst dann die Session an.
+///
+/// - Passwort-Provider aus → 403; Länge außerhalb 8–128 → 400, vor der Entnahme des Schlüssels.
+/// - Ohne, mit unbekanntem oder abgelaufenem Cookie → 401.
+/// - Das neue Passwort gleicht dem bisherigen → 422. Der Schlüssel wird dann (wie bei einem 503)
+///   wieder eingelegt, damit die Person ohne neuen Login korrigieren kann.
+/// - Hat die Administration seit dem Login ein neues Einmalpasswort vergeben, findet das `UPDATE`
+///   den gemerkten Hash nicht mehr → 401; nur das aktuelle Einmalpasswort führt zur Session.
+///
+/// Spur: `passwort_geaendert`, dazu `login_ok`, wenn nicht schon der zweite Faktor die Anmeldung
+/// protokolliert hat.
+pub async fn passwort_festlegen(
+    State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
+    SichererTransport(secure): SichererTransport,
+    GeraetAngabe(geraet): GeraetAngabe,
+    jar: CookieJar,
+    JsonBody(req): JsonBody<PasswortFestlegen>,
+) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
+    passwort_provider_aktiv(&state.pool).await?;
+    crate::routes::benutzer::pruefe_passwort_laenge(&req.neues_passwort)?;
+
+    let key = jar
+        .get(PASSWORT_WECHSEL_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or(AppError::Unauthorized)?;
+    let offen = crate::auth::passwort_wechsel::entnehme(&key).ok_or(AppError::Unauthorized)?;
+
+    let (benutzer, hash) = match festlegen_pruefen(&state.pool, &offen, &req.neues_passwort).await {
+        Ok(geprueft) => geprueft,
+        Err(AppError::Unauthorized) => return Err(AppError::Unauthorized),
+        Err(fehler) => {
+            // Korrigierbar (422, 503): derselbe Schritt gilt weiter, mit frischem Ablauf.
+            crate::auth::passwort_wechsel::speichere(key, offen).map_err(anmeldungen_voll)?;
+            return Err(fehler);
+        }
+    };
+
+    let geaendert = sqlx::query(
+        "UPDATE benutzer SET passwort_hash = ?, passwort_wechsel_pflicht = 0 \
+         WHERE id = ? AND passwort_wechsel_pflicht = 1 AND passwort_hash = ?",
+    )
+    .bind(&hash)
+    .bind(benutzer.id)
+    .bind(&offen.passwort_hash)
+    .execute(&state.pool)
+    .await?
+    .rows_affected();
+    if geaendert == 0 {
+        return Err(AppError::Unauthorized);
+    }
+
+    // Derselbe Weg wie im `login_ok` dieser Anmeldung (LFH-1152): mit zweitem Faktor `totp`.
+    let anmeldeweg = if offen.nach_zweitfaktor {
+        Anmeldeweg::Totp
+    } else {
+        Anmeldeweg::Passwort
+    };
+    let token = session::anlegen(&state.pool, benutzer.id, geraet.as_deref(), anmeldeweg).await?;
+    let jar = jar.add(session_cookie(token, secure)).remove(
+        Cookie::build((PASSWORT_WECHSEL_COOKIE, ""))
+            .path("/api/auth")
+            .build(),
+    );
+
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        peer_ip = ?peer_ip,
+        "Passwort nach Einmalpasswort festgelegt"
+    );
+    let mut ereignisse = vec![crate::auth::audit::Ereignis::PasswortGeaendert];
+    if !offen.nach_zweitfaktor {
+        ereignisse.push(crate::auth::audit::Ereignis::LoginOk);
+    }
+    for ereignis in ereignisse {
+        crate::auth::audit::schreibe(
+            &state.pool,
+            crate::auth::audit::AuditEintrag {
+                ereignis,
+                benutzername: Some(&benutzer.benutzername),
+                benutzer_id: Some(benutzer.id),
+                peer_ip: peer_ip.map(|ip| ip.to_string()),
+                provider: crate::auth::provider::ID_PASSWORT,
+            },
+        )
+        .await;
+    }
+
+    let totp_aktiviert: bool =
+        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
+            .bind(benutzer.id)
+            .fetch_one(&state.pool)
+            .await?;
+    let mut benutzer = benutzer;
+    benutzer.passwort_hash = hash;
+    Ok((jar, Json(benutzer.anzeige(totp_aktiviert))))
 }
 
 /// Öffentliche Projektion der Provider-Liste: nur aktivierte (LFH-277). Dieselbe DTO wie der
@@ -1755,7 +1952,7 @@ pub async fn totp_finish(
     GeraetAngabe(geraet): GeraetAngabe,
     jar: CookieJar,
     JsonBody(req): JsonBody<TotpFinishRequest>,
-) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
+) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
     quelle_pruefen(peer_ip, GesperrterWeg::Zweitfaktor)?;
 
     let key = jar.get(MFA_PENDING_COOKIE).map(|c| c.value().to_string());
@@ -1767,19 +1964,35 @@ pub async fn totp_finish(
         ergebnis.as_ref().map(|(benutzer, _)| benutzer),
     )
     .await;
-    let (benutzer, token) = ergebnis.map_err(|abgewiesen| abgewiesen.fehler)?;
+    let (benutzer, weiter) = ergebnis.map_err(|abgewiesen| abgewiesen.fehler)?;
 
-    let jar = jar.add(session_cookie(token, secure));
     let jar = jar.remove(
         Cookie::build((MFA_PENDING_COOKIE, ""))
             .path("/api/auth")
             .build(),
     );
+    let token = match weiter {
+        NachZweitfaktor::Sitzung(token) => token,
+        // Erst der zweite Faktor, dann der Wechsel (LFH-1121, Design D2).
+        NachZweitfaktor::PasswortWechsel => {
+            return passwort_wechsel_beginnen(jar, &benutzer, true, secure);
+        }
+    };
+    let jar = jar.add(session_cookie(token, secure));
     // Der Pending-State entsteht nur im TOTP-Zweig von `login`; der Status ist hier sicher `true`.
-    Ok((jar, Json(benutzer.anzeige(true))))
+    Ok((jar, Json(LoginAntwort::Angemeldet(benutzer.anzeige(true)))))
 }
 
-/// Schritte 1–4 von [`totp_finish`]: liefert Benutzer und Session-Token. Ab Schritt 2 steht der
+/// Wie es nach bestandenem zweitem Faktor weitergeht.
+enum NachZweitfaktor {
+    /// Session angelegt, mit ihrem Token.
+    Sitzung(String),
+    /// Das Konto steht unter Änderungszwang (LFH-1121): noch keine Session.
+    PasswortWechsel,
+}
+
+/// Schritte 1–4 von [`totp_finish`]: liefert Benutzer und Session-Token, oder statt des Tokens
+/// den Zwischenschritt eines Kontos unter Änderungszwang (LFH-1121). Ab Schritt 2 steht der
 /// Benutzer fest (er hat den Passwortschritt bestanden), und jede Abweisung nennt ihn.
 async fn totp_pruefen(
     pool: &SqlitePool,
@@ -1787,12 +2000,13 @@ async fn totp_pruefen(
     code: &str,
     peer_ip: Option<std::net::IpAddr>,
     geraet: Option<&str>,
-) -> Result<(Benutzer, String), Abgewiesen> {
+) -> Result<(Benutzer, NachZweitfaktor), Abgewiesen> {
     // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
     let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
 
     // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 1).
-    let benutzer_id = crate::auth::totp::state::entnehme(&key).ok_or_else(Abgewiesen::ohne_spur)?;
+    let offen = crate::auth::totp::state::entnehme(&key).ok_or_else(Abgewiesen::ohne_spur)?;
+    let benutzer_id = offen.benutzer_id;
 
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
@@ -1805,6 +2019,12 @@ async fn totp_pruefen(
         return Err(Abgewiesen::anonym());
     };
     if !benutzer.aktiv {
+        return Err(Abgewiesen::fuer(benutzer));
+    }
+    // Das Passwort, das der erste Schritt geprüft hat, gilt nicht mehr (LFH-1121): etwa weil die
+    // Administration dazwischen ein neues Einmalpasswort vergeben hat. Sonst führte ein ersetztes
+    // Einmalpasswort samt zweitem Faktor doch noch in den Wechsel.
+    if benutzer.passwort_hash != offen.passwort_hash {
         return Err(Abgewiesen::fuer(benutzer));
     }
 
@@ -1867,8 +2087,17 @@ async fn totp_pruefen(
         crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
+    let wechsel_pflicht: bool =
+        sqlx::query_scalar("SELECT passwort_wechsel_pflicht FROM benutzer WHERE id = ?")
+            .bind(benutzer_id)
+            .fetch_one(pool)
+            .await?;
+    if wechsel_pflicht {
+        return Ok((benutzer, NachZweitfaktor::PasswortWechsel));
+    }
+
     let token = session::anlegen(pool, benutzer.id, geraet, Anmeldeweg::Totp).await?;
-    Ok((benutzer, token))
+    Ok((benutzer, NachZweitfaktor::Sitzung(token)))
 }
 
 /// Body von `POST /api/auth/app-code` (LFH-818).

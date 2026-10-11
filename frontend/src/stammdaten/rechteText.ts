@@ -45,3 +45,10 @@ export const ORG_ROLLE_TEXT: Record<OrgRolle, string> = {
   keine: 'Keine',
   fuehrungskraft: 'Führungskraft',
 };
+
+/**
+ * „Einmalpasswort vergeben“ im Bearbeiten-Dialog (LFH-1121): der Server lehnt das eigene Konto
+ * (422, das Passwort wechselt man im Profil) und ein SSO-Konto ohne lokales Passwort (422) ab.
+ */
+export const EIGENES_PASSWORT = 'Gesperrt: eigenes Konto, Passwort im Profil ändern';
+export const SSO_KONTO = 'Gesperrt: meldet sich über SSO an';

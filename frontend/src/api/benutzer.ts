@@ -1,4 +1,4 @@
-import type { BenutzerAnzeige, OrgRolle, SystemRolle } from './types';
+import type { BenutzerAnzeige, Einmalpasswort, OrgRolle, SystemRolle } from './types';
 import { apiGet, apiSend } from './client';
 
 export function listeBenutzer(): Promise<BenutzerAnzeige[]> {
@@ -39,4 +39,11 @@ export interface PatchBenutzer {
 
 export function bearbeiteBenutzer(id: number, patch: PatchBenutzer): Promise<BenutzerAnzeige> {
   return apiSend<BenutzerAnzeige>(`/api/benutzer/${id}`, 'PATCH', patch);
+}
+
+/** Vergibt der Person ein Einmalpasswort (LFH-1121): der Server erzeugt es, beendet alle ihre
+ *  Sitzungen und liefert es genau dieses eine Mal. `422` für das eigene oder ein SSO-Konto, `404`
+ *  für ein fremdes, beides als {@link ApiError}. Die Antwort gehört nie in den Query-Cache. */
+export function vergibEinmalpasswort(id: number): Promise<Einmalpasswort> {
+  return apiSend<Einmalpasswort>(`/api/benutzer/${id}/einmalpasswort`, 'POST');
 }

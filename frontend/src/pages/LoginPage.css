@@ -106,6 +106,17 @@
   width: 100%;
 }
 
+/* Überschrift der Stufe „Neues Passwort festlegen“ nach einem Einmalpasswort (LFH-1121): sagt,
+   warum statt der Einsatzliste noch ein Formular kommt. Augenbrauen-Typo wie die Dev-Zeile. */
+.login-stufe__titel {
+  margin: 0 0 16px;
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  font-weight: var(--lfh-typo-augenbraue-gewicht);
+  letter-spacing: var(--lfh-typo-augenbraue-sperrung);
+  text-transform: uppercase;
+  color: var(--lfh-schwach);
+}
+
 /* TOTP-Code-Eingabe: mittig, weit gesperrt — liest sich wie ein 6-stelliger Code.
    `text-indent` gleicht den Letter-Spacing-Überhang hinter der letzten Ziffer aus. */
 .login-otp {

@@ -1,7 +1,8 @@
 import { request } from '@playwright/test';
 import { oeffneMenue, waehleImMenue } from '../menue-kern';
 import { zweitenFaktorEinrichten } from '../totp-kern';
-import { anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
+import { anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
+import { kontoAnlegen } from '../konto-anlegen';
 
 /**
  * Bilder des Kapitels „Gerät verloren“ (`docs/anwender/kapitel/geraet-verloren.md`, LFH-1129).
@@ -26,7 +27,7 @@ test.describe(KAPITEL, () => {
   test('Anmeldungen einer Person in der Verwaltung', async ({ page }) => {
     await anmelden(page);
     const person = { benutzername: 'm.beispiel', passwort: 'doku-passwort-123' };
-    await fuelle(page, 'post', '/api/benutzer', { anzeigename: 'Max Beispiel', ...person });
+    await kontoAnlegen(page.request, { anzeigename: 'Max Beispiel', ...person });
     // Zwei Geräte der Person: das verlorene Tablet und ein Arbeitsplatzrechner.
     const baseURL = test.info().project.use.baseURL;
     const geraete = [];
@@ -90,7 +91,7 @@ test.describe(KAPITEL, () => {
   test('Zweiten Faktor einer Person zurücksetzen', async ({ page }) => {
     await anmelden(page);
     const person = { benutzername: 'e.beispiel', passwort: 'doku-passwort-123' };
-    await fuelle(page, 'post', '/api/benutzer', { anzeigename: 'Erik Beispiel', ...person });
+    await kontoAnlegen(page.request, { anzeigename: 'Erik Beispiel', ...person });
     // Die Person hat den zweiten Faktor eingerichtet und ist an ihrem Telefon angemeldet.
     const telefon = await request.newContext({ baseURL: test.info().project.use.baseURL });
     expect((await telefon.post('/api/auth/login', { data: person })).ok()).toBe(true);

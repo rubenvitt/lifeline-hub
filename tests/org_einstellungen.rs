@@ -42,7 +42,8 @@ async fn benutzer_anlegen(
         resp.status(),
         StatusCode::CREATED,
         "Benutzer anlegen muss klappen"
-    );
+    ); // Die Anlage stellt unter Änderungszwang (LFH-1121); die Tests melden sich gleich an.
+    common::zwang_aufheben(benutzername).await;
 }
 
 /// GET /api/org-einstellungen mit Cookie; liefert (StatusCode, Body).

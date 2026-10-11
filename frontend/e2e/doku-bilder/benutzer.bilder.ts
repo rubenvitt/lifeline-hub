@@ -1,6 +1,7 @@
 import { request } from '@playwright/test';
 import { oeffneMenue, waehleImMenue } from '../menue-kern';
-import { KONTEXTE, anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
+import { KONTEXTE, anmelden, expect, fotografiere, test, uhrAnhalten } from './kern';
+import { kontoAnlegen } from '../konto-anlegen';
 
 /**
  * Bilder des Kapitels „Benutzer“ (`docs/anwender/kapitel/benutzer.md`).
@@ -10,6 +11,9 @@ import { KONTEXTE, anmelden, expect, fotografiere, fuelle, test, uhrAnhalten } f
  *   benutzerliste.png     frontend/src/pages/BenutzerPage.tsx
  *   benutzer-anlegen.png  frontend/src/pages/BenutzerPage.tsx
  *   anmeldungen.png       frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/SitzungsListe.tsx
+ *   einmalpasswort.png    frontend/src/pages/BenutzerPage.tsx,
+ *                         frontend/src/auth/EinmalpasswortVergeben.tsx,
+ *                         frontend/src/components/KopierbarerText.tsx
  *
  * Füllung (D3): eine Person „Kim Beispiel“ mit zwei Anmeldungen, damit Liste und Anmeldungen
  * etwas zeigen. Die Demo-Daten legen keine Benutzer an.
@@ -27,7 +31,7 @@ async function personAnlegen(page: Parameters<typeof anmelden>[0]): Promise<numb
     (b) => b.benutzername === PERSON.benutzername,
   );
   if (vorhanden) return vorhanden.id;
-  const neu = await fuelle<{ id: number }>(page, 'post', '/api/benutzer', {
+  const neu = await kontoAnlegen(page.request, {
     ...PERSON,
     passwort: PASSWORT,
     org_rolle: 'fuehrungskraft',
@@ -109,5 +113,31 @@ test.describe(KAPITEL, () => {
     } finally {
       for (const api of kontexte) await api.dispose();
     }
+  });
+
+  // Zuletzt: das Einmalpasswort beendet die Anmeldungen der Person und ersetzt ihr Passwort.
+  test('Einmalpasswort im Dialog „Benutzer bearbeiten“', async ({ page }) => {
+    await anmelden(page);
+    await personAnlegen(page);
+    // Ein fester Wert statt des zufälligen: das Bild soll nicht je Lauf ein anderes zeigen.
+    await page.route('**/api/benutzer/*/einmalpasswort', (route) =>
+      route.fulfill({ json: { einmalpasswort: 'kx7m-p4qr-9tzw' } }),
+    );
+    await uhrAnhalten(page);
+    await page.goto('/admin/benutzer');
+    await waehleImMenue(
+      page,
+      page.getByRole('button', { name: 'Aktionen zu Benutzer Kim Beispiel (@k.beispiel)' }),
+      'Bearbeiten',
+    );
+    const dialog = page.getByRole('dialog', { name: 'Benutzer bearbeiten' });
+    await dialog.getByRole('button', { name: 'Einmalpasswort vergeben' }).click();
+    await page
+      .locator('.ant-popconfirm')
+      .getByRole('button', { name: 'Einmalpasswort vergeben' })
+      .click();
+    await expect(dialog.getByText('kx7m-p4qr-9tzw')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(dialog, KAPITEL, 'einmalpasswort');
   });
 });
