@@ -103,11 +103,13 @@ aufgenommen ist, verschwindet aus der Auswahl, wer entfernt wird, steht wieder d
   freigegeben ist.
 - Die Vorschläge für den **Rufname** stehen in Gruppen, in dieser Folge: die Fahrzeuge, die der
   Führungsstelle zugeordnet sind, die übrigen disponierten Führungsfahrzeuge, dann die
-  Führungsfahrzeuge der Organisation, die im Dienst und nicht disponiert sind, Demo-Daten zuletzt.
-  Als Führungsfahrzeug gilt, was auf der Lagekarte das Zeichen Führung trägt (etwa ELW, KdoW).
-  Ohne Freigabe des Moduls Fahrzeuge fehlen die ersten beiden Gruppen. Trägt die Führungsstelle
-  genau ein Fahrzeug, steht dessen Funkrufname grau im leeren Feld; gespeichert wird er erst,
-  wenn ihn jemand wählt.
+  Führungsfahrzeuge der Organisation, die im Dienst und nicht disponiert sind, und zuletzt deren
+  Demo-Daten. Als Führungsfahrzeug gilt, was auf der Lagekarte das Zeichen Führung trägt (etwa
+  ELW, KdoW). Ohne Freigabe des Moduls Fahrzeuge fehlen die ersten beiden Gruppen, und die
+  Organisation nennt dann auch disponierte Fahrzeuge. Enter speichert den getippten Text; einen
+  Vorschlag übernimmt Enter erst, wenn er mit den Pfeiltasten angesteuert ist. Trägt die
+  Führungsstelle genau ein Fahrzeug, steht dessen Funkrufname grau im leeren Feld; gespeichert
+  wird er erst, wenn ihn jemand wählt.
 - Die **Führungsstelle eines Mitglieds** ist der erste Vorschlag, wenn das Einsatztagebuch die
   Person nach ihrem Rufnamen fragt, noch vor ihrem eigenen Sachgebiet im Stab.
 

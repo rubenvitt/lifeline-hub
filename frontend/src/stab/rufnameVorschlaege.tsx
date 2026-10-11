@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import type { EinsatzFahrzeug, Fahrzeug } from '../api/types';
 import { monoStil, useRollen } from '../components/instrument';
-import { DEMO_GRUPPE, DemoLabel, trenneDemo } from '../stammdaten/demoAuswahl';
-import { istFuehrungsfahrzeug } from './fernmeldeskizze';
+import { DEMO_GRUPPE, DemoLabel, splitDemo } from '../stammdaten/demoAuswahl';
+import { isFuehrungsfahrzeug } from './fernmeldeskizze';
 
 /**
  * Vorschläge für den Rufnamen der eigenen Führungsstelle aus vorhandenen Stammdaten (LFH-1187):
@@ -13,10 +13,10 @@ import { istFuehrungsfahrzeug } from './fernmeldeskizze';
  * Zuordnung ist selbst die Aussage, wie LFH-1106), dann die übrigen disponierten
  * Führungsfahrzeuge, dann die nicht disponierten der Organisation, deren Demo-Daten zuletzt
  * (`stammdaten/demoAuswahl.tsx`). Führungsfahrzeug heißt: Fachaufgabe Führung im Zeichen
- * (`istFuehrungsfahrzeug`, dieselbe Regel wie Lagekarte und Skizze).
+ * (`isFuehrungsfahrzeug`, dieselbe Regel wie Lagekarte und Skizze).
  */
 
-export const RUFNAME_GRUPPE = {
+export const RUFNAME_GROUP = {
   fuehrungsstelle: 'Fahrzeuge der Führungsstelle',
   disponiert: 'Disponierte Führungsfahrzeuge',
   organisation: 'Führungsfahrzeuge der Organisation',
@@ -25,76 +25,77 @@ export const RUFNAME_GRUPPE = {
 export interface RufnameVorschlag {
   funkrufname: string;
   typ: string | null;
-  istDemo: boolean;
+  isDemo: boolean;
 }
 
-export interface RufnameGruppe {
-  titel: string;
+export interface RufnameGroup {
+  title: string;
   vorschlaege: RufnameVorschlag[];
 }
 
-export interface RufnameQuellen {
+export interface RufnameSources {
   /** Die der Führungsstelle zugeordneten Fahrzeuge (`fahrzeug_ids`). */
   fahrzeugIds: readonly number[];
   /**
    * Die disponierten Fahrzeuge des Einsatzes; `null` ohne Freigabe der Fahrzeuge oder ohne
-   * Daten. Dann fehlen die ersten beiden Gruppen — abwesend, nicht als leer behauptet.
+   * Daten. Dann fehlen die ersten beiden Gruppen — abwesend, nicht als leer behauptet — und die
+   * Organisation kann Disponiertes nicht ausnehmen.
    */
   disponiert: readonly EinsatzFahrzeug[] | null;
   /** Die Fahrzeuge der Organisation; `null` ohne Lesezugriff oder ohne Daten: Gruppe 3 fehlt. */
   stamm: readonly Fahrzeug[] | null;
 }
 
-type MitRufname = Pick<Fahrzeug, 'funkrufname' | 'fahrzeugtyp' | 'ist_demo'>;
+type WithFunkrufname = Pick<Fahrzeug, 'funkrufname' | 'fahrzeugtyp' | 'ist_demo'>;
 
 export function rufnameVorschlaege({
   fahrzeugIds,
   disponiert,
   stamm,
-}: RufnameQuellen): RufnameGruppe[] {
+}: RufnameSources): RufnameGroup[] {
   // Ein Funkrufname steht nur einmal da, in der ersten Gruppe, die ihn nennt.
-  const gesehen = new Set<string>();
-  const vorschlaege = (fahrzeuge: readonly MitRufname[]): RufnameVorschlag[] =>
+  const seen = new Set<string>();
+  const toVorschlaege = (fahrzeuge: readonly WithFunkrufname[]): RufnameVorschlag[] =>
     fahrzeuge.flatMap((f) => {
       const funkrufname = f.funkrufname.trim();
-      if (funkrufname === '' || gesehen.has(funkrufname)) return [];
-      gesehen.add(funkrufname);
-      return [{ funkrufname, typ: f.fahrzeugtyp?.trim() || null, istDemo: f.ist_demo }];
+      if (funkrufname === '' || seen.has(funkrufname)) return [];
+      seen.add(funkrufname);
+      return [{ funkrufname, typ: f.fahrzeugtyp?.trim() || null, isDemo: f.ist_demo }];
     });
 
-  const gruppen: RufnameGruppe[] = [];
-  const gruppe = (titel: string, fahrzeuge: readonly MitRufname[]) => {
-    const liste = vorschlaege(fahrzeuge);
-    if (liste.length > 0) gruppen.push({ titel, vorschlaege: liste });
+  const groups: RufnameGroup[] = [];
+  const addGroup = (title: string, fahrzeuge: readonly WithFunkrufname[]) => {
+    const vorschlaege = toVorschlaege(fahrzeuge);
+    if (vorschlaege.length > 0) groups.push({ title, vorschlaege });
   };
 
   if (disponiert) {
     const zugeordnet = new Set(fahrzeugIds);
-    gruppe(
-      RUFNAME_GRUPPE.fuehrungsstelle,
+    addGroup(
+      RUFNAME_GROUP.fuehrungsstelle,
       disponiert.filter((f) => zugeordnet.has(f.id)),
     );
-    gruppe(
-      RUFNAME_GRUPPE.disponiert,
-      disponiert.filter((f) => !zugeordnet.has(f.id) && istFuehrungsfahrzeug(f)),
+    addGroup(
+      RUFNAME_GROUP.disponiert,
+      disponiert.filter((f) => !zugeordnet.has(f.id) && isFuehrungsfahrzeug(f)),
     );
   }
   if (stamm) {
     const imEinsatz = new Set((disponiert ?? []).map((f) => f.fahrzeug_id));
-    const { echte, demo } = trenneDemo(
-      stamm.filter((f) => !imEinsatz.has(f.id) && istFuehrungsfahrzeug(f)),
+    const { echte, demo } = splitDemo(
+      stamm.filter((f) => !imEinsatz.has(f.id) && isFuehrungsfahrzeug(f)),
     );
-    gruppe(RUFNAME_GRUPPE.organisation, echte);
-    gruppe(DEMO_GRUPPE, demo);
+    addGroup(RUFNAME_GROUP.organisation, echte);
+    addGroup(DEMO_GRUPPE, demo);
   }
-  return gruppen;
+  return groups;
 }
 
 /**
  * Der Platzhalter bei leerem Rufnamen: trägt die Führungsstelle genau ein Fahrzeug, dessen
  * Funkrufname — nur gezeigt, nie gesetzt (kein Rückschluss ohne Bestätigung).
  */
-export function rufnamePlatzhalter(
+export function rufnamePlaceholder(
   fahrzeugIds: readonly number[],
   disponiert: readonly EinsatzFahrzeug[] | null,
 ): string | undefined {
@@ -106,10 +107,10 @@ export interface RufnameOption {
   value: string;
   label: ReactNode;
   /** Gefiltert wird nach Funkrufname und Typ; das Label ist ein ReactNode. */
-  suche: string;
+  search: string;
 }
 
-export interface RufnameOptionGruppe {
+export interface RufnameOptionGroup {
   label: string;
   title: string;
   options: RufnameOption[];
@@ -125,19 +126,19 @@ function VorschlagLabel({ vorschlag }: { vorschlag: RufnameVorschlag }) {
   );
 }
 
-const suchtext = (t: string) => t.toLocaleLowerCase('de');
+const searchText = (t: string) => t.toLocaleLowerCase('de');
 
 /** Die Gruppen als Optionen für antds `AutoComplete`. */
-export function rufnameOptionen(gruppen: readonly RufnameGruppe[]): RufnameOptionGruppe[] {
-  return gruppen.map(({ titel, vorschlaege }) => ({
-    label: titel,
-    title: titel,
+export function rufnameOptions(groups: readonly RufnameGroup[]): RufnameOptionGroup[] {
+  return groups.map(({ title, vorschlaege }) => ({
+    label: title,
+    title,
     options: vorschlaege.map((v) => {
       const label = <VorschlagLabel vorschlag={v} />;
       return {
         value: v.funkrufname,
-        label: v.istDemo ? <DemoLabel>{label}</DemoLabel> : label,
-        suche: suchtext([v.funkrufname, v.typ].filter(Boolean).join(' ')),
+        label: v.isDemo ? <DemoLabel>{label}</DemoLabel> : label,
+        search: searchText([v.funkrufname, v.typ].filter(Boolean).join(' ')),
       };
     }),
   }));
@@ -145,11 +146,8 @@ export function rufnameOptionen(gruppen: readonly RufnameGruppe[]): RufnameOptio
 
 /**
  * Filter für `AutoComplete`: im Combobox-Modus filtert antd sonst gar nicht. Gruppen tragen kein
- * `suche` und fallen durch; rc-select prüft dann ihre Optionen einzeln.
+ * `search` und fallen durch; rc-select prüft dann ihre Optionen einzeln.
  */
-export function rufnameFilter(
-  eingabe: string,
-  option?: RufnameOption | RufnameOptionGruppe,
-): boolean {
-  return option != null && 'suche' in option && option.suche.includes(suchtext(eingabe.trim()));
+export function rufnameFilter(input: string, option?: RufnameOption | RufnameOptionGroup): boolean {
+  return option != null && 'search' in option && option.search.includes(searchText(input.trim()));
 }

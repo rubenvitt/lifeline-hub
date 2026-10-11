@@ -112,7 +112,7 @@ const stammFahrzeuge = [
     funkrufname: 'Kater Musterstadt 1',
     fahrzeugtyp: 'KdoW',
     angelegt_at: '2026-01-01T00:00:00',
-    dienststatus: 'im_dienst',
+    dienststatus: 'in_dienst',
     ist_demo: false,
     sondersignal: true,
   },
@@ -121,7 +121,7 @@ const stammFahrzeuge = [
     funkrufname: 'Demo ELW 1',
     fahrzeugtyp: 'ELW 1',
     angelegt_at: '2026-01-01T00:00:00',
-    dienststatus: 'im_dienst',
+    dienststatus: 'in_dienst',
     ist_demo: true,
     sondersignal: true,
   },
@@ -130,7 +130,7 @@ const stammFahrzeuge = [
     funkrufname: 'Florian Musterstadt 44/1',
     fahrzeugtyp: 'HLF 20',
     angelegt_at: '2026-01-01T00:00:00',
-    dienststatus: 'im_dienst',
+    dienststatus: 'in_dienst',
     ist_demo: false,
     sondersignal: true,
   },
@@ -1298,7 +1298,85 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     await waitFor(() =>
       expect(feld.closest('.ant-select')).toHaveTextContent('Florian Musterstadt 10/1'),
     );
+    // Enter auf dem leeren Feld übernimmt den Platzhalter nicht: nichts geht hinaus.
+    await user.keyboard('{Enter}');
+    expect(await p.findByRole('button', { name: 'Rufname eintragen' })).toBeVisible();
     expect(bodies).toEqual([]);
+  });
+
+  /**
+   * Enter, wie der Browser es schickt: rc-select liest `which`, das user-event in jsdom auf 0
+   * lässt. Ohne `which` wäre der Fall unsichtbar.
+   */
+  const ENTER = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 };
+  const PFEIL_RUNTER = { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40 };
+
+  it('Rufname: Enter behält Freitext, der Anfang eines Vorschlags ist (LFH-1187)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    const feld = p.getByRole('combobox', { name: 'Rufname' });
+    await user.type(feld, 'Florian Musterstadt 10');
+    await waitFor(() => expect(vorschlagsliste()).toContain('Florian Musterstadt 10/1ELW 2'));
+    // `fireEvent` meldet `false`, wenn jemand `preventDefault` ruft — dann sendete das Formular nicht.
+    expect(fireEvent.keyDown(feld, ENTER)).toBe(true);
+    expect(feld).toHaveValue('Florian Musterstadt 10');
+    await user.click(p.getByRole('button', { name: 'Rufname speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ rufname: 'Florian Musterstadt 10' }]));
+  });
+
+  it('Rufname: Pfeil und Enter übernehmen den angesteuerten Vorschlag (LFH-1187)', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    const feld = p.getByRole('combobox', { name: 'Rufname' });
+    await user.type(feld, 'kater');
+    await waitFor(() => expect(vorschlagsliste()).toContain('Kater Musterstadt 1KdoW'));
+    fireEvent.keyDown(feld, PFEIL_RUNTER);
+    expect(fireEvent.keyDown(feld, ENTER)).toBe(false);
+    expect(feld).toHaveValue('Kater Musterstadt 1');
+    // Das Popup ist zu; das nächste Enter sendet.
+    expect(fireEvent.keyDown(feld, ENTER)).toBe(true);
+    await user.click(p.getByRole('button', { name: 'Rufname speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ rufname: 'Kater Musterstadt 1' }]));
+  });
+
+  it('Rufname: Pfeil, dann Escape — das nächste Enter sendet den Text (LFH-1187)', async () => {
+    setup();
+    fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    const feld = p.getByRole('combobox', { name: 'Rufname' });
+    await user.type(feld, 'Kater');
+    await waitFor(() => expect(vorschlagsliste()).toContain('Kater Musterstadt 1KdoW'));
+    fireEvent.keyDown(feld, PFEIL_RUNTER);
+    fireEvent.keyDown(feld, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27 });
+    await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
+    expect(fireEvent.keyDown(feld, ENTER)).toBe(true);
+    expect(feld).toHaveValue('Kater');
+  });
+
+  it('Rufname: ohne Schreibrecht kein Abruf der Organisationsfahrzeuge (LFH-1187)', async () => {
+    let abrufe = 0;
+    setup({
+      einsatz: { meine_rolle: 'beobachter' },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
+    server.use(
+      http.get('/api/fahrzeuge', () => {
+        abrufe += 1;
+        return HttpResponse.json(stammFahrzeuge);
+      }),
+    );
+    fuehrungsstelleMitschnitt({ sprechgruppen: [], fahrzeug_ids: [], rufname: 'Florian 10/1' });
+    const p = await paneel();
+    expect(await p.findByText('Florian 10/1')).toBeInTheDocument();
+    expect(abrufe).toBe(0);
   });
 
   it('Rufname: ohne Freigabe der Fahrzeuge nur die Organisation, kein Fehler (LFH-1187)', async () => {

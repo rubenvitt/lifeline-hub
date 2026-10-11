@@ -54,7 +54,7 @@ export function DemoLabel({ children }: { children: ReactNode }) {
 }
 
 /** Teilt in echte und Demo-Einträge; beide behalten die Eingangsreihenfolge. */
-export function trenneDemo<T extends { ist_demo: boolean }>(
+export function splitDemo<T extends { ist_demo: boolean }>(
   eintraege: readonly T[],
 ): { echte: T[]; demo: T[] } {
   const echte: T[] = [];
@@ -67,7 +67,7 @@ export function demoGruppierteOptionen<T extends { id: number; ist_demo: boolean
   eintraege: readonly T[],
   label: (eintrag: T) => string,
 ): (AuswahlOption | AuswahlGruppe)[] {
-  const { echte, demo } = trenneDemo(eintraege);
+  const { echte, demo } = splitDemo(eintraege);
   const echteOptionen = echte.map((e) => ({ value: e.id, label: label(e) }));
   return demo.length
     ? [

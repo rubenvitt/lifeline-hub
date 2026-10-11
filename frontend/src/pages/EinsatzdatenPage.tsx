@@ -47,7 +47,7 @@ import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { NUR_LEITUNG_FUEHRUNG_ORG_ADMIN } from '../components/nurAnsicht';
-import { InlineAngabe } from '../components/InlineAngabe';
+import { InlineAngabe, type InlineEingabe } from '../components/InlineAngabe';
 import { useViewport } from '../components/useViewport';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -68,8 +68,8 @@ import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { ZUSTAND_GRUND } from '../stab/funkplan';
 import {
   rufnameFilter,
-  rufnameOptionen,
-  rufnamePlatzhalter,
+  rufnameOptions,
+  rufnamePlaceholder,
   rufnameVorschlaege,
 } from '../stab/rufnameVorschlaege';
 import PaneelZustand from '../components/instrument/PaneelZustand';
@@ -539,8 +539,6 @@ function FuehrungsstellePaneel({
 /**
  * Zeile „Rufname“ der Führungsstelle mit Vorschlägen aus den Stammdaten (LFH-1187,
  * `stab/rufnameVorschlaege.tsx`): Funkrufnamen der Führungsfahrzeuge, Freitext bleibt erlaubt.
- * Die Organisationsfahrzeuge kommen aus demselben Cache wie der Pool auf der Fahrzeugseite und
- * werden nur mit Schreibrecht abgerufen; ein Fehler dort lässt nur ihre Gruppe weg.
  */
 function RufnameAngabe({
   rufname,
@@ -555,15 +553,6 @@ function RufnameAngabe({
   darfSchreiben: boolean;
   onSpeichern: (wert: string) => Promise<unknown>;
 }) {
-  const stammQuery = useQuery({
-    queryKey: globalKeys.fahrzeugeListe('im-dienst'),
-    queryFn: () => listeFahrzeuge(true),
-    enabled: darfSchreiben,
-  });
-  const disponiert = quelle.zustand === 'daten' ? quelle.fahrzeuge : null;
-  const optionen = rufnameOptionen(
-    rufnameVorschlaege({ fahrzeugIds, disponiert, stamm: stammQuery.data ?? null }),
-  );
   return (
     <InlineAngabe<string>
       etikett="Rufname"
@@ -573,18 +562,65 @@ function RufnameAngabe({
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
       onSpeichern={onSpeichern}
-      eingabe={({ feld, popup, value, onChange }) => (
-        <AutoComplete
-          {...feld}
-          {...popup}
-          options={optionen}
-          filterOption={rufnameFilter}
-          placeholder={rufnamePlatzhalter(fahrzeugIds, disponiert)}
-          value={value}
-          onChange={(v?: string) => onChange(v ?? '')}
+      eingabe={(eingabe) => (
+        <RufnameInput
+          eingabe={eingabe}
+          fahrzeugIds={fahrzeugIds}
+          disponiert={quelle.zustand === 'daten' ? quelle.fahrzeuge : null}
         />
       )}
     />
+  );
+}
+
+/**
+ * Das Eingabefeld des Rufnamens. Die Fahrzeuge der Organisation lädt es erst beim Bearbeiten,
+ * aus demselben Cache wie der Pool der Fahrzeugseite; ein Fehler dort lässt nur ihre Gruppe weg.
+ *
+ * **Enter übernimmt nur eine angesteuerte Option.** rc-select macht beim Tippen still die erste
+ * Option aktiv, deren Wert mit dem Getippten beginnt, und Enter übernähme sie: „Kater 1“ würde zu
+ * „Kater 11“. Ohne Pfeiltaste seit der letzten Eingabe hält die Capture-Phase Enter deshalb von
+ * rc-select fern, und das `<form>` von `InlineAngabe` sendet den getippten Text. Bei
+ * geschlossenem Popup lässt rc-select Enter ohnehin durch.
+ */
+function RufnameInput({
+  eingabe: { feld, popup, value, onChange },
+  fahrzeugIds,
+  disponiert,
+}: {
+  eingabe: InlineEingabe<string>;
+  fahrzeugIds: readonly number[];
+  disponiert: readonly EinsatzFahrzeug[] | null;
+}) {
+  const stammQuery = useQuery({
+    queryKey: globalKeys.fahrzeugeListe('im-dienst'),
+    queryFn: () => listeFahrzeuge(true),
+  });
+  const navigated = useRef(false);
+  const options = rufnameOptions(
+    rufnameVorschlaege({ fahrzeugIds, disponiert, stamm: stammQuery.data ?? null }),
+  );
+  return (
+    <div
+      onKeyDownCapture={(e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') navigated.current = true;
+        else if (e.key === 'Enter' && !navigated.current) e.stopPropagation();
+      }}
+    >
+      <AutoComplete
+        {...feld}
+        {...popup}
+        options={options}
+        filterOption={rufnameFilter}
+        placeholder={rufnamePlaceholder(fahrzeugIds, disponiert)}
+        value={value}
+        onChange={(v?: string) => {
+          navigated.current = false;
+          onChange(v ?? '');
+        }}
+        style={{ width: '100%' }}
+      />
+    </div>
   );
 }
 

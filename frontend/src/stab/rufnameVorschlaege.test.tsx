@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { EinsatzFahrzeug, Fahrzeug } from '../api/types';
 import { DEMO_GRUPPE } from '../stammdaten/demoAuswahl';
 import {
-  RUFNAME_GRUPPE,
+  RUFNAME_GROUP,
   rufnameFilter,
-  rufnameOptionen,
-  rufnamePlatzhalter,
+  rufnameOptions,
+  rufnamePlaceholder,
   rufnameVorschlaege,
 } from './rufnameVorschlaege';
 
@@ -38,16 +38,16 @@ function stamm(
     funkrufname,
     fahrzeugtyp,
     angelegt_at: '2026-01-01T00:00:00',
-    dienststatus: 'im_dienst',
+    dienststatus: 'in_dienst',
     ist_demo: false,
     sondersignal: false,
     ...extra,
-  } as Fahrzeug;
+  };
 }
 
 /** Gruppen als „Titel: Rufname, Rufname“ — liest sich im Fehlerfall wie die Liste. */
-function lesbar(gruppen: ReturnType<typeof rufnameVorschlaege>): string[] {
-  return gruppen.map((g) => `${g.titel}: ${g.vorschlaege.map((v) => v.funkrufname).join(', ')}`);
+function readable(gruppen: ReturnType<typeof rufnameVorschlaege>): string[] {
+  return gruppen.map((g) => `${g.title}: ${g.vorschlaege.map((v) => v.funkrufname).join(', ')}`);
 }
 
 const einsatzFahrzeuge = [
@@ -72,10 +72,10 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
       disponiert: einsatzFahrzeuge,
       stamm: orgFahrzeuge,
     });
-    expect(lesbar(gruppen)).toEqual([
-      `${RUFNAME_GRUPPE.fuehrungsstelle}: Florian Musterstadt 19/1`,
-      `${RUFNAME_GRUPPE.disponiert}: Florian Musterstadt 11/1, Heros Musterstadt 10/1`,
-      `${RUFNAME_GRUPPE.organisation}: Kater Musterstadt 1, Rotkreuz Musterstadt 10/1`,
+    expect(readable(gruppen)).toEqual([
+      `${RUFNAME_GROUP.fuehrungsstelle}: Florian Musterstadt 19/1`,
+      `${RUFNAME_GROUP.disponiert}: Florian Musterstadt 11/1, Heros Musterstadt 10/1`,
+      `${RUFNAME_GROUP.organisation}: Kater Musterstadt 1, Rotkreuz Musterstadt 10/1`,
       `${DEMO_GRUPPE}: Demo ELW`,
     ]);
   });
@@ -88,7 +88,7 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
     });
     expect(gruppen[0].vorschlaege.map((v) => v.funkrufname)).toEqual(['Florian Musterstadt 44/1']);
     // MTW und LF sind keine Führungsfahrzeuge und fehlen ohne Zuordnung.
-    expect(lesbar(gruppen).join('\n')).not.toContain('19/1');
+    expect(readable(gruppen).join('\n')).not.toContain('19/1');
   });
 
   it('ein manuelles Zeichen mit Fachaufgabe Führung gilt wie in der Skizze', () => {
@@ -99,12 +99,12 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
       ],
       stamm: null,
     });
-    expect(lesbar(gruppen)).toEqual([`${RUFNAME_GRUPPE.disponiert}: Florian Musterstadt 19/2`]);
+    expect(readable(gruppen)).toEqual([`${RUFNAME_GROUP.disponiert}: Florian Musterstadt 19/2`]);
   });
 
   it('ohne Freigabe der Fahrzeuge keine Gruppe 1–2, die Organisation bleibt ganz', () => {
     const gruppen = rufnameVorschlaege({ fahrzeugIds: [1], disponiert: null, stamm: orgFahrzeuge });
-    expect(gruppen.map((g) => g.titel)).toEqual([RUFNAME_GRUPPE.organisation, DEMO_GRUPPE]);
+    expect(gruppen.map((g) => g.title)).toEqual([RUFNAME_GROUP.organisation, DEMO_GRUPPE]);
     // Ohne Disposition ist auch das disponierte ELW 1 nur ein Fahrzeug der Organisation.
     expect(gruppen[0].vorschlaege.map((v) => v.funkrufname)).toContain('Florian Musterstadt 11/1');
   });
@@ -112,9 +112,9 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
   it('ohne Stammdaten keine Gruppe 3; ohne jede Quelle nichts', () => {
     expect(
       rufnameVorschlaege({ fahrzeugIds: [], disponiert: einsatzFahrzeuge, stamm: null }).map(
-        (g) => g.titel,
+        (g) => g.title,
       ),
-    ).toEqual([RUFNAME_GRUPPE.disponiert]);
+    ).toEqual([RUFNAME_GROUP.disponiert]);
     expect(rufnameVorschlaege({ fahrzeugIds: [], disponiert: null, stamm: null })).toEqual([]);
   });
 
@@ -124,8 +124,8 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
       disponiert: einsatzFahrzeuge,
       stamm: [stamm(103, 'Heros Musterstadt 10-1', 'ELW 2')],
     });
-    expect(lesbar(gruppen)).toEqual([
-      `${RUFNAME_GRUPPE.disponiert}: Florian Musterstadt 11/1, Heros Musterstadt 10/1`,
+    expect(readable(gruppen)).toEqual([
+      `${RUFNAME_GROUP.disponiert}: Florian Musterstadt 11/1, Heros Musterstadt 10/1`,
     ]);
   });
 
@@ -138,7 +138,7 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
       ],
       stamm: [stamm(200, 'Florian 10/1', 'ELW 2')],
     });
-    expect(lesbar(gruppen)).toEqual([`${RUFNAME_GRUPPE.disponiert}: Florian 10/1`]);
+    expect(readable(gruppen)).toEqual([`${RUFNAME_GROUP.disponiert}: Florian 10/1`]);
   });
 
   it('der Typ steht neben dem Funkrufnamen, Demo-Herkunft bleibt sichtbar', () => {
@@ -147,28 +147,28 @@ describe('rufnameVorschlaege (LFH-1187)', () => {
       disponiert: [disponiert(1, 'Demo 10/1', 'ELW 2', { ist_demo: true })],
       stamm: null,
     });
-    expect(gruppe.vorschlaege).toEqual([{ funkrufname: 'Demo 10/1', typ: 'ELW 2', istDemo: true }]);
+    expect(gruppe.vorschlaege).toEqual([{ funkrufname: 'Demo 10/1', typ: 'ELW 2', isDemo: true }]);
   });
 });
 
-describe('rufnamePlatzhalter (LFH-1187)', () => {
+describe('rufnamePlaceholder (LFH-1187)', () => {
   it('genau ein zugeordnetes Fahrzeug → dessen Funkrufname', () => {
-    expect(rufnamePlatzhalter([3], einsatzFahrzeuge)).toBe('Heros Musterstadt 10/1');
+    expect(rufnamePlaceholder([3], einsatzFahrzeuge)).toBe('Heros Musterstadt 10/1');
   });
 
   it('keins, mehrere, entlassen oder ohne Freigabe → kein Vorschlag', () => {
-    expect(rufnamePlatzhalter([], einsatzFahrzeuge)).toBeUndefined();
-    expect(rufnamePlatzhalter([2, 3], einsatzFahrzeuge)).toBeUndefined();
-    expect(rufnamePlatzhalter([999], einsatzFahrzeuge)).toBeUndefined();
-    expect(rufnamePlatzhalter([3], null)).toBeUndefined();
+    expect(rufnamePlaceholder([], einsatzFahrzeuge)).toBeUndefined();
+    expect(rufnamePlaceholder([2, 3], einsatzFahrzeuge)).toBeUndefined();
+    expect(rufnamePlaceholder([999], einsatzFahrzeuge)).toBeUndefined();
+    expect(rufnamePlaceholder([3], null)).toBeUndefined();
   });
 });
 
 describe('rufnameFilter (LFH-1187)', () => {
-  const [gruppe] = rufnameOptionen([
+  const [gruppe] = rufnameOptions([
     {
-      titel: RUFNAME_GRUPPE.disponiert,
-      vorschlaege: [{ funkrufname: 'Heros Musterstadt 10/1', typ: 'ELW 2', istDemo: false }],
+      title: RUFNAME_GROUP.disponiert,
+      vorschlaege: [{ funkrufname: 'Heros Musterstadt 10/1', typ: 'ELW 2', isDemo: false }],
     },
   ]);
   const option = gruppe.options[0];

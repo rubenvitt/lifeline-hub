@@ -328,14 +328,14 @@ const vergleicheMittel = (a: SkizzenAusstattung, b: SkizzenAusstattung) =>
   vergleiche(a.text, b.text) || vergleiche(a.titel, b.titel);
 
 /** Was das Zeichen eines Fahrzeugs bestimmt; Stammdaten-Fahrzeuge tragen keine Overrides. */
-export type FahrzeugZeichenQuelle = Pick<
+export type FahrzeugZeichenSource = Pick<
   EinsatzFahrzeug,
   'fahrzeugtyp' | 'opta' | 'traegerorganisation'
 > &
   Partial<Pick<EinsatzFahrzeug, 'tz_fachaufgabe' | 'tz_organisation'>>;
 
 /** Das Zeichen eines Fahrzeugs wie auf der Lagekarte (`baueTzProps`), Overrides gewinnen. */
-function fahrzeugTz(f: FahrzeugZeichenQuelle): TzProps {
+function fahrzeugTz(f: FahrzeugZeichenSource): TzProps {
   return baueTzProps({
     objekttyp: 'fahrzeug',
     fachaufgabe: f.tz_fachaufgabe,
@@ -350,7 +350,7 @@ function fahrzeugTz(f: FahrzeugZeichenQuelle): TzProps {
  * Ein Führungsfahrzeug trägt im Zeichen die Fachaufgabe Führung — die eine Regel für Lagekarte,
  * Skizze und die Rufname-Vorschläge der Führungsstelle (LFH-1187).
  */
-export function istFuehrungsfahrzeug(f: FahrzeugZeichenQuelle): boolean {
+export function isFuehrungsfahrzeug(f: FahrzeugZeichenSource): boolean {
   return fahrzeugTz(f).fachaufgabe === 'fuehrung';
 }
 
