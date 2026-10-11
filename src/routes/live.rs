@@ -246,6 +246,7 @@ pub const STAMMDATEN_PFADE: &[&str] = &[
     "/api/sprechgruppen",
     "/api/etb-bausteine",
     "/api/stichwort-vorschlaege",
+    "/api/externe-stellen",
     "/api/org-fuehrungsfunktionen",
     "/api/organisation",
 ];

@@ -1495,6 +1495,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/org-modul-einstellungen/{modul_key}",
             put(routes::org_einstellungen::modul_einstellung_setzen),
         )
+        .route(
+            "/api/externe-stellen",
+            get(routes::externe_stelle::liste).post(routes::externe_stelle::anlegen),
+        )
+        .route(
+            "/api/externe-stellen/{id}",
+            patch(routes::externe_stelle::aktualisieren),
+        )
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route(
             "/api/stichwort-vorschlaege",

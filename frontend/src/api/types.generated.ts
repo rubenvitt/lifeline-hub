@@ -2068,6 +2068,30 @@ export interface components {
             /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
         };
+        /** @description Eine externe Stelle des Katalogs. */
+        ExterneStelle: {
+            aktiv: boolean;
+            art: components["schemas"]["ExterneStelleArt"];
+            bezeichnung: string;
+            funkrufname?: string | null;
+            /** Format: int64 */
+            id: number;
+            rufnummer?: string | null;
+            /**
+             * @description Die zuständige Leitstelle der Organisation; höchstens eine, nur aktiv und Art
+             *     `leitstelle`.
+             */
+            zustaendig: boolean;
+        };
+        /**
+         * @description Art einer externen Stelle (Schema-Anker für die OpenAPI-Union, LFH-120). Bewusst nicht
+         *     die `Stellenart` des Kommunikationsplans: die beschreibt die Rolle im Plan und kennt weder
+         *     Polizei noch Hilfsorganisation (design.md D2).
+         *
+         *     Die Reihenfolge der Varianten ist die Anzeigereihenfolge der Gruppen.
+         * @enum {string}
+         */
+        ExterneStelleArt: "leitstelle" | "polizei" | "behoerde" | "hilfsorganisation" | "sonstige";
         /** @description Einheitlicher Umschlag für jede Fachebene. */
         FachebeneAntwort: {
             /**

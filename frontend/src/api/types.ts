@@ -186,6 +186,9 @@ export type EtbTyp = S['EtbTyp'];
 export type MeldeWeg = S['MeldeWeg'];
 export type EtbEintragAnzeige = S['EtbEintragAnzeige'];
 export type EtbBaustein = S['EtbBaustein'];
+/** Katalog „Externe Stellen“ (LFH-1194). */
+export type ExterneStelle = S['ExterneStelle'];
+export type ExterneStelleArt = S['ExterneStelleArt'];
 /** Eigener Lesestand im Tagebuch eines Einsatzes (LFH-611). */
 export type EtbLesemarke = S['EtbLesemarkeAnzeige'];
 /** Exakte Zahl der ETB-Einträge gesamt und je Typ, filtertreu zur Liste (LFH-612). */
