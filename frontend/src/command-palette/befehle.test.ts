@@ -235,6 +235,51 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === 'aktion:etb')).toBe(false);
     expect(baueBefehle(kontext()).some((x) => x.id === 'aktion:etb')).toBe(true);
   });
+  /**
+   * „Person aufnehmen“ (LFH-1170, Spec `einsatz-zugriff`): Mitglieder aufnehmen darf nur die
+   * Einsatzleitung eines laufenden Einsatzes. `darfSchreibenImEinsatz` schließt Führungspersonal
+   * ein und reicht deshalb nicht.
+   */
+  describe('Person aufnehmen (LFH-1170)', () => {
+    const ID = 'aktion:person-aufnehmen';
+    it('springt für die Einsatzleitung in die Personenauswahl der Sektion „Zugriff“', () => {
+      const k = kontext({ darfEinsatzLeiten: true });
+      const b = baueBefehle(k);
+      const zeile = b.find((x) => x.id === ID)!;
+      expect(zeile.label).toBe('Person aufnehmen');
+      expect(zeile.gruppe).toBe('schnellaktionen');
+      expect(zeile.kontext).toBe(b.find((x) => x.id === 'modul:einsatz-einstellungen')!.label);
+      zeile.ausfuehren();
+      expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einstellungen/zugriff?neu=1');
+    });
+    it('steht am Ende; die Bestandszeilen behalten ihre Reihenfolge', () => {
+      const ids = baueBefehle(kontext({ darfEinsatzLeiten: true }))
+        .map((x) => x.id)
+        .filter((id) => id.startsWith('aktion:'));
+      expect(ids[ids.length - 1]).toBe(ID);
+      expect(ids.slice(0, -1)).toEqual(
+        baueBefehle(kontext())
+          .map((x) => x.id)
+          .filter((id) => id.startsWith('aktion:')),
+      );
+    });
+    it('fehlt ohne Leitungsrecht, auch mit Schreibrecht (Führungspersonal)', () => {
+      expect(baueBefehle(kontext()).some((x) => x.id === ID)).toBe(false);
+      expect(baueBefehle(kontext({ darfEinsatzLeiten: false })).some((x) => x.id === ID)).toBe(
+        false,
+      );
+    });
+    it('fehlt ohne Schreibrecht im Einsatz (abgeschlossen)', () => {
+      const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false, darfEinsatzLeiten: true }));
+      expect(b.some((x) => x.id === ID)).toBe(false);
+    });
+    it('findet sich über „mitglied“ und „zugriff“', () => {
+      const b = baueBefehle(kontext({ darfEinsatzLeiten: true }));
+      for (const q of ['mitglied', 'zugriff']) {
+        expect(ordneTreffer(filtereBefehle(b, q), q)[0]?.id).toBe(ID);
+      }
+    });
+  });
   it('versteckt ALLE Schnellaktionen wenn darfSchreibenImEinsatz=false (Beobachter/abgeschlossen)', () => {
     const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false }));
     expect(b.some((x) => x.id.startsWith('aktion:'))).toBe(false);

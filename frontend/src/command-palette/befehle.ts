@@ -26,6 +26,7 @@ import {
   dokumentePfad,
   einsaetzePfad,
   einsatzabschnittePfad,
+  einsatzEinstellungenPfad,
   einsatzberichtPfad,
   einsatzModulPfad,
   einsatzPfad,
@@ -87,6 +88,12 @@ export const SCHNELLAKTIONEN: {
   /** Objekt + Verb (LFH-1055); die frühere Beschriftung steht als letztes Schlagwort. */
   label: string;
   schlagworte: string[];
+  /**
+   * Engeres Recht als das Schreibrecht des Blocks (LFH-1170): `leitung` zeigt die Zeile nur der
+   * Einsatzleitung eines laufenden Einsatzes (`darfEinsatzLeiten`). Ohne Angabe genügt das
+   * Schreibrecht im Einsatz.
+   */
+  recht?: 'leitung';
 }[] = [
   {
     modulKey: 'personen',
@@ -178,6 +185,19 @@ export const SCHNELLAKTIONEN: {
     pfad: (id) => lagekartePfad(id, { zeichnen: { typ: 'gefahrengebiet' } }),
     label: 'Gefahrengebiet zeichnen',
     schlagworte: ['gefahr', 'gefahrenbereich', 'gefahrenzone', 'zone', 'skizze', 'lagekarte'],
+  },
+  {
+    // Ans ENDE (LFH-1170): Mitglieder aufnehmen ist einer der ersten Schritte eines Einsatzes,
+    // die Sektion „Zugriff“ liegt aber in den Einstellungen. Leser:
+    // `pages/EinsatzEinstellungenPage.tsx` (der Guard ordnet über den Dateinamen zu), weitergereicht
+    // an die Sektion.
+    modulKey: 'einsatz-einstellungen',
+    parameter: 'neu',
+    kennung: 'person-aufnehmen',
+    pfad: (id) => einsatzEinstellungenPfad(id, 'zugriff', { neu: true }),
+    label: 'Person aufnehmen',
+    schlagworte: ['mitglied', 'zugriff', 'hinzufügen', 'rolle', 'benutzer', 'einsatzkraft'],
+    recht: 'leitung',
   },
 ];
 
@@ -393,6 +413,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     //    ein unfertiges Modul.
     if (k.darfSchreibenImEinsatz) {
       for (const a of SCHNELLAKTIONEN) {
+        if (a.recht === 'leitung' && !k.darfEinsatzLeiten) continue;
         const m = modulRegistry.find((x) => x.key === a.modulKey);
         if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
         const ziel = a.pfad(k.einsatzId);

@@ -50,9 +50,9 @@ Sektion ist das Redirect-Ziel und bleibt „Allgemein“), Route in `EINSTELLUNG
 `pages/einstellungen/EinsatzZugriff.tsx`. Sie liest den Einsatz über `useEinstellungenDaten`
 (Lade-/Fehlerriegel wie die übrigen Sektionen) und hängt `MitgliederAbschnitt` mit denselben
 Rechten ein wie bisher (`darfEinsatzLeiten`, Führungsstelle zusätzlich `istEinsatzLeitung`).
-Wer nicht verwalten darf, liest über der Liste einen `RechteHinweis` „Nur die Einsatzleitung
-verwaltet den Zugriff“ (eigener Text wie in „Geräte“, weil die Grenze enger ist als
-`NUR_LEITUNG_FUEHRUNG_ORG_ADMIN`). Am abgeschlossenen Einsatz trägt schon die Einstellungsseite
+Wer nicht verwalten darf, liest über der Liste „Nur Ansicht · nur Einsatzleitung“
+(`RechteHinweis` mit `NUR_LEITUNG` aus `components/nurAnsicht.ts`; die Grenze ist enger als
+`NUR_LEITUNG_FUEHRUNG_ORG_ADMIN` der übrigen Sektionen). Am abgeschlossenen Einsatz trägt schon die Einstellungsseite
 `EINSATZ_ABGESCHLOSSEN`; die Sektion zeigt dann keinen zweiten Hinweis.
 
 `MitgliederAbschnitt` wandert nicht und wird nicht umgebaut; nur der Außenabstand oben
