@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
  * 2. **Die Schließung** — ein Scan über `frontend/src`: außerhalb des Primitivs und der
  *    namentlichen Ausnahmen gibt es KEIN rohes antd-Tabellenelement. Ohne ihn sagte der Guard
  *    nichts über eine neu hinzukommende Tabelle.
- * 3. **Die Ordnung** — die dreizehn Kataloge tragen Sortierung, Filterachse und Freitextsuche
+ * 3. **Die Ordnung** — die vierzehn Kataloge tragen Sortierung, Filterachse und Freitextsuche
  *    an der Aufrufstelle, nicht bloß das Primitiv darunter. Teil 1 sähe einen Rückbau nicht.
  *    Siehe {@link ordnungsBefunde}.
  *
@@ -50,7 +50,7 @@ const SRC = (() => {
 })();
 
 /**
- * Die achtzehn Tabellen hinter dem Primitiv — dreizehn Kataloge (zehn Stammdaten-Reiter, zwei
+ * Die neunzehn Tabellen hinter dem Primitiv — vierzehn Kataloge (elf Stammdaten-Reiter, zwei
  * Karten-Sektionen, Benutzer) und fünf Einsatz-/Verwaltungstabellen als Überlaufschutz.
  *
  * Die fünf sind KEINE `Datensicht`-Konsumenten: sie bekommen nur Scrollcontainer, stehende
@@ -60,6 +60,7 @@ const SRC = (() => {
 const KATALOGE = [
   'stammdaten/QualifikationenTab.tsx',
   'stammdaten/SprechgruppenTab.tsx',
+  'stammdaten/ExterneStellenTab.tsx',
   'stammdaten/FahrzeugeTab.tsx',
   'stammdaten/PersonalTab.tsx',
   'stammdaten/StichworteTab.tsx',
@@ -148,7 +149,7 @@ function katalogText(pfad: string): string {
 
 const QUELLEN = KATALOGTABELLEN.map((pfad) => ({ pfad, text: katalogText(pfad) }));
 
-// ── Teil 3: die Ordnung der dreizehn Kataloge (LFH-330 · O) ───────────────────────
+// ── Teil 3: die Ordnung der vierzehn Kataloge (LFH-330 · O) ───────────────────────
 
 /** Spaltensortierung, Filterachse, Freitextsuche — je als Vorkommen im entkommentierten Text. */
 const SORTER_MUSTER = /\bsorter:/g;
@@ -183,7 +184,7 @@ const OHNE_FILTERACHSE: Record<string, string> = {
 };
 
 /**
- * Fehlende Ordnung in den dreizehn Katalogen UND tote Filter-Ausnahmen in EINER Liste. Rein und
+ * Fehlende Ordnung in den vierzehn Katalogen UND tote Filter-Ausnahmen in EINER Liste. Rein und
  * exportiert für die Selbstbeweis-Fälle.
  *
  * `filters` und `onFilter` müssen in der ZAHL übereinstimmen: eine Spalte mit `filters` ohne
@@ -301,8 +302,8 @@ export function rohtabellenBefunde(dateien: Record<string, string>, ausnahmen: s
 const KORPUS = lieseKorpus(SRC);
 
 describe('KatalogTabelle-Inventar', () => {
-  it('alle 18 Tabellen laufen über das Primitiv', () => {
-    expect(QUELLEN).toHaveLength(18);
+  it('alle 19 Tabellen laufen über das Primitiv', () => {
+    expect(QUELLEN).toHaveLength(19);
 
     const ohnePrimitiv = QUELLEN.filter(
       (q) => treffer(q.text, elementMuster('KatalogTabelle')) < 1,
@@ -330,7 +331,7 @@ describe('KatalogTabelle-Inventar', () => {
      * Ohne diese Zusicherung ist `BLAETTER_SCHWELLE` eine Attrappe: `pagination={false}` schaltet
      * lautlos ab, und abgeschaltete Blätterung sieht aus wie eine Liste unter der Schwelle.
      *
-     * Nur die dreizehn Kataloge sind verpflichtet. Die Nachzügler dürfen abschalten (Blätterung
+     * Nur die vierzehn Kataloge sind verpflichtet. Die Nachzügler dürfen abschalten (Blätterung
      * fachlich nicht bestellt), `Datensicht` ebenso: eine Seitenblätterung schnitte die
      * Zeilenschleuse entzwei, und Kriterium 12 hat Vorrang.
      */
@@ -377,10 +378,10 @@ describe('KatalogTabelle-Inventar', () => {
 });
 
 describe('KatalogTabelle-Ordnung', () => {
-  /** Nur die dreizehn Kataloge — die fünf Nachzügler tragen die Ordnung ausdrücklich nicht. */
+  /** Nur die vierzehn Kataloge — die fünf Nachzügler tragen die Ordnung ausdrücklich nicht. */
   const KATALOG_QUELLEN = QUELLEN.filter((q) => KATALOGE.includes(q.pfad));
 
-  it('die dreizehn Kataloge sind vollzählig', () => {
+  it('die vierzehn Kataloge sind vollzählig', () => {
     /**
      * Der Zuschnitt ist die halbe Zusicherung: fiele ein Katalog aus `KATALOG_QUELLEN`, prüfte ihn
      * der Fall darunter nicht mehr.
@@ -389,14 +390,14 @@ describe('KatalogTabelle-Ordnung', () => {
      * gebäre das Gate rot. Diese Null wird bewusst NICHT festgeschrieben: bekommt einer Ordnung,
      * wandert er nach `KATALOGE` (oder, über `Datensicht`, ganz aus diesem Inventar).
      */
-    expect(KATALOG_QUELLEN).toHaveLength(13);
+    expect(KATALOG_QUELLEN).toHaveLength(14);
     expect(KATALOG_QUELLEN.map((q) => q.pfad)).toEqual(KATALOGE);
   });
 
   it('jeder Katalog trägt Sortierung, Suche und — bis auf drei begründete — eine Filterachse', () => {
     expect(
       ordnungsBefunde(KATALOG_QUELLEN, OHNE_FILTERACHSE),
-      `Die dreizehn Kataloge haben mit LFH-330 Sortierung, Filter und Suche bekommen. Wer ` +
+      `Die vierzehn Kataloge haben mit LFH-330 Sortierung, Filter und Suche bekommen. Wer ` +
         `eine davon herausnimmt, dreht den Ausgangsbefund des Tickets zurück: das Primitiv ` +
         `kann es, die Aufrufstelle nutzt es nicht. Fehlt eine Filterachse aus einem SACHLICHEN ` +
         `Grund, gehört die Datei mit Begründung in OHNE_FILTERACHSE — und wieder heraus, ` +
@@ -590,7 +591,7 @@ describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
  * Objektliteralen; dieser Guard schließt die Lücke je Konsumentendatei. Die Doppelpunkt-Form
  * trifft `overflow: 'hidden'` nicht.
  *
- * BLINDE FLECKEN: gelesen werden nur die achtzehn Konsumentendateien. Eine ausgelagerte
+ * BLINDE FLECKEN: gelesen werden nur die neunzehn Konsumentendateien. Eine ausgelagerte
  * Spaltenliste (Muster `personen/personenSpalten.tsx`) sieht er nicht, und eine Typassertion
  * (`[…] as KatalogSpalte<X>[]`) hebelt die Typsperre aus. Wer eine Spaltenliste auslagert,
  * nimmt die Datei hier mit auf.

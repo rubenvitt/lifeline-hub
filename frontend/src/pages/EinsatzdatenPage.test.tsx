@@ -9,6 +9,7 @@ import { meHandler, server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
+  ExterneStelle,
   BenutzerAnzeige,
   EinsatzAnzeige,
   EinsatzFahrzeug,
@@ -58,6 +59,12 @@ const mitglieder = [
 const vorschlaege = [
   { id: 1, text: 'H1' },
   { id: 2, text: 'MANV' },
+];
+
+/** Katalog „Externe Stellen“ (LFH-1194); die Seite fragt nur die aktiven ab. */
+const externeStellen: ExterneStelle[] = [
+  { id: 1, bezeichnung: 'ILS Musterkreis', art: 'leitstelle', aktiv: true, zustaendig: true },
+  { id: 2, bezeichnung: 'Polizei Musterstadt', art: 'polizei', aktiv: true, zustaendig: false },
 ];
 
 const sprechgruppenListe: Sprechgruppe[] = [
@@ -120,6 +127,7 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
     http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
+    http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
     http.get('/api/einsaetze/:id/ort-vorschau', () =>
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
@@ -667,6 +675,42 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     await waitFor(() => expect(bodies).toEqual([{ stichwort: 'MANV 2' }]));
   });
 
+  it('Meldende Stelle schlägt den Katalog nach Art gruppiert vor und sendet genau den Text', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Meldende Stelle eintragen' }));
+    const feld = screen.getByRole('combobox', { name: 'Meldende Stelle' });
+    expect(feld).toHaveAttribute('maxlength', '200');
+    await user.type(feld, 'mus');
+    // Gruppen „Leitstelle“ und „Polizei“; die zuständige Leitstelle trägt das Wort.
+    const zustaendig = await screen.findByTitle('ILS Musterkreis · zuständig');
+    expect(screen.getByTitle('Polizei Musterstadt')).toBeInTheDocument();
+    const gruppen = [...document.querySelectorAll('.ant-select-item-group')].map(
+      (g) => g.textContent,
+    );
+    expect(gruppen).toEqual(['Leitstelle', 'Polizei']);
+    await user.click(zustaendig);
+    expect(feld).toHaveValue('ILS Musterkreis');
+    await user.click(screen.getByRole('button', { name: 'Meldende Stelle speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ meldende_stelle: 'ILS Musterkreis' }]));
+  });
+
+  it('Meldende Stelle nimmt weiter Freitext', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Meldende Stelle eintragen' }));
+    await user.type(
+      screen.getByRole('combobox', { name: 'Meldende Stelle' }),
+      'Polizei vor Ort, Streife 12/3',
+    );
+    await user.click(screen.getByRole('button', { name: 'Meldende Stelle speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([{ meldende_stelle: 'Polizei vor Ort, Streife 12/3' }]),
+    );
+  });
+
   it('leeren einer optionalen Angabe sendet null', async () => {
     setup({ einsatz: { einsatzort: 'Deich Süd' } });
     const bodies = patchMitschnitt({ einsatzort: 'Deich Süd' });
@@ -792,9 +836,9 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     );
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Meldende Stelle eintragen' }));
-    await user.type(screen.getByRole('textbox', { name: 'Meldende Stelle' }), 'ILS{Enter}');
+    await user.type(screen.getByRole('combobox', { name: 'Meldende Stelle' }), 'ILS{Enter}');
     expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Meldende Stelle' })).toHaveValue('ILS');
+    expect(screen.getByRole('combobox', { name: 'Meldende Stelle' })).toHaveValue('ILS');
     expect(document.querySelector('.ant-message-error')).toBeNull();
   });
 
@@ -970,6 +1014,19 @@ describe('EinsatzdatenPage · Vollformular sendet nur Geändertes (LFH-839)', ()
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).not.toHaveProperty('leitstellen_nr');
     expect(stand().leitstellen_nr).toBe('LS-99');
+  });
+
+  it('Vollformular: Meldende/anfordernde Stelle schlägt den Katalog vor (LFH-1194)', async () => {
+    setup();
+    const { bodies } = serverStand();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = screen.getByLabelText('Meldende/anfordernde Stelle');
+    expect(feld).toHaveAttribute('maxlength', '200');
+    await user.type(feld, 'Poli');
+    await user.click(await screen.findByTitle('Polizei Musterstadt'));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ meldende_stelle: 'Polizei Musterstadt' }]));
   });
 
   it('ohne Änderung: kein PATCH, das Formular schließt', async () => {
@@ -1429,6 +1486,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
       http.get('/api/einsaetze/:id/mitglieder', () => HttpResponse.json(mitglieder)),
       http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
       http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
+      http.get('/api/externe-stellen', () => HttpResponse.json(externeStellen)),
       http.get('/api/einsaetze/:id/ort-vorschau', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),

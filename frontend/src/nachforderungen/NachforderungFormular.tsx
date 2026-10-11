@@ -1,4 +1,4 @@
-import { Col, Form, Input, InputNumber, Row } from 'antd';
+import { AutoComplete, Col, Form, Input, InputNumber, Row } from 'antd';
 import {
   ETB_PARTEI_MAX,
   NACHFORDERUNG_ART_MAX,
@@ -11,6 +11,12 @@ import { Select } from '../components/Select';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
 import type { NachforderungVorbelegung } from '../routing/deeplinks';
+import {
+  externeStellenOptionen,
+  useExterneStellen,
+  zustaendigeLeitstelle,
+} from '../stammdaten/externeStellenVorschlaege';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 const { TextArea } = Input;
 
@@ -71,6 +77,23 @@ export default function NachforderungFormular({
   speicherung?: Speicherung;
 }) {
   const [form] = Form.useForm<FormWerte>();
+  // Katalog „Externe Stellen“ (LFH-1194, design.md D8): Vorschläge für die Adressat-Bezeichnung,
+  // die zuständige Leitstelle als Vorgabe bei der Kategorie „Leitstelle“.
+  const stellen = useExterneStellen().data;
+  const stellenOptionen = externeStellenOptionen(stellen ?? []);
+  const vorgabeLeitstelle = zustaendigeLeitstelle(stellen ?? []) ?? '';
+  const kategorie = Form.useWatch('adressatKategorie', form);
+
+  // Vorbelegen, nie überschreiben: nur bei Kategorie „Leitstelle“, leerem und unberührtem Feld.
+  // Läuft, sobald die Liste da ist (sie kommt nach dem Einhängen) und bei jedem Wechsel auf
+  // „Leitstelle“. Den Reset nach dem Absetzen deckt `initialValues` ab.
+  useEffect(() => {
+    if (!vorgabeLeitstelle || kategorie !== 'leitstelle') return;
+    if (form.getFieldValue('adressatBezeichnung') || form.isFieldTouched('adressatBezeichnung')) {
+      return;
+    }
+    form.setFieldValue('adressatBezeichnung', vorgabeLeitstelle);
+  }, [form, kategorie, vorgabeLeitstelle]);
 
   // Läuft nach dem Einhängen des `<Form>` und nur bei einer NEUEN Vorbelegung (die Seite hält
   // sie identitätsstabil).
@@ -105,7 +128,7 @@ export default function NachforderungFormular({
         anzahl: null,
         bezeichnung: '',
         adressatKategorie: 'leitstelle',
-        adressatBezeichnung: '',
+        adressatBezeichnung: vorgabeLeitstelle,
         prioritaet: 'normal',
         begruendung: '',
       }}
@@ -155,7 +178,14 @@ export default function NachforderungFormular({
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="adressatBezeichnung" label="Adressat-Bezeichnung">
-            <Input placeholder="z. B. Leitstelle Nord" maxLength={ETB_PARTEI_MAX} />
+            <AutoComplete
+              aria-label="Adressat-Bezeichnung"
+              options={stellenOptionen}
+              showSearch={teilwortSuche}
+              allowClear
+              placeholder="z. B. Leitstelle Nord"
+              maxLength={ETB_PARTEI_MAX}
+            />
           </Form.Item>
         </Col>
       </Row>

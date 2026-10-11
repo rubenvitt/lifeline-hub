@@ -841,6 +841,9 @@ export const GLOBAL_KEYS = {
   einheitTypen: 'einheit-typen',
   etbBausteine: 'etb-bausteine',
   stichwortVorschlaege: 'stichwort-vorschlaege',
+  // Katalog „Externe Stellen“ (LFH-1194). Nicht im Lagebild: ohne Netz bleibt die meldende
+  // Stelle Freitext, und Rufnummern gehören nicht ohne Not auf die Platte.
+  externeStellen: 'externe-stellen',
   // Katalog der Führungsfunktionen mit Mandantenlabels (LFH-549). Nicht im Lagebild: gelesen
   // werden Snapshot und Auflösung, die im Auftrag stecken.
   fuehrungsfunktionen: 'fuehrungsfunktionen',
@@ -952,6 +955,12 @@ export const globalKeys = {
   // sprechgruppen kennt nur den Filterwert 'alle', deshalb nur dieser eine Accessor (siehe
   // queryKeys.prefixmatch.test.ts). Den baren Prefix invalidiert `stammdaten` (LFH-734).
   sprechgruppenAlle: () => [GLOBAL_KEYS.sprechgruppen, 'alle'] as const,
+  /**
+   * Externe Stellen (LFH-1194): `'aktiv'` für die Vorschläge, `'alle'` für die Verwaltung. Der
+   * argumentlose Accessor ist der Invalidierungs-Prefix beider Fächer.
+   */
+  externeStellen: () => [GLOBAL_KEYS.externeStellen] as const,
+  externeStellenListe: (umfang: 'aktiv' | 'alle') => [GLOBAL_KEYS.externeStellen, umfang] as const,
 
   /**
    * Präferenzen EINES Benutzers. Der Server-Slot ist pro Benutzer, sein Cache-Fach muss es auch
@@ -1012,6 +1021,7 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.einheitTypen,
     GLOBAL_KEYS.etbBausteine,
     GLOBAL_KEYS.stichwortVorschlaege,
+    GLOBAL_KEYS.externeStellen,
     GLOBAL_KEYS.fuehrungsfunktionen,
     GLOBAL_KEYS.organisation,
     // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
@@ -1077,7 +1087,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * (Object-URLs, nur im Speicher, LFH-759),
  * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Org-Einstellungs- und Admin-Keys, die eigene
  * Führungsstelle (LFH-849: Erreichbarkeit ist personenbezogen), der
- * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
+ * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), die externen
+ * Stellen (LFH-1194: ohne Netz bleibt die meldende Stelle Freitext; Rufnummern), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
  * LFH-554 design.md D8, offen mit LFH-767), die Daten der Fernmeldeskizze (LFH-893: bearbeitet
  * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an
