@@ -29,7 +29,7 @@
 
 ## 4. Organigramm
 
-- [ ] 4.1 Wurzel „Einsatzleitung“ zeigt Bezeichnung und Rufnamen der erfassten Führungsstelle (D6), auch im Druck und in der Übernahme; „Leitung nicht erfasst“ bleibt; Kommentar D5 in `Organigramm.tsx` fortgeschrieben; Vitest „Wurzel mit Führungsstelle“ / „ohne Bezeichnung“ / Abruf gescheitert in `Organigramm.test.tsx` grün; e2e `fuehrungsorganisation.spec.ts` grün
+- [x] 4.1 Wurzel „Einsatzleitung“ zeigt Bezeichnung und Rufnamen der erfassten Führungsstelle (D6), auch im Druck und in der Übernahme; „Leitung nicht erfasst“ bleibt; Kommentar D5 in `Organigramm.tsx` fortgeschrieben; Vitest „Wurzel mit Führungsstelle“ / „ohne Bezeichnung“ / Abruf gescheitert in `Organigramm.test.tsx` grün; e2e `fuehrungsorganisation.spec.ts` grün
 - [x] 4.2 Doku `docs/anwender/kapitel/einsatzabschnitte.md`: Wurzel nennt die Führungsstelle; Guard grün
 
 ## 5. Lagekarte
@@ -41,7 +41,7 @@
 
 ## 6. Nachweis
 
-- [ ] 6.1 Gates: `scripts/check-all.sh` (inkl. fmt, Lint, tsc, Vitest, cargo test, Codegen, Migrationen, OpenSpec-Archiv) grün; e2e der berührten Specs (`einsatzdaten-*`, `funkplan`, `fernmeldeskizze*`, `fuehrungsorganisation`, `lagekarte-*`, `kommunikationsplan`) grün
+- [x] 6.1 Gates: `scripts/check-all.sh` (inkl. fmt, Lint, tsc, Vitest, cargo test, Codegen, Migrationen, OpenSpec-Archiv) grün; e2e der berührten Specs (`einsatzdaten-*`, `funkplan`, `fernmeldeskizze*`, `fuehrungsorganisation`, `lagekarte-*`, `kommunikationsplan`) grün — Lauf 11.10.2026 in der Cloud-Sitzung: Schritte 1–3, 5, 6, 8–15 grün (Vitest 12 460); Rust-Suite 177 Läufe grün, nur die Desktop-Hülle ohne GTK-Systembibliotheken nicht baubar; e2e Chromium: die 14 Rotläufe sind auf `alpha` dieselben (Umgebung), `funkplan.spec.ts:165` mit einem Worker auf beiden Seiten grün; Firefox/WebKit und die Hülle belegt die CI des PRs
 
 ## Workflow follow-up
 

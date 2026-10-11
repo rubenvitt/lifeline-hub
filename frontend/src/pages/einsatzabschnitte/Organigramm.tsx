@@ -52,7 +52,7 @@ import './organigrammPrint.css';
  *   Fernmeldeskizze des S6 (LFH-625 D4).
  * - **Einsatzleitung ohne erfundene Leitung** (D5): wer die Einsatzleitung führt, ist kein Datum.
  *   Seit LFH-1181 trägt die eigene Führungsstelle einen Namen; die Wurzel nennt ihre Bezeichnung
- *   und ihren Rufnamen (`openspec/changes/lfh-1181-fuehrungsstelle-ort/design.md`, D6), die
+ *   und ihren Rufnamen (`openspec/changes/archive/2026-10-11-lfh-1181-fuehrungsstelle-ort/design.md`, D6), die
  *   Leitung bleibt die benannte Lücke. Der Stab steht nur mit Stab-Freigabe daneben — fail-closed
  *   über `useStabFreigabe`.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
