@@ -41,6 +41,8 @@ interface Tabelle {
   menue: (kennung: string) => string;
   /** Der zweite Knopf neben „Bearbeiten“ (Rückfrage bzw. Statuswechsel). */
   zweiteAktion: string;
+  /** Aktionen auf jeder Breite im Menü, nicht erst unter `md` (Benutzer, LFH-1122). */
+  immerMenue?: true;
 }
 
 async function saeen(page: Page, pfad: string, daten: object): Promise<void> {
@@ -63,8 +65,10 @@ const TABELLEN: Tabelle[] = [
       return kennung;
     },
     status: 'aktiv',
-    menue: (k) => `Aktionen zu Benutzer ${k}`,
+    // Der Benutzername steht mit im Namen; `saeen` bildet ihn aus der Marke am Ende der Kennung.
+    menue: (k) => `Aktionen zu Benutzer ${k} (@e2e-verwaltung-${k.split(' ').pop()})`,
     zweiteAktion: 'Deaktivieren',
+    immerMenue: true,
   },
   {
     name: 'Fahrzeuge',
@@ -178,7 +182,7 @@ for (const ansicht of ANSICHTEN) {
         const status = zeile.getByText(tabelle.status, { exact: true });
         await vollImBild(status, ansicht.breite, `Status „${tabelle.status}“`);
 
-        if (ansicht.schmal) {
+        if (ansicht.schmal || tabelle.immerMenue) {
           const ausloeser = zeile.getByRole('button', { name: tabelle.menue(kennung) });
           await vollImBild(ausloeser, ansicht.breite, 'Aktionsmenü');
           await ausloeser.click();

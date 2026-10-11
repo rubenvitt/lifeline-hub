@@ -21,16 +21,10 @@ export const STAMMDATEN_RECHTE_TEXT = NUR_ADMIN;
 /** Zugriff eines Einsatzes: die einzige Einsatzleitung (Server: 409, `routes/einsatz.rs`). */
 export const LETZTE_EINSATZLEITUNG_TEXT = 'Gesperrt: letzte Einsatzleitung';
 /**
- * Benutzerverwaltung: `kurz` steht unter `md` im Aktionsmenü („Deaktivieren gesperrt: …“), wo
- * kein Grund unter den Eintrag passt; `text` ab `md` unter dem gesperrten Knopf.
+ * Benutzerverwaltung: der Grund steht im Aktionsmenü der Zeile („Deaktivieren gesperrt: …“), wo
+ * kein Grund unter den Eintrag passt; das Menü trägt die Zeile auf jeder Breite (LFH-1122).
  */
 /** Das eigene Konto — Deaktivieren beendete die eigene Sitzung. */
-export const EIGENES_KONTO = {
-  kurz: 'eigenes Konto',
-  text: 'Gesperrt: eigenes Konto',
-} as const;
+export const EIGENES_KONTO = 'eigenes Konto';
 /** Der letzte aktive Admin (Server: 409, `routes/benutzer.rs`). */
-export const LETZTER_ADMIN = {
-  kurz: 'letzter aktiver Admin',
-  text: 'Gesperrt: letzter aktiver Admin',
-} as const;
+export const LETZTER_ADMIN = 'letzter aktiver Admin';
