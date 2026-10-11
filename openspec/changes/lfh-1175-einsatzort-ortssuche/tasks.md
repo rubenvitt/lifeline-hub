@@ -8,9 +8,9 @@
 
 ## 2. Server: neue Einstiege
 
-- [ ] 2.1 `GET /api/einsaetze/{id}/ort-suche` mit `EinsatzVerwaltungszugriff`, Umgebung = Einsatzort, `PFAD_KEY` ohne Modul; Integrationstests in `tests/ort_suche.rs`: Führungspersonal ohne Lagekarte 200 mit Treffern und `viewbox`, Beobachter 403, fremde Org 404, Suchtext zu kurz 400, Geocoder geschlossen → `nicht_erreichbar` mit 200 (Stub nicht gefragt, wo verlangt); `tests/einsatz_kontext_guard.rs` grün
-- [ ] 2.2 `GET /api/ort-suche` mit `darf_einsatz_anlegen()`, Geocoder der Org des Benutzers, ohne `viewbox`; Integrationstests: Führungskraft 200, Helfer 403 ohne Geocoder-Anfrage, zwei Orgs mit verschiedenen Geocodern → Anfrage am Stub der eigenen Org, 400 bei zu kurzem Text
-- [ ] 2.3 Schema-Pfade der DTOs in `src/api_doc.rs` und `tests/enum_wire_kontrakt.rs` auf `routes::ort_suche` (das OpenAPI-Dokument führt keine Pfade); Codegen erneut prüfen
+- [x] 2.1 `GET /api/einsaetze/{id}/ort-suche` mit `EinsatzVerwaltungszugriff`, Umgebung = Einsatzort, `PFAD_KEY` ohne Modul; Integrationstests in `tests/ort_suche.rs`: Führungspersonal ohne Lagekarte 200 mit Treffern und `viewbox`, Beobachter 403, fremde Org 403, Suchtext zu kurz 400, Geocoder geschlossen → `nicht_erreichbar` mit 200 (Stub nicht gefragt, wo verlangt); `tests/einsatz_kontext_guard.rs` grün
+- [x] 2.2 `GET /api/ort-suche` mit `darf_einsatz_anlegen()`, Geocoder der Org des Benutzers, ohne `viewbox`; Integrationstests: Führungskraft 200, Helfer 403 ohne Geocoder-Anfrage, zwei Orgs mit verschiedenen Geocodern → Anfrage am Stub der eigenen Org, 400 bei zu kurzem Text
+- [x] 2.3 Schema-Pfade der DTOs in `src/api_doc.rs` und `tests/enum_wire_kontrakt.rs` auf `routes::ort_suche` (das OpenAPI-Dokument führt keine Pfade); Codegen erneut prüfen
 
 ## 3. Server: Einsatzort beim Anlegen, Prüfung der Koordinate
 

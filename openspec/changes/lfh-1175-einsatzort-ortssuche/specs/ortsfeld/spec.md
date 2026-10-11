@@ -97,7 +97,7 @@ Lagekarte.
 
 #### Scenario: Fremde Organisation
 - **WHEN** eine Person einer anderen Organisation die Ortssuche des Einsatzes aufruft
-- **THEN** antwortet der Server mit 404 und fragt den Geocoder nicht
+- **THEN** antwortet der Server mit 403 und fragt den Geocoder nicht
 
 ### Requirement: Ortssuche in der Organisation
 Der Server SHALL eine Ortssuche ohne Einsatz anbieten, für Personen, die Einsätze anlegen dürfen

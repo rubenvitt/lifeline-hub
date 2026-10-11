@@ -12,10 +12,15 @@
 //! 400 gibt es nur für den Suchtext selbst (`src/AGENTS.md`, Statuscode-Konvention). Takt und
 //! Cache sind prozessweit und gelten für alle Einstiege zusammen (`geocoding::suche`).
 
+use crate::app::AppState;
+use crate::auth::session::CurrentUser;
+use crate::einsatz::kontext::EinsatzVerwaltungszugriff;
 use crate::error::AppError;
 use crate::geocoding::{self, suche};
 use crate::org::einstellungen as org_einst;
 use crate::wire_enum::wire_enum;
+use axum::extract::{Query, State};
+use axum::Json;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
@@ -95,6 +100,36 @@ pub(crate) fn ausschnitt_um(lat: Option<f64>, lon: Option<f64>) -> Option<suche:
         (Some(lat), Some(lon)) => Some(suche::Ausschnitt::um(lat, lon)),
         _ => None,
     }
+}
+
+/// GET /api/einsaetze/:id/ort-suche?q= — Ortsfeld im Einsatz (LFH-1175). Dasselbe Recht wie der
+/// PATCH der Kopfdaten, für den die Suche da ist; kein Modul-Gate. Bevorzugt die Umgebung des
+/// Einsatzorts.
+pub async fn im_einsatz(
+    State(state): State<AppState>,
+    ctx: EinsatzVerwaltungszugriff,
+    Query(params): Query<OrtSucheParams>,
+) -> Result<Json<OrtSucheAntwort>, AppError> {
+    let ausschnitt = ausschnitt_um(ctx.einsatz.einsatzort_lat, ctx.einsatz.einsatzort_lon);
+    Ok(Json(
+        suchen(&state.pool, ctx.einsatz.org_id, params.q, ausschnitt).await?,
+    ))
+}
+
+/// GET /api/ort-suche?q= — Ortsfeld ohne Einsatz, etwa beim Anlegen (LFH-1175). Nur wer Einsätze
+/// anlegen darf; Geocoder der eigenen Organisation, ohne bevorzugte Umgebung (die Organisation
+/// hat keinen Standort). Das Recht wird vor dem Suchtext geprüft: ohne Recht 403, nie 400.
+pub async fn in_org(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Query(params): Query<OrtSucheParams>,
+) -> Result<Json<OrtSucheAntwort>, AppError> {
+    if !benutzer.darf_einsatz_anlegen() {
+        return Err(AppError::Forbidden);
+    }
+    Ok(Json(
+        suchen(&state.pool, benutzer.org_id, params.q, None).await?,
+    ))
 }
 
 /// Ergebnis des Geocoders → Antwort. Rein und ohne `Result`: kein Ausgang des Geocoders wird zum
