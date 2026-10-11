@@ -5,7 +5,7 @@
 //! meldet das Ereignis `einsatz` über `routes::einsatz::kopf_geaendert` (Spec `einsatzkopf-live`).
 //! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3).
 //! Der Einsatzleiter (LFH-1199) schreibt bei einem Wechsel zusätzlich einen Übergabe-Eintrag ins
-//! ETB und meldet ihn nach dem Commit: `openspec/changes/lfh-1199-einsatzleiter-angabe/design.md`
+//! ETB und meldet ihn nach dem Commit: `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md`
 //! (D2, D3).
 
 use crate::app::AppState;

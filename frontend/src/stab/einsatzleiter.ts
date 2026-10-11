@@ -10,7 +10,7 @@ import { md, ZUSTAND_GRUND } from './funkplan';
  * der App-Rolle `einsatzleitung` oder der Stab-Besetzung ableiten: das wäre eine erfundene Leitung
  * (`frontend/AGENTS.md`, „Keine erfundenen Daten“).
  *
- * Herleitung: `openspec/changes/lfh-1199-einsatzleiter-angabe/design.md` (D5).
+ * Herleitung: `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md` (D5).
  */
 export type EinsatzleiterDarstellung =
   | { art: 'erfasst'; name: string; seit: string; nichtMehrDisponiert: boolean }

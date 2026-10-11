@@ -642,7 +642,7 @@ async fn schwaerzung_nullt_nur_die_erreichbarkeit() {
 //
 // Spec `einsatz-fuehrungsstelle`, „Einsatzleiter als Person oder Freitext“ und „Übergabe der
 // Einsatzleitung im ETB“. Herleitung:
-// `openspec/changes/lfh-1199-einsatzleiter-angabe/design.md` (D1–D3).
+// `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md` (D1–D3).
 
 /// ETB-Einträge des Einsatzes, deren Inhalt `nadel` enthält.
 async fn etb_mit(app: &axum::Router, cookie: &str, einsatz: i64, nadel: &str) -> Vec<Value> {

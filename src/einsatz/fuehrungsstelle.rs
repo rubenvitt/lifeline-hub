@@ -8,7 +8,7 @@
 //! mit `einsatz_mitgliedschaft.fuehrungsstelle` (Freitext je Person, LFH-461).
 //!
 //! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2);
-//! Einsatzleiter: `openspec/changes/lfh-1199-einsatzleiter-angabe/design.md` (D1–D3).
+//! Einsatzleiter: `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md` (D1–D3).
 
 use crate::error::AppError;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};

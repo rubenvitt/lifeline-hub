@@ -126,5 +126,11 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, rot belegt, dann die Umsetzung.
 - [x] 9.1 e2e: Einsatzleiter auf Einsatzdaten setzen und wechseln. Danach zeigen Kopfleiste,
   Organigramm und Funkplan denselben Namen, und das ETB trägt genau einen Übergabe-Eintrag.
   Eigene Spec `e2e/einsatzleiter.spec.ts`. Nachweis: Spec grün (Chromium, Lauf 11.10.2026).
-- [ ] 9.2 `./scripts/check-all.sh` grün, dazu Vitest und Rust-Tests vollständig. Nachweis: Lauf
+- [x] 9.2 `./scripts/check-all.sh` grün, dazu Vitest und Rust-Tests vollständig. Nachweis: Lauf
   ohne Fehler, Kästchen mit Verweis auf diesen Lauf bzw. die CI des PRs abhaken.
+
+  Lauf 11.10.2026 (Cloud-Sitzung, Chromium): Bündel `schnell` grün; Vitest voll mit
+  `TZ=Europe/Berlin` grün (ein Abruf-Mock nachgezogen); Rust: `--lib`, `einsatz_fuehrungsstelle`,
+  `enum_wire_kontrakt`, `eingabegrenzen_spiegel`, `aufbewahrung_e2e`, `openapi_spec_aktuell`
+  grün; e2e `einsatzleiter.spec.ts` grün. Den vollen Rust-Workspace und die ganze e2e-Suite trägt
+  die CI des PRs (die Sitzung hat nicht den Platz für alle ~160 Testbinaries).

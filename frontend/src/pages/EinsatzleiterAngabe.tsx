@@ -28,7 +28,7 @@ import { ZUSTAND_GRUND } from '../stab/funkplan';
 /**
  * Zeile „Einsatzleiter“ der eigenen Führungsstelle (LFH-1199): eine disponierte Person oder ein
  * externer Einsatzleiter als Freitext, dazu „seit“ (leer = jetzt). Ein Wechsel schreibt der Server
- * als Übergabe ins ETB. Herleitung: `openspec/changes/lfh-1199-einsatzleiter-angabe/design.md` (D6).
+ * als Übergabe ins ETB. Herleitung: `openspec/changes/archive/2026-10-11-lfh-1199-einsatzleiter-angabe/design.md` (D6).
  *
  * Die Wahl ist ein Schlüssel: `p:<einsatz_personal.id>` für eine Person, `x:<Name>` für einen
  * externen, `bisher` für eine inzwischen entlassene Person (ihr Name steht nur noch eingefroren).
