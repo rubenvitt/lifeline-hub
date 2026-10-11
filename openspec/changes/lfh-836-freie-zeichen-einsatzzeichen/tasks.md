@@ -38,29 +38,29 @@
   - Farbe an Person → entfällt
   - gleiche Eingabe → gleiches Token
   - Gleichstandsfall gepinnt
-- [ ] 3.4 Snapshot- und Offline-Pfad: `snapshotDaten.ts` und `useLagekarteDaten.ts` über den Adapter. Tests:
+- [x] 3.4 Snapshot- und Offline-Pfad: `snapshotDaten.ts` und `useLagekarteDaten.ts` über den Adapter. Tests:
   - Ein eingefrorener Snapshot mit Altfeldern zeichnet nach neuer Darstellung.
   - Ein Offline-Stand mit Altfeldern ebenso.
 
 ## 4. Karte und Inspector
 
-- [ ] 4.1 `markerIcons.ts` und `marker.ts` nach D8: freie Zeichen liefern den `ez|`-Schlüssel des Adapters; `tzIconKey`, `baueFreiesZeichenTz` und das `tz`-Feld entfallen. Tests in `markerIcons.test.ts`, `marker.test.ts`, `markerLayer.test.ts`, `spiderfy.test.ts` und `kartenLayer.test.ts` umgestellt und grün. Gleiche Spec bei Fachobjekt und freiem Zeichen ergibt denselben Schlüssel.
-- [ ] 4.2 `kartenbildResolver.ts` und `Kartenflaeche.tsx`: `tz|`-Zweig, `ladeTz` und `erzeugeTaktischesZeichen` entfernen. `kartenbildResolver.test.ts` und `zeichenDichte.test.ts` sind grün.
-- [ ] 4.3 `FreiesZeichenInspector.tsx`: Kachel über `EinsatzZeichen` mit dem Adapter, Rahmen nach Spec (Palettenfarbe, sonst Textrolle). Hinweis „vereinfacht dargestellt“ mit Alt-Kennung bei `vereinfacht`. Das entprellte Schreiben sendet `zeichen_spec`. In `FreiesZeichenInspector.test.tsx` sind die Szenarien der Spec belegt (Nachtmodus, Füllung, vereinfacht, Altzeile → Spec beim Ändern), und die Entprellungstests bleiben grün.
-- [ ] 4.4 `Inspector.tsx`: toten Zweig für freie Zeichen in `markerBildUrl` entfernen. `Inspector.test.tsx` ist grün.
+- [x] 4.1 `markerIcons.ts` und `marker.ts` nach D8: freie Zeichen liefern den `ez|`-Schlüssel des Adapters; `tzIconKey`, `baueFreiesZeichenTz` und das `tz`-Feld entfallen. Tests in `markerIcons.test.ts`, `marker.test.ts`, `markerLayer.test.ts`, `spiderfy.test.ts` und `kartenLayer.test.ts` umgestellt und grün. Gleiche Spec bei Fachobjekt und freiem Zeichen ergibt denselben Schlüssel.
+- [x] 4.2 `kartenbildResolver.ts` und `Kartenflaeche.tsx`: `tz|`-Zweig, `ladeTz` und `erzeugeTaktischesZeichen` entfernen. `kartenbildResolver.test.ts` und `zeichenDichte.test.ts` sind grün.
+- [x] 4.3 `FreiesZeichenInspector.tsx`: Kachel über `EinsatzZeichen` mit dem Adapter, Rahmen nach Spec (Palettenfarbe, sonst Textrolle). Hinweis „vereinfacht dargestellt“ mit Alt-Kennung bei `vereinfacht`. Das entprellte Schreiben sendet `zeichen_spec`. In `FreiesZeichenInspector.test.tsx` sind die Szenarien der Spec belegt (Nachtmodus, Füllung, vereinfacht, Altzeile → Spec beim Ändern), und die Entprellungstests bleiben grün.
+- [x] 4.4 `Inspector.tsx`: toten Zweig für freie Zeichen in `markerBildUrl` entfernen. `Inspector.test.tsx` ist grün.
 
 ## 5. Picker und „zuletzt verwendet“
 
-- [ ] 5.1 `FreiesZeichenPicker.tsx` nach D7:
+- [x] 5.1 `FreiesZeichenPicker.tsx` nach D7:
   - Raster Grundzeichen aus `vocabulary(…, 'kind')` plus „Kein Grundzeichen“.
   - Raster Symbol aus `capabilities`/`states` bzw. `freestandingVocabulary` (`state`, `pictogram`, `animal-state`).
   - „Details“: Organisation, Fachaufgabe als `bodyMarks`, Einheit, Palettenfarbe, Bezeichnung. Die Achse „Funktion“ entfällt.
   - Kacheln über `EinsatzZeichen` mit `idPrefix`.
 
   Prüfen: Die Tests in `FreiesZeichenPicker.test.tsx` sind auf die Spec-Szenarien umgestellt und grün. Dazu gehören „Nur Zeichenbares“, „Piktogramm ohne Grundzeichen“ und „Farbe aus der Palette“; Tastatur, Suche und Enter sind unverändert. Jede angebotene Kombination zeichnet ohne Wurf (Eigenschaftstest über die Optionen).
-- [ ] 5.2 Kosten des Vokabulars messen: Test oder Benchmark für das Öffnen des Pickers und einen Grundzeichenwechsel. Ergebnis in `messung.md`. Optionen per `useMemo`.
-- [ ] 5.3 Aufrufer auf `zeichen_spec` umstellen: `Sidebar.tsx`, `ZeichenHierDialog.tsx` (Startentwurf), `useKartenInteraktion.ts` (POST-Body), `LagekartePage.tsx`, `api/types.ts` (Input-DTOs). Die Tests in `Sidebar.test.tsx`, `ZeichenHierDialog.test.tsx` und `useKartenInteraktion.test.tsx` sind umgestellt und grün.
-- [ ] 5.4 `zuletztVerwendet.ts` nach D10: neuer Schlüssel v2, Übernahme des alten Schlüssels über den Adapter, nicht Übersetzbares entfällt. `offline/geraetRaeumung.ts` räumt beide Schlüssel. Tests in `zuletztVerwendet.test.ts`:
+- [x] 5.2 Kosten des Vokabulars messen: Test oder Benchmark für das Öffnen des Pickers und einen Grundzeichenwechsel. Ergebnis in `messung.md`. Optionen per `useMemo`.
+- [x] 5.3 Aufrufer auf `zeichen_spec` umstellen: `Sidebar.tsx`, `ZeichenHierDialog.tsx` (Startentwurf), `useKartenInteraktion.ts` (POST-Body), `LagekartePage.tsx`, `api/types.ts` (Input-DTOs). Die Tests in `Sidebar.test.tsx`, `ZeichenHierDialog.test.tsx` und `useKartenInteraktion.test.tsx` sind umgestellt und grün.
+- [x] 5.4 `zuletztVerwendet.ts` nach D10: neuer Schlüssel v2, Übernahme des alten Schlüssels über den Adapter, nicht Übersetzbares entfällt. `offline/geraetRaeumung.ts` räumt beide Schlüssel. Tests in `zuletztVerwendet.test.ts`:
   - Übernahme in Reihenfolge
   - kaputter Alteintrag entfällt
   - kaputter Speicher → leere Leiste
@@ -68,11 +68,11 @@
 
 ## 6. Altpaket entfernen
 
-- [ ] 6.1 `TzProps`-ID-Typen lokal in `taktischesZeichen.ts` (D9), `grundzeichenAkzeptiert` entfernen. `stab/skizze`, `stab/fernmeldenetz.test.ts` und `pages/einsatzabschnitte/fuehrungsorganisation.test.ts` sind angepasst. `pnpm typecheck` ist grün.
-- [ ] 6.2 `taktische-zeichen-react` aus `package.json` und dem Lockfile entfernen. Prüfen:
+- [x] 6.1 `TzProps`-ID-Typen lokal in `taktischesZeichen.ts` (D9), `grundzeichenAkzeptiert` entfernen. `stab/skizze`, `stab/fernmeldenetz.test.ts` und `pages/einsatzabschnitte/fuehrungsorganisation.test.ts` sind angepasst. `pnpm typecheck` ist grün.
+- [x] 6.2 `taktische-zeichen-react` aus `package.json` und dem Lockfile entfernen. Prüfen:
   - `grep -rn "taktische-zeichen" frontend/src frontend/e2e frontend/package.json` liefert nichts außer Kommentaren mit Verweis auf die Historie.
   - `pnpm build` ist grün.
-- [ ] 6.3 Nach dem Umbau messen: Lagekarten-Chunk und Precache. Beide sind nicht größer als in 1.1; Werte in `messung.md`.
+- [x] 6.3 Nach dem Umbau messen: Lagekarten-Chunk und Precache. Beide sind nicht größer als in 1.1; Werte in `messung.md`.
 
 ## 7. e2e, Sichtprüfung, Doku
 

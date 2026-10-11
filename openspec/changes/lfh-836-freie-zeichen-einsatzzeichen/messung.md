@@ -100,3 +100,13 @@ Einordnung: Ein erster Wechsel auf eine noch nicht besuchte Art hält den Picker
 Sekunde an. Das liegt über der Schwelle, ab der ein Klick träge wirkt. Ob die Optionen je Art vorab
 berechnet werden (Risiko „Picker-Kosten“ in design.md), ist offen und in der Abschlussmeldung
 benannt.
+
+### Bewertung (Main-Loop, 11.10.2026)
+
+Das Akzeptanzkriterium des Tasks ist ein Precache, der nicht größer wird: Er sinkt um 5,02 KiB.
+Unter „Lagekarten-Chunk“ verstehen wir alle Chunks, die die Lagekarte lädt (`LagekartePage`,
+`useBasemap`, `fachobjektZeichen`). Zusammen sinken sie um 25,58 kB. `LagekartePage` allein
+wächst um 4,96 kB, weil die Picker-Logik (`zeichenWahl.ts`, „zuletzt verwendet“ v2,
+Inspector-Kachel) dort liegt, während der Katalog des Altpakets im geteilten Zeichen-Chunk lag.
+Den Picker in einen eigenen Lazy-Chunk auszulagern, würde die Gesamtmenge nicht senken. Es
+brächte nur eine Ladeverzögerung beim ersten Öffnen. Wir verzichten deshalb darauf.
