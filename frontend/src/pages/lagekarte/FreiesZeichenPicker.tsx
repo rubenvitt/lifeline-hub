@@ -34,13 +34,28 @@ import {
   type DetailAchse,
 } from './zeichenWahl';
 
+/**
+ * Der Entwurf im Picker: wie {@link FreiesZeichenUpdate}, aber `zeichen_spec` darf `null` sein —
+ * „Kein Grundzeichen“ ohne gewähltes Symbol ist noch kein Zeichen. Platzieren, Setzen und das
+ * Speichern im Inspector warten dann, bis ein Symbol gewählt ist ({@link hatZeichen}).
+ */
+export type ZeichenEntwurf = Omit<FreiesZeichenUpdate, 'zeichen_spec'> & {
+  zeichen_spec: string | null;
+};
+
+/** Trägt der Entwurf ein Zeichen? Nur dann darf er platziert oder gespeichert werden. */
+export function hatZeichen(entwurf: ZeichenEntwurf): entwurf is FreiesZeichenUpdate {
+  return entwurf.zeichen_spec != null;
+}
+
 export interface FreiesZeichenPickerProps {
   /** Der Entwurf: das Zeichen als `zeichen_spec` (`serializeAnySpec`), dazu die Bezeichnung. */
-  wert: FreiesZeichenUpdate;
-  onChange: (spec: FreiesZeichenUpdate) => void;
+  wert: ZeichenEntwurf;
+  onChange: (entwurf: ZeichenEntwurf) => void;
   /**
    * Enter im Picker: auf einer Kachel, in einem Suchfeld und in der Bezeichnung. Ohne diesen
-   * Callback (Inspector) sendet Enter nichts — das Platzieren gehört der Leiste.
+   * Callback (Inspector) sendet Enter nichts — das Platzieren gehört der Leiste. Ein Entwurf ohne
+   * Zeichen wird nie gesendet.
    *
    * Der Callback bringt die Spec mit: die Bezeichnung wird erst beim Verlassen übernommen, und eine
    * per Enter gewählte Kachel steht in derselben Runde noch nicht im State des Aufrufers.
@@ -65,6 +80,9 @@ const DETAIL_ACHSEN: { achse: Exclude<DetailAchse, 'farbe'>; label: string }[] =
  *  (Fachaufgabe im Grundzeichen) unterscheidbar. */
 const KACHEL_BILD = 40;
 const VORSCHAU_BILD = 56;
+
+/** Die Vorschau ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl). */
+export const OHNE_ZEICHEN_HINWEIS = 'Symbol wählen';
 
 /** Kachel-Höhen, bis das Raster scrollt. Die Suche ist der eigentliche Weg zum Ziel. */
 const RASTER_REIHEN = 4;
@@ -358,9 +376,9 @@ function Farbfeld({ farbe, rand }: { farbe: string; rand: string }) {
  * design.md D7): Bild-Raster mit Suche, „zuletzt verwendet" und Enter-Weg. Kein `<Form>`: das
  * Absenden gehört der Leiste.
  *
- * „Kein Grundzeichen“ ohne gewähltes Symbol ist noch kein Zeichen: der Picker merkt sich die Wahl
- * selbst und meldet erst das gewählte freistehende Symbol. Bis dahin steht der Entwurf des
- * Aufrufers unverändert (Vorschau und Platzieren zeigen, was gilt).
+ * „Kein Grundzeichen“ ohne gewähltes Symbol ist noch kein Zeichen: der Picker meldet einen Entwurf
+ * ohne Zeichen (`zeichen_spec: null`). Die Vorschau zeigt dann „Symbol wählen“, Enter sendet nichts,
+ * und der Aufrufer sperrt Platzieren bzw. Speichern ({@link hatZeichen}), bis ein Symbol gewählt ist.
  */
 export default function FreiesZeichenPicker({
   wert,
@@ -375,12 +393,12 @@ export default function FreiesZeichenPicker({
   // montierter Picker den Stand vom Einhängen.
   useEffect(() => abonniereZuletztVerwendet(() => setZuletzt(leseZuletztVerwendet())), []);
 
-  const entwurf = useMemo(() => leseEntwurf(wert.zeichen_spec), [wert.zeichen_spec]);
-
-  /** „Kein Grundzeichen“ gewählt, aber noch kein Symbol — gilt nur für den Entwurf, an dem es geschah. */
-  const [ohneFuer, setOhneFuer] = useState<string | null>(null);
-  const grundzeichen: SymbolKind | null =
-    ohneFuer === wert.zeichen_spec ? null : grundzeichenVon(entwurf);
+  /** Das gewählte Zeichen; `null` nach „Kein Grundzeichen“, solange kein Symbol gewählt ist. */
+  const entwurf = useMemo(
+    () => (wert.zeichen_spec == null ? null : leseEntwurf(wert.zeichen_spec)),
+    [wert.zeichen_spec],
+  );
+  const grundzeichen: SymbolKind | null = entwurf ? grundzeichenVon(entwurf) : null;
   const koerper = grundzeichen ? (entwurf as SymbolSpec) : null;
 
   // Das Vokabular zeichnet jeden Kandidaten probeweise (D7): Optionen je Entwurfsstand gemerkt.
@@ -398,7 +416,8 @@ export default function FreiesZeichenPicker({
   // Ohne Grundzeichen (auch „Kein Grundzeichen“ vor der Symbolwahl) nur die Bezeichnung.
   const details = useMemo(() => (koerper ? detailOptionen(koerper) : KEINE_DETAILS), [koerper]);
   const vorschau = useMemo(
-    () => freiesZeichen({ zeichen_spec: wert.zeichen_spec }).drawing,
+    () =>
+      wert.zeichen_spec == null ? null : freiesZeichen({ zeichen_spec: wert.zeichen_spec }).drawing,
     [wert.zeichen_spec],
   );
 
@@ -406,10 +425,7 @@ export default function FreiesZeichenPicker({
     ...wert,
     zeichen_spec: serializeAnySpec(spec),
   });
-  const melde = (spec: FreiesZeichenUpdate) => {
-    setOhneFuer(null);
-    onChange(spec);
-  };
+  const melde = onChange;
 
   /**
    * Übernimmt eine Spec und sendet sie — dieselbe frische Spec an beide, weil der Aufrufer seinen
@@ -424,16 +440,24 @@ export default function FreiesZeichenPicker({
   /** Der Entwurf nach einer Grundzeichen-Kachel; `null` heißt „Kein Grundzeichen“ (noch kein Zeichen). */
   const nachGrundzeichen = (id: string | null): FreiesZeichenUpdate | null => {
     if (id == null) return null;
-    return mitSpec(mitGrundzeichen(entwurf, id as SymbolKind));
+    // Nach „Kein Grundzeichen“ beginnt ein neues Grundzeichen von vorn.
+    return mitSpec(
+      entwurf ? mitGrundzeichen(entwurf, id as SymbolKind) : { kind: id as SymbolKind },
+    );
   };
+  /** „Kein Grundzeichen“ an einem Körper: noch kein Zeichen. Ein freistehendes bleibt, wie es ist. */
   const waehleGrundzeichen = (id: string | null) => {
     const neu = nachGrundzeichen(id);
     if (neu) melde(neu);
-    else if (grundzeichenVon(entwurf) !== null) setOhneFuer(wert.zeichen_spec);
+    else if (koerper) melde({ ...wert, zeichen_spec: null });
   };
 
   const nachSymbol = (id: string | null): FreiesZeichenUpdate | null => {
-    const spec = mitSymbol(koerper ?? nullWennKoerper(entwurf), id);
+    // Ohne Körper ist das Symbol das ganze Zeichen (freistehend).
+    const spec = mitSymbol(
+      koerper ?? (entwurf && grundzeichenVon(entwurf) === null ? entwurf : null),
+      id,
+    );
     return spec ? mitSpec(spec) : null;
   };
 
@@ -443,7 +467,7 @@ export default function FreiesZeichenPicker({
    */
   const uebernimm = (zeichenSpec: string) => melde({ ...wert, zeichen_spec: zeichenSpec });
 
-  const mitLabel = (roh: string): FreiesZeichenUpdate => ({ ...wert, label: roh.trim() || null });
+  const mitLabel = (roh: string): ZeichenEntwurf => ({ ...wert, label: roh.trim() || null });
 
   /**
    * Die Bezeichnung ist kontrolliert, mit eigenem Tipp-Merker: das Feld folgt `wert.label`, solange
@@ -456,7 +480,7 @@ export default function FreiesZeichenPicker({
   const [bezeichnung, setBezeichnung] = useState(wert.label ?? '');
   const [bezeichnungGetippt, setBezeichnungGetippt] = useState(false);
   if (!bezeichnungGetippt && bezeichnung !== (wert.label ?? '')) setBezeichnung(wert.label ?? '');
-  const bezeichnungUebernehmen = (): FreiesZeichenUpdate | null => {
+  const bezeichnungUebernehmen = (): ZeichenEntwurf | null => {
     setBezeichnungGetippt(false);
     const spec = mitLabel(bezeichnung);
     return spec.label !== (wert.label ?? null) ? spec : null;
@@ -467,10 +491,22 @@ export default function FreiesZeichenPicker({
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }} data-lfh="zeichen-picker">
-      <div style={{ display: 'flex', justifyContent: 'center' }} aria-label="Vorschau">
-        <span aria-hidden style={{ display: 'flex' }}>
-          <ZeichenBild drawing={vorschau} size={VORSCHAU_BILD} />
-        </span>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: VORSCHAU_BILD,
+        }}
+        aria-label="Vorschau"
+      >
+        {vorschau ? (
+          <span aria-hidden style={{ display: 'flex' }}>
+            <ZeichenBild drawing={vorschau} size={VORSCHAU_BILD} />
+          </span>
+        ) : (
+          <Typography.Text type="secondary">{OHNE_ZEICHEN_HINWEIS}</Typography.Text>
+        )}
       </div>
 
       {zuletzt.length > 0 && (
@@ -517,7 +553,7 @@ export default function FreiesZeichenPicker({
                 const neu = nachGrundzeichen(id);
                 if (neu) uebernimmUndSende(neu);
                 // „Kein Grundzeichen“: ein schon freistehendes Zeichen gilt, sonst nur wählen.
-                else if (grundzeichenVon(entwurf) === null) uebernimmUndSende(wert);
+                else if (hatZeichen(wert) && !koerper) uebernimmUndSende(wert);
                 else waehleGrundzeichen(id);
               }
             : undefined
@@ -529,7 +565,7 @@ export default function FreiesZeichenPicker({
           gruppenName="Symbol"
           suchName="Symbol suchen"
           eintraege={symbolEintraege}
-          gewaehlt={grundzeichen || grundzeichenVon(entwurf) === null ? symbolVon(entwurf) : null}
+          gewaehlt={entwurf ? symbolVon(entwurf) : null}
           onWaehle={(id) => {
             const neu = nachSymbol(id);
             if (neu) melde(neu);
@@ -565,10 +601,10 @@ export default function FreiesZeichenPicker({
                         allowClear
                         placeholder={label}
                         style={{ width: '100%' }}
-                        value={detailVon(entwurf, achse) ?? undefined}
+                        value={(koerper && detailVon(koerper, achse)) ?? undefined}
                         options={details[achse]}
                         onChange={(v?: string) =>
-                          melde(mitSpec(mitDetail(entwurf, achse, v ?? null)))
+                          melde(mitSpec(mitDetail(koerper!, achse, v ?? null)))
                         }
                       />
                     ) : null,
@@ -581,7 +617,7 @@ export default function FreiesZeichenPicker({
                       allowClear
                       placeholder="Farbe"
                       style={{ width: '100%' }}
-                      value={detailVon(entwurf, 'farbe') ?? undefined}
+                      value={(koerper && detailVon(koerper, 'farbe')) ?? undefined}
                       options={farbOptionen}
                       optionRender={(o) => (
                         <span>
@@ -601,7 +637,7 @@ export default function FreiesZeichenPicker({
                         );
                       }}
                       onChange={(v?: string) =>
-                        melde(mitSpec(mitDetail(entwurf, 'farbe', v ?? null)))
+                        melde(mitSpec(mitDetail(koerper!, 'farbe', v ?? null)))
                       }
                     />
                   )}
@@ -621,9 +657,10 @@ export default function FreiesZeichenPicker({
                     }}
                     onPressEnter={() => {
                       const geaendert = bezeichnungUebernehmen();
-                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) übernimmt es
-                      // nur den getippten Namen.
-                      if (onAbsenden) uebernimmUndSende(geaendert ?? wert);
+                      const stand = geaendert ?? wert;
+                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) oder ohne
+                      // Zeichen übernimmt es nur den getippten Namen.
+                      if (onAbsenden && hatZeichen(stand)) uebernimmUndSende(stand);
                       else if (geaendert) onChange(geaendert);
                     }}
                   />
@@ -635,9 +672,4 @@ export default function FreiesZeichenPicker({
       />
     </Space>
   );
-}
-
-/** Ein freistehender Entwurf bleibt Grundlage des Symbolwechsels; ein Körper nicht (dann „ohne“). */
-function nullWennKoerper(spec: AnySpec): AnySpec | null {
-  return grundzeichenVon(spec) === null ? spec : null;
 }

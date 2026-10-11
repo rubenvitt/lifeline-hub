@@ -12,13 +12,16 @@
  *   {@link GRUNDZEICHEN_NAMEN} (Alltagsbegriffe; die Bezeichnung der Bibliothek ist Suchbegriff).
  * - **Symbol mit Grundzeichen:** Fähigkeit in der Boxfassung (`capabilities`) oder Zustand
  *   (`states`), eins zur Zeit. **Ohne Grundzeichen:** freistehender Zustand, Piktogramm oder
- *   Tierzustand. Namen aus den Piktogrammtiteln.
+ *   Tierzustand. Namen aus den Piktogrammtiteln. Führt das Register eine zweite Darstellung
+ *   (`variant: 'alternative'`) und zeichnet die Bibliothek sie freistehend, steht sie als eigene
+ *   Kachel direkt hinter der ersten — mit unterscheidendem Namen ({@link variantenZusatz}).
  * - **Details:** Organisation, Fachaufgabe als randbündige Körpermarke (`bodyMarks`, wie die
  *   Fachobjekte), Einheit (`strength`/`unitGrouping`), Farbe nur aus der Palette und nur, wo das
  *   Zeichen eine technische Füllung trägt (D6). Die Achse „Funktion“ des Altpakets gibt es nicht.
  */
 import {
   ALL_PICTOGRAMS,
+  checkAnySpec,
   FREESTANDING_FIELD_VALUES,
   ORGANIZATION_LABELS,
   SPEC_FIELD_VALUES,
@@ -36,6 +39,7 @@ import {
   PALETTE,
   TECHNICAL_FILL_TOKENS,
   isFreestandingSpec,
+  type AnimalStateId,
   type AnySpec,
   type CapabilityId,
   type Drawing,
@@ -108,7 +112,32 @@ export const FARB_NAMEN: Record<TechnicalFillToken, string> = {
 export const START_ZEICHEN_SPEC = serializeAnySpec({ kind: 'formation' });
 
 const TITEL = new Map<string, string>();
-for (const p of ALL_PICTOGRAMS) if (p.variant === 'primary') TITEL.set(p.id, p.title);
+/** Register-Datei der zweiten Darstellung je Piktogramm, nur wo das Register eine führt. */
+const ZWEITE_DARSTELLUNG = new Map<string, string>();
+for (const p of ALL_PICTOGRAMS) {
+  if (p.variant === 'primary') TITEL.set(p.id, p.title);
+  else if (p.variant === 'alternative') ZWEITE_DARSTELLUNG.set(p.id, p.referenceAsset);
+}
+
+const ZWEITE = 'alternative' as const;
+/** Das Feld der Darstellung: die erste trägt keins. */
+const variante = (zweite: boolean) => (zweite ? { variant: ZWEITE } : {});
+
+/**
+ * Was den Namen einer Darstellung unterscheidet, wo das Register zwei führt; beide Fassungen
+ * tragen dort denselben Titel. Anhang J (`comms.*`): die erste Darstellung ist drahtlos
+ * (Zickzack), die zweite leitergebunden (`pictograms/comms/01-connections.ts` der Bibliothek,
+ * Register-Datei `…_leitergebunden.svg`) — „(Funk)“ und „(Draht)“. Sonst heißt nur die zweite
+ * „(zweite Darstellung)“. Ohne zweite Darstellung im Register: nichts.
+ */
+export function variantenZusatz(pictogram: string, zweite: boolean): string {
+  const datei = ZWEITE_DARSTELLUNG.get(pictogram);
+  if (datei === undefined) return '';
+  if (pictogram.startsWith('comms.') && /leitergebunden/i.test(datei)) {
+    return zweite ? ' (Draht)' : ' (Funk)';
+  }
+  return zweite ? ' (zweite Darstellung)' : '';
+}
 
 const titel = (pictogram: string): string => TITEL.get(pictogram) ?? pictogram;
 const faehigkeitName = (id: string) => titel(`capability.${id}`);
@@ -190,13 +219,15 @@ export function mitGrundzeichen(alt: AnySpec, kind: SymbolKind): SymbolSpec {
 
 /**
  * Das gewählte Symbol als Kachel-Kennung: mit Grundzeichen `cap:` (Fähigkeit) oder `st:`
- * (Zustand), ohne `state:`, `pic:` oder `tier:`. `null` ohne Symbol.
+ * (Zustand), ohne `state:`, `pic:` oder `tier:`, die zweite Darstellung mit `:alternative`
+ * dahinter (`pic:comms.voice:alternative`). `null` ohne Symbol.
  */
 export function symbolVon(spec: AnySpec): string | null {
   if (isFreestandingSpec(spec)) {
-    if (spec.kind === 'state') return `state:${spec.state}`;
-    if (spec.kind === 'pictogram') return `pic:${spec.pictogram}`;
-    if (spec.kind === 'animal-state') return `tier:${spec.state}`;
+    const zusatz = 'variant' in spec && spec.variant === ZWEITE ? `:${ZWEITE}` : '';
+    if (spec.kind === 'state') return `state:${spec.state}${zusatz}`;
+    if (spec.kind === 'pictogram') return `pic:${spec.pictogram}${zusatz}`;
+    if (spec.kind === 'animal-state') return `tier:${spec.state}${zusatz}`;
     return null;
   }
   if (spec.capabilities?.length) return `cap:${spec.capabilities[0]}`;
@@ -210,17 +241,31 @@ export function symbolVon(spec: AnySpec): string | null {
  * ganze Zeichen. Ohne Grundzeichen und ohne Symbol gibt es kein Zeichen: `null`.
  */
 export function mitSymbol(entwurf: AnySpec | null, id: string | null): AnySpec | null {
-  const [art, wert] = id ? [id.slice(0, id.indexOf(':')), id.slice(id.indexOf(':') + 1)] : [];
+  const { art, wert, zweite } = zerlegeSymbol(id);
   if (entwurf && !isFreestandingSpec(entwurf)) {
     const basis = ohne(entwurf, 'capabilities', 'states');
     if (art === 'cap') return { ...basis, capabilities: [wert as CapabilityId] };
     if (art === 'st') return { ...basis, states: [wert as StateId] };
     return basis;
   }
-  if (art === 'state') return { kind: 'state', state: wert as StateId };
-  if (art === 'pic') return { kind: 'pictogram', pictogram: wert as PictogramId };
-  if (art === 'tier') return { kind: 'animal-state', state: wert } as FreestandingSpec;
+  if (art === 'state') return { kind: 'state', state: wert as StateId, ...variante(zweite) };
+  if (art === 'pic') {
+    return { kind: 'pictogram', pictogram: wert as PictogramId, ...variante(zweite) };
+  }
+  if (art === 'tier') {
+    return { kind: 'animal-state', state: wert as AnimalStateId, ...variante(zweite) };
+  }
   return null;
+}
+
+/** Zerlegt eine Kachel-Kennung in Art, Wert und Darstellung (siehe {@link symbolVon}). */
+function zerlegeSymbol(id: string | null): { art?: string; wert: string; zweite: boolean } {
+  if (!id) return { wert: '', zweite: false };
+  const art = id.slice(0, id.indexOf(':'));
+  let wert = id.slice(id.indexOf(':') + 1);
+  const zweite = wert.endsWith(`:${ZWEITE}`);
+  if (zweite) wert = wert.slice(0, -(ZWEITE.length + 1));
+  return { art, wert, zweite };
 }
 
 export type DetailAchse = 'organisation' | 'fachaufgabe' | 'einheit' | 'farbe';
@@ -342,6 +387,42 @@ let SYMBOLE_OHNE: KachelOption[] | null = null;
 const erlaubt = <V>(optionen: readonly { value: V; status: string }[]): V[] =>
   optionen.filter((o) => o.status === 'allowed').map((o) => o.value);
 
+type FreiArt = 'state' | 'pic' | 'tier';
+
+/** Die Kennung im Register (`state.*` für Zustand und Tierzustand). */
+const registerId = (art: FreiArt, wert: string) => (art === 'pic' ? wert : `state.${wert}`);
+
+/**
+ * Die Kacheln einer freistehenden Art aus den Befunden ihres Wertfeldes: jeder erlaubte Wert, und
+ * dahinter seine zweite Darstellung, wo das Register eine führt und die Bibliothek sie zeichnet
+ * (`checkAnySpec`). Die zweite steht auch dann, wenn die erste freistehend nicht kanonisch ist
+ * (5.8.8.6: die erste gehört an die Person, die zweite zeichnet nur freistehend).
+ */
+function freistehendeKacheln<V extends string>(
+  art: FreiArt,
+  befunde: readonly { value: V; status: string }[],
+  bau: (wert: V, zweite: boolean) => FreestandingSpec,
+): KachelOption[] {
+  const kacheln: KachelOption[] = [];
+  const kachel = (wert: V, zweite: boolean): KachelOption => {
+    const spec = bau(wert, zweite);
+    const pictogram = registerId(art, wert);
+    return {
+      id: symbolVon(spec)!,
+      label: titel(pictogram) + variantenZusatz(pictogram, zweite),
+      suche: '',
+      drawing: kachelBild(spec),
+    };
+  };
+  for (const { value, status } of befunde) {
+    if (status === 'allowed') kacheln.push(kachel(value, false));
+    if (ZWEITE_DARSTELLUNG.has(registerId(art, value)) && checkAnySpec(bau(value, true)).ok) {
+      kacheln.push(kachel(value, true));
+    }
+  }
+  return kacheln;
+}
+
 /**
  * Das Symbolraster. Mit Grundzeichen die Fähigkeiten und Zustände, die das Vokabular am Entwurf
  * (ohne sein Symbol) erlaubt; ohne Grundzeichen (`null`) die freistehenden Zustände, Piktogramme
@@ -351,29 +432,24 @@ const erlaubt = <V>(optionen: readonly { value: V; status: string }[]): V[] =>
 export function symbolOptionen(entwurf: SymbolSpec | null): KachelOption[] {
   if (!entwurf) {
     SYMBOLE_OHNE ??= [
-      ...erlaubt(
+      ...freistehendeKacheln(
+        'state',
         freestandingVocabulary(
           { kind: 'state', state: FREESTANDING_FIELD_VALUES.state.state.values[0] },
           'state',
         ),
-      ).map((s) => ({
-        id: `state:${s}`,
-        label: zustandName(s),
-        suche: '',
-        drawing: kachelBild({ kind: 'state', state: s }),
-      })),
-      ...erlaubt(
+        (state, zweite) => ({ kind: 'state', state, ...variante(zweite) }),
+      ),
+      ...freistehendeKacheln(
+        'pic',
         freestandingVocabulary(
           { kind: 'pictogram', pictogram: FREESTANDING_FIELD_VALUES.pictogram.pictogram.values[0] },
           'pictogram',
         ),
-      ).map((p) => ({
-        id: `pic:${p}`,
-        label: titel(p),
-        suche: '',
-        drawing: kachelBild({ kind: 'pictogram', pictogram: p }),
-      })),
-      ...erlaubt(
+        (pictogram, zweite) => ({ kind: 'pictogram', pictogram, ...variante(zweite) }),
+      ),
+      ...freistehendeKacheln(
+        'tier',
         freestandingVocabulary(
           {
             kind: 'animal-state',
@@ -381,12 +457,8 @@ export function symbolOptionen(entwurf: SymbolSpec | null): KachelOption[] {
           },
           'state',
         ),
-      ).map((s) => ({
-        id: `tier:${s}`,
-        label: zustandName(s),
-        suche: '',
-        drawing: kachelBild({ kind: 'animal-state', state: s } as FreestandingSpec),
-      })),
+        (state, zweite) => ({ kind: 'animal-state', state, ...variante(zweite) }),
+      ),
     ];
     return SYMBOLE_OHNE;
   }
@@ -476,10 +548,11 @@ export function detailOptionen(spec: AnySpec): DetailOptionen {
 export function symbolName(spec: AnySpec): string | null {
   const id = symbolVon(spec);
   if (!id) return null;
-  const wert = id.slice(id.indexOf(':') + 1);
-  if (id.startsWith('cap:')) return faehigkeitName(wert);
-  if (id.startsWith('pic:')) return titel(wert);
-  return zustandName(wert);
+  const { art, wert, zweite } = zerlegeSymbol(id);
+  if (art === 'cap') return faehigkeitName(wert);
+  if (art === 'st') return zustandName(wert);
+  const pictogram = registerId(art as FreiArt, wert);
+  return titel(pictogram) + variantenZusatz(pictogram, zweite);
 }
 
 /** Die Bestandteile eines Zeichens mit ihren Namen, vom Träger zum Beiwerk. */

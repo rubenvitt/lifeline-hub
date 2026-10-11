@@ -75,6 +75,51 @@ describe('symbolOptionen ohne Grundzeichen', () => {
     expect(ids).not.toContain('pic:state.damaged');
   });
 
+  it('bietet die zweite Darstellung als eigene Kachel an: leitergebunden „(Draht)“, drahtlos „(Funk)“', () => {
+    // Anhang J: die erste Darstellung ist drahtlos (Zickzack), die zweite leitergebunden
+    // (`pictograms/comms/01-connections.ts` der Bibliothek, Asset `…_leitergebunden.svg`).
+    const funk = optionen.find((o) => o.id === 'pic:comms.voice')!;
+    const draht = optionen.find((o) => o.id === 'pic:comms.voice:alternative')!;
+    expect(funk.label).toBe('Sprache (Funk)');
+    expect(draht.label).toBe('Sprache (Draht)');
+    // Die Draht-Kachel steht direkt hinter ihrer Funk-Kachel.
+    expect(ids.indexOf(draht.id)).toBe(ids.indexOf(funk.id) + 1);
+    expect(mitSymbol(null, draht.id)).toEqual({
+      kind: 'pictogram',
+      pictogram: 'comms.voice',
+      variant: 'alternative',
+    });
+    expect(mitSymbol(null, funk.id)).toEqual({ kind: 'pictogram', pictogram: 'comms.voice' });
+    expect(symbolVon(mitSymbol(null, draht.id)!)).toBe(draht.id);
+    expect(zeichenName(mitSymbol(null, draht.id)!)).toBe('Sprache (Draht)');
+  });
+
+  it('nennt andere zweite Darstellungen „(zweite Darstellung)“, auch an Zustand und Tierzustand', () => {
+    const name = (id: string) => optionen.find((o) => o.id === id)?.label;
+    expect(name('pic:capability.chemical-materials:alternative')).toBe(
+      'Chemische Stoffe (zweite Darstellung)',
+    );
+    expect(name('pic:capability.chemical-materials')).toBe('Chemische Stoffe');
+    expect(name('state:hazardous-substances:alternative')).toMatch(/\(zweite Darstellung\)$/);
+    expect(name('tier:contaminated-animal:alternative')).toMatch(/\(zweite Darstellung\)$/);
+    expect(mitSymbol(null, 'tier:contaminated-animal:alternative')).toEqual({
+      kind: 'animal-state',
+      state: 'contaminated-animal',
+      variant: 'alternative',
+    });
+    // 5.8.8.6: die erste Darstellung gehört an die Person, die zweite zeichnet nur freistehend.
+    expect(ids).not.toContain('state:person-contaminated');
+    expect(ids).toContain('state:person-contaminated:alternative');
+  });
+
+  it('bietet keine zweite Darstellung an, die die Bibliothek freistehend nicht zeichnet', () => {
+    // 5.8.1.13/14: die zweite Darstellung ist die Gefahr mit Zustand (`state-not-canonical`).
+    expect(ids).not.toContain('state:suspected-situation:alternative');
+    expect(ids).not.toContain('state:acute-situation:alternative');
+    // Ohne zweite Darstellung im Register keine Variante.
+    expect(ids).not.toContain('pic:capability.rescue-aerial-ladder:alternative');
+  });
+
   it('setzt das Piktogramm „Drehleiter“ ohne Grundzeichen', () => {
     const drehleiter = optionen.find((o) => /Drehleiter/.test(o.label))!;
     expect(mitSymbol(null, drehleiter.id)).toEqual({

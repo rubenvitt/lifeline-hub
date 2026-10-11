@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
 import type { FreiesZeichen, FreiesZeichenUpdate, KartenAnsicht } from '../../api/types';
 import KartenDetailCard from './KartenDetailCard';
-import FreiesZeichenPicker from './FreiesZeichenPicker';
+import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
 import { ZeichenBild } from '../../zeichen/EinsatzZeichen';
@@ -92,7 +92,7 @@ export default function FreiesZeichenInspector({
   onVerschieben,
 }: FreiesZeichenInspectorProps) {
   const { rollen } = useRollen();
-  const [entwurf, setEntwurf] = useState<FreiesZeichenUpdate>(() => baueWert(zeichen));
+  const [entwurf, setEntwurf] = useState<ZeichenEntwurf>(() => baueWert(zeichen));
   /**
    * Eigen-Merker: nur eine Änderung im Picker setzt ihn, das Senden löscht ihn. Ohne ihn schriebe
    * eine per Live-Invalidierung hereinkommende fremde Änderung nach der Frist den alten Entwurf
@@ -124,7 +124,8 @@ export default function FreiesZeichenInspector({
    */
   const offenerStand = useRef<string | null>(null);
   useEffect(() => {
-    if (!eigeneAenderung || entwurfText === serverStand) {
+    // Ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl) wird nichts gespeichert.
+    if (!eigeneAenderung || entwurfText === serverStand || !hatZeichen(entwurf)) {
       offenerStand.current = null;
       return;
     }
@@ -135,7 +136,7 @@ export default function FreiesZeichenInspector({
       onAendernRef.current(JSON.parse(entwurfText) as FreiesZeichenUpdate);
     }, SCHREIB_FRIST_MS);
     return () => clearTimeout(t);
-  }, [eigeneAenderung, entwurfText, serverStand]);
+  }, [eigeneAenderung, entwurf, entwurfText, serverStand]);
 
   // Beim Abbau nachholen, was die Frist nicht geschafft hat. Leere Deps: läuft einmal beim Abbau
   // und liest über Refs.

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
 import { PALETTE, type AnySpec } from '@einsatzzeichen/schema';
@@ -10,6 +11,7 @@ import FreiesZeichenPicker, {
   kachelFarben,
   kachelStil,
   type FreiesZeichenPickerProps,
+  type ZeichenEntwurf,
 } from './FreiesZeichenPicker';
 import { merkeZuletztVerwendet } from './zuletztVerwendet';
 import { FARB_NAMEN } from './zeichenWahl';
@@ -24,9 +26,10 @@ const wertAus = (spec: AnySpec, rest: Partial<FreiesZeichenUpdate> = {}): Freies
 
 /** Die Zeichenbeschreibung des letzten Aufrufs eines `onChange`/`onAbsenden`. */
 function zuletzt(fn: Mock): AnySpec {
-  const aufruf = fn.mock.calls[fn.mock.calls.length - 1]?.[0] as FreiesZeichenUpdate | undefined;
+  const aufruf = fn.mock.calls[fn.mock.calls.length - 1]?.[0] as ZeichenEntwurf | undefined;
   expect(aufruf, 'kein Aufruf').toBeDefined();
-  return parseAnySpec(aufruf!.zeichen_spec);
+  expect(aufruf!.zeichen_spec, 'Entwurf ohne Zeichen').not.toBeNull();
+  return parseAnySpec(aufruf!.zeichen_spec!);
 }
 
 function render(wert: FreiesZeichenUpdate, extra: Partial<FreiesZeichenPickerProps> = {}) {
@@ -37,6 +40,39 @@ function render(wert: FreiesZeichenUpdate, extra: Partial<FreiesZeichenPickerPro
   const ergebnis = renderMitProviders(
     <FreiesZeichenPicker wert={wert} onChange={onChange} onAbsenden={onAbsenden} />,
   );
+  return { onChange, onAbsenden, ...ergebnis };
+}
+
+/**
+ * Wie {@link render}, aber gesteuert wie in Leiste und Dialog: der Aufrufer hält den Entwurf und
+ * gibt ihn zurück. Dazu der Knopf „Platzieren“ der Leiste, gesperrt ohne Zeichen.
+ */
+function renderGesteuert(start: ZeichenEntwurf) {
+  const onChange = vi.fn<(e: ZeichenEntwurf) => void>();
+  const onAbsenden = vi.fn<(spec: FreiesZeichenUpdate) => void>();
+  function Leiste() {
+    const [wert, setWert] = useState<ZeichenEntwurf>(start);
+    return (
+      <>
+        <FreiesZeichenPicker
+          wert={wert}
+          onChange={(e) => {
+            onChange(e);
+            setWert(e);
+          }}
+          onAbsenden={onAbsenden}
+        />
+        <button
+          type="button"
+          disabled={wert.zeichen_spec == null}
+          onClick={() => wert.zeichen_spec != null && onAbsenden(wert as FreiesZeichenUpdate)}
+        >
+          Platzieren
+        </button>
+      </>
+    );
+  }
+  const ergebnis = renderMitProviders(<Leiste />);
   return { onChange, onAbsenden, ...ergebnis };
 }
 
@@ -214,10 +250,10 @@ describe('FreiesZeichenPicker — Symbole als Bild-Raster', () => {
 
 describe('FreiesZeichenPicker — Piktogramm ohne Grundzeichen', () => {
   it('bietet nach „Kein Grundzeichen“ freistehende Piktogramme an; die Wahl setzt das Piktogramm', async () => {
-    const { onChange } = render(FORMATION);
+    const { onChange } = renderGesteuert(FORMATION);
     await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
-    // Ohne Symbol gibt es noch kein Zeichen: nichts gemeldet, aber die Kachel ist gewählt.
-    expect(onChange).not.toHaveBeenCalled();
+    // Ohne Symbol gibt es noch kein Zeichen: gemeldet wird ein Entwurf ohne Zeichen.
+    expect(onChange).toHaveBeenLastCalledWith({ ...FORMATION, zeichen_spec: null });
     expect(
       raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }),
     ).toHaveAttribute('aria-checked', 'true');
@@ -233,7 +269,7 @@ describe('FreiesZeichenPicker — Piktogramm ohne Grundzeichen', () => {
   });
 
   it('blendet nach „Kein Grundzeichen“ die Achsen des alten Grundzeichens unter „Details“ aus', async () => {
-    render(FORMATION);
+    renderGesteuert(FORMATION);
     expect(sichtbar('Organisation')).toBe(true);
     await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
     expect(sichtbar('Organisation')).toBe(false);
@@ -440,6 +476,95 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
     kachel.focus();
     fireEvent.keyDown(kachel, { key: 'Enter' });
     expect(onAbsenden).not.toHaveBeenCalled();
+  });
+});
+
+describe('FreiesZeichenPicker — „Kein Grundzeichen“ ohne Symbol ist noch kein Zeichen', () => {
+  const vorschau = () => screen.getByLabelText('Vorschau');
+
+  it('zeigt in der Vorschau kein Zeichen mehr, sondern „Symbol wählen“, und sperrt „Platzieren“', async () => {
+    renderGesteuert(FORMATION);
+    expect(vorschau().querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Platzieren' })).toBeEnabled();
+    await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
+    // Das vorige Zeichen (die Formation) steht nicht mehr da.
+    expect(vorschau().querySelector('svg')).toBeNull();
+    expect(within(vorschau()).getByText('Symbol wählen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Platzieren' })).toBeDisabled();
+    // Erst ein Symbol macht es zum Zeichen.
+    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'Drehleiter' } });
+    fireEvent.click(raster('Symbol').getByRole('radio', { name: /Drehleiter/ }));
+    expect(vorschau().querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Platzieren' })).toBeEnabled();
+  });
+
+  it('platziert per Enter nicht, weder im Suchfeld noch in der Bezeichnung noch auf der Kachel', async () => {
+    const { onAbsenden } = renderGesteuert(FORMATION);
+    await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
+    fireEvent.keyDown(screen.getByLabelText('Grundzeichen suchen'), { key: 'Enter' });
+    const kachel = raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' });
+    kachel.focus();
+    fireEvent.keyDown(kachel, { key: 'Enter' });
+    const bezeichnung = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(bezeichnung, { target: { value: 'EA Nord' } });
+    fireEvent.keyDown(bezeichnung, { key: 'Enter' });
+    expect(onAbsenden).not.toHaveBeenCalled();
+  });
+
+  it('beginnt nach „Kein Grundzeichen“ mit einem neuen Grundzeichen von vorn', async () => {
+    const { onChange } = renderGesteuert(wertAus({ kind: 'formation', organization: 'thw' }));
+    await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
+    await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Person' }));
+    expect(zuletzt(onChange)).toEqual({ kind: 'person' });
+  });
+
+  it('meldet bei einem schon freistehenden Zeichen auf „Kein Grundzeichen“ nichts Neues', async () => {
+    const { onChange } = renderGesteuert(wertAus({ kind: 'state', state: 'damaged' }));
+    await userEvent.click(raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Platzieren' })).toBeEnabled();
+  });
+});
+
+describe('FreiesZeichenPicker — zweite Darstellungen', () => {
+  const SPRACHE = wertAus({ kind: 'pictogram', pictogram: 'comms.voice' });
+
+  it('bietet beide Formen eines J-Zeichens als Kacheln an und speichert die gewählte Variante', () => {
+    const { onChange } = render(SPRACHE);
+    const funk = raster('Symbol').getByRole('radio', { name: 'Sprache (Funk)' });
+    const draht = raster('Symbol').getByRole('radio', { name: 'Sprache (Draht)' });
+    expect(funk).toHaveAttribute('aria-checked', 'true');
+    expect(draht).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(draht);
+    expect(zuletzt(onChange)).toEqual({
+      kind: 'pictogram',
+      pictogram: 'comms.voice',
+      variant: 'alternative',
+    });
+  });
+
+  it('markiert die leitergebundene Form als gewählt, wenn der Entwurf sie trägt', () => {
+    const { onChange } = render(
+      wertAus({ kind: 'pictogram', pictogram: 'comms.voice', variant: 'alternative' }),
+    );
+    expect(raster('Symbol').getByRole('radio', { name: 'Sprache (Draht)' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    fireEvent.click(raster('Symbol').getByRole('radio', { name: 'Sprache (Funk)' }));
+    expect(zuletzt(onChange)).toEqual({ kind: 'pictogram', pictogram: 'comms.voice' });
+  });
+
+  it('findet über „Draht“ die leitergebundenen Formen und nur sie', () => {
+    render(SPRACHE);
+    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'Draht' } });
+    expect(raster('Symbol').getByRole('radio', { name: 'Sprache (Draht)' })).toBeInTheDocument();
+    expect(
+      raster('Symbol').getByRole('radio', { name: 'Datenübertragung (Draht)' }),
+    ).toBeInTheDocument();
+    for (const kachel of raster('Symbol').getAllByRole('radio')) {
+      expect(kachel).toHaveAccessibleName(/\(Draht\)$/);
+    }
   });
 });
 

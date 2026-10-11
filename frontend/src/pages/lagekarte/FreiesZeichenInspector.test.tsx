@@ -200,6 +200,36 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(gesendeteSpec(vi.mocked(onAendern).mock.calls[0][0])).toMatchObject({ kind: 'person' });
   });
 
+  it('schreibt nach „Kein Grundzeichen“ nichts, bis ein Symbol gewählt ist (LFH-836)', () => {
+    vi.useFakeTimers();
+    const { onAendern, unmount } = renderInspector();
+    fireEvent.click(kachel('Kein Grundzeichen'));
+    act(() => vi.advanceTimersByTime(2000));
+    expect(onAendern).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Symbol suchen'), { target: { value: 'Angeschlagen' } });
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Symbol' })).getByRole('radio', {
+        name: 'Angeschlagen',
+      }),
+    );
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(gesendeteSpec(vi.mocked(onAendern).mock.calls[0][0])).toEqual({
+      kind: 'state',
+      state: 'damaged',
+    });
+    unmount();
+    expect(onAendern).toHaveBeenCalledTimes(1);
+  });
+
+  it('holt beim Schließen nichts nach, solange kein Zeichen gewählt ist', () => {
+    vi.useFakeTimers();
+    const { onAendern, unmount } = renderInspector();
+    fireEvent.click(kachel('Kein Grundzeichen'));
+    unmount();
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
   it('schreibt beim Schließen ohne Änderung nichts', () => {
     vi.useFakeTimers();
     const { onAendern, unmount } = renderInspector();

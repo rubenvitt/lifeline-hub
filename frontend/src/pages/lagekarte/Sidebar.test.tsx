@@ -747,6 +747,35 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
   });
 
+  it('sperrt „Platzieren“ nach „Kein Grundzeichen“, bis ein Symbol gewählt ist (LFH-836)', () => {
+    const onZeichenPlatzierenStart = vi.fn();
+    renderMitProviders(
+      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole('radio', {
+        name: 'Kein Grundzeichen',
+      }),
+    );
+    const knopf = screen.getByRole('button', { name: 'Platzieren' });
+    expect(knopf).toBeDisabled();
+    fireEvent.click(knopf);
+    expect(onZeichenPlatzierenStart).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Symbol' })).getByRole('radio', {
+        name: 'Angeschlagen',
+      }),
+    );
+    expect(knopf).toBeEnabled();
+    fireEvent.click(knopf);
+    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        zeichen_spec: '{"v":1,"freestanding":{"kind":"state","state":"damaged"}}',
+      }),
+    );
+  });
+
   it('startet das Platzieren per Enter im Picker wie der Knopf und schließt den Picker (LFH-716)', () => {
     const onZeichenPlatzierenStart = vi.fn();
     renderMitProviders(

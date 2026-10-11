@@ -49,6 +49,23 @@ describe('ZeichenHierDialog (LFH-776)', () => {
     );
   });
 
+  it('sperrt „Setzen“ nach „Kein Grundzeichen“, bis ein Symbol gewählt ist (LFH-836)', async () => {
+    const { onSetzen } = aufbau();
+    await userEvent.click(
+      within(raster('Grundzeichen')).getByRole('radio', { name: 'Kein Grundzeichen' }),
+    );
+    const knopf = within(dialog()).getByRole('button', { name: 'Setzen' });
+    expect(knopf).toBeDisabled();
+    await userEvent.click(within(raster('Symbol')).getByRole('radio', { name: 'Angeschlagen' }));
+    expect(knopf).toBeEnabled();
+    await userEvent.click(knopf);
+    expect(onSetzen).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        zeichen_spec: '{"v":1,"freestanding":{"kind":"state","state":"damaged"}}',
+      }),
+    );
+  });
+
   it('während des Speicherns ist „Setzen“ gesperrt und meldet nichts', async () => {
     const { onSetzen } = aufbau({ laeuft: true });
     const knopf = within(dialog()).getByRole('button', { name: /Setzen/ });
