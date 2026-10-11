@@ -35,7 +35,7 @@ Code). Gates aus dem Frontend-Ordner über `mise exec -- pnpm …`.
 
 ## 5. Abschluss-Prüfung
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (lokal oder im CI-Lauf des PRs)
+- [x] 5.1 `./scripts/check-all.sh` grün (lokal oder im CI-Lauf des PRs) — lokal Bündel `schnell` grün, Vitest bis auf 13 umgebungsbedingte Fehler grün (identisch auf `origin/alpha`), betroffene e2e grün; der volle Lauf belegt die CI des PRs
 - [x] 5.2 Code-Review (`superpowers:requesting-code-review`) ohne offene blockierende Befunde
 
 ## Workflow follow-up

@@ -104,8 +104,8 @@ Stab-GET liefert sie mit. Einen zweiten gespeicherten Termin gibt es nicht.
 - **THEN** zeigt das Paneel „Eigene Führungsstelle“ auf Schirm B die neuen Sprechgruppen ohne Neuladen
 
 #### Scenario: Offenes Bearbeitungsformular
-- **WHEN** auf Schirm B das Formular „Einsatzdaten bearbeiten" offen ist und ein Ereignis `einsatz` eintrifft
-- **THEN** behält das Formular die Eingaben von Schirm B
+- **WHEN** auf Schirm B die Zeile „Sachverhalt / Meldebild“ der Einsatzdaten in Bearbeitung ist und ein Ereignis `einsatz` eintrifft
+- **THEN** behält die Eingabe den Text von Schirm B, und die übrigen Angaben zeigen den neuen Stand
 
 ### Requirement: Bewusst nicht live
 Die benutzerbezogenen Felder des Einsatzkopfs aus der Stab-Besetzung (`meine_sachgebiete`) SHALL
