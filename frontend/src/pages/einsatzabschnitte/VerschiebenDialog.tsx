@@ -1,0 +1,97 @@
+import { Button, Modal } from 'antd';
+import type { Einsatzabschnitt } from '../../api/types';
+import { useRollen } from '../../components/instrument';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { verschiebeZiele } from './gliederungZug';
+
+interface Props {
+  /** Der zu verschiebende Abschnitt; `null` = zu. */
+  abschnitt: Einsatzabschnitt | null;
+  abschnitte: readonly Einsatzabschnitt[];
+  laeuft: boolean;
+  fehler: unknown;
+  onWahl: (zielId: number | null) => void;
+  onAbbrechen: () => void;
+  /**
+   * Nach dem Ausblenden (Ende der Zoom-Animation, in jsdom nie): dort setzt der Aufrufer den Fokus
+   * ein zweites Mal, falls die Animation ihn verschoben hat.
+   */
+  nachDemSchliessen: () => void;
+}
+
+/**
+ * „Verschieben unter …“ (LFH-1212): derselbe Umhang wie der Zug in der Gliederung, ohne Ziehen —
+ * für Tastatur, Touch und Handschuh (WCAG 2.5.7). Ein Ziel wählen IST das Speichern: die Liste
+ * nennt die gültigen Ziele (eigene Nachfahren fehlen, ein Zyklus ist unwählbar), der jetzige Ort
+ * steht gesperrt mit Grund.
+ *
+ * Der Dialog schließt erst beim Erfolg; solange gespeichert wird, ist Abbrechen gesperrt, und der
+ * Grund einer Ablehnung steht im Dialog (`frontend/AGENTS.md`, „Rückwege und Fehler“).
+ */
+export default function VerschiebenDialog({
+  abschnitt,
+  abschnitte,
+  laeuft,
+  fehler,
+  onWahl,
+  onAbbrechen,
+  nachDemSchliessen,
+}: Props) {
+  const { token } = useRollen();
+  const ziele = abschnitt ? verschiebeZiele(abschnitte, abschnitt.id) : [];
+  return (
+    <Modal
+      open={abschnitt !== null}
+      title={abschnitt ? `„${abschnitt.name}“ verschieben unter …` : undefined}
+      onCancel={laeuft ? undefined : onAbbrechen}
+      closable={!laeuft}
+      keyboard={!laeuft}
+      mask={{ closable: !laeuft }}
+      // Den Fokus setzt der Aufrufer (an den Auslöser des Abschnitts): antds Rückgabe zielte auf den
+      // Menüeintrag, den es nicht mehr gibt, und landete auf <body>.
+      focusTriggerAfterClose={false}
+      afterClose={nachDemSchliessen}
+      destroyOnHidden
+      footer={
+        <Button onClick={onAbbrechen} disabled={laeuft}>
+          Abbrechen
+        </Button>
+      }
+    >
+      {fehler != null && (
+        <div style={{ marginBottom: token.marginSM }}>
+          <SpeicherFehler
+            fehler={fehler}
+            titel="Nicht verschoben"
+            fallback="Verschieben fehlgeschlagen"
+          />
+        </div>
+      )}
+      <ul
+        aria-label="Ziele"
+        data-lfh="verschieben-ziele"
+        style={{ listStyle: 'none', margin: 0, padding: 0 }}
+      >
+        {ziele.map((z, i) => (
+          <li key={z.id ?? 'wurzel'}>
+            <Button
+              type="text"
+              block
+              // Fokus im ersten wählbaren Ziel, nicht auf dem Kreuz.
+              autoFocus={i === ziele.findIndex((x) => !x.jetzt)}
+              disabled={z.jetzt || laeuft}
+              onClick={() => onWahl(z.id)}
+              style={{
+                justifyContent: 'flex-start',
+                paddingInlineStart: token.paddingSM + z.tiefe * token.paddingLG,
+              }}
+            >
+              {z.name}
+              {z.jetzt && ' (jetziger Ort)'}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Modal>
+  );
+}
