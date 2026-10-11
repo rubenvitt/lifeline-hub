@@ -2,8 +2,8 @@
 
 ## 1. Abhängigkeiten
 
-- [ ] 1.1 Vor dem Upgrade messen und notieren: Größe des Lagekarten-Chunks und Precache-Summe aus `pnpm build`. Die Werte kommen nach `openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/messung.md`.
-- [ ] 1.2 Alle vier `@einsatzzeichen/*` in `frontend/package.json` auf exakt `5.2.0` heben (`mise exec -- pnpm -C <abs>/frontend install`). Prüfen:
+- [x] 1.1 Vor dem Upgrade messen und notieren: Größe des Lagekarten-Chunks und Precache-Summe aus `pnpm build`. Die Werte kommen nach `openspec/changes/lfh-836-freie-zeichen-einsatzzeichen/messung.md`.
+- [x] 1.2 Alle vier `@einsatzzeichen/*` in `frontend/package.json` auf exakt `5.2.0` heben (`mise exec -- pnpm -C <abs>/frontend install`). Prüfen:
   - Der Guard `zeichen/einsatzzeichenVersionen.guard.test.ts` ist grün.
   - Die Vitest-Dateien unter `zeichen/`, `kraefte/`, `stab/` und `pages/lagekarte/` sind grün; Fachobjekte unverändert.
 
