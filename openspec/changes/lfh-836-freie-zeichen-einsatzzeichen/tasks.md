@@ -9,22 +9,22 @@
 
 ## 2. Backend: Speicherform und Prüfung (TDD)
 
-- [ ] 2.1 Migration anlegen (Nummer nach `git fetch origin alpha` und `scripts/check-migrationen.sh`, heute 0172). Rebuild von `freies_zeichen` nach design.md D2: `zeichen_spec TEXT`, `grundzeichen` nullable, CHECK genau eine Form, Fremdschlüssel, Index und Daten erhalten. Prüfen:
+- [x] 2.1 Migration anlegen (Nummer nach `git fetch origin alpha` und `scripts/check-migrationen.sh`, heute 0172). Rebuild von `freies_zeichen` nach design.md D2: `zeichen_spec TEXT`, `grundzeichen` nullable, CHECK genau eine Form, Fremdschlüssel, Index und Daten erhalten. Prüfen:
   - DB-Test „Bestandszeile überlebt mit allen Spalten und Fremdschlüsseln“.
   - Der CHECK lehnt beide Formen und auch keine Form ab.
   - `scripts/check-migrationen.sh` ist grün.
-- [ ] 2.2 Frontend-Skript, das `src/freies_zeichen/zeichen_werte.json` aus `@einsatzzeichen` erzeugt (D3), plus Vitest-Wächter, der die eingecheckte Datei gegen die installierte Bibliothek vergleicht. Prüfen: Der Wächter ist grün und wird rot, wenn ein Wert in der Datei testweise fehlt (Mutationsprobe).
-- [ ] 2.3 Rust-Prüfer für `zeichen_spec` nach D3 in `src/freies_zeichen/`, mit `include_str!` der Werteliste und `ZEICHEN_SPEC_MAX`. Unit-Tests zuerst rot, dann grün:
+- [x] 2.2 Frontend-Skript, das `src/freies_zeichen/zeichen_werte.json` aus `@einsatzzeichen` erzeugt (D3), plus Vitest-Wächter, der die eingecheckte Datei gegen die installierte Bibliothek vergleicht. Prüfen: Der Wächter ist grün und wird rot, wenn ein Wert in der Datei testweise fehlt (Mutationsprobe).
+- [x] 2.3 Rust-Prüfer für `zeichen_spec` nach D3 in `src/freies_zeichen/`, mit `include_str!` der Werteliste und `ZEICHEN_SPEC_MAX`. Unit-Tests zuerst rot, dann grün:
   - gültige `SymbolSpec`, gültige `state`/`pictogram`
   - kaputtes JSON, `v: 2`, unbekannte Art, fremdes Feld, unbekannter Wert
   - Dublette in einer Liste, `designation`, `labels`, Überlänge
-- [ ] 2.4 Repo und Route (`repo.rs`, `routes/freies_zeichen.rs`) nach D4: zwei Bodies, genau einer; PATCH-Tri-State um `zeichen_spec` erweitern; Altspalten beim neuen Body auf NULL, beim alten `zeichen_spec`. DTO `FreiesZeichenAnzeige` um `zeichen_spec` ergänzen. Prüfen mit den Integrationstests in `tests/freies_zeichen.rs`:
+- [x] 2.4 Repo und Route (`repo.rs`, `routes/freies_zeichen.rs`) nach D4: zwei Bodies, genau einer; PATCH-Tri-State um `zeichen_spec` erweitern; Altspalten beim neuen Body auf NULL, beim alten `zeichen_spec`. DTO `FreiesZeichenAnzeige` um `zeichen_spec` ergänzen. Prüfen mit den Integrationstests in `tests/freies_zeichen.rs`:
   - Spec anlegen und lesen, Altformat anlegen
   - beide Formen → 400, keine Form → 400, ungültige Spec → 400
   - PATCH Altzeile → Spec, PATCH nur Bezeichnung lässt die Form unberührt
   - Die Statuscode-Referenztests sind bewusst umbenannt, und `src/AGENTS.md` ist nachgezogen.
-- [ ] 2.5 Schwärzungs-Registry: `zeichen_spec` als `retain` eintragen. Der Guard `jede_einsatz_scoped_spalte_ist_klassifiziert` ist grün. Die INSERTs in `src/einsatz/repo.rs` und `purge_scheduler.rs` sind angepasst; deren Tests sind grün.
-- [ ] 2.6 `scripts/check-typ-codegen.sh` laufen lassen und beide generierten Dateien mitcommitten. `cargo test` für `freies_zeichen`, `lage_snapshot`, `schwaerzung` und `enum_wire_kontrakt` ist grün.
+- [x] 2.5 Schwärzungs-Registry: `zeichen_spec` als `retain` eintragen. Der Guard `jede_einsatz_scoped_spalte_ist_klassifiziert` ist grün. Die INSERTs in `src/einsatz/repo.rs` und `purge_scheduler.rs` sind angepasst; deren Tests sind grün.
+- [x] 2.6 `scripts/check-typ-codegen.sh` laufen lassen und beide generierten Dateien mitcommitten. `cargo test` für `freies_zeichen`, `lage_snapshot`, `schwaerzung` und `enum_wire_kontrakt` ist grün.
 
 ## 3. Leseadapter für freie Zeichen (TDD)
 
