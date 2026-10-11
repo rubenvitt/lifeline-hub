@@ -15,7 +15,8 @@
  *   bleibt, wie es war, eine bisher fehlende Fachaufgabe erscheint abgeleitet.
  * - D4: Ergebnis je Eingang gecacht.
  *
- * Freie Zeichen laufen NICHT hier durch, sie bleiben bis LFH-836 auf dem Altpaket.
+ * Freie Zeichen übersetzt `freiesZeichen.ts` (LFH-836); es nutzt Körper, Organisations-Alias,
+ * Stärke und Fachaufgaben von hier mit.
  */
 import {
   CompositionError,
@@ -46,7 +47,7 @@ export interface FachobjektZeichen {
   schluessel: string;
 }
 
-type Teil = Partial<SymbolSpec>;
+export type Teil = Partial<SymbolSpec>;
 type Koerpermarke = CapabilityId | TechnicalBodyMarkId;
 
 // Grundzeichen des Hubs → Körper. `befehlsstelle` (Abschnitt) ist neutral in „Führung und
@@ -54,7 +55,7 @@ type Koerpermarke = CapabilityId | TechnicalBodyMarkId;
 // Hilfsorganisation mit Fachaufgabe (F.3; Lücke LFH-829); seit core 4.0 füllt jede Organisation
 // den Kreis, die Stellen des Hubs bleiben bewusst Hilfsorganisation. `zweirad` hat keinen Körper
 // (LFH-831) und wird Landfahrzeug. `organisation` hier überstimmt die gespeicherte.
-const KOERPER: Record<string, Teil> = {
+export const KOERPER: Record<string, Teil> = {
   'taktische-formation': { kind: 'formation' },
   'kraftfahrzeug-landgebunden': { kind: 'vehicle-land', vehicleCategory: 'kfz-kategorie-1' },
   wasserfahrzeug: { kind: 'vehicle-water' },
@@ -75,7 +76,7 @@ const ORGANISATION_ALIAS: Record<string, OrganizationId> = {
   zivil: 'zivile-einheiten',
 };
 
-const STAERKE: Record<string, Teil> = {
+export const STAERKE: Record<string, Teil> = {
   trupp: { strength: 'trupp' },
   staffel: { strength: 'staffel' },
   gruppe: { strength: 'gruppe' },
@@ -152,7 +153,7 @@ const FARBE_TOKEN: Record<string, ColorToken> = {
   [AUSMASS_FARBE.katastrophal]: 'rot',
 };
 
-function organisation(wert: string | undefined): OrganizationId | undefined {
+export function organisation(wert: string | undefined): OrganizationId | undefined {
   if (!wert) return undefined;
   const id = ORGANISATION_ALIAS[wert] ?? wert;
   return (ORGANIZATION_IDS as readonly string[]).includes(id) ? (id as OrganizationId) : undefined;
@@ -167,7 +168,7 @@ function marken(...teile: Array<Teil | undefined>): Koerpermarke[] | undefined {
  * Fügt Teil-Specs zusammen; spätere überstimmen frühere. `bodyMarks` werden aneinandergehängt, ein
  * ausdrücklich `undefined` gesetztes Feld entfernt es (etwa die Kfz-Kategorie am Radpaar).
  */
-function verbinde(...teile: Array<Teil | undefined>): SymbolSpec {
+export function verbinde(...teile: Array<Teil | undefined>): SymbolSpec {
   const spec: Record<string, unknown> = {};
   for (const t of teile) {
     for (const [k, v] of Object.entries(t ?? {})) {
@@ -186,7 +187,7 @@ function verbinde(...teile: Array<Teil | undefined>): SymbolSpec {
  * Fassungen einer Stufe sind gleichwertig (vermessen vor abgeleitet, s. `waehle`), eine spätere
  * Stufe gibt etwas auf.
  */
-function fassungen(fachaufgabe: string | undefined, koerper: Teil): Teil[][] {
+export function fassungen(fachaufgabe: string | undefined, koerper: Teil): Teil[][] {
   if (!fachaufgabe) return [];
   const versorgung = VERSORGUNG[fachaufgabe];
   // Ist die Marke am Körper nicht darstellbar, bleibt wenigstens das Fußband (Versorgung, Anhang G).
