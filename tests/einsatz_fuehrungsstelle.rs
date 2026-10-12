@@ -1177,6 +1177,8 @@ async fn entlassen_des_einsatzleiters_feuert_einsatz() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Eine Stamm-Person ohne Einsatz, damit Stamm- und Dispositionskennung auseinanderfallen.
+    stammpersonal_anlegen(&app, &admin, "Carla Ohne").await;
     let anna = stammpersonal_disponieren(&app, &admin, einsatz, "Anna Schulz").await;
     let bernd = stammpersonal_disponieren(&app, &admin, einsatz, "Bernd Kurz").await;
     let (status, _) = patchen(

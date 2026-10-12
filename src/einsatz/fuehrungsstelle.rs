@@ -172,7 +172,7 @@ pub async fn traegt_fahrzeug_tx(
 /// Ist die Dispositionszeile der Einsatzleiter? Wer sie löscht, fragt vorher: `ON DELETE SET NULL`
 /// (Migration 0177) setzt den Vermerk „nicht mehr disponiert“ still, das Ereignis `einsatz` muss
 /// der Aufrufer melden (LLH-1164).
-pub async fn ist_einsatzleiter_tx(
+pub async fn is_einsatzleiter_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einsatz_personal_id: i64,

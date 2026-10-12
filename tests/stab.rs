@@ -317,6 +317,8 @@ async fn entlassen_einer_besetzten_person_feuert_stab() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Eine Stamm-Person ohne Einsatz, damit Stamm- und Dispositionskennung auseinanderfallen.
+    person_anlegen(&app, &admin, "Ohne", None).await;
     let weber = person_anlegen(&app, &admin, "Weber", None).await;
     let weber = disponieren(&app, &admin, einsatz, weber).await;
     let kurz = person_anlegen(&app, &admin, "Kurz", None).await;

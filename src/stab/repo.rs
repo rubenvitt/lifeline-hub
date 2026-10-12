@@ -594,7 +594,7 @@ pub async fn entfernen(
 /// Besetzt die Dispositionszeile ein Sachgebiet? Wer sie löscht, fragt vorher: `ON DELETE SET
 /// NULL` (Migration 0102) setzt den Vermerk „nicht mehr disponiert“ still, das Ereignis `stab`
 /// muss der Aufrufer melden (LLH-1164).
-pub async fn besetzt_tx(
+pub async fn is_besetzt_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einsatz_personal_id: i64,
