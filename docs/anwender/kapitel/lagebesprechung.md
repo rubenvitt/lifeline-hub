@@ -65,8 +65,9 @@ darunter. „In Lagebericht übernehmen“ erscheint nur für sie und nur, wenn 
 freigegeben ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
 Die Lagebesprechung hat ihre eigene Freigabe. Ist der Stab ausgeblendet oder gesperrt, bleibt sie
-voll nutzbar; ist sie selbst gesperrt, fehlen Seite, Verweise und die Schnellaktion „Lagebesprechung
-abschließen“ in der Befehlspalette.
+voll nutzbar. Ist sie selbst gesperrt, fehlen die Seite und die Schnellaktion „Lagebesprechung
+abschließen“ in der Befehlspalette; die Zeile auf der Seite Stab zeigt den Termin mit gesperrtem
+„Zur Lagebesprechung“, die Marke im Führungsüberblick den Termin ohne Sprung.
 
 ### Ein Termin für den ganzen Einsatz
 
