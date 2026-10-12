@@ -4,6 +4,7 @@ use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::freies_zeichen::pruefung::pruefe_zeichen_spec;
 use crate::freies_zeichen::repo::{self as zeichen_repo, ZeichenNeu, ZeichenPatch};
 use crate::freies_zeichen::FreiesZeichenAnzeige;
 use crate::live::LiveEvent;
@@ -35,11 +36,16 @@ pub async fn liste(
     ))
 }
 
+/// POST-Body. Genau eine Form (LFH-836, design.md D4): `zeichen_spec` (neu) ODER `grundzeichen`
+/// mit Overlays (alter Body veralteter Clients, Übergang). Beides oder keines → 400.
 #[derive(Debug, Deserialize)]
 pub struct AnlegenBody {
     pub lat: f64,
     pub lon: f64,
-    pub grundzeichen: String,
+    /// Kanonische Zeichenbeschreibung (`serializeAnySpec`), geprüft durch
+    /// [`pruefe_zeichen_spec`].
+    pub zeichen_spec: Option<String>,
+    pub grundzeichen: Option<String>,
     pub organisation: Option<String>,
     pub fachaufgabe: Option<String>,
     pub symbol: Option<String>,
@@ -59,7 +65,6 @@ pub async fn anlegen(
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<FreiesZeichenAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let grundzeichen = grundzeichen_pflicht(&body.grundzeichen)?;
     let organisation = trimme(body.organisation.clone());
     let fachaufgabe = trimme(body.fachaufgabe.clone());
     let symbol = trimme(body.symbol.clone());
@@ -67,6 +72,27 @@ pub async fn anlegen(
     let funktion = trimme(body.funktion.clone());
     let farbe = trimme(body.farbe.clone());
     let label = trimme(body.label.clone());
+    let altform = body.grundzeichen.is_some()
+        || [
+            &organisation,
+            &fachaufgabe,
+            &symbol,
+            &einheit,
+            &funktion,
+            &farbe,
+        ]
+        .iter()
+        .any(|o| o.is_some());
+    let (zeichen_spec, grundzeichen) = match (&body.zeichen_spec, altform) {
+        (Some(_), true) => return Err(beide_formen()),
+        (Some(spec), false) => (Some(pruefe_zeichen_spec(spec)?), None),
+        (None, true) => match &body.grundzeichen {
+            Some(g) => (None, Some(grundzeichen_pflicht(g)?)),
+            // Overlays ohne Grundzeichen sind keine Form.
+            None => return Err(keine_form()),
+        },
+        (None, false) => return Err(keine_form()),
+    };
     // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404.
     crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
         .await?;
@@ -77,7 +103,8 @@ pub async fn anlegen(
         ZeichenNeu {
             lat: body.lat,
             lon: body.lon,
-            grundzeichen: &grundzeichen,
+            zeichen_spec: zeichen_spec.as_deref(),
+            grundzeichen: grundzeichen.as_deref(),
             organisation: organisation.as_deref(),
             fachaufgabe: fachaufgabe.as_deref(),
             symbol: symbol.as_deref(),
@@ -96,16 +123,17 @@ pub async fn anlegen(
 }
 
 /// PATCH-Body (LFH-306, Tri-State): **jedes** Feld ist optional — absent = unverändert.
-/// Bewusst getrennt von [`AnlegenBody`]: der POST muss sein Pflicht-`grundzeichen`
-/// weiterhin strukturell erzwingen (fehlendes Feld → 400 schon im Extractor, siehe
-/// `fehlendes_grundzeichen_ist_400`).
+/// Bewusst getrennt von [`AnlegenBody`]: der POST verlangt genau eine Form, der PATCH keine.
 ///
-/// `grundzeichen` ist NOT NULL und daher **nicht** Tri-State: absent = unverändert, ein
-/// vorhandener leerer Wert bleibt 400 (`grundzeichen_pflicht`). Die sieben Overlay-Felder
-/// sind nullable und tragen den vollen Tri-State — vor LFH-306 nullte ein Patch, der sie
-/// wegließ, sie stillschweigend mit.
+/// Die Form (LFH-836, design.md D4): `zeichen_spec` setzt die Zeichenbeschreibung und leert die
+/// Altform; `grundzeichen` setzt die Altform und leert die Beschreibung. Beide sind **nicht**
+/// Tri-State: absent oder `null` = unverändert, ein vorhandener leerer Wert bleibt 400.
+/// Zeichenbeschreibung zusammen mit `grundzeichen` oder einem Overlay-Wert → 400. Die sieben
+/// Overlay-Felder sind nullable und tragen den vollen Tri-State — vor LFH-306 nullte ein Patch,
+/// der sie wegließ, sie stillschweigend mit; ein `null`-Overlay ist mit jeder Form verträglich.
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
+    pub zeichen_spec: Option<String>,
     pub grundzeichen: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub organisation: Option<Option<String>>,
@@ -136,12 +164,6 @@ pub async fn aktualisieren(
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<FreiesZeichenAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    // Nur GESENDETE Felder werden geprüft: ein absentes `grundzeichen` ist schlicht kein
-    // Wunsch, ein vorhandenes leeres bleibt 400.
-    let grundzeichen = match &body.grundzeichen {
-        Some(g) => Some(grundzeichen_pflicht(g)?),
-        None => None,
-    };
     let organisation = trimme_tri(body.organisation);
     let fachaufgabe = trimme_tri(body.fachaufgabe);
     let symbol = trimme_tri(body.symbol);
@@ -149,6 +171,31 @@ pub async fn aktualisieren(
     let funktion = trimme_tri(body.funktion);
     let farbe = trimme_tri(body.farbe);
     let label = trimme_tri(body.label);
+    let overlay_werte = [
+        &organisation,
+        &fachaufgabe,
+        &symbol,
+        &einheit,
+        &funktion,
+        &farbe,
+    ]
+    .iter()
+    .any(|o| matches!(o, Some(Some(_))));
+    if body.zeichen_spec.is_some() && (body.grundzeichen.is_some() || overlay_werte) {
+        return Err(beide_formen());
+    }
+    // Nur GESENDETE Felder werden geprüft: ein absentes Feld ist schlicht kein Wunsch, ein
+    // vorhandenes leeres bleibt 400.
+    let zeichen_spec = body
+        .zeichen_spec
+        .as_deref()
+        .map(pruefe_zeichen_spec)
+        .transpose()?;
+    let grundzeichen = body
+        .grundzeichen
+        .as_deref()
+        .map(grundzeichen_pflicht)
+        .transpose()?;
     // Ansicht (LFH-738): nur das Setzen wird geprüft, `null` gibt auf alle Ansichten frei.
     crate::karten_ansicht::repo::pruefe_zugehoerig(
         &state.pool,
@@ -162,6 +209,7 @@ pub async fn aktualisieren(
         einsatz_id,
         zid,
         ZeichenPatch {
+            zeichen_spec: zeichen_spec.as_deref(),
             grundzeichen: grundzeichen.as_deref(),
             organisation: organisation.as_ref().map(|v| v.as_deref()),
             fachaufgabe: fachaufgabe.as_ref().map(|v| v.as_deref()),
@@ -191,12 +239,30 @@ pub async fn aufloesen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `grundzeichen` ist Pflicht: nach Trim non-empty, sonst 400. Liefert den getrimmten Wert.
+/// `grundzeichen` ist in der Altform Pflicht: nach Trim non-empty, sonst 400. Liefert den
+/// getrimmten Wert.
 ///
 /// 400 und nicht 422, weil das Feld ISOLIERT unbrauchbar ist — die Konvention bewertet mit
-/// 422 erst den Zusammenhang (Feld-Kombination, Objekt-Zustand). Siehe src/AGENTS.md, Abschnitt
+/// 422 erst den Zusammenhang (Objekt-Zustand). Siehe src/AGENTS.md, Abschnitt
 /// „Backend — Statuscode-Konvention".
 fn grundzeichen_pflicht(roh: &str) -> Result<String, AppError> {
-    let g = pflicht(&roh, "grundzeichen")?;
+    let g = pflicht(roh, "grundzeichen")?;
     Ok(g.to_string())
+}
+
+/// Beide Formen in einem Body → 400 (Spec `lagekarte-freie-zeichen`, „Beide Formate zugleich“).
+///
+/// 400 und nicht 422: der Body beschreibt für sich kein eindeutiges Zeichen — wie ein falsch
+/// geformtes Feld, unabhängig vom gespeicherten Zustand. 422 bleibt dem Zusammenhang mit dem
+/// Zeichen vorbehalten (`repo::patche`: Overlays ohne Grundzeichen an einem Spec-Zeichen).
+fn beide_formen() -> AppError {
+    AppError::Validation(
+        "Entweder zeichen_spec oder das alte Format (grundzeichen mit Overlays) senden, nicht beides"
+            .into(),
+    )
+}
+
+/// Keine Form beim Anlegen → 400, wie ein fehlendes Pflichtfeld.
+fn keine_form() -> AppError {
+    AppError::Validation("zeichen_spec fehlt (im alten Format: grundzeichen)".into())
 }

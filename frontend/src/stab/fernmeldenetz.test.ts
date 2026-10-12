@@ -124,7 +124,7 @@ const LEER_SKIZZE: Fernmeldeskizze = {
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const fs = (p: Partial<Fuehrungsstelle> = {}): FernmeldenetzQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { sprechgruppen: [], fahrzeug_ids: [], ...p },
+  daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p },
 });
 
 function quellen(
@@ -255,6 +255,21 @@ describe('baueFernmeldenetz · Stellen', () => {
     });
     expect(netz.schienen[0].teilnehmer).toEqual([{ element: 'fs', status: 'bestehend' }]);
     expect(JSON.stringify(netz.stellen)).not.toContain('GEHEIM');
+  });
+
+  it('Wurzel mit Bezeichnung: Überschrift bleibt „Einsatzleitung“, die Bezeichnung ist Zusatz (LFH-1181)', () => {
+    const netz = baueFernmeldenetz(
+      quellen({ fuehrungsstelle: fs({ bezeichnung: 'TEL Rathaus', rufname: 'Florian 10/1' }) }),
+    );
+    expect(stelleMit(netz, 'fs')).toMatchObject({
+      bezeichnung: EINSATZLEITUNG,
+      zusatz: 'TEL Rathaus',
+      rufname: 'Florian 10/1',
+    });
+    const ohne = baueFernmeldenetz(quellen({ fuehrungsstelle: fs({ rufname: 'Florian 10/1' }) }));
+    expect(stelleMit(ohne, 'fs')).toMatchObject({ zusatz: null });
+    const nichtErfasst = baueFernmeldenetz(quellen({ fuehrungsstelle: fs() }));
+    expect(stelleMit(nichtErfasst, 'fs')).toMatchObject({ zusatz: null, erfasst: false });
   });
 
   it('nennt den Grund, wenn die Führungsstelle nicht geladen ist', () => {

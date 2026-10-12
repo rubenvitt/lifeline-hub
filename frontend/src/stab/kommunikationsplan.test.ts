@@ -69,7 +69,7 @@ function quellen(p: Partial<KommunikationsplanQuellen> = {}): Kommunikationsplan
 }
 
 function fs(p: Partial<Fuehrungsstelle> = {}): KommunikationsplanQuellen['fuehrungsstelle'] {
-  return { zustand: 'daten', daten: { sprechgruppen: [], fahrzeug_ids: [], ...p } };
+  return { zustand: 'daten', daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p } };
 }
 
 describe('baueKommunikationsplan', () => {

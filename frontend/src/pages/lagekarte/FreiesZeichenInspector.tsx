@@ -1,27 +1,30 @@
-import { Button, Descriptions, Popconfirm, Space } from 'antd';
+import { Button, Popconfirm, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import TaktischesZeichen, {
-  einheiten,
-  fachaufgaben,
-  funktionen,
-  grundzeichen as grundzeichenKatalog,
-  organisationen,
-  symbole,
-} from 'taktische-zeichen-react';
-import type { GrundzeichenId } from 'taktische-zeichen-react';
-import type { FreiesZeichen, FreiesZeichenUpdate, KartenAnsicht } from '../../api/types';
+import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core';
+import type {
+  FreiesZeichen,
+  FreiesZeichenPatch,
+  FreiesZeichenUpdate,
+  KartenAnsicht,
+} from '../../api/types';
 import KartenDetailCard from './KartenDetailCard';
-import FreiesZeichenPicker from './FreiesZeichenPicker';
+import FreiesZeichenPicker, {
+  hatZeichen,
+  ZeichenAufPlatte,
+  type ZeichenEntwurf,
+} from './FreiesZeichenPicker';
 import AnsichtZuordnung from './AnsichtZuordnung';
-import { baueFreiesZeichenTz } from './marker';
-import { useRollen } from '../../components/instrument';
+import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
+import { freiesZeichen, fuellfarbe, type FreiesZeichenEingabe } from '../../zeichen/freiesZeichen';
+import { ZEICHEN_KARTEN_PX } from './markerIcons';
+import { zeichenTeile } from './zeichenWahl';
 
 export interface FreiesZeichenInspectorProps {
   zeichen: FreiesZeichen;
   darfSchreiben: boolean;
   onSchliessen: () => void;
-  /** Whole-Spec-Overwrite (lat/lon unveränderbar in v1). */
-  onAendern: (spec: FreiesZeichenUpdate) => void;
+  /** Zeichen und Bezeichnung als Ganzes (lat/lon unveränderbar in v1). */
+  onAendern: (spec: FreiesZeichenPatch) => void;
   onLoeschen: () => void;
   ansichten: KartenAnsicht[];
   onVerschieben: (ansichtId: number | null) => void;
@@ -30,35 +33,72 @@ export interface FreiesZeichenInspectorProps {
 /** Ruhefrist, nach der eine Änderung im Inspector geschrieben wird. */
 const SCHREIB_FRIST_MS = 600;
 
+/** Die Altspalten eines Zeichens in der Reihenfolge, in der sie die Alt-Kennung nennen. */
+const ALT_FELDER = [
+  'grundzeichen',
+  'organisation',
+  'fachaufgabe',
+  'symbol',
+  'einheit',
+  'funktion',
+  'farbe',
+] as const;
+
+function eingabe(z: FreiesZeichen): FreiesZeichenEingabe {
+  return {
+    zeichen_spec: z.zeichen_spec,
+    grundzeichen: z.grundzeichen,
+    organisation: z.organisation,
+    fachaufgabe: z.fachaufgabe,
+    symbol: z.symbol,
+    einheit: z.einheit,
+    funktion: z.funktion,
+    farbe: z.farbe,
+  };
+}
+
 /**
- * Editier-Spec aus dem rohen Record — inkl. fürs Rendering gestrippter Overlays, damit sie im
- * Editor erhalten und wählbar bleiben.
+ * Der Entwurf aus dem gespeicherten Zeichen (LFH-836, design.md D5): eine lesbare Spec so, wie sie
+ * gespeichert ist (kanonisch), sonst die wirksame Spec des Leseadapters. Eine Altzeile steht damit
+ * im Picker als Zeichenbeschreibung und wird beim nächsten Ändern als solche gespeichert.
  */
 function baueWert(z: FreiesZeichen): FreiesZeichenUpdate {
+  let zeichenSpec: string | null = null;
+  if (z.zeichen_spec) {
+    try {
+      zeichenSpec = serializeAnySpec(parseAnySpec(z.zeichen_spec));
+    } catch {
+      // Unlesbar: wie eine Altzeile über den Adapter.
+    }
+  }
   return {
-    grundzeichen: z.grundzeichen as GrundzeichenId,
-    organisation: z.organisation as FreiesZeichenUpdate['organisation'],
-    fachaufgabe: z.fachaufgabe as FreiesZeichenUpdate['fachaufgabe'],
-    symbol: z.symbol as FreiesZeichenUpdate['symbol'],
-    einheit: z.einheit as FreiesZeichenUpdate['einheit'],
-    funktion: z.funktion as FreiesZeichenUpdate['funktion'],
-    farbe: z.farbe,
+    zeichen_spec: zeichenSpec ?? serializeAnySpec(freiesZeichen(eingabe(z)).spec),
     label: z.label,
   };
 }
 
-function labelAus(
-  katalog: readonly { id: string; label: string }[],
-  id: string | null | undefined,
-): string | null {
-  if (!id) return null;
-  return katalog.find((k) => k.id === id)?.label ?? id;
+/**
+ * Was gesendet wird: Bleibt das Zeichen gleich und ändert sich nur die Bezeichnung, geht nur
+ * `label` raus. Sonst würde schon eine Umbenennung eine Altzeile (oder eine unlesbare Spec aus
+ * einer neueren Bibliothek) durch ihre wirksame, womöglich vereinfachte Fassung ersetzen und die
+ * Alt-Kennung samt Alt-Farbe verlieren (design.md D6, LFH-836 Review).
+ */
+function sendung(entwurf: FreiesZeichenUpdate, server: FreiesZeichenUpdate): FreiesZeichenPatch {
+  return entwurf.zeichen_spec === server.zeichen_spec ? { label: entwurf.label } : entwurf;
+}
+
+/** Die Alt-Kennung eines Altzeichens (`gefahr · abc · #cc0000`), sonst `null`. */
+function altKennung(z: FreiesZeichen): string | null {
+  if (z.zeichen_spec) return null;
+  const teile = ALT_FELDER.map((f) => z[f]).filter((w): w is string => !!w);
+  return teile.length > 0 ? teile.join(' · ') : null;
 }
 
 /**
  * Detail-Inspector eines freien taktischen Zeichens. Schreibend: der {@link FreiesZeichenPicker},
- * vorbelegt aus dem rohen Record; Änderungen gehen entprellt als Whole-Spec an `onAendern`.
- * Read-only: Vorschau + Werte. Der Parent hält ihn per `key={zeichen.id}` je Record frisch.
+ * vorbelegt aus dem gespeicherten Zeichen; Änderungen gehen entprellt als `zeichen_spec` samt
+ * Bezeichnung an `onAendern`. Read-only: die Werte. Die Symbolkachel zeigt das Zeichen, wie die
+ * Bibliothek es zeichnet. Der Parent hält ihn per `key={zeichen.id}` je Record frisch.
  */
 export default function FreiesZeichenInspector({
   zeichen,
@@ -70,7 +110,7 @@ export default function FreiesZeichenInspector({
   onVerschieben,
 }: FreiesZeichenInspectorProps) {
   const { rollen } = useRollen();
-  const [entwurf, setEntwurf] = useState<FreiesZeichenUpdate>(() => baueWert(zeichen));
+  const [entwurf, setEntwurf] = useState<ZeichenEntwurf>(() => baueWert(zeichen));
   /**
    * Eigen-Merker: nur eine Änderung im Picker setzt ihn, das Senden löscht ihn. Ohne ihn schriebe
    * eine per Live-Invalidierung hereinkommende fremde Änderung nach der Frist den alten Entwurf
@@ -93,8 +133,10 @@ export default function FreiesZeichenInspector({
   if (eigeneAenderung && entwurfText === serverStand) setEigeneAenderung(false);
 
   const onAendernRef = useRef(onAendern);
+  const serverRef = useRef<FreiesZeichenUpdate>(JSON.parse(serverStand) as FreiesZeichenUpdate);
   useEffect(() => {
     onAendernRef.current = onAendern;
+    serverRef.current = JSON.parse(serverStand) as FreiesZeichenUpdate;
   });
   /**
    * Wer den Inspector innerhalb der Frist schließt, verlöre seine Änderung (der Cleanup räumt den
@@ -102,7 +144,8 @@ export default function FreiesZeichenInspector({
    */
   const offenerStand = useRef<string | null>(null);
   useEffect(() => {
-    if (!eigeneAenderung || entwurfText === serverStand) {
+    // Ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl) wird nichts gespeichert.
+    if (!eigeneAenderung || entwurfText === serverStand || !hatZeichen(entwurf)) {
       offenerStand.current = null;
       return;
     }
@@ -110,30 +153,43 @@ export default function FreiesZeichenInspector({
     const t = setTimeout(() => {
       offenerStand.current = null;
       setEigeneAenderung(false);
-      onAendernRef.current(JSON.parse(entwurfText) as FreiesZeichenUpdate);
+      onAendernRef.current(
+        sendung(JSON.parse(entwurfText) as FreiesZeichenUpdate, serverRef.current),
+      );
     }, SCHREIB_FRIST_MS);
     return () => clearTimeout(t);
-  }, [eigeneAenderung, entwurfText, serverStand]);
+  }, [eigeneAenderung, entwurf, entwurfText, serverStand]);
 
   // Beim Abbau nachholen, was die Frist nicht geschafft hat. Leere Deps: läuft einmal beim Abbau
   // und liest über Refs.
   useEffect(
     () => () => {
       const rest = offenerStand.current;
-      if (rest) onAendernRef.current(JSON.parse(rest) as FreiesZeichenUpdate);
+      if (rest) {
+        onAendernRef.current(sendung(JSON.parse(rest) as FreiesZeichenUpdate, serverRef.current));
+      }
     },
     [],
   );
   const titel = zeichen.label?.trim() ? zeichen.label : 'Taktisches Zeichen';
-  const tz = baueFreiesZeichenTz(zeichen);
+  const bild = freiesZeichen(eingabe(zeichen));
+  const alt = altKennung(zeichen);
 
   return (
     <KartenDetailCard
       titel={titel}
       akzentFarbe={
-        // Ohne eigene Farbe eine Textrolle: die Kartentinte verschwände auf dem dunklen Paneel
-        // (LFH-797, Spec `lagekarte-taktische-zeichen`).
-        zeichen.farbe ?? rollen.text2
+        // Mit Füllung deren Palettenfarbe; ohne eine Textrolle: die Kartentinte verschwände auf dem
+        // dunklen Paneel (LFH-797, Spec `lagekarte-taktische-zeichen`).
+        fuellfarbe(bild.spec) ?? rollen.text2
+      }
+      kachel={<ZeichenAufPlatte drawing={bild.drawing} size={ZEICHEN_KARTEN_PX} />}
+      unterzeile={
+        bild.vereinfacht ? (
+          <span data-lfh="zeichen-vereinfacht">
+            vereinfacht dargestellt{alt ? ` · ${alt}` : ''}
+          </span>
+        ) : undefined
       }
       onSchliessen={onSchliessen}
     >
@@ -175,39 +231,13 @@ export default function FreiesZeichenInspector({
           </Popconfirm>
         </Space>
       ) : (
-        <Space orientation="vertical" style={{ width: '100%', alignItems: 'center' }}>
-          <TaktischesZeichen {...tz} style={{ width: 64, height: 64 }} />
-          <Descriptions column={1} size="small" style={{ width: '100%' }}>
-            <Descriptions.Item label="Grundzeichen">
-              {labelAus(grundzeichenKatalog, zeichen.grundzeichen)}
-            </Descriptions.Item>
-            {zeichen.organisation && (
-              <Descriptions.Item label="Organisation">
-                {labelAus(organisationen, zeichen.organisation)}
-              </Descriptions.Item>
-            )}
-            {zeichen.fachaufgabe && (
-              <Descriptions.Item label="Fachaufgabe">
-                {labelAus(fachaufgaben, zeichen.fachaufgabe)}
-              </Descriptions.Item>
-            )}
-            {zeichen.symbol && (
-              <Descriptions.Item label="Symbol">
-                {labelAus(symbole, zeichen.symbol)}
-              </Descriptions.Item>
-            )}
-            {zeichen.einheit && (
-              <Descriptions.Item label="Einheit">
-                {labelAus(einheiten, zeichen.einheit)}
-              </Descriptions.Item>
-            )}
-            {zeichen.funktion && (
-              <Descriptions.Item label="Funktion">
-                {labelAus(funktionen, zeichen.funktion)}
-              </Descriptions.Item>
-            )}
-          </Descriptions>
-        </Space>
+        <Datenraster spalten={1} beschriftung="Zeichen">
+          {zeichenTeile(bild.spec).map((t, i) => (
+            <Datenfeld key={`${t.achse}-${i}`} label={t.achse}>
+              {t.name}
+            </Datenfeld>
+          ))}
+        </Datenraster>
       )}
     </KartenDetailCard>
   );

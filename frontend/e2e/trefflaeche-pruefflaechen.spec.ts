@@ -752,8 +752,9 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
           mindestens: 1,
           kurz: true,
         },
-        // Das Detail bearbeitet an der Zeile (LFH-1208): Wert- und Eintragen-Knöpfe, die Stufen des
-        // Lagezustands und das abgesetzte „Auflösen“.
+        // Das Detail bearbeitet an der Zeile (LFH-1208): Wert- und Eintragen-Knöpfe und die Stufen
+        // des Lagezustands. „Verschieben unter …“ und „Auflösen“ stehen hinter „Weitere Aktionen“
+        // (LFH-1212).
         {
           sorte: 'Abschnitt Zeilen',
           ziele: knopf(/ (bearbeiten|eintragen)$/),
@@ -764,7 +765,17 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
           ziele: segment(/^(nicht beurteilt|planmäßig|angespannt|kritisch)$/),
           mindestens: 4,
         },
-        { sorte: 'Abschnitt Auflösen', ziele: knopf('Auflösen'), mindestens: 1 },
+        {
+          sorte: 'Abschnitt Weitere Aktionen',
+          ziele: knopf(/^Weitere Aktionen zu Abschnitt .+$/),
+          mindestens: 1,
+        },
+        {
+          // Der Griff zum Umhängen ist ein Zeigerziel der Staffel (LFH-1212), kein Tastaturziel.
+          sorte: 'Gliederung Griffe',
+          ziele: (page) => inMain(page).locator('[data-lfh="drag-handle"]'),
+          mindestens: 2,
+        },
       ],
     },
     {
@@ -798,11 +809,15 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
     {
       pfad: `${R}/einsatzabschnitte`,
       anker: (page) => inMain(page).locator('.ant-tree-node-content-wrapper').first(),
-      // Ohne Schreibrecht fehlen Anlegen, Zeilenstifte und die Stufenwahl (LFH-1208).
+      // Ohne Schreibrecht fehlen Anlegen, Zeilenstifte, Stufenwahl, „Weitere Aktionen“ (LFH-1208)
+      // und die Griffe zum Umhängen (LFH-1212).
       fehlt: (page) =>
         inMain(page)
-          .getByRole('button', { name: /^Abschnitt anlegen$| (bearbeiten|eintragen)$|^Auflösen$/ })
-          .or(inMain(page).getByRole('radiogroup', { name: 'Lagezustand' })),
+          .getByRole('button', {
+            name: /^Abschnitt anlegen$| (bearbeiten|eintragen)$|^Weitere Aktionen zu Abschnitt /,
+          })
+          .or(inMain(page).getByRole('radiogroup', { name: 'Lagezustand' }))
+          .or(inMain(page).locator('[data-lfh="drag-handle"]')),
       ziele: [
         {
           sorte: 'Baumknoten',

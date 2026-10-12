@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Input, TreeSelect } from 'antd';
+import { Input } from 'antd';
 import { ApiError } from '../../api/client';
 import type { AbschnittPatch } from '../../api/einsatzabschnitte';
 import { leerZuNull } from '../../api/patchTriState';
@@ -25,7 +25,7 @@ import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import SprechgruppenPicker from '../../components/SprechgruppenPicker';
 import StatusTag from '../../components/StatusTag';
 import { abschnittLagezustand, rollenFarbe } from '../../theme/statusFarben';
-import { nachfahrenInkl, type AbschnittStaerken } from './abschnittStaerke';
+import type { AbschnittStaerken } from './abschnittStaerke';
 import { findKurzbezeichnungConflict, kurzbezeichnungVergeben } from './kurzbezeichnung';
 
 /**
@@ -37,7 +37,7 @@ export type AbschnittPatchHandler = (etikett: string, patch: AbschnittPatch) => 
 
 interface AbschnittDetailProps {
   abschnitt: Einsatzabschnitt;
-  /** Alle Abschnitte des Einsatzes: Über-Abschnitt-Auswahl und Kurzbezeichnungs-Prüfung. */
+  /** Alle Abschnitte des Einsatzes, für die Kurzbezeichnungs-Prüfung. */
   abschnitte: Einsatzabschnitt[];
   /** Disponierte Personen für den Abschnittsleiter. */
   personal: readonly { id: number; name: string }[];
@@ -67,6 +67,9 @@ function isSameIds(a: readonly number[], b: readonly number[]): boolean {
  *
  * Bewusst ein eigenes Bauteil neben `AbschnittDaten` (design.md D1): Vorschau und
  * Funktionsansicht lesen nur und sollen weder Personal noch Mutationen kennen.
+ *
+ * Den Über-Abschnitt ändert keine Zeile, sondern das Umhängen in der Gliederung (Ziehen oder
+ * „Verschieben unter …“, LFH-1212); die Gliederung zeigt ihn.
  *
  * Alle Angaben nehmen `InlineAngabe`, auch die optionalen Freitexte: `BemerkungZelle` ist für
  * Listen gebaut und speichert beim Verlassen; hier gilt wie auf den Einsatzdaten EIN Vertrag
@@ -116,13 +119,6 @@ export default function AbschnittDetail({
     />
   );
 
-  // Ein Abschnitt kann nicht unter sich selbst oder einen eigenen Unterabschnitt rücken.
-  const excludedIds = nachfahrenInkl(abschnitte, a.id);
-  const ueberAbschnittOptions = abschnitte
-    .filter((x) => !excludedIds.has(x.id))
-    .map((x) => ({ value: x.id, title: x.name }));
-  const ueberAbschnittName = abschnitte.find((x) => x.id === a.ueber_abschnitt_id)?.name ?? null;
-
   const { tmo, dmo } = teileSprechgruppen(a.sprechgruppen);
   const sprechgruppenText = [
     tmo.length > 0 ? mitBetriebsart('TMO', tmo.map((s) => s.bezeichnung).join(', ')) : null,
@@ -170,27 +166,6 @@ export default function AbschnittDetail({
               placeholder="z. B. EA-N"
               value={value}
               onChange={(e) => onChange(e.target.value)}
-            />
-          )}
-        />
-      </Datenfeld>
-      <Datenfeld label="Über-Abschnitt">
-        <InlineAngabe<number | null>
-          etikett="Über-Abschnitt"
-          wert={a.ueber_abschnitt_id ?? null}
-          anzeige={ueberAbschnittName}
-          leer={(w) => w == null}
-          darfSchreiben={darfSchreiben}
-          onSpeichern={(w) => onPatch('Über-Abschnitt', { ueber_abschnitt_id: w })}
-          eingabe={({ feld, popup, value, onChange }) => (
-            <TreeSelect<number>
-              {...feld}
-              {...popup}
-              allowClear
-              placeholder="oberster Abschnitt"
-              treeData={ueberAbschnittOptions}
-              value={value ?? undefined}
-              onChange={(w) => onChange(w ?? null)}
             />
           )}
         />

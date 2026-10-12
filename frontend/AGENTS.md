@@ -151,7 +151,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
   `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
-  „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
+  „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `stab/einsatzleiter.ts`
+  (LFH-1199); Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
   das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
   `SPALTE_MIN_PX` gemessen, tiefer senkrecht) — keine
   Graph-Bibliothek, kein zweites Gerüst. **Live-Zufluss nur über die Schleuse des Gerüsts**
@@ -448,8 +449,15 @@ anwendbar), „nicht geprüft" ist keins.
   eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
   Hinweis per `data-fehler`; Zeitpunkte über `ZeitpunktEingabe` und Gleichheit am Instant. Die
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
-  Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung und Koordinate nur
-  im Vollformular.
+  Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung nur im
+  Vollformular. Ausnahmen (LFH-1175, Spec `einsatzdaten-bearbeitung`): die Zeile „Koordinate“
+  schickt das Paar, die Zeile „Adresse“ mit gewähltem Treffer Adresse und Koordinate zusammen;
+  beide stehen im Paneel „Einsatzort“, die Kopfleiste zeigt den Einsatzort nur an.
+- **Ortsangaben mit Suche nehmen `anzeige/Ortsfeld.tsx`** (LFH-1175, Spec `ortsfeld`): Suche nur
+  auf Enter oder „Ort suchen“, nie beim Tippen (Nominatim-Regeln, ein Takt für alle); Enter im
+  Feld sendet das umgebende Formular nicht ab. Die Suche wird hineingereicht (im Einsatz
+  `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide ohne Lagekarten-Recht; den Punkt zeigt
+  `anzeige/Kartenausschnitt.tsx`. Personenadressen bekommen keine Suche (folgt mit LFH-1248).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
@@ -711,7 +719,9 @@ Spec `bedien-arbeitsplatz`).
   Platzhalter (`etb/Schnellerfassung.tsx`).
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
-  Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt".
+  Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
+  „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026): fünf Felder, das fünfte ist der
+  optionale Einsatzort; ein sechstes gehört in die Kopfdaten.
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
   bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
   `einheit:<id>`). Einzige Ausnahme: ein Klappteil, der bei einem Prüffehler darin selbst aufgeht

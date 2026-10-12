@@ -10,10 +10,10 @@ Angaben geändert und aufgelöst wird, ohne dass eine Änderung die eines andere
 
 ### Requirement: Jede Angabe an ihrem Wert bearbeiten
 Das Detailpaneel der Seite Einsatzabschnitte SHALL jede Angabe des gewählten Abschnitts an ihrem
-Wert bearbeitbar machen: Name, Kurzbezeichnung, Über-Abschnitt, Abschnittsleiter, Lagezustand,
-Abschnittsauftrag, Sprechgruppen, Kommunikationsmittel, Erreichbarkeit / Nummer und Bemerkung.
-Einen Knopf „Bearbeiten“ und ein Formular, das alle Angaben zugleich zeigt, MUST es im Detail
-nicht geben.
+Wert bearbeitbar machen: Name, Kurzbezeichnung, Abschnittsleiter, Lagezustand, Abschnittsauftrag,
+Sprechgruppen, Kommunikationsmittel, Erreichbarkeit / Nummer und Bemerkung. Den Über-Abschnitt
+ändert das Umhängen in der Gliederung (Ziehen oder „Verschieben unter …“). Einen Knopf
+„Bearbeiten“ und ein Formular mit allen Angaben MUST es im Detail nicht geben.
 
 #### Scenario: Abschnittsleiter ablösen
 - **WHEN** eine Person mit Schreibrecht im Detail „Abschnittsleiter bearbeiten“ wählt, eine
@@ -138,11 +138,12 @@ erhalten bleiben; das Bearbeiten einer anderen Angabe MUST ihn nicht verändern.
 - **THEN** enthält die gesendete Änderung kein Feld `fortschritt`
 
 ### Requirement: Auflösen bleibt abgesetzt und rückgefragt
-Mit Schreibrecht SHALL das Detail „Auflösen“ als roten Knopf zeigen, abgesetzt von den Angaben.
-Es MUST erst nach einer Rückfrage wirken, deren Bestätigung „Abschnitt auflösen“ heißt. Eine
-Ablehnung MUST im Detail stehen.
+Mit Schreibrecht SHALL das Detail „Auflösen“ abgesetzt von den Angaben anbieten, als rot
+gekennzeichneten Eintrag im Menü „Weitere Aktionen“ neben „Verschieben unter …“. Es MUST erst
+nach einer Rückfrage wirken, die den Abschnitt nennt und deren Bestätigung „Abschnitt auflösen“
+heißt. Eine Ablehnung MUST im Detail stehen.
 
 #### Scenario: Auflösen bestätigen
-- **WHEN** jemand „Auflösen“ wählt und „Abschnitt auflösen“ bestätigt
+- **WHEN** jemand im Menü „Weitere Aktionen“ „Auflösen“ wählt und „Abschnitt auflösen“ bestätigt
 - **THEN** verschwindet der Abschnitt aus der Gliederung, und das Detail zeigt den ersten
   verbliebenen Abschnitt

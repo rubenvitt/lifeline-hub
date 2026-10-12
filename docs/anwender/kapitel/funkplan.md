@@ -2,7 +2,7 @@
 titel: Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs]
 ---
 
 ## Überblick
@@ -89,10 +89,14 @@ lesbar. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
 
 Der Funkplan wird nicht eigens gepflegt. Er entsteht aus Abschnitten, Einheiten, Fahrzeugen,
 Personal, Sprechgruppen und der eigenen Führungsstelle (siehe
-[Einsatzdaten und Führungsstelle](einsatzdaten.md)). Ordnet die Skizze einer Stelle eine
+[Einsatzdaten und Führungsstelle](einsatzdaten.md)). In der Zeile der Führungsstelle steht unter
+„Leiter/Führer“ der dort festgelegte Einsatzleiter, sonst „—“. Ordnet die Skizze einer Stelle eine
 Sprechgruppe zu, schreibt sie das in den Datensatz der Stelle; Funkplan und Skizze zeigen danach
 dasselbe. Die Skizze speichert selbst nur Lage, Komponenten, Verbindungen, Bereiche und das
 Schriftfeld. Externe Stellen der Skizze sind die des Kommunikationsplans.
+
+Trägt die eigene Führungsstelle eine Bezeichnung, etwa „ELW 2 Musterstadt“, steht sie im Funkplan
+neben „Führungsstelle“ und in der Skizze als eigene Zeile unter „Einsatzleitung“.
 
 Auch im Kommunikationsplan stehen Abschnitte, Einheiten und die eigene Führungsstelle nur
 abgeleitet; ihre Angaben pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“

@@ -106,6 +106,7 @@ pub async fn importieren_tx(
             stichwort: Some(szenario::EINSATZ_STICHWORT),
             einsatzart: Some(crate::einsatz::EINSATZART_UEBUNG),
             begonnen_at: Some(&begonnen_at),
+            ort: Default::default(),
         },
         admin_id,
         jetzt.and_utc(),

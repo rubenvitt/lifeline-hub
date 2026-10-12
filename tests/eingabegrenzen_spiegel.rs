@@ -4,9 +4,10 @@
 
 use std::collections::BTreeMap;
 
+use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
-    auftrag, etb, fuehrung, infotelefon, lage_zone, nachforderung, personal, presse, schaden,
-    sprechgruppe,
+    auftrag, einsatz, etb, externe_stelle, fuehrung, infotelefon, lage_zone, nachforderung,
+    personal, presse, schaden, sprechgruppe,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -33,9 +34,28 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("PRESSE_THEMA_MAX", presse::THEMA_MAX),
         ("PRESSE_ANTWORT_MAX", presse::ANTWORT_MAX),
         ("SCHADEN_ORT_MAX", schaden::ORT_MAX),
+        ("EINSATZORT_MAX", einsatz::EINSATZORT_MAX),
         ("SCHADEN_BESCHREIBUNG_MAX", schaden::BESCHREIBUNG_MAX),
         ("GEOMETRIE_STUETZPUNKTE_MAX", lage_zone::STUETZPUNKTE_MAX),
         ("SPRECHGRUPPE_BEDINGUNG_MAX", sprechgruppe::BEDINGUNG_MAX),
+        (
+            "FUEHRUNGSSTELLE_BEZEICHNUNG_MAX",
+            fuehrungsstelle::FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+        ),
+        (
+            "FUEHRUNGSSTELLE_ADRESSE_MAX",
+            fuehrungsstelle::FUEHRUNGSSTELLE_ADRESSE_MAX,
+        ),
+        (
+            "EXTERNE_STELLE_BEZEICHNUNG_MAX",
+            externe_stelle::BEZEICHNUNG_MAX,
+        ),
+        ("EXTERNE_STELLE_KURZ_MAX", externe_stelle::KURZ_MAX),
+        ("MELDENDE_STELLE_MAX", einsatz::MELDENDE_STELLE_MAX),
+        (
+            "EINSATZLEITER_NAME_MAX",
+            fuehrungsstelle::EINSATZLEITER_NAME_MAX,
+        ),
     ])
 }
 

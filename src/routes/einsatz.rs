@@ -54,6 +54,38 @@ pub struct NeuerEinsatz {
     pub einsatzart: Option<String>,
     /// Alarmzeit. Absent → DB-Default `datetime('now')`.
     pub begonnen_at: Option<String>,
+    /// Einsatzort (LFH-1175). Leer oder absent → ohne Ort.
+    pub einsatzort: Option<String>,
+    /// Koordinate des Einsatzorts, nur als Paar ([`pruefe_koordinate`]).
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lon: Option<Option<f64>>,
+}
+
+/// Prüft die Koordinate des Einsatzorts im Tri-State von Anlegen und PATCH (LFH-1175, Spec
+/// `ortsfeld`, „Koordinate des Einsatzorts wird geprüft“). Breite und Länge kommen nur als Paar:
+/// beide fehlen, beide `null` oder beide mit Wert. Ein halbes Paar ist **422**, ein Wert außerhalb
+/// des Bereichs **400** (`src/AGENTS.md`, Statuscode-Konvention). Liefert das gesetzte Paar.
+fn pruefe_koordinate(
+    lat: Option<Option<f64>>,
+    lon: Option<Option<f64>>,
+) -> Result<Option<(f64, f64)>, AppError> {
+    // Erst jeder Wert für sich (400), dann das Paar (422): ein halbes Paar mit einem Wert außerhalb
+    // des Bereichs scheitert schon am Feld.
+    let ausserhalb = |w: Option<Option<f64>>, grenze: f64| matches!(w, Some(Some(x)) if !(-grenze..=grenze).contains(&x));
+    if ausserhalb(lat, 90.0) || ausserhalb(lon, 180.0) {
+        return Err(AppError::Validation(
+            "Koordinate außerhalb des gültigen Bereichs".into(),
+        ));
+    }
+    match (lat, lon) {
+        (None, None) | (Some(None), Some(None)) => Ok(None),
+        (Some(Some(lat)), Some(Some(lon))) => Ok(Some((lat, lon))),
+        _ => Err(AppError::UnprocessableEntity(
+            "Breite und Länge des Einsatzorts nur gemeinsam setzen oder leeren".into(),
+        )),
+    }
 }
 
 /// POST /api/einsaetze — neuen Einsatz anlegen; Ersteller wird Einsatzleitung.
@@ -91,6 +123,9 @@ pub async fn anlegen(
         Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
         None => None,
     };
+    let adresse =
+        support::optional_max(req.einsatzort, "Einsatzort", crate::einsatz::EINSATZORT_MAX)?;
+    let koordinate = pruefe_koordinate(req.einsatzort_lat, req.einsatzort_lon)?;
 
     let einsatz = repo::anlegen(
         &state.pool,
@@ -99,6 +134,10 @@ pub async fn anlegen(
             stichwort,
             einsatzart,
             begonnen_at: begonnen_at.as_deref(),
+            ort: repo::NeuerEinsatzort {
+                adresse: adresse.as_deref(),
+                koordinate,
+            },
         },
         benutzer.id,
     )
@@ -1030,8 +1069,20 @@ pub async fn aktualisieren(
         .transpose()?;
     let leitstellen_nr = support::trimme_tri(req.leitstellen_nr);
     let einsatzort = support::trimme_tri(req.einsatzort);
+    if let Some(Some(ort)) = &einsatzort {
+        support::hoechstens(ort, "Einsatzort", crate::einsatz::EINSATZORT_MAX)?;
+    }
     let meldende_stelle = support::trimme_tri(req.meldende_stelle);
+    if let Some(Some(stelle)) = &meldende_stelle {
+        support::hoechstens(
+            stelle,
+            "Meldende Stelle",
+            crate::einsatz::MELDENDE_STELLE_MAX,
+        )?;
+    }
     let sachverhalt = support::trimme_tri(req.sachverhalt);
+    // Nach allen Feldprüfungen: ein halbes Paar ist 422 (Zusammenhang), ein Feld für sich 400.
+    pruefe_koordinate(req.einsatzort_lat, req.einsatzort_lon)?;
 
     let aktualisiert = repo::patche_kopf(
         &state.pool,

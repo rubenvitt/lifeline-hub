@@ -1,4 +1,5 @@
 import { Einsatzzeichen } from '@einsatzzeichen/react';
+import type { Drawing } from '@einsatzzeichen/schema';
 import { useId, type CSSProperties } from 'react';
 import type { TzProps } from '../pages/lagekarte/taktischesZeichen';
 import { farbenHell } from '../theme/tokens';
@@ -71,4 +72,22 @@ export function FunktionsZeichen({
   const zeichen = funktionsZeichen(funktion);
   if (!zeichen) return null;
   return <Einsatzzeichen drawing={zeichen.drawing} size={size} idPrefix={idPrefix} />;
+}
+
+/**
+ * Eine fertige Zeichnung (etwa aus dem Leseadapter `freiesZeichen` oder dem Vokabular des Pickers,
+ * LFH-836) als Inline-SVG, mit eigenem `idPrefix` je Instanz wie {@link EinsatzZeichen}.
+ */
+export function ZeichenBild({
+  drawing,
+  size,
+  style,
+}: {
+  drawing: Drawing;
+  /** Kantenlänge in px, ganzzahlig. */
+  size: number;
+  style?: CSSProperties;
+}) {
+  const idPrefix = `ez${useId()}`;
+  return <Einsatzzeichen drawing={drawing} size={size} idPrefix={idPrefix} style={style} />;
 }

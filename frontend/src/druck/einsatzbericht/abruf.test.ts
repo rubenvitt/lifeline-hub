@@ -6,7 +6,7 @@ import { QUELLEN, type QuellenFreigabe, type QuellenSchluessel } from './quellen
 
 const api = vi.hoisted(() => ({
   ladeEinsatz: vi.fn(),
-  ladeMitglieder: vi.fn(),
+  ladeFuehrungsstelle: vi.fn(),
   ladeStab: vi.fn(),
   ladeLagebesprechungen: vi.fn(),
   listeEinheiten: vi.fn(),
@@ -26,7 +26,7 @@ const api = vi.hoisted(() => ({
 
 vi.mock('../../api/einsaetze', () => ({
   ladeEinsatz: api.ladeEinsatz,
-  ladeMitglieder: api.ladeMitglieder,
+  ladeFuehrungsstelle: api.ladeFuehrungsstelle,
 }));
 vi.mock('../../api/stab', () => ({
   ladeStab: api.ladeStab,

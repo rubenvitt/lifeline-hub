@@ -1,16 +1,6 @@
 // Barrel über die aus Rust generierten Schemas (`types.generated.ts`, LFH-120). Nicht von Hand
 // pflegen: Response-Typen ändern sich über die Rust-Structs + `scripts/check-typ-codegen.sh`.
 // FE-lokale Typen (Eingabe-Bodies, Record-Maps) sind unten als „kein Backend-Schema“ markiert.
-// ID-Typen der freien Zeichen (`NeuesFreiesZeichen`/`FreiesZeichenUpdate`) aus dem Altpaket, bis
-// LFH-836 sie auf @einsatzzeichen umstellt.
-import type {
-  EinheitId,
-  FachaufgabeId,
-  FunktionId,
-  GrundzeichenId,
-  OrganisationId,
-  SymbolId,
-} from 'taktische-zeichen-react';
 import type { components } from './types.generated';
 
 type S = components['schemas'];
@@ -186,6 +176,9 @@ export type EtbTyp = S['EtbTyp'];
 export type MeldeWeg = S['MeldeWeg'];
 export type EtbEintragAnzeige = S['EtbEintragAnzeige'];
 export type EtbBaustein = S['EtbBaustein'];
+/** Katalog „Externe Stellen“ (LFH-1194). */
+export type ExterneStelle = S['ExterneStelle'];
+export type ExterneStelleArt = S['ExterneStelleArt'];
 /** Eigener Lesestand im Tagebuch eines Einsatzes (LFH-611). */
 export type EtbLesemarke = S['EtbLesemarkeAnzeige'];
 /** Exakte Zahl der ETB-Einträge gesamt und je Typ, filtertreu zur Liste (LFH-612). */
@@ -245,20 +238,42 @@ export type EinheitStatus = S['EinheitStatus'];
 export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
-/** Eigene Führungsstelle des Einsatzes (LFH-849). */
+/** Eigene Führungsstelle des Einsatzes (LFH-849), seit LFH-1181 ein Ort mit Art und Standort. */
 export type Fuehrungsstelle = S['FuehrungsstelleAnzeige'];
+/** `mobil` (ELW) oder `ortsfest` (TEL im Rathaus), nie leer (LFH-1181). */
+export type FuehrungsstellenArt = S['FuehrungsstellenArt'];
+/** Der Einsatzleiter an der eigenen Führungsstelle (LFH-1199). */
+export type Einsatzleiter = S['EinsatzleiterAnzeige'];
+export type EinsatzleiterArt = S['EinsatzleiterArt'];
+
+/**
+ * Ein neuer Einsatzleiter im PATCH der Führungsstelle: eine disponierte Person oder ein externer
+ * als Freitext; ohne `seit` gilt die Zeit des Speicherns.
+ */
+export type EinsatzleiterEingabe =
+  | { art: 'personal'; personal_id: number; seit?: string }
+  | { art: 'extern'; name: string; seit?: string };
 
 /**
  * Teiländerung der Führungsstelle (kein Backend-Schema, `routes/einsatz_fuehrungsstelle.rs`):
  * fehlender Schlüssel = unverändert, `null` = leeren; `sprechgruppe_ids` ersetzt vollständig.
  */
 export interface FuehrungsstellePatch {
+  /** Nie `null`: die Art lässt sich nicht leeren (400). */
+  art?: FuehrungsstellenArt;
+  bezeichnung?: string | null;
+  standort_adresse?: string | null;
+  /** Koordinate des Standorts, nur als Paar (sonst 422). */
+  standort_lat?: number | null;
+  standort_lon?: number | null;
   rufname?: string | null;
   kommunikationsmittel?: string | null;
   erreichbarkeit?: string | null;
   sprechgruppe_ids?: number[];
   /** Dispositionszeilen, die die Führungsstelle tragen (LFH-1106); ersetzt vollständig. */
   fahrzeug_ids?: number[];
+  /** Der Einsatzleiter (LFH-1199); `null` leert ihn, ein Wechsel schreibt ins ETB. */
+  einsatzleiter?: EinsatzleiterEingabe | null;
 }
 
 // ============================== E‑2 Personen ==============================
@@ -347,25 +362,25 @@ export type LageZone = S['LageZoneAnzeige'];
 export type FreiesZeichen = S['FreiesZeichenAnzeige'];
 
 /** POST-Body für ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt). Kein
- *  Backend-Schema, FE-lokal; Overlays nutzen die DV-102-ID-Unions aus
- *  `taktische-zeichen-core`. */
+ *  Backend-Schema, FE-lokal. Neue Clients senden nur `zeichen_spec`, die kanonische
+ *  Zeichenbeschreibung von @einsatzzeichen (`serializeAnySpec`; LFH-836, design.md D1/D4); den
+ *  alten Body mit Grundzeichen und Overlays nimmt der Server nur noch für veraltete Clients an. */
 export interface NeuesFreiesZeichen {
   lat: number;
   lon: number;
-  grundzeichen: GrundzeichenId;
-  organisation?: OrganisationId | null;
-  fachaufgabe?: FachaufgabeId | null;
-  symbol?: SymbolId | null;
-  einheit?: EinheitId | null;
-  funktion?: FunktionId | null;
-  farbe?: string | null;
+  zeichen_spec: string;
   label?: string | null;
   /** Ansichts-Zugehörigkeit (LFH-320): aktive Ansicht beim Anlegen; `null` = auf allen. */
   ansicht_id?: number | null;
 }
 
-/** PATCH-Body (Whole-Spec-Overwrite ohne lat/lon, nicht verschiebbar). */
+/** PATCH-Body (ohne lat/lon, nicht verschiebbar). `zeichen_spec` schreibt das Zeichen und leert
+ *  die Altspalten; eine Altzeile wird so beim nächsten Ändern zur Spec. */
 export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
+
+/** Teil-PATCH: Nur eine Umbenennung schickt bloß `label`, dann bleibt die gespeicherte Form —
+ *  auch eine Altzeile mit Alt-Kennung und Alt-Farbe — unverändert (LFH-836, Review). */
+export type FreiesZeichenPatch = Partial<FreiesZeichenUpdate>;
 
 // ============================== LFH-319 Kartenansichten ==============================
 export type KartenAnsicht = S['KartenAnsichtAnzeige'];

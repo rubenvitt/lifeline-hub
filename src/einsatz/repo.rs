@@ -23,6 +23,16 @@ pub struct NeuerEinsatzDaten<'a> {
     /// Alarmzeit. `None` → DB-Default `datetime('now')`. Der Aufrufer hat den Wert
     /// bereits durch `etb::normalisiere_zeit` geschickt.
     pub begonnen_at: Option<&'a str>,
+    /// Einsatzort beim Anlegen (LFH-1175). Leer → ohne Ort.
+    pub ort: NeuerEinsatzort<'a>,
+}
+
+/// Einsatzort beim Anlegen: Adresse und Koordinate, beide optional. Die Koordinate ist ein Paar
+/// (Breite, Länge), der Aufrufer hat Bereich und Paar geprüft.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NeuerEinsatzort<'a> {
+    pub adresse: Option<&'a str>,
+    pub koordinate: Option<(f64, f64)>,
 }
 
 /// Legt einen Einsatz an und macht den Ersteller in derselben Transaktion zur Einsatzleitung.
@@ -143,13 +153,14 @@ pub(crate) async fn anlegen_tx(
     // für `INTEGER PRIMARY KEY` ohne AUTOINCREMENT. Rennfrei unter BEGIN IMMEDIATE.
     let einsatz_id: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz (id, org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
-                              einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at) \
+                              einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at, \
+                              einsatzort, einsatzort_lat, einsatzort_lon) \
          VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM einsatz), 0), \
                              COALESCE((SELECT MAX(einsatz_id) FROM demo_import), 0), \
                              COALESCE((SELECT MAX(einsatz_id) FROM aufbewahrung_loeschprotokoll), 0)) \
                          + 1), \
                  ?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
-                 ?, ?, datetime('now')) RETURNING id",
+                 ?, ?, datetime('now'), ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(daten.bezeichnung)
@@ -159,6 +170,9 @@ pub(crate) async fn anlegen_tx(
     .bind(&einsatznummer)
     .bind(jahr)
     .bind(lfd)
+    .bind(daten.ort.adresse)
+    .bind(daten.ort.koordinate.map(|(lat, _)| lat))
+    .bind(daten.ort.koordinate.map(|(_, lon)| lon))
     .fetch_one(&mut *conn)
     .await?;
 
@@ -1406,6 +1420,7 @@ mod tests {
                 stichwort,
                 einsatzart: None,
                 begonnen_at: None,
+                ort: Default::default(),
             },
             ersteller_id,
         )
@@ -2442,22 +2457,38 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        // LFH-836: ein Zeichen mit Zeichenbeschreibung — die Beschreibung trägt nur Katalogwerte
+        // (Freitext lehnt der Server ab) und bleibt als Skelett, das Label fällt.
+        let spec = r#"{"v":1,"freestanding":{"kind":"state","state":"developed-fire"}}"#;
+        sqlx::query(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, zeichen_spec, label, erstellt_von) \
+             VALUES (?, ?, ?, ?, 'Fam. Meier', ?)",
+        )
+        .bind(einsatz.id)
+        .bind(50.2)
+        .bind(8.7)
+        .bind(spec)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
             .await
             .unwrap());
 
-        let (label, lat): (Option<String>, f64) =
-            sqlx::query_as("SELECT label, lat FROM freies_zeichen WHERE einsatz_id = ?")
-                .bind(einsatz.id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let zeilen: Vec<(Option<String>, f64, Option<String>)> = sqlx::query_as(
+            "SELECT label, lat, zeichen_spec FROM freies_zeichen WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(einsatz.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
         assert_eq!(
-            label, None,
-            "Freitext-Label (PII) muss nach Schwärzung NULL sein"
+            zeilen,
+            vec![(None, 50.1, None), (None, 50.2, Some(spec.to_string()))],
+            "Freitext-Label (PII) NULL, Position und Zeichenbeschreibung bleiben (Skelett)"
         );
-        assert_eq!(lat, 50.1, "operative Position bleibt erhalten (Skelett)");
     }
 
     #[tokio::test]
@@ -3768,6 +3799,7 @@ mod tests {
                 stichwort: None,
                 einsatzart: None,
                 begonnen_at: None,
+                ort: Default::default(),
             },
             leit,
             Utc::now(),
@@ -3951,6 +3983,7 @@ mod tests {
             stichwort: None,
             einsatzart: None,
             begonnen_at: None,
+            ort: Default::default(),
         };
 
         // Ohne Einstellung: Europe/Berlin.

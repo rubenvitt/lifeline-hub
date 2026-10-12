@@ -40,9 +40,23 @@ export const PRESSE_THEMA_MAX = 500;
 export const PRESSE_ANTWORT_MAX = 8_000;
 /** Ort und Kontakt des Geschädigten eines Schadens. */
 export const SCHADEN_ORT_MAX = 500;
+/** Einsatzort als Text (Adresse oder Freitext, LFH-1175). */
+export const EINSATZORT_MAX = 500;
 /** Beschreibung eines Schadens. */
 export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
 /** Netz und Sicherheit einer Sprechgruppe (Bedingungszeichen, LFH-1030). */
 export const SPRECHGRUPPE_BEDINGUNG_MAX = 40;
+/** Bezeichnung der eigenen Führungsstelle (LFH-1181). */
+export const FUEHRUNGSSTELLE_BEZEICHNUNG_MAX = 200;
+/** Adresse des Standorts der eigenen Führungsstelle (LFH-1181). */
+export const FUEHRUNGSSTELLE_ADRESSE_MAX = 500;
+/** Bezeichnung einer externen Stelle (Katalog, LFH-1194). */
+export const EXTERNE_STELLE_BEZEICHNUNG_MAX = 200;
+/** Rufnummer und Funkrufname einer externen Stelle. */
+export const EXTERNE_STELLE_KURZ_MAX = 100;
+/** Meldende Stelle eines Einsatzes (LFH-1194). */
+export const MELDENDE_STELLE_MAX = 200;
+/** Freitext eines externen Einsatzleiters an der eigenen Führungsstelle (LFH-1199). */
+export const EINSATZLEITER_NAME_MAX = 200;

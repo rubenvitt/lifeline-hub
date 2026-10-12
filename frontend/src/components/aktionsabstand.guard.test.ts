@@ -53,6 +53,9 @@ const MIT_NACHBARSCHAFT = [
   'stammdaten/KatalogVerwaltung.tsx',
   // Reihe Speichern + Auflösen(danger) in der sticky Aktionsleiste der Detailroute.
   'pages/EinheitDetailPage.tsx',
+  // Fuß der Rückfrage „Abschnitt … auflösen?“: Abbrechen neben dem roten „Abschnitt auflösen“
+  // (LFH-1212); „Auflösen“ selbst steht im Menü „Weitere Aktionen“.
+  'pages/EinsatzabschnittePage.tsx',
   // Dokumentenablage (LFH-656): „Bearbeiten“ neben „Entfernen“ (`danger`) in der Aktionsspalte.
   // Im Kartenzweig steht Entfernen im Menü; dessen Trenner prüft `Datensicht`.
   'pages/DokumentePage.tsx',
@@ -114,9 +117,6 @@ const BEWERTET_OHNE_SCANNER_DECKUNG = ['nachforderungen/NachforderungKarte.tsx']
 const OHNE_NACHBARSCHAFT = [
   'stammdaten/StichworteTab.tsx',
   'pages/MitgliederAbschnitt.tsx',
-  // „Auflösen“ (`danger`) steht allein unter dem Abschnittsdetail; „Bearbeiten“ daneben entfiel mit
-  // dem Bearbeiten an der Zeile (LFH-1208).
-  'pages/EinsatzabschnittePage.tsx',
   // „Zone aufheben“ (`danger`) steht allein in der äußeren Reihe des Inspectors, abgesetzt unter
   // den Feldern; die neutralen Knöpfe (Gefahrenmatrix, Sprung ins Fachmodul) stehen in der
   // inneren.

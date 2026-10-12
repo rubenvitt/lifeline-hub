@@ -1,5 +1,6 @@
 import type {
   Betreuungsstelle,
+  Fuehrungsstelle,
   Einheit,
   Einsatzabschnitt,
   EinsatzFahrzeug,
@@ -44,6 +45,7 @@ import { staerkeText } from '../../anzeige/staerke';
  */
 export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'einsatzort', name: 'Einsatzort' },
+  { key: 'fuehrungsstelle', name: 'Führungsstelle' },
   { key: 'einheit', name: 'Einheiten' },
   { key: 'fahrzeug', name: 'Fahrzeuge' },
   { key: 'fuehrung', name: 'Personal' },
@@ -65,6 +67,7 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
 export function ebenenFarbe(key: keyof LayerSichtbar, rollen: Farbrollen): string {
   switch (key) {
     case 'einsatzort':
+    case 'fuehrungsstelle':
       return rollen.marke;
     case 'zone':
     case 'schaden':
@@ -177,9 +180,9 @@ function personenZeile(
   ];
 }
 
-/** Zahl der verorteten Objekte für den Seitenkopf (ohne den Einsatzort-Anker). */
+/** Zahl der verorteten Objekte für den Seitenkopf (ohne die Anker Einsatzort und Führungsstelle). */
 export function verortetAnzahl(verortet: readonly Pick<KarteMarker, 'typ'>[]): number {
-  return verortet.filter((m) => m.typ !== 'einsatzort').length;
+  return verortet.filter((m) => m.typ !== 'einsatzort' && m.typ !== 'fuehrungsstelle').length;
 }
 
 // ── Ausgewählt ──
@@ -193,6 +196,8 @@ export interface AuswahlRoh {
   abschnitte: readonly Einsatzabschnitt[];
   /** Betreuungsstellen — leer ohne Modulrecht. */
   betreuungsstellen: readonly Betreuungsstelle[];
+  /** Eigene Führungsstelle (LFH-1181); fehlt sie, zeigt der Inspector nur den Sprung. */
+  fuehrungsstelle?: Fuehrungsstelle | null;
   /**
    * Letzte Rückmeldung je Einheit. Optional und bewusst ohne Leerwert: fehlt sie (lädt, 403,
    * Fehler, Historien-Modus), zeigt das Paneel den Block gar nicht — eine leere Menge hieße „nie
@@ -228,6 +233,7 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   fuehrung: 'Personal',
   abschnitt: 'Einsatzabschnitt',
   einsatzort: 'Einsatzort',
+  fuehrungsstelle: 'Führungsstelle',
   lagemeldung: 'Lagemeldung',
   freies_zeichen: 'Taktisches Zeichen',
   // Objektart-Wort für Personen-Marker.
@@ -285,6 +291,15 @@ export function auswahlRaster(
   const abschnittName = (id: number | null | undefined) =>
     id == null ? '—' : text(roh.abschnitte.find((a) => a.id === id)?.name);
   switch (marker.typ) {
+    case 'fuehrungsstelle': {
+      const fs = roh.fuehrungsstelle;
+      if (!fs) return [];
+      return [
+        { label: 'Art', wert: fs.art, mono: false },
+        { label: 'Adresse', wert: text(fs.standort_adresse), mono: false },
+        { label: 'Rufname', wert: text(fs.rufname) },
+      ];
+    }
     case 'einheit': {
       const e = roh.einheiten.find((x) => x.id === marker.id);
       if (!e) return [];

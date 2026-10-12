@@ -1,7 +1,7 @@
 {
   "name": "lifeline-hub-frontend",
   "private": true,
-  "version": "1.0.0-alpha.109",
+  "version": "1.0.0-alpha.110",
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "engines": {
@@ -19,14 +19,15 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "doku:bilder": "node scripts/doku-bilder.mjs"
+    "doku:bilder": "node scripts/doku-bilder.mjs",
+    "zeichen-werte": "node scripts/zeichen-werte.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
-    "@einsatzzeichen/core": "4.3.0",
-    "@einsatzzeichen/maplibre": "4.3.0",
-    "@einsatzzeichen/react": "4.3.0",
-    "@einsatzzeichen/schema": "4.3.0",
+    "@einsatzzeichen/core": "5.2.0",
+    "@einsatzzeichen/maplibre": "5.2.0",
+    "@einsatzzeichen/react": "5.2.0",
+    "@einsatzzeichen/schema": "5.2.0",
     "@simplewebauthn/browser": "14.0.0",
     "@tanstack/query-persist-client-core": "5.104.0",
     "@tanstack/react-query": "^5.104.0",
@@ -44,7 +45,6 @@
     "react-markdown": "^10.1.0",
     "react-router": "^8.4.0",
     "remark-gfm": "^4.0.1",
-    "taktische-zeichen-react": "^0.10.0",
     "terra-draw": "^1.35.0",
     "terra-draw-maplibre-gl-adapter": "^1.4.1"
   },
@@ -71,7 +71,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",
     "vite": "^8.3.2",
-    "vite-plugin-pwa": "^1.3.0",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.3",
     "workbox-window": "^7.4.1"
   }

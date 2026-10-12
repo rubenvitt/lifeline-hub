@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
@@ -83,6 +82,26 @@ function recordPatches(basis: Record<string, unknown>, aid = 5) {
     }),
   );
   return bodies;
+}
+
+/** Das offene Menü eines `MenueAusloeser` (`frontend/AGENTS.md`, „Aktionen“). */
+async function offenesMenue(): Promise<HTMLElement> {
+  let menue: HTMLElement | null = null;
+  await waitFor(() => {
+    menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(menue).not.toBeNull();
+  });
+  return menue as unknown as HTMLElement;
+}
+
+/** „Weitere Aktionen zu Abschnitt …“ öffnen und einen Eintrag wählen (LFH-1212). */
+async function weitereAktion(abschnitt: string, eintrag: string) {
+  await userEvent.click(
+    await screen.findByRole('button', { name: `Weitere Aktionen zu Abschnitt ${abschnitt}` }),
+  );
+  await userEvent.click(within(await offenesMenue()).getByText(eintrag));
 }
 
 function renderPage() {
@@ -531,8 +550,9 @@ describe('EinsatzabschnittePage', () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
     await userEvent.click(await findInTree('Nord'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
-    const rueckfrage = await offeneRueckfrage();
+    // Seit LFH-1212 steht „Auflösen“ im Menü „Weitere Aktionen“, die Rückfrage als Dialog.
+    await weitereAktion('Nord', 'Auflösen');
+    const rueckfrage = await screen.findByRole('dialog', { name: 'Abschnitt „Nord“ auflösen?' });
     expect(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' })).toHaveClass(
       'ant-btn-dangerous',
     );
@@ -958,8 +978,8 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
   }
   async function loeseAuf(name: string) {
     await userEvent.click(await findInTree(name));
-    await userEvent.click(await within(detail(name)).findByRole('button', { name: 'Auflösen' }));
-    const rueckfrage = await offeneRueckfrage();
+    await weitereAktion(name, 'Auflösen');
+    const rueckfrage = await screen.findByRole('dialog', { name: `Abschnitt „${name}“ auflösen?` });
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' }));
   }
 
@@ -1074,5 +1094,364 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(within(screen.getByRole('tree')).getByText('Nord'));
     await screen.findByRole('region', { name: 'Abschnitt: Nord' });
     expect(within(detail('Nord')).queryByRole('alert')).toBeNull();
+  });
+});
+
+/**
+ * Umhängen in der Gliederung (LFH-1212): per Zeiger (dnd-kit, `ZugPointerSensor`) und per Menü
+ * „Verschieben unter …“, mit Rückgängig im Toast und Live-Zufluss über die Schleuse.
+ */
+describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
+  const basis = {
+    einsatz_id: 1,
+    leiter_id: 3,
+    leiter_name: 'Leiter',
+    bemerkung: null,
+    sortier: 0,
+    sprechgruppen: [],
+  };
+  // Nord ── Nord-Ost; Süd
+  const nord = { ...basis, id: 5, name: 'Nord', ueber_abschnitt_id: null };
+  const nordOst = { ...basis, id: 7, name: 'Nord-Ost', ueber_abschnitt_id: 5 };
+  const sued = { ...basis, id: 6, name: 'Süd', ueber_abschnitt_id: null };
+  const zug = {
+    id: 10,
+    einsatz_id: 1,
+    abschnitt_id: 5,
+    name: '1. Zug',
+    typ_label: 'Zug',
+    ist_kumuliert: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+  };
+
+  /** Schreibt jeden PATCH mit; der Server antwortet mit dem Abschnitt bzw. der Einheit. */
+  function mitPatches(rolle = 'einsatzleitung') {
+    const abschnittPatches: { id: number; body: unknown }[] = [];
+    const einheitPatches: { id: number; body: unknown }[] = [];
+    server.use(
+      // Vor den Grund-Handlern: MSW nimmt den ersten passenden.
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug])),
+      ...handlers(rolle, 'aktiv', [nord, nordOst, sued]),
+      http.patch('/api/einsaetze/1/abschnitte/:aid', async ({ request, params }) => {
+        const body = await request.json();
+        abschnittPatches.push({ id: Number(params.aid), body });
+        return HttpResponse.json({ ...nordOst, ...(body as object) });
+      }),
+      http.patch('/api/einsaetze/1/einheiten/:eid', async ({ request, params }) => {
+        const body = await request.json();
+        einheitPatches.push({ id: Number(params.eid), body });
+        return HttpResponse.json({ ...zug, ...(body as object) });
+      }),
+    );
+    return { abschnittPatches, einheitPatches };
+  }
+
+  /** Ebene eines Knotens im antd-Baum (Zahl der Einzüge) und seine Stelle in der Folge. */
+  function knoten(name: string) {
+    const baum = screen.getByRole('tree');
+    const zeilen = [...baum.querySelectorAll<HTMLElement>('.ant-tree-treenode')];
+    const zeile = within(baum).getByText(name).closest('.ant-tree-treenode') as HTMLElement;
+    return {
+      ebene: zeile.querySelectorAll('.ant-tree-indent-unit').length,
+      stelle: zeilen.indexOf(zeile),
+    };
+  }
+
+  describe('Menü „Verschieben unter …“', () => {
+    it('nennt die gültigen Ziele, sperrt den jetzigen Ort und schickt genau einen PATCH', async () => {
+      const { abschnittPatches } = mitPatches();
+      renderPage();
+      await userEvent.click(await screen.findByText('Nord-Ost'));
+      // Gegenprobe zum Rechtefall unten: mit Schreibrecht trägt jeder Abschnitt einen Griff.
+      expect(document.querySelectorAll('[data-lfh="drag-handle"]')).toHaveLength(3);
+      await weitereAktion('Nord-Ost', 'Verschieben unter …');
+
+      const dialog = await screen.findByRole('dialog', { name: '„Nord-Ost“ verschieben unter …' });
+      expect(within(dialog).getByRole('button', { name: 'Oberste Ebene' })).toBeEnabled();
+      expect(within(dialog).getByRole('button', { name: 'Nord (jetziger Ort)' })).toBeDisabled();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Süd' }));
+
+      await waitFor(() =>
+        expect(abschnittPatches).toEqual([{ id: 7, body: { ueber_abschnitt_id: 6 } }]),
+      );
+      expect(await screen.findByText('„Nord-Ost“ unter „Süd“ verschoben')).toBeInTheDocument();
+      await waitFor(() => expect(knoten('Nord-Ost').stelle).toBeGreaterThan(knoten('Süd').stelle));
+      expect(knoten('Nord-Ost').ebene).toBe(1);
+      // Der Fokus kehrt zum Abschnitt zurück, an den Auslöser, von dem der Weg ausging.
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Weitere Aktionen zu Abschnitt Nord-Ost' }),
+        ).toHaveFocus(),
+      );
+    });
+
+    it('lässt den Abschnitt selbst und seine Unterabschnitte weg: ein Zyklus ist unwählbar', async () => {
+      mitPatches();
+      renderPage();
+      await userEvent.click(await findInTree('Nord'));
+      await weitereAktion('Nord', 'Verschieben unter …');
+
+      const dialog = await screen.findByRole('dialog', { name: '„Nord“ verschieben unter …' });
+      const ziele = within(dialog)
+        .getAllByRole('button')
+        .map((b) => b.textContent)
+        .filter((t) => t !== 'Abbrechen' && t !== '');
+      expect(ziele).toEqual(['Oberste Ebene (jetziger Ort)', 'Süd']);
+    });
+
+    it('Rückgängig im Toast schickt den alten Über-Abschnitt zurück', async () => {
+      const { abschnittPatches } = mitPatches();
+      renderPage();
+      await userEvent.click(await screen.findByText('Nord-Ost'));
+      await weitereAktion('Nord-Ost', 'Verschieben unter …');
+      const dialog = await screen.findByRole('dialog', { name: '„Nord-Ost“ verschieben unter …' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Oberste Ebene' }));
+      await screen.findByText('„Nord-Ost“ auf die oberste Ebene verschoben');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }));
+      await waitFor(() =>
+        expect(abschnittPatches).toEqual([
+          { id: 7, body: { ueber_abschnitt_id: null } },
+          { id: 7, body: { ueber_abschnitt_id: 5 } },
+        ]),
+      );
+    });
+
+    it('eine Ablehnung steht im Dialog, der Dialog bleibt offen, kein Toast', async () => {
+      mitPatches();
+      server.use(
+        http.patch('/api/einsaetze/1/abschnitte/:aid', () =>
+          HttpResponse.json({ error: 'Zyklus in der Abschnittshierarchie' }, { status: 422 }),
+        ),
+      );
+      renderPage();
+      await userEvent.click(await screen.findByText('Nord-Ost'));
+      await weitereAktion('Nord-Ost', 'Verschieben unter …');
+      const dialog = await screen.findByRole('dialog', { name: '„Nord-Ost“ verschieben unter …' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Süd' }));
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Zyklus in der Abschnittshierarchie',
+      );
+      // Der Dialog bleibt offen: seine Ziele stehen weiter zur Wahl.
+      expect(within(dialog).getByRole('button', { name: 'Süd' })).toBeEnabled();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('ohne Schreibrecht gibt es weder Griff noch Menü', async () => {
+      mitPatches('beobachter');
+      renderPage();
+      await userEvent.click(await screen.findByText('Nord-Ost'));
+      await screen.findByRole('region', { name: 'Abschnitt: Nord-Ost' });
+      expect(document.querySelector('[data-lfh="drag-handle"]')).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Weitere Aktionen zu Abschnitt/ })).toBeNull();
+    });
+  });
+
+  describe('Rückfrage „Auflösen“', () => {
+    it('löst den Abschnitt auf, für den sie geöffnet wurde, auch wenn das Detail darunter wechselt', async () => {
+      mitPatches();
+      const geloescht: string[] = [];
+      server.use(
+        http.delete('/api/einsaetze/1/abschnitte/:aid', ({ params }) => {
+          geloescht.push(String(params.aid));
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      const { client } = renderPage();
+      // Ohne Klick steht die Vorwahl im Detail: der erste oberste Abschnitt, Nord.
+      await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+      await weitereAktion('Nord', 'Auflösen');
+      const rueckfrage = await screen.findByRole('dialog', { name: 'Abschnitt „Nord“ auflösen?' });
+
+      // Ein anderer Arbeitsplatz hängt Nord unter Süd: die Vorwahl wird Süd.
+      act(() => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          { ...nord, ueber_abschnitt_id: 6 },
+          nordOst,
+          sued,
+        ]);
+      });
+      await screen.findByRole('region', { name: 'Abschnitt: Süd' });
+
+      await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abschnitt auflösen' }));
+      await waitFor(() => expect(geloescht).toEqual(['5']));
+    });
+  });
+
+  describe('Ziehen per Zeiger', () => {
+    const zeiger = { isPrimary: true, button: 0, pointerId: 1 };
+    const ZEILE = 40;
+
+    /**
+     * jsdom misst nichts: je Ziel ein Rechteck nach seiner Stelle im Baum, die Wurzelzone darunter.
+     * `pointerWithin` entscheidet dann nach den Koordinaten des Zeigers wie im Browser.
+     */
+    function messeZiele() {
+      return vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: Element,
+      ) {
+        const ziele = [...document.querySelectorAll('[data-lfh="gliederung-ziel"]')];
+        const i = ziele.indexOf(this);
+        const top =
+          i >= 0 ? i * ZEILE : this.matches('[data-lfh="gliederung-wurzel"]') ? 10 * ZEILE : -1;
+        if (top < 0) return new DOMRect(0, 0, 0, 0);
+        return new DOMRect(0, top, 300, ZEILE - 4);
+      });
+    }
+    const mitte = (name: string) => {
+      const ziel = within(screen.getByRole('tree'))
+        .getByText(name)
+        .closest('[data-lfh="gliederung-ziel"]') as HTMLElement;
+      const r = ziel.getBoundingClientRect();
+      return { clientX: r.left + 10, clientY: r.top + 10 };
+    };
+    const griff = (art: string, id: number) =>
+      document.querySelector(`[data-drag="drag-${art}-${id}"]`) as HTMLElement;
+
+    /** Greift, zieht über die Aktivierungsdistanz, fährt zum Ziel; `loslassen` beendet den Zug. */
+    function zieheBis(start: HTMLElement, ziel: { clientX: number; clientY: number }) {
+      fireEvent.pointerDown(start, { ...zeiger, clientX: 5, clientY: 5 });
+      act(() => {
+        fireEvent.pointerMove(document, { ...zeiger, clientX: 5, clientY: 15 });
+      });
+      act(() => {
+        fireEvent.pointerMove(document, { ...zeiger, ...ziel });
+      });
+      return () =>
+        act(() => {
+          fireEvent.pointerUp(document, { ...zeiger, ...ziel });
+        });
+    }
+
+    it('ein Abschnitt auf einen anderen wird sein Unterabschnitt; gesperrt sind er selbst und sein jetziger Ort', async () => {
+      const messung = messeZiele();
+      const { abschnittPatches } = mitPatches();
+      renderPage();
+      await screen.findByText('Nord-Ost');
+
+      const loslassen = zieheBis(griff('abschnitt', 7), mitte('Süd'));
+      const zustand = (name: string) =>
+        within(screen.getByRole('tree'))
+          .getByText(name)
+          .closest('[data-lfh="gliederung-ziel"]')
+          ?.getAttribute('data-ziel');
+      expect(zustand('Süd')).toBe('frei');
+      expect(zustand('Nord')).toBe('gesperrt');
+      expect(zustand('Nord-Ost')).toBe('gesperrt');
+      loslassen();
+
+      await waitFor(() =>
+        expect(abschnittPatches).toEqual([{ id: 7, body: { ueber_abschnitt_id: 6 } }]),
+      );
+      expect(await screen.findByText('„Nord-Ost“ unter „Süd“ verschoben')).toBeInTheDocument();
+      messung.mockRestore();
+    });
+
+    it('ein Abschnitt auf seinen eigenen Unterabschnitt schickt nichts', async () => {
+      const messung = messeZiele();
+      const { abschnittPatches } = mitPatches();
+      renderPage();
+      await screen.findByText('Nord-Ost');
+
+      zieheBis(griff('abschnitt', 5), mitte('Nord-Ost'))();
+      // Ein Tick für eine Mutation, die nicht kommen darf.
+      await act(async () => {});
+      expect(abschnittPatches).toEqual([]);
+      messung.mockRestore();
+    });
+
+    it('auf die Wurzelzone „Oberste Ebene“ setzt den Über-Abschnitt auf null', async () => {
+      const messung = messeZiele();
+      const { abschnittPatches } = mitPatches();
+      renderPage();
+      await screen.findByText('Nord-Ost');
+
+      const loslassen = zieheBis(griff('abschnitt', 7), { clientX: 10, clientY: 10 * ZEILE + 10 });
+      expect(await screen.findByText('Oberste Ebene')).toBeInTheDocument();
+      loslassen();
+
+      await waitFor(() =>
+        expect(abschnittPatches).toEqual([{ id: 7, body: { ueber_abschnitt_id: null } }]),
+      );
+      messung.mockRestore();
+    });
+
+    it('eine Einheit aus „Zugeordnete Einheiten“ auf einen Abschnitt ordnet sie ihm zu', async () => {
+      const messung = messeZiele();
+      const { einheitPatches } = mitPatches();
+      renderPage();
+      await userEvent.click(await findInTree('Nord'));
+      await screen.findByText('1. Zug');
+
+      zieheBis(griff('einheit', 10), mitte('Süd'))();
+
+      await waitFor(() => expect(einheitPatches).toEqual([{ id: 10, body: { abschnitt_id: 6 } }]));
+      expect(await screen.findByText('„1. Zug“ zu „Süd“ zugeordnet')).toBeInTheDocument();
+      messung.mockRestore();
+    });
+  });
+
+  describe('Live-Zufluss', () => {
+    it('ein fremder Umhang wartet unter dem Mauszeiger im Sammelbanner, „anzeigen“ übernimmt ihn', async () => {
+      mitPatches();
+      const { client } = renderPage();
+      await screen.findByText('Nord-Ost');
+      const bereich = document.querySelector('[data-lfh="gliederung-bereich"]') as HTMLElement;
+      fireEvent.pointerEnter(bereich, { pointerType: 'mouse' });
+      fireEvent.pointerMove(bereich, { pointerType: 'mouse' });
+      expect(await screen.findByText('Live pausiert')).toBeInTheDocument();
+
+      // Ein anderer Arbeitsplatz hängt Nord-Ost unter Süd.
+      act(() => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          nord,
+          { ...nordOst, ueber_abschnitt_id: 6 },
+          sued,
+        ]);
+      });
+      expect(await screen.findByText('1 umgehängt')).toBeInTheDocument();
+      expect(knoten('Nord-Ost').stelle).toBeLessThan(knoten('Süd').stelle);
+
+      await userEvent.click(screen.getByRole('button', { name: /anzeigen/ }));
+      await waitFor(() => expect(knoten('Nord-Ost').stelle).toBeGreaterThan(knoten('Süd').stelle));
+    });
+
+    it('„anzeigen“ lässt den Fokus im Bereich; wer ihn verlässt, taut die Schleuse', async () => {
+      mitPatches();
+      const { client } = renderPage();
+      await screen.findByText('Nord-Ost');
+      const bereich = document.querySelector('[data-lfh="gliederung-bereich"]') as HTMLElement;
+      fireEvent.pointerEnter(bereich, { pointerType: 'mouse' });
+      act(() => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          nord,
+          { ...nordOst, ueber_abschnitt_id: 6 },
+          sued,
+        ]);
+      });
+      await userEvent.click(await screen.findByRole('button', { name: /anzeigen/ }));
+
+      // Der Knopf ist weg; der Fokus fiel nicht auf <body>, die Standzeile hat ihn.
+      expect(document.activeElement).toBe(document.querySelector('[data-lfh="gliederung-stand"]'));
+      fireEvent.pointerLeave(bereich, { pointerType: 'mouse' });
+      // Ein Ziel außerhalb des Bereichs: die Zeile „Name“ des Details (LFH-1208).
+      act(() => screen.getByRole('button', { name: 'Name bearbeiten' }).focus());
+      expect(await screen.findByText('Live')).toBeInTheDocument();
+    });
+
+    it('ohne Zeiger und Fokus fließt der Umhang sofort', async () => {
+      mitPatches();
+      const { client } = renderPage();
+      await screen.findByText('Nord-Ost');
+      expect(screen.getByText('Live')).toBeInTheDocument();
+      act(() => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          nord,
+          { ...nordOst, ueber_abschnitt_id: 6 },
+          sued,
+        ]);
+      });
+      await waitFor(() => expect(knoten('Nord-Ost').stelle).toBeGreaterThan(knoten('Süd').stelle));
+    });
   });
 });

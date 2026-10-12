@@ -185,3 +185,17 @@ greift also nicht mehr. Damit erledigt sich der Befund „kein Verlassen-Schutz 
 
 Nur Frontend, keine Migration. Rückweg: Revert des PRs. Daten ändern sich nicht, Altwerte von
 `fortschritt` bleiben in der Datenbank.
+
+## Nachtrag (12.10.2026): Zusammenführung mit LFH-1212
+
+Während der PR offen war, kam LFH-1212 nach `alpha`: Umhängen per Ziehen oder „Verschieben
+unter …“, eine Schleuse für den Live-Zufluss der Gliederung und das Menü „Weitere Aktionen“ mit
+der Rückfrage zum Auflösen als Dialog. Beim Zusammenführen gilt:
+
+- **Über-Abschnitt** ist keine Zeile des Details mehr. Das Ticket sah vor, dass das Umhängen sie
+  ersetzt. Der Anlegen-Dialog behält das Feld (D6).
+- **Auflösen** nimmt den Weg aus LFH-1212: „Weitere Aktionen“ → „Auflösen“ → Rückfrage
+  „Abschnitt „…“ auflösen?“. Der eigene rote Knopf aus D1 entfällt; die Spec ist angepasst.
+- **Anlegen** übergibt den neuen Stand an die Schleuse (`zufluss.uebernehmen`), damit die
+  eigene Handlung nicht hinter dem Sammelbanner wartet; Auflösen nimmt den Abschnitt wie
+  zuvor sofort aus dem Cache.

@@ -436,6 +436,12 @@ describe('einsatzKeys (Factory-Output)', () => {
       'uhs:5',
     ]);
     expect(einsatzKeys.ortSuche(1, 'Hauptstraße 12')).toEqual(['ort-suche', 1, 'Hauptstraße 12']);
+    // Ortsfeld (LFH-1175): eigener Prefix, die Lagekarten-Suche fragt eine andere Route.
+    expect(einsatzKeys.einsatzortSuche(1, 'Hauptstraße 12')).toEqual([
+      'einsatzort-suche',
+      1,
+      'Hauptstraße 12',
+    ]);
     expect(einsatzKeys.ortVorschau(1, null, null, null)).toEqual([
       'ort-vorschau',
       1,
@@ -656,6 +662,7 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'einheit-typen',
         'etb-bausteine',
         'stichwort-vorschlaege',
+        'externe-stellen',
         'fuehrungsfunktionen',
         'organisation',
         // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
@@ -668,11 +675,13 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
     const qc = new QueryClient();
     qc.setQueryData(['personal', 'alle'], { wert: 1 });
     qc.setQueryData(['sprechgruppen', 'alle'], { wert: 1 });
+    qc.setQueryData(['externe-stellen', 'aktiv'], { wert: 1 });
     for (const key of ORG_STREAM_EVENTS.stammdaten) {
       void qc.invalidateQueries({ queryKey: [key] });
     }
     expect(qc.getQueryState(['personal', 'alle'])?.isInvalidated).toBe(true);
     expect(qc.getQueryState(['sprechgruppen', 'alle'])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['externe-stellen', 'aktiv'])?.isInvalidated).toBe(true);
   });
 });
 

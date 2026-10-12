@@ -82,7 +82,6 @@ describe('AbschnittDetail (LFH-1208)', () => {
     expect(labelsOf(ansicht.container)).toEqual([
       'Name',
       'Kurzbezeichnung',
-      'Über-Abschnitt',
       'Abschnittsleiter',
       'Lagezustand',
       'Abschnittsauftrag',
@@ -321,44 +320,6 @@ describe('AbschnittDetail (LFH-1208)', () => {
       erfuelle();
       await waitFor(() => expect(level('kritisch')).toHaveAttribute('aria-checked', 'true'));
       expect(onPatch).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('Über-Abschnitt', () => {
-    // Nord (5) mit Unterabschnitt UA Nord 1 (7), daneben Süd (6).
-    const ua = nord({ id: 7, name: 'UA Nord 1', ueber_abschnitt_id: 5, kurzbezeichnung: null });
-    const baum = [nord(), sued, ua];
-
-    it('ohne sich selbst und eigene Unterabschnitte; Süd geht als `ueber_abschnitt_id`', async () => {
-      const user = userEvent.setup();
-      const { onPatch } = renderDetail(nord(), { abschnitte: baum });
-      await user.click(screen.getByRole('button', { name: 'Über-Abschnitt eintragen' }));
-      await user.click(screen.getByRole('combobox', { name: 'Über-Abschnitt' }));
-      const liste = document.querySelector<HTMLElement>('.ant-select-dropdown')!;
-      await waitFor(() => expect(within(liste).getByTitle('Süd')).toBeInTheDocument());
-      expect(within(liste).queryByTitle('Nord')).toBeNull();
-      expect(within(liste).queryByTitle('UA Nord 1')).toBeNull();
-      await user.click(within(liste).getByTitle('Süd'));
-      await user.click(screen.getByRole('button', { name: 'Über-Abschnitt speichern' }));
-      await waitFor(() =>
-        expect(onPatch).toHaveBeenCalledWith('Über-Abschnitt', { ueber_abschnitt_id: 6 }),
-      );
-    });
-
-    it('Leeren macht ihn zum obersten Abschnitt: `null`', async () => {
-      const user = userEvent.setup();
-      const { onPatch } = renderDetail(ua, { abschnitte: baum });
-      const knopf = screen.getByRole('button', { name: 'Über-Abschnitt bearbeiten' });
-      expect(knopf).toHaveAccessibleDescription('Nord');
-      await user.click(knopf);
-      const feld = screen.getByRole('combobox', { name: 'Über-Abschnitt' });
-      await user.click(
-        feld.closest('.ant-select')!.querySelector<HTMLElement>('.ant-select-clear')!,
-      );
-      await user.click(screen.getByRole('button', { name: 'Über-Abschnitt speichern' }));
-      await waitFor(() =>
-        expect(onPatch).toHaveBeenCalledWith('Über-Abschnitt', { ueber_abschnitt_id: null }),
-      );
     });
   });
 

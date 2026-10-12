@@ -57,3 +57,9 @@ Begründung). Gerechnetes und aus dem Quelltext Geschlossenes trägt **[abgeleit
 Unter `md` steht die Gliederung über dem Detail (unverändert, `EinsatzabschnittePage.test.tsx`
 „stapelt unter md“). Das Datenraster gibt auf eine Spalte ab (`DATENRASTER_MINDESTBREITE`), die
 Segmentleiste bricht um (`flex-wrap`). [abgeleitet]
+
+## Nachtrag (12.10.2026): nach der Zusammenführung mit LFH-1212
+
+„Auflösen“ steht jetzt im Menü „Weitere Aktionen“ neben „Verschieben unter …“, die Rückfrage als
+Dialog (Kriterium 4 unverändert erfüllt). C12 misst statt des Knopfs „Auflösen“ den Auslöser
+„Weitere Aktionen“ und die Griffe zum Umhängen; der Beobachterzweig belegt, dass beide fehlen.

@@ -23,7 +23,7 @@ export interface ChecklistenVorlage {
 const LFS_BW = 'LFS-BW F5-I Kap. 5, S. 33–34';
 
 export const CHECKLISTE: readonly ChecklistenVorlage[] = [
-  { punkt: 'aufstellort', text: 'Aufstellort des ELW festgelegt', quelle: LFS_BW },
+  { punkt: 'aufstellort', text: 'Standort der Führungsstelle festgelegt', quelle: LFS_BW },
   { punkt: 'einweisung', text: 'Einweisung durch die Einsatzleitung erhalten', quelle: LFS_BW },
   { punkt: 'lageskizze', text: 'Lageskizze begonnen', quelle: LFS_BW },
   { punkt: 'funkarbeitsplaetze', text: 'Funkarbeitsplätze eingerichtet', quelle: LFS_BW },

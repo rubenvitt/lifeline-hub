@@ -108,6 +108,9 @@ Verlauf steht im Einsatztagebuch.
   festen Stand gibt es nur über „In Lagebericht übernehmen“.
 - Die sieben Punkte der „Arbeitsaufnahme“ sind fest. Kein Punkt wird aus anderen Modulen
   abgeleitet; abgehakt wird von Hand.
+- Der Punkt „Standort der Führungsstelle festgelegt“ zeigt Bezeichnung und Standort der eigenen
+  Führungsstelle aus den Einsatzdaten und verweist dorthin. Der Haken bleibt trotzdem offen,
+  bis jemand ihn setzt.
 
 ### Fälliger Termin
 

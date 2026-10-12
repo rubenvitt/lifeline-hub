@@ -1718,6 +1718,32 @@ export interface components {
          * @enum {string}
          */
         Einsatzart: "realeinsatz" | "uebung" | "sanitaetsdienst" | "bereitstellung";
+        /** @description Der Einsatzleiter, wie der Client ihn liest. */
+        EinsatzleiterAnzeige: {
+            art: components["schemas"]["EinsatzleiterArt"];
+            /**
+             * @description Bei `personal` der beim Setzen eingefrorene Name, bei `extern` der Freitext. Fehlt nur nach
+             *     der Schwärzung des Einsatzes.
+             */
+            name?: string | null;
+            /**
+             * Format: int64
+             * @description Die Dispositionszeile (`einsatz_personal.id`); fehlt bei `extern` und nach dem Entlassen.
+             */
+            personal_id?: number | null;
+            /**
+             * @description `false`, wenn die Person aus dem Einsatz entlassen ist (Name bleibt, `ON DELETE SET NULL`);
+             *     bei `extern` immer `false`.
+             */
+            personal_noch_disponiert: boolean;
+            /** @description Seit wann er die Einsatzleitung hat (UTC `YYYY-MM-DD HH:MM:SS`). */
+            seit: string;
+        };
+        /**
+         * @description Woher der Einsatzleiter kommt (LFH-1199). Wire == `as_str()`.
+         * @enum {string}
+         */
+        EinsatzleiterArt: "personal" | "extern";
         /** @description Eine Einsatzperiode einer Kraft. Offen, solange `ende_at` fehlt. */
         Einsatzperiode: {
             /** @description `alarmierung` oder `eintreffen`. */
@@ -2068,6 +2094,30 @@ export interface components {
             /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
         };
+        /** @description Eine externe Stelle des Katalogs. */
+        ExterneStelle: {
+            aktiv: boolean;
+            art: components["schemas"]["ExterneStelleArt"];
+            bezeichnung: string;
+            funkrufname?: string | null;
+            /** Format: int64 */
+            id: number;
+            rufnummer?: string | null;
+            /**
+             * @description Die zuständige Leitstelle der Organisation; höchstens eine, nur aktiv und Art
+             *     `leitstelle`.
+             */
+            zustaendig: boolean;
+        };
+        /**
+         * @description Art einer externen Stelle (Schema-Anker für die OpenAPI-Union, LFH-120). Bewusst nicht
+         *     die `Stellenart` des Kommunikationsplans: die beschreibt die Rolle im Plan und kennt weder
+         *     Polizei noch Hilfsorganisation (design.md D2).
+         *
+         *     Die Reihenfolge der Varianten ist die Anzeigereihenfolge der Gruppen.
+         * @enum {string}
+         */
+        ExterneStelleArt: "leitstelle" | "polizei" | "behoerde" | "hilfsorganisation" | "sonstige";
         /** @description Einheitlicher Umschlag für jede Fachebene. */
         FachebeneAntwort: {
             /**
@@ -2172,7 +2222,13 @@ export interface components {
              */
             lfd_nr?: number | null;
         };
-        /** @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170). */
+        /**
+         * @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).
+         *
+         *     Genau eine Form ist gesetzt (DB-CHECK, LFH-836): `zeichen_spec` (neu) ODER `grundzeichen` mit
+         *     den Overlays (Altform aus der Zeit vor LFH-836 bzw. von einem veralteten Client). Der Client
+         *     übersetzt die Altform beim Lesen (design.md D5).
+         */
         FreiesZeichenAnzeige: {
             /**
              * Format: int64
@@ -2189,7 +2245,8 @@ export interface components {
             farbe?: string | null;
             funktion?: string | null;
             geaendert_at: string;
-            grundzeichen: string;
+            /** @description Altform: fehlt bei einem Zeichen mit `zeichen_spec`. */
+            grundzeichen?: string | null;
             /** Format: int64 */
             id: number;
             label?: string | null;
@@ -2199,6 +2256,11 @@ export interface components {
             lon: number;
             organisation?: string | null;
             symbol?: string | null;
+            /**
+             * @description Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie
+             *     gesendet; fehlt bei einem Zeichen in Altform.
+             */
+            zeichen_spec?: string | null;
         };
         /**
          * @description Führungsfunktion aus dem Katalog. Wire == `as_str()`.
@@ -2241,8 +2303,19 @@ export interface components {
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
-        /** @description Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON. */
+        /**
+         * @description Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON; die Art steht
+         *     immer.
+         */
         FuehrungsstelleAnzeige: {
+            /**
+             * @description Ohne gespeicherte Zeile die Vorgabe `mobil`. Zählt nicht dafür, ob die Führungsstelle
+             *     erfasst ist (Spec `einsatz-fuehrungsstelle`).
+             */
+            art: components["schemas"]["FuehrungsstellenArt"];
+            /** @description Name der Stelle, z. B. „ELW 2 Musterstadt“ oder „TEL Rathaus“. */
+            bezeichnung?: string | null;
+            einsatzleiter?: components["schemas"]["EinsatzleiterAnzeige"] | null;
             /** @description Personenbezogen: wird geschwärzt und steht nie im Lagebericht. */
             erreichbarkeit?: string | null;
             /**
@@ -2260,7 +2333,26 @@ export interface components {
              *     Einheit.
              */
             sprechgruppen: components["schemas"]["SprechgruppeAnzeige"][];
+            /** @description Adresse des Standorts. Wird geschwärzt (kann eine Privatadresse sein). */
+            standort_adresse?: string | null;
+            /**
+             * Format: double
+             * @description Koordinate des Standorts, nur als Paar gesetzt. Wird mit der Adresse geschwärzt.
+             */
+            standort_lat?: number | null;
+            /**
+             * Format: double
+             * @description Länge zur Breite `standort_lat`, nur als Paar gesetzt.
+             */
+            standort_lon?: number | null;
         };
+        /**
+         * @description Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`
+         *     (Feuerwehrhaus, TEL im Rathaus). Nie leer, Vorgabe `mobil`; die CHECK-Liste in
+         *     `migrations/0179_einsatz_fuehrungsstelle_ort.sql` spiegelt `ALLE`.
+         * @enum {string}
+         */
+        FuehrungsstellenArt: "mobil" | "ortsfest";
         /**
          * @description Art der Führungsfunktion nach FwDV 100 Anlage 1 (Nr. 1.1.4/1.1.5). Aus dem Code
          *     abgeleitet, nie gespeichert und nie vom Client gesetzt.
@@ -3557,6 +3649,8 @@ export interface components {
          */
         OrtSucheZustand: "ok" | "ausgelastet" | "nicht_erreichbar";
         OrtTreffer: {
+            /** @description Kurzadresse „Straße Nr, PLZ Ort“, wenn der Geocoder die Teile liefert (LFH-1175). */
+            kurz?: string | null;
             /** Format: double */
             lat: number;
             /** Format: double */

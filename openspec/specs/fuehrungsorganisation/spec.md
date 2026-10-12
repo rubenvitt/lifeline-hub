@@ -125,11 +125,35 @@ es ohne Platzhalter.
 
 ### Requirement: Einsatzleitung und Stab
 
-Die Wurzel „Einsatzleitung“ SHALL „Leitung nicht erfasst“ zeigen, solange der Einsatz keine eigene
-Führungsstelle als Datum kennt. Ist das Modul Stab für die betrachtende Person freigegeben, SHALL
-neben der Wurzel eine Stabsstelle „Stab“ mit den besetzten Sachgebieten und ihrer Besetzung stehen.
-Ist der Stab nicht freigegeben oder seine Freigabe noch nicht ermittelt, MUST die Stabsstelle
-fehlen, und es MUST kein Name aus dem Stab erscheinen.
+Die Wurzel „Einsatzleitung“ SHALL den an der eigenen Führungsstelle erfassten Einsatzleiter mit
+seinem „seit“ zeigen, in derselben Darstellung wie die Kopfleiste der Einsatzdaten. Ist kein
+Einsatzleiter erfasst, SHALL sie „Leitung nicht erfasst“ zeigen. Kann die Führungsstelle nicht
+geladen werden, SHALL sie den Grund nennen. Die Wurzel MUST NOT eine Leitung aus der App-Rolle
+Einsatzleitung, aus der Stab-Besetzung oder aus anderen Daten ableiten.
+
+Die Übernahme in den Lagebericht SHALL unter „Einsatzleitung“ dieselbe Angabe tragen. Solange die
+Führungsstelle lädt, MUST die Übernahme gesperrt sein. Das gilt für beide Wege: „In Lagebericht
+übernehmen“ am Organigramm und „Aus Meldebild und Führungsorganisation übernehmen“.
+
+Ist das Modul Stab für die betrachtende Person freigegeben, SHALL neben der Wurzel eine Stabsstelle
+„Stab“ mit den besetzten Sachgebieten und ihrer Besetzung stehen. Ist der Stab nicht freigegeben
+oder seine Freigabe noch nicht ermittelt, MUST die Stabsstelle fehlen, und es MUST kein Name aus dem
+Stab erscheinen.
+
+#### Scenario: Einsatzleiter erfasst
+
+- **WHEN** an der Führungsstelle „Anna Schulz“ seit 111430 als Einsatzleiter erfasst ist
+- **THEN** zeigt die Wurzel „Einsatzleitung“ „Anna Schulz“ und „seit 111430“
+
+#### Scenario: Kein Einsatzleiter, aber App-Rolle
+
+- **WHEN** kein Einsatzleiter erfasst ist und ein Mitglied die Einsatzrolle Einsatzleitung trägt
+- **THEN** zeigt die Wurzel „Leitung nicht erfasst“ und keinen Namen
+
+#### Scenario: Übernahme mit Einsatzleiter
+
+- **WHEN** der Einsatzleiter „KBM Weber (extern)“ erfasst ist und die Person „In Lagebericht übernehmen“ wählt
+- **THEN** steht im neuen Lagebericht unter „Einsatzleitung“ „KBM Weber (extern)“ mit seinem „seit“, als Text und nicht als Markup
 
 #### Scenario: Stab freigegeben
 
@@ -300,3 +324,17 @@ Ausdruck fehlen.
 - **WHEN** ein neuer Abschnitt hinter dem Sammelbanner wartet und die Person „Drucken / als PDF“
   wählt
 - **THEN** enthält der Ausdruck den neuen Abschnitt, und weder Banner noch Standzeile stehen darauf
+
+### Requirement: Führungsstelle an der Wurzel
+Ist die eigene Führungsstelle erfasst, SHALL die Wurzel „Einsatzleitung“ ihre Bezeichnung und ihren
+Rufnamen zeigen, soweit gesetzt, am Bildschirm, im Druck und in der Übernahme in den Lagebericht
+gleich. „Leitung nicht erfasst“ MUST bleiben, denn die Führungsstelle nennt keine Person. Ist sie
+nicht erfasst oder ihr Abruf gescheitert, MUST die Wurzel aussehen wie ohne diese Anforderung.
+
+#### Scenario: Wurzel mit Führungsstelle
+- **WHEN** die Führungsstelle „ELW 2 Musterstadt“ mit Rufname „Florian Musterstadt 10/1“ erfasst ist
+- **THEN** zeigt die Wurzel „Einsatzleitung“, „ELW 2 Musterstadt“, „Florian Musterstadt 10/1“ und „Leitung nicht erfasst“
+
+#### Scenario: Führungsstelle ohne Bezeichnung
+- **WHEN** die Führungsstelle nur einen Rufnamen trägt
+- **THEN** zeigt die Wurzel den Rufnamen und keine erfundene Bezeichnung

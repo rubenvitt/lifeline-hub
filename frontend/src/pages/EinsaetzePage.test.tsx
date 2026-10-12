@@ -17,6 +17,15 @@ import { adminFixture } from '../test/fixtures';
 
 const admin = adminFixture();
 
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({ punkt }: { punkt: { lat: number; lon: number } | null }) => (
+    <div data-testid="kartenausschnitt">
+      {punkt ? `Karte ${punkt.lat}, ${punkt.lon}` : 'Nicht verortet'}
+    </div>
+  ),
+}));
+
 function einsatz(over: Partial<Record<string, unknown>> = {}) {
   return {
     id: 7,
@@ -101,7 +110,7 @@ describe('EinsaetzePage', () => {
     expect(Math.abs(gesendet.diff(dayjs.utc(), 'minute'))).toBeLessThanOrEqual(1);
   });
 
-  it('führt genau vier Felder — die Obergrenze einer Schnellerfassung', async () => {
+  it('führt fünf Felder — der Einsatzort ist das optionale fünfte (LFH-1175)', async () => {
     server.use(
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
@@ -111,10 +120,12 @@ describe('EinsaetzePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
     const dialog = await screen.findByRole('dialog');
 
-    for (const feld of ['Bezeichnung', 'Stichwort', 'Einsatzart', 'Alarmzeit']) {
+    for (const feld of ['Bezeichnung', 'Stichwort', 'Einsatzart', 'Alarmzeit', 'Einsatzort']) {
       expect(screen.getByLabelText(feld)).toBeInTheDocument();
     }
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(4);
+    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    // Der Ausschnitt erscheint erst nach der Wahl eines Treffers.
+    expect(screen.queryByTestId('kartenausschnitt')).toBeNull();
   });
 
   it('setzt den Fokus beim Öffnen ins erste Feld und sendet per Enter', async () => {
@@ -903,5 +914,87 @@ describe('EinsaetzePage — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(rumpf).not.toBeNull());
     expect(rumpf!.begonnen_at).toBe('2026-10-04 10:00:00');
+  });
+});
+
+/** LFH-1175, Spec `ortsfeld`, „Einsatzort beim Anlegen“. */
+describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
+  function aufbau() {
+    const rumpfe: Record<string, unknown>[] = [];
+    const begriffe: string[] = [];
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.post('/api/einsaetze', async ({ request }) => {
+        rumpfe.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
+      }),
+      http.get('/api/ort-suche', ({ request }) => {
+        begriffe.push(new URL(request.url).searchParams.get('q')!);
+        return HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            {
+              lat: 51.1,
+              lon: 10.4,
+              name: 'Bahnhofstraße 1, Musterstadt, 12345, Deutschland',
+              kurz: 'Bahnhofstraße 1, 12345 Musterstadt',
+            },
+          ],
+        });
+      }),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
+    );
+    return { rumpfe, begriffe };
+  }
+
+  async function dialogOeffnen() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd');
+  }
+
+  it('ein Treffer schickt Adresse und Koordinate mit, Enter im Feld legt nicht an', async () => {
+    const { rumpfe, begriffe } = aufbau();
+    await dialogOeffnen();
+    await userEvent.type(screen.getByLabelText('Einsatzort'), 'Bahnhofstraße 1{Enter}');
+    const liste = await screen.findByRole('list', { name: 'Treffer' });
+    expect(begriffe).toEqual(['Bahnhofstraße 1']);
+    expect(rumpfe).toEqual([]);
+    await userEvent.click(within(liste).getByRole('button', { name: /Bahnhofstraße 1, 12345/ }));
+    expect(screen.getByText('Karte 51.1, 10.4')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    expect(rumpfe[0]).toMatchObject({
+      bezeichnung: 'Sturm Süd',
+      einsatzort: 'Bahnhofstraße 1, 12345 Musterstadt',
+      einsatzort_lat: 51.1,
+      einsatzort_lon: 10.4,
+    });
+  });
+
+  it('Freitext schickt nur die Adresse', async () => {
+    const { rumpfe } = aufbau();
+    await dialogOeffnen();
+    await userEvent.type(screen.getByLabelText('Einsatzort'), 'Waldweg hinter Sportplatz');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    expect(rumpfe[0].einsatzort).toBe('Waldweg hinter Sportplatz');
+    expect(rumpfe[0]).not.toHaveProperty('einsatzort_lat');
+    expect(rumpfe[0]).not.toHaveProperty('einsatzort_lon');
+  });
+
+  it('leer schickt keinen Einsatzort', async () => {
+    const { rumpfe } = aufbau();
+    await dialogOeffnen();
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    for (const feld of ['einsatzort', 'einsatzort_lat', 'einsatzort_lon']) {
+      expect(rumpfe[0]).not.toHaveProperty(feld);
+    }
   });
 });

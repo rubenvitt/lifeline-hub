@@ -66,7 +66,7 @@ import { besatzungsUrteil, statusKategorie, type BesatzungsUrteil } from '../the
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
-import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
+import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 import { fmsEtikett } from '../kraefte/meldebildRaster';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
@@ -472,7 +472,7 @@ export default function FahrzeugePage() {
     efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null),
   );
   // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
-  const poolOptionen = demoGruppierteOptionen(
+  const poolOptionen = demoGroupedOptions(
     (poolQuery.data ?? []).filter((f) => !disponierteIds.has(f.id)),
     (f) => `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
   );

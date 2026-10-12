@@ -56,11 +56,15 @@ describe('baueMarkerFc', () => {
     expect(fc.features[0].properties.statusFarbe).toBe('#00ff00');
   });
 
-  it('setzt für freie Zeichen den Bildschlüssel des Altpakets (bis LFH-836)', () => {
+  it('setzt für freie Zeichen den ez|-Bildschlüssel des Leseadapters (LFH-836)', () => {
     const fc = baueMarkerFc([
-      mk({ schluessel: 'freies_zeichen-1', typ: 'freies_zeichen', tz: { grundzeichen: 'person' } }),
+      mk({
+        schluessel: 'freies_zeichen-1',
+        typ: 'freies_zeichen',
+        freiesZeichen: { grundzeichen: 'person' },
+      }),
     ]);
-    expect(fc.features[0].properties.icon?.startsWith('tz|')).toBe(true);
+    expect(fc.features[0].properties.icon).toBe('ez|{"v":1,"spec":{"kind":"person"}}');
   });
 
   it('lässt icon bei Lagemeldung (kein tz) weg → wird als Kreis gerendert', () => {
@@ -98,6 +102,24 @@ describe('baueEinsatzortFc', () => {
     ]);
     expect(fc.features.map((f) => f.properties.schluessel)).toEqual(['einsatzort']);
     expect(fc.features[0].properties.icon?.startsWith('ez|')).toBe(true);
+  });
+
+  it('trägt auch die Führungsstelle, nie im Cluster (LFH-1181)', () => {
+    const marker = [
+      mk({ schluessel: 'einsatzort', typ: 'einsatzort', tz: { grundzeichen: 'anlass' } }),
+      mk({
+        schluessel: 'fuehrungsstelle',
+        typ: 'fuehrungsstelle',
+        label: 'ELW 2',
+        tz: { grundzeichen: 'befehlsstelle' },
+      }),
+      mk({ schluessel: 'uhs-5' }),
+    ];
+    expect(baueEinsatzortFc(marker).features.map((f) => f.properties.schluessel)).toEqual([
+      'einsatzort',
+      'fuehrungsstelle',
+    ]);
+    expect(baueMarkerFc(marker).features.map((f) => f.properties.schluessel)).toEqual(['uhs-5']);
   });
 
   it('ist leer, wenn kein Einsatzort verortet ist', () => {

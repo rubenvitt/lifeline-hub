@@ -794,6 +794,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/ort-vorschau",
             get(routes::ort_vorschau::vorschau),
         )
+        // Ortssuche des Ortsfelds (LFH-1175): Recht der Einsatzdaten, kein Modul.
+        .route(
+            "/api/einsaetze/{id}/ort-suche",
+            get(routes::ort_suche::im_einsatz),
+        )
         .route(
             "/api/einsaetze/{id}/nachforderungen",
             get(routes::nachforderung::liste),
@@ -1494,6 +1499,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/org-modul-einstellungen/{modul_key}",
             put(routes::org_einstellungen::modul_einstellung_setzen),
+        )
+        // Ortssuche ohne Einsatz, für „Einsatz anlegen“ (LFH-1175).
+        .route("/api/ort-suche", get(routes::ort_suche::in_org))
+        .route(
+            "/api/externe-stellen",
+            get(routes::externe_stelle::list).post(routes::externe_stelle::create),
+        )
+        .route(
+            "/api/externe-stellen/{id}",
+            patch(routes::externe_stelle::update),
         )
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route(
