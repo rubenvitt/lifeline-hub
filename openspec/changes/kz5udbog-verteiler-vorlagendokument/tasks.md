@@ -103,7 +103,7 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 - [x] 5.3 Wächtertest: Keine Vorlage in `befehle/vorlagen.ts` und den Lagebericht-Vorlagen trägt
   den Schlüssel `verteiler`. Nachweis: Der Test ist grün, und mit einem Testschlüssel
   `verteiler` wird er rot.
-- [ ] 5.4 `lageberichte/LageberichtDetailPage.tsx`: Feld, Druckkopf und Lesefassung wie 5.1 und
+- [x] 5.4 `lageberichte/LageberichtDetailPage.tsx`: Feld, Druckkopf und Lesefassung wie 5.1 und
   5.2. Nachweis: Die entsprechenden Fälle in `LageberichtDetailPage.test.tsx` sind grün.
 - [ ] 5.5 e2e: In `e2e/druck-fluss.spec.ts` bekommt der Befehlsentwurf einen Verteiler, und der
   Ausdruck nennt ihn ohne Auswahlfeld. Nachweis: Die Spec ist in Chromium grün.
