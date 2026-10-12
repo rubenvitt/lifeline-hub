@@ -1,3 +1,27 @@
+## [1.0.0-alpha.115](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.114...v1.0.0-alpha.115) (2026-10-12)
+
+### Aufträge und Befehle
+
+- **Neue Ansicht mit Liste und Detailbereich:** Beide Reiter („Einzelaufträge“ und „Einsatzbefehle“) haben jetzt denselben Aufbau. Auf breiten Bildschirmen steht links die Liste und rechts das Detail. Das Detail bleibt beim Scrollen unter dem Kopfbereich stehen. Auf schmalen Geräten klappt das Detail direkt unter der gewählten Karte auf.
+- **Handlungen nur noch im Detail:** Quittieren, Vollzug melden, Abnehmen, Berichtigen und Aufheben macht man jetzt im Detail des gewählten Auftrags. Die Karten in der Liste haben keine Knöpfe mehr. Auch Rückgängig und Fehlermeldungen erscheinen im Detail. Die Karten in der Geräteansicht bleiben bedienbar wie bisher.
+- **Detail eines Auftrags:** Das Detail zeigt die Handlungen unter dem Auftragstext, die Empfänger, die Felder nach FwDV 100 und den Verlauf. Im Verlauf steht auch, wenn ein Auftrag aufgehoben wurde. Nach einer Handlung zeigt das Detail sofort den neuen Stand: Nach „Vollzug melden“ steht zum Beispiel „Abnehmen“ bereit.
+- **„Auftrag erteilen“ als Dialog:** Ein neuer Auftrag wird in einem Dialog erteilt, auch als Serie. „Berichtigen“ öffnet denselben Dialog mit dem bestehenden Auftrag.
+- **Übersichtliche Auftragsliste:** Im Bereich „Offen“ sind die Aufträge nach Fälligkeit gruppiert. Im Bereich „Abgeschlossen“ lassen sich ältere Aufträge nachladen. Ein Auftrag, der über einen Link geöffnet wurde, steht oben in der Liste. Bevor die ersten Daten da sind, zeigt die Liste keine irreführenden Anzahlen wie „Offen (0)“ mehr.
+- **Suche über alle Aufträge:** Die Suche findet Aufträge über die Kennung (#n), den Auftragstext und die Empfänger. Sie findet auch abgeschlossene Aufträge, die noch nicht nachgeladen sind, und die Kennzahlen berücksichtigen die Suche ebenfalls. Aufträge aus sehr frühen Versionen haben keine Nummer und lassen sich deshalb nicht über die Kennung finden. Wer einen Link zu einem Auftrag öffnet, sieht die Liste ohne gesetzte Filter und Suchbegriffe.
+- **Einsatzbefehle direkt im Detail lesen und bearbeiten:** Die Befehlsliste ist in „Entwürfe“ und „Freigegeben“ geteilt. Gibt es einen Entwurf, öffnet sich zuerst „Entwürfe“. Die Suche durchsucht Titel und Schema. Jede Karte zeigt den Zeitstand und die Versionsnummer. Im Detail lässt sich ein Befehl lesen, freigeben und fortschreiben. Die Vollansicht bleibt für das Entwerfen, den Druck und Links erreichbar. Auf dem Weg zurück aus der Vollansicht bleibt der Befehl in der Liste ausgewählt.
+- **Bedienung im Einsatz:**
+  - Ein Klick in das aufgeklappte Detail klappt es nicht mehr versehentlich zu.
+  - Ein Auftrag, der nach einer Handlung aus der Liste fällt, bleibt an seiner Stelle sichtbar und zeigt den neuen Stand.
+  - Ein über einen Link angesprungener Eintrag ist farblich klar von der eigenen Auswahl zu unterscheiden.
+  - Auf breiten Bildschirmen führt ein Link „Zum Detail“ von der gewählten Karte per Tastatur ins Detail.
+  - Liste, Detail und Sprunglinks sind groß genug, um sie auf schmalen Geräten auch mit Handschuhen zu treffen.
+- **Live-Aktualisierung:** Kommen neue Einträge an, bleibt die Liste ruhig, solange man darin arbeitet. Bei Änderungen in Echtzeit wird nur die betroffene Karte neu angezeigt.
+
+### Anwenderdokumentation
+
+- Das Kapitel „Aufträge und Befehle“ ist neu geschrieben, mit neuen Bildern. Es beschreibt: Auftrag im Dialog erteilen, Karte wählen und im Detail quittieren, Vollzug melden und abnehmen, Befehl im Detail lesen, Suche.
+- „Einen Einsatzbefehl lesen“ (für alle Rollen) und „Einen Einsatzbefehl freigeben und fortschreiben“ (für Einsatzleitung und Führungspersonal) sind jetzt getrennte Abschnitte.
+
 ## [1.0.0-alpha.114](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.113...v1.0.0-alpha.114) (2026-10-12)
 
 ### Wichtige Änderungen
