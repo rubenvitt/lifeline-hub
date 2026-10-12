@@ -2,7 +2,7 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 260
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/lageberichte/ketten.ts, frontend/src/lageberichte/AbschnittsAkkordeon.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, src/vorlagendokument/repo.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/lageberichte/ketten.ts, frontend/src/lageberichte/AbschnittsAkkordeon.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerFeld.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -41,14 +41,17 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 ### Einen Entwurf schreiben
 
 1. Den Entwurf öffnen. Die Abschnitte der Vorlage stehen untereinander; ein leerer trägt „(leer)“.
-2. Einen Abschnitt öffnen und den Text schreiben. Mit „Vorschau neben dem Text“ steht die
+2. Unter „Verteiler“ wählen, an wen der Bericht geht: Einsatzabschnitte, Einheiten, Funktionen
+   oder eigener Text. Externe Stellen wie die übergeordnete Führung kommen mit „Externe Stelle
+   hinzufügen“ dazu.
+3. Einen Abschnitt öffnen und den Text schreiben. Mit „Vorschau neben dem Text“ steht die
    gesetzte Fassung daneben.
-3. Im Lagevortrag zur Information den Knopf über dem Abschnitt wählen, um Inhalte zu übernehmen,
+4. Im Lagevortrag zur Information den Knopf über dem Abschnitt wählen, um Inhalte zu übernehmen,
    etwa „Aus Meldebild und Führungsorganisation übernehmen“ in „Eigene Lage“.
 
    ![Entwurf mit geöffnetem Abschnitt „Eigene Lage“, übernommenem Kräftemeldebild und Vorschau](../bilder/lageberichte/entwurf.png)
 
-4. „Entwurf speichern“ wählen. Oben steht danach „zuletzt gespeichert …“ mit der Uhrzeit.
+5. „Entwurf speichern“ wählen. Oben steht danach „zuletzt gespeichert …“ mit der Uhrzeit.
 
 ### Einen Lagebericht freigeben
 
@@ -67,7 +70,8 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
    ![Freigegebener Lagebericht mit Berichtstext und den Knöpfen „Fortschreiben“, „Zum ETB-Eintrag“ und „Drucken / als PDF“](../bilder/lageberichte/freigegeben.png)
 
 2. „Fortschreiben“ wählen. Es öffnet sich eine neue Fassung als Entwurf mit dem Text und den
-   Anlagen der freigegebenen; sie wird wie jeder Entwurf geschrieben und freigegeben.
+   Anlagen und dem Verteiler der freigegebenen; sie wird wie jeder Entwurf geschrieben und
+   freigegeben.
 
 ## Hintergrund
 
@@ -103,6 +107,14 @@ Die Freigabe ist endgültig: Der Text geht ins Einsatztagebuch, eine Korrektur g
 Fortschreibung. Die Fortschreibung ist eine neue Fassung mit demselben Titel; die Vorgänger
 bleiben freigegeben. Die Liste zeigt je Bericht die jüngste Fassung, die früheren sind über die
 Fassungszeile erreichbar.
+
+### Verteiler
+
+Der Verteiler ist freiwillig und fasst höchstens 50 Einträge; Personen und Fahrzeuge gehören
+nicht hinein. Jeder Eintrag behält den Namen, den er beim Speichern hatte, und eine Funktion
+nennt nie die Person, die sie besetzt. Bei der Freigabe steht der Verteiler im ETB-Eintrag als
+Empfänger („An“) und vollständig als Abschnitt „Verteiler“ am Ende des Textes; ohne Verteiler
+bleibt „System“ der Empfänger. Auf dem Papier steht er im Kopf des Blatts.
 
 ### Anlagen
 

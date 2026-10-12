@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs]
+quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerFeld.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs]
 ---
 
 ## Überblick
@@ -122,15 +122,18 @@ Für Einsatzleitung und Führungspersonal:
 1. Im Reiter „Einsatzbefehle“ „Befehl entwerfen“ wählen.
 2. Im Dialog „Neuer Befehlsentwurf“ ein „Schema“ wählen und einen „Titel“ eintragen, dann
    „Entwurf anlegen“. Die App öffnet den Entwurf.
-3. Die Abschnitte des Schemas ausfüllen. Neben jedem Feld zeigt die „Vorschau“ den gesetzten
+3. Unter „Verteiler“ wählen, an wen der Befehl geht: Einsatzabschnitte, Einheiten und
+   Funktionen stehen zur Auswahl, ein eigener Text gilt mit Enter oder Komma. Externe Stellen
+   kommen mit „Externe Stelle hinzufügen“ dazu, je Zeile mit Kategorie und Bezeichnung.
+4. Die Abschnitte des Schemas ausfüllen. Neben jedem Feld zeigt die „Vorschau“ den gesetzten
    Text.
 
    ![Befehlsentwurf mit Titel und den Abschnitten „Lage“, „Auftrag“ und „Durchführung“ samt Vorschau, darüber „Entwurf speichern“, „Freigeben“ und „Drucken / als PDF“](../bilder/auftraege-befehle/befehl-entwurf.png)
 
-4. „Entwurf speichern“ wählen oder einfach weiterarbeiten: Der Entwurf speichert sich alle 30
+5. „Entwurf speichern“ wählen oder einfach weiterarbeiten: Der Entwurf speichert sich alle 30
    Sekunden und beim Verlassen eines Feldes selbst; neben den Knöpfen steht „zuletzt gespeichert
    …“.
-5. Bei Bedarf „Fernmeldeskizze anfügen“ wählen. Die App nimmt die aktuelle Fernmeldeskizze als
+6. Bei Bedarf „Fernmeldeskizze anfügen“ wählen. Die App nimmt die aktuelle Fernmeldeskizze als
    Bild auf und hängt sie unter „Anlagen“ an. Das geht nur mit Verbindung und nur, wenn der Stab
    im Einsatz freigegeben ist ([Funkplan, Fernmeldeskizze und Kommunikationsplan](funkplan.md)).
 
@@ -141,7 +144,7 @@ Ein gespeicherter Entwurf öffnet sich wieder über den Reiter „Einsatzbefehle
 
 1. Im Reiter „Einsatzbefehle“ die Ansicht „Entwürfe“ oder „Freigegeben“ wählen, bei Bedarf im
    Suchfeld „Titel oder Schema“ suchen, und einen Befehl wählen. Er steht mit Schema, Zeitstand,
-   Ersteller, Freigabe und dem ganzen „Befehlstext“ neben bzw. unter der Liste.
+   Ersteller, Verteiler, Freigabe und dem ganzen „Befehlstext“ neben bzw. unter der Liste.
 
    ![Einsatzbefehle mit der Liste der Befehle links und dem gewählten Befehl rechts, darin „Entwurf bearbeiten“, „Freigeben“ und der Befehlstext](../bilder/auftraege-befehle/befehl-detail.png)
 
@@ -210,8 +213,22 @@ freigeben, fortschreiben und drucken.
 ### Befehle im Einsatztagebuch
 
 Mit der Freigabe schreibt der Befehl seinen vollständigen Text als „Anordnung“ ins ETB. Danach
-ist die Fassung eingefroren, auch ihre Anlagen. Eine Fortschreibung ist eine neue Fassung mit
-eigener Freigabe.
+ist die Fassung eingefroren, auch ihre Anlagen und ihr Verteiler. Eine Fortschreibung ist eine
+neue Fassung mit eigener Freigabe.
+
+### Verteiler
+
+Der Verteiler nennt, an wen ein Befehl geht. Er ist freiwillig und fasst höchstens 50 Einträge;
+doppelte Einträge fasst die App zu einem zusammen. Personen und Fahrzeuge gehören nicht in den
+Verteiler. Jeder Eintrag behält den Namen, den er beim Speichern hatte: ein später umbenannter
+oder aufgelöster Abschnitt steht weiter unter seinem alten Namen da, und eine Funktion nennt nie
+die Person, die sie gerade besetzt.
+
+Bei der Freigabe steht der Verteiler im ETB-Eintrag als Empfänger („An“), bei vielen Einträgen
+gekürzt auf „… und N weitere“, und vollständig als Abschnitt „Verteiler“ am Ende des Textes.
+Ohne Verteiler bleibt „System“ der Empfänger. Gedruckt steht der Verteiler im Kopf des Blatts,
+im Entwurf mit dem Stand im Formular, auch wenn er noch nicht gespeichert ist. Eine
+Fortschreibung übernimmt den Verteiler der freigegebenen Fassung.
 
 ## Grundlagen und Quellen
 

@@ -163,7 +163,8 @@ Aufgaben.
 Props, hält seinen Such-State selbst und baut die drei Optionsgruppen.
 
 - Die Kodierung (`abschnitt:<id>`, `einheit:<id>`, `funktion:…`, Freitext) und `baueEmpfaenger`
-  ziehen aus `auftragFormularKern.ts` in `fuehrung/empfaengerKern.ts` um.
+  ziehen aus `auftragFormularKern.ts` in `fuehrung/empfaengerKern.ts` um; die Funktion heißt dort
+  nach LFH-1312 `buildEmpfaenger`.
 - `AuftragFormular` nutzt die Komponente und bleibt aus Bediensicht gleich. Seine Tests laufen
   unverändert.
 - Für den umgekehrten Weg von gespeicherten Einträgen zu Tags gibt es `empfaengerTagsAus(...)`

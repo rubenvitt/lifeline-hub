@@ -9,6 +9,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   lageberichte.png       frontend/src/pages/LageberichtePage.tsx
  *   neuer-lagebericht.png  frontend/src/pages/LageberichtePage.tsx (Dialog „Neuer Lagebericht“)
  *   entwurf.png            frontend/src/pages/LageberichtDetailPage.tsx,
+ *                          frontend/src/entwurf/VerteilerFeld.tsx,
  *                          frontend/src/lageberichte/AbschnittsAkkordeon.tsx,
  *                          frontend/src/lageberichte/AbschnittUebernahme.tsx,
  *                          frontend/src/lageberichte/eigeneLageUebernahme.ts
@@ -40,6 +41,17 @@ async function entwurfAnlegen(page: Page, einsatzId: number): Promise<number> {
       ],
     },
   );
+  // Verteiler (LLH-1172): übergeordnete Führung und Einsatzleitung.
+  await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/lageberichte/${bericht.id}`, {
+    verteiler: [
+      {
+        empfaenger_typ: 'extern',
+        extern_kategorie: 'uebergeordnet',
+        extern_bezeichnung: 'Krisenstab Landkreis',
+      },
+      { empfaenger_typ: 'funktion', funktion: 'el' },
+    ],
+  });
   return bericht.id;
 }
 
