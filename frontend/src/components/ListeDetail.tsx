@@ -13,7 +13,6 @@ import {
 import { Augenbraue, useRollen } from './instrument';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from './SeitenZustand';
 import { useViewport } from './useViewport';
-import { useRahmenOben } from './rahmenOben';
 import { useDruckModus } from './druck/useDruckModus';
 import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAusschnitt';
 import { flachZufluss, useZuflussSchleuse, useZuflussSteuerung } from './useZuflussSchleuse';
@@ -204,7 +203,6 @@ export default function ListeDetail<T>({
   const { token } = useRollen();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
-  const rahmenOben = useRahmenOben();
   const druckt = useDruckModus();
   const detailId = useId();
   const liste = useRef<HTMLUListElement>(null);
@@ -519,7 +517,11 @@ export default function ListeDetail<T>({
       {/* Klebt unter dem Rahmen, damit das Detail beim Scrollen der Liste im Blick bleibt. */}
       <div
         data-lfh="liste-detail-spalte"
-        style={{ position: 'sticky', top: rahmenOben + token.margin, minWidth: 0 }}
+        style={{
+          position: 'sticky',
+          top: `calc(var(--lfh-rahmen-oben, 0px) + ${token.margin}px)`,
+          minWidth: 0,
+        }}
       >
         {detailFlaeche}
       </div>
