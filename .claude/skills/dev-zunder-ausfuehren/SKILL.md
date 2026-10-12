@@ -83,7 +83,7 @@ Rückfrage) mit `update_task` des Zunder-Connectors setzen — `task_id` und `st
 (Codes und Spur: `AGENTS.md`, Abschnitt „Zunder“). Diese Tabelle ist die einzige Stelle, die
 sagt, **wann** welcher Status gilt; `dev-zunder-orchestrieren` verweist hierher.
 
-| Moment | Status | Felder per `update_task` |
+| Moment | Status | Felder per `update_task`, Kommentar per `add_comment` |
 |---|---|---|
 | Arbeit beginnt (Schritt 1, nach `claim_task`) | `in_progress` | — |
 | Branch steht (Schritt 2) | — | `branch` |
@@ -92,14 +92,18 @@ sagt, **wann** welcher Status gilt; `dev-zunder-orchestrieren` verweist hierher.
 | Freigabe erteilt, `/opsx:apply` beginnt | `in_progress` | `plan` nachziehen |
 | PR gegen `alpha` offen (Schritt 4) | `review` | `pr_url` |
 | PR gemergt | `done` | — |
-| Task wird verworfen | `dropped` | Grund als `## Notizen`-Eintrag |
-| Harter Blocker, Session endet mit offener Frage | `blocked` | Frage als `## Notizen`-Eintrag |
+| Task wird verworfen | `dropped` | Kommentar: Grund |
+| Harter Blocker, Session endet mit offener Frage | `blocked` | Kommentar: die Frage |
+| Arbeit wartet sonst auf etwas oder jemanden (anderer Task, Mensch, Dienst) | `blocked` | Kommentar: worauf |
 
 Regeln dazu:
 
 - **Nur vorwärts** entlang `open → in_progress → review → done`. Steht der Task schon weiter
   (oder genau auf dem Ziel-Status), nicht zurücksetzen und nicht redundant neu schreiben.
   `blocked` verlassen ist kein Rückschritt.
+- **`blocked`** darf jederzeit gesetzt werden, wenn es nötig ist, nicht nur an den Stellen der
+  Tabelle; immer mit Kommentar, worauf gewartet wird. Löst sich der Blocker, zurück auf den
+  Status davor.
 - **Unabhängig vom Workspace.** Auch wenn der User den Branch-Switch (Schritt 2) ablehnt und
   ihr wo-ihr-seid weiterarbeitet, wird der Status gesetzt.
 - **`dropped`** nur, wenn der Task verworfen wird — nicht beim bloßen Pausieren/Abbrechen
@@ -107,7 +111,8 @@ Regeln dazu:
 - **Merge nachtragen:** Kein Dienst setzt nach dem Merge `done`. Steht ein Task beim Laden
   (Schritt 1) auf `review` und zeigt `gh pr view <pr_url> --json state` `MERGED`, zuerst auf
   `done` setzen.
-- Notizen an der Aufgabe: Verfahren in `AGENTS.md`, Abschnitt „Zunder“ (keine Kommentare).
+- Zwischenstände, Gründe und Fragen als Kommentar (`add_comment`), nie in die Beschreibung
+  (`AGENTS.md`, Abschnitt „Zunder“).
 
 ## Schritt 1: Task laden
 

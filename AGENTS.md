@@ -87,7 +87,7 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   `blocked` und `dropped` sind Seitenzustände. Wann welcher Status gilt, steht in
   `dev-zunder-ausfuehren`, Abschnitt „Board-Status mitführen“. Erledigte und verworfene
   Aufgaben fehlen nach 3 Tagen in `filter_tasks` (`include_closed: true`).
-- **Typen:** `aufgabe`, `bug`, `feature`. Keine Tags, Prioritäten, Zuständigen, Kommentare.
+- **Typen:** `aufgabe`, `bug`, `feature`. Keine Tags, Prioritäten, Zuständigen.
 - **Kennung einer Aufgabe:** die UUID. Branch `<typ>/<kurz>-<slug>` und Change-Name
   `<kurz>-<slug>`, wobei `<kurz>` die ersten 8 Hex-Zeichen der UUID sind (Beispiel
   `feat/60638201-release-flow`). Commit-Body und PR-Beschreibung tragen die Zeile
@@ -97,8 +97,10 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   umgeschrieben. Zunder kennt sie nicht als Feld: die importierte Aufgabe per `search` nach dem
   Titel finden (aus `git log --grep 'LFH-<n>'`); ihr Link lautet
   `https://zunder.rubeen.dev/#/clickup/<clickup_id>`.
-- **Notizen an einer Aufgabe** (statt Kommentar): erst `get_task`, dann `update_task` mit
-  `description` = bisherige Beschreibung + Abschnitt `## Notizen`, ein Eintrag je Datum.
+- **Kommentare statt Beschreibung bearbeiten:** Zwischenstände, Gründe, offene Fragen und
+  Notizen kommen per `add_comment` an die Aufgabe, nie in die `description`. Die Beschreibung
+  bleibt der Auftrag und ändert sich nur, wenn sich der Auftrag ändert. Ältere
+  `## Notizen`-Abschnitte bleiben stehen.
 - **Nie `delete_task`** (nicht rückgängig zu machen) — stattdessen `dropped`.
 
 ## Planung und Ausführung — OpenSpec und Superpowers (LFH-588)
