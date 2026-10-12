@@ -104,10 +104,10 @@ Repo-Wurzelverzeichnis.
 
 ## 5. Doku, e2e und Einsatztauglichkeit
 
-- [ ] 5.1 `e2e/chat-layout.spec.ts`: Statt `/Befehlsschema/` und „Ort / Wo“ öffnet die Spec
+- [x] 5.1 `e2e/chat-layout.spec.ts`: Statt `/Befehlsschema/` und „Ort / Wo“ öffnet die Spec
   „Ausführung: Mittel, Ziel, Weg, Zeit“ und erwartet „Ziel / Ort“. `grep -rn "Befehlsschema und
   Richtung" frontend/` trifft nichts mehr. Nachweis: die Spec ist grün.
-- [ ] 5.2 Kapitel `docs/anwender/kapitel/auftraege-befehle.md`:
+- [x] 5.2 Kapitel `docs/anwender/kapitel/auftraege-befehle.md`:
   - „Einen Auftrag erteilen“ in der neuen Reihenfolge, mit beiden Klappteilen und dem Weg
   - unter „Grundlagen und Quellen“ die EA/ZMW-Vorlage als „nur noch für bestehende Befehle“, mit
     Verweis auf den Auftrag
@@ -115,12 +115,12 @@ Repo-Wurzelverzeichnis.
 
   Regeln aus `docs/anwender/AGENTS.md`. Nachweis: Der Wächter der Anwenderdoku
   (`hilfe/anwenderdoku.guard.test.ts`) ist grün.
-- [ ] 5.3 `e2e/doku-bilder/auftraege-befehle.bilder.ts`: `auftrag-erteilen` zeigt die neue Folge
+- [x] 5.3 `e2e/doku-bilder/auftraege-befehle.bilder.ts`: `auftrag-erteilen` zeigt die neue Folge
   (Empfänger oben). Bilder neu erzeugen mit `pnpm doku:bilder --grep auftraege-befehle`, auch die
   dunkle Fassung, und den Alt-Text im Kapitel anpassen. Nachweis: Die Bilder liegen neu unter
   `docs/anwender/bilder/auftraege-befehle/`. Trägt der Container den Bildlauf nicht, steht das
   mit Grund hier, und der Lauf folgt in der CI bzw. lokal.
-- [ ] 5.4 `pruefliste.md` (neben dieser Datei) mit der Prüfliste Einsatztauglichkeit für das
+- [x] 5.4 `pruefliste.md` (neben dieser Datei) mit der Prüfliste Einsatztauglichkeit für das
   umgebaute Auftragsformular. Es sind 15 Kriterien, jedes mit Verdikt, dazu Handschuh-Dichte und
   mobil (390 px, Zeilen stapeln). Nachweis: die Datei ist vollständig, ohne „nicht geprüft“.
 
