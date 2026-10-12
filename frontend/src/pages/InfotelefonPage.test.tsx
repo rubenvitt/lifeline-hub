@@ -225,11 +225,11 @@ describe('InfotelefonPage auf dem Handschirm (LFH-1067)', () => {
 
 /** Schnellaktion „Anruf erfassen“ (LLH-1127): `?neu=1` setzt den Fokus in die Erfassung. */
 describe('InfotelefonPage · ?neu=1', () => {
-  function Ort() {
+  function LocationProbe() {
     const ort = useLocation();
     return <output data-testid="ort">{ort.search}</output>;
   }
-  function setupMitOrt(route: string) {
+  function setupWithLocation(route: string) {
     return renderMitProviders(
       <Routes>
         <Route
@@ -237,7 +237,7 @@ describe('InfotelefonPage · ?neu=1', () => {
           element={
             <>
               <InfotelefonPage />
-              <Ort />
+              <LocationProbe />
             </>
           }
         />
@@ -247,14 +247,14 @@ describe('InfotelefonPage · ?neu=1', () => {
   }
 
   it('fokussiert das Anliegen und räumt den Auftrag aus der Adresse', async () => {
-    setupMitOrt('/einsaetze/1/stab/infotelefon?neu=1');
+    setupWithLocation('/einsaetze/1/stab/infotelefon?neu=1');
     const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
     await waitFor(() => expect(anliegen).toHaveFocus());
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
   });
 
   it('lässt ohne Auftrag den Fokus, wo er ist', async () => {
-    setupMitOrt('/einsaetze/1/stab/infotelefon');
+    setupWithLocation('/einsaetze/1/stab/infotelefon');
     const anliegen = await screen.findByRole('combobox', { name: 'Anliegen' });
     await screen.findByText('Sperrung B 3');
     expect(anliegen).not.toHaveFocus();
@@ -262,7 +262,7 @@ describe('InfotelefonPage · ?neu=1', () => {
 
   it('räumt den Auftrag auch ohne Schreibrecht, ohne eine Erfassung zu zeigen', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
-    setupMitOrt('/einsaetze/1/stab/infotelefon?neu=1');
+    setupWithLocation('/einsaetze/1/stab/infotelefon?neu=1');
     await screen.findByText('Sperrung B 3');
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
     expect(screen.queryByRole('combobox', { name: 'Anliegen' })).toBeNull();
@@ -270,7 +270,7 @@ describe('InfotelefonPage · ?neu=1', () => {
 
   it('räumt den Auftrag bei gesperrtem Stab und zeigt keine Daten', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
-    setupMitOrt('/einsaetze/1/stab/infotelefon?neu=1');
+    setupWithLocation('/einsaetze/1/stab/infotelefon?neu=1');
     await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^$/));
     expect(screen.queryByRole('combobox', { name: 'Anliegen' })).toBeNull();
     expect(ladeAnrufe).not.toHaveBeenCalled();

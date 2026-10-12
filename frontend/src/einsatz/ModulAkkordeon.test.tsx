@@ -149,4 +149,18 @@ describe('ModulAkkordeon · Stab-Marken', () => {
       'Kommunikationsplan',
     ]);
   });
+
+  it('sperrt sie im Drawer mit dem Stab und lässt sie mit ausgeblendetem Stab weg', () => {
+    const { unmount } = zeige({
+      offeneKategorie: 'fuehrung',
+      freigaben: freigabenFixture({ stab: { zugriff: false } }),
+    });
+    expect(screen.getByRole('button', { name: /^Funkplan, springt zu/ })).toBeDisabled();
+    unmount();
+    zeige({
+      offeneKategorie: 'fuehrung',
+      freigaben: freigabenFixture({ stab: { sichtbar: false, zugriff: false } }),
+    });
+    expect(screen.queryByRole('button', { name: /^Funkplan, springt zu/ })).toBeNull();
+  });
 });

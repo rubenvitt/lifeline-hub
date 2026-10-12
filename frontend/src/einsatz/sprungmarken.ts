@@ -62,14 +62,14 @@ const STAB_SCHLAGWORTE: Record<string, string[]> = {
 function stabMarken(): Sprungmarke[] {
   const marken: Sprungmarke[] = [];
   let nach = 'stab';
-  const haenge = (marke: Omit<Sprungmarke, 'kategorie' | 'zielModul' | 'nach'>) => {
+  const append = (marke: Omit<Sprungmarke, 'kategorie' | 'zielModul' | 'nach'>) => {
     marken.push({ ...marke, kategorie: 'fuehrung', zielModul: 'stab', nach });
     nach = marke.key;
   };
   for (const { sachgebiet, kuerzel } of SACHGEBIETE) {
     const sg = kuerzel.toLowerCase();
     for (const seite of unterseitenFuer(sachgebiet)) {
-      haenge({
+      append({
         key: seite.key,
         label: seite.label,
         hinweis: `Stab · ${seite.label}`,
@@ -77,7 +77,7 @@ function stabMarken(): Sprungmarke[] {
         pfad: seite.pfad,
       });
       if (seite.key === 'funkplan') {
-        haenge({
+        append({
           key: 'fernmeldeskizze',
           label: 'Fernmeldeskizze',
           hinweis: 'Funkplan · Skizze',
@@ -164,17 +164,17 @@ type NavZeile = { art: 'modul'; modul: ModulEintrag } | { art: 'sprung'; marke: 
 export function navZeilen(module: ModulEintrag[], marken: Sprungmarke[]): NavZeile[] {
   const zeilen: NavZeile[] = [];
   const offen = new Set(marken);
-  const haengeAn = (anker: string) => {
+  const appendAn = (anker: string) => {
     for (const marke of marken) {
       if (!offen.has(marke) || marke.nach !== anker) continue;
       offen.delete(marke);
       zeilen.push({ art: 'sprung', marke });
-      haengeAn(marke.key);
+      appendAn(marke.key);
     }
   };
   for (const modul of module) {
     zeilen.push({ art: 'modul', modul });
-    haengeAn(modul.key);
+    appendAn(modul.key);
   }
   for (const marke of marken) {
     if (offen.has(marke)) zeilen.push({ art: 'sprung', marke });

@@ -64,4 +64,5 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   `Outlet`-Context weiter.
   Stab-Unterseiten (`stab/unterseiten.ts`) gehören zum Träger `stab`; zeigt eine Zeile auf
   `…/stab/<unterseite>`, muss genau diese Seite den Parameter lesen, nicht die Stab-Seite
-  („Anruf erfassen“ → `InfotelefonPage.tsx`, LLH-1127).
+  („Anruf erfassen“ → `InfotelefonPage.tsx`, LLH-1127); ein Ziel auf den Stab selbst deckt nur
+  `StabPage.tsx`.

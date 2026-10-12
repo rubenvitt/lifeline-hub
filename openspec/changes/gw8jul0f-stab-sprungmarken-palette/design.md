@@ -82,14 +82,16 @@ die Rangfunktion.
 `neu`, Kennung `infotelefon-anruf`, Pfad `infotelefonPfad(id, { neu: true })` (Builder bekommt
 `neu`), Schlagworte „anruf“, „bürgertelefon“, „hotline“, „infotelefon“, „informationstelefon“.
 `InfotelefonPage` liest `searchParams.get('neu') === '1'`, fokussiert das erste Feld der
-Erfassung (`AnrufErfassung` reicht einen Fokus-Griff heraus) und räumt den Parameter
+Erfassung (Zähler-Prop `focusRequest` an `AnrufErfassung`; nur ein neuer Wert fokussiert, ein
+Neu-Einhängen nicht) und räumt den Parameter
 (apply-then-clean, Muster `StabPage`/`EtbPage`). Fokus erst, wenn die Stab-Freigabe `frei` ist.
 
 **D7 Guard kennt Stab-Unterseiten.** `modulZuLeserDatei` ordnet eine Datei, deren Basisname
 einem Schlüssel aus `stab/unterseiten.ts` entspricht (`InfotelefonPage.tsx` → `infotelefon`),
 dem Modul `stab` zu. Die Deckungsprüfung wird schärfer: liegt das Ziel einer Schnellaktion
 unter `…/stab/<unterseite>`, MUSS der Leser in der Datei dieser Unterseite stehen, nicht
-irgendwo im Stab. Verworfen: Leser im `StabPage` als Deckung gelten lassen — die Schnellaktion
+irgendwo im Stab; umgekehrt deckt eine Unterseite nie ein Ziel auf den Stab selbst
+(„Lagebesprechung abschließen“ braucht den Leser in `StabPage.tsx`, `findCoveringFiles`). Verworfen: Leser im `StabPage` als Deckung gelten lassen — die Schnellaktion
 liefe ins Leere, ohne dass ein Test rot wird (genau was der Guard verhindern soll).
 
 **D8 Regeln.** `frontend/AGENTS.md` (LFH-620-Absatz): Stab-Unterseiten als Marken, Marken stehen

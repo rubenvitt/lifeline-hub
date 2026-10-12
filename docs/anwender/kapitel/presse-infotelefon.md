@@ -2,7 +2,7 @@
 titel: Presse und Infotelefon
 gruppen: [fuehrung]
 reihenfolge: 450
-quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs]
+quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick

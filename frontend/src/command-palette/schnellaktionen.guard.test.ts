@@ -122,7 +122,7 @@ const LESER = new Map<SchnellaktionParameter, Leser[]>(
 const normal = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Basisname einer Datei in Vergleichsform, ohne Endung und ohne `Page` (`InfotelefonPage.tsx` → `infotelefon`). */
-const dateiBasis = (pfad: string): string =>
+const fileBase = (pfad: string): string =>
   normal((pfad.split('/').pop() ?? '').replace(/\.tsx?$/, '')).replace(/page$/, '');
 
 /** Die Schlüssel der Stab-Unterseiten in Vergleichsform. */
@@ -134,11 +134,7 @@ const STAB_UNTERSEITEN = new Set(
  * Die Stab-Unterseite, auf die ein Ziel zeigt (`/einsaetze/1/stab/infotelefon?neu=1` →
  * `infotelefon`), oder `null`. Nur für den Träger `stab`.
  */
-export function stabUnterseiteVonZiel(
-  modulKey: string,
-  ziel: string,
-  basis: string,
-): string | null {
+export function findStabUnterseite(modulKey: string, ziel: string, basis: string): string | null {
   if (modulKey !== 'stab') return null;
   const [pfadTeil] = ziel.split('?');
   if (!pfadTeil.startsWith(`${basis}/`)) return null;
@@ -147,12 +143,29 @@ export function stabUnterseiteVonZiel(
 }
 
 /**
+ * Die Leser-Dateien eines Trägermoduls, die einen Eintrag DECKEN (Kopfkommentar, Stab-Unterseiten):
+ * zeigt das Ziel auf eine Stab-Unterseite, nur deren Seite; zeigt es auf den Stab selbst, nur
+ * Dateien, die keine Unterseite sind — sonst deckte das Informationstelefon die Lagebesprechung.
+ */
+export function findCoveringFiles(
+  modulKey: string,
+  ziel: string,
+  basis: string,
+  dateien: readonly string[],
+): string[] {
+  const unterseite = findStabUnterseite(modulKey, ziel, basis);
+  if (unterseite) return dateien.filter((pfad) => fileBase(pfad) === unterseite);
+  if (modulKey === 'stab') return dateien.filter((pfad) => !STAB_UNTERSEITEN.has(fileBase(pfad)));
+  return [...dateien];
+}
+
+/**
  * Modulschlüssel zu einer Leser-Datei über ihren Dateinamen (`pages/PersonenPage.tsx` →
  * `personen`). Verglichen gegen Schlüssel UND Route, weil beide auseinanderfallen können
  * (`gefahrenzonen` hat die Route `gefahren`).
  */
 export function modulZuLeserDatei(pfad: string): string[] {
-  const basis = dateiBasis(pfad);
+  const basis = fileBase(pfad);
   if (!basis) return [];
   if (STAB_UNTERSEITEN.has(basis)) return ['stab'];
   return modulRegistry
@@ -221,12 +234,23 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
     expect(modulZuLeserDatei('/src/pages/FunkplanPage.tsx')).toEqual(['stab']);
     expect(modulZuLeserDatei('/src/pages/StabPage.tsx')).toEqual(['stab']);
     const basis = '/einsaetze/1/stab';
-    expect(stabUnterseiteVonZiel('stab', `${basis}/infotelefon?neu=1`, basis)).toBe('infotelefon');
-    expect(stabUnterseiteVonZiel('stab', `${basis}?neu=1`, basis)).toBeNull();
-    expect(stabUnterseiteVonZiel('stab', `${basis}/unbekannt?neu=1`, basis)).toBeNull();
+    expect(findStabUnterseite('stab', `${basis}/infotelefon?neu=1`, basis)).toBe('infotelefon');
+    expect(findStabUnterseite('stab', `${basis}?neu=1`, basis)).toBeNull();
+    expect(findStabUnterseite('stab', `${basis}/unbekannt?neu=1`, basis)).toBeNull();
     expect(
-      stabUnterseiteVonZiel('etb', '/einsaetze/1/etb/infotelefon', '/einsaetze/1/etb'),
+      findStabUnterseite('etb', '/einsaetze/1/etb/infotelefon', '/einsaetze/1/etb'),
     ).toBeNull();
+    // Selbstbeweis der Deckung: kein Leser der falschen Seite deckt.
+    const stabSeite = '/src/pages/StabPage.tsx';
+    const infotelefon = '/src/pages/InfotelefonPage.tsx';
+    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [infotelefon])).toEqual([]);
+    expect(findCoveringFiles('stab', `${basis}/funkplan?neu=1`, basis, [stabSeite])).toEqual([]);
+    expect(
+      findCoveringFiles('stab', `${basis}/infotelefon?neu=1`, basis, [stabSeite, infotelefon]),
+    ).toEqual([infotelefon]);
+    expect(findCoveringFiles('stab', `${basis}?neu=1`, basis, [stabSeite, infotelefon])).toEqual([
+      stabSeite,
+    ]);
   });
 
   it('prüft das Ziel je Parameter', () => {
@@ -286,23 +310,15 @@ describe('Schnellaktionen-Guard: Deckung', () => {
     for (const a of SCHNELLAKTIONEN) {
       const leser = LESER.get(a.parameter) ?? [];
       const module = LESER_MODULE.get(a.parameter) ?? new Map<string, string[]>();
-      expect(
-        module.get(a.modulKey) ?? [],
-        `Schnellaktion „${a.label}" zeigt auf das Modul '${a.modulKey}', aber KEINE Seite dieses ` +
-          `Moduls liest ?${a.parameter}. Gefundene Leser:\n${leser.map(zeige).join('\n')}\n` +
-          `Zugeordnet: ${[...module].map(([k, v]) => `${k} ← ${v.join(', ')}`).join(' | ')}`,
-      ).not.toHaveLength(0);
-      // Stab-Unterseite: der Leser muss auf genau dieser Seite stehen (Kopfkommentar).
       const m = modulRegistry.find((x) => x.key === a.modulKey)!;
       const basis = einsatzModulPfad(4711, modulZielRoute(m));
-      const unterseite = stabUnterseiteVonZiel(a.modulKey, a.pfad(4711), basis);
-      if (unterseite) {
-        expect(
-          (module.get(a.modulKey) ?? []).filter((pfad) => dateiBasis(pfad) === unterseite),
-          `Schnellaktion „${a.label}" zeigt auf die Stab-Unterseite '${unterseite}', aber deren Seite ` +
-            `liest ?${a.parameter} nicht`,
-        ).not.toHaveLength(0);
-      }
+      expect(
+        findCoveringFiles(a.modulKey, a.pfad(4711), basis, module.get(a.modulKey) ?? []),
+        `Schnellaktion „${a.label}" (${a.pfad(4711)}) zeigt auf das Modul '${a.modulKey}', aber ` +
+          `KEINE Seite dieses Ziels liest ?${a.parameter}. Gefundene Leser:\n` +
+          `${leser.map(zeige).join('\n')}\n` +
+          `Zugeordnet: ${[...module].map(([k, v]) => `${k} ← ${v.join(', ')}`).join(' | ')}`,
+      ).not.toHaveLength(0);
     }
   });
 

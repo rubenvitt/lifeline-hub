@@ -596,6 +596,8 @@ describe('ModulListe — Stab-Marken', () => {
     for (const label of STAB_MARKEN) {
       const knopf = screen.getByRole('button', { name: new RegExp(`^${label}, springt zu`) });
       expect(knopf, label).toBeDisabled();
+      expect(knopf, label).toHaveAttribute('title', 'Keine Berechtigung');
+      expect(knopf.querySelector('[data-lfh-icon="schloss"]'), label).not.toBeNull();
       await userEvent.click(knopf);
     }
     expect(klick).not.toHaveBeenCalled();

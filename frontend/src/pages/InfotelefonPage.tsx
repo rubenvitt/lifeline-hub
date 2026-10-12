@@ -87,7 +87,7 @@ export default function InfotelefonPage() {
   const { fokusInLeiste, leistenFokus } = useFokusInLeiste();
   const [anliegenOffen, setAnliegenOffen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [fokusAuftrag, setFokusAuftrag] = useState(0);
+  const [focusRequest, setFocusRequest] = useState(0);
   const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   // Zufluss-Schleuse (Muster ETB-Zeitachse): eingefroren, solange der Fokus in der Liste liegt.
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
@@ -128,7 +128,7 @@ export default function InfotelefonPage() {
     if (stabFreigabe.zustand === 'laden') return;
     if (frei && einsatzQuery.isLoading) return;
     if (frei && einsatzQuery.data && darfImEinsatzSchreiben(einsatzQuery.data)) {
-      setFokusAuftrag((n) => n + 1);
+      setFocusRequest((n) => n + 1);
     }
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
@@ -299,7 +299,7 @@ export default function InfotelefonPage() {
               laeuft={erfassenMutation.isPending}
               fehler={erfassenMutation.error}
               einklappbar={istSchmal && !fokusInLeiste}
-              fokusAuftrag={fokusAuftrag}
+              focusRequest={focusRequest}
             />
           </div>
         ) : undefined
