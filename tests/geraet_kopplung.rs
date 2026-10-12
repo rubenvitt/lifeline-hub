@@ -2372,6 +2372,30 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
         "Personen sehen ihn"
     );
 
+    // LLH-1168: der Einsatzleiter am Einsatzkopf geht an keine Gerätesitzung; kein Gerät liest
+    // die Führungsstelle (design.md D3b der Change b1tfx66d).
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle"),
+        &admin,
+        Some(&json!({"einsatzleiter": {"art": "extern", "name": "KBM Weber"}})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for (wer, cookie) in [("Monitor", &monitor), ("Tablet", &tablet)] {
+        let (s, v) = anfrage(&app, "GET", &kopf, cookie, None).await;
+        assert_eq!(s, StatusCode::OK, "{wer}: {v}");
+        assert!(v.get("einsatzleiter").is_none(), "{wer}: {v}");
+        assert!(!v.to_string().contains("KBM Weber"), "{wer}: {v}");
+    }
+    let (_, v) = anfrage(&app, "GET", &kopf, &admin, None).await;
+    assert_eq!(
+        v["einsatzleiter"]["name"],
+        json!("KBM Weber"),
+        "Personen sehen ihn"
+    );
+
     // Nur der Lagemonitor: Person und Tablet bekommen das verdichtete Lagebild nicht.
     let (s, _) = anfrage(&app, "GET", &lagebild, &admin, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Person");

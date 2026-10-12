@@ -86,6 +86,18 @@ und Sachverhalt, wenn die Antwort einen für die Person gesperrten Einsatz zeigt
 Einsatzleiters ist PII derselben Art und fällt dort ebenso weg. Die Liste braucht das nicht, denn
 sie filtert über `darf_lesen`.
 
+### D3b · Gekoppelte Geräte bekommen keinen Einsatzleiter
+
+Jede Funktionsansicht liest den Einsatzkopf (`geraet::ALLE_ANSICHTEN`), aber keine liest
+`…/fuehrungsstelle`. Ohne Riegel bekämen Lagemonitor und Verpflegung einen Personennamen samt
+`personal_id`, gegen „Keine personenbezogenen Daten“ (Specs `lagemonitor`, `funktionsansichten`).
+Die übrigen Ansichten sahen den Einsatzleiter bisher ebenso wenig. `detail` nimmt das Feld deshalb
+für jede Gerätesitzung heraus, nicht nur für `ohne_personenbezug`. So ändert sich für Geräte
+nichts. Gefunden im Review dieser Change. Die Einsatzliste erreicht kein Gerät.
+
+Verworfen: nur Lagemonitor und Verpflegung ausnehmen. Ob ein UHS-Tablet den Einsatzleiter zeigen
+soll, wäre eine eigene Entscheidung. Kein Gerät hat heute eine Stelle, die ihn zeigt.
+
 ### D4 · Offline liegt der Name mit Liste und Kopf auf dem Gerät
 
 Die Liste und der Kopf sind offline lesbar, also liegt der Name dort mit. LFH-1199 hatte nur den Key

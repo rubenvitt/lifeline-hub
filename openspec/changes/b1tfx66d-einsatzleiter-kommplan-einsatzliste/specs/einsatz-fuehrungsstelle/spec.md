@@ -7,7 +7,7 @@ Die Einsatzanzeige SHALL den Einsatzleiter der eigenen Führungsstelle mitliefer
 Einsätze wie im Detail eines Einsatzes, mit Art, Name, „seit“ und dem Vermerk „nicht mehr
 disponiert“ wie an der Führungsstelle. Ohne erfassten Einsatzleiter MUST das Feld fehlen. Ein
 geschwärzter Name MUST ohne Namen geliefert werden. Der Lage-Snapshot MUST den Einsatzleiter nicht
-einfrieren.
+einfrieren, und eine Gerätesitzung MUST ihn nicht erhalten.
 
 #### Scenario: Liste nennt den Einsatzleiter
 - **WHEN** im Einsatz „Hochwasser“ die Person „Anna Schulz“ als Einsatzleiter erfasst ist und eine Person mit Leserecht die Liste der Einsätze abruft
@@ -20,6 +20,10 @@ einfrieren.
 #### Scenario: Geschwärzter Name
 - **WHEN** der Name des Einsatzleiters „Anna Schulz“ in einem noch lesbaren Einsatz geschwärzt wurde (Schwärzung auf Antrag)
 - **THEN** liefert die Liste den Einsatzleiter ohne Namen, und „Anna Schulz“ steht nirgends in der Antwort
+
+#### Scenario: Gekoppeltes Gerät
+- **WHEN** ein gekoppelter Lagemonitor oder ein UHS-Tablet den Einsatzkopf eines Einsatzes mit erfasstem Einsatzleiter „KBM Weber“ abruft
+- **THEN** fehlt das Feld des Einsatzleiters, und „KBM Weber“ steht nicht in der Antwort
 
 #### Scenario: Snapshot ohne Einsatzleiter
 - **WHEN** ein Lage-Snapshot eines Einsatzes mit erfasstem Einsatzleiter angelegt wird

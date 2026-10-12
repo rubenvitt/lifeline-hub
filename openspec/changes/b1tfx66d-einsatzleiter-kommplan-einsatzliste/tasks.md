@@ -3,7 +3,7 @@
 Zunder: https://zunder.rubeen.dev/#/aufgabe/b1tfx66djmhy80rchxkgwwd8 (LLH-1168). Jede Aufgabe
 entsteht testgetrieben (`superpowers:test-driven-development`).
 
-## 1. Backend: Einsatzleiter an der Einsatzanzeige (D1–D3)
+## 1. Backend: Einsatzleiter an der Einsatzanzeige (D1–D3b)
 
 - [x] 1.1 Umformung der vier Spalten samt `personal_noch_disponiert` als eine Funktion in
   `src/einsatz/fuehrungsstelle.rs` herausziehen, `load_tx` ruft sie; belegt durch die
@@ -22,6 +22,9 @@ entsteht testgetrieben (`superpowers:test-driven-development`).
   eines gesperrten Einsatzes neben den übrigen Kopf-PII
 - [x] 1.6 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/openapi.json` sowie
   `frontend/src/api/types.generated.ts` mitcommitten; das Skript ist danach grün
+- [x] 1.7 Gerätesitzungen bekommen den Einsatzleiter am Einsatzkopf nicht (D3b, Review-Befund);
+  Test in `tests/geraet_kopplung.rs` (`lagemonitor_antwort_traegt_keine_personen`) für Monitor
+  und Tablet, Regel in `frontend/src/geraet/AGENTS.md`
 
 ## 2. Frontend: eine Darstellung aus der Angabe (D5)
 
