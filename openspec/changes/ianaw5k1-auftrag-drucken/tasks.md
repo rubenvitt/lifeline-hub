@@ -93,8 +93,13 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 - [x] 7.0 Prüfliste Einsatztauglichkeit `pruefliste.md` in der Change (15 Kriterien, je Verdikt
   mit Beleg, Vorbild `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/pruefliste.md`).
   Nachweis: jede Zeile trägt ein Verdikt, die Bilanz steht darunter.
-- [ ] 7.1 `./scripts/check-all.sh` (Bündel nach `scripts/AGENTS.md`) ist grün, oder die Schritte,
+- [x] 7.1 `./scripts/check-all.sh` (Bündel nach `scripts/AGENTS.md`) ist grün, oder die Schritte,
   die die Umgebung nicht fahren kann, sind benannt und von der CI des PRs belegt.
+  Lauf in der Cloud-Sitzung (12.10.2026): Bündel `schnell` grün; Vitest voll grün (871 Dateien,
+  13 430 Tests, drei Anteile); e2e in Chromium gezielt grün (`druck-fluss`, `auftrag-druck`,
+  `auftraege-*`, `auftrag-aufheben`, `befehl-navigation`, `einsatzbericht-*`, `etb-druck`,
+  `modul-listen-druck`). Nicht gefahren, belegt von der CI des PRs: Bündel `rust` (Diff ohne
+  Backend), Firefox und WebKit (`DRUCK_SPECS`, Browser fehlen), volle e2e-Suite.
 
 ## Workflow follow-up
 

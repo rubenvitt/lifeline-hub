@@ -14,6 +14,10 @@ import { einsatzAnlegen } from './einsatz-kern';
  * verbreitern: am Handy weitete er den Layout-Viewport, auf Papier ragte er über den Rand.
  */
 
+// Drei Anmeldungen und zwei Handy-Kontexte: unter parallelen Workern reichen 30 s nicht (wie
+// `einsatzbericht-druck.spec.ts`).
+test.setTimeout(120_000);
+
 /** Ein Wort ohne Umbruchstelle, länger als die Breite des Handys. */
 const LANGES_WORT = 'Sammelplatz'.repeat(8);
 
