@@ -36,7 +36,8 @@ Für Einsatzleitung und Führungspersonal:
    „Weg“ und „Zeit / Wann“ eintragen.
 6. Bei Bedarf „Weitere Angaben“ aufklappen: „Lage“, „Absicht“, „Verbindung / Meldewege“,
    „Sicherheit / Besonderes“, „Richtung“ (Intern oder Extern) und „Erteilt am (optional)“, bei
-   extern dazu „Externe Stelle“ und „Bezeichnung der Stelle“.
+   extern dazu „Externe Stelle“ und „Bezeichnung der Stelle“. Steht die Richtung auf extern,
+   heißt der Teil auch zugeklappt „Weitere Angaben · Richtung: Extern“.
 7. „Auftrag erteilen“ wählen. Ist ein Feld in einem zugeklappten Teil zu lang, klappt der Teil auf
    und nennt den Grund am Feld.
 

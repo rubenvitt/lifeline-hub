@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { NEU_WAEHLBAR, VORLAGEN, vorlage } from './vorlagen';
+import { NEW_SELECTABLE, VORLAGEN, vorlage } from './vorlagen';
 
 describe('Befehlsvorlagen', () => {
   it('hat die vier Schemata mit erwarteter Abschnittszahl (Sync zu Backend)', () => {
@@ -37,7 +37,7 @@ describe('Befehlsvorlagen', () => {
   });
 
   it('bietet für neue Befehle nur die drei Befehlsvorlagen an', () => {
-    expect(NEU_WAEHLBAR.map((v) => v.schluessel)).toEqual([
+    expect(NEW_SELECTABLE.map((v) => v.schluessel)).toEqual([
       'befehl_lad',
       'befehl_ladef',
       'befehl_schnee',

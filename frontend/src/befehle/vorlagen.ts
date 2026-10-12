@@ -92,4 +92,4 @@ export function vorlage(schluessel: BefehlVorlageKey): VorlageDef | undefined {
 }
 
 /** Vorlagen, die ein neuer Befehlsentwurf anbietet (ohne `nurBestand`). */
-export const NEU_WAEHLBAR: VorlageDef[] = VORLAGEN.filter((v) => !v.nurBestand);
+export const NEW_SELECTABLE: VorlageDef[] = VORLAGEN.filter((v) => !v.nurBestand);

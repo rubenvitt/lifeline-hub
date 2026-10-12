@@ -29,10 +29,10 @@ import {
 } from '../api/eingabegrenzen';
 import { grenzeText, istZuLang, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
-  FORMULAR_ETIKETT,
+  FORM_LABEL,
   KLAPPTEIL,
-  KLAPPTEIL_KOPF,
-  PRUEF_NAME,
+  KLAPPTEIL_HEADER,
+  VALIDATION_NAME,
   klappteilFuer,
   type Klappteil,
   type SchemaFeld,
@@ -201,39 +201,39 @@ function empfaengerAnzahlRegel({ getFieldValue }: Pick<FormInstance<FormWerte>, 
 const BEFEHLSFELD_ZAEHLER = zeichenGrenze(AUFTRAG_BEFEHLSFELD_MAX);
 
 /** Zweck und Lage tragen oft mehr als eine Zeile, die übrigen Schemafelder sind kurz. */
-const MEHRZEILIG: ReadonlySet<SchemaFeld> = new Set(['lage', 'absicht']);
+const MULTILINE: ReadonlySet<SchemaFeld> = new Set(['lage', 'absicht']);
 
-const PLATZHALTER: Partial<Record<SchemaFeld, string>> = {
+const PLACEHOLDER: Partial<Record<SchemaFeld, string>> = {
   zeit: 'z. B. sofort, bis 14:00, nach Eintreffen',
 };
 
 /** Ein Freitextfeld des Befehlsschemas mit Etikett, Zähler und Längenregel aus dem Kern. */
-function SchemaFeldEingabe({ feld }: { feld: SchemaFeld }) {
-  const etikett = FORMULAR_ETIKETT[feld];
+function SchemaFeldInput({ feld }: { feld: SchemaFeld }) {
+  const etikett = FORM_LABEL[feld];
   return (
     <Form.Item
       name={feld}
-      rules={[zeichenRegel(AUFTRAG_BEFEHLSFELD_MAX, PRUEF_NAME[feld])]}
+      rules={[zeichenRegel(AUFTRAG_BEFEHLSFELD_MAX, VALIDATION_NAME[feld])]}
       label={etikett}
     >
-      {MEHRZEILIG.has(feld) ? (
+      {MULTILINE.has(feld) ? (
         <TextArea aria-label={etikett} rows={1} count={BEFEHLSFELD_ZAEHLER} />
       ) : (
-        <Input aria-label={etikett} placeholder={PLATZHALTER[feld]} count={BEFEHLSFELD_ZAEHLER} />
+        <Input aria-label={etikett} placeholder={PLACEHOLDER[feld]} count={BEFEHLSFELD_ZAEHLER} />
       )}
     </Form.Item>
   );
 }
 
 /** Zwei Schemafelder nebeneinander, unter `sm` gestapelt. */
-function SchemaZeile({ links, rechts }: { links: SchemaFeld; rechts: SchemaFeld }) {
+function SchemaRow({ links, rechts }: { links: SchemaFeld; rechts: SchemaFeld }) {
   return (
     <Row gutter={16}>
       <Col xs={24} sm={12}>
-        <SchemaFeldEingabe feld={links} />
+        <SchemaFeldInput feld={links} />
       </Col>
       <Col xs={24} sm={12}>
-        <SchemaFeldEingabe feld={rechts} />
+        <SchemaFeldInput feld={rechts} />
       </Col>
     </Row>
   );
@@ -305,7 +305,7 @@ export default function AuftragFormular({
   const [suche, setSuche] = useState('');
   const funktionen: FunktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
   // Offene Klappteile: gesteuert, damit ein Prüffehler seinen Klappteil öffnen kann (D4).
-  const [offen, setOffen] = useState<Klappteil[]>([]);
+  const [openKlappteile, setOpenKlappteile] = useState<Klappteil[]>([]);
 
   /*
    * Die Empfänger-Regeln zählen den externen Adressaten mit: ändern sich Richtung oder Bezeichnung,
@@ -368,8 +368,8 @@ export default function AuftragFormular({
    */
   const ausfuehrungFelder = (
     <>
-      <SchemaZeile links="mittel" rechts="ort" />
-      <SchemaZeile links="weg" rechts="zeit" />
+      <SchemaRow links="mittel" rechts="ort" />
+      <SchemaRow links="weg" rechts="zeit" />
     </>
   );
 
@@ -380,8 +380,8 @@ export default function AuftragFormular({
    */
   const weitereFelder = (
     <>
-      <SchemaZeile links="lage" rechts="absicht" />
-      <SchemaZeile links="verbindung" rechts="sicherheit" />
+      <SchemaRow links="lage" rechts="absicht" />
+      <SchemaRow links="verbindung" rechts="sicherheit" />
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="richtung" label="Richtung">
@@ -427,9 +427,9 @@ export default function AuftragFormular({
   );
 
   /** Ein Fehler hinter einem geschlossenen Kopf bliebe unsichtbar und sperrte das Senden (D4). */
-  const oeffneKlappteileMitFehler = (fehlerFelder: string[]) => {
-    const betroffen = fehlerFelder.map(klappteilFuer).filter((k): k is Klappteil => k !== null);
-    if (betroffen.length > 0) setOffen((vorher) => [...new Set([...vorher, ...betroffen])]);
+  const openKlappteileWithErrors = (fehlerFelder: string[]) => {
+    const affected = fehlerFelder.map(klappteilFuer).filter((k): k is Klappteil => k !== null);
+    if (affected.length > 0) setOpenKlappteile((prev) => [...new Set([...prev, ...affected])]);
   };
 
   const formular = (
@@ -464,7 +464,7 @@ export default function AuftragFormular({
       erfassenText="Auftrag erteilen"
       serie={serie}
       uebernahme={UEBERNAHME}
-      onPruefungGescheitert={oeffneKlappteileMitFehler}
+      onPruefungGescheitert={openKlappteileWithErrors}
     >
       {zitat}
       {/* Reihenfolge der FwDV 100 (LLH-1091): Einheit vor Auftrag. Der Empfänger ist das erste Feld
@@ -527,17 +527,22 @@ export default function AuftragFormular({
       <Collapse
         ghost
         style={{ marginInline: -8, marginBottom: 8 }}
-        activeKey={offen}
-        onChange={(k) => setOffen((Array.isArray(k) ? k : [k]) as Klappteil[])}
+        activeKey={openKlappteile}
+        onChange={(k) => setOpenKlappteile((Array.isArray(k) ? k : [k]) as Klappteil[])}
         items={[
           {
             key: KLAPPTEIL.ausfuehrung,
-            label: KLAPPTEIL_KOPF.ausfuehrung,
+            label: KLAPPTEIL_HEADER.ausfuehrung,
             children: ausfuehrungFelder,
           },
           {
             key: KLAPPTEIL.weitere,
-            label: KLAPPTEIL_KOPF.weitere,
+            // Die Richtung geht mit „Werte behalten“ in den nächsten Auftrag; zugeklappt nennt der
+            // Kopf die Abweichung von der Vorgabe „Intern“ (Erfassungs-Norm, `frontend/AGENTS.md`).
+            label:
+              richtung === 'extern'
+                ? `${KLAPPTEIL_HEADER.weitere} · Richtung: Extern`
+                : KLAPPTEIL_HEADER.weitere,
             children: weitereFelder,
           },
         ]}

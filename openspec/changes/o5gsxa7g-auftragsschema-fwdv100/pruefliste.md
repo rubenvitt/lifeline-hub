@@ -27,11 +27,13 @@ Begründung). Gerechnetes und aus dem Quelltext Geschlossenes trägt **[abgeleit
 
 | Nachweis | Ergebnis |
 | --- | --- |
-| Vitest `AuftragFormular.test.tsx` | 29 grün: vier Felder in Folge, Gegenproben 8 und 10, Fokus im Empfänger, `weg` im Body, Überlängen aller acht Schemafelder, Selbstöffnen samt Gegenprobe |
+| Vitest `AuftragFormular.test.tsx` | 31 grün: vier Felder in Folge, Gegenproben 8 und 10, Fokus im Empfänger (auch nach „Speichern und nächste“), `weg` im Body, Überlängen aller acht Schemafelder, Selbstöffnen samt Gegenprobe, Kopf „Weitere Angaben · Richtung: Extern“ samt Rückweg |
+| Vitest `AuftraegePage.test.tsx` | grün: Zeit / Wann über den Klappteil „Ausführung“ im Body der Seite |
 | Vitest Kern, Karte, ETB-Dialog, Befehlsliste, Vorlagen, Befehlsdetail | `auftragsschemaKern.test.ts` (4), `AuftragKarte.test.tsx` (4), `AuftragAusEtbModal.test.tsx` (1), `BefehlListe.test.tsx`, `vorlagen.test.ts`, `BefehlDetailPage.test.tsx` (Bestand EA) grün |
 | Mutationsproben | Selbstöffnen entfernt, `weg` nicht gesendet, EA-Vorlage aus `VORLAGEN` entfernt, Schwärzungsregel entfernt, Längenprüfung `weg` entfernt: je ein Test rot |
 | Rust | `tests/auftrag.rs`, `tests/etb.rs`, `tests/eingabegrenzen_auftrag.rs`, `tests/befehl.rs`, Wächter `jede_einsatz_scoped_spalte_ist_klassifiziert`, Schwärzungstest am Einsatz grün |
 | e2e | `chat-layout` (Aufträge auf 390 px mit beiden Klappteilen offen, kein waagerechter Überlauf), `etb-folgeauftraege`, `fuehrungsfunktionen`: 9/9 grün (Chromium) |
+| e2e Prüfflächen | `trefflaeche-pruefflaechen`, `auftraege-abgeschlossen`, `gate1-ueberlauf`, `knopf-wortlaut`, `fehlertext-kontrast`: 64/64 grün (Chromium) |
 
 ---
 
@@ -39,7 +41,7 @@ Begründung). Gerechnetes und aus dem Quelltext Geschlossenes trägt **[abgeleit
 
 | Nr. | Kriterium | Verdikt | Beleg / Begründung | Zielticket |
 | --- | --- | --- | --- | --- |
-| 1 | **Treffläche** | **erfüllt** [abgeleitet] | Nur antd-Bausteine unter dem Dichte-Kontext (`Select`, `Input`, `TextArea`, `ZeitpunktEingabe`). Die Klappköpfe erben den Boden über `antdKlappkopf(dichte)` (LFH-653), kein lokales `size` | — |
+| 1 | **Treffläche** | **erfüllt** | Nur antd-Bausteine unter dem Dichte-Kontext (`Select`, `Input`, `TextArea`, `ZeitpunktEingabe`). Die Klappköpfe erben den Boden über `antdKlappkopf(dichte)` (LFH-653), kein lokales `size`. `trefflaeche-pruefflaechen` grün | — |
 | 2 | **Handschuh-Modus** | **erfüllt** [abgeleitet] | Wie 1: die Staffel 30/48/72 wirkt über `controlHeight` und den Klappkopf-Kontext. Kein neuer handgebauter Bedienknopf | — |
 | 3 | **Rückmeldung vor der Serverantwort** | **erfüllt** | Unverändert über die Erfassungshülle („Auftrag erteilen“ lädt, Abbrechen gesperrt). Ein Prüffehler hinter einem geschlossenen Klappteil öffnet ihn jetzt, statt das Senden lautlos zu sperren (Vitest „öffnet einen geschlossenen Klappteil …“) | — |
 | 4 | **Kritische Aktion hat eine zweite Handlung** | **nicht anwendbar** | Der Umbau ändert am Erteilen nichts: es geht wie bisher ohne Rückfrage. Ein erteilter Auftrag lässt sich heute nicht aufheben, das Aufheben und Berichtigen ist LLH-1098 | — |
@@ -47,7 +49,7 @@ Begründung). Gerechnetes und aus dem Quelltext Geschlossenes trägt **[abgeleit
 | 6 | **Kein Status allein über Farbe** | **nicht anwendbar** | Kein Status im umgebauten Teil | — |
 | 7 | **Eine Farbe = eine Bedeutung** | **erfüllt** | Keine neue Farbe | — |
 | 8 | **Helligkeits-/Kontrastregler** | **erfüllt** [abgeleitet] | Unverändert app-weit | — |
-| 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Empfänger und Auftrag stehen oben, Pflicht und sichtbar. Nichts, was eine Ablehnung auslöst, liegt dauerhaft verdeckt (D4) | — |
+| 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Empfänger und Auftrag stehen oben, Pflicht und sichtbar. Nichts, was eine Ablehnung auslöst, liegt dauerhaft verdeckt (D4). Eine übernommene Richtung „Extern“ steht auch zugeklappt im Kopf | — |
 | 10 | **Alarmbudget** | **erfüllt** [abgeleitet] | Kein neuer Alarm | — |
 | 11 | **Warnverhalten** | **erfüllt** | Kein Blinken, kein Ton | — |
 | 12 | **Kein Sprung unter dem Cursor** | **erfüllt** [abgeleitet] | Klappteile öffnen nur auf Klick oder bei einem Prüffehler nach dem Absenden, nie durch Live-Daten. Ein offener Klappteil bleibt nach „Speichern und nächste“ offen | — |

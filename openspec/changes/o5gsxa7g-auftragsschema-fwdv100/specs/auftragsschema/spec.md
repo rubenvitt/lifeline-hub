@@ -29,7 +29,8 @@ Hinter dem ersten Klappteil „Ausführung: Mittel, Ziel, Weg, Zeit“ SHALL das
 vier Felder in dieser Reihenfolge tragen: „Mittel / Womit“, „Ziel / Ort“, „Weg“, „Zeit / Wann“.
 Hinter dem zweiten Klappteil „Weitere Angaben“ SHALL es „Lage“, „Absicht“, „Verbindung /
 Meldewege“, „Sicherheit / Besonderes“, „Richtung“ und „Erteilt am (optional)“ tragen. Bei Richtung
-„Extern“ kommen „Externe Stelle“ und „Bezeichnung der Stelle“ dazu. Beide Klappteile MUST im
+„Extern“ kommen „Externe Stelle“ und „Bezeichnung der Stelle“ dazu, und der Kopf nennt die
+abweichende Richtung. Beide Klappteile MUST im
 Ausgangszustand geschlossen sein, und im Ausgangszustand MUST kein Feld eines Klappteils als
 Feld im Formular stehen.
 
@@ -41,6 +42,11 @@ Feld im Formular stehen.
 #### Scenario: Aufklappen der weiteren Angaben
 - **WHEN** jemand im Ausgangszustand „Weitere Angaben“ aufklappt
 - **THEN** kommen „Lage“, „Absicht“, „Verbindung / Meldewege“, „Sicherheit / Besonderes“, „Richtung“ und „Erteilt am (optional)“ dazu
+
+#### Scenario: Abweichende Richtung im Kopf
+- **WHEN** die Richtung auf „Extern“ steht, etwa weil „Werte behalten“ sie aus dem vorigen Auftrag übernommen hat
+- **THEN** heißt der zweite Klappteil „Weitere Angaben · Richtung: Extern“, auch zugeklappt
+- **AND** bei „Intern“ heißt er wieder „Weitere Angaben“
 
 ### Requirement: Ein Klappteil öffnet sich bei einem Prüffehler darin
 Scheitert beim Absenden die Prüfung eines Feldes, das hinter einem geschlossenen Klappteil liegt,

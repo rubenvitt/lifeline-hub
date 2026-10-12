@@ -24,14 +24,14 @@ function felderZaehlen(): number {
 }
 
 /** Beschriftungen der Felder in Dokumentfolge. */
-function etiketten(): string[] {
+function labels(): string[] {
   return [...document.querySelectorAll('.ant-form-item-label label')].map(
     (l) => l.textContent ?? '',
   );
 }
 
-const oeffneAusfuehrung = () => userEvent.click(screen.getByText(/^Ausführung:/));
-const oeffneWeitere = () => userEvent.click(screen.getByText('Weitere Angaben'));
+const openAusfuehrung = () => userEvent.click(screen.getByText(/^Ausführung:/));
+const openWeitere = () => userEvent.click(screen.getByText('Weitere Angaben'));
 
 function rendern(over: Partial<Parameters<typeof AuftragFormular>[0]> = {}) {
   return renderMitProviders(
@@ -48,7 +48,7 @@ function rendern(over: Partial<Parameters<typeof AuftragFormular>[0]> = {}) {
 
 /** Richtung „extern“ samt Bezeichnung: der externe Adressat zählt als Empfänger. */
 async function externMitBezeichnung() {
-  await oeffneWeitere();
+  await openWeitere();
   await userEvent.click(screen.getByLabelText('Richtung'));
   await userEvent.click(await screen.findByTitle('Extern'));
   await userEvent.type(screen.getByLabelText('Externe Bezeichnung'), 'Leitstelle Nord');
@@ -62,7 +62,7 @@ describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
   it('zeigt im Ausgangszustand genau vier Felder in der Folge der FwDV 100', () => {
     rendern();
     expect(felderZaehlen()).toBe(4);
-    expect(etiketten()).toEqual([
+    expect(labels()).toEqual([
       'Empfänger',
       'Auftrag / Was',
       'Priorität',
@@ -73,24 +73,24 @@ describe('AuftragFormular — Feldbudget (LFH-343 · C8, Befund H49)', () => {
 
   it('holt Mittel, Ziel, Weg und Zeit erst beim Aufklappen der Ausführung ins DOM', async () => {
     rendern();
-    await oeffneAusfuehrung();
+    await openAusfuehrung();
     expect(felderZaehlen()).toBe(8);
-    expect(etiketten().slice(4)).toEqual(AUSFUEHRUNG);
+    expect(labels().slice(4)).toEqual(AUSFUEHRUNG);
     for (const feld of WEITERE) expect(screen.queryByLabelText(feld)).toBeNull();
   });
 
   it('holt die weiteren Angaben samt Richtung und Erteilzeit erst beim Aufklappen ins DOM', async () => {
     rendern();
-    await oeffneWeitere();
+    await openWeitere();
     expect(felderZaehlen()).toBe(10);
-    expect(etiketten().slice(4)).toEqual([...WEITERE, 'Richtung', 'Erteilt am (optional)']);
+    expect(labels().slice(4)).toEqual([...WEITERE, 'Richtung', 'Erteilt am (optional)']);
     for (const feld of AUSFUEHRUNG) expect(screen.queryByLabelText(feld)).toBeNull();
   });
 
   it('gibt dem Empfänger den ersten Fokus, auch vor einem vorbelegten Auftragstext', async () => {
     rendern({ initialText: 'Aus der Meldung' });
     await waitFor(() => expect(screen.getByLabelText('Empfänger')).toHaveFocus());
-    expect(etiketten().slice(0, 2)).toEqual(['Empfänger', 'Auftrag / Was']);
+    expect(labels().slice(0, 2)).toEqual(['Empfänger', 'Auftrag / Was']);
   });
 
   /**
@@ -205,7 +205,7 @@ describe('AuftragFormular — Frist und Erteilung in der Anzeigezone (LFH-692)',
           />
         </AnzeigeKonventionenProvider>,
       );
-      await oeffneWeitere();
+      await openWeitere();
       expect(await screen.findByRole('textbox', { name: 'Erteilt am (optional)' })).toHaveValue(
         '2026-09-24 10:00',
       );
@@ -295,7 +295,7 @@ describe('AuftragFormular — Eingabegrenzen (LFH-937)', () => {
 
   it('begrenzt die Extern-Bezeichnung nativ auf 200 Zeichen', async () => {
     rendern();
-    await oeffneWeitere();
+    await openWeitere();
     await userEvent.click(screen.getByLabelText('Richtung'));
     await userEvent.click(await screen.findByTitle('Extern'));
     expect(screen.getByLabelText('Externe Bezeichnung')).toHaveAttribute('maxlength', '200');
@@ -304,8 +304,8 @@ describe('AuftragFormular — Eingabegrenzen (LFH-937)', () => {
   it('zählt die acht Befehlsfelder ab 80 %; über 2 000 Zeichen bleiben sie stehen und sperren', async () => {
     const onAnlegen = vi.fn().mockResolvedValue(undefined);
     rendern({ onAnlegen });
-    await oeffneAusfuehrung();
-    await oeffneWeitere();
+    await openAusfuehrung();
+    await openWeitere();
     fireEvent.change(screen.getByLabelText('Lage'), { target: { value: 'l'.repeat(1_600) } });
     expect(screen.getByText('1.600 / 2.000')).toBeInTheDocument();
     for (const feld of SCHEMA) {
@@ -372,14 +372,14 @@ describe('AuftragFormular — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     const onAnlegen = vi.fn().mockResolvedValue(undefined);
     rendern({ onAnlegen });
     // Zugeklappt geht kein Wert hinaus, dann setzt der Server die Erteilzeit selbst.
-    await oeffneWeitere();
+    await openWeitere();
     expect(await erteilen(onAnlegen)).toBe('2026-10-04 10:00:00');
   });
 
   it('eine eingetragene Zeit bleibt unverändert', async () => {
     const onAnlegen = vi.fn().mockResolvedValue(undefined);
     rendern({ onAnlegen });
-    await oeffneWeitere();
+    await openWeitere();
     const feld = screen.getByRole('textbox', { name: 'Erteilt am (optional)' });
     await userEvent.click(feld);
     await userEvent.clear(feld);
@@ -409,7 +409,7 @@ describe('AuftragFormular — Pflicht-Empfänger am Feld (LFH-1077)', () => {
 
   it('meldet sich nicht, bevor abgesendet wurde, auch nicht beim Umschalten der Richtung', async () => {
     rendern();
-    await oeffneWeitere();
+    await openWeitere();
     await userEvent.click(screen.getByLabelText('Richtung'));
     await userEvent.click(await screen.findByTitle('Extern'));
     await userEvent.type(screen.getByLabelText('Externe Bezeichnung'), 'L');
@@ -453,12 +453,12 @@ describe('AuftragFormular — Schema nach FwDV 100 (LLH-1091)', () => {
     rendern({ onAnlegen });
     await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Deich sichern');
-    await oeffneAusfuehrung();
+    await openAusfuehrung();
     await userEvent.type(screen.getByLabelText('Mittel / Womit'), 'Sandsäcke');
     await userEvent.type(screen.getByLabelText('Ziel / Ort'), 'Deich km 3');
     await userEvent.type(screen.getByLabelText('Weg'), ' über B 3 ');
     await userEvent.type(screen.getByLabelText('Zeit / Wann'), 'sofort');
-    await oeffneWeitere();
+    await openWeitere();
     await userEvent.type(screen.getByLabelText('Absicht'), 'Überflutung verhindern');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
@@ -478,7 +478,7 @@ describe('AuftragFormular — Schema nach FwDV 100 (LLH-1091)', () => {
     rendern({ onAnlegen });
     await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
-    await oeffneAusfuehrung();
+    await openAusfuehrung();
     await userEvent.type(screen.getByLabelText('Weg'), '   ');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
@@ -491,9 +491,9 @@ describe('AuftragFormular — Schema nach FwDV 100 (LLH-1091)', () => {
     rendern({ onAnlegen });
     await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
-    await oeffneAusfuehrung();
+    await openAusfuehrung();
     fireEvent.change(screen.getByLabelText('Weg'), { target: { value: 'w'.repeat(2_001) } });
-    await oeffneAusfuehrung();
+    await openAusfuehrung();
     const kopf = screen.getByText(/^Ausführung:/).closest('.ant-collapse-header');
     await waitFor(() => expect(kopf).toHaveAttribute('aria-expanded', 'false'));
 
@@ -514,5 +514,32 @@ describe('AuftragFormular — Schema nach FwDV 100 (LLH-1091)', () => {
     for (const kopf of document.querySelectorAll('.ant-collapse-header')) {
       expect(kopf).toHaveAttribute('aria-expanded', 'false');
     }
+  });
+
+  /**
+   * „Werte behalten“ übernimmt die Richtung: ein zugeklappter Kopf, der „Extern“ verschwiege,
+   * schickte Folgeaufträge still nach außen (Erfassungs-Norm: der Kopf nennt die Abweichung).
+   */
+  it('nennt eine Richtung „Extern“ im Kopf der weiteren Angaben', async () => {
+    rendern();
+    expect(screen.getByText('Weitere Angaben')).toBeInTheDocument();
+    await openWeitere();
+    await userEvent.click(screen.getByLabelText('Richtung'));
+    await userEvent.click(await screen.findByTitle('Extern'));
+    expect(screen.getByText('Weitere Angaben · Richtung: Extern')).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText('Richtung'));
+    await userEvent.click(await screen.findByTitle('Intern'));
+    expect(screen.getByText('Weitere Angaben')).toBeInTheDocument();
+  });
+
+  it('gibt dem Empfänger nach „Speichern und nächste“ wieder den Fokus', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue(undefined);
+    rendern({ onAnlegen, serie: true });
+    await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.click(screen.getByRole('button', { name: /Speichern und nächste/ }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByLabelText('Auftrag / Was')).toHaveValue(''));
+    await waitFor(() => expect(screen.getByLabelText('Empfänger')).toHaveFocus());
   });
 });

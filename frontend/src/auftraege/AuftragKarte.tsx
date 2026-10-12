@@ -12,7 +12,7 @@ import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { LESE_ETIKETT, LESEFOLGE } from './auftragsschemaKern';
+import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
 
 const { Text } = Typography;
 
@@ -24,7 +24,7 @@ const QUITTIERT_CHIP_GRENZE = 3;
  * Formular teilt (FwDV 100, LLH-1091), danach die Erteilzeit.
  */
 const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
-  ...LESEFOLGE.map((key) => ({ key, label: LESE_ETIKETT[key] })),
+  ...READ_ORDER.map((key) => ({ key, label: READ_LABEL[key] })),
   { key: 'erteilt_at', label: 'Erteilt am', zeit: true },
 ];
 

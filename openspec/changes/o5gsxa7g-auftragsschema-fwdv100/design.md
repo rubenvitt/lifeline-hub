@@ -87,6 +87,12 @@ Beide Klappteile haben kein `forceRender`, damit die Zählung mit Gegenprobe pr�
 (4 → 8 bzw. 4 → 10). Ein gemeinsamer `activeKey`-Zustand (Mehrfachöffnung) steuert sie, damit D4
 sie öffnen kann.
 
+Steht die Richtung auf „Extern“, heißt der zweite Kopf „Weitere Angaben · Richtung: Extern“.
+„Werte behalten“ übernimmt die Richtung in den nächsten Auftrag, und zugeklappt verschwiege der
+Kopf sonst, dass der Auftrag nach außen geht. Damit nennt der Kopf die Abweichung von der Vorgabe,
+wie es die Erfassungs-Norm für einen Klappteil mit verborgenen Angaben vorsieht (Fund aus dem
+Review, 12.10.2026).
+
 *Alternative:* Kopf „Ausführung (EAMZW)“ wie im Ticket. Verworfen, weil E und A nicht im
 Klappteil liegen, sondern sichtbar darüber stehen. Der Kopf nennt deshalb, was er enthält.
 

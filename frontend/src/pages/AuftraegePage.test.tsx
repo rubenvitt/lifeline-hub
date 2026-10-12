@@ -213,9 +213,9 @@ describe('AuftraegePage', () => {
     // Empfänger in einem Feld (Optionen + freier Funktionstext).
     await userEvent.type(screen.getByLabelText('Empfänger'), 'EA Nord{Enter}');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
-    // Die sieben SKK-Felder liegen hinter einem zugeklappten Collapse; ohne `forceRender` stehen
-    // sie vor dem Aufklappen nicht im DOM.
-    await userEvent.click(screen.getByText(/Befehlsschema/));
+    // Mittel, Ziel, Weg und Zeit liegen im zugeklappten Teil „Ausführung“ (LLH-1091); ohne
+    // `forceRender` stehen sie vor dem Aufklappen nicht im DOM.
+    await userEvent.click(screen.getByText(/^Ausführung:/));
     await userEvent.type(await screen.findByLabelText('Zeit / Wann'), 'sofort');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() =>

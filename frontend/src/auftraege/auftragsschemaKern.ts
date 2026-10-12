@@ -16,19 +16,19 @@ export const KLAPPTEIL = { ausfuehrung: 'ausfuehrung', weitere: 'weitere' } as c
 export type Klappteil = (typeof KLAPPTEIL)[keyof typeof KLAPPTEIL];
 
 /** Köpfe der Klappteile: sie nennen, was darin liegt (design.md D2). */
-export const KLAPPTEIL_KOPF: Record<Klappteil, string> = {
+export const KLAPPTEIL_HEADER: Record<Klappteil, string> = {
   ausfuehrung: 'Ausführung: Mittel, Ziel, Weg, Zeit',
   weitere: 'Weitere Angaben',
 };
 
 /** Erster Klappteil: Mittel, Ziel, Weg, Zeit. `ort` ist das Ziel der Ausführung (D3). */
-export const AUSFUEHRUNG_FELDER = ['mittel', 'ort', 'weg', 'zeit'] as const satisfies SchemaFeld[];
+export const AUSFUEHRUNG_FIELDS = ['mittel', 'ort', 'weg', 'zeit'] as const satisfies SchemaFeld[];
 
 /**
  * Zweiter Klappteil: die übrigen Schemafelder, dazu Richtung und Erteilzeit; die Extern-Felder
  * gehen mit der Richtung, die sie einblendet (Formularnamen, nicht nur Schemafelder).
  */
-export const WEITERE_FELDER = [
+export const WEITERE_FIELDS = [
   'lage',
   'absicht',
   'verbindung',
@@ -40,7 +40,7 @@ export const WEITERE_FELDER = [
 ] as const;
 
 /** Etiketten im Formular, mit Fragewort wo es hilft („Womit“, „Wann“). */
-export const FORMULAR_ETIKETT: Record<SchemaFeld, string> = {
+export const FORM_LABEL: Record<SchemaFeld, string> = {
   mittel: 'Mittel / Womit',
   ort: 'Ziel / Ort',
   weg: 'Weg',
@@ -52,7 +52,7 @@ export const FORMULAR_ETIKETT: Record<SchemaFeld, string> = {
 };
 
 /** Name des Feldes in einer Längenmeldung, gleich der Meldung des Servers (`auftrag/eingabe.rs`). */
-export const PRUEF_NAME: Record<SchemaFeld, string> = {
+export const VALIDATION_NAME: Record<SchemaFeld, string> = {
   mittel: 'Mittel',
   ort: 'Ziel/Ort',
   weg: 'Weg',
@@ -64,23 +64,23 @@ export const PRUEF_NAME: Record<SchemaFeld, string> = {
 };
 
 /** Lesefolge der Karte = Formularfolge der Schemafelder (Spec: „liest in derselben Reihenfolge“). */
-export const LESEFOLGE: SchemaFeld[] = [
-  ...AUSFUEHRUNG_FELDER,
-  ...WEITERE_FELDER.filter(
-    (f): f is Extract<(typeof WEITERE_FELDER)[number], SchemaFeld> => f in FORMULAR_ETIKETT,
+export const READ_ORDER: SchemaFeld[] = [
+  ...AUSFUEHRUNG_FIELDS,
+  ...WEITERE_FIELDS.filter(
+    (f): f is Extract<(typeof WEITERE_FIELDS)[number], SchemaFeld> => f in FORM_LABEL,
   ),
 ];
 
 /** Etiketten der Lesefassung: ohne die Fragewörter des Formulars. */
-export const LESE_ETIKETT: Record<SchemaFeld, string> = {
-  ...FORMULAR_ETIKETT,
+export const READ_LABEL: Record<SchemaFeld, string> = {
+  ...FORM_LABEL,
   mittel: 'Mittel',
   zeit: 'Zeit',
 };
 
 /** Der Klappteil, hinter dem ein Formularfeld liegt; sichtbare Felder liegen hinter keinem. */
 export function klappteilFuer(feld: string): Klappteil | null {
-  if ((AUSFUEHRUNG_FELDER as readonly string[]).includes(feld)) return KLAPPTEIL.ausfuehrung;
-  if ((WEITERE_FELDER as readonly string[]).includes(feld)) return KLAPPTEIL.weitere;
+  if ((AUSFUEHRUNG_FIELDS as readonly string[]).includes(feld)) return KLAPPTEIL.ausfuehrung;
+  if ((WEITERE_FIELDS as readonly string[]).includes(feld)) return KLAPPTEIL.weitere;
   return null;
 }
