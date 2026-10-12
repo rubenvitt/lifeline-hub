@@ -28,7 +28,7 @@ relativ zu `frontend/src/`.
 
 ## 2. Backend: Aufheben (D2–D5, D7)
 
-- [ ] 2.1 Test zuerst in `tests/auftrag_aufheben.rs` (neu). Abgedeckt sind:
+- [x] 2.1 Test zuerst in `tests/auftrag_aufheben.rs` (neu). Abgedeckt sind:
   - Aufheben aus „offen“, „in Arbeit“ und „vollzogen“; die Vollzugsmeldung bleibt.
   - 422 für einen abgenommenen und für einen schon aufgehobenen Auftrag, ohne zweiten
     ETB-Eintrag.
@@ -41,12 +41,12 @@ relativ zu `frontend/src/`.
   - Das Live-Ereignis `auftrag` kommt nach dem Commit, bei einem Fehler kommt nichts.
 
   Nachweis: rot belegt.
-- [ ] 2.2 `src/auftrag/etb_text.rs` (neu, rein, mit Unit-Tests) für „aufgehoben“ und „geändert“
+- [x] 2.2 `src/auftrag/etb_text.rs` (neu, rein, mit Unit-Tests) für „aufgehoben“ und „geändert“
   umsetzen, ebenso `AUFHEBUNGSGRUND_MAX`. Dazu `repo::aufheben_tx` im `write_retry!` (Prüfung,
   Spalten, ETB, `schliesse_offene_auto_tx`) und den Handler `aufheben`. Route in `src/app.rs`
   eintragen. Quittieren, Vollzug und Abnehmen sperren den aufgehobenen Auftrag, das Quittieren über
   die Bedingung im `UPDATE` (D6). Nachweis: 2.1 grün, `tests/auftrag.rs` grün.
-- [ ] 2.3 Den Spiegel der Grenze in `api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`
+- [x] 2.3 Den Spiegel der Grenze in `api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`
   eintragen, Szenario „Zu langer Aufhebungsgrund“ in `tests/eingabegrenzen_auftrag.rs`. Nachweis:
   beide grün.
 

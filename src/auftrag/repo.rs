@@ -502,23 +502,32 @@ pub async fn gehoert_zu_einsatz(
     Ok(treffer.is_some())
 }
 
-/// Setzt die Quittung einer Empfänger-Zeile (idempotent: hält den ersten Zeitstempel).
+/// Setzt die Quittung einer Empfänger-Zeile (idempotent: hält den ersten Zeitstempel). Ein
+/// aufgehobener Auftrag erwartet keine Quittung mehr (LLH-1098): die Bedingung steht im `UPDATE`
+/// selbst, damit eine gleichzeitige Aufhebung nicht übergangen wird; dann 422.
 pub async fn quittiere_empfaenger(
     pool: &SqlitePool,
     empfaenger_id: i64,
     von_id: i64,
     jetzt: &str,
 ) -> Result<(), AppError> {
-    sqlx::query(
+    let getroffen = sqlx::query(
         "UPDATE auftrag_empfaenger \
          SET quittiert_at = COALESCE(quittiert_at, ?), quittiert_von_id = COALESCE(quittiert_von_id, ?) \
-         WHERE id = ?",
+         WHERE id = ? AND NOT EXISTS (SELECT 1 FROM auftrag a \
+           WHERE a.id = auftrag_empfaenger.auftrag_id AND a.aufgehoben_at IS NOT NULL)",
     )
     .bind(jetzt)
     .bind(von_id)
     .bind(empfaenger_id)
     .execute(pool)
-    .await?;
+    .await?
+    .rows_affected();
+    if getroffen == 0 {
+        return Err(AppError::UnprocessableEntity(
+            "Der Auftrag ist aufgehoben und erwartet keine Quittung mehr".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -945,13 +954,157 @@ pub async fn nimm_ab(
     von_id: i64,
     jetzt: &str,
 ) -> Result<(), AppError> {
-    sqlx::query("UPDATE auftrag SET abgenommen_at = ?, abgenommen_von_id = ? WHERE id = ? AND abgenommen_at IS NULL")
-        .bind(jetzt)
-        .bind(von_id)
-        .bind(auftrag_id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE auftrag SET abgenommen_at = ?, abgenommen_von_id = ? \
+         WHERE id = ? AND abgenommen_at IS NULL AND aufgehoben_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(von_id)
+    .bind(auftrag_id)
+    .execute(pool)
+    .await?;
     Ok(())
+}
+
+/// Bearbeitungsstatus und Nummer eines Auftrags des Einsatzes, in der Transaktion gelesen
+/// (LLH-1098). `NotFound` für einen unbekannten oder einsatzfremden Auftrag.
+async fn stand_in_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    auftrag_id: i64,
+) -> Result<(super::AuftragBearbeitungsstatus, Option<i64>, bool), AppError> {
+    const SQL: &str = concat!(
+        "SELECT ",
+        bearbeitungsstatus_sql!(),
+        ", a.lfd_nr, ",
+        ist_berichtigbar_sql!(),
+        " FROM auftrag a",
+        vollzug_join_sql!(),
+        " WHERE a.id = ? AND a.einsatz_id = ?"
+    );
+    let (status, lfd_nr, berichtigbar): (String, Option<i64>, bool) = sqlx::query_as(SQL)
+        .bind(auftrag_id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let status = super::AuftragBearbeitungsstatus::try_from(status)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok((status, lfd_nr, berichtigbar))
+}
+
+/// Die Anzeigenamen der Empfänger eines Auftrags in ihrer Reihenfolge (für das ETB-`an`).
+async fn empfaenger_namen_tx(
+    conn: &mut sqlx::SqliteConnection,
+    auftrag_id: i64,
+) -> Result<Vec<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT snap_anzeige FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
+    )
+    .bind(auftrag_id)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
+/// Schreibt eine Anordnung zu einem Auftrag ins ETB (LLH-1098, design.md D5): Ereigniszeit
+/// jetzt, `von` die Systemkennung, `an` die Empfänger, Rückverweis `auftrag_id`. Unabhängig vom
+/// Auto-ETB-Schalter: Aufheben und Berichtigen sind Führungsvorgänge, kein Spiegel.
+#[allow(clippy::too_many_arguments)]
+async fn anordnung_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    von_id: i64,
+    etb_startwert: i64,
+    inhalt: &str,
+    an: &str,
+    jetzt: &str,
+) -> Result<i64, AppError> {
+    let etb_id = crate::etb::repo::anlegen_tx(
+        &mut *conn,
+        einsatz_id,
+        von_id,
+        etb_startwert,
+        crate::etb::repo::EintragDaten {
+            typ: crate::etb::TYP_ANORDNUNG,
+            inhalt,
+            von: None,
+            an: Some(an),
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: Some(jetzt),
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await?;
+    sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
+        .bind(auftrag_id)
+        .bind(etb_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(etb_id)
+}
+
+/// Hebt einen Auftrag auf (LLH-1098, Spec `auftrag-aufheben-berichtigen`) und liefert die id der
+/// ETB-Anordnung. In EINER Transaktion: Prüfung des Stands (abgenommen oder schon aufgehoben →
+/// 422), Aufhebung am Auftrag, Anordnung „Auftrag #N aufgehoben: <Grund>“ und das Schließen der
+/// Auto-Frist-Erinnerung. Manuelle Erinnerungen bleiben. `grund` ist vom Handler geprüft.
+#[allow(clippy::too_many_arguments)]
+pub async fn aufheben_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    von_id: i64,
+    etb_startwert: i64,
+    grund: &str,
+    jetzt: &str,
+) -> Result<i64, AppError> {
+    use super::AuftragBearbeitungsstatus as S;
+    let (status, lfd_nr, _) = stand_in_tx(&mut *conn, einsatz_id, auftrag_id).await?;
+    match status {
+        S::Aufgehoben => {
+            return Err(AppError::UnprocessableEntity(
+                "Der Auftrag ist bereits aufgehoben".into(),
+            ))
+        }
+        S::Abgenommen => {
+            return Err(AppError::UnprocessableEntity(
+                "Ein abgenommener Auftrag lässt sich nicht aufheben".into(),
+            ))
+        }
+        S::Offen | S::InArbeit | S::Vollzogen => {}
+    }
+    sqlx::query(
+        "UPDATE auftrag SET aufgehoben_at = ?, aufgehoben_von_id = ?, aufhebungsgrund = ? \
+         WHERE id = ? AND aufgehoben_at IS NULL AND abgenommen_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(von_id)
+    .bind(grund)
+    .bind(auftrag_id)
+    .execute(&mut *conn)
+    .await?;
+    let an = super::kappe_an(&empfaenger_namen_tx(&mut *conn, auftrag_id).await?);
+    let etb_id = anordnung_tx(
+        &mut *conn,
+        einsatz_id,
+        auftrag_id,
+        von_id,
+        etb_startwert,
+        &super::etb_text::aufgehoben(lfd_nr, grund),
+        &an,
+        jetzt,
+    )
+    .await?;
+    crate::erinnerung::repo::schliesse_offene_auto_tx(
+        &mut *conn,
+        crate::kommunikation::OBJEKT_AUFTRAG,
+        auftrag_id,
+        jetzt,
+    )
+    .await?;
+    Ok(etb_id)
 }
 
 #[cfg(test)]

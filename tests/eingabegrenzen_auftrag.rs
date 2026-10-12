@@ -327,3 +327,41 @@ async fn ein_typ_mit_leerzeichen_wird_nicht_weggeduppelt() {
     assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
     assert_eq!(j["error"], "Ungültiger Empfänger-Typ");
 }
+
+/// LLH-1098: der Grund beim Aufheben hat seine eigene Grenze; darüber 400, der Auftrag bleibt
+/// offen (Spec `eingabegrenzen`, „Zu langer Aufhebungsgrund“).
+#[tokio::test]
+async fn zu_langer_aufhebungsgrund_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, a) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&auftrag("T", vec![funktion("EA")])),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let aid = a["id"].as_i64().unwrap();
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}/aufheben"),
+        &admin,
+        Some(&json!({ "grund": x(2_001) }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
+    assert!(j["error"].as_str().unwrap().starts_with("Grund"), "{j:?}");
+    let (_, d) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(d["bearbeitungsstatus"], "offen");
+}
