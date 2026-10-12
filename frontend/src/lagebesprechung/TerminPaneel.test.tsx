@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -125,6 +125,15 @@ describe('TerminPaneel · Termin setzen', () => {
   it('„kein Termin“ sendet naechste_at: null', async () => {
     const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
     await userEvent.click(within(p).getByRole('button', { name: 'kein Termin' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toEqual({ naechste_at: null });
+  });
+
+  it('das Löschkreuz der freien Wahl leert einen gesetzten Termin: naechste_at null', async () => {
+    const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
+    const feld = within(p).getByLabelText('Termin wählen');
+    // jsdom aktiviert den CSS-Hoverzustand des Kreuzes nicht; hier zählt der onClear-Pfad.
+    fireEvent.click(feld.closest('.ant-picker')!.querySelector<HTMLElement>('.ant-picker-clear')!);
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toEqual({ naechste_at: null });
   });
