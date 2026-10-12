@@ -20,8 +20,9 @@ ins ETB. Dargestellt wird er nur über `stab/einsatzleiter.ts` (`einsatzleiterDa
 Kopfleiste der Einsatzdaten, Wurzel des Organigramms, Spalte Leiter/Führer der Zeile `fs`, die
 Lagebericht-Übernahmen, der Einsatzbericht, der Nebentext der Zeile `fs` im Kommunikationsplan und
 die Einsatzkachel („EL …“, aus `EinsatzAnzeige.einsatzleiter` über `einsatzleiterAusAngabe`;
-LLH-1168, `openspec/changes/b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`). **Nie aus
-der App-Rolle `einsatzleitung` oder der Stab-Besetzung ableiten**; fehlt er, steht „nicht erfasst“, fehlt die Quelle, ihr Grund. In der
+LLH-1168,
+`openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`).
+**Nie aus der App-Rolle `einsatzleitung` oder der Stab-Besetzung ableiten**; fehlt er, steht „nicht erfasst“, fehlt die Quelle, ihr Grund. In der
 Fernmeldeskizze steht kein Name (Regel unten).
 
 **Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`;

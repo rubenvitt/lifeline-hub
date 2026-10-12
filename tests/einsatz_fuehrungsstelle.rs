@@ -1469,7 +1469,7 @@ async fn schwaerzung_nullt_den_namen_des_einsatzleiters() {
 
 // ── Einsatzleiter an der Einsatzanzeige (LLH-1168) ─────────────────────────────────────────
 // Spec `einsatz-fuehrungsstelle`, „Einsatzleiter in der Einsatzanzeige“. Herleitung:
-// `openspec/changes/b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md` (D1–D3).
+// `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md` (D1–D3).
 
 /// Der Eintrag `einsatz` aus `GET /api/einsaetze`.
 async fn listeneintrag(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {

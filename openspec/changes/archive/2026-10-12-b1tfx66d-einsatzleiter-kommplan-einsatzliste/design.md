@@ -131,9 +131,9 @@ Verworfen: „Einsatzleiter“ ausgeschrieben in der Kachel. Die Kachel ist schm
 
 ## Risks / Trade-offs
 
-- [Ein Entlassen der Person ändert „nicht mehr disponiert“ ohne Ereignis `einsatzliste`] → Die
-  Kachel zieht beim nächsten Abgleich der Liste nach, wie heute die Kopfleiste beim Abgleich der
-  Führungsstelle. Kein eigenes Ereignis dafür.
+- [Ein Entlassen der Person ändert „nicht mehr disponiert“] → Seit LLH-1164 (auf `alpha` vor dem
+  Merge dieser Change) meldet das Entlassen des Einsatzleiters `kopf_geaendert`, also auch
+  `einsatzliste`; die Kachel zieht live nach.
 - [Neues Feld an einem viel genutzten DTO] → Optional mit `skip_serializing_if`. Bestehende
   Fixtures im Frontend bleiben gültig, Typ-Codegen wird geprüft (`scripts/check-typ-codegen.sh`).
 - [JOIN in `laden`, das sehr oft läuft] → 1:1 über Primärschlüssel, kein Mehraufwand von Belang.

@@ -2373,7 +2373,8 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
     );
 
     // LLH-1168: der Einsatzleiter am Einsatzkopf geht an keine Gerätesitzung; kein Gerät liest
-    // die Führungsstelle (design.md D3b der Change b1tfx66d).
+    // die Führungsstelle (D3b in
+    // `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`).
     let (s, v) = anfrage_json(
         &app,
         "PATCH",

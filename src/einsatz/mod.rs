@@ -278,8 +278,9 @@ pub struct EinsatzAnzeige {
     pub teilschwaerzungen: Option<i64>,
     /// Der Einsatzleiter der eigenen Führungsstelle (LLH-1168), in Liste und Detail dieselbe
     /// Aussage: fehlt, solange keiner erfasst ist. Lesen darf ihn, wer den Einsatz liest (wie
-    /// `GET …/fuehrungsstelle`); der Lage-Snapshot friert ihn nicht ein. Herleitung:
-    /// `openspec/changes/b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md` (D1–D3).
+    /// `GET …/fuehrungsstelle`); der Lage-Snapshot friert ihn nicht ein, Gerätesitzungen bekommen
+    /// ihn nicht. Herleitung (D1–D3b):
+    /// `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatzleiter: Option<fuehrungsstelle::EinsatzleiterAnzeige>,
 }
