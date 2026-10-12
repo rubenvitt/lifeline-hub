@@ -2,10 +2,10 @@
 
 ## 1. Stab-Marken im Modulmenü
 
-- [ ] 1.1 `Sprungmarke.schlagworte` ergänzen und die vier Bestandsmarken mit Schlagworten versehen (D5); `sprungmarken.test.ts` pinnt die Felder; Vitest grün
-- [ ] 1.2 Test zuerst (rot): `sprungmarken.test.ts` erwartet hinter `stab` die Kette Pressearbeit, Informationstelefon, Funkplan, Fernmeldeskizze, Kommunikationsplan (`navZeilen` über die Registry-Kategorie `fuehrung`), Pfade gleich `unterseitenFuer('s5'|'s6')` bzw. `funkplanPfad(id, { ansicht: 'skizze' })`, und jede Stab-Unterseite hat genau eine Marke gleichen Namens (D2); dann die Marken aus `stab/unterseiten.ts` ableiten (D1/D2); Vitest grün
-- [ ] 1.3 `ModulPanel.test.tsx`/`ModulAkkordeon.test.tsx`: Stab sichtbar → fünf Marken hinter „Stab“ mit Ziel im zugänglichen Namen, ohne `aria-current`; Stab gesperrt → Marken gesperrt mit Schloss, Klick springt nicht; Stab ausgeblendet → keine Marke (D3); Vitest grün
-- [ ] 1.4 Regeln: LFH-620-Absatz in `frontend/AGENTS.md` und Einstiegsangaben in `frontend/src/stab/AGENTS.md` nachziehen (D8); `prettier --check` über `frontend/` grün
+- [x] 1.1 `Sprungmarke.schlagworte` ergänzen und die vier Bestandsmarken mit Schlagworten versehen (D5); `sprungmarken.test.ts` pinnt die Felder; Vitest grün
+- [x] 1.2 Test zuerst (rot): `sprungmarken.test.ts` erwartet hinter `stab` die Kette Pressearbeit, Informationstelefon, Funkplan, Fernmeldeskizze, Kommunikationsplan (`navZeilen` über die Registry-Kategorie `fuehrung`), Pfade gleich `unterseitenFuer('s5'|'s6')` bzw. `funkplanPfad(id, { ansicht: 'skizze' })`, und jede Stab-Unterseite hat genau eine Marke gleichen Namens (D2); dann die Marken aus `stab/unterseiten.ts` ableiten (D1/D2); Vitest grün
+- [x] 1.3 `ModulPanel.test.tsx`/`ModulAkkordeon.test.tsx`: Stab sichtbar → fünf Marken hinter „Stab“ mit Ziel im zugänglichen Namen, ohne `aria-current`; Stab gesperrt → Marken gesperrt mit Schloss, Klick springt nicht; Stab ausgeblendet → keine Marke (D3); Vitest grün
+- [x] 1.4 Regeln: LFH-620-Absatz in `frontend/AGENTS.md` und Einstiegsangaben in `frontend/src/stab/AGENTS.md` nachziehen (D8); `prettier --check` über `frontend/` grün
 
 ## 2. Ansichten in der Sprungpalette
 

@@ -1,4 +1,6 @@
-import { etbPfad, fahrzeugePfad, personenPfad } from '../routing/deeplinks';
+import { etbPfad, fahrzeugePfad, funkplanPfad, personenPfad } from '../routing/deeplinks';
+import { SACHGEBIETE } from '../stab/sachgebiete';
+import { unterseitenFuer } from '../stab/unterseiten';
 import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegistry';
 
 /**
@@ -18,6 +20,9 @@ import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegi
  * Namen („springt zu ETB …").
  *
  * Keine Zähler: für Sprungmarken gibt es keine Quelle — weggelassen, nicht erfunden.
+ *
+ * Dieselbe Tabelle speist die Gruppe „Ansichten“ der Sprungpalette (LLH-1127,
+ * `command-palette/befehle.ts`); dort zählen zusätzlich die `schlagworte`.
  */
 export interface Sprungmarke {
   key: string;
@@ -35,7 +40,54 @@ export interface Sprungmarke {
    * zugängliche Name stellt „springt zu“ davor, weil der Pfeil daneben nur Dekoration ist.
    */
   hinweis: string;
+  /** Suchworte für die Sprungpalette; das Menü zeigt sie nicht. */
+  schlagworte: string[];
   pfad: (einsatzId: number) => string;
+}
+
+/** Suchworte der Stab-Unterseiten je Schlüssel aus `stab/unterseiten.ts`; das Kürzel (s5, s6) kommt dazu. */
+const STAB_SCHLAGWORTE: Record<string, string[]> = {
+  presse: ['presse', 'medien', 'pressemitteilung', 'medienlage'],
+  infotelefon: ['bürgertelefon', 'anrufe', 'hotline', 'infotelefon', 'informationstelefon'],
+  funkplan: ['funk', 'sprechgruppe', 'tmo', 'dmo', 'kanal', 'rufname'],
+  kommunikationsplan: ['telefon', 'rufnummer', 'leitstelle', 'erreichbarkeit'],
+};
+
+/**
+ * Die Arbeitsseiten des Stabs (LLH-1127) als Marken direkt hinter „Stab“, nach Sachgebiet.
+ * Name und Adresse kommen aus `stab/unterseiten.ts`, EINE Wahrheit mit den Einstiegen der
+ * Stab-Seite; nur die Fernmeldeskizze ist eine Ansicht des Funkplans und steht hier selbst.
+ * Sperre und Sichtbarkeit erben sie vom Stab, wie die Seiten selbst (`useStabFreigabe`).
+ */
+function stabMarken(): Sprungmarke[] {
+  const marken: Sprungmarke[] = [];
+  let nach = 'stab';
+  const haenge = (marke: Omit<Sprungmarke, 'kategorie' | 'zielModul' | 'nach'>) => {
+    marken.push({ ...marke, kategorie: 'fuehrung', zielModul: 'stab', nach });
+    nach = marke.key;
+  };
+  for (const { sachgebiet, kuerzel } of SACHGEBIETE) {
+    const sg = kuerzel.toLowerCase();
+    for (const seite of unterseitenFuer(sachgebiet)) {
+      haenge({
+        key: seite.key,
+        label: seite.label,
+        hinweis: `Stab · ${seite.label}`,
+        schlagworte: [...(STAB_SCHLAGWORTE[seite.key] ?? []), sg],
+        pfad: seite.pfad,
+      });
+      if (seite.key === 'funkplan') {
+        haenge({
+          key: 'fernmeldeskizze',
+          label: 'Fernmeldeskizze',
+          hinweis: 'Funkplan · Skizze',
+          schlagworte: ['skizze', 'fernmeldeskizze', 'kommunikationsskizze', 'funk', sg],
+          pfad: (einsatzId) => funkplanPfad(einsatzId, { ansicht: 'skizze' }),
+        });
+      }
+    }
+  }
+  return marken;
 }
 
 export const sprungmarken: Sprungmarke[] = [
@@ -46,6 +98,7 @@ export const sprungmarken: Sprungmarke[] = [
     zielModul: 'etb',
     nach: 'auftraege',
     hinweis: 'ETB · Entscheidung',
+    schlagworte: ['entscheidung', 'beschluss', 'entschluss'],
     pfad: (einsatzId) => etbPfad(einsatzId, { typ: 'entscheidung' }),
   },
   {
@@ -57,6 +110,7 @@ export const sprungmarken: Sprungmarke[] = [
     zielModul: 'personen',
     nach: 'personen',
     hinweis: 'Personen · Sichtungsraster',
+    schlagworte: ['sichtung', 'sichtungsraster', 'sk', 'verletzte'],
     pfad: (einsatzId) => personenPfad(einsatzId, { ansicht: 'raster', filter: 'alle' }),
   },
   {
@@ -66,6 +120,7 @@ export const sprungmarken: Sprungmarke[] = [
     zielModul: 'personen',
     nach: 'patienten',
     hinweis: 'Personen · Vermisst',
+    schlagworte: ['vermisst', 'suche', 'abgängig'],
     pfad: (einsatzId) => personenPfad(einsatzId, { ansicht: 'zeilen', filter: 'vermisst' }),
   },
   {
@@ -77,8 +132,10 @@ export const sprungmarken: Sprungmarke[] = [
     zielModul: 'fahrzeuge',
     nach: 'fahrzeuge',
     hinweis: 'Fahrzeuge · FMS-Tableau',
+    schlagworte: ['fms', 'status', 'statustableau', 'fahrzeugstatus'],
     pfad: (einsatzId) => fahrzeugePfad(einsatzId, { ansicht: 'tableau' }),
   },
+  ...stabMarken(),
 ];
 
 export function sprungmarkenNachKategorie(
