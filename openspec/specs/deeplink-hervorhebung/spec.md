@@ -12,7 +12,7 @@ Statustönungen, ohne den Kontrastboden des Zeilentexts zu unterschreiten.
 ### Requirement: Hervorhebung aus vorhandenen Rollen
 
 Die Markierung einer per Deeplink angesteuerten Zeile oder Karte einer Datensicht, eines
-Zeitachseneintrags oder einer Kommunikationskarte (Meldung, Auftrag) MUST ihre Farben
+Zeitachseneintrags oder einer Kommunikationskarte (Meldung, Auftrag, Einsatzbefehl) MUST ihre Farben
 ausschließlich aus vorhandenen Farbrollen beziehen. Sie MUST NOT eine Statusrolle (`achtung`,
 `alarm`, `normal`) oder eine Statustönung einer Zeile verwenden, weil die angesprungene Zeile
 kein Zustand ist.
@@ -26,7 +26,7 @@ kein Zustand ist.
 - **THEN** fügt die Markierung weder die Achtung- noch die Alarmfläche, noch eine Lücken-, Problem- oder Berichtigungstönung hinzu
 
 #### Scenario: Kommunikationskarte
-- **WHEN** im Tag- oder Nachtmodus eine nicht alarmierte Meldung per `?meldung=` oder ein nicht alarmierter Auftrag per `?auftrag=` angesprungen wird
+- **WHEN** im Tag- oder Nachtmodus eine nicht alarmierte Meldung per `?meldung=`, ein nicht alarmierter Auftrag per `?auftrag=` oder ein Einsatzbefehl per `?befehl=` angesprungen wird
 - **THEN** trägt die Karte die Fläche und die Linie der Bedienrollen des Modus, wie die Tabellenzeile
 
 ### Requirement: Zwei Kanäle, in beiden Modi sichtbar
@@ -93,3 +93,18 @@ und nur die Linie oben und unten hinzufügen. Die Linie MUST gegen die Gefahrfl�
 #### Scenario: Linie auf der Alarmfläche
 - **WHEN** eine alarmierte Karte per Deeplink angesprungen wird
 - **THEN** misst die Linie gegen die Alarmfläche mindestens 3 : 1
+
+### Requirement: Markierung bleibt von der Auswahl unterscheidbar
+
+In einer Fläche mit gewählter Karte (Muster „Liste + Detailpaneel“) MUST nur die angesprungene
+Karte die Linie oben und unten tragen. Eine gewählte, nicht angesprungene Karte MUST NOT diese Linie
+tragen. Trägt eine Karte beides, MUST die Markierung (Bedienfläche und Linie) über der Auswahlfläche
+stehen.
+
+#### Scenario: Gewählt, nicht angesprungen
+- **WHEN** eine Karte von Hand gewählt ist und keine Karte angesprungen wurde
+- **THEN** trägt die gewählte Karte die Auswahlfläche und keine Linie oben und unten
+
+#### Scenario: Angesprungen und gewählt
+- **WHEN** ein Auftrag per `?auftrag=` angesprungen und dadurch gewählt wird
+- **THEN** trägt seine Karte die Bedienfläche und die Linie oben und unten

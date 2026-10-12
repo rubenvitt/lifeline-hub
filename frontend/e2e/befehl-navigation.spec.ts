@@ -28,6 +28,15 @@ async function vorbereiten(page: Page) {
   return { einsatzId, api, liste, befehle, detail };
 }
 
+/**
+ * Öffnet den Befehl aus der Liste (oxgob5gk, Liste + Detailpaneel): Karte wählen, dann der Sprung
+ * „Vollansicht“ im Detail. Er steht auch ohne Schreibrecht da („Entwurf bearbeiten“ nicht).
+ */
+async function oeffneBefehl(page: Page) {
+  await page.getByRole('button', { name: 'Befehl v1: Befehl Navigation', exact: true }).click();
+  await page.getByRole('link', { name: /^Vollansicht/ }).click();
+}
+
 test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor der Navigation', async ({
   page,
 }) => {
@@ -65,7 +74,7 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.goto(liste);
   await page.getByRole('tab', { name: 'Einsatzbefehle' }).click();
-  await page.getByRole('link', { name: 'Befehl Navigation', exact: true }).click();
+  await oeffneBefehl(page);
   await expect(page).toHaveURL(detail);
   // Ein abgelehnter PATCH hält die Fassung reproduzierbar offen; keine Zeitannahme.
   await page.route(`**${api}`, async (route) => {
@@ -128,18 +137,26 @@ for (const rolle of ['admin', 'beobachter'] as const) {
     if (rolle === 'beobachter') await expect(entwerfen).toHaveCount(0);
     else await expect(entwerfen).toBeVisible();
 
-    await page.getByRole('link', { name: 'Befehl Navigation', exact: true }).click();
+    await oeffneBefehl(page);
     await expect(page).toHaveURL(detail);
+    // Die Brotkrume wählt den Befehl wieder (`?befehl=`, oxgob5gk D6); der Parameter wird danach
+    // geräumt, es bleibt der Reiter.
     await page.getByRole('link', { name: 'Aufträge/Befehle', exact: true }).click();
     await expect(page).toHaveURL(befehle);
     await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
+    const karte = page.getByRole('button', { name: 'Befehl v1: Befehl Navigation', exact: true });
+    await expect(karte).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('[data-befehl-id]').first()).toHaveAttribute(
+      'data-hervorgehoben',
+      'true',
+    );
 
-    await page.getByRole('link', { name: 'Befehl Navigation', exact: true }).click();
+    await oeffneBefehl(page);
     await expect(page).toHaveURL(detail);
     await page.goBack();
     await expect(page).toHaveURL(befehle);
     await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('link', { name: 'Befehl Navigation', exact: true })).toBeVisible();
+    await expect(karte).toBeVisible();
 
     await page.goto(`${liste}/befehle/kein-befehl`);
     await expect(page).toHaveURL(befehle);

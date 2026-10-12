@@ -503,6 +503,12 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       '/einsaetze/5/auftraege?auftrag=13',
     );
   });
+  it('auftraegePfad mit ?befehl= setzt den Reiter Einsatzbefehle (oxgob5gk D6)', () => {
+    expect(auftraegePfad(E, { befehl: 7 })).toBe('/einsaetze/5/auftraege?befehl=7&reiter=befehle');
+    const rund = new URL(auftraegePfad(E, { befehl: 7 }), 'http://x').searchParams;
+    expect(parseAuftraegeReiter(rund)).toBe('befehle');
+    expect(rund.get('befehl')).toBe('7');
+  });
   it('parseAuftraegeReiter: Round-Trip, unbekannter und fehlender Wert ergeben die Vorgabe', () => {
     const rund = (pfad: string) => parseAuftraegeReiter(new URL(pfad, 'http://x').searchParams);
     expect(rund(auftraegePfad(E, { reiter: 'befehle' }))).toBe('befehle');

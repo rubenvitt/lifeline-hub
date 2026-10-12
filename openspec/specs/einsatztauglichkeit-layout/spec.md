@@ -30,8 +30,9 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
 - Gefahrenmatrix: alle 58 Zell-Auslöser und die Gebietszeilen.
 - Kommunikation (Meldungen, Erinnerungen, Nachforderungen, Aufträge und Befehle, Chat): die
   Primäraktion des Seitenkopfs, die Aktionsknöpfe und Auswahlfelder jeder Karte, auf der Seite
-  Aufträge die Tabs „Einzelaufträge“ und „Einsatzbefehle“ und der Kopf „Befehlsdetails“, der Link einer
-  Befehlskarte, im Chat Eingabefeld und Senden-Knopf.
+  Aufträge die Tabs „Einzelaufträge“ und „Einsatzbefehle“, die Status-Segmente und das Suchfeld
+  beider Reiter, das Auswahlziel jeder Auftrags- und Befehlskarte und die Handlungen und Sprünge
+  des Detailpaneels, im Chat Eingabefeld und Senden-Knopf.
 - Einsatz-Einstellungen: die Sektionswahl, Auswahl- und Zahlfelder, der Speichern-Knopf und die
   Modulzeilen (Schalter, Rollenauswahl), in der Sektion „Zugriff“ die Personen- und
   Rollenauswahl, „Hinzufügen“ und die Aktionen jeder Mitgliederzeile. Einsatzdaten: die
@@ -82,6 +83,10 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 #### Scenario: Brotkrume der Stammdaten-Detailseiten
 - **WHEN** die Fahrzeug- oder die Personal-Detailseite der Stammdaten am Fükw-Schirm und auf dem Handschirm steht
 - **THEN** misst der Link „Fahrzeuge“ bzw. „Personal“ im Ortspfad in `handschuh` mindestens 72 px und in `kompakt` mindestens 30 px in der Höhe, und seine Schrift ist in jeder Stufe 12 px groß
+
+#### Scenario: Liste und Detail der Aufträge im Handschuh-Betrieb
+- **WHEN** die Dichtestufe `handschuh` gewählt ist und auf dem Handschirm ein offener Auftrag mit offenem Empfänger aufgeklappt ist
+- **THEN** misst das Auswahlziel jeder Karte und jeder Knopf des Detailpaneels („Quittieren“, „Bearbeitung beginnen“, „Vollzug melden“) mindestens 72 px in der Höhe
 
 ### Requirement: Abstand zwischen klickbaren Kennzahlen
 

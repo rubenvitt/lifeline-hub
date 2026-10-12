@@ -7,7 +7,8 @@ import { wechsleZuRolle } from './rollen-kern';
  * „Zusage erfassen" statt „→ Zugesagt", „Erübrigt (zur Kenntnis)" und „Erledigt (durchgeführt)"
  * statt „Quittieren"/„Erledigt" mit Tooltip. Die Texte werden länger; hier steht, was jsdom
  * nicht belegt: auf Handy, Tablet hoch und quer und Desktop steht jeder Knopf als Wort sichtbar
- * innerhalb seiner Karte, und die Seite bekommt keinen waagerechten Überhang.
+ * innerhalb seiner Karte (bei den Aufträgen seit oxgob5gk: seines Detailpaneels), und die Seite
+ * bekommt keinen waagerechten Überhang.
  *
  * Gemessen als Admin UND als Beobachter (`frontend/e2e/AGENTS.md`, Layout-Gate
  * nicht-privilegiert): ohne Schreibrecht fehlen die Knöpfe, die Karte bleibt.
@@ -33,20 +34,46 @@ const BREITEN = [
   { width: 1440, height: 900 },
 ];
 
-const MODULE = [
+/** Hülle eines Knopfs: die Kommunikationskarte bzw. das Detailpaneel. */
+const KARTE = 'komm-karte';
+const DETAIL = 'liste-detail-detail';
+
+const MODULE: readonly {
+  pfad: string;
+  anker: string;
+  knoepfe: readonly string[];
+  huelle: typeof KARTE | typeof DETAIL;
+  /** Auswahlziel der Karte, deren Detail die Knöpfe trägt (Muster „Liste + Detailpaneel“). */
+  waehle?: RegExp;
+}[] = [
   {
     pfad: 'erinnerungen',
     anker: 'Lagemeldung an die Leitstelle',
     knoepfe: ['Erübrigt (zur Kenntnis)', 'Erledigt (durchgeführt)'],
+    huelle: KARTE,
   },
-  { pfad: 'meldungen', anker: 'Brücke Nord gesperrt', knoepfe: ['Bearbeitung beginnen'] },
   {
+    pfad: 'meldungen',
+    anker: 'Brücke Nord gesperrt',
+    knoepfe: ['Bearbeitung beginnen'],
+    huelle: KARTE,
+  },
+  {
+    // Seit oxgob5gk trägt die Auftragskarte keine Handlung: die Knöpfe stehen im Detail, das ab
+    // lg neben der Liste steht und darunter unter der gewählten Karte aufklappt.
     pfad: 'auftraege',
     anker: 'Erkundung Brücke Nord',
     knoepfe: ['Bearbeitung beginnen', 'Vollzug melden'],
+    huelle: DETAIL,
+    waehle: /^Auftrag #\d+: Erkundung Brücke Nord$/,
   },
-  { pfad: 'nachforderungen', anker: 'RTW Wortlaut', knoepfe: ['Zusage erfassen', 'Ablehnen'] },
-] as const;
+  {
+    pfad: 'nachforderungen',
+    anker: 'RTW Wortlaut',
+    knoepfe: ['Zusage erfassen', 'Ablehnen'],
+    huelle: KARTE,
+  },
+];
 
 /** Waagerechter Überhang der Seite in px (Chromium rundet `scrollWidth`, 1 px Toleranz). */
 async function ueberhang(page: Page): Promise<number> {
@@ -81,9 +108,9 @@ async function seede(page: Page): Promise<string> {
   return einsatzId;
 }
 
-/** Der Knopf steht innerhalb seiner Karte (1 px Toleranz für Subpixel). */
-async function innerhalbDerKarte(knopf: Locator, wo: string) {
-  const karte = knopf.locator('xpath=ancestor::*[@data-lfh="komm-karte"][1]');
+/** Der Knopf steht innerhalb seiner Karte bzw. seines Detailpaneels (1 px Toleranz für Subpixel). */
+async function innerhalbDerKarte(knopf: Locator, huelle: string, wo: string) {
+  const karte = knopf.locator(`xpath=ancestor::*[@data-lfh="${huelle}"][1]`);
   const k = await knopf.boundingBox();
   const r = await karte.boundingBox();
   expect(k, `${wo}: Knopf messbar`).not.toBeNull();
@@ -100,6 +127,15 @@ async function pruefe(page: Page, einsatzId: string, rolle: 'admin' | 'beobachte
       await page.goto(`/einsaetze/${einsatzId}/${modul.pfad}`);
       const main = page.locator('main');
       await expect(main.getByText(modul.anker).first(), `${wo}: Datenanker`).toBeVisible();
+      if (modul.waehle) {
+        // Ab lg ist der Auftrag vorgewählt und bleibt es beim Klick; darunter klappt der Klick
+        // das Detail auf. In beiden Rollen: sonst fehlten die Knöpfe dem Beobachter nur, weil
+        // nichts aufgeklappt ist.
+        await main.getByRole('button', { name: modul.waehle }).click();
+        await expect(main.locator(`[data-lfh="${DETAIL}"]`), `${wo}: Detail steht`).toContainText(
+          modul.anker,
+        );
+      }
       for (const name of modul.knoepfe) {
         const knopf = main.getByRole('button', { name, exact: true });
         if (rolle === 'beobachter') {
@@ -108,7 +144,7 @@ async function pruefe(page: Page, einsatzId: string, rolle: 'admin' | 'beobachte
         }
         await expect(knopf.first(), `${wo}: „${name}" als Wort`).toBeVisible();
         await knopf.first().click({ trial: true, timeout: 5_000 });
-        await innerhalbDerKarte(knopf.first(), `${wo} „${name}"`);
+        await innerhalbDerKarte(knopf.first(), modul.huelle, `${wo} „${name}"`);
       }
       expect(await ueberhang(page), `${wo}: ohne Überhang`).toBeLessThanOrEqual(1);
     }

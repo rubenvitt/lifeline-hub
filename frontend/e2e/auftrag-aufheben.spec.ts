@@ -3,10 +3,13 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Auftrag aufheben und berichtigen (LLH-1098, Spec `auftrag-aufheben-berichtigen`): erteilen,
- * über das Menü der Karte mit Grund aufheben, danach steht er unter „Abgeschlossen“ mit Etikett
- * und Grund. Berichtigen vor der ersten Quittung schreibt die Anordnung „… geändert: …“ ins ETB.
+ * über das Menü im Detail mit Grund aufheben (Change oxgob5gk: Handlungen stehen im Detail, nicht
+ * an der Karte), danach steht er unter „Abgeschlossen“ mit Etikett und Grund. Berichtigen vor der ersten Quittung schreibt die Anordnung „… geändert: …“ ins ETB.
  * Als Beobachter fehlen beide Handlungen (`e2e/AGENTS.md`, Rollen).
  */
+
+/** Das Detailpaneel des gewählten Auftrags (`components/ListeDetail.tsx`). */
+const detail = (page: Page) => page.locator('[data-lfh="liste-detail-detail"]');
 
 async function einsatzMitAuftrag(page: Page): Promise<{ einsatzId: string; nr: number }> {
   const e = await page.request.post('/api/einsaetze', {
@@ -29,7 +32,7 @@ test.describe('Auftrag aufheben und berichtigen', () => {
     await anmeldenAlsAdmin(page);
     const { einsatzId, nr } = await einsatzMitAuftrag(page);
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);
-    await expect(page.getByText('Sandsäcke zum Deich bringen')).toBeVisible();
+    await expect(detail(page).getByText('Sandsäcke zum Deich bringen')).toBeVisible();
 
     await page.getByRole('button', { name: `Aktionen zu Auftrag #${nr}` }).click();
     await page.getByRole('menuitem', { name: 'Auftrag aufheben' }).click();
@@ -41,7 +44,7 @@ test.describe('Auftrag aufheben und berichtigen', () => {
     await page.getByText('Abgeschlossen (1)').click();
     const karte = page.locator('[data-auftrag-id]');
     await expect(karte.getByText('Aufgehoben', { exact: true })).toBeVisible();
-    await expect(karte.getByText('Grund: Material kommt vom Bauhof')).toBeVisible();
+    await expect(detail(page).getByText('Grund: Material kommt vom Bauhof')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Quittieren' })).toHaveCount(0);
   });
 
@@ -51,11 +54,11 @@ test.describe('Auftrag aufheben und berichtigen', () => {
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);
     await page.getByRole('button', { name: `Aktionen zu Auftrag #${nr}` }).click();
     await page.getByRole('menuitem', { name: 'Berichtigen' }).click();
-    const paneel = page.getByRole('region', { name: `Auftrag #${nr} berichtigen` });
-    await paneel.getByLabel('Auftrag / Was').fill('Sandsäcke zum Deich Nord bringen');
-    await paneel.getByRole('button', { name: 'Berichtigung speichern' }).click();
-    await expect(paneel).toHaveCount(0);
-    await expect(page.getByText('Sandsäcke zum Deich Nord bringen')).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: `Auftrag #${nr} berichtigen` });
+    await dialog.getByLabel('Auftrag / Was').fill('Sandsäcke zum Deich Nord bringen');
+    await dialog.getByRole('button', { name: 'Berichtigung speichern' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(detail(page).getByText('Sandsäcke zum Deich Nord bringen')).toBeVisible();
 
     const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
     const inhalte = ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
@@ -69,8 +72,8 @@ test.describe('Auftrag aufheben und berichtigen', () => {
     const { einsatzId, nr } = await einsatzMitAuftrag(page);
     await wechsleZuRolle(page, 'beobachter', einsatzId);
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);
-    // Vorbedingung: der Rollenzweig steht (Karte da, Quittieren fehlt).
-    await expect(page.getByText('Sandsäcke zum Deich bringen')).toBeVisible();
+    // Vorbedingung: der Rollenzweig steht (Detail da, Quittieren fehlt).
+    await expect(detail(page).getByText('Sandsäcke zum Deich bringen')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Quittieren' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: `Aktionen zu Auftrag #${nr}` })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Auftrag aufheben', exact: true })).toHaveCount(

@@ -19,11 +19,16 @@ type Hueller = Omit<HTMLAttributes<HTMLElement>, 'children' | 'style'>;
  * links stehen bleibt und die Karte beim Sprung nicht wächst. Kein umlaufender Ring: das ist die
  * Form des Fokusrings. Gefahr gewinnt: eine alarmierte Karte behält ihre Fläche
  * ({@link kartenGrund}), die Markierung legt nur die Linien darüber.
+ *
+ * Auswahl (`gewaehlt`, Muster „Liste + Detailpaneel“, `components/ListeDetail.tsx`): Fläche
+ * `auswahlFlaeche` ohne Linie. Die Linie bleibt allein der Markierung, sonst wären gewählt und
+ * angesprungen nicht zu unterscheiden.
  */
 export default function KommKarte({
   alarm = false,
   unbearbeitet = false,
   hervorgehoben = false,
+  gewaehlt = false,
   zeit,
   nr,
   children,
@@ -34,6 +39,8 @@ export default function KommKarte({
   unbearbeitet?: boolean;
   /** Deeplink-Hervorhebung (`?meldung=` / `?auftrag=`): Bedienfläche plus Ober-/Unterlinie. */
   hervorgehoben?: boolean;
+  /** Gewählte Karte einer `ListeDetail`: Auswahlfläche, keine Linie. */
+  gewaehlt?: boolean;
   /** Zeitspalte links (Zeitachsen-Optik) — ohne sie beginnt die Karte mit dem Inhalt. */
   zeit?: ReactNode;
   nr?: ReactNode;
@@ -49,12 +56,13 @@ export default function KommKarte({
       data-alarm={alarm ? 'true' : undefined}
       data-unbearbeitet={kante.zustand === 'unbearbeitet' ? 'true' : undefined}
       data-hervorgehoben={hervorgehoben ? 'true' : undefined}
+      data-gewaehlt={gewaehlt ? 'true' : undefined}
       style={{
         display: 'flex',
         alignItems: 'stretch',
         minWidth: 0,
         marginBottom: token.marginXS,
-        background: kartenGrund(rollen, { alarm, hervorgehoben }),
+        background: kartenGrund(rollen, { alarm, hervorgehoben, gewaehlt }),
         border: `1px solid ${rollen.linie}`,
         borderInlineStart: `3px solid ${kante.farbe}`,
         borderRadius: 0,

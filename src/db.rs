@@ -2,6 +2,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
 mod physisch;
+pub mod suche;
 #[cfg(test)]
 pub(crate) use physisch::datei_oder_wal_enthaelt;
 pub use physisch::{bereinige_altbestand_einmalig, wal_zurueckschreiben};

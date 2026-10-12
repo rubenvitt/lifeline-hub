@@ -203,8 +203,9 @@ Die Abgeschlossen-Ansicht MUST aufgehobene Aufträge nach dem Zeitpunkt des Aufh
 - **THEN** zeigt die Bilanz „1 von 2 erledigt“
 
 ### Requirement: Aufheben und Berichtigen in der Oberfläche
-Die Auftragskarte SHALL die Handlungen „Berichtigen“ und „Auftrag aufheben“ nur für Mitglieder mit
-Schreibrecht anbieten. „Berichtigen“ steht nur bereit, solange der Server berichtigen ließe;
+Das Detail eines Auftrags (auf der Seite „Aufträge/Befehle“ das Detailpaneel, Spec `liste-detail`;
+in der Geräteansicht die Auftragskarte) SHALL die Handlungen „Berichtigen“ und „Auftrag aufheben“
+nur für Mitglieder mit Schreibrecht anbieten. „Berichtigen“ steht nur bereit, solange der Server berichtigen ließe;
 sonst MUST die Handlung fehlen oder gesperrt mit Grund stehen. „Auftrag aufheben“ steht bei jedem
 nicht abgenommenen, nicht aufgehobenen Auftrag bereit.
 

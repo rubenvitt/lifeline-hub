@@ -723,13 +723,19 @@ export type AuftraegeReiter = 'auftraege' | 'befehle';
 
 export function auftraegePfad(
   einsatzId: number,
-  opts: { auftrag?: number; reiter?: AuftraegeReiter } = {},
+  opts: { auftrag?: number; befehl?: number; reiter?: AuftraegeReiter } = {},
 ): string {
+  // `?befehl=` wählt einen Befehl in der Liste (oxgob5gk D6) und meint immer den Reiter Befehle.
+  const befehl = opts.auftrag === undefined ? opts.befehl : undefined;
   return mitQuery(einsatzModulPfad(einsatzId, 'auftraege'), {
     auftrag: opts.auftrag,
+    befehl,
     // Ein `?auftrag=`-Sprung meint immer den Reiter Aufträge: im Reiter Befehle hinge die
     // Auftragsliste nicht ein, und der Parameter würde nie angewendet und geräumt.
-    reiter: opts.reiter === 'befehle' && opts.auftrag === undefined ? 'befehle' : undefined,
+    reiter:
+      (opts.reiter === 'befehle' || befehl !== undefined) && opts.auftrag === undefined
+        ? 'befehle'
+        : undefined,
   });
 }
 

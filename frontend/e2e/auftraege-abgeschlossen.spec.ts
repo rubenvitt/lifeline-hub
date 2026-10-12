@@ -7,7 +7,14 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * ältesten holt ihn einzeln, ohne bis zu ihm zu blättern. Als Admin und als Beobachter
  * (`e2e/AGENTS.md`, Rollen): das Board ist ein Lesepfad beider. Ab 51 Aufträgen rendert die
  * Ansicht nur ihren Ausschnitt, gezählt wird deshalb über die Zeile „… von … geladen".
+ *
+ * Seit oxgob5gk (Liste + Detailpaneel) steht ein gewählter Auftrag zweimal da (Karte und Detail);
+ * gesucht wird deshalb über das Auswahlziel bzw. in der Liste. Die Server-Suche (`q`, D9) findet
+ * den ältesten, ohne zu blättern.
  */
+
+// 105 Aufträge über die API plus Neuladen und Suche: mehr als die Vorgabe von 30 s.
+test.setTimeout(90_000);
 
 const VOLLZOGEN = 105;
 
@@ -52,7 +59,7 @@ async function pruefeBlaettern(
   vorbedingung?: () => Promise<void>,
 ) {
   await page.goto(`/einsaetze/${einsatzId}/auftraege`);
-  await expect(page.getByText('Noch offen')).toBeVisible();
+  await expect(page.getByRole('button', { name: /: Noch offen$/ })).toBeVisible();
   await vorbedingung?.();
 
   await page.getByText(`Abgeschlossen (${VOLLZOGEN})`).click();
@@ -60,11 +67,27 @@ async function pruefeBlaettern(
   await page.getByRole('button', { name: 'Ältere laden' }).click();
   await expect(page.getByRole('button', { name: 'Ältere laden' })).toHaveCount(0);
 
+  // Die Suche geht an den Server: sie findet den ältesten auch ohne geladene Seiten.
+  await page.reload();
+  await page.getByText(`Abgeschlossen (${VOLLZOGEN})`).click();
+  await expect(page.getByText(`100 von ${VOLLZOGEN} geladen`)).toBeVisible();
+  await page.getByRole('textbox', { name: 'Aufträge durchsuchen' }).fill('Vollzogen 0');
+  await expect(page.getByText('Abgeschlossen (1)')).toBeVisible();
+  const abgeschlossene = page.getByRole('list', { name: 'Abgeschlossene Aufträge' });
+  await expect(abgeschlossene.getByRole('button', { name: /: Vollzogen 0$/ })).toBeVisible();
+  await expect(abgeschlossene.getByRole('button', { name: /^Auftrag / })).toHaveCount(1);
+
   // Deeplink auf den ältesten: einzeln geholt, über der ersten Seite angeheftet.
   await page.goto(`/einsaetze/${einsatzId}/auftraege?auftrag=${aeltesterId}`);
   await expect(page.getByText('Verlinkter Auftrag')).toBeVisible();
-  await expect(page.locator(`[data-auftrag-id="${aeltesterId}"]`)).toBeVisible();
-  await expect(page.getByText('Vollzogen 0', { exact: true })).toBeVisible();
+  const karte = page.locator(`[data-auftrag-id="${aeltesterId}"]`);
+  await expect(karte).toBeVisible();
+  await expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+  await expect(karte.getByText('Vollzogen 0', { exact: true })).toBeVisible();
+  // Gewählt: das Detail zeigt ihn.
+  await expect(
+    page.locator('[data-lfh="liste-detail-detail"]').getByText('Vollzogen 0', { exact: true }),
+  ).toBeVisible();
 }
 
 test.describe('Aufträge: Abgeschlossen seitenweise', () => {

@@ -78,15 +78,21 @@ const KETTE = [
 
 /** Macht den aktuellen Pfad sichtbar: nach dem Anlegen springt die Liste zur Detailseite. */
 function PfadProbe() {
-  return <span data-testid="pfad">{useLocation().pathname}</span>;
+  const ort = useLocation();
+  return (
+    <>
+      <span data-testid="pfad">{ort.pathname}</span>
+      <span data-testid="suche">{ort.search}</span>
+    </>
+  );
 }
 
-function renderListe() {
+function renderListe(route = '/einsaetze/1/auftraege?reiter=befehle') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/auftraege?reiter=befehle']}>
+        <MemoryRouter initialEntries={[route]}>
           <PfadProbe />
           {/* Die Tastatur-Registry trägt Escape in der Erfassungshülle (`keyboard={false}`). */}
           <CommandPaletteProvider>
@@ -100,88 +106,97 @@ function renderListe() {
 
 beforeEach(() => {
   vi.mocked(befehleApi.listeBefehle).mockResolvedValue(KETTE as never);
+  // Das Detail lädt den gewählten Befehl einzeln (oxgob5gk D5).
+  vi.mocked(befehleApi.ladeBefehl).mockImplementation(
+    async (_e, id) => ({ ...KETTE.find((b) => b.id === id)!, abschnitte: [] }) as never,
+  );
 });
 
-describe('BefehlListe', () => {
-  it('macht die Fortschreibungskette als Kette lesbar (v-Nummer, Gruppen, Zähler)', async () => {
+/** Die Liste der Karten des aktuellen Segments, über den Namen des Baustein-`<ul>`. */
+const liste = (name: RegExp | string) => screen.findByRole('list', { name });
+const kartenNamen = (ul: HTMLElement) =>
+  within(ul)
+    .getAllByRole('button')
+    .map((b) => b.getAttribute('aria-label'));
+
+describe('BefehlListe — Liste + Detailpaneel (Spec `auftraege-befehle`)', () => {
+  it('macht die Fortschreibungskette über die v-Nummer lesbar, Entwürfe und Freigegebene getrennt', async () => {
     renderListe();
-    const sicht = await screen.findByRole('region', { name: 'Befehle' });
+    // Vorgabe „Entwürfe“, weil der erste Datenstand einen Entwurf hat (design.md D5).
+    const entwuerfe = await liste('Befehlsentwürfe');
+    expect(kartenNamen(entwuerfe)).toEqual(['Befehl v2: Befehl A']);
 
-    // Zwei Karten mit demselben Titel — unterscheidbar nur über die v-Nummer.
-    // `getAllByRole`: der Singular wirft bei zwei Treffern.
-    const links = await screen.findAllByRole('link', { name: 'Befehl A' });
-    expect(links.map((l) => l.getAttribute('href'))).toEqual([
-      '/einsaetze/1/auftraege/befehle/9',
-      '/einsaetze/1/auftraege/befehle/7',
-    ]);
-    // Der Titel-Link darf keinen zweiten Anker enthalten (den Link setzt `karte.titel.ziel`).
-    links.forEach((l) => expect(l.querySelector('a')).toBeNull());
-
-    expect(sicht).toHaveTextContent('v2');
-    expect(sicht).toHaveTextContent('v1');
-    // Exakter Text: der Schemawert steht in eigenem Knoten. Zwei Treffer, weil das Schema ein
-    // Merkmal der Kette ist.
-    expect(screen.getAllByText('Befehl LAD (vereinfacht)')).toHaveLength(2);
-    expect(screen.getByText('Einzelauftrag (EA/ZMW)')).toBeInTheDocument();
-
-    // Gruppenköpfe mit Zähler, Entwürfe zuerst; die Zählerform (Zahl vor Wort) gehört dem
-    // Primitiv (`gruppenZahl`).
-    // Einzahl bei einem (LFH-1153): „1 Entwürfe“ war falsch.
-    expect(sicht).toHaveTextContent(/1\s*Entwurf(?!e)/);
-    expect(sicht).not.toHaveTextContent(/Entwürfe/);
-    expect(sicht).toHaveTextContent(/2\s*Freigegeben/);
-    const text = sicht.textContent ?? '';
-    expect(text.indexOf('Entwurf')).toBeLessThan(text.indexOf('Freigegeben'));
-
-    // Innerhalb der Gruppe absteigend nach Zeitstand: 7 (10:00) vor 4 (09:00), obwohl 4 zuerst
-    // geliefert wird.
-    expect(
-      within(sicht)
-        .getAllByRole('link')
-        .map((l) => l.getAttribute('href')),
-    ).toEqual([
-      '/einsaetze/1/auftraege/befehle/9',
-      '/einsaetze/1/auftraege/befehle/7',
-      '/einsaetze/1/auftraege/befehle/4',
-    ]);
+    await userEvent.click(screen.getByText(/^Freigegeben \(/));
+    const frei = await liste('Freigegebene Befehle');
+    // Absteigend nach Zeitstand: 7 (10:00) vor 4 (09:00), obwohl 4 zuerst geliefert wird.
+    expect(kartenNamen(frei)).toEqual(['Befehl v1: Befehl A', 'Befehl v1: EA 2. Zug']);
+    expect(within(frei).getByText('Einzelauftrag (EA/ZMW)')).toBeInTheDocument();
   });
 
-  it('bleibt in jeder Breite eine Kartensicht (form="karte", kein Breakpoint-Rückfall)', async () => {
-    // Befehle werden GELESEN, nicht verglichen: auch ab `md` Karten, keine Tabelle.
+  it('wählt ab lg den ersten Befehl vor und zeigt ihn im Detail mit dem Sprung zur Vollansicht', async () => {
+    renderListe();
+    const entwuerfe = await liste('Befehlsentwürfe');
+    expect(within(entwuerfe).getByRole('button', { name: 'Befehl v2: Befehl A' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(await screen.findByRole('heading', { name: 'Befehl v2' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Vollansicht/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege/befehle/9',
+    );
+  });
+
+  it('nennt vor der ersten Lieferung keine Mengen', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockImplementation(() => new Promise(() => {}));
+    renderListe();
+    expect(await screen.findByRole('radio', { name: 'Entwürfe' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Freigegeben' })).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ freigegeben/)).toBeNull();
+  });
+
+  it('steht ohne Entwurf auf „Freigegeben“', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockResolvedValue([KETTE[0], KETTE[1]] as never);
+    renderListe();
+    expect(kartenNamen(await liste('Freigegebene Befehle'))).toHaveLength(2);
+  });
+
+  it('bleibt in jeder Breite eine Kartenliste, keine Tabelle', async () => {
     setzeViewportBreite(390);
     const schmal = renderListe();
-    await screen.findByRole('region', { name: 'Befehle' });
+    await liste('Befehlsentwürfe');
     expect(schmal.container.querySelector('.ant-table')).toBeNull();
     schmal.unmount();
 
     setzeViewportBreite(1366);
     const breit = renderListe();
-    await screen.findByRole('region', { name: 'Befehle' });
+    await liste('Befehlsentwürfe');
     expect(breit.container.querySelector('.ant-table')).toBeNull();
   });
 
-  it('filtert die Kartenliste über die Suche (Titel UND Schema)', async () => {
+  it('sucht über Titel UND Schema; die Segmente zählen das Gefundene, der Kopf den Bestand', async () => {
     renderListe();
-    await screen.findByRole('region', { name: 'Befehle' });
-
-    // `EA/ZMW` steht NUR im Schema-Label — ein nur auf den Titel gelegter `suchText` wäre rot.
-    await userEvent.type(screen.getByPlaceholderText('Titel oder Schema'), 'EA/ZMW');
-
-    expect(screen.queryAllByRole('link', { name: 'Befehl A' })).toHaveLength(0);
-    expect(screen.getByRole('link', { name: 'EA 2. Zug' })).toBeInTheDocument();
+    await liste('Befehlsentwürfe');
+    // `EA/ZMW` steht NUR im Schema-Label — eine nur auf den Titel gelegte Suche wäre rot.
+    await userEvent.type(screen.getByRole('textbox', { name: 'Befehle durchsuchen' }), 'EA/ZMW');
+    expect(screen.getByText('Entwürfe (0)')).toBeInTheDocument();
+    expect(screen.getByText('Freigegeben (1)')).toBeInTheDocument();
+    expect(screen.getByText(/1 Entwurf · 2 freigegeben/)).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Freigegeben (1)'));
+    expect(kartenNamen(await liste('Freigegebene Befehle'))).toEqual(['Befehl v1: EA 2. Zug']);
   });
 
-  it('trägt Überschrift und Kennzahlenzeile', async () => {
+  it('trägt Überschrift und Kennzahlenzeile im Bereichskopf', async () => {
     renderListe();
     expect(await screen.findByRole('heading', { name: 'Befehle', level: 3 })).toBeInTheDocument();
     // `findBy`, nicht `getBy`: die Überschrift steht sofort, die Kennzahl erst mit den Daten.
-    expect(await screen.findByText(/3 Befehle · 1 im Entwurf/)).toBeInTheDocument();
+    expect(await screen.findByText(/^1 Entwurf · 2 freigegeben/)).toBeInTheDocument();
   });
 
-  it('zählt einen einzelnen Befehl in der Einzahl', async () => {
+  it('zählt ohne Entwurf in der Mehrzahl „Entwürfe“', async () => {
     vi.mocked(befehleApi.listeBefehle).mockResolvedValue([KETTE[0]] as never);
     renderListe();
-    expect(await screen.findByText(/^1 Befehl · 0 im Entwurf/)).toBeInTheDocument();
+    expect(await screen.findByText(/^0 Entwürfe · 1 freigegeben/)).toBeInTheDocument();
   });
 
   it('zeigt "Befehl entwerfen" bei Schreibrecht — mit exaktem Namen', async () => {
@@ -192,18 +207,30 @@ describe('BefehlListe', () => {
     expect(screen.queryByRole('button', { name: /erteilen/ })).toBeNull();
   });
 
-  it('zeigt den Leerzustand ohne eigenen Leer-Knoten', async () => {
-    // Wächter: fehlt `leerText`, rendert `Liste.tsx` einen `.ant-empty`-Knoten.
+  it('zeigt den Leerzustand mit „Befehl entwerfen“, ohne antds Leer-Knoten', async () => {
     vi.mocked(befehleApi.listeBefehle).mockResolvedValue([] as never);
     const { container } = renderListe();
-
     expect(await screen.findByText('Noch keine Befehle')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Befehl entwerfen' })).toHaveLength(2);
     expect(container.querySelector('.ant-empty')).toBeNull();
+  });
+
+  it('?befehl= wählt den Befehl in seinem Segment, markiert ihn und räumt den Parameter', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    renderListe('/einsaetze/1/auftraege?befehl=7&reiter=befehle');
+    const frei = await liste('Freigegebene Befehle');
+    const ziel = within(frei).getByRole('button', { name: 'Befehl v1: Befehl A' });
+    expect(ziel).toHaveAttribute('aria-current', 'true');
+    expect(frei.querySelector('[data-befehl-id="7"]')).toHaveAttribute(
+      'data-hervorgehoben',
+      'true',
+    );
+    await waitFor(() => expect(screen.getByTestId('suche')).not.toHaveTextContent('befehl='));
   });
 });
 
 /**
- * Zeitstand der Fassungszeile: UTC-Wirestring, angezeigt über `ZeitAnzeige`, sortiert roh.
+ * Zeitstand der Karte: UTC-Wirestring, angezeigt über `ZeitAnzeige` in der Anzeigezone.
  * Die Zone wird ausdrücklich gestellt UND im Cache vorbelegt: ohne Provider gälte die lokale
  * Maschinenzone, und die Einstellungs-Abfrage löst erst nach dem ersten Render auf — der Test
  * wäre auf einem Berliner Rechner auch mit falscher Zone grün.
@@ -233,8 +260,8 @@ function renderMitZone() {
   );
 }
 
-describe('BefehlListe — Fassungszeile (LFH-350 · H60)', () => {
-  it('zeigt den Zeitstand als taktische DTG in der Anzeigezone, nicht roh', async () => {
+describe('BefehlListe — Zeitstand (LFH-350 · H60)', () => {
+  it('zeigt den Zeitstand in der Anzeigezone, nicht roh', async () => {
     vi.mocked(befehleApi.listeBefehle).mockResolvedValue([
       {
         ...BASIS,
@@ -247,9 +274,12 @@ describe('BefehlListe — Fassungszeile (LFH-350 · H60)', () => {
         vorgaenger_id: null,
       },
     ] as never);
-    renderMitZone();
-    // 12:00 UTC → 14:00 Sommerzeit in Berlin.
-    expect(await screen.findByText('v1 · 251400JUL2026 · EL')).toBeInTheDocument();
+    const { container } = renderMitZone();
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin; im Detail als DTG.
+    await waitFor(() =>
+      expect(container.querySelector('[data-lfh="komm-karte-zeit"]')).toHaveTextContent('1400'),
+    );
+    expect(await screen.findByText('251400JUL2026')).toBeInTheDocument();
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 });

@@ -226,6 +226,9 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   Gleichstand über die Registriernummer in derselben Richtung; Sortierung oder Cursor ohne
   `limit` 422. Suche per `LIKE … ESCAPE '\'` mit maskiertem `%`/`_` über dasselbe WHERE-Fragment
   wie die Kennzahlen. Ohne `limit` bleibt die Vollliste (Druck, Bericht, Snapshot).
+- **Suche einer geblätterten Liste: `q` getrimmt, leer = keine Suche, über 200 Zeichen 400**,
+  Muster nur aus `db::suche::like_muster`. Die Auftragsliste trägt sie wie die Schadenliste
+  (`…/auftraege?q=` und `…/auftraege/kennzahlen?q=`: Kennung `#n`, Text, Empfänger).
 
 ## Backend — Benutzername und KDF (LFH-921, LFH-981)
 

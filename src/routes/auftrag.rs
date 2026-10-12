@@ -11,7 +11,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::kommunikation::VOLLZUG_IN_ARBEIT;
 use crate::live::LiveEvent;
-use crate::routes::support::pflicht_max;
+use crate::routes::support::{hoechstens, pflicht_max};
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -39,6 +39,20 @@ pub struct ListeParams {
     pub vor_id: Option<i64>,
     /// Seitengröße nur mit `phase=abgeschlossen` (Vorgabe 100, geklemmt auf 1…500).
     pub limit: Option<i64>,
+    /// Suchbegriff über Kennung, Text und Empfänger (oxgob5gk, D9).
+    pub q: Option<String>,
+}
+
+/// Längste zulässige Suche (Zeichen), wie in der Schadenliste.
+const SUCHE_MAX: usize = 200;
+
+/// Suchbegriff aus `q`: getrimmt, leer = keine Suche, länger als [`SUCHE_MAX`] → 400.
+fn suche_aus(q: Option<&str>) -> Result<Option<&str>, AppError> {
+    let suche = q.map(str::trim).filter(|q| !q.is_empty());
+    if let Some(q) = suche {
+        hoechstens(q, "q", SUCHE_MAX)?;
+    }
+    Ok(suche)
 }
 
 /// Empfänger- und Richtungsfilter prüfen (Liste und Kennzahlen).
@@ -80,6 +94,7 @@ pub async fn liste(
         params.abschnitt_id,
         params.einheit_id,
     )?;
+    let suche = suche_aus(params.q.as_deref())?;
     let (phase, seite) = crate::kommunikation::phase_und_seite(
         params.phase.as_deref(),
         params.vor_zeit.as_deref(),
@@ -113,6 +128,7 @@ pub async fn liste(
             bereich: bereich.as_ref(),
             phase,
             seite,
+            suche,
         },
         &jetzt(),
     )
@@ -134,6 +150,7 @@ pub struct KennzahlenParams {
     pub richtung: Option<String>,
     pub abschnitt_id: Option<i64>,
     pub einheit_id: Option<i64>,
+    pub q: Option<String>,
 }
 
 /// GET /api/einsaetze/{id}/auftraege/kennzahlen — Zahlen des Auftragsboards (LFH-1071, D3).
@@ -147,8 +164,16 @@ pub async fn kennzahlen(
         params.abschnitt_id,
         params.einheit_id,
     )?;
+    let suche = suche_aus(params.q.as_deref())?;
     Ok(Json(
-        repo::kennzahlen(&state.pool, ctx.einsatz.id, richtung, filter.as_ref()).await?,
+        repo::kennzahlen(
+            &state.pool,
+            ctx.einsatz.id,
+            richtung,
+            filter.as_ref(),
+            suche,
+        )
+        .await?,
     ))
 }
 

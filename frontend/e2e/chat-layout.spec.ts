@@ -237,17 +237,20 @@ test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page })
   await expect(page.getByRole('heading', { level: 3, name: 'Aufträge' })).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
-  // Das Erfassungsformular aufgeklappt gemessen — die Fläche, die es im Betrieb gibt.
-  await page.getByRole('button', { name: /Auftrag erteilen/ }).click();
-  await expect(page.getByLabel('Auftrag / Was')).toBeVisible();
+  // Das Erfassungsformular offen gemessen — die Fläche, die es im Betrieb gibt. Seit oxgob5gk
+  // ein Dialog; die leere Liste trägt dieselbe Erfassen-Aktion, gemeint ist die im Bereichskopf
+  // (sie steht im DOM zuerst).
+  await page.getByRole('button', { name: 'Auftrag erteilen', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Auftrag erteilen' });
+  await expect(dialog.getByLabel('Auftrag / Was')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
   // Beide Klappteile (LLH-1091): die Ausführung mit Mittel, Ziel, Weg, Zeit und die weiteren Angaben.
-  await page.getByText(/^Ausführung:/).click();
-  await expect(page.getByLabel('Ziel / Ort')).toBeVisible();
+  await dialog.getByText(/^Ausführung:/).click();
+  await expect(dialog.getByLabel('Ziel / Ort')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
-  await page.getByText('Weitere Angaben').click();
-  await expect(page.getByLabel('Verbindung / Meldewege')).toBeVisible();
+  await dialog.getByText('Weitere Angaben').click();
+  await expect(dialog.getByLabel('Verbindung / Meldewege')).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 });

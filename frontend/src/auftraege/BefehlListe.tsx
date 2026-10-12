@@ -1,90 +1,55 @@
 import { IconPlus } from '../icons';
 import { Button, Form, Input } from 'antd';
 import { Select } from '../components/Select';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BefehlKopf, BefehlVorlageKey } from '../api/types';
-import { NEW_SELECTABLE, VORLAGEN } from '../befehle/vorlagen';
+import type { BefehlKopf } from '../api/types';
+import { NEW_SELECTABLE } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Bereichskopf from '../kommunikation/Bereichskopf';
-import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
-import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ErfassungsModal } from '../components/Erfassung';
-import { anzahl } from '../anzeige/anzahl';
+import { anzahl, segmentLabel } from '../anzeige/anzahl';
+import ListeDetail from '../components/ListeDetail';
+import { SeitenLeer } from '../components/SeitenZustand';
+import { Segmentleiste, useRollen } from '../components/instrument';
+import BefehlListenKarte from './BefehlListenKarte';
+import BefehlDetail from './BefehlDetail';
+import { befehlSchemaLabel } from './befehlTexte';
 
 /**
- * Befehlsliste des Aufträge/Befehle-Tabs.
+ * Befehlsliste des Reiters „Einsatzbefehle“ im Muster „Liste + Detailpaneel“ (Spec
+ * `auftraege-befehle`; design.md D5): gleich gebaut wie die Einzelaufträge — Bereichskopf,
+ * Status-Segmente mit Zahl, Suche, Karten aus `KommKarte`, Detail neben bzw. unter der Karte.
  *
- * `form="karte"` in JEDER Breite: ein Befehl wird als Einheit gelesen (Schema, Fassung,
- * Freigabestand), nicht verglichen; die Nachbarflächen des Tabs sind ebenfalls Karten. Das
- * Spaltenregister bleibt die einzige Wahrheit für Etikett, Sortierung, Suche und Filter.
+ * DIE V-NUMMER IST KEIN ZIERRAT: die Fortschreibung legt eine neue Zeile mit gleichem Titel an,
+ * der Vorgänger bleibt freigegeben liegen. Die Segmente Entwürfe/Freigegeben zerschneiden die Kette
+ * bewusst: nur der Entwurf ist bearbeitbar.
  *
- * DIE V-NUMMER IST KEIN ZIERRAT: die Fortschreibung legt eine neue Zeile mit gleichem Titel
- * an, der Vorgänger bleibt freigegeben liegen. Die v-Nummer unterscheidet sie und erscheint
- * immer, nicht erst ab `version > 1`. Die Gruppierung Entwürfe/Freigegeben zerschneidet die
- * Kette bewusst: nur der Entwurf ist bearbeitbar.
- *
- * Das Schema (`vorlage`) ist über die Fortschreibung unveränderlich und als geschlossene Menge
- * ein Filter, kein Freitext.
+ * Die Befehle kommen ungeblättert; die Suche über Titel und Schema läuft deshalb im Client. Der
+ * Bereichskopf zählt den Bestand, die Segmente das Gefundene.
  */
 
-function schemaLabel(schluessel: BefehlVorlageKey | string): string {
-  return VORLAGEN.find((v) => v.schluessel === schluessel)?.label ?? String(schluessel);
+/** Neueste Fassung zuerst: absteigend nach Zeitstand (UTC-Wirestring, lexikografisch korrekt). */
+function compareZeitstand(a: BefehlKopf, b: BefehlKopf): number {
+  return b.zeitstand.localeCompare(a.zeitstand);
 }
 
-/**
- * Modulkonstante IN dieser Datei (der Guard verlangt `spaltenFuer` je Konsumentendatei). Nie
- * annotieren — eine Typangabe weitete `K` auf `string`, und der Kartenplan nähme Tippfehler an.
- */
-const befehlSpalten = spaltenFuer<BefehlKopf>()([
-  {
-    key: 'titel',
-    title: 'Titel',
-    immerSichtbar: true,
-    sortWert: (b) => b.titel,
-    suchText: (b) => b.titel,
-    // KEIN Anker hier: den Link setzt `karte.titel.ziel`, sonst verschachtelte Links.
-    render: (_t, b) => b.titel,
-  },
-  {
-    key: 'status',
-    title: 'Status',
-    // Sekundärslot statt `karte.status`: der Befehl bleibt auf der Kommunikations-Phasenachse
-    // (außerhalb des Statusfarb-Vertrags) und sieht damit aus wie der Auftrag im Nachbar-Tab.
-    render: (_t, b) => (
-      <StatusBadge phase={BEFEHL_STATUS[b.status].phase} label={BEFEHL_STATUS[b.status].label} />
-    ),
-  },
-  {
-    key: 'schema',
-    title: 'Schema',
-    suchText: (b) => schemaLabel(b.vorlage),
-    filter: {
-      werte: VORLAGEN.map((v) => ({ text: v.label, value: v.schluessel })),
-      trifft: (b, w) => b.vorlage === w,
-    },
-    render: (_t, b) => schemaLabel(b.vorlage),
-  },
-  {
-    key: 'fassung',
-    title: 'Fassung',
-    sortWert: (b) => b.zeitstand,
-    // v-Nummer, Zeitstand und Ersteller in EINER Zeile — drei Slots sind das Maximum. `zeitstand`
-    // läuft durch `ZeitAnzeige`; `sortWert` bleibt der rohe UTC-Wirestring, der lexikografisch
-    // korrekt sortiert (die DTG nicht).
-    render: (_t, b) => (
-      <>
-        {`v${b.version} · `}
-        <ZeitAnzeige wert={b.zeitstand} />
-        {` · ${b.ersteller_name}`}
-      </>
-    ),
-  },
-]);
+function trifft(b: BefehlKopf, begriff: string): boolean {
+  if (begriff === '') return true;
+  const b2 = begriff.toLocaleLowerCase('de');
+  return (
+    b.titel.toLocaleLowerCase('de').includes(b2) ||
+    befehlSchemaLabel(b.vorlage).toLocaleLowerCase('de').includes(b2)
+  );
+}
+
+type BefehlStatus = BefehlKopf['status'];
+
+const befehlSchluessel = (b: BefehlKopf) => b.id;
 
 export default function BefehlListe({
   einsatzId,
@@ -126,18 +91,64 @@ export default function BefehlListe({
     };
   }, []);
 
-  const befehle = befehleQuery.data ?? [];
+  const befehle = useMemo(
+    () => [...(befehleQuery.data ?? [])].sort(compareZeitstand),
+    [befehleQuery.data],
+  );
   const entwuerfe = befehle.filter((b) => b.status === 'entwurf').length;
+  const freigegebene = befehle.length - entwuerfe;
+
+  const [suche, setSuche] = useState('');
+  const gefunden = useMemo(() => befehle.filter((b) => trifft(b, suche.trim())), [befehle, suche]);
+  /*
+   * Vorgabe des Segments (design.md D5): „Entwürfe“, wenn es beim ersten Datenstand einen gibt,
+   * sonst „Freigegeben“. Danach schaltet nur die Person um.
+   */
+  const [segment, setSegment] = useState<BefehlStatus | null>(null);
+  useEffect(() => {
+    if (segment === null && befehleQuery.isSuccess) {
+      setSegment(befehleQuery.data.some((b) => b.status === 'entwurf') ? 'entwurf' : 'freigegeben');
+    }
+  }, [segment, befehleQuery.isSuccess, befehleQuery.data]);
+  const aktivesSegment: BefehlStatus = segment ?? 'entwurf';
+  const eintraege = useMemo(
+    () => gefunden.filter((b) => b.status === aktivesSegment),
+    [gefunden, aktivesSegment],
+  );
+
+  // Wahl und Sprung wie bei den Aufträgen; `?befehl=` wählt aus dem Ortspfad der Vollseite (D6).
+  const [gewaehlt, setGewaehlt] = useState<number | null>(null);
+  const [sprung, setSprung] = useState<{ id: number; nr: number } | null>(null);
+  const sprungNr = useRef(0);
+  useQueryParamSelektion('befehl', befehleQuery.isSuccess, (id) => {
+    const ziel = (befehleQuery.data ?? []).find((b) => b.id === id);
+    if (!ziel) return;
+    setSuche('');
+    setSegment(ziel.status);
+    setGewaehlt(id);
+    sprungNr.current += 1;
+    setSprung({ id, nr: sprungNr.current });
+  });
+  const select = useCallback((id: number | null) => {
+    setGewaehlt(id);
+    setSprung(null);
+  }, []);
+  const changeSegment = (neu: BefehlStatus) => {
+    setSegment(neu);
+    select(null);
+  };
+  const { token } = useRollen();
 
   return (
     <div>
-      {/* Die Mengen zählen den BESTAND, die Gruppenköpfe das ANGEZEIGTE — bei aktiver Suche laufen sie
-         bewusst auseinander. */}
       <Bereichskopf
         titel="Befehle"
-        // Ausdrücklich statt Vorgabe: die Gruppenköpfe der Datensicht rechnen mit dieser Ebene.
-        ueberschrift="h3"
-        meta={`${anzahl(befehle.length, 'Befehl', 'Befehle')} · ${entwuerfe} im Entwurf`}
+        meta={
+          // Vor der ersten Lieferung keine Menge (wie bei den Aufträgen).
+          befehleQuery.isSuccess
+            ? `${anzahl(entwuerfe, 'Entwurf', 'Entwürfe')} · ${freigegebene} freigegeben`
+            : undefined
+        }
         dataUpdatedAt={befehleQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (
@@ -155,30 +166,100 @@ export default function BefehlListe({
           )
         }
       />
+      <div
+        data-lfh="befehle-filter"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: token.marginSM,
+          marginBottom: token.margin,
+          alignItems: 'center',
+        }}
+      >
+        <Segmentleiste
+          beschriftung="Status"
+          wert={aktivesSegment}
+          onWechsel={changeSegment}
+          optionen={[
+            {
+              wert: 'entwurf',
+              label: segmentLabel(
+                'Entwürfe',
+                befehleQuery.isSuccess
+                  ? gefunden.filter((b) => b.status === 'entwurf').length
+                  : null,
+              ),
+            },
+            {
+              wert: 'freigegeben',
+              label: segmentLabel(
+                'Freigegeben',
+                befehleQuery.isSuccess
+                  ? gefunden.filter((b) => b.status === 'freigegeben').length
+                  : null,
+              ),
+            },
+          ]}
+        />
+        <Input
+          allowClear
+          aria-label="Befehle durchsuchen"
+          placeholder="Titel oder Schema"
+          style={{ width: 260, maxWidth: '100%' }}
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+        />
+      </div>
 
-      <Datensicht
-        bezeichnung="Befehle"
-        form="karte"
-        spalten={befehlSpalten}
-        daten={befehle}
-        zeilenSchluessel="id"
-        ladend={befehleQuery.isLoading}
-        leerText="Noch keine Befehle"
-        suche={{ platzhalter: 'Titel oder Schema' }}
-        standardSortierung={{ spalte: 'fassung', richtung: 'ab' }}
-        gruppen={{
-          schluessel: (b) => b.status,
-          etikett: (w, n) => (w === 'entwurf' ? (n === 1 ? 'Entwurf' : 'Entwürfe') : 'Freigegeben'),
-          reihenfolge: ['entwurf', 'freigegeben'],
-          // Die Gruppenköpfe stehen unter dem `Bereichskopf` (`ueberschrift="h3"` oben).
-          unterEbene: 3,
-        }}
-        karte={{
-          art: 'plan',
-          titel: { spalte: 'titel', ziel: (b) => befehlDetailPfad(einsatzId, b.id) },
-          // Keine `aktion`: Freigeben/Fortschreiben/Drucken liegen auf der Detailseite.
-          sekundaer: ['status', 'schema', 'fassung'],
-        }}
+      <ListeDetail<BefehlKopf>
+        bezeichnung={aktivesSegment === 'entwurf' ? 'Befehlsentwürfe' : 'Freigegebene Befehle'}
+        eintraege={eintraege}
+        schluessel={befehlSchluessel}
+        gewaehlt={gewaehlt}
+        onWahl={select}
+        sprung={sprung}
+        ladend={befehleQuery.isPending}
+        fehler={
+          befehleQuery.isError
+            ? {
+                text: 'Befehle konnten nicht geladen werden',
+                ursache: befehleQuery.error,
+                onWiederholen: () => void befehleQuery.refetch(),
+              }
+            : null
+        }
+        leer={
+          <SeitenLeer
+            titel={
+              befehle.length === 0
+                ? 'Noch keine Befehle'
+                : aktivesSegment === 'entwurf'
+                  ? 'Keine Entwürfe'
+                  : 'Keine freigegebenen Befehle'
+            }
+            aktion={
+              darfSchreiben
+                ? { label: 'Befehl entwerfen', onClick: () => setAnlegenOffen(true) }
+                : undefined
+            }
+          />
+        }
+        karte={(b, z) => (
+          <BefehlListenKarte
+            befehl={b}
+            gewaehlt={z.gewaehlt}
+            hervorgehoben={z.hervorgehoben}
+            auswahl={z.auswahl}
+          />
+        )}
+        detail={(b, { entfallen }) => (
+          <BefehlDetail
+            befehl={b}
+            einsatzId={einsatzId}
+            darfSchreiben={darfSchreiben}
+            entfallen={entfallen}
+          />
+        )}
       />
 
       {/* Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm): sie setzt auf JEDEM Weg hinaus

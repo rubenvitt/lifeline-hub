@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -110,6 +110,13 @@ function renderPage(route = '/einsaetze/1/auftraege') {
   return { client };
 }
 
+/** Wartet, bis die Liste (links im Muster „Liste + Detailpaneel“) den Auftrag zeigt; vorgewählt
+ *  steht sein Text noch einmal im Detail. */
+const geladen = async (text: string) =>
+  within(await screen.findByRole('list', { name: /Aufträge$/ })).findByText(text);
+const detail = () =>
+  document.querySelector<HTMLElement>('[data-lfh="liste-detail-detail"]') as HTMLElement;
+
 describe('Auftragsboard blättert am Server (LFH-1071)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -124,7 +131,7 @@ describe('Auftragsboard blättert am Server (LFH-1071)', () => {
 
   it('lädt Abgeschlossene erst in ihrer Ansicht und zählt aus den Kennzahlen', async () => {
     renderPage();
-    await screen.findByText('Offener Auftrag');
+    await geladen('Offener Auftrag');
     expect(listeAuftraege).not.toHaveBeenCalled();
     expect(listeAbgeschlosseneAuftraege).not.toHaveBeenCalled();
     expect(await screen.findByText('Abgeschlossen (150)')).toBeInTheDocument();
@@ -136,14 +143,14 @@ describe('Auftragsboard blättert am Server (LFH-1071)', () => {
     expect(listeAbgeschlosseneAuftraege).toHaveBeenCalledTimes(1);
     expect(listeAbgeschlosseneAuftraege).toHaveBeenLastCalledWith(
       1,
-      { richtung: undefined, abschnittId: undefined, einheitId: undefined },
+      { richtung: undefined, abschnittId: undefined, einheitId: undefined, suche: '' },
       undefined,
     );
   });
 
   it('„Ältere laden“ holt die nächste Seite ab dem letzten Auftrag', async () => {
     renderPage();
-    await screen.findByText('Offener Auftrag');
+    await geladen('Offener Auftrag');
     await userEvent.click(await screen.findByText('Abgeschlossen (150)'));
     await userEvent.click(await screen.findByRole('button', { name: 'Ältere laden' }));
     await waitFor(() => expect(listeAbgeschlosseneAuftraege).toHaveBeenCalledTimes(2));
@@ -167,6 +174,16 @@ describe('Auftragsboard blättert am Server (LFH-1071)', () => {
         'true',
       ),
     );
+    // Die Ansicht folgt ihm nach „Abgeschlossen“, gewählt steht er im Detail.
+    expect(screen.getByRole('radio', { name: /^Abgeschlossen/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(document.querySelector('[data-auftrag-id="140"]')).toHaveAttribute(
+      'data-gewaehlt',
+      'true',
+    );
+    expect(within(detail()).getByText('Auftrag 140')).toBeInTheDocument();
   });
 
   it('?auftrag= auf einen offenen Auftrag braucht keinen Einzelabruf', async () => {

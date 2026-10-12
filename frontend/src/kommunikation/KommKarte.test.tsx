@@ -78,6 +78,38 @@ describe('KommKarte — Deeplink-Hervorhebung (LFH-896, Spec `deeplink-hervorheb
     expect(k.style.boxShadow).toBe(wieGesetzt('boxShadow', LINIEN));
   });
 
+  it('gewählt steht die Karte auf der Auswahlfläche, ohne Linie (Spec `deeplink-hervorhebung`)', () => {
+    const { container } = render(<KommKarte gewaehlt>Inhalt</KommKarte>);
+    const k = karte(container);
+    expect(k).toHaveAttribute('data-gewaehlt', 'true');
+    expect(k.style.boxShadow).toBe('');
+    expect(k.style.background).toBe(wieGesetzt('background', farbenHell.auswahlFlaeche));
+  });
+
+  it('gewählt und angesprungen trägt die Karte Bedienfläche und Linie', () => {
+    const { container } = render(
+      <KommKarte gewaehlt hervorgehoben>
+        Inhalt
+      </KommKarte>,
+    );
+    const k = karte(container);
+    expect(k.style.boxShadow).toBe(wieGesetzt('boxShadow', LINIEN));
+    expect(k.style.background).toBe(wieGesetzt('background', farbenHell.bedienFlaeche));
+  });
+
+  it('gewählt und alarmiert behält die Karte Alarmfläche und Alarmkante', () => {
+    const { container } = render(
+      <KommKarte gewaehlt alarm>
+        Inhalt
+      </KommKarte>,
+    );
+    const k = karte(container);
+    expect(k.style.background).toBe(wieGesetzt('background', farbenHell.alarmFlaeche));
+    expect(k.style.borderInlineStart).toBe(
+      wieGesetzt('borderInlineStart', `3px solid ${farbenHell.alarm}`),
+    );
+  });
+
   it('ohne Markierung trägt die Karte keinen Schatten und steht auf dem Paneel', () => {
     const { container } = render(<KommKarte>Inhalt</KommKarte>);
     const k = karte(container);
