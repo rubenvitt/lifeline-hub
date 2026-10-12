@@ -9,7 +9,7 @@ gegen Hintergrund-Workflows gesichert ist.
 ## Requirements
 
 ### Requirement: Eine Change entsteht genau auf der Route „Entwurf“
-Das Routing von `dev-clickup-ausfuehren` kennt fünf Routen mit festen Schlüsseln: `trivial`
+Das Routing von `dev-zunder-ausfuehren` kennt fünf Routen mit festen Schlüsseln: `trivial`
 („trivial“), `unklar` („Anforderung unklar“), `bug-unklar` („Bug, Ursache unklar“), `klar`
 („klare Spec“) und `entwurf` („Entwurf“). Ein (Sub)Task MUST genau dann eine OpenSpec-Change
 bekommen, wenn das Routing für ihn die Route „Entwurf“ wählt. Die Route „Entwurf“ MUST gewählt
@@ -51,8 +51,8 @@ Board-Status bleibt dabei vorwärts gerichtet, und der Freigabe-Checkpoint MUST 
 #### Scenario: Bug, dessen Ursache eine Entscheidung verlangt
 - **WHEN** ein Task auf `bug-unklar` beim Debuggen zeigt, dass die Behebung eine Wahl zwischen
   zwei vertretbaren Wegen verlangt (E1)
-- **THEN** wechselt er auf „Entwurf“, `/opsx:propose` läuft im Main-Loop, der Status bleibt auf
-  `in development`, und `/opsx:apply` beginnt erst nach der Freigabe
+- **THEN** wechselt er auf „Entwurf“, `/opsx:propose` läuft im Main-Loop, der Task steht bis zur
+  Freigabe auf `blocked`, und `/opsx:apply` beginnt erst nach der Freigabe
 
 #### Scenario: Neue Projektregel in einem Subsystem
 - **WHEN** ein Task nur `.claude/` und `CLAUDE.md` ändert, dabei aber eine neue Regel festlegt
@@ -110,38 +110,39 @@ MUST keinen eigenen Planungsschritt in Phase 2 bekommen.
 
 ### Requirement: Die Scope-Map ist die Eingabe der Change
 Für jeden Task auf der Route „Entwurf“ MUST der Main-Loop `/opsx:propose` mit dem Namen
-`<custom_id klein>-<slug>` aufrufen (Beispiel `lfh-589-entwurfs-hoheit-orchestrierung`). Er MUST
+`<kurz>-<slug>` aufrufen, `<kurz>` sind die ersten 8 Hex-Zeichen der Zunder-UUID des Tasks
+(Beispiel `60638201-status-filter-einheiten`). Er MUST
 dabei den Map-Eintrag übergeben: Zusammenfassung, berührte Dateien, Entwurfsgründe und die am
 Checkpoint beantworteten Fragen. `/opsx:propose` MUST den Eintrag als Ausgangspunkt nehmen und die
 Stellen trotzdem selbst lesen. Grundsatz ist eine Change je Task. Ändern zwei oder mehr Subtasks
 **auf der Route „Entwurf“** desselben Parents dieselbe Fähigkeit (gleicher Eintrag unter
 `openspec/specs/` oder dieselbe neue Fähigkeit, deren Anforderungen sie ändern oder anlegen), MUST
-es eine gemeinsame Change geben. Sie trägt die `custom_id` des Parents, und ihre `tasks.md`
-gliedert nach Subtask samt `custom_id`. Ein Subtask auf einer anderen Route MUST ohne Change
+es eine gemeinsame Change geben. Sie trägt den `<kurz>` des Parents, und ihre `tasks.md`
+gliedert nach Subtask samt `<kurz>`. Ein Subtask auf einer anderen Route MUST ohne Change
 bleiben, auch wenn er dieselbe Fähigkeit berührt. Subtasks einer gemeinsamen Change MUST NOT
 parallel im autonomen Dev-Modus laufen, weil sie dieselbe `tasks.md` abhaken.
 
-Ruft der Orchestrierungs-Skill `dev-clickup-ausfuehren` für einen Task auf, MUST die bestätigte
+Ruft der Orchestrierungs-Skill `dev-zunder-ausfuehren` für einen Task auf, MUST die bestätigte
 Route der Scope-Map gelten. Ein Task mit freigegebener Change MUST direkt in `/opsx:apply`
 einsteigen, ohne zweites `/opsx:propose`.
 
 #### Scenario: Einzelner Subtask
-- **WHEN** Subtask `LFH-701` „Status-Filter Einheiten“ auf „Entwurf“ steht und keine Fähigkeit
+- **WHEN** Subtask `60638201` „Status-Filter Einheiten“ auf „Entwurf“ steht und keine Fähigkeit
   mit einem anderen Subtask teilt
-- **THEN** entsteht die Change `openspec/changes/lfh-701-status-filter-einheiten/`
+- **THEN** entsteht die Change `openspec/changes/60638201-status-filter-einheiten/`
 
 #### Scenario: Zwei Subtasks, dieselbe Fähigkeit
-- **WHEN** die Map für `LFH-701` und `LFH-702` (Parent `LFH-700`), beide auf „Entwurf“, dieselbe
+- **WHEN** die Map für `60638201` und `7fe1f0cf` (Parent `6f0058a8`), beide auf „Entwurf“, dieselbe
   Fähigkeit `modul-zaehler` nennt
-- **THEN** entsteht genau eine Change `lfh-700-<slug>`, deren `tasks.md` Abschnitte für
-  `LFH-701` und `LFH-702` hat, und beide Subtasks laufen in Phase 3 nicht parallel autonom
+- **THEN** entsteht genau eine Change `6f0058a8-<slug>`, deren `tasks.md` Abschnitte für
+  `60638201` und `7fe1f0cf` hat, und beide Subtasks laufen in Phase 3 nicht parallel autonom
 
 #### Scenario: Gleiche Fähigkeit, nur einer auf „Entwurf“
-- **WHEN** `LFH-701` auf „Entwurf“ und `LFH-703` auf „klare Spec“ dieselbe Fähigkeit nennen
-- **THEN** bekommt nur `LFH-701` eine Change, und `LFH-703` bleibt ohne Change
+- **WHEN** `60638201` auf „Entwurf“ und `23c3f2b7` auf „klare Spec“ dieselbe Fähigkeit nennen
+- **THEN** bekommt nur `60638201` eine Change, und `23c3f2b7` bleibt ohne Change
 
 #### Scenario: Freigegebene Change im sequenziellen Dev-Modus
-- **WHEN** der Orchestrierungs-Skill `dev-clickup-ausfuehren` für einen Task aufruft, dessen
+- **WHEN** der Orchestrierungs-Skill `dev-zunder-ausfuehren` für einen Task aufruft, dessen
   Change in Phase 2 freigegeben wurde
 - **THEN** beginnt die Arbeit mit `/opsx:apply`, ohne erneute Routenschätzung und ohne zweites
   `/opsx:propose`
@@ -152,14 +153,15 @@ Ein Workflow oder Subagent MUST NOT `/opsx:explore`, `/opsx:propose`, `/opsx:upd
 unter `openspec/changes/` anlegen oder ändern, außer beim Abhaken von Aufgaben einer freigegebenen
 Change im autonomen Dev-Modus.
 Nach `/opsx:propose` MUST der Main-Loop anhalten und die Changes des Laufs gesammelt vorlegen.
-Erst mit der Freigabe des Menschen MUST ein Task auf `ready for development` und in `/opsx:apply`
-gehen. Autonome Dev-Agents MUST nur an Changes arbeiten, die bereits freigegeben sind. Zeigt die
+Bis zur Freigabe MUST der Task auf `blocked` stehen; erst mit der Freigabe des Menschen MUST er
+auf `in_progress` und in `/opsx:apply` gehen. Autonome Dev-Agents MUST nur an Changes arbeiten,
+die bereits freigegeben sind. Zeigt die
 Umsetzung, dass Proposal, Spec oder Design nicht tragen, MUST der Agent abbrechen und das als
 Blocker zurückgeben, statt die Artefakte selbst zu ändern.
 
 #### Scenario: Mehrere Proposals in einem Lauf
 - **WHEN** der Main-Loop in Phase 2 zwei Changes über `/opsx:propose` erzeugt hat
-- **THEN** legt er beide gemeinsam vor, beide Tasks bleiben auf `in design`, und `/opsx:apply`
+- **THEN** legt er beide gemeinsam vor, beide Tasks stehen auf `blocked`, und `/opsx:apply`
   beginnt erst nach der Freigabe
 
 #### Scenario: Autonomer Agent trifft auf eine Lücke im Design
@@ -181,7 +183,8 @@ Lese- oder Suchschritt erledigt. Gesprächsschritte, Checkpoints und Nachrichten
 MUST im Main-Loop bleiben.
 
 #### Scenario: Auftrag ohne Opt-in
-- **WHEN** ein Ticket-Thread mit dem Auftrag „Bearbeite das ClickUp-Ticket LFH-900“ startet und
+- **WHEN** ein Ticket-Thread mit dem Auftrag „Bearbeite die Zunder-Aufgabe
+  `https://zunder.rubeen.dev/#/aufgabe/<uuid>`“ startet und
   der Task Frontend und Backend berührt
 - **THEN** darf der Main-Loop für den Scope-Fan-out Subagents oder einen Workflow starten, ohne
   vorher zu fragen

@@ -26,7 +26,7 @@
  * FEHLER MACHEN DEN LAUF NICHT ROT: das Release ist schon veröffentlicht, ein roter Job hieße
  * nur „Re-run" ohne Wirkung auf das Release. Jeder Fehler steht als `::warning::` im Protokoll.
  * Issues, die ein PR per Schlüsselwort schließt, kommentiert das Skript nicht (die Aufgaben
- * liegen in ClickUp).
+ * liegen in Zunder).
  */
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';

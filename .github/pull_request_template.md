@@ -1,21 +1,13 @@
-ClickUp: #LFH-
+Zunder: https://zunder.rubeen.dev/#/aufgabe/
 
 <!--
-DIE RAUTE GEHÖRT DAZU, UND DIE KENNUNG WIRD GROSS GESCHRIEBEN.
+Vollständiger Link auf die Aufgabe, mit UUID. Eine Integration liest die Zeile nicht: sie ist
+für Menschen. Die Gegenrichtung trägt die Aufgabe selbst (`pr_url`, gesetzt von
+`dev-zunder-ausfuehren`), ebenso den Status — `review` bei offenem PR, `done` nach dem Merge.
 
-Die ClickUp-Integration sucht eine Task-Kennung in PR-Titel, PR-Beschreibung, Branch-Namen
-und Commit-Nachrichten. Ohne die Raute erkennt sie nichts — die Zeile ist dann bloß Text, und
-der Task bleibt auf „in development" stehen, während der PR längst gemergt ist. Custom-IDs
-tragen in ClickUp immer Großbuchstaben (`LFH-527`), ein kleingeschriebenes `lfh-527` wird
-nicht gefunden.
-
-Das ist auch der Grund, warum die Verknüpfung hier steht und nicht am Branch-Namen hängt: die
-Branch-Konvention `<typ>/lfh-<nnn>-<slug>` ist kleingeschrieben, wie in Git üblich. Die
-Commit-Nachrichten dieses Projekts tragen die Kennung ohnehin groß im Body — das ist der
-zweite Weg, auf dem ClickUp den Task findet.
-
-Optional lässt sich ein Zielstatus anhängen: `#LFH-527[in review]` setzt den Task beim
-Erkennen direkt dorthin.
+Branch `<typ>/<kurz>-<slug>` mit den ersten 8 Hex-Zeichen der UUID; Commit-Bodys tragen dieselbe
+`Zunder:`-Zeile. Ältere PRs nennen `#LFH-<n>` aus der ClickUp-Zeit, die bleiben gültig.
+Konvention: `AGENTS.md`, Abschnitt „Zunder“.
 -->
 
 ## Was ändert sich

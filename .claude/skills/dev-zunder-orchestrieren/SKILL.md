@@ -1,18 +1,18 @@
 ---
-name: dev-clickup-orchestrieren
-description: Use as the primary entry point whenever the user wants to implement, pick up, "umsetzen", or work through a task from the Lifeline-Hub ClickUp Entwicklungsboard — including epics/parent tasks with subtasks, and any request phrased "mit subagents", "ultracode", "als Workflow", "automode", or "mach alle Subtasks". This skill orchestrates the whole task (and its subtasks) with fan-out via Workflow or subagents, started at its own discretion without opt-in (scope scan, design-option judging, review), OpenSpec changes per task in the main loop, and human checkpoints in between. It supersedes and internally invokes dev-clickup-ausfuehren for per-(sub)task execution. NOT for capturing/creating new tasks — that's clickup-task-anlegen.
+name: dev-zunder-orchestrieren
+description: Use as the primary entry point whenever the user wants to implement, pick up, "umsetzen", or work through a task from the Lifeline-Hub Zunder Entwicklungsboard (project "Dev: Lifeline-Hub") — including epics/parent tasks with subtasks, and any request phrased "mit subagents", "ultracode", "als Workflow", "automode", or "mach alle Subtasks". This skill orchestrates the whole task (and its subtasks) with fan-out via Workflow or subagents, started at its own discretion without opt-in (scope scan, design-option judging, review), OpenSpec changes per task in the main loop, and human checkpoints in between. It supersedes and internally invokes dev-zunder-ausfuehren for per-(sub)task execution. NOT for capturing/creating new tasks — that's zunder-task-anlegen.
 ---
 
-# ClickUp-Task umsetzen — Orchestrierung (Lifeline Hub)
+# Zunder-Aufgabe umsetzen — Orchestrierung (Lifeline Hub)
 
 ## Überblick
 
-Primärer Einstieg, um einen Task vom **Entwicklungsboard** (`901523554968`) — und **alle
+Primärer Einstieg, um einen Task vom **Entwicklungsboard** (Zunder, `AGENTS.md` Abschnitt „Zunder“) — und **alle
 seine Subtasks** — umzusetzen. Dieser Skill ist eine **Orchestrierungs-Schicht**: er treibt
 den Ablauf im Main-Loop, nutzt **Workflows oder parallele Subagents** für die Fan-out-Phasen
 (Scope, Bewertung von Entwurfsoptionen, Review) und präsentiert **Zwischenstände vor der Dev**. Die
-eigentliche Pro-(Sub)Task-Ausführung — Status-Spur, Komplexitäts-Routing, Worktree — delegiert er an
-`dev-clickup-ausfuehren`. Diese Logik **nicht** hier reimplementieren; es gibt eine Quelle der
+eigentliche Pro-(Sub)Task-Ausführung — Status-Spur, Reservierung, Komplexitäts-Routing, Worktree — delegiert er an
+`dev-zunder-ausfuehren`. Diese Logik **nicht** hier reimplementieren; es gibt eine Quelle der
 Wahrheit.
 
 ## Kernprinzip: Hybrid, nicht ein großer Workflow
@@ -29,7 +29,7 @@ Lauf fragen.** Daraus folgt die ganze Architektur:
 
 **Ob und wie viel Fan-out, entscheidest du selbst** — ein Opt-in wie „ultracode“ braucht es
 nicht (Festlegung des Users, 04.10.2026; Regeln, Abwägung Agent oder Workflow und Pflichtinhalt
-jedes Worker-Prompts in `dev-clickup-ausfuehren`, Abschnitt „Agenten nach Bedarf“). Fan-out
+jedes Worker-Prompts in `dev-zunder-ausfuehren`, Abschnitt „Agenten nach Bedarf“). Fan-out
 lohnt sich für Scope, Entwurfsbewertung und Review (den Entwurf selbst schreibt
 `/opsx:propose` im Main-Loop, s. „Entwurfs-Hoheit“) — nicht dafür, jede einzelne
 Subtask-Code-Änderung in einen Workflow zu wickeln (das ist Zeremonie). Die
@@ -43,7 +43,7 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 
 | Phase | Wer | Werkzeug | Checkpoint? |
 |---|---|---|---|
-| 0 Laden & Statuskontext | Main-Loop | ClickUp-Connector, ggf. Worktree | — |
+| 0 Laden & Statuskontext | Main-Loop | Zunder-Connector, ggf. Worktree | — |
 | 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, bei Unklarheit; Route bestätigen** |
 | 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel (**Workflow** oder Subagents) als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
@@ -67,19 +67,22 @@ Scope und Entwurf beantworten der Workflow und OpenSpec, aber **nie beide diesel
   (`/opsx:propose`), klärt eine unklare Anforderung (`/opsx:explore`) und setzt nach Freigabe um
   (`/opsx:apply`). Alle drei laufen **im Main-Loop**, weil sie den Menschen brauchen.
 - **Ob ein Task eine Change bekommt**, entscheidet allein seine Route: Change genau bei
-  `entwurf` (Gründe E1–E3 in `dev-clickup-ausfuehren`, Schritt 3), ausdrücklich keine bei
+  `entwurf` (Gründe E1–E3 in `dev-zunder-ausfuehren`, Schritt 3), ausdrücklich keine bei
   `trivial`, `bug-unklar` und `klar`.
 
 ## Phase 0 — Laden & Statuskontext
 
-1. **Parent-Task + Subtasks laden** (`clickup_get_task` des ClickUp-Connectors). Subtasks
-   über die `subtasks` der Antwort bzw. `clickup_filter_tasks` ermitteln. Pro (Sub)Task
-   ziehen: `custom_id`, Name/Beschreibung, **aktueller Status**, Abhängigkeiten.
+1. **Parent-Task + Subtasks laden** (`get_task` des Zunder-Connectors; liefert den Baum der
+   Unteraufgaben und den Fortschritt immer mit). Pro (Sub)Task ziehen: `id` und `<kurz>` (erste
+   8 Hex-Zeichen), Titel/Beschreibung, **aktueller Status**, `branch`/`pr_url`/`plan`,
+   Abhängigkeiten.
 2. **Statuskontext bilden:** Wo steht jeder (Sub)Task auf der Spur? (Spur und Regeln:
-   `dev-clickup-ausfuehren`.) Das bestimmt, wo der Lauf einsteigt — schon `in development`
-   stehende Subtasks nicht zurücksetzen.
+   `dev-zunder-ausfuehren`, „Board-Status mitführen“.) Das bestimmt, wo der Lauf einsteigt —
+   schon `in_progress` stehende Subtasks nicht zurücksetzen. Hält ein anderer Agent eine
+   Aufgabe per `claim_task`, bleibt sie draußen und wird gemeldet. Reserviert und freigegeben
+   wird immer im Main-Loop, auch für Subtasks, die ein autonomer Agent umsetzt.
 3. **Workspace/Branch:** für den Parent einen Branch/Worktree wählen. Delegiere die
-   Anlage an `dev-clickup-ausfuehren` (das wiederum `superpowers:using-git-worktrees` nutzt) —
+   Anlage an `dev-zunder-ausfuehren` (das wiederum `superpowers:using-git-worktrees` nutzt) —
    die Wahl läuft dort **automatisch** und wird nur gemeldet, nicht erfragt.
 
 Task mehrdeutig oder keine Subtasks auffindbar → kurz beim User rückfragen, nicht raten.
@@ -108,14 +111,17 @@ Annahmen, mehrere sinnvolle Schnitte oder eine strittige Route → Map kompakt p
 **den User fragen**, gern mit konkreten Optionen (s. „Checkpoints & Entscheidungen“). Ist alles
 klar → ohne Stopp weiter, aber die Map samt Routen in 2–3 Zeilen zusammenfassen.
 
-**Status:** raus aus `backlog`. Bei `unklar` `scoping`; sonst die Routing-Regeln aus
-`dev-clickup-ausfuehren` greifen lassen.
+**Zerlegen:** Zeigt der Scope, dass ein Task ohne Subtasks in Teile gehört, und stimmt der
+Mensch am Checkpoint zu, legt `decompose_task` die Subtasks in einem Schritt an (alles oder
+nichts).
+
+**Status:** `in_progress`, Route in `plan` (`dev-zunder-ausfuehren`, „Board-Status mitführen“).
 
 ## Phase 2 — Entwurf (Main-Loop mit `/opsx:propose`)
 
 **Mechanismus: `/opsx:propose` im Main-Loop, je Task mit `route: entwurf`.** Tasks auf
 `trivial`, `klar` oder `bug-unklar` bekommen in Phase 2 **keinen** Planungsschritt und keine
-Change. Sie gehen direkt in Phase 3 (TDD bzw. Debugging über `dev-clickup-ausfuehren`). Einen
+Change. Sie gehen direkt in Phase 3 (TDD bzw. Debugging über `dev-zunder-ausfuehren`). Einen
 Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Change ist der Plan.
 
 **Erkennungsmerkmal:** Phase 2 läuft genau für die Map-Einträge mit bestätigter Route
@@ -123,14 +129,15 @@ Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Chang
 
 **Schnittstelle Scope-Map → Proposal:**
 
-- **Name:** `<custom_id klein>-<slug>`, z. B. `lfh-701-status-filter-einheiten`.
+- **Name:** `<kurz>-<slug>`, z. B. `60638201-status-filter-einheiten` (`<kurz>` = erste 8
+  Hex-Zeichen der UUID).
 - **Eingabe:** Der Map-Eintrag geht als Argument an `/opsx:propose`: Zusammenfassung, Files,
   Entwurfsgründe und die am Phase-1-Checkpoint beantworteten Fragen. `/opsx:propose` nimmt ihn
   als Ausgangspunkt und liest die Stellen trotzdem selbst.
 - **Eine Change je Task.** Nennen zwei oder mehr Subtasks **auf `entwurf`** desselben Parents
   dieselbe Fähigkeit (`faehigkeiten` der Map: gleicher Pfad unter `openspec/specs/` oder
-  dieselbe neue Fähigkeit), gibt es **eine** gemeinsame Change mit der `custom_id` des
-  Parents. Ihre `tasks.md` gliedert nach Subtask samt `custom_id`. Ein Subtask auf einer
+  dieselbe neue Fähigkeit), gibt es **eine** gemeinsame Change mit dem `<kurz>` des
+  Parents. Ihre `tasks.md` gliedert nach Subtask samt `<kurz>`. Ein Subtask auf einer
   anderen Route bleibt ohne Change, auch wenn er dieselbe Fähigkeit nennt.
 
 **Judge-Panel nur als Zulieferer.** Ist der Lösungsraum weit (E1 mit mehr als zwei ernsthaften
@@ -146,23 +153,23 @@ du am Checkpoint einen Entwurf in Claude Design an, samt Prompt (Regel: `fronten
 
 **Checkpoint — Pflicht (LFH-588).** Nach den `/opsx:propose`-Läufen hältst du an und legst
 **alle Changes des Laufs gesammelt** vor, samt offenen Optionen und Empfehlung. Die Tasks
-bleiben auf `in design`. Erst die Freigabe des Menschen führt auf `ready for development`, und
+stehen dabei auf `blocked`. Erst die Freigabe des Menschen führt zurück auf `in_progress`, und
 erst danach beginnt Phase 3 mit `/opsx:apply`. Kein Workflow darf diesen Halt ersetzen.
 
-**Status:** `entwurf` → `in design` → nach Freigabe `ready for development`.
+**Status:** Route `entwurf` → `blocked` am Checkpoint → nach Freigabe `in_progress`.
 
 ## Phase 3 — Dev / umsetzen (Moduswahl)
 
 **Wähle den Modus selbst** und nenne dem User die Wahl + Begründung (er darf overriden):
 
 - **Sequenziell-interaktiv (Default, sicher):** Subtasks nacheinander. Pro Subtask rufst du
-  **`dev-clickup-ausfuehren`** auf — das routet im Main-Loop in die Arbeitsdisziplin von
+  **`dev-zunder-ausfuehren`** auf — das routet im Main-Loop in die Arbeitsdisziplin von
   Superpowers (TDD/Debugging/…) und in den OpenSpec-Änderungszyklus (`/opsx:explore`,
   `/opsx:propose`, `/opsx:apply`) und führt den Board-Status pro Subtask mit. Die Route aus
   Phase 1 gilt dabei weiter, sie wird nicht neu geschätzt. Die einzige Ausnahme ist der
   Wechsel `bug-unklar` → `entwurf`, wenn die gefundene Ursache auf E1 oder E2 führt. Dann folgt
-  `/opsx:propose` im Main-Loop und ein eigener Halt vor `/opsx:apply` (Status bleibt
-  `in development`, nur vorwärts). Ein Subtask auf `entwurf`, dessen
+  `/opsx:propose` im Main-Loop und ein eigener Halt vor `/opsx:apply` (Status `blocked` bis zur
+  Freigabe). Ein Subtask auf `entwurf`, dessen
   Change in Phase 2 freigegeben wurde, steigt direkt bei `/opsx:apply` ein und bekommt **kein
   zweites** `/opsx:propose`. Ein in Phase 1 geklärter `unklar`-Task bekommt kein zweites
   `/opsx:explore`. Wähle das,
@@ -196,22 +203,24 @@ sequenziell — aber das nur, wenn der Schnitt sauber ist.
 3. **Interaktiv:** `superpowers:requesting-code-review` vor dem Mergen.
    `superpowers:verification-before-completion` vor jeder „fertig"-Aussage.
 
-**Status:** `in review`; läuft danach noch eine Abnahme/Testrunde → `testing`.
+**Status:** bleibt `in_progress`; `review` erst mit offenem PR (Phase 5).
 
 ## Phase 5 — Abschluss & Status
 
 - **OpenSpec-Changes vor dem PR archivieren**, im selben Branch (`/opsx:archive`, Einzelheiten
-  in `dev-clickup-ausfuehren`, Schritt 4). Kein Archiv-PR nach dem Merge; Schritt 13 von
+  in `dev-zunder-ausfuehren`, Schritt 4). Kein Archiv-PR nach dem Merge; Schritt 13 von
   `check-all.sh` hält eine abgehakte, nicht archivierte Change rot.
 - Integration → `superpowers:finishing-a-development-branch`, und zwar **ohne Menü mit der
   stehenden Wahl „Push + PR gegen `alpha`"** (Festlegung des Users, 22.09.2026; Details in
-  `dev-clickup-ausfuehren`). Worktree/Branch dem Harness überlassen (nicht manuell removen).
-- Pro (Sub)Task Board-Status vorwärts: nach Merge `shipped`; ist nichts mehr offen → `done`.
-  Parent erst auf `shipped`/`done`, wenn alle Subtasks es sind.
-- Commits/PR auf die jeweilige `custom_id` referenzieren.
+  `dev-zunder-ausfuehren`). Worktree/Branch dem Harness überlassen (nicht manuell removen).
+- Pro (Sub)Task Board-Status vorwärts: PR offen → `review` samt `pr_url`, nach Merge `done`.
+  Parent erst auf `done`, wenn alle Subtasks es sind (`progress` aus `get_task`). Danach
+  `release_task` für jede reservierte Aufgabe.
+- Commit-Body und PR-Beschreibung tragen je (Sub)Task die Zeile
+  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>`.
 - **Eine** Abschlussmeldung an den Menschen für den ganzen Task — Inhalt/Form und der
-  Startbefehl für den Dev-Stack stehen in `dev-clickup-ausfuehren` (Abschnitt
-  „Abschlussmeldung an den Menschen"), hier nicht duplizieren. `dev-clickup-ausfuehren`
+  Startbefehl für den Dev-Stack stehen in `dev-zunder-ausfuehren` (Abschnitt
+  „Abschlussmeldung an den Menschen"), hier nicht duplizieren. `dev-zunder-ausfuehren`
   gibt pro Subtask **keine eigene** Meldung aus, wenn es von hier aufgerufen wird — die
   Bediensicht/Klickweg-Angaben je Subtask sammelst du während Phase 3 ein (frisch, nicht
   aus git rekonstruiert) und fügst sie hier zu **einer zusammenhängenden** Meldung
@@ -221,14 +230,13 @@ sequenziell — aber das nur, wenn der Schnitt sauber ist.
 ## Status durchgehen — Entscheidungspunkte
 
 Der Board-Status wird grundsätzlich **automatisch und nur vorwärts** geführt (Spur + Regeln:
-`dev-clickup-ausfuehren`). Den User **nur an echten Verzweigungen** entscheiden lassen — nicht bei
-jedem Übergang:
+`dev-zunder-ausfuehren`, „Board-Status mitführen“). Den User **nur an echten Verzweigungen**
+entscheiden lassen — nicht bei jedem Übergang. Die Route bestätigt er am Phase-1-Checkpoint,
+die Change am Freigabe-Checkpoint; als eigene Status-Frage bleibt nur:
 
 | Verzweigung | Wann fragen | Optionen |
 |---|---|---|
-| Routing nach Scope | Komplexität/Anforderung unklar | `scoping` · `in design` · direkt `in development` |
-| Nach der Dev | unklar, ob noch eine Abnahme/Testrunde nötig ist | `in review → testing` · direkt `shipped` |
-| Verwerfen | Task soll fallen gelassen werden | `cancelled` |
+| Verwerfen | Task soll fallen gelassen werden | `dropped` (nie `delete_task`) |
 
 Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 
@@ -246,8 +254,8 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 
 ## Don'ts
 
-- Status-Spur, Routing, Task-Laden, Worktree-Logik **nicht** hier kopieren → an
-  `dev-clickup-ausfuehren` delegieren.
+- Status-Spur, Routing, Task-Laden, Reservierung, Worktree-Logik **nicht** hier kopieren → an
+  `dev-zunder-ausfuehren` delegieren.
 - **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Review) in einen Workflow oder
   Subagent stecken — beide können nicht fragen.
 - **Kein `/opsx:*` im Workflow oder Subagent** (`explore`, `propose`, `update`, `apply`,
@@ -260,7 +268,7 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 - Einzelne Subtask-Code-Änderungen **nicht** zwanghaft in Workflows wickeln (Zeremonie) —
   Workflow für Scope/Design/Review und für echten autonomen Fan-out.
 - Autonomen Modus **nicht** bei geteilten Files / Abhängigkeiten wählen.
-- Bei jedem Status-Übergang fragen — nur an den drei Verzweigungen oben.
-- Keinen neuen Task anlegen — das ist `clickup-task-anlegen`.
+- Bei jedem Status-Übergang fragen — nur an der Verzweigung oben.
+- Keinen neuen Task anlegen — das ist `zunder-task-anlegen`.
 - Am Ende **nicht** acht Einzelmeldungen aneinanderreihen — eine gebündelte
   Gesamt-Abschlussmeldung (s. Phase 5).

@@ -6,7 +6,7 @@ User-Interaktion im Lauf). Ergebnisse landen im Main-Loop → dort Checkpoint/En
 
 Ein Skelett muss nicht als Workflow laufen: Bei wenigen Jobs startest du dieselben Prompts als
 einzelne Subagents (Agent-Tool) und führst die Ergebnisse im Main-Loop zusammen. Die Wahl
-triffst du selbst, ohne Opt-in (`dev-clickup-ausfuehren`, Abschnitt „Agenten nach Bedarf“). Die
+triffst du selbst, ohne Opt-in (`dev-zunder-ausfuehren`, Abschnitt „Agenten nach Bedarf“). Die
 Grundregeln unten gelten für Subagents genauso, und jeder Subagent-Prompt bringt die
 Pflichtpunkte aus jenem Abschnitt mit.
 
@@ -28,30 +28,30 @@ Grundregeln (aus der Workflow-Tool-Doku):
 
 Pro Subtask ein Reader-Agent; alle Ergebnisse für die Map zusammenführen (Barriere ist hier
 korrekt, weil die Map cross-subtask-Abhängigkeiten braucht). Jeder Reader schlägt die **Route**
-vor (Schlüssel aus dem Routing von `dev-clickup-ausfuehren`, Schritt 3). Die Route `entwurf` ist
+vor (Schlüssel aus dem Routing von `dev-zunder-ausfuehren`, Schritt 3). Die Route `entwurf` ist
 der einzige Weg zu einer OpenSpec-Change. Die Gründe E1–E3 stehen im Prompt, weil ein
 Workflow-Agent den Skill nicht selbst liest. Ändert sich das Kriterium dort, hier nachziehen.
 
 ```js
 export const meta = {
-  name: 'scope-clickup-task',
-  description: 'Scope a ClickUp parent task and its subtasks against the codebase',
+  name: 'scope-zunder-task',
+  description: 'Scope a Zunder parent task and its subtasks against the codebase',
   phases: [{ title: 'Scope' }],
 }
-const SUBTASKS = args.subtasks  // [{custom_id, name, description}]
+const SUBTASKS = args.subtasks  // [{kurz, name, description}], kurz = erste 8 Hex-Zeichen der UUID
 const SCOPE = {
   type: 'object',
   properties: {
-    custom_id: { type: 'string' },
+    kurz: { type: 'string' },
     files: { type: 'array', items: { type: 'string' } },
-    depends_on: { type: 'array', items: { type: 'string' } }, // custom_ids
+    depends_on: { type: 'array', items: { type: 'string' } }, // kurz der anderen Subtasks
     route: { enum: ['trivial', 'klar', 'bug-unklar', 'unklar', 'entwurf'] },
     entwurfsgruende: { type: 'array', items: { enum: ['E1', 'E2', 'E3'] } }, // leer außer bei 'entwurf'
     faehigkeiten: { type: 'array', items: { type: 'string' } }, // Pfade unter openspec/specs/, deren Anforderungen der Subtask ändert oder neu anlegt
     open_questions: { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },
   },
-  required: ['custom_id', 'files', 'depends_on', 'route', 'entwurfsgruende', 'faehigkeiten',
+  required: ['kurz', 'files', 'depends_on', 'route', 'entwurfsgruende', 'faehigkeiten',
     'open_questions', 'summary'],
 }
 const ROUTEN =
@@ -65,13 +65,13 @@ const ROUTEN =
   'und nicht bei einer reinen Text-/Tippfehlerkorrektur.'
 const map = await parallel(SUBTASKS.map(st => () =>
   agent(
-    `Scope subtask ${st.custom_id} "${st.name}" against this codebase.\n` +
+    `Scope subtask ${st.kurz} "${st.name}" against this codebase.\n` +
     `Beschreibung:\n${st.description}\n\n` +
-    `Finde: berührte Files, Abhängigkeiten zu anderen Subtasks (${SUBTASKS.map(s => s.custom_id).join(', ')}), ` +
+    `Finde: berührte Files, Abhängigkeiten zu anderen Subtasks (${SUBTASKS.map(s => s.kurz).join(', ')}), ` +
     `Fähigkeiten unter openspec/specs/, deren Anforderungen der Subtask ändert oder neu anlegt (bloßes Berühren zählt nicht), ` +
     `offene Fragen, und schlage die Route vor.\n${ROUTEN}\n` +
     `Nichts ändern — nur lesen. Kein /opsx:* ausführen.`,
-    { label: `scope:${st.custom_id}`, phase: 'Scope', schema: SCOPE }
+    { label: `scope:${st.kurz}`, phase: 'Scope', schema: SCOPE }
   )
 ))
 return map.filter(Boolean)
@@ -101,11 +101,11 @@ Die `tasks.md` der Change ist der Plan, und Tasks ohne `entwurf` brauchen keinen
 
 ```js
 export const meta = {
-  name: 'design-clickup-task',
+  name: 'design-zunder-task',
   description: 'Generate competing designs for a task and pick the best via a judge panel',
   phases: [{ title: 'Entwürfe' }, { title: 'Bewertung' }],
 }
-const TASK = args.task   // {custom_id, name, description}
+const TASK = args.task   // {kurz, name, description}
 const ANGLES = ['MVP-zuerst', 'risiko-zuerst', 'an-bestehenden-Mustern-orientiert']
 const PLAN = {
   type: 'object',
@@ -123,7 +123,7 @@ const SCORE = {
   required: ['angle', 'score', 'why'],
 }
 const drafts = await parallel(ANGLES.map(a => () =>
-  agent(`Entwirf einen Umsetzungsplan für ${TASK.custom_id} "${TASK.name}" aus Sicht „${a}".\n${TASK.description}\n` +
+  agent(`Entwirf einen Umsetzungsplan für ${TASK.kurz} "${TASK.name}" aus Sicht „${a}".\n${TASK.description}\n` +
     `Nur lesen: keine Datei anlegen oder ändern, kein /opsx:* ausführen.`,
     { label: `draft:${a}`, phase: 'Entwürfe', schema: PLAN })
 ))
@@ -150,8 +150,8 @@ verifiziert sobald ihr Review fertig ist).
 
 ```js
 export const meta = {
-  name: 'review-clickup-changes',
-  description: 'Review the changes for a ClickUp task across dimensions, verify each finding',
+  name: 'review-zunder-changes',
+  description: 'Review the changes for a Zunder task across dimensions, verify each finding',
   phases: [{ title: 'Review' }, { title: 'Verify' }],
 }
 const DIMENSIONS = [
@@ -176,7 +176,7 @@ const VERDICT = {
 }
 const results = await pipeline(
   DIMENSIONS,
-  d => agent(`Review die geänderten Files für ${args.custom_id} — Dimension „${d.key}": ${d.prompt}`,
+  d => agent(`Review die geänderten Files für ${args.kurz} — Dimension „${d.key}": ${d.prompt}`,
     { label: `review:${d.key}`, phase: 'Review', schema: FINDINGS }),
   review => parallel((review?.findings ?? []).map(f => () =>
     agent(`Versuche zu widerlegen: ${f.title} (${f.file}). ${f.detail}\nDefault: isReal=false bei Unsicherheit.`,

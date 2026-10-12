@@ -68,17 +68,38 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
   überholt. Herleitung:
   `openspec/changes/archive/2026-10-11-lfh-1312-bezeichner-sprache/design.md`.
 
-## ClickUp
+## Zunder (Aufgabenverwaltung)
 
-Dieses Projekt hat ein eigenes ClickUp-Projekt im Space **Lifeline Hub** (`901511065513`,
-Workspace/Team `9015920204`). Das **Entwicklungsboard** (`901523554968`) ist das
-Task-Board des Projekts, das **Feedbackboard** (`901523554969`) sammelt Feedback.
-Tasks werden selbstständig über den ClickUp-Connector des claude.ai-Kontos angelegt — wie und
-wann beschreibt der Skill `clickup-task-anlegen`. Das Repo bringt keinen eigenen ClickUp-Server
-mit (kein `.mcp.json`): der Connector wirkt lokal wie in Cloud-Sitzungen, ein Projektserver
-braucht OAuth je Rechner und scheitert in nicht-interaktiven Sitzungen. Skills nennen die
-Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebung
-(`mcp__claude_ai_ClickUp__…` im lokalen CLI, `mcp__ClickUp__…` in Cloud-Sitzungen).
+Seit 12.10.2026 liegen die Aufgaben in **Zunder** (`https://zunder.rubeen.dev`), nicht mehr in
+ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen; die Skills
+`zunder-task-anlegen`, `dev-zunder-ausfuehren` und `dev-zunder-orchestrieren` verweisen hierher.
+
+- **Stellen:** Bereich **Lifeline Hub** (`c6748f09-39fb-500e-875b-e0e8a68ad2e6`). Das
+  Dev-Projekt **„Dev: Lifeline-Hub“** (`aafceb07-f9e9-5e8b-8ffe-a38afadd7067`, Repo
+  `rubenvitt/lifeline-hub`) ist das Entwicklungsboard, das **Feedbackboard**
+  (`c28e466d-5525-5777-95c9-5d52bcb4d0f8`) sammelt Feedback. Im Zweifel `list_structure`.
+- **Werkzeuge:** Zunder-Connector des claude.ai-Kontos, kein `.mcp.json` im Repo. Skills nennen
+  die Werkzeuge ohne Präfix (`update_task`); im lokalen CLI heißen sie
+  `mcp__claude_ai_Zunder__…`.
+- **Status** (Werkzeuge erwarten und liefern den Code): `open` (Offen) · `in_progress` (In
+  Arbeit) · `review` (PR offen) · `blocked` (wartet auf etwas oder jemanden) · `done`
+  (Erledigt) · `dropped` (Verworfen). Spur: `open → in_progress → review → done`, nur vorwärts;
+  `blocked` und `dropped` sind Seitenzustände. Wann welcher Status gilt, steht in
+  `dev-zunder-ausfuehren`, Abschnitt „Board-Status mitführen“. Erledigte und verworfene
+  Aufgaben fehlen nach 3 Tagen in `filter_tasks` (`include_closed: true`).
+- **Typen:** `aufgabe`, `bug`, `feature`. Keine Tags, Prioritäten, Zuständigen, Kommentare.
+- **Kennung einer Aufgabe:** die UUID. Branch `<typ>/<kurz>-<slug>` und Change-Name
+  `<kurz>-<slug>`, wobei `<kurz>` die ersten 8 Hex-Zeichen der UUID sind (Beispiel
+  `feat/60638201-release-flow`). Commit-Body und PR-Beschreibung tragen die Zeile
+  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>`. Ergebnisse stehen an der Aufgabe in
+  `branch`, `pr_url` und `plan`.
+- **Alte Kennungen `LFH-<n>`** in Commits, Changes und Doku bleiben gültig und werden nicht
+  umgeschrieben. Zunder kennt sie nicht als Feld: die importierte Aufgabe per `search` nach dem
+  Titel finden (aus `git log --grep 'LFH-<n>'`); ihr Link lautet
+  `https://zunder.rubeen.dev/#/clickup/<clickup_id>`.
+- **Notizen an einer Aufgabe** (statt Kommentar): erst `get_task`, dann `update_task` mit
+  `description` = bisherige Beschreibung + Abschnitt `## Notizen`, ein Eintrag je Datum.
+- **Nie `delete_task`** (nicht rückgängig zu machen) — stattdessen `dropped`.
 
 ## Planung und Ausführung — OpenSpec und Superpowers (LFH-588)
 
@@ -95,14 +116,14 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
 - **`/opsx:apply` bringt keine Disziplin mit:** jede Aufgabe per `test-driven-development`, vor
   jedem „fertig" `verification-before-completion` und `requesting-code-review`.
 - **Pflicht-Checkpoint:** `/opsx:propose` hält nach den Artefakten an (kein Fehlschlag) —
-  vorlegen, Freigabe abwarten, dann `ready for development` und `/opsx:apply`.
+  vorlegen (Aufgabe auf `blocked`), Freigabe abwarten, dann `in_progress` und `/opsx:apply`.
 - **Entwurfs-Hoheit** (LFH-589, Spec `entwurfs-hoheit`,
   `openspec/changes/archive/2026-09-30-lfh-589-entwurfs-hoheit-orchestrierung/design.md`):
   Workflows besitzen die Menge (Scope-Scan, Judge-Panel als Zulieferer), OpenSpec den einzelnen
   Task. Eine Change entsteht **genau** auf der Route `entwurf` (E1 Entscheidung · E2 Regel ·
   E3 mehr als ein Subsystem, nicht bei einem Bugfix, der Bestehendes wiederherstellt, oder
   einer reinen Textkorrektur; Liste in
-  `dev-clickup-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein
+  `dev-zunder-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein
   Workflow ruft `/opsx:*` oder schreibt unter `openspec/changes/`.**
 - **Vier Ablageorte, keine Überschneidung:** `openspec/changes/<name>/` (laufende Änderung, hier
   landet Neues) · `openspec/changes/archive/` (nach `/opsx:archive`) · `openspec/specs/`
