@@ -12,15 +12,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 `_ds/…/tokens/*.css` ist alt). Bei Konflikten gewinnt das Design — **außer bei der Sichtung**
 (BBK). Umgekehrte Altregeln tragen „Neuentwurf 22.09.2026".
 
-- **Größere UI-Entwürfe über Claude Design** (Ruben, 08.10.2026): Bei etwas wirklich Größerem
-  (neue Seite, neues Modul, Umbau des Rahmens, neuer Baustein; nicht bei einem Feld oder Knopf)
-  bietet der Agent an, den Entwurf in Claude Design zu machen, und gibt Ruben den fertigen
-  Prompt. Dort liegt das Design System **„Lifeline Hub“**; es baut auf den Entwurf, nicht auf
-  antd. Das Ergebnis landet wie der Neuentwurf unter `docs/design/<datum>-<thema>/`
-  (Inline-Styles maßgeblich). Ändert ein PR Rollen, `schriftskala`, Dichten, Bausteine oder
-  Textregeln, sagt der Agent, dass das Design System nachgezogen werden muss. Eine
-  Cloud-Sitzung erreicht Claude Design nicht (`DesignSync` braucht `/design-login` aus einer
-  interaktiven Sitzung); dann Prompt statt Zugriff.
+- **Größere UI-Entwürfe über Claude Design** (Ruben, 08.10.2026, geändert 12.10.2026): Bei etwas
+  wirklich Größerem (neue Seite, neues Modul, Umbau des Rahmens, neuer Baustein; nicht bei einem
+  Feld oder Knopf) entwirft der Agent selbst in Claude Design, **wenn er Zugriff hat**
+  (`DesignSync`). Dort liegt das Design System **„Lifeline Hub“**; es baut auf den Entwurf, nicht
+  auf antd. Das Ergebnis landet wie der Neuentwurf unter `docs/design/<datum>-<thema>/`
+  (Inline-Styles maßgeblich). Ohne Zugriff (etwa in einer Cloud-Sitzung, `DesignSync` braucht
+  `/design-login` aus einer interaktiven Sitzung) baut er direkt nach dieser Gestaltungssprache:
+  kein Angebot, kein Prompt für Ruben, kein Entwurfsabschnitt im Ticket. Ändert ein PR Rollen,
+  `schriftskala`, Dichten, Bausteine oder Textregeln, sagt der Agent, dass das Design System
+  nachgezogen werden muss.
 
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
