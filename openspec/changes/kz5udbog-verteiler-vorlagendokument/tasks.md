@@ -105,18 +105,18 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
   `verteiler` wird er rot.
 - [x] 5.4 `lageberichte/LageberichtDetailPage.tsx`: Feld, Druckkopf und Lesefassung wie 5.1 und
   5.2. Nachweis: Die entsprechenden Fälle in `LageberichtDetailPage.test.tsx` sind grün.
-- [ ] 5.5 e2e: In `e2e/druck-fluss.spec.ts` bekommt der Befehlsentwurf einen Verteiler, und der
+- [x] 5.5 e2e: In `e2e/druck-fluss.spec.ts` bekommt der Befehlsentwurf einen Verteiler, und der
   Ausdruck nennt ihn ohne Auswahlfeld. Nachweis: Die Spec ist in Chromium grün.
 
 ## 6. Doku
 
-- [ ] 6.1 `docs/anwender/kapitel/auftraege-befehle.md`: Absatz „Verteiler“ im Entwurfsablauf
+- [x] 6.1 `docs/anwender/kapitel/auftraege-befehle.md`: Absatz „Verteiler“ im Entwurfsablauf
   (wählen, externe Stellen, Druck, ETB, Fortschreiben). `quellen:` um die neuen Dateien
   ergänzen, `e2e/doku-bilder/auftraege-befehle.bilder.ts` füllt den Verteiler, und
   `befehl-entwurf.png` wird hell und dunkel neu erzeugt (`pnpm doku:bilder --grep
   auftraege-befehle`). Nachweis: `hilfe/anwenderdoku.guard.test.ts` ist grün, und das Bild zeigt
   den gefüllten Verteiler.
-- [ ] 6.2 `docs/anwender/kapitel/lageberichte.md` entsprechend, samt Bild des Entwurfs aus
+- [x] 6.2 `docs/anwender/kapitel/lageberichte.md` entsprechend, samt Bild des Entwurfs aus
   `lageberichte.bilder.ts`. Nachweis wie 6.1.
 
 ## 7. Abschluss

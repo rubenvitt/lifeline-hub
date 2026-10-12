@@ -49,7 +49,7 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 4. Im Lagevortrag zur Information den Knopf über dem Abschnitt wählen, um Inhalte zu übernehmen,
    etwa „Aus Meldebild und Führungsorganisation übernehmen“ in „Eigene Lage“.
 
-   ![Entwurf mit geöffnetem Abschnitt „Eigene Lage“, übernommenem Kräftemeldebild und Vorschau](../bilder/lageberichte/entwurf.png)
+   ![Entwurf mit Verteiler, geöffnetem Abschnitt „Eigene Lage“, übernommenem Kräftemeldebild und Vorschau](../bilder/lageberichte/entwurf.png)
 
 5. „Entwurf speichern“ wählen. Oben steht danach „zuletzt gespeichert …“ mit der Uhrzeit.
 
