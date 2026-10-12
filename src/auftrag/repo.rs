@@ -661,11 +661,7 @@ pub async fn anlegen_tx(
             },
         )
         .await?;
-        sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
-            .bind(auftrag_id)
-            .bind(etb_id)
-            .execute(&mut *tx)
-            .await?;
+        link_etb_tx(&mut *tx, etb_id, auftrag_id).await?;
         sqlx::query("UPDATE auftrag SET etb_anordnung_id = ? WHERE id = ?")
             .bind(etb_id)
             .bind(auftrag_id)
@@ -980,11 +976,7 @@ pub async fn melde_vollzug_tx(
         },
     )
     .await?;
-    sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
-        .bind(auftrag_id)
-        .bind(etb_id)
-        .execute(&mut *conn)
-        .await?;
+    link_etb_tx(&mut *conn, etb_id, auftrag_id).await?;
     // Vollzug-Achse im SELBEN Commit wie ETB-Meldung + Rückmeldetext (atomar):
     // ein Teilfehler rollt alles zurück, kein verwaister ETB-Eintrag.
     krepo::setze_vollzug_tx(
@@ -1106,12 +1098,34 @@ async fn anordnung_tx(
         },
     )
     .await?;
+    link_etb_tx(&mut *conn, etb_id, auftrag_id).await?;
+    Ok(etb_id)
+}
+
+/// Koppelt einen ETB-Eintrag an seinen Auftrag (Rückverweis `auftrag_id`) und hält die
+/// Einheiten fest, an die er sich jetzt richtet (LLH-1175, Tabelle `etb_eintrag_einheit`). Der
+/// ETB-Filter „Einheit“ liest diesen Stand, nicht die aktuellen Empfänger: eine Berichtigung
+/// ersetzt sie, und alte Einträge wanderten sonst zum neuen Empfänger.
+async fn link_etb_tx(
+    conn: &mut sqlx::SqliteConnection,
+    etb_id: i64,
+    auftrag_id: i64,
+) -> Result<(), AppError> {
     sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
         .bind(auftrag_id)
         .bind(etb_id)
         .execute(&mut *conn)
         .await?;
-    Ok(etb_id)
+    sqlx::query(
+        "INSERT OR IGNORE INTO etb_eintrag_einheit (eintrag_id, einheit_id) \
+         SELECT ?, einheit_id FROM auftrag_empfaenger \
+         WHERE auftrag_id = ? AND empfaenger_typ = 'einheit' AND einheit_id IS NOT NULL",
+    )
+    .bind(etb_id)
+    .bind(auftrag_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Hebt einen Auftrag auf (LLH-1098, Spec `auftrag-aufheben-berichtigen`) und liefert die id der
@@ -1433,6 +1447,22 @@ pub async fn berichtigen_tx(
         jetzt,
     )
     .await?;
+    // Die Anordnung nennt den alten Kreis („vorher …“), also steht sie auch unter ihm (LLH-1175);
+    // den neuen hat `anordnung_tx` schon festgehalten.
+    if neue_empfaenger.is_some() {
+        for (ziel, _) in &alte_ziele {
+            if let ("einheit", Some(einheit_id)) = (ziel.0.as_str(), ziel.2) {
+                sqlx::query(
+                    "INSERT OR IGNORE INTO etb_eintrag_einheit (eintrag_id, einheit_id) \
+                     VALUES (?, ?)",
+                )
+                .bind(etb_id)
+                .bind(einheit_id)
+                .execute(&mut *conn)
+                .await?;
+            }
+        }
+    }
     Ok(Some(etb_id))
 }
 
