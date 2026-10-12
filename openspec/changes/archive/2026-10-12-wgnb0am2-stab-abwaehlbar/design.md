@@ -148,9 +148,9 @@ Erwogen und verworfen:
   (oben).
 - **Label „Information und Kommunikation“** (FwDV 100, S6): Es verwechselt sich mit der
   Kategorie „Kommunikation“, und der Chat ist ebenfalls Kommunikation. „Fernmeldewesen“ ist das
-  Wort der Fernmeldeskizze und des Fernmeldebetriebsdienstes. Die Wahl des Labels ist am
-  Freigabe-Checkpoint offen. Der Schlüssel folgt dem Label und wird mit F2 fest, denn er steht in
-  der Datenbank.
+  Wort der Fernmeldeskizze und des Fernmeldebetriebsdienstes. Der Schlüssel folgt dem Label und
+  wird mit F2 fest, denn er steht in der Datenbank. Am Checkpoint gewählt: „Fernmeldewesen“
+  (Abschnitt „Freigabe“).
 
 ### D4 — Adressen: API bleibt, Oberfläche zieht um
 
@@ -365,8 +365,13 @@ ihrem Zielzustand. „bleibt“ heißt weiter Stab-Freigabe. Pfade im Frontend s
 
 Keine in dieser Change. Die Migrationen von F1 und F2 sind in D2 und D7 beschrieben.
 
-## Open Questions
+## Freigabe
 
-- Das Label des Moduls („Fernmeldewesen“ oder eine Alternative wie „Funk und Kommunikation“).
-  Es ändert weder Schnitt noch Aufgaben, wird aber mit F2 als Schlüssel fest. Antwort am
-  Freigabe-Checkpoint.
+Ruben hat am 12.10.2026 freigegeben:
+
+- D1–D9 wie empfohlen, also auch die Auflösung zur Lesezeit (D2) und keine Kopie der Ausblendung
+  (D7).
+- Das Label „Fernmeldewesen“, Schlüssel `fernmeldewesen`. Erwogen waren auch „Funk und
+  Kommunikation“ und „Funkplan“.
+- Den Weg über einen Entscheidungs-PR ohne Spec-Deltas (D8). Das ist die ausdrückliche Ausnahme
+  von „Ein Plan allein bekommt keinen PR“ (`AGENTS.md`).
