@@ -91,6 +91,7 @@ async fn bild(pool: &SqlitePool) -> Vec<(&'static str, Vec<String>)> {
         "meldung",
         "auftrag",
         "auftrag_empfaenger",
+        "etb_eintrag_einheit",
         "kommunikation_status",
         "befehl",
         "lagebericht",

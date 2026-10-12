@@ -3206,6 +3206,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             inhalt: string;
+            /**
+             * @description Abgeleitet: der verknüpfte Auftrag ist aufgehoben (LLH-1177). Dann lässt sich aus der
+             *     Meldung erneut ein Auftrag erteilen; `auftrag_id` zeigt bis dahin auf den alten.
+             */
+            is_auftrag_aufgehoben: boolean;
             /** @description Abgeleitet: quittiert_at IS NOT NULL. */
             ist_bestaetigt: boolean;
             /** @description Abgeleitet: status != 'erledigt' (Posteingang = offene Meldungen). */

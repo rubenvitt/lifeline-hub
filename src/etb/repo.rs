@@ -578,8 +578,10 @@ pub struct EtbFilter {
     pub erfasser_id: Option<i64>,
     /// Filter „betrifft Einheit" (LFH-616). Ein ETB-Eintrag hat keine Einheit-Spalte; er
     /// betrifft eine Einheit, wenn EINER von zwei Wegen trägt:
-    /// 1. **Fremdschlüssel über den Auftrag**: `e.auftrag_id` zeigt auf einen Auftrag mit der
-    ///    Einheit als Empfänger (Anordnung und Vollzugsmeldung).
+    /// 1. **Empfänger beim Schreiben**: der Eintrag hängt an einem Auftrag, und die Einheit
+    ///    war Empfänger, als er geschrieben wurde (Tabelle `etb_eintrag_einheit`, LLH-1175;
+    ///    Anordnung und Vollzugsmeldung). Nach einer Berichtigung bleibt die Erteilung beim
+    ///    alten Kreis, die Anordnung „… geändert: Empfänger …“ steht unter altem und neuem.
     /// 2. **Name in von/an**: `von` oder `an` ist — getrimmt, ASCII-Groß/Klein egal — der
     ///    AKTUELLE Einheitsname. Das deckt den freien Funkverkehr ab, die Mehrheit im ETB.
     ///    Grenzen, bewusst: nach einer Umbenennung fallen ältere Einträge heraus; eine
@@ -687,9 +689,8 @@ fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &Etb
     }
     if let Some(einheit) = filter.einheit_id {
         qb.push(
-            " AND (EXISTS (SELECT 1 FROM auftrag_empfaenger ae \
-                           WHERE ae.auftrag_id = e.auftrag_id \
-                             AND ae.empfaenger_typ = 'einheit' AND ae.einheit_id = ",
+            " AND (EXISTS (SELECT 1 FROM etb_eintrag_einheit ez \
+                           WHERE ez.eintrag_id = e.id AND ez.einheit_id = ",
         );
         qb.push_bind(einheit);
         qb.push(

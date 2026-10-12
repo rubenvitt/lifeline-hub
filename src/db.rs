@@ -5379,4 +5379,103 @@ mod tests {
                 .unwrap();
         assert_eq!(rest, 0, "ON DELETE CASCADE auf einsatz wirkt weiter");
     }
+
+    // --- Migration 0182: Einheiten je ETB-Eintrag festhalten (LLH-1175) ---
+
+    /// Die Rückfüllung übernimmt für jeden Auftragseintrag die heutigen Einheiten-Empfänger,
+    /// also genau das, was der Filter bis 0181 zeigte; andere Empfängertypen und Einträge ohne
+    /// Auftrag bleiben draußen. Die Einsatz-Löschung räumt die Zeilen über `etb_eintrag` ab.
+    #[tokio::test]
+    async fn migration_0182_fuellt_einheiten_aus_den_heutigen_empfaengern() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 181).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let mut einheiten = Vec::new();
+        for name in ["Logistiktrupp", "Sanitätszug", "Bergungsgruppe"] {
+            einheiten.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 1, 'Sandsäcke', '2026-10-12 10:00:00', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        for einheit in &einheiten[..2] {
+            sqlx::query(
+                "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, einheit_id, snap_anzeige) \
+                 VALUES (?, 'einheit', ?, 'x')",
+            )
+            .bind(auftrag)
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, funktion_text, snap_anzeige) \
+             VALUES (?, 'funktion', 'S4', 'S4')",
+        )
+        .bind(auftrag)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mut eintraege = Vec::new();
+        for (lfd, auftrag_id) in [(1, Some(auftrag)), (2, Some(auftrag)), (3, None)] {
+            eintraege.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, \
+                        ereigniszeit, auftrag_id) \
+                     VALUES (?, ?, 'anordnung', 'x', ?, '2026-10-12 10:00:00', ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(lfd)
+                .bind(b)
+                .bind(auftrag_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+
+        migriere_bis(&pool, 182).await;
+
+        let zeilen: Vec<(i64, i64)> = sqlx::query_as(
+            "SELECT eintrag_id, einheit_id FROM etb_eintrag_einheit ORDER BY eintrag_id, einheit_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let (l, s) = (einheiten[0], einheiten[1]);
+        assert_eq!(
+            zeilen,
+            vec![
+                (eintraege[0], l),
+                (eintraege[0], s),
+                (eintraege[1], l),
+                (eintraege[1], s)
+            ]
+        );
+
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag_einheit")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "ON DELETE CASCADE über etb_eintrag");
+    }
 }

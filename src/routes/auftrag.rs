@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::auftrag::{
-    anreichern_alle, repo, validiere_neuen_auftrag, AuftragBearbeitungsstatus, AuftragDetail,
+    anreichern_alle, repo, validate_neuer_auftrag, AuftragBearbeitungsstatus, AuftragDetail,
     NeuerAuftrag,
 };
 use crate::einsatz::einstellungen;
@@ -223,7 +223,7 @@ pub async fn anlegen(
         crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
     let default_frist = auftrag_default_quittierung_frist_min(&einst, &org_einst);
     let validiert =
-        validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
+        validate_neuer_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
     let d = repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -543,6 +543,21 @@ pub async fn aufheben(
         .await
     })?;
     state.live.publiziere(einsatz_id, etb_id);
+    // Hängt eine Meldung an diesem Auftrag, zeigt ihre Karte jetzt „aufgehoben“ und bietet
+    // „Auftrag erteilen“ wieder an (LLH-1177) → die Meldungen müssen nachladen.
+    // Nach dem Commit: ein Lesefehler macht das Aufheben nicht zum 500, dann lieber einmal zu viel
+    // melden.
+    let is_aus_meldung: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM meldung WHERE auftrag_id = ?)")
+            .bind(auftrag_id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(true);
+    if is_aus_meldung {
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);
+    }
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
     anreichern_alle(
         &state.pool,
@@ -567,7 +582,8 @@ pub async fn berichtigen(
     JsonBody(req): JsonBody<crate::auftrag::AuftragPatch>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
-    let b = crate::auftrag::validiere_berichtigung(&state.pool, einsatz_id, &req).await?;
+    let b =
+        crate::auftrag::validate_berichtigung(&state.pool, einsatz_id, auftrag_id, &req).await?;
     let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
     // Dieselbe Zone wie die Zeiten in den ETB-Texten der Verpflegung (Org-Einstellung).
     let tz = crate::verpflegung::repo::zeitzone(&state.pool, einsatz_id).await?;
