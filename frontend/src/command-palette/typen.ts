@@ -323,6 +323,7 @@ export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
   schnellaktionen: false,
   zuletzt: true,
   module: false,
+  ansichten: false,
   einsaetze: false,
   einstellungen: false,
   navigation: false,
