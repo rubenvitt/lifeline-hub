@@ -1,6 +1,7 @@
 import { theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { monoStil } from '../components/instrument';
+import './druckansichtSchmal.css';
 
 /**
  * Etikett-Wert-Listen der Druckstücke mit ihren Titeln (Einsatzbericht LFH-726/LFH-1098, Auftrag

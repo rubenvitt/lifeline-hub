@@ -58,13 +58,13 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
   Detail, Feldfolge im Kern, Blatt über `druck/ZeilenListe.tsx`); der Verweis „Etikett-Wert-Liste“
   beim Einsatzbericht zeigt auf das neue Modul. Nachweis: Prettier über `frontend/` ist sauber,
   und `grep -rn "ZeilenListe" frontend/src/druck/AGENTS.md` nennt den neuen Pfad.
-- [ ] 4.5 `[data-lfh='druckwurzel'] dd { overflow-wrap: anywhere }` in `druck/druck.css` (unter
+- [x] 4.5 `[data-lfh='druckwurzel'] dd { overflow-wrap: anywhere }` in `druck/druck.css` (unter
   `@media print` und am Bildschirm der Druckansicht). Nachweis: Test in `druck/druck.test.ts`
   pinnt die Regel; am Handy belegt 5.2, dass ein langes Wort das Blatt nicht verbreitert.
 
 ## 5. Druck-Gate (D6)
 
-- [ ] 5.1 Fall „Auftrag druckt im normalen Fluss über mehrere Seiten“ in
+- [x] 5.1 Fall „Auftrag druckt im normalen Fluss über mehrere Seiten“ in
   `e2e/druck-fluss.spec.ts`: Er legt per API einen Auftrag mit langen Schemafeldern an und meldet
   den Vollzug mit `ENDMARKE` im Vermerk (letzte Angabe des Blatts), öffnet die Druckansicht und
   ruft `pruefeDruckImFluss`. Nachweis:
@@ -72,7 +72,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
   `data-lfh="druckwurzel"` auf der Seite wird er rot. Kann die Umgebung den e2e-Lauf nicht
   fahren, belegt die CI des PRs den Fall, und das steht im PR.
 
-- [ ] 5.2 `e2e/auftrag-druck.spec.ts`: Ein Beobachter öffnet aus dem Detail „Druckansicht“, sieht
+- [x] 5.2 `e2e/auftrag-druck.spec.ts`: Ein Beobachter öffnet aus dem Detail „Druckansicht“, sieht
   das Blatt und kommt über „Zurück zu Aufträge/Befehle“ zurück. Am Handy (390 px, Admin und
   Beobachter, `mitHandy`) bleibt der Layout-Viewport bei 390 px, auch mit einem Wort ohne
   Umbruchstelle im Weg. Nachweis: grün in Chromium; ohne die Regel aus 4.5 wird die 390-px-Messung
@@ -90,7 +90,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 7. Integration
 
-- [ ] 7.0 Prüfliste Einsatztauglichkeit `pruefliste.md` in der Change (15 Kriterien, je Verdikt
+- [x] 7.0 Prüfliste Einsatztauglichkeit `pruefliste.md` in der Change (15 Kriterien, je Verdikt
   mit Beleg, Vorbild `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/pruefliste.md`).
   Nachweis: jede Zeile trägt ein Verdikt, die Bilanz steht darunter.
 - [ ] 7.1 `./scripts/check-all.sh` (Bündel nach `scripts/AGENTS.md`) ist grün, oder die Schritte,
