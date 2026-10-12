@@ -195,6 +195,23 @@ test('Schnellaktion „Mitglied aufnehmen“ öffnet den Zugriff mit offener Per
   await expect(auswahl).toHaveAttribute('aria-expanded', 'true');
 });
 
+test('„Funk“ findet den Funkplan als ersten Treffer, ↵ öffnet ihn (LLH-1127)', async ({ page }) => {
+  await anmelden(page);
+  const id = await einsatzAnlegen(page, `E2E Ansichten ${Date.now()}`);
+  await zumModul(page, id, 'etb');
+
+  await page.keyboard.press('Control+k');
+  await expect(paletteInput(page)).toBeVisible();
+  await paletteInput(page).fill('Funk');
+  const erster = page.getByRole('option').first();
+  await expect(erster).toHaveAttribute('aria-selected', 'true');
+  await expect(erster).toHaveAccessibleName(/^Funkplan/);
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/stab/funkplan$`));
+  await expect(page.getByRole('heading', { name: 'Funkplan', exact: true })).toBeVisible();
+});
+
 test('Schnelleinstellung schaltet das Theme sichtbar um (Schnelleinstellungen)', async ({
   page,
 }) => {

@@ -9,10 +9,10 @@
 
 ## 2. Ansichten in der Sprungpalette
 
-- [ ] 2.1 Test zuerst (rot) in `befehle.test.ts`: Gruppe `ansichten` mit allen freien Marken (Id `ansicht:<key>`, Kontext und Icon des Zielmoduls, `sprungZu`-Ziel = Markenpfad), keine Zeile bei gesperrtem oder ausgeblendetem Zielmodul, `oeffnung` reicht bis `navigate` (bestehender Guard); dann Gruppe in `typen.ts` (`GRUPPEN_REIHENFOLGE` hinter `module`, `GRUPPEN_LABEL` „Ansichten“, `GRUPPE_MERKBAR` true) und Schleife in `baueBefehle` (D4); `typen.test.ts` und Vitest grün
-- [ ] 2.2 Rangtest: „Funk“ → erster Treffer „Funkplan“, „bürgertelefon“ → „Informationstelefon“, „entscheid“ → „Entscheidungen“ (`CommandPalette.test.tsx` bzw. `fuzzy.test.ts`); Strg/⌘+↵ auf „Funkplan“ öffnet im neuen Tab (`CommandPalette.oeffnung.test.tsx`); Startansicht: „Ansichten“ unter „Module“, gemerkte Marke fehlt dort (`kernId`); Vitest grün
+- [x] 2.1 Test zuerst (rot) in `befehle.test.ts`: Gruppe `ansichten` mit allen freien Marken (Id `ansicht:<key>`, Kontext und Icon des Zielmoduls, `sprungZu`-Ziel = Markenpfad), keine Zeile bei gesperrtem oder ausgeblendetem Zielmodul, `oeffnung` reicht bis `navigate` (bestehender Guard); dann Gruppe in `typen.ts` (`GRUPPEN_REIHENFOLGE` hinter `module`, `GRUPPEN_LABEL` „Ansichten“, `GRUPPE_MERKBAR` true) und Schleife in `baueBefehle` (D4); `typen.test.ts` und Vitest grün
+- [x] 2.2 Rangtest: „Funk“ → erster Treffer „Funkplan“, „bürgertelefon“ → „Informationstelefon“, „entscheid“ → „Entscheidungen“ (`CommandPalette.test.tsx` bzw. `fuzzy.test.ts`); Strg/⌘+↵ auf „Funkplan“ öffnet im neuen Tab (`CommandPalette.oeffnung.test.tsx`); Startansicht: „Ansichten“ unter „Module“, gemerkte Marke fehlt dort (`kernId`); Vitest grün
 - [ ] 2.3 e2e `command-palette.spec.ts`: „Funk“ tippen, ↵ → Funkplan-Seite (Chromium) grün
-- [ ] 2.4 Regeln: Abschnitt „Ansichten“ in `frontend/src/command-palette/AGENTS.md` (D8); `prettier --check` grün
+- [x] 2.4 Regeln: Abschnitt „Ansichten“ in `frontend/src/command-palette/AGENTS.md` (D8); `prettier --check` grün
 
 ## 3. Schnellaktion „Anruf erfassen“
 

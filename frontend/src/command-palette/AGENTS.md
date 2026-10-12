@@ -43,6 +43,12 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   Vorgabemodus immer zuletzt und nie vorausgewählt, auch allein nicht (Stufe 3, Score hinter
   jedem Treffer, Gruppe `ortssuche` zuletzt; Vorgabe -1 in `CommandPalette.tsx`). Sie **springt nur** (`lagekartePfad(id, { ort })`); die Palette fragt den
   Geocoder nie. Rechte wie der Koordinatensprung über `useLagekarteZugang`.
+- **Ansichten** (LLH-1127): jede Sprungmarke des Modulmenüs (`einsatz/sprungmarken.ts`, Regel
+  LFH-620 in `frontend/AGENTS.md`) steht als Zeile der Gruppe „Ansichten“ direkt unter „Module“,
+  Id `ansicht:<key>`, Icon und Name des Zielmoduls als Kontext, Suche über `schlagworte` und
+  `hinweis` der Marke. Angeboten nur bei `istModulFreigegeben(zielModul)`, gesperrt nie (im Menü
+  steht sie dann mit Schloss). Merkbar wie `navigation`, nicht im Modul-Gedächtnis. Eine neue
+  Marke ist ein Eintrag in der Tabelle, keine Palette-Zeile von Hand.
 - **Schnellaktionen** (`SCHNELLAKTIONEN` in `befehle.ts`, Guard `schnellaktionen.guard.test.ts`):
   das Ziel liegt unter dem Modulpfad des **eigenen** Trägers, und eine Seite dieses Moduls liest
   den deklarierten `parameter` als Literal (`X.get('neu')` bzw. `X.get('zeichnen')`). `neu` ist die
