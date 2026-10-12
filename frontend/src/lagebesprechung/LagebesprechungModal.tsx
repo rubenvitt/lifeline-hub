@@ -4,12 +4,18 @@ import type { Dayjs } from 'dayjs';
 import { useState } from 'react';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { einsatzKeys } from '../api/queryKeys';
-import { schliesseLagebesprechungAb } from '../api/stab';
-import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
+import { LAGEBESPRECHUNG_ENTSCHLUSS_MAX } from '../api/eingabegrenzen';
+import { lagebesprechungAbschliessen } from '../api/lagebesprechung';
+import type {
+  Lagebesprechung,
+  LagebesprechungAbschlussBody,
+  LagebesprechungStand,
+} from '../api/types';
 import { serverJetzt } from '../offline/serveruhr';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { schnellwahlAuswahl, schnellwahlTermin } from '../components/terminSchnellwahl';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
   abschlussBody,
   abschlussVorbelegung,
@@ -28,7 +34,7 @@ const NAECHSTE_ZU_FRUEH =
 interface LagebesprechungModalProps {
   einsatzId: number;
   /** Stand beim Öffnen — die Seite montiert die Maske erst, wenn er da ist. */
-  stab: Stab;
+  stand: LagebesprechungStand;
   /** Nach erfolgreichem POST, vor dem Schließen. `undefined` = Antwort trug eine fremde Zeile. */
   onAbgeschlossen: (eigene: Lagebesprechung | undefined) => void;
   onSchliessen: () => void;
@@ -45,27 +51,28 @@ interface LagebesprechungModalProps {
  * Zeiten sind Zeitpunkte; Felder zeigen und lesen die Anzeigezone (`ZeitpunktEingabe`, LFH-692).
  *
  * Montiert = offen: `useState` friert Vorbelegung und Vergleichsbasis beim ÖFFNEN ein, obwohl
- * `stab` live invalidiert wird, und jede Öffnung hat eine frische Mutation. Fehler des POST
+ * `stand` live invalidiert wird, und jede Öffnung hat eine frische Mutation. Fehler des POST
  * stehen IM Modal; Erfolg quittiert der Aufrufer per Toast.
  */
 export default function LagebesprechungModal({
   einsatzId,
-  stab,
+  stand,
   onAbgeschlossen,
   onSchliessen,
 }: LagebesprechungModalProps) {
   const qc = useQueryClient();
   const [vorbelegung] = useState(() =>
-    abschlussVorbelegung(stab.naechste_lagebesprechung_at, serverJetzt()),
+    abschlussVorbelegung(stand.naechste_lagebesprechung_at, serverJetzt()),
   );
   const [form] = Form.useForm<AbschlussFormWerte>();
 
   const mutation = useMutation({
-    mutationFn: (body: LagebesprechungAbschlussBody) => schliesseLagebesprechungAb(einsatzId, body),
+    mutationFn: (body: LagebesprechungAbschlussBody) =>
+      lagebesprechungAbschliessen(einsatzId, body),
     onSuccess: (antwort, body) => {
-      // Der Prefix trifft auch die Historie. `einsatz` ist Hygiene für den eigenen Schirm: das
+      // Der Prefix trifft auch den Verlauf. `einsatz` ist Hygiene für den eigenen Schirm: das
       // Live-Ereignis `einsatz` (LFH-555) kommt nur bei geändertem Termin und erst über den Strom.
-      void qc.invalidateQueries({ queryKey: einsatzKeys.stab(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.lagebesprechung(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       onAbgeschlossen(eigeneLagebesprechung(antwort, body));
     },
@@ -80,10 +87,10 @@ export default function LagebesprechungModal({
       erfassenText="Abschließen"
       laeuft={mutation.isPending}
       onErfassen={async (werte) => {
-        // `stab` ist hier die LIVE-Prop, nicht die eingefrorene Vorbelegung: nur so erkennt
+        // `stand` ist hier die LIVE-Prop, nicht die eingefrorene Vorbelegung: nur so erkennt
         // `abschlussBody` einen inzwischen fremd gesetzten oder gelöschten Termin.
         await mutation.mutateAsync(
-          abschlussBody(werte, vorbelegung, serverJetzt(), stab.naechste_lagebesprechung_at),
+          abschlussBody(werte, vorbelegung, serverJetzt(), stand.naechste_lagebesprechung_at),
         );
       }}
       onFertig={onSchliessen}
@@ -92,9 +99,16 @@ export default function LagebesprechungModal({
       <Form.Item
         label="Entschluss"
         name="entschluss"
-        rules={[{ required: true, whitespace: true, message: 'Entschluss angeben' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Entschluss angeben' },
+          zeichenRegel(LAGEBESPRECHUNG_ENTSCHLUSS_MAX, 'Entschluss'),
+        ]}
       >
-        <Input.TextArea rows={3} placeholder="z. B. Lage unverändert, Maßnahmen fortführen" />
+        <Input.TextArea
+          rows={3}
+          placeholder="z. B. Lage unverändert, Maßnahmen fortführen"
+          count={zeichenGrenze(LAGEBESPRECHUNG_ENTSCHLUSS_MAX)}
+        />
       </Form.Item>
       <Form.Item
         label="Nächste Lagebesprechung"

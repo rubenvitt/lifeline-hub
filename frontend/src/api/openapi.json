@@ -7668,7 +7668,7 @@
       },
       "LagebesprechungAnzeige": {
         "type": "object",
-        "description": "Eine abgeschlossene Lagebesprechung.\n\nDer Entschluss steht zusätzlich im ETB (`typ='entscheidung'`, `etb_eintrag_id`); die Zeile\nträgt Nummer, Zeitpunkt und den **Snapshot** des beim Abschluss gesetzten Termins.\n`naechste_at` ist damit Beweiswert, **keine** zweite lebende Terminwahrheit — die bleibt\n`einsatz.naechste_lagebesprechung_at` (Entscheidung 11).",
+        "description": "Eine abgeschlossene Lagebesprechung.\n\nDer Entschluss steht zusätzlich im ETB (`typ='entscheidung'`, `etb_eintrag_id`); die Zeile\nträgt Nummer, Zeitpunkt und den **Snapshot** des beim Abschluss gesetzten Termins.\n`naechste_at` ist damit Beweiswert, **keine** zweite lebende Terminwahrheit — die bleibt\n`einsatz.naechste_lagebesprechung_at` (LFH-46, Entscheidung 11).",
         "required": [
           "id",
           "einsatz_id",
@@ -7710,6 +7710,35 @@
             "format": "int64"
           },
           "naechste_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "LagebesprechungStand": {
+        "type": "object",
+        "description": "Stand der Lagebesprechung eines Einsatzes: nächster Termin, Zahl und letzte Besprechung.\n\n`naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**. Kein zweiter\nSpeicherort: ändert sich der Termin, frischt das Live-Ereignis `einsatz` Kopf und diesen\nStand gemeinsam auf (LFH-555).",
+        "required": [
+          "anzahl_lagebesprechungen"
+        ],
+        "properties": {
+          "anzahl_lagebesprechungen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "letzte_lagebesprechung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagebesprechungAnzeige"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "naechste_lagebesprechung_at": {
             "type": [
               "string",
               "null"
@@ -7960,6 +7989,7 @@
           "etb",
           "befehl",
           "stab",
+          "lagebesprechung",
           "dokument",
           "abloesung",
           "betreuung",
@@ -11752,37 +11782,16 @@
       },
       "StabAnzeige": {
         "type": "object",
-        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden.\n\n`naechste_lagebesprechung_at` kommt aus `einsatz` und wird hier **mitgeliefert**\n(Entscheidung 11). Kein zweiter Speicherort: ändert sich der Termin, frischt das\nLive-Ereignis `einsatz` Kopf und Stab-Anzeige gemeinsam auf (LFH-555).",
+        "description": "Die Führungsorganisation eines Einsatzes.\n\n`besetzung` enthält **nur belegte** Zeilen in `s1..s6`-Reihenfolge; die sechs festen\nZeilen baut das Frontend aus [`Sachgebiet::ALLE`] — eine Leerzeile vom Server zu\nschicken hiesse, „nicht vergeben\" als Datensatz zu erfinden. Termin und Lagebesprechungen\nträgt seit LLH-1111 das Modul Lagebesprechung (`lagebesprechung::LagebesprechungStand`).",
         "required": [
-          "besetzung",
-          "anzahl_lagebesprechungen"
+          "besetzung"
         ],
         "properties": {
-          "anzahl_lagebesprechungen": {
-            "type": "integer",
-            "format": "int64"
-          },
           "besetzung": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/StabsfunktionAnzeige"
             }
-          },
-          "letzte_lagebesprechung": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/LagebesprechungAnzeige"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "naechste_lagebesprechung_at": {
-            "type": [
-              "string",
-              "null"
-            ]
           }
         }
       },

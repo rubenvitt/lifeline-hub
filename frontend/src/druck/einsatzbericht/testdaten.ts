@@ -146,7 +146,6 @@ export function rohBericht(
         { sachgebiet: 's2', besetzung_art: 'personal', name: 'Sven Lage' },
         { sachgebiet: 's1', besetzung_art: 'einsatzleitung' },
       ],
-      anzahl_lagebesprechungen: 1,
     } as unknown as Stab),
     lagebesprechungen: daten([
       {

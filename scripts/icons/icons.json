@@ -71,6 +71,15 @@
       "notiz": "mehrdeutig: zwei Tabler-Bilder, eine Bedeutung; Alternative file (11651)"
     },
     {
+      "name": "besprechungstisch",
+      "bedeutung": "Lagebesprechung (LLH-1111)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "68119",
+        "commonName": "meeting-room"
+      }
+    },
+    {
       "name": "besteck",
       "bedeutung": "Verpflegung",
       "herkunft": "icons8",

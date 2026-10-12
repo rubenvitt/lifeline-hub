@@ -1103,6 +1103,7 @@ fn live_event_wire() {
         Etb => "etb",
         Befehl => "befehl",
         Stab => "stab",
+        Lagebesprechung => "lagebesprechung",
         Dokument => "dokument",
         Abloesung => "abloesung",
         Betreuung => "betreuung",

@@ -1192,8 +1192,8 @@ pub struct KopfPatch<'a> {
     pub anzahl_betroffene_initial: Option<Option<i64>>,
     /// Bereits ins DB-Format normalisierte Alarmzeit.
     pub begonnen_at: Option<&'a str>,
-    /// Expliziter UTC-Termin; absent erhält, innere None löscht.
-    pub naechste_lagebesprechung_at: Option<Option<&'a str>>,
+    // Kein Termin der nächsten Lagebesprechung: den schreibt seit LLH-1111 nur das Modul
+    // Lagebesprechung (`lagebesprechung::repo`). Der Handler weist das Feld mit 400 ab.
 }
 
 /// Teil-Patch der editierbaren Kopf-Spalten. Nicht-editierbare Spalten (status,
@@ -1201,7 +1201,7 @@ pub struct KopfPatch<'a> {
 /// (`einsatznummer_intern`, `nummer_jahr`, `nummer_lfd`), die nur `anlegen` schreibt (LFH-617).
 ///
 /// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`).
-/// Bei zwölf gleichtypigen Paaren ist die Nummerierung die eigentliche Absicherung: eine um
+/// Bei elf gleichtypigen Paaren ist die Nummerierung die eigentliche Absicherung: eine um
 /// eine Position verschobene Bind-Kette vertauschte Nachbarspalten
 /// (`meldende_stelle`↔`sachverhalt`, `einsatzort_lat`↔`einsatzort_lon`) STILL — ohne
 /// Compile- und ohne Laufzeitfehler. Abgesichert von
@@ -1224,10 +1224,8 @@ pub async fn patche_kopf(
             sachverhalt = CASE WHEN ?17 IS NULL THEN sachverhalt ELSE ?18 END, \
             anzahl_betroffene_initial = \
                 CASE WHEN ?19 IS NULL THEN anzahl_betroffene_initial ELSE ?20 END, \
-            begonnen_at = CASE WHEN ?21 IS NULL THEN begonnen_at ELSE ?22 END, \
-            naechste_lagebesprechung_at = \
-                CASE WHEN ?23 IS NULL THEN naechste_lagebesprechung_at ELSE ?24 END \
-         WHERE id = ?25",
+            begonnen_at = CASE WHEN ?21 IS NULL THEN begonnen_at ELSE ?22 END \
+         WHERE id = ?23",
     )
     .bind(patch.bezeichnung.map(|_| 1_i64))
     .bind(patch.bezeichnung)
@@ -1251,8 +1249,6 @@ pub async fn patche_kopf(
     .bind(patch.anzahl_betroffene_initial.and_then(|v| v))
     .bind(patch.begonnen_at.map(|_| 1_i64))
     .bind(patch.begonnen_at)
-    .bind(patch.naechste_lagebesprechung_at.map(|_| 1_i64))
-    .bind(patch.naechste_lagebesprechung_at.flatten())
     .bind(einsatz_id)
     .execute(pool)
     .await;
@@ -4042,7 +4038,6 @@ mod tests {
                 sachverhalt: Some(Some("Mehrzeiliges\nMeldebild")),
                 anzahl_betroffene_initial: Some(Some(3)),
                 begonnen_at: Some("2026-05-25 08:00:00"),
-                naechste_lagebesprechung_at: Some(Some("2026-05-25 10:17:43")),
             },
         )
         .await
@@ -4062,10 +4057,6 @@ mod tests {
         assert_eq!(aktualisiert.leitstellen_nr, None, "Some(None) leert");
         assert_eq!(aktualisiert.meldende_stelle, None, "Some(None) leert");
         assert_eq!(aktualisiert.begonnen_at, "2026-05-25 08:00:00");
-        assert_eq!(
-            aktualisiert.naechste_lagebesprechung_at.as_deref(),
-            Some("2026-05-25 10:17:43")
-        );
         // angelegt_at bleibt unverändert (Audit-Spur).
         assert_eq!(aktualisiert.angelegt_at, einsatz.angelegt_at);
         // Die Einsatznummer schreibt nur `anlegen` (LFH-617).

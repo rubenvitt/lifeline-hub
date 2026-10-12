@@ -1,16 +1,17 @@
 ---
-titel: Stab, Checkliste und Lagebesprechung
+titel: Stab und Checkliste
 gruppen: [fuehrung]
 reihenfolge: 430
-quellen: [frontend/src/pages/StabPage.tsx, frontend/src/stab/BesetzungModal.tsx, frontend/src/stab/besetzung.ts, frontend/src/stab/sachgebiete.ts, frontend/src/stab/unterseiten.ts, frontend/src/stab/useStabFreigabe.tsx, frontend/src/stab/VorbereitungPaneel.tsx, frontend/src/stab/vorbereitung.ts, frontend/src/stab/LagebesprechungModal.tsx, frontend/src/stab/LagebesprechungStand.tsx, frontend/src/stab/LagebesprechungHistorie.tsx, frontend/src/stab/lagebesprechungZustand.ts, frontend/src/stab/ChecklistePaneel.tsx, frontend/src/stab/checkliste.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/stab.rs, src/stab/mod.rs, src/stab/repo.rs, src/stab/checkliste.rs]
+quellen: [frontend/src/pages/StabPage.tsx, frontend/src/stab/BesetzungModal.tsx, frontend/src/stab/besetzung.ts, frontend/src/stab/sachgebiete.ts, frontend/src/stab/unterseiten.ts, frontend/src/stab/useStabFreigabe.tsx, frontend/src/lagebesprechung/LagebesprechungZeile.tsx, frontend/src/stab/ChecklistePaneel.tsx, frontend/src/stab/checkliste.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/stab.rs, src/stab/mod.rs, src/stab/repo.rs, src/stab/checkliste.rs]
 ---
 
 ## Überblick
 
 Die Seite „Stab“ unterstützt die Führungsgruppe oder den Stab der Einsatzleitung. Sie zeigt, wer
-die Sachgebiete S1 bis S6 besetzt, und führt von jedem Sachgebiet zu seinen Werkzeugen. Sie
-bereitet die Lagebesprechung vor, hält ihren Entschluss fest und plant die nächste. Die Checkliste
-„Arbeitsaufnahme“ begleitet den Aufbau der Führungsstelle. Lesen können alle Mitglieder des
+die Sachgebiete S1 bis S6 besetzt, und führt von jedem Sachgebiet zu seinen Werkzeugen. Oben
+steht die nächste Lagebesprechung mit dem Verweis „Zur Lagebesprechung“; vorbereitet,
+abgeschlossen und nachgelesen wird sie im eigenen Kapitel [Lagebesprechung](lagebesprechung.md).
+Die Checkliste „Arbeitsaufnahme“ begleitet den Aufbau der Führungsstelle. Lesen können alle Mitglieder des
 Einsatzes, bedienen Einsatzleitung und Führungspersonal.
 
 ## Abläufe
@@ -28,34 +29,6 @@ Einsatzes, bedienen Einsatzleitung und Führungspersonal.
 
 4. „Übernehmen“ wählen.
 
-### Die Lagebesprechung vorbereiten
-
-1. Auf der Seite „Stab“ das Paneel „Vorbereitung“ lesen. Es stellt die Kennzahlen für die
-   Besprechung zusammen: Betroffene, Vermisste, Sichtung, Kräfte, höchste Warnstufe, offene
-   Aufträge und Meldungen, letzter Lagebericht, letzte Lagebesprechung und nächster Termin, jede
-   Zeile mit ihrer Quelle.
-
-   ![Paneel „Vorbereitung“ mit Kennzahlen und Quellen je Zeile](../bilder/stab/vorbereitung.png)
-
-2. Soll der Stand festgehalten werden, „In Lagebericht übernehmen“ wählen. Das legt einen
-   Lagebericht „Vorbereitung Lagebesprechung …“ an.
-
-### Die Lagebesprechung abschließen
-
-1. Im Seitenkopf „Lagebesprechung abschließen“ wählen.
-2. Den „Entschluss“ eintragen.
-3. Unter „Nächste Lagebesprechung“ den Termin setzen, mit „+30 min“, „+1 h“, „+2 h“ oder
-   direkt; „kein Termin“ leert ihn.
-
-   ![Dialog „Lagebesprechung abschließen“ mit Entschluss und nächstem Termin](../bilder/stab/lagebesprechung.png)
-
-4. Lag die Besprechung früher, unter „Weitere Angaben“ den „Zeitpunkt der Besprechung“ setzen;
-   leer gilt jetzt.
-5. „Abschließen“ wählen.
-
-Das Paneel „Lagebesprechung“ zeigt danach die Nummer der letzten Besprechung, den nächsten
-Termin und unter „Frühere Lagebesprechungen“ die Liste davor.
-
 ### Die Arbeitsaufnahme abhaken
 
 1. Auf der Seite „Stab“ zum Paneel „Arbeitsaufnahme“ gehen.
@@ -70,14 +43,14 @@ Termin und unter „Frühere Lagebesprechungen“ die Liste davor.
 
 ### Wer was darf
 
-Besetzung, Lagebesprechung und Checkliste bedienen Einsatzleitung und Führungspersonal, solange der
-Einsatz läuft. Wer das nicht darf, sieht „Lagebesprechung abschließen“ gesperrt mit dem Grund
-darunter. „In Lagebericht übernehmen“ erscheint nur für sie und nur, wenn das Modul Lageberichte
-freigegeben ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
+Besetzung und Checkliste bedienen Einsatzleitung und Führungspersonal, solange der Einsatz läuft.
+Wer das nicht darf, sieht den Grund unter dem Seitenkopf. Einzelheiten stehen in
+[Rechte im Einsatz](rechte-im-einsatz.md).
 
 Ist das Modul Stab für den Einsatz nicht freigegeben, sind auch seine Unterseiten (Funkplan,
 Kommunikationsplan, Pressearbeit, Informationstelefon) gesperrt: „… nicht verfügbar“, „Modul Stab
-nicht freigegeben“.
+nicht freigegeben“. Die Lagebesprechung hat ihre eigene Freigabe; ist sie gesperrt, steht
+„Zur Lagebesprechung (Keine Berechtigung)“ gesperrt da.
 
 ### Die Zeilen der Besetzung
 
@@ -92,20 +65,11 @@ Verlauf steht im Einsatztagebuch.
 
 - **Besetzung:** jeder wirksame Wechsel, etwa „S2 Lage: Besetzung → … (vorher: …)“. Dieselbe Wahl
   ein zweites Mal schreibt nichts.
-- **Lagebesprechung:** ein Eintrag vom Typ Entscheidung mit der Veranlassung „Lagebesprechung“,
-  der Nummer, dem Zeitpunkt, dem Entschluss und dem nächsten Termin. Die Nummer zählt je Einsatz
-  fortlaufend. Der Termin gilt zugleich als „Nächste Lagebesprechung“ des Einsatzes. Eintrag,
-  Nummer und Termin entstehen gemeinsam oder gar nicht.
 - **Arbeitsaufnahme:** nur der Punkt „Einsatzbereitschaft an die Leitstelle gemeldet“, beim Haken
-  wie bei der Rücknahme. Die anderen Punkte, ihre Bemerkungen und die Vorbereitung schreiben
-  nichts.
+  wie bei der Rücknahme. Die anderen Punkte und ihre Bemerkungen schreiben nichts.
 
-### Vorbereitung und Checkliste
+### Checkliste
 
-- Die „Vorbereitung“ rechnet keine eigenen Zahlen, sie zeigt dieselben wie Überblick und
-  Modulzähler. Fehlt einer Person das Recht auf eine Quelle oder ist die Quelle nicht geladen,
-  steht „—“ mit Grund, nie eine 0. Sie gibt kein Vortragsschema vor und friert nichts ein; einen
-  festen Stand gibt es nur über „In Lagebericht übernehmen“.
 - Die sieben Punkte der „Arbeitsaufnahme“ sind fest. Kein Punkt wird aus anderen Modulen
   abgeleitet; abgehakt wird von Hand.
 - Der Punkt „Standort der Führungsstelle festgelegt“ zeigt Bezeichnung und Standort der eigenen
@@ -114,18 +78,16 @@ Verlauf steht im Einsatztagebuch.
 
 ### Fälliger Termin
 
-Erreicht die Uhr den Termin der nächsten Lagebesprechung, zeigt das Paneel „Lagebesprechung“
-„jetzt fällig“, danach „seit … min überfällig“, als Hinweis, nicht als Alarm.
+Erreicht die Uhr den Termin der nächsten Lagebesprechung, zeigt die Zeile oben „jetzt fällig“,
+danach „seit … min überfällig“, als Hinweis, nicht als Alarm.
 
 ### Ohne Netz
 
-Besetzung, Lagebesprechungen und Checkliste werden ohne Netz nicht vorgehalten (siehe
+Besetzung und Checkliste werden ohne Netz nicht vorgehalten (siehe
 [Arbeiten ohne Netz](ohne-netz.md)).
 
 ## Grundlagen und Quellen
 
 - FwDV 100, Anlage 2: Sachgebiete S1 bis S6 und ihre Aufgaben.
-- FwDV 100, Abschnitt 3.3.3.2, S. 42: Lagebesprechung bei oder unmittelbar nach Erteilung
-  dokumentieren.
 - FwDV 100, Anlage 5, S. 64, und LFS-BW F5-I, Kapitel 5, S. 33–34: Punkte der Arbeitsaufnahme.
 - EEMUA 191: Ein fälliger Termin ist kein Alarm (Alarmbudget).

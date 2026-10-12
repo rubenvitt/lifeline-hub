@@ -22,6 +22,8 @@ export const AUFTRAG_EMPFAENGER_MAX = 50;
 export const AUFTRAG_EXTERN_BEZEICHNUNG_MAX = 200;
 /** Grund beim Aufheben eines Auftrags (LLH-1098); steht wörtlich in der ETB-Anordnung. */
 export const AUFTRAG_AUFHEBUNGSGRUND_MAX = 2_000;
+/** Entschluss einer Lagebesprechung (LLH-1111); steht samt Kopf im ETB-Eintrag. */
+export const LAGEBESPRECHUNG_ENTSCHLUSS_MAX = 10_000;
 /** Freier Empfänger-Tag eines Auftrags (`funktion_text`). */
 export const FUNKTION_TEXT_MAX = 200;
 /** Name und Funktion einer Ad-hoc-Kraft, die an einer UHS erfasst wird (LFH-1045). */

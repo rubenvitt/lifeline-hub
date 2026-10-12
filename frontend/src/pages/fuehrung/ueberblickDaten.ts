@@ -45,7 +45,7 @@ import {
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
 import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
-import { dauerText, lagebesprechungUeberfaellig } from '../../stab/lagebesprechungZustand';
+import { dauerText, lagebesprechungUeberfaellig } from '../../lagebesprechung/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
@@ -494,8 +494,8 @@ interface MarkenAuswahl {
 /**
  * Ton und Wort einer Frist: überfällig `alarm`, unter {@link KNAPP_MINUTEN} `achtung`, sonst
  * `neutral`. Ausnahme ist die überfällige Lagebesprechung: sie liest Ton und Wort aus
- * `lagebesprechungUeberfaellig`, damit die Stab-Seite und diese Liste denselben Termin gleich
- * zeigen (LFH-859, `stab/AGENTS.md`).
+ * `lagebesprechungUeberfaellig`, damit die Seite Lagebesprechung und diese Liste denselben Termin
+ * gleich zeigen (LFH-859, `lagebesprechung/AGENTS.md`).
  */
 export function markenBewertung(
   zeit: Dayjs,

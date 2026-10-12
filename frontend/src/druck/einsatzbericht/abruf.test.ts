@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({
   ladeEinsatz: vi.fn(),
   ladeFuehrungsstelle: vi.fn(),
   ladeStab: vi.fn(),
-  ladeLagebesprechungen: vi.fn(),
+  fetchLagebesprechungen: vi.fn(),
   listeEinheiten: vi.fn(),
   listeEinheitenPerioden: vi.fn(),
   listeEinsatzPersonal: vi.fn(),
@@ -28,9 +28,9 @@ vi.mock('../../api/einsaetze', () => ({
   ladeEinsatz: api.ladeEinsatz,
   ladeFuehrungsstelle: api.ladeFuehrungsstelle,
 }));
-vi.mock('../../api/stab', () => ({
-  ladeStab: api.ladeStab,
-  ladeLagebesprechungen: api.ladeLagebesprechungen,
+vi.mock('../../api/stab', () => ({ ladeStab: api.ladeStab }));
+vi.mock('../../api/lagebesprechung', () => ({
+  fetchLagebesprechungen: api.fetchLagebesprechungen,
 }));
 vi.mock('../../api/einheiten', () => ({ listeEinheiten: api.listeEinheiten }));
 vi.mock('../../api/kraefteZeitachse', () => ({

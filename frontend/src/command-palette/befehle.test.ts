@@ -154,7 +154,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:etb', '/einsaetze/5/etb?neu=1'],
       ['aktion:unfallhilfsstellen', '/einsaetze/5/unfallhilfsstellen/liste?neu=1'],
       ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
-      ['aktion:stab', '/einsaetze/5/stab?neu=1'],
+      ['aktion:stab', '/einsaetze/5/lagebesprechung?neu=1'],
       ['aktion:dokumente', '/einsaetze/5/dokumente?neu=1'],
       ['aktion:tiere', '/einsaetze/5/tiere?neu=1'],
       ['aktion:bereitstellungsraeume', '/einsaetze/5/bereitstellungsraeume/liste?neu=1'],
@@ -229,6 +229,17 @@ describe('baueBefehle — Schnellaktionen', () => {
   it('folgt dem Modulfilter: versteckte Trägermodule liefern keine Schnellaktion', () => {
     const freigaben = freigabenFixture({ etb: { sichtbar: false } });
     expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === 'aktion:etb')).toBe(false);
+  });
+  // LLH-1111: „Lagebesprechung abschließen“ hängt an der Lagebesprechung, nicht am Stab; die Id
+  // bleibt `aktion:stab` (Gedächtnis „Zuletzt ausgeführt“).
+  it('Lagebesprechung abschließen folgt dem Modul Lagebesprechung, nicht dem Stab', () => {
+    const ohneStab = freigabenFixture({ stab: { sichtbar: false, zugriff: false } });
+    const zeile = baueBefehle(kontext({ freigaben: ohneStab })).find((x) => x.id === 'aktion:stab');
+    expect(zeile?.label).toBe('Lagebesprechung abschließen');
+    const ohneLb = freigabenFixture({ lagebesprechung: { sichtbar: false } });
+    expect(baueBefehle(kontext({ freigaben: ohneLb })).some((x) => x.id === 'aktion:stab')).toBe(
+      false,
+    );
   });
   it('folgt dem Zugriff: gesperrte Trägermodule liefern keine Schnellaktion', () => {
     const freigaben = freigabenFixture({ etb: { zugriff: false } });

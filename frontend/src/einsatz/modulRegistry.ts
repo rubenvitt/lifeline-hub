@@ -1,6 +1,7 @@
 import {
   IconArzttasche,
   IconBericht,
+  IconBesprechungstisch,
   IconBesteck,
   IconDokument,
   IconDokumente,
@@ -192,6 +193,16 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Aufträge, Befehle, Quittungen',
     zaehlerQuelle: 'auftraege',
   },
+  // LLH-1111: eigenes Modul, unabhängig von der Stab-Freigabe (Führungsstufe B/C ohne Stab).
+  {
+    key: 'lagebesprechung',
+    kategorie: 'fuehrung',
+    label: 'Lagebesprechung',
+    icon: IconBesprechungstisch,
+    route: 'lagebesprechung',
+    status: 'fertig',
+    beschreibung: 'Termin, Vorbereitung, Entschluss',
+  },
   {
     key: 'stab',
     kategorie: 'fuehrung',
@@ -199,7 +210,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconGebaeudegruppe,
     route: 'stab',
     status: 'fertig',
-    beschreibung: 'S1–S6, Lagebesprechung',
+    beschreibung: 'S1–S6, Besetzung',
   },
   {
     key: 'dokumente',

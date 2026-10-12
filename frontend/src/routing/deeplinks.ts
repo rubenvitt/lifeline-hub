@@ -296,9 +296,17 @@ export function betreuungPfad(
   });
 }
 
-/** Stab-Modul. `?neu=1` liest und räumt die Seite (Abschluss der Lagebesprechung). */
-export function stabPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'stab'), {
+/** Stab-Modul. Den Abschluss der Lagebesprechung trägt seit LLH-1111 `lagebesprechungPfad`. */
+export function stabPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'stab');
+}
+
+/**
+ * Modul Lagebesprechung (LLH-1111). `?neu=1` liest und räumt die Seite (Abschluss der
+ * Lagebesprechung, Schnellaktion der Palette).
+ */
+export function lagebesprechungPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'lagebesprechung'), {
     neu: opts.neu ? 1 : undefined,
   });
 }

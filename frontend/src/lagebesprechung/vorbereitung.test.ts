@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { render } from '@testing-library/react';
 import Markdown from '../components/Markdown';
-import type { EinsatzAnzeige, Person, Stab } from '../api/types';
+import type { EinsatzAnzeige, LagebesprechungStand, Person } from '../api/types';
 import { baueLagebild, type Rohdaten } from '../pages/lage-dashboard/lagebild';
 import {
   quellenLaden,
@@ -57,12 +57,11 @@ const alleDa = {
   kraefte: 'daten',
   gefahren: 'daten',
   lageberichte: 'daten',
-  stab: 'daten',
+  besprechung: 'daten',
 } as const;
 
-const stab = {
+const besprechung = {
   anzahl_lagebesprechungen: 3,
-  besetzung: [],
   letzte_lagebesprechung: {
     id: 3,
     lfd_nr: 3,
@@ -74,7 +73,7 @@ const stab = {
     etb_eintrag_id: 9,
   },
   naechste_lagebesprechung_at: '2026-06-11 12:30:00',
-} as Stab;
+} as LagebesprechungStand;
 
 function quellen(over: Partial<VorbereitungsQuellen> = {}): VorbereitungsQuellen {
   return {
@@ -82,7 +81,7 @@ function quellen(over: Partial<VorbereitungsQuellen> = {}): VorbereitungsQuellen
     zustand: alleDa,
     auftraege: { zustand: 'daten', zahl: { offen: 5, in_arbeit: 2, ueberfaellig: 1 } },
     meldungen: { zustand: 'daten', zahl: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 } },
-    stab,
+    besprechung,
     ...over,
   };
 }
@@ -145,8 +144,8 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
       'Aufträge/Befehle',
       'Meldungen (eingehend)',
       'Lageberichte',
-      'Stab',
-      'Stab',
+      'Lagebesprechung',
+      'Lagebesprechung',
     ]);
   });
 
@@ -177,14 +176,18 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
     expect(quellenLaden(vorbereitungsZeilen(quellen(), BERLIN))).toBe(false);
   });
 
-  it('letzte Besprechung und nächster Termin aus dem Stab', () => {
+  it('letzte Besprechung und nächster Termin aus dem Modul Lagebesprechung', () => {
     const zeilen = vorbereitungsZeilen(quellen(), BERLIN);
     expect(zeile(zeilen, 'besprechung')).toMatchObject({ wert: 'Nr. 3' });
     expect(zeile(zeilen, 'besprechung').notiz).toContain('abgehalten');
     expect(zeile(zeilen, 'termin').wert).not.toBe('kein Termin');
     const ohne = vorbereitungsZeilen(
       quellen({
-        stab: { ...stab, letzte_lagebesprechung: null, naechste_lagebesprechung_at: null },
+        besprechung: {
+          ...besprechung,
+          letzte_lagebesprechung: null,
+          naechste_lagebesprechung_at: null,
+        },
       }),
       BERLIN,
     );

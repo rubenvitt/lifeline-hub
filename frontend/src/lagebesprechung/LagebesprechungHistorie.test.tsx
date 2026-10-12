@@ -21,22 +21,22 @@ const eintrag = (lfd_nr: number, over: object = {}) => ({
 });
 const LEER = 'Noch keine Lagebesprechung abgeschlossen';
 
-const FEHLER = 'Frühere Lagebesprechungen konnten nicht geladen werden';
+const FEHLER = 'Verlauf der Lagebesprechungen konnte nicht geladen werden';
 const VERALTET = /Aktualisierung fehlgeschlagen/;
 
 function zeige(antwort: () => Response | Promise<Response>) {
-  server.use(http.get('/api/einsaetze/1/stab/lagebesprechungen', antwort));
+  server.use(http.get('/api/einsaetze/1/lagebesprechungen', antwort));
   return renderMitProviders(<LagebesprechungHistorie einsatzId={1} />);
 }
 
 /** Stellt den Handler auf 500 um und lädt über den Client des Renders neu. */
 async function neuladenScheitert(client: QueryClient) {
   server.use(
-    http.get('/api/einsaetze/1/stab/lagebesprechungen', () =>
+    http.get('/api/einsaetze/1/lagebesprechungen', () =>
       HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
     ),
   );
-  await act(() => client.invalidateQueries({ queryKey: einsatzKeys.stabLagebesprechungen(1) }));
+  await act(() => client.invalidateQueries({ queryKey: einsatzKeys.lagebesprechungen(1) }));
 }
 
 describe('LagebesprechungHistorie', () => {
@@ -56,84 +56,47 @@ describe('LagebesprechungHistorie', () => {
     expect(within(eins).getByText(/kein Termin/)).toBeInTheDocument();
   });
 
-  /** Titel „Nr. n · …" der Zeilen — innerhalb oder ausserhalb des Expanders. */
-  const titel = (imExpander: boolean) =>
-    screen
-      .getAllByRole('listitem')
-      .filter((li) => (li.closest('.ant-collapse') != null) === imExpander)
-      .map((li) => within(li).getByRole('heading', { level: 3 }).textContent);
-
-  /**
-   * Die Historie steht ÜBER der Besetzung; ab dem vierten Eintrag wächst sie nicht mehr in der
-   * Höhe — ein Live-Abschluss ändert nur die Zahl im Expander-Titel.
-   */
-  it('zeigt die drei jüngsten; die älteren liegen eingeklappt im Expander mit Anzahl', async () => {
+  // LLH-1111 (design.md D7): die Seite gehört dem Verlauf, die Begrenzung auf drei fällt.
+  it('zeigt alle Einträge, neueste zuerst, ohne Expander', async () => {
     zeige(() => HttpResponse.json([eintrag(5), eintrag(4), eintrag(3), eintrag(2), eintrag(1)]));
-    const expander = await screen.findByRole('button', {
-      name: /Frühere Lagebesprechungen \(2\)/,
-    });
-    expect(expander).toHaveAttribute('aria-expanded', 'false');
-    expect(titel(false)).toEqual([
-      expect.stringMatching(/^Nr\. 5 · /),
-      expect.stringMatching(/^Nr\. 4 · /),
-      expect.stringMatching(/^Nr\. 3 · /),
-    ]);
-    expect(titel(true)).toEqual([]);
-
-    await userEvent.click(expander);
-    await waitFor(() =>
-      expect(titel(true)).toEqual([
-        expect.stringMatching(/^Nr\. 2 · /),
-        expect.stringMatching(/^Nr\. 1 · /),
-      ]),
-    );
-    expect(titel(false)).toHaveLength(3);
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(5));
+    expect(
+      screen
+        .getAllByRole('listitem')
+        .map((li) => within(li).getByRole('heading', { level: 3 }).textContent),
+    ).toEqual([5, 4, 3, 2, 1].map((n) => expect.stringMatching(new RegExp(`^Nr\\. ${n} · `))));
+    expect(screen.queryByRole('button', { name: /Frühere Lagebesprechungen/ })).toBeNull();
   });
 
-  it('drei Einträge → kein Expander (Gegenfall)', async () => {
-    zeige(() => HttpResponse.json([eintrag(3), eintrag(2), eintrag(1)]));
-    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(3));
-    expect(screen.queryByRole('button', { name: /Frühere Lagebesprechungen/ })).toBeNull();
+  it('kürzt einen langen Entschluss und zeigt ihn auf Wunsch ganz', async () => {
+    const lang = `Anfang ${'Wort '.repeat(60)}Ende`;
+    zeige(() => HttpResponse.json([eintrag(1, { entschluss: lang })]));
+    const knopf = await screen.findByRole('button', {
+      name: 'Entschluss von Lagebesprechung Nr. 1 ganz zeigen',
+    });
+    expect(screen.queryByText(/Ende$/)).toBeNull();
+    await userEvent.click(knopf);
+    expect(screen.getByText(/Ende$/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Entschluss von Lagebesprechung Nr. 1 kürzen' }),
+    ).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('kurzer Entschluss: kein Umschalter (Gegenfall)', async () => {
+    zeige(() => HttpResponse.json([eintrag(1)]));
+    await screen.findByText('Entschluss 1');
+    expect(screen.queryByRole('button', { name: /Entschluss von/ })).toBeNull();
   });
 
   it('leer: sagt es beim Wort, ohne Fehler zu behaupten', async () => {
     zeige(() => HttpResponse.json([]));
     expect(await screen.findByText(LEER)).toBeInTheDocument();
-    expect(screen.queryByText(/konnten nicht geladen werden/)).toBeNull();
-  });
-
-  // LFH-961: der Stand darüber sagt schon „noch keine".
-  it('leer und schon ausgesagt: kein eigener Leertext', async () => {
-    let geladen = false;
-    server.use(
-      http.get('/api/einsaetze/1/stab/lagebesprechungen', () => {
-        geladen = true;
-        return HttpResponse.json([]);
-      }),
-    );
-    const { client } = renderMitProviders(<LagebesprechungHistorie einsatzId={1} leerAusgesagt />);
-    await waitFor(() => expect(geladen).toBe(true));
-    await waitFor(() =>
-      expect(client.getQueryState(einsatzKeys.stabLagebesprechungen(1))?.status).toBe('success'),
-    );
-    expect(screen.queryByText(LEER)).toBeNull();
-  });
-
-  it('schon ausgesagt, aber Fehler: der Fehler steht trotzdem', async () => {
-    server.use(
-      http.get('/api/einsaetze/1/stab/lagebesprechungen', () =>
-        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
-      ),
-    );
-    renderMitProviders(<LagebesprechungHistorie einsatzId={1} leerAusgesagt />);
-    expect(await screen.findByText(FEHLER)).toBeInTheDocument();
+    expect(screen.queryByText(/nicht geladen werden/)).toBeNull();
   });
 
   it('Fehler ist nicht leer', async () => {
     zeige(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
-    expect(
-      await screen.findByText('Frühere Lagebesprechungen konnten nicht geladen werden'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(FEHLER)).toBeInTheDocument();
     expect(screen.queryByText(LEER)).toBeNull();
   });
 
@@ -166,6 +129,6 @@ describe('LagebesprechungHistorie', () => {
     // Positiv abwarten, dass die Liste steht (Spinner), sonst wäre das `null` unten trivial.
     await waitFor(() => expect(document.querySelector('.ant-spin-spinning')).not.toBeNull());
     expect(screen.queryByText(LEER)).toBeNull();
-    expect(screen.queryByText(/konnten nicht geladen werden/)).toBeNull();
+    expect(screen.queryByText(/nicht geladen werden/)).toBeNull();
   });
 });

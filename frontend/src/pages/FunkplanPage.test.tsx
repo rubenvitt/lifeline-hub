@@ -195,7 +195,7 @@ beforeEach(() => {
   });
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([]);
   vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
-  vi.mocked(ladeStab).mockResolvedValue({ besetzung: [], anzahl_lagebesprechungen: 0 });
+  vi.mocked(ladeStab).mockResolvedValue({ besetzung: [] });
   bild.props = null;
 });
 
@@ -1457,7 +1457,6 @@ describe('FunkplanPage — Ausstattung der Kästen (LFH-1029)', () => {
       { ...FAHRZEUGE[0], id: 102, fahrzeugtyp: 'ELW 1', funkrufname: 'Florian 1/11-1' },
     ]);
     vi.mocked(ladeStab).mockResolvedValue({
-      anzahl_lagebesprechungen: 0,
       besetzung: [
         {
           sachgebiet: 's2',

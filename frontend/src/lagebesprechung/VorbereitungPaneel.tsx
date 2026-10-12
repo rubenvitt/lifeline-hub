@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
-import type { EinsatzAnzeige, ModulFreigaben, Stab } from '../api/types';
+import type { EinsatzAnzeige, LagebesprechungStand, ModulFreigaben } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -38,17 +38,17 @@ interface Props {
   einsatzId: number;
   einsatz: EinsatzAnzeige;
   freigaben: ModulFreigaben | undefined;
-  stab: Stab | undefined;
-  stabZustand: AbrufZustand;
-  stabStand: number;
+  besprechung: LagebesprechungStand | undefined;
+  besprechungZustand: AbrufZustand;
+  besprechungStand: number;
 }
 
 /**
- * Paneel „Vorbereitung" der Stab-Seite (LFH-550): der Lagestand zur nächsten Lagebesprechung.
+ * Paneel „Vorbereitung" der Seite Lagebesprechung (LFH-550, seit LLH-1111 nicht mehr am Stab): der Lagestand zur nächsten Lagebesprechung.
  *
  * Die Zahlen kommen aus DERSELBEN Zusammenstellung wie das Lage-Dashboard (`useLagebild` +
  * `baueLagebild`) und aus dem Modulzähler — das Paneel rechnet nichts selbst
- * (`stab/vorbereitung.ts`). Jede Zeile nennt ihre Quelle; eine gesperrte Quelle steht als „—" mit
+ * (`lagebesprechung/vorbereitung.ts`). Jede Zeile nennt ihre Quelle; eine gesperrte Quelle steht als „—" mit
  * Grund da. Nichts wird gespeichert: einen festen Stand gibt es nur über „In Lagebericht
  * übernehmen" (EIN Aufruf mit Startinhalt, Spec `dokument-uebernahme`).
  */
@@ -56,9 +56,9 @@ export default function VorbereitungPaneel({
   einsatzId,
   einsatz,
   freigaben,
-  stab,
-  stabZustand,
-  stabStand,
+  besprechung,
+  besprechungZustand,
+  besprechungStand,
 }: Props) {
   const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
@@ -88,11 +88,11 @@ export default function VorbereitungPaneel({
         kraefte: kraefteZustand(zustand),
         gefahren: zustand.gefahren,
         lageberichte: zustand.lageberichte,
-        stab: stabZustand,
+        besprechung: besprechungZustand,
       },
       auftraege: auftragsStand(q.zaehler),
       meldungen: meldungsStand(q.zaehler),
-      stab,
+      besprechung,
     },
     konv,
   );
@@ -112,7 +112,7 @@ export default function VorbereitungPaneel({
         standVon('lageberichte'),
         standVon('zaehler'),
       ),
-      stabStand,
+      besprechungStand,
     ].filter((s) => s > 0),
   );
   const standWire = Number.isFinite(stand) ? alsWire(stand) : null;

@@ -1,5 +1,5 @@
 import type { AbrufZustand } from '../api/abrufZustand';
-import type { ModulZaehler, Stab } from '../api/types';
+import type { LagebesprechungStand, ModulZaehler } from '../api/types';
 import {
   DEFAULT_KONVENTIONEN,
   formatUhrzeitMitTag,
@@ -15,7 +15,7 @@ import {
 import type { KennzahlEtikett, Lagebild } from '../pages/lage-dashboard/lagebild';
 import { SK_WORT } from '../personen/personMeta';
 import { sichtung as SK_META, warnstufeKennzahl } from '../theme/statusFarben';
-import { md, ZUSTAND_GRUND } from './funkplan';
+import { md, ZUSTAND_GRUND } from '../stab/funkplan';
 
 /**
  * Vorbereitung der Lagebesprechung (LFH-550; FwDV 100 Anl. 2: S2 bereitet vor).
@@ -54,11 +54,11 @@ export interface VorbereitungsQuellen {
     kraefte: AbrufZustand;
     gefahren: AbrufZustand;
     lageberichte: AbrufZustand;
-    stab: AbrufZustand;
+    besprechung: AbrufZustand;
   };
   auftraege: Zaehlstand<AuftragsZaehler>;
   meldungen: Zaehlstand<MeldungsZaehler>;
-  stab: Stab | undefined;
+  besprechung: LagebesprechungStand | undefined;
 }
 
 /** Name des Quellmoduls aus der Registry — kein zweiter Wortlaut. */
@@ -166,7 +166,7 @@ export function vorbereitungsZeilen(
 
   const auftraege = ausZaehler(q.auftraege, (z) => String(z.offen), auftraegeNotiz);
   const meldungen = ausZaehler(q.meldungen, (z) => String(z.offen), meldungenNotiz);
-  const letzte = q.stab?.letzte_lagebesprechung;
+  const letzte = q.besprechung?.letzte_lagebesprechung;
 
   return [
     zeile('betroffene', 'Betroffene', 'personen', q.zustand.personen, (l) =>
@@ -203,7 +203,7 @@ export function vorbereitungsZeilen(
           }
         : { wert: 'keiner', notiz: 'noch nicht erstellt' },
     ),
-    zeile('besprechung', 'Letzte Lagebesprechung', 'stab', q.zustand.stab, () =>
+    zeile('besprechung', 'Letzte Lagebesprechung', 'lagebesprechung', q.zustand.besprechung, () =>
       letzte
         ? {
             wert: `Nr. ${letzte.lfd_nr}`,
@@ -211,9 +211,9 @@ export function vorbereitungsZeilen(
           }
         : { wert: 'keine', notiz: 'noch keine abgehalten' },
     ),
-    zeile('termin', 'Nächster Termin', 'stab', q.zustand.stab, () => ({
-      wert: q.stab?.naechste_lagebesprechung_at
-        ? formatUhrzeitMitTag(q.stab.naechste_lagebesprechung_at, konv)
+    zeile('termin', 'Nächster Termin', 'lagebesprechung', q.zustand.besprechung, () => ({
+      wert: q.besprechung?.naechste_lagebesprechung_at
+        ? formatUhrzeitMitTag(q.besprechung.naechste_lagebesprechung_at, konv)
         : 'kein Termin',
       notiz: null,
     })),

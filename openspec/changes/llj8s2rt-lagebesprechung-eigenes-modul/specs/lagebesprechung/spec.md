@@ -101,16 +101,17 @@ und den Termin setzen; scheitert ein Teil, MUST nichts gespeichert sein.
 - **THEN** antwortet der Server mit 422, und nichts wird gespeichert
 
 ### Requirement: Entschluss mit Pflicht und Längengrenze
-Der Entschluss SHALL Pflicht sein und MUST höchstens so lang sein wie der Inhalt eines
-ETB-Eintrags. Ein leerer oder zu langer Entschluss MUST mit 400 abgelehnt werden, und die
-Oberfläche MUST dieselbe Grenze vor dem Senden zeigen.
+Der Entschluss SHALL Pflicht sein und MUST höchstens 10 000 Zeichen lang sein, damit der
+ETB-Eintrag der Besprechung samt Nummer, Zeit und Termin in die Grenze eines ETB-Inhalts passt.
+Ein leerer oder zu langer Entschluss MUST mit 400 abgelehnt werden, und die Oberfläche MUST
+dieselbe Grenze vor dem Senden zeigen.
 
 #### Scenario: Leerer Entschluss
 - **WHEN** ein Abschluss mit leerem Entschluss gesendet wird
 - **THEN** antwortet der Server mit 400, und nichts wird gespeichert
 
 #### Scenario: Zu langer Entschluss
-- **WHEN** ein Abschluss mit einem Entschluss über der Grenze gesendet wird
+- **WHEN** ein Abschluss mit einem Entschluss von 10 001 Zeichen gesendet wird
 - **THEN** antwortet der Server mit 400, und nichts wird gespeichert
 
 ### Requirement: Verlauf der Lagebesprechungen

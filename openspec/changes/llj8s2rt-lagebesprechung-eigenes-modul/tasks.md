@@ -12,7 +12,7 @@ Umbenennungen nach LFH-1312 als eigener `refactor`-Commit.
 - [ ] 1.3 `src/routes/lagebesprechung.rs`: `GET …/lagebesprechung` (`LagebesprechungStand`), `GET`/`POST …/lagebesprechungen` mit `EinsatzLesezugriff`/`EinsatzSchreibzugriff<Lagebesprechung>`; Routen in `src/app.rs`, `src/routes/mod.rs`, `src/api_doc.rs`; die alten `…/stab/lagebesprechungen`-Routen und die drei Felder aus `StabAnzeige` entfernt; Lagebesprechungs-Tests aus `tests/stab.rs` nach `tests/lagebesprechung.rs` verschoben und auf die neuen Pfade umgestellt, alle grün
 - [ ] 1.4 Gate-Tests in `tests/lagebesprechung.rs`: Stab ausgeblendet → Lagebesprechung lesen und abschließen gelingt; Lagebesprechung ausgeblendet → 403 für Lesen und Schreiben; fremde Org → 404; Beobachter liest, schreibt 403; System-Admin ohne Einsatzrolle schreibt 403
 - [ ] 1.5 `tests/modul_override.rs`: `lagebesprechung` in `MODUL_GET_PFADE` mit seinem GET-Pfad, Eintrag `stab` in `OHNE_EIGENE_ROUTEN` geprüft und berichtigt; `jeder_ausblendbare_modul_key_ist_guard_abgedeckt` grün. Der Abgleich `backend_modul_keys_decken_frontend_registry` braucht den Registry-Eintrag, deshalb landen 1.1 und 4.1 im selben Commit
-- [ ] 1.6 Entschluss-Grenze (D10): `entschluss` länger als `etb::INHALT_MAX` → 400, nichts gespeichert; Test `zu_langer_entschluss_ist_400`
+- [ ] 1.6 Entschluss-Grenze (D10): `ENTSCHLUSS_MAX` = 10 000, länger → 400, nichts gespeichert; Test `zu_langer_entschluss_ist_400`; Spiegel `LAGEBESPRECHUNG_ENTSCHLUSS_MAX` in `api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`
 
 ## 2. Backend: Termin-Schreibweg und Kopf-PATCH (D3)
 
@@ -42,7 +42,7 @@ Umbenennungen nach LFH-1312 als eigener `refactor`-Commit.
 - [ ] 5.3 Paneel „Termin“: taktische Zeit groß, Zustand („in 25 min“, „kein Termin“, „jetzt fällig“, „seit 5 min überfällig“ im Ton `achtung`) im 30-s-Takt, Schnellwahl +30 min/+1 h/+2 h ab `serverJetzt()`, „kein Termin“, „Termin wählen“ über `ZeitpunktEingabe`; Vitest: jede Schnellwahl sendet den erwarteten UTC-Zeitpunkt, „kein Termin“ sendet `null`, Fehler steht am Paneel, ohne Schreibrecht gesperrt mit Grund
 - [ ] 5.4 Paneel „Vorbereitung“ eingehängt; `vorbereitung.ts` führt „Letzte Lagebesprechung“ und „Nächster Termin“ mit Quelle `lagebesprechung`; Vitest: Stab gesperrt → beide Zeilen zeigen Werte, Lagebesprechung-Quelle fehlt → „—“ mit Grund
 - [ ] 5.5 Paneel „Verlauf“: alle Besprechungen, neueste zuerst, `Liste` mit `h3`-Titel „Nr. n · Zeit“, Entschluss gekürzt mit Aufklappen, Termin beim Abschluss, ETB-Sprung; leer: „Noch keine Lagebesprechung abgeschlossen“; Vitest für Reihenfolge, Leerzustand, ETB-Ziel, Überschriftenebene
-- [ ] 5.6 Modal: Entschluss-Grenze `ETB_INHALT_MAX` mit Zähler; `LagebesprechungModal.test.tsx` grün
+- [ ] 5.6 Modal: Entschluss-Grenze `LAGEBESPRECHUNG_ENTSCHLUSS_MAX` mit Zähler; `LagebesprechungModal.test.tsx` grün
 - [ ] 5.7 Prüfliste Einsatztauglichkeit (15 Kriterien) als `pruefliste.md` in dieser Change, jede Zeile mit Verdikt; e2e: Dichte-Staffel und Bedienziele in `trefflaeche-pruefflaechen.spec.ts`, Handy 390 px ohne Querlauf (neue `lagebesprechung-schmal.spec.ts` oder bestehendes Muster)
 
 ## 6. Frontend: Einstiege und Abnehmer (D8)

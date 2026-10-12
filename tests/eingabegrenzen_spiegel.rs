@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
-    auftrag, einsatz, etb, externe_stelle, fuehrung, infotelefon, lage_zone, nachforderung,
-    personal, presse, schaden, sprechgruppe,
+    auftrag, einsatz, etb, externe_stelle, fuehrung, infotelefon, lage_zone, lagebesprechung,
+    nachforderung, personal, presse, schaden, sprechgruppe,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -22,6 +22,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             auftrag::EXTERN_BEZEICHNUNG_MAX,
         ),
         ("AUFTRAG_AUFHEBUNGSGRUND_MAX", auftrag::AUFHEBUNGSGRUND_MAX),
+        (
+            "LAGEBESPRECHUNG_ENTSCHLUSS_MAX",
+            lagebesprechung::ENTSCHLUSS_MAX,
+        ),
         ("FUNKTION_TEXT_MAX", fuehrung::TEXT_MAX),
         ("PERSONAL_ADHOC_TEXT_MAX", personal::ADHOC_TEXT_MAX),
         (

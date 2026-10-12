@@ -48,9 +48,9 @@ export function lagebesprechungZustand(
 
 /**
  * Ton und Wort eines erreichten oder verstrichenen Besprechungstermins — die EINE Heimat dieser
- * Regel (LFH-859, `stab/AGENTS.md`): die Stab-Seite (`lagebesprechungZustand`) und die
- * Fristenliste des Führungsüberblicks (`markenBewertung`, Marke „Lagebesprechung") lesen beide
- * hier. `achtung`, nie `alarm`: eine Besprechung ist kein Gefahrenereignis (Alarmbudget
+ * Regel (LFH-859, `lagebesprechung/AGENTS.md`): die Seite Lagebesprechung und die Termin-Zeile
+ * der Stab-Seite (`lagebesprechungZustand`) und die Fristenliste des Führungsüberblicks
+ * (`markenBewertung`, Marke „Lagebesprechung") lesen alle hier. `achtung`, nie `alarm`: eine Besprechung ist kein Gefahrenereignis (Alarmbudget
  * EEMUA 191). In der ersten Minute „jetzt fällig", danach „seit 5 min überfällig".
  *
  * `null`, solange der Termin in der Zukunft liegt; den kommenden Termin bewertet jeder Aufrufer

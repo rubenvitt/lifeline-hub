@@ -483,7 +483,6 @@ export interface FuehrungsfunktionUpdate {
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];
 export type Stabsfunktion = S['StabsfunktionAnzeige'];
-export type Lagebesprechung = S['LagebesprechungAnzeige'];
 export type Sachgebiet = S['Sachgebiet'];
 export type BesetzungArt = S['BesetzungArt'];
 export type ChecklistenEintrag = S['ChecklistenEintrag'];
@@ -541,8 +540,12 @@ export interface BesetzungBody {
   bezeichnung?: string;
 }
 
+// ============================== LLH-1111 Lagebesprechung ==============================
+export type Lagebesprechung = S['LagebesprechungAnzeige'];
+export type LagebesprechungStand = S['LagebesprechungStand'];
+
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/stab/lagebesprechungen`, FE-lokal.
+ * Kein Backend-Schema: Eingabe-Body von `POST …/lagebesprechungen`, FE-lokal.
  *
  * `naechste_at` ist DREIWERTIG: Schlüssel fehlt = Termin unverändert · `null` = löschen · Wert =
  * setzen. Ein leerer String löscht STILL (`support::trimme_tri`), Aufrufer schicken nie `''`.
@@ -552,6 +555,14 @@ export interface LagebesprechungAbschlussBody {
   entschluss: string;
   abgehalten_at?: string;
   naechste_at?: string | null;
+}
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `PUT …/lagebesprechung/termin`, FE-lokal. Der Schlüssel
+ * ist Pflicht: Zeitpunkt (UTC 'YYYY-MM-DD HH:mm:ss') = setzen, `null` = kein Termin.
+ */
+export interface LagebesprechungTerminBody {
+  naechste_at: string | null;
 }
 
 // ============================== LFH-552 Kräfte-Zeitachse ==============================

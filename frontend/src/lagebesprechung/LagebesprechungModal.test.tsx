@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Lagebesprechung, Stab } from '../api/types';
+import type { Lagebesprechung, LagebesprechungStand } from '../api/types';
 import { server } from '../test/server';
 import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
@@ -25,14 +25,12 @@ const wireAb = (minuten: number) =>
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 const GRUND = 'Die nächste Lagebesprechung muss nach dem Zeitpunkt liegen';
 
-const stab = (over: Partial<Stab> = {}): Stab => ({
+const stand = (over: Partial<LagebesprechungStand> = {}): LagebesprechungStand => ({
   anzahl_lagebesprechungen: 3,
-  besetzung: [],
   ...over,
 });
-const antwort = (letzte: Partial<Lagebesprechung> = {}) => ({
+const antwort = (letzte: Partial<Lagebesprechung> = {}): LagebesprechungStand => ({
   anzahl_lagebesprechungen: 4,
-  besetzung: [],
   letzte_lagebesprechung: {
     id: 9,
     einsatz_id: 1,
@@ -55,7 +53,7 @@ beforeEach(() => {
   gesendet = [];
   postAntwort = () => HttpResponse.json(antwort(), { status: 201 });
   server.use(
-    http.post('/api/einsaetze/1/stab/lagebesprechungen', async ({ request }) => {
+    http.post('/api/einsaetze/1/lagebesprechungen', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return postAntwort();
     }),
@@ -69,7 +67,7 @@ function Ort() {
 }
 
 /** Wie die Seite: montiert = offen, Toast mit dem `navigate` des Aufrufers. */
-function Harness({ daten }: { daten: Stab }) {
+function Harness({ daten }: { daten: LagebesprechungStand }) {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [offen, setOffen] = useState(true);
@@ -78,7 +76,7 @@ function Harness({ daten }: { daten: Stab }) {
       {offen && (
         <LagebesprechungModal
           einsatzId={1}
-          stab={daten}
+          stand={daten}
           onAbgeschlossen={(eigene) =>
             zeigeAbschlussToast(message, { einsatzId: 1, eigene, navigate })
           }
@@ -90,13 +88,13 @@ function Harness({ daten }: { daten: Stab }) {
   );
 }
 
-function zeige(daten: Stab = stab()) {
+function zeige(daten: LagebesprechungStand = stand()) {
   renderMitProviders(
     <Routes>
-      <Route path="/einsaetze/:id/stab" element={<Harness daten={daten} />} />
+      <Route path="/einsaetze/:id/lagebesprechung" element={<Harness daten={daten} />} />
       <Route path="/einsaetze/:id/etb" element={<Ort />} />
     </Routes>,
-    { route: '/einsaetze/1/stab' },
+    { route: '/einsaetze/1/lagebesprechung' },
   );
   return screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
 }
@@ -191,40 +189,40 @@ describe('LagebesprechungModal · Feldbudget', () => {
 
 describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
   it('belegt einen zukünftigen Termin vor — einen vergangenen nicht', async () => {
-    const dialog = await zeige(stab({ naechste_lagebesprechung_at: wireAb(45) }));
+    const dialog = await zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe(
       dayjs(JETZT).add(45, 'minute').format(ZEITFORMAT),
     );
   });
 
   it('lässt das Feld bei vergangenem Termin leer (Gegenfall)', async () => {
-    const dialog = await zeige(stab({ naechste_lagebesprechung_at: wireAb(-5) }));
+    const dialog = await zeige(stand({ naechste_lagebesprechung_at: wireAb(-5) }));
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('');
   });
 
   it('unverändert abgeschickt → der Schlüssel naechste_at FEHLT', async () => {
-    const dialog = await zeige(stab({ naechste_lagebesprechung_at: wireAb(45) }));
+    const dialog = await zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
     await absenden(dialog);
     expect(gesendet[0]).toEqual({ entschluss: 'Lage unverändert', abgehalten_at: wireAb(0) });
   });
 
   /**
-   * `stab` wird live invalidiert, die Maske friert beim ÖFFNEN ein. Neu gerendert wird mit einem
+   * `stand` wird live invalidiert, die Maske friert beim ÖFFNEN ein. Neu gerendert wird mit einem
    * NEUEN Element, sonst übersprünge React den Teilbaum und der Test wäre trivial grün.
    */
   it('friert den Termin beim Öffnen ein: ein live geänderter Stand ändert weder Feld noch Body', async () => {
-    const routen = (daten: Stab) => (
+    const routen = (daten: LagebesprechungStand) => (
       <Routes>
-        <Route path="/einsaetze/:id/stab" element={<Harness daten={daten} />} />
+        <Route path="/einsaetze/:id/lagebesprechung" element={<Harness daten={daten} />} />
       </Routes>
     );
     const { rerender } = renderMitProviders(
-      routen(stab({ naechste_lagebesprechung_at: wireAb(45) })),
-      { route: '/einsaetze/1/stab' },
+      routen(stand({ naechste_lagebesprechung_at: wireAb(45) })),
+      { route: '/einsaetze/1/lagebesprechung' },
     );
     const dialog = await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
 
-    rerender(routen(stab({ naechste_lagebesprechung_at: wireAb(90) })));
+    rerender(routen(stand({ naechste_lagebesprechung_at: wireAb(90) })));
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe(
       dayjs(JETZT).add(45, 'minute').format(ZEITFORMAT),
     );
@@ -234,14 +232,14 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
   });
 
   it('„kein Termin" → naechste_at ist null', async () => {
-    const dialog = await zeige(stab({ naechste_lagebesprechung_at: wireAb(45) }));
+    const dialog = await zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'kein Termin' }));
     await absenden(dialog);
     expect(gesendet[0]).toHaveProperty('naechste_at', null);
   });
 
   it('vergangener Termin, leer gelassen → null, nicht weggelassen (Ruling 1)', async () => {
-    const dialog = await zeige(stab({ naechste_lagebesprechung_at: wireAb(-5) }));
+    const dialog = await zeige(stand({ naechste_lagebesprechung_at: wireAb(-5) }));
     await absenden(dialog);
     expect(gesendet[0]).toHaveProperty('naechste_at', null);
   });
@@ -295,6 +293,28 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
     await absenden(dialog);
     // Ab jetzt gerechnet käme wireAb(60) an — nur 30 min nach der Besprechung.
     expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(30), naechste_at: wireAb(90) });
+  });
+});
+
+describe('LagebesprechungModal · Zeichengrenze des Entschlusses (LLH-1111)', () => {
+  it('über 10.000 Zeichen bleibt der Entschluss ganz stehen, die Meldung steht am Feld, kein POST', async () => {
+    const dialog = await zeige();
+    const entschluss = feld(dialog, 'Entschluss');
+    fireEvent.change(entschluss, { target: { value: 'e'.repeat(10_001) } });
+    expect(entschluss).toHaveValue('e'.repeat(10_001));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    expect(
+      await within(dialog).findByText('Entschluss darf höchstens 10.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(gesendet).toHaveLength(0);
+  });
+
+  it('genau 10.000 Zeichen gehen hinaus (Gegenfall)', async () => {
+    const dialog = await zeige();
+    fireEvent.change(feld(dialog, 'Entschluss'), { target: { value: 'e'.repeat(10_000) } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toHaveProperty('entschluss', 'e'.repeat(10_000));
   });
 });
 
@@ -396,20 +416,20 @@ describe('LagebesprechungModal · Fehler im Modal, Erfolg im Toast', () => {
 describe('LagebesprechungModal · Anzeigezone (LFH-692)', () => {
   mitProzessZone('UTC');
 
-  function zeigeBerlin(daten: Stab) {
+  function zeigeBerlin(daten: LagebesprechungStand) {
     renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
         <Routes>
-          <Route path="/einsaetze/:id/stab" element={<Harness daten={daten} />} />
+          <Route path="/einsaetze/:id/lagebesprechung" element={<Harness daten={daten} />} />
         </Routes>
       </AnzeigeKonventionenProvider>,
-      { route: '/einsaetze/1/stab' },
+      { route: '/einsaetze/1/lagebesprechung' },
     );
     return screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
   }
 
   it('Termin und Zeitpunkt erscheinen mit der Berliner Uhrzeit; unverändert geht nichts verschoben hinaus', async () => {
-    const dialog = await zeigeBerlin(stab({ naechste_lagebesprechung_at: wireAb(45) }));
+    const dialog = await zeigeBerlin(stand({ naechste_lagebesprechung_at: wireAb(45) }));
     // 10:45 UTC → 12:45 Berlin; jetzt 10:00 UTC → 12:00 Berlin.
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('2026-09-13 12:45');
     expect(feld(dialog, 'Zeitpunkt der Besprechung').value).toBe('2026-09-13 12:00');
@@ -418,7 +438,7 @@ describe('LagebesprechungModal · Anzeigezone (LFH-692)', () => {
   });
 
   it('die Schnellwahl „+1 h“ zeigt 13:00 Berlin und sendet 11:00 UTC', async () => {
-    const dialog = await zeigeBerlin(stab());
+    const dialog = await zeigeBerlin(stand());
     const u = userEvent.setup();
     await u.click(within(dialog).getByRole('button', { name: '+1 h' }));
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('2026-09-13 13:00');

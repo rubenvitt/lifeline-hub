@@ -355,7 +355,7 @@ async fn kopfaenderungen_melden_einsatz_und_einsatzliste() {
     let mut einsatz_rx = live.abonniere(eid);
     let mut rx = live.abonniere_org();
 
-    let schritte: [(&str, String, Option<&str>); 4] = [
+    let schritte: [(&str, String, Option<&str>); 5] = [
         (
             "PATCH",
             format!("/api/einsaetze/{eid}"),
@@ -363,10 +363,16 @@ async fn kopfaenderungen_melden_einsatz_und_einsatzliste() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{eid}/stab/lagebesprechungen"),
+            format!("/api/einsaetze/{eid}/lagebesprechungen"),
             Some(
                 r#"{"entschluss":"A","abgehalten_at":"2026-09-12 10:00:00","naechste_at":"2026-09-12 12:00:00"}"#,
             ),
+        ),
+        // LLH-1111: der Termin ohne Abschluss meldet die Liste ebenso.
+        (
+            "PUT",
+            format!("/api/einsaetze/{eid}/lagebesprechung/termin"),
+            Some(r#"{"naechste_at":"2026-09-12 14:00:00"}"#),
         ),
         (
             "PUT",
@@ -405,7 +411,7 @@ async fn besprechung_ohne_neuen_termin_und_besetzung_melden_keine_einsatzliste()
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/stab/lagebesprechungen"),
+        &format!("/api/einsaetze/{eid}/lagebesprechungen"),
         &admin,
         Some(r#"{"entschluss":"A","abgehalten_at":"2026-09-12 10:00:00"}"#),
     )

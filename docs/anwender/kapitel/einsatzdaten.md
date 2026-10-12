@@ -29,8 +29,9 @@ der Einsatz gehört. Wer in den Einsatz darf, regelt die Einsatzleitung in den E
 4. Mit Enter oder „Speichern“ übernehmen. Escape oder „Abbrechen“ verwirft die Eingabe. Die App
    meldet „… gespeichert“.
 
-So lassen sich Bezeichnung, Einsatzstichwort, Alarmzeit, Einsatzart, Leitstellen-Nr., Nächste
-Lagebesprechung, Meldende Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial) ändern.
+So lassen sich Bezeichnung, Einsatzstichwort, Alarmzeit, Einsatzart, Leitstellen-Nr., Meldende
+Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial) ändern. Den Termin der nächsten
+Lagebesprechung setzt das Kapitel [Lagebesprechung](lagebesprechung.md).
 Ein eigenes Formular für alle Angaben gibt es nicht. Den Einsatzort ändert das Paneel „Einsatzort“
 (nächster Ablauf); die Kopfleiste zeigt ihn nur an.
 

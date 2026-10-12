@@ -57,8 +57,8 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 - Lagekarte mit Zonen, Zeichen, Gefahrengebieten und Schäden
 - Rückmeldungen und Kommunikationsplan
 
-Nicht vorgehalten werden unter anderem die übrigen Meldungen sowie Besetzung und
-Lagebesprechungen des Stabs.
+Nicht vorgehalten werden unter anderem die übrigen Meldungen, die Besetzung des Stabs und die
+Lagebesprechungen.
 
 **Grenze: 24 Stunden.** Ein vorgehaltener Stand gilt höchstens 24 Stunden nach der letzten
 Verbindung zum Server. Startet die App ohne Netz mit einem älteren Stand, verwirft sie ihn. Nach

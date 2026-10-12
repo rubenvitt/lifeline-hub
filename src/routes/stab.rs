@@ -1,5 +1,6 @@
-//! Routen der Führungsorganisation (LFH-46): Besetzung der Sachgebiete S1–S6, Lagebesprechung
-//! und die Checkliste Arbeitsaufnahme (LFH-551).
+//! Routen der Führungsorganisation (LFH-46): Besetzung der Sachgebiete S1–S6 und die Checkliste
+//! Arbeitsaufnahme (LFH-551). Die Lagebesprechung hat seit LLH-1111 eigene Routen
+//! (`routes::lagebesprechung`).
 //!
 //! Gates strukturell über die Extractor-Typen — `EinsatzLesezugriff<Stab>` (alle
 //! Einsatzmitglieder inkl. Beobachter) bzw. `EinsatzSchreibzugriff<Stab>` (Einsatzleitung,
@@ -27,9 +28,8 @@ use crate::stab::fernmeldeskizze::{
     Verkehrsart, VsVermerk,
 };
 use crate::stab::kommunikation;
-use crate::stab::repo::{self, AbschlussEingabe, BesetzungEingabe};
-use crate::stab::{BesetzungArt, LagebesprechungAnzeige, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
-use crate::zeit::jetzt;
+use crate::stab::repo::{self, BesetzungEingabe};
+use crate::stab::{BesetzungArt, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
 
 fn sse(state: &AppState, einsatz_id: i64) {
     state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
@@ -182,89 +182,6 @@ pub async fn besetzung_entfernen(
         sse(&state, einsatz_id);
     }
     Ok(StatusCode::NO_CONTENT)
-}
-
-#[derive(Debug, Deserialize)]
-pub struct LagebesprechungAbschluss {
-    entschluss: String,
-    /// Zeitpunkt der Besprechung; fehlt = jetzt.
-    #[serde(default)]
-    abgehalten_at: Option<String>,
-    /// **Tri-State** wie am Einsatzkopf (`routes/einsatz.rs`): Feld fehlt = Termin
-    /// unverändert, `null` = Termin löschen, Wert = Termin setzen.
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    naechste_at: Option<Option<String>>,
-}
-
-/// GET /api/einsaetze/{id}/stab/lagebesprechungen — Historie, absteigend.
-pub async fn lagebesprechungen_liste(
-    State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Stab>,
-) -> Result<Json<Vec<LagebesprechungAnzeige>>, AppError> {
-    let liste = repo::lagebesprechungen(&state.pool, ctx.einsatz.id).await?;
-    Ok(Json(liste))
-}
-
-/// POST /api/einsaetze/{id}/stab/lagebesprechungen — Lagebesprechung abschliessen.
-///
-/// Die Antwort wird **nach** dem Schreiben frisch geladen: die Quittung darf keinen Zustand
-/// tragen, den es nie gab (LFH-340/C5).
-pub async fn lagebesprechung_abschliessen(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Stab>,
-    JsonBody(req): JsonBody<LagebesprechungAbschluss>,
-) -> Result<(StatusCode, Json<StabAnzeige>), AppError> {
-    let einsatz_id = ctx.einsatz.id;
-
-    // Ein leeres Pflichtfeld scheitert am Feld ISOLIERT → 400 (LFH-267). „Lage unverändert,
-    // Maßnahmen fortführen" ist ein gültiger Entschluss, ein leerer Eintrag vom Typ
-    // `entscheidung` wäre semantisch leer.
-    let entschluss = pflicht(&req.entschluss, "entschluss")?;
-
-    // Nicht parsebare Zeit → 400 (Feld isoliert). `normalisiere_zeit` läuft in der ROUTE, nie
-    // im Repo — dieselbe Arbeitsteilung wie im Bestand.
-    let abgehalten_at = match req.abgehalten_at.as_deref().map(str::trim) {
-        Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
-        _ => jetzt(),
-    };
-    let naechste_at = match support::trimme_tri(req.naechste_at) {
-        Some(Some(s)) => Some(Some(crate::etb::normalisiere_zeit(&s)?)),
-        Some(None) => Some(None),
-        None => None,
-    };
-
-    // Ein Termin VOR der Besprechung ist ein Zusammenhang zweier Felder → 422.
-    if let Some(Some(t)) = &naechste_at {
-        if t.as_str() <= abgehalten_at.as_str() {
-            return Err(AppError::UnprocessableEntity(
-                "naechste_at muss nach abgehalten_at liegen".into(),
-            ));
-        }
-    }
-
-    let ergebnis = repo::lagebesprechung_abschliessen(
-        &state.pool,
-        einsatz_id,
-        ctx.benutzer.id,
-        &AbschlussEingabe {
-            entschluss,
-            abgehalten_at,
-            naechste_at,
-        },
-    )
-    .await?;
-
-    let stab = repo::laden(&state.pool, einsatz_id).await?;
-    // Der ETB-Eintrag entstand im selben Commit → ETB-Kurzruf mitschicken.
-    state.live.publiziere(einsatz_id, ergebnis.etb_eintrag_id);
-    sse(&state, einsatz_id);
-    // Den Einsatzkopf nur bei geändertem Termin (LFH-555, design.md D3): `einsatz` erreicht auch
-    // Leser ohne Stab-Recht und darf ihnen nicht mehr sagen, als der Kopf-GET ohnehin zeigt.
-    // Mit `einsatz` geht auch `einsatzliste` (LFH-734): die Liste zeigt den Termin.
-    if ergebnis.termin_geaendert {
-        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
-    }
-    Ok((StatusCode::CREATED, Json(stab)))
 }
 
 #[derive(Debug, Deserialize)]

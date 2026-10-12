@@ -1,5 +1,9 @@
 import type { Dayjs } from 'dayjs';
-import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
+import type {
+  Lagebesprechung,
+  LagebesprechungAbschlussBody,
+  LagebesprechungStand,
+} from '../api/types';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { terminZeitpunkt } from './lagebesprechungZustand';
 
@@ -124,7 +128,7 @@ export function abschlussBody(
  * darauf zeigte einen fremden Beleg.
  */
 export function eigeneLagebesprechung(
-  antwort: Stab,
+  antwort: LagebesprechungStand,
   gesendet: LagebesprechungAbschlussBody,
 ): Lagebesprechung | undefined {
   const letzte = antwort.letzte_lagebesprechung;

@@ -260,11 +260,14 @@ jeder Besetzungsänderung.
 - Alle Code-Kommentare mit Verweis auf die alten Abschnitte werden per `grep -rn "stab/AGENTS.md"`
   nachgezogen.
 
-### D10 Entschluss bekommt die ETB-Grenze
+### D10 Entschluss bekommt eine eigene Grenze
 
 Bisher fehlt eine Längengrenze, obwohl `src/AGENTS.md` sie für Text verlangt, der ins ETB geht.
-`entschluss` bekommt die Grenze `etb::INHALT_MAX` (20 000 Zeichen). Der Client nutzt
-`ETB_INHALT_MAX` aus `api/eingabegrenzen.ts`, und das Modal zeigt den Zähler.
+`lagebesprechung::ENTSCHLUSS_MAX` = 10 000 Zeichen (wie der Auftragstext). Die ETB-Grenze selbst
+(`etb::INHALT_MAX`, 20 000) taugt nicht: der Snapshot setzt Nummer, Zeit und Termin davor, ein
+Entschluss an der ETB-Grenze ergäbe einen ETB-Inhalt darüber. Der Client spiegelt die Grenze als
+`LAGEBESPRECHUNG_ENTSCHLUSS_MAX` in `api/eingabegrenzen.ts` (Spiegeltest
+`tests/eingabegrenzen_spiegel.rs`), das Modal zeigt den Zähler.
 
 ### D11 Anwenderdoku
 

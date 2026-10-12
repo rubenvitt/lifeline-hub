@@ -1,7 +1,11 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
+import type {
+  Lagebesprechung,
+  LagebesprechungAbschlussBody,
+  LagebesprechungStand,
+} from '../api/types';
 import {
   abschlussBody,
   abschlussVorbelegung,
@@ -243,28 +247,27 @@ describe('eigeneLagebesprechung', () => {
     erfasst_at: '2026-09-13 10:00:01',
     ...over,
   });
-  const stab = (letzte?: Lagebesprechung): Stab => ({
+  const stand = (letzte?: Lagebesprechung): LagebesprechungStand => ({
     anzahl_lagebesprechungen: 4,
-    besetzung: [],
     ...(letzte ? { letzte_lagebesprechung: letzte } : {}),
   });
 
   it('ordnet die Zeile zu, wenn Entschluss und Zeitpunkt passen', () => {
-    expect(eigeneLagebesprechung(stab(zeile()), gesendet)?.etb_eintrag_id).toBe(77);
+    expect(eigeneLagebesprechung(stand(zeile()), gesendet)?.etb_eintrag_id).toBe(77);
   });
 
   it('verwirft eine fremde Zeile — anderer Entschluss', () => {
-    expect(eigeneLagebesprechung(stab(zeile({ entschluss: 'Fremd' })), gesendet)).toBeUndefined();
+    expect(eigeneLagebesprechung(stand(zeile({ entschluss: 'Fremd' })), gesendet)).toBeUndefined();
   });
 
   it('verwirft eine fremde Zeile — gleicher Entschluss, anderer Zeitpunkt', () => {
     expect(
-      eigeneLagebesprechung(stab(zeile({ abgehalten_at: '2026-09-13 10:00:30' })), gesendet),
+      eigeneLagebesprechung(stand(zeile({ abgehalten_at: '2026-09-13 10:00:30' })), gesendet),
     ).toBeUndefined();
   });
 
   it('ohne letzte Lagebesprechung gibt es nichts zuzuordnen', () => {
-    expect(eigeneLagebesprechung(stab(), gesendet)).toBeUndefined();
+    expect(eigeneLagebesprechung(stand(), gesendet)).toBeUndefined();
   });
 });
 

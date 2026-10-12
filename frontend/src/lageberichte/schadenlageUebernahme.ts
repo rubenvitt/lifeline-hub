@@ -7,7 +7,7 @@ import { baueLagebild, kennzahlReihe, type Lagebild } from '../pages/lage-dashbo
 import { ladeLagebasis, type GeladeneLagebasis } from '../pages/lage-dashboard/useLagebild';
 import { pegelZeile, wasserstandMeter } from '../pegel/pegelKennzahl';
 import { ZUSTAND_GRUND, md } from '../stab/funkplan';
-import { ausKennzahl, sichtungText, warnstufeAngabe } from '../stab/vorbereitung';
+import { ausKennzahl, sichtungText, warnstufeAngabe } from '../lagebesprechung/vorbereitung';
 import { dwdWarnstufe } from '../theme/statusFarben';
 import {
   messStand,

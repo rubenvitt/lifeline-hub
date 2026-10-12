@@ -65,6 +65,8 @@ export const EINSATZ_KEYS = {
   kartenAnsicht: 'einsatz-karten-ansicht',
   lageSnapshot: 'einsatz-lage-snapshot',
   stab: 'einsatz-stab',
+  // Lagebesprechung (LLH-1111): Stand und Verlauf unter EINEM Prefix, eigenes Ereignis.
+  lagebesprechung: 'einsatz-lagebesprechung',
   // Modulzähler des Navigationsrahmens: hängt an jedem Ereignis, das die Liste eines gezählten
   // Moduls invalidiert (Vollständigkeit: `queryKeys.test.ts`).
   modulZaehler: 'einsatz-modul-zaehler',
@@ -260,8 +262,8 @@ export const EINSATZ_STREAM_EVENTS = {
   // „Für den Einsatz speichern“ aktualisiert den Ansichts-Switcher aller Betrachter.
   karten_ansicht: [EINSATZ_KEYS.kartenAnsicht],
   lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
-  // Führungsorganisation (Besetzung S1–S6, Lagebesprechungen). Die Lagebesprechungs-Historie hängt
-  // als Sub-Key unter DEMSELBEN Prefix, sonst entstünde die Lücke der Detail-Keys oben.
+  // Führungsorganisation (Besetzung S1–S6, Checkliste, Kommunikationsplan, Skizze unter EINEM
+  // Prefix). Die Lagebesprechung hat seit LLH-1111 ihr eigenes Ereignis.
   // Aufträge und Erinnerungen an ein Sachgebiet lösen zur Lesezeit auf die Besetzung auf
   // (LFH-549): ein Besetzungswechsel ändert ihre Anzeige. Beide sind gezählte Listen, deshalb geht
   // der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn sich die Zahl hier nicht ändert.
@@ -271,6 +273,9 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.erinnerungen,
     EINSATZ_KEYS.modulZaehler,
   ],
+  // Lagebesprechung (LLH-1111): Stand und Verlauf unter EINEM Prefix. Kein Modulzähler (das Modul
+  // zählt nichts); der ETB-Nachweis des Abschlusses kommt über das eigene `etb`-Ereignis.
+  lagebesprechung: [EINSATZ_KEYS.lagebesprechung],
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
   dokument: [EINSATZ_KEYS.dokumente, EINSATZ_KEYS.modulZaehler],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
@@ -283,13 +288,13 @@ export const EINSATZ_STREAM_EVENTS = {
   // Zeitfenster samt Deckung und Ausgaben unter EINEM Prefix. Kein Fan-out von `nachforderung`:
   // das DTO trägt nur die Kennung.
   verpflegung: [EINSATZ_KEYS.verpflegung],
-  // Einsatzkopf (LFH-555). Der Stab-GET liefert den Termin der nächsten Lagebesprechung aus
-  // derselben Spalte mit (LFH-46, Entscheidung 11), deshalb hängt er hier mit dran: eine
-  // Terminwahrheit, zwei Caches. `lagekennzahlen` lösen es aus, aber nur beim Umschalten einer
+  // Einsatzkopf (LFH-555). Der Stand der Lagebesprechung liefert den Termin der nächsten
+  // Lagebesprechung aus derselben Spalte mit (LFH-46, Entscheidung 11; LLH-1111), deshalb hängt er
+  // hier mit dran: eine Terminwahrheit, zwei Caches. `lagekennzahlen` lösen es aus, aber nur beim Umschalten einer
   // Kennzahl, nicht bei jeder Pegel- oder Bezirksänderung (LFH-855). Die Stab-Besetzung
   // (`meine_sachgebiete`) löst es nicht aus; sie wird beim nächsten Abruf frisch. Die eigene
   // Führungsstelle (LFH-849) meldet ihre Änderung über dasselbe Ereignis.
-  einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.stab, EINSATZ_KEYS.fuehrungsstelle],
+  einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.lagebesprechung, EINSATZ_KEYS.fuehrungsstelle],
   // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
   // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.
   presse: [EINSATZ_KEYS.presse],
@@ -633,6 +638,10 @@ export const einsatzKeys = {
 
   // Stab: Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,
+  // Lagebesprechung (LLH-1111): Stand; der Verlauf hängt als Sub-Key unter DEMSELBEN Prefix.
+  lagebesprechung: (einsatzId: number) => [EINSATZ_KEYS.lagebesprechung, einsatzId] as const,
+  lagebesprechungen: (einsatzId: number) =>
+    [EINSATZ_KEYS.lagebesprechung, einsatzId, 'verlauf'] as const,
   // Ablösung: argumentlos = Invalidierungs-Prefix; Liste je Statusfilter und Rhythmus-Vorgaben
   // hängen als Sub-Keys darunter.
   abloesungen: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId] as const,
@@ -687,9 +696,6 @@ export const einsatzKeys = {
   pressemitteilung: (einsatzId: number, mitteilungId: number) =>
     [EINSATZ_KEYS.presse, einsatzId, 'mitteilung', mitteilungId] as const,
   infotelefon: (einsatzId: number) => [EINSATZ_KEYS.infotelefon, einsatzId] as const,
-  /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
-  stabLagebesprechungen: (einsatzId: number) =>
-    [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,
   /** Checkliste Arbeitsaufnahme (LFH-551), ebenfalls unter dem Stab-Prefix: kein eigenes Ereignis. */
   stabCheckliste: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId, 'checkliste'] as const,
   /**

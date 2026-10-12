@@ -61,6 +61,7 @@ describe('Sprungmarken (LFH-620)', () => {
       'einsatzabschnitte',
       'auftraege',
       '↗entscheidungen',
+      'lagebesprechung',
       'stab',
       'dokumente',
     ]);

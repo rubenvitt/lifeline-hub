@@ -40,7 +40,7 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
   Gefahren-/Schadenlage, Lageentwicklung und Besondere (Führungs-)Probleme; Auftrag, Anträge und
   Zusammenfassung bleiben von Hand. Das Lagebild lädt beim Klick nur über `ladeLagebasis` aus
   `LAGEBILD_QUELLEN` (`pages/lage-dashboard/useLagebild.ts`, dieselben Keys und Module wie der
-  Hook), Wortlaut aus Vorbereitung (`stab/vorbereitung.ts`) und Funkplan
+  Hook), Wortlaut aus Vorbereitung (`lagebesprechung/vorbereitung.ts`) und Funkplan
   (`funkplanLueckenZeilen`). **Kein Freitext aus Auftrag, Meldung, ETB, Personen oder Schäden**
   (Dritte), nur Zahlen, Nummern, Arten und Zeiten als DTG. Die Lageentwicklung zählt ab dem
   ETB-Eintrag der letzten Lagebesprechung nach `lfd_nr`, ohne `system` und freigegebene

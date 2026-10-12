@@ -123,7 +123,7 @@ export function besetzungAktion(
   }
 }
 
-/** Grund der fehlenden Schreibberechtigung für Besetzung und Lagebesprechung. */
+/** Grund der fehlenden Schreibberechtigung für Besetzung und Checkliste. */
 export function besetzungRechteText(einsatzStatus: EinsatzStatus): string {
   return einsatzRechteGrund(einsatzStatus);
 }
