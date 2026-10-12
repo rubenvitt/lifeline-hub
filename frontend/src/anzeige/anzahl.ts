@@ -11,6 +11,6 @@ export function anzahl(n: number, einzahl: string, mehrzahl: string): string {
  * „Offen (3)“ als Beschriftung eines Segments; „Offen“, solange die Menge unbekannt ist (vor der
  * ersten Lieferung wäre „Offen (0)“ eine falsche Aussage über die Lage).
  */
-export function mitZahl(label: string, zahl: number | null): string {
+export function segmentLabel(label: string, zahl: number | null): string {
   return zahl == null ? label : `${label} (${zahl})`;
 }

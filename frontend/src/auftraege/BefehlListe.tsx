@@ -12,7 +12,7 @@ import { befehlDetailPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { ErfassungsModal } from '../components/Erfassung';
-import { anzahl, mitZahl } from '../anzeige/anzahl';
+import { anzahl, segmentLabel } from '../anzeige/anzahl';
 import ListeDetail from '../components/ListeDetail';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { Segmentleiste, useRollen } from '../components/instrument';
@@ -34,7 +34,7 @@ import { befehlSchemaLabel } from './befehlTexte';
  */
 
 /** Neueste Fassung zuerst: absteigend nach Zeitstand (UTC-Wirestring, lexikografisch korrekt). */
-function vergleicheZeitstand(a: BefehlKopf, b: BefehlKopf): number {
+function compareZeitstand(a: BefehlKopf, b: BefehlKopf): number {
   return b.zeitstand.localeCompare(a.zeitstand);
 }
 
@@ -92,7 +92,7 @@ export default function BefehlListe({
   }, []);
 
   const befehle = useMemo(
-    () => [...(befehleQuery.data ?? [])].sort(vergleicheZeitstand),
+    () => [...(befehleQuery.data ?? [])].sort(compareZeitstand),
     [befehleQuery.data],
   );
   const entwuerfe = befehle.filter((b) => b.status === 'entwurf').length;
@@ -129,13 +129,13 @@ export default function BefehlListe({
     sprungNr.current += 1;
     setSprung({ id, nr: sprungNr.current });
   });
-  const waehle = useCallback((id: number | null) => {
+  const select = useCallback((id: number | null) => {
     setGewaehlt(id);
     setSprung(null);
   }, []);
-  const wechsleSegment = (neu: BefehlStatus) => {
+  const changeSegment = (neu: BefehlStatus) => {
     setSegment(neu);
-    waehle(null);
+    select(null);
   };
   const { token } = useRollen();
 
@@ -179,11 +179,11 @@ export default function BefehlListe({
         <Segmentleiste
           beschriftung="Status"
           wert={aktivesSegment}
-          onWechsel={wechsleSegment}
+          onWechsel={changeSegment}
           optionen={[
             {
               wert: 'entwurf',
-              label: mitZahl(
+              label: segmentLabel(
                 'Entwürfe',
                 befehleQuery.isSuccess
                   ? gefunden.filter((b) => b.status === 'entwurf').length
@@ -192,7 +192,7 @@ export default function BefehlListe({
             },
             {
               wert: 'freigegeben',
-              label: mitZahl(
+              label: segmentLabel(
                 'Freigegeben',
                 befehleQuery.isSuccess
                   ? gefunden.filter((b) => b.status === 'freigegeben').length
@@ -216,7 +216,7 @@ export default function BefehlListe({
         eintraege={eintraege}
         schluessel={befehlSchluessel}
         gewaehlt={gewaehlt}
-        onWahl={waehle}
+        onWahl={select}
         sprung={sprung}
         ladend={befehleQuery.isPending}
         fehler={

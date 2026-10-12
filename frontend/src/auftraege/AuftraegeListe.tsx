@@ -1,6 +1,6 @@
 import { IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { mitZahl } from '../anzeige/anzahl';
+import { segmentLabel } from '../anzeige/anzahl';
 import { App, Button, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -174,14 +174,14 @@ export default function AuftraegeListe({
     }
     setVerlinkteId(aid);
   });
-  const waehle = useCallback((id: number | null) => {
+  const select = useCallback((id: number | null) => {
     setGewaehlt(id);
     setSprung(null);
   }, []);
   // Ein Wechsel der Ansicht löst die Wahl (Spec `liste-detail`, „Gewähltes Objekt entfällt“).
-  const wechsleAnsicht = (neu: 'offen' | 'abgeschlossen') => {
+  const changeAnsicht = (neu: 'offen' | 'abgeschlossen') => {
     setAnsicht(neu);
-    waehle(null);
+    select(null);
   };
   const verlinkteQuery = useQuery({
     queryKey: einsatzKeys.auftragEinzeln(einsatzId, verlinkteId ?? 0),
@@ -214,10 +214,10 @@ export default function AuftraegeListe({
   /*
    * Der Stand aus der jüngsten Antwort einer Handlung: schiebt sie den gewählten Auftrag aus der
    * Ansicht (Vollzug, Abnahme), zeigt das Detail diesen Stand statt des letzten Listenstands
-   * (`ListeDetail`, `aufloesen`; Spec `liste-detail`, „Gewähltes Objekt entfällt“).
+   * (`ListeDetail`, `resolve`; Spec `liste-detail`, „Gewähltes Objekt entfällt“).
    */
   const [frisch, setFrisch] = useState<Auftrag | null>(null);
-  const aufloesen = (id: number) => (frisch?.id === id ? frisch : undefined);
+  const resolve = (id: number) => (frisch?.id === id ? frisch : undefined);
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
   // Optimistische Updates treffen jede Form unter dem Prefix, nie die Kennzahlen (D5).
   const aendere = (fn: (a: Auftrag) => Auftrag) =>
@@ -459,7 +459,7 @@ export default function AuftraegeListe({
 
   const imOffenen = ansicht === 'offen';
   const listenQuery = imOffenen ? offeneQuery : abgeschlosseneQuery;
-  const oeffneErteilen = () => {
+  const openErteilen = () => {
     if (!anlegenMutation.isPending && anlegenMutation.error != null) anlegenMutation.reset();
     setErteilenOffen(true);
   };
@@ -481,7 +481,7 @@ export default function AuftraegeListe({
         dataUpdatedAt={offeneQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (
-            <Button type="primary" icon={<IconPlus />} onClick={oeffneErteilen}>
+            <Button type="primary" icon={<IconPlus />} onClick={openErteilen}>
               Auftrag erteilen
             </Button>
           )
@@ -500,10 +500,10 @@ export default function AuftraegeListe({
         <Segmentleiste
           beschriftung="Ansicht"
           wert={ansicht}
-          onWechsel={wechsleAnsicht}
+          onWechsel={changeAnsicht}
           optionen={[
-            { wert: 'offen', label: mitZahl('Offen', offenZahl) },
-            { wert: 'abgeschlossen', label: mitZahl('Abgeschlossen', abgeschlossenZahl) },
+            { wert: 'offen', label: segmentLabel('Offen', offenZahl) },
+            { wert: 'abgeschlossen', label: segmentLabel('Abgeschlossen', abgeschlossenZahl) },
           ]}
         />
         <Input
@@ -539,9 +539,9 @@ export default function AuftraegeListe({
         eintraege={imOffenen ? offene : abgeschlosseneEintraege}
         schluessel={auftragSchluessel}
         gewaehlt={gewaehlt}
-        onWahl={waehle}
+        onWahl={select}
         sprung={sprung}
-        aufloesen={aufloesen}
+        resolve={resolve}
         gruppen={imOffenen ? offeneGruppen : verlinktGruppen}
         fenster={!imOffenen}
         ladend={listenQuery.isPending}
@@ -558,7 +558,7 @@ export default function AuftraegeListe({
           <SeitenLeer
             titel="Keine Aufträge"
             aktion={
-              darfSchreiben ? { label: 'Auftrag erteilen', onClick: oeffneErteilen } : undefined
+              darfSchreiben ? { label: 'Auftrag erteilen', onClick: openErteilen } : undefined
             }
           />
         }

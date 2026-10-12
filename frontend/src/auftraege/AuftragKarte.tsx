@@ -67,7 +67,7 @@ function AuftragKarte({
   quittierFehlerGrund,
 }: AuftragKarteProps) {
   const { formatZeit } = useAnzeigeKonventionen();
-  const hatSchema = gefuellteFelder(a, formatZeit).length > 0;
+  const hasSchema = gefuellteFelder(a, formatZeit).length > 0;
 
   return (
     // Erteilungszeit links in Mono, darunter die Nummer; überfällig schlägt „offen" am Rand.
@@ -97,7 +97,7 @@ function AuftragKarte({
 
       <AuftragVollzug auftrag={a} ansicht={ansicht} />
 
-      {hatSchema && (
+      {hasSchema && (
         <Collapse
           ghost
           style={{ marginInline: -8 }}

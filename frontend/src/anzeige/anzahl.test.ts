@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anzahl, mitZahl } from './anzahl';
+import { anzahl, segmentLabel } from './anzahl';
 
 describe('anzahl', () => {
   it('nimmt bei genau eins die Einzahl', () => {
@@ -16,13 +16,13 @@ describe('anzahl', () => {
   });
 });
 
-describe('mitZahl', () => {
+describe('segmentLabel', () => {
   it('hängt eine bekannte Menge in Klammern an, auch null', () => {
-    expect(mitZahl('Offen', 3)).toBe('Offen (3)');
-    expect(mitZahl('Offen', 0)).toBe('Offen (0)');
+    expect(segmentLabel('Offen', 3)).toBe('Offen (3)');
+    expect(segmentLabel('Offen', 0)).toBe('Offen (0)');
   });
 
   it('lässt eine unbekannte Menge weg', () => {
-    expect(mitZahl('Offen', null)).toBe('Offen');
+    expect(segmentLabel('Offen', null)).toBe('Offen');
   });
 });

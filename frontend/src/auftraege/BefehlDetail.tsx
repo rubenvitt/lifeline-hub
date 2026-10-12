@@ -51,7 +51,7 @@ export default function BefehlDetail({
   // Kopfdaten frisch aus dem Einzelabruf, sobald er da ist; vorher aus der Liste.
   const b: BefehlKopf | BefehlAnzeige = detailQuery.data ?? kopf;
   const v = vorlage(b.vorlage);
-  const istEntwurf = b.status === 'entwurf';
+  const isEntwurf = b.status === 'entwurf';
   const vollseite = befehlDetailPfad(einsatzId, b.id);
 
   const invalidieren = () => {
@@ -79,7 +79,7 @@ export default function BefehlDetail({
 
   const handlungen = darfSchreiben && (
     <Space wrap size={token.marginSM} style={{ marginTop: token.marginSM }}>
-      {istEntwurf ? (
+      {isEntwurf ? (
         <>
           {/* Link in Knopfgestalt: Strg/⌘+Klick öffnet die Vollseite in einem Tab
               (`frontend/AGENTS.md`, Handgebautes Bedienziel). */}

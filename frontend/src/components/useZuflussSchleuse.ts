@@ -168,7 +168,7 @@ export function useZuflussSchleuse<T>(
    * mit der Maus auf eine Zeile zielt, hat oft noch nicht geklickt.
    */
   const bedingung = useRef({ zeiger: false, fokus: false });
-  const pruefeOffen = useCallback(() => {
+  const checkOffen = useCallback(() => {
     if (!bedingung.current.zeiger && !bedingung.current.fokus) setSchleuse({ art: 'offen' });
   }, [setSchleuse]);
 
@@ -203,16 +203,16 @@ export function useZuflussSchleuse<T>(
     (e: ReactPointerEvent) => {
       if (e.pointerType === 'touch') return;
       bedingung.current.zeiger = false;
-      pruefeOffen();
+      checkOffen();
     },
-    [pruefeOffen],
+    [checkOffen],
   );
 
   /**
    * `focusout` feuert auch beim Sprung von der Titelzelle zum Aktionsknopf derselben Sicht; ohne
    * `contains`-Prüfung taute die Schleuse genau beim Bedienen auf.
    */
-  const pruefeVerlassen = useCallback(
+  const checkVerlassen = useCallback(
     (e: ReactFocusEvent) => {
       const ziel = e.relatedTarget;
       if (ziel != null && wurzel.current?.contains(ziel as Node)) return;
@@ -234,14 +234,14 @@ export function useZuflussSchleuse<T>(
         return;
       }
       bedingung.current.fokus = false;
-      pruefeOffen();
+      checkOffen();
     },
-    [pruefeOffen, wurzel],
+    [checkOffen, wurzel],
   );
 
   return {
     onFocus: betreten,
-    onBlur: pruefeVerlassen,
+    onBlur: checkVerlassen,
     onPointerMove: zeigerBewegt,
     onPointerLeave: zeigerRaus,
   };

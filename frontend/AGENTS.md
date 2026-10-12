@@ -495,7 +495,7 @@ anwendbar), „nicht geprüft" ist keins.
 - **Material** (LFH-341, `materialStatus`): `im_einsatz` `bedien`, `defekt`/`verbraucht` `alarm`;
   `pages/MaterialPage.tsx` und `pages/uhs/MaterialTab.tsx` lesen beide von dort — zwei
   Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss.
-- Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
+- Portal-Menüs sind kein Verlassen der `Datensicht` (`checkVerlassen`, `components/useZuflussSchleuse.ts`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
   `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 36 am 08.10.2026, LFH-1022); jede weitere

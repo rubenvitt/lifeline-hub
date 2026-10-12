@@ -88,7 +88,7 @@ export interface ListeDetailProps<T> {
    * entfällt“): etwa die Antwort der Handlung, die es hinausgeschoben hat. Ohne Treffer zeigt das
    * Detail den zuletzt gesehenen Stand.
    */
-  aufloesen?: (id: number) => T | undefined;
+  resolve?: (id: number) => T | undefined;
   gruppen?: ListeDetailGruppen<T>;
   /** Erste Lieferung läuft: Skelett, keine Aussage über die Menge. */
   ladend?: boolean;
@@ -168,7 +168,7 @@ export function DetailSprung({ ziel, children }: { ziel: string; children: React
 /** Ein Klick auf ein eigenes Bedienziel der Karte (Kennungs-Link, Auswahlziel) wählt nicht doppelt. */
 const EIGENES_ZIEL = 'a, button, input, textarea, select, [role="button"]';
 
-function ordne<T>(
+function sortByGruppe<T>(
   eintraege: readonly T[],
   gruppen: ListeDetailGruppen<T> | undefined,
 ): readonly T[] {
@@ -193,7 +193,7 @@ export default function ListeDetail<T>({
   sprung = null,
   karte,
   detail,
-  aufloesen,
+  resolve,
   gruppen,
   ladend = false,
   fehler = null,
@@ -211,7 +211,7 @@ export default function ListeDetail<T>({
   const start = useRef<HTMLDivElement>(null);
 
   // ── Zufluss (Spec `liste-detail`, „Zufluss hält die Folge“) ─────────────────────────────
-  const geordnet = useMemo(() => ordne(eintraege, gruppen), [eintraege, gruppen]);
+  const geordnet = useMemo(() => sortByGruppe(eintraege, gruppen), [eintraege, gruppen]);
   const zufluss = useZuflussSteuerung<T>();
   const zuflussBereich = useZuflussSchleuse(zufluss, {
     zeilen: geordnet,
@@ -240,7 +240,7 @@ export default function ListeDetail<T>({
   const gemerkt = zuletzt.current?.id === gewaehlt ? zuletzt.current : null;
   const entfallen = aktuell === undefined && gemerkt != null;
   const detailEintrag =
-    aktuell ?? (entfallen ? (aufloesen?.(gewaehlt!) ?? gemerkt.eintrag) : undefined);
+    aktuell ?? (entfallen ? (resolve?.(gewaehlt!) ?? gemerkt.eintrag) : undefined);
 
   useLayoutEffect(() => {
     if (gewaehlt == null) {
@@ -284,37 +284,41 @@ export default function ListeDetail<T>({
    * bekommen ein neues.
    */
   const auswahlCache = useRef(
-    new Map<number, { breit: boolean; ist: boolean; props: AuswahlZielProps }>(),
+    new Map<number, { breit: boolean; isGewaehlt: boolean; props: AuswahlZielProps }>(),
   );
   const auswahlJe = useMemo(() => {
-    const waehle = (id: number) => {
+    const select = (id: number) => {
       const s = wahlStand.current;
       // Unter `lg` klappt die erneute Wahl der aufgeklappten Karte zu.
       s.onWahl(!s.breit && s.gewaehlt === id ? null : id);
     };
     const alt = auswahlCache.current;
-    const neu = new Map<number, { breit: boolean; ist: boolean; props: AuswahlZielProps }>();
+    const neu = new Map<number, { breit: boolean; isGewaehlt: boolean; props: AuswahlZielProps }>();
     for (const e of sichtbar) {
       const id = schluessel(e);
-      const ist = id === gewaehlt;
+      const isGewaehlt = id === gewaehlt;
       const vorher = alt.get(id);
-      if (vorher && vorher.breit === breit && vorher.ist === ist) {
+      if (vorher && vorher.breit === breit && vorher.isGewaehlt === isGewaehlt) {
         neu.set(id, vorher);
         continue;
       }
       // `aria-controls` in jeder Breite: ab `lg` steuert die Wahl das Detail daneben.
       const props: AuswahlZielProps = {
-        onClick: () => waehle(id),
-        ...(breit ? (ist ? { 'aria-current': 'true' as const } : {}) : { 'aria-expanded': ist }),
-        ...(ist ? { 'aria-controls': detailId } : {}),
+        onClick: () => select(id),
+        ...(breit
+          ? isGewaehlt
+            ? { 'aria-current': 'true' as const }
+            : {}
+          : { 'aria-expanded': isGewaehlt }),
+        ...(isGewaehlt ? { 'aria-controls': detailId } : {}),
       };
-      neu.set(id, { breit, ist, props });
+      neu.set(id, { breit, isGewaehlt, props });
     }
     auswahlCache.current = neu;
     return new Map([...neu].map(([id, eintrag]) => [id, eintrag.props]));
   }, [sichtbar, schluessel, gewaehlt, breit, detailId]);
 
-  const kartenKlick = (e: ReactMouseEvent, id: number) => {
+  const handleKarteClick = (e: ReactMouseEvent, id: number) => {
     if ((e.target as Element).closest?.(EIGENES_ZIEL)) return;
     auswahlJe.get(id)?.onClick();
   };
@@ -358,9 +362,9 @@ export default function ListeDetail<T>({
       </div>
     ) : null;
 
-  const eintragKnoten = (e: T) => {
+  const renderEintrag = (e: T) => {
     const id = schluessel(e);
-    const ist = id === gewaehlt;
+    const isGewaehlt = id === gewaehlt;
     return (
       <li
         key={id}
@@ -370,16 +374,16 @@ export default function ListeDetail<T>({
       >
         {/* Nur die Karte wählt per Klick; das Detail daneben ist ihr Geschwister, ein Klick
             darin klappt nichts zu. */}
-        <div onClick={(ev) => kartenKlick(ev, id)}>
+        <div onClick={(ev) => handleKarteClick(ev, id)}>
           {karte(e, {
-            gewaehlt: ist,
+            gewaehlt: isGewaehlt,
             hervorgehoben: sprung?.id === id,
             auswahl: auswahlJe.get(id)!,
           })}
         </div>
         {/* Ab `lg` steht das Detail im DOM hinter der ganzen Liste: ein Sprunglink, sichtbar erst
             mit dem Fokus, erspart das Tabben durch alle übrigen Karten (WCAG 2.4.1). */}
-        {breit && ist && detailEintrag !== undefined && (
+        {breit && isGewaehlt && detailEintrag !== undefined && (
           <a
             href={`#${detailId}`}
             className="lfh-sprung-detail"
@@ -399,13 +403,15 @@ export default function ListeDetail<T>({
         )}
         {/* Unter `lg` steht das Detail direkt unter seiner Karte, im selben Eintrag: so zählt seine
             Höhe im Ausschnitt zur Karte. */}
-        {!breit && (ist || (entfallenOrt === 'hinter' && id === entfallenHinter)) && detailFlaeche}
+        {!breit &&
+          (isGewaehlt || (entfallenOrt === 'hinter' && id === entfallenHinter)) &&
+          detailFlaeche}
       </li>
     );
   };
 
   const listenStil: CSSProperties = { margin: 0, padding: 0 };
-  const listenKoerper = () => {
+  const renderListe = () => {
     if (gruppen) {
       // Gruppiert wird über die eingefrorene Achse, solange die Schleuse zu ist.
       const gruppeVon = (e: T) => gefroreneGruppeVon?.get(schluessel(e)) ?? gruppen.von(e);
@@ -426,7 +432,7 @@ export default function ListeDetail<T>({
               <Augenbraue als="h4" style={{ display: 'block', marginBottom: token.marginXS }}>
                 {gruppen.etikett(g, je.get(g)!.length)}
               </Augenbraue>
-              <ul style={listenStil}>{je.get(g)!.map(eintragKnoten)}</ul>
+              <ul style={listenStil}>{je.get(g)!.map(renderEintrag)}</ul>
             </li>
           ))}
         </ul>
@@ -435,7 +441,7 @@ export default function ListeDetail<T>({
     if (!virtuell) {
       return (
         <ul ref={liste} aria-label={bezeichnung} style={listenStil} {...zuflussBereich}>
-          {sichtbar.map(eintragKnoten)}
+          {sichtbar.map(renderEintrag)}
         </ul>
       );
     }
@@ -444,7 +450,7 @@ export default function ListeDetail<T>({
         <li aria-hidden style={{ listStyle: 'none' }}>
           <div ref={start} data-lfh="liste-detail-platzhalter" style={{ height: oben }} />
         </li>
-        {sichtbar.slice(von, bis).map(eintragKnoten)}
+        {sichtbar.slice(von, bis).map(renderEintrag)}
         <li
           aria-hidden
           data-lfh="liste-detail-platzhalter"
@@ -482,7 +488,7 @@ export default function ListeDetail<T>({
             </Button>
           </div>
         )}
-        {sichtbar.length === 0 ? leer : listenKoerper()}
+        {sichtbar.length === 0 ? leer : renderListe()}
         {fuss}
       </>
     );

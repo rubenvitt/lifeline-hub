@@ -1777,7 +1777,7 @@ describe('Datensicht · Zeilenschleuse', () => {
      * allein auch, wenn die Zeile ganz verschwände.
      *
      * `fireEvent` statt `userEvent` trägt den Test: `userEvent` zieht den Fokus ins Dropdown-Portal,
-     * `pruefeVerlassen` taut auf, und der Test würde auch ohne den Fix zeitweise grün.
+     * `checkVerlassen` taut auf, und der Test würde auch ohne den Fix zeitweise grün.
      */
     const { container } = rendere();
     const namen = () =>
@@ -1802,7 +1802,7 @@ describe('Datensicht · Zeilenschleuse', () => {
 
     /**
      * Antds Dropdown zieht den Fokus per `autoFocus` NACHGELAGERT ins Menü. Käme das nach dem
-     * `focus()` unten, taute `pruefeVerlassen` die Schleuse auf, und der Test wäre ohne den Fix grün.
+     * `focus()` unten, taute `checkVerlassen` die Schleuse auf, und der Test wäre ohne den Fix grün.
      * Erst warten, bis der Fokus im Menü ist, DANN einfrieren.
      */
     await waitFor(() => expect(menue!.contains(document.activeElement)).toBe(true));

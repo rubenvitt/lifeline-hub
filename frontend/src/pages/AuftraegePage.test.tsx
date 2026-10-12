@@ -661,7 +661,7 @@ describe('AuftraegePage', () => {
     await waitFor(() => expect(karte(1)).toBeNull());
     expect(within(detail()).getByText('Deich sichern')).toBeInTheDocument();
     // Das Detail zeigt den Stand nach der Meldung, nicht den davor: Vermerk da, nächste Handlung
-    // „Abnehmen“, kein zweites „Vollzug melden“ (ListeDetail `aufloesen`).
+    // „Abnehmen“, kein zweites „Vollzug melden“ (ListeDetail `resolve`).
     expect(within(detail()).getAllByText(/Deich gehalten/).length).toBeGreaterThan(0);
     expect(within(detail()).getByRole('button', { name: 'Abnehmen' })).toBeInTheDocument();
     expect(within(detail()).queryByRole('button', { name: 'Vollzug melden' })).toBeNull();

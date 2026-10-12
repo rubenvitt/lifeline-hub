@@ -340,11 +340,11 @@ describe('ListeDetail — Review-Befunde (oxgob5gk)', () => {
     expect(detail()).toHaveTextContent('Detail Alpha');
   });
 
-  it('ein entfallenes Objekt zeigt den frischen Stand aus `aufloesen`', () => {
+  it('ein entfallenes Objekt zeigt den frischen Stand aus `resolve`', () => {
     const frisch = { ...B, titel: 'Bravo vollzogen' };
     const { rerender } = rendere(<Harness eintraege={[A, B]} startWahl={2} />);
     rerender(
-      <Harness eintraege={[A]} startWahl={2} aufloesen={(id) => (id === 2 ? frisch : undefined)} />,
+      <Harness eintraege={[A]} startWahl={2} resolve={(id) => (id === 2 ? frisch : undefined)} />,
     );
     expect(detail()).toHaveTextContent('Detail Bravo vollzogen · nicht mehr in der Liste');
   });

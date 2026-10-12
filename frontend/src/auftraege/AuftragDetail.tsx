@@ -90,7 +90,7 @@ export default function AuftragDetail({
   const { token, rollen } = useRollen();
   const { formatZeit } = useAnzeigeKonventionen();
   const kennung = auftragKennung(a);
-  const hatSchema = gefuellteFelder(a, formatZeit).length > 0;
+  const hasSchema = gefuellteFelder(a, formatZeit).length > 0;
   const verlauf = auftragVerlauf(a);
   const abschnitt = { marginTop: token.marginLG } as const;
   return (
@@ -143,7 +143,7 @@ export default function AuftragDetail({
         />
       </div>
 
-      {hatSchema && (
+      {hasSchema && (
         <div style={abschnitt}>
           <Augenbraue als="h5" style={{ display: 'block', marginBottom: token.marginXS }}>
             Schema
