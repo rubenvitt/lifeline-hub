@@ -103,8 +103,9 @@ export default function TerminPaneel({
             format="YYYY-MM-DD HH:mm"
             disabled={gesperrt}
             value={terminZeitpunkt(termin)}
+            // Das Löschkreuz des Felds leert den Termin wie „kein Termin“.
             onChange={(zeitpunkt) => {
-              if (zeitpunkt) setze(zeitpunkt);
+              if (zeitpunkt || termin) setze(zeitpunkt);
             }}
           />
         </Flex>

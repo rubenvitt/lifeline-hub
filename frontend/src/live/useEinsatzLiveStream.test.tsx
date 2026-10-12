@@ -222,7 +222,8 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
-  it('invalidiert Einsatzkopf und Stab-Anzeige bei einsatz-Event (LFH-555)', async () => {
+  // LLH-1111: der Termin liegt im Modul Lagebesprechung, nicht mehr in der Stab-Anzeige.
+  it('invalidiert Einsatzkopf und Lagebesprechung bei einsatz-Event, den Stab nicht (LFH-555)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -235,8 +236,29 @@ describe('useEinsatzLiveStream', () => {
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
       expect(calls).toContainEqual(['einsatz', 3]);
-      expect(calls).toContainEqual(['einsatz-stab', 3]);
+      expect(calls).toContainEqual(['einsatz-lagebesprechung', 3]);
     });
+    const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    expect(calls).not.toContainEqual(['einsatz-stab', 3]);
+  });
+
+  it('invalidiert Stand und Verlauf der Lagebesprechung bei lagebesprechung-Event (LLH-1111)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('lagebesprechung', JSON.stringify({ einsatz_id: 3 }));
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      // Der Prefix `['einsatz-lagebesprechung', 3]` trifft auch den Verlauf (`…, 'verlauf'`).
+      expect(calls).toContainEqual(['einsatz-lagebesprechung', 3]);
+    });
+    const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    expect(calls).not.toContainEqual(['einsatz-stab', 3]);
   });
 
   it('nimmt den Einsatzkopf in den lagged-Vollabgleich auf (LFH-555)', async () => {

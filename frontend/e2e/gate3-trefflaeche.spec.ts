@@ -1358,8 +1358,9 @@ test('Stab (Beobachter): Werkzeug-Links, Arbeitsaufnahme und der Sprung „Zur L
 // Die Teile, die bis LLH-1111 auf der Stab-Seite standen. Gemessen werden:
 //  - die ETB-Links des Verlaufs, einer je Besprechung. ZWEI gesäte Lagebesprechungen → genau
 //    zwei Links, damit der Verlauf als Schleife belegt ist.
-//  - die Schnellwahl im Paneel „Termin" („+30 min", „+1 h", „+2 h", „kein Termin"); die zweite
-//    Besprechung setzt einen Termin, damit auch „kein Termin" freigegeben ist.
+//  - die Schnellwahl im Paneel „Termin" („+30 min", „+1 h", „+2 h", „kein Termin") und das Feld
+//    „Termin wählen"; die zweite Besprechung setzt einen Termin, damit auch „kein Termin"
+//    freigegeben ist.
 //  - die Kopfaktion „Lagebesprechung abschließen" und die Übernahme der Vorbereitung (LFH-550).
 
 /** Zwei abgeschlossene Lagebesprechungen → zwei Einträge im Verlauf. */
@@ -1382,7 +1383,12 @@ async function lagebesprechungenSaeen(page: Page, einsatzId: string) {
   }
 }
 
-/** Anker der Seite: Verlauf mit beiden Einträgen; liefert Verlauf, ETB-Links und Schnellwahl. */
+/**
+ * Anker der Seite: Verlauf mit beiden Einträgen; liefert ETB-Links, Schnellwahl und die Hülle des
+ * Felds „Termin wählen". Die Schnellwahl ist über ihre Namen gezählt: das Löschkreuz des Felds
+ * („Zurücksetzen") steht in derselben Gruppe und ist benannt ausgenommen — das Feld selbst ist
+ * das gleichwertige Ziel (wie in `trefflaeche-pruefflaechen.spec.ts`).
+ */
 async function lagebesprechungSteht(page: Page) {
   const verlauf = page.getByRole('region', { name: 'Verlauf', exact: true });
   await expect(verlauf).toHaveCount(1);
@@ -1393,12 +1399,15 @@ async function lagebesprechungSteht(page: Page) {
   await expect(
     verlauf.getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 1', exact: true }),
   ).toHaveCount(1);
-  const schnellwahl = page
+  const gruppe = page
     .getByRole('region', { name: 'Termin', exact: true })
-    .getByRole('group', { name: 'Termin setzen', exact: true })
-    .getByRole('button');
+    .getByRole('group', { name: 'Termin setzen', exact: true });
+  const schnellwahl = gruppe.getByRole('button', { name: /^(\+30 min|\+1 h|\+2 h|kein Termin)$/ });
   await expect(schnellwahl).toHaveCount(TERMIN_KNOEPFE);
-  return { etbLinks, schnellwahl };
+  const terminFeld = gruppe
+    .locator('.ant-picker')
+    .filter({ has: page.getByRole('textbox', { name: 'Termin wählen', exact: true }) });
+  return { etbLinks, schnellwahl, terminFeld };
 }
 
 const lagebesprechungKopfaktion = (page: Page) =>
@@ -1420,7 +1429,7 @@ test('Lagebesprechung: ETB-Links, Schnellwahl, Kopfaktion und Übernahme folgen 
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
     await stelleDichte(page, dichte);
-    const { etbLinks, schnellwahl } = await lagebesprechungSteht(page);
+    const { etbLinks, schnellwahl, terminFeld } = await lagebesprechungSteht(page);
 
     // (1) ETB-Links; sie müssen auch ins ETB zeigen.
     const etb = await alleHaltenStufe(
@@ -1442,6 +1451,7 @@ test('Lagebesprechung: ETB-Links, Schnellwahl, Kopfaktion und Übernahme folgen 
       `Schnellwahl (${dichte})`,
       TERMIN_KNOEPFE,
     );
+    const feld = await haeltStufe(terminFeld, soll, `Feld „Termin wählen" (${dichte})`);
 
     // (3) Die Kopfaktion: erst freigegeben, dann gemessen — gesperrt stünde sie ebenso hoch da.
     const kopfaktion = lagebesprechungKopfaktion(page);
@@ -1456,8 +1466,8 @@ test('Lagebesprechung: ETB-Links, Schnellwahl, Kopfaktion und Übernahme folgen 
     const vorbereitung = await haeltStufe(uebernahme, soll, `Übernahme (${dichte})`);
 
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Schnellwahl ${termin}, Kopfaktion ${kopf}, ` +
-        `Übernahme ${vorbereitung}`,
+      `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Schnellwahl ${termin}, ` +
+        `Termin wählen ${feld}, Kopfaktion ${kopf}, Übernahme ${vorbereitung}`,
     );
   }
 
@@ -1483,7 +1493,7 @@ test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperr
     await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
     await stelleDichte(page, dichte);
     // Datenanker: der Verlauf trägt beide Einträge, erst danach sind Sperren eine Aussage.
-    const { etbLinks, schnellwahl } = await lagebesprechungSteht(page);
+    const { etbLinks, schnellwahl, terminFeld } = await lagebesprechungSteht(page);
 
     // ── VORBEDINGUNGEN: Rechtehinweis steht, Schnellwahl gesperrt, keine Übernahme.
     await rechteHinweisSteht(page);
@@ -1511,6 +1521,7 @@ test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperr
       `Schnellwahl gesperrt (${dichte})`,
       TERMIN_KNOEPFE,
     );
+    const feld = await haeltStufe(terminFeld, soll, `Feld „Termin wählen" gesperrt (${dichte})`);
     const kopf = await gesperrtHaeltStufe(
       lagebesprechungKopfaktion(page),
       soll,
@@ -1519,7 +1530,7 @@ test('Lagebesprechung (Beobachter): ETB-Links, gesperrte Schnellwahl und gesperr
 
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): ETB-Link ${etb}, Schnellwahl gesperrt ${termin}, ` +
-        `Kopfaktion gesperrt ${kopf}`,
+        `Termin wählen gesperrt ${feld}, Kopfaktion gesperrt ${kopf}`,
     );
   }
 
