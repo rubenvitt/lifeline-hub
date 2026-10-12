@@ -1,8 +1,8 @@
-//! Gemeinsamer Kern der Vorlagen-Dokumente Befehl, Lagebericht und Pressemitteilung: Entwurf aus einer festen
-//! Vorlage, Freigabe als Snapshot ins ETB, Fortschreibung als neue Version.
+//! Gemeinsamer Kern der Vorlagen-Dokumente Befehl, Lagebericht und Pressemitteilung: Entwurf aus
+//! einer festen Vorlage, Freigabe als Snapshot ins ETB, Fortschreibung als neue Version.
 //!
-//! Die beiden Arten unterscheiden sich nur in den Werten von [`Dokumentart`] (Tabelle,
-//! ETB-Typ und -Rückverweis, Vorlagen, Wortlaut). Ihre Wire-Typen (`Abschnitt`, `…Anzeige`)
+//! Die Arten unterscheiden sich nur in den Werten von [`Dokumentart`] (Tabelle, ETB-Typ und
+//! -Rückverweis, Vorlagen, Wortlaut, Anlagen und Verteiler). Ihre Wire-Typen (`Abschnitt`, `…Anzeige`)
 //! bleiben je Art eigene Structs, weil sie eigene OpenAPI-Schemanamen tragen.
 
 pub mod anlage;

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { FuehrungsfunktionEintrag, VerteilerEintrag } from '../api/types';
 import {
+  exceedsVerteilerLimits,
+  keepOpenRows,
   toVerteilerRequest,
   isVerteilerChanged,
   verteilerDruckzeile,
@@ -160,18 +162,106 @@ describe('verteilerKern (LLH-1172)', () => {
     ]);
   });
 
-  it('geändert nur bei einer echten Abweichung vom gespeicherten Verteiler', () => {
-    expect(isVerteilerChanged(undefined, gespeichert)).toBe(false);
-    expect(isVerteilerChanged(toVerteilerFormValues(gespeichert), gespeichert)).toBe(false);
-    expect(isVerteilerChanged({ intern: [], extern: [] }, [])).toBe(false);
-    expect(isVerteilerChanged({ intern: ['abschnitt:3'], extern: [] }, [])).toBe(true);
-    const werte = toVerteilerFormValues(gespeichert);
+  it('geändert nur bei einer echten Abweichung von der Basis (zuletzt gesendet oder übernommen)', () => {
+    const basis = toVerteilerFormValues(gespeichert);
+    expect(isVerteilerChanged(undefined, basis)).toBe(false);
+    expect(isVerteilerChanged(toVerteilerFormValues(gespeichert), basis)).toBe(false);
+    expect(isVerteilerChanged({ intern: [], extern: [] }, { intern: [], extern: [] })).toBe(false);
+    expect(
+      isVerteilerChanged({ intern: ['abschnitt:3'], extern: [] }, { intern: [], extern: [] }),
+    ).toBe(true);
     expect(
       isVerteilerChanged(
-        { ...werte, extern: [{ kategorie: 'leitstelle', bezeichnung: 'ILS Musterstadt ' }] },
-        gespeichert,
+        { ...basis, extern: [{ kategorie: 'leitstelle', bezeichnung: 'ILS Musterstadt ' }] },
+        basis,
       ),
     ).toBe(false);
-    expect(isVerteilerChanged({ ...werte, extern: [] }, gespeichert)).toBe(true);
+    expect(isVerteilerChanged({ ...basis, extern: [] }, basis)).toBe(true);
+    // Eine unfertige Zeile ist (noch) keine Änderung.
+    expect(
+      isVerteilerChanged({ ...basis, extern: [...basis.extern, { bezeichnung: '' }] }, basis),
+    ).toBe(false);
+  });
+
+  it('S1: ein Entfernen nach einem noch nicht zurückgelesenen Speichern zählt als Änderung', () => {
+    // Gesendet wurde [EA Süd]; die Query hält noch []. Verglichen wird mit dem Gesendeten.
+    const gesendet = { intern: ['abschnitt:3'], extern: [] };
+    expect(isVerteilerChanged({ intern: [], extern: [] }, gesendet)).toBe(true);
+  });
+
+  it('unfertige externe Zeilen gehen nie hinaus: ohne Kategorie oder ohne Bezeichnung', () => {
+    expect(
+      toVerteilerRequest(
+        {
+          intern: [],
+          extern: [
+            { bezeichnung: 'ILS Musterstadt' },
+            { kategorie: 'leitstelle', bezeichnung: '' },
+            { kategorie: 'leitstelle', bezeichnung: 'Leitstelle Nord' },
+          ],
+        },
+        katalog,
+      ),
+    ).toEqual([
+      {
+        empfaenger_typ: 'extern',
+        extern_kategorie: 'leitstelle',
+        extern_bezeichnung: 'Leitstelle Nord',
+      },
+    ]);
+  });
+
+  it('B1: der Serverstand übernimmt die unfertigen Zeilen des Formulars, statt sie zu löschen', () => {
+    const server = { intern: ['abschnitt:3'], extern: [] };
+    const formular = {
+      intern: [],
+      extern: [
+        { kategorie: 'leitstelle' as const, bezeichnung: 'Alt' },
+        { kategorie: 'leitstelle' as const, bezeichnung: '' },
+      ],
+    };
+    expect(keepOpenRows(server, formular)).toEqual({
+      intern: ['abschnitt:3'],
+      extern: [{ kategorie: 'leitstelle', bezeichnung: '' }],
+    });
+    expect(keepOpenRows(server, undefined)).toEqual(server);
+  });
+
+  it('S3: Grenzen des Servers – Zahl gesamt, Freitext und Bezeichnung', () => {
+    const extern = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        kategorie: 'leitstelle' as const,
+        bezeichnung: `S ${i}`,
+      }));
+    expect(exceedsVerteilerLimits({ intern: ['abschnitt:3'], extern: extern(49) }, katalog)).toBe(
+      false,
+    );
+    expect(exceedsVerteilerLimits({ intern: ['abschnitt:3'], extern: extern(50) }, katalog)).toBe(
+      true,
+    );
+    expect(exceedsVerteilerLimits({ intern: ['x'.repeat(201)], extern: [] }, katalog)).toBe(true);
+    expect(exceedsVerteilerLimits({ intern: ['x'.repeat(200)], extern: [] }, katalog)).toBe(false);
+    expect(
+      exceedsVerteilerLimits(
+        { intern: [`funktion:fachberater:${'x'.repeat(201)}`], extern: [] },
+        katalog,
+      ),
+    ).toBe(true);
+    expect(
+      exceedsVerteilerLimits(
+        { intern: [], extern: [{ kategorie: 'leitstelle', bezeichnung: 'x'.repeat(201) }] },
+        katalog,
+      ),
+    ).toBe(true);
+  });
+
+  it('S4: der Druckkopf nennt einen gespeicherten Eintrag mit seinem gespeicherten Namen', () => {
+    const umbenannt: VerteilerSources = {
+      ...quellen,
+      abschnitte: [{ id: 3, name: 'EA Süd-West' }],
+    };
+    expect(
+      verteilerNamesFromForm({ intern: ['abschnitt:3'], extern: [] }, umbenannt, gespeichert),
+    ).toEqual(['EA Süd']);
   });
 });

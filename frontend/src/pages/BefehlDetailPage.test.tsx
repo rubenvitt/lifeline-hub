@@ -1207,6 +1207,46 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
     );
   });
 
+  it('eine neue externe Zeile übersteht den Autosave davor und geht fertig hinaus (Review B1)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    await screen.findByRole('combobox', { name: 'Verteiler' });
+    await userEvent.click(screen.getByRole('button', { name: 'Externe Stelle hinzufügen' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Kategorie externe Stelle 1' }));
+    await userEvent.click(await screen.findByTitle('Leitstelle'));
+    // Verlassen des Felds: Blur-Autosave mit der halben Zeile, danach Rücklesen des Serverstands.
+    const ladenVorher = vi.mocked(befehleApi.ladeBefehl).mock.calls.length;
+    fireEvent.blur(screen.getByRole('combobox', { name: 'Kategorie externe Stelle 1' }));
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(befehleApi.aktualisiereBefehl).mock.calls[0][2]).not.toHaveProperty(
+      'verteiler',
+      expect.anything(),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(befehleApi.ladeBefehl).mock.calls.length).toBeGreaterThan(ladenVorher),
+    );
+    const bezeichnung = await screen.findByRole('combobox', {
+      name: 'Bezeichnung externe Stelle 1',
+    });
+    await userEvent.type(bezeichnung, 'ILS Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() =>
+      expect(befehleApi.aktualisiereBefehl).toHaveBeenLastCalledWith(
+        1,
+        7,
+        expect.objectContaining({
+          verteiler: [
+            {
+              empfaenger_typ: 'extern',
+              extern_kategorie: 'leitstelle',
+              extern_bezeichnung: 'ILS Nord',
+            },
+          ],
+        }),
+      ),
+    );
+  });
+
   it('ein gespeicherter Verteiler steht nach dem Laden im Feld', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
       ...befehl('entwurf'),

@@ -6,6 +6,7 @@ import {
   empfaengerTag,
   type ZielOption,
 } from '../fuehrung/empfaengerKern';
+import { FUNKTION_TEXT_MAX, VERTEILER_BEZEICHNUNG_MAX, VERTEILER_MAX } from '../api/eingabegrenzen';
 import type { ExternerEmpfaenger } from '../fuehrung/ExterneEmpfaenger';
 import { dekodiere, type FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 
@@ -107,38 +108,77 @@ export function toVerteilerRequest(
     const e = bekannt.get(tag);
     return e ? [toNeuerEmpfaenger(e)] : buildEmpfaenger([tag], katalog);
   });
-  const extern = (werte?.extern ?? []).flatMap((z): NeuerEmpfaenger[] => {
-    const bezeichnung = z.bezeichnung.trim();
-    return bezeichnung
-      ? [
-          {
-            empfaenger_typ: 'extern',
-            ...(z.kategorie ? { extern_kategorie: z.kategorie } : {}),
-            extern_bezeichnung: bezeichnung,
-          },
-        ]
-      : [];
-  });
+  const extern = (werte?.extern ?? []).filter(isCompleteRow).map((z): NeuerEmpfaenger => ({
+    empfaenger_typ: 'extern',
+    extern_kategorie: z.kategorie,
+    extern_bezeichnung: z.bezeichnung.trim(),
+  }));
   return [...intern, ...extern];
 }
 
 /**
- * Weicht der Formularwert vom gespeicherten Verteiler ab? Nur dann schickt der PATCH ihn mit; ein
- * Speichern von Titel oder Text schreibt den Verteiler so nicht neu (neue Zeilen-ids, Rennen mit
- * dem Katalog).
+ * Eine externe Zeile ist fertig mit Kategorie UND Bezeichnung. Nur fertige Zeilen gehen hinaus: eine
+ * halbe Zeile scheiterte am Server (400) und nähme Titel und Text desselben Speicherns mit.
+ */
+function isCompleteRow(
+  z: ExternerEmpfaenger,
+): z is ExternerEmpfaenger & { kategorie: NonNullable<ExternerEmpfaenger['kategorie']> } {
+  return z.kategorie != null && z.bezeichnung.trim() !== '';
+}
+
+/**
+ * Der Serverstand für das Formular, samt der unfertigen externen Zeilen, die dort gerade bearbeitet
+ * werden. Der Verlustschutz übernimmt nach jedem quittierten Speichern den Serverstand; ohne das
+ * verschwände eine eben hinzugefügte Zeile beim ersten Autosave, weil sie nie gesendet wurde.
+ */
+export function keepOpenRows(
+  server: VerteilerFormValues,
+  formular: VerteilerFormValues | undefined,
+): VerteilerFormValues {
+  const offen = (formular?.extern ?? []).filter((z) => !isCompleteRow(z));
+  return offen.length > 0 ? { ...server, extern: [...server.extern, ...offen] } : server;
+}
+
+/**
+ * Überschreitet der Verteiler eine Grenze des Servers (Spec `dokument-verteiler`, „Grenzen und
+ * Prüfung“)? Dann schickt das Speichern ihn nicht mit: das Feld nennt den Grund, die Freigabe prüft
+ * es, und Titel und Text gehen trotzdem hinaus.
+ */
+export function exceedsVerteilerLimits(
+  werte: VerteilerFormValues | undefined,
+  katalog: FunktionsVorschlaege['katalog'],
+): boolean {
+  if (!werte) return false;
+  const extern = werte.extern.filter(isCompleteRow);
+  if (werte.intern.length + extern.length > VERTEILER_MAX) return true;
+  if (werte.extern.some((z) => z.bezeichnung.trim().length > VERTEILER_BEZEICHNUNG_MAX)) {
+    return true;
+  }
+  return werte.intern.some(
+    (tag) => (dekodiere(tag, katalog).text ?? '').length > FUNKTION_TEXT_MAX,
+  );
+}
+
+/**
+ * Weicht der Formularwert von der Basis ab, also vom zuletzt gesendeten oder zuletzt ins Formular
+ * übernommenen Verteiler? Nur dann schickt der PATCH ihn mit; ein Speichern von Titel oder Text
+ * schreibt den Verteiler so nicht neu (neue Zeilen-ids, Rennen mit dem Katalog). Die Basis ist nicht
+ * der Stand der Query: der kommt nach einem Speichern erst mit dem Neuabruf, und ein Entfernen in
+ * dieser Lücke ginge sonst verloren. Unfertige externe Zeilen zählen nicht.
  */
 export function isVerteilerChanged(
   werte: VerteilerFormValues | undefined,
-  gespeichert: readonly VerteilerEintrag[] | undefined,
+  basis: VerteilerFormValues | undefined,
 ): boolean {
   if (werte === undefined) return false;
-  const vorher = toVerteilerFormValues(gespeichert);
-  const normal = (w: VerteilerFormValues) =>
+  const normal = (w: VerteilerFormValues | undefined) =>
     JSON.stringify({
-      intern: w.intern,
-      extern: w.extern.map((z) => [z.kategorie ?? null, z.bezeichnung.trim()]),
+      intern: w?.intern ?? [],
+      extern: (w?.extern ?? [])
+        .filter(isCompleteRow)
+        .map((z) => [z.kategorie, z.bezeichnung.trim()]),
     });
-  return normal(werte) !== normal(vorher);
+  return normal(werte) !== normal(basis);
 }
 
 /** Was die Seite braucht, um ungespeicherte Tags zu benennen. */
@@ -164,8 +204,9 @@ function funktionLabel(wert: string, katalog: FunktionsVorschlaege['katalog']): 
 
 /**
  * Namen des Verteilers aus dem Formularwert, für den Druckkopf eines Entwurfs (LFH-731: der Druck
- * zeigt den ungespeicherten Stand). Der Name eines Tags kommt aus den geladenen Optionen, sonst aus
- * dem gespeicherten Verteiler, sonst steht der Tag selbst da.
+ * zeigt den ungespeicherten Stand). Ein schon gespeicherter Eintrag behält seinen gespeicherten
+ * Namen, auch wenn der Abschnitt inzwischen anders heißt: so steht auf dem Papier, was die Freigabe
+ * ins ETB schreibt. Ein neuer Tag nimmt den Namen der geladenen Option, sonst den Katalognamen.
  */
 export function verteilerNamesFromForm(
   werte: VerteilerFormValues | undefined,
@@ -183,8 +224,8 @@ export function verteilerNamesFromForm(
   ]);
   const intern = (werte?.intern ?? []).flatMap((tag) => {
     const name =
-      optionsNamen.get(tag) ??
       gespeicherteNamen.get(tag) ??
+      optionsNamen.get(tag) ??
       funktionLabel(tag, quellen.vorschlaege.katalog);
     return name ? [name] : [];
   });

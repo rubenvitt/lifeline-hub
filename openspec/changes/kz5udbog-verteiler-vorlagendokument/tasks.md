@@ -96,8 +96,8 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
   ungespeichert.
 - [x] 5.2 Druckkopf und Lesefassung Befehl: Zeile „Verteiler“ im `Druckkopf` aus
   `useWatch('verteiler')` (Entwurf) bzw. `snap_anzeige` (freigegeben), leer ohne Zeile. Dazu ein
-  `Datenfeld` im freigegebenen Zweig, in `auftraege/BefehlLesefassung.tsx` und in
-  `auftraege/BefehlDetail.tsx`. Nachweis: Tests „Druck eines Entwurfs mit ungespeichertem
+  `Datenfeld` im freigegebenen Zweig der Vollseite (`VerteilerAnzeige` neben der
+  Lesefassung) und eine Zeile in `auftraege/BefehlDetail.tsx`. Nachweis: Tests „Druck eines Entwurfs mit ungespeichertem
   Verteiler“, „leerer Verteiler ohne Zeile“, „Detail nennt Verteiler“. Ein DOM-Test belegt,
   dass das Auswahlfeld `befehl-no-print` trägt.
 - [x] 5.3 Wächtertest: Keine Vorlage in `befehle/vorlagen.ts` und den Lagebericht-Vorlagen trägt

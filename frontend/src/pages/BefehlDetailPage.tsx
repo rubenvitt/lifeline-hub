@@ -26,15 +26,17 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
-import { VerteilerAnzeige, VerteilerField, useVerteilerSources } from '../entwurf/VerteilerField';
+import {
+  VerteilerAnzeige,
+  VerteilerField,
+  useVerteilerSources,
+  useVerteilerSync,
+} from '../entwurf/VerteilerField';
 import {
   VERTEILER_FIELD,
-  toVerteilerRequest,
   verteilerDruckzeile,
-  isVerteilerChanged,
   verteilerNames,
   verteilerNamesFromForm,
-  toVerteilerFormValues,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
 import { Paneel, monoStil } from '../components/instrument';
@@ -110,6 +112,7 @@ function BefehlDetail() {
       ? darfImEinsatzSchreiben(einsatzQuery.data)
       : false,
   );
+  const verteilerSync = useVerteilerSync(verteilerQuellen);
   // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur am
   // freigegebenen Befehl: ein Entwurf hat noch keinen ETB-Eintrag.
   const etbSprung = useZumEtbEintrag(
@@ -131,15 +134,11 @@ function BefehlDetail() {
       const text = werte[a.schluessel];
       return { schluessel: a.schluessel, text: typeof text === 'string' ? text : '' };
     });
-    // Der Verteiler nur, wenn er sich geändert hat (`isVerteilerChanged`, LLH-1172).
-    const gespeichert = befehlQuery.data!.verteiler;
-    const verteiler = isVerteilerChanged(werte[VERTEILER_FIELD], gespeichert)
-      ? toVerteilerRequest(
-          werte[VERTEILER_FIELD],
-          verteilerQuellen.vorschlaege.katalog,
-          gespeichert,
-        )
-      : undefined;
+    // Der Verteiler nur bei einer Änderung und innerhalb der Grenzen (`useVerteilerSync`, LLH-1172).
+    const { verteiler, settle } = verteilerSync.forPatch(
+      werte[VERTEILER_FIELD],
+      befehlQuery.data!.verteiler,
+    );
     // Blur-Autosave und explizites Speichern können direkt aufeinander folgen. In Reihenfolge
     // schreiben, damit eine späte S1-Antwort S2 nicht überschreibt.
     const auftrag = speicherfolge.current
@@ -154,6 +153,11 @@ function BefehlDetail() {
           verteiler,
         });
       });
+    // Die Basis des Verteilers rückt nur bei Erfolg endgültig vor (`useVerteilerSync`).
+    auftrag.then(
+      () => settle(true),
+      () => settle(false),
+    );
     speicherfolge.current = auftrag;
     return auftrag;
   };
@@ -169,7 +173,10 @@ function BefehlDetail() {
     werteAus: (b) => {
       const werte: FormWerte = {
         titel: b.titel,
-        [VERTEILER_FIELD]: toVerteilerFormValues(b.verteiler),
+        [VERTEILER_FIELD]: verteilerSync.fromServer(
+          b.verteiler,
+          form.getFieldValue(VERTEILER_FIELD),
+        ),
       };
       for (const a of b.abschnitte) werte[a.schluessel] = a.text;
       return werte;
@@ -528,7 +535,7 @@ function BefehlDetail() {
                 <Input />
               </Form.Item>
               {/* An wen der Befehl geht (LLH-1172); auf Papier steht er im Druckkopf. */}
-              <VerteilerField quellen={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
+              <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
               {v?.abschnitte.map((a) => (
                 <Form.Item
                   key={a.schluessel}

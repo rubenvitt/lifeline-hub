@@ -269,6 +269,7 @@ async fn freigegebenes_dokument_nimmt_keinen_verteiler_an() {
 async fn grenzen_und_pruefung_der_eintraege() {
     let u = umgebung().await;
     let sued = u.abschnitt("EA Süd").await;
+    let person = stammpersonal_disponieren(&u.app, &u.admin, u.einsatz, "Muster").await;
     for art in ARTEN {
         let id = u.anlegen(art).await;
 
@@ -277,6 +278,11 @@ async fn grenzen_und_pruefung_der_eintraege() {
             .collect();
         let (s, j) = u.patch(art, id, json!({"verteiler": zu_viele})).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
+        assert_eq!(
+            u.laden(art, id).await["verteiler"],
+            json!([]),
+            "unverändert nach 51"
+        );
 
         // Fünfzig sind erlaubt, gezählt vor dem Zusammenführen.
         let genau: Vec<Value> = (0..50)
@@ -293,16 +299,44 @@ async fn grenzen_und_pruefung_der_eintraege() {
         assert_eq!(s, StatusCode::OK, "{j:?}");
         assert_eq!(snaps(&j), ["EA Süd", "S3 Einsatz"]);
 
-        for typ in ["person", "fahrzeug"] {
-            let (s, j) = u
-                .patch(
-                    art,
-                    id,
-                    json!({"verteiler": [{"empfaenger_typ": typ, "person_id": 1}]}),
-                )
-                .await;
-            assert_eq!(s, StatusCode::BAD_REQUEST, "{typ}: {j:?}");
-        }
+        // Eine echte Person des Einsatzes: ohne den Riegel in `validate_verteiler` bestünde sie
+        // die Zeilenprüfung und scheiterte erst am CHECK der Tabelle (422).
+        let (s, j) = u
+            .patch(
+                art,
+                id,
+                json!({"verteiler": [{"empfaenger_typ": "person", "person_id": person}]}),
+            )
+            .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "person: {j:?}");
+        let (s, j) = u
+            .patch(
+                art,
+                id,
+                json!({"verteiler": [{"empfaenger_typ": "fahrzeug", "fahrzeug_id": 1}]}),
+            )
+            .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "fahrzeug: {j:?}");
+
+        // Mehr als ein Ziel in einem Eintrag.
+        let (s, j) = u
+            .patch(
+                art,
+                id,
+                json!({"verteiler": [{"empfaenger_typ": "abschnitt", "abschnitt_id": sued, "funktion": "s3"}]}),
+            )
+            .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "zwei Ziele: {j:?}");
+
+        // Freitext einer Funktion über der Grenze.
+        let (s, j) = u
+            .patch(
+                art,
+                id,
+                json!({"verteiler": [{"empfaenger_typ": "funktion", "funktion_text": "x".repeat(201)}]}),
+            )
+            .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "Freitext 201: {j:?}");
 
         let (s, j) = u
             .patch(

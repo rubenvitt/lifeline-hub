@@ -183,7 +183,17 @@ Formulartyp wird von `Record<string, string>` auf einen benannten Typ erweitert.
 Wächtertest stellt sicher, dass keine Vorlage einen Abschnittsschlüssel `verteiler` trägt.
 
 - `werteAus` und `speichern` bilden den Verteiler hin und zurück ab.
-- Der Druckkopf liest `Form.useWatch('verteiler')` wie den Titel (LFH-731). Die Anzeigenamen der
+- Den Abgleich mit dem Verlustschutz trägt `useVerteilerSync` (`entwurf/VerteilerField.tsx`),
+  nachgezogen nach dem Review:
+  - Der PATCH schickt den Verteiler nur, wenn er von der Basis abweicht. Basis ist der zuletzt
+    gesendete oder zuletzt übernommene Stand, nicht die Query, damit ein Entfernen vor dem
+    Rücklesen nicht verloren geht.
+  - Unfertige externe Zeilen (ohne Kategorie oder Bezeichnung) gehen nie hinaus und überstehen
+    die Übernahme des Serverstands.
+  - Wer eine Grenze verletzt, schickt den Verteiler nicht mit; das Feld nennt den Grund.
+- Der Druckkopf liest `Form.useWatch('verteiler')` wie den Titel (LFH-731). Ein gespeicherter
+  Eintrag zeigt dort seinen gespeicherten Namen, auch nach einer Umbenennung, denn den schreibt die
+  Freigabe ins ETB. Die Anzeigenamen der
   ungespeicherten Tags kommen aus den geladenen Optionen.
 - Abschnitte und Einheiten lädt die Seite über `einsatzKeys.abschnitte`/`einheiten`.
 - Im freigegebenen Zweig und in `BefehlLesefassung`/`BefehlDetail` steht ein `Datenfeld`

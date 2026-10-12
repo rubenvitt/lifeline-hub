@@ -49,15 +49,17 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import DokumentAnlagen from '../entwurf/DokumentAnlagen';
-import { VerteilerAnzeige, VerteilerField, useVerteilerSources } from '../entwurf/VerteilerField';
+import {
+  VerteilerAnzeige,
+  VerteilerField,
+  useVerteilerSources,
+  useVerteilerSync,
+} from '../entwurf/VerteilerField';
 import {
   VERTEILER_FIELD,
-  toVerteilerRequest,
   verteilerDruckzeile,
-  isVerteilerChanged,
   verteilerNames,
   verteilerNamesFromForm,
-  toVerteilerFormValues,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
 import { Paneel, monoStil } from '../components/instrument';
@@ -146,6 +148,7 @@ function LageberichtDetail() {
       ? darfImEinsatzSchreiben(einsatzQuery.data)
       : false,
   );
+  const verteilerSync = useVerteilerSync(verteilerQuellen);
   /**
    * Die Leer-Marke je Kopfzeile — über ein Primitiv memoisiert. `befuellteAbschnitte(werte, …)`
    * liefert je Tastenanschlag ein neues `Set` mit gleichem Inhalt; als Prop am memoisierten
@@ -183,22 +186,28 @@ function LageberichtDetail() {
       const text = werte[a.schluessel];
       return { schluessel: a.schluessel, text: typeof text === 'string' ? text : '' };
     });
-    // Der Verteiler nur, wenn er sich geändert hat (`isVerteilerChanged`, LLH-1172).
-    const gespeichert = berichtQuery.data!.verteiler;
-    const verteiler = isVerteilerChanged(werte[VERTEILER_FIELD], gespeichert)
-      ? toVerteilerRequest(
-          werte[VERTEILER_FIELD],
-          verteilerQuellen.vorschlaege.katalog,
-          gespeichert,
-        )
-      : undefined;
+    // Der Verteiler nur bei einer Änderung und innerhalb der Grenzen (`useVerteilerSync`, LLH-1172).
+    const { verteiler, settle } = verteilerSync.forPatch(
+      werte[VERTEILER_FIELD],
+      berichtQuery.data!.verteiler,
+    );
     return aktualisiereLagebericht(einsatzId, berichtId, {
       titel: werte.titel,
       ...(verteiler ? { verteiler } : {}),
       // Leer gelassen → Feld nicht mitschicken; das Backend behält den Bestandswert.
       ...(werte.zeitstand ? { zeitstand: alsBackendZeit(werte.zeitstand) } : {}),
       abschnitte,
-    });
+    }).then(
+      (antwort) => {
+        settle(true);
+        return antwort;
+      },
+      (fehler: unknown) => {
+        // Die Basis des Verteilers rückt nur bei Erfolg endgültig vor (`useVerteilerSync`).
+        settle(false);
+        throw fehler;
+      },
+    );
   };
 
   /**
@@ -214,7 +223,10 @@ function LageberichtDetail() {
       const werte: FormWerte = {
         titel: b.titel,
         zeitstand: alsZeitpunkt(b.zeitstand),
-        [VERTEILER_FIELD]: toVerteilerFormValues(b.verteiler),
+        [VERTEILER_FIELD]: verteilerSync.fromServer(
+          b.verteiler,
+          form.getFieldValue(VERTEILER_FIELD),
+        ),
       };
       for (const a of b.abschnitte) werte[a.schluessel] = a.text;
       return werte;
@@ -567,7 +579,7 @@ function LageberichtDetail() {
               />
             </Form.Item>
             {/* An wen der Bericht geht (LLH-1172); auf Papier steht er im Druckkopf. */}
-            <VerteilerField quellen={verteilerQuellen} ohneDruckKlasse="lagebericht-no-print" />
+            <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="lagebericht-no-print" />
             {/* Umschalter = Bedienung, kein Inhalt: im Druck weg. */}
             <Checkbox
               className="lagebericht-no-print"
