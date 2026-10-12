@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Spin, Tabs } from 'antd';
+import { Breadcrumb, Tabs } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -9,6 +9,7 @@ import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { parseAuftraegeReiter } from '../routing/deeplinks';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -40,15 +41,16 @@ export default function AuftraegePage() {
     queryFn: () => ladeEinsatz(einsatzId),
   });
 
-  if (einsatzQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
+  // Seitenzustände wie die Nachbarseiten (oxgob5gk D11): Skelett statt Spinner, Fehler mit Ursache.
+  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        ursache={einsatzQuery.error}
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);

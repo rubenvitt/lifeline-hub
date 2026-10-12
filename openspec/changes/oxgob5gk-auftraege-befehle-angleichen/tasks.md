@@ -60,7 +60,7 @@ pnpm laufen über `mise exec -- …`.
   `SeitenStandVeraltet` bei Bestand, `SeitenLeer` mit Aktion.
   Nachweis: Vitest für die Szenarien „Erste Lieferung“, „Leer mit Schreibrecht“ (genau ein Knopf
   mit dem Wortlaut des Kopfes) und „Abgleich scheitert“.
-- [ ] 3.4 Deeplink-Sprung: `hervorgehoben` und Scroll in den Sichtbereich einmal je Sprung; eine
+- [x] 3.4 Deeplink-Sprung: `hervorgehoben` und Scroll in den Sichtbereich einmal je Sprung; eine
   Wahl von Hand räumt die Markierung.
   Nachweis: Vitest „Deeplink bei aktivem Filter“ (zusammen mit dem Aufrufer, siehe 4.4) und „Wahl
   von Hand“.
@@ -100,7 +100,7 @@ pnpm laufen über `mise exec -- …`.
   aufsteigend, Sprung zum ETB-Eintrag, Hinweis „Nicht mehr in dieser Ansicht“ bei `entfallen`.
   Nachweis: Vitest „Quittieren im Detail“, „Ohne Schreibrecht“, „Abgeschlossener Auftrag“
   (Verlaufsfolge) und „Abgelehnte Abnahme“ (Grund über den Handlungen, kein Toast).
-- [ ] 4.4 `auftraege/AuftraegeListe.tsx` auf `ListeDetail` umbauen: Filterleiste (Ansicht, Suche
+- [x] 4.4 `auftraege/AuftraegeListe.tsx` auf `ListeDetail` umbauen: Filterleiste (Ansicht, Suche
   entprellt, Richtung, Empfänger), Fälligkeitsgruppen in „Offen“, „Verlinkter Auftrag“ angeheftet,
   „Ältere laden“ als `fuss`, `fenster` in „Abgeschlossen“. Mutationen, optimistisches Quittieren,
   Rückgängig und Fehlerorte bleiben; die Handler hängen am Detail.
@@ -109,11 +109,11 @@ pnpm laufen über `mise exec -- …`.
   Render-Zähler der Listenkarten (LFH-949) bleibt bei einem Live-Ereignis mit einem geänderten
   Auftrag auf eine Karte. „Deeplink bei aktivem Filter“ und „Rückgängig nach Bearbeitung
   beginnen“ sind grün.
-- [ ] 4.5 Suche in den Aufträgen: Der entprellte Begriff geht als `suche` in alle drei Abrufe;
+- [x] 4.5 Suche in den Aufträgen: Der entprellte Begriff geht als `suche` in alle drei Abrufe;
   Deeplink räumt auch die Suche.
   Nachweis: Vitest mit Fake-Timern (`fireEvent.change`) prüft genau einen Abruf mit `q` nach
   300 ms und die geräumte Suche nach einem Deeplink.
-- [ ] 4.6 `auftraege/AuftragErteilenDialog.tsx` (Modal + `AuftragFormular card={false} serie`)
+- [x] 4.6 `auftraege/AuftragErteilenDialog.tsx` (Modal + `AuftragFormular card={false} serie`)
   ersetzt das Inline-Paneel; Kopfknopf und Leerzustand öffnen ihn.
   Nachweis: Vitest „Serie“ (Dialog bleibt offen, Feld leer, Fokus im ersten Feld), „Abgelehnt“
   (Grund im Dialog, Felder bleiben) und gesperrte Auswege während des Sendens.
@@ -121,27 +121,27 @@ pnpm laufen über `mise exec -- …`.
 
 ## 5. Reiter „Einsatzbefehle“ (D5, D6; Spec `auftraege-befehle`)
 
-- [ ] 5.1 `auftraege/BefehlLesefassung.tsx` aus dem freigegebenen Zweig von
+- [x] 5.1 `auftraege/BefehlLesefassung.tsx` aus dem freigegebenen Zweig von
   `pages/BefehlDetailPage.tsx` herauslösen; die Vollseite nutzt sie.
   Nachweis: `BefehlDetailPage.test.tsx`, `pages/befehlPrint.test.ts` und
   `e2e/druck-fluss.spec.ts` (Befehl) sind grün, und ein Vitest prüft „Leerer Abschnitt“ (`—`).
-- [ ] 5.2 `auftraege/BefehlListenKarte.tsx`: `KommKarte` mit Zeitstand und `v<n>`, Status,
+- [x] 5.2 `auftraege/BefehlListenKarte.tsx`: `KommKarte` mit Zeitstand und `v<n>`, Status,
   Schema, Titel, Ersteller bzw. Freigabe.
   Nachweis: Vitest „Fortgeschriebener Befehl“ (zwei Karten, `v1` und `v2`) und „Keine Handlung
   in der Karte“.
-- [ ] 5.3 `auftraege/BefehlDetail.tsx`: Einzelabruf erst für den gewählten Befehl, Angaben,
+- [x] 5.3 `auftraege/BefehlDetail.tsx`: Einzelabruf erst für den gewählten Befehl, Angaben,
   Lesefassung, „Entwurf bearbeiten“, „Freigeben“ über `FreigabeDialog` und `gibBefehlFrei`,
   „Fortschreiben“ mit Sprung auf die Vollseite des neuen Entwurfs, Sprungzeile „↗ Vollansicht“.
   Nachweis: Vitest „Entwurf freigeben im Detail“, „Fortschreiben“ (Navigation auf die neue
   Kennung), abgelehnte Freigabe (Grund im Dialog, Dialog bleibt offen) und ohne Schreibrecht
   keine Handlung.
-- [ ] 5.4 `auftraege/BefehlListe.tsx` auf `ListeDetail` umbauen: Segmente Entwürfe/Freigegeben
+- [x] 5.4 `auftraege/BefehlListe.tsx` auf `ListeDetail` umbauen: Segmente Entwürfe/Freigegeben
   mit Vorgabe nach D5, Suche über Titel und Schema im Client, Bereichskopf „n Entwürfe ·
   m freigegeben“, „Befehl entwerfen“ wie bisher. `components/datensicht.guard.test.ts`:
   BefehlListe verlässt `NUR_KARTE` und `KONSUMENTEN`, die gepinnten Längen sinken.
   Nachweis: `BefehlListe.test.tsx` ist umgeschrieben und deckt „Suche nach Schema“, die Vorgabe
   des Segments und „Befehl entwerfen“ samt Sprung ab; der Guard ist grün.
-- [ ] 5.5 `routing/deeplinks.ts`: `auftraegePfad(…, { befehl })` setzt den Reiter `befehle`;
+- [x] 5.5 `routing/deeplinks.ts`: `auftraegePfad(…, { befehl })` setzt den Reiter `befehle`;
   `BefehlListe` wendet `?befehl=` über `useQueryParamSelektion` an. Der Ortspfad der
   `BefehlDetailPage` führt dorthin.
   Nachweis: `deeplinks.test.ts` mit Round-Trip, Vitest „Zurück aus der Vollseite“ (Befehl
@@ -149,10 +149,10 @@ pnpm laufen über `mise exec -- …`.
 
 ## 6. Seite und Gleichheit beider Reiter (D11)
 
-- [ ] 6.1 `pages/AuftraegePage.tsx`: `SeitenSkeleton` und `SeitenFehler` mit „Erneut abrufen“
+- [x] 6.1 `pages/AuftraegePage.tsx`: `SeitenSkeleton` und `SeitenFehler` mit „Erneut abrufen“
   statt `Spin`/`Alert`.
   Nachweis: Vitest für Laden und Fehler (Ursache steht, Wiederholen ruft den Abruf).
-- [ ] 6.2 Gleichheit der Reiter festhalten.
+- [x] 6.2 Gleichheit der Reiter festhalten.
   Nachweis: Ein Vitest „Gleiche Leiste“ prüft in beiden Reitern Segmentleiste mit zwei Segmenten
   und Zahl plus Suchfeld, und „Empfängerfilter nur bei Aufträgen“.
 

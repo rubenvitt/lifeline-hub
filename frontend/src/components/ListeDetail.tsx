@@ -243,28 +243,42 @@ export default function ListeDetail<T>({
   useLayoutEffect(() => {
     wahlStand.current = { breit, gewaehlt, onWahl };
   });
+  /*
+   * Je Eintrag EIN Auswahlobjekt, solange Breite und Wahl dieses Eintrags gleich bleiben (LFH-949):
+   * ein Live-Ereignis bringt eine neue Folge, und ein neues Objekt je Karte machte jede `memo`-Karte
+   * neu. Der Cache hält die Objekte über Folgen hinweg; nur die gewählte und die abgewählte Karte
+   * bekommen ein neues.
+   */
+  const auswahlCache = useRef(
+    new Map<number, { breit: boolean; ist: boolean; props: AuswahlZielProps }>(),
+  );
   const auswahlJe = useMemo(() => {
     const waehle = (id: number) => {
       const s = wahlStand.current;
       // Unter `lg` klappt die erneute Wahl der aufgeklappten Karte zu.
       s.onWahl(!s.breit && s.gewaehlt === id ? null : id);
     };
-    const m = new Map<number, AuswahlZielProps>();
+    const alt = auswahlCache.current;
+    const neu = new Map<number, { breit: boolean; ist: boolean; props: AuswahlZielProps }>();
     for (const e of sichtbar) {
       const id = schluessel(e);
       const ist = id === gewaehlt;
-      m.set(
-        id,
-        breit
-          ? { onClick: () => waehle(id), ...(ist ? { 'aria-current': 'true' as const } : {}) }
-          : {
-              onClick: () => waehle(id),
-              'aria-expanded': ist,
-              ...(ist ? { 'aria-controls': detailId } : {}),
-            },
-      );
+      const vorher = alt.get(id);
+      if (vorher && vorher.breit === breit && vorher.ist === ist) {
+        neu.set(id, vorher);
+        continue;
+      }
+      const props: AuswahlZielProps = breit
+        ? { onClick: () => waehle(id), ...(ist ? { 'aria-current': 'true' as const } : {}) }
+        : {
+            onClick: () => waehle(id),
+            'aria-expanded': ist,
+            ...(ist ? { 'aria-controls': detailId } : {}),
+          };
+      neu.set(id, { breit, ist, props });
     }
-    return m;
+    auswahlCache.current = neu;
+    return new Map([...neu].map(([id, eintrag]) => [id, eintrag.props]));
   }, [sichtbar, schluessel, gewaehlt, breit, detailId]);
 
   const kartenKlick = (e: ReactMouseEvent, id: number) => {

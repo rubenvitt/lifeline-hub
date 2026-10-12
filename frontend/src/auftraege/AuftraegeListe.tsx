@@ -1,6 +1,6 @@
-import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
+import { IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Alert, App, Button, Spin } from 'antd';
+import { App, Button, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -33,13 +33,17 @@ import {
   type FaelligGruppe,
 } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
-import AuftragListe from './AuftragListe';
 import { ersetzeAuftraege, findeAuftrag } from './auftragCache';
-import AuftragFormular from './AuftragFormular';
+import AuftragErteilenDialog from './AuftragErteilenDialog';
+import AuftragListenKarte from './AuftragListenKarte';
+import AuftragDetail from './AuftragDetail';
 import VollzugMeldenModal from './VollzugMeldenModal';
 import Bereichskopf from '../kommunikation/Bereichskopf';
-import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { Segmentleiste, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
+import ListeDetail, { type ListeDetailGruppen } from '../components/ListeDetail';
+import { SeitenLeer } from '../components/SeitenZustand';
+import { SERVER_SUCHE_ENTPRELLUNG_MS } from '../components/Datensicht';
 
 /** Abgeschlossen nach der gemeinsamen Phasen-Semantik. */
 function istAuftragAbgeschlossen(a: Auftrag): boolean {
@@ -89,31 +93,45 @@ export default function AuftraegeListe({
   const abschnittId = empfTyp === 'abschnitt' ? Number(empfId) : undefined;
   const einheitId = empfTyp === 'einheit' ? Number(empfId) : undefined;
 
+  // Suche am Server (`q`, oxgob5gk D9): das Feld zeigt sofort, abgefragt wird entprellt.
+  const [suchEingabe, setSuchEingabe] = useState('');
+  const [suche, setSuche] = useState('');
+  useEffect(() => {
+    const frist = setTimeout(() => setSuche(suchEingabe.trim()), SERVER_SUCHE_ENTPRELLUNG_MS);
+    return () => clearTimeout(frist);
+  }, [suchEingabe]);
+
   const richtungsKey = richtungFilter ?? 'alle';
   const empfaengerKey = empfFilter ?? 'alle';
   const filter = useMemo(
-    () => ({ richtung: richtungFilter, abschnittId, einheitId }),
-    [richtungFilter, abschnittId, einheitId],
+    () => ({ richtung: richtungFilter, abschnittId, einheitId, suche }),
+    [richtungFilter, abschnittId, einheitId, suche],
   );
 
   // Offene und abgeschlossene Aufträge getrennt vom Server (LFH-1071, design.md D1/D5): die offenen
   // ungeblättert, die abgeschlossenen seitenweise und erst in ihrer Ansicht. Ohne Platzhalter
   // zeigte ein Filterwechsel für die Dauer des Requests „Keine Aufträge“.
   const offeneQuery = useQuery({
-    queryKey: einsatzKeys.auftraegePhase(einsatzId, 'offen', richtungsKey, empfaengerKey),
+    queryKey: einsatzKeys.auftraegePhase(einsatzId, 'offen', richtungsKey, empfaengerKey, suche),
     queryFn: () => listeOffeneAuftraege(einsatzId, filter),
     placeholderData: (prev) => prev,
   });
   // Zahlen über den ganzen Bestand aus einem eigenen Abruf (D3).
   const kennzahlenQuery = useQuery({
-    queryKey: einsatzKeys.auftragKennzahlen(einsatzId, richtungsKey, empfaengerKey),
+    queryKey: einsatzKeys.auftragKennzahlen(einsatzId, richtungsKey, empfaengerKey, suche),
     queryFn: () => ladeAuftragKennzahlen(einsatzId, filter),
     placeholderData: (prev) => prev,
   });
   // Ein Ereignis lädt nur die schon geladenen Seiten neu; die Cursor rechnet TanStack dabei aus
   // den frischen Seiten nach.
   const abgeschlosseneQuery = useInfiniteQuery({
-    queryKey: einsatzKeys.auftraegePhase(einsatzId, 'abgeschlossen', richtungsKey, empfaengerKey),
+    queryKey: einsatzKeys.auftraegePhase(
+      einsatzId,
+      'abgeschlossen',
+      richtungsKey,
+      empfaengerKey,
+      suche,
+    ),
     queryFn: ({ pageParam }) => listeAbgeschlosseneAuftraege(einsatzId, filter, pageParam),
     initialPageParam: undefined as AbschlussCursor | undefined,
     getNextPageParam: (letzte) =>
@@ -124,20 +142,29 @@ export default function AuftraegeListe({
     placeholderData: (prev) => prev,
   });
 
-  // Deeplink ?auftrag=<id> hebt den Auftrag hervor. Ansicht und Filter werden zurückgesetzt, damit
-  // das Ziel sichtbar ist. Liegt er nicht in den offenen, holt das Board ihn einzeln (D4) und
-  // zeigt ihn über der abgeschlossenen Liste, bis er in einer geladenen Seite auftaucht. Jeder
-  // Deeplink zählt für sich, auch ein zweiter auf denselben Auftrag (`deeplinkNr`).
-  const [highlightAuftragId, setHighlightAuftragId] = useState<number | null>(null);
+  /*
+   * Wahl und Sprung (Muster „Liste + Detailpaneel“, Spec `liste-detail`): die Wahl hält diese
+   * Komponente, `ListeDetail` wählt vor und meldet jede Wahl. Eine Wahl räumt die Markierung.
+   *
+   * Deeplink ?auftrag=<id> wählt den Auftrag und markiert ihn. Ansicht, Filter und Suche werden
+   * zurückgesetzt, damit das Ziel sichtbar ist. Liegt er nicht in den offenen, holt das Board ihn
+   * einzeln (D4) und zeigt ihn über der abgeschlossenen Liste, bis er in einer geladenen Seite
+   * auftaucht. Jeder Deeplink zählt für sich, auch ein zweiter auf denselben Auftrag (`nr`).
+   */
+  const [gewaehlt, setGewaehlt] = useState<number | null>(null);
+  const [sprung, setSprung] = useState<{ id: number; nr: number } | null>(null);
   const [verlinkteId, setVerlinkteId] = useState<number | null>(null);
+  // Zählt jeden Deeplink, unabhängig vom Sprung: eine Wahl von Hand räumt den Sprung, nicht die Zahl.
   const [deeplinkNr, setDeeplinkNr] = useState(0);
-  const [scrollZiel, setScrollZiel] = useState<number | null>(null);
   useQueryParamSelektion('auftrag', offeneQuery.isSuccess, (aid) => {
     setRichtungFilter(undefined);
     setEmpfFilter(undefined);
-    setHighlightAuftragId(aid);
-    setScrollZiel(aid);
-    setDeeplinkNr((n) => n + 1);
+    setSuchEingabe('');
+    setSuche('');
+    const nr = deeplinkNr + 1;
+    setDeeplinkNr(nr);
+    setGewaehlt(aid);
+    setSprung({ id: aid, nr });
     if ((offeneQuery.data ?? []).some((x) => x.id === aid)) {
       setAnsicht('offen');
       // Kein Einzelabruf mehr beobachten: er hinge sonst an jedem Ereignis mit.
@@ -146,6 +173,15 @@ export default function AuftraegeListe({
     }
     setVerlinkteId(aid);
   });
+  const waehle = useCallback((id: number | null) => {
+    setGewaehlt(id);
+    setSprung(null);
+  }, []);
+  // Ein Wechsel der Ansicht löst die Wahl (Spec `liste-detail`, „Gewähltes Objekt entfällt“).
+  const wechsleAnsicht = (neu: 'offen' | 'abgeschlossen') => {
+    setAnsicht(neu);
+    waehle(null);
+  };
   const verlinkteQuery = useQuery({
     queryKey: einsatzKeys.auftragEinzeln(einsatzId, verlinkteId ?? 0),
     queryFn: () => ladeAuftrag(einsatzId, verlinkteId ?? 0),
@@ -163,13 +199,13 @@ export default function AuftraegeListe({
     setAnsicht(istAuftragAbgeschlossen(verlinkte) ? 'abgeschlossen' : 'offen');
   }, [verlinkte, angewandtNr, deeplinkNr]);
 
-  // Inline-Anlegen-Formular: per Kopf-Button auf-/zugeklappt, kein Drawer/Modal.
-  const [formOffen, setFormOffen] = useState(false);
+  // „Auftrag erteilen“ als Dialog mit Serie (Spec `auftraege-befehle`, „Erfassen per Dialog“).
+  const [erteilenOffen, setErteilenOffen] = useState(false);
 
   /*
    * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
-   * „Rückwege und Fehler“): Anlegen am Paneel, Quittieren an der Empfängerzeile, Statuswechsel und
-   * Abnahme an der Karte, Vollzug melden im Dialog. Die Gründe je Karte kommen aus den Callbacks
+   * „Rückwege und Fehler“): Anlegen im Dialog, Quittieren an der Empfängerzeile, Statuswechsel und
+   * Abnahme im Detail über den Handlungen, Vollzug melden im Dialog. Die Gründe je Karte kommen aus den Callbacks
    * der Mutationen, nicht aus `mutation.variables` (`components/useZeilenFehler.ts`).
    */
   const kartenFehler = useZeilenFehler<number>();
@@ -181,8 +217,7 @@ export default function AuftraegeListe({
       ersetzeAuftraege(alt, fn),
     );
 
-  // Kein `setFormOffen(false)`: das Inline-Formular bleibt nach dem Erteilen offen (Zuklappen ist
-  // ausdrückliche Nutzeraktion); ein Unmount verlöre Serienzähler und Wertübernahme.
+  // Den Dialog schließt `onFertig` des Formulars; „Speichern und nächste“ hält ihn offen.
   const anlegenMutation = useMutation({
     mutationFn: (d: NeuerAuftrag) => legeAuftragAn(einsatzId, d),
     onSuccess: () => {
@@ -190,15 +225,6 @@ export default function AuftraegeListe({
       message.success('Auftrag erteilt');
     },
   });
-  // Auf- und Zuklappen räumen den Grund einer Ablehnung (Abbrechen räumt die Hülle); eine laufende
-  // Mutation bleibt unberührt.
-  const raeumeAnlegen = () => {
-    if (!anlegenMutation.isPending && anlegenMutation.error != null) anlegenMutation.reset();
-  };
-  const schalteFormular = (offen: boolean) => {
-    raeumeAnlegen();
-    setFormOffen(offen);
-  };
   const quittierenMutation = useMutation({
     mutationFn: ({ auftragId, empfaengerId }: { auftragId: number; empfaengerId: number }) =>
       quittiereEmpfaenger(einsatzId, auftragId, empfaengerId),
@@ -324,25 +350,22 @@ export default function AuftraegeListe({
    * gefilterte Liste gäbe ihnen nichts zu vergleichen. Die Aufträge selbst bleiben die Objekte aus
    * TanStack Query; dessen `structuralSharing` hält unveränderte identisch.
    */
-  const { offene, offeneGruppen } = useMemo(() => {
-    // Die Phase trennt der Server; der Filter hält eine optimistisch oder per Abgleich
-    // abgeschlossene Karte bis zum nächsten Abruf aus der Offen-Ansicht heraus.
-    const offene = (offeneQuery.data ?? []).filter((a) => !istAuftragAbgeschlossen(a));
-
-    // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach Prio dann Frist.
-    const offeneGruppen: { gruppe: FaelligGruppe; auftraege: Auftrag[] }[] = GRUPPE_ORDNUNG.map(
-      (gruppe) => ({
-        gruppe,
-        auftraege: offene
-          .filter(
-            (a) => faelligGruppe(a.frist_at, a.ist_ueberfaellig, konventionen.zeitzone) === gruppe,
-          )
-          .sort(vergleicheOffen),
-      }),
-    ).filter(({ auftraege }) => auftraege.length > 0);
-
-    return { offene, offeneGruppen };
-  }, [offeneQuery.data, konventionen.zeitzone]);
+  const offene = useMemo(
+    () =>
+      // Die Phase trennt der Server; der Filter hält eine optimistisch oder per Abgleich
+      // abgeschlossene Karte bis zum nächsten Abruf aus der Offen-Ansicht heraus. Offen nach Prio,
+      // dann Frist; die Fälligkeitsgruppen ordnet `ListeDetail` (stabil innerhalb der Gruppe).
+      (offeneQuery.data ?? []).filter((a) => !istAuftragAbgeschlossen(a)).sort(vergleicheOffen),
+    [offeneQuery.data],
+  );
+  const offeneGruppen = useMemo<ListeDetailGruppen<Auftrag>>(
+    () => ({
+      von: (a) => faelligGruppe(a.frist_at, a.ist_ueberfaellig, konventionen.zeitzone),
+      etikett: (g, n) => `${GRUPPE_LABEL[g as FaelligGruppe]} (${n})`,
+      reihenfolge: GRUPPE_ORDNUNG,
+    }),
+    [konventionen.zeitzone],
+  );
   // Abgeschlossen-Ansicht: flach in der Ordnung des Servers, zuletzt abgeschlossen zuerst (D2).
   // Zwischen zwei Seitenabrufen kann sich der Bestand verschieben (neu abgeschlossene oben), dann
   // steht ein Auftrag kurz in zwei Seiten; der vordere gilt.
@@ -360,14 +383,22 @@ export default function AuftraegeListe({
     !abgeschlossene.some((a) => a.id === verlinkte.id)
       ? verlinkte
       : null;
-  // Scroll einmal je Deeplink, sobald die Karte im DOM steht; nicht bei jedem späteren Nachladen.
-  useEffect(() => {
-    if (scrollZiel == null) return;
-    const karte = document.querySelector(`[data-auftrag-id="${scrollZiel}"]`);
-    if (!karte) return;
-    karte.scrollIntoView?.({ block: 'center' });
-    setScrollZiel(null);
-  }, [scrollZiel, ansicht, verlinkteAngeheftet, offene, abgeschlossene]);
+  // Der verlinkte, noch nicht geladene Auftrag steht in einer eigenen Gruppe über der Liste.
+  const abgeschlosseneEintraege = useMemo(
+    () => (verlinkteAngeheftet ? [verlinkteAngeheftet, ...abgeschlossene] : abgeschlossene),
+    [verlinkteAngeheftet, abgeschlossene],
+  );
+  const verlinktGruppen = useMemo<ListeDetailGruppen<Auftrag> | undefined>(
+    () =>
+      verlinkteAngeheftet
+        ? {
+            von: (a) => (a.id === verlinkteAngeheftet.id ? 'verlinkt' : 'abgeschlossen'),
+            etikett: (g, n) => (g === 'verlinkt' ? 'Verlinkter Auftrag' : `Abgeschlossen (${n})`),
+            reihenfolge: ['verlinkt', 'abgeschlossen'],
+          }
+        : undefined,
+    [verlinkteAngeheftet],
+  );
   const kennzahlen = kennzahlenQuery.data;
   const offenZahl = kennzahlen?.offen ?? offene.length;
   const abgeschlossenZahl = kennzahlen?.abgeschlossen ?? abgeschlossene.length;
@@ -406,18 +437,11 @@ export default function AuftraegeListe({
     [],
   );
 
-  const listenProps = {
-    einsatzId,
-    darfSchreiben,
-    highlightId: highlightAuftragId,
-    quittierungLaeuft: quittierenMutation.isPending,
-    quittierungZiel: quittierenMutation.variables ?? null,
-    onQuittieren,
-    onInArbeit,
-    onVollzugMelden: setVollzugFuer,
-    onAbnehmen,
-    kartenFehler: kartenFehler.grund,
-    quittierFehler: quittierFehler.grund,
+  const imOffenen = ansicht === 'offen';
+  const listenQuery = imOffenen ? offeneQuery : abgeschlosseneQuery;
+  const oeffneErteilen = () => {
+    if (!anlegenMutation.isPending && anlegenMutation.error != null) anlegenMutation.reset();
+    setErteilenOffen(true);
   };
 
   return (
@@ -428,62 +452,14 @@ export default function AuftraegeListe({
         dataUpdatedAt={offeneQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (
-            // Solange ein Auftrag unterwegs ist, bleibt das Paneel offen: die Antwort braucht ihren
-            // Ort (design.md D3).
-            <Button
-              type="primary"
-              icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
-              disabled={formOffen && anlegenMutation.isPending}
-              onClick={() => schalteFormular(!formOffen)}
-            >
-              {formOffen ? 'Formular schließen' : 'Auftrag erteilen'}
+            <Button type="primary" icon={<IconPlus />} onClick={oeffneErteilen}>
+              Auftrag erteilen
             </Button>
           )
         }
       />
-
-      {darfSchreiben && formOffen && (
-        <Paneel
-          titel="Neuer Auftrag"
-          koerperPolster
-          style={{ marginBottom: token.margin }}
-          aktion={
-            <Button
-              type="text"
-              icon={<IconKreuz />}
-              disabled={anlegenMutation.isPending}
-              onClick={() => schalteFormular(false)}
-              aria-label="Formular schließen"
-            />
-          }
-        >
-          <AuftragFormular
-            card={false}
-            senden={anlegenMutation.isPending}
-            abschnitte={abschnitte}
-            einheiten={einheiten}
-            einsatzId={einsatzId}
-            // Serienerfassung: an derselben Lage entstehen mehrere Aufträge hintereinander.
-            serie
-            // mutateAsync: die Hülle darf die Felder nur leeren, wenn der Auftrag angekommen ist.
-            onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
-            // Grund einer Ablehnung im Formular, bis zum nächsten Absenden; Abbrechen räumt ihn.
-            speicherung={anlegenMutation}
-            speicherFehlerTitel="Auftrag nicht erteilt"
-            speicherFehlerFallback="Erteilen fehlgeschlagen"
-          />
-        </Paneel>
-      )}
-
-      {(offeneQuery.isError || (ansicht === 'abgeschlossen' && abgeschlosseneQuery.isError)) && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: token.marginSM }}
-          title="Aufträge konnten nicht geladen werden"
-        />
-      )}
       <div
+        data-lfh="auftraege-filter"
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -495,11 +471,19 @@ export default function AuftraegeListe({
         <Segmentleiste
           beschriftung="Ansicht"
           wert={ansicht}
-          onWechsel={setAnsicht}
+          onWechsel={wechsleAnsicht}
           optionen={[
             { wert: 'offen', label: `Offen (${offenZahl})` },
             { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossenZahl})` },
           ]}
+        />
+        <Input
+          allowClear
+          aria-label="Aufträge durchsuchen"
+          placeholder="Kennung, Text oder Empfänger"
+          style={{ width: 260, maxWidth: '100%' }}
+          value={suchEingabe}
+          onChange={(e) => setSuchEingabe(e.target.value)}
         />
         <Segmentleiste
           beschriftung="Richtung"
@@ -520,63 +504,90 @@ export default function AuftraegeListe({
           options={empfaengerOptionen}
         />
       </div>
-      {ansicht === 'offen' ? (
-        offeneGruppen.length === 0 ? (
-          <AuftragListe auftraege={[]} ansicht="offen" {...listenProps} />
-        ) : (
-          offeneGruppen.map(({ gruppe, auftraege }) => (
-            <div key={gruppe} style={{ marginBottom: token.margin }}>
-              <Augenbraue als="h4" style={{ display: 'block', marginBottom: token.marginXS }}>
-                {GRUPPE_LABEL[gruppe]} ({auftraege.length})
-              </Augenbraue>
-              <AuftragListe auftraege={auftraege} ansicht="offen" {...listenProps} />
-            </div>
-          ))
-        )
-      ) : (
-        <>
-          {verlinkteAngeheftet && (
-            <div style={{ marginBottom: token.margin }}>
-              <Augenbraue als="h4" style={{ display: 'block', marginBottom: token.marginXS }}>
-                Verlinkter Auftrag
-              </Augenbraue>
-              <AuftragListe
-                auftraege={[verlinkteAngeheftet]}
-                ansicht="abgeschlossen"
-                {...listenProps}
-              />
-            </div>
-          )}
-          {abgeschlosseneQuery.isPending ? (
-            <div style={{ textAlign: 'center', padding: token.paddingLG }}>
-              <Spin />
-            </div>
-          ) : (
-            <AuftragListe
-              auftraege={abgeschlossene}
-              ansicht="abgeschlossen"
-              fenster
-              {...listenProps}
-            />
-          )}
-          {/* Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
-              sagt, dass es keine gibt. */}
-          {abgeschlosseneQuery.hasNextPage &&
-            (kennzahlen == null || abgeschlossene.length < kennzahlen.abgeschlossen) && (
-              <div style={{ textAlign: 'center', marginTop: token.margin }}>
-                <Button
-                  onClick={() => void abgeschlosseneQuery.fetchNextPage()}
-                  loading={abgeschlosseneQuery.isFetchingNextPage}
-                >
-                  Ältere laden
-                </Button>
-                <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
-                </div>
+
+      <ListeDetail<Auftrag>
+        bezeichnung={imOffenen ? 'Offene Aufträge' : 'Abgeschlossene Aufträge'}
+        eintraege={imOffenen ? offene : abgeschlosseneEintraege}
+        schluessel={auftragSchluessel}
+        gewaehlt={gewaehlt}
+        onWahl={waehle}
+        sprung={sprung}
+        gruppen={imOffenen ? offeneGruppen : verlinktGruppen}
+        fenster={!imOffenen}
+        ladend={listenQuery.isPending}
+        fehler={
+          listenQuery.isError
+            ? {
+                text: 'Aufträge konnten nicht geladen werden',
+                ursache: listenQuery.error,
+                onWiederholen: () => void listenQuery.refetch(),
+              }
+            : null
+        }
+        leer={
+          <SeitenLeer
+            titel="Keine Aufträge"
+            aktion={
+              darfSchreiben ? { label: 'Auftrag erteilen', onClick: oeffneErteilen } : undefined
+            }
+          />
+        }
+        karte={(a, z) => (
+          <AuftragListenKarte
+            auftrag={a}
+            gewaehlt={z.gewaehlt}
+            hervorgehoben={z.hervorgehoben}
+            auswahl={z.auswahl}
+          />
+        )}
+        detail={(a, { entfallen }) => (
+          <AuftragDetail
+            auftrag={a}
+            einsatzId={einsatzId}
+            darfSchreiben={darfSchreiben}
+            entfallen={entfallen}
+            quittierungLaeuft={quittierenMutation.isPending}
+            quittierungZiel={quittierenMutation.variables ?? null}
+            onQuittieren={onQuittieren}
+            onInArbeit={onInArbeit}
+            onVollzugMelden={setVollzugFuer}
+            onAbnehmen={onAbnehmen}
+            fehlerGrund={kartenFehler.grund(a.id)}
+            quittierFehlerGrund={quittierFehler.grund(a.id)}
+          />
+        )}
+        fuss={
+          // Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
+          // sagt, dass es keine gibt.
+          !imOffenen &&
+          abgeschlosseneQuery.hasNextPage &&
+          (kennzahlen == null || abgeschlossene.length < kennzahlen.abgeschlossen) && (
+            <div style={{ textAlign: 'center', marginTop: token.margin }}>
+              <Button
+                onClick={() => void abgeschlosseneQuery.fetchNextPage()}
+                loading={abgeschlosseneQuery.isFetchingNextPage}
+              >
+                Ältere laden
+              </Button>
+              <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
+                {abgeschlossene.length} von {abgeschlossenZahl} geladen
               </div>
-            )}
-        </>
-      )}
+            </div>
+          )
+        }
+      />
+
+      <AuftragErteilenDialog
+        offen={darfSchreiben && erteilenOffen}
+        onSchliessen={() => setErteilenOffen(false)}
+        abschnitte={abschnitte}
+        einheiten={einheiten}
+        einsatzId={einsatzId}
+        senden={anlegenMutation.isPending}
+        // mutateAsync: die Hülle darf die Felder nur leeren, wenn der Auftrag angekommen ist.
+        onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
+        speicherung={anlegenMutation}
+      />
       <VollzugMeldenModal
         offen={vollzugFuer !== null}
         onAbbrechen={() => setVollzugFuer(null)}
@@ -591,3 +602,5 @@ export default function AuftraegeListe({
     </>
   );
 }
+
+const auftragSchluessel = (a: Auftrag) => a.id;
