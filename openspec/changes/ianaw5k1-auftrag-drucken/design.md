@@ -80,8 +80,10 @@ Verworfen:
 `einsatzKeys.auftragDruck(einsatzId, auftragId)` mit eigenem Prefix `einsatz-auftrag-druck` in
 `NICHT_LIVE_KEYS`. Begründung wie `etbDruck`: Ein Druckbeleg ist ein Schnappschuss, und eine
 Quittung an einem anderen Gerät darf ihn nicht still ändern. Unter dem Prefix `auftraege` zöge
-ihn das Ereignis `auftrag` per Präfix mit. Optionen: `refetchOnMount: 'always'`, sonst die
-Vorgaben. Den Personendruck-Riegel (`networkMode: 'always'`, `gcTime: 0`) braucht es nicht, ein
+ihn das Ereignis `auftrag` per Präfix mit. Optionen wie `EtbDruckPage`: `staleTime: Infinity`,
+`refetchOnWindowFocus: false`, `refetchOnReconnect: false`, `retry: false` und
+`refetchOnMount: 'always'`. Die Vorgaben des Clients (`staleTime` 10 s, Neuladen bei Fokus) lüden
+den Schnappschuss sonst beim Zurückkehren aus dem Druckdialog still neu. Den Personendruck-Riegel (`networkMode: 'always'`, `gcTime: 0`) braucht es nicht, ein
 Auftrag hat kein Zugriffsprotokoll. „Neu laden“ ist die ausdrückliche Handlung. Der Kopf nennt
 den Stand als Zeitpunkt des Abrufs (`dataUpdatedAt`).
 
@@ -133,7 +135,10 @@ importiert von dort. Das ist ein reiner Umzug, die Tests von `Bloecke` bleiben u
 quittiert“) und „Bearbeitung“ (Phase, „In Bearbeitung seit“, „Vollzogen am“, „Vollzugsvermerk“,
 „Abgenommen am“, „Aufgehoben am“, „Aufgehoben von“, „Grund“, leere weg). Der Titel steht jeweils
 mit der ersten Zeile im Titelblock (Firefox). Freitext bricht um (`pre-wrap`). Eine einzelne
-überlange Zeile darf brechen, denn nur der Titelblock ist geschützt.
+überlange Zeile darf brechen, denn nur der Titelblock ist geschützt. Ein Wort ohne Umbruchstelle
+(Kennung, Kennzeichen, kopierte Adresse) weitete die Wertspalte über das Blatt. Deshalb bekommt
+`dd` in der Druckwurzel `overflow-wrap: anywhere` in `druck/druck.css`, wie Tabellenzellen und
+`pre` dort schon. Das wirkt auch im Einsatzbericht.
 
 Die Bearbeitungs-Etiketten haben Zwillinge in `AuftragVollzug`/`AuftragAufhebung` („Vollzogen
 am:“). Die Wörter bleiben gleich. Sie wandern nicht in einen Kern, weil die Karte sie als Satz mit
@@ -143,7 +148,17 @@ Doppelpunkt setzt.
 
 - `e2e/druck-fluss.spec.ts` (schon in `DRUCK_SPECS`, also Chromium, Firefox, WebKit): Der neue
   Fall „Auftrag druckt im normalen Fluss über mehrere Seiten“ legt per API einen Auftrag mit acht
-  langen Schemafeldern an, die mit der Endmarke enden, und ruft `pruefeDruckImFluss`.
+  langen Schemafeldern an und meldet seinen Vollzug. Die Endmarke steht im Vollzugsvermerk, der
+  letzten Angabe des Blatts: Stünde sie im letzten Schemafeld, folgten ihr noch Richtung,
+  Quittung und Bearbeitung, und die PDF-Prüfung „nach der Endmarke nur die Zählung“ würde rot.
+  Danach ruft der Fall `pruefeDruckImFluss`. `druckLage` findet die Endmarke dafür auch in `dd`,
+  die Titel auch als `h3` des Blatts.
+- `e2e/auftrag-druck.spec.ts` (nur Chromium, nicht in `DRUCK_SPECS`): Ein Beobachter öffnet die
+  Druckansicht aus dem Detail und kehrt zurück (Spec „Beobachter druckt einen Auftrag“). Am Handy
+  bleibt das Blatt mit einem langen Wort ohne Umbruchstelle bei 390 px, für den Admin und den
+  Beobachter (`e2e/druckansicht-mobil-kern.ts`, LFH-956).
+- Die Prüfliste Einsatztauglichkeit liegt als `pruefliste.md` in der Change (`frontend/AGENTS.md`,
+  Bedien-Leitlinie, Gate 7).
 - `druck/AGENTS.md` bekommt einen Abschnitt „Auftragsdruck“ (Route, Key, Einstieg, Feldfolge im
   Kern).
 - Die Anwenderkapitel beschreiben den Ablauf und nennen die neuen Quellen. Bilder entstehen nur

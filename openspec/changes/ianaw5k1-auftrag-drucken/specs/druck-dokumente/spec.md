@@ -10,7 +10,8 @@ Dokumentart und -titel, Einsatzbezeichnung mit Einsatznummer (falls vergeben), S
 bzw. die gedruckte Auswahl, Name der druckenden Person und Druckzeitpunkt. Zeitangaben im
 Druckkopf MUST in der Zeitzone der Organisation stehen. Lagebericht, Befehl, Meldebild,
 ETB-Druck, Einsatzbericht und Auftrag MUST denselben Druckkopf verwenden. Am Bildschirm SHALL der
-Druckkopf nur auf den Druckansichten (ETB-Druck, Einsatzbericht, Auftrag) sichtbar sein.
+Druckkopf nur auf den Druckansichten (ETB-Druck, Druck der Modul-Listen, Einsatzbericht, Auftrag)
+sichtbar sein.
 
 #### Scenario: Meldebild mit Auswahl
 
