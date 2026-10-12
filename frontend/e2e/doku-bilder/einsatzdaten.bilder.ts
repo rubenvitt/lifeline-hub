@@ -25,14 +25,16 @@ import {
  *   einsatzdaten.png          frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/anzeige/Kartenausschnitt.tsx
  *   einsatzort.png            frontend/src/pages/EinsatzdatenPage.tsx (EinsatzortPaneel), frontend/src/anzeige/Ortsfeld.tsx
  *   fuehrungsstelle.png       frontend/src/pages/EinsatzdatenPage.tsx (FuehrungsstellePaneel)
- *   mitglied-stelle.png       frontend/src/pages/MitgliederAbschnitt.tsx (FuehrungsstelleModal)
+ *
+ * Den Dialog „Führungsstelle für …“ eines Mitglieds zeigt seit LFH-1170 das Kapitel „Rechte im
+ * Einsatz“ (`rechte-im-einsatz.bilder.ts`): der Zugriff liegt in den Einstellungen.
  *
  * Füllung (D3): der Demo-Einsatz trägt nur Bezeichnung, Stichwort, Art und Alarmzeit. Einsatzort,
- * Koordinate, Lagedaten, die eigene Führungsstelle samt Bezeichnung, Standort (LFH-1181) und zwei
- * einsatzlokalen Sprechgruppen und die
- * Führungsstelle der Einsatzleitung kommen über die API, jeweils nur, wenn sie noch fehlen (ein
- * Lauf aller Kapitel teilt eine Datenbank). Kartengrundlage und Ortssuche ohne Netz: Kacheln aus
- * `e2e/kartenFixture.ts`, die Treffer der Ortssuche per `page.route` (kein Geocoder im Bildlauf).
+ * Koordinate, Erstmeldung und die eigene Führungsstelle samt Bezeichnung, Standort (LFH-1181),
+ * Einsatzleiter (LFH-1199) und zwei einsatzlokalen Sprechgruppen kommen über die API, jeweils nur,
+ * wenn sie noch fehlen (ein Lauf aller Kapitel teilt eine Datenbank). Kartengrundlage und
+ * Ortssuche ohne Netz: Kacheln aus `e2e/kartenFixture.ts`, die Treffer der Ortssuche per
+ * `page.route` (kein Geocoder im Bildlauf).
  */
 
 const KAPITEL = 'einsatzdaten';
@@ -145,14 +147,14 @@ test.describe(KAPITEL, () => {
     await api.dispose();
   });
 
-  test('Einsatzdaten mit Kopfleiste und Lagedaten', async ({ page }) => {
+  test('Einsatzdaten mit Kennungen, Kopfleiste und Paneelen', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await kartengrundlage(page);
     const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
-    await expect(page.getByRole('region', { name: 'Lagedaten' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Erstmeldung' })).toBeVisible();
     await ortVorschau;
     await expect(page.getByText('Integrierte Leitstelle Musterstadt')).toBeVisible();
     // Die Ortszeile unter der Koordinate fragt den Server; ohne Netz bleibt sie leer.
@@ -188,30 +190,5 @@ test.describe(KAPITEL, () => {
     await expect(paneel.getByText('Max Mustermann')).toBeVisible();
     await expect(paneel.getByText('Musterstadt 11-1', { exact: false }).last()).toBeVisible();
     await fotografiere(paneel, KAPITEL, 'fuehrungsstelle');
-  });
-
-  test('Dialog „Führungsstelle für …“ eines Mitglieds', async ({ page }) => {
-    await anmelden(page);
-    const demo = await demoEinsatz(page);
-    const mitglieder = (await (
-      await page.request.get(`/api/einsaetze/${demo.id}/mitglieder`)
-    ).json()) as { benutzer_id: number; einsatz_rolle: string; fuehrungsfunktion: string | null }[];
-    const leitung = mitglieder.find((m) => m.einsatz_rolle === 'einsatzleitung');
-    expect(leitung, 'der Demo-Einsatz hat eine Einsatzleitung').toBeDefined();
-    if (!leitung!.fuehrungsfunktion) {
-      await fuelle(page, 'put', `/api/einsaetze/${demo.id}/mitglieder/${leitung!.benutzer_id}`, {
-        einsatz_rolle: 'einsatzleitung',
-        fuehrungsfunktion: 'el',
-        fuehrungsstelle: null,
-      });
-    }
-    await uhrAnhalten(page);
-    await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
-    await page.getByRole('button', { name: /^Führungsstelle für .+ bearbeiten$/ }).click();
-    const dialog = page.getByRole('dialog', { name: /^Führungsstelle für / });
-    await expect(dialog.getByRole('button', { name: 'Speichern' })).toBeVisible();
-    // Der Fokus stünde sonst im Feld (Fokusring und Cursor im Bild).
-    await dialog.getByRole('combobox', { name: 'Führungsstelle' }).blur();
-    await fotografiere(dialog, KAPITEL, 'mitglied-stelle');
   });
 });

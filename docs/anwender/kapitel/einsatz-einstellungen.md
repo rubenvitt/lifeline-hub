@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -13,10 +13,11 @@ werden, welche Fristen gelten und wer welche Module sieht. Jede Einstellung gilt
 Einsatz. Was hier leer bleibt, übernimmt die Vorgabe der Organisation aus der Verwaltung, und
 fehlt auch die, die Vorgabe des Systems.
 
-Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, der Reiter „Module“ nur
-von der Einsatzleitung. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
+Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, die Reiter „Module“ und
+„Zugriff“ nur von der Einsatzleitung. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
 [Aufbewahrung](aufbewahrung.md), die Reiter „Pegel“ und „Geräte“ die Kapitel zu Wetter und
-Pegeln und zu gekoppelten Geräten.
+Pegeln und zu gekoppelten Geräten, den Reiter „Zugriff“ (wer im Einsatz mit welcher Rolle
+arbeitet) das Kapitel [Rechte im Einsatz](rechte-im-einsatz.md).
 
 ## Abläufe
 
@@ -110,6 +111,8 @@ selbst aussperrt.
 - „Allgemein“, „Verhalten & Automatik“ und die Aufbewahrungs-Dauer ändern die Einsatzleitung,
   das Führungspersonal und System-Admins der Organisation des Einsatzes.
 - „Module“ ändern nur die Einsatzleitung und System-Admins der Organisation des Einsatzes.
+- „Zugriff“ bedient nur die Einsatzleitung eines laufenden Einsatzes, auch ein System-Admin nur
+  mit dieser Rolle.
 - Alle anderen sehen die Einstellungen als „Nur Ansicht“.
 
 Nach dem Abschluss ist der Einsatz eingefroren; nur die Aufbewahrungsfrist lässt sich noch

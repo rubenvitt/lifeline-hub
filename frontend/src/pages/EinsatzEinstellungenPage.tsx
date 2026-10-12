@@ -1,7 +1,15 @@
 import { Breadcrumb } from 'antd';
-import { useId } from 'react';
+import { useCallback, useId } from 'react';
 import { Segmentleiste } from '../components/instrument';
-import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+  useParams,
+  useSearchParams,
+} from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -69,6 +77,27 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
  */
 export const RECHTE_TEXT = NUR_LEITUNG_FUEHRUNG_ORG_ADMIN;
 
+/**
+ * Einmal-Auftrag an die Sektionen (LFH-1170): `mitgliedAufnehmen` kommt aus `?neu=1`, dem Ziel der
+ * Schnellaktion „Mitglied aufnehmen“. Gelesen wird im Layout, weil der Schnellaktionen-Guard den
+ * Leser über den Dateinamen dem Modul `einsatz-einstellungen` zuordnet.
+ *
+ * Der Context trägt nur dieses Signal und keine Daten; die Falle aus {@link useEinstellungenDaten}
+ * (ein Formular, das ohne Daten montiert) betrifft ihn nicht.
+ */
+export interface EinstellungenAuftrag {
+  mitgliedAufnehmen: boolean;
+  /** Räumt den Auftrag aus der Adresse (`replace`): ein Neuladen öffnet nicht noch einmal. */
+  clearAuftrag: () => void;
+}
+
+const KEIN_AUFTRAG: EinstellungenAuftrag = { mitgliedAufnehmen: false, clearAuftrag: () => {} };
+
+/** Der Auftrag des Layouts; außerhalb des Layouts (Einzeltests einer Sektion) keiner. */
+export function useEinstellungenAuftrag(): EinstellungenAuftrag {
+  return useOutletContext<EinstellungenAuftrag | undefined>() ?? KEIN_AUFTRAG;
+}
+
 /** Aktive Sektion aus dem Pfad: `/einsaetze/1/einstellungen/verhalten` → `verhalten`. */
 function sektionAus(pathname: string): EinstellungenSektion {
   // Kein `.at(-1)`: `tsconfig.lib` steht auf ES2020, die Methode bricht dort den Typecheck.
@@ -98,6 +127,25 @@ export default function EinsatzEinstellungenPage() {
   const daten = useEinstellungenDaten(einsatzId);
   const aktiv = sektionAus(pathname);
   const panelId = useId();
+  const [suche, setSuche] = useSearchParams();
+  // `setSuche` wechselt mit jeder Suche (react-router), also auch dieses Callback. Keine Schleife:
+  // der Effekt der Sektion ruft es nur, solange `mitgliedAufnehmen` gilt, und das räumt es selbst.
+  const clearAuftrag = useCallback(
+    () =>
+      setSuche(
+        (vorher) => {
+          const rest = new URLSearchParams(vorher);
+          rest.delete('neu');
+          return rest;
+        },
+        { replace: true },
+      ),
+    [setSuche],
+  );
+  const auftrag: EinstellungenAuftrag = {
+    mitgliedAufnehmen: suche.get('neu') === '1',
+    clearAuftrag,
+  };
 
   if (daten.laedt) return <SeitenSkeleton />;
   if (!daten.einsatz) {
@@ -154,7 +202,7 @@ export default function EinsatzEinstellungenPage() {
         id={panelId}
         aria-label={EINSTELLUNGEN_SEKTIONEN.find((s) => s.key === aktiv)?.label}
       >
-        <Outlet />
+        <Outlet context={auftrag} />
       </div>
     </EinsatzSeite>
   );

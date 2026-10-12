@@ -33,8 +33,9 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
   Aufträge die Tabs „Einzelaufträge“ und „Einsatzbefehle“ und der Kopf „Befehlsdetails“, der Link einer
   Befehlskarte, im Chat Eingabefeld und Senden-Knopf.
 - Einsatz-Einstellungen: die Sektionswahl, Auswahl- und Zahlfelder, der Speichern-Knopf und die
-  Modulzeilen (Schalter, Rollenauswahl). Einsatzdaten: die Bearbeiten-Knöpfe und der
-  Akkordeon-Kopf „Technische Angaben“. Profil: „Passwort ändern“ und „2FA einrichten“. Die
+  Modulzeilen (Schalter, Rollenauswahl), in der Sektion „Zugriff“ die Personen- und
+  Rollenauswahl, „Hinzufügen“ und die Aktionen jeder Mitgliederzeile. Einsatzdaten: die
+  Bearbeiten- und Eintragen-Knöpfe der Zeilen und die Nebenwege im Seitenkopf. Profil: „Passwort ändern“ und „2FA einrichten“. Die
   Verwaltungsseite „Anzeige“: Auswahlfelder und Speichern-Knopf.
 - Verwaltung: die Zeilenknöpfe der Fahrzeug-Katalogseite; Text-, Auswahl- und Zahlfelder und der
   Speichern-Knopf der Fahrzeug-Detailseite; die Rollenauswahl der Modulzeilen und der

@@ -189,6 +189,30 @@ describe('InlineAngabe · Riegel', () => {
     expect(screen.getByRole('textbox', { name: 'Alarmzeit' })).toHaveValue('09:00');
   });
 
+  // LFH-1170: eine Eingabe, die ihren Fehler selbst zeigt (Koordinate), sperrt das Senden.
+  it('ungültiger Entwurf: kein Senden, die Eingabe bleibt mit dem Entwurf offen', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <TextAngabe wert="ILS-1" isValid={(w) => !w.includes(';')} onSpeichern={onSpeichern} />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    await user.clear(feld);
+    await user.type(feld, 'ILS;2{Enter}');
+    expect(onSpeichern).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('ILS;2');
+
+    // Über den Knopf: kein Senden, der Fokus kehrt ins Feld zurück, das seinen Fehler selbst nennt.
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' }));
+    expect(onSpeichern).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveFocus();
+
+    await user.clear(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }));
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), 'ILS-2{Enter}');
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('ILS-2'));
+  });
+
   it('eine optionale Angabe darf geleert werden', async () => {
     const onSpeichern = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);

@@ -157,6 +157,11 @@ export interface BefehlKontext {
    */
   freigaben?: ModulFreigaben;
   darfSchreibenImEinsatz: boolean;
+  /**
+   * Einsatzleitung eines laufenden Einsatzes (`darfEinsatzLeiten`): Schnellaktionen mit
+   * `recht: 'leitung'` (LFH-1170). Fehlt es, gilt es als nicht gegeben.
+   */
+  darfEinsatzLeiten?: boolean;
   /** Zuletzt besuchte Modulschlüssel des aktuellen Einsatzes, jüngstes zuerst
    *  (`einsatz/zuletztModule.ts`). */
   zuletztModulKeys?: string[];

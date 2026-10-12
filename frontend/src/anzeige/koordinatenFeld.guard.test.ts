@@ -30,10 +30,9 @@ const dateien = import.meta.glob('/src/**/*.tsx', {
 const DIREKT = new Set([
   '/src/anzeige/KoordinatenFeld.tsx', // die Formularhülle selbst
   '/src/pages/lagekarte/Sidebar.tsx', // „Übernehmen“ und „Mittelpunkt setzen“, kein Form
-  // Zeile „Koordinate“ im Paneel „Einsatzort“ (LFH-1175): `InlineAngabe`, kein Form; lehnt
-  // ungültig selbst ab (`istUngueltigeKoordinate`, `EinsatzdatenPage.test.tsx`).
-  // Standort der eigenen Führungsstelle (LFH-1181): `InlineAngabe`, kein Form; ein ungültiger
-  // Wert wird vor `alsLatLon` abgefangen und steht als Fehler an der Zeile.
+  // Zeile „Koordinate“ im Paneel „Einsatzort“ (LFH-1175/LFH-1170) und Standort der eigenen
+  // Führungsstelle (LFH-1181): je `InlineAngabe` mit eigenem `<form>`, kein `Form.Item`; ein
+  // ungültiger Wert wird vor dem Senden abgefangen (`isValid` bzw. vor `alsLatLon`).
   '/src/pages/EinsatzdatenPage.tsx',
 ]);
 

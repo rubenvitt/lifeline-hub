@@ -41,12 +41,17 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     const einsatzId = await einsatzAnlegen(page, `E2E Lagebesprechung ${Date.now()}`);
     await seedeEintrag(page, einsatzId);
     await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
-    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
-    const termin = page.getByLabel('Nächste Lagebesprechung (optional)');
+    // Die Zeile (LFH-1170: das Vollformular ist entfallen).
+    await page
+      .getByRole('button', { name: 'Nächste Lagebesprechung eintragen', exact: true })
+      .click();
+    const termin = page.getByRole('textbox', { name: 'Nächste Lagebesprechung', exact: true });
     await termin.fill('2099-09-09 15:17:43');
-    // Enter übernimmt den Pickerwert und sendet das umgebende Formular ab.
+    // Enter übernimmt den Pickerwert und sendet die Zeile (wie die Alarmzeit, LFH-472).
     await termin.press('Enter');
-    await expect(page.getByRole('button', { name: 'Bearbeiten', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Nächste Lagebesprechung bearbeiten', exact: true }),
+    ).toBeVisible();
     let einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
       string,
       unknown
@@ -77,14 +82,20 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     expect(antwort.request().postDataJSON().faellig_at).toBe('2099-09-09 13:17:43');
 
     await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
-    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Nächste Lagebesprechung bearbeiten', exact: true })
+      .click();
     const picker = page
       .locator('.ant-picker')
-      .filter({ has: page.getByLabel('Nächste Lagebesprechung (optional)') });
+      .filter({ has: page.getByRole('textbox', { name: 'Nächste Lagebesprechung', exact: true }) });
     await picker.hover();
     await picker.locator('.ant-picker-clear').click();
-    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Bearbeiten', exact: true })).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Nächste Lagebesprechung speichern', exact: true })
+      .click();
+    await expect(
+      page.getByRole('button', { name: 'Nächste Lagebesprechung eintragen', exact: true }),
+    ).toBeVisible();
     einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
       string,
       unknown

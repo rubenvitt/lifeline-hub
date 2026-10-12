@@ -112,9 +112,22 @@ test('Einsatzabschluss: fehlt für Führungspersonal auf allen Breiten', async (
     await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
     const main = page.locator('main');
     // Vorbedingung: der Rollenzweig steht — Führungspersonal bearbeitet die Kopfdaten, verwaltet
-    // aber keine Mitglieder.
-    await expect(main.getByRole('button', { name: 'Bearbeiten', exact: true }), wo).toBeVisible();
-    await expect(main.getByRole('button', { name: 'Hinzufügen' }), wo).toHaveCount(0);
+    // aber den Zugriff nicht (LFH-1170: kein Sprung dorthin).
+    await expect(main.getByRole('button', { name: 'Bezeichnung bearbeiten' }), wo).toBeVisible();
+    if (breite.width < 768) {
+      // Unter `md` stehen die Nebenwege als Menüeinträge hinter „Weitere“, nie als Link.
+      await page.getByRole('button', { name: 'Weitere Aktionen zu den Einsatzdaten' }).click();
+      const menue = page.getByRole('menu');
+      await expect(
+        menue.getByRole('menuitem', { name: 'Einsatzbericht drucken' }),
+        wo,
+      ).toBeVisible();
+      await expect(menue.getByRole('menuitem', { name: /Zugriff verwalten/ }), wo).toHaveCount(0);
+      await page.keyboard.press('Escape');
+    } else {
+      await expect(page.getByRole('link', { name: 'Einsatzbericht drucken' }), wo).toBeVisible();
+      await expect(page.getByRole('link', { name: /Zugriff verwalten/ }), wo).toHaveCount(0);
+    }
     await expect(main.getByRole('heading', { name: 'Einsatzabschluss' }), wo).toHaveCount(0);
     await expect(main.getByText('Einsatz abschließen'), wo).toHaveCount(0);
     expect(await ueberhang(page), `${wo}: ohne Überhang`).toBeLessThanOrEqual(1);

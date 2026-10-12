@@ -914,7 +914,7 @@ export function parseRouteId(param: string | undefined): number | null {
 
 /** Die Sektionen von `/einsaetze/:id/einstellungen`. */
 export type EinstellungenSektion =
-  'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel' | 'geraete';
+  'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel' | 'geraete' | 'zugriff';
 
 /**
  * Sektionen in Bedienreihenfolge — EINE Wahrheit für Tab-Band, Routentabelle und das Ziel des
@@ -930,17 +930,24 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   { key: 'pegel', label: 'Pegel' },
   // Gerätekopplung (LFH-892): nur die Einsatzleitung koppelt, die Sektion erklärt das selbst.
   { key: 'geraete', label: 'Geräte' },
+  // Mitglieder und Rollen (LFH-1170): von den Einsatzdaten hierher, dieselbe Rechtegrenze wie
+  // die Gerätekopplung.
+  { key: 'zugriff', label: 'Zugriff' },
 ];
 
 /**
  * Sektions-Route der Einsatz-Einstellungen. Ohne Sektion der bare Modulpfad, der auf die erste
- * Sektion umleitet.
+ * Sektion umleitet. `neu` ist der Auftrag der Schnellaktion „Mitglied aufnehmen“ (LFH-1170): die
+ * Sektion „Zugriff“ öffnet damit die Personenauswahl.
  */
 export function einsatzEinstellungenPfad(
   einsatzId: number,
   sektion: EinstellungenSektion = 'allgemein',
+  opts: { neu?: boolean } = {},
 ): string {
-  return `${einsatzModulPfad(einsatzId, 'einstellungen')}/${sektion}`;
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'einstellungen')}/${sektion}`, {
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 // ── Gerätekopplung (LFH-892) ─────────────────────────────────────────────────

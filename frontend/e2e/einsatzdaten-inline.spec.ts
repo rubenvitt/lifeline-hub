@@ -36,13 +36,14 @@ test('LFH-472: Leitstellen-Nr. inline nachtragen, die Leseansicht bleibt stehen'
 }) => {
   const id = await anmeldenUndAnlegen(page);
   await page.goto(einsatzdatenPfad(id));
-  await page.getByRole('button', { name: /Technische Angaben/ }).click();
+  // LFH-1170: kein Klappbereich mehr — die Zeile steht ohne Aufklappen im Paneel „Einsatz“.
+  await expect(page.getByRole('button', { name: /Technische Angaben/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Leitstellen-Nr. eintragen', exact: true }).click();
 
   const feld = page.getByRole('textbox', { name: 'Leitstellen-Nr.', exact: true });
   await expect(feld).toBeFocused();
-  // Die übrigen Angaben stehen weiter da, das Vollformular ist nicht offen.
-  await expect(page.getByText('Lagedaten', { exact: true })).toBeVisible();
+  // Die übrigen Angaben stehen weiter da; ein Formular gibt es nicht.
+  await expect(page.getByRole('region', { name: 'Erstmeldung' })).toBeVisible();
   await expect(page.getByText('Einsatzdaten bearbeiten', { exact: true })).toHaveCount(0);
 
   await feld.fill('ILS-4711');
@@ -50,7 +51,33 @@ test('LFH-472: Leitstellen-Nr. inline nachtragen, die Leseansicht bleibt stehen'
   const wertKnopf = page.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten', exact: true });
   await expect(wertKnopf).toBeFocused();
   await expect(wertKnopf).toContainText('ILS-4711');
+  // Der Seitenkopf nennt die Kennung (LFH-1170).
+  await expect(page.locator('.lfh-seitenkopf__meta')).toContainText('ILS-4711');
   expect((await stand(page, id)).leitstellen_nr).toBe('ILS-4711');
+});
+
+test('LFH-1170: Koordinate als Zeile — unlesbar wird nicht gesendet, das Paar schon', async ({
+  page,
+}) => {
+  const id = await anmeldenUndAnlegen(page);
+  await page.goto(einsatzdatenPfad(id));
+  await page.getByRole('button', { name: 'Koordinate eintragen', exact: true }).click();
+  const feld = page.getByRole('textbox', { name: 'Koordinate', exact: true });
+  await expect(feld).toBeFocused();
+  await feld.fill('52.52; 13.405');
+  await page.getByRole('button', { name: 'Koordinate speichern', exact: true }).click();
+  await expect(page.getByText(/^Ungültige Koordinate im Format/)).toBeVisible();
+  await expect(feld).toBeVisible();
+  expect((await stand(page, id)).einsatzort_lat ?? null).toBeNull();
+
+  await feld.fill('52.52, 13.405');
+  await page.getByRole('button', { name: 'Koordinate speichern', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Koordinate bearbeiten', exact: true }),
+  ).toBeVisible();
+  const neu = await stand(page, id);
+  expect(neu.einsatzort_lat).toBeCloseTo(52.52, 5);
+  expect(neu.einsatzort_lon).toBeCloseTo(13.405, 5);
 });
 
 test('LFH-472: Alarmzeit inline — Enter übernimmt, gespeichert wird der absolute Zeitpunkt', async ({

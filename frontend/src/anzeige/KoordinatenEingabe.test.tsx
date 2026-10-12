@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { Form } from 'antd';
 import { http, HttpResponse } from 'msw';
@@ -212,5 +213,20 @@ describe('KoordinatenEingabe', () => {
     expect(
       await screen.findByText(/Hauptstr\. 5, Musterstadt · 1[.,]20 km NO von Einsatzort/),
     ).toBeInTheDocument();
+  });
+
+  it('ungültig: das Feld trägt aria-invalid und den Grund als Beschreibung (LFH-1170)', async () => {
+    function Gesteuert() {
+      const [wert, setWert] = useState<KoordinatenWert>(null);
+      return <KoordinatenEingabe aria-label="Koordinate" value={wert} onChange={setWert} />;
+    }
+    renderMitProviders(<Gesteuert />);
+    const feld = screen.getByRole('textbox', { name: 'Koordinate' });
+    await userEvent.type(feld, '48.5; 11.5');
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld).toHaveAccessibleDescription('Ungültige Koordinate im Format WGS84 dezimal');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '48.5, 11.5');
+    expect(feld).not.toHaveAttribute('aria-invalid');
   });
 });

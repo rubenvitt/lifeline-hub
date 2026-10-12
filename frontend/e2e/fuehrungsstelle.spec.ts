@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { einsatzdatenPfad, etbPfad } from '../src/routing/deeplinks';
+import { einsatzEinstellungenPfad, etbPfad } from '../src/routing/deeplinks';
 import { benutzerAnlegen, wechsleZu } from './rollen-kern';
 
 for (const breite of [1280, 390]) {
@@ -23,7 +23,8 @@ for (const breite of [1280, 390]) {
     const a = await anlegen('Führungsstelle A');
     const b = await anlegen('Führungsstelle B');
 
-    await page.goto(einsatzdatenPfad(a));
+    // Die Führungsstelle je Person liegt seit LFH-1170 im Reiter „Zugriff“ der Einstellungen.
+    await page.goto(einsatzEinstellungenPfad(a, 'zugriff'));
     await page
       .getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` })
       .click();

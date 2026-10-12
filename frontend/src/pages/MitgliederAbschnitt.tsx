@@ -39,6 +39,11 @@ interface Props {
   einsatzId: number;
   darfVerwalten: boolean;
   darfFuehrungsstelleVerwalten: boolean;
+  /**
+   * Personenauswahl beim Einhängen aufgeklappt und fokussiert (Schnellaktion „Mitglied aufnehmen“,
+   * LFH-1170). Wirkt nur beim Einhängen der Auswahl; ein späterer Wechsel schließt sie nicht.
+   */
+  openAuswahl?: boolean;
 }
 
 /**
@@ -115,7 +120,8 @@ function FuehrungsstelleModal({
 }
 
 /**
- * Zugriffsverwaltung eines Einsatzes (gemountet in `EinsatzdatenPage`).
+ * Zugriffsverwaltung eines Einsatzes (gemountet in der Einstellungs-Sektion „Zugriff“,
+ * `einstellungen/EinsatzZugriff.tsx`, LFH-1170).
  *
  * ── Keine Karten unter `md` ──
  *
@@ -131,6 +137,7 @@ export default function MitgliederAbschnitt({
   einsatzId,
   darfVerwalten,
   darfFuehrungsstelleVerwalten,
+  openAuswahl = false,
 }: Props) {
   const qc = useQueryClient();
   const { benutzer: ich } = useAuth();
@@ -392,13 +399,14 @@ export default function MitgliederAbschnitt({
           </>
         ) : undefined
       }
-      style={{ marginTop: token.marginLG }}
     >
       {darfVerwalten && (
         <Space style={{ padding: token.padding }} wrap>
           <Select
             placeholder="Benutzer …"
             aria-label="Person zum Aufnehmen"
+            autoFocus={openAuswahl}
+            defaultOpen={openAuswahl}
             style={{ width: 200 }}
             value={neuerBenutzer}
             options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}

@@ -449,10 +449,12 @@ anwendbar), „nicht geprüft" ist keins.
   eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
   Hinweis per `data-fehler`; Zeitpunkte über `ZeitpunktEingabe` und Gleichheit am Instant. Die
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
-  Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung nur im
-  Vollformular. Ausnahmen (LFH-1175, Spec `einsatzdaten-bearbeitung`): die Zeile „Koordinate“
-  schickt das Paar, die Zeile „Adresse“ mit gewähltem Treffer Adresse und Koordinate zusammen;
-  beide stehen im Paneel „Einsatzort“, die Kopfleiste zeigt den Einsatzort nur an.
+  Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
+  (`patcheEinsatz`); ein Vollformular gibt es nicht. Ausnahmen (LFH-1175, Spec
+  `einsatzdaten-bearbeitung`): die Zeile „Koordinate“ schickt das Paar, die Zeile „Adresse“ mit
+  gewähltem Treffer Adresse und Koordinate zusammen; beide stehen im Paneel „Einsatzort“, die
+  Kopfleiste zeigt den Einsatzort nur an. Eine Eingabe, die einen ungültigen Entwurf selbst
+  anzeigt (Koordinate), sperrt das Senden über `isValid`.
 - **Ortsangaben mit Suche nehmen `anzeige/Ortsfeld.tsx`** (LFH-1175, Spec `ortsfeld`): Suche nur
   auf Enter oder „Ort suchen“, nie beim Tippen (Nominatim-Regeln, ein Takt für alle); Enter im
   Feld sendet das umgebende Formular nicht ab. Die Suche wird hineingereicht (im Einsatz

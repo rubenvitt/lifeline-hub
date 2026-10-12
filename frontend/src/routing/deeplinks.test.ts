@@ -737,7 +737,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     expect(einsatzEinstellungenPfad(E)).toBe('/einsaetze/5/einstellungen/allgemein');
   });
 
-  it('baut alle fünf Sektionen', () => {
+  it('baut alle Sektionen', () => {
     expect(einsatzEinstellungenPfad(E, 'allgemein')).toBe('/einsaetze/5/einstellungen/allgemein');
     expect(einsatzEinstellungenPfad(E, 'verhalten')).toBe('/einsaetze/5/einstellungen/verhalten');
     expect(einsatzEinstellungenPfad(E, 'aufbewahrung')).toBe(
@@ -746,6 +746,16 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     expect(einsatzEinstellungenPfad(E, 'module')).toBe('/einsaetze/5/einstellungen/module');
     expect(einsatzEinstellungenPfad(E, 'pegel')).toBe('/einsaetze/5/einstellungen/pegel');
     expect(einsatzEinstellungenPfad(E, 'geraete')).toBe('/einsaetze/5/einstellungen/geraete');
+    expect(einsatzEinstellungenPfad(E, 'zugriff')).toBe('/einsaetze/5/einstellungen/zugriff');
+  });
+
+  it('trägt den Aufnahme-Auftrag der Schnellaktion als `?neu=1` (LFH-1170)', () => {
+    expect(einsatzEinstellungenPfad(E, 'zugriff', { neu: true })).toBe(
+      '/einsaetze/5/einstellungen/zugriff?neu=1',
+    );
+    expect(einsatzEinstellungenPfad(E, 'zugriff', { neu: false })).toBe(
+      '/einsaetze/5/einstellungen/zugriff',
+    );
   });
 
   it('trägt den Kopplungscode im Fragment, nie im Pfad oder in der Abfrage (LFH-892)', () => {
@@ -767,6 +777,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'module',
       'pegel',
       'geraete',
+      'zugriff',
     ]);
     expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
       einsatzEinstellungenPfad(E),

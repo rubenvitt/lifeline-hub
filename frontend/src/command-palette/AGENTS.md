@@ -51,3 +51,8 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   `befehle.test.ts`, `befehle.modulstatus.test.ts`), Bestandszeilen ohne `kennung`. Die Zeile
   trägt Icon und Namen des Trägermoduls (`kontext`), die Beschriftung heißt Objekt + Verb
   („Person erfassen“); wer eine Beschriftung ändert, legt die alte als Schlagwort ab (LFH-1055).
+  Ein engeres Recht als das Schreibrecht trägt die Zeile selbst: `recht: 'leitung'` zeigt sie nur
+  der Einsatzleitung eines laufenden Einsatzes (`darfEinsatzLeiten`, „Mitglied aufnehmen“,
+  LFH-1170). Liegt das Ziel in einer Sektion der Einstellungen, liest das Layout
+  `EinsatzEinstellungenPage.tsx` den Parameter (Zuordnung über den Dateinamen) und reicht ihn per
+  `Outlet`-Context weiter.

@@ -2,36 +2,54 @@
 titel: Rechte im Einsatz
 gruppen: [fuehrung, administration]
 reihenfolge: 40
-quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, src/routes/einsatz.rs]
+quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs]
 ---
 
 ## Überblick
 
 Was eine Person in einem Einsatz darf, hängt an ihrer Rolle in diesem Einsatz: **Einsatzleitung**,
 **Führungspersonal** oder **Beobachter**. Die Rollen vergibt die Einsatzleitung eines laufenden
-Einsatzes in den Einsatzdaten. Ohne Rolle lesen Führungskräfte der Organisation und System-Admins
-mit; schreiben dürfen sie dort nur eingeschränkt.
+Einsatzes in den Einstellungen des Einsatzes, Reiter „Zugriff“. Ohne Rolle lesen Führungskräfte
+der Organisation und System-Admins mit; schreiben dürfen sie dort nur eingeschränkt.
 
 ## Abläufe
 
 ### Eine Person in den Einsatz aufnehmen
 
-1. Im Einsatz unter „Führung“ die „Einsatzdaten“ öffnen.
-2. Im Abschnitt „Zugriff“ unter „Benutzer …“ die Person wählen und daneben ihre Rolle;
-   vorgewählt ist „Führungspersonal“.
+Für die Einsatzleitung:
+
+1. In der Sprungpalette „Mitglied aufnehmen“ wählen. Die Einstellungen öffnen sich im Reiter
+   „Zugriff“, die Auswahl „Benutzer …“ ist aufgeklappt. Alternativ im Einsatz „Einstellungen“
+   und dort den Reiter „Zugriff“ öffnen, oder in den „Einsatzdaten“ „Zugriff verwalten“ wählen.
+2. Unter „Benutzer …“ die Person wählen und daneben ihre Rolle; vorgewählt ist
+   „Führungspersonal“.
 3. „Hinzufügen“ wählen. Die Person steht danach in der Liste, mit ihrer Rolle in einem
    Auswahlfeld.
 
-   ![Abschnitt „Zugriff“ mit der Zeile zum Aufnehmen und zwei Mitgliedern: die Einsatzleitung mit „Gesperrt: letzte Einsatzleitung“ und eine neu aufgenommene Person als Führungspersonal](../bilder/rechte-im-einsatz/zugriff.png)
+   ![Reiter „Zugriff“ mit der Zeile zum Aufnehmen und zwei Mitgliedern: die Einsatzleitung mit „Gesperrt: letzte Einsatzleitung“ und eine neu aufgenommene Person als Führungspersonal](../bilder/rechte-im-einsatz/zugriff.png)
 
 ### Eine Rolle ändern oder entziehen
 
-1. Im Abschnitt „Zugriff“ der Einsatzdaten bei der Person eine andere Rolle wählen.
+Für die Einsatzleitung:
+
+1. Im Reiter „Zugriff“ der Einstellungen bei der Person eine andere Rolle wählen.
 2. Zum Entziehen „Entfernen“ wählen und die Rückfrage „Mitglied entfernen?“ mit „Entfernen“
    bestätigen.
 
 Wer die eigene Rolle herabstuft, bestätigt das zuerst mit „Rolle herabstufen“: danach endet das
 Recht, den Zugriff des Einsatzes zu verwalten.
+
+### Die Führungsstelle eines Mitglieds festlegen
+
+Für die Einsatzleitung:
+
+1. Im Reiter „Zugriff“ in der Spalte „Führungsstelle“ „Führungsstelle festlegen“ oder den
+   bisherigen Wert wählen.
+2. Im Dialog eine Funktion aus der Liste wählen oder einen Freitext eingeben.
+
+   ![Dialog „Führungsstelle für Administrator“ mit dem Feld „Führungsstelle“](../bilder/rechte-im-einsatz/mitglied-stelle.png)
+
+3. „Speichern“ wählen.
 
 ## Hintergrund
 
@@ -40,14 +58,20 @@ Recht, den Zugriff des Einsatzes zu verwalten.
 - **Einsatzleitung** und **Führungspersonal** schreiben in den Modulen, ändern Kopfdaten,
   Einstellungen und die eigene Führungsstelle.
 - **Beobachter** lesen nur.
-- Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte.
+- Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte. Alle anderen sehen den
+  Reiter „Zugriff“ als „Nur Ansicht“ mit dem Grund „nur Einsatzleitung“; die Schnellaktion
+  „Mitglied aufnehmen“ und der Sprung „Zugriff verwalten“ fehlen ihnen.
 
 Die letzte Einsatzleitung eines Einsatzes lässt sich nicht entfernen („Gesperrt: letzte
 Einsatzleitung“).
 
 Aufnehmen kann die Einsatzleitung jede aktive Person der Organisation des Einsatzes, auch ohne
 Rolle in der Administration. Die Auswahl „Benutzer …“ zeigt nur diese Personen, mit ihrem
-Anzeigenamen; Personen anderer Organisationen stehen nicht darin.
+Anzeigenamen; Personen anderer Organisationen, deaktivierte Konten und gekoppelte Geräte stehen
+nicht darin. Ist niemand mehr übrig, zeigt sie „Keine weitere Person der Organisation“.
+
+Die **Führungsstelle eines Mitglieds** ist der erste Vorschlag, wenn das Einsatztagebuch die
+Person nach ihrem Rufnamen fragt, noch vor ihrem eigenen Sachgebiet im Stab.
 
 ### Ohne Rolle im Einsatz
 
