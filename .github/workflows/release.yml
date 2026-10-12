@@ -51,7 +51,7 @@ jobs:
           if [ -z "${APP_ID:-}" ]; then
             echo "bereit=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Release übersprungen — das Secret RELEASE_APP_ID ist nicht gesetzt."
-            echo "::notice::Einrichtung siehe ClickUp LFH-527 (GitHub App anlegen, Secrets hinterlegen)."
+            echo "::notice::Einrichtung siehe LFH-527 (GitHub App anlegen, Secrets hinterlegen): https://zunder.rubeen.dev/#/clickup/123zgec1t79"
           else
             echo "bereit=true" >> "$GITHUB_OUTPUT"
           fi

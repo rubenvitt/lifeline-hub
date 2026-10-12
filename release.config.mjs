@@ -83,7 +83,7 @@ Die Release Notes sollen:
 3. Für Führungskräfte und Betreiber geschrieben sein: technische Commit-Messages in beschreibende Sätze übersetzen, die sagen, was sich in der Bedienung oder im Betrieb ändert
 4. Rein technische Commits weglassen (Tests, CI, Linter, Formatierung, Refactoring ohne spürbare Wirkung, Abhängigkeits-Updates ohne Wirkung, Release-Pipeline, Review-Korrekturen an Änderungen desselben Releases)
 5. Bugfixes den jeweiligen Bereichen zuordnen, nicht separat auflisten
-6. Keine Commit-Hashes, keine Ticket-Nummern (LFH-…), keine Pull-Request-Nummern, keine Datei- oder Funktionsnamen
+6. Keine Commit-Hashes, keine Ticket-Nummern (LFH-…) oder Aufgaben-Links (zunder.rubeen.dev/…), keine Pull-Request-Nummern, keine Datei- oder Funktionsnamen
 7. Nichts behaupten, was nicht aus den Commits hervorgeht
 8. Markdown-Formatierung mit ## für Abschnitts-Überschriften
 9. Kompakt und scanbar sein – Qualität vor Quantität
@@ -214,7 +214,7 @@ export default {
         // und das Plugin legte die Etiketten nebenbei im Repository an.
         releasedLabels: false,
         /*
-         * Kein Issue bei einem GESCHEITERTEN Release: die Aufgabenverwaltung ist ClickUp, und
+         * Kein Issue bei einem GESCHEITERTEN Release: die Aufgabenverwaltung ist Zunder, und
          * ein roter Lauf meldet sich selbst. `failCommentCondition` statt `failComment`, das
          * eine DEPRECATION-Warnung in jeden Lauf schriebe.
          */

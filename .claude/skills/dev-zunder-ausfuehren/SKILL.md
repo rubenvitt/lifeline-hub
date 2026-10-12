@@ -1,14 +1,15 @@
 ---
-name: dev-clickup-ausfuehren
-description: Per-single-(sub)task execution layer for the Lifeline-Hub ClickUp Entwicklungsboard — owns the board-status spur, complexity routing, and worktree handoff for ONE task. Primarily invoked by dev-clickup-orchestrieren, which orchestrates whole tasks (incl. subtasks) and is the entry point for "umsetzen"/"implementiere"/"mit subagents"/"ultracode". Use this directly only for a single, standalone task with no subtasks. NOT for capturing new tasks (use clickup-task-anlegen).
+name: dev-zunder-ausfuehren
+description: Per-single-(sub)task execution layer for the Lifeline-Hub Zunder Entwicklungsboard (project "Dev: Lifeline-Hub") — owns the board-status spur, the claim, complexity routing, and worktree handoff for ONE task. Primarily invoked by dev-zunder-orchestrieren, which orchestrates whole tasks (incl. subtasks) and is the entry point for "umsetzen"/"implementiere"/"mit subagents"/"ultracode". Use this directly only for a single, standalone task with no subtasks. NOT for capturing new tasks (use zunder-task-anlegen).
 ---
 
-# ClickUp-Task implementieren (Lifeline Hub)
+# Zunder-Aufgabe implementieren (Lifeline Hub)
 
 ## Überblick
 
-Einen Task vom **Entwicklungsboard** (`901523554968`) umsetzen. Dieser Skill macht wenige
-**eigene Entscheidungen** — Workspace (Branch/Worktree), Komplexitäts-Routing und das
+Einen Task vom **Entwicklungsboard** (Zunder-Projekt „Dev: Lifeline-Hub“, IDs und Status in
+`AGENTS.md`, Abschnitt „Zunder“) umsetzen. Dieser Skill macht wenige **eigene
+Entscheidungen** — Workspace (Branch/Worktree), Komplexitäts-Routing, Reservierung und das
 **Mitführen des Board-Status** — und delegiert alles andere weiter. Nichts davon
 reimplementieren. Subagents und Workflows startest du dabei nach eigenem Ermessen (Abschnitt
 „Agenten nach Bedarf“).
@@ -28,11 +29,12 @@ verliert die Zusicherung, ohne dass ein Test rot wird.
 
 ## Wann benutzen
 
-- User nennt einen konkreten Task ("implementiere ClickUp #123", "mach Task LH-42", URL/Name)
+- User nennt einen konkreten Task (Zunder-Link `…/#/aufgabe/<uuid>`, UUID, Titel oder eine alte
+  Kennung `LFH-<n>`)
 - Bevor Code-Arbeit für einen bekannten Board-Task beginnt
 
-**Nicht** zum Anlegen neuer Tasks → `clickup-task-anlegen`.
-**Ganzer Task mit Subtasks / „mit subagents" / „ultracode"** → `dev-clickup-orchestrieren`
+**Nicht** zum Anlegen neuer Tasks → `zunder-task-anlegen`.
+**Ganzer Task mit Subtasks / „mit subagents" / „ultracode"** → `dev-zunder-orchestrieren`
 orchestriert und ruft diesen Skill pro (Sub)Task auf.
 
 ## Agenten nach Bedarf (LFH-1032)
@@ -52,12 +54,12 @@ auch dann recht, wenn er den Main-Loop von breitem Lesen entlastet. Herleitung:
 | Scope über mehr als ein Subsystem oder mehrere Subtasks | Was ein Grep oder ein Read beantwortet |
 | Review parallel zu laufenden Gates (`check-all.sh`, Vitest) | Route `trivial` |
 | Ursachensuche über viel unbekannten Code (`bug-unklar`) | Alles Interaktive: Checkpoint, Rückfrage, Freigabe |
-| Unabhängige Subtasks im autonomen Modus (`dev-clickup-orchestrieren`, Phase 3) | `/opsx:*`, TDD-Zyklus des Main-Loops |
+| Unabhängige Subtasks im autonomen Modus (`dev-zunder-orchestrieren`, Phase 3) | `/opsx:*`, TDD-Zyklus des Main-Loops |
 | Gegenlesen eines Entwurfs oder eines heiklen Diffs | |
 
 **Agent oder Workflow:** Für einen bis drei unabhängige Jobs das Agent-Tool (kein Skript,
 gleich im Hintergrund). Ein Workflow, wenn es mehrstufig wird (finden → verifizieren) oder mehr
-als drei Agents braucht; Skelette in `dev-clickup-orchestrieren/references/workflow-bausteine.md`.
+als drei Agents braucht; Skelette in `dev-zunder-orchestrieren/references/workflow-bausteine.md`.
 Der Größenrichtwert der Umgebung für Workflows gilt weiter.
 
 **Jeder Worker-Prompt bringt mit**, denn Worker sehen weder Systemprompt noch Skill:
@@ -65,7 +67,8 @@ Der Größenrichtwert der Umgebung für Workflows gilt weiter.
 - Keine `mcp__hearthbot__`-Tools: nur der Main-Loop spricht mit dem Menschen.
 - Kein `/opsx:*` und nichts unter `openspec/changes/` anlegen oder ändern (Ausnahme: der autonome
   Dev-Agent hakt Aufgaben einer freigegebenen Change ab).
-- Kein Push, kein PR, kein Board-Status — das bleibt beim Main-Loop.
+- Kein Push, kein PR, kein Zunder-Aufruf (Status, Felder, Reservierung) — das bleibt beim
+  Main-Loop.
 - Bei einer Frage, die nur der Mensch beantworten kann: abbrechen und den Blocker strukturiert
   zurückgeben, nicht raten.
 - Nutzt er `/mnt/project-files`: die Regeln des geteilten Ordners, wie sie im Systemprompt der
@@ -75,33 +78,57 @@ Ergebnisse fließen in den Main-Loop zurück; dort fallen Entscheidung und Meldu
 
 ## Board-Status mitführen
 
-Der Task soll auf dem Board zeigen, wo die Arbeit gerade steht. Status **automatisch**
-(keine Rückfrage) mit `clickup_update_task` des ClickUp-Connectors setzen — `task_id` und
-`status` wörtlich (case-sensitive).
+Der Task soll auf dem Board zeigen, wo die Arbeit gerade steht. Status **automatisch** (keine
+Rückfrage) mit `update_task` des Zunder-Connectors setzen — `task_id` und `status` als Code
+(Codes und Spur: `AGENTS.md`, Abschnitt „Zunder“). Diese Tabelle ist die einzige Stelle, die
+sagt, **wann** welcher Status gilt; `dev-zunder-orchestrieren` verweist hierher.
 
-Status-Spur des Boards:
-`backlog → scoping → in design → ready for development → in development → in review → testing → shipped → done` (Sonderfall: `cancelled`).
+| Moment | Status | Felder per `update_task` |
+|---|---|---|
+| Arbeit beginnt (Schritt 1, nach `claim_task`) | `in_progress` | — |
+| Branch steht (Schritt 2) | — | `branch` |
+| Route gewählt (Schritt 3) | — | `plan`: Route, bei `entwurf` der Change-Name |
+| Change liegt zur Freigabe vor (Route `entwurf`) | `blocked` | `plan`: „Change `<name>` wartet auf Freigabe“ |
+| Freigabe erteilt, `/opsx:apply` beginnt | `in_progress` | `plan` nachziehen |
+| PR gegen `alpha` offen (Schritt 4) | `review` | `pr_url` |
+| PR gemergt | `done` | — |
+| Task wird verworfen | `dropped` | Grund als `## Notizen`-Eintrag |
+| Harter Blocker, Session endet mit offener Frage | `blocked` | Frage als `## Notizen`-Eintrag |
 
-**Wann welcher Status** ergibt sich aus den `→`-Markern in Schritt 3 (Routing) und Schritt 4
-(Abschluss). Regeln dazu:
+Regeln dazu:
 
-- **Nur vorwärts.** Steht der Task schon weiter (oder genau auf dem Ziel-Status), nicht
-  zurücksetzen und nicht redundant neu schreiben.
+- **Nur vorwärts** entlang `open → in_progress → review → done`. Steht der Task schon weiter
+  (oder genau auf dem Ziel-Status), nicht zurücksetzen und nicht redundant neu schreiben.
+  `blocked` verlassen ist kein Rückschritt.
 - **Unabhängig vom Workspace.** Auch wenn der User den Branch-Switch (Schritt 2) ablehnt und
   ihr wo-ihr-seid weiterarbeitet, wird der Status gesetzt.
-- **`cancelled`** nur, wenn der Task verworfen wird — nicht beim bloßen Pausieren/Abbrechen
-  einer Session.
+- **`dropped`** nur, wenn der Task verworfen wird — nicht beim bloßen Pausieren/Abbrechen
+  einer Session. Nie `delete_task`.
+- **Merge nachtragen:** Kein Dienst setzt nach dem Merge `done`. Steht ein Task beim Laden
+  (Schritt 1) auf `review` und zeigt `gh pr view <pr_url> --json state` `MERGED`, zuerst auf
+  `done` setzen.
+- Notizen an der Aufgabe: Verfahren in `AGENTS.md`, Abschnitt „Zunder“ (keine Kommentare).
 
 ## Schritt 1: Task laden
 
-`clickup_get_task` des ClickUp-Connectors mit der genannten ID/URL. Daraus ziehen:
+`get_task` des Zunder-Connectors mit der UUID (aus dem Link `…/#/aufgabe/<uuid>`). Bei einem
+Titel oder einer alten Kennung `LFH-<n>` erst per `search` die Aufgabe finden (Verfahren in
+`AGENTS.md`, Abschnitt „Zunder“). Daraus ziehen:
 
-- **`custom_id`** (z.B. `LH-42`) — für Branch-Name und Commit-Referenzen
-- **Name + Beschreibung** — für Slug, Typ und Komplexität
-- **Conventional-Typ** selbst ableiten (der Space hat keine Tags): `feat` / `fix` /
+- **`id`** (UUID) — für Zunder-Link und Commit-Referenz; **`<kurz>`** = die ersten 8
+  Hex-Zeichen, für Branch- und Change-Namen
+- **Titel + Beschreibung** — für Slug, Typ und Komplexität
+- **`status`, `branch`, `pr_url`, `plan`** — wo die Arbeit steht (Merge nachtragen, s. o.)
+- **Conventional-Typ** aus `type` (`bug` → `fix`) und Inhalt ableiten: `feat` / `fix` /
   `refactor` / `chore` / `docs` …
 
 Task unklar oder mehrdeutig → kurz beim User rückfragen, nicht raten.
+
+**Reservieren:** `claim_task` mit `agent` = Sitzungsname (z. B. `claude-code@<rechner>`) und
+`ttl_minutes` passend zur Arbeit (Standard 120). Scheitert er, weil ein anderer Agent die Aufgabe
+gültig hält, **nicht** weiterarbeiten, sondern melden. Bei langen Läufen denselben Aufruf
+wiederholen, um zu verlängern. `release_task` nach dem PR (Schritt 4), beim Verwerfen und wenn
+die Session ohne Ergebnis endet. Danach Status laut Tabelle oben.
 
 ## Schritt 2: Workspace prüfen (Branch / Worktree)
 
@@ -113,9 +140,9 @@ Worktree-Helfer deshalb von dort abzweigt. Nach einem `EnterWorktree` deshalb
 **prüfen**, worauf der Branch zeigt (`git rev-list --left-right --count HEAD...origin/alpha`),
 und bei Bedarf auf `origin/alpha` umsetzen, bevor die erste Zeile Code entsteht.
 
-Branch-Name bilden: **`<typ>/<custom_id>-<slug>`**, custom_id klein, Slug aus dem
-Task-Namen (ASCII, kebab-case, Umlaute auflösen, 3–5 Wörter).
-Beispiel: `feat/lh-42-personal-status`.
+Branch-Name bilden: **`<typ>/<kurz>-<slug>`**, `<kurz>` = erste 8 Hex-Zeichen der UUID, Slug
+aus dem Titel (ASCII, kebab-case, Umlaute auflösen, 3–5 Wörter).
+Beispiel: `feat/a1b2c3d4-personal-status`.
 
 `git branch --show-current` prüfen und **ohne Rückfrage** handeln (Festlegung des
 Users vom 21.09.2026: „mach das immer automatisch"):
@@ -126,23 +153,24 @@ Users vom 21.09.2026: „mach das immer automatisch"):
 | Generischer **Harness-/Worktree-Branch** (`claude/…`, `dev`, `wip`, `test`), sauber und ohne eigene Commits gegenüber `origin/alpha` | Nein | Im selben Worktree per `git branch -m <neuer-name>` umbenennen; Basis ggf. auf `origin/alpha` setzen |
 | `alpha` / `main` / `master`, oder Branch mit **fremder** Arbeit (andere Task, eigene Commits, dreckiger Baum) | Nein | Neuen Worktree mit dem Branch-Namen anlegen → **REQUIRED SUB-SKILL:** `superpowers:using-git-worktrees` |
 
-Die Wahl dem User in **einem Satz** melden („Branch `feat/lh-42-…` angelegt"), nicht
+Die Wahl dem User in **einem Satz** melden („Branch `feat/a1b2c3d4-…` angelegt"), nicht
 erfragen. Fremde Arbeit wird dabei nie umbenannt oder überschrieben — im Zweifel neuer
 Worktree.
 
 ## Schritt 3: Komplexität einschätzen → Routing
 
-Komplexität aus Task-Beschreibung selbst einschätzen und den passenden Skill wählen. Beim
-Start in den jeweiligen **Board-Status** wechseln (raus aus `backlog`). Die Spalte „Route“ ist
-der Schlüssel, den auch die Scope-Map von `dev-clickup-orchestrieren` führt (`route`):
+Komplexität aus Task-Beschreibung selbst einschätzen und den passenden Skill wählen. Der Task
+steht dabei auf `in_progress`; die Route kommt in `plan` (Tabelle „Board-Status mitführen“). Die
+Spalte „Route“ ist der Schlüssel, den auch die Scope-Map von `dev-zunder-orchestrieren` führt
+(`route`):
 
-| Route | Komplexität | Skill | Board-Status |
-|---|---|---|---|
-| `trivial` | Trivial (Typo, Text/Copy-Change) | Direkt, kein Sub-Skill | `in development` |
-| `unklar` | Anforderung unklar | **`/opsx:explore`** zuerst, danach neu routen | `scoping` → danach `in design`/`in development` |
-| `bug-unklar` | Bug, Ursache unklar | **`superpowers:systematic-debugging`** | `in development` |
-| `klar` | Feature/Bugfix, klare Spec | **`superpowers:test-driven-development`** | `in development` |
-| `entwurf` | Entwurf nötig (E1–E3, s. u.) | **`/opsx:propose`** → ⟨Checkpoint⟩ → **`/opsx:apply`** | `in design` → `ready for development` → `in development` |
+| Route | Komplexität | Skill |
+|---|---|---|
+| `trivial` | Trivial (Typo, Text/Copy-Change) | Direkt, kein Sub-Skill |
+| `unklar` | Anforderung unklar | **`/opsx:explore`** zuerst, danach neu routen |
+| `bug-unklar` | Bug, Ursache unklar | **`superpowers:systematic-debugging`** |
+| `klar` | Feature/Bugfix, klare Spec | **`superpowers:test-driven-development`** |
+| `entwurf` | Entwurf nötig (E1–E3, s. u.) | **`/opsx:propose`** → ⟨Checkpoint, `blocked`⟩ → **`/opsx:apply`** |
 
 **Wann eine OpenSpec-Change entsteht — genau auf der Route `entwurf`** (LFH-589, Spec
 `entwurfs-hoheit`). Die Route `entwurf` gilt, sobald **mindestens einer** dieser Gründe
@@ -164,11 +192,10 @@ zutrifft, und geht dann den übrigen Zeilen vor:
 Auf den Routen `trivial`, `bug-unklar` und `klar` entsteht **ausdrücklich keine** Change. Das
 gilt auch, wenn mehrere Dateien berührt sind. `unklar` entscheidet noch nichts: erst
 `/opsx:explore`, danach neu routen. Führt `bug-unklar` nach dem Finden der Ursache auf E1 oder
-E2, wechselt der Task auf `entwurf`. Dann `/opsx:propose` im Main-Loop. Der Board-Status bleibt
-auf `in development` (nur vorwärts), aber der Freigabe-Checkpoint gilt trotzdem: `/opsx:apply`
-erst nach Freigabe.
+E2, wechselt der Task auf `entwurf`. Dann `/opsx:propose` im Main-Loop, und der Freigabe-Checkpoint
+gilt wie auf jeder Route `entwurf`: `/opsx:apply` erst nach Freigabe.
 
-**Aufruf durch `dev-clickup-orchestrieren`:** Dann schätzt dieser Skill die Route **nicht**
+**Aufruf durch `dev-zunder-orchestrieren`:** Dann schätzt dieser Skill die Route **nicht**
 selbst. Es gilt die am Phase-1-Checkpoint bestätigte `route` der Scope-Map. Liegt für den Task
 schon eine in Phase 2 freigegebene Change vor, steigt er direkt bei `/opsx:apply` ein, ohne
 zweites `/opsx:propose`. Ein in Phase 1 geklärter `unklar`-Task bekommt kein zweites
@@ -179,11 +206,10 @@ die *planning boundary*: es erzeugt `proposal.md`, Delta-Spec, `design.md` und `
 und **hält dann an** — „Do not start implementation in the same response, even if the initial
 request asks for it. Wait for a new user request after the artifacts are presented; then
 start the apply workflow." Der Stopp ist das erwartete Verhalten und **kein Fehler**: nicht
-umgehen, nicht im selben Zug weiterimplementieren. Die Artefakte dem Menschen vorlegen und
-auf `in design` stehen bleiben; **erst mit seiner Freigabe** auf `ready for development`, dann
-`/opsx:apply` und `in development`. (Dieselbe Reihenfolge wie in `dev-clickup-orchestrieren`,
-Phase 2: „nach Freigabe `ready for development`“. Dort werden mehrere Changes eines Laufs
-gesammelt vorgelegt, aber auch dann gilt: kein Workflow ruft `/opsx:*`.)
+umgehen, nicht im selben Zug weiterimplementieren. Die Artefakte dem Menschen vorlegen, der Task steht
+dabei auf `blocked`; **erst mit seiner Freigabe** zurück auf `in_progress` und `/opsx:apply`.
+(Dieselbe Reihenfolge wie in `dev-zunder-orchestrieren`, Phase 2. Dort werden mehrere Changes
+eines Laufs gesammelt vorgelegt, aber auch dann gilt: kein Workflow ruft `/opsx:*`.)
 
 `/opsx:apply` arbeitet die `tasks.md` ab — die **Art zu arbeiten** bleibt davon unberührt:
 Aufgaben mit klarer Spec entstehen weiter per `superpowers:test-driven-development`, und
@@ -203,19 +229,20 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   umgesetzte Changes aktiv). Schritt 13 von `check-all.sh` (`scripts/check-openspec-archiv.sh`)
   macht eine abgehakte, nicht archivierte Change rot. Kästchen, die erst die CI des PRs belegt
   („`check-all.sh` grün“), werden mit Verweis auf diesen Lauf abgehakt, nicht offen gelassen.
-- **`superpowers:requesting-code-review`** vor dem Mergen → **Status: `in review`** (läuft
-  danach noch eine Abnahme-/Testrunde → `testing`)
-- Commits/PR auf die `custom_id` referenzieren (z.B. `LH-42` im Body)
+- **`superpowers:requesting-code-review`** vor dem Mergen
+- Commit-Body und PR-Beschreibung tragen die Zeile
+  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>` (Konvention: `AGENTS.md`, Abschnitt „Zunder“)
 - Integration → **`superpowers:finishing-a-development-branch`**, **Ziel `alpha`** (PR-Base
-  `alpha`, nicht `main`) → nach erfolgreichem Merge **Status: `shipped`**; ist damit nichts
-  mehr offen → `done`
+  `alpha`, nicht `main`) → PR offen: **Status `review`** samt `pr_url`, dann `release_task`;
+  nach dem Merge **`done`**
 - **Stehende Wahl im Integrationsmenü: Option 2 — pushen und PR gegen `alpha` öffnen**
   (Festlegung des Users, 22.09.2026). Das Menü von `finishing-a-development-branch` wird
   **nicht** mehr vorgelegt, sondern diese Wahl direkt ausgeführt; kein lokaler Merge, der
   Worktree bleibt für PR-Feedback stehen. Der Board-Status bleibt bis zum Merge auf
-  `in review`, erst der gemergte PR führt auf `shipped`. Abweichen nur, wenn der User im
+  `review`, erst der gemergte PR führt auf `done` (wer ihn zuerst gemergt sieht, setzt ihn;
+  „Merge nachtragen“ oben). Abweichen nur, wenn der User im
   laufenden Task ausdrücklich etwas anderes sagt.
-- Wird der Task verworfen statt umgesetzt → **Status: `cancelled`**
+- Wird der Task verworfen statt umgesetzt → **Status: `dropped`**, `release_task`
 - Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
   Board-Status.
 
@@ -233,7 +260,7 @@ Wiederholung des Tickets, keine Dateinamen statt Bedienwegen. Inhalt:
    „Seite öffnen". Braucht es dafür bestimmte Daten (überfälliger Auftrag, >8 Einsätze o.ä.),
    gehört das dazu.
 4. **Was sich bewusst NICHT geändert hat**, wo jemand es erwarten könnte.
-5. **Offene Nachzüge** mit Ticketnummer, falls beim Umsetzen welche entstanden sind.
+5. **Offene Nachzüge** mit Zunder-Link, falls beim Umsetzen welche entstanden sind.
 
 **Dev-Stack starten** (damit die Meldung nicht ins Leere zeigt): das Frontend ist per
 `rust-embed` **zur Compile-Zeit** ins Backend-Binary eingebettet — wer nur `cargo run`
@@ -248,7 +275,7 @@ Frontend über den **Vite-Dev-Server**, nicht über das eingebettete Bundle:
   Workspaces andere Ports über `.env.local` und nennt dabei auch den passenden
   `cargo run --bind …`-Befehl).
 
-**Wird dieser Skill von `dev-clickup-orchestrieren` aufgerufen, entfällt diese Meldung
+**Wird dieser Skill von `dev-zunder-orchestrieren` aufgerufen, entfällt diese Meldung
 hier** — der Orchestrator sammelt Bediensicht/Klickweg je Subtask ein und gibt am Ende
 **eine** Gesamtmeldung aus (s. dort, Phase 5).
 
@@ -259,7 +286,8 @@ hier** — der Orchestrator sammelt Bediensicht/Klickweg je Subtask ein und gibt
 - Komplexität nicht überspringen — auch „kleine" Features brauchen TDD.
 - Keine Agents für Interaktives, `/opsx:*` oder Triviales, und kein Worker-Prompt ohne die
   Pflichtpunkte aus „Agenten nach Bedarf“.
-- Keinen neuen Task anlegen — das ist `clickup-task-anlegen`.
+- Keinen neuen Task anlegen — das ist `zunder-task-anlegen`.
+- Nicht an einer Aufgabe arbeiten, die ein anderer Agent per `claim_task` hält.
 - Status nicht rückwärts oder redundant setzen — nur vorwärts entlang der Spur.
 - Abschlussmeldung **nicht** als Commit-Liste oder mit Dateinamen — Bediensicht und
-  Klickweg, nicht Code. Und **nicht** ausgeben, wenn `dev-clickup-orchestrieren` aufruft.
+  Klickweg, nicht Code. Und **nicht** ausgeben, wenn `dev-zunder-orchestrieren` aufruft.
