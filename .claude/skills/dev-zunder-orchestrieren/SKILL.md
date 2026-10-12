@@ -129,7 +129,7 @@ Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Chang
 
 **Schnittstelle Scope-Map → Proposal:**
 
-- **Name:** `<kurz>-<slug>`, z. B. `60638201-status-filter-einheiten` (`<kurz>` = erste 8
+- **Name:** `<kurz>-<slug>`, z. B. `a1b2c3d4-status-filter-einheiten` (`<kurz>` = erste 8
   Hex-Zeichen der UUID).
 - **Eingabe:** Der Map-Eintrag geht als Argument an `/opsx:propose`: Zusammenfassung, Files,
   Entwurfsgründe und die am Phase-1-Checkpoint beantworteten Fragen. `/opsx:propose` nimmt ihn

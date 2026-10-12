@@ -111,7 +111,7 @@ MUST keinen eigenen Planungsschritt in Phase 2 bekommen.
 ### Requirement: Die Scope-Map ist die Eingabe der Change
 Für jeden Task auf der Route „Entwurf“ MUST der Main-Loop `/opsx:propose` mit dem Namen
 `<kurz>-<slug>` aufrufen, `<kurz>` sind die ersten 8 Hex-Zeichen der Zunder-UUID des Tasks
-(Beispiel `60638201-status-filter-einheiten`). Er MUST
+(Beispiel `a1b2c3d4-status-filter-einheiten`). Er MUST
 dabei den Map-Eintrag übergeben: Zusammenfassung, berührte Dateien, Entwurfsgründe und die am
 Checkpoint beantworteten Fragen. `/opsx:propose` MUST den Eintrag als Ausgangspunkt nehmen und die
 Stellen trotzdem selbst lesen. Grundsatz ist eine Change je Task. Ändern zwei oder mehr Subtasks
@@ -127,19 +127,19 @@ Route der Scope-Map gelten. Ein Task mit freigegebener Change MUST direkt in `/o
 einsteigen, ohne zweites `/opsx:propose`.
 
 #### Scenario: Einzelner Subtask
-- **WHEN** Subtask `60638201` „Status-Filter Einheiten“ auf „Entwurf“ steht und keine Fähigkeit
+- **WHEN** Subtask `a1b2c3d4` „Status-Filter Einheiten“ auf „Entwurf“ steht und keine Fähigkeit
   mit einem anderen Subtask teilt
-- **THEN** entsteht die Change `openspec/changes/60638201-status-filter-einheiten/`
+- **THEN** entsteht die Change `openspec/changes/a1b2c3d4-status-filter-einheiten/`
 
 #### Scenario: Zwei Subtasks, dieselbe Fähigkeit
-- **WHEN** die Map für `60638201` und `7fe1f0cf` (Parent `6f0058a8`), beide auf „Entwurf“, dieselbe
+- **WHEN** die Map für `a1b2c3d4` und `a1b2c3d5` (Parent `a1b2c3d0`), beide auf „Entwurf“, dieselbe
   Fähigkeit `modul-zaehler` nennt
-- **THEN** entsteht genau eine Change `6f0058a8-<slug>`, deren `tasks.md` Abschnitte für
-  `60638201` und `7fe1f0cf` hat, und beide Subtasks laufen in Phase 3 nicht parallel autonom
+- **THEN** entsteht genau eine Change `a1b2c3d0-<slug>`, deren `tasks.md` Abschnitte für
+  `a1b2c3d4` und `a1b2c3d5` hat, und beide Subtasks laufen in Phase 3 nicht parallel autonom
 
 #### Scenario: Gleiche Fähigkeit, nur einer auf „Entwurf“
-- **WHEN** `60638201` auf „Entwurf“ und `23c3f2b7` auf „klare Spec“ dieselbe Fähigkeit nennen
-- **THEN** bekommt nur `60638201` eine Change, und `23c3f2b7` bleibt ohne Change
+- **WHEN** `a1b2c3d4` auf „Entwurf“ und `a1b2c3d6` auf „klare Spec“ dieselbe Fähigkeit nennen
+- **THEN** bekommt nur `a1b2c3d4` eine Change, und `a1b2c3d6` bleibt ohne Change
 
 #### Scenario: Freigegebene Change im sequenziellen Dev-Modus
 - **WHEN** der Orchestrierungs-Skill `dev-zunder-ausfuehren` für einen Task aufruft, dessen

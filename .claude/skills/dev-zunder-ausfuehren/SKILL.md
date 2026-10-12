@@ -142,7 +142,7 @@ und bei Bedarf auf `origin/alpha` umsetzen, bevor die erste Zeile Code entsteht.
 
 Branch-Name bilden: **`<typ>/<kurz>-<slug>`**, `<kurz>` = erste 8 Hex-Zeichen der UUID, Slug
 aus dem Titel (ASCII, kebab-case, Umlaute auflösen, 3–5 Wörter).
-Beispiel: `feat/60638201-personal-status`.
+Beispiel: `feat/a1b2c3d4-personal-status`.
 
 `git branch --show-current` prüfen und **ohne Rückfrage** handeln (Festlegung des
 Users vom 21.09.2026: „mach das immer automatisch"):
@@ -153,7 +153,7 @@ Users vom 21.09.2026: „mach das immer automatisch"):
 | Generischer **Harness-/Worktree-Branch** (`claude/…`, `dev`, `wip`, `test`), sauber und ohne eigene Commits gegenüber `origin/alpha` | Nein | Im selben Worktree per `git branch -m <neuer-name>` umbenennen; Basis ggf. auf `origin/alpha` setzen |
 | `alpha` / `main` / `master`, oder Branch mit **fremder** Arbeit (andere Task, eigene Commits, dreckiger Baum) | Nein | Neuen Worktree mit dem Branch-Namen anlegen → **REQUIRED SUB-SKILL:** `superpowers:using-git-worktrees` |
 
-Die Wahl dem User in **einem Satz** melden („Branch `feat/60638201-…` angelegt"), nicht
+Die Wahl dem User in **einem Satz** melden („Branch `feat/a1b2c3d4-…` angelegt"), nicht
 erfragen. Fremde Arbeit wird dabei nie umbenannt oder überschrieben — im Zweifel neuer
 Worktree.
 
