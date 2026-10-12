@@ -1,5 +1,5 @@
 //! Verteiler an Befehl und Lagebericht (LLH-1172, Spec `dokument-verteiler`, Herleitung
-//! `openspec/changes/kz5udbog-verteiler-vorlagendokument/design.md`).
+//! `openspec/changes/archive/2026-10-12-kz5udbog-verteiler-vorlagendokument/design.md`).
 //!
 //! Der Verteiler nennt, an wen ein Dokument geht: eine geordnete Liste aus Einsatzabschnitten,
 //! Einheiten, Führungsfunktionen und externen Stellen, eine Zeile je Empfänger in einer Tabelle je

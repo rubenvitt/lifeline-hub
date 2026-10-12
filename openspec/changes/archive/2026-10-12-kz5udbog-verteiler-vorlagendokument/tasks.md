@@ -121,8 +121,12 @@ Wurzelverzeichnis des Repos. Zunder: https://zunder.rubeen.dev/#/aufgabe/kz5udbo
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` ist grün (bei fehlender lokaler Werkzeugkette: Nachweis durch
-  den CI-Lauf des PRs). Nachweis: Ausgabe bzw. CI-Lauf.
+- [x] 7.1 `./scripts/check-all.sh` ist grün (bei fehlender lokaler Werkzeugkette: Nachweis durch
+  den CI-Lauf des PRs). Nachweis: Ausgabe bzw. CI-Lauf. Lokal am 12.10.2026 nach dem Merge mit
+  `alpha`: `cargo test -p lifeline-hub` (171 Testläufe grün), Vitest voll (874 Dateien, 13 459
+  Tests), `check-typ-codegen.sh`, `check-migrationen.sh`, `check-schreibweisen.sh`,
+  `check-toolversionen.sh`, Lint, Prettier, rustfmt, e2e `druck-fluss` und `lagebericht-schmal`
+  in Chromium; der volle Gate-Lauf mit allen Browsern ist der CI-Lauf des PRs.
 
 ## Workflow follow-up
 

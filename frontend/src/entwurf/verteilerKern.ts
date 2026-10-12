@@ -12,7 +12,8 @@ import { dekodiere, type FunktionsVorschlaege } from '../fuehrung/funktionsOptio
 
 /**
  * Verteiler an Befehl und Lagebericht (LLH-1172, Spec `dokument-verteiler`, Herleitung
- * `openspec/changes/kz5udbog-verteiler-vorlagendokument/design.md`, D7): reiner Kern für die
+ * `openspec/changes/archive/2026-10-12-kz5udbog-verteiler-vorlagendokument/design.md`, D7):
+ * reiner Kern für die
  * beiden Entwurfsseiten. Das Formularfeld trägt den Verteiler unter {@link VERTEILER_FIELD}, neben
  * `titel` und den Abschnitten als Feldnamen der obersten Ebene.
  */

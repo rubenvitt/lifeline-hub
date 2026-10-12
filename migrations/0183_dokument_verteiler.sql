@@ -4,7 +4,7 @@
 -- Pressemitteilung bekommt keinen Verteiler. Die Zeilen sind je Fassung eindeutig: das
 -- Fortschreiben kopiert sie, damit eine spätere Quittung je Empfänger (LLH-1173) an genau einer
 -- Fassung hängt. `einsatz_id` steht wie bei den Anlagen-Linkern (0157) direkt an der Zeile.
--- Herleitung: `openspec/changes/kz5udbog-verteiler-vorlagendokument/design.md` (D1, D5a).
+-- Herleitung: `openspec/changes/archive/2026-10-12-kz5udbog-verteiler-vorlagendokument/design.md` (D1, D5a).
 CREATE TABLE befehl_verteiler (
     id                 INTEGER PRIMARY KEY,
     einsatz_id         INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

@@ -25,7 +25,8 @@ import {
 
 /**
  * Verteiler an Befehl und Lagebericht (LLH-1172, Spec `dokument-verteiler`, Herleitung
- * `openspec/changes/kz5udbog-verteiler-vorlagendokument/design.md`, D7): Feld im Entwurf und
+ * `openspec/changes/archive/2026-10-12-kz5udbog-verteiler-vorlagendokument/design.md`, D7):
+ * Feld im Entwurf und
  * Anzeige im Lesezweig, gemeinsam für beide Entwurfsseiten.
  */
 
