@@ -1,11 +1,13 @@
 import type dayjs from 'dayjs';
 import type { AdressatKategorie, AuftragPrioritaet, NeuerEmpfaenger, Richtung } from '../api/types';
-import { dekodiere, type FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
+import { buildEmpfaenger } from '../fuehrung/empfaengerKern';
+import type { FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 
 /**
  * Reiner Kern des Auftragsformulars (LLH-1098 aus `AuftragFormular.tsx` gelöst): Formularwerte und
  * ihre Umsetzung in Empfänger. Erteilen und Berichtigen rechnen dieselben Empfänger, sonst
- * erschiene eine unveränderte Liste als Änderung.
+ * erschiene eine unveränderte Liste als Änderung. Die Kodierung des Empfängerfelds steht in
+ * `fuehrung/empfaengerKern.ts`.
  */
 
 /** Werte des Formulars; Zeiten sind Zeitpunkte, das Feld zeigt die Anzeigezone (LFH-692). */
@@ -32,39 +34,6 @@ export interface FormWerte {
   richtung: Richtung;
   frist: dayjs.Dayjs | null;
   erteiltAm: dayjs.Dayjs | null;
-}
-
-/**
- * Wandelt die Werte des Empfängerfeldes in Empfänger-DTOs: `abschnitt:<id>`/`einheit:<id>`
- * stammen aus den Optionen, `funktion:<code>` aus dem Katalog (LFH-549), alles andere wird
- * Funktionstext — ohne Rückschluss von „S3“ auf den Code (`fuehrung/funktionsOptionenKern.ts`).
- */
-export function buildEmpfaenger(
-  werte: string[],
-  katalog: FunktionsVorschlaege['katalog'],
-): NeuerEmpfaenger[] {
-  return werte.flatMap((wert): NeuerEmpfaenger[] => {
-    const trenner = wert.indexOf(':');
-    const typ = trenner === -1 ? '' : wert.slice(0, trenner);
-    const id = Number(wert.slice(trenner + 1));
-    if (typ === 'abschnitt' && Number.isFinite(id)) {
-      return [{ empfaenger_typ: 'abschnitt', abschnitt_id: id }];
-    }
-    if (typ === 'einheit' && Number.isFinite(id)) {
-      return [{ empfaenger_typ: 'einheit', einheit_id: id }];
-    }
-    const angabe = dekodiere(wert, katalog);
-    if (angabe.funktion) {
-      return [
-        {
-          empfaenger_typ: 'funktion',
-          funktion: angabe.funktion,
-          ...(angabe.text ? { funktion_text: angabe.text } : {}),
-        },
-      ];
-    }
-    return angabe.text ? [{ empfaenger_typ: 'funktion', funktion_text: angabe.text }] : [];
-  });
 }
 
 /**

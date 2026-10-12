@@ -14,7 +14,8 @@ import type {
   NeuerAuftrag,
   Richtung,
 } from '../api/types';
-import { alleEmpfaenger, buildEmpfaenger, type FormWerte } from './auftragFormularKern';
+import { alleEmpfaenger, type FormWerte } from './auftragFormularKern';
+import { buildEmpfaenger } from '../fuehrung/empfaengerKern';
 import { berichtigungAus, vorbelegungAus } from './auftragBerichtigungKern';
 import { funktionsOptionen, type FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
