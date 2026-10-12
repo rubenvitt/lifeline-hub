@@ -130,6 +130,9 @@ pub struct MeldungAnzeige {
     pub eingang_at: String,
     pub etb_meldung_id: Option<i64>,
     pub auftrag_id: Option<i64>,
+    /// Abgeleitet: der verknüpfte Auftrag ist aufgehoben (LLH-1177). Dann lässt sich aus der
+    /// Meldung erneut ein Auftrag erteilen; `auftrag_id` zeigt bis dahin auf den alten.
+    pub is_auftrag_aufgehoben: bool,
     pub erfasst_von_id: i64,
     pub erstellt_at: String,
     /// Abgeleitet: id des erzeugten Lageobjekts (LFH-95), falls übergeben.

@@ -169,6 +169,25 @@ pub async fn traegt_fahrzeug_tx(
     Ok(treffer.is_some())
 }
 
+/// Ist die Dispositionszeile der Einsatzleiter? Wer sie löscht, fragt vorher: `ON DELETE SET NULL`
+/// (Migration 0177) setzt den Vermerk „nicht mehr disponiert“ still, das Ereignis `einsatz` muss
+/// der Aufrufer melden (LLH-1164).
+pub async fn is_einsatzleiter_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einsatz_personal_id: i64,
+) -> Result<bool, AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_fuehrungsstelle \
+         WHERE einsatz_id = ? AND einsatzleiter_personal_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_personal_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(treffer.is_some())
+}
+
 fn ids_json(ids: &[i64]) -> Result<String, AppError> {
     serde_json::to_string(ids)
         .map_err(|e| AppError::Internal(format!("Fahrzeug-ids serialisieren: {e}")))
