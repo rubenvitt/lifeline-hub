@@ -37,7 +37,14 @@ ein Scope-Lauf am 12.10.2026 erhoben.
   Freigabe `stab`.
 
 **Bezüge**
-- LLH-1116 („Stab abwählbar“) empfiehlt genau diesen Schnitt, setzt ihn aber nicht voraus.
+- LLH-1116 („Stab abwählbar“) hat am 12.10.2026 entschieden: Change `wgnb0am2-stab-abwaehlbar`,
+  `design.md`, im Branch von LLH-1116, noch nicht in `alpha`.
+  - D5 bestätigt das eigene Modul.
+  - D7 verlangt die Rollen-Übernahme ohne Ausblendung (hier D5).
+  - D2 führt eine Sichtbarkeits-Vorgabe je Organisation ein (LLH-1179). Sie gilt auch für dieses
+    Modul; hier ist nichts zu bauen, das Modul darf nur nicht ausgenommen werden.
+- LLH-1180 (Modul Fernmeldewesen) baut parallel nach demselben Muster und berührt dieselben Stellen
+  (`src/einsatz/modul.rs`, `modulRegistry.ts`, `frontend/src/stab/AGENTS.md`, Regelkarte).
 - LLH-1124 (Stab-Seite neu) und LLH-1127 (Stab-Sprungmarken) warten auf diese Change.
 
 ## Goals / Non-Goals
@@ -143,7 +150,9 @@ WHERE modul_key = 'stab' AND benoetigte_rolle IS NOT NULL;
 ```
 
 - `geaendert_von` bleibt `NULL`, als Systemänderung.
-- Wer Stab ausgeblendet hat, bekommt die Lagebesprechung sichtbar. Das ist der Zweck des Tickets.
+- Wer Stab ausgeblendet hat, bekommt die Lagebesprechung sichtbar. Das ist der Zweck des Tickets. Das
+  gehört in die Versionshinweise; ein `feat`-Commit mit diesem Satz im Body reicht, weil das
+  Release sie aus den Commits erzeugt.
 - Wer Stab auf eine Rolle beschränkt hat, behält dieselbe Grenze. Deshalb sieht niemand mehr als
   heute.
 
@@ -269,11 +278,12 @@ Bisher fehlt eine Längengrenze, obwohl `src/AGENTS.md` sie für Text verlangt, 
 - Zeile in `README.md`.
 - Das Bild `einsatzdaten.png` wird neu erzeugt.
 
-### D12 Abstimmung mit LFH-852 (Feldbefund Stab, Entscheidung 17)
+### D12 Abstimmung mit LLH-722, früher LFH-852 (Feldbefund Stab, Entscheidung 17)
 
 - Die Rückbau-Option „wird nach der ersten Übung keine Lagebesprechung über das Modul
   abgeschlossen, wandert der Abschluss ins ETB-Modul“ bleibt gültig.
-- Ihr Gegenstand ist künftig das Modul Lagebesprechung statt des Stabs.
+- Ihr Gegenstand ist künftig das Modul Lagebesprechung statt des Stabs. Das ist Kriterium (b) in
+  `wgnb0am2-stab-abwaehlbar`, D9.
 - `docs/superpowers/` ist eingefrorenes Archiv und wird nicht geändert. Der Vermerk steht hier und
   an der Zunder-Aufgabe.
 
@@ -284,8 +294,9 @@ Bisher fehlt eine Längengrenze, obwohl `src/AGENTS.md` sie für Text verlangt, 
   neu. Der Kopf-PATCH lehnt das Altfeld laut mit 400 ab statt still (D3).
 - **Schreib-Warteschlange (LFH-705)** mit einem gespeicherten Kopf-PATCH samt Termin. → 400
   erscheint als Fehler an der Warteschlange und geht nicht still verloren.
-- **Parallel laufende Changes** (LLH-1116, LLH-1127) können `frontend/src/stab/AGENTS.md`,
-  `befehle.ts` und `modulRegistry.ts` berühren. → Den Branch vor dem PR auf `alpha` mergen und
+- **Parallel laufende Changes** (LLH-1180 Fernmeldewesen, LLH-1179 Org-Sichtbarkeit, LLH-1127)
+  berühren `MODUL_KEYS`, `modulRegistry.ts`, `frontend/src/stab/AGENTS.md`, `befehle.ts`,
+  die Regelkarte und die nächste Migrationsnummer. Wer als Zweiter merged, zieht nach. → Den Branch vor dem PR auf `alpha` mergen und
   Konflikte von Hand lösen.
 - **Migrationsnummer 0182** kann durch einen früheren Merge belegt werden. → Prüfen per
   `scripts/check-migrationen.sh`, Autofix auf dem PR-Branch (LFH-1014).

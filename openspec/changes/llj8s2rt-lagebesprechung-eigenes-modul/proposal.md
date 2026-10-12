@@ -99,6 +99,8 @@ braucht es eine eigene Verwaltung.“
     `frontend/src/lagebesprechung/AGENTS.md`
   - `docs/anwender/` (Kapitel, Bilder, README)
 - **Bezüge:**
-  - LLH-1116 (Stab abwählbar) empfiehlt diesen Schnitt und setzt ihn nicht voraus.
+  - LLH-1116 (Stab abwählbar, Change `wgnb0am2-stab-abwaehlbar`) hat diesen Schnitt entschieden
+    (D5, Rollen-Übernahme D7).
+  - LLH-1180 (Fernmeldewesen) und LLH-1179 (Org-Sichtbarkeit) laufen parallel.
   - LLH-1124 (Stab-Seite neu) und LLH-1127 (Stab-Sprungmarken) bauen auf dieser Change auf.
-  - LFH-852 (Feldbefund Stab) siehe design.md.
+  - LLH-722, früher LFH-852 (Feldbefund Stab): siehe design.md, D12.
