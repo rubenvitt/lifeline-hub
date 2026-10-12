@@ -196,6 +196,11 @@ geändert: …“ mit neuem und vorherigem Wert, etwa „Frist 12.10. 16:00 (vor
 Die Felder des Befehlsschemas erscheinen dort nur mit ihrem Namen. Die ursprüngliche Anordnung
 bleibt unverändert stehen.
 
+Der Filter nach Einheit im ETB zeigt einen Eintrag zum Auftrag bei den Einheiten, an die er sich
+beim Schreiben richtete. Werden die Empfänger berichtigt, bleibt die ursprüngliche Anordnung bei
+den bisherigen Einheiten; die Anordnung „Auftrag #4 geändert: Empfänger …“ steht bei den bisherigen
+und den neuen.
+
 Aufträge lassen sich auch direkt aus einem ETB-Eintrag oder einer Meldung erteilen (siehe
 [Einsatztagebuch](einsatztagebuch.md) und [Meldungen](meldungen.md)). Ein Auftrag aus einem
 ETB-Eintrag führt unter „Verlauf“ mit „ETB-Eintrag“ zu diesem Eintrag zurück.
