@@ -1,2 +1,5 @@
 schema: spec-driven
 created: 2026-10-12
+# Klärungsticket: die Change entscheidet nur, Anforderungen kommen mit den Folgetickets
+# (proposal.md, Capabilities; design.md, D8).
+skip_specs: true
