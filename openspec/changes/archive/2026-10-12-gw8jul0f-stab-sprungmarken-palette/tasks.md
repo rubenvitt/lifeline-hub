@@ -27,8 +27,8 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (Bündel inkl. Vitest, Lint, Typcheck, Prettier); betroffene e2e-Specs (`command-palette.spec.ts`, `stab-schmal.spec.ts`) grün
-- [ ] 5.2 Review (`requesting-code-review`) und Bildbeleg Menü (Fükw, Drawer) im PR
+- [x] 5.1 `./scripts/check-all.sh` grün (Bündel inkl. Vitest, Lint, Typcheck, Prettier); betroffene e2e-Specs (`command-palette.spec.ts`, `stab-schmal.spec.ts`) grün — lokal: Bündel `schnell` grün, Bündel `frontend` bis auf `SchaedenPage.blaettern.test.tsx` (Zeitüberschreitung, auf `origin/alpha` identisch rot) grün; e2e `command-palette`, `stab-schmal`, `modulnamen`, `palette-*`, `nav-schmal`, `rahmen-stehen-bleiben`, `befehl-navigation` grün (Chromium). Voller Lauf: CI des PRs
+- [x] 5.2 Review (`requesting-code-review`) und Bildbeleg Menü (Fükw, Drawer) im PR — Review per Subagent, Befunde in 6053ec0 behoben; Bildbeleg `docs/anwender/bilder/einsatz-oberflaeche/arbeitsflaeche.png`
 
 ## Workflow follow-up
 
