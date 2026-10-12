@@ -170,7 +170,9 @@ export default function AbschnittDetail({
           )}
         />
       </Datenfeld>
-      <Datenfeld label="Abschnittsleiter">
+      {/* Breit: nach Name und Kurzbezeichnung bliebe sonst eine leere Zelle (die Zeile
+          „Über-Abschnitt“ entfiel mit dem Umhängen, LFH-1212). */}
+      <Datenfeld label="Abschnittsleiter" breit>
         <InlineAngabe<number | null>
           etikett="Abschnittsleiter"
           wert={a.leiter_id ?? null}
