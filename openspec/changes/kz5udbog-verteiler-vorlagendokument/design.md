@@ -125,6 +125,21 @@ schriftlichen Befehls, bei dem Anlagen und Verteiler am Ende stehen.
 `INSERT … SELECT` mit allen Spalten außer `id` und dem neuen `<art>_id`. Es wird neben
 `anlage::kopieren_tx` aufgerufen.
 
+### D5a Das Modell trägt eine spätere Quittung je Empfänger (LLH-1173)
+
+LLH-1173 (Einsatzbefehl mit Quittung, zurückgestellt bis zum Merge dieser Change) hängt
+Zeitpunkt und quittierende Person an jede Verteiler-Zeile der **freigegebenen** Fassung. Die
+Quittungsspalten bringt LLH-1173 per eigener Migration mit; diese Change legt sie nicht an. Damit
+das ohne Umbau geht, gilt Folgendes:
+
+- Eine Zeile je Empfänger, keine JSON-Spalte (D1).
+- Der Verteiler ist je Fassung eindeutig: Das Fortschreiben kopiert die Zeilen in die neue
+  Fassung (D5), nichts zeigt auf die Zeilen der Vorgängerfassung. Eine neue Fassung startet damit
+  ohne Quittung.
+- Das Ersetzen im Entwurf (löschen und neu einfügen, D2) vergibt neue Zeilen-ids. Das stört eine
+  Quittung nicht, weil der Entwurf noch nicht quittiert werden kann und die freigegebene Fassung
+  eingefroren ist.
+
 ### D6 Schwärzung und ETB-Ausnahmen
 
 `TABELLEN` in `schwaerzung_registry.rs` bekommt beide Tabellen mit direktem Scoping über
