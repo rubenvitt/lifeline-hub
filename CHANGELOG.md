@@ -1,3 +1,28 @@
+## [1.0.0-alpha.113](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.112...v1.0.0-alpha.113) (2026-10-12)
+
+### Wichtige Änderungen
+
+- **Datenbankmigration:** Aufträge haben neue Felder für Zeitpunkt, Person und Grund einer Aufhebung.
+- **Neuer Auftragsstatus „Aufgehoben“:** Schnittstellen, die den Bearbeitungsstatus eines Auftrags auswerten, müssen diesen Wert kennen. Ein aufgehobener Auftrag gilt als abgeschlossen. Er zählt nie als offen und nie als überfällig.
+- **Neue Schnittstellen:** Mit der einen wird ein Auftrag aufgehoben, mit der anderen berichtigt. Neu ist auch die Angabe am Auftrag, ob er noch berichtigt werden kann. Abschnittsgeräte können keine der beiden Schnittstellen nutzen.
+
+### Aufträge und Befehle
+
+- **Erteilten Auftrag aufheben:** An der Auftragskarte gibt es den roten Knopf „Auftrag aufheben“. Bei drei oder mehr Aktionen steht er im Menü. Ein Dialog fragt nach dem Grund, der Pflicht ist und bis zu 2 000 Zeichen lang sein darf. Die Aufhebung lässt sich nicht rückgängig machen. Bereits abgenommene oder schon aufgehobene Aufträge lassen sich nicht aufheben.
+- **Aufgehobene Aufträge:** Die Karte zeigt Zeitpunkt, Person und Grund der Aufhebung. Quittung, Vollzugsmeldung und Abnahme nimmt ein aufgehobener Auftrag nicht mehr an. Das gilt auch, wenn jemand gleichzeitig aufhebt und meldet.
+- **Auftrag vor der ersten Quittung berichtigen:** „Berichtigen“ öffnet das Auftragsformular mit den bisherigen Werten. Auftragstext, Empfänger, Priorität, Frist und Befehlsschema lassen sich ändern, und nur geänderte Felder werden übernommen. Hat ein Empfänger quittiert, ist „Berichtigen“ gesperrt und zeigt den Grund dafür. Empfänger, die das Formular nicht darstellen kann, stehen gesperrt im Formular.
+- **Darstellung und Zählung:** Der Status „Aufgehoben“ erscheint bei den abgeschlossenen Aufträgen in neutraler Farbe und nicht wie ein erledigter Auftrag. In der Bilanz der Abschnitte im Überblick zählen aufgehobene Aufträge nicht mit.
+- **Erinnerung „Quittierfrist“:** Beim Aufheben wird die Erinnerung geschlossen. Beim Berichtigen folgt sie der geänderten Frist.
+
+### Einsatztagebuch
+
+- Wird ein Auftrag aufgehoben, steht automatisch die Anordnung „Auftrag #N aufgehoben: <Grund>“ im Einsatztagebuch. Das gilt auch, wenn der automatische ETB-Eintrag sonst abgeschaltet ist.
+- Eine Berichtigung schreibt die Anordnung „Auftrag #N geändert: …“ mit neuem und altem Wert ins Einsatztagebuch. Bei geänderten Feldern des Befehlsschemas steht nur der Feldname im Eintrag. Ohne echte Änderung entsteht kein Eintrag.
+
+### Dokumentation
+
+- Das Kapitel „Aufträge und Befehle“ beschreibt jetzt, wie man einen Auftrag berichtigt oder aufhebt und was dabei mit der Erinnerung und dem Einsatztagebuch passiert. Neue Bilder in hellem und dunklem Design zeigen die Auftragsliste und den Dialog „Auftrag aufheben“.
+
 ## [1.0.0-alpha.112](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.111...v1.0.0-alpha.112) (2026-10-12)
 
 ### Betrieb und Installation
