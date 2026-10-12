@@ -112,6 +112,37 @@ pub struct EinsatzleiterAnzeige {
     pub seit: String,
 }
 
+/// Die vier Spalten des Einsatzleiters an `einsatz_fuehrungsstelle` und ob seine Person noch
+/// disponiert ist (`einsatz_personal`-Treffer), so gelesen von der Führungsstelle, vom Einsatzkopf
+/// und von der Einsatzliste (LLH-1168). Eine Umformung für alle drei: [`Self::anzeige`].
+#[derive(Debug, Clone, Default, sqlx::FromRow)]
+pub struct EinsatzleiterSpalten {
+    pub einsatzleiter_art: Option<String>,
+    pub einsatzleiter_personal_id: Option<i64>,
+    pub einsatzleiter_name: Option<String>,
+    pub einsatzleiter_seit: Option<String>,
+    pub einsatzleiter_noch_disponiert: bool,
+}
+
+impl EinsatzleiterSpalten {
+    /// Art und seit stehen nur gemeinsam (LFH-1199, D1); eine unbekannte Art kann der CHECK
+    /// nicht liefern. Fehlt eins, ist kein Einsatzleiter erfasst.
+    pub fn anzeige(self) -> Option<EinsatzleiterAnzeige> {
+        let art = self
+            .einsatzleiter_art
+            .as_deref()
+            .and_then(EinsatzleiterArt::parse)?;
+        Some(EinsatzleiterAnzeige {
+            art,
+            name: self.einsatzleiter_name,
+            personal_id: self.einsatzleiter_personal_id,
+            personal_noch_disponiert: art == EinsatzleiterArt::Personal
+                && self.einsatzleiter_noch_disponiert,
+            seit: self.einsatzleiter_seit?,
+        })
+    }
+}
+
 /// Höchstzahl der Fahrzeuge einer Führungsstelle (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
 pub const FAHRZEUGE_JE_FUEHRUNGSSTELLE_MAX: usize = 16;
 
@@ -224,11 +255,8 @@ struct Zeile {
     rufname: Option<String>,
     kommunikationsmittel: Option<String>,
     erreichbarkeit: Option<String>,
-    einsatzleiter_art: Option<String>,
-    einsatzleiter_personal_id: Option<i64>,
-    einsatzleiter_name: Option<String>,
-    einsatzleiter_seit: Option<String>,
-    personal_noch_disponiert: bool,
+    #[sqlx(flatten)]
+    einsatzleiter: EinsatzleiterSpalten,
 }
 
 /// Lädt die Führungsstelle; ohne Zeile alle Angaben leer.
@@ -245,7 +273,7 @@ async fn load_tx(
         "SELECT fs.art, fs.bezeichnung, fs.standort_adresse, fs.standort_lat, fs.standort_lon, \
                 fs.rufname, fs.kommunikationsmittel, fs.erreichbarkeit, \
                 fs.einsatzleiter_art, fs.einsatzleiter_personal_id, fs.einsatzleiter_name, \
-                fs.einsatzleiter_seit, ep.id IS NOT NULL AS personal_noch_disponiert \
+                fs.einsatzleiter_seit, ep.id IS NOT NULL AS einsatzleiter_noch_disponiert \
          FROM einsatz_fuehrungsstelle fs \
          LEFT JOIN einsatz_personal ep ON ep.id = fs.einsatzleiter_personal_id \
          WHERE fs.einsatz_id = ?",
@@ -289,23 +317,6 @@ async fn load_tx(
     let fs_art = FuehrungsstellenArt::parse(&z.art).ok_or_else(|| {
         AppError::Internal(format!("Unbekannte Art der Führungsstelle: {}", z.art))
     })?;
-    // Art und seit stehen nur gemeinsam (D1); eine unbekannte Art kann der CHECK nicht liefern.
-    let einsatzleiter = match (
-        z.einsatzleiter_art
-            .as_deref()
-            .and_then(EinsatzleiterArt::parse),
-        z.einsatzleiter_seit,
-    ) {
-        (Some(art), Some(seit)) => Some(EinsatzleiterAnzeige {
-            art,
-            name: z.einsatzleiter_name,
-            personal_id: z.einsatzleiter_personal_id,
-            personal_noch_disponiert: art == EinsatzleiterArt::Personal
-                && z.personal_noch_disponiert,
-            seit,
-        }),
-        _ => None,
-    };
     Ok(FuehrungsstelleAnzeige {
         art: fs_art,
         bezeichnung: z.bezeichnung,
@@ -317,7 +328,7 @@ async fn load_tx(
         kommunikationsmittel: z.kommunikationsmittel,
         erreichbarkeit: z.erreichbarkeit,
         fahrzeug_ids,
-        einsatzleiter,
+        einsatzleiter: z.einsatzleiter.anzeige(),
     })
 }
 

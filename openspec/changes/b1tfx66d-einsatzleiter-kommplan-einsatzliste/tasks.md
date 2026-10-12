@@ -5,57 +5,57 @@ entsteht testgetrieben (`superpowers:test-driven-development`).
 
 ## 1. Backend: Einsatzleiter an der Einsatzanzeige (D1–D3)
 
-- [ ] 1.1 Umformung der vier Spalten samt `personal_noch_disponiert` als eine Funktion in
+- [x] 1.1 Umformung der vier Spalten samt `personal_noch_disponiert` als eine Funktion in
   `src/einsatz/fuehrungsstelle.rs` herausziehen, `load_tx` ruft sie; belegt durch die
   bestehenden Tests in `tests/einsatz_fuehrungsstelle.rs` (grün, unverändert)
-- [ ] 1.2 `EinsatzAnzeige.einsatzleiter: Option<EinsatzleiterAnzeige>` (`skip_serializing_if`)
+- [x] 1.2 `EinsatzAnzeige.einsatzleiter: Option<EinsatzleiterAnzeige>` (`skip_serializing_if`)
   einführen; `Einsatz` trägt die Rohspalten, `repo::laden` und `repo::liste_fuer` holen sie über
   LEFT JOIN auf `einsatz_fuehrungsstelle` und `einsatz_personal`, `Einsatz::anzeige` und die Liste
   rufen die Umformung aus 1.1; Integrationstest: Liste und Detail tragen „Anna Schulz“ mit `seit`,
   ohne Einsatzleiter fehlt der Schlüssel (`contains_key`), App-Rolle Einsatzleitung allein ergibt
   kein Feld, eine entlassene Person trägt `personal_noch_disponiert: false`
-- [ ] 1.3 Schwärzung auf Antrag des Einsatzleiters: Integrationstest, dass die Liste danach den
+- [x] 1.3 Schwärzung auf Antrag des Einsatzleiters: Integrationstest, dass die Liste danach den
   Einsatzleiter ohne `name` liefert und „Anna Schulz“ nicht im Antworttext steht
-- [ ] 1.4 `lage_snapshot::erzeuge` setzt `einsatzleiter` auf `None` (D2); Test: Snapshot eines
+- [x] 1.4 `lage_snapshot::erzeuge` setzt `einsatzleiter` auf `None` (D2); Test: Snapshot eines
   Einsatzes mit Einsatzleiter enthält in `daten.einsatz` keinen Schlüssel `einsatzleiter`
-- [ ] 1.5 `ohne_kopf_pii_wenn_gesperrt` nimmt `einsatzleiter` heraus (D3); Test am Frist-PUT
+- [x] 1.5 `ohne_kopf_pii_wenn_gesperrt` nimmt `einsatzleiter` heraus (D3); Test am Frist-PUT
   eines gesperrten Einsatzes neben den übrigen Kopf-PII
-- [ ] 1.6 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/openapi.json` sowie
+- [x] 1.6 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/openapi.json` sowie
   `frontend/src/api/types.generated.ts` mitcommitten; das Skript ist danach grün
 
 ## 2. Frontend: eine Darstellung aus der Angabe (D5)
 
-- [ ] 2.1 `einsatzleiterAusAngabe` in `frontend/src/stab/einsatzleiter.ts`, `einsatzleiterDarstellung`
+- [x] 2.1 `einsatzleiterAusAngabe` in `frontend/src/stab/einsatzleiter.ts`, `einsatzleiterDarstellung`
   ruft sie; Vitest in `stab/einsatzleiter.test.ts`: erfasst, nicht erfasst (`null`/`undefined`),
   geschwärzt („Name geschwärzt“), extern („(extern)“), „nicht mehr disponiert“
 
 ## 3. Kommunikationsplan: Einsatzleiter im Nebentext der Zeile `fs`
 
-- [ ] 3.1 `fuehrungsstelleZeile` in `stab/kommunikationsplan.ts` setzt den Nebentext aus Rufname
+- [x] 3.1 `fuehrungsstelleZeile` in `stab/kommunikationsplan.ts` setzt den Nebentext aus Rufname
   und „Einsatzleiter …“ über `einsatzleiterKurz`; Vitest in `stab/kommunikationsplan.test.ts` für
   die Szenarien der Delta-Spec `stab-kommunikationsplan` (mit/ohne Rufname, nicht erfasst,
   geschwärzt, fehlende Quelle nur mit Grund) und Abwesenheit eines App-Rollen-Namens
-- [ ] 3.2 Seitentest des Kommunikationsplans (Schirm und Druckform) zeigt den Nebentext der Zeile
+- [x] 3.2 Seitentest des Kommunikationsplans (Schirm und Druckform) zeigt den Nebentext der Zeile
   „Führungsstelle“ mit Einsatzleiter
-- [ ] 3.3 `frontend/src/stab/AGENTS.md`, Abschnitte „Einsatzleiter“ und „Kommunikationsplan S6“:
+- [x] 3.3 `frontend/src/stab/AGENTS.md`, Abschnitte „Einsatzleiter“ und „Kommunikationsplan S6“:
   den Kommunikationsplan als Anzeigestelle nennen; Prettier über `frontend/` grün
 
 ## 4. Einsatzliste: Zeile „EL …“ in jeder Kachel
 
-- [ ] 4.1 `renderKarte` in `pages/EinsaetzePage.tsx` zeigt `<abbr title="Einsatzleiter">EL</abbr>`
+- [x] 4.1 `renderKarte` in `pages/EinsaetzePage.tsx` zeigt `<abbr title="Einsatzleiter">EL</abbr>`
   und `einsatzleiterKurz(einsatzleiterAusAngabe(e.einsatzleiter))`, aktiv wie abgeschlossen;
   Seitentest: „EL Anna Schulz“, „EL KBM Weber (extern)“, „EL nicht erfasst“ trotz App-Rolle,
   „EL Name geschwärzt“
-- [ ] 4.2 Live: Seitentest oder bestehender Live-Test belegt, dass ein Ereignis `einsatzliste`
+- [x] 4.2 Live: Seitentest oder bestehender Live-Test belegt, dass ein Ereignis `einsatzliste`
   die Kachel ohne Neuladen auf den neuen Einsatzleiter zieht (Szenario „Wechsel auf einem anderen
   Schirm“), sonst Backend-Test, dass der PATCH des Einsatzleiters `einsatzliste` meldet
 
 ## 5. Anwenderdokumentation (Mitänderungsregel)
 
-- [ ] 5.1 `docs/anwender/kapitel/einsatz-oberflaeche.md`: die Kachel nennt den Einsatzleiter
+- [x] 5.1 `docs/anwender/kapitel/einsatz-oberflaeche.md`: die Kachel nennt den Einsatzleiter
   („EL …“); Bilder `pnpm doku:bilder e2e/doku-bilder/einsatz-oberflaeche.bilder.ts` neu erzeugen
   und committen; Wächter `hilfe/anwenderdoku.guard.test.ts` grün
-- [ ] 5.2 `docs/anwender/kapitel/funkplan.md`, Abschnitt Kommunikationsplan: Zeile
+- [x] 5.2 `docs/anwender/kapitel/funkplan.md`, Abschnitt Kommunikationsplan: Zeile
   „Führungsstelle“ nennt Rufname und Einsatzleiter; Bilder
   `pnpm doku:bilder e2e/doku-bilder/funkplan.bilder.ts` neu erzeugen und committen; Wächter grün
 

@@ -150,6 +150,10 @@ pub struct Einsatz {
     /// Read-only abgeleitet (LFH-996): Schwärzungsstand, `None` bei 0. Siehe
     /// [`EinsatzAnzeige::teilschwaerzungen`] und `teilschwaerzungen_spalte!` in `repo`.
     pub teilschwaerzungen: Option<i64>,
+    /// Read-only Join (LLH-1168): der Einsatzleiter der eigenen Führungsstelle, über
+    /// `einsatzleiter_spalten!`/`einsatzleiter_joins!` in `repo`.
+    #[sqlx(flatten)]
+    pub einsatzleiter: fuehrungsstelle::EinsatzleiterSpalten,
 }
 
 impl Einsatz {
@@ -204,6 +208,7 @@ impl Einsatz {
                 self.evakuierung_angeordnet,
             ),
             teilschwaerzungen: self.teilschwaerzungen,
+            einsatzleiter: self.einsatzleiter.clone().anzeige(),
         }
     }
 }
@@ -271,6 +276,12 @@ pub struct EinsatzAnzeige {
     /// Nennt bewusst weder Person noch Zeitpunkt noch Modul.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub teilschwaerzungen: Option<i64>,
+    /// Der Einsatzleiter der eigenen Führungsstelle (LLH-1168), in Liste und Detail dieselbe
+    /// Aussage: fehlt, solange keiner erfasst ist. Lesen darf ihn, wer den Einsatz liest (wie
+    /// `GET …/fuehrungsstelle`); der Lage-Snapshot friert ihn nicht ein. Herleitung:
+    /// `openspec/changes/b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md` (D1–D3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatzleiter: Option<fuehrungsstelle::EinsatzleiterAnzeige>,
 }
 
 /// Eine Person, die die Einsatzleitung in den Einsatz aufnehmen kann (LFH-1141, Spec
@@ -367,6 +378,7 @@ mod tests {
             anzahl_betroffene_initial: None,
             retention_bis: None,
             geloescht_at: None,
+            einsatzleiter: Default::default(),
         };
         assert!(e.ist_aktiv());
         e.status = EinsatzStatus::Abgeschlossen;

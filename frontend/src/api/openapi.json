@@ -3869,6 +3869,17 @@
           "einsatzart": {
             "$ref": "#/components/schemas/Einsatzart"
           },
+          "einsatzleiter": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzleiterAnzeige",
+                "description": "Der Einsatzleiter der eigenen Führungsstelle (LLH-1168), in Liste und Detail dieselbe\nAussage: fehlt, solange keiner erfasst ist. Lesen darf ihn, wer den Einsatz liest (wie\n`GET …/fuehrungsstelle`); der Lage-Snapshot friert ihn nicht ein. Herleitung:\n`openspec/changes/b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md` (D1–D3)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "einsatznummer_intern": {
             "type": [
               "string",

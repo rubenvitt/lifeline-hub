@@ -1416,3 +1416,215 @@ async fn schwaerzung_nullt_den_namen_des_einsatzleiters() {
         lifeline_hub::einsatz::fuehrungsstelle::EinsatzleiterArt::Personal
     );
 }
+
+// ── Einsatzleiter an der Einsatzanzeige (LLH-1168) ─────────────────────────────────────────
+// Spec `einsatz-fuehrungsstelle`, „Einsatzleiter in der Einsatzanzeige“. Herleitung:
+// `openspec/changes/b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md` (D1–D3).
+
+/// Der Eintrag `einsatz` aus `GET /api/einsaetze`.
+async fn listeneintrag(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
+    let (status, json) = anfrage(app, "GET", "/api/einsaetze", cookie, None).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    json.as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_i64() == Some(einsatz))
+        .cloned()
+        .expect("Einsatz steht in der Liste")
+}
+
+async fn detail(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
+    let (status, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    json
+}
+
+#[tokio::test]
+async fn liste_und_detail_tragen_den_einsatzleiter() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = stammpersonal_disponieren(&app, &admin, einsatz, "Anna Schulz").await;
+    let (status, json) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"einsatzleiter": {"art": "personal", "personal_id": anna, "seit": "2026-10-12T12:30:00Z"}}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let erwartet = json!({
+        "art": "personal",
+        "name": "Anna Schulz",
+        "personal_id": anna,
+        "personal_noch_disponiert": true,
+        "seit": "2026-10-12 12:30:00",
+    });
+    assert_eq!(
+        listeneintrag(&app, &admin, einsatz).await["einsatzleiter"],
+        erwartet
+    );
+    assert_eq!(
+        detail(&app, &admin, einsatz).await["einsatzleiter"],
+        erwartet
+    );
+}
+
+#[tokio::test]
+async fn ohne_einsatzleiter_fehlt_das_feld_auch_bei_app_rolle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Der Anleger trägt die App-Rolle Einsatzleitung; das ist kein Einsatzleiter.
+    let eintrag = listeneintrag(&app, &admin, einsatz).await;
+    assert_eq!(eintrag["meine_rolle"], "einsatzleitung");
+    assert!(
+        !eintrag.as_object().unwrap().contains_key("einsatzleiter"),
+        "{eintrag}"
+    );
+    let kopf = detail(&app, &admin, einsatz).await;
+    assert!(
+        !kopf.as_object().unwrap().contains_key("einsatzleiter"),
+        "{kopf}"
+    );
+}
+
+#[tokio::test]
+async fn liste_traegt_den_vermerk_einer_entlassenen_person() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anna = stammpersonal_disponieren(&app, &admin, einsatz, "Anna Schulz").await;
+    patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"einsatzleiter": {"art": "personal", "personal_id": anna}}),
+    )
+    .await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/personal/{anna}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(status.is_success(), "entlassen: {status}");
+
+    let el = &listeneintrag(&app, &admin, einsatz).await["einsatzleiter"];
+    assert_eq!(el["name"], "Anna Schulz");
+    assert_eq!(el["personal_noch_disponiert"], false);
+    assert!(el.get("personal_id").is_none(), "{el:?}");
+}
+
+#[tokio::test]
+async fn liste_liefert_den_geschwaerzten_einsatzleiter_ohne_namen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"einsatzleiter": {"art": "extern", "name": "Anna Schulz", "seit": "2026-10-12T12:00:00Z"}}),
+    )
+    .await;
+
+    let mut tx = pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        einsatz,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let (status, liste) = anfrage(&app, "GET", "/api/einsaetze", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!liste.to_string().contains("Anna Schulz"), "{liste}");
+    let el = &listeneintrag(&app, &admin, einsatz).await["einsatzleiter"];
+    assert_eq!(el["art"], "extern");
+    assert!(el.get("name").is_none(), "{el:?}");
+    assert_eq!(el["seit"], "2026-10-12 12:00:00");
+}
+
+#[tokio::test]
+async fn lage_snapshot_friert_keinen_einsatzleiter_ein() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"einsatzleiter": {"art": "extern", "name": "KBM Weber"}}),
+    )
+    .await;
+    let (status, snapshot) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lage-snapshots"),
+        &admin,
+        Some(r#"{"bezeichnung":"Stand 1"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{snapshot:?}");
+    let eingefroren = snapshot["daten"]["einsatz"]
+        .as_object()
+        .expect("Einsatz im Snapshot");
+    assert!(
+        !eingefroren.contains_key("einsatzleiter"),
+        "{eingefroren:?}"
+    );
+    assert!(!snapshot.to_string().contains("KBM Weber"), "{snapshot}");
+}
+
+/// Szenario „Wechsel auf einem anderen Schirm“ der Einsatzliste: der Wechsel meldet nach dem
+/// Commit `einsatzliste`, auf das die Liste im Browser neu abruft (`ORG_STREAM_EVENTS`).
+#[tokio::test]
+async fn wechsel_des_einsatzleiters_meldet_die_einsatzliste() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere_org();
+    let listen_events = |rx: &mut Receiver<lifeline_hub::live::org::OrgNachricht>| {
+        let mut n = 0;
+        while let Ok(nachricht) = rx.try_recv() {
+            if nachricht.event == lifeline_hub::live::org::OrgLiveEvent::Einsatzliste {
+                n += 1;
+            }
+        }
+        n
+    };
+
+    let (status, json) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"einsatzleiter": {"art": "extern", "name": "KBM Weber"}}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(listen_events(&mut rx), 1);
+
+    // Abgelehnt: kein Ereignis.
+    let (status, _) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"einsatzleiter": {"art": "extern", "name": "   "}}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(listen_events(&mut rx), 0);
+}
