@@ -27,6 +27,7 @@ import {
 } from '../api/eingabegrenzen';
 import { grenzeText, istZuLang, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
+  EXTERN_KATEGORIE_LABEL,
   FORM_LABEL,
   KLAPPTEIL,
   KLAPPTEIL_HEADER,
@@ -36,12 +37,10 @@ import {
   type SchemaFeld,
 } from './auftragsschemaKern';
 
-const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
-  { value: 'leitstelle', label: 'Leitstelle' },
-  { value: 'nachbar_ea', label: 'Nachbar-Einsatzabschnitt' },
-  { value: 'uebergeordnet', label: 'Übergeordnete Führung' },
-  { value: 'andere_bos', label: 'Andere BOS' },
-];
+/** Die Etiketten teilt das Auftragsblatt (`druckFelder`), sie stehen deshalb im Kern. */
+const EXTERN_OPTIONEN = (
+  Object.entries(EXTERN_KATEGORIE_LABEL) as [AdressatKategorie, string][]
+).map(([value, label]) => ({ value, label }));
 
 const { TextArea } = Input;
 

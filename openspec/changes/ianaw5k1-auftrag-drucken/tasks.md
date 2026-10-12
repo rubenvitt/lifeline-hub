@@ -5,7 +5,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 1. Feldfolge des Blatts im Schemakern (D4)
 
-- [ ] 1.1 `druckFelder(a, fmt)` in `auftraege/auftragsschemaKern.ts` mit der Folge Empfänger ·
+- [x] 1.1 `druckFelder(a, fmt)` in `auftraege/auftragsschemaKern.ts` mit der Folge Empfänger ·
   Auftrag · Priorität · Frist · READ_ORDER · Richtung · Erteilt am, leere Angaben weg; Richtung
   „Intern“ bzw. „Extern“ samt Kategorie und Bezeichnung der Stelle, Kategorie-Etiketten aus der
   Quelle des Formulars. Nachweis: Tests in `auftraege/auftragsschemaKern.test.ts` pinnen die
@@ -17,7 +17,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 2. Gemeinsame Etikett-Wert-Liste (D5, Umzug)
 
-- [ ] 2.1 `ZeilenListe` samt `Titel`, `TitelZeile`, `Titelfolge` und `ZeilenEintraege` aus
+- [x] 2.1 `ZeilenListe` samt `Titel`, `TitelZeile`, `Titelfolge` und `ZeilenEintraege` aus
   `druck/einsatzbericht/Bloecke.tsx` nach `druck/ZeilenListe.tsx` verschieben, ohne das Markup zu
   ändern. `Bloecke` importiert von dort, der Kopfkommentar verweist darauf. Nachweis:
   `druck/einsatzbericht/Bloecke.test.tsx` ist unverändert grün, `tsc` und ESLint sind sauber.
