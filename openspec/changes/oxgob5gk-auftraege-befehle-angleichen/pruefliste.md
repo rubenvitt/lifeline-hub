@@ -25,9 +25,9 @@ Begründung). Aus dem Quelltext Geschlossenes trägt **[abgeleitet]**.
 | `e2e/auftraege-abgeschlossen.spec.ts` | 2/2 grün (Admin, Beobachter): Blättern, Server-Suche findet den ältesten von 105 ohne Blättern („Abgeschlossen (1)“), Deeplink heftet an, markiert, wählt |
 | `e2e/befehl-navigation.spec.ts` | 4/4 grün: Rückweg aus der Vollseite wählt den Befehl wieder (Admin, Beobachter), Verlassen-Schutz unverändert |
 | Weitere e2e | siehe Abschnitt „e2e nachgezogen“ unten |
-| Vitest | Neu: `ListeDetail.test.tsx` (22), `useZuflussSchleuse.test.tsx` (7), `AuftragListenKarte` (6), `AuftragDetail` (7), `AuftragErteilenDialog` (5), `BefehlListenKarte` (4), `BefehlDetail` (7), `BefehlLesefassung` (1), `AuftraegePage.reiter` (3), `api/auftraege` (2). Umgeschrieben: `AuftraegePage*.test.tsx` (57), `BefehlListe.test.tsx` (21). Datensicht-Tests (188) unverändert grün |
+| Vitest | Neu: `ListeDetail.test.tsx` (35, davon 13 aus dem Review: Klick ins Detail und aus einem Portal, frischer Stand entfallener Objekte, Neueinhängen je Objekt, Ort des entfallenen Details unter `lg`, `aria-controls` ab `lg`, Sprunglink „Zum Detail“, Anker auf die Wahl, Boden `auswahlZielStil`), `useZuflussSchleuse.test.tsx` (7), `AuftragListenKarte` (6), `AuftragDetail` (7), `AuftragErteilenDialog` (5), `BefehlListenKarte` (4), `BefehlDetail` (8), `BefehlLesefassung` (1), `AuftraegePage.reiter` (3), `api/auftraege` (2). Umgeschrieben: `AuftraegePage*.test.tsx` (58), `BefehlListe.test.tsx` (22); beide prüfen auch, dass vor der ersten Lieferung keine Menge steht. Datensicht-Tests (188) unverändert grün |
 | Backend | `auftrag::repo` Suchtests (2), Route `auftrag_blaettern` (8) |
-| Mutationsproben | Zufluss: Touch-Prüfung und Portal-Ausnahme entfernt → 2 rot. ListeDetail: Vorauswahl, Link-Riegel, Entfallen, Zuklappen entfernt → je rot. Suche: `lfd_nr IS NOT NULL` entfernt → rot. Auswahl-Cache fehlte → Render-Zähler (LFH-949) rot, mit Cache grün |
+| Mutationsproben | Zufluss: Touch-Prüfung und Portal-Ausnahme entfernt → 2 rot. ListeDetail: Vorauswahl, Link-Riegel, Entfallen, Zuklappen entfernt → je rot. Suche: `lfd_nr IS NOT NULL` entfernt → rot. Auswahl-Cache fehlte → Render-Zähler (LFH-949) rot, mit Cache grün. Review: `key` am Detail, `aufloesen`, Anker auf die Wahl, Ort des entfallenen Details → je rot; der Portal-Riegel überlebte seine Mutation (das Detail ist Geschwister der Karte) und ist entfallen. „Befehlstext“ als h5 → Gliederungstest rot |
 | Bildlauf | `pnpm doku:bilder --grep auftraege-befehle` 4/4, Bilder hell und dunkel gesichtet |
 
 ---
@@ -48,7 +48,7 @@ Begründung). Aus dem Quelltext Geschlossenes trägt **[abgeleitet]**.
 | 10 | **Alarmbudget** | **erfüllt** [abgeleitet] | Kein neuer Alarm, kein neuer Ton | — |
 | 11 | **Warnverhalten** | **erfüllt** | Kein Blinken, kein Ton | — |
 | 12 | **Kein Sprung unter dem Cursor** | **erfüllt** | Zufluss-Schleuse der `Datensicht` (herausgelöst, `useZuflussSchleuse`): Fokus oder Mauszeiger halten Folge, Sammelbanner nennt Neues; die Handlungen stehen im Detail, nicht in wandernden Karten; ein entfallendes gewähltes Objekt bleibt im Detail stehen | — |
-| 13 | **Fokus nie verdeckt** | **erfüllt** [abgeleitet] | Das klebende Detail liegt neben der Liste, nicht über ihr; unter `lg` klebt nichts | — |
+| 13 | **Fokus nie verdeckt** | **erfüllt** [abgeleitet] | Das klebende Detail liegt neben der Liste, nicht über ihr; unter `lg` klebt nichts. Ab `lg` führt der Sprunglink „Zum Detail“ (sichtbar mit dem Fokus) hinter der gewählten Karte ins Detail, statt durch alle übrigen Karten zu tabben | — |
 | 14 | **Tabellenseite vollständig** | **nicht anwendbar** | Keine Tabelle: Listen aus Karten (Frage „was ist mit diesem?“, LFH-330) | — |
 | 15 | **Erfassungsmaske vollständig** | **erfüllt** | „Auftrag erteilen“: `ErfassungsFormular` des `AuftragFormular` im Dialog (Enter sendet, Fokus im ersten Feld, Serie, Grund im Dialog, Reset auf jedem Weg hinaus über `destroyOnHidden`); „Befehl entwerfen“ unverändert `ErfassungsModal`. Belegt in `AuftragErteilenDialog.test.tsx` und `AuftraegePage.test.tsx` | — |
 
@@ -62,5 +62,17 @@ Filterleiste bricht um (`flex-wrap`), das Suchfeld nimmt höchstens die volle Br
 
 ## e2e nachgezogen
 
-Die Specs, die die Seite berühren, sind auf die neue Bedienung gezogen (Karte wählen, im Detail
-handeln, Dialog statt Paneel); Ergebnisse im PR.
+Karte wählen, im Detail handeln, Erteilen im Dialog. Einzeln und zusammen grün (Chromium):
+
+| Spec | Änderung |
+| --- | --- |
+| `deeplink-hervorhebung-kontrast` | Auftrag zusätzlich „gewählt“; neu Befehlskarte per `?befehl=` und gewählte, nicht angesprungene Karte (Auswahlfläche ohne Linie), je hell und dunkel |
+| `trefflaeche-pruefflaechen` | Ziele von Liste, Detail und Sprüngen beider Reiter (Admin, Beobachter); neu Handschuh-Fall auf 390 px (Auswahlziel und Detailknöpfe ≥ 72 px, Gegenprobe kompakt) |
+| `knopf-wortlaut` | Knöpfe der Aufträge im Detailpaneel statt in der Karte, beide Rollen, 4 Breiten |
+| `gate1-ueberlauf` | Anker ist das Auswahlziel, gemessen mit offenem Detail |
+| `chat-layout`, `fuehrungsfunktionen` | Erteilen im Dialog, Text in der Liste gesucht |
+| `auftraege-abgeschlossen`, `befehl-navigation` | Server-Suche, Rückweg wählt den Befehl wieder |
+
+Unverändert grün: `befehl-aktionsleiste`, `etb-folgeauftraege`, `palette-oeffnung`, `gate3-trefflaeche`
+(misst nur die unveränderte Vollseite), `nav-schmal`, `druck-fluss`, `dokument-anlage-druck`,
+`funkplan`, `stab-vorbereitung`, `lagebericht-tippen`, `fokusring-kontrast`, `hellmodus-kontrast`.
