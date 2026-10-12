@@ -10,7 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
 import type { BefehlAbschnitt, BefehlAnzeige } from '../api/types';
 import { vorlage } from '../befehle/vorlagen';
-import Markdown from '../components/Markdown';
+import BefehlLesefassung from '../auftraege/BefehlLesefassung';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
@@ -405,8 +405,9 @@ function BefehlDetail() {
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
               {
+                // Zurück auf den Reiter Befehle, dieser Befehl gewählt und markiert (oxgob5gk D6).
                 title: (
-                  <Link to={auftraegePfad(einsatzId, { reiter: 'befehle' })}>Aufträge/Befehle</Link>
+                  <Link to={auftraegePfad(einsatzId, { befehl: befehlId })}>Aufträge/Befehle</Link>
                 ),
               },
               { title: befehl.titel },
@@ -503,33 +504,13 @@ function BefehlDetail() {
               />
             </Form>
           ) : (
-            <div className="befehl-druck">
-              {v?.abschnitte.map((a) => {
-                const text =
-                  befehl.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
-                // h3 unter dem Paneel (h2); Satz bleibt der von h5. Im Titelblock mit dem ersten
-                // Absatz, damit er im Druck nicht allein am Seitenende steht (LFH-1008).
-                const titel = (
-                  <Typography.Title level={3} style={{ fontSize: token.fontSizeHeading5 }}>
-                    {a.label}
-                  </Typography.Title>
-                );
-                return (
-                  <section key={a.schluessel} style={{ marginBottom: 16 }}>
-                    {text.trim() ? (
-                      <Markdown variante="dokument" unterEbene={3} titel={titel}>
-                        {text}
-                      </Markdown>
-                    ) : (
-                      <div data-lfh="titelblock">
-                        {titel}
-                        <Typography.Paragraph>—</Typography.Paragraph>
-                      </div>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
+            // h3 unter dem Paneel (h2); die Druckklasse bleibt an der Vollseite.
+            <BefehlLesefassung
+              className="befehl-druck"
+              vorlage={v}
+              abschnitte={befehl.abschnitte}
+              ebene={3}
+            />
           )}
         </Paneel>
         {/* Bild-Anlagen (LFH-1028): am Schirm ein Paneel, auf Papier je ein Blatt hinter dem Text. */}

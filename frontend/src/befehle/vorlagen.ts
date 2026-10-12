@@ -6,7 +6,7 @@ interface AbschnittDef {
   /** Frontend-only Eingabehilfe (SKK-Unterpunkte); nicht im Backend. */
   hilfetext?: string;
 }
-interface VorlageDef {
+export interface VorlageDef {
   schluessel: BefehlVorlageKey;
   label: string;
   abschnitte: AbschnittDef[];

@@ -238,12 +238,12 @@ describe('BefehlDetailPage', () => {
     expect(router.state.location.search).toBe('?reiter=befehle');
   });
 
-  it('die Brotkrume führt auf den Reiter Befehle, nicht auf die Vorgabe (LFH-972)', async () => {
+  it('die Brotkrume führt auf den Reiter Befehle mit diesem Befehl gewählt (LFH-972, oxgob5gk D6)', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
     renderAt(7);
     expect(await screen.findByRole('link', { name: 'Aufträge/Befehle' })).toHaveAttribute(
       'href',
-      '/einsaetze/1/auftraege?reiter=befehle',
+      '/einsaetze/1/auftraege?befehl=7&reiter=befehle',
     );
   });
 

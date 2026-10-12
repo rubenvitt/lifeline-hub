@@ -108,7 +108,6 @@ const KARTEN_EIGENBAU: string[] = [];
  * Dateien, die `form="karte"` tragen MÜSSEN: Module, die kartenbasiert gelesen werden.
  */
 const NUR_KARTE: string[] = [
-  '/src/auftraege/BefehlListe.tsx',
   // Ein Evakuierungsbezirk wird GELESEN („was ist mit diesem Bezirk?“), nicht verglichen.
   '/src/betreuung/EvakuierungBlock.tsx',
   '/src/pages/LageberichtePage.tsx',
@@ -160,7 +159,6 @@ const REITERSCHLUESSEL_OFFEN: string[] = [];
  * Datei.
  */
 const KONSUMENTEN = [
-  '/src/auftraege/BefehlListe.tsx',
   // Die Aufbewahrungsübersicht: verglichen wird („welcher Einsatz läuft als nächstes ab?“).
   '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
   // Die Betreuungsseite trägt ZWEI Sichten in zwei Dateien (Bezirke als Karten, Stellen als
@@ -705,10 +703,10 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // LEER. Wer einträgt, begründet wie über der Liste beschrieben, sonst wäre der Kartenplan nur
     // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Drei Kartenmodule, vier Vergleichsflächen (seit LFH-548 mit dem Funkplan). Wer einträgt,
-    // ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer umbaut, ohne einzutragen, an der
-    // Formprüfung.
-    expect(NUR_KARTE).toHaveLength(3);
+    // Zwei Kartenmodule (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`), fünf
+    // Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer
+    // umbaut, ohne einzutragen, an der Formprüfung.
+    expect(NUR_KARTE).toHaveLength(2);
     expect(NUR_TABELLE).toHaveLength(5);
     // Eine PFLICHT, dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild.
     expect(VOLLMENGE_PFLICHT).toHaveLength(1);
