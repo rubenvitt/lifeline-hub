@@ -1,17 +1,26 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzdatenPfad, einsatzModulPfad, stabPfad } from '../src/routing/deeplinks';
+import {
+  einsatzModulPfad,
+  lagebesprechungPfad,
+  stabPfad,
+  ueberblickPfad,
+} from '../src/routing/deeplinks';
 import { anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /**
  * Der Einsatzkopf ist live (LFH-555): ein Termin, den ein anderer Schirm setzt, erscheint ohne
- * Neuladen, in beide Richtungen zwischen Stab und Einsatzdaten-Seite.
+ * Neuladen. Seit LLH-1111 setzt ihn nur das Modul Lagebesprechung (`PUT …/lagebesprechung/termin`
+ * oder der Abschluss `POST …/lagebesprechungen`); der Kopf-PATCH lehnt das Feld mit 400 ab. Es
+ * folgen die Zeile „Nächste Lagebesprechung“ der Stab-Seite, die Marke im Führungsüberblick und
+ * die Seite Lagebesprechung selbst.
  *
  * Der „andere Schirm" schreibt über die API derselben Sitzung; was hier zählt, ist der Weg über
  * den Live-Strom in die offene Seite. Die Seite wartet auf die Antwort von `/live`, BEVOR
  * geschrieben wird: der Server abonniert vor dem ersten Byte, ein früheres Ereignis ginge sonst
  * verloren (kein Refetch-Fallback, vgl. `kernfluss.spec.ts`). Kein `networkidle` (LFH-385).
  *
- * Mutationsprobe (LFH-555, 5.2): `einsatz` aus `EINSATZ_STREAM_EVENTS` genommen → beide Tests rot.
+ * Mutationsprobe (LFH-555, 5.2): `einsatz` aus `EINSATZ_STREAM_EVENTS` genommen → die Stab-Zeile
+ * und der Überblick bleiben stehen, beide Termin-Tests rot.
  *
  * LFH-854: ein Rollenwechsel im Einsatz feuert ebenfalls `einsatz`; der Schirm der betroffenen
  * Person zeigt ihr neues Schreibrecht ohne Neuladen. Mutationsprobe: Emitter in
@@ -54,41 +63,75 @@ function terminInZweiStunden(): string {
   return t.toISOString();
 }
 
-test('LFH-555: der Stab setzt den Termin, die offene Einsatzdaten-Seite folgt', async ({
-  page,
-}) => {
-  const id = await anmeldenUndAnlegen(page);
-  await oeffnenMitStrom(page, einsatzdatenPfad(id), id);
-  await expect(
-    page.getByRole('button', { name: 'Nächste Lagebesprechung eintragen', exact: true }),
-  ).toBeVisible();
+/** Die Zeile „Nächste Lagebesprechung“ der Stab-Seite (`lagebesprechung/LagebesprechungZeile.tsx`). */
+const stabZeile = (page: Page) => page.getByRole('group', { name: 'Nächste Lagebesprechung' });
 
-  const abschluss = await page.request.post(`/api/einsaetze/${id}/stab/lagebesprechungen`, {
-    data: { entschluss: 'Lage unverändert', naechste_at: terminInZweiStunden() },
-  });
-  expect(abschluss.status()).toBe(201);
+/** Die Kennzahl „Nächste Lagebesprechung“ im Paneel „Termin“ der Seite Lagebesprechung. */
+const terminKennzahl = (page: Page) =>
+  page
+    .getByRole('region', { name: 'Termin', exact: true })
+    .locator('[data-lfh="kennzahl"]')
+    .filter({ hasText: 'Nächste Lagebesprechung' });
 
-  await expect(
-    page.getByRole('button', { name: 'Nächste Lagebesprechung bearbeiten', exact: true }),
-  ).toBeVisible();
-});
+/** Zustand eines Termins in rund zwei Stunden („in 1 h 59 min“ oder „in 2 h 00 min“). */
+const IN_ZWEI_STUNDEN = /in (1 h 5\d|2 h 00) min/;
 
-test('LFH-555: die Einsatzdaten setzen den Termin, der offene Stab-Kopfblock folgt', async ({
+test('LLH-1111: ein anderer Schirm setzt den Termin, die offene Stab-Zeile folgt', async ({
   page,
 }) => {
   const id = await anmeldenUndAnlegen(page);
   await oeffnenMitStrom(page, stabPfad(id), id);
-  // Nur der Stand-Block: die Vorbereitung (LFH-550) zeigt den Termin ebenfalls.
-  const stand = page.getByLabel('Stand der Lagebesprechung');
-  await expect(stand.getByText('kein Termin', { exact: true })).toBeVisible();
+  const zeile = stabZeile(page);
+  await expect(zeile.getByText('kein Termin', { exact: true })).toBeVisible();
 
+  // Der Kopf-PATCH lehnt den Termin ab, laut statt still: es gibt nur einen Schreibweg.
   const patch = await page.request.patch(`/api/einsaetze/${id}`, {
     data: { naechste_lagebesprechung_at: terminInZweiStunden() },
   });
-  expect(patch.ok()).toBeTruthy();
+  expect(patch.status()).toBe(400);
 
-  await expect(stand.getByText(/^in (1 h 5\d|2 h 00) min$/)).toBeVisible();
-  await expect(stand.getByText('kein Termin', { exact: true })).toHaveCount(0);
+  const termin = await page.request.put(`/api/einsaetze/${id}/lagebesprechung/termin`, {
+    data: { naechste_at: terminInZweiStunden() },
+  });
+  expect(termin.ok()).toBeTruthy();
+
+  await expect(zeile.getByText(IN_ZWEI_STUNDEN)).toBeVisible();
+  await expect(zeile.getByText('kein Termin', { exact: true })).toHaveCount(0);
+});
+
+test('LLH-1111: der Abschluss setzt den Termin, Überblick und Seite Lagebesprechung folgen', async ({
+  page,
+  context,
+}) => {
+  const id = await anmeldenUndAnlegen(page);
+  await oeffnenMitStrom(page, ueberblickPfad(id), id);
+  const marke = page
+    .locator('[data-lfh="ueberblick-marke"]')
+    .filter({ hasText: 'Lagebesprechung' });
+  await expect(page.getByText('Keine anstehenden Fristen.')).toBeVisible();
+  await expect(marke).toHaveCount(0);
+
+  // Der zweite Schirm derselben Sitzung steht auf der Seite Lagebesprechung.
+  const seite = await context.newPage();
+  await oeffnenMitStrom(seite, lagebesprechungPfad(id), id);
+  await expect(terminKennzahl(seite)).toContainText('kein Termin');
+  await expect(seite.getByText('Noch keine Lagebesprechung abgeschlossen')).toBeVisible();
+
+  const abschluss = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+    data: { entschluss: 'Lage unverändert', naechste_at: terminInZweiStunden() },
+  });
+  expect(abschluss.status()).toBe(201);
+
+  // Überblick: die Marke steht und führt in das Modul Lagebesprechung.
+  await expect(marke).toHaveCount(1);
+  await expect(marke).toHaveAttribute('href', lagebesprechungPfad(id));
+  // Seite Lagebesprechung: Termin, Zahl und Verlauf ohne Neuladen.
+  await expect(terminKennzahl(seite)).toContainText(IN_ZWEI_STUNDEN);
+  const verlauf = seite.getByRole('region', { name: 'Verlauf', exact: true });
+  await expect(verlauf.getByRole('heading', { level: 3, name: /^Nr\. 1 · / })).toBeVisible();
+  await expect(
+    verlauf.getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 1', exact: true }),
+  ).toBeVisible();
 });
 
 test('LFH-854: ein Rollenwechsel schaltet das Schreibrecht der betroffenen Person ohne Neuladen', async ({
