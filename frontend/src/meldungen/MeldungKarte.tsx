@@ -197,7 +197,9 @@ function MeldungKarte({
         ...(!m.lagerelevant && onLagerelevant
           ? [{ key: 'lr', label: 'An Lage übergeben', onClick: () => onLagerelevant(m.id) }]
           : []),
-        ...(m.auftrag_id == null && onAuftragErteilen
+        // Ein aufgehobener Auftrag gilt nicht mehr: die Meldung lässt sich erneut überführen, der
+        // Server stellt den Rückverweis dann auf den neuen Auftrag um (LLH-1177).
+        ...((m.auftrag_id == null || m.is_auftrag_aufgehoben) && onAuftragErteilen
           ? [
               auftragGesperrt
                 ? {
@@ -239,11 +241,15 @@ function MeldungKarte({
           />
           {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
           {m.lagerelevant && <StatusChip ton="bedien" wort="Lagerelevant ✓" />}
-          {m.auftrag_id != null && darf('fremde-module') && (
-            <KennungsLink to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>
-              ↗ Auftrag
-            </KennungsLink>
-          )}
+          {m.auftrag_id != null &&
+            darf('fremde-module') &&
+            (m.is_auftrag_aufgehoben ? (
+              <StatusChip ton="neutral" wort="Auftrag aufgehoben" />
+            ) : (
+              <KennungsLink to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>
+                ↗ Auftrag
+              </KennungsLink>
+            ))}
         </Space>
         <Space size={10} wrap>
           {bestaetigungsAchse(m, formatZeit)}
