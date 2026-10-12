@@ -87,7 +87,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   „alle“; gefiltert wird mit der Funktion der Liste. Keys `personenDruck`/`tiereDruck`/`schaedenDruck`
   nicht live, außerhalb des Offline-Lagebilds. Query-Felder einzeln an den Rahmen geben, nie das
   Ergebnisobjekt (`useQuery` beobachtet nur, was die Seite liest).
-- **Auftragsdruck** (LLH-1171, Herleitung `openspec/changes/ianaw5k1-auftrag-drucken/design.md`):
+- **Auftragsdruck** (LLH-1171, Herleitung `openspec/changes/archive/2026-10-12-ianaw5k1-auftrag-drucken/design.md`):
   `/einsaetze/:id/auftraege/:auftragId/druck` (`pages/AuftragDruckPage.tsx`, Pfad
   `auftragDruckPfad`), Einstieg nur als Sprung „Druckansicht“ im Detail eines Auftrags, auch
   ohne Schreibrecht. Gedruckt wird nie aus dem Detailpaneel, wie der Befehl nur auf seiner

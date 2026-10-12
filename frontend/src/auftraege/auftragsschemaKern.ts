@@ -124,7 +124,7 @@ function richtungText(a: Auftrag): string {
  * Reihenfolge der FwDV 100“): Empfänger, Auftrag, Priorität, Frist, dann die Lesefolge der Karte
  * ({@link READ_ORDER}), dann Richtung und Erteilzeit. Leere Angaben fallen weg; Zeiten über
  * `formatZeit` der Anzeigezone. Herleitung:
- * `openspec/changes/ianaw5k1-auftrag-drucken/design.md` (D4).
+ * `openspec/changes/archive/2026-10-12-ianaw5k1-auftrag-drucken/design.md` (D4).
  */
 export function druckFelder(
   a: Auftrag,
