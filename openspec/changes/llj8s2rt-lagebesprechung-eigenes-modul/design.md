@@ -37,8 +37,7 @@ ein Scope-Lauf am 12.10.2026 erhoben.
   Freigabe `stab`.
 
 **Bezüge**
-- LLH-1116 („Stab abwählbar“) hat am 12.10.2026 entschieden: Change `wgnb0am2-stab-abwaehlbar`,
-  `design.md`, im Branch von LLH-1116, noch nicht in `alpha`.
+- LLH-1116 („Stab abwählbar“) hat am 12.10.2026 entschieden: Change `openspec/changes/archive/2026-10-12-wgnb0am2-stab-abwaehlbar/design.md`.
   - D5 bestätigt das eigene Modul.
   - D7 verlangt die Rollen-Übernahme ohne Ausblendung (hier D5).
   - D2 führt eine Sichtbarkeits-Vorgabe je Organisation ein (LLH-1179). Sie gilt auch für dieses
@@ -134,7 +133,7 @@ lässt einen System-Admin ohne Rolle schreiben und feuert `einsatz` auch ohne Ä
 
 ### D5 Freigaben: nur die Rolle wandert (Entscheidung Ruben, 12.10.2026)
 
-Migration `0182_lagebesprechung_modul.sql`, die Nummer zum Merge per
+Migration `0183_lagebesprechung_modul.sql`, die Nummer zum Merge per
 `scripts/check-migrationen.sh` geprüft:
 
 ```sql
@@ -301,7 +300,7 @@ Entschluss an der ETB-Grenze ergäbe einen ETB-Inhalt darüber. Der Client spieg
   berühren `MODUL_KEYS`, `modulRegistry.ts`, `frontend/src/stab/AGENTS.md`, `befehle.ts`,
   die Regelkarte und die nächste Migrationsnummer. Wer als Zweiter merged, zieht nach. → Den Branch vor dem PR auf `alpha` mergen und
   Konflikte von Hand lösen.
-- **Migrationsnummer 0182** kann durch einen früheren Merge belegt werden. → Prüfen per
+- **Migrationsnummer 0183** kann durch einen früheren Merge belegt werden. → Prüfen per
   `scripts/check-migrationen.sh`, Autofix auf dem PR-Branch (LFH-1014).
 - **Bildlauf in der Cloud-Sitzung**: Plattenkontingent und Playwright-Browser sind ungeprüft. →
   Früh versuchen. Scheitert der Lauf, wird das im PR benannt und die Bilder lokal nachgezogen,
@@ -309,7 +308,7 @@ Entschluss an der ETB-Grenze ergäbe einen ETB-Inhalt darüber. Der Client spieg
 
 ## Migration Plan
 
-1. Migration 0182 läuft beim Start (sqlx). Sie fügt nur Zeilen hinzu, und ein Rollback ist ein
+1. Migration 0183 läuft beim Start (sqlx). Sie fügt nur Zeilen hinzu, und ein Rollback ist ein
    `DELETE … WHERE modul_key = 'lagebesprechung'`.
 2. Backend und Frontend kommen in einem Binary. Ein Übergangsweg für die alten Pfade ist nicht
    nötig.

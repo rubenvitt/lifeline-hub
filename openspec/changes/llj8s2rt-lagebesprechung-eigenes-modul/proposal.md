@@ -82,7 +82,7 @@ braucht es eine eigene Verwaltung.“
   - Lagebesprechungsteile aus `src/stab/` und `src/routes/stab.rs` werden in ein neues
     `src/lagebesprechung/` und `src/routes/lagebesprechung.rs` herausgelöst
   - `src/routes/einsatz.rs` (`KopfdatenPatch`), `src/live/mod.rs` (neues `LiveEvent`), `src/app.rs`, `src/api_doc.rs`
-  - Migration 0182 (Rollen-Übernahme)
+  - Migration 0183 (Rollen-Übernahme)
   - Tests: `tests/stab.rs`, `tests/einsatz.rs`, `tests/einsatz_live.rs`, `tests/modul_override.rs`,
     `tests/modul_freigaben.rs`, `tests/enum_wire_kontrakt.rs`, `tests/aufbewahrung_e2e.rs`
   - Typ-Codegen
