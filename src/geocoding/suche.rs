@@ -36,6 +36,9 @@ pub struct OrtTreffer {
     pub lat: f64,
     pub lon: f64,
     pub name: String,
+    /// Kurzadresse „Straße Nr, PLZ Ort“ aus den Adressteilen des Geocoders (`addressdetails`);
+    /// fehlt, wenn er weder Straße noch Ort liefert.
+    pub kurz: Option<String>,
 }
 
 /// Ausgang einer Suche. `Ok` mit leerer Liste heißt „nichts gefunden“.
@@ -144,6 +147,44 @@ async fn token_nehmen(bucket: &Mutex<TokenBucket>, warten_max: Duration) -> bool
     }
 }
 
+/// Adressteile in Nominatims `address`, die eine Straße (oder einen Platz) benennen.
+const STRASSEN_TEILE: &[&str] = &["road", "pedestrian", "footway", "path", "square", "place"];
+/// Adressteile, die den Ort benennen, vom größten zum kleinsten.
+const ORT_TEILE: &[&str] = &["city", "town", "village", "municipality", "hamlet"];
+
+/// Kurzadresse „Straße Nr, PLZ Ort“ aus `address` (LFH-1175, Spec `ortsfeld`, „Kurzadresse der
+/// Treffer“). Fehlende Teile entfallen samt Trennzeichen; ohne Straße und ohne Ort keine.
+fn kurzadresse(eintrag: &serde_json::Value) -> Option<String> {
+    let adresse = eintrag.get("address")?;
+    let teil = |schluessel: &str| {
+        adresse
+            .get(schluessel)
+            .and_then(|w| w.as_str())
+            .map(str::trim)
+            .filter(|w| !w.is_empty())
+    };
+    let erster = |liste: &[&str]| liste.iter().find_map(|k| teil(k));
+    let strasse = erster(STRASSEN_TEILE);
+    let ort = erster(ORT_TEILE);
+    if strasse.is_none() && ort.is_none() {
+        return None;
+    }
+    let strassen_zeile = strasse.map(|s| match teil("house_number") {
+        Some(nr) => format!("{s} {nr}"),
+        None => s.to_string(),
+    });
+    let ort_zeile = [teil("postcode"), ort]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let zeilen: Vec<String> = strassen_zeile
+        .into_iter()
+        .chain((!ort_zeile.is_empty()).then_some(ort_zeile))
+        .collect();
+    Some(zeilen.join(", "))
+}
+
 /// Liest eine Nominatim-`jsonv2`-Liste. `lat`/`lon` kommen dort als Zeichenketten; ein Eintrag
 /// ohne lesbare Koordinate oder Namen fällt weg, eine Antwort, die keine Liste ist, gilt als Fehler.
 fn lies_treffer(v: &serde_json::Value) -> Option<Vec<OrtTreffer>> {
@@ -167,6 +208,7 @@ fn lies_treffer(v: &serde_json::Value) -> Option<Vec<OrtTreffer>> {
                     lat,
                     lon,
                     name: name.to_string(),
+                    kurz: kurzadresse(e),
                 })
             })
             .take(TREFFER_MAX)
@@ -203,6 +245,7 @@ pub async fn suche_mit(
         ("format", "jsonv2"),
         ("limit", &limit),
         ("accept-language", "de"),
+        ("addressdetails", "1"),
     ];
     if let Some(vb) = viewbox.as_deref() {
         params.push(("viewbox", vb));
@@ -353,12 +396,14 @@ mod tests {
                 OrtTreffer {
                     lat: 51.1604,
                     lon: 10.4514,
-                    name: "Hauptstraße 12, Musterstadt".into()
+                    name: "Hauptstraße 12, Musterstadt".into(),
+                    kurz: None,
                 },
                 OrtTreffer {
                     lat: 48.1,
                     lon: 11.5,
-                    name: "Hauptstraße 12, Anderswo".into()
+                    name: "Hauptstraße 12, Anderswo".into(),
+                    kurz: None,
                 },
             ])
         );
@@ -406,7 +451,8 @@ mod tests {
             SuchErgebnis::Ok(vec![OrtTreffer {
                 lat: 51.0,
                 lon: 10.0,
-                name: "Gut".into()
+                name: "Gut".into(),
+                kurz: None,
             }])
         );
     }
@@ -540,6 +586,7 @@ mod tests {
         assert!(q.contains("format=jsonv2"), "{q}");
         assert!(q.contains("limit=5"), "{q}");
         assert!(q.contains("accept-language=de"), "{q}");
+        assert!(q.contains("addressdetails=1"), "{q}");
         assert!(
             q.contains("viewbox=9.750%2C51.250%2C10.250%2C50.750"),
             "{q}"
@@ -635,5 +682,68 @@ mod tests {
         );
         assert!(c.lese("alt").is_none());
         assert!(c.eintraege.is_empty());
+    }
+
+    #[test]
+    fn kurzadresse_aus_vollen_adressteilen() {
+        let e = serde_json::json!({
+            "address": {
+                "road": "Hauptstraße", "house_number": "12",
+                "postcode": "12345", "town": "Musterstadt", "county": "Landkreis X"
+            }
+        });
+        assert_eq!(
+            kurzadresse(&e).as_deref(),
+            Some("Hauptstraße 12, 12345 Musterstadt")
+        );
+    }
+
+    #[test]
+    fn kurzadresse_nur_ort() {
+        let e = serde_json::json!({ "address": { "village": "Musterstadt" } });
+        assert_eq!(kurzadresse(&e).as_deref(), Some("Musterstadt"));
+    }
+
+    #[test]
+    fn kurzadresse_strasse_ohne_ort_und_nummer() {
+        let e =
+            serde_json::json!({ "address": { "pedestrian": "Marktplatz", "postcode": "12345" } });
+        assert_eq!(kurzadresse(&e).as_deref(), Some("Marktplatz, 12345"));
+    }
+
+    #[test]
+    fn ohne_strasse_und_ort_keine_kurzadresse() {
+        assert_eq!(kurzadresse(&serde_json::json!({})), None);
+        let nur_plz =
+            serde_json::json!({ "address": { "postcode": "12345", "country": "Deutschland" } });
+        assert_eq!(kurzadresse(&nur_plz), None);
+    }
+
+    #[tokio::test]
+    async fn treffer_tragen_die_kurzadresse() {
+        let (base, _a, _h) = such_stub(serde_json::json!([{
+            "lat": "51.1604", "lon": "10.4514",
+            "display_name": "Hauptstraße 12, Musterstadt, Landkreis X, Niedersachsen, 12345, Deutschland",
+            "address": { "road": "Hauptstraße", "house_number": "12", "postcode": "12345", "city": "Musterstadt" }
+        }]))
+        .await;
+        let cache = Mutex::new(SuchCache::default());
+        let e = suche_mit(
+            &client(),
+            &bucket_voll(),
+            &cache,
+            &base,
+            "Hauptstraße 12",
+            None,
+            Duration::ZERO,
+        )
+        .await;
+        let SuchErgebnis::Ok(t) = e else {
+            panic!("{e:?}")
+        };
+        assert_eq!(
+            t[0].kurz.as_deref(),
+            Some("Hauptstraße 12, 12345 Musterstadt")
+        );
     }
 }

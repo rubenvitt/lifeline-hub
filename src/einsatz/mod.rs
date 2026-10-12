@@ -35,6 +35,10 @@ pub const EINSATZ_ROLLE_FUEHRUNG: &str = EinsatzRolle::Fuehrungspersonal.as_str(
 /// Einsatz-Rolle: nur lesend.
 pub const EINSATZ_ROLLE_BEOBACHTER: &str = EinsatzRolle::Beobachter.as_str();
 
+/// Einsatzort als Text (Adresse oder Freitext, LFH-1175), Zeichen nach dem Trimmen
+/// (`src/AGENTS.md`, Eingabegrenzen; Spiegel `frontend/src/api/eingabegrenzen.ts`).
+pub const EINSATZORT_MAX: usize = 500;
+
 /// Status eines aktiven Einsatzes.
 pub const STATUS_AKTIV: &str = EinsatzStatus::Aktiv.as_str();
 /// Status eines abgeschlossenen (read-only) Einsatzes.

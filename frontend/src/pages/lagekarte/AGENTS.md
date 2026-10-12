@@ -70,7 +70,8 @@ diese Zusage.
   `openspec/changes/archive/2026-10-01-lfh-638-lagekarte-ort-suche/design.md`): `MarkerSuche` erkennt
   eine Koordinate beim Tippen (`anzeige/koordinatenErkennung.ts`, dieselbe Quelle wie die
   Sprungpalette) und sucht eine Adresse **nur auf Enter** (`AdressGruppe`, Route `…/karte/ort-suche`;
-  kein Autovervollständigen, Nominatim-Regeln). Die Suchnadel (`suchnadelLayer.ts`) ist **keine
+  kein Autovervollständigen, Nominatim-Regeln; die Zustandstexte teilt sie mit dem Ortsfeld über
+  `anzeige/ortssuche.ts`). Die Suchnadel (`suchnadelLayer.ts`) ist **keine
   Klickebene** (keine Rolle in `ordneKlickebene`, Guard in `suchnadelLayer.test.ts`), liegt unter
   der Eigenposition, lebt nur im Seitenzustand und trägt Beschriftung und „Suchnadel entfernen“ im
   Fuß-Band `SuchnadelBand`. `?zentrum=` setzt die Nadel mit, `?ort=` belegt das Suchfeld vor.

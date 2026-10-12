@@ -1,4 +1,9 @@
-import type { APIRequestContext } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
+import {
+  kachelnBeantworten,
+  kartenConfigBeantworten,
+  vektorStilBeantworten,
+} from '../kartenFixture';
 import {
   apiAlsAdmin,
   anmelden,
@@ -17,7 +22,8 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep einsatzdaten`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   einsatzdaten.png          frontend/src/pages/EinsatzdatenPage.tsx
+ *   einsatzdaten.png          frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/anzeige/Kartenausschnitt.tsx
+ *   einsatzort.png            frontend/src/pages/EinsatzdatenPage.tsx (EinsatzortPaneel), frontend/src/anzeige/Ortsfeld.tsx
  *   fuehrungsstelle.png       frontend/src/pages/EinsatzdatenPage.tsx (FuehrungsstellePaneel)
  *   mitglied-stelle.png       frontend/src/pages/MitgliederAbschnitt.tsx (FuehrungsstelleModal)
  *
@@ -25,10 +31,51 @@ import {
  * Koordinate, Lagedaten, die eigene Führungsstelle samt Bezeichnung, Standort (LFH-1181) und zwei
  * einsatzlokalen Sprechgruppen und die
  * Führungsstelle der Einsatzleitung kommen über die API, jeweils nur, wenn sie noch fehlen (ein
- * Lauf aller Kapitel teilt eine Datenbank).
+ * Lauf aller Kapitel teilt eine Datenbank). Kartengrundlage und Ortssuche ohne Netz: Kacheln aus
+ * `e2e/kartenFixture.ts`, die Treffer der Ortssuche per `page.route` (kein Geocoder im Bildlauf).
  */
 
 const KAPITEL = 'einsatzdaten';
+const STIL_PFAD = '/api/karte/proxy/9/style.json';
+const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+
+/** Kartengrundlage des Kartenausschnitts aus der Fixture (docs/anwender/AGENTS.md, „Bilder“). */
+async function kartengrundlage(page: Page) {
+  await kartenConfigBeantworten(page, {
+    online_styles: [{ name: 'Kachel-Fixture', typ: 'vektor', url: STIL_PFAD }],
+  });
+  await vektorStilBeantworten(page, STIL_PFAD, {
+    id: 'fixture',
+    kachelVorlage: `${KACHEL_PRAEFIX}{z}/{x}/{y}.pbf`,
+    layer: 'strassen',
+  });
+  await kachelnBeantworten(page, KACHEL_PRAEFIX, 'strassen');
+}
+
+/** Treffer der Ortssuche, ohne Geocoder. */
+async function ortssuche(page: Page) {
+  await page.route(/\/api\/einsaetze\/\d+\/ort-suche\?/, (route) =>
+    route.fulfill({
+      json: {
+        zustand: 'ok',
+        treffer: [
+          {
+            lat: 50.9525,
+            lon: 10.2465,
+            name: 'Mühlbachstraße 12, Nord, Musterstadt, Landkreis Muster, 12345, Deutschland',
+            kurz: 'Mühlbachstraße 12, 12345 Musterstadt',
+          },
+          {
+            lat: 50.9318,
+            lon: 10.2711,
+            name: 'Mühlbachstraße, Süd, Musterstadt, Landkreis Muster, 12347, Deutschland',
+            kurz: 'Mühlbachstraße, 12347 Musterstadt',
+          },
+        ],
+      },
+    }),
+  );
+}
 
 interface Sprechgruppe {
   id: number;
@@ -102,6 +149,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
+    await kartengrundlage(page);
     const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
     await expect(page.getByRole('region', { name: 'Lagedaten' })).toBeVisible();
@@ -110,6 +158,23 @@ test.describe(KAPITEL, () => {
     // Die Ortszeile unter der Koordinate fragt den Server; ohne Netz bleibt sie leer.
     await expect(page.getByText('Ort wird ermittelt …')).toHaveCount(0);
     await fotografiere(page, KAPITEL, 'einsatzdaten');
+  });
+
+  test('Paneel „Einsatzort“ mit Treffern der Ortssuche', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await kartengrundlage(page);
+    await ortssuche(page);
+    await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
+    const paneel = page.getByRole('region', { name: 'Einsatzort' });
+    await expect(paneel.getByRole('img', { name: 'Karte: Einsatzort' })).toBeVisible();
+    await paneel.getByRole('button', { name: 'Adresse bearbeiten' }).click();
+    const feld = paneel.getByRole('textbox', { name: 'Adresse' });
+    await feld.fill('Mühlbachstraße');
+    await feld.press('Enter');
+    await expect(paneel.getByRole('list', { name: 'Treffer' })).toBeVisible();
+    await fotografiere(paneel, KAPITEL, 'einsatzort');
   });
 
   test('Paneel „Eigene Führungsstelle“', async ({ page }) => {

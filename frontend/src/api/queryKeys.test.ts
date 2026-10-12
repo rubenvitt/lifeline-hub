@@ -436,6 +436,12 @@ describe('einsatzKeys (Factory-Output)', () => {
       'uhs:5',
     ]);
     expect(einsatzKeys.ortSuche(1, 'Hauptstraße 12')).toEqual(['ort-suche', 1, 'Hauptstraße 12']);
+    // Ortsfeld (LFH-1175): eigener Prefix, die Lagekarten-Suche fragt eine andere Route.
+    expect(einsatzKeys.einsatzortSuche(1, 'Hauptstraße 12')).toEqual([
+      'einsatzort-suche',
+      1,
+      'Hauptstraße 12',
+    ]);
     expect(einsatzKeys.ortVorschau(1, null, null, null)).toEqual([
       'ort-vorschau',
       1,

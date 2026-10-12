@@ -34,6 +34,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("PRESSE_THEMA_MAX", presse::THEMA_MAX),
         ("PRESSE_ANTWORT_MAX", presse::ANTWORT_MAX),
         ("SCHADEN_ORT_MAX", schaden::ORT_MAX),
+        ("EINSATZORT_MAX", einsatz::EINSATZORT_MAX),
         ("SCHADEN_BESCHREIBUNG_MAX", schaden::BESCHREIBUNG_MAX),
         ("GEOMETRIE_STUETZPUNKTE_MAX", lage_zone::STUETZPUNKTE_MAX),
         ("SPRECHGRUPPE_BEDINGUNG_MAX", sprechgruppe::BEDINGUNG_MAX),

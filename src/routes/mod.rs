@@ -54,6 +54,7 @@ pub mod modul_zaehler;
 pub mod nachforderung;
 pub mod org_einstellungen;
 pub mod organisation;
+pub mod ort_suche;
 pub mod ort_vorschau;
 pub mod pegel;
 pub mod person_anhang;

@@ -724,6 +724,7 @@ mod tests {
                 stichwort: None,
                 einsatzart: None,
                 begonnen_at: None,
+                ort: Default::default(),
             },
             leit,
         )
