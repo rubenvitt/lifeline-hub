@@ -74,6 +74,14 @@ export function befehlDetailPfad(einsatzId: number, befehlId: number): string {
   return `${einsatzModulPfad(einsatzId, 'auftraege')}/befehle/${befehlId}`;
 }
 
+/**
+ * Druckansicht eines Einzelauftrags (LLH-1171): eine eigene Seite wie die Vollseite des Befehls, auf
+ * die das Detailpaneel führt. Unter `auftraege/` erbt sie Sperre und Sichtbarkeit des Moduls.
+ */
+export function auftragDruckPfad(einsatzId: number, auftragId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'auftraege')}/${auftragId}/druck`;
+}
+
 export function personDetailPfad(einsatzId: number, personId: number): string {
   return `${einsatzModulPfad(einsatzId, 'personen')}/${personId}`;
 }

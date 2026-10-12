@@ -24,12 +24,12 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 3. Daten, Pfad und Route (D2, D3)
 
-- [ ] 3.1 Key `einsatzKeys.auftragDruck(einsatzId, auftragId)` mit Prefix
+- [x] 3.1 Key `einsatzKeys.auftragDruck(einsatzId, auftragId)` mit Prefix
   `EINSATZ_KEYS.auftragDruck = 'einsatz-auftrag-druck'` in `api/queryKeys.ts`, eingetragen in
   `NICHT_LIVE_KEYS` samt Begründungszeile. Nachweis: die Guard-Tests von `queryKeys` (live oder
   nicht live, Offline-Lagebild) sind grün. Gegenprobe: ohne Eintrag in `NICHT_LIVE_KEYS` wird der
   Guard rot.
-- [ ] 3.2 `auftragDruckPfad(einsatzId, auftragId)` in `routing/deeplinks.ts` →
+- [x] 3.2 `auftragDruckPfad(einsatzId, auftragId)` in `routing/deeplinks.ts` →
   `/einsaetze/<id>/auftraege/<auftragId>/druck`. Route in `App.tsx` neben
   `auftraege/befehle/:befehlId`. Nachweis: Test in `routing/deeplinks.test.ts`. Ein Test belegt,
   dass `modulAusPfad` die Route dem Modul „Aufträge/Befehle“ zuordnet, sodass die Modulsperre
@@ -37,13 +37,13 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
 
 ## 4. Blatt und Druckansicht (D3, D5)
 
-- [ ] 4.1 `auftraege/AuftragDruckBlatt.tsx`: drei `ZeilenListe` mit `h3` „Auftrag“
+- [x] 4.1 `auftraege/AuftragDruckBlatt.tsx`: drei `ZeilenListe` mit `h3` „Auftrag“
   (`druckFelder`), „Quittung“ (je Empfänger Zeitpunkt oder „nicht quittiert“) und „Bearbeitung“
   (Phase, In Bearbeitung seit, Vollzogen am, Vollzugsvermerk, Abgenommen am, Aufgehoben am,
   Aufgehoben von, Grund; leere weg). Nachweis: `auftraege/AuftragDruckBlatt.test.tsx` deckt die
   Spec-Szenarien „Abgenommener Auftrag“, „Offener Auftrag ohne Quittung“ und „Aufgehobener
   Auftrag“ ab und prüft, dass jeder Titel mit der ersten Zeile in `data-lfh="titelblock"` steht.
-- [ ] 4.2 `pages/AuftragDruckPage.tsx` nach D3: Laden, 404 „Auftrag nicht gefunden“ mit
+- [x] 4.2 `pages/AuftragDruckPage.tsx` nach D3: Laden, 404 „Auftrag nicht gefunden“ mit
   Rückweg, 403 „Kein Zugriff“, Fehler mit „Erneut laden“, ungültige ID → `Navigate`. Bei Erfolg
   genau eine Druckwurzel mit `Druckkopf` (`dokumentart="Auftrag"`, Titel `#n`, Zeile „Stand“,
   `sichtbarkeit="immer"`, `ebene={2}`) und Blatt. Aktionen: „Zurück zu Aufträge/Befehle“ auf
@@ -51,7 +51,7 @@ Code. Pfade ohne Präfix sind relativ zu `frontend/src/`.
   während des Ladens. Nachweis: `pages/AuftragDruckPage.test.tsx` mit MSW belegt jeden Zustand,
   den Rückweg, die Sperre und den Schnappschuss (ein Live-Ereignis `auftrag` ändert das Blatt
   nicht, „Neu laden“ schon; Spec „Auftrag ändert sich bei offener Druckansicht“).
-- [ ] 4.3 Sprung „Druckansicht“ in `auftraege/AuftragDetail.tsx` (`DetailSprung` auf
+- [x] 4.3 Sprung „Druckansicht“ in `auftraege/AuftragDetail.tsx` (`DetailSprung` auf
   `auftragDruckPfad`), ohne Schreibrecht und in jeder Phase. Nachweis: Test in
   `auftraege/AuftragDetail.test.tsx` (Beobachter, aufgehobener Auftrag, Ziel der Adresse).
 - [ ] 4.4 `druck/AGENTS.md`: Abschnitt „Auftragsdruck“ (Route, nicht-live Key, Einstieg aus dem

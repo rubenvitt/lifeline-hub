@@ -86,6 +86,7 @@ import AufnahmePage from './pages/personen/AufnahmePage';
 import LageberichtePage from './pages/LageberichtePage';
 import LageberichtDetailPage from './pages/LageberichtDetailPage';
 import BefehlDetailPage from './pages/BefehlDetailPage';
+import AuftragDruckPage from './pages/AuftragDruckPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
@@ -366,6 +367,8 @@ export const appRouten = createRoutesFromElements(
           <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
           <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
           <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
+          {/* Druckansicht eines Auftrags (LLH-1171): das Detail führt hierher, Modul aus `auftraege/`. */}
+          <Route path="auftraege/:auftragId/druck" element={<AuftragDruckPage />} />
           <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
           {/* Statisches Segment vor der dynamischen Detail-Route (React Router rankt ohnehin statisch höher). */}
           <Route path="personen/aufnahme" element={<AufnahmePage />} />

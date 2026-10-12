@@ -1,9 +1,9 @@
-import { Alert, Typography } from 'antd';
+import { Alert, Flex, Typography } from 'antd';
 import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/types';
 import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
 import { DetailSprung } from '../components/ListeDetail';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { etbPfad } from '../routing/deeplinks';
+import { auftragDruckPfad, etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import {
@@ -74,7 +74,7 @@ export function auftragVerlauf(a: Auftrag): VerlaufEintrag[] {
  * Detail eines Einzelauftrags im Muster „Liste + Detailpaneel“ (Spec `auftraege-befehle`,
  * „Handlungen eines Auftrags im Detail“, „Lesefassung eines Auftrags im Detail“; design.md D3/D4).
  * Die Handlungen stehen direkt unter dem Text, damit sie auf dem Handschirm ohne Scrollen
- * erreichbar sind; Empfänger, Schema und Verlauf folgen.
+ * erreichbar sind; Empfänger, Schema und Verlauf folgen, am Ende der Sprung zur Druckansicht.
  */
 export default function AuftragDetail({
   auftrag: a,
@@ -188,6 +188,11 @@ export default function AuftragDetail({
           </DetailSprung>
         )}
       </div>
+      {/* Gedruckt wird auf der eigenen Druckansicht, wie der Befehl auf seiner Vollseite (LLH-1171,
+         Change `ianaw5k1-auftrag-drucken` D1); lesend, also ohne Schreibrecht und in jeder Phase. */}
+      <Flex style={abschnitt}>
+        <DetailSprung ziel={auftragDruckPfad(einsatzId, a.id)}>Druckansicht</DetailSprung>
+      </Flex>
     </Paneel>
   );
 }
