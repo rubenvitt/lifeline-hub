@@ -35,7 +35,15 @@ echo "==> 1/3 Alten Embed-Inhalt entfernen"
 find frontend/dist -mindepth 1 ! -name '.gitkeep' -delete
 
 echo "==> 2/3 Frontend bauen (frontend/dist)"
-( cd frontend && pnpm install --frozen-lockfile && pnpm run build )
+# HEAP-GRENZE FÜR `tsc -b`: der Typcheck braucht in der Spitze rund 2,3 GB Heap. Node legt die
+# Grenze nach dem Arbeitsspeicher fest, auf dem macOS-Runner (7 GB) liegt sie bei etwa 2 GB —
+# dort brach der Bau ab alpha.110 mit „JavaScript heap out of memory" ab, der Entwurf blieb
+# liegen. 4 GB lassen Luft und passen auf jeden Runner. Eine Grenze, keine Reservierung.
+# Ein von außen gesetztes NODE_OPTIONS bleibt erhalten (später genannte Werte gewinnen).
+(
+  export NODE_OPTIONS="--max-old-space-size=4096${NODE_OPTIONS:+ $NODE_OPTIONS}"
+  cd frontend && pnpm install --frozen-lockfile && pnpm run build
+)
 
 # Fail-closed: lieber hier abbrechen als eine Binary mit leerem Frontend ausliefern.
 if [ ! -f frontend/dist/index.html ]; then
