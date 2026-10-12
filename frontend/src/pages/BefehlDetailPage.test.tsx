@@ -1109,3 +1109,56 @@ describe('BefehlDetailPage — Nebenwege im Kopf (LFH-1079)', () => {
     expect(screen.queryByRole('button', { name: WEITERE })).toBeNull();
   });
 });
+
+/**
+ * LLH-1091: die Vorlage „Einzelauftrag (EA/ZMW)“ wird für neue Befehle nicht mehr angeboten
+ * (`nurBestand`), ein bestehender Befehl mit ihr bleibt aber voll bedienbar (Spec
+ * `befehlsvorlagen`). Die Detailseite liest die Abschnitte aus `VORLAGEN`; fiele die Vorlage dort
+ * heraus, würfe das Speichern und Editor wie Druck blieben leer.
+ */
+describe('BefehlDetailPage — Bestandsbefehl mit Einzelauftrag-Vorlage (LLH-1091)', () => {
+  const eaBefehl = {
+    ...befehl('entwurf'),
+    vorlage: 'befehl_ea_zmw',
+    abschnitte: [
+      { schluessel: 'einheit', text: 'Zweiter Zug' },
+      { schluessel: 'auftrag_ziel', text: 'Deich km 3 sichern' },
+      { schluessel: 'mittel', text: 'Sandsäcke' },
+      { schluessel: 'weg', text: 'über B 3' },
+    ],
+  };
+
+  it('zeigt die vier Abschnitte mit Text und speichert sie unter ihren Schlüsseln', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(eaBefehl as never);
+    vi.mocked(befehleApi.aktualisiereBefehl).mockReset();
+    vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(eaBefehl as never);
+    renderAt(7);
+    for (const [etikett, text] of [
+      ['Einheit', 'Zweiter Zug'],
+      ['Auftrag / Ziel', 'Deich km 3 sichern'],
+      ['Mittel', 'Sandsäcke'],
+      ['Weg', 'über B 3'],
+    ]) {
+      expect(await screen.findByLabelText(etikett)).toHaveValue(text);
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() => expect(befehleApi.aktualisiereBefehl).toHaveBeenCalled());
+    expect(vi.mocked(befehleApi.aktualisiereBefehl).mock.calls[0][2]).toEqual({
+      titel: 'Befehl 1',
+      abschnitte: eaBefehl.abschnitte,
+    });
+  });
+
+  it('zeigt einen freigegebenen Einzelauftrag-Befehl lesend mit allen Abschnitten', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...eaBefehl,
+      status: 'freigegeben',
+      etb_eintrag_id: 5,
+    } as never);
+    renderAt(7);
+    expect(await screen.findByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
+    for (const text of ['Zweiter Zug', 'Deich km 3 sichern', 'Sandsäcke', 'über B 3']) {
+      expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+    }
+  });
+});

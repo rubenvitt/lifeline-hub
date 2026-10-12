@@ -26,6 +26,15 @@ import {
   FUNKTION_TEXT_MAX,
 } from '../api/eingabegrenzen';
 import { grenzeText, istZuLang, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import {
+  FORM_LABEL,
+  KLAPPTEIL,
+  KLAPPTEIL_HEADER,
+  VALIDATION_NAME,
+  klappteilFuer,
+  type Klappteil,
+  type SchemaFeld,
+} from './auftragsschemaKern';
 
 const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
   { value: 'leitstelle', label: 'Leitstelle' },
@@ -109,7 +118,45 @@ function empfaengerAnzahlRegel({ getFieldValue }: Pick<FormInstance<FormWerte>, 
  * `maxLength` nur, wo antd nicht zählt); ein vorbelegter längerer Wert bleibt stehen (LFH-937).
  */
 const BEFEHLSFELD_ZAEHLER = zeichenGrenze(AUFTRAG_BEFEHLSFELD_MAX);
-const befehlsfeldRegel = (feld: string) => zeichenRegel(AUFTRAG_BEFEHLSFELD_MAX, feld);
+
+/** Zweck und Lage tragen oft mehr als eine Zeile, die übrigen Schemafelder sind kurz. */
+const MULTILINE: ReadonlySet<SchemaFeld> = new Set(['lage', 'absicht']);
+
+const PLACEHOLDER: Partial<Record<SchemaFeld, string>> = {
+  zeit: 'z. B. sofort, bis 14:00, nach Eintreffen',
+};
+
+/** Ein Freitextfeld des Befehlsschemas mit Etikett, Zähler und Längenregel aus dem Kern. */
+function SchemaFeldInput({ feld }: { feld: SchemaFeld }) {
+  const label = FORM_LABEL[feld];
+  return (
+    <Form.Item
+      name={feld}
+      rules={[zeichenRegel(AUFTRAG_BEFEHLSFELD_MAX, VALIDATION_NAME[feld])]}
+      label={label}
+    >
+      {MULTILINE.has(feld) ? (
+        <TextArea aria-label={label} rows={1} count={BEFEHLSFELD_ZAEHLER} />
+      ) : (
+        <Input aria-label={label} placeholder={PLACEHOLDER[feld]} count={BEFEHLSFELD_ZAEHLER} />
+      )}
+    </Form.Item>
+  );
+}
+
+/** Zwei Schemafelder nebeneinander, unter `sm` gestapelt. */
+function SchemaRow({ links, rechts }: { links: SchemaFeld; rechts: SchemaFeld }) {
+  return (
+    <Row gutter={16}>
+      <Col xs={24} sm={12}>
+        <SchemaFeldInput feld={links} />
+      </Col>
+      <Col xs={24} sm={12}>
+        <SchemaFeldInput feld={rechts} />
+      </Col>
+    </Row>
+  );
+}
 
 /**
  * Wiederholfelder einer Auftrags-Serie: gleiche Stelle, Dringlichkeit und Richtung; der
@@ -192,6 +239,8 @@ export default function AuftragFormular({
   // Kann das Formular einen Empfänger nicht abbilden, stehen alle Empfängerfelder gesperrt; ihre
   // Änderung fiele sonst still weg (der Patch schickt dann keine Empfänger).
   const empfaengerGesperrt = !!vorbelegung && !vorbelegung.empfaengerAenderbar;
+  // Offene Klappteile: gesteuert, damit ein Prüffehler seinen Klappteil öffnen kann (D4).
+  const [openKlappteile, setOpenKlappteile] = useState<Klappteil[]>([]);
 
   /*
    * Die Empfänger-Regeln zählen den externen Adressaten mit: ändern sich Richtung oder Bezeichnung,
@@ -235,6 +284,7 @@ export default function AuftragFormular({
       mittel: w.mittel?.trim() || undefined,
       verbindung: w.verbindung?.trim() || undefined,
       sicherheit: w.sicherheit?.trim() || undefined,
+      weg: w.weg?.trim() || undefined,
       prioritaet: w.prioritaet,
       richtung: w.richtung,
       frist_at: w.frist ? alsBackendZeit(w.frist) : undefined,
@@ -256,14 +306,26 @@ export default function AuftragFormular({
   ];
 
   /**
-   * Befehlsschema und Richtungs-Angaben hinter dem Collapse. `richtung` steuert zwar die
-   * Extern-Felder, geht aber mit, weil `intern` der Normalfall ist; die Extern-Felder gehen MIT,
-   * sonst stünden sie sichtbar unter einem eingeklappten Auslöser.
-   * Bewusst OHNE `forceRender`: nur so ist „im Ausgangszustand höchstens vier Felder" samt
-   * Gegenprobe („Aufklappen bringt die sieben") prüfbar.
+   * Klappteil „Ausführung“: Mittel, Ziel, Weg, Zeit nach FwDV 100 (LLH-1091). Beide Klappteile
+   * bewusst OHNE `forceRender`: nur so ist „im Ausgangszustand vier Felder“ samt Gegenprobe
+   * („Aufklappen bringt die Felder“) prüfbar.
    */
-  const schemaFelder = (
+  const ausfuehrungFelder = (
     <>
+      <SchemaRow links="mittel" rechts="ort" />
+      <SchemaRow links="weg" rechts="zeit" />
+    </>
+  );
+
+  /**
+   * Klappteil „Weitere Angaben“: Lage, Absicht, Meldewege, Sicherheit, dazu Richtung und
+   * Erteilzeit. `richtung` steuert die Extern-Felder, geht aber mit, weil `intern` der Normalfall
+   * ist; die Extern-Felder gehen MIT, sonst stünden sie sichtbar unter einem eingeklappten Auslöser.
+   */
+  const weitereFelder = (
+    <>
+      <SchemaRow links="lage" rechts="absicht" />
+      <SchemaRow links="verbindung" rechts="sicherheit" />
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="richtung" label="Richtung">
@@ -312,61 +374,14 @@ export default function AuftragFormular({
           </Col>
         </Row>
       )}
-      <Row gutter={16}>
-        <Col xs={24} sm={12}>
-          <Form.Item name="absicht" rules={[befehlsfeldRegel('Absicht')]} label="Absicht / Ziel">
-            <TextArea aria-label="Absicht / Ziel" rows={1} count={BEFEHLSFELD_ZAEHLER} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12}>
-          <Form.Item name="lage" rules={[befehlsfeldRegel('Lage')]} label="Lage">
-            <TextArea aria-label="Lage" rows={1} count={BEFEHLSFELD_ZAEHLER} />
-          </Form.Item>
-        </Col>
-      </Row>
-      <Row gutter={16}>
-        <Col xs={24} sm={8}>
-          <Form.Item name="ort" rules={[befehlsfeldRegel('Ort')]} label="Ort / Wo">
-            <Input aria-label="Ort / Wo" count={BEFEHLSFELD_ZAEHLER} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Form.Item name="zeit" rules={[befehlsfeldRegel('Zeit')]} label="Zeit / Wann">
-            <Input
-              aria-label="Zeit / Wann"
-              placeholder="z. B. sofort, bis 14:00, nach Eintreffen"
-              count={BEFEHLSFELD_ZAEHLER}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Form.Item name="mittel" rules={[befehlsfeldRegel('Mittel')]} label="Mittel / Womit">
-            <Input aria-label="Mittel / Womit" count={BEFEHLSFELD_ZAEHLER} />
-          </Form.Item>
-        </Col>
-      </Row>
-      <Row gutter={16}>
-        <Col xs={24} sm={12}>
-          <Form.Item
-            name="verbindung"
-            rules={[befehlsfeldRegel('Verbindung')]}
-            label="Verbindung / Meldewege"
-          >
-            <Input aria-label="Verbindung / Meldewege" count={BEFEHLSFELD_ZAEHLER} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12}>
-          <Form.Item
-            name="sicherheit"
-            rules={[befehlsfeldRegel('Sicherheit')]}
-            label="Sicherheit / Besonderes"
-          >
-            <Input aria-label="Sicherheit / Besonderes" count={BEFEHLSFELD_ZAEHLER} />
-          </Form.Item>
-        </Col>
-      </Row>
     </>
   );
+
+  /** Ein Fehler hinter einem geschlossenen Kopf bliebe unsichtbar und sperrte das Senden (D4). */
+  const openKlappteileWithErrors = (fehlerFelder: string[]) => {
+    const affected = fehlerFelder.map(klappteilFuer).filter((k): k is Klappteil => k !== null);
+    if (affected.length > 0) setOpenKlappteile((prev) => [...new Set([...prev, ...affected])]);
+  };
 
   const formular = (
     <ErfassungsFormular<FormWerte>
@@ -384,6 +399,7 @@ export default function AuftragFormular({
           mittel: '',
           verbindung: '',
           sicherheit: '',
+          weg: '',
           prioritaet: 'normal',
           richtung: 'intern',
           frist: null,
@@ -401,9 +417,39 @@ export default function AuftragFormular({
       erfassenText={berichtigen ? 'Berichtigung speichern' : 'Auftrag erteilen'}
       serie={serie && !berichtigen}
       uebernahme={berichtigen ? undefined : UEBERNAHME}
+      onPruefungGescheitert={openKlappteileWithErrors}
     >
       {zitat}
-      {/* „Auftrag / Was" bleibt oben in voller Breite. */}
+      {/* Reihenfolge der FwDV 100 (LLH-1091): Einheit vor Auftrag. Der Empfänger ist das erste Feld
+          und bekommt den Fokus; EIN Feld für beide Empfängersorten (Begründung an
+          `FormWerte.empfaenger`). Das Komma bleibt Trennzeichen, damit „S3, Fachberater" zwei
+          Empfänger ergibt. */}
+      <Form.Item
+        name="empfaenger"
+        label="Empfänger"
+        // Ein Empfänger, den das Formular nicht abbildet (Person, Fahrzeug), sperrt das Feld;
+        // der Grund steht sichtbar daran (LFH-1078).
+        extra={empfaengerGesperrt ? 'Empfänger hier nicht änderbar' : undefined}
+        rules={[
+          (f) => pflichtEmpfaengerRegel(funktionen.katalog, f),
+          empfaengerRegel(funktionen.katalog),
+          empfaengerAnzahlRegel,
+        ]}
+      >
+        <Select
+          mode="tags"
+          aria-label="Empfänger"
+          disabled={empfaengerGesperrt}
+          // Grenze des Servers vor dem Entdoppeln (LFH-937); kappt auch eine eingefügte Liste.
+          maxCount={AUFTRAG_EMPFAENGER_MAX}
+          options={zielOptionen}
+          placeholder="Abschnitt, Einheit oder Funktion (z. B. S3)"
+          allowClear
+          tokenSeparators={[',']}
+          onSearch={setSuche}
+          onBlur={() => setSuche('')}
+        />
+      </Form.Item>
       <Form.Item
         name="text"
         label="Auftrag / Was"
@@ -418,36 +464,6 @@ export default function AuftragFormular({
       </Form.Item>
       <Row gutter={16}>
         <Col xs={24} sm={12}>
-          {/* EIN Feld für beide Empfängersorten (Begründung an `FormWerte.empfaenger`). Das Komma bleibt
-             Trennzeichen, damit „S3, Fachberater" zwei Empfänger ergibt. */}
-          <Form.Item
-            name="empfaenger"
-            label="Empfänger"
-            // Ein Empfänger, den das Formular nicht abbildet (Person, Fahrzeug), sperrt das Feld;
-            // der Grund steht sichtbar daran (LFH-1078).
-            extra={empfaengerGesperrt ? 'Empfänger hier nicht änderbar' : undefined}
-            rules={[
-              (f) => pflichtEmpfaengerRegel(funktionen.katalog, f),
-              empfaengerRegel(funktionen.katalog),
-              empfaengerAnzahlRegel,
-            ]}
-          >
-            <Select
-              mode="tags"
-              aria-label="Empfänger"
-              disabled={empfaengerGesperrt}
-              // Grenze des Servers vor dem Entdoppeln (LFH-937); kappt auch eine eingefügte Liste.
-              maxCount={AUFTRAG_EMPFAENGER_MAX}
-              options={zielOptionen}
-              placeholder="Abschnitt, Einheit oder Funktion (z. B. S3)"
-              allowClear
-              tokenSeparators={[',']}
-              onSearch={setSuche}
-              onBlur={() => setSuche('')}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={6}>
           <Form.Item name="prioritaet" label="Priorität">
             <Select<AuftragPrioritaet>
               aria-label="Priorität"
@@ -459,7 +475,7 @@ export default function AuftragFormular({
             />
           </Form.Item>
         </Col>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={12}>
           <Form.Item name="frist" label="Frist (Quittung/Vollzug)">
             <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
           </Form.Item>
@@ -468,11 +484,23 @@ export default function AuftragFormular({
       <Collapse
         ghost
         style={{ marginInline: -8, marginBottom: 8 }}
+        activeKey={openKlappteile}
+        onChange={(k) => setOpenKlappteile((Array.isArray(k) ? k : [k]) as Klappteil[])}
         items={[
           {
-            key: 'schema',
-            label: 'Befehlsschema und Richtung (optional)',
-            children: schemaFelder,
+            key: KLAPPTEIL.ausfuehrung,
+            label: KLAPPTEIL_HEADER.ausfuehrung,
+            children: ausfuehrungFelder,
+          },
+          {
+            key: KLAPPTEIL.weitere,
+            // Die Richtung geht mit „Werte behalten“ in den nächsten Auftrag; zugeklappt nennt der
+            // Kopf die Abweichung von der Vorgabe „Intern“ (Erfassungs-Norm, `frontend/AGENTS.md`).
+            label:
+              richtung === 'extern'
+                ? `${KLAPPTEIL_HEADER.weitere} · Richtung: Extern`
+                : KLAPPTEIL_HEADER.weitere,
+            children: weitereFelder,
           },
         ]}
       />

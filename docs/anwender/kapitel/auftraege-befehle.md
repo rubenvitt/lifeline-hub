@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/BefehlListe.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs]
+quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/BefehlListe.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs]
 ---
 
 ## Überblick
@@ -28,18 +28,21 @@ Entwerfen und Freigeben dürfen Einsatzleitung und Führungspersonal, solange de
 Für Einsatzleitung und Führungspersonal:
 
 1. Im Einsatz „Aufträge/Befehle“ öffnen, Reiter „Einzelaufträge“, und „Auftrag erteilen“ wählen.
-2. Unter „Auftrag / Was“ den Auftrag formulieren.
+2. Unter „Empfänger“ die Einheit nennen: einen Abschnitt, eine Einheit oder eine Funktion (zum
+   Beispiel S3) wählen oder eintippen. Ein Komma trennt mehrere Empfänger.
 
-   ![Formular „Neuer Auftrag“ mit Auftragstext, Empfänger „Logistiktrupp“, Priorität „Dringend“ und dem leeren Feld „Frist (Quittung/Vollzug)“](../bilder/auftraege-befehle/auftrag-erteilen.png)
+   ![Formular „Neuer Auftrag“ mit Empfänger „Logistiktrupp“, Auftragstext, Priorität „Dringend“, dem leeren Feld „Frist (Quittung/Vollzug)“ und den zugeklappten Teilen „Ausführung: Mittel, Ziel, Weg, Zeit“ und „Weitere Angaben“](../bilder/auftraege-befehle/auftrag-erteilen.png)
 
-3. Unter „Empfänger“ einen Abschnitt, eine Einheit oder eine Funktion (zum Beispiel S3) wählen
-   oder eintippen. Ein Komma trennt mehrere Empfänger.
+3. Unter „Auftrag / Was“ den Auftrag formulieren.
 4. „Priorität“ und bei Bedarf „Frist (Quittung/Vollzug)“ setzen.
-5. Bei Bedarf „Befehlsschema und Richtung (optional)“ aufklappen: „Richtung“ (Intern oder
-   Extern), „Erteilt am (optional)“, bei extern „Externe Stelle“ und „Bezeichnung der Stelle“,
-   dazu die Felder „Absicht / Ziel“, „Lage“, „Ort / Wo“, „Zeit / Wann“, „Mittel / Womit“,
-   „Verbindung / Meldewege“ und „Sicherheit / Besonderes“.
-6. „Auftrag erteilen“ wählen.
+5. Bei Bedarf „Ausführung: Mittel, Ziel, Weg, Zeit“ aufklappen und „Mittel / Womit“, „Ziel / Ort“,
+   „Weg“ und „Zeit / Wann“ eintragen.
+6. Bei Bedarf „Weitere Angaben“ aufklappen: „Lage“, „Absicht“, „Verbindung / Meldewege“,
+   „Sicherheit / Besonderes“, „Richtung“ (Intern oder Extern) und „Erteilt am (optional)“, bei
+   extern dazu „Externe Stelle“ und „Bezeichnung der Stelle“. Steht die Richtung auf extern,
+   heißt der Teil auch zugeklappt „Weitere Angaben · Richtung: Extern“.
+7. „Auftrag erteilen“ wählen. Ist ein Feld in einem zugeklappten Teil zu lang, klappt der Teil auf
+   und nennt den Grund am Feld.
 
 „Speichern und nächste“ (Strg+Enter, am Mac ⌘+Enter) erteilt den Auftrag und leert das Formular
 für den nächsten. Mit dem Häkchen „Werte behalten“ bleiben Empfänger, Priorität und Richtung
@@ -58,7 +61,8 @@ stehen.
    sechs Sekunden lang „Rückgängig“.
 
 Offene Aufträge stehen in den Gruppen „Überfällig“, „Heute fällig“, „Später“ und „Ohne Frist“.
-„Auftragsdetails (Schema)“ an der Karte klappt die Felder des Befehlsschemas auf.
+„Auftragsdetails (Schema)“ an der Karte klappt die Felder des Befehlsschemas auf, in derselben
+Reihenfolge wie im Formular; leere Felder fehlen.
 
 ### Einen Auftrag berichtigen
 
@@ -171,6 +175,13 @@ Aufträge lassen sich auch direkt aus einem ETB-Eintrag oder einer Meldung ertei
 [Einsatztagebuch](einsatztagebuch.md) und [Meldungen](meldungen.md)). Ein Auftrag aus einem
 ETB-Eintrag führt an seiner Karte mit „↗ ETB-Eintrag“ zu diesem Eintrag zurück.
 
+### Einzelauftrag oder Einsatzbefehl
+
+Ein Einzelauftrag wird als Auftrag erteilt: nur der Auftrag kennt Empfänger, Quittung und Vollzug.
+Das Schema „Einzelauftrag (EA/ZMW)“ bietet „Neuer Befehlsentwurf“ deshalb nicht mehr an.
+Befehle, die schon mit diesem Schema angelegt sind, lassen sich weiter öffnen, bearbeiten,
+freigeben, fortschreiben und drucken.
+
 ### Befehle im Einsatztagebuch
 
 Mit der Freigabe schreibt der Befehl seinen vollständigen Text als „Anordnung“ ins ETB. Danach
@@ -182,4 +193,8 @@ eigener Freigabe.
 Die Befehlsschemata der App sind „Befehl LAD (vereinfacht)“ mit Lage, Auftrag und Durchführung,
 „Befehl LADEF (erweitert, SKK)“ mit zusätzlich Einsatzunterstützung sowie Führung und
 Kommunikation, „Befehl SCHNEE“ mit Schadenlage, Nachbarn, Entschluss / Absicht, Einzelauftrag
-und eigenem Standort und „Einzelauftrag (EA/ZMW)“ mit Einheit, Auftrag / Ziel, Mittel und Weg.
+und eigenem Standort sowie, nur noch an bestehenden Befehlen, „Einzelauftrag (EA/ZMW)“ mit
+Einheit, Auftrag / Ziel, Mittel und Weg.
+
+Das Auftragsformular folgt dem Einzelauftrag der FwDV 100: Einheit – Auftrag – Mittel – Ziel –
+Weg, ergänzt um die Zeit. In dieser Reihenfolge wird ein Auftrag im Funk durchgegeben.

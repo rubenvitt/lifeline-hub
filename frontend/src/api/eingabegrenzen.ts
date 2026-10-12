@@ -14,7 +14,7 @@ export const ETB_INHALT_MAX = 20_000;
 export const ETB_PARTEI_MAX = 500;
 /** Auftragstext. */
 export const AUFTRAG_TEXT_MAX = 10_000;
-/** Jedes Feld des Befehlsschemas (absicht, lage, ort, zeit, mittel, verbindung, sicherheit). */
+/** Jedes Feld des Befehlsschemas (absicht, lage, ort, zeit, mittel, verbindung, sicherheit, weg). */
 export const AUFTRAG_BEFEHLSFELD_MAX = 2_000;
 /** Empfänger eines Auftrags im Request (vor dem Entdoppeln). */
 export const AUFTRAG_EMPFAENGER_MAX = 50;

@@ -10,11 +10,18 @@ interface VorlageDef {
   schluessel: BefehlVorlageKey;
   label: string;
   abschnitte: AbschnittDef[];
+  /**
+   * Nur noch für bestehende Befehle: lesen, bearbeiten, fortschreiben, filtern und drucken bleibt,
+   * ein neuer Befehlsentwurf bietet die Vorlage nicht mehr an (LLH-1091, Spec `befehlsvorlagen`).
+   * Rein Frontend; der Eintrag bleibt in dieser Liste, weil Detailseite und Druck ihn brauchen.
+   */
+  nurBestand?: true;
 }
 
 /**
  * Befehlsschemata — MUSS synchron zu src/befehl/mod.rs::VORLAGEN bleiben
- * (Schlüssel + Reihenfolge; Labels/Hilfetexte dürfen kosmetisch abweichen).
+ * (Schlüssel + Reihenfolge; Labels/Hilfetexte dürfen kosmetisch abweichen, `nurBestand` ist
+ * reine Frontend-Angabe).
  */
 export const VORLAGEN: VorlageDef[] = [
   {
@@ -69,6 +76,8 @@ export const VORLAGEN: VorlageDef[] = [
   {
     schluessel: 'befehl_ea_zmw',
     label: 'Einzelauftrag (EA/ZMW)',
+    // Ein Einzelauftrag braucht Empfänger, Quittung und Vollzug: das trägt der Auftrag (LLH-1091).
+    nurBestand: true,
     abschnitte: [
       { schluessel: 'einheit', label: 'Einheit' },
       { schluessel: 'auftrag_ziel', label: 'Auftrag / Ziel' },
@@ -81,3 +90,6 @@ export const VORLAGEN: VorlageDef[] = [
 export function vorlage(schluessel: BefehlVorlageKey): VorlageDef | undefined {
   return VORLAGEN.find((v) => v.schluessel === schluessel);
 }
+
+/** Vorlagen, die ein neuer Befehlsentwurf anbietet (ohne `nurBestand`). */
+export const NEW_SELECTABLE: VorlageDef[] = VORLAGEN.filter((v) => !v.nurBestand);

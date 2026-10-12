@@ -18,6 +18,7 @@ const SCHEMAFELDER: readonly AuftragSchemafeld[] = [
   'mittel',
   'verbindung',
   'sicherheit',
+  'weg',
 ];
 
 /**

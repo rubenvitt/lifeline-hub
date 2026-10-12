@@ -13,21 +13,19 @@ import { KennungsLink } from '../components/kennungsLink';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
 
 const { Text } = Typography;
 
 /** Höchstzahl quittierter Empfänger-Chips; der Rest steht als „+n ✓". */
 const QUITTIERT_CHIP_GRENZE = 3;
 
-/** Befehlsschema-Felder für die Read-back-Detailansicht (Reihenfolge = Anzeige). */
+/**
+ * Befehlsschema-Felder für die Read-back-Detailansicht: Folge und Etiketten aus dem Kern, den das
+ * Formular teilt (FwDV 100, LLH-1091), danach die Erteilzeit.
+ */
 const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
-  { key: 'absicht', label: 'Absicht/Ziel' },
-  { key: 'lage', label: 'Lage' },
-  { key: 'ort', label: 'Ort' },
-  { key: 'zeit', label: 'Zeit' },
-  { key: 'mittel', label: 'Mittel' },
-  { key: 'verbindung', label: 'Verbindung/Meldewege' },
-  { key: 'sicherheit', label: 'Sicherheit/Besonderes' },
+  ...READ_ORDER.map((key) => ({ key, label: READ_LABEL[key] })),
   { key: 'erteilt_at', label: 'Erteilt am', zeit: true },
 ];
 

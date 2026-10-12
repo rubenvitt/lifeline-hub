@@ -185,3 +185,70 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     .await;
     assert!(!detail["abschnitte"].as_array().unwrap().is_empty());
 }
+
+/// LLH-1091: die Vorlage „Einzelauftrag (EA/ZMW)“ bietet das Frontend für neue Befehle nicht mehr
+/// an; ein bestehender Befehl mit ihr bleibt bedienbar (Spec `befehlsvorlagen`). Der Server nimmt
+/// sie weiter an, gibt frei und schreibt mit derselben Vorlage und denselben Abschnitten fort.
+#[tokio::test]
+async fn einzelauftrag_befehl_bleibt_freigebbar_und_fortschreibbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, b) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &admin,
+        Some(r#"{"vorlage":"befehl_ea_zmw","titel":"EA 2. Zug"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{b:?}");
+    let bid = b["id"].as_i64().unwrap();
+    let u = format!("/api/einsaetze/{einsatz}/befehle/{bid}");
+
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(
+            r#"{"abschnitte":[{"schluessel":"einheit","text":"2. Zug"},{"schluessel":"auftrag_ziel","text":"Deich km 3"},{"schluessel":"mittel","text":"Sandsäcke"},{"schluessel":"weg","text":"über B 3"}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, frei) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{frei:?}");
+
+    let (s, fort) = anfrage(
+        &app,
+        "POST",
+        &format!("{u}/fortschreiben"),
+        &admin,
+        Some(r#"{}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{fort:?}");
+    assert_eq!(fort["vorlage"], "befehl_ea_zmw");
+    assert_eq!(fort["version"], 2);
+    let abschnitte: Vec<(&str, &str)> = fort["abschnitte"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| {
+            (
+                a["schluessel"].as_str().unwrap(),
+                a["text"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        abschnitte,
+        [
+            ("einheit", "2. Zug"),
+            ("auftrag_ziel", "Deich km 3"),
+            ("mittel", "Sandsäcke"),
+            ("weg", "über B 3"),
+        ]
+    );
+}

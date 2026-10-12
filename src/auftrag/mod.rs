@@ -217,6 +217,8 @@ pub struct AuftragAnzeige {
     pub mittel: Option<String>,
     pub verbindung: Option<String>,
     pub sicherheit: Option<String>,
+    /// Weg der Einheit (FwDV 100, LLH-1091).
+    pub weg: Option<String>,
     #[sqlx(try_from = "String")]
     pub prioritaet: Prioritaet,
     /// Richtung intern/extern (LFH-87).

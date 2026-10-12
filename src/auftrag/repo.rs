@@ -38,6 +38,7 @@ pub struct AuftragDaten<'a> {
     pub mittel: Option<&'a str>,
     pub verbindung: Option<&'a str>,
     pub sicherheit: Option<&'a str>,
+    pub weg: Option<&'a str>,
     pub prioritaet: &'a str,
     pub richtung: &'a str,
     pub frist_at: Option<&'a str>,
@@ -113,7 +114,7 @@ macro_rules! vollzug_join_sql {
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
 const ANZEIGE_SELECT: &str = concat!(
     "SELECT a.id, a.einsatz_id, a.lfd_nr, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
-            a.verbindung, a.sicherheit, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
+            a.verbindung, a.sicherheit, a.weg, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
             a.vollzugsmeldung, a.abgenommen_at, a.abgenommen_von_id, a.etb_anordnung_id, \
             a.quell_etb_eintrag_id, \
             a.erstellt_von_id, a.erstellt_at, \
@@ -588,8 +589,8 @@ pub async fn anlegen_tx(
     let auftrag_id: i64 = sqlx::query_scalar(
         "INSERT INTO auftrag \
            (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
-            prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+            weg, prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM auftrag WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -603,6 +604,7 @@ pub async fn anlegen_tx(
     .bind(daten.mittel)
     .bind(daten.verbindung)
     .bind(daten.sicherheit)
+    .bind(daten.weg)
     .bind(daten.prioritaet)
     .bind(daten.richtung)
     .bind(daten.frist_at)
@@ -1194,10 +1196,11 @@ struct BerichtigungsStand {
     mittel: Option<String>,
     verbindung: Option<String>,
     sicherheit: Option<String>,
+    weg: Option<String>,
 }
 
 impl BerichtigungsStand {
-    fn schema(&self) -> [&Option<String>; 7] {
+    fn schema(&self) -> [&Option<String>; 8] {
         [
             &self.absicht,
             &self.lage,
@@ -1206,6 +1209,7 @@ impl BerichtigungsStand {
             &self.mittel,
             &self.verbindung,
             &self.sicherheit,
+            &self.weg,
         ]
     }
 }
@@ -1253,7 +1257,7 @@ pub async fn berichtigen_tx(
     }
     let alt: BerichtigungsStand = sqlx::query_as(
         "SELECT auftrag_text, prioritaet, frist_at, absicht, lage, ort, zeit, mittel, verbindung, \
-                sicherheit FROM auftrag WHERE id = ?",
+                sicherheit, weg FROM auftrag WHERE id = ?",
     )
     .bind(auftrag_id)
     .fetch_one(&mut *conn)
@@ -1335,7 +1339,7 @@ pub async fn berichtigen_tx(
     let frist_wert = frist.clone().unwrap_or(alt.frist_at.clone());
     sqlx::query(
         "UPDATE auftrag SET auftrag_text = ?, prioritaet = ?, frist_at = ?, absicht = ?, lage = ?, \
-           ort = ?, zeit = ?, mittel = ?, verbindung = ?, sicherheit = ? WHERE id = ?",
+           ort = ?, zeit = ?, mittel = ?, verbindung = ?, sicherheit = ?, weg = ? WHERE id = ?",
     )
     .bind(&text)
     .bind(&prioritaet)
@@ -1347,6 +1351,7 @@ pub async fn berichtigen_tx(
     .bind(&schema[4])
     .bind(&schema[5])
     .bind(&schema[6])
+    .bind(&schema[7])
     .bind(auftrag_id)
     .execute(&mut *conn)
     .await?;
@@ -1450,6 +1455,7 @@ mod tests {
             mittel: None,
             verbindung: None,
             sicherheit: None,
+            weg: None,
             prioritaet: super::super::PRIO_NORMAL,
             richtung: super::super::RICHTUNG_INTERN,
             frist_at: frist,

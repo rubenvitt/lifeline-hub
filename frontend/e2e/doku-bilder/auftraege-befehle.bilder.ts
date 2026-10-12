@@ -9,7 +9,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * (`pnpm doku:bilder --grep auftraege-befehle`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   auftraege-liste.png    frontend/src/pages/AuftraegePage.tsx, frontend/src/auftraege/AuftraegeListe.tsx,
  *                          frontend/src/auftraege/AuftragKarte.tsx
- *   auftrag-erteilen.png   frontend/src/auftraege/AuftragFormular.tsx
+ *   auftrag-erteilen.png   frontend/src/auftraege/AuftragFormular.tsx,
+ *                          frontend/src/auftraege/auftragsschemaKern.ts
  *   auftrag-aufheben.png   frontend/src/auftraege/AuftragAufhebenDialog.tsx
  *   befehl-entwurf.png     frontend/src/pages/BefehlDetailPage.tsx
  */
@@ -39,12 +40,13 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/auftraege`);
     await page.getByRole('button', { name: 'Auftrag erteilen' }).click();
     const paneel = page.getByRole('region', { name: 'Neuer Auftrag' });
-    await paneel
-      .getByLabel('Auftrag / Was')
-      .fill('Sandsäcke an der Unterführung Lindenstraße auslegen, Keller Nr. 6 sichern.');
+    // Reihenfolge der FwDV 100 (LLH-1091): erst die Einheit, dann der Auftrag.
     const empfaenger = paneel.getByRole('combobox', { name: 'Empfänger' });
     await empfaenger.fill('Logistiktrupp');
     await empfaenger.press('Enter');
+    await paneel
+      .getByLabel('Auftrag / Was')
+      .fill('Sandsäcke an der Unterführung Lindenstraße auslegen, Keller Nr. 6 sichern.');
     await waehleIn(paneel.getByRole('combobox', { name: 'Priorität' }), 'Dringend');
     await fokusWeg(page);
     await expect(paneel.getByTitle('Logistiktrupp')).toBeVisible();

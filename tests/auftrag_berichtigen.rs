@@ -416,3 +416,28 @@ async fn liste_traegt_berichtigbar() {
     .await;
     assert_eq!(liste[0]["berichtigbar"], true);
 }
+
+/// LLH-1091: der Weg ist ein Feld des Befehlsschemas wie die übrigen; er lässt sich berichtigen,
+/// steht als „Weg“ in der Anordnung und hat dieselbe Grenze.
+#[tokio::test]
+async fn weg_berichtigen_nennt_ihn_im_etb() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let aid = standard(&app, &admin, e).await["id"].as_i64().unwrap();
+
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "weg": " über B 3 " })).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["weg"], "über B 3");
+    assert_eq!(j["mittel"], "LKW", "nicht gesendetes Feld bleibt");
+    assert!(inhalte(&anordnungen(&app, &admin, e).await)
+        .contains(&"Auftrag #1 geändert: Weg.".to_string()));
+
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "weg": "x".repeat(2_001) })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j}");
+    assert!(j["error"].as_str().unwrap().starts_with("Weg"), "{j}");
+
+    let (s, j) = patch(&app, &admin, e, aid, json!({ "weg": null })).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert!(j["weg"].is_null());
+}

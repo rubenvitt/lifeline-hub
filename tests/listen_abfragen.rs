@@ -156,6 +156,7 @@ async fn einsatz_mit_auftraegen(pool: &SqlitePool, benutzer: i64, n: usize) -> i
                 mittel: None,
                 verbindung: None,
                 sicherheit: None,
+                weg: None,
                 prioritaet: "normal",
                 richtung: "intern",
                 frist_at: None,

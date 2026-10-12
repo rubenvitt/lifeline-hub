@@ -825,6 +825,8 @@ export interface NeuerAuftrag {
   mittel?: string;
   verbindung?: string;
   sicherheit?: string;
+  /** Weg der Einheit (FwDV 100: Einheit – Auftrag – Mittel – Ziel – Weg, LLH-1091). */
+  weg?: string;
   prioritaet?: AuftragPrioritaet;
   richtung?: Richtung;
   /** 'YYYY-MM-DD HH:MM' (UTC). */
@@ -836,7 +838,7 @@ export interface NeuerAuftrag {
 
 /** Die Felder des Befehlsschemas, die eine Berichtigung einzeln leeren kann. */
 export type AuftragSchemafeld =
-  'absicht' | 'lage' | 'ort' | 'zeit' | 'mittel' | 'verbindung' | 'sicherheit';
+  'absicht' | 'lage' | 'ort' | 'zeit' | 'mittel' | 'verbindung' | 'sicherheit' | 'weg';
 
 /**
  * Kein Backend-Schema: Teil-Patch der Berichtigung (LLH-1098), FE-lokal. Ein fehlendes Feld bleibt,

@@ -27,6 +27,7 @@ export interface FormWerte {
   mittel: string;
   verbindung: string;
   sicherheit: string;
+  weg: string;
   prioritaet: AuftragPrioritaet;
   richtung: Richtung;
   frist: dayjs.Dayjs | null;

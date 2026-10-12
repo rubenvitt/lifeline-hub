@@ -275,7 +275,7 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
 
   async function waehleSchema(nutzer: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
     await nutzer.click(within(dialog).getByRole('combobox'));
-    const option = (await screen.findAllByText('Einzelauftrag (EA/ZMW)')).find((el) =>
+    const option = (await screen.findAllByText('Befehl SCHNEE')).find((el) =>
       el.closest('.ant-select-item-option'),
     );
     await nutzer.click(option!);
@@ -300,9 +300,26 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
       expect(within(dialog).getByLabelText('Titel')).toHaveValue('');
       // Das Schema steht wieder auf der Vorgabe, nicht auf dem verworfenen Wert.
       expect(within(dialog).getByText('Befehl LAD (vereinfacht)')).toBeInTheDocument();
-      expect(within(dialog).queryByText('Einzelauftrag (EA/ZMW)')).toBeNull();
+      expect(within(dialog).queryByText('Befehl SCHNEE')).toBeNull();
     },
   );
+
+  /** LLH-1091: ein Einzelauftrag ist ein Auftrag mit Quittung und Vollzug, kein Befehl. */
+  it('bietet den Einzelauftrag (EA/ZMW) nicht als Schema eines neuen Befehls an', async () => {
+    const nutzer = userEvent.setup();
+    renderListe();
+    const dialog = await oeffneDialog(nutzer);
+    await nutzer.click(within(dialog).getByRole('combobox'));
+    await screen.findAllByText('Befehl SCHNEE');
+    const optionen = [...document.querySelectorAll('.ant-select-item-option')].map(
+      (o) => o.textContent,
+    );
+    expect(optionen).toEqual([
+      'Befehl LAD (vereinfacht)',
+      'Befehl LADEF (erweitert, SKK)',
+      'Befehl SCHNEE',
+    ]);
+  });
 
   it('liegt auf der Erfassungshülle: Knopf im Formular, keine Fußzeile, Fokus im ersten Feld', async () => {
     const nutzer = userEvent.setup();
